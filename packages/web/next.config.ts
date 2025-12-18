@@ -175,7 +175,11 @@ const nextConfig: NextConfig = {
   typedRoutes: true,
   productionBrowserSourceMaps: false,
   eslint: {
-    dirs: ['app', 'components', 'lib', 'hooks', 'types']
+    dirs: ['app', 'components', 'lib', 'hooks', 'types'],
+    ignoreDuringBuilds: true, // Speed up builds - lint separately in CI
+  },
+  typescript: {
+    ignoreBuildErrors: false, // Keep type checking
   },
   images: {
     formats: ['image/avif', 'image/webp'],
