@@ -1,0 +1,32 @@
+{
+  "course_title": "Introduction to Python Programming",
+  "course_description": "This comprehensive beginner-level course introduces students to Python programming through hands-on projects and practical exercises. Students will master fundamental programming concepts including variables, data types, control structures, functions, and object-oriented programming. The course emphasizes real-world applications and problem-solving skills, preparing students for advanced programming topics and potential career opportunities in software development, data analysis, or automation. Through interactive coding exercises and project-based learning, students will build a strong foundation in Python syntax and programming logic while developing analytical thinking and computational problem-solving abilities.",
+  "course_overview": "This course is structured into eight comprehensive modules that progressively build programming competency. Module 1 introduces Python basics including installation, IDEs, and your first 'Hello World' program. Module 2 covers data types (integers, floats, strings, lists, dictionaries) with practical examples like calculating compound interest or managing a contact list. Module 3 explores control structures (if/else, loops) through projects like password validators and number guessing games. Module 4 focuses on functions and modular programming by creating reusable code for mathematical calculations. Module 5 introduces file handling and data persistence with examples like reading CSV files and creating a simple inventory system. Module 6 covers error handling and debugging techniques using real debugging scenarios. Module 7 introduces object-oriented programming concepts through classes representing real-world entities like bank accounts or library books. The final module culminates in a capstone project where students build a complete application, such as a personal finance tracker or task management system, integrating all learned concepts.",
+  "target_audience": "This course is designed for complete beginners with no prior programming experience, including career changers seeking to enter technology fields, college students studying non-computer science subjects, working professionals in non-technical roles looking to automate tasks, and motivated self-learners interested in computational thinking. Ideal students have basic computer literacy (file management, internet browsing) and strong problem-solving mindset, but no advanced technical background is required.",
+  "estimated_duration_hours": 40,
+  "difficulty_level": "beginner",
+  "prerequisites": [
+    "Basic computer literacy",
+    "High school mathematics",
+    "Problem-solving mindset"
+  ],
+  "learning_outcomes": [
+    "Define fundamental Python programming concepts including variables, data types, and control structures with 90% accuracy",
+    "Build functional Python programs using functions, loops, and conditional statements to solve computational problems",
+    "Create object-oriented Python applications with classes and objects to model real-world scenarios",
+    "Analyze and debug Python code using systematic debugging techniques and error handling strategies",
+    "Implement file input/output operations to persist and retrieve data in Python applications",
+    "Design complete software solutions by integrating multiple programming concepts into cohesive projects"
+  ],
+  "course_tags": [
+    "python",
+    "programming",
+    "beginner",
+    "coding",
+    "software development",
+    "computer science",
+    "automation",
+    "object-oriented programming",
+    "data structures"
+  ]
+}

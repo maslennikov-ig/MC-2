@@ -1,0 +1,93 @@
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "This hands-on programming section explores the essentials of variables and data types in Python, featuring interactive exercises to reinforce concepts through practical coding, helping learners declare variables, manipulate data types, and perform operations to build foundational programming skills.",
+  "learning_objectives": [
+    "Students will be able to declare and assign variables using proper Python syntax.",
+    "Students will be able to identify and utilize core data types including integers, floats, strings, and booleans.",
+    "Students will be able to execute basic operations and type conversions on variables.",
+    "Students will be able to apply variable naming conventions and avoid common data type errors."
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Declaring and Assigning Variables",
+      "lesson_objective": "Students will be able to create variables, assign values, and print them using Python's dynamic typing.",
+      "key_topics": [
+        "Variable naming rules with underscores and letters",
+        "Using the equals sign for assignment",
+        "Reassigning values to existing variables"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Simple Variable Assignment",
+          "exercise_instructions": "Declare a variable named 'student_name' and assign it your full name as a string, then print the variable using print()."
+        },
+        {
+          "exercise_title": "Multiple Assignments",
+          "exercise_instructions": "Assign the value 42 to a variable called 'answer', reassign it to 100, and print both the variable name and its final value."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Working with Numeric Data Types",
+      "lesson_objective": "Students will be able to perform arithmetic operations on integers and floats while checking their types.",
+      "key_topics": [
+        "Integer operations like addition and division",
+        "Floating-point precision and decimal handling",
+        "Using type() function to verify numeric types"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Basic Arithmetic Calculation",
+          "exercise_instructions": "Declare two integer variables 'length' as 10 and 'width' as 5, calculate their product to find the area, and print the result with its data type."
+        },
+        {
+          "exercise_title": "Float Operations",
+          "exercise_instructions": "Assign 3.14 to a variable 'pi', multiply it by 2 to double it, and print the result confirming it remains a float using type()."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "Manipulating Strings and Booleans",
+      "lesson_objective": "Students will be able to concatenate strings and evaluate boolean expressions for conditional logic.",
+      "key_topics": [
+        "String creation with quotes and concatenation operator",
+        "Boolean literals True and False in comparisons",
+        "String methods such as len() and capitalize()"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "String Concatenation",
+          "exercise_instructions": "Create two string variables 'first_name' as 'John' and 'last_name' as 'Doe', concatenate them with a space, and print the full name using the + operator."
+        },
+        {
+          "exercise_title": "Boolean Evaluation",
+          "exercise_instructions": "Declare a boolean variable 'is_student' as True, compare it to False using ==, assign the result to a new variable, and print the comparison outcome."
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "Type Conversion Techniques",
+      "lesson_objective": "Students will be able to convert between data types safely and handle common conversion scenarios.",
+      "key_topics": [
+        "Conversion functions int(), float(), str(), and bool()",
+        "Handling ValueError from invalid conversions",
+        "Implicit vs explicit type conversion examples"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "String to Integer Conversion",
+          "exercise_instructions": "Assign the string '25' to a variable, convert it to an integer using int(), add 10 to it, and print the final numeric result."
+        },
+        {
+          "exercise_title": "Boolean to Integer",
+          "exercise_instructions": "Set a boolean variable 'active' to True, convert it to an integer, multiply by 5, and print the result to observe the numeric value of True."
+        }
+      ]
+    }
+  ]
+}

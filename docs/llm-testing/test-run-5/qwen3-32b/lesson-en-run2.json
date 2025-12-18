@@ -1,0 +1,87 @@
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "This section introduces the fundamentals of variables and data types in Python, focusing on how to store, retrieve, and manipulate different kinds of data. Students will learn about dynamic typing, basic data types, and type conversion to build a strong foundation for programming.",
+  "learning_objectives": [
+    "Declare and assign variables using valid Python syntax",
+    "Identify and describe the behavior of basic Python data types (integers, floats, strings, booleans)",
+    "Perform explicit and implicit type conversion between data types"
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Introduction to Variables and Naming Conventions",
+      "lesson_objective": "Create and manage variables using proper naming conventions and assignment techniques",
+      "key_topics": [
+        "Variable declaration and assignment",
+        "Naming rules (snake_case, keywords, valid characters)",
+        "Dynamic typing in Python",
+        "Best practices for readable variable names"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Variable Assignment Practice",
+          "exercise_instructions": "Create three variables with different values: one integer, one string, and one float. Print each variable to the console."
+        },
+        {
+          "exercise_title": "Naming Convention Challenge",
+          "exercise_instructions": "Rename the following invalid variable names to valid ones: 1st_variable, my-variable, class, total_Sales. Use snake_case in your solutions."
+        },
+        {
+          "exercise_title": "Value Swapping",
+          "exercise_instructions": "Declare two variables with different values. Write a short program to swap their values and print the results."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Core Data Types and Operations",
+      "lesson_objective": "Work with integers, floats, strings, and booleans using appropriate operations",
+      "key_topics": [
+        "Integer and float arithmetic operations",
+        "String concatenation and formatting",
+        "Boolean logic and comparisons",
+        "Type checking using type()"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Data Type Identification",
+          "exercise_instructions": "Write a program that accepts user input, determines its data type using type(), and prints a descriptive message."
+        },
+        {
+          "exercise_title": "Arithmetic and String Practice",
+          "exercise_instructions": "Calculate the area of a rectangle using integer inputs for length and width. Then create a formatted string output displaying the result."
+        },
+        {
+          "exercise_title": "Boolean Logic Challenges",
+          "exercise_instructions": "Write three boolean expressions using comparison operators that evaluate to True and three that evaluate to False. Print each result."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "Type Conversion and Casting",
+      "lesson_objective": "Convert between data types using built-in functions and handle type-related errors",
+      "key_topics": [
+        "Implicit type conversion (coercion)",
+        "Explicit type conversion (casting) using int(), float(), str(), bool()",
+        "Common conversion errors and exceptions",
+        "Practical use cases for type conversion"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Conversion Practice",
+          "exercise_instructions": "Convert a user-provided string '123' to integer and float types. Verify the conversions using type() checks."
+        },
+        {
+          "exercise_title": "Mixed Type Calculations",
+          "exercise_instructions": "Create a program that adds an integer and a string containing a number by converting the string to a numeric type first."
+        },
+        {
+          "exercise_title": "Error Handling Exercise",
+          "exercise_instructions": "Write code that attempts to convert an invalid string to an integer using try-except blocks to catch conversion errors."
+        }
+      ]
+    }
+  ]
+}

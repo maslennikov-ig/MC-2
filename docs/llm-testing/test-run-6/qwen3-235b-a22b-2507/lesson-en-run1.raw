@@ -1,0 +1,94 @@
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "A hands-on introduction to variables and core data types in Python, including practical exercises to reinforce understanding.",
+  "learning_objectives": [
+    "Declare and assign variables using appropriate naming conventions.",
+    "Identify and differentiate between major Python data types.",
+    "Use type() to inspect the data type of a variable.",
+    "Convert between data types using built-in functions.",
+    "Apply variables and data types in simple programming tasks."
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Introduction to Variables",
+      "lesson_objective": "Declare and assign values to variables following Python naming rules.",
+      "key_topics": [
+        "What is a variable?",
+        "Variable assignment with =",
+        "Valid variable names",
+        "Dynamic typing",
+        "Reassigning variables"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Create Your First Variables",
+          "exercise_instructions": "Declare three variables: name, age, and city. Assign your name, age, and hometown to them respectively and print each."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Core Data Types in Python",
+      "lesson_objective": "Identify and use int, float, str, and bool data types correctly.",
+      "key_topics": [
+        "Integer (int)",
+        "Floating-point (float)",
+        "String (str)",
+        "Boolean (bool)",
+        "Using type() function"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Check Data Types",
+          "exercise_instructions": "Create one variable of each type: int, float, str, and bool. Use the type() function to print the type of each variable."
+        },
+        {
+          "exercise_title": "Boolean Logic Practice",
+          "exercise_instructions": "Create two boolean variables with values True and False. Print the result of using 'and', 'or', and 'not' operators on them."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "String Manipulation",
+      "lesson_objective": "Manipulate strings using concatenation, repetition, and built-in methods.",
+      "key_topics": [
+        "String creation with quotes",
+        "String concatenation",
+        "String repetition",
+        "Common string methods",
+        "Escape characters"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Build a Greeting Message",
+          "exercise_instructions": "Using your name and city variables from earlier, create a greeting string like 'Hello, I'm [name] from [city].' and print it."
+        },
+        {
+          "exercise_title": "Practice String Methods",
+          "exercise_instructions": "Create a string in all lowercase. Use .upper(), .title(), and .replace() to transform it and print each result."
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "Type Conversion",
+      "lesson_objective": "Convert between data types using int(), float(), str(), and bool().",
+      "key_topics": [
+        "Implicit vs explicit conversion",
+        "String to number conversion",
+        "Number to string conversion",
+        "Boolean conversion rules",
+        "Handling conversion errors"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Convert and Combine",
+          "exercise_instructions": "Convert your age (int) to a string and concatenate it with a sentence. Then, convert a string number like '25' to an integer and add 5."
+        }
+      ]
+    }
+  ]
+}

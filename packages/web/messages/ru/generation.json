@@ -1,0 +1,183 @@
+{
+  "stages": {
+    "stage_1": "Инициализация курса",
+    "stage_2": "Обработка документов",
+    "stage_3": "Приоритизация документов",
+    "stage_4": "Глубокий анализ",
+    "stage_5": "Формирование структуры",
+    "stage_6": "Генерация контента"
+  },
+  "status": {
+    "pending": "Ожидание",
+    "active": "Выполняется",
+    "completed": "Завершено",
+    "error": "Ошибка",
+    "awaiting": "Ожидает подтверждения",
+    "skipped": "Пропущено"
+  },
+  "actions": {
+    "approve": "Подтвердить",
+    "reject": "Отклонить",
+    "retry": "Повторить",
+    "viewDetails": "Подробнее",
+    "fitView": "Вписать",
+    "zoomIn": "Приблизить",
+    "zoomOut": "Отдалить"
+  },
+  "drawer": {
+    "input": "Входные данные",
+    "process": "Процесс",
+    "output": "Результат",
+    "attempts": "Попытки",
+    "awaitingMessage": "Этот этап ожидает вашего подтверждения",
+    "activity": "Активность",
+    "expand": "Развернуть на всю ширину",
+    "collapse": "Свернуть до половины"
+  },
+  "refinementChat": {
+    "buttonTooltip": "Уточнить результат",
+    "panelTitle": "Уточнение",
+    "placeholder": "Опишите, что изменить...",
+    "send": "Отправить и перегенерировать",
+    "history": "История чата",
+    "thinking": "Обрабатываю...",
+    "quickActions": {
+      "shorter": "Короче",
+      "moreExamples": "Больше примеров",
+      "simplify": "Упростить",
+      "moreDetail": "Подробнее"
+    }
+  },
+  "errors": {
+    "connectionLost": "Соединение потеряно",
+    "reconnecting": "Переподключение...",
+    "retryFailed": "Не удалось повторить"
+  },
+  "retry": {
+    "confirmTitle": "Подтвердить повтор",
+    "confirmDescription": "Вы уверены, что хотите повторить этот элемент?",
+    "retryButton": "Повторить",
+    "cancelButton": "Отмена"
+  },
+  "mobile": {
+    "title": "Прогресс генерации",
+    "noStages": "Этапов пока нет",
+    "stageProgress": "Этап {{current}} из {{total}}"
+  },
+  "viewToggle": {
+    "graphView": "Граф",
+    "listView": "Список"
+  },
+  "longRunning": {
+    "message": "Занимает больше времени, чем обычно...",
+    "emailNotify": "Уведомить по email, когда завершится",
+    "emailPlaceholder": "Введите ваш email",
+    "subscribe": "Подписаться"
+  },
+  "metrics": {
+    "duration": "Время",
+    "tokens": "Токены",
+    "cost": "Стоимость",
+    "processing": "Обработка..."
+  },
+  "completionMessages": {
+    "stage_1": "Курс инициализирован",
+    "stage_2": "Документы обработаны",
+    "stage_3": "Приоритеты установлены",
+    "stage_4": "Анализ завершён",
+    "stage_5": "Структура сформирована",
+    "stage_6": "Контент создан"
+  },
+  "analysisResult": {
+    "classification": "Классификация курса",
+    "classificationDesc": "Категория и контекст курса",
+    "topicAnalysis": "Анализ темы",
+    "topicAnalysisDesc": "Детали темы и ключевые концепции",
+    "structure": "Рекомендуемая структура",
+    "structureDesc": "Объём и распределение уроков",
+    "pedagogy": "Педагогическая стратегия",
+    "pedagogyDesc": "Стиль обучения и подход",
+    "guidance": "Рекомендации для генерации",
+    "guidanceDesc": "Тон, примеры и упражнения",
+    "documents": "Связь с документами",
+    "documentsDesc": "RAG-планирование по модулям",
+    "category": "Категория",
+    "confidence": "Уверенность",
+    "reasoning": "Обоснование",
+    "whyMatters": "Почему это важно",
+    "motivators": "Мотиваторы",
+    "topic": "Тема",
+    "complexity": "Сложность",
+    "audience": "Аудитория",
+    "keyConcepts": "Ключевые концепции",
+    "keywords": "Ключевые слова",
+    "totalLessons": "Уроков",
+    "totalSections": "Модулей",
+    "lessonDuration": "Длительность урока",
+    "scopeReasoning": "Обоснование объёма",
+    "teachingStyle": "Стиль",
+    "practicalFocus": "Практический фокус",
+    "interactivity": "Интерактивность",
+    "assessmentApproach": "Подход к оценке",
+    "assessmentTypes": "Типы заданий",
+    "tone": "Тон изложения",
+    "analogies": "Аналогии",
+    "noAnalogies": "Без аналогий",
+    "visuals": "Визуальные элементы",
+    "exerciseTypes": "Типы упражнений",
+    "section": "Модуль",
+    "noDocuments": "Нет связанных документов"
+  },
+  "courseStructure": {
+    "courseInfo": "Информация о курсе",
+    "courseInfoDesc": "Название, описание и параметры курса",
+    "structure": "Структура курса",
+    "structureDesc": "Модули и уроки",
+    "targetAudience": "Целевая аудитория",
+    "difficulty": "Уровень сложности",
+    "duration": "Длительность",
+    "totalDuration": "Общая длительность",
+    "prerequisites": "Предварительные требования",
+    "noPrerequisites": "Без предварительных требований",
+    "tags": "Теги курса",
+    "overview": "Обзор курса",
+    "learningOutcomes": "Результаты обучения",
+    "assessmentStrategy": "Стратегия оценки",
+    "beginner": "Начинающий",
+    "intermediate": "Средний",
+    "advanced": "Продвинутый",
+    "section": "Модуль",
+    "sectionDescription": "Описание модуля",
+    "sectionObjectives": "Цели модуля",
+    "lesson": "Урок",
+    "lessons": "уроков",
+    "lessonTitle": "Название урока",
+    "lessonObjectives": "Цели урока",
+    "keyTopics": "Ключевые темы",
+    "practicalExercises": "Практические задания",
+    "exerciseType": "Тип задания",
+    "exerciseTitle": "Название задания",
+    "exerciseDescription": "Описание задания",
+    "hours": "ч",
+    "minutes": "мин",
+    "hoursLong": "часов",
+    "minutesLong": "минут",
+    "lessonsCount": "уроков",
+    "sectionsCount": "модулей",
+    "exercisesCount": "заданий",
+    "topicsCount": "тем",
+    "noLessons": "Нет уроков",
+    "noSections": "Нет модулей",
+    "noTopics": "Нет ключевых тем",
+    "noExercises": "Нет практических заданий"
+  },
+  "restart": {
+    "confirmTitle": "Перезапустить этап?",
+    "confirmDescription": "Вы собираетесь перезапустить генерацию с этапа {{stageNumber}} ({{stageName}}). Все результаты после этого этапа будут пересозданы.",
+    "warningMessage": "Это действие перезапишет текущие результаты генерации.",
+    "restartButton": "Перезапустить",
+    "restartingButton": "Перезапуск...",
+    "cancelButton": "Отмена",
+    "buttonTooltip": "Перезапустить с этого этапа"
+  }
+}

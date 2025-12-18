@@ -1,0 +1,81 @@
+services:
+  # Redis for BullMQ queues and caching
+  redis:
+    image: redis:7-alpine
+    container_name: megacampus-redis
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    networks:
+      - megacampus
+
+  # Docling MCP Server for document processing (PDF, DOCX, PPTX)
+  # Used by document-processing worker for text extraction
+  docling-mcp:
+    image: docling-mcp-docling-mcp  # Custom image from docling-mcp project
+    container_name: docling-mcp-server
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8000:8000"
+    environment:
+      - PORT=8000
+    volumes:
+      # Mount uploads directory for file access (read-only)
+      - ./packages/course-gen-platform/uploads:/app/uploads:ro
+      # Mount test fixtures for integration tests (read-only)
+      - ./packages/course-gen-platform/tests:/app/tests:ro
+      # Persistent cache for document processing
+      - docling-cache:/app/cache
+    # Note: Docling MCP server uses MCP protocol, not REST
+    # Health check is disabled as /health endpoint doesn't exist
+    networks:
+      - megacampus
+
+networks:
+  megacampus:
+    driver: bridge
+
+volumes:
+  redis-data:
+    driver: local
+  docling-cache:
+    driver: local
+
+# Usage:
+#
+# Start all services:
+#   docker compose up -d
+#
+# Start specific service:
+#   docker compose up redis -d
+#   docker compose up docling-mcp -d
+#
+# Stop services:
+#   docker compose stop
+#   docker compose stop redis
+#   docker compose stop docling-mcp
+#
+# View logs:
+#   docker compose logs -f redis
+#   docker compose logs -f docling-mcp
+#
+# Restart services:
+#   docker compose restart redis
+#   docker compose restart docling-mcp
+#
+# Check status:
+#   docker compose ps
+#
+# Docling MCP Server:
+#   - URL: http://localhost:8000/mcp
+#   - Protocol: MCP (Model Context Protocol)
+#   - Used for: PDF/DOCX/PPTX text extraction
+#   - Environment variable: DOCLING_MCP_URL=http://localhost:8000/mcp

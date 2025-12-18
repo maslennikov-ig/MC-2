@@ -1,0 +1,35 @@
+{
+  "course_title": "Introduction to Python Programming",
+  "course_description": "Learn Python from scratch: variables, loops, functions, and file handling through hands-on projects that turn absolute beginners into confident coders.",
+  "course_overview": "This beginner-friendly course takes you from zero to writing real Python scripts. You will explore Python syntax, control flow, built-in data structures, functions, error handling, and the standard library. Each module mixes concise video lessons, interactive quizzes, and mini-projects such as a number-guessing game, a CSV analyzer, and a web scraper. By the end you will read and write Python files, debug code with confidence, and be ready for specialized tracks like data science or web development.",
+  "target_audience": "Absolute beginners aged 14+ with basic computer literacy who want to start coding or automate everyday tasks.",
+  "estimated_duration_hours": 24,
+  "difficulty_level": "beginner",
+  "prerequisites": [
+    "A computer with internet access",
+    "Ability to install software",
+    "Basic file management skills"
+  ],
+  "learning_outcomes": [
+    "Install and configure Python 3 and VS Code on your machine",
+    "Explain and apply variables, operators, and basic data types in Python",
+    "Construct programs using conditional statements and loops to control execution",
+    "Create reusable functions with parameters and return values to modularize code",
+    "Manipulate lists, tuples, sets, and dictionaries to store and retrieve data",
+    "Read from and write to text and CSV files using Python’s file I/O",
+    "Debug runtime errors using exception handling and IDE tools",
+    "Design and implement a 150-line terminal application that meets stated requirements"
+  ],
+  "course_tags": [
+    "Python",
+    "programming",
+    "beginner",
+    "automation",
+    "scripting",
+    "fundamentals",
+    "coding",
+    "hands-on",
+    "project-based",
+    "intro"
+  ]
+}

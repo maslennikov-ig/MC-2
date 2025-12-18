@@ -1,0 +1,29 @@
+{
+  "course_title": "Introduction to Python Programming",
+  "course_description": "This beginner-level technical programming course provides a comprehensive foundation in Python, one of the world's most versatile and in-demand programming languages. Designed for absolute newcomers, it covers core programming concepts through hands-on practice with real-world applications in automation, data analysis, and web development. Students will progress from basic syntax to building functional programs while developing computational thinking skills. The curriculum emphasizes practical implementation over theory, featuring interactive coding exercises, debugging challenges, and project-based learning to ensure immediate skill application in professional or academic contexts.",
+  "course_overview": "This structured 10-module course begins with Python installation and environment setup using IDLE and VS Code. Module 1 introduces variables and data types through practical examples like calculating BMI from user input. Module 2 covers control structures by building a temperature converter with if-else statements and a multiplication table generator using loops. Module 3 explores functions by creating reusable code for currency conversion and geometric area calculations. Module 4 dives into data structures through hands-on manipulation of lists (student gradebook management) and dictionaries (inventory tracking system). Module 5 teaches file handling via CSV data processing for sales records analysis. Module 6 introduces error handling with real-world scenarios like validating user registration forms. Module 7 covers modules and libraries through practical Pandas data frame operations on sample datasets. Module 8 implements object-oriented programming by designing a banking system with classes and inheritance. The capstone project requires students to build a weather data analyzer that fetches API data, processes it using lists and dictionaries, and generates summary reports - integrating all concepts into a portfolio-ready application with comprehensive testing.",
+  "target_audience": "Absolute beginners including career changers entering tech fields, high school students preparing for AP Computer Science, college freshmen in non-CS majors requiring programming skills, and professionals seeking automation for repetitive tasks. Specific personas: (1) Alex, a marketing analyst wanting to automate social media reports; (2) Priya, a biology student needing data processing skills for research; (3) David, an accountant aiming to streamline financial calculations; (4) Emma, a teacher creating educational tools for classroom use.",
+  "estimated_duration_hours": 40,
+  "difficulty_level": "beginner",
+  "prerequisites": [
+    "Basic computer navigation skills (file management, web browsing)",
+    "Elementary mathematics knowledge (arithmetic operations, percentages)"
+  ],
+  "learning_outcomes": [
+    "Define and implement core Python syntax elements to create error-free executable scripts",
+    "Build conditional logic structures to develop interactive programs like quiz applications",
+    "Create reusable functions with parameters and return values for mathematical operations",
+    "Analyze datasets using lists and dictionaries to compute statistics such as averages and extremes",
+    "Design file handling operations to process CSV data for inventory management systems",
+    "Construct object-oriented programs with classes and inheritance for banking simulation"
+  ],
+  "course_tags": [
+    "python",
+    "programming_fundamentals",
+    "beginner_coding",
+    "data_structures",
+    "automation",
+    "software_development",
+    "computational_thinking"
+  ]
+}

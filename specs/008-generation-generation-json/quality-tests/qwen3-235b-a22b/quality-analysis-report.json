@@ -1,0 +1,178 @@
+{
+  "generatedAt": "2025-11-13T12:39:30.000Z",
+  "testRunId": "qwen3-235b-a22b-quality-eval",
+  "model": {
+    "name": "Qwen3 235B A22B",
+    "slug": "qwen3-235b-a22b",
+    "apiName": "qwen/qwen3-235b-a22b",
+    "tier": "C-TIER",
+    "previousResults": "0/4 FAILED"
+  },
+  "testConfiguration": {
+    "runsPerScenario": 3,
+    "totalScenarios": 4,
+    "totalRuns": 12,
+    "temperature": 0.7,
+    "maxTokens": 8000
+  },
+  "executionSummary": {
+    "totalRuns": 12,
+    "passed": 2,
+    "failed": 10,
+    "successRate": 0.167,
+    "avgDuration": 50058
+  },
+  "scenarioResults": {
+    "metadata-en": {
+      "passed": 0,
+      "failed": 3,
+      "successRate": 0.0,
+      "failureReason": "Model only provided reasoning, no actual content (hit token limit during thinking)"
+    },
+    "metadata-ru": {
+      "passed": 1,
+      "failed": 2,
+      "successRate": 0.333,
+      "successfulRuns": [
+        {
+          "runNumber": 2,
+          "duration": 35116,
+          "schemaValid": true,
+          "hasRequiredFields": true,
+          "usesSnakeCase": true,
+          "learningOutcomesCount": 4,
+          "learningOutcomesQuality": "Good (action verbs: Определить, Построить, Проанализировать, Создать)",
+          "overviewLength": 556,
+          "languageQuality": "Native Russian phrasing, correct terminology",
+          "qualityScore": 0.85
+        }
+      ]
+    },
+    "lesson-en": {
+      "passed": 1,
+      "failed": 2,
+      "successRate": 0.333,
+      "successfulRuns": [
+        {
+          "runNumber": 3,
+          "duration": 81480,
+          "schemaValid": true,
+          "hasRequiredFields": true,
+          "usesSnakeCase": true,
+          "lessonCount": 5,
+          "lessonCountQuality": "Excellent (5 complete lessons)",
+          "objectivesQuality": "Good (measurable, action verbs)",
+          "topicsSpecific": true,
+          "exercisesQuality": "Excellent (2 exercises per lesson, actionable instructions)",
+          "qualityScore": 0.92
+        }
+      ]
+    },
+    "lesson-ru": {
+      "passed": 0,
+      "failed": 3,
+      "successRate": 0.0,
+      "failureReason": "Model only provided reasoning, no actual content (hit token limit during thinking)"
+    }
+  },
+  "qualityAnalysis": {
+    "metadataQuality": {
+      "avgScore": 0.85,
+      "consistency": 0.0,
+      "sampleCount": 1,
+      "bestRun": {
+        "scenario": "metadata-ru",
+        "run": 2,
+        "score": 0.85
+      },
+      "strengths": [
+        "Valid JSON with snake_case compliance",
+        "Good learning outcomes with action verbs (Russian)",
+        "Detailed course overview (556 chars)",
+        "Specific target audience definition"
+      ],
+      "weaknesses": [
+        "Only 1 successful run out of 6 attempts (16.7% success)",
+        "Fails consistently on English metadata",
+        "Hits token limit during reasoning phase"
+      ]
+    },
+    "lessonQuality": {
+      "avgScore": 0.92,
+      "consistency": 0.0,
+      "sampleCount": 1,
+      "lessonCountAvg": 5.0,
+      "bestRun": {
+        "scenario": "lesson-en",
+        "run": 3,
+        "score": 0.92
+      },
+      "strengths": [
+        "Excellent lesson count (5 complete lessons)",
+        "Valid JSON with snake_case compliance",
+        "Measurable objectives with action verbs",
+        "Specific key topics (not generic)",
+        "Excellent exercises (2 per lesson, actionable)"
+      ],
+      "weaknesses": [
+        "Only 1 successful run out of 6 attempts (16.7% success)",
+        "Fails consistently on Russian lessons",
+        "Hits token limit during reasoning phase"
+      ]
+    },
+    "overallQuality": 0.885,
+    "overallSuccessRate": 0.167,
+    "criticalIssue": "Reasoning model that hits max_tokens during thinking phase, resulting in 83.3% failure rate"
+  },
+  "detailedFindings": {
+    "schemaCompliance": {
+      "validJSON": "2/2 successful runs (100%)",
+      "snakeCaseUsage": "2/2 successful runs (100%)",
+      "requiredFields": "2/2 successful runs (100%)",
+      "correctDataTypes": "2/2 successful runs (100%)"
+    },
+    "contentQuality": {
+      "learningOutcomes": {
+        "count": "4 outcomes (metadata-ru)",
+        "actionVerbs": "Yes (Определить, Построить, Проанализировать, Создать)",
+        "bloomsTaxonomy": "Yes (multiple cognitive levels)",
+        "measurable": "Yes"
+      },
+      "lessonStructure": {
+        "lessonCount": "5 lessons (lesson-en)",
+        "objectivesPresent": "Yes (all 5 lessons)",
+        "topicsSpecific": "Yes (not generic)",
+        "exercisesPresent": "Yes (2 per lesson)",
+        "exercisesActionable": "Yes (clear instructions)"
+      }
+    },
+    "languageQuality": {
+      "russian": "Native phrasing, correct terminology (metadata-ru)",
+      "english": "Natural grammar, professional tone (lesson-en)"
+    },
+    "consistencyAnalysis": {
+      "issue": "Cannot calculate consistency (only 1 success per entity type)",
+      "failurePattern": "Hits token limit during reasoning phase",
+      "failureRate": "83.3% (10/12 runs)",
+      "recommendation": "Model is NOT suitable for production use"
+    }
+  },
+  "comparison": {
+    "previousEvaluation": "0/4 FAILED (all tests failed)",
+    "currentEvaluation": "2/12 PASSED (16.7% success rate)",
+    "improvement": "Slight improvement (0% → 16.7%)",
+    "rootCause": "Model is a reasoning model (like Qwen3 235B Thinking) but hits token limit during thinking phase before generating actual output"
+  },
+  "recommendations": {
+    "productionReady": false,
+    "tier": "C-TIER (CONFIRMED)",
+    "useCases": [],
+    "alternatives": [
+      "qwen/qwen3-235b-a22b-thinking-2507 (dedicated thinking model with higher token limits)",
+      "qwen/qwen3-32b (non-thinking version, A-TIER for metadata)",
+      "moonshotai/kimi-k2-0905 (S-TIER, 100% success rate)",
+      "deepseek/deepseek-v3.2-exp (S-TIER, 100% success rate)"
+    ],
+    "technicalNote": "This model appears to be a reasoning variant but fails to complete reasoning within max_tokens limit, resulting in empty content output. Not recommended for any production use."
+  }
+}

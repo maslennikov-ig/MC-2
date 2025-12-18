@@ -1,0 +1,9 @@
+{
+  "model": "OSS 120B",
+  "modelSlug": "oss-120b",
+  "scenario": "metadata-en",
+  "runNumber": 3,
+  "error": "OpenAI or Azure OpenAI API key or Token Provider not found",
+  "duration": 3,
+  "timestamp": "2025-11-14T07:16:14.683Z"
+}

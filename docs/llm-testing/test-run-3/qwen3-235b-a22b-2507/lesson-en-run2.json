@@ -1,0 +1,102 @@
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "A hands-on introduction to variables and core data types in Python, including practical exercises to reinforce understanding.",
+  "learning_objectives": [
+    "Declare and assign variables using appropriate naming conventions.",
+    "Identify and use basic Python data types: int, float, str, and bool.",
+    "Convert between data types using type casting.",
+    "Use the type() function to inspect variable types.",
+    "Apply variables and data types to solve simple programming problems."
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Introduction to Variables",
+      "lesson_objective": "Create and assign values to variables using correct Python syntax and naming rules.",
+      "key_topics": [
+        "What is a variable?",
+        "Variable assignment with =",
+        "Naming conventions (snake_case)",
+        "Reassigning variables",
+        "Dynamic typing"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Declare Your First Variables",
+          "exercise_instructions": "Create three variables: name, age, and city. Assign your name, age, and hometown to them respectively."
+        },
+        {
+          "exercise_title": "Reassign Variable Values",
+          "exercise_instructions": "Take the variables from the previous exercise and reassign them to different values representing another person."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Core Data Types in Python",
+      "lesson_objective": "Differentiate between int, float, str, and bool data types and assign values accordingly.",
+      "key_topics": [
+        "Integer (int)",
+        "Floating-point (float)",
+        "String (str)",
+        "Boolean (bool)",
+        "Literal values",
+        "Using type() to check types"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Identify Data Types",
+          "exercise_instructions": "Create one variable for each data type (int, float, str, bool) and use type() to print each variable's type."
+        },
+        {
+          "exercise_title": "Data Type Scavenger Hunt",
+          "exercise_instructions": "Write code that stores examples of each core data type and labels them with a descriptive print statement."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "Type Conversion",
+      "lesson_objective": "Convert variables from one data type to another using built-in functions like str(), int(), and float().",
+      "key_topics": [
+        "Implicit vs explicit type conversion",
+        "Using int()",
+        "Using float()",
+        "Using str()",
+        "Handling conversion errors"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Convert a Number to a String",
+          "exercise_instructions": "Create a variable with a number, convert it to a string, and concatenate it with a message to print a sentence."
+        },
+        {
+          "exercise_title": "Calculate with Converted Types",
+          "exercise_instructions": "Store a number as a string, convert it to a float, perform a simple arithmetic operation, and print the result."
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "Practical Applications of Variables",
+      "lesson_objective": "Solve real-world problems by combining variables, data types, and type conversion in small programs.",
+      "key_topics": [
+        "Building simple messages with variables",
+        "Calculating values using user-like inputs",
+        "Debugging type-related errors",
+        "Best practices for variable use"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Create a Personal Bio Summary",
+          "exercise_instructions": "Use variables for name, age, and favorite hobby, then print a formatted sentence combining them."
+        },
+        {
+          "exercise_title": "Temperature Converter (Part 1)",
+          "exercise_instructions": "Store a temperature in Celsius as a float, convert it to a string, and print it in a sentence stating the value."
+        }
+      ]
+    }
+  ]
+}

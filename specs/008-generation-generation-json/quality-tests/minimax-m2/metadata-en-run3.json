@@ -1,0 +1,36 @@
+{
+  "course_title": "Introduction to Python Programming",
+  "course_description": "This comprehensive beginner-level course provides a solid foundation in Python programming, one of the world's most versatile and in-demand programming languages. Students will master fundamental concepts including variables, data types, control structures, functions, and object-oriented programming principles. The course emphasizes hands-on practice through real-world projects and coding exercises, ensuring students develop both theoretical knowledge and practical skills. Through systematic progression from basic syntax to advanced concepts, learners will build the confidence and competence needed to create functional Python applications, analyze code problems, and continue their programming journey.",
+  "course_overview": "The Introduction to Python Programming course is structured as a comprehensive learning journey designed for absolute beginners in software development. The course begins with Python fundamentals, covering installation, basic syntax, variables, and data types (integers, floats, strings, lists, dictionaries). Students then progress through control structures including conditional statements (if/else), loops (for/while), and logical operators. Functions and modules are introduced to teach code organization and reusability, with practical examples like creating a calculator program and a simple contact management system. Object-Oriented Programming (OOP) concepts including classes, objects, inheritance, and encapsulation are covered through hands-on projects like building a student grade management system. The course concludes with file handling, error handling, and basic web development using Flask. Each module includes practical coding exercises, programming challenges, and mini-projects to reinforce learning. Students will build a complete project portfolio including a to-do list application, a basic web scraper, and a personal finance tracker, demonstrating mastery of Python fundamentals and preparing them for advanced programming topics.",
+  "target_audience": "This course is specifically designed for three primary persona types: (1) Complete beginners with no programming experience but basic computer literacy, including career changers from non-technical fields seeking to enter software development, professionals in data analysis wanting to enhance their analytical capabilities, and students from humanities or business backgrounds interested in learning programming fundamentals. (2) Professionals in technical fields (IT support, database administration, system administration) who need to automate repetitive tasks and enhance their problem-solving toolkit with Python scripting capabilities. (3) Students and educators in academic settings, including undergraduate students in non-computer science disciplines who need programming skills for research projects, and K-12 educators seeking to integrate programming concepts into their curriculum. All target audiences share the common goal of building practical programming skills through structured, hands-on learning experiences.",
+  "estimated_duration_hours": 50,
+  "difficulty_level": "beginner",
+  "prerequisites": [
+    "Basic computer literacy and file management skills",
+    "Familiarity with using web browsers and installing software",
+    "No prior programming experience required",
+    "High school level mathematics understanding"
+  ],
+  "learning_outcomes": [
+    "Define and implement fundamental Python data structures including lists, dictionaries, tuples, and sets with proper syntax and application contexts",
+    "Build structured programs using control flow statements (if/elif/else, for/while loops) and logical operators to solve complex algorithmic problems",
+    "Create modular and reusable code through function definition, parameter passing, return values, and module organization principles",
+    "Analyze and debug Python code using debugging tools, error handling techniques, and best practices for code quality and maintainability",
+    "Construct object-oriented Python applications using classes, objects, inheritance, encapsulation, and polymorphism for real-world problem solving",
+    "Implement file input/output operations, JSON data handling, and basic database interactions for data persistence and management",
+    "Build complete Python applications including GUI programs, web scrapers, and automation scripts using external libraries and APIs",
+    "Evaluate programming solutions using algorithmic thinking, computational problem-solving approaches, and industry-standard coding conventions"
+  ],
+  "course_tags": [
+    "python programming",
+    "beginner coding",
+    "software development",
+    "object-oriented programming",
+    "data structures",
+    "algorithms",
+    "automation",
+    "web development",
+    "gui programming",
+    "programming fundamentals"
+  ]
+}

@@ -1,0 +1,143 @@
+{
+  "model": "minimax/minimax-m2",
+  "timestamp": "2025-11-13T12:17:25.020Z",
+  "scenarios": [
+    {
+      "scenario": "metadata-en",
+      "type": "metadata",
+      "runs": [
+        {
+          "run": 1,
+          "valid": true,
+          "schemaScore": 1,
+          "contentScore": 0.9999999999999999,
+          "languageScore": 1,
+          "overallScore": 1,
+          "lessonCount": null
+        },
+        {
+          "run": 2,
+          "valid": true,
+          "schemaScore": 1,
+          "contentScore": 0.8999999999999999,
+          "languageScore": 0.7,
+          "overallScore": 0.9,
+          "lessonCount": null
+        },
+        {
+          "run": 3,
+          "valid": true,
+          "schemaScore": 1,
+          "contentScore": 0.8999999999999999,
+          "languageScore": 0.7,
+          "overallScore": 0.9,
+          "lessonCount": null
+        }
+      ]
+    },
+    {
+      "scenario": "metadata-ru",
+      "type": "metadata",
+      "runs": [
+        {
+          "run": 1,
+          "valid": true,
+          "schemaScore": 1,
+          "contentScore": 0.6,
+          "languageScore": 1,
+          "overallScore": 0.8400000000000001,
+          "lessonCount": null
+        },
+        {
+          "run": 2,
+          "valid": true,
+          "schemaScore": 1,
+          "contentScore": 0.5,
+          "languageScore": 1,
+          "overallScore": 0.8,
+          "lessonCount": null
+        },
+        {
+          "run": 3,
+          "valid": true,
+          "schemaScore": 1,
+          "contentScore": 0.5,
+          "languageScore": 1,
+          "overallScore": 0.8,
+          "lessonCount": null
+        }
+      ]
+    },
+    {
+      "scenario": "lesson-en",
+      "type": "lesson",
+      "runs": [
+        {
+          "run": 1,
+          "valid": true,
+          "schemaScore": 1,
+          "contentScore": 1,
+          "languageScore": 1,
+          "overallScore": 1,
+          "lessonCount": 5
+        },
+        {
+          "run": 2,
+          "valid": true,
+          "schemaScore": 1,
+          "contentScore": 0.9000000000000001,
+          "languageScore": 0.7,
+          "overallScore": 0.9000000000000001,
+          "lessonCount": 4
+        },
+        {
+          "run": 3,
+          "valid": true,
+          "schemaScore": 1,
+          "contentScore": 0.9000000000000001,
+          "languageScore": 0.7,
+          "overallScore": 0.9000000000000001,
+          "lessonCount": 5
+        }
+      ]
+    },
+    {
+      "scenario": "lesson-ru",
+      "type": "lesson",
+      "runs": [
+        {
+          "run": 1,
+          "valid": true,
+          "schemaScore": 1,
+          "contentScore": 0.8,
+          "languageScore": 1,
+          "overallScore": 0.9200000000000002,
+          "lessonCount": 5
+        },
+        {
+          "run": 2,
+          "valid": true,
+          "schemaScore": 1,
+          "contentScore": 0.8,
+          "languageScore": 1,
+          "overallScore": 0.9200000000000002,
+          "lessonCount": 5
+        },
+        {
+          "run": 3,
+          "valid": true,
+          "schemaScore": 1,
+          "contentScore": 0.8,
+          "languageScore": 1,
+          "overallScore": 0.9200000000000002,
+          "lessonCount": 5
+        }
+      ]
+    }
+  ],
+  "summary": {
+    "overallQuality": 0.8999999999999999,
+    "consistency": 0.9388989907339221,
+    "successRate": 1
+  }
+}

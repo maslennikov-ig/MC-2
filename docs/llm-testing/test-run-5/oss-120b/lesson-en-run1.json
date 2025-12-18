@@ -1,0 +1,97 @@
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "This section introduces the fundamental concepts of storing information in Python programs. Learners will explore how to create variables, understand Python's built‑in data types, and manipulate values safely and effectively.",
+  "learning_objectives": [
+    "Declare and assign values to variables using correct syntax.",
+    "Identify and use Python's core data types: integers, floats, strings, booleans, and lists.",
+    "Perform basic type conversion and understand when it is necessary.",
+    "Apply naming conventions and best practices for readable code."
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Understanding Variables",
+      "lesson_objective": "Create and assign variables with valid identifiers and observe how Python stores values.",
+      "key_topics": [
+        "Variable naming rules",
+        "Assignment operator (=)",
+        "Dynamic typing",
+        "Printing variable values"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Simple Variable Assignment",
+          "exercise_instructions": "Open a new Python file. Declare three variables named `age`, `name`, and `is_student`. Assign appropriate values (e.g., 25, \"Alex\", True). Use `print()` to display each variable on a separate line."
+        },
+        {
+          "exercise_title": "Variable Name Practice",
+          "exercise_instructions": "Write five variable declarations that follow Python naming conventions (e.g., `total_price`, `user_input`). Then, intentionally write two invalid variable names (e.g., `2ndPlace`, `my-variable`) and observe the error messages."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Core Data Types: Numbers and Strings",
+      "lesson_objective": "Differentiate between integers, floats, and strings, and perform basic operations on each type.",
+      "key_topics": [
+        "Integers vs. floats",
+        "String literals and concatenation",
+        "Arithmetic operators",
+        "String methods: len(), upper(), lower()"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Math with Numbers",
+          "exercise_instructions": "Create variables `a = 12`, `b = 4.5`. Calculate and print the sum, difference, product, and quotient. Then, use the `type()` function to display each variable's data type."
+        },
+        {
+          "exercise_title": "String Manipulation",
+          "exercise_instructions": "Assign the string `greeting = \"hello world\"`. Print the length of the string, the string in all caps, and a new string that concatenates `greeting` with \"!\"."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "Booleans and Type Conversion",
+      "lesson_objective": "Use boolean values in expressions and convert between data types safely.",
+      "key_topics": [
+        "Boolean literals (True, False)",
+        "Comparison operators",
+        "Logical operators (and, or, not)",
+        "Explicit type casting: int(), float(), str()"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Boolean Logic Practice",
+          "exercise_instructions": "Define variables `x = 10` and `y = 20`. Create three boolean expressions: (x < y), (x == y), and (x != y). Print each result. Then combine two expressions using `and` and `or` and print the outcomes."
+        },
+        {
+          "exercise_title": "Convert and Compute",
+          "exercise_instructions": "Take the string `num_str = \"42\"`. Convert it to an integer, add 8, and print the result. Next, convert the integer result back to a string and concatenate it with the text \" is the answer\"."
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "Lists and Basic List Operations",
+      "lesson_objective": "Create lists, access elements by index, and modify list contents.",
+      "key_topics": [
+        "List literals",
+        "Indexing and slicing",
+        "Appending and removing items",
+        "Using `len()` with lists"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Build a Shopping List",
+          "exercise_instructions": "Create a list named `shopping` containing at least five items (e.g., \"apples\", \"bread\"). Print the full list, then print the first and last items using indexing. Append a new item, remove the second item, and finally print the updated list."
+        },
+        {
+          "exercise_title": "Slice the List",
+          "exercise_instructions": "Using the same `shopping` list, create a new list `first_three` that contains the first three elements via slicing. Print `first_three` and its length."
+        }
+      ]
+    }
+  ]
+}

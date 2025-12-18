@@ -1,0 +1,20 @@
+
+{
+  "course_title": "Introduction to Python Programming",
+  "course_description": "This comprehensive beginner-level course introduces students to Python programming, one of the most versatile and in-demand programming languages today. Students will learn fundamental programming concepts including variables, data types, control structures, functions, and basic object-oriented programming. The course emphasizes hands-on learning through practical exercises and real-world applications, preparing students for further study in software development, data science, or automation.",
+  "course_overview": "Introduction to Python Programming is a structured journey into the world of coding, designed specifically for beginners with no prior programming experience. The course begins with foundational concepts like setting up the Python environment, writing your first program, and understanding Python's syntax. Students will progressively build their skills through modules covering variables and data types (integers, strings, lists, dictionaries), control flow (if statements, loops), functions, error handling, and file operations. Each module includes hands-on coding exercises where students will create practical applications such as a simple calculator, a text-based adventure game, and a basic data analysis tool. The course culminates in a capstone project where students apply all learned concepts to build a personal finance tracker that can record expenses, categorize transactions, and generate spending reports. Throughout the course, students will also learn best practices for code organization, debugging techniques, and how to use the extensive Python ecosystem of libraries and resources.",
+  "target_audience": "This course is ideal for absolute beginners to programming, including students transitioning from non-technical fields, professionals seeking to add technical skills to their toolkit, entrepreneurs who want to understand the technical side of their businesses, and anyone curious about how software is created. No prior programming experience is required, though basic computer literacy and familiarity with using applications is expected.",
+  "estimated_duration_hours": 40,
+  "difficulty_level": "beginner",
+  "prerequisites": ["Basic computer literacy", "Familiarity with using applications", "Ability to install software on your computer", "Problem-solving mindset"],
+  "learning_outcomes": [
+    "Define fundamental programming concepts including variables, data types, and control structures",
+    "Build functional Python programs using proper syntax and programming conventions",
+    "Analyze problems and design algorithmic solutions using Python",
+    "Create functions and modules to organize code effectively",
+    "Implement error handling and debugging techniques in Python applications",
+    "Develop interactive programs that handle user input and generate output",
+    "Apply object-oriented programming principles to design reusable code components"
+  ],
+  "course_tags": ["Python", "Programming", "Beginner", "Coding", "Software Development", "Computer Science", "Technical Skills"]
+}

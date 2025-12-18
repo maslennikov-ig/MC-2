@@ -1,0 +1,32 @@
+{
+  "course_title": "Introduction to Python Programming",
+  "course_description": "Master Python fundamentals in this hands-on beginner course! Learn core programming concepts through practical exercises and real-world projects. Build executable scripts, manipulate data structures, and solve problems while gaining confidence in coding. No prior experience needed – start your tech career journey today.",
+  "course_overview": "This comprehensive course teaches Python programming from absolute zero. Starting with installation and environment setup, students progress through variables, data types, control flow, functions, and file handling. Through 40+ coding exercises and 5 portfolio projects (including a text-based game and data analyzer), learners develop problem-solving skills using industry-standard tools like VS Code and Git. The curriculum emphasizes clean code practices, debugging techniques, and computational thinking, culminating in object-oriented programming foundations. Includes Python 3.10 syntax, error handling, and best practices for maintainable code.",
+  "target_audience": "Absolute beginners with no coding background, career switchers, students, and professionals seeking foundational programming skills for automation or data analysis.",
+  "estimated_duration_hours": 28.5,
+  "difficulty_level": "beginner",
+  "prerequisites": [
+    "Basic computer navigation skills",
+    "Familiarity with file management concepts",
+    "No prior programming knowledge required"
+  ],
+  "learning_outcomes": [
+    "Write executable Python scripts using correct syntax and indentation rules",
+    "Implement control structures (if-statements, loops) to solve computational problems",
+    "Manipulate core data structures (lists, dictionaries, tuples) for data organization",
+    "Create reusable functions with parameters and return values",
+    "Handle file input/output operations for data persistence",
+    "Debug code using error messages and print statements",
+    "Apply object-oriented principles by designing simple classes"
+  ],
+  "course_tags": [
+    "Python",
+    "Programming Fundamentals",
+    "Beginner Coding",
+    "Software Development",
+    "Data Structures",
+    "Automation",
+    "Object-Oriented Programming",
+    "Scripting"
+  ]
+}

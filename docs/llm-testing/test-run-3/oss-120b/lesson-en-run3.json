@@ -1,0 +1,105 @@
+{
+  "section_number": 1,
+  "section_title": "Understanding Variables and Data Types in Python",
+  "section_description": "This section introduces Python variables, explores built-in data types, and provides hands-on exercises to reinforce syntax and type operations.",
+  "learning_objectives": [
+    "Declare and assign variables using correct naming conventions",
+    "Identify and use Python's built-in data types appropriately",
+    "Apply type conversion functions to manipulate data safely"
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Introducing Variables and Naming Conventions",
+      "lesson_objective": "Students will be able to declare variables with valid identifiers and assign values of various types.",
+      "key_topics": [
+        "Variable declaration",
+        "Naming rules",
+        "Assignment operator",
+        "Case sensitivity",
+        "Best practices"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Create basic variables",
+          "exercise_instructions": "Write Python code to define three variables named `age`, `price`, and `is_valid` and assign them an integer, a float, and a boolean value respectively."
+        },
+        {
+          "exercise_title": "Invalid identifier identification",
+          "exercise_instructions": "List five examples of invalid variable names in Python and explain why each violates naming rules."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Exploring Python Primitive Data Types",
+      "lesson_objective": "Learners will be able to recognize and create values of int, float, bool, and str types, and understand their unique characteristics.",
+      "key_topics": [
+        "Integers",
+        "Floating-point numbers",
+        "Booleans",
+        "Strings",
+        "Type checking with type()",
+        "Literal syntax"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Data type identification",
+          "exercise_instructions": "Write a script that declares variables of each primitive type, then print each variable’s value alongside its type using the `type()` function."
+        },
+        {
+          "exercise_title": "String manipulation basics",
+          "exercise_instructions": "Create a string variable containing your full name, then use slicing to display the first name, last name, and the total character count."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "Working with Collections: Lists, Tuples, and Dictionaries",
+      "lesson_objective": "Students will be able to construct and access list, tuple, and dictionary objects, and differentiate between mutable and immutable collection types.",
+      "key_topics": [
+        "Lists",
+        "List indexing",
+        "Tuples",
+        "Tuple immutability",
+        "Dictionaries",
+        "Key-value access",
+        "Mutability concepts"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Build and modify a list",
+          "exercise_instructions": "Create a list of five favorite movies, then add a new movie, remove the second item, and print the final list."
+        },
+        {
+          "exercise_title": "Dictionary lookup",
+          "exercise_instructions": "Define a dictionary mapping country names to their capitals, retrieve the capital of a given country, and handle the case where the key does not exist using `get()`."
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "Type Conversion and Casting in Python",
+      "lesson_objective": "Learners will be able to convert values between different data types using built-in functions and understand when implicit conversion occurs.",
+      "key_topics": [
+        "int()",
+        "float()",
+        "str()",
+        "bool()",
+        "implicit conversion",
+        "error handling during casting",
+        "type() verification"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Convert user input",
+          "exercise_instructions": "Prompt the user for a numeric string, convert it to an integer, add 10, then display the result as a string."
+        },
+        {
+          "exercise_title": "Safe casting practice",
+          "exercise_instructions": "Write a function that attempts to cast a value to float; if conversion fails, return `None` and print an informative message."
+        }
+      ]
+    }
+  ]
+}

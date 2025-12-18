@@ -1,0 +1,89 @@
+import React from 'react';
+import { ArrowLeft, Shield, Sun, Moon, Maximize, Minimize } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import Link from 'next/link';
+import { StatsBar } from './StatsBar';
+import { useTheme } from 'next-themes';
+
+interface GraphHeaderProps {
+    title: string;
+    progress: number;
+    courseId: string;
+    isAdmin?: boolean;
+    onOpenAdminPanel?: () => void;
+    isDark?: boolean;
+    isFullscreen?: boolean;
+    onToggleFullscreen?: () => void;
+}
+
+export const GraphHeader = ({ title, progress, isAdmin, onOpenAdminPanel, isDark, isFullscreen, onToggleFullscreen }: GraphHeaderProps) => {
+    const { setTheme } = useTheme();
+
+    return (
+        <div className={`px-4 py-3 flex items-center justify-between shadow-sm relative z-20 border-b ${
+            isDark
+                ? 'bg-slate-800 border-slate-700'
+                : 'bg-white border-slate-200'
+        }`}>
+            <div className="flex items-center gap-4">
+                <Link href="/courses">
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        className={isDark ? 'text-slate-400 hover:text-slate-100' : 'text-slate-500 hover:text-slate-900'}
+                    >
+                        <ArrowLeft size={20} />
+                    </Button>
+                </Link>
+                <div>
+                    <h1 className={`text-base font-bold flex items-center gap-2 ${isDark ? 'text-slate-100' : 'text-slate-900'}`}>
+                        {title}
+                        <span className={`text-xs font-normal px-2 py-0.5 rounded-full ${
+                            isDark
+                                ? 'text-slate-300 bg-slate-700'
+                                : 'text-slate-400 bg-slate-100'
+                        }`}>
+                             {Math.round(progress)}%
+                        </span>
+                    </h1>
+                </div>
+            </div>
+            <div className="flex items-center gap-2">
+                <StatsBar progress={progress} isDark={isDark} />
+                {/* Fullscreen Toggle */}
+                {onToggleFullscreen && (
+                    <Button
+                        variant="ghost"
+                        size="icon"
+                        onClick={onToggleFullscreen}
+                        className={isDark ? 'text-slate-400 hover:text-blue-400' : 'text-slate-500 hover:text-blue-600'}
+                        title={isFullscreen ? 'Выйти из полноэкранного режима' : 'Полноэкранный режим'}
+                    >
+                        {isFullscreen ? <Minimize size={18} /> : <Maximize size={18} />}
+                    </Button>
+                )}
+                {/* Theme Toggle */}
+                <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={() => setTheme(isDark ? 'light' : 'dark')}
+                    className={isDark ? 'text-slate-400 hover:text-yellow-400' : 'text-slate-500 hover:text-slate-900'}
+                    title={isDark ? 'Светлая тема' : 'Тёмная тема'}
+                >
+                    {isDark ? <Sun size={18} /> : <Moon size={18} />}
+                </Button>
+                {isAdmin && (
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={onOpenAdminPanel}
+                        className={isDark ? 'text-slate-400 hover:text-purple-400' : 'text-slate-500 hover:text-purple-600'}
+                        title="Панель администратора"
+                    >
+                        <Shield size={16} />
+                    </Button>
+                )}
+            </div>
+        </div>
+    );
+};

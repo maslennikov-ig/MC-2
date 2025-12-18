@@ -1,0 +1,17 @@
+{
+  "course_title": "Introduction to Python Programming",
+  "course_description": "A hands-on beginner course that teaches core Python 3 syntax, control flow, data structures, and file handling through short lectures and 40+ interactive coding labs. Learners build real CLI tools, automate tasks, and finish with a capstone data-analysis project.",
+  "course_overview": "The course is organized in four progressive milestones. Milestone 1 covers environment setup (VS Code, CPython, venv), syntax basics (variables, numeric & string operations, f-strings), and debugging with pdb. Milestone 2 deepens structured thinking: learners write reusable functions with type hints, practice tracing algorithms on paper, and master loops plus comprehensions by generating the Fibonacci sequence and filtering even numbers. Milestone 3 introduces collections—lists, tuples, sets, dicts—through realistic tasks such as parsing CSV logs into dicts, counting word frequencies, and simulating a shopping cart that applies discounts. Milestone 4 focuses on IO and modules: reading/writing JSON configs, using pathlib to batch-rename photos, consuming open REST APIs with requests, and packaging code into importable modules. Each concept is immediately applied in auto-graded labs; for example, after learning dictionaries learners build a grade-book that calculates GPA. A final capstone asks students to fetch COVID-19 data from an open API, clean it with list comprehensions, compute rolling averages, and export results to Excel. By the end, participants have a GitHub portfolio showcasing at least five runnable scripts, demonstrating fluency in Pythonic style (PEP 8), error handling, and virtual-environment best practices.",
+  "target_audience": "Career changers with zero coding background, analysts who automate Excel reports, STEM undergrads needing Python for labs, and hobbyists who want to build simple automation scripts.",
+  "estimated_duration_hours": 24,
+  "difficulty_level": "beginner",
+  "prerequisites": ["Basic computer literacy", "Ability to install software", "High-school algebra"],
+  "learning_outcomes": [
+    "Define and explain Python 3 core data types and operators with 90% accuracy on quizzes",
+    "Build command-line programs that accept user input and produce formatted output validated by unit tests",
+    "Create reusable functions with docstrings and type annotations following PEP 8 standards",
+    "Analyze runtime errors using tracebacks and implement try/except blocks to handle exceptions gracefully",
+    "Design scripts that read, process, and write local CSV and JSON files to automate repetitive tasks"
+  ],
+  "course_tags": ["Python", "CLI", "automation", "beginner", "data cleaning", "REST API", "portfolio project"]
+}

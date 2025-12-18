@@ -1,0 +1,128 @@
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "Guided, hands-on exploration of Python’s core data types through progressive coding exercises.",
+  "learning_objectives": [
+    "Declare and assign variables with descriptive names",
+    "Distinguish and correctly use int, float, str, bool, list, tuple, dict, and set",
+    "Predict and verify type behavior with type() and isinstance()",
+    "Convert between compatible types without runtime errors",
+    "Select the optimal data type for a given real-world problem"
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Primitive Types & Variable Assignment",
+      "lesson_objective": "Create and manipulate int, float, str, and bool variables while observing memory identity",
+      "key_topics": [
+        "naming conventions",
+        "dynamic typing",
+        "id() vs value equality",
+        "type() function",
+        "bool truthiness",
+        "string literals"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Temperature Converter",
+          "exercise_instructions": "Declare celsius_temp=25.0, convert to Fahrenheit, store in fahrenheit_temp, print both values and types."
+        },
+        {
+          "exercise_title": "Truthy Detective",
+          "exercise_instructions": "Assign five different values that evaluate to False in bool(); print variable names and bool() results."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Collections: Lists & Tuples",
+      "lesson_objective": "Build, index, slice, and mutate lists while contrasting immutable tuples",
+      "key_topics": [
+        "zero-based indexing",
+        "negative indices",
+        "slice notation",
+        "list methods",
+        "tuple unpacking",
+        "nested collections"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Shopping List Manager",
+          "exercise_instructions": "Start with empty list; append 3 items, insert 1 at index 1, remove last, print final list."
+        },
+        {
+          "exercise_title": "Coordinate Swap",
+          "exercise_instructions": "Assign tuple (3,4) to point; unpack into x,y; swap values using tuple unpacking; print new point."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "Mappings & Sets",
+      "lesson_objective": "Construct and query dictionaries and sets to model real-world relationships",
+      "key_topics": [
+        "dict keys/values",
+        "hashability",
+        "set operations",
+        "comprehension syntax",
+        "membership testing",
+        "performance traits"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Phonebook Lookup",
+          "exercise_instructions": "Create dict with 3 name-number pairs; prompt user for name; print number or 'Not found'."
+        },
+        {
+          "exercise_title": "Unique Tags",
+          "exercise_instructions": "Given list with duplicates, convert to set, add two new tags, print sorted set."
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "Type Conversion & Input",
+      "lesson_objective": "Safely convert user input to required numeric or collection types with error awareness",
+      "key_topics": [
+        "int()/float() casting",
+        "str() formatting",
+        "eval() dangers",
+        "list() vs tuple() constructors",
+        "input() prompts",
+        "try/except preview"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Safe Division Calculator",
+          "exercise_instructions": "Read two inputs, convert to float inside try/except, divide, print result rounded to 2 decimals."
+        },
+        {
+          "exercise_title": "CSV to List",
+          "exercise_instructions": "Read comma-separated numbers from input, split, convert to list of ints, print sum and average."
+        }
+      ]
+    },
+    {
+      "lesson_number": 5,
+      "lesson_title": "Mini Project: Student Gradebook",
+      "lesson_objective": "Combine all data types to build a console gradebook that stores, updates, and reports student data",
+      "key_topics": [
+        "choosing structures",
+        "nested dicts",
+        "list inside dict",
+        "formatting output",
+        "incremental development"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Gradebook Builder",
+          "exercise_instructions": "Create empty dict; add 2 students with name as key and list of 3 scores as value; print entire gradebook."
+        },
+        {
+          "exercise_title": "Average Calculator",
+          "exercise_instructions": "For each student compute and store average score as new key 'avg'; print formatted report."
+        }
+      ]
+    }
+  ]
+}

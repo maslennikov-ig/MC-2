@@ -1,0 +1,30 @@
+{
+  "course_title": "Introduction to Python Programming for Beginners",
+  "course_description": "Learn the fundamentals of programming with Python, the world's most versatile language. Build a solid foundation and create your first applications from scratch.",
+  "course_overview": "This course provides a gentle introduction to the core concepts of programming using Python. You will start from absolute zero, learning about variables, data types, and basic operations. Progress through control flow with conditionals and loops, then explore essential data structures like lists and dictionaries. You'll learn to write your own functions, handle files, and debug errors. The course combines theoretical concepts with hands-on coding exercises and mini-projects to ensure you gain practical, applicable skills for automating tasks, analyzing data, or pursuing further study in software development and data science.",
+  "target_audience": "Absolute beginners with no prior coding experience, students, and professionals seeking to add programming to their skillset.",
+  "estimated_duration_hours": 20,
+  "difficulty_level": "beginner",
+  "prerequisites": [
+    "Basic computer literacy",
+    "Ability to install software on your computer",
+    "No prior programming experience required"
+  ],
+  "learning_outcomes": [
+    "Define core programming terminology and Python syntax",
+    "Apply conditional logic and loops to control program flow",
+    "Construct functions to create reusable blocks of code",
+    "Differentiate between fundamental data structures like lists, tuples, and dictionaries",
+    "Build a simple Python application from scratch to solve a basic problem"
+  ],
+  "course_tags": [
+    "Python",
+    "Programming",
+    "Beginner",
+    "Coding",
+    "Software Development",
+    "Automation",
+    "Data Structures",
+    "Functions"
+  ]
+}

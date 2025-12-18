@@ -1,0 +1,29 @@
+
+
+{
+  "course_title": "Introduction to Python Programming",
+  "course_description": "This beginner-level technical programming course provides a thorough foundation in Python syntax, logic, and application development. Designed for absolute newcomers, it covers essential concepts through hands-on exercises including variable manipulation, conditional statements, loop structures, and basic data handling. Students will gain practical experience writing scripts for automation, data processing, and problem-solving scenarios while developing computational thinking skills applicable to web development, data analysis, and software engineering career paths.",
+  "course_overview": "This structured course begins with environment setup using IDLE and VS Code, followed by core syntax fundamentals through interactive examples like temperature converters and unit calculators. Module 2 explores data structures via practical implementations: building student grade trackers with dictionaries and inventory systems with lists. Control flow concepts are reinforced through building password validators and BMI calculators using if-else statements and loops. Functions are taught by creating reusable modules for currency conversion and data validation. File handling techniques are demonstrated through contact list managers that read/write CSV files. The capstone project requires developing a text-based quiz application with score tracking, incorporating error handling for user inputs. Each section includes debugging exercises targeting common beginner mistakes like indentation errors and type mismatches, with real-world parallels to automate report generation and analyze survey data.",
+  "target_audience": "Absolute beginners with no coding experience including career changers entering tech fields, high school students preparing for AP Computer Science, marketing professionals automating data reports, educators creating classroom tools, and hobbyists building personal projects like home automation scripts. Specifically targets individuals comfortable with basic computer operations but unfamiliar with programming concepts.",
+  "estimated_duration_hours": 40,
+  "difficulty_level": "beginner",
+  "prerequisites": [
+    "Basic computer navigation skills",
+    "Familiarity with file management concepts"
+  ],
+  "learning_outcomes": [
+    "Define programming terminology including variables, data types, and operators through practical code examples",
+    "Build functional scripts that automate file organization using os module operations",
+    "Create data processing programs that manipulate lists and dictionaries for inventory management",
+    "Analyze logical errors in loop structures to correct infinite loop conditions",
+    "Develop modular applications by writing parameterized functions for currency conversion tasks"
+  ],
+  "course_tags": [
+    "python",
+    "beginner_programming",
+    "coding_fundamentals",
+    "automation",
+    "data_structures",
+    "scripting"
+  ]
+}

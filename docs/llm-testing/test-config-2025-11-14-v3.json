@@ -1,0 +1,216 @@
+{
+  "testRunId": "2025-11-14-v3-parallel-eval",
+  "testVersion": "v3",
+  "date": "2025-11-14",
+  "purpose": "THIRD complete quality-focused model evaluation (v3) with PARALLEL execution of all 11 models simultaneously for maximum speed.",
+  "previousRuns": [
+    {
+      "testRunId": "2025-11-13-complete-quality-eval",
+      "testVersion": "v1",
+      "outputDirectory": "specs/008-generation-generation-json/quality-tests/",
+      "notes": "First test completed, sequential execution"
+    },
+    {
+      "testRunId": "2025-11-13-v2-quality-eval",
+      "testVersion": "v2",
+      "outputDirectory": "docs/llm-testing/test-run-2/",
+      "notes": "Second test completed, sequential execution"
+    }
+  ],
+  "executionStrategy": "PARALLEL",
+  "parallelization": {
+    "enabled": true,
+    "maxConcurrentModels": 11,
+    "maxConcurrentRequestsPerModel": 4,
+    "description": "All 11 models run in parallel, each model can have up to 4 concurrent scenario runs"
+  },
+  "models": [
+    {
+      "name": "Kimi K2 0905",
+      "slug": "kimi-k2-0905",
+      "apiName": "moonshotai/kimi-k2-0905",
+      "description": "Regular version without thinking tokens",
+      "tier": "S-TIER",
+      "v2Results": "100% overall, 12/12 success - UNIVERSAL CHAMPION"
+    },
+    {
+      "name": "Kimi K2 Thinking",
+      "slug": "kimi-k2-thinking",
+      "apiName": "moonshotai/kimi-k2-thinking",
+      "description": "Version with thinking tokens for deep reasoning",
+      "tier": "S-TIER",
+      "v2Results": "100% metadata (4/6), 0% lessons (0/6) - METADATA SPECIALIST"
+    },
+    {
+      "name": "DeepSeek v3.2 Exp",
+      "slug": "deepseek-v32-exp",
+      "apiName": "deepseek/deepseek-v3.2-exp",
+      "description": "Experimental version, cheapest and fastest",
+      "tier": "S-TIER",
+      "v2Results": "100% overall, 12/12 success"
+    },
+    {
+      "name": "DeepSeek Chat v3.1",
+      "slug": "deepseek-chat-v31",
+      "apiName": "deepseek/deepseek-chat-v3.1",
+      "description": "Stable version, excellent Russian support",
+      "tier": "S-TIER",
+      "v2Results": "100% overall, 12/12 success"
+    },
+    {
+      "name": "Grok 4 Fast",
+      "slug": "grok-4-fast",
+      "apiName": "x-ai/grok-4-fast",
+      "description": "Speed-focused model, requires API key",
+      "tier": "S-TIER",
+      "v2Results": "100% overall, 12/12 success"
+    },
+    {
+      "name": "GLM 4.6",
+      "slug": "glm-46",
+      "apiName": "z-ai/glm-4.6",
+      "description": "Good for multilingual content",
+      "tier": "A-TIER",
+      "v2Results": "100% overall, 12/12 success"
+    },
+    {
+      "name": "MiniMax M2",
+      "slug": "minimax-m2",
+      "apiName": "minimax/minimax-m2",
+      "description": "New model with reasoning tokens",
+      "tier": "A-TIER",
+      "v2Results": "100% overall, 12/12 success"
+    },
+    {
+      "name": "Qwen3 32B",
+      "slug": "qwen3-32b",
+      "apiName": "qwen/qwen3-32b",
+      "description": "Good quality but markdown wrapper issues",
+      "tier": "B-TIER",
+      "v2Results": "100% overall but markdown wrapper issues in some runs"
+    },
+    {
+      "name": "Qwen3 235B Thinking",
+      "slug": "qwen3-235b-thinking",
+      "apiName": "qwen/qwen3-235b-a22b-thinking-2507",
+      "description": "Excellent quality with deep reasoning",
+      "tier": "A-TIER",
+      "v2Results": "98.9% overall, minor RU lesson quality reduction (95.7%)"
+    },
+    {
+      "name": "OSS 120B",
+      "slug": "oss-120b",
+      "apiName": "openai/gpt-oss-120b",
+      "description": "Excellent for Russian, poor for English",
+      "tier": "B-TIER",
+      "v2Results": "93.8% overall, RU lesson quality issues (76.7%)"
+    },
+    {
+      "name": "Qwen3 235B A22B",
+      "slug": "qwen3-235b-a22b",
+      "apiName": "qwen/qwen3-235b-a22b",
+      "description": "Reasoning timeout issues",
+      "tier": "C-TIER",
+      "v2Results": "Metadata generation failures (0/6), lessons OK (2/6)"
+    }
+  ],
+  "entities": [
+    {
+      "id": "metadata",
+      "name": "Course Metadata",
+      "description": "Course-level information including title, description, learning outcomes, etc.",
+      "schemaFields": [
+        "course_title",
+        "course_description",
+        "course_overview",
+        "target_audience",
+        "estimated_duration_hours",
+        "difficulty_level",
+        "prerequisites",
+        "learning_outcomes",
+        "course_tags"
+      ]
+    },
+    {
+      "id": "lesson",
+      "name": "Lesson Structure",
+      "description": "Section-level structure with 3-5 lessons, objectives, topics, exercises",
+      "schemaFields": [
+        "section_number",
+        "section_title",
+        "section_description",
+        "learning_objectives",
+        "lessons"
+      ]
+    }
+  ],
+  "testScenarios": [
+    {
+      "id": "metadata-en",
+      "entityId": "metadata",
+      "language": "en",
+      "title": "Introduction to Python Programming",
+      "description": "Beginner-level technical programming course",
+      "difficultyLevel": "beginner",
+      "category": "technical"
+    },
+    {
+      "id": "metadata-ru",
+      "entityId": "metadata",
+      "language": "ru",
+      "title": "Машинное обучение для начинающих",
+      "description": "Intermediate-level conceptual ML course",
+      "difficultyLevel": "intermediate",
+      "category": "conceptual"
+    },
+    {
+      "id": "lesson-en",
+      "entityId": "lesson",
+      "language": "en",
+      "title": "Variables and Data Types in Python",
+      "description": "Hands-on programming section with exercises",
+      "difficultyLevel": "beginner",
+      "category": "programming"
+    },
+    {
+      "id": "lesson-ru",
+      "entityId": "lesson",
+      "language": "ru",
+      "title": "Основы нейронных сетей",
+      "description": "Conceptual theory section with examples",
+      "difficultyLevel": "intermediate",
+      "category": "theory"
+    }
+  ],
+  "testParameters": {
+    "runsPerScenario": 3,
+    "temperature": 0.7,
+    "maxTokens": 8000,
+    "waitBetweenRequests": 500,
+    "timeout": 120000,
+    "retryOnError": false
+  },
+  "outputDirectory": "docs/llm-testing/test-run-3",
+  "expectedTotalCalls": 132,
+  "expectedDuration": "15-25 minutes (parallel execution)",
+  "comparisonWithPreviousRuns": {
+    "enabled": true,
+    "v1ResultsPath": "specs/008-generation-generation-json/quality-tests/",
+    "v2ResultsPath": "docs/llm-testing/test-run-2/",
+    "compareMetrics": [
+      "quality scores",
+      "consistency across runs",
+      "reliability",
+      "schema compliance",
+      "performance variance"
+    ]
+  },
+  "notes": [
+    "THIRD TEST RUN (v3) - PARALLEL EXECUTION",
+    "Output directory: docs/llm-testing/test-run-3/",
+    "All 11 models run simultaneously for maximum speed",
+    "Each model processes all 4 scenarios (12 total runs per model)",
+    "Will compare consistency with v1 and v2 results",
+    "Expected significant time savings due to parallel execution"
+  ]
+}

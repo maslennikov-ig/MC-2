@@ -1,0 +1,34 @@
+{
+  "course_title": "Introduction to Python Programming",
+  "course_description": "Start your coding journey with Python! This beginner-friendly course teaches core programming concepts through hands-on exercises, helping you build real-world applications and laying the foundation for advanced software development.",
+  "course_overview": "This comprehensive course introduces learners to the fundamentals of Python programming, one of the most popular and versatile programming languages. Topics include variables, data types, control structures, functions, file handling, and basic data structures like lists and dictionaries. Through interactive coding exercises and practical projects, students will gain confidence in writing clean, functional Python code. The course also emphasizes problem-solving techniques and best practices in software development, preparing learners for further study in data science, web development, or automation.",
+  "target_audience": "Beginners with little to no programming experience who want to learn Python for career development or personal projects.",
+  "estimated_duration_hours": 40,
+  "difficulty_level": "beginner",
+  "prerequisites": [
+    "Basic computer literacy",
+    "Familiarity with using a web browser and text editor",
+    "No prior programming experience required"
+  ],
+  "learning_outcomes": [
+    "Write and execute Python scripts using core syntax and data types",
+    "Implement control flow structures such as loops and conditionals",
+    "Define and use functions to modularize code",
+    "Manipulate strings, lists, dictionaries, and tuples effectively",
+    "Read from and write to files using Python",
+    "Solve simple programming problems using algorithmic thinking",
+    "Debug basic syntax and logic errors in Python code"
+  ],
+  "course_tags": [
+    "Python",
+    "Programming",
+    "Beginner Coding",
+    "Software Development",
+    "Data Types",
+    "Functions",
+    "Control Flow",
+    "File Handling",
+    "Problem Solving",
+    "Automation"
+  ]
+}

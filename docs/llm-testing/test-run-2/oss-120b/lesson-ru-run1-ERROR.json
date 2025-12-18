@@ -1,0 +1,9 @@
+{
+  "model": "OSS 120B",
+  "modelSlug": "oss-120b",
+  "scenario": "lesson-ru",
+  "runNumber": 1,
+  "error": "Cannot read properties of undefined (reading 'message')",
+  "timestamp": "2025-11-13T18:33:30.378Z",
+  "duration": 14936
+}

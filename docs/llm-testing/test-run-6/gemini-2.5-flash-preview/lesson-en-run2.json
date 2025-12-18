@@ -1,0 +1,79 @@
+{
+  "section_number": 1,
+  "section_title": "Introduction to Variables and Core Data Types in Python",
+  "section_description": "This hands-on section introduces the fundamental concepts of variables, how to assign values, and the primary built-in data types (integers, floats, strings, and booleans) essential for all Python programming.",
+  "learning_objectives": [
+    "Define and correctly use Python variables following naming conventions.",
+    "Identify and distinguish between the four primary data types (int, float, str, bool).",
+    "Perform basic assignment and type-checking operations using the type() function.",
+    "Manipulate and perform simple operations on string and numeric variables."
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Variable Assignment and Naming Conventions",
+      "lesson_objective": "Students will be able to declare and initialize variables correctly and adhere to standard Python naming conventions (PEP 8).",
+      "key_topics": [
+        "What is a variable?",
+        "Variable declaration and assignment (= operator)",
+        "Python naming rules and best practices (snake_case)",
+        "Reassignment of variables",
+        "Dynamic typing in Python"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Creating Your First Variables",
+          "exercise_instructions": "Create three variables: 'user_age' (integer), 'user_name' (string), and 'is_active' (boolean). Print the value of each variable to the console."
+        },
+        {
+          "exercise_title": "Variable Reassignment Challenge",
+          "exercise_instructions": "Assign the value 10 to a variable called 'counter'. Then, reassign 'counter' to the value 25. Print the final value of 'counter' and explain why the initial value is overwritten."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Numeric Data Types: Integers and Floats",
+      "lesson_objective": "Students will be able to distinguish between integers and floating-point numbers and perform basic arithmetic operations using them.",
+      "key_topics": [
+        "Integers (int)",
+        "Floating-point numbers (float)",
+        "The difference between int and float",
+        "Basic arithmetic operators (+, -, *, /, //, %)",
+        "Using the type() function to verify data types"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Calculating Area and Type Checking",
+          "exercise_instructions": "Define 'radius' as 5 (int) and 'pi' as 3.14159 (float). Calculate the area (pi * radius * radius). Print the result and use the type() function on the result variable."
+        },
+        {
+          "exercise_title": "Integer Division Practice",
+          "exercise_instructions": "Calculate the result of 17 divided by 3 using both standard division (/) and floor division (//). Print both results and explain the difference between the two operations."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "String and Boolean Data Types",
+      "lesson_objective": "Students will be able to declare strings using different quotation marks, understand boolean logic, and perform basic string concatenation.",
+      "key_topics": [
+        "Strings (str) and quotation marks (single vs. double)",
+        "Boolean values (True/False)",
+        "Basic string concatenation (+ operator)",
+        "Introduction to f-strings (formatted strings)",
+        "Type conversion basics (int(), str(), bool())"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Building a Profile String",
+          "exercise_instructions": "Define variables 'first_name', 'last_name', and 'is_student' (boolean). Use an f-string to create a sentence that combines these variables, such as: 'The user [First Name] [Last Name] is a student: [True/False].'"
+        },
+        {
+          "exercise_title": "Boolean Logic Check",
+          "exercise_instructions": "Assign the result of the comparison (10 > 5) to a variable called 'is_greater'. Assign the result of (5 == 5.0) to a variable called 'is_equal'. Print both results and their respective types."
+        }
+      ]
+    }
+  ]
+}

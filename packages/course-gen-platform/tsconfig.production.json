@@ -1,0 +1,16 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "Bundler",
+    "esModuleInterop": true,
+    "strict": true,
+    "skipLibCheck": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./dist/*"],
+      "@megacampus/shared-types": ["./node_modules/@megacampus/shared-types"],
+      "@megacampus/shared-types/*": ["./node_modules/@megacampus/shared-types/*"]
+    }
+  }
+}

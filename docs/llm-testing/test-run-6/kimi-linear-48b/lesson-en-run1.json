@@ -1,0 +1,119 @@
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "Master Python variables and data types through hands-on coding exercises and real-world examples.",
+  "learning_objectives": [
+    "Define and assign variables using valid Python identifiers",
+    "Demonstrate understanding of Python's built-in data types",
+    "Perform type conversion and validation operations",
+    "Write code that creates variables with appropriate data types"
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Introduction to Variables",
+      "lesson_objective": "Create and assign variables using different naming conventions",
+      "keyTopics": [
+        "Variable assignment syntax",
+        "Valid identifier rules",
+        "Variable reassignment",
+        "Multiple assignment",
+        "Variable scope basics"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Create Your First Variables",
+          "exercise_instructions": "Create variables for a person's name, age, and favorite color. Print each variable on a separate line using f-strings."
+        },
+        {
+          "exercise_title": "Variable Reassignment Practice",
+          "exercise_instructions": "Create a variable called 'score' and assign it the value 0. Reassign score three times with different values, printing the result each time."
+        },
+        {
+          "exercise_title": "Multiple Assignment Challenge",
+          "exercise_instructions": "Use multiple assignment to create three variables: x, y, and z, all with the value 10. Print each variable."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Understanding Python Data Types",
+      "lesson_objective": "Identify and work with Python's core built-in data types",
+      "keyTopics": [
+        "Numbers: int, float, complex",
+        "Strings: single, double, and triple quotes",
+        "Booleans: True and False",
+        "NoneType",
+        "Type checking with type()",
+        "Type conversion functions"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Type Identification Exercise",
+          "exercise_instructions": "Create variables of different types (int, float, string, boolean, None). Use type() to check each variable's type and print the results."
+        },
+        {
+          "exercise_title": "Type Conversion Practice",
+          "exercise_instructions": "Create a string '123' and convert it to an integer. Create a float 3.14 and convert it to a string. Print both converted values."
+        },
+        {
+          "exercise_title": "Boolean Logic Exercise",
+          "exercise_instructions": "Create boolean variables representing whether a number is positive, even, or greater than 50. Use comparison operators to set these values."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "Working with Strings and Numbers",
+      "lesson_objective": "Perform operations on strings and numeric types",
+      "keyTopics": [
+        "String concatenation and repetition",
+        "Numeric operations: addition, subtraction, multiplication, division",
+        "String methods: upper(), lower(), len()",
+        "Format strings with f-strings",
+        "Type validation and error handling"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "String Manipulation Lab",
+          "exercise_instructions": "Create a first_name and last_name variable. Concatenate them with a space and print the full name in uppercase. Also print the length of the full name."
+        },
+        {
+          "exercise_title": "Calculator Functions",
+          "exercise_instructions": "Create two variables with numeric values. Perform addition, subtraction, multiplication, and division. Store results in new variables and print each operation."
+        },
+        {
+          "exercise_title": "Data Type Checker",
+          "exercise_instructions": "Create variables of different types and write functions to check if a variable is a number, string, or boolean. Print appropriate messages for each type."
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "Advanced Data Types and Best Practices",
+      "lesson_objective": "Use lists, dictionaries, and tuples while following Python naming conventions",
+      "keyTopics": [
+        "Lists: creation, indexing, and modification",
+        "Dictionaries: key-value pairs",
+        "Tuples: immutable sequences",
+        "Variable naming conventions (PEP 8)",
+        "Constants and readonly variables",
+        "Best practices for variable naming"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Data Structure Collection",
+          "exercise_instructions": "Create a list of 5 numbers, a dictionary with student names as keys and scores as values, and a tuple with 3 colors. Print each structure."
+        },
+        {
+          "exercise_title": "Shopping List Manager",
+          "exercise_instructions": "Create a shopping list using a list variable. Add 3 items, remove one item, and print the updated list."
+        },
+        {
+          "exercise_title": "Configuration Settings",
+          "exercise_instructions": "Create a dictionary with application settings using constant-like variable names. Access and print specific settings."
+        }
+      ]
+    }
+  ]
+}

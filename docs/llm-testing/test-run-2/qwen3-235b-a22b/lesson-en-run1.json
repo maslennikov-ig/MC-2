@@ -1,0 +1,119 @@
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "Hands-on programming section with exercises focusing on variable declaration, data type manipulation, and type conversion through practical coding tasks.",
+  "learning_objectives": [
+    "Declare variables with valid Python naming conventions",
+    "Identify and differentiate between core data types (int, float, str, bool, None)",
+    "Convert between data types using casting functions",
+    "Apply string formatting techniques",
+    "Differentiate between mutable and immutable data types"
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Creating and Naming Variables",
+      "lesson_objective": "Create valid variables following Python naming conventions",
+      "key_topics": [
+        "Variable assignment syntax",
+        "Legal/illegal variable names",
+        "Dynamic typing behavior",
+        "Underscore naming conventions"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Variable Declaration Practice",
+          "exercise_instructions": "Create variables storing your age, favorite color, and subscription status using appropriate naming conventions"
+        },
+        {
+          "exercise_title": "Naming Error Debugging",
+          "exercise_instructions": "Identify and fix invalid variable names in a provided code block containing 5 syntax errors"
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Exploring Core Data Types",
+      "lesson_objective": "Identify and manipulate Python's core data types",
+      "key_topics": [
+        "Integer and float operations",
+        "String immutability",
+        "Boolean value representation",
+        "Type checking with type() and isinstance()"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Type Identification Lab",
+          "exercise_instructions": "Write code to determine the data type of 10 provided values using both type() and isinstance() functions"
+        },
+        {
+          "exercise_title": "Type Prediction Challenge",
+          "exercise_instructions": "Predict then verify the output of arithmetic operations combining integers and floats"
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "Type Conversion Techniques",
+      "lesson_objective": "Convert between data types using explicit and implicit casting",
+      "key_topics": [
+        "String to numeric conversion",
+        "Float to integer truncation",
+        "Boolean evaluation of values",
+        "Automatic type promotion"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Temperature Converter",
+          "exercise_instructions": "Create a program converting Celsius temperatures to Fahrenheit using string input and numeric conversion"
+        },
+        {
+          "exercise_title": "Data Type Analysis",
+          "exercise_instructions": "Analyze and document type changes in mathematical operations between different data type pairs"
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "String Manipulation Fundamentals",
+      "lesson_objective": "Manipulate strings using concatenation, formatting, and slicing",
+      "key_topics": [
+        "String concatenation vs interpolation",
+        "Indexing and slicing operations",
+        "Common string methods (upper, lower, strip)",
+        "Escape character usage"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "User Profile Builder",
+          "exercise_instructions": "Construct a formatted user profile string from separate input variables using f-strings and concatenation"
+        },
+        {
+          "exercise_title": "String Analysis Tool",
+          "exercise_instructions": "Create a program analyzing string properties including length, uppercase conversion, and whitespace stripping"
+        }
+      ]
+    },
+    {
+      "lesson_number": 5,
+      "lesson_title": "Boolean Logic and None Type",
+      "lesson_objective": "Evaluate boolean expressions and handle NoneType values",
+      "key_topics": [
+        "Comparison operators",
+        "Logical operator precedence",
+        "Truth value testing",
+        "NoneType representation and usage"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Login System Validator",
+          "exercise_instructions": "Implement a basic login validation system evaluating username/password presence and length requirements"
+        },
+        {
+          "exercise_title": "Optional Value Handler",
+          "exercise_instructions": "Create a function that gracefully handles None values in mathematical operations with fallback behavior"
+        }
+      ]
+    }
+  ]
+}

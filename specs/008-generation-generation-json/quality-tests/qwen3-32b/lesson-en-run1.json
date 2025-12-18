@@ -1,0 +1,94 @@
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "This section provides hands-on practice with Python variables and core data types. Students will learn to declare variables, work with integers, floats, strings, booleans, and None values, perform type conversions, and debug common data type issues through structured coding exercises.",
+  "learning_objectives": [
+    "Declare variables using Python syntax and assign appropriate values",
+    "Identify and utilize core Python data types including int, float, str, bool, and None",
+    "Convert between data types using type conversion functions",
+    "Debug code errors related to incorrect data type usage",
+    "Apply best practices for variable naming and type inference"
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Declaring Variables and Basic Data Types",
+      "lesson_objective": "Students will be able to declare variables and assign integer, float, string, and boolean values correctly",
+      "key_topics": ["Variable declaration syntax", "Integer data type", "Float data type", "String data type", "Boolean data type"],
+      "exercises": [
+        {
+          "exercise_title": "Basic Variable Assignment",
+          "exercise_instructions": "Create variables of each basic data type (int, float, str, bool) and use the type() function to verify their data types"
+        },
+        {
+          "exercise_title": "Arithmetic Operations",
+          "exercise_instructions": "Perform addition, subtraction, multiplication, and division operations with integers and floats, storing results in new variables"
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Dynamic Typing and Type Inference",
+      "lesson_objective": "Students will demonstrate understanding of Python's dynamic typing behavior by predicting and verifying variable types",
+      "key_topics": ["Dynamic type assignment", "Type inference rules", "Updating variables with different types", "type() vs isinstance()"],
+      "exercises": [
+        {
+          "exercise_title": "Variable Reassignment",
+          "exercise_instructions": "Create a variable, assign it a string value, then reassign it to a boolean. Use type checks to document the type changes"
+        },
+        {
+          "exercise_title": "Type Prediction Challenge",
+          "exercise_instructions": "Write a program that assigns various operations to variables and predict the resulting data types before running the code"
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "Type Conversion and Casting",
+      "lesson_objective": "Students will successfully convert between data types using int(), float(), str(), and bool() functions",
+      "key_topics": ["Implicit type conversion", "Explicit type casting", "Conversion rules between data types", "Error handling in type conversion"],
+      "exercises": [
+        {
+          "exercise_title": "User Input Conversion",
+          "exercise_instructions": "Write a program that takes user input as a string and converts it to integer and float types, handling potential errors"
+        },
+        {
+          "exercise_title": "Data Type Transformation",
+          "exercise_instructions": "Convert a float to integer, a string to boolean, and a boolean to string while documenting the output values"
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "Special Data Types (None and Literals)",
+      "lesson_objective": "Students will implement programs that demonstrate proper usage of None and Python literals",
+      "key_topics": ["None type behavior", "Integer and string literals", "Type-specific operations", "Truthiness evaluations"],
+      "exercises": [
+        {
+          "exercise_title": "None Value Handling",
+          "exercise_instructions": "Create a function that returns None under specific conditions and handles this return value appropriately in the calling code"
+        },
+        {
+          "exercise_title": "Literal Type Analysis",
+          "exercise_instructions": "Write code to determine the data types of various literals including 0, 0.0, '0', and False"
+        }
+      ]
+    },
+    {
+      "lesson_number": 5,
+      "lesson_title": "Debugging Data Type Issues",
+      "lesson_objective": "Students will identify and resolve data type-related errors in provided code samples",
+      "key_topics": ["Type mismatch errors", "Unexpected conversion results", "Debugging techniques", "Type annotation basics"],
+      "exercises": [
+        {
+          "exercise_title": "Error Identification",
+          "exercise_instructions": "Analyze a code sample with intentional type errors and modify it to execute without errors"
+        },
+        {
+          "exercise_title": "Conversion Bug Fix",
+          "exercise_instructions": "Debug a program where type conversions produce incorrect results by implementing proper casting"
+        }
+      ]
+    }
+  ]
+}

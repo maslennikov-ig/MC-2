@@ -1,0 +1,227 @@
+-- Migration: 20251104172737_remove_unused_indexes.sql
+-- Purpose: Remove genuinely unused indexes after comprehensive analysis
+-- Priority: P2 (Low priority - optimization, no functional impact)
+-- Estimated Impact: Minimal (tiny table, negligible savings)
+--
+-- Background:
+-- Supabase performance advisor identified 32 unused indexes. After detailed analysis,
+-- only 1 index was determined to be truly redundant and safe to remove.
+--
+-- Analysis Report: docs/reports/database/2025-11/2025-11-04-unused-indexes-analysis.md
+--
+-- Indexes Analyzed: 32 total
+-- Indexes Removed: 1 (3% removal rate)
+-- Indexes Kept: 31 (97% retention rate)
+--
+-- Conservative Approach Rationale:
+-- 1. Database is early stage (< 100 rows per table) - usage patterns not yet established
+-- 2. "Unused" reflects lack of production data, not lack of purpose
+-- 3. All indexes serve valid anticipated query patterns
+-- 4. Cost of keeping unused indexes is minimal at current scale
+-- 5. Risk of removing needed indexes outweighs storage savings
+--
+-- Rollback Instructions:
+-- CREATE INDEX idx_llm_model_config_phase ON llm_model_config(phase_name);
+--
+-- ==============================================================================
+-- SECTION 1: INDEXES BEING REMOVED (1 index)
+-- ==============================================================================
+
+-- ------------------------------------------------------------------------------
+-- Index: idx_llm_model_config_phase
+-- Table: llm_model_config (5 rows, 5 distinct phase names)
+-- ------------------------------------------------------------------------------
+-- REASON FOR REMOVAL:
+-- 1. Tiny table (5 rows - one per analysis phase + emergency)
+-- 2. Very low cardinality (only 5 distinct values)
+-- 3. Full table scan on 5 rows is essentially free (< 1ms)
+-- 4. PostgreSQL query planner unlikely to use index for such small table
+-- 5. Index maintenance cost outweighs any theoretical benefit
+--
+-- QUERIES AFFECTED: None (all queries will use full table scan, which is faster)
+-- RISK LEVEL: None (zero performance impact)
+-- ESTIMATED SAVINGS: ~8KB disk space
+
+DROP INDEX IF EXISTS idx_llm_model_config_phase;
+
+-- Verification: Confirm index is dropped
+DO $$
+BEGIN
+  IF NOT EXISTS (
+    SELECT 1 FROM pg_indexes
+    WHERE schemaname = 'public'
+      AND indexname = 'idx_llm_model_config_phase'
+  ) THEN
+    RAISE NOTICE 'Index idx_llm_model_config_phase successfully removed';
+  ELSE
+    RAISE EXCEPTION 'Failed to remove index idx_llm_model_config_phase';
+  END IF;
+END;
+$$;
+
+-- ==============================================================================
+-- SECTION 2: INDEXES BEING KEPT (31 indexes)
+-- ==============================================================================
+--
+-- All other unused indexes are being retained for the following reasons:
+--
+-- CATEGORY 1: Foreign Key & Join Operations (1 index)
+-- -------------------------------------------------------
+-- idx_lessons_section_id
+--   → Essential for JOIN queries between lessons and sections
+--   → Will be heavily used when querying lesson hierarchies
+--
+-- CATEGORY 2: Status & Filtering Queries (8 indexes)
+-- -------------------------------------------------------
+-- idx_courses_status
+--   → Common query pattern: "WHERE status = 'published'"
+-- idx_courses_generation_status
+--   → Filters by generation workflow states
+-- idx_courses_active_generation
+--   → Critical for monitoring active course generations
+-- idx_job_status_status
+--   → Essential for BullMQ: "WHERE status = 'pending'"
+-- idx_lessons_status
+--   → Used for "WHERE status = 'published'" in student views
+-- idx_enrollments_status
+--   → Supports active vs completed enrollment queries
+-- idx_job_status_cancelled
+--   → Optimizes cancellation lookups (rare but critical)
+-- idx_job_status_org_cancelled
+--   → Org-specific cancellation for multi-tenancy
+--
+-- CATEGORY 3: Temporal & Sorting Queries (4 indexes)
+-- -------------------------------------------------------
+-- idx_job_status_created_at
+--   → Used for "recent jobs" and FIFO ordering
+-- idx_job_status_updated_at
+--   → Supports polling for job status changes
+-- idx_enrollments_enrolled_at
+--   → Used for "recent enrollments" reports
+-- idx_generation_history_timestamp
+--   → Essential for chronological audit trail views
+--
+-- CATEGORY 4: Search & Discovery (5 indexes)
+-- -------------------------------------------------------
+-- idx_courses_difficulty
+--   → Supports "WHERE difficulty = 'beginner'"
+-- idx_courses_language
+--   → Essential for multi-language catalogs
+-- idx_courses_is_published
+--   → Shows only published courses to students
+-- idx_courses_share_token
+--   → Lookup by share token for anonymous access
+-- idx_lessons_type
+--   → Supports "WHERE lesson_type = 'video'"
+--
+-- CATEGORY 5: Deduplication & Integrity (1 index)
+-- -------------------------------------------------------
+-- idx_file_catalog_dedup_lookup
+--   → Critical for preventing duplicate file uploads
+--
+-- CATEGORY 6: Error & Monitoring Queries (4 indexes)
+-- -------------------------------------------------------
+-- idx_error_logs_severity_critical
+--   → Essential for alerting dashboards
+-- idx_system_metrics_event_type
+--   → Used for analytics: "WHERE event_type = 'job_rollback'"
+-- idx_system_metrics_severity
+--   → Supports error/warn/info event grouping
+-- idx_generation_history_transitions
+--   → Analyzes state transition patterns for debugging
+--
+-- CATEGORY 7: User & Relationship Queries (4 indexes)
+-- -------------------------------------------------------
+-- idx_users_email
+--   → Essential for login and duplicate checks
+-- idx_system_metrics_user_id
+--   → Tracks system events per user for auditing
+-- idx_error_logs_user_id
+--   → Supports "errors for specific user"
+-- idx_generation_history_changed_by
+--   → Tracks who triggered status changes
+--
+-- CATEGORY 8: JSONB Indexes (2 indexes)
+-- -------------------------------------------------------
+-- idx_courses_analysis_result_gin
+--   → Stage 4 feature (brand new - Nov 1, 2025)
+--   → May be used for containment queries: analysis_result @> '{"category": "..."}'
+--   → Too early to determine if needed - keeping for safety
+-- idx_file_catalog_parsed_content_metadata
+--   → GIN index on nested JSONB path for docling metadata searches
+--   → Uncertain usage pattern - keeping until production data available
+--
+-- CATEGORY 9: Hash Lookups (1 index)
+-- -------------------------------------------------------
+-- idx_file_catalog_hash
+--   → Covers queries not handled by partial dedup index
+--   → Dedup index has WHERE clause: original_file_id IS NULL
+--   → This index handles: "Find ALL files with hash" (including duplicates)
+--
+-- CATEGORY 10: Error Analysis (1 index)
+-- -------------------------------------------------------
+-- idx_file_catalog_error_message
+--   → Used for debugging failed file processing
+--   → Partial index (only error rows) - minimal cost
+--   → Important for development and troubleshooting
+--
+-- ==============================================================================
+-- SECTION 3: FUTURE RECOMMENDATIONS
+-- ==============================================================================
+--
+-- WHEN TO REVISIT:
+-- 1. After 3 months of production usage (real query patterns will emerge)
+-- 2. After reaching 10K+ rows per table (index costs become significant)
+-- 3. During performance optimization sprints with pg_stat_statements data
+--
+-- HOW TO MONITOR:
+-- Run these queries periodically to identify truly unused indexes:
+--
+-- -- Check index usage statistics
+-- SELECT
+--     schemaname,
+--     tablename,
+--     indexname,
+--     idx_scan,
+--     idx_tup_read,
+--     idx_tup_fetch,
+--     pg_size_pretty(pg_relation_size(indexrelid)) AS index_size
+-- FROM pg_stat_user_indexes
+-- WHERE schemaname = 'public'
+--   AND idx_scan = 0
+-- ORDER BY pg_relation_size(indexrelid) DESC;
+--
+-- -- Check index sizes
+-- SELECT
+--     schemaname,
+--     tablename,
+--     indexname,
+--     pg_size_pretty(pg_relation_size(indexrelid)) AS index_size
+-- FROM pg_stat_user_indexes
+-- WHERE schemaname = 'public'
+-- ORDER BY pg_relation_size(indexrelid) DESC;
+--
+-- ==============================================================================
+-- SECTION 4: MIGRATION SUMMARY
+-- ==============================================================================
+--
+-- INDEXES REMOVED: 1
+-- - idx_llm_model_config_phase (tiny table, no performance impact)
+--
+-- INDEXES KEPT: 31
+-- - All serve valid query patterns that will emerge as application scales
+-- - Cost of keeping is minimal at current scale
+-- - Risk of premature removal outweighs storage savings
+--
+-- DISK SAVINGS: ~8KB (negligible)
+-- QUERY PERFORMANCE IMPACT: None (positive or negative)
+-- RISK LEVEL: None
+--
+-- ==============================================================================
+-- Migration Metadata
+-- ==============================================================================
+-- Author: Database Architect Agent
+-- Date: 2025-11-04
+-- Analysis Report: docs/reports/database/2025-11/2025-11-04-unused-indexes-analysis.md
+-- Decision: Ultra-conservative approach - removed 1 of 32 indexes (3%)
+-- Next Review: Q1 2026 (after production usage data available)

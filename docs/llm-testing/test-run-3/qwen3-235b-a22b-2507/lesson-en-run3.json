@@ -1,0 +1,91 @@
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "A hands-on introduction to variables and core data types in Python, including practical exercises.",
+  "learning_objectives": [
+    "Declare and assign variables using proper Python syntax",
+    "Identify and differentiate between major data types in Python",
+    "Use built-in functions to check and convert data types",
+    "Apply variables and data types to solve basic programming tasks"
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Introduction to Variables",
+      "lesson_objective": "Create and assign values to variables using correct naming conventions",
+      "key_topics": [
+        "What are variables?",
+        "Variable naming rules",
+        "Assigning values",
+        "Reassigning variables",
+        "Dynamic typing"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Declare Your First Variables",
+          "exercise_instructions": "Create three variables: one for your name, age, and city. Assign appropriate values and print them."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Understanding Data Types",
+      "lesson_objective": "Recognize and use common Python data types in code",
+      "key_topics": [
+        "Integers and floats",
+        "Strings",
+        "Booleans",
+        "None type",
+        "Using type() function"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Check Data Types",
+          "exercise_instructions": "Declare variables with different types and use the type() function to verify each type."
+        },
+        {
+          "exercise_title": "Boolean Logic Practice",
+          "exercise_instructions": "Create expressions that evaluate to True and False using comparison operators."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "Type Conversion",
+      "lesson_objective": "Convert between data types using built-in conversion functions",
+      "key_topics": [
+        "Implicit vs explicit conversion",
+        "int(), float(), str() functions",
+        "Common conversion errors",
+        "Using conversion in expressions"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Convert and Calculate",
+          "exercise_instructions": "Ask the user for a number as a string, convert it to an integer, and calculate its square."
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "Working with Strings",
+      "lesson_objective": "Manipulate strings using basic operations and methods",
+      "key_topics": [
+        "String concatenation",
+        "String formatting (f-strings)",
+        "Accessing characters",
+        "Common string methods"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Personalized Greeting",
+          "exercise_instructions": "Use f-strings to create a greeting message that includes the user's name and age."
+        },
+        {
+          "exercise_title": "String Transformation",
+          "exercise_instructions": "Take a sentence, convert it to uppercase, and count the number of words."
+        }
+      ]
+    }
+  ]
+}

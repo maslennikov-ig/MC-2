@@ -1,0 +1,118 @@
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "Hands-on programming section with exercises",
+  "learning_objectives": [
+    "Demonstrate proficiency in declaring and assigning variables",
+    "Differentiate between numeric, string, boolean, and None data types",
+    "Apply type conversion techniques to manipulate data",
+    "Implement variables in practical programming scenarios"
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Declaring Variables and Basic Assignments",
+      "lesson_objective": "Create and manipulate variables using proper naming conventions",
+      "key_topics": [
+        "Variable naming rules",
+        "Assignment operator usage",
+        "Declaring multiple variables",
+        "Updating variable values"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Personal Information Storage",
+          "exercise_instructions": "Create variables for name, age, and email address using appropriate naming conventions. Print all values to the console."
+        },
+        {
+          "exercise_title": "Inventory Tracker",
+          "exercise_instructions": "Initialize a variable for 'total_items' with value 100. Create separate variables for 'items_sold' and 'items_received', then update 'total_items' accordingly after a transaction."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Exploring Integer, Float, and String Data Types",
+      "lesson_objective": "Identify and utilize numeric and string data types effectively",
+      "key_topics": [
+        "Integer vs float operations",
+        "String concatenation and formatting",
+        "Type checking with type()",
+        "Escape characters in strings"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Circle Area Calculator",
+          "exercise_instructions": "Calculate the area of a circle with radius 5.7 using the formula πr². Store π as a float variable and display the result with two decimal places."
+        },
+        {
+          "exercise_title": "Product Description Builder",
+          "exercise_instructions": "Create variables for product name, weight (float), and quantity (integer). Use string formatting to generate a description: 'Product X weighs Y kg and is available in Z units.'"
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "Type Conversion and Casting",
+      "lesson_objective": "Convert between different data types using casting techniques",
+      "key_topics": [
+        "Implicit type conversion",
+        "Explicit type conversion functions",
+        "String to numeric conversion",
+        "Handling conversion errors"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "User Input Processor",
+          "exercise_instructions": "Take user input for age (string) and convert it to integer. Take height input (string like '5.9') and convert to float. Handle potential conversion errors gracefully."
+        },
+        {
+          "exercise_title": "Temperature Converter",
+          "exercise_instructions": "Create variables for temperature in string format (e.g., '37.5'). Convert to float and implement a Celsius to Fahrenheit conversion formula. Display both values as strings in a formatted output."
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "Working with Boolean and None Types",
+      "lesson_objective": "Apply boolean logic and None type in programming scenarios",
+      "key_topics": [
+        "Boolean truth values",
+        "Comparison operators",
+        "Logical operators",
+        "None as null placeholder"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Access Control Checker",
+          "exercise_instructions": "Create variables for 'is_admin' (boolean) and 'user_role' (string). Implement logic to grant access if either admin is true or user role is 'manager'."
+        },
+        {
+          "exercise_title": "Data Validation Tester",
+          "exercise_instructions": "Initialize a variable 'user_input' with None. Simulate checking if input is None, then assign a string value. Implement conditional checks to validate input presence."
+        }
+      ]
+    },
+    {
+      "lesson_number": 5,
+      "lesson_title": "Practical Application with Variables and Data Types",
+      "lesson_objective": "Develop a complete program utilizing all covered data types and variables",
+      "key_topics": [
+        "Variable scope management",
+        "Data type selection strategies",
+        "Runtime type checking",
+        "Memory-efficient variable usage"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Simple Banking Application",
+          "exercise_instructions": "Create variables for account holder name (string), balance (float), is_active (boolean), and transaction_history (None initially). Implement basic deposit and withdrawal functionality with type validation."
+        },
+        {
+          "exercise_title": "Sensor Data Processor",
+          "exercise_instructions": "Simulate processing sensor data using different data types: temperature (float), humidity (integer), status (string), and error_code (None or integer). Implement type checking and conversion for data validation."
+        }
+      ]
+    }
+  ]
+}

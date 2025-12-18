@@ -1,0 +1,126 @@
+{
+  "testRunId": "2025-11-14-v4-qwen3-235b-a22b-2507",
+  "model": "Qwen3 235B A22B Instruct 2507",
+  "modelSlug": "qwen3-235b-a22b-2507",
+  "apiName": "qwen/qwen3-235b-a22b-2507",
+  "timestamp": "2025-11-14T08:36:26.881Z",
+  "duration": 59006,
+  "durationMinutes": "0.98",
+  "scenarios": 4,
+  "runsPerScenario": 3,
+  "totalTests": 12,
+  "successfulTests": 12,
+  "failedTests": 0,
+  "successRate": "100.00",
+  "avgTestDuration": "26296",
+  "results": [
+    {
+      "model": "Qwen3 235B A22B Instruct 2507",
+      "modelSlug": "qwen3-235b-a22b-2507",
+      "scenario": "metadata-en",
+      "runNumber": 1,
+      "success": true,
+      "duration": 14951,
+      "contentLength": 1862
+    },
+    {
+      "model": "Qwen3 235B A22B Instruct 2507",
+      "modelSlug": "qwen3-235b-a22b-2507",
+      "scenario": "metadata-en",
+      "runNumber": 2,
+      "success": true,
+      "duration": 15186,
+      "contentLength": 1762
+    },
+    {
+      "model": "Qwen3 235B A22B Instruct 2507",
+      "modelSlug": "qwen3-235b-a22b-2507",
+      "scenario": "metadata-en",
+      "runNumber": 3,
+      "success": true,
+      "duration": 16067,
+      "contentLength": 1850
+    },
+    {
+      "model": "Qwen3 235B A22B Instruct 2507",
+      "modelSlug": "qwen3-235b-a22b-2507",
+      "scenario": "metadata-ru",
+      "runNumber": 1,
+      "success": true,
+      "duration": 21878,
+      "contentLength": 1875
+    },
+    {
+      "model": "Qwen3 235B A22B Instruct 2507",
+      "modelSlug": "qwen3-235b-a22b-2507",
+      "scenario": "metadata-ru",
+      "runNumber": 2,
+      "success": true,
+      "duration": 18927,
+      "contentLength": 1774
+    },
+    {
+      "model": "Qwen3 235B A22B Instruct 2507",
+      "modelSlug": "qwen3-235b-a22b-2507",
+      "scenario": "metadata-ru",
+      "runNumber": 3,
+      "success": true,
+      "duration": 20710,
+      "contentLength": 1549
+    },
+    {
+      "model": "Qwen3 235B A22B Instruct 2507",
+      "modelSlug": "qwen3-235b-a22b-2507",
+      "scenario": "lesson-en",
+      "runNumber": 1,
+      "success": true,
+      "duration": 27527,
+      "contentLength": 4083
+    },
+    {
+      "model": "Qwen3 235B A22B Instruct 2507",
+      "modelSlug": "qwen3-235b-a22b-2507",
+      "scenario": "lesson-en",
+      "runNumber": 2,
+      "success": true,
+      "duration": 23256,
+      "contentLength": 3774
+    },
+    {
+      "model": "Qwen3 235B A22B Instruct 2507",
+      "modelSlug": "qwen3-235b-a22b-2507",
+      "scenario": "lesson-en",
+      "runNumber": 3,
+      "success": true,
+      "duration": 27333,
+      "contentLength": 4036
+    },
+    {
+      "model": "Qwen3 235B A22B Instruct 2507",
+      "modelSlug": "qwen3-235b-a22b-2507",
+      "scenario": "lesson-ru",
+      "runNumber": 1,
+      "success": true,
+      "duration": 59005,
+      "contentLength": 4922
+    },
+    {
+      "model": "Qwen3 235B A22B Instruct 2507",
+      "modelSlug": "qwen3-235b-a22b-2507",
+      "scenario": "lesson-ru",
+      "runNumber": 2,
+      "success": true,
+      "duration": 36102,
+      "contentLength": 3881
+    },
+    {
+      "model": "Qwen3 235B A22B Instruct 2507",
+      "modelSlug": "qwen3-235b-a22b-2507",
+      "scenario": "lesson-ru",
+      "runNumber": 3,
+      "success": true,
+      "duration": 34605,
+      "contentLength": 4229
+    }
+  ]
+}

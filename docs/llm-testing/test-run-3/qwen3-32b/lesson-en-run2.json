@@ -1,0 +1,135 @@
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "This section introduces variables, basic data types, and type conversion in Python through interactive coding exercises and practical examples.",
+  "learning_objectives": [
+    "Declare variables using assignment operators.",
+    "Identify and use common Python data types.",
+    "Convert between data types using built-in functions.",
+    "Apply type hints to variables and functions.",
+    "Debug common type-related errors in code."
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Introduction to Variables and Assignment",
+      "lesson_objective": "Students will be able to declare variables and assign values using appropriate syntax and operators.",
+      "key_topics": [
+        "Variable declaration syntax",
+        "Naming conventions",
+        "Assignment operators (=, +=, -=)"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Create and Print Variables",
+          "exercise_instructions": "Write Python code to declare variables for your name, age, and favorite color, then print each value."
+        },
+        {
+          "exercise_title": "Swap Variable Values",
+          "exercise_instructions": "Create two variables with numeric values and swap their contents using assignment operators."
+        },
+        {
+          "exercise_title": "Naming Practice",
+          "exercise_instructions": "Rename poorly named variables (e.g., 'a=5') to follow Python's PEP8 naming conventions."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Core Data Types in Python",
+      "lesson_objective": "Students will be able to identify and manipulate Python’s fundamental data types including integers, floats, strings, and booleans.",
+      "key_topics": [
+        "Integers and floats",
+        "String operations",
+        "Boolean logic",
+        "NoneType"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Data Type Identification",
+          "exercise_instructions": "Create variables of each core data type and use the type() function to verify their types."
+        },
+        {
+          "exercise_title": "String Concatenation",
+          "exercise_instructions": "Combine two strings and a number into a single sentence using string formatting techniques."
+        },
+        {
+          "exercise_title": "Boolean Logic Challenges",
+          "exercise_instructions": "Write expressions using comparison operators that evaluate to True and False with different data types."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "Type Conversion and Casting",
+      "lesson_objective": "Students will be able to perform explicit and implicit type conversion between numeric, string, and boolean types.",
+      "key_topics": [
+        "Implicit type conversion",
+        "Explicit casting (str(), int(), float())",
+        "Type conversion errors"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Convert User Input",
+          "exercise_instructions": "Take input from the user as a string and convert it to an integer for arithmetic operations."
+        },
+        {
+          "exercise_title": "Mixed-Type Calculations",
+          "exercise_instructions": "Write code that adds a string and a number after proper type conversion."
+        },
+        {
+          "exercise_title": "Error Handling Practice",
+          "exercise_instructions": "Use try-except blocks to handle invalid type conversions and display meaningful error messages."
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "Type Hints and Annotations",
+      "lesson_objective": "Students will be able to apply type hints to variables and function parameters to improve code clarity and validation.",
+      "key_topics": [
+        "Adding type hints to variables",
+        "Function parameter and return type annotations",
+        "Using mypy for static type checking"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Annotate Variables",
+          "exercise_instructions": "Add type hints to variables storing numbers, strings, and boolean values."
+        },
+        {
+          "exercise_title": "Function Type Annotations",
+          "exercise_instructions": "Write a function that adds two numbers and include type annotations for parameters and return value."
+        },
+        {
+          "exercise_title": "Validate with mypy",
+          "exercise_instructions": "Use the mypy tool to check a Python script for type consistency and fix any errors reported."
+        }
+      ]
+    },
+    {
+      "lesson_number": 5,
+      "lesson_title": "Debugging Type-Related Errors",
+      "lesson_objective": "Students will be able to debug and resolve common type-related errors in Python programs.",
+      "key_topics": [
+        "Common type errors (e.g., TypeError)",
+        "Using print() and type() for diagnostics",
+        "Fixing mismatched operations"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Fix a Broken Script",
+          "exercise_instructions": "Debug and correct a provided Python script containing intentional type-related errors."
+        },
+        {
+          "exercise_title": "Error Logging",
+          "exercise_instructions": "Modify a script to log variable types at runtime to identify mismatches before execution."
+        },
+        {
+          "exercise_title": "Type-Check User Input",
+          "exercise_instructions": "Write code that ensures user input is of the expected type before performing calculations."
+        }
+      ]
+    }
+  ]
+}

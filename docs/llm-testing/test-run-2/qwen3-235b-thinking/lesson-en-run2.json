@@ -1,0 +1,86 @@
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "Hands-on programming section with exercises covering fundamental data structures, type manipulation, and practical applications through immediate coding practice",
+  "learning_objectives": [
+    "Declare variables using valid Python naming conventions",
+    "Convert between numeric data types using built-in functions",
+    "Manipulate strings using slicing and formatting techniques",
+    "Differentiate between mutable and immutable data structures",
+    "Verify data types using type-checking methods"
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Numeric Variables and Type Conversion",
+      "lesson_objective": "Declare integer and float variables, perform arithmetic operations, and convert between numeric types using int() and float()",
+      "key_topics": [
+        "Variable assignment syntax",
+        "Arithmetic operators with precedence rules",
+        "Integer vs float division behavior",
+        "Explicit type conversion between int and float",
+        "Type inference from numeric literals"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Temperature Unit Converter",
+          "exercise_instructions": "Create variables: celsius = 25.5, fahrenheit = 77.9. Convert celsius to fahrenheit using (celsius * 9/5) + 32 and fahrenheit to celsius using (fahrenheit - 32) * 5/9. Print results with 2 decimal places using round(). Verify conversions are reversible."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "String Manipulation Fundamentals",
+      "lesson_objective": "Construct formatted strings using f-strings and perform string operations including slicing and case conversion",
+      "key_topics": [
+        "Single vs double quote usage",
+        "Indexing and negative indexing",
+        "String slicing with start/stop/step",
+        "Case conversion methods (upper, lower, title)",
+        "Escape sequences for special characters"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Username Generator",
+          "exercise_instructions": "Declare variables: first_name = 'alicia', last_name = 'silverstone'. Create a username by taking the first 3 characters of last_name in uppercase and last 2 characters of first_name in lowercase. Format the result as 'Generated username: [result]'. Verify length is exactly 5 characters."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "Boolean Logic and Type Verification",
+      "lesson_objective": "Evaluate comparison expressions and verify data types using type() and isinstance() functions",
+      "key_topics": [
+        "Comparison operators with mixed types",
+        "Boolean operator precedence (not, and, or)",
+        "Truth value testing of data types",
+        "Using type() for exact type checking",
+        "Using isinstance() for inheritance-aware checks"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Data Type Detective",
+          "exercise_instructions": "Create variables: value1 = 10, value2 = '10', value3 = True. Print the results of: value1 == value2, value1 == int(value2), type(value1) == type(value3), isinstance(value3, bool). Explain why the first comparison returns False while the second returns True."
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "List Operations and Mutability Concepts",
+      "lesson_objective": "Modify list elements in-place and explain mutability differences between lists and strings",
+      "key_topics": [
+        "List creation with mixed data types",
+        "Index-based element modification",
+        "List methods: append(), pop(), insert()",
+        "Shallow copy vs reference behavior",
+        "Immutable string vs mutable list comparison"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Inventory Tracker",
+          "exercise_instructions": "Create a list: inventory = ['apple', 5, 'banana', 3]. Update 'banana' quantity to 8 using index assignment. Add 'orange' with quantity 4 using append(). Attempt to modify the first character of 'apple' to 'A' and explain the resulting error. Print the final inventory list."
+        }
+      ]
+    }
+  ]
+}

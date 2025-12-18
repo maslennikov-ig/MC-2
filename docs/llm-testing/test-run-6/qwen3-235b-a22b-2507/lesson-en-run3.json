@@ -1,0 +1,98 @@
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "A hands-on introduction to variables and core data types in Python, including practical exercises to reinforce learning.",
+  "learning_objectives": [
+    "Declare and assign variables using proper Python syntax",
+    "Identify and use basic data types: int, float, str, and bool",
+    "Use the type() function to inspect variable data types",
+    "Convert between data types using type casting",
+    "Apply variables in simple arithmetic and string operations"
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Introduction to Variables",
+      "lesson_objective": "Declare and assign values to variables using correct naming conventions",
+      "key_topics": [
+        "What is a variable?",
+        "Variable assignment with =",
+        "Valid variable names",
+        "Dynamic typing",
+        "Printing variable values"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Create Your First Variables",
+          "exercise_instructions": "Declare three variables: name, age, and city. Assign appropriate values and print each one."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Core Data Types in Python",
+      "lesson_objective": "Identify and use integer, float, string, and boolean data types in code",
+      "key_topics": [
+        "int type",
+        "float type",
+        "str type",
+        "bool type",
+        "Using type() to check types"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Check Data Types",
+          "exercise_instructions": "Create one variable of each core type (int, float, str, bool). Use type() to print the type of each variable."
+        },
+        {
+          "exercise_title": "Boolean Logic Practice",
+          "exercise_instructions": "Create two boolean variables with True and False. Print the result of using 'and', 'or', and 'not' operators on them."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "String Operations and Formatting",
+      "lesson_objective": "Manipulate strings using concatenation and basic formatting techniques",
+      "key_topics": [
+        "String concatenation",
+        "String formatting with f-strings",
+        "Escape characters",
+        "Multi-line strings",
+        "Accessing string characters"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Build a Personal Bio",
+          "exercise_instructions": "Using f-strings, create a formatted string that includes your name, age, and favorite hobby, then print it."
+        },
+        {
+          "exercise_title": "String Concatenation Challenge",
+          "exercise_instructions": "Create three string variables and concatenate them into a single sentence. Include spaces and punctuation."
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "Type Conversion and Casting",
+      "lesson_objective": "Convert between data types using int(), float(), str(), and bool()",
+      "key_topics": [
+        "Implicit vs explicit conversion",
+        "Converting string to number",
+        "Converting number to string",
+        "Casting to boolean",
+        "Handling conversion errors"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Convert and Calculate",
+          "exercise_instructions": "Ask the user for a number as a string, convert it to float, double it, and print the result."
+        },
+        {
+          "exercise_title": "Type Casting Practice",
+          "exercise_instructions": "Create a float variable, convert it to int and str, then print each version with its type."
+        }
+      ]
+    }
+  ]
+}

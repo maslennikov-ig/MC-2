@@ -1,0 +1,106 @@
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "Hands-on programming section exploring Python variables and data types with interactive lessons and practical exercises to reinforce core concepts.",
+  "learning_objectives": [
+    "Declare and initialize variables with appropriate data types.",
+    "Identify and use Python's primitive data types including int, float, str, and bool.",
+    "Perform type conversions and handle common data type operations.",
+    "Debug variable assignment and type-related errors in code.",
+    "Apply variables and data types in simple programs."
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Introduction to Variables",
+      "lesson_objective": "Students will be able to declare, assign, and print variables following Python naming rules.",
+      "key_topics": [
+        "Definition and purpose of variables",
+        "Variable naming conventions",
+        "Assignment operator (=)",
+        "Dynamic typing in Python",
+        "Printing variables with print()"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Declare Your First Variable",
+          "exercise_instructions": "Create a variable called 'student_name' assigned to a string with your name, then print it using print()."
+        },
+        {
+          "exercise_title": "Multiple Variables",
+          "exercise_instructions": "Declare three variables: age (int), height (float), is_student (bool), assign values, and print them."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Primitive Data Types",
+      "lesson_objective": "Students will identify and use int, float, str, and bool data types correctly in Python.",
+      "key_topics": [
+        "Integer (int) type",
+        "Float (float) type",
+        "String (str) type",
+        "Boolean (bool) type",
+        "Using type() function"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Explore Data Types",
+          "exercise_instructions": "Declare variables of each primitive type (int, float, str, bool), use type() to check them, and print the results."
+        },
+        {
+          "exercise_title": "Mixed Types",
+          "exercise_instructions": "Create variables for name (str), age (int), score (float), active (bool), and print each with its type."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "Strings and Basic Operations",
+      "lesson_objective": "Students will manipulate strings using concatenation, repetition, and formatting.",
+      "key_topics": [
+        "String literals and quotes",
+        "String concatenation (+)",
+        "String repetition (*)",
+        "Escape characters",
+        "Basic string methods (upper(), lower())"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "String Concatenation",
+          "exercise_instructions": "Declare variables for first_name and last_name, concatenate them into full_name, and print it."
+        },
+        {
+          "exercise_title": "Formatted Greeting",
+          "exercise_instructions": "Use variables age (int) and city (str) to create and print a greeting like 'I am 25 years old and live in New York'."
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "Numbers and Type Conversion",
+      "lesson_objective": "Students will perform arithmetic on numbers and convert between data types safely.",
+      "key_topics": [
+        "Arithmetic operators (+, -, *, /, //, %)",
+        "Integer vs float division",
+        "Explicit type conversion (int(), float(), str())",
+        "Implicit type conversion",
+        "Handling TypeError"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Basic Arithmetic",
+          "exercise_instructions": "Declare num1=10 (int), num2=3.5 (float), compute sum, product, and integer division, then print results."
+        },
+        {
+          "exercise_title": "Type Conversions",
+          "exercise_instructions": "Convert a string '123' to int, add 5, convert back to str, and print the final value."
+        },
+        {
+          "exercise_title": "Fix the Error",
+          "exercise_instructions": "Given code with TypeError (e.g., '5' + 3), fix it using int() conversion and print the sum."
+        }
+      ]
+    }
+  ]
+}

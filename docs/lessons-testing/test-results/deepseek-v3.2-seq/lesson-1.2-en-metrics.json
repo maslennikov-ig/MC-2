@@ -1,0 +1,48 @@
+{
+  "model": "DeepSeek V3.2 (Sequential)",
+  "modelSlug": "deepseek-v3.2-seq",
+  "modelApiName": "deepseek/deepseek-v3.2",
+  "lessonId": "1.2-en",
+  "lessonTitle": "Ticket Pricing: How Discounts and Tiers Work",
+  "language": "en",
+  "duration": 49171,
+  "timestamp": "2025-12-16T11:20:06.484Z",
+  "parseSuccess": true,
+  "parseError": null,
+  "usage": {
+    "prompt_tokens": 524,
+    "completion_tokens": 1521,
+    "total_tokens": 2045,
+    "cost": 0.000749356,
+    "is_byok": false,
+    "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "audio_tokens": 0,
+      "video_tokens": 0
+    },
+    "cost_details": {
+      "upstream_inference_cost": null,
+      "upstream_inference_prompt_cost": 0.000140956,
+      "upstream_inference_completions_cost": 0.0006084
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 0,
+      "image_tokens": 0
+    }
+  },
+  "quality": {
+    "hasIntro": true,
+    "hasSections": true,
+    "hasExamples": true,
+    "hasExercises": true,
+    "hasSummary": true,
+    "sectionsCount": 4,
+    "examplesCount": 2,
+    "exercisesCount": 2,
+    "totalWordCount": 678,
+    "introWordCount": 98,
+    "coversObjectives": 3,
+    "coversTopics": 5,
+    "qualityScore": 100
+  }
+}

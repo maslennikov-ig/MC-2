@@ -1,0 +1,37 @@
+{
+  "course_title": "Introduction to Python Programming",
+  "course_description": "A hands-on beginner course that builds practical coding skills using Python 3. Learn core syntax, problem-solving, and project-based learning to prepare for real-world automation and data tasks.",
+  "course_overview": "This beginner-friendly course introduces Python 3 fundamentals through a practical, project-based approach. You will start with installing and configuring Python and an integrated development environment, then progress through variables and data types, operators and expressions, control flow (conditionals and loops), functions and scope, basic input/output, and file handling. The course covers core data structures (lists, tuples, sets, and dictionaries), string manipulation, modular programming with modules and packages, and an introduction to error handling and debugging. You will explore popular standard library modules such as os, sys, datetime, csv, and json, and build mini-projects that simulate real tasks like simple calculators, text processors, data parsers, and basic scripts. We will include lightweight introductions to testing (assert and unittest) and coding style conventions, as well as guidance on reading documentation and continuing your learning path with data analysis, automation, or web development. The course uses hands-on coding exercises, short quizzes, and a final capstone mini-project to solidify skills, supported by interactive REPL work and practical exercises. Tools: Python 3.10+, Jupyter Notebooks or VS Code/PyCharm, and pip for package management.",
+  "target_audience": "Absolute beginners, career changers, students, and professionals seeking a solid foundation in Python.",
+  "estimated_duration_hours": 25,
+  "difficulty_level": "beginner",
+  "prerequisites": [
+    "Basic computer literacy (file management, web browsing)",
+    "Comfort using a text editor or IDE",
+    "High-school level math and logical reasoning",
+    "No prior programming experience required",
+    "Access to a computer (Windows/macOS/Linux) and internet"
+  ],
+  "learning_outcomes": [
+    "Install and configure Python 3 and a development environment (IDE/Jupyter).",
+    "Write, run, and debug Python scripts using variables, data types, and operators.",
+    "Implement control flow using conditionals and loops to solve problems.",
+    "Define reusable functions with parameters, return values, and scope.",
+    "Process and transform data using lists, tuples, sets, and dictionaries.",
+    "Read from and write to files and parse common formats like CSV and JSON.",
+    "Use standard library modules (os, sys, datetime) and install third-party packages with pip.",
+    "Apply basic testing and debugging techniques and follow Python style conventions (PEP 8)."
+  ],
+  "course_tags": [
+    "Python",
+    "Programming Fundamentals",
+    "Beginner",
+    "Scripting",
+    "Automation",
+    "Problem Solving",
+    "Data Handling",
+    "Software Development",
+    "Computer Science",
+    "Hands-on Projects"
+  ]
+}

@@ -1,0 +1,112 @@
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "This hands-on programming section teaches fundamental concepts of variables and data types in Python through interactive lessons, code examples, and practical exercises to build foundational coding skills.",
+  "learning_objectives": [
+    "Declare and assign variables using proper Python syntax",
+    "Identify and utilize core data types including integers, floats, strings, and booleans",
+    "Perform basic operations and type conversions on variables",
+    "Debug common errors related to variables and data types",
+    "Write simple Python programs manipulating multiple data types"
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Introduction to Variables",
+      "lesson_objective": "Students will declare and assign variables in Python code successfully.",
+      "key_topics": [
+        "What are variables?",
+        "Variable assignment with = operator",
+        "Rules for variable names",
+        "Printing variables with print()",
+        "Dynamic typing in Python"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "First Variable Assignment",
+          "exercise_instructions": "Create a variable named 'name' and assign it your name as a string. Then print it using print(). Run the code and verify output."
+        },
+        {
+          "exercise_title": "Multiple Variables",
+          "exercise_instructions": "Declare three variables: age (integer), height (float), and is_student (boolean). Print each one on a new line."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Core Data Types",
+      "lesson_objective": "Students will differentiate and use int, float, str, and bool data types in Python.",
+      "key_topics": [
+        "Integer (int) for whole numbers",
+        "Float for decimal numbers",
+        "String (str) for text",
+        "Boolean (bool) for True/False",
+        "Using type() function",
+        "Literal values for each type"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Data Type Exploration",
+          "exercise_instructions": "Create variables for each data type: an int (42), float (3.14), str ('Hello'), bool (True). Use type() on each and print the results."
+        },
+        {
+          "exercise_title": "Mixed Types Program",
+          "exercise_instructions": "Write code with variables of different types. Concatenate a string with an int using str() conversion and print the result."
+        },
+        {
+          "exercise_title": "Boolean Logic",
+          "exercise_instructions": "Assign booleans based on comparisons (e.g., 5 > 3) and print them. Experiment with False values."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "Variable Operations and Naming",
+      "lesson_objective": "Students will apply arithmetic, string operations, and follow naming conventions for variables.",
+      "key_topics": [
+        "Arithmetic operations (+, -, *, /, //, %, **)",
+        "String concatenation and repetition",
+        "Updating variable values",
+        "Naming conventions (snake_case)",
+        "Reserved keywords to avoid"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Arithmetic Calculator",
+          "exercise_instructions": "Create two int variables, perform addition, subtraction, multiplication, and division. Print all results."
+        },
+        {
+          "exercise_title": "String Builder",
+          "exercise_instructions": "Use string variables to build and print a full sentence by concatenating first_name, last_name, and age."
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "Type Conversion and Common Errors",
+      "lesson_objective": "Students will convert between data types and troubleshoot common variable-related errors.",
+      "key_topics": [
+        "int(), float(), str(), bool() functions",
+        "Implicit vs explicit conversion",
+        "TypeError and NameError examples",
+        "None type",
+        "Best practices for type safety",
+        "Input handling with input()"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Type Converter",
+          "exercise_instructions": "Take a string '123.45', convert to float then int. Print original and converted types using type()."
+        },
+        {
+          "exercise_title": "User Input Handler",
+          "exercise_instructions": "Use input() to get user's age as string, convert to int, add 5, and print the future age."
+        },
+        {
+          "exercise_title": "Error Fixing",
+          "exercise_instructions": "Given buggy code with TypeError (e.g., '5' + 3), fix it by converting types and test by printing."
+        }
+      ]
+    }
+  ]
+}

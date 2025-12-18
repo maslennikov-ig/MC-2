@@ -1,0 +1,79 @@
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "Hands-on programming section covering Python variables, data types, and practical exercises",
+  "learning_objectives": [
+    "Define and assign variables using Python's naming conventions",
+    "Identify and use basic data types including integers, floats, strings, and booleans",
+    "Perform type conversion between different data types",
+    "Create and manipulate lists, tuples, and dictionaries"
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Introduction to Variables and Basic Data Types",
+      "lesson_objective": "Create and assign variables with different data types",
+      "keyTopics": [
+        "Variable assignment and naming conventions",
+        "Integers and floating-point numbers",
+        "Strings and string operations",
+        "Boolean values and logical operations",
+        "Type() function for checking data types"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Variable Declaration Practice",
+          "exercise_instructions": "Create variables for name, age, height, and is_student. Assign appropriate values and print each variable with its type."
+        },
+        {
+          "exercise_title": "Temperature Conversion",
+          "exercise_instructions": "Convert a temperature from Celsius to Fahrenheit. Create variables for celsius, fahrenheit, and display both values with proper labels."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "String Manipulation and Type Conversion",
+      "lesson_objective": "Manipulate strings and convert between data types",
+      "keyTopics": [
+        "String concatenation and formatting",
+        "Type conversion functions (int(), float(), str())",
+        "String methods (upper(), lower(), split(), join())",
+        "Input validation and error handling",
+        "Formatting strings with f-strings"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "User Profile Generator",
+          "exercise_instructions": "Create a program that takes user input for first name, last name, and age. Format these into a profile string and convert age to a float for calculations."
+        },
+        {
+          "exercise_title": "Temperature Converter with Validation",
+          "exercise_instructions": "Build a temperature converter that accepts Celsius input, validates it's a number, converts to Fahrenheit, and handles non-numeric input gracefully."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "Lists, Tuples, and Basic Data Structures",
+      "lesson_objective": "Create and manipulate lists, tuples, and basic data structures",
+      "keyTopics": [
+        "Creating and accessing list elements",
+        "List operations (append, insert, remove, pop)",
+        "Tuple creation and immutability",
+        "Dictionary key-value pairs",
+        "Iterating through collections"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Shopping List Manager",
+          "exercise_instructions": "Create a shopping list with at least 5 items. Add 2 more items, remove 1 item, and display the list in a formatted way."
+        },
+        {
+          "exercise_title": "Contact Information System",
+          "exercise_instructions": "Create a dictionary with contact information for 3 people. Add a new contact, update an existing phone number, and search for a contact by last name."
+        }
+      ]
+    }
+  ]
+}

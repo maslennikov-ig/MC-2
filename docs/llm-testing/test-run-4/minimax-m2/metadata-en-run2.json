@@ -1,0 +1,34 @@
+{
+  "course_title": "Introduction to Python Programming",
+  "course_description": "Master the fundamentals of Python programming through hands-on projects and practical exercises. Perfect for beginners with no prior coding experience who want to build a strong foundation in programming.",
+  "course_overview": "This comprehensive beginner course introduces students to Python programming through a structured, project-based approach. Students will learn core programming concepts including variables, data types, control structures, functions, and object-oriented programming. The course emphasizes practical application with real-world coding exercises and mini-projects that build confidence and competence. By the end, students will have created functional Python applications and developed problem-solving skills applicable to any programming language.",
+  "target_audience": "Complete beginners with no prior programming experience who want to start their coding journey",
+  "estimated_duration_hours": 30,
+  "difficulty_level": "beginner",
+  "prerequisites": [
+    "Basic computer literacy",
+    "Comfort with using web browsers and basic software",
+    "High school level mathematics",
+    "Access to a computer with internet connection"
+  ],
+  "learning_outcomes": [
+    "Understand fundamental programming concepts and Python syntax",
+    "Apply variables, data types, and operators to solve problems",
+    "Implement control structures (loops and conditionals) in Python code",
+    "Create and utilize functions for code organization and reusability",
+    "Design object-oriented programs using classes and objects",
+    "Debug and troubleshoot Python code effectively",
+    "Build complete Python applications with GUI or console interfaces",
+    "Evaluate different programming approaches for optimal solutions"
+  ],
+  "course_tags": [
+    "python",
+    "programming",
+    "coding",
+    "software development",
+    "beginner friendly",
+    "object oriented programming",
+    "problem solving",
+    "hands-on projects"
+  ]
+}

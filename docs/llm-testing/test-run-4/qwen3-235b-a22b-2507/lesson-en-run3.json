@@ -1,0 +1,89 @@
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "This section introduces the fundamental concepts of variables and core data types in Python. Learners will understand how to store and manipulate data using variables, and explore the most commonly used data types. By the end, students will be able to write simple programs that use variables effectively.",
+  "learning_objectives": [
+    "Declare and assign values to variables using proper naming conventions.",
+    "Identify and differentiate between basic data types: integers, floats, strings, and booleans.",
+    "Use the type() function to inspect the data type of a variable.",
+    "Convert between data types using type casting functions.",
+    "Apply variables and data types to perform basic computations and output results."
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Introduction to Variables",
+      "lesson_objective": "Define and assign values to variables using correct syntax and naming rules.",
+      "key_topics": [
+        "What is a variable?",
+        "Variable assignment with = operator",
+        "Valid variable names and naming conventions",
+        "Overwriting variable values",
+        "Using print() to display variable values"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Create Your First Variables",
+          "exercise_instructions": "Create three variables: 'name' (string), 'age' (integer), and 'height' (float). Assign appropriate values to each and print them one by one."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Core Data Types in Python",
+      "lesson_objective": "Recognize and use integers, floats, strings, and booleans in Python programs.",
+      "key_topics": [
+        "Integer (int) data type",
+        "Floating-point (float) data type",
+        "String (str) data type",
+        "Boolean (bool) data type",
+        "Using quotes for strings",
+        "Literal values vs. variables"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Data Type Identification",
+          "exercise_instructions": "Create one variable for each data type: int, float, str, and bool. Use the type() function to print the type of each variable."
+        },
+        {
+          "exercise_title": "Boolean Expressions",
+          "exercise_instructions": "Create two variables with boolean values. Print the result of a logical expression using 'and' between them."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "Inspecting and Converting Data Types",
+      "lesson_objective": "Use built-in functions to check and convert between data types.",
+      "key_topics": [
+        "Using type() to check data type",
+        "Converting with int(), float(), str()",
+        "Understanding when conversion fails",
+        "Implicit vs. explicit type conversion"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Type Conversion Practice",
+          "exercise_instructions": "Create a string variable with a number (e.g., '42'). Convert it to an integer and print both the original and converted values. Repeat the process converting a number to a string."
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "Working with Strings",
+      "lesson_objective": "Manipulate string data using concatenation and basic operations.",
+      "key_topics": [
+        "String concatenation with + operator",
+        "Using str() to convert values to strings",
+        "Escape characters (e.g., \\n, \\t)",
+        "Quoting with single, double, and triple quotes"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Build a Personal Introduction",
+          "exercise_instructions": "Using your earlier variables (name, age, height), create a new string variable called 'introduction' that combines them into a sentence like 'Hi, I'm Alex, I'm 25 and 1.75m tall.' Print the result."
+        }
+      ]
+    }
+  ]
+}

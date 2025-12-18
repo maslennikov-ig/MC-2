@@ -1,0 +1,492 @@
+{
+  "generatedAt": "2025-11-13T13:05:45.692Z",
+  "model": "Grok 4 Fast",
+  "modelSlug": "grok-4-fast",
+  "apiName": "x-ai/grok-4-fast",
+  "totalRuns": 12,
+  "scenarioStats": {
+    "metadata-en": {
+      "runs": 3,
+      "avgOverall": 1,
+      "avgSchema": 1,
+      "avgContent": 0.9999999999999999,
+      "avgLanguage": 1,
+      "consistency": 1,
+      "best": {
+        "run": 1,
+        "score": 1
+      },
+      "worst": {
+        "run": 1,
+        "score": 1
+      }
+    },
+    "metadata-ru": {
+      "runs": 3,
+      "avgOverall": 0.7400000000000001,
+      "avgSchema": 1,
+      "avgContent": 0.5,
+      "avgLanguage": 0.6999999999999998,
+      "consistency": 1,
+      "best": {
+        "run": 1,
+        "score": 0.7400000000000001
+      },
+      "worst": {
+        "run": 1,
+        "score": 0.7400000000000001
+      }
+    },
+    "lesson-en": {
+      "runs": 3,
+      "avgOverall": 0.9600000000000003,
+      "avgSchema": 1,
+      "avgContent": 0.9,
+      "avgLanguage": 1,
+      "consistency": 0.9999999999999999,
+      "best": {
+        "run": 1,
+        "score": 0.9600000000000002
+      },
+      "worst": {
+        "run": 1,
+        "score": 0.9600000000000002
+      }
+    },
+    "lesson-ru": {
+      "runs": 3,
+      "avgOverall": 0.9200000000000003,
+      "avgSchema": 1,
+      "avgContent": 0.8000000000000002,
+      "avgLanguage": 1,
+      "consistency": 0.9999999999999999,
+      "best": {
+        "run": 1,
+        "score": 0.9200000000000002
+      },
+      "worst": {
+        "run": 1,
+        "score": 0.9200000000000002
+      }
+    }
+  },
+  "overallQuality": {
+    "overall": 0.9050000000000001,
+    "metadata": 0.8700000000000001,
+    "lesson": 0.9400000000000001,
+    "successRate": 1
+  },
+  "analyses": [
+    {
+      "file": "lesson-en-run1.json",
+      "scenario": "lesson-en",
+      "runNumber": 1,
+      "entityType": "lesson",
+      "language": "en",
+      "schema": {
+        "validJSON": true,
+        "hasRequiredFields": true,
+        "usesSnakeCase": true,
+        "correctDataTypes": true,
+        "score": 1,
+        "issues": []
+      },
+      "content": {
+        "score": 0.9000000000000001,
+        "details": {
+          "lessonCount": 4
+        },
+        "issues": [
+          "Some lesson objectives not measurable"
+        ]
+      },
+      "languageQuality": {
+        "score": 1,
+        "details": {
+          "language": "en"
+        },
+        "issues": []
+      },
+      "overallScore": 0.9600000000000002
+    },
+    {
+      "file": "lesson-en-run2.json",
+      "scenario": "lesson-en",
+      "runNumber": 2,
+      "entityType": "lesson",
+      "language": "en",
+      "schema": {
+        "validJSON": true,
+        "hasRequiredFields": true,
+        "usesSnakeCase": true,
+        "correctDataTypes": true,
+        "score": 1,
+        "issues": []
+      },
+      "content": {
+        "score": 0.9000000000000001,
+        "details": {
+          "lessonCount": 4
+        },
+        "issues": [
+          "Some lesson objectives not measurable"
+        ]
+      },
+      "languageQuality": {
+        "score": 1,
+        "details": {
+          "language": "en"
+        },
+        "issues": []
+      },
+      "overallScore": 0.9600000000000002
+    },
+    {
+      "file": "lesson-en-run3.json",
+      "scenario": "lesson-en",
+      "runNumber": 3,
+      "entityType": "lesson",
+      "language": "en",
+      "schema": {
+        "validJSON": true,
+        "hasRequiredFields": true,
+        "usesSnakeCase": true,
+        "correctDataTypes": true,
+        "score": 1,
+        "issues": []
+      },
+      "content": {
+        "score": 0.9000000000000001,
+        "details": {
+          "lessonCount": 4
+        },
+        "issues": [
+          "Some lesson objectives not measurable"
+        ]
+      },
+      "languageQuality": {
+        "score": 1,
+        "details": {
+          "language": "en"
+        },
+        "issues": []
+      },
+      "overallScore": 0.9600000000000002
+    },
+    {
+      "file": "lesson-ru-run1.json",
+      "scenario": "lesson-ru",
+      "runNumber": 1,
+      "entityType": "lesson",
+      "language": "ru",
+      "schema": {
+        "validJSON": true,
+        "hasRequiredFields": true,
+        "usesSnakeCase": true,
+        "correctDataTypes": true,
+        "score": 1,
+        "issues": []
+      },
+      "content": {
+        "score": 0.8,
+        "details": {
+          "lessonCount": 4
+        },
+        "issues": [
+          "Some lesson objectives not measurable"
+        ]
+      },
+      "languageQuality": {
+        "score": 1,
+        "details": {
+          "language": "ru"
+        },
+        "issues": []
+      },
+      "overallScore": 0.9200000000000002
+    },
+    {
+      "file": "lesson-ru-run2.json",
+      "scenario": "lesson-ru",
+      "runNumber": 2,
+      "entityType": "lesson",
+      "language": "ru",
+      "schema": {
+        "validJSON": true,
+        "hasRequiredFields": true,
+        "usesSnakeCase": true,
+        "correctDataTypes": true,
+        "score": 1,
+        "issues": []
+      },
+      "content": {
+        "score": 0.8,
+        "details": {
+          "lessonCount": 4
+        },
+        "issues": [
+          "Some lesson objectives not measurable"
+        ]
+      },
+      "languageQuality": {
+        "score": 1,
+        "details": {
+          "language": "ru"
+        },
+        "issues": []
+      },
+      "overallScore": 0.9200000000000002
+    },
+    {
+      "file": "lesson-ru-run3.json",
+      "scenario": "lesson-ru",
+      "runNumber": 3,
+      "entityType": "lesson",
+      "language": "ru",
+      "schema": {
+        "validJSON": true,
+        "hasRequiredFields": true,
+        "usesSnakeCase": true,
+        "correctDataTypes": true,
+        "score": 1,
+        "issues": []
+      },
+      "content": {
+        "score": 0.8,
+        "details": {
+          "lessonCount": 4
+        },
+        "issues": [
+          "Some lesson objectives not measurable"
+        ]
+      },
+      "languageQuality": {
+        "score": 1,
+        "details": {
+          "language": "ru"
+        },
+        "issues": []
+      },
+      "overallScore": 0.9200000000000002
+    },
+    {
+      "file": "metadata-en-run1.json",
+      "scenario": "metadata-en",
+      "runNumber": 1,
+      "entityType": "metadata",
+      "language": "en",
+      "schema": {
+        "validJSON": true,
+        "hasRequiredFields": true,
+        "usesSnakeCase": true,
+        "correctDataTypes": true,
+        "score": 1,
+        "issues": []
+      },
+      "content": {
+        "score": 0.9999999999999999,
+        "details": {
+          "outcomesCount": 7,
+          "bloomLevels": 6,
+          "overviewLength": 2513,
+          "descriptionLength": 796
+        },
+        "issues": []
+      },
+      "languageQuality": {
+        "score": 1,
+        "details": {
+          "language": "en"
+        },
+        "issues": []
+      },
+      "overallScore": 1
+    },
+    {
+      "file": "metadata-en-run2.json",
+      "scenario": "metadata-en",
+      "runNumber": 2,
+      "entityType": "metadata",
+      "language": "en",
+      "schema": {
+        "validJSON": true,
+        "hasRequiredFields": true,
+        "usesSnakeCase": true,
+        "correctDataTypes": true,
+        "score": 1,
+        "issues": []
+      },
+      "content": {
+        "score": 0.9999999999999999,
+        "details": {
+          "outcomesCount": 6,
+          "bloomLevels": 6,
+          "overviewLength": 2022,
+          "descriptionLength": 839
+        },
+        "issues": []
+      },
+      "languageQuality": {
+        "score": 1,
+        "details": {
+          "language": "en"
+        },
+        "issues": []
+      },
+      "overallScore": 1
+    },
+    {
+      "file": "metadata-en-run3.json",
+      "scenario": "metadata-en",
+      "runNumber": 3,
+      "entityType": "metadata",
+      "language": "en",
+      "schema": {
+        "validJSON": true,
+        "hasRequiredFields": true,
+        "usesSnakeCase": true,
+        "correctDataTypes": true,
+        "score": 1,
+        "issues": []
+      },
+      "content": {
+        "score": 0.9999999999999999,
+        "details": {
+          "outcomesCount": 6,
+          "bloomLevels": 6,
+          "overviewLength": 1747,
+          "descriptionLength": 810
+        },
+        "issues": []
+      },
+      "languageQuality": {
+        "score": 1,
+        "details": {
+          "language": "en"
+        },
+        "issues": []
+      },
+      "overallScore": 1
+    },
+    {
+      "file": "metadata-ru-run1.json",
+      "scenario": "metadata-ru",
+      "runNumber": 1,
+      "entityType": "metadata",
+      "language": "ru",
+      "schema": {
+        "validJSON": true,
+        "hasRequiredFields": true,
+        "usesSnakeCase": true,
+        "correctDataTypes": true,
+        "score": 1,
+        "issues": []
+      },
+      "content": {
+        "score": 0.5,
+        "details": {
+          "outcomesCount": 6,
+          "bloomLevels": 0,
+          "overviewLength": 1582,
+          "descriptionLength": 777
+        },
+        "issues": [
+          "Learning outcomes lack action verbs",
+          "Learning outcomes use fewer than 2 Bloom taxonomy levels",
+          "Some learning outcomes use vague verbs (understand/learn/know)",
+          "Target audience lacks specific personas"
+        ]
+      },
+      "languageQuality": {
+        "score": 0.7,
+        "details": {
+          "language": "ru"
+        },
+        "issues": [
+          "Possible translation artifacts detected"
+        ]
+      },
+      "overallScore": 0.7400000000000001
+    },
+    {
+      "file": "metadata-ru-run2.json",
+      "scenario": "metadata-ru",
+      "runNumber": 2,
+      "entityType": "metadata",
+      "language": "ru",
+      "schema": {
+        "validJSON": true,
+        "hasRequiredFields": true,
+        "usesSnakeCase": true,
+        "correctDataTypes": true,
+        "score": 1,
+        "issues": []
+      },
+      "content": {
+        "score": 0.5,
+        "details": {
+          "outcomesCount": 6,
+          "bloomLevels": 0,
+          "overviewLength": 1647,
+          "descriptionLength": 801
+        },
+        "issues": [
+          "Learning outcomes lack action verbs",
+          "Learning outcomes use fewer than 2 Bloom taxonomy levels",
+          "Some learning outcomes use vague verbs (understand/learn/know)",
+          "Target audience lacks specific personas"
+        ]
+      },
+      "languageQuality": {
+        "score": 0.7,
+        "details": {
+          "language": "ru"
+        },
+        "issues": [
+          "Possible translation artifacts detected"
+        ]
+      },
+      "overallScore": 0.7400000000000001
+    },
+    {
+      "file": "metadata-ru-run3.json",
+      "scenario": "metadata-ru",
+      "runNumber": 3,
+      "entityType": "metadata",
+      "language": "ru",
+      "schema": {
+        "validJSON": true,
+        "hasRequiredFields": true,
+        "usesSnakeCase": true,
+        "correctDataTypes": true,
+        "score": 1,
+        "issues": []
+      },
+      "content": {
+        "score": 0.5,
+        "details": {
+          "outcomesCount": 5,
+          "bloomLevels": 1,
+          "overviewLength": 1228,
+          "descriptionLength": 559
+        },
+        "issues": [
+          "Learning outcomes use fewer than 2 Bloom taxonomy levels",
+          "Some learning outcomes use vague verbs (understand/learn/know)",
+          "Overview lacks specific examples",
+          "Target audience lacks specific personas"
+        ]
+      },
+      "languageQuality": {
+        "score": 0.7,
+        "details": {
+          "language": "ru"
+        },
+        "issues": [
+          "Possible translation artifacts detected"
+        ]
+      },
+      "overallScore": 0.7400000000000001
+    }
+  ]
+}

@@ -1,0 +1,1296 @@
+{
+  "testRunId": "2025-11-14-v3-parallel-eval",
+  "testVersion": "v3",
+  "executionMode": "PARALLEL",
+  "timestamp": "2025-11-14T07:20:53.848Z",
+  "duration": 217769,
+  "durationMinutes": "3.63",
+  "models": 11,
+  "scenarios": 4,
+  "runsPerScenario": 3,
+  "totalTests": 132,
+  "successfulTests": 118,
+  "failedTests": 14,
+  "successRate": "89.39",
+  "avgTestDuration": "46889",
+  "results": [
+    {
+      "model": "Kimi K2 0905",
+      "modelSlug": "kimi-k2-0905",
+      "scenario": "metadata-en",
+      "runNumber": 1,
+      "success": true,
+      "duration": 19629,
+      "contentLength": 1846
+    },
+    {
+      "model": "Kimi K2 0905",
+      "modelSlug": "kimi-k2-0905",
+      "scenario": "metadata-en",
+      "runNumber": 2,
+      "success": true,
+      "duration": 19614,
+      "contentLength": 1794
+    },
+    {
+      "model": "Kimi K2 0905",
+      "modelSlug": "kimi-k2-0905",
+      "scenario": "metadata-en",
+      "runNumber": 3,
+      "success": true,
+      "duration": 19198,
+      "contentLength": 1802
+    },
+    {
+      "model": "Kimi K2 0905",
+      "modelSlug": "kimi-k2-0905",
+      "scenario": "metadata-ru",
+      "runNumber": 1,
+      "success": true,
+      "duration": 35633,
+      "contentLength": 1827
+    },
+    {
+      "model": "Kimi K2 0905",
+      "modelSlug": "kimi-k2-0905",
+      "scenario": "metadata-ru",
+      "runNumber": 2,
+      "success": true,
+      "duration": 43272,
+      "contentLength": 2078
+    },
+    {
+      "model": "Kimi K2 0905",
+      "modelSlug": "kimi-k2-0905",
+      "scenario": "metadata-ru",
+      "runNumber": 3,
+      "success": true,
+      "duration": 31238,
+      "contentLength": 2511
+    },
+    {
+      "model": "Kimi K2 0905",
+      "modelSlug": "kimi-k2-0905",
+      "scenario": "lesson-en",
+      "runNumber": 1,
+      "success": true,
+      "duration": 56164,
+      "contentLength": 3878
+    },
+    {
+      "model": "Kimi K2 0905",
+      "modelSlug": "kimi-k2-0905",
+      "scenario": "lesson-en",
+      "runNumber": 2,
+      "success": true,
+      "duration": 43595,
+      "contentLength": 3731
+    },
+    {
+      "model": "Kimi K2 0905",
+      "modelSlug": "kimi-k2-0905",
+      "scenario": "lesson-en",
+      "runNumber": 3,
+      "success": true,
+      "duration": 42520,
+      "contentLength": 3522
+    },
+    {
+      "model": "Kimi K2 0905",
+      "modelSlug": "kimi-k2-0905",
+      "scenario": "lesson-ru",
+      "runNumber": 1,
+      "success": true,
+      "duration": 90051,
+      "contentLength": 4573
+    },
+    {
+      "model": "Kimi K2 0905",
+      "modelSlug": "kimi-k2-0905",
+      "scenario": "lesson-ru",
+      "runNumber": 2,
+      "success": true,
+      "duration": 77860,
+      "contentLength": 3777
+    },
+    {
+      "model": "Kimi K2 0905",
+      "modelSlug": "kimi-k2-0905",
+      "scenario": "lesson-ru",
+      "runNumber": 3,
+      "success": true,
+      "duration": 100869,
+      "contentLength": 5335
+    },
+    {
+      "model": "Kimi K2 Thinking",
+      "modelSlug": "kimi-k2-thinking",
+      "scenario": "metadata-en",
+      "runNumber": 1,
+      "success": true,
+      "duration": 78645,
+      "contentLength": 2127
+    },
+    {
+      "model": "Kimi K2 Thinking",
+      "modelSlug": "kimi-k2-thinking",
+      "scenario": "metadata-en",
+      "runNumber": 2,
+      "success": true,
+      "duration": 42651,
+      "contentLength": 1968
+    },
+    {
+      "model": "Kimi K2 Thinking",
+      "modelSlug": "kimi-k2-thinking",
+      "scenario": "metadata-en",
+      "runNumber": 3,
+      "success": true,
+      "duration": 38042,
+      "contentLength": 1826
+    },
+    {
+      "model": "Kimi K2 Thinking",
+      "modelSlug": "kimi-k2-thinking",
+      "scenario": "metadata-ru",
+      "runNumber": 1,
+      "success": true,
+      "duration": 46634,
+      "contentLength": 1902
+    },
+    {
+      "model": "Kimi K2 Thinking",
+      "modelSlug": "kimi-k2-thinking",
+      "scenario": "metadata-ru",
+      "runNumber": 2,
+      "success": true,
+      "duration": 49323,
+      "contentLength": 1756
+    },
+    {
+      "model": "Kimi K2 Thinking",
+      "modelSlug": "kimi-k2-thinking",
+      "scenario": "metadata-ru",
+      "runNumber": 3,
+      "success": true,
+      "duration": 64217,
+      "contentLength": 1725
+    },
+    {
+      "model": "Kimi K2 Thinking",
+      "modelSlug": "kimi-k2-thinking",
+      "scenario": "lesson-en",
+      "runNumber": 1,
+      "success": true,
+      "duration": 46789,
+      "contentLength": 4257
+    },
+    {
+      "model": "Kimi K2 Thinking",
+      "modelSlug": "kimi-k2-thinking",
+      "scenario": "lesson-en",
+      "runNumber": 2,
+      "success": true,
+      "duration": 78190,
+      "contentLength": 5404
+    },
+    {
+      "model": "Kimi K2 Thinking",
+      "modelSlug": "kimi-k2-thinking",
+      "scenario": "lesson-en",
+      "runNumber": 3,
+      "success": true,
+      "duration": 71806,
+      "contentLength": 4321
+    },
+    {
+      "model": "Kimi K2 Thinking",
+      "modelSlug": "kimi-k2-thinking",
+      "scenario": "lesson-ru",
+      "runNumber": 1,
+      "success": true,
+      "duration": 138144,
+      "contentLength": 5233
+    },
+    {
+      "model": "Kimi K2 Thinking",
+      "modelSlug": "kimi-k2-thinking",
+      "scenario": "lesson-ru",
+      "runNumber": 2,
+      "success": false,
+      "duration": 154013,
+      "error": "Unexpected end of JSON input"
+    },
+    {
+      "model": "Kimi K2 Thinking",
+      "modelSlug": "kimi-k2-thinking",
+      "scenario": "lesson-ru",
+      "runNumber": 3,
+      "success": true,
+      "duration": 94702,
+      "contentLength": 3934
+    },
+    {
+      "model": "DeepSeek v3.2 Exp",
+      "modelSlug": "deepseek-v32-exp",
+      "scenario": "metadata-en",
+      "runNumber": 1,
+      "success": true,
+      "duration": 12986,
+      "contentLength": 1413
+    },
+    {
+      "model": "DeepSeek v3.2 Exp",
+      "modelSlug": "deepseek-v32-exp",
+      "scenario": "metadata-en",
+      "runNumber": 2,
+      "success": true,
+      "duration": 14675,
+      "contentLength": 1469
+    },
+    {
+      "model": "DeepSeek v3.2 Exp",
+      "modelSlug": "deepseek-v32-exp",
+      "scenario": "metadata-en",
+      "runNumber": 3,
+      "success": true,
+      "duration": 16709,
+      "contentLength": 1850
+    },
+    {
+      "model": "DeepSeek v3.2 Exp",
+      "modelSlug": "deepseek-v32-exp",
+      "scenario": "metadata-ru",
+      "runNumber": 1,
+      "success": true,
+      "duration": 19560,
+      "contentLength": 1571
+    },
+    {
+      "model": "DeepSeek v3.2 Exp",
+      "modelSlug": "deepseek-v32-exp",
+      "scenario": "metadata-ru",
+      "runNumber": 2,
+      "success": true,
+      "duration": 20338,
+      "contentLength": 1678
+    },
+    {
+      "model": "DeepSeek v3.2 Exp",
+      "modelSlug": "deepseek-v32-exp",
+      "scenario": "metadata-ru",
+      "runNumber": 3,
+      "success": true,
+      "duration": 20039,
+      "contentLength": 1578
+    },
+    {
+      "model": "DeepSeek v3.2 Exp",
+      "modelSlug": "deepseek-v32-exp",
+      "scenario": "lesson-en",
+      "runNumber": 1,
+      "success": true,
+      "duration": 46850,
+      "contentLength": 5690
+    },
+    {
+      "model": "DeepSeek v3.2 Exp",
+      "modelSlug": "deepseek-v32-exp",
+      "scenario": "lesson-en",
+      "runNumber": 2,
+      "success": true,
+      "duration": 41292,
+      "contentLength": 4775
+    },
+    {
+      "model": "DeepSeek v3.2 Exp",
+      "modelSlug": "deepseek-v32-exp",
+      "scenario": "lesson-en",
+      "runNumber": 3,
+      "success": true,
+      "duration": 40605,
+      "contentLength": 4542
+    },
+    {
+      "model": "DeepSeek v3.2 Exp",
+      "modelSlug": "deepseek-v32-exp",
+      "scenario": "lesson-ru",
+      "runNumber": 1,
+      "success": true,
+      "duration": 51657,
+      "contentLength": 4513
+    },
+    {
+      "model": "DeepSeek v3.2 Exp",
+      "modelSlug": "deepseek-v32-exp",
+      "scenario": "lesson-ru",
+      "runNumber": 2,
+      "success": true,
+      "duration": 53961,
+      "contentLength": 5024
+    },
+    {
+      "model": "DeepSeek v3.2 Exp",
+      "modelSlug": "deepseek-v32-exp",
+      "scenario": "lesson-ru",
+      "runNumber": 3,
+      "success": true,
+      "duration": 46925,
+      "contentLength": 4096
+    },
+    {
+      "model": "DeepSeek Chat v3.1",
+      "modelSlug": "deepseek-chat-v31",
+      "scenario": "metadata-en",
+      "runNumber": 1,
+      "success": true,
+      "duration": 13664,
+      "contentLength": 1785
+    },
+    {
+      "model": "DeepSeek Chat v3.1",
+      "modelSlug": "deepseek-chat-v31",
+      "scenario": "metadata-en",
+      "runNumber": 2,
+      "success": true,
+      "duration": 8326,
+      "contentLength": 1757
+    },
+    {
+      "model": "DeepSeek Chat v3.1",
+      "modelSlug": "deepseek-chat-v31",
+      "scenario": "metadata-en",
+      "runNumber": 3,
+      "success": true,
+      "duration": 12860,
+      "contentLength": 1715
+    },
+    {
+      "model": "DeepSeek Chat v3.1",
+      "modelSlug": "deepseek-chat-v31",
+      "scenario": "metadata-ru",
+      "runNumber": 1,
+      "success": true,
+      "duration": 11046,
+      "contentLength": 1449
+    },
+    {
+      "model": "DeepSeek Chat v3.1",
+      "modelSlug": "deepseek-chat-v31",
+      "scenario": "metadata-ru",
+      "runNumber": 2,
+      "success": true,
+      "duration": 12303,
+      "contentLength": 1576
+    },
+    {
+      "model": "DeepSeek Chat v3.1",
+      "modelSlug": "deepseek-chat-v31",
+      "scenario": "metadata-ru",
+      "runNumber": 3,
+      "success": true,
+      "duration": 13019,
+      "contentLength": 1621
+    },
+    {
+      "model": "DeepSeek Chat v3.1",
+      "modelSlug": "deepseek-chat-v31",
+      "scenario": "lesson-en",
+      "runNumber": 1,
+      "success": true,
+      "duration": 30991,
+      "contentLength": 6109
+    },
+    {
+      "model": "DeepSeek Chat v3.1",
+      "modelSlug": "deepseek-chat-v31",
+      "scenario": "lesson-en",
+      "runNumber": 2,
+      "success": true,
+      "duration": 24834,
+      "contentLength": 4724
+    },
+    {
+      "model": "DeepSeek Chat v3.1",
+      "modelSlug": "deepseek-chat-v31",
+      "scenario": "lesson-en",
+      "runNumber": 3,
+      "success": true,
+      "duration": 29114,
+      "contentLength": 4721
+    },
+    {
+      "model": "DeepSeek Chat v3.1",
+      "modelSlug": "deepseek-chat-v31",
+      "scenario": "lesson-ru",
+      "runNumber": 1,
+      "success": true,
+      "duration": 33133,
+      "contentLength": 4293
+    },
+    {
+      "model": "DeepSeek Chat v3.1",
+      "modelSlug": "deepseek-chat-v31",
+      "scenario": "lesson-ru",
+      "runNumber": 2,
+      "success": true,
+      "duration": 24449,
+      "contentLength": 4089
+    },
+    {
+      "model": "DeepSeek Chat v3.1",
+      "modelSlug": "deepseek-chat-v31",
+      "scenario": "lesson-ru",
+      "runNumber": 3,
+      "success": true,
+      "duration": 25959,
+      "contentLength": 3932
+    },
+    {
+      "model": "Grok 4 Fast",
+      "modelSlug": "grok-4-fast",
+      "scenario": "metadata-en",
+      "runNumber": 1,
+      "success": true,
+      "duration": 6139,
+      "contentLength": 1931
+    },
+    {
+      "model": "Grok 4 Fast",
+      "modelSlug": "grok-4-fast",
+      "scenario": "metadata-en",
+      "runNumber": 2,
+      "success": true,
+      "duration": 5925,
+      "contentLength": 2310
+    },
+    {
+      "model": "Grok 4 Fast",
+      "modelSlug": "grok-4-fast",
+      "scenario": "metadata-en",
+      "runNumber": 3,
+      "success": true,
+      "duration": 6796,
+      "contentLength": 1988
+    },
+    {
+      "model": "Grok 4 Fast",
+      "modelSlug": "grok-4-fast",
+      "scenario": "metadata-ru",
+      "runNumber": 1,
+      "success": true,
+      "duration": 7710,
+      "contentLength": 1856
+    },
+    {
+      "model": "Grok 4 Fast",
+      "modelSlug": "grok-4-fast",
+      "scenario": "metadata-ru",
+      "runNumber": 2,
+      "success": true,
+      "duration": 8442,
+      "contentLength": 1982
+    },
+    {
+      "model": "Grok 4 Fast",
+      "modelSlug": "grok-4-fast",
+      "scenario": "metadata-ru",
+      "runNumber": 3,
+      "success": true,
+      "duration": 8414,
+      "contentLength": 1781
+    },
+    {
+      "model": "Grok 4 Fast",
+      "modelSlug": "grok-4-fast",
+      "scenario": "lesson-en",
+      "runNumber": 1,
+      "success": true,
+      "duration": 11232,
+      "contentLength": 5008
+    },
+    {
+      "model": "Grok 4 Fast",
+      "modelSlug": "grok-4-fast",
+      "scenario": "lesson-en",
+      "runNumber": 2,
+      "success": true,
+      "duration": 8949,
+      "contentLength": 4722
+    },
+    {
+      "model": "Grok 4 Fast",
+      "modelSlug": "grok-4-fast",
+      "scenario": "lesson-en",
+      "runNumber": 3,
+      "success": true,
+      "duration": 8590,
+      "contentLength": 4612
+    },
+    {
+      "model": "Grok 4 Fast",
+      "modelSlug": "grok-4-fast",
+      "scenario": "lesson-ru",
+      "runNumber": 1,
+      "success": true,
+      "duration": 11479,
+      "contentLength": 4435
+    },
+    {
+      "model": "Grok 4 Fast",
+      "modelSlug": "grok-4-fast",
+      "scenario": "lesson-ru",
+      "runNumber": 2,
+      "success": true,
+      "duration": 11164,
+      "contentLength": 4433
+    },
+    {
+      "model": "Grok 4 Fast",
+      "modelSlug": "grok-4-fast",
+      "scenario": "lesson-ru",
+      "runNumber": 3,
+      "success": true,
+      "duration": 10370,
+      "contentLength": 4399
+    },
+    {
+      "model": "GLM 4.6",
+      "modelSlug": "glm-46",
+      "scenario": "metadata-en",
+      "runNumber": 1,
+      "success": true,
+      "duration": 89610,
+      "contentLength": 1811
+    },
+    {
+      "model": "GLM 4.6",
+      "modelSlug": "glm-46",
+      "scenario": "metadata-en",
+      "runNumber": 2,
+      "success": true,
+      "duration": 93295,
+      "contentLength": 2224
+    },
+    {
+      "model": "GLM 4.6",
+      "modelSlug": "glm-46",
+      "scenario": "metadata-en",
+      "runNumber": 3,
+      "success": true,
+      "duration": 91852,
+      "contentLength": 2039
+    },
+    {
+      "model": "GLM 4.6",
+      "modelSlug": "glm-46",
+      "scenario": "metadata-ru",
+      "runNumber": 1,
+      "success": true,
+      "duration": 191334,
+      "contentLength": 2154
+    },
+    {
+      "model": "GLM 4.6",
+      "modelSlug": "glm-46",
+      "scenario": "metadata-ru",
+      "runNumber": 2,
+      "success": true,
+      "duration": 187766,
+      "contentLength": 1996
+    },
+    {
+      "model": "GLM 4.6",
+      "modelSlug": "glm-46",
+      "scenario": "metadata-ru",
+      "runNumber": 3,
+      "success": true,
+      "duration": 182745,
+      "contentLength": 2116
+    },
+    {
+      "model": "GLM 4.6",
+      "modelSlug": "glm-46",
+      "scenario": "lesson-en",
+      "runNumber": 1,
+      "success": true,
+      "duration": 209887,
+      "contentLength": 5350
+    },
+    {
+      "model": "GLM 4.6",
+      "modelSlug": "glm-46",
+      "scenario": "lesson-en",
+      "runNumber": 2,
+      "success": true,
+      "duration": 163976,
+      "contentLength": 5415
+    },
+    {
+      "model": "GLM 4.6",
+      "modelSlug": "glm-46",
+      "scenario": "lesson-en",
+      "runNumber": 3,
+      "success": true,
+      "duration": 89624,
+      "contentLength": 5182
+    },
+    {
+      "model": "GLM 4.6",
+      "modelSlug": "glm-46",
+      "scenario": "lesson-ru",
+      "runNumber": 1,
+      "success": true,
+      "duration": 203438,
+      "contentLength": 3647
+    },
+    {
+      "model": "GLM 4.6",
+      "modelSlug": "glm-46",
+      "scenario": "lesson-ru",
+      "runNumber": 2,
+      "success": true,
+      "duration": 203364,
+      "contentLength": 4309
+    },
+    {
+      "model": "GLM 4.6",
+      "modelSlug": "glm-46",
+      "scenario": "lesson-ru",
+      "runNumber": 3,
+      "success": true,
+      "duration": 216652,
+      "contentLength": 4243
+    },
+    {
+      "model": "MiniMax M2",
+      "modelSlug": "minimax-m2",
+      "scenario": "metadata-en",
+      "runNumber": 1,
+      "success": true,
+      "duration": 15530,
+      "contentLength": 2567
+    },
+    {
+      "model": "MiniMax M2",
+      "modelSlug": "minimax-m2",
+      "scenario": "metadata-en",
+      "runNumber": 2,
+      "success": true,
+      "duration": 48449,
+      "contentLength": 2048
+    },
+    {
+      "model": "MiniMax M2",
+      "modelSlug": "minimax-m2",
+      "scenario": "metadata-en",
+      "runNumber": 3,
+      "success": true,
+      "duration": 16406,
+      "contentLength": 2238
+    },
+    {
+      "model": "MiniMax M2",
+      "modelSlug": "minimax-m2",
+      "scenario": "metadata-ru",
+      "runNumber": 1,
+      "success": true,
+      "duration": 25245,
+      "contentLength": 2345
+    },
+    {
+      "model": "MiniMax M2",
+      "modelSlug": "minimax-m2",
+      "scenario": "metadata-ru",
+      "runNumber": 2,
+      "success": true,
+      "duration": 23048,
+      "contentLength": 2265
+    },
+    {
+      "model": "MiniMax M2",
+      "modelSlug": "minimax-m2",
+      "scenario": "metadata-ru",
+      "runNumber": 3,
+      "success": true,
+      "duration": 13863,
+      "contentLength": 1871
+    },
+    {
+      "model": "MiniMax M2",
+      "modelSlug": "minimax-m2",
+      "scenario": "lesson-en",
+      "runNumber": 1,
+      "success": true,
+      "duration": 24680,
+      "contentLength": 5102
+    },
+    {
+      "model": "MiniMax M2",
+      "modelSlug": "minimax-m2",
+      "scenario": "lesson-en",
+      "runNumber": 2,
+      "success": true,
+      "duration": 18923,
+      "contentLength": 4470
+    },
+    {
+      "model": "MiniMax M2",
+      "modelSlug": "minimax-m2",
+      "scenario": "lesson-en",
+      "runNumber": 3,
+      "success": true,
+      "duration": 40165,
+      "contentLength": 6222
+    },
+    {
+      "model": "MiniMax M2",
+      "modelSlug": "minimax-m2",
+      "scenario": "lesson-ru",
+      "runNumber": 1,
+      "success": true,
+      "duration": 33250,
+      "contentLength": 4660
+    },
+    {
+      "model": "MiniMax M2",
+      "modelSlug": "minimax-m2",
+      "scenario": "lesson-ru",
+      "runNumber": 2,
+      "success": true,
+      "duration": 33835,
+      "contentLength": 3831
+    },
+    {
+      "model": "MiniMax M2",
+      "modelSlug": "minimax-m2",
+      "scenario": "lesson-ru",
+      "runNumber": 3,
+      "success": true,
+      "duration": 39673,
+      "contentLength": 5613
+    },
+    {
+      "model": "Qwen3 32B",
+      "modelSlug": "qwen3-32b",
+      "scenario": "metadata-en",
+      "runNumber": 1,
+      "success": true,
+      "duration": 24145,
+      "contentLength": 1692
+    },
+    {
+      "model": "Qwen3 32B",
+      "modelSlug": "qwen3-32b",
+      "scenario": "metadata-en",
+      "runNumber": 2,
+      "success": true,
+      "duration": 18329,
+      "contentLength": 1474
+    },
+    {
+      "model": "Qwen3 32B",
+      "modelSlug": "qwen3-32b",
+      "scenario": "metadata-en",
+      "runNumber": 3,
+      "success": true,
+      "duration": 45149,
+      "contentLength": 2149
+    },
+    {
+      "model": "Qwen3 32B",
+      "modelSlug": "qwen3-32b",
+      "scenario": "metadata-ru",
+      "runNumber": 1,
+      "success": true,
+      "duration": 41299,
+      "contentLength": 1599
+    },
+    {
+      "model": "Qwen3 32B",
+      "modelSlug": "qwen3-32b",
+      "scenario": "metadata-ru",
+      "runNumber": 2,
+      "success": true,
+      "duration": 31575,
+      "contentLength": 1467
+    },
+    {
+      "model": "Qwen3 32B",
+      "modelSlug": "qwen3-32b",
+      "scenario": "metadata-ru",
+      "runNumber": 3,
+      "success": true,
+      "duration": 52711,
+      "contentLength": 1287
+    },
+    {
+      "model": "Qwen3 32B",
+      "modelSlug": "qwen3-32b",
+      "scenario": "lesson-en",
+      "runNumber": 1,
+      "success": true,
+      "duration": 83670,
+      "contentLength": 4748
+    },
+    {
+      "model": "Qwen3 32B",
+      "modelSlug": "qwen3-32b",
+      "scenario": "lesson-en",
+      "runNumber": 2,
+      "success": true,
+      "duration": 57603,
+      "contentLength": 4538
+    },
+    {
+      "model": "Qwen3 32B",
+      "modelSlug": "qwen3-32b",
+      "scenario": "lesson-en",
+      "runNumber": 3,
+      "success": true,
+      "duration": 31132,
+      "contentLength": 4116
+    },
+    {
+      "model": "Qwen3 32B",
+      "modelSlug": "qwen3-32b",
+      "scenario": "lesson-ru",
+      "runNumber": 1,
+      "success": true,
+      "duration": 62122,
+      "contentLength": 4852
+    },
+    {
+      "model": "Qwen3 32B",
+      "modelSlug": "qwen3-32b",
+      "scenario": "lesson-ru",
+      "runNumber": 2,
+      "success": true,
+      "duration": 71223,
+      "contentLength": 4347
+    },
+    {
+      "model": "Qwen3 32B",
+      "modelSlug": "qwen3-32b",
+      "scenario": "lesson-ru",
+      "runNumber": 3,
+      "success": false,
+      "duration": 200875,
+      "error": "Unterminated string in JSON at position 556 (line 9 column 58)"
+    },
+    {
+      "model": "Qwen3 235B Thinking",
+      "modelSlug": "qwen3-235b-thinking",
+      "scenario": "metadata-en",
+      "runNumber": 1,
+      "success": true,
+      "duration": 15453,
+      "contentLength": 1793
+    },
+    {
+      "model": "Qwen3 235B Thinking",
+      "modelSlug": "qwen3-235b-thinking",
+      "scenario": "metadata-en",
+      "runNumber": 2,
+      "success": true,
+      "duration": 18731,
+      "contentLength": 1845
+    },
+    {
+      "model": "Qwen3 235B Thinking",
+      "modelSlug": "qwen3-235b-thinking",
+      "scenario": "metadata-en",
+      "runNumber": 3,
+      "success": true,
+      "duration": 19862,
+      "contentLength": 2268
+    },
+    {
+      "model": "Qwen3 235B Thinking",
+      "modelSlug": "qwen3-235b-thinking",
+      "scenario": "metadata-ru",
+      "runNumber": 1,
+      "success": true,
+      "duration": 31482,
+      "contentLength": 1870
+    },
+    {
+      "model": "Qwen3 235B Thinking",
+      "modelSlug": "qwen3-235b-thinking",
+      "scenario": "metadata-ru",
+      "runNumber": 2,
+      "success": true,
+      "duration": 26614,
+      "contentLength": 1899
+    },
+    {
+      "model": "Qwen3 235B Thinking",
+      "modelSlug": "qwen3-235b-thinking",
+      "scenario": "metadata-ru",
+      "runNumber": 3,
+      "success": true,
+      "duration": 50678,
+      "contentLength": 1671
+    },
+    {
+      "model": "Qwen3 235B Thinking",
+      "modelSlug": "qwen3-235b-thinking",
+      "scenario": "lesson-en",
+      "runNumber": 1,
+      "success": true,
+      "duration": 28869,
+      "contentLength": 4262
+    },
+    {
+      "model": "Qwen3 235B Thinking",
+      "modelSlug": "qwen3-235b-thinking",
+      "scenario": "lesson-en",
+      "runNumber": 2,
+      "success": true,
+      "duration": 53358,
+      "contentLength": 4208
+    },
+    {
+      "model": "Qwen3 235B Thinking",
+      "modelSlug": "qwen3-235b-thinking",
+      "scenario": "lesson-en",
+      "runNumber": 3,
+      "success": true,
+      "duration": 29778,
+      "contentLength": 3252
+    },
+    {
+      "model": "Qwen3 235B Thinking",
+      "modelSlug": "qwen3-235b-thinking",
+      "scenario": "lesson-ru",
+      "runNumber": 1,
+      "success": true,
+      "duration": 27744,
+      "contentLength": 2747
+    },
+    {
+      "model": "Qwen3 235B Thinking",
+      "modelSlug": "qwen3-235b-thinking",
+      "scenario": "lesson-ru",
+      "runNumber": 2,
+      "success": true,
+      "duration": 31666,
+      "contentLength": 3818
+    },
+    {
+      "model": "Qwen3 235B Thinking",
+      "modelSlug": "qwen3-235b-thinking",
+      "scenario": "lesson-ru",
+      "runNumber": 3,
+      "success": true,
+      "duration": 26262,
+      "contentLength": 3118
+    },
+    {
+      "model": "OSS 120B",
+      "modelSlug": "oss-120b",
+      "scenario": "metadata-en",
+      "runNumber": 1,
+      "success": true,
+      "duration": 19793,
+      "contentLength": 1784
+    },
+    {
+      "model": "OSS 120B",
+      "modelSlug": "oss-120b",
+      "scenario": "metadata-en",
+      "runNumber": 2,
+      "success": true,
+      "duration": 14411,
+      "contentLength": 2009
+    },
+    {
+      "model": "OSS 120B",
+      "modelSlug": "oss-120b",
+      "scenario": "metadata-en",
+      "runNumber": 3,
+      "success": true,
+      "duration": 9343,
+      "contentLength": 1964
+    },
+    {
+      "model": "OSS 120B",
+      "modelSlug": "oss-120b",
+      "scenario": "metadata-ru",
+      "runNumber": 1,
+      "success": true,
+      "duration": 7655,
+      "contentLength": 1799
+    },
+    {
+      "model": "OSS 120B",
+      "modelSlug": "oss-120b",
+      "scenario": "metadata-ru",
+      "runNumber": 2,
+      "success": true,
+      "duration": 15701,
+      "contentLength": 1889
+    },
+    {
+      "model": "OSS 120B",
+      "modelSlug": "oss-120b",
+      "scenario": "metadata-ru",
+      "runNumber": 3,
+      "success": true,
+      "duration": 23907,
+      "contentLength": 1880
+    },
+    {
+      "model": "OSS 120B",
+      "modelSlug": "oss-120b",
+      "scenario": "lesson-en",
+      "runNumber": 1,
+      "success": true,
+      "duration": 51910,
+      "contentLength": 4647
+    },
+    {
+      "model": "OSS 120B",
+      "modelSlug": "oss-120b",
+      "scenario": "lesson-en",
+      "runNumber": 2,
+      "success": true,
+      "duration": 14693,
+      "contentLength": 4627
+    },
+    {
+      "model": "OSS 120B",
+      "modelSlug": "oss-120b",
+      "scenario": "lesson-en",
+      "runNumber": 3,
+      "success": true,
+      "duration": 26725,
+      "contentLength": 4423
+    },
+    {
+      "model": "OSS 120B",
+      "modelSlug": "oss-120b",
+      "scenario": "lesson-ru",
+      "runNumber": 1,
+      "success": true,
+      "duration": 13989,
+      "contentLength": 4185
+    },
+    {
+      "model": "OSS 120B",
+      "modelSlug": "oss-120b",
+      "scenario": "lesson-ru",
+      "runNumber": 2,
+      "success": true,
+      "duration": 58758,
+      "contentLength": 3871
+    },
+    {
+      "model": "OSS 120B",
+      "modelSlug": "oss-120b",
+      "scenario": "lesson-ru",
+      "runNumber": 3,
+      "success": true,
+      "duration": 30779,
+      "contentLength": 3769
+    },
+    {
+      "model": "Qwen3 235B A22B",
+      "modelSlug": "qwen3-235b-a22b",
+      "scenario": "metadata-en",
+      "runNumber": 1,
+      "success": false,
+      "duration": 1445,
+      "error": "Unexpected end of JSON input"
+    },
+    {
+      "model": "Qwen3 235B A22B",
+      "modelSlug": "qwen3-235b-a22b",
+      "scenario": "metadata-en",
+      "runNumber": 2,
+      "success": false,
+      "duration": 1425,
+      "error": "Unexpected end of JSON input"
+    },
+    {
+      "model": "Qwen3 235B A22B",
+      "modelSlug": "qwen3-235b-a22b",
+      "scenario": "metadata-en",
+      "runNumber": 3,
+      "success": false,
+      "duration": 13904,
+      "error": "Unexpected end of JSON input"
+    },
+    {
+      "model": "Qwen3 235B A22B",
+      "modelSlug": "qwen3-235b-a22b",
+      "scenario": "metadata-ru",
+      "runNumber": 1,
+      "success": false,
+      "duration": 2041,
+      "error": "Unexpected end of JSON input"
+    },
+    {
+      "model": "Qwen3 235B A22B",
+      "modelSlug": "qwen3-235b-a22b",
+      "scenario": "metadata-ru",
+      "runNumber": 2,
+      "success": false,
+      "duration": 19591,
+      "error": "Unexpected end of JSON input"
+    },
+    {
+      "model": "Qwen3 235B A22B",
+      "modelSlug": "qwen3-235b-a22b",
+      "scenario": "metadata-ru",
+      "runNumber": 3,
+      "success": false,
+      "duration": 17879,
+      "error": "Unexpected end of JSON input"
+    },
+    {
+      "model": "Qwen3 235B A22B",
+      "modelSlug": "qwen3-235b-a22b",
+      "scenario": "lesson-en",
+      "runNumber": 1,
+      "success": false,
+      "duration": 2463,
+      "error": "Unexpected end of JSON input"
+    },
+    {
+      "model": "Qwen3 235B A22B",
+      "modelSlug": "qwen3-235b-a22b",
+      "scenario": "lesson-en",
+      "runNumber": 2,
+      "success": false,
+      "duration": 48618,
+      "error": "Unexpected end of JSON input"
+    },
+    {
+      "model": "Qwen3 235B A22B",
+      "modelSlug": "qwen3-235b-a22b",
+      "scenario": "lesson-en",
+      "runNumber": 3,
+      "success": false,
+      "duration": 49113,
+      "error": "Unexpected end of JSON input"
+    },
+    {
+      "model": "Qwen3 235B A22B",
+      "modelSlug": "qwen3-235b-a22b",
+      "scenario": "lesson-ru",
+      "runNumber": 1,
+      "success": false,
+      "duration": 73389,
+      "error": "Unexpected end of JSON input"
+    },
+    {
+      "model": "Qwen3 235B A22B",
+      "modelSlug": "qwen3-235b-a22b",
+      "scenario": "lesson-ru",
+      "runNumber": 2,
+      "success": false,
+      "duration": 65343,
+      "error": "Unexpected end of JSON input"
+    },
+    {
+      "model": "Qwen3 235B A22B",
+      "modelSlug": "qwen3-235b-a22b",
+      "scenario": "lesson-ru",
+      "runNumber": 3,
+      "success": false,
+      "duration": 56207,
+      "error": "Unexpected end of JSON input"
+    }
+  ],
+  "modelSummary": [
+    {
+      "model": "Kimi K2 0905",
+      "slug": "kimi-k2-0905",
+      "totalTests": 12,
+      "successful": 12,
+      "failed": 0,
+      "successRate": "100.0"
+    },
+    {
+      "model": "Kimi K2 Thinking",
+      "slug": "kimi-k2-thinking",
+      "totalTests": 12,
+      "successful": 11,
+      "failed": 1,
+      "successRate": "91.7"
+    },
+    {
+      "model": "DeepSeek v3.2 Exp",
+      "slug": "deepseek-v32-exp",
+      "totalTests": 12,
+      "successful": 12,
+      "failed": 0,
+      "successRate": "100.0"
+    },
+    {
+      "model": "DeepSeek Chat v3.1",
+      "slug": "deepseek-chat-v31",
+      "totalTests": 12,
+      "successful": 12,
+      "failed": 0,
+      "successRate": "100.0"
+    },
+    {
+      "model": "Grok 4 Fast",
+      "slug": "grok-4-fast",
+      "totalTests": 12,
+      "successful": 12,
+      "failed": 0,
+      "successRate": "100.0"
+    },
+    {
+      "model": "GLM 4.6",
+      "slug": "glm-46",
+      "totalTests": 12,
+      "successful": 12,
+      "failed": 0,
+      "successRate": "100.0"
+    },
+    {
+      "model": "MiniMax M2",
+      "slug": "minimax-m2",
+      "totalTests": 12,
+      "successful": 12,
+      "failed": 0,
+      "successRate": "100.0"
+    },
+    {
+      "model": "Qwen3 32B",
+      "slug": "qwen3-32b",
+      "totalTests": 12,
+      "successful": 11,
+      "failed": 1,
+      "successRate": "91.7"
+    },
+    {
+      "model": "Qwen3 235B Thinking",
+      "slug": "qwen3-235b-thinking",
+      "totalTests": 12,
+      "successful": 12,
+      "failed": 0,
+      "successRate": "100.0"
+    },
+    {
+      "model": "OSS 120B",
+      "slug": "oss-120b",
+      "totalTests": 12,
+      "successful": 12,
+      "failed": 0,
+      "successRate": "100.0"
+    },
+    {
+      "model": "Qwen3 235B A22B",
+      "slug": "qwen3-235b-a22b",
+      "totalTests": 12,
+      "successful": 0,
+      "failed": 12,
+      "successRate": "0.0"
+    }
+  ]
+}

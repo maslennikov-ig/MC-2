@@ -1,0 +1,497 @@
+{
+  "dashboard": {
+    "id": null,
+    "uid": "transactional-outbox",
+    "title": "Transactional Outbox Monitoring",
+    "tags": ["outbox", "fsm", "reliability", "course-generation"],
+    "timezone": "browser",
+    "schemaVersion": 38,
+    "version": 1,
+    "refresh": "30s",
+    "time": {
+      "from": "now-1h",
+      "to": "now"
+    },
+    "panels": [
+      {
+        "id": 1,
+        "title": "FSM Initialization Success Rate",
+        "type": "graph",
+        "gridPos": {
+          "x": 0,
+          "y": 0,
+          "w": 12,
+          "h": 8
+        },
+        "targets": [
+          {
+            "expr": "(fsm_init_success / fsm_init_total) * 100",
+            "legendFormat": "Success Rate %",
+            "refId": "A"
+          }
+        ],
+        "yaxes": [
+          {
+            "format": "percent",
+            "min": 0,
+            "max": 100,
+            "label": "Success Rate"
+          },
+          {
+            "format": "short"
+          }
+        ],
+        "alert": {
+          "name": "FSM Success Rate Below 95%",
+          "conditions": [
+            {
+              "evaluator": {
+                "params": [95],
+                "type": "lt"
+              },
+              "operator": {
+                "type": "and"
+              },
+              "query": {
+                "params": ["A", "5m", "now"]
+              },
+              "reducer": {
+                "params": [],
+                "type": "avg"
+              },
+              "type": "query"
+            }
+          ],
+          "executionErrorState": "alerting",
+          "for": "5m",
+          "frequency": "1m",
+          "handler": 1,
+          "message": "FSM initialization success rate dropped below 95%",
+          "noDataState": "no_data",
+          "notifications": []
+        },
+        "thresholds": [
+          {
+            "value": 95,
+            "colorMode": "critical",
+            "op": "lt",
+            "fill": true,
+            "line": true
+          }
+        ],
+        "tooltip": {
+          "shared": true,
+          "sort": 0,
+          "value_type": "individual"
+        },
+        "legend": {
+          "show": true,
+          "values": true,
+          "min": true,
+          "max": true,
+          "current": true,
+          "avg": true
+        }
+      },
+      {
+        "id": 2,
+        "title": "Outbox Queue Depth",
+        "type": "graph",
+        "gridPos": {
+          "x": 12,
+          "y": 0,
+          "w": 12,
+          "h": 8
+        },
+        "targets": [
+          {
+            "expr": "outbox_queue_depth",
+            "legendFormat": "Pending Jobs",
+            "refId": "A"
+          },
+          {
+            "expr": "avg_over_time(outbox_queue_depth[5m])",
+            "legendFormat": "5min Average",
+            "refId": "B"
+          }
+        ],
+        "yaxes": [
+          {
+            "format": "short",
+            "min": 0,
+            "label": "Jobs"
+          },
+          {
+            "format": "short"
+          }
+        ],
+        "alert": {
+          "name": "Outbox Queue Depth Above 1000",
+          "conditions": [
+            {
+              "evaluator": {
+                "params": [1000],
+                "type": "gt"
+              },
+              "operator": {
+                "type": "and"
+              },
+              "query": {
+                "params": ["A", "5m", "now"]
+              },
+              "reducer": {
+                "params": [],
+                "type": "avg"
+              },
+              "type": "query"
+            }
+          ],
+          "executionErrorState": "alerting",
+          "for": "5m",
+          "frequency": "1m",
+          "handler": 1,
+          "message": "Outbox queue depth exceeded 1000 jobs",
+          "noDataState": "no_data",
+          "notifications": []
+        },
+        "thresholds": [
+          {
+            "value": 1000,
+            "colorMode": "critical",
+            "op": "gt",
+            "fill": true,
+            "line": true
+          }
+        ]
+      },
+      {
+        "id": 3,
+        "title": "FSM Cache Hit Rate",
+        "type": "singlestat",
+        "gridPos": {
+          "x": 0,
+          "y": 8,
+          "w": 6,
+          "h": 4
+        },
+        "targets": [
+          {
+            "expr": "(fsm_init_cache_hits / fsm_init_total) * 100",
+            "refId": "A"
+          }
+        ],
+        "format": "percent",
+        "gauge": {
+          "show": true,
+          "minValue": 0,
+          "maxValue": 100,
+          "thresholdLabels": false,
+          "thresholdMarkers": true
+        },
+        "thresholds": "20,50,80",
+        "colors": ["#d44a3a", "#e0b400", "#73BF69"],
+        "valueName": "current",
+        "valueMaps": [],
+        "sparkline": {
+          "show": true,
+          "full": false,
+          "lineColor": "rgb(31, 120, 193)",
+          "fillColor": "rgba(31, 118, 189, 0.18)"
+        }
+      },
+      {
+        "id": 4,
+        "title": "Outbox Processor Status",
+        "type": "singlestat",
+        "gridPos": {
+          "x": 6,
+          "y": 8,
+          "w": 6,
+          "h": 4
+        },
+        "targets": [
+          {
+            "expr": "outbox_processor_alive",
+            "refId": "A"
+          }
+        ],
+        "format": "none",
+        "valueName": "current",
+        "valueMaps": [
+          {
+            "value": "0",
+            "text": "DOWN"
+          },
+          {
+            "value": "1",
+            "text": "RUNNING"
+          }
+        ],
+        "thresholds": "0.5,1",
+        "colors": ["#d44a3a", "#e0b400", "#73BF69"],
+        "colorBackground": true
+      },
+      {
+        "id": 5,
+        "title": "FSM Init Total Count",
+        "type": "singlestat",
+        "gridPos": {
+          "x": 12,
+          "y": 8,
+          "w": 6,
+          "h": 4
+        },
+        "targets": [
+          {
+            "expr": "fsm_init_total",
+            "refId": "A"
+          }
+        ],
+        "format": "short",
+        "valueName": "current",
+        "sparkline": {
+          "show": true,
+          "full": false
+        },
+        "colorBackground": false
+      },
+      {
+        "id": 6,
+        "title": "Outbox Jobs Created",
+        "type": "singlestat",
+        "gridPos": {
+          "x": 18,
+          "y": 8,
+          "w": 6,
+          "h": 4
+        },
+        "targets": [
+          {
+            "expr": "rate(outbox_jobs_created[5m]) * 60",
+            "refId": "A"
+          }
+        ],
+        "format": "short",
+        "decimals": 1,
+        "valueName": "current",
+        "postfix": " jobs/min",
+        "sparkline": {
+          "show": true,
+          "full": false
+        }
+      },
+      {
+        "id": 7,
+        "title": "Defense Layer Activations (5min rate)",
+        "type": "graph",
+        "gridPos": {
+          "x": 0,
+          "y": 12,
+          "w": 12,
+          "h": 8
+        },
+        "targets": [
+          {
+            "expr": "rate(layer2_activations[5m]) * 60",
+            "legendFormat": "Layer 2 (QueueEvents)",
+            "refId": "A"
+          },
+          {
+            "expr": "rate(layer3_activations[5m]) * 60",
+            "legendFormat": "Layer 3 (Worker Validation)",
+            "refId": "B"
+          },
+          {
+            "expr": "rate(layer2_failures[5m]) * 60",
+            "legendFormat": "Layer 2 Failures",
+            "refId": "C"
+          },
+          {
+            "expr": "rate(layer3_failures[5m]) * 60",
+            "legendFormat": "Layer 3 Failures",
+            "refId": "D"
+          }
+        ],
+        "yaxes": [
+          {
+            "format": "short",
+            "min": 0,
+            "label": "Activations per minute"
+          },
+          {
+            "format": "short"
+          }
+        ],
+        "legend": {
+          "show": true,
+          "values": true,
+          "current": true,
+          "avg": true
+        },
+        "seriesOverrides": [
+          {
+            "alias": "/Failures/",
+            "color": "#e24d42",
+            "dashes": true
+          }
+        ]
+      },
+      {
+        "id": 8,
+        "title": "Outbox Processor Latency (p95)",
+        "type": "graph",
+        "gridPos": {
+          "x": 12,
+          "y": 12,
+          "w": 12,
+          "h": 8
+        },
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.95, outbox_processing_duration_ms)",
+            "legendFormat": "p95 Batch Duration",
+            "refId": "A"
+          },
+          {
+            "expr": "histogram_quantile(0.50, outbox_processing_duration_ms)",
+            "legendFormat": "p50 Batch Duration",
+            "refId": "B"
+          },
+          {
+            "expr": "histogram_quantile(0.99, outbox_processing_duration_ms)",
+            "legendFormat": "p99 Batch Duration",
+            "refId": "C"
+          }
+        ],
+        "yaxes": [
+          {
+            "format": "ms",
+            "label": "Duration"
+          },
+          {
+            "format": "short"
+          }
+        ],
+        "thresholds": [
+          {
+            "value": 5000,
+            "colorMode": "critical",
+            "op": "gt",
+            "fill": false,
+            "line": true
+          }
+        ],
+        "legend": {
+          "show": true,
+          "values": true,
+          "current": true,
+          "avg": true,
+          "max": true
+        }
+      },
+      {
+        "id": 9,
+        "title": "FSM Initialization Latency Distribution",
+        "type": "graph",
+        "gridPos": {
+          "x": 0,
+          "y": 20,
+          "w": 12,
+          "h": 8
+        },
+        "targets": [
+          {
+            "expr": "histogram_quantile(0.50, fsm_init_duration_ms)",
+            "legendFormat": "p50",
+            "refId": "A"
+          },
+          {
+            "expr": "histogram_quantile(0.95, fsm_init_duration_ms)",
+            "legendFormat": "p95",
+            "refId": "B"
+          },
+          {
+            "expr": "histogram_quantile(0.99, fsm_init_duration_ms)",
+            "legendFormat": "p99",
+            "refId": "C"
+          }
+        ],
+        "yaxes": [
+          {
+            "format": "ms",
+            "label": "Duration"
+          },
+          {
+            "format": "short"
+          }
+        ],
+        "thresholds": [
+          {
+            "value": 500,
+            "colorMode": "critical",
+            "op": "gt",
+            "fill": false,
+            "line": true
+          }
+        ]
+      },
+      {
+        "id": 10,
+        "title": "Top FSM Failure Reasons",
+        "type": "table",
+        "gridPos": {
+          "x": 12,
+          "y": 20,
+          "w": 12,
+          "h": 8
+        },
+        "targets": [
+          {
+            "expr": "topk(10, sort_desc(fsm_init_failure_reasons))",
+            "format": "table",
+            "instant": true,
+            "refId": "A"
+          }
+        ],
+        "transform": "table",
+        "columns": [
+          {
+            "text": "Error Message",
+            "value": "reason"
+          },
+          {
+            "text": "Count",
+            "value": "count"
+          }
+        ],
+        "styles": [
+          {
+            "pattern": "count",
+            "type": "number",
+            "unit": "short",
+            "decimals": 0
+          }
+        ]
+      }
+    ],
+    "annotations": {
+      "list": [
+        {
+          "datasource": "-- Grafana --",
+          "enable": true,
+          "hide": false,
+          "iconColor": "rgba(0, 211, 255, 1)",
+          "name": "Deployments",
+          "type": "tags"
+        }
+      ]
+    },
+    "templating": {
+      "list": []
+    }
+  },
+  "overwrite": false,
+  "message": "Transactional Outbox Monitoring Dashboard - Initial Version",
+  "folderId": 0,
+  "folderUid": null
+}

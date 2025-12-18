@@ -1,0 +1,118 @@
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "This section provides hands-on practice with Python variables, data types, and type conversion. Students will learn through interactive coding exercises to reinforce core programming concepts.",
+  "learning_objectives": [
+    "Students will be able to declare and assign variables using valid Python syntax",
+    "Students will be able to identify and utilize Python's built-in data types effectively",
+    "Students will be able to perform explicit and implicit type conversions",
+    "Students will be able to debug common variable-related syntax and type errors"
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Variable Declaration and Basic Assignment",
+      "lesson_objective": "Students will be able to create variables with appropriate names and assign values using different assignment techniques",
+      "key_topics": [
+        "Variable naming conventions",
+        "Case sensitivity in variable names",
+        "Snake_case vs camelCase usage",
+        "Multiple assignment syntax"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Numeric Variable Assignment",
+          "exercise_instructions": "Create three variables (age, price, count) and assign them values. Print each variable with a descriptive message."
+        },
+        {
+          "exercise_title": "String Variable Practice",
+          "exercise_instructions": "Declare variables for first_name, last_name, and full_name. Combine first and last name into full_name and print the result."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Working with Integer and Float Types",
+      "lesson_objective": "Students will be able to perform arithmetic operations and understand type behavior with integers and floating-point numbers",
+      "key_topics": [
+        "Integer division vs float division",
+        "Precision issues in floating-point math",
+        "Type-specific operations",
+        "Using the math module with numeric types"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Area Calculator",
+          "exercise_instructions": "Write a program that calculates the area of a rectangle and a circle using integer and float values respectively. Display both results with type annotations."
+        },
+        {
+          "exercise_title": "Temperature Conversion",
+          "exercise_instructions": "Create a script that converts Celsius to Fahrenheit using floating-point arithmetic and displays the result with 2 decimal places."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "String Manipulation and Type Casting",
+      "lesson_objective": "Students will be able to manipulate strings and convert between string and numeric types",
+      "key_topics": [
+        "String concatenation and formatting",
+        "Type conversion functions (str(), int(), float())",
+        "Handling conversion errors",
+        "String length and slicing"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Data Input and Conversion",
+          "exercise_instructions": "Prompt the user for their age as a string, convert it to integer, then calculate their birth year. Handle any conversion errors gracefully."
+        },
+        {
+          "exercise_title": "Product Label Formatter",
+          "exercise_instructions": "Create a function that takes product price (float) and name (string) parameters, formats them into a label string, and returns the result."
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "Boolean Logic and Comparison Types",
+      "lesson_objective": "Students will be able to create and evaluate Boolean expressions using comparison operators",
+      "key_topics": [
+        "Truth values of different data types",
+        "Comparison operators (==, !=, >, <, etc.)",
+        "Logical operators (and, or, not)",
+        "Boolean type conversion"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Access Control Validation",
+          "exercise_instructions": "Write code that checks if a user's age is between 18-65 and if their account is active. Display appropriate access messages based on these conditions."
+        },
+        {
+          "exercise_title": "Data Type Truth Test",
+          "exercise_instructions": "Create a script that tests the truth value of empty strings, zero values, and None in Boolean contexts."
+        }
+      ]
+    },
+    {
+      "lesson_number": 5,
+      "lesson_title": "Debugging Variable Type Issues",
+      "lesson_objective": "Students will be able to identify and resolve common variable type-related bugs in Python code",
+      "key_topics": [
+        "TypeError identification and resolution",
+        "Using the type() function for debugging",
+        "Mixed-type calculations",
+        "Best practices for type annotation"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Bug Fixing Challenge",
+          "exercise_instructions": "Debug a provided script containing 3 variable type errors. Fix each error and verify the outputs match expected results."
+        },
+        {
+          "exercise_title": "Type Safety Implementation",
+          "exercise_instructions": "Modify an existing code snippet to include type checks and conversion before performing mathematical operations."
+        }
+      ]
+    }
+  ]
+}

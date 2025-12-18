@@ -1,0 +1,31 @@
+{
+  "course_title": "Introduction to Python Programming",
+  "course_description": "Learn Python programming from scratch in this hands-on beginner course. Master fundamentals like variables, data types, control flow, functions, and basic data structures through practical exercises and real-world examples. No prior coding experience required.",
+  "course_overview": "This comprehensive introduction to Python programming provides a solid foundation for aspiring developers, data analysts, and automation specialists. Students learn through hands-on projects covering variables, control structures, functions, file handling, error handling, and essential libraries like NumPy and Pandas basics. The course emphasizes practical application through coding exercises, debugging practice, and real-world mini-projects, ensuring students write clean, functional Python code. By completion, learners will confidently tackle intermediate Python topics and apply their skills to data analysis, web scraping, and task automation.",
+  "target_audience": "Absolute beginners with no programming experience, career changers entering tech, students preparing for computer science studies, and professionals seeking to automate tasks or add programming to their skillset.",
+  "estimated_duration_hours": 28,
+  "difficulty_level": "beginner",
+  "prerequisites": [
+    "Basic computer literacy (file management, installing software)",
+    "High school level mathematics (algebra, logical reasoning)",
+    "Access to a computer with internet connection"
+  ],
+  "learning_outcomes": [
+    "Write Python programs using variables, data types, and control flow statements",
+    "Apply functions and modules to create organized, reusable code",
+    "Analyze problems and develop algorithmic solutions using pseudocode and flowcharts",
+    "Implement and manipulate basic data structures including lists, dictionaries, and tuples",
+    "Debug and troubleshoot Python code using error messages and debugging techniques",
+    "Create simple applications to automate tasks and solve real-world problems"
+  ],
+  "course_tags": [
+    "Python",
+    "Programming",
+    "Beginner",
+    "Coding",
+    "Software Development",
+    "Automation",
+    "Data Science",
+    "Web Development"
+  ]
+}

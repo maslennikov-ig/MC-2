@@ -1,0 +1,124 @@
+ {
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "Hands-on programming section with exercises",
+  "learning_objectives": [
+    "Demonstrate proficiency in creating and managing variables with different data types",
+    "Implement arithmetic operations and type conversions for numeric data",
+    "Manipulate string data using indexing, slicing, and formatting techniques",
+    "Construct and modify ordered collections including lists and tuples",
+    "Apply dictionaries and sets to solve real-world data organization problems"
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Creating and Assigning Variables in Python",
+      "lesson_objective": "Students will be able to declare variables using proper naming conventions and assign values of different data types while understanding Python's dynamic typing system",
+      "key_topics": [
+        "Variable naming rules and conventions",
+        "Assignment operators and syntax",
+        "Dynamic typing principles",
+        "Variable reassignment and memory management",
+        "Using type() function for inspection"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Variable Declaration and Type Inspection",
+          "exercise_instructions": "Create variables to store your name (string), age (integer), height in meters (float), and whether you are enrolled (boolean). Use the type() function to inspect each variable's data type and print the results in a formatted string that displays both the variable name and its type."
+        },
+        {
+          "exercise_title": "Dynamic Typing Demonstration",
+          "exercise_instructions": "Create a variable named 'data' and assign it an integer value. Reassign the same variable to a string, then to a list, and finally to a dictionary. After each reassignment, print the variable's new value and type to demonstrate Python's dynamic typing behavior."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Working with Integers and Floats",
+      "lesson_objective": "Students will be able to perform arithmetic operations, handle numeric precision issues, and convert between integer and float data types",
+      "key_topics": [
+        "Integer and float type characteristics",
+        "Arithmetic operators and precedence",
+        "Type conversion using int() and float()",
+        "Numeric precision and floating-point limitations",
+        "Augmented assignment operators"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Temperature Conversion Calculator",
+          "exercise_instructions": "Create a program that converts Celsius to Fahrenheit. Prompt the user to input a temperature in Celsius (as float), perform the conversion using the formula F = (C × 9/5) + 32, and display the result with exactly 2 decimal places. Then convert the result back to Celsius and compare with the original input."
+        },
+        {
+          "exercise_title": "Compound Interest Calculator",
+          "exercise_instructions": "Implement a compound interest calculator that takes principal amount, annual interest rate (as percentage), and time in years. Calculate the final amount using A = P(1 + r/100)^t. Use augmented assignment operators to update the principal each year in a loop and print the year-by-year growth."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "String Operations and Formatting",
+      "lesson_objective": "Students will be able to extract substring data, combine strings efficiently, and format output using f-strings and string methods",
+      "key_topics": [
+        "String indexing and slicing syntax",
+        "String concatenation and multiplication",
+        "Common string methods (upper, lower, strip, replace)",
+        "f-string formatting and expressions",
+        "Escape characters and multiline strings"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Email Parser and Validator",
+          "exercise_instructions": "Create a program that extracts the username and domain from an email address using string slicing and the find() method. Validate that the email contains exactly one '@' symbol. Format the output using an f-string to display: 'Username: [username], Domain: [domain]'. Handle potential leading/trailing whitespace."
+        },
+        {
+          "exercise_title": "Text Normalization Pipeline",
+          "exercise_instructions": "Implement a text cleaning function that takes a user-provided sentence and performs these operations: convert to lowercase, strip leading/trailing whitespace, replace all exclamation marks with periods, and capitalize the first letter. Test with multiple input strings including edge cases with extra spaces."
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "Managing Ordered Collections with Lists and Tuples",
+      "lesson_objective": "Students will be able to create mutable lists and immutable tuples, access elements by index, and apply common collection methods",
+      "key_topics": [
+        "List creation and element access",
+        "List modification methods (append, insert, remove, pop)",
+        "Tuple creation and immutability principles",
+        "List comprehension basics",
+        "Tuple unpacking and swapping variables"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Shopping List Manager",
+          "exercise_instructions": "Build an interactive shopping list application. Start with an empty list, then programmatically add 5 items using append(). Insert an item at position 2, remove one item by value, and pop the last item. Print the list after each modification. Finally, create a tuple from the final list and demonstrate that tuples are immutable by attempting to modify an element."
+        },
+        {
+          "exercise_title": "Coordinate Geometry with Tuples",
+          "exercise_instructions": "Create a list of 3 coordinate tuples representing points in 2D space (e.g., (3, 4)). Write code to calculate the distance between the first two points using the distance formula. Use tuple unpacking to assign x and y values to variables, then swap the coordinates of the third point using Python's simultaneous assignment feature."
+        }
+      ]
+    },
+    {
+      "lesson_number": 5,
+      "lesson_title": "Working with Key-Value Pairs and Unique Elements",
+      "lesson_objective": "Students will be able to structure data using dictionaries and manage unique collections with sets",
+      "key_topics": [
+        "Dictionary creation and key-value access",
+        "Dictionary methods (keys, values, items, get, update)",
+        "Set creation and unique element enforcement",
+        "Set operations (union, intersection, difference)",
+        "Nested data structures"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "User Profile Management System",
+          "exercise_instructions": "Create a dictionary to store a user profile with keys: username, email, age, hobbies (as list), and active_status (boolean). Add at least 3 hobbies to the list. Use the get() method to safely retrieve a potentially missing 'phone' key. Update the profile with a new key-value pair for 'membership_level'. Iterate through all key-value pairs and print them in a formatted manner."
+        },
+        {
+          "exercise_title": "Duplicate Remover and Set Operations",
+          "exercise_instructions": "Given a list with duplicate numbers, convert it to a set to remove duplicates. Create two sets: one with even numbers from 1-10, another with multiples of 3 from 1-10. Perform and print the union, intersection, and difference operations. Then convert the resulting set back to a sorted list."
+        }
+      ]
+    }
+  ]
+}

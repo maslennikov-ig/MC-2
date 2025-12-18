@@ -1,0 +1,34 @@
+{
+  "course_title": "Introduction to Python Programming",
+  "course_description": "Embark on your programming journey with this beginner-friendly course on Python, the popular and versatile language used in web development, data science, and automation. Learn core concepts through hands-on exercises to build confidence in coding from scratch.",
+  "course_overview": "This comprehensive introductory course to Python programming is tailored for newcomers to the field. Starting from the ground up, you'll explore Python's syntax, data types, control flow statements, functions, and modules. Through interactive lessons, coding challenges, and mini-projects like building a simple calculator or text analyzer, you'll gain practical skills to write, test, and debug code. The course emphasizes problem-solving and best practices, preparing you to apply Python in real-world scenarios such as scripting or introductory data manipulation. No prior experience needed—just curiosity and a computer.",
+  "target_audience": "Absolute beginners with little to no programming background, including students, professionals transitioning careers, hobbyists, and anyone eager to learn coding fundamentals.",
+  "estimated_duration_hours": 25,
+  "difficulty_level": "beginner",
+  "prerequisites": [
+    "Basic computer skills (using a keyboard and mouse)",
+    "No prior programming experience required",
+    "Access to a computer with internet for installation"
+  ],
+  "learning_outcomes": [
+    "Explain fundamental Python concepts including variables, data types, and operators.",
+    "Write and execute basic Python scripts using control structures like loops and conditionals.",
+    "Define and call functions to organize and reuse code effectively.",
+    "Manipulate common data structures such as lists, tuples, dictionaries, and strings.",
+    "Identify and debug syntax errors and logical issues in Python programs.",
+    "Apply Python to solve simple real-world problems, such as data processing tasks.",
+    "Utilize built-in libraries for basic input/output and file handling."
+  ],
+  "course_tags": [
+    "Python",
+    "Programming",
+    "Beginner",
+    "Coding Fundamentals",
+    "Data Structures",
+    "Functions",
+    "Debugging",
+    "Problem Solving",
+    "Software Basics",
+    "Introductory Coding"
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "model": "Qwen3 32B",
+  "modelSlug": "qwen3-32b",
+  "scenario": "metadata-en",
+  "runNumber": 2,
+  "error": "OpenAI or Azure OpenAI API key or Token Provider not found",
+  "duration": 1,
+  "timestamp": "2025-11-14T07:16:14.579Z"
+}

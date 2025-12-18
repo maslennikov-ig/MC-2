@@ -1,0 +1,33 @@
+{
+  "course_title": "Introduction to Python Programming",
+  "course_description": "Master Python programming fundamentals through hands-on projects and real-world examples. Perfect for beginners with no prior coding experience who want to build a solid foundation in one of the world's most popular programming languages.",
+  "course_overview": "This comprehensive beginner-level course introduces students to Python programming through a structured, hands-on approach. Students will learn core programming concepts including variables, data types, control structures, functions, and object-oriented programming principles. The course emphasizes practical application with interactive coding exercises, mini-projects, and real-world problem-solving scenarios. By the end of the course, students will be able to write Python scripts, debug code, and understand how to continue their learning journey in software development.",
+  "target_audience": "Beginners with no programming experience, career changers, students, and professionals seeking to learn Python for data analysis, automation, or web development.",
+  "estimated_duration_hours": 25,
+  "difficulty_level": "beginner",
+  "prerequisites": [
+    "Basic computer literacy and file management skills",
+    "High school mathematics (algebra)",
+    "Access to a computer with internet connection",
+    "Willingness to practice coding exercises"
+  ],
+  "learning_outcomes": [
+    "Understand fundamental programming concepts and Python syntax",
+    "Apply control structures (if/else, loops) to solve problems",
+    "Create and utilize functions to write modular, reusable code",
+    "Implement object-oriented programming principles in Python",
+    "Debug and troubleshoot Python code using best practices",
+    "Develop simple programs for data manipulation and automation tasks"
+  ],
+  "course_tags": [
+    "Python Programming",
+    "Programming Fundamentals",
+    "Beginner Coding",
+    "Object-Oriented Programming",
+    "Software Development",
+    "Data Types and Variables",
+    "Functions and Modules",
+    "Problem Solving",
+    "Hands-on Projects"
+  ]
+}

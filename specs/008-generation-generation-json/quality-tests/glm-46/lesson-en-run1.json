@@ -1,0 +1,124 @@
+
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "Hands-on programming section focusing on Python variables, data types, and basic operations with practical exercises",
+  "learning_objectives": [
+    "Create and assign variables using appropriate naming conventions",
+    "Identify and use Python's basic data types (integers, floats, strings, booleans)",
+    "Perform operations on different data types",
+    "Convert between data types as needed",
+    "Debug type-related errors in Python code"
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Creating Variables and Assignment",
+      "lesson_objective": "Students will be able to create variables, assign values, and follow Python naming conventions",
+      "key_topics": [
+        "Variable declaration and assignment operator (=)",
+        "Naming rules and conventions",
+        "Multiple assignment techniques",
+        "Variable reassignment and updating"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Variable Creation Practice",
+          "exercise_instructions": "Create 5 variables with different valid names: one for your age as an integer, one for your name as a string, one for your height as a float, one for a boolean indicating if you like programming, and one for a list of your favorite colors. Print all variables to verify their values."
+        },
+        {
+          "exercise_title": "Naming Convention Challenge",
+          "exercise_instructions": "Identify which of the following variable names are invalid and explain why: 1st_place, user_name, total-value, class, _private_var, max_score, user@name. Then create valid alternatives for the invalid ones."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Working with Numeric Data Types",
+      "lesson_objective": "Students will be able to use integers and floats, perform arithmetic operations, and understand type differences",
+      "key_topics": [
+        "Integer operations and limitations",
+        "Floating-point numbers and precision",
+        "Arithmetic operators (+, -, *, /, //, %, **)",
+        "Order of operations (PEMDAS)",
+        "Math functions from the math module"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Calculator Program",
+          "exercise_instructions": "Write a program that calculates the area and perimeter of a rectangle. The program should have variables for length and width, perform the calculations using appropriate operators, and print the results. Test with integer and floating-point inputs."
+        },
+        {
+          "exercise_title": "Temperature Converter",
+          "exercise_instructions": "Create variables to store a temperature in Celsius. Convert it to Fahrenheit using the formula: F = (C × 9/5) + 32. Print both temperatures with descriptive labels. Test with multiple Celsius values including negative numbers."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "String Manipulation and Operations",
+      "lesson_objective": "Students will be able to create, modify, and format strings using various string methods",
+      "key_topics": [
+        "String creation with quotes",
+        "String concatenation and repetition",
+        "String indexing and slicing",
+        "Common string methods (upper, lower, strip, replace)",
+        "String formatting with f-strings"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "String Transformation",
+          "exercise_instructions": "Create a string variable with your full name. Using string methods, create and print: 1) Your name in all uppercase, 2) Your name in all lowercase, 3) Your name with first letter capitalized, 4) The number of characters in your name, 5) Your initials extracted using slicing."
+        },
+        {
+          "exercise_title": "Personalized Greeting Generator",
+          "exercise_instructions": "Create variables for a person's name, age, and favorite hobby. Use f-string formatting to create a personalized greeting message that includes all this information. The message should be properly formatted with punctuation and spacing."
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "Boolean Values and Logical Operations",
+      "lesson_objective": "Students will be able to use boolean values and logical operators to make decisions in code",
+      "key_topics": [
+        "True and False boolean values",
+        "Comparison operators (==, !=, <, >, <=, >=)",
+        "Logical operators (and, or, not)",
+        "Truthiness and falsiness in Python",
+        "Boolean expressions in conditions"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Comparison Practice",
+          "exercise_instructions": "Create variables for two numbers and a string. Write boolean expressions to compare these values using all comparison operators. Print each expression with a description of what you're comparing."
+        },
+        {
+          "exercise_title": "Login Validation",
+          "exercise_instructions": "Create variables for username, password, and is_active status. Write boolean expressions to check: 1) If username and password are not empty, 2) If username length is at least 6 characters, 3) If user is active, 4) If all conditions are met simultaneously. Print the results."
+        }
+      ]
+    },
+    {
+      "lesson_number": 5,
+      "lesson_title": "Type Conversion and Checking",
+      "lesson_objective": "Students will be able to convert between data types and check variable types programmatically",
+      "key_topics": [
+        "Implicit vs explicit type conversion",
+        "Using int(), float(), str(), bool() functions",
+        "Type checking with type() and isinstance()",
+        "Handling conversion errors with try-except",
+        "Converting user input strings to numbers"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Type Conversion Practice",
+          "exercise_instructions": "Create variables of different types (string numbers, float values, booleans). Convert each variable to all other possible types using conversion functions. Print the original type, value, converted value, and new type for each conversion."
+        },
+        {
+          "exercise_title": "Input Calculator",
+          "exercise_instructions": "Write a program that accepts two numbers as input (using input()), converts them to appropriate numeric types, performs addition, subtraction, multiplication, and division, then displays the results. Include type checking to ensure valid numeric input."
+        }
+      ]
+    }
+  ]
+}

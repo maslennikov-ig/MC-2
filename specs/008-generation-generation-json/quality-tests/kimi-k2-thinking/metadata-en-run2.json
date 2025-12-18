@@ -1,0 +1,34 @@
+ {
+  "course_title": "Introduction to Python Programming",
+  "course_description": "Introduction to Python Programming is a comprehensive beginner-level technical course designed for individuals with little to no prior programming experience. This hands-on course covers fundamental programming concepts using Python's clear and readable syntax. Students will learn essential skills including variables, data types, control structures, functions, and basic object-oriented programming. Through practical exercises and real-world projects, participants will build a solid foundation in software development and problem-solving using one of the world's most popular programming languages.",
+  "course_overview": "This immersive course provides a structured journey into Python programming, starting with environment setup and basic syntax. In Module 1, students configure VS Code and write their first 'Hello World' script, then explore variables, strings, integers, floats, and booleans through interactive exercises like building a simple calculator. Module 2 dives into control flow with if-else statements and loops, where students create a number guessing game and analyze data patterns. Module 3 focuses on functions and code organization, teaching students to build reusable functions for tasks like calculating factorials or processing text files. Module 4 introduces data structures including lists, dictionaries, and tuples, with practical applications such as managing a contact book or analyzing CSV data. Module 5 covers file handling and exception management, enabling students to read/write files and handle errors gracefully. Module 6 provides a gentle introduction to object-oriented programming concepts by designing simple classes for real-world entities like bank accounts or inventory items. Throughout the course, students complete 12 hands-on labs including building a to-do list application, a basic web scraper, and a personal expense tracker. The curriculum emphasizes debugging skills, code readability, and best practices following PEP 8 style guidelines. By course completion, students will have a portfolio of 5 functional Python projects demonstrating their ability to solve practical problems programmatically.",
+  "target_audience": "Primary persona: Career changers with 2-5 years of professional experience in non-technical fields (marketing, finance, operations) seeking to transition into software development or data analysis roles. Secondary persona: University students in non-CS majors (biology, psychology, economics) requiring programming skills for research, internships, or academic projects. Tertiary persona: Working professionals in technical adjacent roles (IT support, QA testers, system administrators) aiming to automate tasks and enhance their technical capabilities with scripting skills. All personas share a common trait of having strong logical thinking abilities but minimal to no formal programming background.",
+  "estimated_duration_hours": 40,
+  "difficulty_level": "beginner",
+  "prerequisites": [
+    "Basic computer literacy including file management and installing software",
+    "High school level mathematics (algebra)",
+    "Access to a computer with internet connection (Windows, macOS, or Linux)",
+    "No prior programming experience required"
+  ],
+  "learning_outcomes": [
+    "Define core Python syntax, data types, and control structures with 90% accuracy on technical assessments",
+    "Build functional command-line applications using functions, loops, and conditional logic to solve real-world problems",
+    "Analyze debugging output and error traces to identify and resolve syntax and logical errors in Python code",
+    "Create modular programs by implementing custom functions, importing standard library modules, and organizing code into logical sections",
+    "Evaluate multiple algorithmic approaches to solve programming challenges and justify selection based on efficiency and readability criteria",
+    "Construct data processing pipelines using lists, dictionaries, and file operations to manipulate and transform structured data"
+  ],
+  "course_tags": [
+    "python",
+    "programming",
+    "beginner",
+    "software development",
+    "coding",
+    "scripting",
+    "automation",
+    "data analysis",
+    "web development",
+    "computer science"
+  ]
+}

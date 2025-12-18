@@ -1,0 +1,51 @@
+{
+  "title": "What is an Intangible Product: Ticket as a Product",
+  "intro": "Imagine selling something you can't hold, touch, or store on a shelf. That's the reality of ticket sales. Unlike physical goods, tickets represent access, experience, and time — not ownership. For sales managers in the event industry, understanding this distinction is critical to crafting effective strategies and customer interactions. In this lesson, you'll explore what makes a ticket an intangible product, examine how it differs from physical goods, and learn how to position your customer relationship management (CRM) system as a strategic tool. By the end, you’ll be able to confidently explain the nature of tickets as intangible assets and leverage that understanding to improve sales conversations and customer retention.",
+  "sections": [
+    {
+      "title": "Understanding Intangible Products and the Nature of Tickets",
+      "content": "An intangible product is a service or right that lacks physical form. Unlike a smartphone or a t-shirt, you can't hold it in your hand or resell it in its original state. A ticket is a classic example of an intangible product — it doesn’t grant you ownership of anything tangible. Instead, it gives you the right to participate in an event at a specific time and place. Think of a concert ticket: you’re not buying a CD or merchandise; you're purchasing access to a live performance that exists only in that moment.\n\nThis concept is crucial for sales managers because it changes how customers perceive value. Since there’s no physical item, the customer’s decision hinges on trust, emotion, and expectation. The ticket is a promise — a commitment from the event organizer that the experience will deliver what was advertised. If the event is canceled or underwhelming, the value evaporates. That’s why communication, credibility, and customer experience are central to ticket sales. Recognizing tickets as intangible helps you focus on selling the experience, not the paper (or digital file) itself."
+    },
+    {
+      "title": "Key Differences Between Tickets and Physical Products",
+      "content": "Selling tickets requires a different mindset than selling physical goods. Here are five key differences:\n\n1. **Ownership vs. Access**: With a physical product, the customer owns it and can resell or keep it indefinitely. A ticket grants only temporary access, not ownership.\n\n2. **Tangibility**: Physical products can be touched, stored, and inspected. Tickets, even when printed, are merely proof of entitlement — their value lies in what they represent, not their material form.\n\n3. **Perishability**: Tickets have a fixed expiration — the event date. If not used by then, they become worthless. Physical products can often be stored and sold later.\n\n4. **Non-Refundable Nature**: Many tickets are non-refundable, making the purchase decision feel riskier for customers. This increases the importance of pre-sale communication and trust-building.\n\n5. **Immediate Consumption**: The value of a ticket is consumed the moment the event occurs. There’s no ongoing utility like with a durable product.\n\nUnderstanding these differences allows sales managers to tailor messaging, manage customer expectations, and train teams to emphasize experience and urgency over physical attributes."
+    },
+    {
+      "title": "CRM as a Customer Navigator in Ticket Sales",
+      "content": "In ticket sales, your Customer Relationship Management (CRM) system isn’t just a database — it’s a navigator. Just as a GPS guides a driver through unfamiliar terrain, a CRM guides customers through their journey from awareness to purchase and beyond. Because tickets are intangible and time-sensitive, customers need clear direction: when to buy, what to expect, how to access the event.\n\nA well-used CRM tracks customer interactions, preferences, and purchase history. It helps you send timely reminders about upcoming events, recommend similar experiences, and re-engage lapsed buyers. For example, if a customer bought tickets to a jazz festival last year, your CRM can trigger a personalized email when this year’s lineup is announced.\n\nMore importantly, the CRM builds trust by maintaining continuity. Since the ticket itself offers no physical reassurance, consistent, personalized communication helps customers feel confident in their purchase. By acting as a navigator, your CRM doesn’t just support sales — it enhances the perceived value of the intangible product."
+    }
+  ],
+  "examples": [
+    {
+      "title": "Concert Ticket as Intangible Product",
+      "content": "A customer buys a ticket to a music festival online. They receive a QR code via email. The ticket isn’t a physical object — it’s a digital pass that grants entry. If the event is canceled, the ticket has no resale value and cannot be used later. The customer’s satisfaction depends entirely on the quality of the experience, not the ticket itself. This illustrates the perishable, non-ownership nature of intangible products."
+    },
+    {
+      "title": "CRM Driving Ticket Renewals",
+      "content": "A theater company uses its CRM to identify patrons who attended last season’s Shakespeare play. Six weeks before tickets go on sale for the next season, the system triggers a personalized email with early access and a discount. This targeted outreach increases renewal rates by making customers feel valued and informed — turning the CRM into a proactive sales navigator."
+    }
+  ],
+  "exercises": [
+    {
+      "question": "List three characteristics of intangible products and explain how each affects customer expectations in ticket sales.",
+      "hints": [
+        "Think about how customers evaluate value when they can't touch the product.",
+        "Consider the role of trust and communication in intangible transactions."
+      ]
+    },
+    {
+      "question": "Describe how you would use your CRM to guide a first-time buyer through the ticket purchase process for a major event.",
+      "hints": [
+        "Focus on touchpoints: awareness, purchase, confirmation, pre-event, post-event.",
+        "Include examples of automated messages or personal follow-ups."
+      ]
+    }
+  ],
+  "summary": [
+    "Tickets are intangible products that grant access, not ownership.",
+    "Key differences from physical products include perishability, non-refundability, and immediate consumption.",
+    "Intangible products rely heavily on trust, experience, and communication for perceived value.",
+    "CRM systems act as customer navigators by guiding buyers through time-sensitive purchase journeys.",
+    "Effective ticket sales focus on selling the experience, not a physical item."
+  ]
+}

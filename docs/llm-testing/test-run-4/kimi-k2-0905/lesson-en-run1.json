@@ -1,0 +1,127 @@
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "Master the building blocks of every Python program by learning how to create, name, and use variables to store and manipulate data. You will explore Python’s core data types—numbers, text, and Boolean values—and practice converting between them so you can handle real-world information in your code.",
+  "learning_objectives": [
+    "Declare and assign at least five variables with legal, descriptive names following PEP 8 style.",
+    "Predict and verify the data type of any literal or variable using type() with 100 % accuracy on a 10-question quiz.",
+    "Convert between int, float, str, and bool types without raising errors in three scaffolded coding drills.",
+    "Debug and fix NameError and TypeError messages in provided buggy scripts within 2 minutes each."
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Creating and Naming Variables",
+      "lesson_objective": "Write at least four valid variable assignments that follow Python naming rules and PEP 8 conventions.",
+      "key_topics": [
+        "Variable as a labeled box",
+        "Assignment operator =",
+        "Legal vs illegal names",
+        "Case sensitivity",
+        "PEP 8 naming conventions"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Fix the Names",
+          "exercise_instructions": "1. Open the file broken_names.py. 2. Rename each variable so it obeys Python rules and PEP 8. 3. Run the script and confirm it prints four lines without syntax errors."
+        },
+        {
+          "exercise_title": "Describe Your Day",
+          "exercise_instructions": "1. Create a new script my_day.py. 2. Create variables: wake_up_time (int), breakfast_calories (float), is_weekend (bool), main_task (str). 3. Print all four variables on one line using an f-string."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Numbers: Int and Float",
+      "lesson_objective": "Perform accurate arithmetic calculations using int and float types and explain the result's type.",
+      "key_topics": [
+        "int and float literals",
+        "Basic arithmetic operators",
+        "Division vs floor division",
+        "Operator precedence",
+        "Floating-point rounding"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Shopping Cart Math",
+          "exercise_instructions": "1. Create variables: price_item1 = 19.99, price_item2 = 7.49, quantity1 = 3, quantity2 = 2. 2. Compute total cost as a float. 3. Compute total_items as an int. 4. Print both results with descriptive labels."
+        },
+        {
+          "exercise_title": "Pizza Split",
+          "exercise_instructions": "1. Prompt the user for total_cost (float) and num_friends (int). 2. Calculate cost_per_friend using true division. 3. Calculate whole_pizzas_needed using floor division assuming 8 slices per pizza. 4. Display both values rounded to two decimals."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "Strings and String Operations",
+      "lesson_objective": "Construct new strings by concatenating, repeating, and formatting literals and variables.",
+      "key_topics": [
+        "str literals with quotes",
+        "Escape sequences",
+        "+ and * operators",
+        "f-strings",
+        "len() function"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Movie Ticket",
+          "exercise_instructions": "1. Create variables: movie = 'Python Unleashed', tickets = 4, price_per_ticket = 9.5. 2. Build an f-string that outputs: 'Movie: Python Unleashed, Total: $38.0'. 3. Print the length of the string."
+        },
+        {
+          "exercise_title": "ASCII Banner",
+          "exercise_instructions": "1. Ask the user for a single word. 2. Print the word surrounded by a border of asterisks that is 4 characters longer than the word. 3. Use string multiplication to create the border."
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "Booleans and Logical Operators",
+      "lesson_objective": "Evaluate at least three Boolean expressions that combine comparisons and logical operators.",
+      "key_topics": [
+        "True and False keywords",
+        "Comparison operators",
+        "and, or, not",
+        "Boolean context in Python",
+        "Short-circuit evaluation"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Admission Checker",
+          "exercise_instructions": "1. Input age (int) and has_ticket (str: 'yes'/'no'). 2. Convert has_ticket to Boolean. 3. Print True if age >= 18 and has_ticket is True, otherwise False."
+        },
+        {
+          "exercise_title": "Leap Year Validator",
+          "exercise_instructions": "1. Input a year (int). 2. Compute is_leap = year % 4 == 0 and (year % 100 != 0 or year % 400 == 0). 3. Print is_leap."
+        }
+      ]
+    },
+    {
+      "lesson_number": 5,
+      "lesson_title": "Type Conversion and User Input",
+      "lesson_objective": "Convert user input strings to the correct numeric or Boolean type and handle conversion errors.",
+      "key_topics": [
+        "int(), float(), str(), bool()",
+        "input() always returns str",
+        "ValueError handling",
+        "Truthy and falsy values",
+        "Chaining conversions"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Temperature Converter",
+          "exercise_instructions": "1. Prompt for Celsius as a string. 2. Convert to float. 3. Compute Fahrenheit and print one decimal place using an f-string. 4. Wrap conversion in try/except to catch ValueError and print 'Invalid number'."
+        },
+        {
+          "exercise_title": "Truthy Survey",
+          "exercise_instructions": "1. Ask three yes/no questions returning 'yes' or 'no'. 2. Convert answers to Boolean. 3. Print the number of True answers using simple addition."
+        },
+        {
+          "exercise_title": "Section Quiz",
+          "exercise_instructions": "1. Open quiz.py. 2. Complete 10 fill-in-the-blank questions on variable names, types, and conversions. 3. Run the script to auto-grade; aim for 10/10."
+        }
+      ]
+    }
+  ]
+}

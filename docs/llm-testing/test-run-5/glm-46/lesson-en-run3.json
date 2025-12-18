@@ -1,0 +1,126 @@
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "This section introduces the fundamental concepts of variables and data types in Python. Students will learn how to store, manipulate, and categorize different types of data in their programs.",
+  "learning_objectives": [
+    "Create and assign variables in Python",
+    "Identify and use basic Python data types (strings, integers, floats, booleans)",
+    "Convert between different data types using type casting",
+    "Apply appropriate data types to solve simple programming problems",
+    "Use built-in functions to inspect and manipulate data types"
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Introduction to Variables",
+      "lesson_objective": "Understand what variables are and how to create and assign them in Python",
+      "key_topics": [
+        "What is a variable",
+        "Variable naming conventions",
+        "Assignment operator (=)",
+        "Variable reassignment",
+        "Dynamic typing in Python",
+        "Checking variable types with type()",
+        "Best practices for variable naming"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Creating Your First Variables",
+          "exercise_instructions": "Create five variables with different names representing different pieces of information (e.g., name, age, city, temperature, is_sunny). Assign appropriate values to each variable and print their values."
+        },
+        {
+          "exercise_title": "Variable Naming Practice",
+          "exercise_instructions": "Identify which of the following variable names are valid in Python and explain why: 1st_place, user_name, _private, total-count, class, firstName, first name, totalValue123. For invalid names, suggest valid alternatives."
+        },
+        {
+          "exercise_title": "Variable Inspection",
+          "exercise_instructions": "Create variables of different types (number, text, boolean) and use the type() function to determine their types. Print both the variable value and its type in a formatted string for each variable."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Numeric Data Types",
+      "lesson_objective": "Work with integers and floating-point numbers in Python",
+      "key_topics": [
+        "Integer data type (int)",
+        "Floating-point numbers (float)",
+        "Arithmetic operations with numbers",
+        "Order of operations",
+        "Number formatting",
+        "Mathematical functions",
+        "Number precision and limitations"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Basic Arithmetic Operations",
+          "exercise_instructions": "Create variables containing both integers and floats. Practice all basic arithmetic operations (+, -, *, /, //, %, **) with different combinations of these numbers. Print the results and identify which operations return integers vs floats."
+        },
+        {
+          "exercise_title": "Number Type Identification",
+          "exercise_instructions": "Create a list of 10 numbers (mix of integers and floats). Write a program that determines whether each number is an integer or float and counts how many of each type are in the list."
+        },
+        {
+          "exercise_title": "Mathematical Expressions",
+          "exercise_instructions": "Write Python expressions to solve these problems: 1) Convert a temperature from Celsius to Fahrenheit, 2) Calculate the area of a circle with a given radius, 3) Calculate the compound interest for a given principal, rate, and time."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "Strings and Text Data",
+      "lesson_objective": "Create and manipulate string data in Python",
+      "key_topics": [
+        "String data type (str)",
+        "Creating strings with quotes",
+        "String concatenation",
+        "String methods (upper(), lower(), etc.)",
+        "String indexing and slicing",
+        "Escape characters in strings",
+        "String formatting"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "String Creation and Manipulation",
+          "exercise_instructions": "Create three string variables representing a first name, last name, and city. Use concatenation to combine them into a full sentence that introduces yourself. Experiment with both the + operator and f-strings."
+        },
+        {
+          "exercise_title": "String Methods Practice",
+          "exercise_instructions": "Take a paragraph of text and apply at least five different string methods to it (e.g., upper(), lower(), title(), split(), replace()). For each method, explain what it does and show the before and after results."
+        },
+        {
+          "exercise_title": "String Formatting",
+          "exercise_instructions": "Create variables for a product name, price, and quantity. Use three different string formatting approaches (%, .format(), and f-strings) to create a receipt line that displays this information in a properly formatted way with 2 decimal places for the price."
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "Type Conversion and Basic Operations",
+      "lesson_objective": "Convert between data types and perform type-appropriate operations",
+      "key_topics": [
+        "Implicit type conversion",
+        "Explicit type conversion (casting)",
+        "int(), float(), str(), bool() functions",
+        "Common conversion errors",
+        "Boolean data type",
+        "Comparison between different types",
+        "Type checking with isinstance()"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Type Conversion Practice",
+          "exercise_instructions": "Create a program that takes numeric input as strings, converts them to appropriate numeric types, performs calculations, and then converts the results back to strings for display. Handle potential conversion errors gracefully."
+        },
+        {
+          "exercise_title": "Boolean Operations",
+          "exercise_instructions": "Create boolean variables for different conditions (e.g., is_raining, has_umbrella, temperature > 20). Combine these using logical operators (and, or, not) to determine whether you should go outside. Print your reasoning and final decision."
+        },
+        {
+          "exercise_title": "Type-Specific Operations",
+          "exercise_instructions": "Write a program that determines the type of user input (string, integer, float, or boolean) and performs a type-appropriate operation. For example, if it's a string, reverse it; if it's a number, calculate its square; if it's a boolean, toggle it."
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,94 @@
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "A hands-on introduction to variables and core data types in Python, including practical exercises to reinforce understanding.",
+  "learning_objectives": [
+    "Declare and assign variables using proper Python syntax",
+    "Identify and use basic data types: int, float, str, and bool",
+    "Convert between different data types using type casting",
+    "Use the type() function to inspect variable data types",
+    "Apply variables and data types to solve simple programming tasks"
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Introduction to Variables",
+      "lesson_objective": "Declare and assign values to variables in Python using correct naming conventions",
+      "key_topics": [
+        "What is a variable?",
+        "Variable assignment with =",
+        "Variable naming rules",
+        "Dynamic typing",
+        "Reassigning variables"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Create and Print Variables",
+          "exercise_instructions": "Declare three variables named 'name', 'age', and 'city'. Assign your name, age, and hometown to them. Print each variable on a separate line."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Core Data Types in Python",
+      "lesson_objective": "Differentiate between int, float, str, and bool data types and assign appropriate values",
+      "key_topics": [
+        "Integer (int) type",
+        "Floating-point (float) type",
+        "String (str) type",
+        "Boolean (bool) type",
+        "Using type() to check types"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Identify Data Types",
+          "exercise_instructions": "Create one variable of each type: int, float, str, and bool. Use the type() function to print the type of each variable."
+        },
+        {
+          "exercise_title": "Fix the Type Errors",
+          "exercise_instructions": "Given a piece of code with incorrect data types, correct the assignments so each variable has the appropriate type."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "Type Conversion and Casting",
+      "lesson_objective": "Convert values between data types using int(), float(), str(), and bool() functions",
+      "key_topics": [
+        "Implicit vs explicit type conversion",
+        "Using str() to convert to string",
+        "Using int() and float() for numbers",
+        "Converting to boolean",
+        "Handling conversion errors"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Convert and Combine",
+          "exercise_instructions": "Convert an integer to a string and concatenate it with another string. Then convert a string containing a number into an integer and perform a calculation."
+        },
+        {
+          "exercise_title": "User Input Conversion",
+          "exercise_instructions": "Use input() to ask the user for their age, convert it to an integer, and print a message stating how old they will be in 5 years."
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "Practical Applications",
+      "lesson_objective": "Apply variables and data types to build a simple interactive program",
+      "key_topics": [
+        "Using input() for user interaction",
+        "Storing user input in variables",
+        "Combining data types in output",
+        "Basic string formatting",
+        "Debugging type-related issues"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Build a Personal Profile",
+          "exercise_instructions": "Write a program that collects the user's name, age, and favorite color. Print a formatted sentence using all three values."
+        }
+      ]
+    }
+  ]
+}

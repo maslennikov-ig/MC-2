@@ -1,0 +1,29 @@
+{
+  "course_title": "Introduction to Python Programming",
+  "course_description": "This beginner-level technical programming course provides a comprehensive introduction to Python, one of the most popular and versatile programming languages today. Participants will learn the basics of Python syntax, including variables, data types, operators, control flow statements like if-else and loops, functions, and introductory object-oriented programming concepts. Through interactive exercises, coding challenges, and real-world examples, learners will gain the confidence to write simple programs and understand core programming principles. No prior coding experience is required, making it ideal for newcomers eager to enter the world of software development. The course emphasizes practical application, helping students build foundational skills that can be applied to web development, data analysis, automation, and more. By the end, participants will have created small projects such as a calculator app or a basic text processor, setting the stage for advanced studies in computer science.",
+  "course_overview": "Welcome to Introduction to Python Programming, a foundational course designed to equip beginners with essential coding skills using Python 3. The course is structured into 10 modules, each building progressively on the previous one to ensure a smooth learning curve. Starting with Module 1: Setting Up Your Environment, you'll install Python and an IDE like VS Code, and write your first 'Hello, World!' program to understand basic syntax and output. Module 2 dives into Variables and Data Types, where you'll explore integers, floats, strings, and booleans, practicing with examples like calculating the area of a circle using math operators. In Module 3: Control Structures, learn if-else statements and for/while loops; for instance, build a program that grades student scores based on input thresholds. Module 4 covers Lists and Tuples, teaching you to store and manipulate collections of data, such as creating a shopping list and iterating through it to compute totals. Functions are introduced in Module 5, where you'll define reusable code blocks, like a function to convert temperatures from Celsius to Fahrenheit. Module 6 focuses on Dictionaries and Sets for handling key-value pairs, with a practical example of a simple phonebook application. Error handling with try-except blocks is covered in Module 7 to make robust programs, demonstrated by a file reader that gracefully handles missing files. Module 8 introduces File I/O, showing how to read from and write to text files, such as logging user entries. In Module 9: Introduction to OOP, grasp classes and objects by creating a basic BankAccount class with methods for deposits and withdrawals. The final Module 10: Capstone Project challenges you to integrate all concepts into a real-world application, like a text-based adventure game or a personal expense tracker. Throughout, you'll engage in hands-on coding exercises, quizzes, and peer-reviewed assignments. The course includes video lectures, code snippets, and a supportive community forum. By completion, you'll have a portfolio of Python projects showcasing your newfound abilities, ready to tackle intermediate topics or apply skills in entry-level roles. This structured approach ensures deep understanding through repetition and application, with over 50 practical examples to reinforce learning.",
+  "target_audience": "This course targets absolute beginners with no prior programming experience, including high school students curious about computer science and preparing for college majors in STEM; college freshmen in non-technical fields like business or humanities who want to add coding skills to their resume; career changers from professions such as teaching, marketing, or finance seeking to transition into tech roles like junior developer or data analyst; and hobbyists or self-learners motivated to automate personal tasks or explore creative projects like game development.",
+  "estimated_duration_hours": 30,
+  "difficulty_level": "beginner",
+  "prerequisites": [
+    "No prior programming experience required",
+    "Basic computer literacy and familiarity with using a web browser"
+  ],
+  "learning_outcomes": [
+    "Write basic Python scripts using variables, data types, and operators to perform simple calculations and manipulations",
+    "Implement control structures including loops and conditional statements to solve algorithmic problems like sorting lists or validating user input",
+    "Define and invoke functions with parameters and return values to create modular and reusable code components",
+    "Analyze and manipulate data structures such as lists, dictionaries, and strings to process and store information efficiently",
+    "Build a complete Python program integrating multiple concepts, such as a command-line tool for data entry and basic analysis",
+    "Debug and handle errors in code using try-except blocks to develop resilient applications",
+    "Create introductory object-oriented programs by defining classes and objects to model real-world entities like user accounts"
+  ],
+  "course_tags": [
+    "Python",
+    "Programming Fundamentals",
+    "Beginner Coding",
+    "Software Development",
+    "Data Structures",
+    "Object-Oriented Programming"
+  ]
+}

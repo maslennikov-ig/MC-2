@@ -1,0 +1,105 @@
+
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "This section introduces the fundamental concepts of variables and data types in Python programming. Students will learn how to create and manipulate variables, work with different data types including numbers, strings, and booleans, and perform type conversions. Through hands-on exercises, students will gain practical experience in using Python's built-in data types effectively.",
+  "learning_objectives": [
+    "Create and assign variables using proper Python naming conventions",
+    "Differentiate between and use numeric data types (integers and floats)",
+    "Manipulate strings using Python's built-in methods",
+    "Apply boolean logic to evaluate conditions",
+    "Convert between different data types using type casting functions"
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Creating and Naming Variables",
+      "lesson_objective": "Students will be able to declare variables, assign values, and follow Python naming conventions",
+      "key_topics": [
+        "Variable assignment using the equals operator",
+        "Python naming rules and conventions",
+        "Dynamic typing in Python",
+        "Reassigning variables",
+        "Reserved words to avoid"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Variable Creation Practice",
+          "exercise_instructions": "Create 5 variables with different data types: name (string), age (integer), height (float), is_student (boolean), and gpa (float). Use meaningful variable names following Python conventions. Print each variable to verify its value and type."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Working with Numbers",
+      "lesson_objective": "Students will be able to use integers and floats to perform mathematical operations",
+      "key_topics": [
+        "Integer operations and limitations",
+        "Floating-point numbers and precision",
+        "Arithmetic operators (+, -, *, /, //, %, **)",
+        "Order of operations (PEMDAS)",
+        "Math module functions"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Mathematical Calculator",
+          "exercise_instructions": "Write a program that calculates the area of a rectangle, circle, and triangle. Use appropriate data types for dimensions and results. For the circle, use pi = 3.14159. Print all results with descriptive labels, formatted to 2 decimal places."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "String Manipulation Methods",
+      "lesson_objective": "Students will be able to use Python string methods to process and format text",
+      "key_topics": [
+        "String indexing and slicing",
+        "Common string methods (upper, lower, strip, split)",
+        "String concatenation and formatting",
+        "Escape characters and special sequences",
+        "Multi-line strings"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Text Processing Challenge",
+          "exercise_instructions": "Given the string '  Python Programming is FUN!  ', perform the following operations: remove leading/trailing spaces, convert to uppercase, split into words, replace 'FUN' with 'exciting', and count the number of characters. Print each result with a description."
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "Boolean Logic and Comparisons",
+      "lesson_objective": "Students will be able to create and evaluate boolean expressions using comparison and logical operators",
+      "key_topics": [
+        "Boolean values True and False",
+        "Comparison operators (==, !=, <, >, <=, >=)",
+        "Logical operators (and, or, not)",
+        "Truth tables and evaluation order",
+        "Short-circuit evaluation"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Condition Checker",
+          "exercise_instructions": "Create variables for age, has_license, and has_car. Write boolean expressions to check if: person can drive (age >= 16 and has_license), person can drive alone (all three conditions), and person cannot drive (any condition fails). Print the results with clear descriptions."
+        }
+      ]
+    },
+    {
+      "lesson_number": 5,
+      "lesson_title": "Type Conversion and Checking",
+      "lesson_objective": "Students will be able to convert between data types and check variable types programmatically",
+      "key_topics": [
+        "Implicit vs explicit type conversion",
+        "Using int(), float(), str(), bool() functions",
+        "Type checking with type() and isinstance()",
+        "Handling conversion errors with try-except",
+        "Common conversion pitfalls"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Type Conversion Workshop",
+          "exercise_instructions": "Create variables: num_str = '123', float_str = '45.67', bool_val = True, and negative_int = -42. Convert each to all other types where possible. For each conversion, print the original value, its type, the converted value, and the new type. Handle any conversion errors gracefully."
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,110 @@
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "This section covers the foundational concepts of storing and manipulating data in Python through variables and core data types. You'll learn how to declare variables, understand different data categories, and perform basic operations. By the end, you'll be equipped to handle essential data structures for simple programming tasks.",
+  "learning_objectives": [
+    "Declare and initialize variables using valid Python naming conventions",
+    "Identify and differentiate between integer, float, string, and boolean data types",
+    "Perform basic operations including arithmetic calculations and string manipulations",
+    "Convert between common data types using built-in functions",
+    "Use type() to verify data types during program execution"
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Understanding Variables",
+      "lesson_objective": "Declare variables following Python naming rules and assign values using assignment operators",
+      "key_topics": [
+        "What variables represent in programming",
+        "Valid variable naming conventions (snake_case)",
+        "The assignment operator =",
+        "Dynamic typing concept",
+        "Viewing values with print()",
+        "Reassigning variable values",
+        "Reserved keywords to avoid"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Variable Declaration Practice",
+          "exercise_instructions": "Create three variables: 'user_age' (integer), 'account_balance' (float), and 'is_active' (boolean). Assign realistic values to each and print them using separate print() statements."
+        },
+        {
+          "exercise_title": "Naming Rule Validation",
+          "exercise_instructions": "Attempt to create variables with these names: '2nd_place', 'user-name', 'valid_name', 'class'. Identify which names cause errors and explain why in a comment above each problematic declaration."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Numeric Data Types",
+      "lesson_objective": "Perform arithmetic operations with integers and floats while identifying type differences",
+      "key_topics": [
+        "Integer (int) characteristics",
+        "Floating-point (float) precision",
+        "Basic arithmetic operators (+, -, *, /, **, %)",
+        "Order of operations (PEMDAS)",
+        "Using type() for verification",
+        "Implicit type conversion in operations",
+        "Common numeric errors (e.g., division by zero)"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Math Operations Challenge",
+          "exercise_instructions": "Calculate the area of a circle with radius 7.5. Store radius in a variable, compute area (πr² using 3.14 for π), and print both the radius and area with descriptive text. Verify both values' data types."
+        },
+        {
+          "exercise_title": "Type Comparison Exercise",
+          "exercise_instructions": "Create variables for 10 / 2 and 10 // 2. Print both results and their types. Write a comment explaining the difference between the two operations and resulting data types."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "String Manipulation",
+      "lesson_objective": "Create and modify strings using concatenation, indexing, and basic string methods",
+      "key_topics": [
+        "String definition (single vs double quotes)",
+        "String concatenation with +",
+        "Indexing and slicing ([start:stop:step])",
+        "Essential methods: upper(), lower(), strip(), len()",
+        "Escape characters (\\n, \\t, \\')",
+        "f-strings for formatting",
+        "Immutability concept"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Personalized Greeting Generator",
+          "exercise_instructions": "Create variables 'first_name' and 'last_name' with your name. Generate a full name string, convert it to uppercase, and print it using an f-string that says 'Welcome, [FULL_NAME]!'. Also print the character count."
+        },
+        {
+          "exercise_title": "String Slicing Practice",
+          "exercise_instructions": "Using the string 'Programming is fun', extract and print: the first 11 characters, the last 3 characters, and the word 'is' using slicing. Verify each result with print statements."
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "Booleans and Type Conversion",
+      "lesson_objective": "Evaluate boolean expressions and convert between core data types using built-in functions",
+      "key_topics": [
+        "Boolean (bool) values: True/False",
+        "Comparison operators (==, !=, <, >)",
+        "Type conversion functions (int(), float(), str(), bool())",
+        "Explicit vs implicit conversion",
+        "Truthiness of different types",
+        "Common conversion errors",
+        "Using bool() for truth evaluation"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Data Type Conversion Lab",
+          "exercise_instructions": "Convert the string '3.14' to a float, then to an integer. Print each converted value with its type. Next, convert the integer 0 to a boolean and print the result with explanation in a comment."
+        },
+        {
+          "exercise_title": "Boolean Expression Builder",
+          "exercise_instructions": "Create variables 'a = 5' and 'b = 10'. Write and print the results of these expressions: (a < b), (a == b), and bool('non-empty string'). Add comments explaining each output."
+        }
+      ]
+    }
+  ]
+}

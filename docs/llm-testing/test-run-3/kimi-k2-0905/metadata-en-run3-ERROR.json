@@ -1,0 +1,9 @@
+{
+  "model": "Kimi K2 0905",
+  "modelSlug": "kimi-k2-0905",
+  "scenario": "metadata-en",
+  "runNumber": 3,
+  "error": "OpenAI or Azure OpenAI API key or Token Provider not found",
+  "duration": 0,
+  "timestamp": "2025-11-14T07:16:14.675Z"
+}

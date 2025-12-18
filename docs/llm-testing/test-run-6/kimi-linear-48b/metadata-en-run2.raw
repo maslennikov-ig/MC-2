@@ -1,0 +1,19 @@
+{
+  "course_title": "Introduction to Python Programming Fundamentals",
+  "course_description": "Master Python programming basics through hands-on projects and real-world applications. Perfect for beginners seeking a solid foundation in coding with industry-standard practices.",
+  "course_overview": "This comprehensive introduction to Python programming covers essential concepts from basic syntax to intermediate programming techniques. Students will learn programming fundamentals including variables, data types, control structures, functions, and object-oriented programming. The course emphasizes practical application through interactive coding exercises, real-world projects, and debugging techniques. Topics include Python installation, working with data structures, file handling, error management, and basic algorithm implementation. By course completion, students will be able to write clean, efficient Python code and understand how to approach programming problems systematically.",
+  "target_audience": "Individuals new to programming seeking career transitions into technology",
+  "estimated_duration_hours": 40,
+  "difficulty_level": "beginner",
+  "prerequisites": ["Basic computer literacy", "No prior programming experience required", "Access to a computer with internet connection", "Text editor or IDE installed"],
+  "learning_outcomes": [
+    "Write and execute Python programs using proper syntax and indentation",
+    "Demonstrate understanding of data types, variables, and basic operators",
+    "Implement decision-making logic using conditional statements and loops",
+    "Design and debug Python functions to solve specific programming challenges",
+    "Apply object-oriented programming principles to create reusable code components",
+    "Perform file input/output operations and handle basic exceptions",
+    "Develop complete Python applications incorporating multiple programming concepts"
+  ],
+  "course_tags": ["Python", "Programming", "Beginner", "Coding", "Software Development", "Computer Science", "Data Structures", "Problem Solving", "Career Development", "Technology Skills"]
+}

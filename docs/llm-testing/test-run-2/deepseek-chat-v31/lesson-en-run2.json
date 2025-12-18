@@ -1,0 +1,119 @@
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "This foundational section introduces the core building blocks of Python programs: variables and data types. Students will gain hands-on experience assigning values to variables, understanding fundamental data types like integers, floats, strings, and booleans, and performing basic operations. The section culminates in practical exercises to reinforce these essential concepts.",
+  "learning_objectives": [
+    "Assign values to variables and understand variable naming conventions.",
+    "Identify and use the core Python data types: integers, floats, strings, and booleans.",
+    "Perform basic arithmetic and string operations using variables.",
+    "Convert data between different types using explicit type casting.",
+    "Apply knowledge of variables and types to solve simple programming problems."
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Creating and Using Variables",
+      "lesson_objective": "Students will be able to assign values to variables, use proper naming conventions, and print variable values to the console.",
+      "key_topics": [
+        "The assignment operator (=)",
+        "Rules for valid variable names (snake_case)",
+        "Using the print() function with variables",
+        "Reassigning values to existing variables"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Variable Assignment Practice",
+          "exercise_instructions": "Create three variables: one storing your name, one storing your age, and one storing your favorite color. Print each variable's value on a separate line."
+        },
+        {
+          "exercise_title": "Reassignment Challenge",
+          "exercise_instructions": "Create a variable called 'counter' and assign it the value 10. Print its value. Then, reassign it to 15 and print the new value."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Working with Numbers: Integers and Floats",
+      "lesson_objective": "Students will be able to perform arithmetic operations (addition, subtraction, multiplication, division) using integer and float data types.",
+      "key_topics": [
+        "Difference between integers (int) and floating-point numbers (float)",
+        "Basic arithmetic operators (+, -, *, /)",
+        "Integer division (//) and modulus (%) operators",
+        "Order of operations (PEMDAS)"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Basic Calculator",
+          "exercise_instructions": "Create two variables, 'num1' and 'num2', and assign them numeric values. Calculate and print the result of their sum, difference, product, and quotient."
+        },
+        {
+          "exercise_title": "Modulus and Integer Division",
+          "exercise_instructions": "Assign the value 27 to a variable. Use integer division to find how many full weeks are in 27 days. Use the modulus operator to find how many remaining days there are. Print both results."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "Manipulating Text with Strings",
+      "lesson_objective": "Students will be able to create string variables, concatenate strings, and use basic string methods.",
+      "key_topics": [
+        "Defining strings with single and double quotes",
+        "String concatenation using the plus (+) operator",
+        "String methods: .upper(), .lower(), .title()",
+        "Finding the length of a string with len()"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "String Concatenation",
+          "exercise_instructions": "Create two string variables for a first and last name. Concatenate them with a space in between and print the full name."
+        },
+        {
+          "exercise_title": "String Transformation",
+          "exercise_instructions": "Store a sentence in a variable. Print the sentence in all uppercase letters, then in a title case, and finally print the number of characters in the sentence."
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "Making Decisions with Booleans and Comparisons",
+      "lesson_objective": "Students will be able to use comparison operators to evaluate expressions and store the resulting Boolean values (True/False) in variables.",
+      "key_topics": [
+        "Boolean data type (True, False)",
+        "Comparison operators (==, !=, >, <, >=, <=",
+        "Evaluating expressions to Boolean results",
+        "Using the type() function to check data types"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Comparison Results",
+          "exercise_instructions": "Create two variables with numeric values. Write comparisons to check if they are equal, if one is greater than the other, and if one is less than or equal to the other. Store each result in a separate variable and print them."
+        },
+        {
+          "exercise_title": "Type Checking",
+          "exercise_instructions": "Create variables containing an integer, a float, and a string. Use the type() function to check each variable's type and print the result."
+        }
+      ]
+    },
+    {
+      "lesson_number": 5,
+      "lesson_title": "Converting Between Data Types",
+      "lesson_objective": "Students will be able to convert data between string, integer, and float types using explicit type casting functions.",
+      "key_topics": [
+        "Type casting functions: str(), int(), float()",
+        "Converting user input (which is a string) to numbers",
+        "Handling errors when conversion is not possible",
+        "Building strings that combine text and numbers"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Explicit Conversion Practice",
+          "exercise_instructions": "Create a variable with the integer 100. Convert it to a float and a string, printing each result. Then, create a string '50.5', convert it to a float, and print the result."
+        },
+        {
+          "exercise_title": "User Input and Calculation",
+          "exercise_instructions": "Use the input() function to ask the user for their birth year. Convert the input to an integer and calculate their age. Print a message like: 'You are [age] years old.'."
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,127 @@
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "Hands-on programming section focused on declaring variables, understanding Python's core data types, and performing practical operations. Learners will write short scripts to manipulate numbers, strings, lists, tuples, sets, and dictionaries while mastering type conversion, common methods, and the differences between mutable and immutable objects.",
+  "learning_objectives": [
+    "Declare variables using valid identifiers and apply naming conventions",
+    "Distinguish and use int, float, bool, str, list, tuple, set, and dict types",
+    "Perform arithmetic, comparison, and logical operations with numeric and boolean values",
+    "Create and modify strings using indexing, slicing, and methods",
+    "Build and transform list, tuple, and set collections using comprehensions and methods",
+    "Create and query dictionaries for key-value storage and counting patterns",
+    "Convert between types safely using int(), float(), str(), bool(), list(), tuple(), set(), and dict()"
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Variable Naming and Assignment Fundamentals",
+      "lesson_objective": "Create valid Python identifiers, assign values to variables, and read values from input",
+      "key_topics": [
+        "valid identifier rules and naming conventions (snake_case, descriptive names)",
+        "assignment operator (=) and multiple assignment",
+        "reading input with input() and basic type casting",
+        "print() with formatted strings and sep/end parameters",
+        "del statement and variable scope at module level"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Greeting Script with Input and Output Formatting",
+          "exercise_instructions": "Write a program that asks for the user's name and age, then prints a personalized greeting using formatted strings. Include newline and tab characters to align output. Save the script as greeting.py. Expected output should clearly show the formatted greeting with alignment."
+        },
+        {
+          "exercise_title": "Swapping Variables and Type Conversion",
+          "exercise_instructions": "Create a file called swap_types.py that uses multiple assignment to swap two numbers, converts the swapped values to strings, and prints them on one line separated by ' | '. Demonstrate conversion between int, float, and str."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Numbers, Booleans, and Math Operations",
+      "lesson_objective": "Use integer, float, and boolean types to perform calculations and comparisons",
+      "key_topics": [
+        "integer and float literals, underscores for readability",
+        "arithmetic operators +, -, *, /, //, %, **",
+        "comparison operators <, <=, ==, !=, >, >=",
+        "boolean literals True/False and logical operators not, and, or",
+        "import math and using pow(), round(), abs(), min(), max()",
+        "operator precedence and parentheses"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Circle Geometry Calculator",
+          "exercise_instructions": "Write circle_math.py that accepts a radius from input and computes diameter, circumference, and area. Use math.pi and format results to two decimal places."
+        },
+        {
+          "exercise_title": "Boolean Logic Evaluator",
+          "exercise_instructions": "Create bool_eval.py that reads three boolean inputs (True/False) from the user and prints the results of (a and b), (b or c), and (not a). Show each expression and its result."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "String Indexing, Slicing, and Common Methods",
+      "lesson_objective": "Create, slice, and transform strings using indexing and built-in methods",
+      "key_topics": [
+        "string creation with single, double, triple quotes",
+        "zero-based indexing and negative indices",
+        "slicing with start:stop:step and omitted parameters",
+        "string methods: lower(), upper(), strip(), split(), replace(), startswith(), endswith(), find()",
+        "in operator for membership tests and f-strings for formatting"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Word Frequency Counter",
+          "exercise_instructions": "Write word_freq.py that reads a sentence from input, converts it to lowercase, strips punctuation, splits into words, and counts occurrences using a dictionary. Print each unique word and its count on separate lines."
+        },
+        {
+          "exercise_title": "Password Strength Checker",
+          "exercise_instructions": "Create pwd_check.py that validates a password using string methods: length >= 8, at least one uppercase letter, one digit, and one special character. Print 'Strong' if all criteria are met, otherwise print 'Weak' with a list of missing criteria."
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "Lists, Tuples, and Sets: Creation and Transformation",
+      "lesson_objective": "Build and modify lists, tuples, and sets using methods and comprehensions",
+      "key_topics": [
+        "list literals and mutability; append(), extend(), insert(), pop(), remove(), sort(), reverse()",
+        "tuple creation and immutability; when to use tuples",
+        "set creation, adding and removing elements, set operations union, intersection, difference",
+        "list comprehension with conditionals and enumerate()",
+        "slicing lists to create new lists and the difference between copy and reference"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Todo List Manager",
+          "exercise_instructions": "Write todo_manager.py that stores a list of tasks, allows adding with append(), removing by index with pop(), listing tasks with enumerate(), and sorting alphabetically. Print the list at each step."
+        },
+        {
+          "exercise_title": "Unique Word Collector with Sets",
+          "exercise_instructions": "Create unique_words.py that reads multiple lines of text until a blank line, collects unique words (case-insensitive) into a set, and prints the sorted list of unique words."
+        }
+      ]
+    },
+    {
+      "lesson_number": 5,
+      "lesson_title": "Dictionaries: Key-Value Storage and Counting",
+      "lesson_objective": "Create, update, and query dictionaries for structured data and counting",
+      "key_topics": [
+        "dictionary literals, keys vs values, the in operator for membership",
+        "adding and updating entries with dict[key] and update()",
+        "get() method with default values and setdefault()",
+        "iterating over keys, values, and items()",
+        "dictionary comprehension for counting patterns"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Contact Book with CRUD Operations",
+          "exercise_instructions": "Write contact_book.py that stores names and phone numbers in a dictionary. Implement create (add contact), read (lookup by name), update (change number), and delete (remove contact). Print the dictionary after each operation."
+        },
+        {
+          "exercise_title": "Character Frequency Counter",
+          "exercise_instructions": "Create char_freq.py that counts occurrences of each alphabetic character (case-insensitive) in a given string using a dictionary comprehension. Print characters and their counts sorted alphabetically."
+        }
+      ]
+    }
+  ]
+}

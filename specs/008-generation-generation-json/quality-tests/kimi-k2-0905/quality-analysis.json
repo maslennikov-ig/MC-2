@@ -1,0 +1,278 @@
+{
+  "model": "Kimi K2 0905",
+  "timestamp": "2025-11-13T12:17:19.922Z",
+  "scenarios": {
+    "metadata-en": [
+      {
+        "schemaScore": 0.75,
+        "contentScore": 0.8,
+        "languageScore": 0.8,
+        "overallScore": 0.7800000000000001,
+        "details": [
+          "✓ Valid JSON structure",
+          "✓ All fields use snake_case",
+          "✓ Correct data types",
+          "✓ Learning outcomes use action verbs",
+          "✓ Good number of learning outcomes (6)",
+          "✓ Learning outcomes are detailed",
+          "✓ Comprehensive course overview (1038 chars)",
+          "✓ Overview has clear structure",
+          "✓ Good description length (493 chars)",
+          "✓ Description provides value proposition",
+          "✓ English-only content",
+          "✓ Language quality score: 0.80"
+        ],
+        "issues": [
+          "✗ Missing fields: target_audience",
+          "✗ Target audience too brief"
+        ]
+      },
+      {
+        "schemaScore": 1,
+        "contentScore": 0.9,
+        "languageScore": 0.8,
+        "overallScore": 0.92,
+        "details": [
+          "✓ Valid JSON structure",
+          "✓ All fields use snake_case",
+          "✓ All required metadata fields present",
+          "✓ Correct data types",
+          "✓ Learning outcomes use action verbs",
+          "✓ Good number of learning outcomes (7)",
+          "✓ Learning outcomes are detailed",
+          "✓ Comprehensive course overview (1317 chars)",
+          "✓ Overview has clear structure",
+          "✓ Good description length (377 chars)",
+          "✓ Description provides value proposition",
+          "✓ Target audience is well-defined",
+          "✓ English-only content",
+          "✓ Language quality score: 0.80"
+        ],
+        "issues": []
+      },
+      {
+        "schemaScore": 1,
+        "contentScore": 0.75,
+        "languageScore": 0.8,
+        "overallScore": 0.8600000000000001,
+        "details": [
+          "✓ Valid JSON structure",
+          "✓ All fields use snake_case",
+          "✓ All required metadata fields present",
+          "✓ Correct data types",
+          "✓ Learning outcomes use action verbs",
+          "✓ Good number of learning outcomes (5)",
+          "✓ Learning outcomes are detailed",
+          "✓ Comprehensive course overview (1343 chars)",
+          "✓ Good description length (263 chars)",
+          "✓ Description provides value proposition",
+          "✓ Target audience is well-defined",
+          "✓ English-only content",
+          "✓ Language quality score: 0.80"
+        ],
+        "issues": []
+      }
+    ],
+    "metadata-ru": [
+      {
+        "schemaScore": 1,
+        "contentScore": 0.6499999999999999,
+        "languageScore": 0.8,
+        "overallScore": 0.82,
+        "details": [
+          "✓ Valid JSON structure",
+          "✓ All fields use snake_case",
+          "✓ All required metadata fields present",
+          "✓ Correct data types",
+          "✓ Good number of learning outcomes (5)",
+          "✓ Learning outcomes are detailed",
+          "✓ Comprehensive course overview (946 chars)",
+          "✓ Good description length (330 chars)",
+          "✓ Description provides value proposition",
+          "✓ Target audience is well-defined",
+          "✓ Rich Russian language content",
+          "✓ Language quality score: 0.80"
+        ],
+        "issues": [
+          "✗ Learning outcomes lack action verbs"
+        ]
+      },
+      {
+        "schemaScore": 1,
+        "contentScore": 0.6499999999999999,
+        "languageScore": 0.8,
+        "overallScore": 0.82,
+        "details": [
+          "✓ Valid JSON structure",
+          "✓ All fields use snake_case",
+          "✓ All required metadata fields present",
+          "✓ Correct data types",
+          "✓ Good number of learning outcomes (7)",
+          "✓ Learning outcomes are detailed",
+          "✓ Comprehensive course overview (1277 chars)",
+          "✓ Good description length (470 chars)",
+          "✓ Description provides value proposition",
+          "✓ Target audience is well-defined",
+          "✓ Rich Russian language content",
+          "✓ Language quality score: 0.80"
+        ],
+        "issues": [
+          "✗ Learning outcomes lack action verbs"
+        ]
+      },
+      {
+        "schemaScore": 1,
+        "contentScore": 0.6499999999999999,
+        "languageScore": 0.8,
+        "overallScore": 0.82,
+        "details": [
+          "✓ Valid JSON structure",
+          "✓ All fields use snake_case",
+          "✓ All required metadata fields present",
+          "✓ Correct data types",
+          "✓ Good number of learning outcomes (5)",
+          "✓ Learning outcomes are detailed",
+          "✓ Comprehensive course overview (619 chars)",
+          "✓ Good description length (239 chars)",
+          "✓ Description provides value proposition",
+          "✓ Target audience is well-defined",
+          "✓ Rich Russian language content",
+          "✓ Language quality score: 0.80"
+        ],
+        "issues": [
+          "✗ Learning outcomes lack action verbs"
+        ]
+      }
+    ],
+    "lesson-en": [
+      {
+        "schemaScore": 1,
+        "contentScore": 0.9999999999999999,
+        "languageScore": 0.8,
+        "overallScore": 0.9600000000000001,
+        "details": [
+          "✓ Valid JSON structure",
+          "✓ All fields use snake_case",
+          "✓ All required lesson fields present",
+          "✓ Correct data types",
+          "✓ EXCELLENT: 5 lessons (ideal range)",
+          "✓ All lessons have objectives",
+          "✓ Objectives are measurable",
+          "✓ Objectives use action verbs",
+          "✓ Topics are specific (no generic phrases)",
+          "✓ All lessons have exercises",
+          "✓ English-only content",
+          "✓ Language quality score: 0.80"
+        ],
+        "issues": []
+      },
+      {
+        "schemaScore": 1,
+        "contentScore": 0.9,
+        "languageScore": 0.8,
+        "overallScore": 0.92,
+        "details": [
+          "✓ Valid JSON structure",
+          "✓ All fields use snake_case",
+          "✓ All required lesson fields present",
+          "✓ Correct data types",
+          "✓ EXCELLENT: 5 lessons (ideal range)",
+          "✓ All lessons have objectives",
+          "✓ Objectives use action verbs",
+          "✓ Topics are specific (no generic phrases)",
+          "✓ All lessons have exercises",
+          "✓ English-only content",
+          "✓ Language quality score: 0.80"
+        ],
+        "issues": []
+      },
+      {
+        "schemaScore": 1,
+        "contentScore": 0.7999999999999999,
+        "languageScore": 0.8,
+        "overallScore": 0.88,
+        "details": [
+          "✓ Valid JSON structure",
+          "✓ All fields use snake_case",
+          "✓ All required lesson fields present",
+          "✓ Correct data types",
+          "✓ EXCELLENT: 5 lessons (ideal range)",
+          "✓ All lessons have objectives",
+          "✓ Topics are specific (no generic phrases)",
+          "✓ All lessons have exercises",
+          "✓ English-only content",
+          "✓ Language quality score: 0.80"
+        ],
+        "issues": []
+      }
+    ],
+    "lesson-ru": [
+      {
+        "schemaScore": 1,
+        "contentScore": 0.7,
+        "languageScore": 0.8,
+        "overallScore": 0.84,
+        "details": [
+          "✓ Valid JSON structure",
+          "✓ All fields use snake_case",
+          "✓ All required lesson fields present",
+          "✓ Correct data types",
+          "✓ EXCELLENT: 5 lessons (ideal range)",
+          "✓ All lessons have objectives",
+          "✓ Objectives use action verbs",
+          "✓ All lessons have exercises",
+          "✓ Rich Russian language content",
+          "✓ Language quality score: 0.80"
+        ],
+        "issues": [
+          "✗ Topics contain generic phrases like \"Introduction to...\""
+        ]
+      },
+      {
+        "schemaScore": 1,
+        "contentScore": 0.7999999999999999,
+        "languageScore": 0.8,
+        "overallScore": 0.88,
+        "details": [
+          "✓ Valid JSON structure",
+          "✓ All fields use snake_case",
+          "✓ All required lesson fields present",
+          "✓ Correct data types",
+          "✓ EXCELLENT: 5 lessons (ideal range)",
+          "✓ All lessons have objectives",
+          "✓ Topics are specific (no generic phrases)",
+          "✓ All lessons have exercises",
+          "✓ Rich Russian language content",
+          "✓ Language quality score: 0.80"
+        ],
+        "issues": []
+      },
+      {
+        "schemaScore": 1,
+        "contentScore": 0.9,
+        "languageScore": 0.8,
+        "overallScore": 0.92,
+        "details": [
+          "✓ Valid JSON structure",
+          "✓ All fields use snake_case",
+          "✓ All required lesson fields present",
+          "✓ Correct data types",
+          "✓ EXCELLENT: 5 lessons (ideal range)",
+          "✓ All lessons have objectives",
+          "✓ Objectives use action verbs",
+          "✓ Topics are specific (no generic phrases)",
+          "✓ All lessons have exercises",
+          "✓ Rich Russian language content",
+          "✓ Language quality score: 0.80"
+        ],
+        "issues": []
+      }
+    ]
+  },
+  "summary": {
+    "metadataAvg": 0.8366666666666668,
+    "lessonAvg": 0.9,
+    "overallAvg": 0.8683333333333335,
+    "tier": "A-TIER"
+  }
+}

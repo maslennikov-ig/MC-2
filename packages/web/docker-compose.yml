@@ -1,0 +1,75 @@
+services:
+  # Production service
+  megacampus-app:
+    profiles: ["production"]
+    build:
+      context: .
+      dockerfile: Dockerfile
+    image: megacampus-web:latest
+    container_name: megacampus-app
+    restart: unless-stopped
+    env_file:
+      - .env.local
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_SITE_URL=https://megacampus.ai
+      - NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
+      - NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
+      - SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
+      - N8N_WEBHOOK_URL=${N8N_WEBHOOK_URL:-https://flow8n.ru/webhook/coursegen/generate}
+    ports:
+      - "3000:3000"
+    networks:
+      - caddy_network
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/api/health', (r) => {r.statusCode === 200 ? process.exit(0) : process.exit(1)})"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+
+  # Development service
+  megacampus-dev:
+    profiles: ["dev", "development"]
+    image: node:20-alpine
+    container_name: megacampus-dev
+    working_dir: /app
+    volumes:
+      - .:/app
+      - /app/node_modules
+      - /app/.next
+    env_file:
+      - .env.local
+    environment:
+      - NODE_ENV=development
+    ports:
+      - "3000:3000"
+    command: sh -c "corepack enable pnpm && pnpm install && pnpm dev"
+    networks:
+      - megacampus_network
+
+networks:
+  caddy_network:
+    external: true
+  megacampus_network:
+    driver: bridge
+
+# Usage:
+# 
+# For PRODUCTION:
+#   docker compose --profile production up -d
+#   or
+#   docker compose --profile production build
+#
+# For DEVELOPMENT:
+#   docker compose --profile dev up
+#   or
+#   docker compose --profile development up
+#
+# To see logs:
+#   docker compose --profile production logs -f
+#   docker compose --profile dev logs -f
+#
+# To stop:
+#   docker compose --profile production down
+#   docker compose --profile dev down

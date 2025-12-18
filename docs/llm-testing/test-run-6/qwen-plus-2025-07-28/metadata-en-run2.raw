@@ -1,0 +1,34 @@
+{
+  "course_title": "Introduction to Python Programming",
+  "course_description": "Master the fundamentals of Python programming with hands-on exercises and real-world examples. Perfect for absolute beginners looking to build a strong foundation in coding.",
+  "course_overview": "This comprehensive course introduces learners to the core concepts of Python programming, including variables, data types, control structures, functions, and file handling. Through interactive coding exercises and practical projects, students will gain confidence in writing clean, efficient Python code. The course also covers best practices in debugging and code organization, preparing learners for further study in software development, data science, or automation.",
+  "target_audience": "Aspiring programmers, students, and professionals with little to no coding experience seeking to learn Python.",
+  "estimated_duration_hours": 25,
+  "difficulty_level": "beginner",
+  "prerequisites": [
+    "Basic computer literacy",
+    "Familiarity with using a web browser and text editor",
+    "No prior programming experience required"
+  ],
+  "learning_outcomes": [
+    "Write and execute Python scripts using core syntax and data types",
+    "Implement control flow with conditional statements and loops",
+    "Define and use functions to modularize code",
+    "Manipulate strings and data structures such as lists and dictionaries",
+    "Read from and write to files using Python",
+    "Debug simple programs using error messages and print statements",
+    "Apply programming concepts to solve basic algorithmic problems"
+  ],
+  "course_tags": [
+    "Python",
+    "Programming",
+    "Beginner Coding",
+    "Software Development",
+    "Data Types",
+    "Functions",
+    "Control Flow",
+    "File Handling",
+    "Debugging",
+    "Automation"
+  ]
+}

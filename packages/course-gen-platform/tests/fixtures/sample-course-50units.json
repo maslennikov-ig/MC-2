@@ -1,0 +1,353 @@
+{
+  "courseId": "SAMPLE_COURSE_50",
+  "title": "Introduction to Web Development",
+  "description": "A comprehensive course covering HTML, CSS, JavaScript, and modern web frameworks. This course includes 50 detailed units organized into 5 chapters with 2 sections each.",
+  "org": "MegaCampus",
+  "run": "2025_Q1",
+  "startDate": "2025-01-15T00:00:00Z",
+  "enrollmentStart": "2025-01-01T00:00:00Z",
+  "enrollmentEnd": "2025-02-01T00:00:00Z",
+  "language": "en",
+  "chapters": [
+    {
+      "id": "chapter_1_html_fundamentals",
+      "title": "HTML Fundamentals",
+      "sections": [
+        {
+          "id": "section_1_1_intro_html",
+          "title": "Introduction to HTML",
+          "units": [
+            {
+              "id": "unit_1_1_1",
+              "title": "What is HTML?",
+              "content": "<h2>What is HTML?</h2><p>HTML (HyperText Markup Language) is the standard markup language for creating web pages. It describes the structure of a web page semantically and originally included cues for the appearance of the document.</p><p>HTML elements are the building blocks of HTML pages. With HTML constructs, images and other objects such as interactive forms may be embedded into the rendered page.</p>"
+            },
+            {
+              "id": "unit_1_1_2",
+              "title": "HTML Document Structure",
+              "content": "<h2>HTML Document Structure</h2><p>Every HTML document follows a basic structure:</p><ul><li>DOCTYPE declaration</li><li>HTML root element</li><li>HEAD section (metadata)</li><li>BODY section (visible content)</li></ul><p>Understanding this structure is essential for creating valid HTML documents.</p>"
+            },
+            {
+              "id": "unit_1_1_3",
+              "title": "HTML Tags and Elements",
+              "content": "<h2>HTML Tags and Elements</h2><p>HTML tags are the hidden keywords within a web page that define how your web browser must format and display the content.</p><p>Most tags have an opening tag and a closing tag. For example: <code>&lt;p&gt;This is a paragraph&lt;/p&gt;</code></p><p>Some tags are self-closing, like <code>&lt;br /&gt;</code> and <code>&lt;img /&gt;</code>.</p>"
+            },
+            {
+              "id": "unit_1_1_4",
+              "title": "HTML Attributes",
+              "content": "<h2>HTML Attributes</h2><p>Attributes provide additional information about HTML elements. They are always specified in the start tag and usually come in name/value pairs like: <code>name=\"value\"</code></p><p>Common attributes include:</p><ul><li>id - unique identifier</li><li>class - CSS class name</li><li>style - inline CSS styling</li><li>src - source for images/scripts</li><li>href - hyperlink reference</li></ul>"
+            },
+            {
+              "id": "unit_1_1_5",
+              "title": "Basic HTML Elements",
+              "content": "<h2>Basic HTML Elements</h2><p>Let's explore the most commonly used HTML elements:</p><ul><li><strong>Headings:</strong> &lt;h1&gt; through &lt;h6&gt;</li><li><strong>Paragraphs:</strong> &lt;p&gt;</li><li><strong>Links:</strong> &lt;a&gt;</li><li><strong>Images:</strong> &lt;img&gt;</li><li><strong>Lists:</strong> &lt;ul&gt;, &lt;ol&gt;, &lt;li&gt;</li><li><strong>Divisions:</strong> &lt;div&gt; and &lt;span&gt;</li></ul><p>These elements form the foundation of web page content.</p>"
+            }
+          ]
+        },
+        {
+          "id": "section_1_2_semantic_html",
+          "title": "Semantic HTML",
+          "units": [
+            {
+              "id": "unit_1_2_1",
+              "title": "Introduction to Semantic HTML",
+              "content": "<h2>Introduction to Semantic HTML</h2><p>Semantic HTML introduces meaning to web pages rather than just presentation. Semantic elements clearly describe their meaning to both the browser and the developer.</p><p>Examples of semantic elements: <code>&lt;article&gt;</code>, <code>&lt;section&gt;</code>, <code>&lt;nav&gt;</code>, <code>&lt;header&gt;</code>, <code>&lt;footer&gt;</code>.</p>"
+            },
+            {
+              "id": "unit_1_2_2",
+              "title": "Header and Navigation Elements",
+              "content": "<h2>Header and Navigation Elements</h2><p>The <code>&lt;header&gt;</code> element represents introductory content or navigational links. The <code>&lt;nav&gt;</code> element defines a set of navigation links.</p><p>These elements help screen readers and search engines understand the structure of your page better.</p>"
+            },
+            {
+              "id": "unit_1_2_3",
+              "title": "Article and Section Elements",
+              "content": "<h2>Article and Section Elements</h2><p>The <code>&lt;article&gt;</code> element represents independent, self-contained content. The <code>&lt;section&gt;</code> element defines sections in a document.</p><p>Use <code>&lt;article&gt;</code> for blog posts, news articles, or forum posts. Use <code>&lt;section&gt;</code> to group related content together.</p>"
+            },
+            {
+              "id": "unit_1_2_4",
+              "title": "Footer and Aside Elements",
+              "content": "<h2>Footer and Aside Elements</h2><p>The <code>&lt;footer&gt;</code> element represents footer content, typically containing copyright information, contact details, or links. The <code>&lt;aside&gt;</code> element defines content aside from the main content (like a sidebar).</p>"
+            },
+            {
+              "id": "unit_1_2_5",
+              "title": "Benefits of Semantic HTML",
+              "content": "<h2>Benefits of Semantic HTML</h2><p>Using semantic HTML provides numerous benefits:</p><ul><li>Improved accessibility for screen readers</li><li>Better SEO (search engine optimization)</li><li>Easier code maintenance</li><li>Clearer code structure</li><li>Better browser and assistive technology support</li></ul><p>Always prefer semantic elements over generic <code>&lt;div&gt;</code> elements when appropriate.</p>"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "chapter_2_css_styling",
+      "title": "CSS Styling and Layout",
+      "sections": [
+        {
+          "id": "section_2_1_css_basics",
+          "title": "CSS Basics",
+          "units": [
+            {
+              "id": "unit_2_1_1",
+              "title": "What is CSS?",
+              "content": "<h2>What is CSS?</h2><p>CSS (Cascading Style Sheets) is a stylesheet language used to describe the presentation of a document written in HTML. CSS describes how elements should be rendered on screen, on paper, or in other media.</p><p>CSS saves a lot of work by controlling the layout of multiple web pages all at once.</p>"
+            },
+            {
+              "id": "unit_2_1_2",
+              "title": "CSS Syntax and Selectors",
+              "content": "<h2>CSS Syntax and Selectors</h2><p>A CSS rule consists of a selector and a declaration block:</p><p><code>selector { property: value; }</code></p><p>Common selectors include:</p><ul><li>Element selectors: <code>p</code>, <code>h1</code></li><li>Class selectors: <code>.classname</code></li><li>ID selectors: <code>#idname</code></li><li>Attribute selectors: <code>[type=\"text\"]</code></li></ul>"
+            },
+            {
+              "id": "unit_2_1_3",
+              "title": "Colors and Backgrounds",
+              "content": "<h2>Colors and Backgrounds</h2><p>CSS provides multiple ways to specify colors:</p><ul><li>Named colors: <code>red</code>, <code>blue</code></li><li>Hexadecimal: <code>#FF0000</code></li><li>RGB: <code>rgb(255, 0, 0)</code></li><li>RGBA: <code>rgba(255, 0, 0, 0.5)</code></li><li>HSL: <code>hsl(0, 100%, 50%)</code></li></ul><p>Background properties allow you to set background colors, images, and more.</p>"
+            },
+            {
+              "id": "unit_2_1_4",
+              "title": "Text Styling",
+              "content": "<h2>Text Styling</h2><p>CSS offers extensive text styling options:</p><ul><li>Font family, size, and weight</li><li>Text color and alignment</li><li>Text decoration and transformation</li><li>Line height and letter spacing</li><li>Text shadows and effects</li></ul><p>Proper text styling enhances readability and visual appeal.</p>"
+            },
+            {
+              "id": "unit_2_1_5",
+              "title": "Box Model Fundamentals",
+              "content": "<h2>Box Model Fundamentals</h2><p>The CSS box model describes the rectangular boxes generated for elements in the document tree. Each box has:</p><ul><li>Content area</li><li>Padding (space inside border)</li><li>Border</li><li>Margin (space outside border)</li></ul><p>Understanding the box model is crucial for layout design.</p>"
+            }
+          ]
+        },
+        {
+          "id": "section_2_2_layouts",
+          "title": "CSS Layouts",
+          "units": [
+            {
+              "id": "unit_2_2_1",
+              "title": "Display Property",
+              "content": "<h2>Display Property</h2><p>The <code>display</code> property specifies how an element is displayed:</p><ul><li><code>block</code> - takes full width</li><li><code>inline</code> - flows with text</li><li><code>inline-block</code> - hybrid behavior</li><li><code>none</code> - hidden from view</li><li><code>flex</code> - flexible box layout</li><li><code>grid</code> - grid layout</li></ul>"
+            },
+            {
+              "id": "unit_2_2_2",
+              "title": "Positioning Elements",
+              "content": "<h2>Positioning Elements</h2><p>CSS positioning properties:</p><ul><li><code>static</code> - default positioning</li><li><code>relative</code> - positioned relative to normal position</li><li><code>absolute</code> - positioned relative to nearest positioned ancestor</li><li><code>fixed</code> - positioned relative to viewport</li><li><code>sticky</code> - hybrid of relative and fixed</li></ul>"
+            },
+            {
+              "id": "unit_2_2_3",
+              "title": "Flexbox Layout",
+              "content": "<h2>Flexbox Layout</h2><p>Flexbox is a one-dimensional layout method for arranging items in rows or columns. Key concepts:</p><ul><li>Flex container and flex items</li><li>Main axis and cross axis</li><li>Justify-content and align-items</li><li>Flex-direction and flex-wrap</li><li>Flex-grow, flex-shrink, flex-basis</li></ul><p>Flexbox makes responsive layouts much easier.</p>"
+            },
+            {
+              "id": "unit_2_2_4",
+              "title": "Grid Layout",
+              "content": "<h2>Grid Layout</h2><p>CSS Grid is a two-dimensional layout system. It enables you to create complex layouts with rows and columns:</p><ul><li>Grid container and grid items</li><li>Grid lines, tracks, cells, and areas</li><li>Grid template rows and columns</li><li>Grid gap for spacing</li><li>Auto-placement and named areas</li></ul>"
+            },
+            {
+              "id": "unit_2_2_5",
+              "title": "Responsive Design",
+              "content": "<h2>Responsive Design</h2><p>Responsive web design makes web pages look good on all devices. Key techniques:</p><ul><li>Flexible grids and layouts</li><li>Flexible images and media</li><li>Media queries for different screen sizes</li><li>Mobile-first approach</li><li>Viewport meta tag</li></ul><p>Responsive design is essential for modern web development.</p>"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "chapter_3_javascript_basics",
+      "title": "JavaScript Fundamentals",
+      "sections": [
+        {
+          "id": "section_3_1_intro_javascript",
+          "title": "Introduction to JavaScript",
+          "units": [
+            {
+              "id": "unit_3_1_1",
+              "title": "What is JavaScript?",
+              "content": "<h2>What is JavaScript?</h2><p>JavaScript is a high-level, interpreted programming language that makes web pages interactive. It's one of the core technologies of the World Wide Web, alongside HTML and CSS.</p><p>JavaScript enables dynamic content updates, multimedia control, animated images, and much more.</p>"
+            },
+            {
+              "id": "unit_3_1_2",
+              "title": "Variables and Data Types",
+              "content": "<h2>Variables and Data Types</h2><p>JavaScript variables can be declared using <code>var</code>, <code>let</code>, or <code>const</code>. Data types include:</p><ul><li>Primitives: string, number, boolean, undefined, null</li><li>Objects: arrays, functions, objects</li><li>Symbol and BigInt (ES6+)</li></ul><p>Understanding data types is fundamental to programming in JavaScript.</p>"
+            },
+            {
+              "id": "unit_3_1_3",
+              "title": "Operators and Expressions",
+              "content": "<h2>Operators and Expressions</h2><p>JavaScript supports various operators:</p><ul><li>Arithmetic: +, -, *, /, %</li><li>Comparison: ==, ===, !=, !==, &lt;, &gt;</li><li>Logical: &&, ||, !</li><li>Assignment: =, +=, -=, *=</li><li>Ternary: condition ? true : false</li></ul><p>Operators combine values and variables to produce results.</p>"
+            },
+            {
+              "id": "unit_3_1_4",
+              "title": "Control Flow",
+              "content": "<h2>Control Flow</h2><p>Control flow statements determine the execution path of your code:</p><ul><li><code>if</code>, <code>else if</code>, <code>else</code> - conditional execution</li><li><code>switch</code> - multi-way branching</li><li><code>for</code>, <code>while</code>, <code>do...while</code> - loops</li><li><code>break</code> and <code>continue</code> - loop control</li></ul><p>Mastering control flow is essential for writing effective programs.</p>"
+            },
+            {
+              "id": "unit_3_1_5",
+              "title": "Functions",
+              "content": "<h2>Functions</h2><p>Functions are reusable blocks of code that perform specific tasks. JavaScript supports:</p><ul><li>Function declarations</li><li>Function expressions</li><li>Arrow functions (ES6)</li><li>Parameters and return values</li><li>Default parameters</li><li>Rest parameters and spread syntax</li></ul><p>Functions are fundamental building blocks in JavaScript.</p>"
+            }
+          ]
+        },
+        {
+          "id": "section_3_2_advanced_javascript",
+          "title": "Advanced JavaScript Concepts",
+          "units": [
+            {
+              "id": "unit_3_2_1",
+              "title": "Arrays and Array Methods",
+              "content": "<h2>Arrays and Array Methods</h2><p>Arrays are ordered collections of values. JavaScript provides powerful array methods:</p><ul><li><code>push()</code>, <code>pop()</code>, <code>shift()</code>, <code>unshift()</code></li><li><code>map()</code>, <code>filter()</code>, <code>reduce()</code></li><li><code>forEach()</code>, <code>find()</code>, <code>some()</code>, <code>every()</code></li><li><code>slice()</code>, <code>splice()</code>, <code>concat()</code></li></ul>"
+            },
+            {
+              "id": "unit_3_2_2",
+              "title": "Objects and Properties",
+              "content": "<h2>Objects and Properties</h2><p>Objects are collections of key-value pairs. Working with objects:</p><ul><li>Object literal notation</li><li>Accessing properties (dot and bracket notation)</li><li>Adding and deleting properties</li><li>Object methods</li><li>Object destructuring (ES6)</li><li><code>Object.keys()</code>, <code>Object.values()</code>, <code>Object.entries()</code></li></ul>"
+            },
+            {
+              "id": "unit_3_2_3",
+              "title": "Scope and Closures",
+              "content": "<h2>Scope and Closures</h2><p>Understanding scope is crucial for JavaScript:</p><ul><li>Global scope vs local scope</li><li>Function scope vs block scope</li><li>Lexical scoping</li><li>Closures - functions that remember their lexical environment</li><li>Practical uses of closures</li></ul><p>Closures are a powerful feature enabling encapsulation and data privacy.</p>"
+            },
+            {
+              "id": "unit_3_2_4",
+              "title": "Asynchronous JavaScript",
+              "content": "<h2>Asynchronous JavaScript</h2><p>JavaScript handles asynchronous operations through:</p><ul><li>Callbacks</li><li>Promises (ES6)</li><li>Async/await (ES2017)</li><li>Event loop and call stack</li><li>setTimeout and setInterval</li></ul><p>Asynchronous programming is essential for handling API calls and user interactions.</p>"
+            },
+            {
+              "id": "unit_3_2_5",
+              "title": "Error Handling",
+              "content": "<h2>Error Handling</h2><p>Proper error handling makes applications robust:</p><ul><li><code>try...catch...finally</code> blocks</li><li>Throwing custom errors</li><li>Error types and error objects</li><li>Promise error handling with <code>.catch()</code></li><li>Async/await error handling</li></ul><p>Always anticipate and handle potential errors in your code.</p>"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "chapter_4_dom_manipulation",
+      "title": "DOM Manipulation and Events",
+      "sections": [
+        {
+          "id": "section_4_1_dom_basics",
+          "title": "DOM Basics",
+          "units": [
+            {
+              "id": "unit_4_1_1",
+              "title": "Understanding the DOM",
+              "content": "<h2>Understanding the DOM</h2><p>The Document Object Model (DOM) is a programming interface for HTML documents. It represents the page structure as a tree of nodes that can be manipulated with JavaScript.</p><p>The DOM allows JavaScript to:</p><ul><li>Change HTML content</li><li>Modify HTML attributes</li><li>Change CSS styles</li><li>Create and remove elements</li><li>React to events</li></ul>"
+            },
+            {
+              "id": "unit_4_1_2",
+              "title": "Selecting Elements",
+              "content": "<h2>Selecting Elements</h2><p>JavaScript provides multiple methods to select DOM elements:</p><ul><li><code>getElementById()</code> - select by ID</li><li><code>getElementsByClassName()</code> - select by class</li><li><code>getElementsByTagName()</code> - select by tag name</li><li><code>querySelector()</code> - select with CSS selector</li><li><code>querySelectorAll()</code> - select all matching elements</li></ul>"
+            },
+            {
+              "id": "unit_4_1_3",
+              "title": "Modifying Elements",
+              "content": "<h2>Modifying Elements</h2><p>Once selected, elements can be modified:</p><ul><li><code>textContent</code> and <code>innerHTML</code> - change content</li><li><code>setAttribute()</code> and <code>getAttribute()</code> - manage attributes</li><li><code>style</code> property - modify CSS styles</li><li><code>classList</code> - add/remove/toggle CSS classes</li><li><code>value</code> - read/write form input values</li></ul>"
+            },
+            {
+              "id": "unit_4_1_4",
+              "title": "Creating and Removing Elements",
+              "content": "<h2>Creating and Removing Elements</h2><p>Dynamically manage DOM structure:</p><ul><li><code>createElement()</code> - create new elements</li><li><code>createTextNode()</code> - create text nodes</li><li><code>appendChild()</code> - add child elements</li><li><code>insertBefore()</code> - insert at specific position</li><li><code>removeChild()</code> - remove child elements</li><li><code>replaceChild()</code> - replace elements</li></ul>"
+            },
+            {
+              "id": "unit_4_1_5",
+              "title": "Traversing the DOM",
+              "content": "<h2>Traversing the DOM</h2><p>Navigate the DOM tree structure:</p><ul><li><code>parentNode</code> and <code>parentElement</code></li><li><code>childNodes</code> and <code>children</code></li><li><code>firstChild</code> and <code>lastChild</code></li><li><code>nextSibling</code> and <code>previousSibling</code></li><li><code>closest()</code> - find nearest ancestor matching selector</li></ul>"
+            }
+          ]
+        },
+        {
+          "id": "section_4_2_events",
+          "title": "Event Handling",
+          "units": [
+            {
+              "id": "unit_4_2_1",
+              "title": "Introduction to Events",
+              "content": "<h2>Introduction to Events</h2><p>Events are actions that happen in the browser, such as clicks, key presses, or page loads. JavaScript can listen for and respond to these events.</p><p>Common event types:</p><ul><li>Mouse events: click, dblclick, mouseenter, mouseleave</li><li>Keyboard events: keydown, keyup, keypress</li><li>Form events: submit, change, focus, blur</li><li>Document events: DOMContentLoaded, load</li></ul>"
+            },
+            {
+              "id": "unit_4_2_2",
+              "title": "Event Listeners",
+              "content": "<h2>Event Listeners</h2><p>Add event listeners to respond to events:</p><ul><li><code>addEventListener()</code> - attach event handler</li><li><code>removeEventListener()</code> - detach event handler</li><li>Event handler functions</li><li>Multiple listeners on same element</li><li>Event listener options (capture, once, passive)</li></ul><p>Event listeners enable interactive web applications.</p>"
+            },
+            {
+              "id": "unit_4_2_3",
+              "title": "Event Object",
+              "content": "<h2>Event Object</h2><p>When an event occurs, an event object is passed to the handler containing information about the event:</p><ul><li><code>event.type</code> - type of event</li><li><code>event.target</code> - element that triggered event</li><li><code>event.currentTarget</code> - element with listener</li><li><code>event.preventDefault()</code> - cancel default action</li><li><code>event.stopPropagation()</code> - stop event bubbling</li></ul>"
+            },
+            {
+              "id": "unit_4_2_4",
+              "title": "Event Bubbling and Capturing",
+              "content": "<h2>Event Bubbling and Capturing</h2><p>Events propagate through the DOM in two phases:</p><ul><li><strong>Capturing phase:</strong> event travels from root to target</li><li><strong>Bubbling phase:</strong> event travels from target back to root</li></ul><p>Event delegation leverages bubbling to handle events efficiently on multiple elements.</p>"
+            },
+            {
+              "id": "unit_4_2_5",
+              "title": "Form Events and Validation",
+              "content": "<h2>Form Events and Validation</h2><p>Handle form interactions and validate user input:</p><ul><li>Submit event and preventing default submission</li><li>Input and change events</li><li>Focus and blur events</li><li>Client-side validation techniques</li><li>Displaying validation errors</li><li>Form data collection and processing</li></ul><p>Proper form handling improves user experience.</p>"
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "id": "chapter_5_modern_frameworks",
+      "title": "Modern Web Frameworks",
+      "sections": [
+        {
+          "id": "section_5_1_framework_overview",
+          "title": "Framework Overview",
+          "units": [
+            {
+              "id": "unit_5_1_1",
+              "title": "Why Use Frameworks?",
+              "content": "<h2>Why Use Frameworks?</h2><p>Modern JavaScript frameworks provide numerous benefits:</p><ul><li>Component-based architecture</li><li>State management</li><li>Virtual DOM for performance</li><li>Developer tooling and ecosystem</li><li>Reusable components</li><li>Simplified complex UI development</li></ul><p>Frameworks accelerate development and improve code maintainability.</p>"
+            },
+            {
+              "id": "unit_5_1_2",
+              "title": "Popular Frameworks Comparison",
+              "content": "<h2>Popular Frameworks Comparison</h2><p>Overview of leading JavaScript frameworks:</p><ul><li><strong>React:</strong> Component library by Facebook, virtual DOM, JSX</li><li><strong>Vue:</strong> Progressive framework, easy learning curve</li><li><strong>Angular:</strong> Full-featured framework by Google</li><li><strong>Svelte:</strong> Compiler-based approach, no virtual DOM</li></ul><p>Each framework has strengths for different use cases.</p>"
+            },
+            {
+              "id": "unit_5_1_3",
+              "title": "Components and Props",
+              "content": "<h2>Components and Props</h2><p>Components are reusable building blocks of UI:</p><ul><li>Function components vs class components</li><li>Props for passing data to components</li><li>Component composition</li><li>Prop validation and default values</li><li>Children props</li></ul><p>Well-designed components make applications scalable and maintainable.</p>"
+            },
+            {
+              "id": "unit_5_1_4",
+              "title": "State Management",
+              "content": "<h2>State Management</h2><p>Managing application state is crucial for complex apps:</p><ul><li>Local component state</li><li>Lifting state up</li><li>Context API for global state</li><li>State management libraries (Redux, MobX, Zustand)</li><li>Immutable state updates</li></ul><p>Proper state management prevents bugs and improves performance.</p>"
+            },
+            {
+              "id": "unit_5_1_5",
+              "title": "Routing and Navigation",
+              "content": "<h2>Routing and Navigation</h2><p>Single-page applications need client-side routing:</p><ul><li>React Router, Vue Router, Angular Router</li><li>Route definition and parameters</li><li>Nested routes</li><li>Programmatic navigation</li><li>Route guards and authentication</li><li>Lazy loading routes</li></ul><p>Routing enables complex navigation in single-page apps.</p>"
+            }
+          ]
+        },
+        {
+          "id": "section_5_2_build_tools",
+          "title": "Build Tools and Deployment",
+          "units": [
+            {
+              "id": "unit_5_2_1",
+              "title": "Module Bundlers",
+              "content": "<h2>Module Bundlers</h2><p>Module bundlers package JavaScript modules for production:</p><ul><li><strong>Webpack:</strong> Powerful, configurable bundler</li><li><strong>Vite:</strong> Fast dev server, ES modules</li><li><strong>Parcel:</strong> Zero-config bundler</li><li><strong>Rollup:</strong> Optimized for libraries</li></ul><p>Bundlers optimize code for production deployment.</p>"
+            },
+            {
+              "id": "unit_5_2_2",
+              "title": "Package Managers",
+              "content": "<h2>Package Managers</h2><p>Package managers handle project dependencies:</p><ul><li><strong>npm:</strong> Node Package Manager (default)</li><li><strong>yarn:</strong> Fast, reliable alternative</li><li><strong>pnpm:</strong> Efficient disk space usage</li><li>Installing and managing packages</li><li>Package.json and lock files</li><li>Semantic versioning</li></ul>"
+            },
+            {
+              "id": "unit_5_2_3",
+              "title": "Code Quality Tools",
+              "content": "<h2>Code Quality Tools</h2><p>Maintain code quality with automated tools:</p><ul><li><strong>ESLint:</strong> JavaScript linting</li><li><strong>Prettier:</strong> Code formatting</li><li><strong>TypeScript:</strong> Static type checking</li><li><strong>Jest:</strong> Testing framework</li><li>Pre-commit hooks with Husky</li></ul><p>Quality tools catch bugs early and enforce consistency.</p>"
+            },
+            {
+              "id": "unit_5_2_4",
+              "title": "Performance Optimization",
+              "content": "<h2>Performance Optimization</h2><p>Optimize web applications for better performance:</p><ul><li>Code splitting and lazy loading</li><li>Minification and compression</li><li>Image optimization</li><li>Caching strategies</li><li>Bundle size analysis</li><li>Tree shaking unused code</li></ul><p>Performance directly impacts user experience and SEO.</p>"
+            },
+            {
+              "id": "unit_5_2_5",
+              "title": "Deployment Strategies",
+              "content": "<h2>Deployment Strategies</h2><p>Deploy web applications to production:</p><ul><li><strong>Static hosting:</strong> Netlify, Vercel, GitHub Pages</li><li><strong>Server deployment:</strong> Heroku, DigitalOcean, AWS</li><li><strong>Containerization:</strong> Docker</li><li>CI/CD pipelines</li><li>Environment variables</li><li>Monitoring and error tracking</li></ul><p>Proper deployment ensures reliable application availability.</p>"
+            }
+          ]
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,41 @@
+# Claude Code - Files to exclude from indexing
+# This prevents temporary files from consuming token budget
+
+# Temporary agent orchestration files
+.tmp/
+
+# Node modules
+node_modules/
+
+# Build outputs
+dist/
+build/
+.next/
+out/
+
+# Locks
+.locks/
+
+# Git
+.git/
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# IDE
+.vscode/
+.idea/
+
+# Logs
+*.log
+logs/
+
+# Environment
+.env
+.env.*
+!.env.example
+
+# Test coverage
+coverage/
+.nyc_output/

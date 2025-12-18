@@ -1,0 +1,102 @@
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "This section introduces the fundamental concepts of variables and data types in Python programming. You'll learn how to store and manipulate different types of data using variables, and understand the characteristics of each data type. By the end of this section, you'll be able to create variables and work with various data types confidently.",
+  "learning_objectives": [
+    "Create and name variables following Python naming conventions",
+    "Distinguish between integers, floats, strings, and booleans",
+    "Perform basic operations with different data types",
+    "Convert between data types using type conversion functions",
+    "Use the type() function to check variable data types"
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Introduction to Variables",
+      "lesson_objective": "Create, name, and assign values to variables while following Python naming conventions",
+      "key_topics": [
+        "What are variables?",
+        "Variable naming rules and conventions",
+        "Assigning values using = operator",
+        "Reassigning variables",
+        "Multiple assignment"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Variable Naming Practice",
+          "exercise_instructions": "Create variables to store the following: your name as a string, your age as an integer, and your height in meters as a float. Use descriptive variable names that follow Python conventions (snake_case). Print each variable and its type using the type() function."
+        },
+        {
+          "exercise_title": "Variable Reassignment",
+          "exercise_instructions": "Create a variable called 'score' and assign it the value 50. Then reassign it to 75, and finally to 100. Print the value after each reassignment to demonstrate how variables can change."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Numeric Data Types",
+      "lesson_objective": "Work with integers and floating-point numbers, including arithmetic operations",
+      "key_topics": [
+        "Integers (int) data type",
+        "Floating-point numbers (float) data type",
+        "Basic arithmetic operations (+, -, *, /, //, %, **)",
+        "Order of operations",
+        "Working with large numbers"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Calculator Practice",
+          "exercise_instructions": "Create variables for two numbers: a = 15 and b = 4. Perform and print the results of addition, subtraction, multiplication, division, floor division, modulo, and exponentiation. Label each result clearly."
+        },
+        {
+          "exercise_title": "Temperature Converter",
+          "exercise_instructions": "Create a variable celsius = 25 and convert it to Fahrenheit using the formula F = (C * 9/5) + 32. Store the result in a variable called fahrenheit and print both values with appropriate labels."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "String Data Type",
+      "lesson_objective": "Create and manipulate string variables using basic string operations",
+      "key_topics": [
+        "Creating strings with single, double, and triple quotes",
+        "String concatenation with + operator",
+        "String multiplication with * operator",
+        "Basic string methods (len, upper, lower)",
+        "Escape characters"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "String Concatenation",
+          "exercise_instructions": "Create three variables: first_name = 'John', last_name = 'Doe', and age = 30. Create a formatted string that says 'Hello, my name is John Doe and I am 30 years old.' using string concatenation and print it."
+        },
+        {
+          "exercise_title": "String Operations",
+          "exercise_instructions": "Create a variable word = 'PYTHON'. Print the length of the word, the word in lowercase, the word in uppercase, and the word repeated 3 times separated by spaces."
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "Boolean Data Type and Type Conversion",
+      "lesson_objective": "Use boolean values and convert between different data types",
+      "key_topics": [
+        "Boolean values True and False",
+        "Comparison operators (==, !=, <, >, <=, >=)",
+        "Converting to integers with int()",
+        "Converting to floats with float()",
+        "Converting to strings with str()"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Boolean Comparisons",
+          "exercise_instructions": "Create variables a = 10 and b = 5. Compare them using all comparison operators (==, !=, <, >, <=, >=) and print each result with a descriptive label."
+        },
+        {
+          "exercise_title": "Type Conversion Practice",
+          "exercise_instructions": "Create a string age_str = '25'. Convert it to an integer and add 5 to it, then convert the result back to a string. Print the original string, the converted integer, and the final string with appropriate labels."
+        }
+      ]
+    }
+  ]
+}

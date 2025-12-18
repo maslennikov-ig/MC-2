@@ -1,0 +1,102 @@
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "This section covers the foundational concepts of storing and manipulating data in Python through variables and core data types. Learners will understand how to assign values, recognize different data categories, and perform basic operations. Mastery of these concepts is essential for writing functional Python programs and progressing to more complex topics.",
+  "learning_objectives": [
+    "Declare and initialize variables using valid naming conventions",
+    "Identify and differentiate between int, float, str, and bool data types",
+    "Perform arithmetic operations and string manipulations using appropriate operators",
+    "Convert between data types using built-in conversion functions",
+    "Predict the output of type-checking operations using the type() function"
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Understanding Variables",
+      "lesson_objective": "Create and assign values to variables following Python naming rules",
+      "key_topics": [
+        "What variables are (named storage containers)",
+        "Valid variable naming conventions (letters, numbers, underscores)",
+        "Assignment operator (=) usage",
+        "Case sensitivity in variable names",
+        "Reserved keywords to avoid"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Variable Initialization",
+          "exercise_instructions": "Create three variables: 'user_name' (string with your name), 'account_balance' (integer with 1000), and 'is_active' (boolean set to True). Print all three variables."
+        },
+        {
+          "exercise_title": "Variable Reassignment",
+          "exercise_instructions": "Assign 25 to a variable 'temperature'. Reassign it to the string 'twenty-five'. Print the variable and observe the change in data type."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Numeric Data Types: Integers and Floats",
+      "lesson_objective": "Perform arithmetic operations on integer and float data types",
+      "key_topics": [
+        "Integer (int) characteristics and examples",
+        "Floating-point (float) precision and representation",
+        "Basic arithmetic operators (+, -, *, /)",
+        "Integer division (//) and modulus (%)",
+        "Operator precedence in calculations"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Basic Arithmetic",
+          "exercise_instructions": "Calculate the area of a circle with radius 7 using the formula area = π * r² (use 3.14 for π). Store the result in 'circle_area' and print it."
+        },
+        {
+          "exercise_title": "Currency Conversion",
+          "exercise_instructions": "Convert $150 USD to Euros (assume 1 USD = 0.93 EUR). Store the result in 'euro_amount' and print it rounded to two decimal places."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "String Data Type Fundamentals",
+      "lesson_objective": "Manipulate text data using string operations and formatting",
+      "key_topics": [
+        "String definition with single/double quotes",
+        "String concatenation (+ operator)",
+        "String repetition (* operator)",
+        "Basic escape sequences (\\n, \\t)",
+        "f-string formatting for variable inclusion"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "String Construction",
+          "exercise_instructions": "Create variables 'greeting' (\"Hello\") and 'name' (your name). Concatenate them with a space to form a full message in 'welcome_msg' and print it."
+        },
+        {
+          "exercise_title": "f-string Practice",
+          "exercise_instructions": "Using variables 'product' (\"laptop\") and 'price' (999.99), create an f-string that says \"The laptop costs $999.99\" and store it in 'product_info'. Print the result."
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "Boolean Values and Type Conversion",
+      "lesson_objective": "Convert between data types and evaluate boolean expressions",
+      "key_topics": [
+        "Boolean (bool) values: True and False",
+        "Comparison operators (==, !=, >, <)",
+        "type() function for data type inspection",
+        "Explicit conversion with int(), float(), str()",
+        "Implicit type conversion in operations"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Type Identification",
+          "exercise_instructions": "Create variables: 'a' = 42, 'b' = \"42\", 'c' = 42.0. Print the type of each variable using type()."
+        },
+        {
+          "exercise_title": "Data Type Conversion",
+          "exercise_instructions": "Convert the string \"3.14\" to a float and store it in 'pi_float'. Convert 100 to a string and store it in 'str_hundred'. Print both variables and their types."
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,119 @@
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "A hands-on introduction to the fundamental building blocks of Python programming. Students will learn to store, manipulate, and manage different kinds of data using variables, operators, and basic type conversions through practical coding exercises.",
+  "learning_objectives": [
+    "Define variables and assign values using the correct syntax",
+    "Identify and use Python's core data types: integers, floats, strings, and booleans",
+    "Perform basic arithmetic and string operations",
+    "Convert values between different data types explicitly",
+    "Write programs that use variables and operators to solve simple problems"
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Storing Information with Variables",
+      "lesson_objective": "Students will be able to create variables, assign values of different types, and use the print() function to display them.",
+      "key_topics": [
+        "Variable assignment syntax and naming rules",
+        "Using the print() function to output variable values",
+        "Understanding the difference between variable creation and reassignment",
+        "Identifying common variable naming errors"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Your First Variables",
+          "exercise_instructions": "Create three variables: one storing your name, one storing your age, and one storing your favorite color. Print each variable on a separate line."
+        },
+        {
+          "exercise_title": "Variable Reassignment",
+          "exercise_instructions": "Create a variable called 'score' and assign it the value 10. Print it. Then, reassign it to the value 25 and print it again."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Working with Numbers: Integers and Floats",
+      "lesson_objective": "Students will be able to perform arithmetic operations with numeric data types and predict the resulting data type (int or float).",
+      "key_topics": [
+        "Difference between integers and floating-point numbers",
+        "Arithmetic operators: +, -, *, /, //, %, **",
+        "Order of operations (PEMDAS) in Python expressions",
+        "How division always results in a float"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Basic Calculator",
+          "exercise_instructions": "Write a program that calculates and prints the result of this expression: (15 + 3 * 2) / 4. Then, calculate the remainder when 27 is divided by 4 using the modulo operator."
+        },
+        {
+          "exercise_title": "Temperature Conversion",
+          "exercise_instructions": "Store a temperature in Celsius (e.g., 20) in a variable. Convert it to Fahrenheit using the formula: F = (C * 9/5) + 32. Print both the original and converted values."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "Manipulating Text with Strings",
+      "lesson_objective": "Students will be able to create, concatenate, and perform basic operations on string data.",
+      "key_topics": [
+        "String creation using single, double, and triple quotes",
+        "String concatenation with the + operator",
+        "String repetition with the * operator",
+        "Using f-strings for embedded expressions"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Greeting Generator",
+          "exercise_instructions": "Create two variables, one for a first name and one for a last name. Use concatenation to create a full name and print a greeting message like 'Hello, [full name]!'."
+        },
+        {
+          "exercise_title": "Pattern Printing with f-strings",
+          "exercise_instructions": "Store a word (e.g., 'Python') in a variable. Use an f-string and the repetition operator to print the word three times in a row without spaces (e.g., 'PythonPythonPython')."
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "Making Decisions with Booleans and Comparisons",
+      "lesson_objective": "Students will be able to write expressions using comparison and logical operators that evaluate to True or False.",
+      "key_topics": [
+        "Boolean values True and False",
+        "Comparison operators: ==, !=, >, <, >=, <=",
+        "Logical operators: and, or, not",
+        "How expressions are evaluated to a single Boolean value"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Age Checker",
+          "exercise_instructions": "Create a variable for a person's age. Write a print statement that checks if the age is greater than or equal to 18 and prints the result (True or False)."
+        },
+        {
+          "exercise_title": "Complex Condition",
+          "exercise_instructions": "Set variables for a user's score and membership status. Write an expression that checks if the score is over 50 AND the user is a member, then print the result."
+        }
+      ]
+    },
+    {
+      "lesson_number": 5,
+      "lesson_title": "Converting Between Data Types",
+      "lesson_objective": "Students will be able to convert values between strings, integers, and floats using explicit type conversion functions.",
+      "key_topics": [
+        "The str(), int(), and float() functions",
+        "When and why type conversion is necessary",
+        "Handling errors from invalid conversions (e.g., int('hello'))",
+        "Converting user input (which is always a string) for calculation"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Numeric String Calculator",
+          "exercise_instructions": "Create two variables as strings: '15' and '3'. Convert them to integers, add them together, and print the integer result. Then, convert the result back to a string and print it with a message like 'The result is [result]'."
+        },
+        {
+          "exercise_title": "Input Conversion",
+          "exercise_instructions": "Use the input() function to ask the user for a number. Convert the input to a float, multiply it by 2, and print the result. Note: input() always returns a string."
+        }
+      ]
+    }
+  ]
+}

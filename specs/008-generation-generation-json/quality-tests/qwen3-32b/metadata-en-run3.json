@@ -1,0 +1,29 @@
+{
+  "course_title": "Introduction to Python Programming",
+  "course_description": "A beginner-level technical programming course designed to equip students with foundational Python skills. Through hands-on exercises and real-world examples, learners will master core programming concepts including syntax, data structures, control flow, and functions while building practical applications.",
+  "course_overview": "This course begins with Python installation and setup, then progresses through essential programming principles. Students will explore variable types, loops (for/while), conditional logic (if/elif/else), and error handling. The curriculum includes creating reusable functions, manipulating lists/dictionaries/tuples, and working with file I/O operations. Advanced modules cover object-oriented programming basics, simple data visualization with Matplotlib, and API interactions using the Requests library. Specific projects include building a text-based to-do list manager, developing a weather data analyzer with CSV processing, and constructing a basic calculator with operator precedence handling. The course emphasizes iterative problem-solving through debugging sessions and code optimization challenges.",
+  "target_audience": "Aspiring programmers with no prior coding experience, high school students pursuing computer science fundamentals, career changers from non-technical backgrounds, and professionals in fields like biology, finance, or engineering needing automation skills. Ideal for individuals comfortable with basic computer navigation and logical reasoning.",
+  "estimated_duration_hours": 25,
+  "difficulty_level": "beginner",
+  "prerequisites": [
+    "Basic computer literacy (file management, internet navigation)",
+    "Ability to use a text editor or IDE",
+    "Fundamental understanding of logic/sequencing concepts"
+  ],
+  "learning_outcomes": [
+    "Define and implement core Python syntax elements including variables, operators, and data types",
+    "Build modular programs using control structures (conditionals, loops) and error handling mechanisms",
+    "Create and debug Python functions with parameter passing and return values",
+    "Analyze and manipulate structured data using lists, dictionaries, and tuples",
+    "Develop simple command-line applications combining multiple programming concepts",
+    "Interpret error messages to troubleshoot and optimize code performance"
+  ],
+  "course_tags": [
+    "python_basics",
+    "beginner_programming",
+    "code_syntax",
+    "data_structures",
+    "scripting",
+    "automation"
+  ]
+}

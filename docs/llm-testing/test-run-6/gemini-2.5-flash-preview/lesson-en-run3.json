@@ -1,0 +1,76 @@
+{
+  "section_number": 1,
+  "section_title": "Understanding and Using Variables and Data Types in Python",
+  "section_description": "This hands-on programming section introduces the fundamental concepts of variables, assignment, and the core primitive data types in Python (integers, floats, and strings). Students will immediately apply these concepts through coding exercises.",
+  "learning_objectives": [
+    "Define and correctly initialize a variable in Python.",
+    "Identify and utilize the three primary primitive data types: int, float, and str.",
+    "Perform basic arithmetic and string concatenation using variables.",
+    "Use the type() function to verify a variable's data type."
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Introduction to Variables: Naming and Assignment",
+      "lesson_objective": "Students will be able to correctly declare and assign values to variables following Python naming conventions.",
+      "key_topics": [
+        "What is a variable?",
+        "The assignment operator (=)",
+        "Python variable naming rules (PEP 8)",
+        "Reassigning variable values"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "My First Variables",
+          "exercise_instructions": "Create three variables: 'user_name' storing your name as a string, 'age' storing your age as an integer, and 'pi_value' storing 3.14159 as a float. Print all three variables."
+        },
+        {
+          "exercise_title": "Variable Reassignment Challenge",
+          "exercise_instructions": "Initialize a variable 'counter' to 10. In the next line, reassign 'counter' to be 'counter + 5'. Print the final value of 'counter'."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Primitive Data Types: Integers and Floats",
+      "lesson_objective": "Students will differentiate between integer and float types and perform basic arithmetic operations using them.",
+      "key_topics": [
+        "Integers (int)",
+        "Floating-point numbers (float)",
+        "The 'type()' function",
+        "Basic arithmetic operators (+, -, *, /)"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Calculating Area",
+          "exercise_instructions": "Define 'radius' as 5 (int) and 'pi' as 3.14 (float). Calculate the area of a circle (pi * radius * radius) and store it in a variable 'circle_area'. Print 'circle_area' and use type() to confirm its data type."
+        },
+        {
+          "exercise_title": "Mixed Type Arithmetic",
+          "exercise_instructions": "Initialize 'total_cost' as 50.50 (float) and 'quantity' as 3 (int). Calculate the 'subtotal'. Then, use the type() function to confirm that the result of multiplying a float and an int is a float."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "Working with Strings (str)",
+      "lesson_objective": "Students will understand the string data type and perform basic string operations like concatenation and f-string formatting.",
+      "key_topics": [
+        "Defining strings (single vs. double quotes)",
+        "String concatenation (+ operator)",
+        "Introduction to f-strings (formatted string literals)",
+        "Special characters and escape sequences"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "String Concatenation Practice",
+          "exercise_instructions": "Define 'first_name' and 'last_name'. Concatenate them with a space in between and store the result in 'full_name'. Print 'full_name'."
+        },
+        {
+          "exercise_title": "F-string Introduction",
+          "exercise_instructions": "Using the 'user_name' and 'age' variables created previously, use an f-string to print the sentence: 'Hello [user_name], you are [age] years old.'"
+        }
+      ]
+    }
+  ]
+}

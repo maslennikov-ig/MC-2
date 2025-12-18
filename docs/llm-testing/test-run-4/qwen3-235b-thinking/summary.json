@@ -1,0 +1,126 @@
+{
+  "testRunId": "2025-11-14-v4-qwen3-235b-thinking",
+  "model": "Qwen3 235B Thinking",
+  "modelSlug": "qwen3-235b-thinking",
+  "apiName": "qwen/qwen3-235b-a22b-thinking-2507",
+  "timestamp": "2025-11-14T08:36:27.190Z",
+  "duration": 59316,
+  "durationMinutes": "0.99",
+  "scenarios": 4,
+  "runsPerScenario": 3,
+  "totalTests": 12,
+  "successfulTests": 12,
+  "failedTests": 0,
+  "successRate": "100.00",
+  "avgTestDuration": "44699",
+  "results": [
+    {
+      "model": "Qwen3 235B Thinking",
+      "modelSlug": "qwen3-235b-thinking",
+      "scenario": "metadata-en",
+      "runNumber": 1,
+      "success": true,
+      "duration": 32147,
+      "contentLength": 1937
+    },
+    {
+      "model": "Qwen3 235B Thinking",
+      "modelSlug": "qwen3-235b-thinking",
+      "scenario": "metadata-en",
+      "runNumber": 2,
+      "success": true,
+      "duration": 32575,
+      "contentLength": 2095
+    },
+    {
+      "model": "Qwen3 235B Thinking",
+      "modelSlug": "qwen3-235b-thinking",
+      "scenario": "metadata-en",
+      "runNumber": 3,
+      "success": true,
+      "duration": 35093,
+      "contentLength": 2090
+    },
+    {
+      "model": "Qwen3 235B Thinking",
+      "modelSlug": "qwen3-235b-thinking",
+      "scenario": "metadata-ru",
+      "runNumber": 1,
+      "success": true,
+      "duration": 41638,
+      "contentLength": 1799
+    },
+    {
+      "model": "Qwen3 235B Thinking",
+      "modelSlug": "qwen3-235b-thinking",
+      "scenario": "metadata-ru",
+      "runNumber": 2,
+      "success": true,
+      "duration": 47897,
+      "contentLength": 2037
+    },
+    {
+      "model": "Qwen3 235B Thinking",
+      "modelSlug": "qwen3-235b-thinking",
+      "scenario": "metadata-ru",
+      "runNumber": 3,
+      "success": true,
+      "duration": 40100,
+      "contentLength": 1923
+    },
+    {
+      "model": "Qwen3 235B Thinking",
+      "modelSlug": "qwen3-235b-thinking",
+      "scenario": "lesson-en",
+      "runNumber": 1,
+      "success": true,
+      "duration": 58987,
+      "contentLength": 4247
+    },
+    {
+      "model": "Qwen3 235B Thinking",
+      "modelSlug": "qwen3-235b-thinking",
+      "scenario": "lesson-en",
+      "runNumber": 2,
+      "success": true,
+      "duration": 59316,
+      "contentLength": 4940
+    },
+    {
+      "model": "Qwen3 235B Thinking",
+      "modelSlug": "qwen3-235b-thinking",
+      "scenario": "lesson-en",
+      "runNumber": 3,
+      "success": true,
+      "duration": 37951,
+      "contentLength": 3816
+    },
+    {
+      "model": "Qwen3 235B Thinking",
+      "modelSlug": "qwen3-235b-thinking",
+      "scenario": "lesson-ru",
+      "runNumber": 1,
+      "success": true,
+      "duration": 55875,
+      "contentLength": 3551
+    },
+    {
+      "model": "Qwen3 235B Thinking",
+      "modelSlug": "qwen3-235b-thinking",
+      "scenario": "lesson-ru",
+      "runNumber": 2,
+      "success": true,
+      "duration": 43029,
+      "contentLength": 3390
+    },
+    {
+      "model": "Qwen3 235B Thinking",
+      "modelSlug": "qwen3-235b-thinking",
+      "scenario": "lesson-ru",
+      "runNumber": 3,
+      "success": true,
+      "duration": 51782,
+      "contentLength": 4371
+    }
+  ]
+}

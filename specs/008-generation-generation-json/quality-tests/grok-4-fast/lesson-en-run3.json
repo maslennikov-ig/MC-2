@@ -1,0 +1,93 @@
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "This hands-on programming section explores the essentials of variables and data types in Python, focusing on declaration, manipulation, and practical application through coding exercises to build foundational programming skills.",
+  "learning_objectives": [
+    "Students will be able to declare and assign variables using proper Python syntax",
+    "Students will be able to identify and utilize primitive data types including integers, floats, strings, and booleans",
+    "Students will be able to perform basic operations and type conversions on variables",
+    "Students will be able to debug common errors related to variable naming and data types"
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Declaring and Assigning Variables",
+      "lesson_objective": "Students will be able to create variables, assign initial values, and understand Python's dynamic typing by writing simple assignment statements",
+      "key_topics": [
+        "Variable naming rules using lowercase letters and underscores",
+        "The assignment operator (=) and multiple assignments",
+        "Reassigning values to existing variables"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Basic Variable Declaration",
+          "exercise_instructions": "Write a Python script that declares three variables: user_name as a string with your name, user_age as an integer with your age, and is_student as a boolean True, then print each variable's value"
+        },
+        {
+          "exercise_title": "Multiple Assignments",
+          "exercise_instructions": "Create a script that assigns the same value 'Python' to three variables (lang1, lang2, lang3) in one line, then reassign lang2 to 'Java' and print all three"
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Integers and Floats in Operations",
+      "lesson_objective": "Students will be able to apply arithmetic operations on integers and floats, handling results with mixed types",
+      "key_topics": [
+        "Integer literals and their range in Python",
+        "Float literals with decimal points",
+        "Addition, subtraction, multiplication, and division operators"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Arithmetic with Numbers",
+          "exercise_instructions": "Declare variables x as 10 (int) and y as 3.5 (float), then compute and print the sum, product, and quotient of x and y"
+        },
+        {
+          "exercise_title": "Temperature Conversion",
+          "exercise_instructions": "Write a script with celsius as 25.5 (float), convert to fahrenheit using the formula (celsius * 9/5) + 32, assign to fahrenheit variable, and print both values"
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "Strings and Boolean Expressions",
+      "lesson_objective": "Students will be able to concatenate strings and evaluate boolean conditions to control simple logic flows",
+      "key_topics": [
+        "String literals enclosed in quotes",
+        "String concatenation using the + operator",
+        "Boolean values and comparison operators like == and >"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "String Manipulation",
+          "exercise_instructions": "Declare first_name as 'John' and last_name as 'Doe', concatenate them with a space into full_name, then print 'Hello, full_name'"
+        },
+        {
+          "exercise_title": "Boolean Checks",
+          "exercise_instructions": "Set age as 20 (int) and adult as age >= 18, then print adult as a boolean; repeat with age set to 16 and print the result"
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "Type Conversion and Verification",
+      "lesson_objective": "Students will be able to convert data types explicitly and verify variable types to avoid runtime errors",
+      "key_topics": [
+        "Built-in functions like int(), float(), str(), and bool()",
+        "The type() function for inspecting data types",
+        "Handling TypeError from invalid conversions"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Converting Types",
+          "exercise_instructions": "Declare num_str as '42', convert it to an integer using int(), assign to num_int, then print type(num_int) and perform num_int + 8"
+        },
+        {
+          "exercise_title": "Type Checking",
+          "exercise_instructions": "Create variables of different types: a=5, b=3.14, c='hello', d=True; use type() to print each type and convert c to float if possible, handling any error with a comment"
+        }
+      ]
+    }
+  ]
+}

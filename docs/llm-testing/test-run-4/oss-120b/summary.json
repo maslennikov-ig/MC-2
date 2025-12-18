@@ -1,0 +1,126 @@
+{
+  "testRunId": "2025-11-14-v4-oss-120b",
+  "model": "OSS 120B",
+  "modelSlug": "oss-120b",
+  "apiName": "openai/gpt-oss-120b",
+  "timestamp": "2025-11-14T08:36:12.904Z",
+  "duration": 45028,
+  "durationMinutes": "0.75",
+  "scenarios": 4,
+  "runsPerScenario": 3,
+  "totalTests": 12,
+  "successfulTests": 1,
+  "failedTests": 11,
+  "successRate": "8.33",
+  "avgTestDuration": "28681",
+  "results": [
+    {
+      "model": "OSS 120B",
+      "modelSlug": "oss-120b",
+      "scenario": "metadata-en",
+      "runNumber": 1,
+      "success": false,
+      "duration": 21434,
+      "error": "Cannot read properties of undefined (reading 'message')"
+    },
+    {
+      "model": "OSS 120B",
+      "modelSlug": "oss-120b",
+      "scenario": "metadata-en",
+      "runNumber": 2,
+      "success": true,
+      "duration": 24028,
+      "contentLength": 1880
+    },
+    {
+      "model": "OSS 120B",
+      "modelSlug": "oss-120b",
+      "scenario": "metadata-en",
+      "runNumber": 3,
+      "success": false,
+      "duration": 21559,
+      "error": "Cannot read properties of undefined (reading 'message')"
+    },
+    {
+      "model": "OSS 120B",
+      "modelSlug": "oss-120b",
+      "scenario": "metadata-ru",
+      "runNumber": 1,
+      "success": false,
+      "duration": 41402,
+      "error": "Cannot read properties of undefined (reading 'message')"
+    },
+    {
+      "model": "OSS 120B",
+      "modelSlug": "oss-120b",
+      "scenario": "metadata-ru",
+      "runNumber": 2,
+      "success": false,
+      "duration": 26040,
+      "error": "Cannot read properties of undefined (reading 'message')"
+    },
+    {
+      "model": "OSS 120B",
+      "modelSlug": "oss-120b",
+      "scenario": "metadata-ru",
+      "runNumber": 3,
+      "success": false,
+      "duration": 34725,
+      "error": "Cannot read properties of undefined (reading 'message')"
+    },
+    {
+      "model": "OSS 120B",
+      "modelSlug": "oss-120b",
+      "scenario": "lesson-en",
+      "runNumber": 1,
+      "success": false,
+      "duration": 25735,
+      "error": "Cannot read properties of undefined (reading 'message')"
+    },
+    {
+      "model": "OSS 120B",
+      "modelSlug": "oss-120b",
+      "scenario": "lesson-en",
+      "runNumber": 2,
+      "success": false,
+      "duration": 45026,
+      "error": "Cannot read properties of undefined (reading 'message')"
+    },
+    {
+      "model": "OSS 120B",
+      "modelSlug": "oss-120b",
+      "scenario": "lesson-en",
+      "runNumber": 3,
+      "success": false,
+      "duration": 20714,
+      "error": "Cannot read properties of undefined (reading 'message')"
+    },
+    {
+      "model": "OSS 120B",
+      "modelSlug": "oss-120b",
+      "scenario": "lesson-ru",
+      "runNumber": 1,
+      "success": false,
+      "duration": 33937,
+      "error": "Cannot read properties of undefined (reading 'message')"
+    },
+    {
+      "model": "OSS 120B",
+      "modelSlug": "oss-120b",
+      "scenario": "lesson-ru",
+      "runNumber": 2,
+      "success": false,
+      "duration": 28372,
+      "error": "Cannot read properties of undefined (reading 'message')"
+    },
+    {
+      "model": "OSS 120B",
+      "modelSlug": "oss-120b",
+      "scenario": "lesson-ru",
+      "runNumber": 3,
+      "success": false,
+      "duration": 21204,
+      "error": "Cannot read properties of undefined (reading 'message')"
+    }
+  ]
+}

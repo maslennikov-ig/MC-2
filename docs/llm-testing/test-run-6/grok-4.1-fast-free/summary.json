@@ -1,0 +1,132 @@
+{
+  "model": "Grok 4.1 Fast (free)",
+  "slug": "grok-4.1-fast-free",
+  "apiName": "x-ai/grok-4.1-fast:free",
+  "totalTests": 12,
+  "successful": 12,
+  "failed": 0,
+  "successRate": "100.0",
+  "avgDuration": "21448",
+  "results": [
+    {
+      "model": "Grok 4.1 Fast (free)",
+      "modelSlug": "grok-4.1-fast-free",
+      "scenario": "metadata-en",
+      "runNumber": 1,
+      "success": true,
+      "duration": 14357,
+      "contentLength": 1757,
+      "parseError": null
+    },
+    {
+      "model": "Grok 4.1 Fast (free)",
+      "modelSlug": "grok-4.1-fast-free",
+      "scenario": "metadata-en",
+      "runNumber": 2,
+      "success": true,
+      "duration": 12800,
+      "contentLength": 1843,
+      "parseError": null
+    },
+    {
+      "model": "Grok 4.1 Fast (free)",
+      "modelSlug": "grok-4.1-fast-free",
+      "scenario": "metadata-en",
+      "runNumber": 3,
+      "success": true,
+      "duration": 17475,
+      "contentLength": 1783,
+      "parseError": null
+    },
+    {
+      "model": "Grok 4.1 Fast (free)",
+      "modelSlug": "grok-4.1-fast-free",
+      "scenario": "metadata-ru",
+      "runNumber": 1,
+      "success": true,
+      "duration": 19644,
+      "contentLength": 1823,
+      "parseError": null
+    },
+    {
+      "model": "Grok 4.1 Fast (free)",
+      "modelSlug": "grok-4.1-fast-free",
+      "scenario": "metadata-ru",
+      "runNumber": 2,
+      "success": true,
+      "duration": 18245,
+      "contentLength": 1650,
+      "parseError": null
+    },
+    {
+      "model": "Grok 4.1 Fast (free)",
+      "modelSlug": "grok-4.1-fast-free",
+      "scenario": "metadata-ru",
+      "runNumber": 3,
+      "success": true,
+      "duration": 17842,
+      "contentLength": 1807,
+      "parseError": null
+    },
+    {
+      "model": "Grok 4.1 Fast (free)",
+      "modelSlug": "grok-4.1-fast-free",
+      "scenario": "lesson-en",
+      "runNumber": 1,
+      "success": true,
+      "duration": 21664,
+      "contentLength": 4825,
+      "parseError": null
+    },
+    {
+      "model": "Grok 4.1 Fast (free)",
+      "modelSlug": "grok-4.1-fast-free",
+      "scenario": "lesson-en",
+      "runNumber": 2,
+      "success": true,
+      "duration": 21447,
+      "contentLength": 3297,
+      "parseError": null
+    },
+    {
+      "model": "Grok 4.1 Fast (free)",
+      "modelSlug": "grok-4.1-fast-free",
+      "scenario": "lesson-en",
+      "runNumber": 3,
+      "success": true,
+      "duration": 20198,
+      "contentLength": 3497,
+      "parseError": null
+    },
+    {
+      "model": "Grok 4.1 Fast (free)",
+      "modelSlug": "grok-4.1-fast-free",
+      "scenario": "lesson-ru",
+      "runNumber": 1,
+      "success": true,
+      "duration": 34253,
+      "contentLength": 2567,
+      "parseError": null
+    },
+    {
+      "model": "Grok 4.1 Fast (free)",
+      "modelSlug": "grok-4.1-fast-free",
+      "scenario": "lesson-ru",
+      "runNumber": 2,
+      "success": true,
+      "duration": 30592,
+      "contentLength": 3218,
+      "parseError": null
+    },
+    {
+      "model": "Grok 4.1 Fast (free)",
+      "modelSlug": "grok-4.1-fast-free",
+      "scenario": "lesson-ru",
+      "runNumber": 3,
+      "success": true,
+      "duration": 28863,
+      "contentLength": 4477,
+      "parseError": null
+    }
+  ]
+}

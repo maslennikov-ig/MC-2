@@ -1,0 +1,63 @@
+/* KaTeX Dark Mode Overrides */
+
+/* Dark mode color overrides */
+.dark .katex {
+  color: inherit; /* Use text color from parent */
+}
+
+.dark .katex-display {
+  color: inherit;
+}
+
+/* Improve block formula spacing */
+.katex-display {
+  margin: 1.5em 0;
+  overflow-x: auto;
+  overflow-y: hidden;
+  padding: 0.5em 0;
+}
+
+/* Ensure inline formulas don't break layout */
+.katex {
+  font-size: 1.1em; /* Slightly larger for readability */
+}
+
+/* Prevent inline math from increasing line height */
+.katex-html {
+  white-space: nowrap;
+}
+
+/* Dark mode specific tweaks */
+
+/* Fix color for fraction lines in dark mode */
+.dark .katex .frac-line {
+  border-color: currentColor;
+}
+
+/* Fix radical (square root) symbol in dark mode */
+.dark .katex .sqrt-sign {
+  border-color: currentColor;
+}
+
+/* Fix horizontal lines in dark mode */
+.dark .katex .rule {
+  border-color: currentColor;
+}
+
+/* Accessible focus styles for scrollable formulas */
+.katex-display:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+  border-radius: 0.25rem;
+}
+
+/* Responsive formula sizing */
+@media (max-width: 640px) {
+  .katex {
+    font-size: 1em;
+  }
+
+  .katex-display {
+    padding: 0.25em 0;
+  }
+}

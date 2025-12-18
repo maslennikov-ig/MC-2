@@ -1,0 +1,30 @@
+{
+  "course_title": "Introduction to Python Programming",
+  "course_description": "Embark on your programming journey with this beginner-friendly course on Python, the accessible and powerful language used in web development, data science, and automation. Learn core concepts through interactive lessons and hands-on exercises to build your first programs confidently.",
+  "course_overview": "This comprehensive introduction to Python programming is designed for absolute beginners, covering the fundamentals of coding with one of the world's most popular languages. You'll explore variables, data types, operators, control structures like if-else and loops, functions, modules, and basic file handling. The course includes practical examples, coding challenges, and mini-projects to reinforce learning, such as building a simple calculator or text-based game. By the end, you'll have the skills to write, debug, and run your own Python scripts, setting a strong foundation for further studies in software development, data analysis, or automation.",
+  "target_audience": "Absolute beginners with no prior coding experience, students, career changers, and hobbyists eager to learn programming basics.",
+  "estimated_duration_hours": 25,
+  "difficulty_level": "beginner",
+  "prerequisites": [
+    "Basic computer literacy and familiarity with using a web browser",
+    "No prior programming knowledge required"
+  ],
+  "learning_outcomes": [
+    "Understand fundamental Python syntax, variables, and data types",
+    "Apply control structures including conditionals and loops to solve problems",
+    "Create and use functions to organize and reuse code effectively",
+    "Manipulate common data structures like lists, tuples, and dictionaries",
+    "Debug and troubleshoot simple Python programs",
+    "Develop basic scripts for real-world tasks such as file input/output"
+  ],
+  "course_tags": [
+    "Python",
+    "Programming",
+    "Beginner",
+    "Coding Fundamentals",
+    "Data Types",
+    "Control Structures",
+    "Functions",
+    "Debugging"
+  ]
+}

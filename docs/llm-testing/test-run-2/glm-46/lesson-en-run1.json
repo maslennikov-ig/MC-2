@@ -1,0 +1,125 @@
+
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "Hands-on programming section with exercises covering variable declaration, data types, and type operations in Python. Students will learn how to work with different data types, perform type conversions, and understand the fundamentals of Python's dynamic typing system.",
+  "learning_objectives": [
+    "Declare and initialize variables in Python",
+    "Identify and work with basic data types (int, float, string, boolean)",
+    "Perform operations on different data types",
+    "Convert between data types using built-in functions",
+    "Use type checking to verify data types"
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Variable Declaration and Assignment",
+      "lesson_objective": "Students will be able to declare variables, assign values, and understand Python's dynamic typing system.",
+      "key_topics": [
+        "Variable naming conventions",
+        "Assignment operator (=)",
+        "Dynamic typing in Python",
+        "Variable reassignment",
+        "Multiple assignment"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Variable Declaration Practice",
+          "exercise_instructions": "Create variables for your name, age, height, and favorite color. Assign appropriate values and print each variable. Then, reassign the age variable with a new value and print it again."
+        },
+        {
+          "exercise_title": "Multiple Assignment Challenge",
+          "exercise_instructions": "Use multiple assignment to create three variables (x, y, z) with values 10, 20, and 30 in a single line. Then swap the values of x and y without using a temporary variable."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Working with Numbers: Integers and Floats",
+      "lesson_objective": "Students will be able to perform mathematical operations using integers and floating-point numbers.",
+      "key_topics": [
+        "Integer operations and division",
+        "Floating-point precision",
+        "Arithmetic operators (+, -, *, /, //, %, **)",
+        "Order of operations",
+        "Number formatting"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Calculator Operations",
+          "exercise_instructions": "Create a program that calculates the area of a rectangle (length * width) and the area of a circle (π * radius²). Use both integer and float values. Print the results with appropriate decimal places."
+        },
+        {
+          "exercise_title": "Operator Exploration",
+          "exercise_instructions": "Test all arithmetic operators with both integers and floats. Create examples showing the difference between / (regular division) and // (floor division), and demonstrate the modulo operator with both positive and negative numbers."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "String Manipulation and Methods",
+      "lesson_objective": "Students will be able to create, modify, and extract information from strings using Python string methods.",
+      "key_topics": [
+        "String concatenation",
+        "String indexing and slicing",
+        "Common string methods (upper, lower, strip, split)",
+        "String formatting with f-strings",
+        "Escape characters"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "String Transformation",
+          "exercise_instructions": "Create a string containing your full name. Write code to: 1) Convert it to uppercase, 2) Extract just the first name, 3) Count the number of vowels, 4) Replace spaces with underscores."
+        },
+        {
+          "exercise_title": "Sentence Formatter",
+          "exercise_instructions": "Write a program that takes a user's input sentence and formats it properly: capitalizes the first letter, ensures proper spacing, and adds a period at the end if missing."
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "Boolean Values and Comparison Operations",
+      "lesson_objective": "Students will be able to use boolean values and comparison operators to evaluate conditions.",
+      "key_topics": [
+        "Boolean values (True and False)",
+        "Comparison operators (==, !=, <, >, <=, >=)",
+        "Logical operators (and, or, not)",
+        "Truthiness and falsiness",
+        "Boolean expressions"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Comparison Practice",
+          "exercise_instructions": "Create variables with different numeric and string values. Write expressions to test all comparison operators with these variables. Print both the expression and its result to understand the output."
+        },
+        {
+          "exercise_title": "Logical Operator Challenge",
+          "exercise_instructions": "Write expressions that combine comparison operations with logical operators to check: 1) If a number is between 10 and 20, 2) If a string contains 'python' (case insensitive) OR 'coding', 3) If a number is even AND positive."
+        }
+      ]
+    },
+    {
+      "lesson_number": 5,
+      "lesson_title": "Type Conversion and Type Checking",
+      "lesson_objective": "Students will be able to convert between different data types and check the type of variables.",
+      "key_topics": [
+        "Implicit vs explicit type conversion",
+        "Built-in conversion functions (int(), float(), str(), bool())",
+        "Type checking with type() and isinstance()",
+        "Handling conversion errors",
+        "Practical applications of type conversion"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Type Conversion Practice",
+          "exercise_instructions": "Create variables of different types and practice converting them between types. Include cases that will fail (like converting 'hello' to int) and use try-except to handle the errors gracefully."
+        },
+        {
+          "exercise_title": "User Input Processing",
+          "exercise_instructions": "Write a program that accepts user input as strings and converts them to appropriate types. For example, ask for age (convert to int), height (convert to float), and whether they like programming (convert to bool). Validate the conversions and print the types of each variable."
+        }
+      ]
+    }
+  ]
+}

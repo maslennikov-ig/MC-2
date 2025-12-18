@@ -1,0 +1,36 @@
+
+{
+  "course_title": "Introduction to Python Programming",
+  "course_description": "A comprehensive beginner-level course that introduces students to Python programming fundamentals through practical, hands-on learning. This course is designed for individuals with little to no programming experience who want to develop marketable coding skills. Students will master core Python concepts including variables, data types, control structures, functions, and object-oriented programming while building real-world projects. The curriculum emphasizes problem-solving, code organization, and industry best practices, preparing graduates for entry-level programming roles or further advanced studies.",
+  "course_overview": "This comprehensive course provides a structured pathway to Python programming mastery through progressive skill development. Students begin with Python syntax, variables, and basic data types, then advance to control structures (if/else statements, loops), functions, and error handling. The curriculum incorporates practical projects including a calculator application, text-based adventure game, web scraper for data collection, and inventory management system. Each module features hands-on coding exercises, peer code reviews, and debugging techniques. Students will utilize essential Python libraries such as requests for web interactions, pandas for data manipulation, and matplotlib for basic visualization. The course emphasizes problem-solving methodologies, code readability standards, testing practices, and collaborative development workflows. Real-world scenarios include data processing tasks, API integration exercises, and file management projects that demonstrate Python's versatility across different industries.",
+  "target_audience": "This course is designed for three primary personas: 1) Career changers seeking to transition into tech roles who need practical programming skills and a portfolio of projects; 2) Working professionals in non-technical fields (data analysts, researchers, marketers, financial analysts) who need Python automation skills to improve productivity and data analysis capabilities; 3) Recent high school or college graduates with minimal programming experience who want to establish a foundation for computer science studies or entry-level developer positions. All learners should have basic computer literacy, familiarity with file systems, and willingness to engage in hands-on coding practice.",
+  "estimated_duration_hours": 40,
+  "difficulty_level": "beginner",
+  "prerequisites": [
+    "Basic computer literacy and file management skills",
+    "High school mathematics background",
+    "Access to a computer with internet connection",
+    "Willingness to install and use Python development environment"
+  ],
+  "learning_outcomes": [
+    "Define Python syntax fundamentals including variables, data types, operators, and basic input/output operations",
+    "Build functional Python applications using control structures such as conditional statements, loops, and exception handling",
+    "Create modular code by developing and implementing custom functions with parameters, return values, and scope management",
+    "Analyze and manipulate data structures including lists, dictionaries, tuples, and sets for practical programming solutions",
+    "Construct object-oriented programs using classes, objects, inheritance, and polymorphism to model real-world scenarios",
+    "Integrate external Python libraries and APIs to extend program functionality and solve complex problems",
+    "Debug and optimize Python code using debugging tools, testing frameworks, and performance analysis techniques"
+  ],
+  "course_tags": [
+    "Python programming",
+    "Beginner coding",
+    "Software development",
+    "Object-oriented programming",
+    "Data structures",
+    "Web scraping",
+    "Automation",
+    "Hands-on projects",
+    "Programming fundamentals",
+    "Career development"
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "course_title": "Introduction to Python Programming",
+  "course_description": "This beginner-friendly course provides a comprehensive introduction to Python programming, covering fundamental concepts such as variables, data types, control structures, functions, and basic object-oriented programming. Students will gain hands-on experience through practical exercises and real-world projects, building a solid foundation for advanced programming topics and career development in software development, data analysis, or automation.",
+  "course_overview": "This comprehensive course takes students from zero programming knowledge to confidently writing Python applications. The curriculum begins with Python installation and environment setup, then progresses through core concepts including variables, data types (strings, numbers, lists, dictionaries), conditional statements (if/elif/else), loops (for and while), functions with parameters and return values, and file handling. Students will build practical projects including a calculator application, a text-based adventure game, and a data analysis tool for CSV files. The course emphasizes best practices such as code documentation, error handling with try/except blocks, and using built-in Python modules like math, random, and datetime. Advanced topics include list comprehensions, lambda functions, and an introduction to classes and objects. Each module includes coding exercises, debugging challenges, and a capstone project where students create a personal task management system. By course completion, students will have a portfolio of Python programs demonstrating their problem-solving abilities and readiness for specialized tracks like web development, data science, or automation scripting.",
+  "target_audience": "Complete beginners with no prior programming experience, professionals seeking career transition into tech roles, students preparing for computer science studies, analysts wanting to automate repetitive tasks, entrepreneurs needing to prototype software ideas, and hobbyists interested in building personal projects. Ideal for ages 16+ with basic computer literacy.",
+  "estimated_duration_hours": 40,
+  "difficulty_level": "beginner",
+  "prerequisites": [
+    "Basic computer literacy (file management, installing software)",
+    "High school level mathematics (arithmetic, algebra basics)",
+    "Access to a computer with internet connection (Windows, Mac, or Linux)"
+  ],
+  "learning_outcomes": [
+    "Define and implement variables, data types, and operators in Python programs",
+    "Build interactive applications using input/output functions and control structures",
+    "Create reusable functions with proper documentation and error handling",
+    "Analyze and debug Python code to identify and fix logical errors",
+    "Develop file processing scripts to read, manipulate, and write data",
+    "Design simple object-oriented programs using classes and methods"
+  ],
+  "course_tags": [
+    "python",
+    "programming",
+    "beginner",
+    "software development",
+    "coding fundamentals",
+    "automation",
+    "scripting",
+    "object-oriented programming"
+  ]
+}

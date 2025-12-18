@@ -1,0 +1,35 @@
+
+{
+  "course_title": "Introduction to Python Programming",
+  "course_description": "Beginner-level technical programming course designed for individuals with little to no programming experience. This course introduces fundamental programming concepts using Python, one of the most popular and versatile programming languages in the world. Students will learn to write clean, efficient code while developing problem-solving skills essential for software development.",
+  "course_overview": "This comprehensive Introduction to Python Programming course provides a solid foundation in programming fundamentals. Starting with Python installation and environment setup, students will progress through core concepts including variables, data types, control structures (if statements, loops), functions, and basic data structures like lists and dictionaries. The course emphasizes hands-on learning through practical exercises such as building a simple calculator, creating a text-based game, and analyzing basic data sets. Students will learn Python syntax, error handling techniques, and best practices for writing readable code. The curriculum includes modules on file operations, basic algorithms, and an introduction to object-oriented programming concepts. By the end of the course, students will have completed multiple mini-projects that demonstrate their understanding of programming principles and Python's versatility in applications ranging from web development to data analysis.",
+  "target_audience": "Absolute beginners with no prior programming experience, career changers transitioning to tech roles, students exploring computer science as a potential major, professionals seeking to automate repetitive tasks in their current jobs, and hobbyists interested in creating simple applications or games.",
+  "estimated_duration_hours": 40,
+  "difficulty_level": "beginner",
+  "prerequisites": [
+    "Basic computer literacy",
+    "Ability to install software on personal computer",
+    "Familiarity with using text editors or IDEs",
+    "Basic mathematical skills (arithmetic operations)",
+    "English language proficiency for reading technical documentation"
+  ],
+  "learning_outcomes": [
+    "Define fundamental programming concepts including variables, data types, and control flow structures",
+    "Build functional Python programs using proper syntax and coding conventions",
+    "Create algorithms to solve computational problems using conditional statements and loops",
+    "Analyze and debug Python code using error messages and debugging techniques",
+    "Implement functions and modules to organize code efficiently",
+    "Develop basic applications that process and manipulate data structures",
+    "Apply file handling techniques to read from and write to external files"
+  ],
+  "course_tags": [
+    "python",
+    "programming",
+    "beginner",
+    "coding",
+    "software development",
+    "computer science",
+    "technical skills",
+    "programming fundamentals"
+  ]
+}

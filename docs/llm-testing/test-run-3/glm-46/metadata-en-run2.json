@@ -1,0 +1,34 @@
+{
+  "course_title": "Introduction to Python Programming",
+  "course_description": "Master the fundamentals of Python programming in this beginner-friendly course. Learn to write clean, efficient code and solve real-world problems with one of the most versatile programming languages today.",
+  "course_overview": "This comprehensive introduction to Python programming is designed for absolute beginners with no prior coding experience. You'll start with basic syntax and progressively build your skills through hands-on exercises and practical projects. The course covers essential programming concepts including variables, data types, control structures, functions, and object-oriented programming. You'll also learn how to work with popular Python libraries for data manipulation and visualization. By the end of the course, you'll have a solid foundation in Python and be ready to tackle more advanced programming challenges or specialize in areas like data science, web development, or automation.",
+  "target_audience": "Absolute beginners to programming, students, professionals seeking career change, and anyone interested in learning Python as their first programming language.",
+  "estimated_duration_hours": 40,
+  "difficulty_level": "beginner",
+  "prerequisites": [
+    "Basic computer literacy",
+    "High school level mathematics",
+    "No prior programming experience required"
+  ],
+  "learning_outcomes": [
+    "Apply fundamental Python syntax and programming constructs to solve simple problems",
+    "Design and implement functions to organize code and promote reusability",
+    "Analyze and debug Python code using appropriate tools and techniques",
+    "Create basic programs that handle user input and generate output",
+    "Evaluate different data structures and select appropriate ones for specific tasks",
+    "Develop simple applications using object-oriented programming principles",
+    "Utilize standard Python libraries to accomplish common programming tasks"
+  ],
+  "course_tags": [
+    "Python",
+    "Programming",
+    "Beginner",
+    "Coding",
+    "Software Development",
+    "Computer Science",
+    "Data Types",
+    "Functions",
+    "Object-Oriented Programming",
+    "Problem Solving"
+  ]
+}

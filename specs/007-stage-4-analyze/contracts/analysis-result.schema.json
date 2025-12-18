@@ -1,0 +1,490 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://megacampusai.com/schemas/analysis-result.json",
+  "title": "Analysis Result",
+  "description": "Complete Stage 4 analysis result structure stored in courses.analysis_result JSONB column",
+  "type": "object",
+  "required": [
+    "course_category",
+    "contextual_language",
+    "topic_analysis",
+    "recommended_structure",
+    "pedagogical_strategy",
+    "scope_instructions",
+    "content_strategy",
+    "research_flags",
+    "metadata"
+  ],
+  "properties": {
+    "course_category": {
+      "type": "object",
+      "required": ["primary", "confidence", "reasoning"],
+      "properties": {
+        "primary": {
+          "type": "string",
+          "enum": ["professional", "personal", "creative", "hobby", "spiritual", "academic"],
+          "description": "Primary course category based on semantic analysis"
+        },
+        "confidence": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1,
+          "description": "Confidence score for category detection (0-1, higher = more confident)"
+        },
+        "reasoning": {
+          "type": "string",
+          "minLength": 50,
+          "maxLength": 200,
+          "description": "Explanation of category selection"
+        },
+        "secondary": {
+          "type": ["string", "null"],
+          "enum": ["professional", "personal", "creative", "hobby", "spiritual", "academic", null],
+          "description": "Optional secondary category if course spans multiple domains"
+        }
+      }
+    },
+    "contextual_language": {
+      "type": "object",
+      "required": [
+        "why_matters_context",
+        "motivators",
+        "experience_prompt",
+        "problem_statement_context",
+        "knowledge_bridge",
+        "practical_benefit_focus"
+      ],
+      "properties": {
+        "why_matters_context": {
+          "type": "string",
+          "minLength": 50,
+          "maxLength": 300,
+          "description": "Category-specific explanation of why course matters (TARGET: 100 chars)"
+        },
+        "motivators": {
+          "type": "string",
+          "minLength": 100,
+          "maxLength": 600,
+          "description": "Category-adapted motivators for learners (TARGET: 200 chars)"
+        },
+        "experience_prompt": {
+          "type": "string",
+          "minLength": 100,
+          "maxLength": 600,
+          "description": "Question connecting learners to their experience (TARGET: 200 chars)"
+        },
+        "problem_statement_context": {
+          "type": "string",
+          "minLength": 50,
+          "maxLength": 300,
+          "description": "Problems learners face with this topic (TARGET: 100 chars)"
+        },
+        "knowledge_bridge": {
+          "type": "string",
+          "minLength": 100,
+          "maxLength": 600,
+          "description": "Bridge existing knowledge to new topic (TARGET: 200 chars)"
+        },
+        "practical_benefit_focus": {
+          "type": "string",
+          "minLength": 100,
+          "maxLength": 600,
+          "description": "Tangible benefits from mastering this course (TARGET: 200 chars)"
+        }
+      }
+    },
+    "topic_analysis": {
+      "type": "object",
+      "required": [
+        "determined_topic",
+        "information_completeness",
+        "complexity",
+        "reasoning",
+        "target_audience",
+        "key_concepts",
+        "domain_keywords"
+      ],
+      "properties": {
+        "determined_topic": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 200,
+          "description": "Refined course topic based on user input"
+        },
+        "information_completeness": {
+          "type": "number",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Percentage of information available for course creation (0-100%)"
+        },
+        "complexity": {
+          "type": "string",
+          "enum": ["narrow", "medium", "broad"],
+          "description": "Topic complexity: narrow (single skill), medium (skill set), broad (multiple domains)"
+        },
+        "reasoning": {
+          "type": "string",
+          "minLength": 50,
+          "description": "Explanation of complexity assessment"
+        },
+        "target_audience": {
+          "type": "string",
+          "enum": ["beginner", "intermediate", "advanced", "mixed"],
+          "description": "Detected target audience level"
+        },
+        "missing_elements": {
+          "type": ["array", "null"],
+          "items": {
+            "type": "string"
+          },
+          "description": "List of missing information elements (null if complete)"
+        },
+        "key_concepts": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 3,
+          "maxItems": 10,
+          "description": "Core concepts to be covered in the course"
+        },
+        "domain_keywords": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 5,
+          "maxItems": 15,
+          "description": "Domain-specific keywords for content generation"
+        }
+      }
+    },
+    "recommended_structure": {
+      "type": "object",
+      "required": [
+        "estimated_content_hours",
+        "scope_reasoning",
+        "lesson_duration_minutes",
+        "calculation_explanation",
+        "total_lessons",
+        "total_sections",
+        "sections_breakdown"
+      ],
+      "properties": {
+        "estimated_content_hours": {
+          "type": "number",
+          "minimum": 0.5,
+          "maximum": 200,
+          "description": "Estimated learning time in hours"
+        },
+        "scope_reasoning": {
+          "type": "string",
+          "minLength": 100,
+          "maxLength": 500,
+          "description": "Justification for estimated scope"
+        },
+        "lesson_duration_minutes": {
+          "type": "integer",
+          "minimum": 3,
+          "maximum": 45,
+          "description": "Duration of each lesson in minutes"
+        },
+        "calculation_explanation": {
+          "type": "string",
+          "minLength": 50,
+          "maxLength": 300,
+          "description": "Explanation of lesson count calculation"
+        },
+        "total_lessons": {
+          "type": "integer",
+          "minimum": 10,
+          "maximum": 100,
+          "description": "Total number of lessons (enforced minimum: 10)"
+        },
+        "total_sections": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 30,
+          "description": "Total number of sections/modules"
+        },
+        "scope_warning": {
+          "type": ["string", "null"],
+          "description": "Optional warning if scope is borderline (too narrow or broad)"
+        },
+        "sections_breakdown": {
+          "type": "array",
+          "items": {
+            "$ref": "#/definitions/SectionBreakdown"
+          },
+          "minItems": 1,
+          "maxItems": 30,
+          "description": "Detailed breakdown of sections"
+        }
+      }
+    },
+    "pedagogical_strategy": {
+      "type": "object",
+      "required": [
+        "teaching_style",
+        "assessment_approach",
+        "practical_focus",
+        "progression_logic",
+        "interactivity_level"
+      ],
+      "properties": {
+        "teaching_style": {
+          "type": "string",
+          "enum": ["hands-on", "theory-first", "project-based", "mixed"],
+          "description": "Primary teaching methodology"
+        },
+        "assessment_approach": {
+          "type": "string",
+          "minLength": 50,
+          "maxLength": 200,
+          "description": "How to verify learning outcomes"
+        },
+        "practical_focus": {
+          "type": "string",
+          "enum": ["high", "medium", "low"],
+          "description": "Emphasis on practical application"
+        },
+        "progression_logic": {
+          "type": "string",
+          "minLength": 100,
+          "maxLength": 500,
+          "description": "How complexity builds across lessons"
+        },
+        "interactivity_level": {
+          "type": "string",
+          "enum": ["high", "medium", "low"],
+          "description": "Degree of learner interaction required"
+        }
+      }
+    },
+    "scope_instructions": {
+      "type": "string",
+      "minLength": 100,
+      "maxLength": 800,
+      "description": "Comprehensive prompt for Stage 5 content generation (English only)"
+    },
+    "content_strategy": {
+      "type": "string",
+      "enum": ["create_from_scratch", "expand_and_enhance", "optimize_existing"],
+      "description": "Strategy for generating course content based on available materials"
+    },
+    "expansion_areas": {
+      "type": ["array", "null"],
+      "items": {
+        "$ref": "#/definitions/ExpansionArea"
+      },
+      "description": "Optional areas requiring additional content"
+    },
+    "research_flags": {
+      "type": "array",
+      "items": {
+        "$ref": "#/definitions/ResearchFlag"
+      },
+      "description": "Topics requiring web research for up-to-date information (can be empty)"
+    },
+    "metadata": {
+      "type": "object",
+      "required": [
+        "analysis_version",
+        "total_duration_ms",
+        "phase_durations_ms",
+        "model_usage",
+        "total_tokens",
+        "total_cost_usd",
+        "retry_count",
+        "quality_scores",
+        "created_at"
+      ],
+      "properties": {
+        "analysis_version": {
+          "type": "string",
+          "pattern": "^v\\d+\\.\\d+\\.\\d+$",
+          "description": "Analysis schema version (e.g., v1.0.0)"
+        },
+        "total_duration_ms": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Total analysis duration in milliseconds"
+        },
+        "phase_durations_ms": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "description": "Duration of each phase in milliseconds"
+        },
+        "model_usage": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "description": "Model used for each phase"
+        },
+        "total_tokens": {
+          "type": "object",
+          "required": ["input", "output", "total"],
+          "properties": {
+            "input": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "output": {
+              "type": "integer",
+              "minimum": 0
+            },
+            "total": {
+              "type": "integer",
+              "minimum": 0
+            }
+          }
+        },
+        "total_cost_usd": {
+          "type": "number",
+          "minimum": 0,
+          "description": "Total analysis cost in USD"
+        },
+        "retry_count": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Total retries across all phases"
+        },
+        "quality_scores": {
+          "type": "object",
+          "additionalProperties": {
+            "type": "number",
+            "minimum": 0,
+            "maximum": 1
+          },
+          "description": "Semantic similarity scores per phase (0-1)"
+        },
+        "created_at": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO 8601 timestamp of analysis completion"
+        }
+      }
+    }
+  },
+  "definitions": {
+    "SectionBreakdown": {
+      "type": "object",
+      "required": [
+        "area",
+        "estimated_lessons",
+        "importance",
+        "learning_objectives",
+        "key_topics",
+        "pedagogical_approach",
+        "difficulty_progression"
+      ],
+      "properties": {
+        "area": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 100,
+          "description": "Section name/topic"
+        },
+        "estimated_lessons": {
+          "type": "integer",
+          "minimum": 1,
+          "description": "Number of lessons in this section"
+        },
+        "importance": {
+          "type": "string",
+          "enum": ["core", "important", "optional"],
+          "description": "Importance level for course objectives"
+        },
+        "learning_objectives": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 2,
+          "maxItems": 5,
+          "description": "Learning outcomes for this section"
+        },
+        "key_topics": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 3,
+          "maxItems": 8,
+          "description": "Main topics covered in this section"
+        },
+        "pedagogical_approach": {
+          "type": "string",
+          "minLength": 50,
+          "maxLength": 200,
+          "description": "Teaching methodology for this section"
+        },
+        "difficulty_progression": {
+          "type": "string",
+          "enum": ["flat", "gradual", "steep"],
+          "description": "How difficulty increases within the section"
+        }
+      }
+    },
+    "ExpansionArea": {
+      "type": "object",
+      "required": ["area", "priority", "specific_requirements", "estimated_lessons"],
+      "properties": {
+        "area": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 100,
+          "description": "Topic needing more detail"
+        },
+        "priority": {
+          "type": "string",
+          "enum": ["critical", "important", "nice-to-have"],
+          "description": "Priority level for expansion"
+        },
+        "specific_requirements": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "minItems": 1,
+          "maxItems": 5,
+          "description": "Specific requirements for this expansion"
+        },
+        "estimated_lessons": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10,
+          "description": "Estimated number of additional lessons needed"
+        }
+      }
+    },
+    "ResearchFlag": {
+      "type": "object",
+      "required": ["topic", "reason", "context"],
+      "properties": {
+        "topic": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 100,
+          "description": "Topic requiring research (e.g., regulation name, tech version)"
+        },
+        "reason": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 50,
+          "description": "Reason for research flag (e.g., regulation_updates, tech_version)"
+        },
+        "context": {
+          "type": "string",
+          "minLength": 50,
+          "maxLength": 200,
+          "description": "Why this topic needs up-to-date information"
+        }
+      }
+    }
+  }
+}

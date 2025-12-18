@@ -1,0 +1,17 @@
+{
+  "course_title": "Introduction to Python Programming",
+  "course_description": "This beginner-level technical programming course provides a comprehensive introduction to Python, one of the world's most popular and versatile programming languages. You will learn the fundamental concepts of programming, including variables, data types, control structures, functions, and basic file operations. The course emphasizes hands-on learning through practical exercises and real-world projects, enabling you to write your own Python scripts and solve basic computational problems. No prior programming experience is required, making it the perfect starting point for anyone looking to build a solid foundation in software development, data analysis, or automation.",
+  "course_overview": "This course is your launchpad into the world of programming with Python. We begin by demystifying what programming is and why Python is an excellent first language to learn. You'll start with the absolute basics: installing Python, running your first script, and understanding the core syntax. From there, we delve into core programming concepts. You will learn to use variables to store information, explore different data types like integers, floats, strings, and booleans, and use lists and dictionaries to organize data collections. We will cover control flow using conditional statements (if/elif/else) to make decisions in your code and loops (for/while) to perform repetitive tasks efficiently. A significant portion of the course is dedicated to functions, teaching you how to define your own reusable blocks of code to make your programs more organized and powerful. We will also introduce you to handling errors and exceptions gracefully. The course culminates in a series of small projects, such as building a simple text-based game like a number guessing game, a basic calculator, or a program that reads from and writes to a text file. By the end, you will have the confidence and skills to tackle more advanced Python topics and begin automating simple tasks.",
+  "target_audience": "Absolute beginners with no prior coding experience; career-changers exploring tech roles in software development or data science; students in non-technical majors seeking to add a valuable skill; administrative professionals, researchers, and marketers looking to automate repetitive tasks and data analysis; and hobbyists interested in understanding how software works.",
+  "estimated_duration_hours": 40,
+  "difficulty_level": "beginner",
+  "prerequisites": ["Basic computer literacy", "Familiarity with using a text editor", "No prior programming experience required"],
+  "learning_outcomes": [
+    "Define and apply fundamental programming concepts such as variables, data types, and control structures.",
+    "Build functional Python scripts that utilize loops, conditional logic, and user-defined functions.",
+    "Create programs that can read from and write to external files for data persistence.",
+    "Analyze simple problems and design algorithmic solutions implemented in Python code.",
+    "Construct basic data structures, including lists and dictionaries, to organize and manipulate information."
+  ],
+  "course_tags": ["python", "programming", "beginner", "coding", "software development", "automation", "data types", "functions", "file i/o"]
+}

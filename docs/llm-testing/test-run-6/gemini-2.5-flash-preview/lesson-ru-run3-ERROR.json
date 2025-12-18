@@ -1,0 +1,9 @@
+{
+  "model": "Gemini 2.5 Flash Preview",
+  "modelSlug": "gemini-2.5-flash-preview",
+  "scenario": "lesson-ru",
+  "runNumber": 3,
+  "error": "HTTP 400: {\"error\":{\"message\":\"google/gemini-2.5-flash-preview-05-20 is not a valid model ID\",\"code\":400},\"user_id\":\"user_2x4yi2dwbT5eht8Tydbi2TYE5qZ\"}",
+  "duration": 74,
+  "timestamp": "2025-11-30T17:38:14.177Z"
+}

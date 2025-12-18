@@ -1,0 +1,103 @@
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "This section introduces the foundational concepts of storing and manipulating data in Python. You will learn how to create variables to hold information and explore the core built-in data types the language offers. Mastering these concepts is the first step toward writing meaningful programs.",
+  "learning_objectives": [
+    "Declare and assign values to variables using proper Python syntax.",
+    "Identify and use the four core data types: strings, integers, floats, and booleans.",
+    "Convert values between different data types using built-in functions like str(), int(), and float().",
+    "Use the print() function to display variable values and combined text output."
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Creating Variables and Basic Assignment",
+      "lesson_objective": "Declare variables, assign values of different types, and print their contents.",
+      "key_topics": [
+        "What is a variable?",
+        "Naming rules and conventions for variables (snake_case)",
+        "The assignment operator (=)",
+        "Basic print() function usage",
+        "Viewing output in the console"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Your First Variables",
+          "exercise_instructions": "1. Create a variable named 'greeting' and assign the text 'Hello, World!' to it. 2. Create a variable named 'year' and assign the number 2024 to it. 3. Print both variables using two separate print() statements."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Exploring Numeric Data Types: Integers and Floats",
+      "lesson_objective": "Differentiate between integer and float data types and perform basic arithmetic operations.",
+      "key_topics": [
+        "Integer data type (int) for whole numbers",
+        "Float data type (float) for decimal numbers",
+        "Basic arithmetic operators (+, -, *, /)",
+        "How Python determines the data type of a result"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Number Crunching",
+          "exercise_instructions": "1. Create two variables: 'price' as a float (e.g., 19.99) and 'quantity' as an integer (e.g., 5). 2. Calculate the total cost by multiplying these variables and store it in a new variable named 'total'. 3. Print a message that says 'Total cost: ' followed by the value of 'total'."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "Working with Text: The String Data Type",
+      "lesson_objective": "Create string variables, use string methods, and combine strings with other data.",
+      "key_topics": [
+        "Defining strings with single or double quotes",
+        "String concatenation using the + operator",
+        "The title(), upper(), and lower() string methods",
+        "Understanding that numbers must be converted to strings for concatenation"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Personalized Greeting",
+          "exercise_instructions": "1. Create a variable 'first_name' with your name. 2. Create a variable 'age' with your age as a number. 3. Print a message that says 'Hello [first_name], you are [age] years old.' using the + operator to combine the strings. Remember to convert the age to a string."
+        },
+        {
+          "exercise_title": "Formatting Text",
+          "exercise_instructions": "1. Create a variable 'course' with the value 'introduction to python programming'. 2. Use a string method to format the text so the first letter of each word is capitalized. 3. Print the formatted string."
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "Making Decisions: The Boolean Data Type",
+      "lesson_objective": "Use Boolean values and comparison operators to evaluate conditions.",
+      "key_topics": [
+        "Boolean values: True and False",
+        "Comparison operators (==, !=, >, <, >=, <=)",
+        "How expressions with comparisons result in a Boolean value",
+        "Using the type() function to check a variable's data type"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "True or False?",
+          "exercise_instructions": "1. Create a variable 'score' and assign it the value 85. 2. Create a variable 'is_passing' and assign it the result of the expression 'score >= 70'. 3. Print the value of 'is_passing'. 4. Print the data type of 'is_passing' using the type() function."
+        }
+      ]
+    },
+    {
+      "lesson_number": 5,
+      "lesson_title": "Converting Between Data Types",
+      "lesson_objective": "Explicitly convert values between strings, integers, and floats using type casting functions.",
+      "key_topics": [
+        "Type conversion (type casting)",
+        "The str(), int(), and float() functions",
+        "When conversion is necessary (e.g., user input)",
+        "Potential errors from invalid conversions"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "User Input Simulator",
+          "exercise_instructions": "1. Create a variable 'user_input' with the string value '150'. 2. Convert this string into an integer and store it in a new variable. 3. Perform a calculation by adding 50 to the converted integer. 4. Convert the final result back into a string and print a message like 'The final result is [result]'."
+        }
+      ]
+    }
+  ]
+}

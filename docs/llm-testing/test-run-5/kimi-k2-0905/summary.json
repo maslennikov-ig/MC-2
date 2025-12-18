@@ -1,0 +1,126 @@
+{
+  "testRunId": "2025-11-14-v5-kimi-k2-0905",
+  "model": "Kimi K2 0905",
+  "modelSlug": "kimi-k2-0905",
+  "apiName": "moonshotai/kimi-k2-0905",
+  "timestamp": "2025-11-14T10:40:47.310Z",
+  "duration": 37762,
+  "durationMinutes": "0.63",
+  "scenarios": 4,
+  "runsPerScenario": 3,
+  "totalTests": 12,
+  "successfulTests": 12,
+  "failedTests": 0,
+  "successRate": "100.00",
+  "avgTestDuration": "15584",
+  "results": [
+    {
+      "model": "Kimi K2 0905",
+      "modelSlug": "kimi-k2-0905",
+      "scenario": "metadata-en",
+      "runNumber": 1,
+      "success": true,
+      "duration": 6730,
+      "contentLength": 1811
+    },
+    {
+      "model": "Kimi K2 0905",
+      "modelSlug": "kimi-k2-0905",
+      "scenario": "metadata-en",
+      "runNumber": 2,
+      "success": true,
+      "duration": 6083,
+      "contentLength": 1900
+    },
+    {
+      "model": "Kimi K2 0905",
+      "modelSlug": "kimi-k2-0905",
+      "scenario": "metadata-en",
+      "runNumber": 3,
+      "success": true,
+      "duration": 6220,
+      "contentLength": 1724
+    },
+    {
+      "model": "Kimi K2 0905",
+      "modelSlug": "kimi-k2-0905",
+      "scenario": "metadata-ru",
+      "runNumber": 1,
+      "success": true,
+      "duration": 10167,
+      "contentLength": 1668
+    },
+    {
+      "model": "Kimi K2 0905",
+      "modelSlug": "kimi-k2-0905",
+      "scenario": "metadata-ru",
+      "runNumber": 2,
+      "success": true,
+      "duration": 11231,
+      "contentLength": 2148
+    },
+    {
+      "model": "Kimi K2 0905",
+      "modelSlug": "kimi-k2-0905",
+      "scenario": "metadata-ru",
+      "runNumber": 3,
+      "success": true,
+      "duration": 9953,
+      "contentLength": 2209
+    },
+    {
+      "model": "Kimi K2 0905",
+      "modelSlug": "kimi-k2-0905",
+      "scenario": "lesson-en",
+      "runNumber": 1,
+      "success": true,
+      "duration": 13517,
+      "contentLength": 3941
+    },
+    {
+      "model": "Kimi K2 0905",
+      "modelSlug": "kimi-k2-0905",
+      "scenario": "lesson-en",
+      "runNumber": 2,
+      "success": true,
+      "duration": 13333,
+      "contentLength": 4879
+    },
+    {
+      "model": "Kimi K2 0905",
+      "modelSlug": "kimi-k2-0905",
+      "scenario": "lesson-en",
+      "runNumber": 3,
+      "success": true,
+      "duration": 12370,
+      "contentLength": 4471
+    },
+    {
+      "model": "Kimi K2 0905",
+      "modelSlug": "kimi-k2-0905",
+      "scenario": "lesson-ru",
+      "runNumber": 1,
+      "success": true,
+      "duration": 29328,
+      "contentLength": 6822
+    },
+    {
+      "model": "Kimi K2 0905",
+      "modelSlug": "kimi-k2-0905",
+      "scenario": "lesson-ru",
+      "runNumber": 2,
+      "success": true,
+      "duration": 37759,
+      "contentLength": 6788
+    },
+    {
+      "model": "Kimi K2 0905",
+      "modelSlug": "kimi-k2-0905",
+      "scenario": "lesson-ru",
+      "runNumber": 3,
+      "success": true,
+      "duration": 30322,
+      "contentLength": 7547
+    }
+  ]
+}

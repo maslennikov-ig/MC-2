@@ -1,0 +1,48 @@
+{
+  "model": "GPT OSS 120B",
+  "modelSlug": "gpt-oss-120b",
+  "modelApiName": "openai/gpt-oss-120b",
+  "lessonId": "1.1-en",
+  "lessonTitle": "What is an Intangible Product: Ticket as a Product",
+  "language": "en",
+  "duration": 18640,
+  "timestamp": "2025-12-16T10:28:52.534Z",
+  "parseSuccess": true,
+  "parseError": null,
+  "usage": {
+    "prompt_tokens": 589,
+    "completion_tokens": 2230,
+    "total_tokens": 2819,
+    "cost": 0.0011516,
+    "is_byok": false,
+    "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "audio_tokens": 0,
+      "video_tokens": 0
+    },
+    "cost_details": {
+      "upstream_inference_cost": null,
+      "upstream_inference_prompt_cost": 0.0000589,
+      "upstream_inference_completions_cost": 0.0010927
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 662,
+      "image_tokens": 0
+    }
+  },
+  "quality": {
+    "hasIntro": true,
+    "hasSections": true,
+    "hasExamples": true,
+    "hasExercises": true,
+    "hasSummary": true,
+    "sectionsCount": 3,
+    "examplesCount": 2,
+    "exercisesCount": 3,
+    "totalWordCount": 725,
+    "introWordCount": 118,
+    "coversObjectives": 3,
+    "coversTopics": 5,
+    "qualityScore": 100
+  }
+}

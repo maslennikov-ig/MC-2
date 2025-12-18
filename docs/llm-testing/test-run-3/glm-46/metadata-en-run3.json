@@ -1,0 +1,34 @@
+{
+  "course_title": "Introduction to Python Programming",
+  "course_description": "A beginner-friendly technical programming course that teaches Python fundamentals, syntax, and problem-solving skills for aspiring developers.",
+  "course_overview": "This comprehensive introductory course covers the fundamentals of Python programming from the ground up. Students will learn basic syntax, data types, control structures, functions, and object-oriented programming concepts. Through hands-on exercises and projects, participants will develop practical coding skills and understand how to approach programming problems systematically. The course also introduces popular Python libraries for data manipulation and provides a solid foundation for further specialization in areas like web development, data science, or automation.",
+  "target_audience": "Absolute beginners to programming, students, career changers, and professionals seeking to add Python to their skillset.",
+  "estimated_duration_hours": 40,
+  "difficulty_level": "beginner",
+  "prerequisites": [
+    "Basic computer literacy",
+    "Familiarity with operating systems (Windows, Mac, or Linux)",
+    "Logical thinking ability",
+    "No prior programming experience required"
+  ],
+  "learning_outcomes": [
+    "Identify and apply Python syntax rules and conventions",
+    "Demonstrate proficiency in using variables, data types, and operators",
+    "Implement control structures including loops and conditional statements",
+    "Design and write functions to solve specific programming problems",
+    "Apply object-oriented programming principles using classes and objects",
+    "Utilize common Python libraries for basic data manipulation",
+    "Debug and troubleshoot basic Python programs using error messages",
+    "Create simple Python applications that solve real-world problems"
+  ],
+  "course_tags": [
+    "Python",
+    "Programming",
+    "Beginner",
+    "Coding",
+    "Computer Science",
+    "Software Development",
+    "Technical Skills",
+    "Problem Solving"
+  ]
+}

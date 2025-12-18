@@ -1,0 +1,121 @@
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "A hands-on introduction to the fundamental building blocks of Python programming. Students will learn how to store, manipulate, and understand different kinds of data through practical exercises and real-world examples.",
+  "learning_objectives": [
+    "Define variables to store different data types.",
+    "Apply type conversion functions to change data from one type to another.",
+    "Perform basic arithmetic and string operations using variables.",
+    "Identify the data type of any given value or variable.",
+    "Write programs that accept user input and display formatted output."
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Naming and Assigning Variables",
+      "lesson_objective": "Students will be able to create variables following Python naming conventions and assign values of basic data types.",
+      "key_topics": [
+        "Variable assignment using the equals sign (=)",
+        "Python naming rules (case-sensitive, no spaces, cannot start with a number)",
+        "Choosing meaningful variable names",
+        "The print() function to display variable values",
+        "Reassigning variables with new values"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Your First Variables",
+          "exercise_instructions": "Create variables to store your name, age, and favorite color. Print each variable to the console."
+        },
+        {
+          "exercise_title": "Variable Reassignment",
+          "exercise_instructions": "Create a variable called 'score' and set it to 10. Print it. Then reassign it to 15 and print it again."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Working with Numbers and Strings",
+      "lesson_objective": "Students will be able to perform mathematical operations with numeric data types and manipulate string data.",
+      "key_topics": [
+        "Integer (int) and floating-point (float) data types",
+        "Basic arithmetic operators (+, -, *, /, **)",
+        "String creation using single, double, and triple quotes",
+        "String concatenation with the plus (+) operator",
+        "String repetition with the asterisk (*) operator"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Simple Calculator",
+          "exercise_instructions": "Create two variables holding numbers. Perform addition, subtraction, multiplication, and division on them, printing each result."
+        },
+        {
+          "exercise_title": "String Builder",
+          "exercise_instructions": "Create a variable with your first name and another with your last name. Concatenate them into a full name variable and print it. Then, print your first name repeated 3 times."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "Understanding and Converting Data Types",
+      "lesson_objective": "Students will be able to check the type of any variable and convert between common data types.",
+      "key_topics": [
+        "The type() function for identifying data types",
+        "Explicit type conversion: int(), float(), str()",
+        "Common conversion scenarios and potential errors",
+        "Converting user input (which is always a string) to numbers"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Type Detective",
+          "exercise_instructions": "Create variables with an integer, a float, and a string. Use the type() function to check and print the type of each variable."
+        },
+        {
+          "exercise_title": "Age Calculator",
+          "exercise_instructions": "Use the input() function to ask the user for their birth year. Convert the input to an integer and calculate their age. Print a message stating their age."
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "Boolean Logic and Basic Comparisons",
+      "lesson_objective": "Students will be able to use comparison operators to evaluate expressions and store the Boolean results in variables.",
+      "key_topics": [
+        "Boolean (bool) data type (True/False)",
+        "Comparison operators (==, !=, >, <, >=, <=)",
+        "Using comparisons to control program flow",
+        "Evaluating expressions with variables"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Comparison Check",
+          "exercise_instructions": "Create two variables with numeric values. Write comparisons to check if they are equal, if one is greater than the other, and if one is less than or equal to the other. Print the result of each comparison."
+        },
+        {
+          "exercise_title": "Login Simulator",
+          "exercise_instructions": "Create a variable storing a correct password. Use input() to ask the user for a password. Compare the user's input to the correct password and print True if they match, False if they don't."
+        }
+      ]
+    },
+    {
+      "lesson_number": 5,
+      "lesson_title": "User Input and Formatted Output",
+      "lesson_objective": "Students will be able to create a simple interactive program that takes user input and produces neatly formatted output.",
+      "key_topics": [
+        "Getting user input with the input() function",
+        "Using f-strings for embedding variables in strings",
+        "Combining multiple data types in a single output",
+        "Creating a simple, interactive story or data summary"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Personalized Greeting",
+          "exercise_instructions": "Ask the user for their name and favorite food. Use an f-string to print a message like: 'Hello [name]! I hear you love [food]!'"
+        },
+        {
+          "exercise_title": "Mad Libs Generator",
+          "exercise_instructions": "Ask the user for an adjective, a noun, and a verb. Use f-strings to insert these words into a pre-written story paragraph and print the complete story."
+        }
+      ]
+    }
+  ]
+}

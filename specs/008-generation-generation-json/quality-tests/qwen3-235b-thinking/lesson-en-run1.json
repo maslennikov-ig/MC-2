@@ -1,0 +1,81 @@
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "Practical exploration of core Python data structures through immediate coding exercises. Students will write executable programs to manipulate variables, convert types, and solve real-world data problems while receiving instant feedback on their implementations.",
+  "learning_objectives": [
+    "Declare variables following Python naming conventions and assign appropriate data types",
+    "Perform type-specific operations including arithmetic calculations and string manipulations",
+    "Convert between fundamental data types using built-in functions",
+    "Diagnose and resolve common type-related errors in Python programs"
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Variable Declaration and Numeric Operations",
+      "lesson_objective": "Create valid variable names and execute arithmetic operations with integers and floats",
+      "key_topics": [
+        "PEP 8 naming conventions for variables",
+        "Integer vs float precision behavior",
+        "Order of operations in arithmetic expressions",
+        "Using += and -= assignment operators"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Temperature Converter",
+          "exercise_instructions": "Write a program that declares a variable 'celsius' with value 25.0, converts it to Fahrenheit using the formula (celsius * 9/5) + 32, and prints the result with 2 decimal places."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "String Manipulation Techniques",
+      "lesson_objective": "Apply string methods to modify text and combine variables in formatted output",
+      "key_topics": [
+        "f-string variable interpolation",
+        "Case conversion methods (upper, title)",
+        "String concatenation vs formatting",
+        "Handling quotes within strings"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "User Profile Generator",
+          "exercise_instructions": "Create variables for first_name ('alex') and last_name ('morgan'). Generate a welcome message in title case that says 'Welcome, Alex Morgan!' using f-strings, then print its character count."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "Boolean Logic and Type Conversion",
+      "lesson_objective": "Evaluate comparison expressions and convert between string, integer, and boolean types",
+      "key_topics": [
+        "Truthiness of numeric and string values",
+        "Explicit conversion with int(), str(), bool()",
+        "Chained comparison operators",
+        "Handling ValueError exceptions in conversions"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Discount Eligibility Checker",
+          "exercise_instructions": "Declare 'purchase_amount' as string '299.99'. Convert to float, check if >= 300.0, and print 'Discount applied: True' or 'Discount applied: False' based on the result."
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "Compound Data Structures",
+      "lesson_objective": "Create and modify lists and tuples while explaining mutability differences",
+      "key_topics": [
+        "List indexing and slicing operations",
+        "Tuple immutability constraints",
+        "Appending vs inserting list elements",
+        "len() function for sequence types"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Inventory Tracker",
+          "exercise_instructions": "Initialize a list 'stock' with [15, 8, 22]. Replace the second value with 12, add 5 to the end, then create a tuple 'stock_ids' from [101, 102, 103]. Print both structures and their lengths."
+        }
+      ]
+    }
+  ]
+}

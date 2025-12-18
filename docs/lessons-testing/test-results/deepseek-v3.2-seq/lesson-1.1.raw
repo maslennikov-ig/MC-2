@@ -1,0 +1,19 @@
+{
+  "title": "Что такое нематериальное продукт: билет как товар",
+  "intro": "Добробуте! Если вы работаете в Менеджер и управете билетов, важно понимать что они are нематериальное товара, not физические товара. Билет не есть vậtк что можно touch или взве; он is право на участие в мероприя، на ведж вкал. В этой урок мы will раздow что это значит для ваш практие. Мы will compare билет и физические товар, расконь ключевые особенности нематериального product и will see как CRM acts как навигаator client. Это понимаing will help вам управ билетов more эффективно и избегать common錯誤.",
+  "sections": [
+    {
+      "title": "Опредеите нематериального product и билет как право",
+      "content": "Нематериальное product (или нематериальный товар) is товар что не имеет физические форма. Он не can be взven, не занимаите space, не has weight. In Менеджер контекте, билет is perfect example: он is право on participar in мероприя, not на vậtк. Когда you create билет, you are creating право for client to attend мероприя, not на физический ticket. Это means билет exists only in database, as record that links client to мероприя. Билет не can be lost, damaged, or stolen like physical ticket. Он can be revoked, updated, or deleted, but это actions change data, not on vậtк. This is crucial for Менеджер operators because it changes how you think about inventory, tracking, and reporting."
+    },
+    {
+      "title": "Compare билет vs физический товар по five criteria",
+      "content": "Let's compare билет и physical ticket side-by-side using five key criteria:\n1. **Form**: Biлет is data record; physical ticket is vậtк (e.g., paper, plastic card).\n2. **Storage**: Biлет stored in database; physical ticket stored in drawer, wallet.\n3. **Transfer**: Biлет transferred via CRM (assign to another client); physical ticket transferred by hand.\n4. **Verification**: Biлет verified by checking database; physical ticket verified by examining vậtк (security features).\n5. **Lifecycle**: Biлет lifecycle managed via CRM actions (create, update, delete); physical ticket lifecycle involves printing, distribution, collection, destruction.\n\nThis comparison shows that biлет operations are data operations, not physical actions. For Менеджер, this means you manage билетs through CRM interface, not through physical inventory processes."
+    },
+    {
+      "title": "Три ключевые особенности нематериального product",
+      "content": "Nemaтериального product like билет has three key features that define its behavior:\n1. **Consumable but not destructible**: Билет can be 'used' (client attends мероприя), but record remains in database for audit. You don't throw away билет after use; you mark it as consumed. This is different from physical ticket that you might discard.\n2. **Non-transferable physically**: You cannot hand biлет to another person; transfer happens only through CRM reassignment. This prevents unauthorized sharing.\n3. **Instant auditability**: Because билет is data, you can instantly query its status, history, and related info. No need to collect and count physical tickets.\n\nThese features mean your Менеджер workflows must focus on data integrity and CRM processes, not physical handling."
+    },
+    {
+      "title": "CRM как навигаator client для билетs",
+      "content": "CRM system in Менеджер acts as **навигаator client** for билетs. Think of CRM as traffic controller that directs clients to correct мероприятия via билетs. When client registers for мероприя, CRM creates biлет (data record) linking client to that мероприя. When client arrives, CRM validates biлет and marks it used. If client cancels, CRM updates biлет status

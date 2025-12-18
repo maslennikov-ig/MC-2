@@ -1,0 +1,11 @@
+description = "Automated release management with version bumping and changelog updates"
+prompt = """
+Please execute the release automation script.
+
+Target command:
+bash .claude/scripts/release.sh {{args}} --yes
+
+Instructions:
+1. Navigate to the project root if needed.
+2. Run the command shown above.
+"""

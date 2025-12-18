@@ -1,0 +1,9 @@
+{
+  "model": "DeepSeek Chat v3.1",
+  "modelSlug": "deepseek-chat-v31",
+  "scenario": "metadata-en",
+  "runNumber": 3,
+  "error": "OpenAI or Azure OpenAI API key or Token Provider not found",
+  "duration": 0,
+  "timestamp": "2025-11-14T07:16:14.677Z"
+}

@@ -1,0 +1,90 @@
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "A hands-on introduction to variables and core data types in Python, including practical exercises to reinforce learning.",
+  "learning_objectives": [
+    "Declare and assign variables using appropriate naming conventions.",
+    "Identify and use basic Python data types: int, float, str, and bool.",
+    "Convert between data types using type casting.",
+    "Use the type() function to inspect variable data types.",
+    "Apply variables and data types to solve simple programming problems."
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Introduction to Variables",
+      "lesson_objective": "Declare and assign values to variables following Python naming rules.",
+      "key_topics": [
+        "What is a variable?",
+        "Variable assignment with =",
+        "Variable naming rules and conventions",
+        "Reassigning variables",
+        "Dynamic typing"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Create and Print Variables",
+          "exercise_instructions": "Declare three variables: name, age, and city. Assign appropriate values and print them."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Understanding Basic Data Types",
+      "lesson_objective": "Identify and use int, float, str, and bool data types in Python.",
+      "key_topics": [
+        "Integer (int)",
+        "Floating-point number (float)",
+        "String (str)",
+        "Boolean (bool)",
+        "Checking types with type()"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Type Identification",
+          "exercise_instructions": "Create one variable of each type (int, float, str, bool) and use type() to confirm their data types."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "Working with Strings",
+      "lesson_objective": "Manipulate strings using concatenation and basic methods.",
+      "key_topics": [
+        "String literals with single/double quotes",
+        "String concatenation",
+        "Using len() function",
+        "Accessing characters by index",
+        "String immutability"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "String Concatenation Practice",
+          "exercise_instructions": "Create two string variables and concatenate them to form a full sentence. Print the result."
+        },
+        {
+          "exercise_title": "String Length and Index",
+          "exercise_instructions": "Ask the user for a word, then print its length and the first character using indexing."
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "Type Conversion",
+      "lesson_objective": "Convert between data types using int(), float(), and str().",
+      "key_topics": [
+        "Implicit vs explicit type conversion",
+        "Converting string to number",
+        "Converting number to string",
+        "Common type errors",
+        "Using str(), int(), float()"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Age Calculator",
+          "exercise_instructions": "Ask the user for their birth year, convert it to an integer, and calculate their age. Print the result as a string."
+        }
+      ]
+    }
+  ]
+}

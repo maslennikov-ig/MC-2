@@ -1,0 +1,126 @@
+{
+  "testRunId": "2025-11-14-v4-deepseek-chat-v31",
+  "model": "DeepSeek Chat v3.1",
+  "modelSlug": "deepseek-chat-v31",
+  "apiName": "deepseek/deepseek-chat-v3.1",
+  "timestamp": "2025-11-14T08:36:06.637Z",
+  "duration": 38767,
+  "durationMinutes": "0.65",
+  "scenarios": 4,
+  "runsPerScenario": 3,
+  "totalTests": 12,
+  "successfulTests": 12,
+  "failedTests": 0,
+  "successRate": "100.00",
+  "avgTestDuration": "24683",
+  "results": [
+    {
+      "model": "DeepSeek Chat v3.1",
+      "modelSlug": "deepseek-chat-v31",
+      "scenario": "metadata-en",
+      "runNumber": 1,
+      "success": true,
+      "duration": 12938,
+      "contentLength": 1545
+    },
+    {
+      "model": "DeepSeek Chat v3.1",
+      "modelSlug": "deepseek-chat-v31",
+      "scenario": "metadata-en",
+      "runNumber": 2,
+      "success": true,
+      "duration": 12108,
+      "contentLength": 1771
+    },
+    {
+      "model": "DeepSeek Chat v3.1",
+      "modelSlug": "deepseek-chat-v31",
+      "scenario": "metadata-en",
+      "runNumber": 3,
+      "success": true,
+      "duration": 18808,
+      "contentLength": 1644
+    },
+    {
+      "model": "DeepSeek Chat v3.1",
+      "modelSlug": "deepseek-chat-v31",
+      "scenario": "metadata-ru",
+      "runNumber": 1,
+      "success": true,
+      "duration": 21551,
+      "contentLength": 1594
+    },
+    {
+      "model": "DeepSeek Chat v3.1",
+      "modelSlug": "deepseek-chat-v31",
+      "scenario": "metadata-ru",
+      "runNumber": 2,
+      "success": true,
+      "duration": 16548,
+      "contentLength": 1476
+    },
+    {
+      "model": "DeepSeek Chat v3.1",
+      "modelSlug": "deepseek-chat-v31",
+      "scenario": "metadata-ru",
+      "runNumber": 3,
+      "success": true,
+      "duration": 15325,
+      "contentLength": 1493
+    },
+    {
+      "model": "DeepSeek Chat v3.1",
+      "modelSlug": "deepseek-chat-v31",
+      "scenario": "lesson-en",
+      "runNumber": 1,
+      "success": true,
+      "duration": 27423,
+      "contentLength": 4231
+    },
+    {
+      "model": "DeepSeek Chat v3.1",
+      "modelSlug": "deepseek-chat-v31",
+      "scenario": "lesson-en",
+      "runNumber": 2,
+      "success": true,
+      "duration": 29738,
+      "contentLength": 5084
+    },
+    {
+      "model": "DeepSeek Chat v3.1",
+      "modelSlug": "deepseek-chat-v31",
+      "scenario": "lesson-en",
+      "runNumber": 3,
+      "success": true,
+      "duration": 29210,
+      "contentLength": 4311
+    },
+    {
+      "model": "DeepSeek Chat v3.1",
+      "modelSlug": "deepseek-chat-v31",
+      "scenario": "lesson-ru",
+      "runNumber": 1,
+      "success": true,
+      "duration": 36658,
+      "contentLength": 4881
+    },
+    {
+      "model": "DeepSeek Chat v3.1",
+      "modelSlug": "deepseek-chat-v31",
+      "scenario": "lesson-ru",
+      "runNumber": 2,
+      "success": true,
+      "duration": 38766,
+      "contentLength": 5432
+    },
+    {
+      "model": "DeepSeek Chat v3.1",
+      "modelSlug": "deepseek-chat-v31",
+      "scenario": "lesson-ru",
+      "runNumber": 3,
+      "success": true,
+      "duration": 37124,
+      "contentLength": 4587
+    }
+  ]
+}

@@ -1,0 +1,132 @@
+{
+  "model": "Gemini 2.5 Flash Preview",
+  "slug": "gemini-2.5-flash-preview",
+  "apiName": "google/gemini-2.5-flash-preview-09-2025",
+  "totalTests": 12,
+  "successful": 12,
+  "failed": 0,
+  "successRate": "100.0",
+  "avgDuration": "4273",
+  "results": [
+    {
+      "model": "Gemini 2.5 Flash Preview",
+      "modelSlug": "gemini-2.5-flash-preview",
+      "scenario": "metadata-en",
+      "runNumber": 1,
+      "success": true,
+      "duration": 2774,
+      "contentLength": 1987,
+      "parseError": null
+    },
+    {
+      "model": "Gemini 2.5 Flash Preview",
+      "modelSlug": "gemini-2.5-flash-preview",
+      "scenario": "metadata-en",
+      "runNumber": 2,
+      "success": true,
+      "duration": 2794,
+      "contentLength": 2153,
+      "parseError": null
+    },
+    {
+      "model": "Gemini 2.5 Flash Preview",
+      "modelSlug": "gemini-2.5-flash-preview",
+      "scenario": "metadata-en",
+      "runNumber": 3,
+      "success": true,
+      "duration": 2811,
+      "contentLength": 2235,
+      "parseError": null
+    },
+    {
+      "model": "Gemini 2.5 Flash Preview",
+      "modelSlug": "gemini-2.5-flash-preview",
+      "scenario": "metadata-ru",
+      "runNumber": 1,
+      "success": true,
+      "duration": 3433,
+      "contentLength": 2323,
+      "parseError": null
+    },
+    {
+      "model": "Gemini 2.5 Flash Preview",
+      "modelSlug": "gemini-2.5-flash-preview",
+      "scenario": "metadata-ru",
+      "runNumber": 2,
+      "success": true,
+      "duration": 3379,
+      "contentLength": 2276,
+      "parseError": null
+    },
+    {
+      "model": "Gemini 2.5 Flash Preview",
+      "modelSlug": "gemini-2.5-flash-preview",
+      "scenario": "metadata-ru",
+      "runNumber": 3,
+      "success": true,
+      "duration": 3463,
+      "contentLength": 2274,
+      "parseError": null
+    },
+    {
+      "model": "Gemini 2.5 Flash Preview",
+      "modelSlug": "gemini-2.5-flash-preview",
+      "scenario": "lesson-en",
+      "runNumber": 1,
+      "success": true,
+      "duration": 5580,
+      "contentLength": 4525,
+      "parseError": null
+    },
+    {
+      "model": "Gemini 2.5 Flash Preview",
+      "modelSlug": "gemini-2.5-flash-preview",
+      "scenario": "lesson-en",
+      "runNumber": 2,
+      "success": true,
+      "duration": 4641,
+      "contentLength": 3644,
+      "parseError": null
+    },
+    {
+      "model": "Gemini 2.5 Flash Preview",
+      "modelSlug": "gemini-2.5-flash-preview",
+      "scenario": "lesson-en",
+      "runNumber": 3,
+      "success": true,
+      "duration": 4149,
+      "contentLength": 3308,
+      "parseError": null
+    },
+    {
+      "model": "Gemini 2.5 Flash Preview",
+      "modelSlug": "gemini-2.5-flash-preview",
+      "scenario": "lesson-ru",
+      "runNumber": 1,
+      "success": true,
+      "duration": 5602,
+      "contentLength": 3614,
+      "parseError": null
+    },
+    {
+      "model": "Gemini 2.5 Flash Preview",
+      "modelSlug": "gemini-2.5-flash-preview",
+      "scenario": "lesson-ru",
+      "runNumber": 2,
+      "success": true,
+      "duration": 6172,
+      "contentLength": 3901,
+      "parseError": null
+    },
+    {
+      "model": "Gemini 2.5 Flash Preview",
+      "modelSlug": "gemini-2.5-flash-preview",
+      "scenario": "lesson-ru",
+      "runNumber": 3,
+      "success": true,
+      "duration": 6475,
+      "contentLength": 4109,
+      "parseError": null
+    }
+  ]
+}

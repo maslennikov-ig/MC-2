@@ -1,0 +1,34 @@
+{
+  "course_title": "Introduction to Python Programming",
+  "course_description": "A comprehensive beginner-friendly programming course designed to teach fundamental Python concepts through hands-on projects and practical exercises. Students will learn to write clean, efficient code while building real-world applications including calculators, data analyzers, and simple games. The course emphasizes problem-solving skills and computational thinking, preparing learners for advanced programming topics or career transitions into technology fields.",
+  "course_overview": "This course provides a structured journey through Python programming fundamentals, starting with basic syntax and progressing to complex problem-solving scenarios. Students begin by installing Python and setting up development environments, then explore variables, data types, and control structures through interactive coding exercises. The curriculum includes building a temperature converter application, creating a personal finance tracker using lists and dictionaries, developing a text-based adventure game with functions and loops, and analyzing CSV data files to extract meaningful insights. Advanced modules cover object-oriented programming principles, file handling operations, and error management techniques. Each module includes practical labs where students debug existing code, optimize algorithms, and collaborate on peer code reviews. The course culminates in a capstone project where learners design and implement a custom application of their choice, such as a task management system, weather data analyzer, or expense tracker with graphical interface capabilities.",
+  "target_audience": "Complete beginners with no programming experience, career changers from non-technical backgrounds, high school students exploring technology careers, business professionals seeking automation skills, and university students requiring Python knowledge for data science or research projects. Ideal for analytical thinkers who enjoy problem-solving, detail-oriented individuals who appreciate logical structure, and creative minds interested in building digital solutions.",
+  "estimated_duration_hours": 40,
+  "difficulty_level": "beginner",
+  "prerequisites": [
+    "Basic computer literacy including file management",
+    "High school level mathematics",
+    "Access to a computer with internet connection"
+  ],
+  "learning_outcomes": [
+    "Define and implement Python variables, data types, and operators to solve computational problems",
+    "Build interactive programs using control structures including loops and conditional statements",
+    "Create reusable functions with proper documentation and error handling mechanisms",
+    "Analyze and manipulate structured data using lists, dictionaries, and file operations",
+    "Design object-oriented programs with classes, inheritance, and encapsulation principles",
+    "Develop debugging strategies to identify and resolve syntax and logical errors in code",
+    "Construct complete applications integrating multiple Python concepts for real-world scenarios"
+  ],
+  "course_tags": [
+    "python",
+    "programming",
+    "beginner",
+    "software development",
+    "coding fundamentals",
+    "object-oriented programming",
+    "automation",
+    "data manipulation",
+    "problem solving",
+    "hands-on projects"
+  ]
+}

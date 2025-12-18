@@ -1,0 +1,101 @@
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "In this hands‑on section learners will explore how to create and manipulate variables, work with Python's built‑in data types, and perform type conversions. Each lesson includes practical coding exercises that reinforce concepts through immediate application.",
+  "learning_objectives": [
+    "Students will be able to declare variables using correct naming conventions and assign values of various data types.",
+    "Students will be able to identify, create, and manipulate primitive data types such as integers, floats, booleans, and strings.",
+    "Students will be able to construct, index, slice, and modify collection types including lists and tuples.",
+    "Students will be able to perform explicit type conversions, check data types at runtime, and handle conversion errors."
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Creating and Assigning Variables",
+      "lesson_objective": "Students will be able to declare variables following Python naming rules and assign values of different types using the assignment operator.",
+      "key_topics": [
+        "Variable naming conventions and case sensitivity",
+        "Assignment operator (=) and multiple assignment",
+        "Dynamic typing and implicit type inference",
+        "Reassigning variables to new data types"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Basic Variable Assignment",
+          "exercise_instructions": "Write a script that creates variables named age, price, is_student, and greeting. Assign them an integer, a float, a boolean, and a string respectively. Print each variable on a separate line."
+        },
+        {
+          "exercise_title": "Multiple Assignment Challenge",
+          "exercise_instructions": "Assign the values 10, 20, and 30 to variables x, y, and z in a single line of code. Then swap the values of x and y without using a temporary variable and print the result."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Understanding Primitive Data Types",
+      "lesson_objective": "Students will be able to identify and use Python's primitive data types: int, float, bool, and str, and perform basic type conversions.",
+      "key_topics": [
+        "Integer literals and arithmetic operations",
+        "Floating‑point literals and precision considerations",
+        "Boolean literals (True, False) and logical expressions",
+        "String literals, concatenation, and formatting",
+        "Explicit conversion functions: int(), float(), str(), bool()"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Type Identification Quiz",
+          "exercise_instructions": "Create variables a, b, c, and d with the values 42, 3.14, True, and \"Python\". Use the type() function to print each variable's type."
+        },
+        {
+          "exercise_title": "User Input Conversion",
+          "exercise_instructions": "Write a program that prompts the user for their birth year, converts the input to an integer, calculates their age assuming the current year is 2024, and prints the result."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "Working with Collections: Lists and Tuples",
+      "lesson_objective": "Students will be able to create, index, slice, and modify lists and tuples, and understand the mutability differences between them.",
+      "key_topics": [
+        "List literals and tuple literals syntax",
+        "Zero‑based indexing and negative indices",
+        "Slicing syntax start:stop:step",
+        "Mutability of lists vs. immutability of tuples",
+        "Common list methods: append(), insert(), remove(), pop(), sort(), reverse()",
+        "Tuple packing and unpacking"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "List Manipulation Task",
+          "exercise_instructions": "Create a list called scores containing the numbers 88, 92, 79, 93. Append a new score of 85, replace the third element with 80, and then print the sorted list."
+        },
+        {
+          "exercise_title": "Tuple Unpacking Challenge",
+          "exercise_instructions": "Define a tuple person = (\"Alice\", 30, \"Engineer\"). Unpack the tuple into variables name, age, and profession, then print a sentence using those variables."
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "Data Type Conversion and Type Checking",
+      "lesson_objective": "Students will be able to convert between data types safely, use isinstance() for runtime checks, and handle conversion errors with try/except.",
+      "key_topics": [
+        "Explicit conversion functions: int(), float(), str(), bool()",
+        "Using type() to inspect an object's type",
+        "isinstance() for type verification",
+        "Error handling with try/except during conversion",
+        "Common conversion pitfalls (e.g., converting non‑numeric strings)"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Safe Conversion Function",
+          "exercise_instructions": "Write a function safe_int(value) that attempts to convert value to an integer. If conversion fails, the function should return None without raising an exception. Test the function with inputs \"123\", \"abc\", and 45.6."
+        },
+        {
+          "exercise_title": "Runtime Type Validation",
+          "exercise_instructions": "Prompt the user to enter a value. Use isinstance() to determine if the entered value (after conversion to float) is an integer (i.e., has no fractional part). Print \"Integer\" or \"Float\" accordingly."
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,48 @@
+{
+  "model": "Qwen3 235B Thinking",
+  "modelSlug": "qwen3-235b-thinking",
+  "modelApiName": "qwen/qwen3-235b-a22b-thinking-2507",
+  "lessonId": "1.2-en",
+  "lessonTitle": "Ticket Pricing: How Discounts and Tiers Work",
+  "language": "en",
+  "duration": 175157,
+  "timestamp": "2025-12-16T10:44:31.824Z",
+  "parseSuccess": true,
+  "parseError": null,
+  "usage": {
+    "prompt_tokens": 525,
+    "completion_tokens": 2246,
+    "total_tokens": 2771,
+    "cost": 0.00141585,
+    "is_byok": false,
+    "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "audio_tokens": 0,
+      "video_tokens": 0
+    },
+    "cost_details": {
+      "upstream_inference_cost": null,
+      "upstream_inference_prompt_cost": 0.00006825,
+      "upstream_inference_completions_cost": 0.0013476
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 431,
+      "image_tokens": 0
+    }
+  },
+  "quality": {
+    "hasIntro": true,
+    "hasSections": true,
+    "hasExamples": true,
+    "hasExercises": true,
+    "hasSummary": true,
+    "sectionsCount": 4,
+    "examplesCount": 2,
+    "exercisesCount": 2,
+    "totalWordCount": 701,
+    "introWordCount": 103,
+    "coversObjectives": 3,
+    "coversTopics": 5,
+    "qualityScore": 100
+  }
+}

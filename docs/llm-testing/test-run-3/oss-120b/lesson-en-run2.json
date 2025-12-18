@@ -1,0 +1,98 @@
+{
+  "section_number": 1,
+  "section_title": "Understanding Variables and Data Types in Python",
+  "section_description": "This hands‑on section introduces Python variables, explores core data types, and provides practical coding exercises to reinforce concepts.",
+  "learning_objectives": [
+    "Declare and assign variables using appropriate naming conventions.",
+    "Identify and use Python's built-in data types: int, float, str, bool, list, tuple, dict, set.",
+    "Perform type conversion and understand implicit vs explicit casting.",
+    "Apply variables and data types in simple algorithms and debugging tasks."
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Creating and Naming Variables in Python",
+      "lesson_objective": "Students will be able to declare variables, assign values, and follow naming conventions to write clear Python code.",
+      "key_topics": [
+        "Variable assignment",
+        "Naming conventions",
+        "Case sensitivity",
+        "Dynamic typing",
+        "The REPL and script execution"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Simple Variable Assignment",
+          "exercise_instructions": "Write a Python script that defines variables for a person's name, age, and height, then print each variable using formatted strings."
+        },
+        {
+          "exercise_title": "Naming Convention Practice",
+          "exercise_instructions": "Create five variables following PEP 8 guidelines, using snake_case, and assign them any values. Print the variable names and values to verify."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Working with Primitive Data Types",
+      "lesson_objective": "Learners will identify and manipulate Python's primitive types (int, float, str, bool) and perform basic operations on them.",
+      "key_topics": [
+        "Integers and arithmetic",
+        "Floating-point numbers",
+        "String literals and methods",
+        "Boolean values and logical operators",
+        "Type checking with type()"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Arithmetic Operations",
+          "exercise_instructions": "Create variables a, b, and c with numeric values. Compute and print the sum, difference, product, division, and modulus of a and b, and store the result in c."
+        },
+        {
+          "exercise_title": "String Manipulation",
+          "exercise_instructions": "Define a string variable containing a full sentence. Use string methods to change case, replace a word, and extract a substring, then display each result."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "Introducing Lists, Tuples, Sets, and Dictionaries",
+      "lesson_objective": "Students will construct and manipulate Python collection types, accessing elements, iterating, and performing common operations.",
+      "key_topics": [
+        "List creation and indexing",
+        "Tuple immutability",
+        "Set uniqueness",
+        "Dictionary key-value pairs",
+        "Loops over collections",
+        "Common methods (append, extend, add, update)"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "List Operations",
+          "exercise_instructions": "Create a list of five favorite foods. Add a new item, remove the second item, sort the list alphabetically, and print the final list."
+        },
+        {
+          "exercise_title": "Dictionary Lookup",
+          "exercise_instructions": "Build a dictionary that maps country names to their capitals. Prompt the user to enter a country and display its capital, handling the case where the country is not in the dictionary."
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "Explicit and Implicit Type Conversion",
+      "lesson_objective": "Learners will demonstrate how to convert between data types using built‑in functions and understand when Python performs implicit casting.",
+      "key_topics": [
+        "int(), float(), str() functions",
+        "bool() evaluation rules",
+        "Implicit conversion in expressions",
+        "Error handling for invalid casts",
+        "Practical use‑cases in calculations"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Mixed-type Calculations",
+          "exercise_instructions": "Write a program that asks the user for a numeric string, converts it to an integer, adds 10.5 (float), and prints the result as both a float and a formatted string with two decimal places. Include error handling for non‑numeric input."
+        }
+      ]
+    }
+  ]
+}

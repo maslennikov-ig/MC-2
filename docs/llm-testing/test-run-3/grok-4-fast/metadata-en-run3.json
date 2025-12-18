@@ -1,0 +1,31 @@
+{
+  "course_title": "Introduction to Python Programming",
+  "course_description": "Embark on your programming journey with this beginner-level course on Python. Learn essential concepts like variables, loops, functions, and data structures through interactive lessons and hands-on projects. Ideal for newcomers aiming to build foundational coding skills for future tech careers.",
+  "course_overview": "This comprehensive introduction to Python programming is designed for absolute beginners, guiding you from the basics of syntax and setup to creating functional programs. You'll explore core topics including data types, control structures, modular code with functions, and introductory object-oriented principles. The course emphasizes practical application through coding exercises, quizzes, and a capstone project where you'll develop a simple application. By completion, you'll have the confidence and skills to write, test, and debug Python code independently, setting a strong foundation for advanced programming studies or real-world development tasks.",
+  "target_audience": "Beginners with no programming experience, including students, career switchers, hobbyists, and professionals entering tech fields seeking to learn a versatile language like Python.",
+  "estimated_duration_hours": 30,
+  "difficulty_level": "beginner",
+  "prerequisites": [
+    "Basic computer literacy",
+    "Familiarity with using a web browser and file management"
+  ],
+  "learning_outcomes": [
+    "Explain fundamental Python syntax and data types",
+    "Write and execute basic Python scripts using variables and operators",
+    "Implement control structures such as loops and conditional statements",
+    "Define and invoke functions to modularize code",
+    "Manipulate common data structures like lists and dictionaries",
+    "Debug and troubleshoot simple Python programs",
+    "Apply Python basics to solve introductory programming problems"
+  ],
+  "course_tags": [
+    "Python",
+    "Programming",
+    "Beginner",
+    "Coding",
+    "Computer Science",
+    "Data Structures",
+    "Functions",
+    "Software Development"
+  ]
+}

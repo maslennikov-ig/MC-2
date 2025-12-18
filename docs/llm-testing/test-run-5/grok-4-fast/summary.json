@@ -1,0 +1,126 @@
+{
+  "testRunId": "2025-11-14-v5-grok-4-fast",
+  "model": "Grok 4 Fast",
+  "modelSlug": "grok-4-fast",
+  "apiName": "x-ai/grok-4-fast",
+  "timestamp": "2025-11-14T10:40:25.238Z",
+  "duration": 15684,
+  "durationMinutes": "0.26",
+  "scenarios": 4,
+  "runsPerScenario": 3,
+  "totalTests": 12,
+  "successfulTests": 12,
+  "failedTests": 0,
+  "successRate": "100.00",
+  "avgTestDuration": "12976",
+  "results": [
+    {
+      "model": "Grok 4 Fast",
+      "modelSlug": "grok-4-fast",
+      "scenario": "metadata-en",
+      "runNumber": 1,
+      "success": true,
+      "duration": 12544,
+      "contentLength": 2053
+    },
+    {
+      "model": "Grok 4 Fast",
+      "modelSlug": "grok-4-fast",
+      "scenario": "metadata-en",
+      "runNumber": 2,
+      "success": true,
+      "duration": 12376,
+      "contentLength": 2084
+    },
+    {
+      "model": "Grok 4 Fast",
+      "modelSlug": "grok-4-fast",
+      "scenario": "metadata-en",
+      "runNumber": 3,
+      "success": true,
+      "duration": 11827,
+      "contentLength": 1938
+    },
+    {
+      "model": "Grok 4 Fast",
+      "modelSlug": "grok-4-fast",
+      "scenario": "metadata-ru",
+      "runNumber": 1,
+      "success": true,
+      "duration": 11547,
+      "contentLength": 2055
+    },
+    {
+      "model": "Grok 4 Fast",
+      "modelSlug": "grok-4-fast",
+      "scenario": "metadata-ru",
+      "runNumber": 2,
+      "success": true,
+      "duration": 10534,
+      "contentLength": 1653
+    },
+    {
+      "model": "Grok 4 Fast",
+      "modelSlug": "grok-4-fast",
+      "scenario": "metadata-ru",
+      "runNumber": 3,
+      "success": true,
+      "duration": 10473,
+      "contentLength": 1945
+    },
+    {
+      "model": "Grok 4 Fast",
+      "modelSlug": "grok-4-fast",
+      "scenario": "lesson-en",
+      "runNumber": 1,
+      "success": true,
+      "duration": 15034,
+      "contentLength": 5894
+    },
+    {
+      "model": "Grok 4 Fast",
+      "modelSlug": "grok-4-fast",
+      "scenario": "lesson-en",
+      "runNumber": 2,
+      "success": true,
+      "duration": 14734,
+      "contentLength": 5538
+    },
+    {
+      "model": "Grok 4 Fast",
+      "modelSlug": "grok-4-fast",
+      "scenario": "lesson-en",
+      "runNumber": 3,
+      "success": true,
+      "duration": 15684,
+      "contentLength": 6191
+    },
+    {
+      "model": "Grok 4 Fast",
+      "modelSlug": "grok-4-fast",
+      "scenario": "lesson-ru",
+      "runNumber": 1,
+      "success": true,
+      "duration": 12980,
+      "contentLength": 4869
+    },
+    {
+      "model": "Grok 4 Fast",
+      "modelSlug": "grok-4-fast",
+      "scenario": "lesson-ru",
+      "runNumber": 2,
+      "success": true,
+      "duration": 14710,
+      "contentLength": 5883
+    },
+    {
+      "model": "Grok 4 Fast",
+      "modelSlug": "grok-4-fast",
+      "scenario": "lesson-ru",
+      "runNumber": 3,
+      "success": true,
+      "duration": 13264,
+      "contentLength": 4612
+    }
+  ]
+}

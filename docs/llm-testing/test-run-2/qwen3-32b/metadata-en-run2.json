@@ -1,0 +1,29 @@
+{
+  "course_title": "Introduction to Python Programming",
+  "course_description": "A beginner-level technical programming course designed to equip learners with foundational Python skills. Topics include syntax basics, data types, control structures, functions, and file handling, supported by hands-on coding exercises and real-world examples.",
+  "course_overview": "This course begins with Python fundamentals such as variables, loops, and conditionals, using examples like building a simple calculator and automating file renaming tasks. Students will progress to creating functions and modules, with projects including a to-do list application and a basic web scraper. The curriculum covers data structures (lists, dictionaries, tuples) through practical applications like analyzing sales data, and introduces error handling and debugging techniques via a temperature conversion tool. A final project involves developing a weather forecast application using public APIs, reinforcing integration of concepts like loops, functions, and external libraries. The course emphasizes problem-solving and iterative development, ensuring learners can apply knowledge to scripts for data processing, automation, and small-scale applications.",
+  "target_audience": "Aspiring programmers with no prior coding experience, STEM students seeking foundational programming skills, and professionals from non-technical fields aiming to automate workflows.",
+  "estimated_duration_hours": 20,
+  "difficulty_level": "beginner",
+  "prerequisites": [
+    "Basic computer literacy",
+    "High school level mathematics"
+  ],
+  "learning_outcomes": [
+    "Define core Python syntax elements and data types including integers, strings, and booleans",
+    "Build command-line applications using control structures and functions",
+    "Analyze and debug simple Python scripts using debugging tools and techniques",
+    "Create and manipulate data structures such as lists, dictionaries, and tuples in practical scenarios",
+    "Implement file reading/writing operations for data storage and retrieval",
+    "Design modular programs by organizing code into reusable functions and modules"
+  ],
+  "course_tags": [
+    "Python",
+    "programming",
+    "beginner",
+    "coding",
+    "data science",
+    "automation",
+    "software development"
+  ]
+}

@@ -1,0 +1,120 @@
+{
+  "section_number": 1,
+  "section_title": "variables_and_data_types_in_python",
+  "section_description": "This section provides hands-on practice with variables and data types in Python, covering declaration, type conversion, boolean logic, string manipulation, and operations on various data types through interactive coding exercises.",
+  "learning_objectives": [
+    "Students will be able to declare variables and utilize basic data types (int, float, str)",
+    "Convert between data types using built-in functions",
+    "Apply boolean values and None type in conditional logic",
+    "Manipulate strings using formatting and methods",
+    "Perform operations on different data types and handle type-specific behaviors"
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Declaring Variables and Understanding Basic Data Types",
+      "lesson_objective": "Students will be able to create variables and identify their corresponding data types using the type() function",
+      "key_topics": [
+        "Variable declaration syntax",
+        "Naming conventions (snake_case, reserved keywords)",
+        "Integer data type usage",
+        "Float data type precision",
+        "String data type operations"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Basic Variable Assignment",
+          "exercise_instructions": "Create variables for age (int), price (float), and name (str). Print each variable's value and type using print() and type()."
+        },
+        {
+          "exercise_title": "String Concatenation Practice",
+          "exercise_instructions": "Declare two string variables containing parts of a sentence. Combine them into a third variable and print the result with an exclamation mark at the end."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Converting Between Data Types Using Built-in Functions",
+      "lesson_objective": "Students will be able to perform explicit type conversion between numeric and string types using Python's built-in conversion functions",
+      "key_topics": [
+        "Implicit vs explicit type conversion",
+        "Int(), float(), and str() functions",
+        "Conversion from user input",
+        "Error handling for invalid conversions"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Input to Numeric Conversion",
+          "exercise_instructions": "Write a program that takes user input as a string, converts it to both integer and float types, and prints the converted values with their original input."
+        },
+        {
+          "exercise_title": "Mixed Type Calculations",
+          "exercise_instructions": "Create variables with mixed types (e.g., '123' and 45.67). Convert them appropriately to perform addition operations and display the results."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "Working with Boolean Values and None Type",
+      "lesson_objective": "Students will be able to create and evaluate boolean expressions while understanding the role of None in Python",
+      "key_topics": [
+        "Boolean truth values (True/False)",
+        "Logical operators (and, or, not)",
+        "Truthiness evaluation of different data types",
+        "None type usage and comparisons"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Boolean Expression Evaluation",
+          "exercise_instructions": "Write expressions to check if a number is positive and even, or if a string is empty. Print the boolean results of each condition."
+        },
+        {
+          "exercise_title": "None Type Handling",
+          "exercise_instructions": "Create a function that returns None when given invalid input. Test it with different values and check for None using is operator."
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "String Formatting and Manipulation Techniques",
+      "lesson_objective": "Students will be able to format strings using f-strings and apply common string methods to manipulate text data",
+      "key_topics": [
+        "F-string syntax and formatting",
+        "String methods (upper(), lower(), split(), format())",
+        "String slicing operations",
+        "Concatenation best practices"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Personalized Greeting Generator",
+          "exercise_instructions": "Create a program that takes user input for name and age, then generates a formatted greeting using f-strings that includes both values."
+        },
+        {
+          "exercise_title": "Text Transformation Lab",
+          "exercise_instructions": "Write code that converts a sentence to uppercase, splits it into words, and joins them with hyphens between each word."
+        }
+      ]
+    },
+    {
+      "lesson_number": 5,
+      "lesson_title": "Performing Operations on Different Data Types",
+      "lesson_objective": "Students will be able to perform arithmetic operations on numbers and concatenation operations on strings while handling type-specific behaviors",
+      "key_topics": [
+        "Arithmetic operations on integers and floats",
+        "String concatenation and repetition",
+        "Type coercion in mixed operations",
+        "Operator precedence with multiple data types"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Mathematical Calculations Exercise",
+          "exercise_instructions": "Calculate the area of a circle using radius input from user. Handle both integer and float inputs for accurate results."
+        },
+        {
+          "exercise_title": "Data Type Combination Challenge",
+          "exercise_instructions": "Combine numeric and string operations to create a program that calculates total cost and displays it with a formatted message."
+        }
+      ]
+    }
+  ]
+}

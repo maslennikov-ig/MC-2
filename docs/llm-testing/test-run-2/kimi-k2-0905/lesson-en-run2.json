@@ -1,0 +1,118 @@
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "Explore Python's built-in data types, variable assignment rules, and memory management fundamentals through interactive coding exercises",
+  "learning_objectives": [
+    "Create and assign variables using valid Python identifiers",
+    "Distinguish between mutable and immutable data types",
+    "Apply type conversion functions to transform data",
+    "Debug common variable naming and assignment errors"
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Variable Assignment and Memory Addresses",
+      "lesson_objective": "Students will predict and verify variable memory addresses using id() after multiple assignments",
+      "key_topics": [
+        "identifier naming conventions",
+        "assignment operator behavior",
+        "memory reference counting",
+        "variable reassignment effects"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Memory Tracker",
+          "exercise_instructions": "Create three variables x=10, y=x, x=20. Print the id() of each variable before and after reassignment to observe reference changes"
+        },
+        {
+          "exercise_title": "Valid Identifier Checker",
+          "exercise_instructions": "Write a program that tests 10 different variable names and outputs whether each follows Python naming rules"
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Numeric Types and Precision Limits",
+      "lesson_objective": "Students will demonstrate correct usage of int, float, and complex types while handling precision errors",
+      "key_topics": [
+        "integer arbitrary precision",
+        "floating point epsilon",
+        "complex number operations",
+        "decimal module basics"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Precision Loss Detector",
+          "exercise_instructions": "Calculate 0.1 + 0.2 and compare to 0.3 using == operator, then fix the comparison using round() with 10 decimal places"
+        },
+        {
+          "exercise_title": "Complex Number Calculator",
+          "exercise_instructions": "Create two complex numbers and output their sum, difference, product, and conjugate values"
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "String Indexing and Slicing Patterns",
+      "lesson_objective": "Students will extract substrings using positive and negative indices with stride parameters",
+      "key_topics": [
+        "zero-based indexing",
+        "negative index positions",
+        "slice notation [start:stop:step]",
+        "string immutability consequences"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Palindrome Checker",
+          "exercise_instructions": "Write code that checks if a 7-character string reads the same forwards and backwards using slicing"
+        },
+        {
+          "exercise_title": "String Reverser",
+          "exercise_instructions": "Take user input and print the reversed string without using the reverse() function"
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "List vs Tuple Mutability Showdown",
+      "lesson_objective": "Students will modify list contents while proving tuple immutability through error handling",
+      "key_topics": [
+        "list append and extend",
+        "tuple hashability",
+        "nested structure differences",
+        "performance implications"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "In-place List Modifier",
+          "exercise_instructions": "Start with [1,2,3], insert 1.5 at index 1, remove the last element, and sort in descending order without creating new lists"
+        },
+        {
+          "exercise_title": "Tuple Immutability Test",
+          "exercise_instructions": "Attempt to change the second element of a tuple inside try-except block and catch the specific error type"
+        }
+      ]
+    },
+    {
+      "lesson_number": 5,
+      "lesson_title": "Dictionary Key Constraints and Set Operations",
+      "lesson_objective": "Students will create dictionaries with immutable keys and perform mathematical set operations",
+      "key_topics": [
+        "hashable key requirements",
+        "set union intersection difference",
+        "dictionary get() method",
+        "membership testing speed"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Grade Book Builder",
+          "exercise_instructions": "Build a dictionary mapping student names to lists of grades, then calculate each student's average using dictionary methods"
+        },
+        {
+          "exercise_title": "Set Math Solver",
+          "exercise_instructions": "Given two sets {1,2,3,4} and {3,4,5,6}, output their union, intersection, symmetric difference, and difference results"
+        }
+      ]
+    }
+  ]
+}

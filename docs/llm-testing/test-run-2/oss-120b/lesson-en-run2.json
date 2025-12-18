@@ -1,0 +1,81 @@
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "This section provides hands‑on experience with Python variables and data types. Learners will define variables, explore mutable and immutable types, perform type conversions, and apply these concepts in practical coding exercises that reinforce best practices for data handling in Python.",
+  "learning_objectives": [
+    "Students will be able to declare and assign variables using appropriate naming conventions.",
+    "Students will be able to differentiate between mutable and immutable data types and choose the correct type for a given problem.",
+    "Students will be able to perform explicit type conversion and handle conversion errors gracefully.",
+    "Students will be able to apply variable scope rules in functions and modules."
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Creating and Naming Variables in Python",
+      "lesson_objective": "Students will be able to declare variables, assign values, and follow Python naming conventions.",
+      "key_topics": [
+        "Variable assignment syntax",
+        "PEP 8 naming guidelines",
+        "Dynamic typing basics",
+        "Printing variable values"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Variable Declaration Practice",
+          "exercise_instructions": "Write a script that creates variables for a person's name, age, and height. Assign appropriate values, then print each variable on a separate line using f‑strings."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Exploring Primitive Data Types",
+      "lesson_objective": "Students will be able to identify and use Python's primitive types: int, float, bool, and str.",
+      "key_topics": [
+        "Integer arithmetic operations",
+        "Floating‑point precision",
+        "Boolean logic expressions",
+        "String concatenation and formatting"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Data Type Operations",
+          "exercise_instructions": "Create variables of each primitive type. Perform at least two calculations with integers and floats, evaluate a boolean expression, and combine strings using both + and f‑strings. Print the results."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "Working with Mutable and Immutable Collections",
+      "lesson_objective": "Students will be able to manipulate lists, tuples, sets, and dictionaries, recognizing which are mutable or immutable.",
+      "key_topics": [
+        "List indexing, slicing, and methods (append, remove)",
+        "Tuple immutability and packing/unpacking",
+        "Set operations (union, intersection)",
+        "Dictionary key/value access and update"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Collection Manipulation Challenge",
+          "exercise_instructions": "Write a program that: \n1. Creates a list of five numbers and replaces the third element. \n2. Defines a tuple of three city names and attempts to modify one element (observe the error). \n3. Builds a set of unique letters from a word and displays its size. \n4. Constructs a dictionary mapping student IDs to grades, updates one grade, and prints the updated dictionary."
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "Type Conversion and Error Handling",
+      "lesson_objective": "Students will be able to convert between data types safely and handle conversion errors using try/except blocks.",
+      "key_topics": [
+        "int(), float(), str() casting functions",
+        "Implicit vs explicit conversion",
+        "ValueError exception handling",
+        "User input validation"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Robust Input Processor",
+          "exercise_instructions": "Create a script that prompts the user for two numbers, converts the inputs to floats, calculates their quotient, and prints the result. Use try/except to catch ValueError and ZeroDivisionError, displaying user‑friendly messages."
+        }
+      ]
+    }
+  ]
+}

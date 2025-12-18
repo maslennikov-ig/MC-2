@@ -1,0 +1,486 @@
+[
+  {
+    "model": "kimi-k2-0905",
+    "metadataEN": {
+      "avgScore": 100,
+      "avgSchema": 100,
+      "avgContent": 100,
+      "avgLanguage": 100,
+      "successRate": 1,
+      "totalRuns": 3,
+      "successfulRuns": 3,
+      "failedRuns": 0
+    },
+    "metadataRU": {
+      "avgScore": 100,
+      "avgSchema": 100,
+      "avgContent": 100,
+      "avgLanguage": 100,
+      "successRate": 1,
+      "totalRuns": 3,
+      "successfulRuns": 3,
+      "failedRuns": 0
+    },
+    "lessonEN": {
+      "avgScore": 100,
+      "avgSchema": 100,
+      "avgContent": 100,
+      "avgLanguage": 100,
+      "successRate": 1,
+      "totalRuns": 3,
+      "successfulRuns": 3,
+      "failedRuns": 0
+    },
+    "lessonRU": {
+      "avgScore": 100,
+      "avgSchema": 100,
+      "avgContent": 100,
+      "avgLanguage": 100,
+      "successRate": 1,
+      "totalRuns": 3,
+      "successfulRuns": 3,
+      "failedRuns": 0
+    },
+    "overallScore": 100
+  },
+  {
+    "model": "kimi-k2-thinking",
+    "metadataEN": {
+      "avgScore": 100,
+      "avgSchema": 100,
+      "avgContent": 100,
+      "avgLanguage": 100,
+      "successRate": 1,
+      "totalRuns": 3,
+      "successfulRuns": 3,
+      "failedRuns": 0
+    },
+    "metadataRU": {
+      "avgScore": 100,
+      "avgSchema": 100,
+      "avgContent": 100,
+      "avgLanguage": 100,
+      "successRate": 0.3333333333333333,
+      "totalRuns": 3,
+      "successfulRuns": 1,
+      "failedRuns": 2
+    },
+    "lessonEN": {
+      "avgScore": 0,
+      "avgSchema": 0,
+      "avgContent": 0,
+      "avgLanguage": 0,
+      "successRate": 0,
+      "totalRuns": 3,
+      "successfulRuns": 0,
+      "failedRuns": 3
+    },
+    "lessonRU": {
+      "avgScore": 0,
+      "avgSchema": 0,
+      "avgContent": 0,
+      "avgLanguage": 0,
+      "successRate": 0,
+      "totalRuns": 3,
+      "successfulRuns": 0,
+      "failedRuns": 3
+    },
+    "overallScore": 100
+  },
+  {
+    "model": "deepseek-v32-exp",
+    "metadataEN": {
+      "avgScore": 100,
+      "avgSchema": 100,
+      "avgContent": 100,
+      "avgLanguage": 100,
+      "successRate": 1,
+      "totalRuns": 3,
+      "successfulRuns": 3,
+      "failedRuns": 0
+    },
+    "metadataRU": {
+      "avgScore": 100,
+      "avgSchema": 100,
+      "avgContent": 100,
+      "avgLanguage": 100,
+      "successRate": 1,
+      "totalRuns": 3,
+      "successfulRuns": 3,
+      "failedRuns": 0
+    },
+    "lessonEN": {
+      "avgScore": 100,
+      "avgSchema": 100,
+      "avgContent": 100,
+      "avgLanguage": 100,
+      "successRate": 1,
+      "totalRuns": 3,
+      "successfulRuns": 3,
+      "failedRuns": 0
+    },
+    "lessonRU": {
+      "avgScore": 100,
+      "avgSchema": 100,
+      "avgContent": 100,
+      "avgLanguage": 100,
+      "successRate": 1,
+      "totalRuns": 3,
+      "successfulRuns": 3,
+      "failedRuns": 0
+    },
+    "overallScore": 100
+  },
+  {
+    "model": "deepseek-chat-v31",
+    "metadataEN": {
+      "avgScore": 100,
+      "avgSchema": 100,
+      "avgContent": 100,
+      "avgLanguage": 100,
+      "successRate": 1,
+      "totalRuns": 3,
+      "successfulRuns": 3,
+      "failedRuns": 0
+    },
+    "metadataRU": {
+      "avgScore": 100,
+      "avgSchema": 100,
+      "avgContent": 100,
+      "avgLanguage": 100,
+      "successRate": 1,
+      "totalRuns": 3,
+      "successfulRuns": 3,
+      "failedRuns": 0
+    },
+    "lessonEN": {
+      "avgScore": 100,
+      "avgSchema": 100,
+      "avgContent": 100,
+      "avgLanguage": 100,
+      "successRate": 1,
+      "totalRuns": 3,
+      "successfulRuns": 3,
+      "failedRuns": 0
+    },
+    "lessonRU": {
+      "avgScore": 100,
+      "avgSchema": 100,
+      "avgContent": 100,
+      "avgLanguage": 100,
+      "successRate": 1,
+      "totalRuns": 3,
+      "successfulRuns": 3,
+      "failedRuns": 0
+    },
+    "overallScore": 100
+  },
+  {
+    "model": "grok-4-fast",
+    "metadataEN": {
+      "avgScore": 100,
+      "avgSchema": 100,
+      "avgContent": 100,
+      "avgLanguage": 100,
+      "successRate": 1,
+      "totalRuns": 3,
+      "successfulRuns": 3,
+      "failedRuns": 0
+    },
+    "metadataRU": {
+      "avgScore": 100,
+      "avgSchema": 100,
+      "avgContent": 100,
+      "avgLanguage": 100,
+      "successRate": 1,
+      "totalRuns": 3,
+      "successfulRuns": 3,
+      "failedRuns": 0
+    },
+    "lessonEN": {
+      "avgScore": 100,
+      "avgSchema": 100,
+      "avgContent": 100,
+      "avgLanguage": 100,
+      "successRate": 1,
+      "totalRuns": 3,
+      "successfulRuns": 3,
+      "failedRuns": 0
+    },
+    "lessonRU": {
+      "avgScore": 100,
+      "avgSchema": 100,
+      "avgContent": 100,
+      "avgLanguage": 100,
+      "successRate": 1,
+      "totalRuns": 3,
+      "successfulRuns": 3,
+      "failedRuns": 0
+    },
+    "overallScore": 100
+  },
+  {
+    "model": "glm-46",
+    "metadataEN": {
+      "avgScore": 100,
+      "avgSchema": 100,
+      "avgContent": 100,
+      "avgLanguage": 100,
+      "successRate": 1,
+      "totalRuns": 3,
+      "successfulRuns": 3,
+      "failedRuns": 0
+    },
+    "metadataRU": {
+      "avgScore": 100,
+      "avgSchema": 100,
+      "avgContent": 100,
+      "avgLanguage": 100,
+      "successRate": 1,
+      "totalRuns": 3,
+      "successfulRuns": 3,
+      "failedRuns": 0
+    },
+    "lessonEN": {
+      "avgScore": 100,
+      "avgSchema": 100,
+      "avgContent": 100,
+      "avgLanguage": 100,
+      "successRate": 1,
+      "totalRuns": 3,
+      "successfulRuns": 3,
+      "failedRuns": 0
+    },
+    "lessonRU": {
+      "avgScore": 100,
+      "avgSchema": 100,
+      "avgContent": 100,
+      "avgLanguage": 100,
+      "successRate": 1,
+      "totalRuns": 3,
+      "successfulRuns": 3,
+      "failedRuns": 0
+    },
+    "overallScore": 100
+  },
+  {
+    "model": "minimax-m2",
+    "metadataEN": {
+      "avgScore": 100,
+      "avgSchema": 100,
+      "avgContent": 100,
+      "avgLanguage": 100,
+      "successRate": 1,
+      "totalRuns": 3,
+      "successfulRuns": 3,
+      "failedRuns": 0
+    },
+    "metadataRU": {
+      "avgScore": 100,
+      "avgSchema": 100,
+      "avgContent": 100,
+      "avgLanguage": 100,
+      "successRate": 1,
+      "totalRuns": 3,
+      "successfulRuns": 3,
+      "failedRuns": 0
+    },
+    "lessonEN": {
+      "avgScore": 100,
+      "avgSchema": 100,
+      "avgContent": 100,
+      "avgLanguage": 100,
+      "successRate": 1,
+      "totalRuns": 3,
+      "successfulRuns": 3,
+      "failedRuns": 0
+    },
+    "lessonRU": {
+      "avgScore": 100,
+      "avgSchema": 100,
+      "avgContent": 100,
+      "avgLanguage": 100,
+      "successRate": 1,
+      "totalRuns": 3,
+      "successfulRuns": 3,
+      "failedRuns": 0
+    },
+    "overallScore": 100
+  },
+  {
+    "model": "qwen3-32b",
+    "metadataEN": {
+      "avgScore": 100,
+      "avgSchema": 100,
+      "avgContent": 100,
+      "avgLanguage": 100,
+      "successRate": 1,
+      "totalRuns": 3,
+      "successfulRuns": 3,
+      "failedRuns": 0
+    },
+    "metadataRU": {
+      "avgScore": 100,
+      "avgSchema": 100,
+      "avgContent": 100,
+      "avgLanguage": 100,
+      "successRate": 0.6666666666666666,
+      "totalRuns": 3,
+      "successfulRuns": 2,
+      "failedRuns": 1
+    },
+    "lessonEN": {
+      "avgScore": 100,
+      "avgSchema": 100,
+      "avgContent": 100,
+      "avgLanguage": 100,
+      "successRate": 1,
+      "totalRuns": 3,
+      "successfulRuns": 3,
+      "failedRuns": 0
+    },
+    "lessonRU": {
+      "avgScore": 100,
+      "avgSchema": 100,
+      "avgContent": 100,
+      "avgLanguage": 100,
+      "successRate": 0.3333333333333333,
+      "totalRuns": 3,
+      "successfulRuns": 1,
+      "failedRuns": 2
+    },
+    "overallScore": 100
+  },
+  {
+    "model": "qwen3-235b-thinking",
+    "metadataEN": {
+      "avgScore": 100,
+      "avgSchema": 100,
+      "avgContent": 100,
+      "avgLanguage": 100,
+      "successRate": 1,
+      "totalRuns": 3,
+      "successfulRuns": 3,
+      "failedRuns": 0
+    },
+    "metadataRU": {
+      "avgScore": 100,
+      "avgSchema": 100,
+      "avgContent": 100,
+      "avgLanguage": 100,
+      "successRate": 1,
+      "totalRuns": 3,
+      "successfulRuns": 3,
+      "failedRuns": 0
+    },
+    "lessonEN": {
+      "avgScore": 100,
+      "avgSchema": 100,
+      "avgContent": 100,
+      "avgLanguage": 100,
+      "successRate": 1,
+      "totalRuns": 3,
+      "successfulRuns": 3,
+      "failedRuns": 0
+    },
+    "lessonRU": {
+      "avgScore": 95.66666666666667,
+      "avgSchema": 100,
+      "avgContent": 100,
+      "avgLanguage": 86.66666666666667,
+      "successRate": 1,
+      "totalRuns": 3,
+      "successfulRuns": 3,
+      "failedRuns": 0
+    },
+    "overallScore": 98.91666666666667
+  },
+  {
+    "model": "oss-120b",
+    "metadataEN": {
+      "avgScore": 98.33333333333333,
+      "avgSchema": 100,
+      "avgContent": 95,
+      "avgLanguage": 100,
+      "successRate": 1,
+      "totalRuns": 3,
+      "successfulRuns": 3,
+      "failedRuns": 0
+    },
+    "metadataRU": {
+      "avgScore": 100,
+      "avgSchema": 100,
+      "avgContent": 100,
+      "avgLanguage": 100,
+      "successRate": 1,
+      "totalRuns": 3,
+      "successfulRuns": 3,
+      "failedRuns": 0
+    },
+    "lessonEN": {
+      "avgScore": 100,
+      "avgSchema": 100,
+      "avgContent": 100,
+      "avgLanguage": 100,
+      "successRate": 1,
+      "totalRuns": 3,
+      "successfulRuns": 3,
+      "failedRuns": 0
+    },
+    "lessonRU": {
+      "avgScore": 76.66666666666667,
+      "avgSchema": 66.66666666666667,
+      "avgContent": 93.33333333333333,
+      "avgLanguage": 80,
+      "successRate": 1,
+      "totalRuns": 3,
+      "successfulRuns": 3,
+      "failedRuns": 0
+    },
+    "overallScore": 93.75
+  },
+  {
+    "model": "qwen3-235b-a22b",
+    "metadataEN": {
+      "avgScore": 0,
+      "avgSchema": 0,
+      "avgContent": 0,
+      "avgLanguage": 0,
+      "successRate": 0,
+      "totalRuns": 3,
+      "successfulRuns": 0,
+      "failedRuns": 3
+    },
+    "metadataRU": {
+      "avgScore": 0,
+      "avgSchema": 0,
+      "avgContent": 0,
+      "avgLanguage": 0,
+      "successRate": 0,
+      "totalRuns": 3,
+      "successfulRuns": 0,
+      "failedRuns": 3
+    },
+    "lessonEN": {
+      "avgScore": 100,
+      "avgSchema": 100,
+      "avgContent": 100,
+      "avgLanguage": 100,
+      "successRate": 0.3333333333333333,
+      "totalRuns": 3,
+      "successfulRuns": 1,
+      "failedRuns": 2
+    },
+    "lessonRU": {
+      "avgScore": 100,
+      "avgSchema": 100,
+      "avgContent": 100,
+      "avgLanguage": 100,
+      "successRate": 0.3333333333333333,
+      "totalRuns": 3,
+      "successfulRuns": 1,
+      "failedRuns": 2
+    },
+    "overallScore": 100
+  }
+]

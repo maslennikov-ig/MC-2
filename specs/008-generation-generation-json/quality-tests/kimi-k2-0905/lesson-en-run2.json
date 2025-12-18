@@ -1,0 +1,94 @@
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "This section provides practical, hands-on experience with Python's fundamental data storage mechanisms. Students will actively code variables, manipulate different data types, and solve real-world problems through progressive exercises that build from simple assignments to complex type conversions and validations.",
+  "learning_objectives": [
+    "Create and assign values to variables following Python naming conventions",
+    "Distinguish between mutable and immutable data types through practical examples",
+    "Perform type conversions between strings, integers, and floats without errors",
+    "Implement f-strings and format methods for dynamic string construction",
+    "Validate user input using type checking and conversion techniques"
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Mastering Variable Assignment and Naming Conventions",
+      "lesson_objective": "Students will correctly create 10 variables using snake_case naming and assign appropriate values without naming conflicts",
+      "key_topics": ["snake_case conventions", "reserved keywords avoidance", "dynamic typing behavior", "multiple assignment syntax", "variable reassignment patterns"],
+      "exercises": [
+        {
+          "exercise_title": "Fix the Broken Variables",
+          "exercise_instructions": "Given 15 incorrectly named variables, rewrite them using proper snake_case conventions and assign meaningful values that match their purpose"
+        },
+        {
+          "exercise_title": "Swap Values Without Temporary Variables",
+          "exercise_instructions": "Write a program that swaps values between three variables (x, y, z) using multiple assignment in a single line"
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Working with Numeric Types and Precision",
+      "lesson_objective": "Students will perform calculations mixing integers and floats while maintaining precision and handling potential overflow scenarios",
+      "key_topics": ["integer division vs true division", "floating point precision limits", "scientific notation", "type() function usage", "arithmetic operator precedence"],
+      "exercises": [
+        {
+          "exercise_title": "Calculate Compound Interest",
+          "exercise_instructions": "Create variables for principal ($1000), rate (0.05), and time (10 years), then calculate compound interest showing both integer and float results"
+        },
+        {
+          "exercise_title": "Temperature Converter with Precision",
+          "exercise_instructions": "Convert temperatures between Celsius and Fahrenheit using floating-point variables, ensuring results display exactly 2 decimal places"
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "String Manipulation and Formatting Techniques",
+      "lesson_objective": "Students will construct complex strings using f-strings, concatenation, and formatting methods to display formatted user data",
+      "key_topics": ["f-string interpolation", "string concatenation performance", "escape sequences", "string multiplication", "format specification mini-language"],
+      "exercises": [
+        {
+          "exercise_title": "Generate Receipt Strings",
+          "exercise_instructions": "Create a formatted receipt using f-strings that includes item names, quantities, prices, and calculates totals with proper alignment"
+        },
+        {
+          "exercise_title": "Build Dynamic Password Generator",
+          "exercise_instructions": "Combine string variables containing different character sets to generate random passwords of specified lengths using string multiplication"
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "Type Conversion and Input Validation Strategies",
+      "lesson_objective": "Students will safely convert between data types while handling invalid inputs using try-except blocks and validation loops",
+      "key_topics": ["int() float() str() conversion rules", "ValueError handling", "input() function behavior", "chained type conversions", "validation loop patterns"],
+      "exercises": [
+        {
+          "exercise_title": "Create Robust Calculator Input",
+          "exercise_instructions": "Build a calculator that accepts string input, validates numeric conversion, and handles errors gracefully with retry opportunities"
+        },
+        {
+          "exercise_title": "Convert Mixed Data Types",
+          "exercise_instructions": "Given a list of mixed string numbers ('10', '3.14', '25'), convert them to appropriate numeric types and calculate their sum"
+        }
+      ]
+    },
+    {
+      "lesson_number": 5,
+      "lesson_title": "Boolean Logic and None Type Applications",
+      "lesson_objective": "Students will implement conditional logic using boolean variables and understand None type usage in real-world scenarios",
+      "key_topics": ["boolean operator precedence", "truthy and falsy values", "None as placeholder", "is vs == comparison", "boolean type conversion"],
+      "exercises": [
+        {
+          "exercise_title": "Implement User Login Validation",
+          "exercise_instructions": "Create boolean variables to track login status, password validity, and account lockout, then combine them for access control"
+        },
+        {
+          "exercise_title": "Build Search with None Handling",
+          "exercise_instructions": "Write a search function that returns None when items aren't found, demonstrating proper None checking and default value assignment"
+        }
+      ]
+    }
+  ]
+}

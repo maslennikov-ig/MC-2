@@ -1,0 +1,29 @@
+{
+  "course_title": "Introduction to Python Programming",
+  "course_description": "Master Python fundamentals through hands-on projects and real-world examples. Perfect for complete beginners with no prior programming experience. Learn variables, control flow, functions, data structures, and object-oriented programming while building practical applications.",
+  "course_overview": "This comprehensive beginner-level course provides a solid foundation in Python programming through a structured learning approach. Students will progress from basic syntax and data types to advanced concepts like object-oriented programming and file handling. The curriculum emphasizes practical application through coding exercises, mini-projects, and a final capstone project. Participants will learn to write clean, efficient Python code while developing problem-solving skills essential for software development. The course combines theoretical concepts with hands-on practice, ensuring students can apply their knowledge to real-world scenarios. By the end, students will have the skills to create their own Python applications and be prepared for intermediate-level programming courses.",
+  "target_audience": "Beginners with no programming experience, students, professionals seeking to learn programming, career changers, and anyone interested in Python development.",
+  "estimated_duration_hours": 45,
+  "difficulty_level": "beginner",
+  "prerequisites": [
+    "Basic computer literacy",
+    "Familiarity with operating systems (Windows, macOS, or Linux)"
+  ],
+  "learning_outcomes": [
+    "Identify and explain fundamental Python programming concepts including variables, data types, and control structures",
+    "Implement functions and modules to create reusable and organized code",
+    "Apply data structures such as lists, dictionaries, tuples, and sets to solve programming problems",
+    "Create object-oriented programs using classes, objects, inheritance, and polymorphism",
+    "Design and develop a complete Python application demonstrating practical programming skills"
+  ],
+  "course_tags": [
+    "Python",
+    "Programming",
+    "Beginner",
+    "Software Development",
+    "Code Basics",
+    "Object-Oriented Programming",
+    "Data Structures",
+    "Problem Solving"
+  ]
+}

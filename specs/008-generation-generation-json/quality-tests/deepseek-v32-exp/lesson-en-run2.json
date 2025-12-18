@@ -1,0 +1,118 @@
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "A hands-on introduction to the fundamental building blocks of Python programming. This section covers how to store, manipulate, and understand different kinds of data using variables and core data types, reinforced with practical coding exercises.",
+  "learning_objectives": [
+    "Define and assign values to variables using Python syntax",
+    "Differentiate between and use core data types: integers, floats, strings, and booleans",
+    "Apply type conversion functions to change data from one type to another",
+    "Combine variables and data types within basic Python expressions"
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Creating and Naming Variables",
+      "lesson_objective": "Students will be able to create Python variables with valid names and assign values to them.",
+      "key_topics": [
+        "Variable assignment syntax using the equals sign (=)",
+        "Python naming rules and conventions (snake_case)",
+        "Assigning different data types to variables",
+        "Printing variable values to the console"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Variable Setup",
+          "exercise_instructions": "Create three variables: one for your age (as a number), one for your name (as text), and one for whether you like Python (as True or False). Print each variable's value."
+        },
+        {
+          "exercise_title": "Naming Practice",
+          "exercise_instructions": "Identify which of the following variable names are invalid and explain why: 'my_var', '2nd_place', 'total-score', '_internal', 'class'. Then, rewrite the invalid names correctly."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Working with Numbers: Integers and Floats",
+      "lesson_objective": "Students will be able to perform basic arithmetic operations with numeric data types and understand the difference between integers and floats.",
+      "key_topics": [
+        "Integer vs. float data types",
+        "Basic arithmetic operators (+, -, *, /, **)",
+        "Integer division (//) and modulo (%) operations",
+        "How division always results in a float"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Calculator Operations",
+          "exercise_instructions": "Create variables for two numbers. Write code to perform and print the result of addition, subtraction, multiplication, division, and exponentiation. Note the data type of each result."
+        },
+        {
+          "exercise_title": "Division Investigation",
+          "exercise_instructions": "Perform the following operations and print both the result and its type: 10 / 3, 10 // 3, and 10 % 3. Explain the different outputs in a comment."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "Manipulating Text with Strings",
+      "lesson_objective": "Students will be able to create string variables, use common string methods, and combine strings using concatenation and f-strings.",
+      "key_topics": [
+        "String creation with single, double, and triple quotes",
+        "String concatenation using the + operator",
+        "Introduction to f-strings for variable insertion",
+        "Common string methods: .upper(), .lower(), .strip()"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "String Formatting",
+          "exercise_instructions": "Store your first and last name in separate variables. Create a new variable for your full name using concatenation and another using an f-string. Print both results."
+        },
+        {
+          "exercise_title": "Text Cleanup",
+          "exercise_instructions": "Create a variable with the string ' Hello, World! '. Use string methods to print the string in all uppercase, all lowercase, and with the leading/trailing whitespace removed."
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "Making Decisions with Booleans and Comparisons",
+      "lesson_objective": "Students will be able to use comparison and logical operators to create boolean expressions and evaluate their truth values.",
+      "key_topics": [
+        "Boolean values: True and False",
+        "Comparison operators (==, !=, >, <, >=, <=",
+        "Logical operators (and, or, not)",
+        "Evaluating complex boolean expressions"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Comparison Check",
+          "exercise_instructions": "Create two numeric variables. Write print statements that compare them for equality, inequality, and to see if one is greater than the other."
+        },
+        {
+          "exercise_title": "Logic Gate Simulator",
+          "exercise_instructions": "Set two boolean variables to True and False. Write expressions using 'and', 'or', and 'not' to combine them. Print the result of each expression and check if it matches your expectation."
+        }
+      ]
+    },
+    {
+      "lesson_number": 5,
+      "lesson_title": "Converting Between Data Types",
+      "lesson_objective": "Students will be able to convert data between strings, integers, and floats using built-in type conversion functions.",
+      "key_topics": [
+        "Type conversion functions: str(), int(), float()",
+        "When and why type conversion is necessary",
+        "Handling errors from invalid conversions (e.g., int('hello'))",
+        "Combining type conversion with input()"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Explicit Conversion Practice",
+          "exercise_instructions": "Create a variable 'number_string' with the value '123'. Convert it to an integer and add 7. Convert the result back to a string and print the final value and its type."
+        },
+        {
+          "exercise_title": "User Input Calculator",
+          "exercise_instructions": "Use the input() function to ask the user for two numbers. Convert the input from strings to floats, add them together, and print the sum. Handle a case where the user might enter a whole number."
+        }
+      ]
+    }
+  ]
+}

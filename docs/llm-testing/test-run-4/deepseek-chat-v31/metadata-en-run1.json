@@ -1,0 +1,11 @@
+{
+  "course_title": "Introduction to Python Programming: From Zero to Coder",
+  "course_description": "A hands-on beginner's course to learn the fundamentals of Python, the world's most versatile programming language. Start building your own programs today!",
+  "course_overview": "This comprehensive course provides a solid foundation in Python programming. You'll start with the absolute basics of syntax and variables, then progress to core concepts like data structures, control flow, and functions. Through practical exercises and projects, you'll gain the confidence to write simple applications, automate tasks, and solve problems with code, setting the stage for further study in data science, web development, or automation.",
+  "target_audience": "Absolute beginners with no prior coding experience, students, professionals seeking to add programming to their skillset.",
+  "estimated_duration_hours": 20,
+  "difficulty_level": "beginner",
+  "prerequisites": ["Basic computer literacy", "Ability to install software on your computer"],
+  "learning_outcomes": ["Explain core Python programming concepts and syntax", "Apply data structures like lists and dictionaries to store information", "Construct programs using loops and conditional logic to control program flow", "Create reusable functions to organize and simplify code", "Develop simple scripts to automate basic tasks and solve problems"],
+  "course_tags": ["Python", "Programming", "Beginner", "Coding", "Software Development", "Automation", "Learn to Code", "Introductory"]
+}

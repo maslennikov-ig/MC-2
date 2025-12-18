@@ -1,0 +1,34 @@
+{
+  "course_title": "Introduction to Python Programming: From Zero to Programming Proficiency",
+  "course_description": "Master Python programming fundamentals through hands-on projects, interactive exercises, and real-world applications. Perfect for beginners seeking a solid foundation in one of the world's most versatile programming languages.",
+  "course_overview": "This comprehensive introduction to Python programming takes students from complete beginners to confident programmers. Through a carefully structured curriculum, learners will explore Python's core concepts including variables, data types, control structures, functions, and object-oriented programming. The course combines theoretical knowledge with practical applications, featuring numerous coding exercises, mini-projects, and a final capstone project. Students will learn to write clean, efficient Python code while building problem-solving skills transferable to any programming language. By the end of this course, participants will have created several portfolio-worthy projects demonstrating their newfound programming abilities.",
+  "target_audience": "Individuals with no prior programming experience seeking to enter the tech industry or enhance their career prospects",
+  "estimated_duration_hours": 45,
+  "difficulty_level": "beginner",
+  "prerequisites": [
+    "Basic computer literacy and file management skills",
+    "No prior programming experience required",
+    "Access to a computer with internet connection",
+    "Text editor or IDE software"
+  ],
+  "learning_outcomes": [
+    "Write and execute Python programs using proper syntax and structure",
+    "Implement fundamental programming constructs including loops, conditionals, and functions",
+    "Design and develop Python applications using object-oriented programming principles",
+    "Debug and troubleshoot code using systematic approaches and debugging tools",
+    "Create Python programs that manipulate and process data from various sources",
+    "Apply problem-solving strategies to translate real-world problems into programming solutions"
+  ],
+  "course_tags": [
+    "python programming",
+    "beginner programming",
+    "coding fundamentals",
+    "software development",
+    "data types",
+    "control structures",
+    "functions",
+    "object-oriented programming",
+    "problem solving",
+    "programming basics"
+  ]
+}

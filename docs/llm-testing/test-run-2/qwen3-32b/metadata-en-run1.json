@@ -1,0 +1,20 @@
+{
+  "course_title": "Introduction to Python Programming",
+  "course_description": "This beginner-level course provides foundational knowledge of Python programming, focusing on core concepts, syntax, and practical applications. Through hands-on exercises and real-world examples, students will develop problem-solving skills and build a portfolio of small projects to reinforce learning.",
+  "course_overview": "Starting with the basics of Python syntax and data types, this course progresses through variables, loops, conditionals, functions, and error handling. Students will practice writing scripts for tasks like data analysis with Pandas, building simple GUI applications using Tkinter, and automating file operations. The curriculum includes structured lessons on code debugging, version control with Git, and deploying Python applications. Specific projects include creating a calculator program, developing a text-based adventure game, and analyzing datasets to generate visualizations using Matplotlib. By combining theoretical explanations with guided coding challenges, learners will grasp programming fundamentals while developing practical, industry-relevant skills.",
+  "target_audience": "Aspiring programmers with little/no coding experience, high school students exploring computer science, career changers entering tech fields, and researchers seeking automation skills. Ideal for individuals with non-technical backgrounds or those transitioning from other programming languages.",
+  "estimated_duration_hours": 20,
+  "difficulty_level": "beginner",
+  "prerequisites": ["Basic computer literacy", "No prior programming experience required"],
+  "learning_outcomes": [
+    "Define and implement core Python syntax elements including variables, loops, and functions",
+    "Build command-line applications that process user input and manipulate data structures",
+    "Analyze error messages to debug code and improve program reliability",
+    "Create modular code using functions and object-oriented programming principles",
+    "Process and analyze CSV data files using Pandas libraries",
+    "Design simple graphical user interfaces (GUIs) with Tkinter framework",
+    "Apply version control techniques using Git for code management",
+    "Develop documentation and write unit tests for Python scripts"
+  ],
+  "course_tags": ["python programming", "beginner programming", "data analysis", "automation scripting", "software development fundamentals", "coding for non-technical professionals"]
+}

@@ -1,0 +1,152 @@
+
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "This hands-on programming section introduces fundamental concepts of variables and data types in Python. Students will learn how to create variables, understand Python's built-in data types, perform type conversions, and apply these concepts through practical coding exercises. The section emphasizes real-world application through structured exercises that build progressively from basic variable creation to complex type operations.",
+  "learning_objectives": [
+    "Define and create variables using proper Python naming conventions",
+    "Distinguish between different numeric data types (int, float, complex) and their use cases",
+    "Manipulate string data using basic string operations and methods",
+    "Utilize boolean logic and the None type in conditional programming",
+    "Perform type conversions between different Python data types safely",
+    "Apply type checking methods to verify variable types during runtime"
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Creating and Naming Variables in Python",
+      "lesson_objective": "Students will be able to create valid Python variables using proper naming conventions and understand variable assignment principles",
+      "key_topics": [
+        "Python variable assignment syntax",
+        "Valid identifier naming rules",
+        "Snake_case naming convention",
+        "Assignment vs initialization",
+        "Variable reassignment operations",
+        "Multiple assignment techniques"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Variable Creation Practice",
+          "exercise_instructions": "Create variables named user_age, book_title, and total_price. Assign appropriate values to each: user_age should be 25, book_title should be 'Python Programming Guide', and total_price should be 49.99. Print each variable to verify assignment."
+        },
+        {
+          "exercise_title": "Naming Convention Analysis",
+          "exercise_instructions": "Identify which of the following variable names are valid in Python: myVariable, _private_var, 2nd_attempt, user-profile, class_name, if_statement, total_count. Explain why each valid/invalid name follows or violates Python naming rules."
+        },
+        {
+          "exercise_title": "Multiple Assignment Challenge",
+          "exercise_instructions": "Use multiple assignment to create three variables a, b, and c with values 10, 20, and 30 respectively in a single line. Then demonstrate swapping their values using multiple assignment (a gets b's value, b gets c's value, c gets a's original value)."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Working with Numeric Data Types",
+      "lesson_objective": "Students will be able to differentiate between int, float, and complex numeric types and perform arithmetic operations with appropriate type selection",
+      "key_topics": [
+        "Integer type characteristics and range",
+        "Floating-point precision and limitations",
+        "Complex number syntax and representation",
+        "Integer vs float division operators",
+        "Mathematical operators precedence",
+        "Scientific notation with floats"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Numeric Type Identification",
+          "exercise_instructions": "Create variables with these exact values: x = 42, y = 3.14159, z = 2 + 3j. Use type() function to print the data type of each variable. Explain the differences in their internal representation."
+        },
+        {
+          "exercise_title": "Division Operations Comparison",
+          "exercise_instructions": "Create two variables a = 10 and b = 3. Calculate both regular division (a / b) and floor division (a // b). Print the results and explain why they produce different types and values."
+        },
+        {
+          "exercise_title": "Scientific Calculator Function",
+          "exercise_instructions": "Write a program that calculates the area of a circle with radius 7.5. Use variables for radius and pi (use 3.14159). Calculate both the exact area and area rounded to 2 decimal places. Display the results with appropriate labels."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "String Manipulation and Basic Operations",
+      "lesson_objective": "Students will be able to create, modify, and extract information from string variables using string methods and basic string operations",
+      "key_topics": [
+        "String literal creation with quotes",
+        "String concatenation methods",
+        "String indexing and slicing",
+        "Common string methods (upper, lower, split, replace)",
+        "Escape characters in strings",
+        "String formatting with f-strings"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "String Building Exercise",
+          "exercise_instructions": "Create variables first_name = 'Alice' and last_name = 'Johnson'. Build a full_name variable using string concatenation with a space. Then create an email variable using f-string formatting: firstname.lastname@company.com (use lowercase versions of the names)."
+        },
+        {
+          "exercise_title": "Text Processing Challenge",
+          "exercise_instructions": "Given the string text = 'Python Programming is Fun and Educational', perform these operations: 1) Convert to lowercase, 2) Count the number of words, 3) Extract the word at index 2, 4) Replace 'Fun' with 'Powerful'. Print each result with a descriptive label."
+        },
+        {
+          "exercise_title": "Quote Management Exercise",
+          "exercise_instructions": "Create a string variable that contains this quote exactly: He said, \"Python makes programming accessible to everyone.\" Make sure the quotes are properly escaped. Then extract just the quoted text without the attribution part."
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "Boolean Logic and None Type Applications",
+      "lesson_objective": "Students will be able to utilize boolean values and None type in conditional statements and understand their role in Python's truth value testing",
+      "key_topics": [
+        "Boolean literals True and False",
+        "Comparison operators returning booleans",
+        "None type representation and usage",
+        "Truth value testing in conditionals",
+        "Boolean operators (and, or, not)",
+        "None vs zero vs empty string behavior"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Boolean Expression Evaluation",
+          "exercise_instructions": "Create variables age = 25, has_license = True, and score = 85. Write boolean expressions to check: 1) Is the person old enough to drive? (age >= 16), 2) Do they have a license? (has_license), 3) Did they pass the test? (score >= 80). Print the results of each boolean expression."
+        },
+        {
+          "exercise_title": "None Type Investigation",
+          "exercise_instructions": "Create a variable result = None. Write conditional statements that: 1) Check if result is None and print 'No result available', 2) Assign result = 42, 3) Check if result is not None and print the value. Also demonstrate what happens when you use None in a mathematical operation."
+        },
+        {
+          "exercise_title": "Login Validation Logic",
+          "exercise_instructions": "Create variables username = 'admin', password = 'secret123', and is_logged_in = False. Write a login function that returns True only if username is 'admin' AND password is 'secret123'. Test with correct and incorrect credentials and print appropriate messages."
+        }
+      ]
+    },
+    {
+      "lesson_number": 5,
+      "lesson_title": "Type Conversion and Runtime Type Checking",
+      "lesson_objective": "Students will be able to perform safe type conversions between different Python data types and implement runtime type verification in their programs",
+      "key_topics": [
+        "Implicit vs explicit type conversion",
+        "String to numeric conversion methods",
+        "Numeric to string conversion",
+        "Boolean to integer conversion",
+        "Safe conversion with error handling",
+        "Runtime type checking with isinstance()",
+        "Type hints and checking"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "String to Number Conversion",
+          "exercise_instructions": "Create string variables age_str = '30' and price_str = '29.99'. Convert them to integer and float respectively. Calculate the total by adding the converted values and convert the result back to a string for display. Handle any potential conversion errors using try-except blocks."
+        },
+        {
+          "exercise_title": "Safe Input Processing",
+          "exercise_instructions": "Write a program that asks for user input using input(). Create a function that safely converts user input to float. If conversion fails, return None. Test with valid numbers like '25.5' and invalid inputs like 'abc'. Display appropriate messages based on conversion success."
+        },
+        {
+          "exercise_title": "Type Verification System",
+          "exercise_instructions": "Create a function validate_data(data) that checks the type of input data using isinstance() and returns specific messages: 'Valid integer' for int, 'Valid float' for float, 'Valid string' for str, 'Valid boolean' for bool, and 'Unknown type' for other types. Test the function with different data types and print results."
+        }
+      ]
+    }
+  ]
+}

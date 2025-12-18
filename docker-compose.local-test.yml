@@ -1,0 +1,54 @@
+# Local Docker Testing - Mimics production environment
+# Usage: docker compose -f docker-compose.local-test.yml up -d
+
+services:
+  redis:
+    image: redis:7-alpine
+    container_name: megacampus-redis-test
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 3
+
+  api:
+    image: megacampus-api:test
+    container_name: megacampus-api-test
+    ports:
+      - "4000:4000"
+    env_file:
+      - .env.local-docker
+    environment:
+      - NODE_ENV=production
+      - PORT=4000
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:4000/health', (r) => process.exit(r.statusCode === 200 ? 0 : 1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+      start_period: 30s
+
+  worker:
+    image: megacampus-api:test
+    container_name: megacampus-worker-test
+    command: ["tsx", "dist/orchestrator/worker-entrypoint.js"]
+    env_file:
+      - .env.local-docker
+    environment:
+      - NODE_ENV=production
+      - REDIS_URL=redis://redis:6379
+    depends_on:
+      redis:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+
+networks:
+  default:
+    name: megacampus-test

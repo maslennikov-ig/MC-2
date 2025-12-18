@@ -1,0 +1,121 @@
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "This hands-on programming section introduces fundamental concepts of variables and data types in Python. Students will learn to create, assign, and manipulate variables while exploring numeric types (integers, floats, complex), text strings, boolean values, and None. Through practical exercises and coding challenges, students will develop proficiency in Python's dynamic typing system and understand type conversion methods essential for robust programming.",
+  "learning_objectives": [
+    "Create and assign variables using valid Python naming conventions",
+    "Distinguish and use different numeric data types (int, float, complex)",
+    "Perform string operations including concatenation, indexing, and formatting",
+    "Apply boolean logic and understand truthy/falsy values",
+    "Implement type conversion functions and identify common type errors",
+    "Debug variable-related issues using print statements and type checking"
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Creating and Naming Variables",
+      "lesson_objective": "Students will be able to declare variables with appropriate naming conventions and understand Python's dynamic typing system through hands-on practice.",
+      "key_topics": [
+        "Python variable assignment syntax (name = value)",
+        "Identifier naming rules and best practices (PEP 8)",
+        "Dynamic typing vs static typing concepts",
+        "Variable reassignment and multiple assignment",
+        "Reserved keywords identification"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Variable Declaration Practice",
+          "exercise_instructions": "Create variables for storing personal information: name, age, height, and is_student. Assign appropriate values and verify the data types using the type() function. Print each variable and its type."
+        },
+        {
+          "exercise_title": "Variable Naming Challenge",
+          "exercise_instructions": "Fix the invalid variable names in this code: 1name = 'John', age-limit = 25, class = 'Python'. Explain why each original name is invalid and provide corrected versions that follow Python conventions."
+        },
+        {
+          "exercise_title": "Multiple Assignment Exploration",
+          "exercise_instructions": "Use multiple assignment to swap the values of two variables x = 10 and y = 20 without using a temporary variable. Demonstrate the swap and print the before/after values."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Working with Numeric Data Types",
+      "lesson_objective": "Students will be able to perform arithmetic operations and understand the differences between integer, float, and complex number types in Python.",
+      "key_topics": [
+        "Integer type (unlimited precision in Python 3)",
+        "Floating-point precision and representation",
+        "Complex number syntax and operations",
+        "Arithmetic operators (+, -, *, /, //, %, **)",
+        "Mathematical functions (abs, round, pow)"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Arithmetic Calculator",
+          "exercise_instructions": "Create a program that performs basic arithmetic operations between two user-provided numbers. Include addition, subtraction, multiplication, division, integer division, and modulo. Handle division by zero gracefully."
+        },
+        {
+          "exercise_title": "Type Precision Investigation",
+          "exercise_instructions": "Investigate floating-point precision by creating two variables: a = 0.1 and b = 0.2. Calculate a + b and compare the result to 0.3. Use the decimal module to show the difference and explain the concept of floating-point representation errors."
+        },
+        {
+          "exercise_title": "Complex Number Operations",
+          "exercise_instructions": "Create two complex numbers (e.g., 3+4j and 1-2j) and perform addition, subtraction, multiplication, and division. Calculate the magnitude of each complex number using abs() and verify the results."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "Manipulating String Data Types",
+      "lesson_objective": "Students will be able to create, format, and manipulate strings using various string methods and interpolation techniques.",
+      "key_topics": [
+        "String creation and quoting styles (single, double, triple quotes)",
+        "String indexing and slicing operations",
+        "String concatenation and repetition",
+        "Escape characters and raw strings",
+        "String formatting methods (f-strings, format(), % formatting)",
+        "Common string methods (upper(), lower(), split(), join())"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "String Slicing Practice",
+          "exercise_instructions": "Given the string 'Python Programming', extract and print: the first 6 characters, the last 11 characters, every second character, and the string in reverse order. Demonstrate all slicing techniques."
+        },
+        {
+          "exercise_title": "Personal Information Formatter",
+          "exercise_instructions": "Create a program that takes user input for name, age, and city. Format the information using f-strings to create a formatted presentation: 'Hello, my name is [name]. I am [age] years old and I live in [city].'"
+        },
+        {
+          "exercise_title": "Text Processing Challenge",
+          "exercise_instructions": "Take a sentence input from the user and perform the following operations: count total characters, count words, convert to uppercase, replace all 'a' with '@', and display the first and last characters. Handle edge cases like empty input."
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "Understanding Boolean and None Types",
+      "lesson_objective": "Students will be able to work with boolean values, understand truthy/falsy concepts, and use None for representing absence of value.",
+      "key_topics": [
+        "Boolean literals True and False",
+        "Comparison operators and their boolean results",
+        "Truthy and falsy values in Python",
+        "None type and its usage",
+        "Boolean operators (and, or, not)",
+        "Conditional expressions and boolean contexts"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Truth Value Testing",
+          "exercise_instructions": "Create a list of different values: [0, 1, -1, '', 'hello', [], [1], None, False, True]. Use a loop to test each value in a boolean context and print whether each is truthy or falsy. Explain the results."
+        },
+        {
+          "exercise_title": "Comparison Operator Practice",
+          "exercise_instructions": "Create a program that takes two numbers as input and compares them using all comparison operators (<, <=, ==, !=, >, >=). Print the results of each comparison and explain the difference between = and ==."
+        },
+        {
+          "exercise_title": "None Type Exploration",
+          "exercise_instructions": "Create variables with None values and demonstrate how to check for None using 'is' comparison. Create a function that returns None and show how to handle this return value in different scenarios. Include an example of optional parameters with None defaults."
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,34 @@
+{
+  "course_title": "Introduction to Python Programming",
+  "course_description": "Learn Python from scratch: variables to functions, files to libraries, and build real mini-projects in just one weekend.",
+  "course_overview": "This hands-on course takes absolute beginners from zero to confident Python scripting. You will set up a modern development environment, master core syntax, control flow, data structures, functions, and modules, then apply skills to automate tasks, manipulate files, consume APIs, and create simple games. Interactive labs, auto-graded exercises, and a capstone project reinforce every concept while cultivating professional coding practices such as debugging, version control, and virtual environments.",
+  "target_audience": "Aspiring programmers, data-curious professionals, and students with no prior coding experience who want a practical jump-start into tech.",
+  "estimated_duration_hours": 18,
+  "difficulty_level": "beginner",
+  "prerequisites": [
+    "Basic computer literacy",
+    "Ability to install software"
+  ],
+  "learning_outcomes": [
+    "Install and configure Python 3 and Visual Studio Code",
+    "Apply variables, operators, and built-in data types to solve arithmetic and string problems",
+    "Construct programs using conditionals and loops to control execution flow",
+    "Create and call reusable functions with parameters and return values",
+    "Manipulate lists, tuples, sets, and dictionaries to store and retrieve data",
+    "Read from and write to text files and CSV files with error handling",
+    "Import and utilize standard-library modules to automate OS and web tasks",
+    "Debug syntax and runtime errors using IDE tools and stack traces",
+    "Complete a capstone project that integrates course concepts into a working application"
+  ],
+  "course_tags": [
+    "Python",
+    "programming",
+    "automation",
+    "beginner",
+    "scripting",
+    "data manipulation",
+    "hands-on",
+    "project-based",
+    "self-paced"
+  ]
+}

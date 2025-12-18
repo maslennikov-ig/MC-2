@@ -1,0 +1,30 @@
+{
+  "course_title": "Introduction to Python Programming",
+  "course_description": "Master Python fundamentals from zero! This hands-on course teaches core programming concepts through practical exercises, enabling you to write functional code, solve problems, and build a foundation for software development or data science careers. No prior experience needed.",
+  "course_overview": "This comprehensive course guides absolute beginners through Python programming essentials. Starting with environment setup and syntax basics, you'll progressively learn variables, data types, control structures, functions, file handling, and error management. Each module combines concise theory with real-world coding challenges and mini-projects, including data manipulation tasks and a final capstone project. The curriculum emphasizes problem-solving techniques and clean coding practices while preparing students for advanced Python specializations.",
+  "target_audience": "Absolute beginners, career changers, and professionals seeking foundational programming skills with no prior coding experience.",
+  "estimated_duration_hours": 28.5,
+  "difficulty_level": "beginner",
+  "prerequisites": [
+    "Basic computer navigation skills",
+    "Familiarity with file management concepts"
+  ],
+  "learning_outcomes": [
+    "Write syntactically correct Python programs using variables and operators",
+    "Construct conditional statements and loops to control program flow",
+    "Define and implement functions with parameters and return values",
+    "Manipulate common data structures including lists and dictionaries",
+    "Handle exceptions to create robust error-tolerant code",
+    "Read from and write to text files for data persistence"
+  ],
+  "course_tags": [
+    "Python",
+    "Programming Fundamentals",
+    "Beginner Coding",
+    "Software Development",
+    "Data Science",
+    "Automation",
+    "Computer Science",
+    "Web Development"
+  ]
+}

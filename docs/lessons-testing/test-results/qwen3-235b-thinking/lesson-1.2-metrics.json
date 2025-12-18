@@ -1,0 +1,48 @@
+{
+  "model": "Qwen3 235B Thinking",
+  "modelSlug": "qwen3-235b-thinking",
+  "modelApiName": "qwen/qwen3-235b-a22b-thinking-2507",
+  "lessonId": "1.2",
+  "lessonTitle": "Ценообразование на билеты: как работают скидки и тарифы",
+  "language": "ru",
+  "duration": 178591,
+  "timestamp": "2025-12-16T10:37:00.838Z",
+  "parseSuccess": true,
+  "parseError": null,
+  "usage": {
+    "prompt_tokens": 607,
+    "completion_tokens": 2975,
+    "total_tokens": 3582,
+    "cost": 0.00186391,
+    "is_byok": false,
+    "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "audio_tokens": 0,
+      "video_tokens": 0
+    },
+    "cost_details": {
+      "upstream_inference_cost": null,
+      "upstream_inference_prompt_cost": 0.00007891,
+      "upstream_inference_completions_cost": 0.001785
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 624,
+      "image_tokens": 0
+    }
+  },
+  "quality": {
+    "hasIntro": true,
+    "hasSections": true,
+    "hasExamples": true,
+    "hasExercises": true,
+    "hasSummary": true,
+    "sectionsCount": 3,
+    "examplesCount": 2,
+    "exercisesCount": 2,
+    "totalWordCount": 475,
+    "introWordCount": 86,
+    "coversObjectives": 3,
+    "coversTopics": 5,
+    "qualityScore": 100
+  }
+}

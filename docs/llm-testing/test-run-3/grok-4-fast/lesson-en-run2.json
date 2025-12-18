@@ -1,0 +1,109 @@
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "This hands-on programming section explores variables and data types in Python, featuring interactive exercises to build foundational coding skills.",
+  "learning_objectives": [
+    "Students will be able to declare and assign variables using Python syntax.",
+    "Students will identify and utilize basic data types including integers, floats, strings, and booleans.",
+    "Students will perform simple operations and conversions between data types.",
+    "Students will debug common errors related to variables and data types."
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Introduction to Variables",
+      "lesson_objective": "Students will learn to declare, assign, and modify variables in Python code.",
+      "key_topics": [
+        "What are variables?",
+        "Variable naming conventions",
+        "Assignment operator (=)",
+        "Dynamic typing in Python",
+        "Scope of variables"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Declare Your First Variable",
+          "exercise_instructions": "Write a Python script to declare a variable named 'name' and assign it your name as a string, then print it using print()."
+        },
+        {
+          "exercise_title": "Modify Variable Value",
+          "exercise_instructions": "Create a variable 'age' with an integer value, print it, then reassign it to age + 1 and print the new value."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Numeric Data Types",
+      "lesson_objective": "Students will distinguish between integers and floats and perform basic arithmetic operations.",
+      "key_topics": [
+        "Integers (int)",
+        "Floating-point numbers (float)",
+        "Arithmetic operators (+, -, *, /, //, %)",
+        "Order of operations",
+        "Type checking with isinstance()"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Basic Arithmetic",
+          "exercise_instructions": "Declare two integer variables, add them together, and store the result in a new variable, then print the result."
+        },
+        {
+          "exercise_title": "Float Division",
+          "exercise_instructions": "Use two float variables to compute their division and modulus, printing both results to the console."
+        },
+        {
+          "exercise_title": "Type Verification",
+          "exercise_instructions": "Assign a number to a variable, check if it's an integer using isinstance(), and print the result."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "Strings and Booleans",
+      "lesson_objective": "Students will manipulate strings and use boolean values in conditional expressions.",
+      "key_topics": [
+        "Strings (str) and quoting",
+        "String concatenation and repetition",
+        "Escape characters",
+        "Booleans (bool): True and False",
+        "Comparison operators (==, !=, >, <)"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "String Concatenation",
+          "exercise_instructions": "Create two string variables for first and last name, concatenate them with a space, and print the full name."
+        },
+        {
+          "exercise_title": "Boolean Comparison",
+          "exercise_instructions": "Declare an integer variable, compare it to 10 using ==, assign the boolean result to a variable, and print it."
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "Type Conversion and Best Practices",
+      "lesson_objective": "Students will convert between data types and apply best practices for variable usage.",
+      "key_topics": [
+        "Implicit vs. explicit type conversion",
+        "Functions: int(), float(), str(), bool()",
+        "Common type errors and handling",
+        "Variable naming best practices",
+        "Comments for code clarity"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Convert to Integer",
+          "exercise_instructions": "Take a string variable representing a number, convert it to an integer using int(), add 5, and print the result."
+        },
+        {
+          "exercise_title": "Mixed Type Operations",
+          "exercise_instructions": "Attempt to add a string and an integer, handle the error by converting the string to float first, then print the sum."
+        },
+        {
+          "exercise_title": "Best Practice Refactor",
+          "exercise_instructions": "Write a short script using descriptive variable names and comments to calculate the area of a rectangle with given length and width."
+        }
+      ]
+    }
+  ]
+}

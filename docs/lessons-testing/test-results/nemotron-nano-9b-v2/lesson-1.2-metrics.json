@@ -1,0 +1,31 @@
+{
+  "model": "Nemotron Nano 9B V2",
+  "lessonId": "1.2",
+  "language": "ru",
+  "duration": 26392,
+  "parseSuccess": true,
+  "usage": {
+    "prompt_tokens": 432,
+    "completion_tokens": 2942,
+    "total_tokens": 3374,
+    "cost": 0.000488,
+    "is_byok": false,
+    "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "audio_tokens": 0,
+      "video_tokens": 0
+    },
+    "cost_details": {
+      "upstream_inference_cost": null,
+      "upstream_inference_prompt_cost": 0.00001728,
+      "upstream_inference_completions_cost": 0.00047072
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 1381,
+      "image_tokens": 0
+    }
+  },
+  "quality": {
+    "qualityScore": 100
+  }
+}

@@ -1,0 +1,67 @@
+-- Migration: Fix lesson_contents table for refinement
+-- Purpose: Create proper lesson_contents table with versioning support and fix FK issues
+-- Date: 2025-11-25
+
+-- ============================================================================
+-- 1. Create lesson_contents table (plural)
+-- ============================================================================
+
+CREATE TABLE IF NOT EXISTS lesson_contents (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    lesson_id UUID NOT NULL REFERENCES lessons(id) ON DELETE CASCADE,
+    content TEXT, -- Markdown content
+    status TEXT DEFAULT 'pending', -- pending, generating, completed, failed
+    generation_attempt INTEGER DEFAULT 1,
+    parent_content_id UUID REFERENCES lesson_contents(id) ON DELETE SET NULL,
+    user_refinement_prompt TEXT,
+    created_at TIMESTAMPTZ DEFAULT NOW(),
+    updated_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+-- Indexes
+CREATE INDEX IF NOT EXISTS idx_lesson_contents_lesson_id ON lesson_contents(lesson_id);
+CREATE INDEX IF NOT EXISTS idx_lesson_contents_parent_id ON lesson_contents(parent_content_id);
+CREATE INDEX IF NOT EXISTS idx_lesson_contents_created_at ON lesson_contents(created_at DESC);
+
+-- RLS Policies
+ALTER TABLE lesson_contents ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Admins can manage lesson_contents"
+  ON lesson_contents
+  FOR ALL
+  TO authenticated
+  USING (
+    EXISTS (
+      SELECT 1 FROM lessons l
+      JOIN courses c ON l.course_id = c.id
+      WHERE l.id = lesson_contents.lesson_id
+      AND c.organization_id = (auth.jwt() ->> 'organization_id')::uuid
+      AND (auth.jwt() ->> 'role') IN ('admin', 'instructor')
+    )
+  );
+
+CREATE POLICY "Superadmins can manage all lesson_contents"
+  ON lesson_contents
+  FOR ALL
+  TO authenticated
+  USING (
+    is_superadmin(auth.uid())
+  );
+
+-- ============================================================================
+-- 2. Cleanup lesson_content (singular) table
+-- ============================================================================
+
+-- Remove columns added by incorrect migration if they exist
+ALTER TABLE lesson_content DROP COLUMN IF EXISTS generation_attempt;
+ALTER TABLE lesson_content DROP COLUMN IF EXISTS parent_content_id;
+ALTER TABLE lesson_content DROP COLUMN IF EXISTS user_refinement_prompt;
+
+-- ============================================================================
+-- 3. Update Trigger
+-- ============================================================================
+
+CREATE TRIGGER update_lesson_contents_updated_at
+    BEFORE UPDATE ON lesson_contents
+    FOR EACH ROW
+    EXECUTE FUNCTION update_updated_at_column();

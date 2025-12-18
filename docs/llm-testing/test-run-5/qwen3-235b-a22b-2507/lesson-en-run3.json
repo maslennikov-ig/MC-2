@@ -1,0 +1,98 @@
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "This section introduces the fundamental concepts of variables and data types in Python, essential building blocks for any programming journey. Learners will understand how to store and manipulate different kinds of data using variables. By the end, students will be able to write simple programs using core data types.",
+  "learning_objectives": [
+    "Declare and assign values to variables using proper syntax.",
+    "Identify and use common Python data types including integers, floats, strings, and booleans.",
+    "Check the data type of a variable using the type() function.",
+    "Perform basic operations on variables based on their data types.",
+    "Follow naming conventions and best practices for variables in Python."
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Understanding Variables",
+      "lesson_objective": "Define what a variable is and demonstrate how to create and assign values to variables in Python.",
+      "key_topics": [
+        "What is a variable?",
+        "Variable assignment with = operator",
+        "Rules for variable names",
+        "Dynamic typing in Python",
+        "Reassigning variables"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Create Your First Variables",
+          "exercise_instructions": "Create three variables: name, age, and city. Assign your name (string), age (integer), and hometown (string) to them. Print each variable on a separate line."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Core Data Types in Python",
+      "lesson_objective": "Identify and use the four basic data types: int, float, str, and bool.",
+      "key_topics": [
+        "Integer (int)",
+        "Floating-point number (float)",
+        "String (str)",
+        "Boolean (bool)",
+        "Literal values",
+        "Using type() to inspect data types"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Explore Data Types",
+          "exercise_instructions": "Create one variable for each data type: int, float, str, and bool. Assign appropriate values. Use the type() function to print the data type of each variable."
+        },
+        {
+          "exercise_title": "Classify the Type",
+          "exercise_instructions": "Given the values 42, 3.14, 'Hello', and True, write a program that assigns each to a variable and prints both the value and its type."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "Working with Strings",
+      "lesson_objective": "Manipulate strings using concatenation, string methods, and formatting.",
+      "key_topics": [
+        "String creation with single/double quotes",
+        "String concatenation with + operator",
+        "Common string methods: upper(), lower(), strip()",
+        "Using len() function",
+        "Basic string formatting with f-strings"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "String Basics Practice",
+          "exercise_instructions": "Create a variable containing your full name. Print it in uppercase, then in lowercase. Then print the number of characters in your name using len()."
+        },
+        {
+          "exercise_title": "Personalized Greeting",
+          "exercise_instructions": "Use an f-string to create a greeting message that includes your name and age variables from a previous exercise. Print the message: 'Hello, my name is [name] and I am [age] years old.'"
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "Numeric Data Types and Operations",
+      "lesson_objective": "Perform arithmetic operations using integers and floats and understand type behavior in calculations.",
+      "key_topics": [
+        "Arithmetic operators: +, -, *, /, **, //, %",
+        "Operations between int and float",
+        "Order of operations (PEMDAS)",
+        "Augmented assignment operators (+=, -=, etc.)"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Basic Calculator",
+          "exercise_instructions": "Create two variables, a and b, and assign them the values 10 and 3. Calculate and print the sum, difference, product, quotient, and remainder of a and b."
+        },
+        {
+          "exercise_title": "Temperature Conversion",
+          "exercise_instructions": "Create a variable celsius with a temperature value. Convert it to Fahrenheit using the formula F = C * 9/5 + 32 and store the result in a variable fahrenheit. Print the result using an f-string."
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "course_title": "Introduction to Python Programming",
+  "course_description": "Embark on your programming journey with this beginner-friendly course on Python. Learn essential concepts like variables, loops, functions, and data structures through interactive lessons and hands-on projects. Ideal for those new to coding, building a strong foundation to create your own applications.",
+  "course_overview": "This comprehensive introduction to Python programming is designed for absolute beginners. Starting with installation and basic syntax, the course covers key topics including data types, control flow, functions, modules, and file handling. You'll engage in practical exercises and build small projects like calculators and text analyzers to reinforce learning. By the course's end, you'll have the skills to write, debug, and execute Python code confidently, setting the stage for advanced topics in software development, data science, or automation.",
+  "target_audience": "Beginners with no programming experience, including students, professionals transitioning to tech careers, and hobbyists curious about coding fundamentals.",
+  "estimated_duration_hours": 30,
+  "difficulty_level": "beginner",
+  "prerequisites": [
+    "Basic computer literacy and familiarity with using a web browser",
+    "No prior programming knowledge required"
+  ],
+  "learning_outcomes": [
+    "Identify and explain basic Python syntax, data types, and operators",
+    "Write and execute simple Python scripts to perform calculations and manipulations",
+    "Apply control structures such as loops and conditional statements to solve problems",
+    "Create reusable functions and modules to organize code effectively",
+    "Manipulate common data structures like lists, dictionaries, and strings",
+    "Debug and troubleshoot errors in Python programs",
+    "Develop small projects integrating multiple Python concepts"
+  ],
+  "course_tags": [
+    "Python",
+    "Programming",
+    "Beginner",
+    "Coding Fundamentals",
+    "Data Structures",
+    "Functions",
+    "Loops",
+    "Debugging"
+  ]
+}

@@ -1,0 +1,175 @@
+{
+  "nodes": [
+    {
+      "parameters": {
+        "assignments": {
+          "assignments": [
+            {
+              "id": "file-id",
+              "name": "file_id",
+              "value": "={{ $json.file_id }}",
+              "type": "string"
+            },
+            {
+              "id": "file-text",
+              "name": "file_text",
+              "value": "={{ $('Store File Text & Metadata').item.json.text }}",
+              "type": "string"
+            },
+            {
+              "id": "file-name",
+              "name": "file_name",
+              "value": "={{ $('Store File Text & Metadata').item.json.file_metadata.name }}",
+              "type": "string"
+            },
+            {
+              "id": "course-id",
+              "name": "course_id",
+              "value": "={{ $('Loop Over Items').item.json.course_id }}",
+              "type": "string"
+            },
+            {
+              "id": "language",
+              "name": "language",
+              "value": "={{ $('Loop Over Items').item.json.language || 'ru' }}",
+              "type": "string"
+            }
+          ]
+        },
+        "options": {}
+      },
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        1504,
+        416
+      ],
+      "id": "df3c76bb-27d0-448e-99c1-7449cf42e6f0",
+      "name": "Prepare Data for Vectorization",
+      "notes": "Combines catalog update results with original file data for vectorization"
+    },
+    {
+      "parameters": {
+        "code": {
+          "execute": {
+            "code": "const { RecursiveCharacterTextSplitter } = require('@langchain/textsplitters');\nconst items = $input.all();\nconst embeddings = await this.getInputConnectionData('ai_embedding', 0);\n\n// Initialize text splitter with same settings as node (chunkSize: 2000, chunkOverlap: 300)\nconst textSplitter = new RecursiveCharacterTextSplitter({\n  chunkSize: 2000,\n  chunkOverlap: 300,\n  keepSeparator: false,\n  separators: ['\\n\\n', '\\n', ' ', '']\n});\n\n// Batch processing settings\nconst BATCH_SIZE = 25;\n\nconst allResults = [];\n\nconsole.log(`\\n[VECTORIZATION] Processing files: ${items.length}`);\nconsole.log('[INPUT] First item data:', JSON.stringify(items[0]?.json, null, 2));\n\n// Process each file\nfor (const fileItem of items) {\n  const fileData = fileItem.json;\n\n  const text = (fileData.file_text || fileData.text || '').toString();\n  const fileName = fileData.file_name || 'unknown';\n  const fileId = fileData.file_id;\n\n  console.log(`\\n[FILE]`, {\n    fileName,\n    fileId,\n    hasText: !!text,\n    textLength: text.length\n  });\n\n  if (!fileId || !text.trim()) continue;\n\n  console.log(`=== ${fileName} ===`);\n  console.log(`   file_id (UUID): ${fileId}`);\n  console.log(`   Size: ${text.length} chars`);\n\n  const chunks = await textSplitter.splitText(text);\n  console.log(`   Chunks: ${chunks.length}`);\n  console.log(`   Method: RecursiveCharacterTextSplitter (word-boundary safe)`);\n\n  const startTime = Date.now();\n  const fileResults = [];\n\n  for (let i = 0; i < chunks.length; i += BATCH_SIZE) {\n    const batch = chunks.slice(i, i + BATCH_SIZE);\n    const batchNum = Math.floor(i / BATCH_SIZE) + 1;\n\n    try {\n      const vectors = await embeddings.embedDocuments(batch);\n\n      batch.forEach((chunkContent, batchIdx) => {\n        const chunkIndex = i + batchIdx;\n        const vector = vectors[batchIdx];\n\n        if (vector.length !== 768) {\n          console.error(`   [ERROR] Chunk ${chunkIndex}: dimension ${vector.length} instead of 768`);\n          fileResults.push({\n            json: {\n              file_id: fileId,\n              chunk_index: chunkIndex,\n              content: chunkContent,\n              embedding: null,\n              processing_status: 'error',\n              processing_errors: JSON.stringify([{\n                error: 'invalid_embedding_dimension',\n                expected: 768,\n                received: vector.length\n              }])\n            }\n          });\n          return;\n        }\n\n        fileResults.push({\n          json: {\n            file_id: fileId,\n            chunk_index: chunkIndex,\n            content: chunkContent,\n            embedding: `[${vector.join(',')}]`,\n            metadata: JSON.stringify({\n              chunk_position: chunkIndex + 1,\n              total_chunks: chunks.length,\n              chunk_method: 'RecursiveCharacterTextSplitter',\n              source_file: fileName,\n              language: fileData.language || 'auto'\n            }),\n            trace_id: `${fileId}_${chunkIndex}_${Date.now()}`,\n            workflow_execution_id: $execution.id,\n            processing_status: 'completed',\n            processing_errors: '[]',\n            embedding_model: 'text-embedding-004',\n            model_version: '2025-01',\n            processing_time_ms: Date.now() - startTime,\n            token_count: Math.ceil(chunkContent.length / 4)\n          }\n        });\n      });\n\n      if (i + BATCH_SIZE < chunks.length) {\n        await new Promise(resolve => setTimeout(resolve, 300));\n      }\n\n    } catch (error) {\n      console.error(`   [ERROR] Batch ${batchNum}: ${error.message}`);\n      batch.forEach((chunkContent, batchIdx) => {\n        fileResults.push({\n          json: {\n            file_id: fileId,\n            chunk_index: i + batchIdx,\n            content: chunkContent,\n            embedding: null,\n            processing_status: 'failed',\n            processing_errors: JSON.stringify([{\n              error: error.message,\n              batch_number: batchNum\n            }])\n          }\n        });\n      });\n    }\n  }\n\n  allResults.push(...fileResults);\n\n  const successCount = fileResults.filter(r => r.json.processing_status === 'completed').length;\n  const errorCount = fileResults.filter(r => r.json.processing_status !== 'completed').length;\n\n  console.log(`   [OK] ${successCount}/${chunks.length}`);\n  console.log(`   [FAILED] ${errorCount}`);\n  console.log(`   [TIME] ${((Date.now() - startTime) / 1000).toFixed(2)}s`);\n}\n\nconsole.log('\\n=== TOTAL ===');\nconsole.log(`Files: ${items.length}`);\nconsole.log(`Chunks: ${allResults.length}`);\nconsole.log(`Success: ${allResults.filter(r => r.json.processing_status === 'completed').length}`);\nconsole.log(`Errors: ${allResults.filter(r => r.json.processing_status !== 'completed').length}`);\n\nreturn allResults;\n"
+          }
+        },
+        "inputs": {
+          "input": [
+            {
+              "type": "main",
+              "maxConnections": 1,
+              "required": true
+            },
+            {
+              "type": "ai_embedding",
+              "maxConnections": 1,
+              "required": true
+            }
+          ]
+        },
+        "outputs": {
+          "output": [
+            {
+              "type": "main"
+            }
+          ]
+        }
+      },
+      "id": "a8a0c9f0-9674-43cf-b15c-12b1c9a50603",
+      "name": "LangChain Manual Vectorization",
+      "type": "@n8n/n8n-nodes-langchain.code",
+      "typeVersion": 1,
+      "position": [
+        1728,
+        416
+      ],
+      "notesInFlow": false
+    },
+    {
+      "parameters": {},
+      "id": "e36568a4-0f1f-4a94-b265-9c4eedcdb037",
+      "name": "Google Gemini Embeddings",
+      "type": "@n8n/n8n-nodes-langchain.embeddingsGoogleGemini",
+      "typeVersion": 1,
+      "position": [
+        1808,
+        640
+      ],
+      "notesInFlow": false,
+      "credentials": {
+        "googlePalmApi": {
+          "id": "ZjoinRG8pENQFodD",
+          "name": "Google Gemini(PaLM) Api account"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "tableId": "file_vectors",
+        "dataToSend": "autoMapInputData"
+      },
+      "id": "b0f56aa5-7b7e-48e3-bab4-b4439906bcac",
+      "name": "Batch Insert Vectors",
+      "type": "n8n-nodes-base.supabase",
+      "typeVersion": 1,
+      "position": [
+        2080,
+        416
+      ],
+      "credentials": {
+        "supabaseApi": {
+          "id": "sHgbo78JfWeLLQbC",
+          "name": "ma.slennikov-courseai"
+        }
+      },
+      "notes": "Batch insert vectors into file_vectors (100 records per batch)"
+    }
+  ],
+  "connections": {
+    "Prepare Data for Vectorization": {
+      "main": [
+        [
+          {
+            "node": "LangChain Manual Vectorization",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "LangChain Manual Vectorization": {
+      "main": [
+        [
+          {
+            "node": "Batch Insert Vectors",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Google Gemini Embeddings": {
+      "ai_embedding": [
+        [
+          {
+            "node": "LangChain Manual Vectorization",
+            "type": "ai_embedding",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Batch Insert Vectors": {
+      "main": [
+        []
+      ]
+    }
+  },
+  "pinData": {},
+  "meta": {
+    "templateCredsSetupCompleted": true,
+    "instanceId": "cb1ff704e6c60b16ed7ebf2b587e797b0e42fac4c72ca053967d3c6bf3c48238"
+  }
+}

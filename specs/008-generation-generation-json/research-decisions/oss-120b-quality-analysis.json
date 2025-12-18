@@ -1,0 +1,128 @@
+{
+  "timestamp": "2025-11-13T12:16:48.428Z",
+  "model": "openai/gpt-oss-120b",
+  "results": {
+    "metadata-en": [
+      {
+        "valid": true,
+        "score": 1,
+        "issues": [
+          "No issues"
+        ]
+      },
+      {
+        "valid": false,
+        "error": "INVALID_JSON",
+        "score": 0,
+        "issues": [
+          "Failed to parse JSON: Unterminated string in JSON at position 2192 (line 5 column 214)"
+        ]
+      },
+      {
+        "valid": false,
+        "error": "EMPTY_FILE",
+        "score": 0,
+        "issues": [
+          "File is empty"
+        ]
+      }
+    ],
+    "metadata-ru": [
+      {
+        "valid": true,
+        "score": 0.85,
+        "issues": [
+          "learning_outcomes lack action verbs"
+        ]
+      },
+      {
+        "valid": true,
+        "score": 0.85,
+        "issues": [
+          "learning_outcomes lack action verbs"
+        ]
+      },
+      {
+        "valid": true,
+        "score": 0.85,
+        "issues": [
+          "learning_outcomes lack action verbs"
+        ]
+      }
+    ],
+    "lesson-en": [
+      {
+        "valid": true,
+        "score": 0.25,
+        "issues": [
+          "Missing required fields",
+          "CRITICAL: No lessons generated"
+        ],
+        "lessonCount": 0
+      },
+      {
+        "valid": true,
+        "score": 1,
+        "issues": [
+          "No issues"
+        ],
+        "lessonCount": 4
+      },
+      {
+        "valid": true,
+        "score": 1,
+        "issues": [
+          "No issues"
+        ],
+        "lessonCount": 4
+      }
+    ],
+    "lesson-ru": [
+      {
+        "valid": true,
+        "score": 1,
+        "issues": [
+          "No issues"
+        ],
+        "lessonCount": 3
+      },
+      {
+        "valid": true,
+        "score": 1,
+        "issues": [
+          "No issues"
+        ],
+        "lessonCount": 4
+      },
+      {
+        "valid": true,
+        "score": 1,
+        "issues": [
+          "No issues"
+        ],
+        "lessonCount": 5
+      }
+    ]
+  },
+  "summary": {
+    "metadataEn": {
+      "valid": 1,
+      "total": 3
+    },
+    "metadataRu": {
+      "valid": 3,
+      "total": 3
+    },
+    "lessonEn": {
+      "valid": 2,
+      "total": 3
+    },
+    "lessonRu": {
+      "valid": 3,
+      "total": 3
+    },
+    "metadataSuccess": false,
+    "lessonSuccess": true,
+    "overallSuccess": 2
+  }
+}

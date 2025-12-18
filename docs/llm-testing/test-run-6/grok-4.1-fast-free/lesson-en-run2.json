@@ -1,0 +1,105 @@
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "This hands-on programming section teaches Python variables and data types through interactive lessons and practical exercises to build core coding skills.",
+  "learning_objectives": [
+    "Declare and assign variables using proper naming conventions.",
+    "Identify and manipulate primitive data types: int, float, str, bool.",
+    "Perform explicit and implicit type conversions safely.",
+    "Create and access elements in lists and dictionaries.",
+    "Apply best practices for variable usage and type checking."
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Introduction to Variables",
+      "lesson_objective": "Declare variables, understand naming rules, and assign values in Python.",
+      "key_topics": [
+        "Variable naming conventions",
+        "Assignment operator (=)",
+        "Dynamic typing in Python",
+        "Reassigning variables",
+        "Printing variables with print()"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Create Basic Variables",
+          "exercise_instructions": "Declare variables for your name (str), age (int), height (float), and is_student (bool). Print each with a descriptive message."
+        },
+        {
+          "exercise_title": "Variable Reassignment",
+          "exercise_instructions": "Create a variable score = 85, print it, then reassign to 92 and print again to observe changes."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Primitive Data Types",
+      "lesson_objective": "Use and identify integers, floats, strings, and booleans with type() function.",
+      "key_topics": [
+        "int for whole numbers",
+        "float for decimals",
+        "str for text with quotes",
+        "bool for True/False",
+        "type() and isinstance()"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Data Type Exploration",
+          "exercise_instructions": "Create variables of each primitive type, use type() to check them, and print results."
+        },
+        {
+          "exercise_title": "String Operations",
+          "exercise_instructions": "Create a string variable greeting = 'Hello', concatenate with your name, and print the full greeting."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "Type Conversion",
+      "lesson_objective": "Convert between data types using built-in functions like int(), str(), float().",
+      "key_topics": [
+        "Explicit type casting",
+        "int(), float(), str(), bool() functions",
+        "Handling conversion errors",
+        "Implicit conversion examples"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Numeric Conversions",
+          "exercise_instructions": "Convert string '123' to int, float 3.14 to int, and print before/after with types."
+        },
+        {
+          "exercise_title": "String to Bool",
+          "exercise_instructions": "Convert empty string '', 'False', and 'hello' to bool and print the results."
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "Lists and Dictionaries",
+      "lesson_objective": "Create, access, and modify lists and dictionaries as compound data types.",
+      "key_topics": [
+        "List creation with []",
+        "List indexing and slicing",
+        "Dictionary with key:value pairs",
+        "Accessing dict values",
+        "Adding/removing elements"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Build a List",
+          "exercise_instructions": "Create a list of fruits, access the second item, append a new fruit, and print the list."
+        },
+        {
+          "exercise_title": "Student Dictionary",
+          "exercise_instructions": "Create a dict with keys 'name', 'age', 'grades' (list), update age, and print specific values."
+        },
+        {
+          "exercise_title": "List and Dict Combo",
+          "exercise_instructions": "Create a list of student dicts, access a grade from the first student, and print it."
+        }
+      ]
+    }
+  ]
+}

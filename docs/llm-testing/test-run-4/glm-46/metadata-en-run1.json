@@ -1,0 +1,34 @@
+{
+  "course_title": "Introduction to Python Programming",
+  "course_description": "Master the fundamentals of Python programming in this beginner-friendly course. Learn to write clean, efficient code, solve problems algorithmically, and build a solid foundation for software development, data science, or automation. Perfect for those taking their first steps into the world of programming.",
+  "course_overview": "Introduction to Python Programming is a comprehensive beginner's course designed to take you from zero programming knowledge to writing functional Python code. You'll start with basic syntax and progress through fundamental programming concepts like variables, data types, control flow, functions, and object-oriented principles. Through hands-on exercises and real-world examples, you'll develop problem-solving skills and learn to think like a programmer. The course covers essential Python libraries, debugging techniques, and best practices. By the end, you'll have the confidence to tackle simple programming challenges and the foundation to pursue specialized Python paths in web development, data science, or automation.",
+  "target_audience": "Absolute beginners to programming, students, career changers, or professionals seeking to add Python to their skillset. No prior coding experience required.",
+  "estimated_duration_hours": 35,
+  "difficulty_level": "beginner",
+  "prerequisites": [
+    "Basic computer literacy",
+    "Logical thinking ability",
+    "Familiarity with installing software",
+    "No prior programming experience required"
+  ],
+  "learning_outcomes": [
+    "Demonstrate understanding of Python syntax and fundamental programming concepts",
+    "Apply control structures (if statements, loops) to solve programming problems",
+    "Create functions to organize and reuse code effectively",
+    "Implement basic object-oriented programming principles in Python",
+    "Analyze and debug code to identify and fix errors",
+    "Design simple algorithms to solve real-world problems",
+    "Utilize common Python libraries for basic tasks"
+  ],
+  "course_tags": [
+    "Python",
+    "Programming",
+    "Beginner",
+    "Coding",
+    "Data Types",
+    "Functions",
+    "Object-Oriented Programming",
+    "Problem Solving",
+    "Software Development"
+  ]
+}

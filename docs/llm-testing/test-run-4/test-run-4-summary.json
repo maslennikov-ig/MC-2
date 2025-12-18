@@ -1,0 +1,96 @@
+{
+  "testRunId": "2025-11-14-v4-all-models",
+  "timestamp": "2025-11-14T08:38:24.638Z",
+  "duration": 176774,
+  "durationMinutes": "2.95",
+  "totalModels": 12,
+  "totalScenarios": 4,
+  "runsPerScenario": 3,
+  "totalTests": 144,
+  "modelSummaries": [
+    {
+      "model": "Kimi K2 0905",
+      "modelSlug": "kimi-k2-0905",
+      "successRate": "100.00",
+      "avgTestDuration": "42505",
+      "duration": 94019
+    },
+    {
+      "model": "Kimi K2 Thinking",
+      "modelSlug": "kimi-k2-thinking",
+      "successRate": "75.00",
+      "avgTestDuration": "43076",
+      "duration": 59106
+    },
+    {
+      "model": "DeepSeek v3.2 Exp",
+      "modelSlug": "deepseek-v32-exp",
+      "successRate": "100.00",
+      "avgTestDuration": "74409",
+      "duration": 176769
+    },
+    {
+      "model": "DeepSeek Chat v3.1",
+      "modelSlug": "deepseek-chat-v31",
+      "successRate": "100.00",
+      "avgTestDuration": "24683",
+      "duration": 38767
+    },
+    {
+      "model": "Grok 4 Fast",
+      "modelSlug": "grok-4-fast",
+      "successRate": "100.00",
+      "avgTestDuration": "12710",
+      "duration": 16268
+    },
+    {
+      "model": "GLM 4.6",
+      "modelSlug": "glm-46",
+      "successRate": "91.67",
+      "avgTestDuration": "112958",
+      "duration": 165880
+    },
+    {
+      "model": "MiniMax M2",
+      "modelSlug": "minimax-m2",
+      "successRate": "100.00",
+      "avgTestDuration": "34025",
+      "duration": 57271
+    },
+    {
+      "model": "Qwen3 32B",
+      "modelSlug": "qwen3-32b",
+      "successRate": "100.00",
+      "avgTestDuration": "40868",
+      "duration": 52848
+    },
+    {
+      "model": "Qwen3 235B Thinking",
+      "modelSlug": "qwen3-235b-thinking",
+      "successRate": "100.00",
+      "avgTestDuration": "44699",
+      "duration": 59316
+    },
+    {
+      "model": "Qwen3 235B A22B Instruct 2507",
+      "modelSlug": "qwen3-235b-a22b-2507",
+      "successRate": "100.00",
+      "avgTestDuration": "26296",
+      "duration": 59006
+    },
+    {
+      "model": "OSS 120B",
+      "modelSlug": "oss-120b",
+      "successRate": "8.33",
+      "avgTestDuration": "28681",
+      "duration": 45028
+    },
+    {
+      "model": "Qwen3 235B A22B",
+      "modelSlug": "qwen3-235b-a22b",
+      "successRate": "0.00",
+      "avgTestDuration": "28903",
+      "duration": 59933
+    }
+  ]
+}

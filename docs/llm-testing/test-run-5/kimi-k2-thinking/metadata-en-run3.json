@@ -1,0 +1,31 @@
+{
+  "course_title": "Introduction to Python Programming",
+  "course_description": "Master Python programming from scratch in this hands-on beginner course. Build real projects while learning variables, loops, functions, and core concepts. No prior coding experience needed - start your developer journey today.",
+  "course_overview": "This comprehensive beginner course introduces Python programming fundamentals through a practical, project-based approach. Students explore core concepts including data types, control structures, functions, file handling, and basic object-oriented programming. The curriculum balances theory with hands-on coding exercises, culminating in a final project that demonstrates foundational proficiency. Designed for absolute beginners, the course provides incremental challenges, code reviews, and industry best practices to establish a solid foundation for software development, data analysis, or automation tasks.",
+  "target_audience": "Absolute beginners with no prior programming experience, career changers, students, and professionals seeking foundational coding skills for tech roles or automation.",
+  "estimated_duration_hours": 30,
+  "difficulty_level": "beginner",
+  "prerequisites": [
+    "Basic computer literacy (managing files and installing software)",
+    "No prior programming experience required",
+    "High school level mathematics (basic algebra)"
+  ],
+  "learning_outcomes": [
+    "Write functional Python programs using variables, data types, and control structures",
+    "Debug syntax and logical errors using standard Python debugging tools",
+    "Implement reusable functions with proper parameters, return values, and documentation",
+    "Create programs that read from and write to external files and handle exceptions",
+    "Demonstrate understanding of object-oriented concepts by designing and building simple classes",
+    "Apply Python best practices including PEP 8 style guidelines and code readability principles"
+  ],
+  "course_tags": [
+    "python",
+    "programming",
+    "beginner",
+    "coding",
+    "software development",
+    "automation",
+    "data science fundamentals",
+    "web development basics"
+  ]
+}

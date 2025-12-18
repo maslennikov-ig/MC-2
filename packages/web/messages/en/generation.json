@@ -1,0 +1,183 @@
+{
+  "stages": {
+    "stage_1": "Course Initialization",
+    "stage_2": "Document Processing",
+    "stage_3": "Document Prioritization",
+    "stage_4": "Deep Analysis",
+    "stage_5": "Structure Formation",
+    "stage_6": "Content Generation"
+  },
+  "status": {
+    "pending": "Pending",
+    "active": "In Progress",
+    "completed": "Completed",
+    "error": "Error",
+    "awaiting": "Awaiting Approval",
+    "skipped": "Skipped"
+  },
+  "actions": {
+    "approve": "Approve",
+    "reject": "Reject",
+    "retry": "Retry",
+    "viewDetails": "View Details",
+    "fitView": "Fit View",
+    "zoomIn": "Zoom In",
+    "zoomOut": "Zoom Out"
+  },
+  "drawer": {
+    "input": "Input",
+    "process": "Process",
+    "output": "Output",
+    "attempts": "Attempts",
+    "awaitingMessage": "This stage is waiting for your approval",
+    "activity": "Activity",
+    "expand": "Expand to full width",
+    "collapse": "Collapse to half width"
+  },
+  "refinementChat": {
+    "buttonTooltip": "Refine result",
+    "panelTitle": "Refinement",
+    "placeholder": "Describe what to change...",
+    "send": "Send & Regenerate",
+    "history": "Chat History",
+    "thinking": "Thinking...",
+    "quickActions": {
+      "shorter": "Shorter",
+      "moreExamples": "More examples",
+      "simplify": "Simplify",
+      "moreDetail": "More detail"
+    }
+  },
+  "errors": {
+    "connectionLost": "Connection lost",
+    "reconnecting": "Reconnecting...",
+    "retryFailed": "Retry failed"
+  },
+  "retry": {
+    "confirmTitle": "Confirm Retry",
+    "confirmDescription": "Are you sure you want to retry this item?",
+    "retryButton": "Retry",
+    "cancelButton": "Cancel"
+  },
+  "mobile": {
+    "title": "Generation Progress",
+    "noStages": "No stages yet",
+    "stageProgress": "Stage {{current}} of {{total}}"
+  },
+  "viewToggle": {
+    "graphView": "Graph View",
+    "listView": "List View"
+  },
+  "longRunning": {
+    "message": "Taking longer than usual...",
+    "emailNotify": "Notify me by email when complete",
+    "emailPlaceholder": "Enter your email",
+    "subscribe": "Subscribe"
+  },
+  "metrics": {
+    "duration": "Duration",
+    "tokens": "Tokens",
+    "cost": "Cost",
+    "processing": "Processing..."
+  },
+  "completionMessages": {
+    "stage_1": "Course initialized",
+    "stage_2": "Documents processed",
+    "stage_3": "Priorities assigned",
+    "stage_4": "Analysis complete",
+    "stage_5": "Structure generated",
+    "stage_6": "Content created"
+  },
+  "analysisResult": {
+    "classification": "Course Classification",
+    "classificationDesc": "Category and course context",
+    "topicAnalysis": "Topic Analysis",
+    "topicAnalysisDesc": "Topic details and key concepts",
+    "structure": "Recommended Structure",
+    "structureDesc": "Scope and lesson distribution",
+    "pedagogy": "Pedagogical Strategy",
+    "pedagogyDesc": "Teaching style and approach",
+    "guidance": "Generation Guidance",
+    "guidanceDesc": "Tone, examples, and exercises",
+    "documents": "Document Relations",
+    "documentsDesc": "RAG planning by module",
+    "category": "Category",
+    "confidence": "Confidence",
+    "reasoning": "Reasoning",
+    "whyMatters": "Why it matters",
+    "motivators": "Motivators",
+    "topic": "Topic",
+    "complexity": "Complexity",
+    "audience": "Audience",
+    "keyConcepts": "Key Concepts",
+    "keywords": "Keywords",
+    "totalLessons": "Lessons",
+    "totalSections": "Modules",
+    "lessonDuration": "Lesson Duration",
+    "scopeReasoning": "Scope Reasoning",
+    "teachingStyle": "Style",
+    "practicalFocus": "Practical Focus",
+    "interactivity": "Interactivity",
+    "assessmentApproach": "Assessment Approach",
+    "assessmentTypes": "Assessment Types",
+    "tone": "Tone",
+    "analogies": "Analogies",
+    "noAnalogies": "No analogies",
+    "visuals": "Visual Elements",
+    "exerciseTypes": "Exercise Types",
+    "section": "Module",
+    "noDocuments": "No linked documents"
+  },
+  "courseStructure": {
+    "courseInfo": "Course Information",
+    "courseInfoDesc": "Title, description, and course parameters",
+    "structure": "Course Structure",
+    "structureDesc": "Modules and lessons",
+    "targetAudience": "Target Audience",
+    "difficulty": "Difficulty Level",
+    "duration": "Duration",
+    "totalDuration": "Total Duration",
+    "prerequisites": "Prerequisites",
+    "noPrerequisites": "No prerequisites",
+    "tags": "Course Tags",
+    "overview": "Course Overview",
+    "learningOutcomes": "Learning Outcomes",
+    "assessmentStrategy": "Assessment Strategy",
+    "beginner": "Beginner",
+    "intermediate": "Intermediate",
+    "advanced": "Advanced",
+    "section": "Module",
+    "sectionDescription": "Module Description",
+    "sectionObjectives": "Module Objectives",
+    "lesson": "Lesson",
+    "lessons": "lessons",
+    "lessonTitle": "Lesson Title",
+    "lessonObjectives": "Lesson Objectives",
+    "keyTopics": "Key Topics",
+    "practicalExercises": "Practical Exercises",
+    "exerciseType": "Exercise Type",
+    "exerciseTitle": "Exercise Title",
+    "exerciseDescription": "Exercise Description",
+    "hours": "h",
+    "minutes": "min",
+    "hoursLong": "hours",
+    "minutesLong": "minutes",
+    "lessonsCount": "lessons",
+    "sectionsCount": "modules",
+    "exercisesCount": "exercises",
+    "topicsCount": "topics",
+    "noLessons": "No lessons",
+    "noSections": "No modules",
+    "noTopics": "No key topics",
+    "noExercises": "No practical exercises"
+  },
+  "restart": {
+    "confirmTitle": "Restart Stage?",
+    "confirmDescription": "You are about to restart generation from Stage {{stageNumber}} ({{stageName}}). All results after this stage will be regenerated.",
+    "warningMessage": "This action will overwrite current generation results.",
+    "restartButton": "Restart",
+    "restartingButton": "Restarting...",
+    "cancelButton": "Cancel",
+    "buttonTooltip": "Restart from this stage"
+  }
+}

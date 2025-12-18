@@ -1,0 +1,48 @@
+{
+  "dashboard": "Admin Dashboard",
+  "navigation": {
+    "generations": "Generations",
+    "history": "History",
+    "pipeline": "Pipeline"
+  },
+  "pipeline": {
+    "title": "Pipeline Configuration",
+    "description": "Manage LLM models, prompts, and global settings for the course generation pipeline",
+    "tabs": {
+      "overview": "Overview",
+      "models": "Models",
+      "prompts": "Prompts",
+      "settings": "Settings"
+    },
+    "stats": {
+      "totalGenerations": "Total Generations",
+      "successRate": "Success Rate",
+      "totalCost": "Total Cost",
+      "avgTime": "Avg Time",
+      "last30days": "Last 30 days",
+      "succeeded": "succeeded",
+      "failed": "failed",
+      "usdSpent": "USD spent",
+      "perGeneration": "Per generation"
+    },
+    "stages": {
+      "title": "Pipeline Stages",
+      "stage1": "Stage 1: Document Upload",
+      "stage1Desc": "Upload and validate source documents",
+      "stage2": "Stage 2: Document Processing",
+      "stage2Desc": "Parse, chunk, and embed documents",
+      "stage3": "Stage 3: Classification",
+      "stage3Desc": "Classify and analyze document content",
+      "stage4": "Stage 4: Content Analysis",
+      "stage4Desc": "Expert analysis and synthesis",
+      "stage5": "Stage 5: Planning",
+      "stage5Desc": "Course structure planning",
+      "stage6": "Stage 6: Generation",
+      "stage6Desc": "Lesson content generation",
+      "noLlmPhases": "No LLM phases",
+      "models": "models",
+      "prompts": "prompts",
+      "active": "active"
+    }
+  }
+}

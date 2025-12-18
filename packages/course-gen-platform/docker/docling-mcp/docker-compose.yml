@@ -1,0 +1,63 @@
+version: '3.8'
+
+services:
+  docling-mcp:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: docling-mcp-server
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    volumes:
+      # Mount uploads directory for file access (read-only for security)
+      - ../../uploads:/app/uploads:ro
+      # Mount test fixtures for integration tests (read-only)
+      - ../../tests:/app/tests:ro
+      # Persistent cache for parsed documents (host mount for JSON access)
+      - ../../../../.tmp/docling-cache:/usr/local/lib/python3.12/site-packages/_cache
+      # Persistent storage for ML models
+      - docling-models:/app/models
+    environment:
+      # Docling configuration
+      - DOCLING_CACHE_DIR=/app/cache
+      - DOCLING_MODELS_PATH=/app/models
+      - DOCLING_LOG_LEVEL=INFO
+      - DOCLING_MAX_FILE_SIZE=104857600  # 100MB
+      - DOCLING_TIMEOUT=300  # 5 minutes
+      # MCP server configuration
+      - MCP_TRANSPORT=streamable-http
+      - MCP_HOST=0.0.0.0
+      - MCP_PORT=8000
+      # Python configuration
+      - PYTHONUNBUFFERED=1
+    networks:
+      - megacampus-network
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 4G
+        reservations:
+          cpus: '1'
+          memory: 2G
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import socket; s=socket.socket(); s.connect(('localhost', 8000)); s.close()\" || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  docling-models:
+    driver: local
+
+networks:
+  megacampus-network:
+    name: megacampus-network
+    driver: bridge

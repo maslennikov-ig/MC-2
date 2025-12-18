@@ -1,0 +1,94 @@
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "Master Python's fundamental building blocks through interactive coding exercises. Create, manipulate, and convert variables while exploring numeric, text, and boolean data types with real-world programming scenarios.",
+  "learning_objectives": [
+    "Create and assign variables using Python naming conventions",
+    "Distinguish between int, float, str, and bool data types",
+    "Convert between data types using casting functions",
+    "Debug TypeError messages through systematic troubleshooting",
+    "Build interactive programs combining multiple data types"
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Creating Your First Variables",
+      "lesson_objective": "Students will create five different variables storing personal information and print them with descriptive labels",
+      "key_topics": ["Variable assignment syntax", "Valid identifier rules", "Case sensitivity", "Memory allocation", "Print formatting with f-strings"],
+      "exercises": [
+        {
+          "exercise_title": "Personal Data Storage",
+          "exercise_instructions": "Create variables for your name (str), age (int), height in meters (float), student status (bool), and favorite letter (str). Print each with a descriptive sentence using f-strings."
+        },
+        {
+          "exercise_title": "Variable Swap Challenge",
+          "exercise_instructions": "Create two variables with different values. Swap their contents without creating a third variable. Print before and after values to verify."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Working with Numbers and Calculations",
+      "lesson_objective": "Students will build a compound interest calculator handling both integers and floating-point arithmetic",
+      "key_topics": ["Integer division vs regular division", "Floating-point precision", "Modulo operator", "Exponential notation", "Order of operations"],
+      "exercises": [
+        {
+          "exercise_title": "Shopping Cart Calculator",
+          "exercise_instructions": "Calculate the total cost of 3 items with prices 19.99, 5.49, and 3.00. Add 8.5% tax and print the final amount rounded to 2 decimal places."
+        },
+        {
+          "exercise_title": "Time Converter",
+          "exercise_instructions": "Convert 5000 seconds into hours, minutes, and remaining seconds using integer division and modulo operations. Display as 'X hours, Y minutes, Z seconds'."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "String Manipulation Fundamentals",
+      "lesson_objective": "Students will extract and reformat date components from a single string input",
+      "key_topics": ["String indexing and slicing", "Escape sequences", "String concatenation", "len() function", "String immutability"],
+      "exercises": [
+        {
+          "exercise_title": "Email Parser",
+          "exercise_instructions": "Extract username and domain from an email address like 'student@university.edu'. Store in separate variables and print 'Username: X, Domain: Y'."
+        },
+        {
+          "exercise_title": "Palindrome Checker",
+          "exercise_instructions": "Take a word input and determine if it reads the same forwards and backwards. Print 'Palindrome' or 'Not palindrome' with the reversed word shown."
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "Type Conversion and User Input",
+      "lesson_objective": "Students will create a temperature converter accepting string input and performing mathematical operations",
+      "key_topics": ["int() and float() casting", "str() conversion", "input() function behavior", "Validation techniques", "Error handling with try-except"],
+      "exercises": [
+        {
+          "exercise_title": "BMI Calculator",
+          "exercise_instructions": "Prompt for weight in kg and height in cm as strings. Convert to numeric types and calculate BMI using formula: weight / (height/100)^2. Print with 1 decimal place."
+        },
+        {
+          "exercise_title": "String to Number Addition",
+          "exercise_instructions": "Take two number strings from input like '42' and '7'. Convert to integers, add them, then convert the sum back to string with message 'The answer is X'."
+        }
+      ]
+    },
+    {
+      "lesson_number": 5,
+      "lesson_title": "Boolean Logic and Conditional Variables",
+      "lesson_objective": "Students will implement password strength checker using boolean variables and comparisons",
+      "key_topics": ["Boolean operators", "Comparison operators", "Truthy and falsy values", "Boolean conversion", "Chaining comparisons"],
+      "exercises": [
+        {
+          "exercise_title": "Admission Requirements",
+          "exercise_instructions": "Create variables for gpa (float), test_score (int), and extracurriculars (int). Set is_accepted to True only if gpa >= 3.5, test_score >= 1200, and extracurriculars >= 2. Print acceptance status."
+        },
+        {
+          "exercise_title": "Leap Year Calculator",
+          "exercise_instructions": "Take a year input and determine if it's a leap year using boolean logic: divisible by 4 but not 100, unless also divisible by 400. Store result in is_leap_year variable and print with explanation."
+        }
+      ]
+    }
+  ]
+}

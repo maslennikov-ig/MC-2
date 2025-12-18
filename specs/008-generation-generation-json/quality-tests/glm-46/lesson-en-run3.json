@@ -1,0 +1,103 @@
+
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "In this hands-on programming section, students will learn the fundamentals of Python variables and data types through practical exercises and real-world examples. The section covers variable declaration, naming conventions, data type operations, and type conversion techniques essential for building Python applications.",
+  "learning_objectives": [
+    "Declare variables using proper Python syntax and naming conventions",
+    "Identify and use different Python data types including integers, floats, strings, and booleans",
+    "Perform operations and manipulations on various data types",
+    "Convert between different data types using built-in Python functions",
+    "Debug and resolve common variable and data type errors"
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Creating and Naming Variables",
+      "lesson_objective": "Students will be able to declare variables using appropriate naming conventions and assign values correctly.",
+      "key_topics": [
+        "Variable assignment using the equals operator",
+        "Python naming rules and PEP 8 conventions",
+        "Reserved keywords and avoiding conflicts",
+        "Multiple variable assignment in a single line",
+        "Variable reassignment and updating values"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Variable Declaration Practice",
+          "exercise_instructions": "Create 5 variables with meaningful names to store personal information: name (string), age (integer), height_in_feet (float), is_student (boolean), and gpa (float). Follow Python naming conventions and print each variable with a descriptive label."
+        },
+        {
+          "exercise_title": "Naming Convention Challenge",
+          "exercise_instructions": "Identify and fix the naming errors in the following code: 1st_name = 'John', last-name = 'Doe', class = 'Python 101', studentGPA = 3.8. Rename each variable following proper conventions and demonstrate the corrected code works."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Working with Numeric Data Types",
+      "lesson_objective": "Students will be able to perform arithmetic operations and distinguish between integer and float data types.",
+      "key_topics": [
+        "Integer vs float data types",
+        "Arithmetic operators (+, -, *, /, //, %, **)",
+        "Order of operations (PEMDAS)",
+        "Mathematical functions in the math module",
+        "Precision and floating-point arithmetic"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Calculator Operations",
+          "exercise_instructions": "Write a program that calculates the area of a circle using the formula πr². Use a radius of 5.5, store it as a variable, and display the result. Then modify the program to calculate the circumference using 2πr."
+        },
+        {
+          "exercise_title": "Temperature Converter",
+          "exercise_instructions": "Create variables to store temperature in Celsius (25°C). Convert it to Fahrenheit using the formula F = (C × 9/5) + 32. Display both temperatures with appropriate labels. Test with multiple Celsius values."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "String Manipulation and Operations",
+      "lesson_objective": "Students will be able to create, concatenate, and manipulate string data using Python string methods.",
+      "key_topics": [
+        "String creation with single, double, and triple quotes",
+        "String concatenation and formatting",
+        "String indexing and slicing",
+        "Common string methods (upper, lower, strip, split, join)",
+        "Escape sequences and special characters"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "String Formatting Challenge",
+          "exercise_instructions": "Create variables for first_name, last_name, and age. Format them into a sentence using three different methods: concatenation, f-strings, and the format() method. Display all three versions."
+        },
+        {
+          "exercise_title": "Text Processing",
+          "exercise_instructions": "Given the string '  Python is FUN and Powerful!  ', write code to: (1) Remove leading/trailing spaces, (2) convert to lowercase, (3) split into words, (4) count the number of characters, and (5) replace 'fun' with 'exciting'. Print each result."
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "Type Conversion and Checking",
+      "lesson_objective": "Students will be able to convert between data types and check variable types using appropriate functions.",
+      "key_topics": [
+        "Implicit vs explicit type conversion",
+        "Using int(), float(), str(), bool() functions",
+        "Type checking with type() and isinstance()",
+        "Handling type conversion errors",
+        "Best practices for type conversion"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Type Conversion Practice",
+          "exercise_instructions": "Create the following variables: num_str = '123', float_num = 45.67, bool_val = True. Convert each to the other three data types and print the results. Note any unexpected conversions and explain them."
+        },
+        {
+          "exercise_title": "User Input Processing",
+          "exercise_instructions": "Write a program that prompts for user's age as input, converts it to an integer, and calculates the birth year (assuming current year is 2024). Include error handling for non-numeric input and display appropriate messages for valid and invalid inputs."
+        }
+      ]
+    }
+  ]
+}

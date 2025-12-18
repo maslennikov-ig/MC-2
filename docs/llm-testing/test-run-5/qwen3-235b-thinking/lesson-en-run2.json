@@ -1,0 +1,78 @@
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "This section covers the foundational concepts of storing and manipulating data in Python through variables and data types. You'll learn how to declare variables, understand naming conventions, and work with core data types like integers, floats, strings, and booleans. By the end, you'll be able to write basic programs that handle different kinds of data effectively.",
+  "learning_objectives": [
+    "Declare and assign values to variables using valid naming conventions",
+    "Identify and differentiate between integer, float, string, and boolean data types",
+    "Use the type() function to verify the data type of any variable",
+    "Convert between basic data types using built-in conversion functions",
+    "Apply string concatenation and basic operations on fundamental data types"
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Understanding Variables",
+      "lesson_objective": "Create variables following Python naming rules and assign basic values",
+      "key_topics": [
+        "What variables are (containers for data)",
+        "Assignment operator (=)",
+        "Valid variable naming rules (letters, underscores, no numbers first)",
+        "Case sensitivity in variable names",
+        "Reassigning variable values"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Variable Declaration Practice",
+          "exercise_instructions": "Create three variables: your first name as a string (name), your age as an integer (age), and whether you're a student as a boolean (is_student). Print all three variables."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Core Data Types",
+      "lesson_objective": "Identify and use integers, floats, strings, and booleans correctly",
+      "key_topics": [
+        "Integer (int) data type",
+        "Floating-point (float) data type",
+        "String (str) data type with quotes",
+        "Boolean (bool) values (True/False)",
+        "Checking data types with type()",
+        "Literal values vs. variables"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Data Type Identification",
+          "exercise_instructions": "For each value (42, 3.14, 'Python', False), create a variable and print both the value and its data type using type()."
+        },
+        {
+          "exercise_title": "Boolean Practice",
+          "exercise_instructions": "Create two boolean variables: is_raining (set to True) and has_umbrella (set to False). Print both variables and their types."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "Type Conversion and Operations",
+      "lesson_objective": "Convert between data types and perform basic operations on variables",
+      "key_topics": [
+        "Implicit type conversion in operations",
+        "Explicit conversion with int(), float(), str()",
+        "String concatenation with + operator",
+        "Type errors and prevention",
+        "Numeric operations (addition, subtraction)",
+        "Using len() with strings"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Type Conversion Challenge",
+          "exercise_instructions": "Convert the string '100' to an integer, then add 50. Convert the result back to a string and concatenate it with ' is the total'. Print the final string."
+        },
+        {
+          "exercise_title": "String and Number Operations",
+          "exercise_instructions": "Create a string variable greeting = 'Hello' and an integer variable count = 3. Print the greeting repeated count times using string multiplication."
+        }
+      ]
+    }
+  ]
+}

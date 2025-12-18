@@ -1,0 +1,100 @@
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "This section introduces the fundamental building blocks of Python: variables and data types. You will learn how to store information using variables and work with the core data types that Python uses to represent different kinds of data.",
+  "learning_objectives": [
+    "Define and assign values to variables using the correct syntax.",
+    "Identify and use Python's core data types: integers, floats, strings, and booleans.",
+    "Convert data from one type to another using type casting functions.",
+    "Use the print() function to display variable values and combined output."
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "What is a Variable?",
+      "lesson_objective": "Assign values to variables and print their contents.",
+      "key_topics": [
+        "Understanding variables as named containers for data",
+        "The assignment operator (=)",
+        "Naming rules and conventions for variables (snake_case)",
+        "Using the print() function to output a variable's value"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Your First Variables",
+          "exercise_instructions": "1. Create a variable named 'greeting' and assign it the value 'Hello, World!'. 2. Create a variable named 'year' and assign it the value 2024. 3. Use the print() function to display the value of each variable on its own line."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Working with Text: The String Data Type",
+      "lesson_objective": "Create and manipulate string variables.",
+      "key_topics": [
+        "Defining strings with single quotes (') and double quotes (\")",
+        "String concatenation using the plus (+) operator",
+        "Using f-strings for formatted string literals",
+        "Basic string methods like .upper() and .lower()"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "String concatenation",
+          "exercise_instructions": "1. Create two string variables: one for your first name and one for your last name. 2. Concatenate them with a space in between and store the result in a new variable called 'full_name'. 3. Print the 'full_name' variable."
+        },
+        {
+          "exercise_title": "Using f-strings",
+          "exercise_instructions": "1. Create a variable 'age' and assign it your age as a number. 2. Create a variable 'message' that uses an f-string to combine text and the variable, e.g., 'I am {age} years old.'. 3. Print the 'message' variable."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "Working with Numbers: Integers and Floats",
+      "lesson_objective": "Perform basic arithmetic operations with numeric data types.",
+      "key_topics": [
+        "Integer data type (int) for whole numbers",
+        "Floating-point data type (float) for decimal numbers",
+        "Basic arithmetic operators: +, -, *, /, // (floor division), % (modulo), ** (exponent)",
+        "Order of operations (PEMDAS)"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Basic Calculator",
+          "exercise_instructions": "1. Create two variables, 'num1' and 'num2', and assign them integer values. 2. Perform addition, subtraction, multiplication, and division on these variables. 3. Print the result of each operation in a clear format, e.g., 'The sum is: {result}'."
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "True or False: The Boolean Data Type",
+      "lesson_objective": "Use boolean values and simple comparison operators.",
+      "key_topics": [
+        "Boolean values: True and False",
+        "Comparison operators: ==, !=, >, <, >=, <=",
+        "Using the type() function to check a variable's data type"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Comparisons",
+          "exercise_instructions": "1. Create two variables with numeric values. 2. Write print statements that compare the two variables using the operators: ==, >, and <=. 3. Observe and note the output (True or False) for each statement."
+        }
+      ]
+    },
+    {
+      "lesson_number": 5,
+      "lesson_title": "Converting Between Data Types",
+      "lesson_objective": "Convert variables between string, integer, and float types.",
+      "key_topics": [
+        "Type casting functions: str(), int(), float()",
+        "When and why type conversion is necessary",
+        "Handling errors during conversion (e.g., converting a non-numeric string to an integer)"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Type Conversion Practice",
+          "exercise_instructions": "1. Create a variable 'num_string' with the value '123'. 2. Convert 'num_string' to an integer and store it in a new variable. 3. Add 7 to the new integer variable and print the result. 4. Convert the final result back to a string and concatenate it with the text 'The final number is: ' before printing."
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,96 @@
+{
+  "section_number": 1,
+  "section_title": "Mastering Variables and Data Types in Python",
+  "section_description": "Hands-on programming section where students practice declaring variables and manipulating core data types through practical coding exercises.",
+  "learning_objectives": [
+    "Declare and initialize variables using valid Python naming conventions",
+    "Identify and differentiate between int, float, str, and bool data types",
+    "Convert between data types using type conversion functions",
+    "Use the type() function to verify variable data types during runtime"
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Variable Fundamentals and Declaration",
+      "lesson_objective": "Create properly named variables following Python conventions and assign initial values",
+      "key_topics": [
+        "What variables represent in memory",
+        "Valid naming rules (snake_case, no keywords)",
+        "Assignment operator (=) usage",
+        "Dynamic typing concept",
+        "Common naming mistakes to avoid"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Personal Profile Variables",
+          "exercise_instructions": "Declare three variables: 'full_name' as string, 'birth_year' as integer, and 'is_employed' as boolean. Assign realistic values and print all three."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Core Data Types Identification",
+      "lesson_objective": "Recognize and implement the four primary Python data types in practical scenarios",
+      "key_topics": [
+        "Integer (int) characteristics and limits",
+        "Floating-point (float) precision considerations",
+        "String (str) creation with quotes",
+        "Boolean (bool) truth values",
+        "Using type() for verification",
+        "Literal value representations"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Type Detective",
+          "exercise_instructions": "Create variables: price=19.99, product='Laptop', in_stock=True, quantity=5. Print each variable's value and its data type using type()."
+        },
+        {
+          "exercise_title": "Data Type Matching",
+          "exercise_instructions": "Assign appropriate data types to these values: 0.5, '42', False, 100. Verify each type using type() and explain why each type was chosen."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "Type Conversion Techniques",
+      "lesson_objective": "Convert between data types using explicit conversion functions and handle common conversion scenarios",
+      "key_topics": [
+        "Implicit vs explicit conversion",
+        "int() and float() conversion rules",
+        "str() for any-to-string conversion",
+        "Handling conversion errors",
+        "When conversion is necessary",
+        "Numeric string parsing"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Conversion Practice",
+          "exercise_instructions": "Convert the string '3.14' to float, integer 99 to string, and boolean True to integer. Print original values, converted values, and their new types."
+        },
+        {
+          "exercise_title": "User Input Calculator",
+          "exercise_instructions": "Take two string inputs representing numbers, convert them to integers, add them, and print the result as a formatted string showing the operation."
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "Real-World Data Type Application",
+      "lesson_objective": "Solve practical problems by combining multiple data types and applying type conversions appropriately",
+      "key_topics": [
+        "Mixed-type expressions",
+        "F-string formatting techniques",
+        "Input handling best practices",
+        "Data validation considerations",
+        "Error prevention strategies",
+        "Real-world type conversion cases"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Shopping Cart Processor",
+          "exercise_instructions": "Create variables for item_price (float), quantity (int), and item_name (str). Calculate total cost, then print a receipt using f-strings showing all values with proper data types."
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "course_title": "Introduction to Python Programming",
+  "course_description": "Unlock the power of programming with this beginner-friendly course on Python. Learn essential concepts, write your first code, and build simple projects to kickstart your coding journey in a fun, hands-on way.",
+  "course_overview": "This comprehensive introduction to Python programming is designed for absolute beginners. You'll start with the basics, including variables, data types, and control structures like loops and conditionals. Progress to functions, modules, and file handling. Through interactive exercises, quizzes, and mini-projects such as building a calculator or a simple game, you'll gain practical skills. By the end, you'll be comfortable writing, debugging, and running Python scripts, setting a strong foundation for further studies in web development, data science, or automation.",
+  "target_audience": "Absolute beginners with no prior programming experience, including students, career changers, and hobbyists eager to learn coding fundamentals.",
+  "estimated_duration_hours": 30,
+  "difficulty_level": "beginner",
+  "prerequisites": [
+    "Basic computer literacy",
+    "Familiarity with using a web browser and text editor"
+  ],
+  "learning_outcomes": [
+    "Explain fundamental Python concepts including variables, data types, and operators.",
+    "Write and execute simple Python scripts using control structures like loops and conditionals.",
+    "Create reusable code with functions and modules.",
+    "Debug and troubleshoot common errors in Python programs.",
+    "Manipulate data using lists, dictionaries, and strings.",
+    "Read from and write to files in Python.",
+    "Apply Python basics to build a simple project, such as a text-based application."
+  ],
+  "course_tags": [
+    "Python",
+    "Programming",
+    "Beginner Coding",
+    "Introduction to Programming",
+    "Software Development",
+    "Computer Science Basics",
+    "Hands-on Coding",
+    "Scripting"
+  ]
+}

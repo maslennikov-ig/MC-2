@@ -1,0 +1,76 @@
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "This section introduces the fundamentals of variables and core data types in Python, including integers, floats, strings, and booleans. Students will learn how to declare variables, perform basic operations, and understand type conversion to build a strong programming foundation.",
+  "learning_objectives": [
+    "Declare and assign variables using valid Python syntax",
+    "Identify and use basic data types (int, float, str, bool) appropriately",
+    "Convert between data types using built-in functions",
+    "Explain Python's dynamic typing behavior"
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Introduction to Variables",
+      "lesson_objective": "Understand variable declaration, naming conventions, and assignment in Python",
+      "key_topics": [
+        "Variable declaration syntax",
+        "Naming rules and best practices",
+        "Assignment operators",
+        "Dynamic typing basics"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Variable Assignment Practice",
+          "exercise_instructions": "1. Declare a variable named 'age' and assign it your age. 2. Print the variable's value. 3. Change the value to a float and observe the output."
+        },
+        {
+          "exercise_title": "Swapping Values",
+          "exercise_instructions": "1. Create two variables 'x' and 'y' with numeric values. 2. Swap their values using a temporary variable. 3. Print both variables to confirm the swap."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Basic Data Types",
+      "lesson_objective": "Work with integers, floats, strings, and booleans through practical examples",
+      "key_topics": [
+        "Integer and float operations",
+        "String creation and manipulation",
+        "Boolean logic",
+        "Type checking with type()"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Data Type Identification",
+          "exercise_instructions": "1. Create variables with values of different types. 2. Use the type() function to print each variable's data type. 3. Convert at least one integer to a float and verify the change."
+        },
+        {
+          "exercise_title": "String Concatenation",
+          "exercise_instructions": "1. Declare two strings 'first_name' and 'last_name'. 2. Concatenate them with a space in between. 3. Print the full name using f-string formatting."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "Type Conversion",
+      "lesson_objective": "Convert between data types and handle common conversion errors",
+      "key_topics": [
+        "Implicit vs explicit conversion",
+        "int(), float(), str(), bool() functions",
+        "Error handling in conversions",
+        "Order of operations with mixed types"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Temperature Conversion",
+          "exercise_instructions": "1. Store a temperature in Fahrenheit as a string. 2. Convert it to a float, then to Celsius using (F-32)*5/9. 3. Print the result as a formatted string."
+        },
+        {
+          "exercise_title": "Boolean Evaluation",
+          "exercise_instructions": "1. Create variables with values 0, 1, '', 'hello', and empty list. 2. Use bool() to check their boolean equivalents. 3. Create a truth table showing each value's boolean result."
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,94 @@
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "Master the building blocks of Python programming by creating and manipulating variables across numeric, text, and boolean data types while practicing error-free assignment, naming, and type conversion techniques.",
+  "learning_objectives": [
+    "Create valid variable identifiers following Python naming conventions",
+    "Distinguish between int, float, str, and bool data types using type() function",
+    "Convert variables between compatible types using str(), int(), and float()",
+    "Predict and resolve TypeError exceptions during mixed-type operations",
+    "Build interactive programs that capture, validate, and display user input"
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Declaring Your First Variables",
+      "lesson_objective": "Assign values to five different variables and print their types without syntax errors",
+      "key_topics": ["identifier rules", "assignment operator", "naming conventions", "memory allocation", "print() formatting"],
+      "exercises": [
+        {
+          "exercise_title": "Stock Ticker Variables",
+          "exercise_instructions": "Create variables named ticker, price, volume, is_growing, and market_cap. Assign AAPL, 142.63, 45678912, True, and 2.1e12 respectively. Display each variable on a new line with its data type."
+        },
+        {
+          "exercise_title": "Fix the Syntax Errors",
+          "exercise_instructions": "Correct the following broken assignments: 1st_player = 'Alice', player-score = 95, class = 'Warrior', and print their corrected values."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Working with Numbers",
+      "lesson_objective": "Perform arithmetic operations on integers and floats while avoiding rounding errors",
+      "key_topics": ["int vs float precision", "division behavior", "modulo operator", "exponentiation", "augmented assignment"],
+      "exercises": [
+        {
+          "exercise_title": "Shopping Cart Math",
+          "exercise_instructions": "Given prices 19.99, 7.49, 3.50, calculate subtotal, 8.5% tax, and final total. Use variables for each value and print a formatted receipt showing two decimal places."
+        },
+        {
+          "exercise_title": "Time Converter",
+          "exercise_instructions": "Convert 3678 seconds into minutes and remaining seconds using integer division and modulo. Store results in variables minutes and seconds and print '3678s = Xmin Ys'."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "String Manipulation Essentials",
+      "lesson_objective": "Concatenate, slice, and format strings to produce clean output without runtime errors",
+      "key_topics": ["string indexing", "slice notation", "f-strings", "escape sequences", "immutability"],
+      "exercises": [
+        {
+          "exercise_title": "Email Username Extractor",
+          "exercise_instructions": "Given email = 'student@university.edu', extract the username portion before '@' and domain portion after. Print 'Username: X, Domain: Y' using f-string formatting."
+        },
+        {
+          "exercise_title": "Password Strength Checker",
+          "exercise_instructions": "Store a password in variable pwd. Check and print True if it contains at least 8 characters, one digit, and one uppercase letter; otherwise print False."
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "Type Conversion and Validation",
+      "lesson_objective": "Safely convert user input strings to numeric types while handling conversion failures",
+      "key_topics": ["input() function", "ValueError handling", "try-except pattern", "string stripping", "boolean conversion rules"],
+      "exercises": [
+        {
+          "exercise_title": "Tip Calculator with Validation",
+          "exercise_instructions": "Prompt for bill amount and tip percentage. Convert inputs to float, calculate tip, and total. Wrap conversions in try-except to print 'Invalid number' on error and exit gracefully."
+        },
+        {
+          "exercise_title": "Binary to Decimal Converter",
+          "exercise_instructions": "Ask user for an 8-bit binary string. Validate it contains only 0s and 1s, then convert to decimal using int(binary, 2) and print the result."
+        }
+      ]
+    },
+    {
+      "lesson_number": 5,
+      "lesson_title": "Mixed-Type Expressions and Debugging",
+      "lesson_objective": "Predict output of mixed-type expressions and rewrite them to eliminate TypeErrors",
+      "key_topics": ["implicit conversion rules", "TypeError traceback", "operator overloading", "debugging strategies", "PEP 8 style"],
+      "exercises": [
+        {
+          "exercise_title": "Expression Predictor",
+          "exercise_instructions": "Given expressions: '3' + 4, 7 / '2', str(5) * 3, True + 1. Write down expected results, then run each in Python. Correct any that raise errors using explicit conversion."
+        },
+        {
+          "exercise_title": "Debug the Receipt Generator",
+          "exercise_instructions": "The following code fails: total = items * price + tax; print('Total: $' + total). Fix the concatenation error and ensure total displays with two decimal places."
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,119 @@
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "This foundational section introduces the core building blocks of Python programming: variables and data types. Students will learn how to store, manipulate, and manage different kinds of data, including text, numbers, and boolean values, while understanding the rules for naming variables and the concept of dynamic typing.",
+  "learning_objectives": [
+    "Declare and assign values to variables following Python naming conventions.",
+    "Identify and correctly use Python's core data types: integers, floats, strings, and booleans.",
+    "Convert data between different types using explicit type casting functions.",
+    "Perform basic arithmetic operations and string concatenation.",
+    "Check the data type of any variable using the type() function."
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Naming and Assigning Variables",
+      "lesson_objective": "Students will be able to declare variables using valid names and the assignment operator to store data.",
+      "key_topics": [
+        "The assignment operator (=) and its function",
+        "Rules for valid variable identifiers (case sensitivity, no spaces, no keywords)",
+        "Python naming conventions (snake_case)",
+        "The concept of a variable as a label for a value"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Valid or Invalid?",
+          "exercise_instructions": "Given a list of variable names, identify which are valid in Python and which will cause an error. Correct the invalid names."
+        },
+        {
+          "exercise_title": "Value Assignment",
+          "exercise_instructions": "Write code to assign your name, age, and favorite color to three separate variables with appropriate names. Print each variable."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Working with Numeric Data Types",
+      "lesson_objective": "Students will be able to perform arithmetic operations using integers and floating-point numbers.",
+      "key_topics": [
+        "Integer (int) and floating-point (float) data types",
+        "Basic arithmetic operators (+, -, *, /, //, %, **)",
+        "Order of operations (PEMDAS)",
+        "Differences between integer and float division"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Simple Calculator",
+          "exercise_instructions": "Create a script that calculates the area of a circle and the perimeter of a rectangle. Use variables to store the radius and side lengths, then print the results."
+        },
+        {
+          "exercise_title": "Operator Practice",
+          "exercise_instructions": "Perform and print the results of the following operations: 15 // 4, 18 % 5, and 2 ** 5. Write a comment explaining what each operator does."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "Understanding and Manipulating Strings",
+      "lesson_objective": "Students will be able to create string variables, concatenate them, and use basic string methods.",
+      "key_topics": [
+        "String (str) data type and string literals (single vs. double quotes)",
+        "String concatenation using the + operator",
+        "The len() function to get string length",
+        "Basic string methods: .upper(), .lower(), .title()"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Greeting Generator",
+          "exercise_instructions": "Ask the user for their first and last name using the input() function. Store each in a variable. Create and print a greeting that says 'Hello, Firstname Lastname!' in all uppercase letters."
+        },
+        {
+          "exercise_title": "String Investigation",
+          "exercise_instructions": "Create a variable containing the string 'Python Programming'. Print its length, then print it in title case."
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "Boolean Logic and Type Checking",
+      "lesson_objective": "Students will be able to use boolean values, comparison operators, and check variable data types.",
+      "key_topics": [
+        "Boolean (bool) data type (True and False)",
+        "Comparison operators (==, !=, >, <, >=, <=",
+        "The type() function for identifying data types",
+        "The bool() function for truth value testing"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "True or False?",
+          "exercise_instructions": "Write expressions using comparison operators to check if 10 is greater than 3, if 'hello' is equal to 'world', and if 15.5 is less than or equal to 20. Print the result of each expression."
+        },
+        {
+          "exercise_title": "Type Inspector",
+          "exercise_instructions": "Create variables of different types (int, float, str, bool). Write a program that uses the type() function to print a message identifying the type of each variable."
+        }
+      ]
+    },
+    {
+      "lesson_number": 5,
+      "lesson_title": "Converting Between Data Types",
+      "lesson_objective": "Students will be able to convert values between string, integer, and float data types using type casting.",
+      "key_topics": [
+        "Type casting functions: int(), float(), str()",
+        "When and why type conversion is necessary",
+        "Handling errors during conversion (e.g., converting a non-numeric string to int)",
+        "Converting user input from string to numeric types"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Age in Days Calculator",
+          "exercise_instructions": "Ask the user for their age. Convert the input from a string to an integer. Calculate and print how many days they have been alive (ignore leap years)."
+        },
+        {
+          "exercise_title": "Numeric String Sum",
+          "exercise_instructions": "Create two variables: num1 = '15' and num2 = '20.5'. Convert them to the appropriate numeric types and print their sum."
+        }
+      ]
+    }
+  ]
+}

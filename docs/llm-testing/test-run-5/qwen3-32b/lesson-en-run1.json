@@ -1,0 +1,101 @@
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "This section introduces the fundamental concepts of variables and data types in Python. Students will learn how to declare variables, assign values, and work with common data types such as integers, floats, strings, and booleans. The section also covers type conversion and best practices for variable naming.",
+  "learning_objectives": [
+    "Declare variables and assign values using the assignment operator (=)",
+    "Identify and use Python's core data types (int, float, str, bool)",
+    "Perform explicit and implicit type conversion between data types",
+    "Apply PEP 8 naming conventions for variables",
+    "Demonstrate understanding of dynamic typing in Python"
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Introduction to Variables and Naming Conventions",
+      "lesson_objective": "Create and name variables according to Python syntax rules",
+      "key_topics": [
+        "Variable declaration syntax",
+        "Assignment operator (=)",
+        "Naming rules (snake_case, no special characters)",
+        "Case sensitivity",
+        "Reserved keywords"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Basic Variable Assignment",
+          "exercise_instructions": "Create three variables (name, age, is_student) and assign appropriate values. Print each variable to verify the assignments."
+        },
+        {
+          "exercise_title": "Naming Practice",
+          "exercise_instructions": "Rename the following invalid variable names to valid ones: 1st_name, last-name, class, myVar. Use snake_case convention."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Core Data Types and Operations",
+      "lesson_objective": "Work with integers, floats, strings, and booleans including basic operations",
+      "key_topics": [
+        "Integer and float arithmetic",
+        "String concatenation and repetition",
+        "Boolean logic operations",
+        "type() function for data type checking",
+        "Dynamic typing behavior"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Data Type Identification",
+          "exercise_instructions": "Write a script that declares variables with different values (e.g., 42, 3.14, 'hello', True). Use type() to print each variable's data type."
+        },
+        {
+          "exercise_title": "Arithmetic and String Operations",
+          "exercise_instructions": "Calculate the area of a circle (radius = 5) using float values. Create a string that combines two variables (first_name and last_name) with a space between them."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "Type Conversion Techniques",
+      "lesson_objective": "Convert between different data types using built-in functions",
+      "key_topics": [
+        "int(), float(), str(), bool() conversion functions",
+        "Implicit vs explicit type conversion",
+        "Common conversion errors",
+        "Type casting in mathematical operations"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Number to String Conversion",
+          "exercise_instructions": "Take a numeric variable (e.g., user_age = 25) and convert it to a string to create a sentence like 'The user is 25 years old.'"
+        },
+        {
+          "exercise_title": "Boolean Conversion Practice",
+          "exercise_instructions": "Create variables with different values (0, 1, '', 'Python', 3.14) and convert them to booleans. Explain the results."
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "String Manipulation",
+      "lesson_objective": "Manipulate strings using common methods and operators",
+      "key_topics": [
+        "String concatenation (+ operator)",
+        "String formatting (f-strings)",
+        "String methods (upper(), lower(), strip(), split())",
+        "String slicing syntax",
+        "Immutable nature of strings"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Sentence Builder",
+          "exercise_instructions": "Create variables for subject, verb, and object. Use concatenation and f-strings to form different sentences combining these parts."
+        },
+        {
+          "exercise_title": "Text Processing",
+          "exercise_instructions": "Take a user-input string, convert it to lowercase, remove whitespace, and split it into words. Print the processed results."
+        }
+      ]
+    }
+  ]
+}

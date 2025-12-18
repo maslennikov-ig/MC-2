@@ -1,0 +1,19 @@
+
+{
+  "course_title": "Introduction to Python Programming",
+  "course_description": "A comprehensive beginner-level technical programming course designed to introduce students to the fundamentals of Python programming. This course covers essential concepts including syntax, data types, control structures, functions, and basic object-oriented programming principles. Students will learn to write clean, efficient Python code through hands-on exercises and practical projects that reinforce theoretical knowledge.",
+  "course_overview": "This Introduction to Python Programming course provides a solid foundation in one of the most versatile and in-demand programming languages today. The curriculum is structured to take students from absolute beginners to confident Python programmers capable of solving real-world problems. Starting with basic syntax and data types, students will progress through conditional statements, loops, functions, and error handling. The course includes practical examples like creating a simple calculator, building a text-based adventure game, and developing basic data analysis tools. Students will also learn about Python's extensive standard library and how to work with external modules. The course emphasizes writing clean, readable code following Python's style conventions and introduces best practices in software development. Each module includes hands-on coding exercises that build upon previous knowledge, culminating in a final project where students apply all concepts to create a small but complete application.",
+  "target_audience": "Absolute beginners with no prior programming experience, professionals looking to add Python to their skillset, students interested in computer science or data science, career changers transitioning to tech roles, and anyone seeking to understand programming fundamentals through Python's beginner-friendly syntax.",
+  "estimated_duration_hours": 24,
+  "difficulty_level": "beginner",
+  "prerequisites": ["Basic computer literacy", "Familiarity with operating systems (Windows/Mac/Linux)", "Logical thinking and problem-solving mindset"],
+  "learning_outcomes": [
+    "Define Python's fundamental data types, variables, and operators to write basic programs",
+    "Build conditional statements and loops to control program flow and make decisions",
+    "Create functions to organize code, promote reusability, and solve modular problems",
+    "Analyze and debug Python code using error handling techniques and debugging tools",
+    "Implement basic object-oriented programming concepts including classes and objects",
+    "Utilize Python's standard library and import external modules to extend program functionality"
+  ],
+  "course_tags": ["Python", "Programming", "Beginner", "Coding", "Software Development", "Computer Science", "Technical Skills"]
+}

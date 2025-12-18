@@ -1,0 +1,102 @@
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "This section covers the foundational concepts of storing and manipulating data in Python through variables and core data types. You'll learn how to declare variables, understand different data categories, and perform basic operations. By the end, you'll be equipped to handle data effectively in simple Python programs.",
+  "learning_objectives": [
+    "Declare and assign values to variables following Python naming conventions",
+    "Identify and use the four core data types: integers, floats, strings, and booleans",
+    "Convert between data types using built-in conversion functions",
+    "Apply basic operations (arithmetic, string concatenation, comparisons) on variables"
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Introduction to Variables",
+      "lesson_objective": "Declare and assign values to variables while following Python naming rules",
+      "key_topics": [
+        "What variables are and why we use them",
+        "Variable assignment with = operator",
+        "Naming rules (letters/underscores, no spaces, case sensitivity)",
+        "Reassigning variable values",
+        "Dynamic typing in Python"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Variable Declaration Practice",
+          "exercise_instructions": "Declare a variable named 'user_age' and assign your current age as an integer. Then declare 'favorite_food' and assign your favorite food as a string. Print both variables."
+        },
+        {
+          "exercise_title": "Reassignment Challenge",
+          "exercise_instructions": "Create a variable 'score' with value 10. Reassign it to 100, then reassign it again to 'Perfect!'. Print the final value and observe the output."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Core Data Types: Numbers and Strings",
+      "lesson_objective": "Use integers, floats, and strings in variable assignments and basic operations",
+      "key_topics": [
+        "Integers (int) for whole numbers",
+        "Floats (float) for decimal numbers",
+        "String (str) definition and quotation marks",
+        "String concatenation with + operator",
+        "Basic arithmetic operations (+, -, *, /)",
+        "Type inspection with type() function"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Number Operations",
+          "exercise_instructions": "Create variables 'a' (integer 7) and 'b' (float 2.5). Calculate and print: sum, difference (a-b), product, and quotient (a/b)."
+        },
+        {
+          "exercise_title": "String Building",
+          "exercise_instructions": "Declare 'city' as 'New York' and 'country' as 'USA'. Concatenate them with a comma separator into a new variable 'location' and print it."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "Boolean Logic and Type Checking",
+      "lesson_objective": "Create boolean expressions and verify data types using comparison operators",
+      "key_topics": [
+        "Boolean (bool) values: True and False",
+        "Comparison operators (==, !=, >, <, >=, <=)",
+        "Using type() to check variable types",
+        "Logical operators (and, or, not)",
+        "Truthiness of different data types"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Comparison Practice",
+          "exercise_instructions": "Set 'num1' to 15 and 'num2' to 20. Create boolean variables: 'is_equal', 'is_greater', and 'is_not_equal' using comparison operators. Print all three."
+        },
+        {
+          "exercise_title": "Type Identification",
+          "exercise_instructions": "Create variables: age (int), price (float), name (str), and is_valid (bool). Use type() to print the data type of each variable."
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "Type Conversion Techniques",
+      "lesson_objective": "Convert between data types using explicit conversion functions",
+      "key_topics": [
+        "Implicit vs explicit type conversion",
+        "str() for converting to strings",
+        "int() and float() for numeric conversions",
+        "bool() for truth value testing",
+        "Common conversion errors and troubleshooting"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Numeric Conversion",
+          "exercise_instructions": "Convert the string '42' to an integer and store as 'int_value'. Convert the integer 3 to a float and store as 'float_value'. Print both with their types."
+        },
+        {
+          "exercise_title": "String to Number Challenge",
+          "exercise_instructions": "Attempt to convert the string '3.14' to an integer. Observe the error, then convert it correctly to a float first. Print the final float value."
+        }
+      ]
+    }
+  ]
+}

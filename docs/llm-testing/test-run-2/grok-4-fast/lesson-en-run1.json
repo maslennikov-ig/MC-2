@@ -1,0 +1,93 @@
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "This hands-on programming section immerses students in the fundamentals of variables and data types in Python. Through interactive coding exercises, students will declare variables, explore integer, float, string, and boolean types, perform operations, and handle type conversions, building a strong foundation for writing effective Python code.",
+  "learning_objectives": [
+    "Students will be able to declare and assign variables using Python's dynamic typing system.",
+    "Students will be able to identify and manipulate basic data types including int, float, str, and bool.",
+    "Students will be able to perform arithmetic operations on numeric types and string concatenations.",
+    "Students will be able to use type checking and conversion functions to handle data interoperability."
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Declaring Variables with Proper Naming",
+      "lesson_objective": "Students will be able to declare variables following Python naming conventions and assign initial values correctly.",
+      "key_topics": [
+        "Variable naming rules: lowercase with underscores for multi-word names",
+        "Assignment using the equals operator (=)",
+        "Dynamic typing and reassignment of variable values"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Assign Personal Info Variables",
+          "exercise_instructions": "Create three variables: one for your age as an integer, one for your height in meters as a float, and one for your full name as a string. Assign appropriate values and print each variable using the print() function."
+        },
+        {
+          "exercise_title": "Reassign and Update a Counter",
+          "exercise_instructions": "Declare a variable named counter and assign it the value 0. Reassign it to 5, then to 10. Print the value after each reassignment to observe changes."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Working with Numeric Types: Integers and Floats",
+      "lesson_objective": "Students will be able to perform arithmetic operations using integers and floats, including division and modulus.",
+      "key_topics": [
+        "Integer (int) for whole numbers and float for decimals",
+        "Arithmetic operators: addition (+), subtraction (-), multiplication (*), division (/), floor division (//), modulus (%)",
+        "Order of operations and using parentheses for grouping"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Calculate Rectangle Area and Perimeter",
+          "exercise_instructions": "Declare variables for length (float: 5.5) and width (float: 3.2). Compute and print the area using multiplication and the perimeter using addition and multiplication."
+        },
+        {
+          "exercise_title": "Apply Modulus for Even-Odd Check",
+          "exercise_instructions": "Assign a variable number to 17. Use the modulus operator to check if it is even or odd, store the result in a variable, and print a message like '17 is odd'."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "Manipulating Strings and Booleans",
+      "lesson_objective": "Students will be able to concatenate strings, apply basic string methods, and use boolean values in simple expressions.",
+      "key_topics": [
+        "String (str) creation with quotes and concatenation using +",
+        "Common string methods: len() for length, upper() for capitalization",
+        "Boolean (bool) values: True and False, comparison operators like == and >"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Build and Format a Greeting Message",
+          "exercise_instructions": "Declare variables for first_name ('Alice') and last_name ('Smith'). Concatenate them to form a full name, convert to uppercase, and print 'Hello, ALICE SMITH!' using the upper() method."
+        },
+        {
+          "exercise_title": "Evaluate Boolean Conditions",
+          "exercise_instructions": "Assign age to 25 and is_student to True. Create a boolean variable adult_status by comparing age >= 18. Print whether the person is an adult and if they are a student."
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "Type Checking and Safe Conversions",
+      "lesson_objective": "Students will be able to inspect variable types and convert between data types while avoiding common errors.",
+      "key_topics": [
+        "Using type() function to check data types",
+        "Conversion functions: int(), float(), str(), bool()",
+        "Handling conversion errors like ValueError for invalid inputs"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Inspect and Convert Numeric Input",
+          "exercise_instructions": "Declare a variable user_input as the string '42'. Use type() to print its type, convert it to an integer using int(), and print the converted value and its new type."
+        },
+        {
+          "exercise_title": "Convert String to Float for Calculation",
+          "exercise_instructions": "Assign price_str to '19.99'. Convert it to a float, add 5.0 to it, and print the total as a formatted string using str() and f-string formatting."
+        }
+      ]
+    }
+  ]
+}

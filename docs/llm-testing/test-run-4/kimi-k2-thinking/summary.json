@@ -1,0 +1,126 @@
+{
+  "testRunId": "2025-11-14-v4-kimi-k2-thinking",
+  "model": "Kimi K2 Thinking",
+  "modelSlug": "kimi-k2-thinking",
+  "apiName": "moonshotai/kimi-k2-thinking",
+  "timestamp": "2025-11-14T08:36:26.974Z",
+  "duration": 59106,
+  "durationMinutes": "0.99",
+  "scenarios": 4,
+  "runsPerScenario": 3,
+  "totalTests": 12,
+  "successfulTests": 9,
+  "failedTests": 3,
+  "successRate": "75.00",
+  "avgTestDuration": "43076",
+  "results": [
+    {
+      "model": "Kimi K2 Thinking",
+      "modelSlug": "kimi-k2-thinking",
+      "scenario": "metadata-en",
+      "runNumber": 1,
+      "success": true,
+      "duration": 26352,
+      "contentLength": 2000
+    },
+    {
+      "model": "Kimi K2 Thinking",
+      "modelSlug": "kimi-k2-thinking",
+      "scenario": "metadata-en",
+      "runNumber": 2,
+      "success": true,
+      "duration": 39752,
+      "contentLength": 2120
+    },
+    {
+      "model": "Kimi K2 Thinking",
+      "modelSlug": "kimi-k2-thinking",
+      "scenario": "metadata-en",
+      "runNumber": 3,
+      "success": true,
+      "duration": 27321,
+      "contentLength": 1914
+    },
+    {
+      "model": "Kimi K2 Thinking",
+      "modelSlug": "kimi-k2-thinking",
+      "scenario": "metadata-ru",
+      "runNumber": 1,
+      "success": true,
+      "duration": 34511,
+      "contentLength": 1500
+    },
+    {
+      "model": "Kimi K2 Thinking",
+      "modelSlug": "kimi-k2-thinking",
+      "scenario": "metadata-ru",
+      "runNumber": 2,
+      "success": true,
+      "duration": 39760,
+      "contentLength": 2269
+    },
+    {
+      "model": "Kimi K2 Thinking",
+      "modelSlug": "kimi-k2-thinking",
+      "scenario": "metadata-ru",
+      "runNumber": 3,
+      "success": true,
+      "duration": 43179,
+      "contentLength": 2159
+    },
+    {
+      "model": "Kimi K2 Thinking",
+      "modelSlug": "kimi-k2-thinking",
+      "scenario": "lesson-en",
+      "runNumber": 1,
+      "success": true,
+      "duration": 31280,
+      "contentLength": 4942
+    },
+    {
+      "model": "Kimi K2 Thinking",
+      "modelSlug": "kimi-k2-thinking",
+      "scenario": "lesson-en",
+      "runNumber": 2,
+      "success": true,
+      "duration": 49461,
+      "contentLength": 6056
+    },
+    {
+      "model": "Kimi K2 Thinking",
+      "modelSlug": "kimi-k2-thinking",
+      "scenario": "lesson-en",
+      "runNumber": 3,
+      "success": false,
+      "duration": 59106,
+      "error": "Expected ',' or ']' after array element in JSON at position 1467 (line 1 column 1468)"
+    },
+    {
+      "model": "Kimi K2 Thinking",
+      "modelSlug": "kimi-k2-thinking",
+      "scenario": "lesson-ru",
+      "runNumber": 1,
+      "success": true,
+      "duration": 56404,
+      "contentLength": 8552
+    },
+    {
+      "model": "Kimi K2 Thinking",
+      "modelSlug": "kimi-k2-thinking",
+      "scenario": "lesson-ru",
+      "runNumber": 2,
+      "success": false,
+      "duration": 52097,
+      "error": "Unexpected end of JSON input"
+    },
+    {
+      "model": "Kimi K2 Thinking",
+      "modelSlug": "kimi-k2-thinking",
+      "scenario": "lesson-ru",
+      "runNumber": 3,
+      "success": false,
+      "duration": 57687,
+      "error": "Unexpected end of JSON input"
+    }
+  ]
+}

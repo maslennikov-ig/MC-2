@@ -1,0 +1,79 @@
+{
+  "section_number": 1,
+  "section_title": "Understanding and Using Variables and Primitive Data Types in Python",
+  "section_description": "This hands-on programming section introduces the fundamental concepts of variables, assignment, naming conventions, and the core primitive data types (integers, floats, booleans, strings) essential for writing any Python program.",
+  "learning_objectives": [
+    "Define, initialize, and reassign variables following standard Python naming conventions.",
+    "Identify and apply the four primitive data types (int, float, bool, str) correctly within code.",
+    "Use the built-in 'type()' function to verify the data type of any variable.",
+    "Perform basic arithmetic operations and string concatenation using variables."
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Introduction to Variables: Declaration, Assignment, and Naming Rules",
+      "lesson_objective": "Students will be able to define, initialize, and reassign variables while adhering to Python's naming conventions and best practices.",
+      "key_topics": [
+        "What is a variable?",
+        "Variable assignment operator (=)",
+        "Dynamic typing concept",
+        "Reserved keywords",
+        "PEP 8 variable naming conventions (snake_case)"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Variable Initialization Challenge",
+          "exercise_instructions": "Create three variables: 'user_age' (integer), 'user_name' (string), and 'is_active' (boolean). Print the value of each variable to the console. Then, reassign 'user_age' to a new value and print the updated value."
+        },
+        {
+          "exercise_title": "Fix the Naming Errors",
+          "exercise_instructions": "The following variables have naming issues: '1st_item', 'total-cost', and 'class'. Identify why they are invalid or poor practice, and rewrite them using correct PEP 8 conventions."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Numeric Data Types: Integers and Floats",
+      "lesson_objective": "Students will be able to differentiate between integers and floats, and use them to perform basic mathematical operations.",
+      "key_topics": [
+        "Integer (int) definition and usage",
+        "Floating point (float) definition and usage",
+        "Basic arithmetic operators (+, -, *, /)",
+        "The 'type()' function for verification",
+        "Type conversion (casting) between int() and float()"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "The Price Calculator",
+          "exercise_instructions": "Create two variables: 'item_price' (float) and 'quantity' (integer). Calculate the 'total_cost' and print the result. Use the 'type()' function to confirm the data type of 'total_cost'. Introduce a 15% tax rate and recalculate the final cost."
+        },
+        {
+          "exercise_title": "Casting Practice",
+          "exercise_instructions": "Initialize a variable 'raw_input' as the string '15.7'. Convert this string first to an integer, and then to a float. Print the value and type of the variable after each conversion."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "Boolean and String Data Types",
+      "lesson_objective": "Students will be able to correctly use boolean values for logical states and manipulate strings using basic concatenation.",
+      "key_topics": [
+        "Boolean (bool) definition (True/False)",
+        "String (str) definition and quoting (' ' or \" \")",
+        "String concatenation using the '+' operator",
+        "Introduction to f-strings (formatted string literals)",
+        "Using boolean variables in simple conditions (conceptual)"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "User Welcome Message",
+          "exercise_instructions": "Initialize variables 'first_name', 'last_name', and 'city'. Use string concatenation (the '+' operator) AND an f-string to create and print a single welcome message: 'Hello [First Name] [Last Name], welcome from [City]!'. Ensure you use both methods."
+        },
+        {
+          "exercise_title": "Logical State Check",
+          "exercise_instructions": "Create a boolean variable 'is_logged_in' and set it to True. Create another boolean variable 'has_premium' and set it to False. Print the values and types of both variables. Then, write a comment explaining a scenario where 'has_premium' would change to True."
+        }
+      ]
+    }
+  ]
+}

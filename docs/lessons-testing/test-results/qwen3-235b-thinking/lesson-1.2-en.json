@@ -1,0 +1,56 @@
+{
+  "title": "Ticket Pricing: How Discounts and Tiers Work",
+  "intro": "Welcome to the core of ticket sales strategy! As a sales manager, you're not just selling seats—you're selling experiences wrapped in smart pricing psychology. In this 5-minute lesson, we'll demystify how discounts and tiers transform intangible tickets into irresistible offers. You'll discover why early-bird pricing creates urgency, how VIP tiers boost revenue per customer, and why group discounts need careful guardrails. Most importantly, you'll learn to position prices around value—not cost—so customers happily pay premiums. Whether you're selling concert tickets or conference passes, these fundamentals will help you drive sales while protecting profit margins. Let's turn pricing theory into your next revenue win.",
+  "sections": [
+    {
+      "title": "Mastering Scarcity with Early-Bird Pricing",
+      "content": "Early-bird discounts aren't just about moving inventory—they're psychological triggers that leverage scarcity to accelerate decisions. The magic happens when you frame limited-time offers around *experience access*, not just savings. For example: 'Secure your spot at 20% off before seats enter general sale—only 100 early-bird passes available for our Tech Summit.' Notice we emphasize scarcity ('only 100') and exclusivity ('secure your spot'), not the discount percentage. This avoids training customers to wait for sales. \n\n**Pro Tip**: Always pair early-bird periods with clear end dates ('Ends Friday at midnight') rather than vague timelines ('while supplies last'). Sales teams should communicate urgency through scarcity storytelling: 'Last year's early-bird tier sold out in 72 hours—don't miss priority seating.' Crucially, track conversion rates at different discount levels; a 15% discount might yield better margins than 25% while still driving urgency. Remember: The goal isn't to clear inventory—it's to create momentum that lifts full-price sales later."
+    },
+    {
+      "title": "Designing Tiered Value: Basic vs. VIP",
+      "content": "Tiered pricing turns one product into multiple revenue streams by packaging differentiated experiences. The key is making tiers feel *distinct*, not just incremental. For a music festival:\n- **Basic Tier ($99)**: Entry + main stage access\n- **VIP Tier ($249)**: All Basic benefits PLUS dedicated viewing platform, lounge access, and artist meet-and-greet\n\nCalculate tier differences by quantifying *perceived value*, not just cost. That $150 premium isn't for 'better seats'—it's for 'skip-the-line access saving 45 minutes' and 'exclusive photo op with headliners.' Sales teams must articulate these value gaps clearly: 'VIP isn't 150% more expensive—it's 3x the experience at 125% the price.' \n\nAvoid 'gimmick tiers' by ensuring each level delivers disproportionate value jumps. If your VIP tier only adds a $10 merch discount, customers won't see justification. Instead, bundle high-perceived-value items like reserved parking ($30 value) or digital swag bags (near-zero cost to you). Always train reps to compare tiers side-by-side using real event examples—never discuss prices in isolation."
+    },
+    {
+      "title": "Strategic Discount Management: Groups & Timing",
+      "content": "Group discounts require precision—too generous and you erode margins; too restrictive and you lose volume. Start with non-negotiable guardrails: *minimum group size* (e.g., 10+), *non-transferability*, and *deadline requirements* (e.g., 'must book 30 days pre-event'). For corporate clients, structure discounts as tiered incentives: '10% off 10-24 tickets, 15% off 25+.' Crucially, exclude premium tiers from group deals to protect high-margin revenue.\n\nYour price calendar is your pricing heartbeat. Begin with high early-bird prices for maximum scarcity impact, then strategically drop to standard pricing 60 days out. Never discount during peak demand periods (e.g., holiday weekends). Instead, use 'value boosts' like free add-ons ('Book today: Complimentary shuttle pass included'). Adjust based on real-time data: if 70% of standard tickets sell by Day 30, *delay* late-release discounts. Always communicate changes transparently: 'As demand grows, we're transitioning to standard pricing—but here's how to still save...' This frames price increases as market-driven, not arbitrary."
+    },
+    {
+      "title": "Selling Value, Not Price Tags",
+      "content": "Customers don't buy ticket prices—they buy outcomes. Shift conversations from cost justification to value realization using this framework: \n1. **Identify pain points**: 'Many managers tell us they struggle to justify conference costs to finance teams.'\n2. **Quantify ROI**: 'Our VIP tier includes a personalized strategy session—past attendees secured $20k+ in new business from just one connection.'\n3. **Anchor to alternatives**: 'At $249, that's less than two hours of consultant fees for lifetime industry access.'\n\nNever say 'It's expensive because...' Instead: 'The premium covers [specific high-value benefit], which solves [customer pain point] by [result].' For early-bird discounts, emphasize what scarcity *enables*: 'Booking early guarantees you'll be in the networking zone—not stuck at the back.' Train reps to respond to 'Is this worth it?' with value stories, not price reductions. When customers perceive value exceeding price, discounting becomes unnecessary—and your margins stay healthy."
+    }
+  ],
+  "examples": [
+    {
+      "title": "Early-Bird Scarcity Campaign",
+      "content": "For a 500-seat theater event, the sales team created: 'Founders Circle' early-bird tier (100 tickets at 15% off) with messaging: 'Join the first 100 patrons who shape our opening night experience. Your feedback becomes part of the show—plus reserved front-row seating.' Result: 92% sell-through in 48 hours, with 68% of buyers upgrading to add-ons. Key insight: Scarcity worked because exclusivity was tied to *influence*, not just savings.",
+      "code": ""
+    },
+    {
+      "title": "VIP Tier Value Calculation",
+      "content": "At a $500 business conference:\n- Basic Tier ($500): Access to sessions\n- VIP Tier ($850): All Basic + 1:1 mentor session ($300 value), priority Q&A, and curated attendee list\n\nValue gap calculation: $850 - $500 = $350 premium. But perceived value = $300 (mentor) + $150 (priority access) + $100 (networking advantage) = $550. Sales reps positioned: 'You're investing $350 extra to unlock $550 in business value—net positive $200 ROI before the event starts.'",
+      "code": ""
+    }
+  ],
+  "exercises": [
+    {
+      "question": "Draft an early-bird email for a food festival targeting corporate clients. Include scarcity triggers and value-focused language (not discount percentage).",
+      "hints": [
+        "Frame scarcity around exclusive access (e.g., 'first tasting slots'), not just limited tickets",
+        "Connect the discount to business outcomes like 'network with 50+ industry leaders'"
+      ]
+    },
+    {
+      "question": "Calculate the value gap for a concert: Basic $75 (general admission), VIP $180 (front section + backstage tour). The tour costs $40 to operate. How would you position this to justify the $105 premium?",
+      "hints": [
+        "Quantify non-monetary value: 'Skip 2-hour lines' = 120 min saved",
+        "Compare to alternative costs: 'Front section alone is $150 at resale sites'"
+      ]
+    }
+  ],
+  "summary": [
+    "Early-bird success hinges on scarcity storytelling—emphasize exclusive access and deadlines, not just savings percentages",
+    "VIP tiers must deliver disproportionate perceived value (3x experience for <2x price) through bundled high-impact benefits",
+    "Group discounts require strict guardrails (min. size, deadlines) to protect margins while driving volume",
+    "Always position prices around customer ROI and problem-solving—not cost justification"
+  ]
+}

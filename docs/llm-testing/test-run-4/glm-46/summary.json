@@ -1,0 +1,126 @@
+{
+  "testRunId": "2025-11-14-v4-glm-46",
+  "model": "GLM 4.6",
+  "modelSlug": "glm-46",
+  "apiName": "z-ai/glm-4.6",
+  "timestamp": "2025-11-14T08:38:13.751Z",
+  "duration": 165880,
+  "durationMinutes": "2.76",
+  "scenarios": 4,
+  "runsPerScenario": 3,
+  "totalTests": 12,
+  "successfulTests": 11,
+  "failedTests": 1,
+  "successRate": "91.67",
+  "avgTestDuration": "112958",
+  "results": [
+    {
+      "model": "GLM 4.6",
+      "modelSlug": "glm-46",
+      "scenario": "metadata-en",
+      "runNumber": 1,
+      "success": true,
+      "duration": 53080,
+      "contentLength": 2290
+    },
+    {
+      "model": "GLM 4.6",
+      "modelSlug": "glm-46",
+      "scenario": "metadata-en",
+      "runNumber": 2,
+      "success": true,
+      "duration": 107972,
+      "contentLength": 2332
+    },
+    {
+      "model": "GLM 4.6",
+      "modelSlug": "glm-46",
+      "scenario": "metadata-en",
+      "runNumber": 3,
+      "success": true,
+      "duration": 67514,
+      "contentLength": 2250
+    },
+    {
+      "model": "GLM 4.6",
+      "modelSlug": "glm-46",
+      "scenario": "metadata-ru",
+      "runNumber": 1,
+      "success": true,
+      "duration": 113556,
+      "contentLength": 2034
+    },
+    {
+      "model": "GLM 4.6",
+      "modelSlug": "glm-46",
+      "scenario": "metadata-ru",
+      "runNumber": 2,
+      "success": true,
+      "duration": 122309,
+      "contentLength": 2064
+    },
+    {
+      "model": "GLM 4.6",
+      "modelSlug": "glm-46",
+      "scenario": "metadata-ru",
+      "runNumber": 3,
+      "success": true,
+      "duration": 113428,
+      "contentLength": 1850
+    },
+    {
+      "model": "GLM 4.6",
+      "modelSlug": "glm-46",
+      "scenario": "lesson-en",
+      "runNumber": 1,
+      "success": true,
+      "duration": 165879,
+      "contentLength": 6647
+    },
+    {
+      "model": "GLM 4.6",
+      "modelSlug": "glm-46",
+      "scenario": "lesson-en",
+      "runNumber": 2,
+      "success": true,
+      "duration": 110673,
+      "contentLength": 6796
+    },
+    {
+      "model": "GLM 4.6",
+      "modelSlug": "glm-46",
+      "scenario": "lesson-en",
+      "runNumber": 3,
+      "success": true,
+      "duration": 120628,
+      "contentLength": 4711
+    },
+    {
+      "model": "GLM 4.6",
+      "modelSlug": "glm-46",
+      "scenario": "lesson-ru",
+      "runNumber": 1,
+      "success": false,
+      "duration": 161123,
+      "error": "Unterminated string in JSON at position 844 (line 12 column 11)"
+    },
+    {
+      "model": "GLM 4.6",
+      "modelSlug": "glm-46",
+      "scenario": "lesson-ru",
+      "runNumber": 2,
+      "success": true,
+      "duration": 111326,
+      "contentLength": 5382
+    },
+    {
+      "model": "GLM 4.6",
+      "modelSlug": "glm-46",
+      "scenario": "lesson-ru",
+      "runNumber": 3,
+      "success": true,
+      "duration": 108007,
+      "contentLength": 5143
+    }
+  ]
+}

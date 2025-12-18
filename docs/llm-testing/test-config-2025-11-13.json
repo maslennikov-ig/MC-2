@@ -1,0 +1,120 @@
+{
+  "testRunId": "2025-11-13-quality-focused",
+  "date": "2025-11-13",
+  "purpose": "Initial quality-focused model evaluation with 6 models",
+  "models": [
+    {
+      "name": "Kimi K2 0905",
+      "slug": "kimi-k2-0905",
+      "apiName": "moonshotai/kimi-k2-0905",
+      "description": "Regular version without thinking tokens"
+    },
+    {
+      "name": "Kimi K2 Thinking",
+      "slug": "kimi-k2-thinking",
+      "apiName": "moonshotai/kimi-k2-thinking",
+      "description": "Version with thinking tokens for comparison"
+    },
+    {
+      "name": "DeepSeek v3.2 Exp",
+      "slug": "deepseek-v32-exp",
+      "apiName": "deepseek/deepseek-v3.2-exp",
+      "description": "Experimental version, reportedly cheapest"
+    },
+    {
+      "name": "DeepSeek Chat v3.1",
+      "slug": "deepseek-chat-v31",
+      "apiName": "deepseek/deepseek-chat-v3.1",
+      "description": "Stable version, previous quality issues noted"
+    },
+    {
+      "name": "Grok 4 Fast",
+      "slug": "grok-4-fast",
+      "apiName": "x-ai/grok-4-fast",
+      "description": "Speed-focused model"
+    },
+    {
+      "name": "MiniMax M2",
+      "slug": "minimax-m2",
+      "apiName": "minimax/minimax-m2",
+      "description": "New candidate to evaluate"
+    }
+  ],
+  "entities": [
+    {
+      "id": "metadata",
+      "name": "Course Metadata",
+      "description": "Course-level information including title, description, learning outcomes, etc.",
+      "schemaFields": [
+        "course_title",
+        "course_description",
+        "course_overview",
+        "target_audience",
+        "estimated_duration_hours",
+        "difficulty_level",
+        "prerequisites",
+        "learning_outcomes",
+        "course_tags"
+      ]
+    },
+    {
+      "id": "lesson",
+      "name": "Lesson Structure",
+      "description": "Section-level structure with 3-5 lessons, objectives, topics, exercises",
+      "schemaFields": [
+        "section_number",
+        "section_title",
+        "section_description",
+        "learning_objectives",
+        "lessons"
+      ]
+    }
+  ],
+  "testScenarios": [
+    {
+      "id": "metadata-en",
+      "entityId": "metadata",
+      "language": "en",
+      "title": "Introduction to Python Programming",
+      "description": "Beginner-level technical programming course",
+      "difficultyLevel": "beginner",
+      "category": "technical"
+    },
+    {
+      "id": "metadata-ru",
+      "entityId": "metadata",
+      "language": "ru",
+      "title": "Машинное обучение для начинающих",
+      "description": "Intermediate-level conceptual ML course",
+      "difficultyLevel": "intermediate",
+      "category": "conceptual"
+    },
+    {
+      "id": "lesson-en",
+      "entityId": "lesson",
+      "language": "en",
+      "title": "Variables and Data Types in Python",
+      "description": "Hands-on programming section with exercises",
+      "difficultyLevel": "beginner",
+      "category": "programming"
+    },
+    {
+      "id": "lesson-ru",
+      "entityId": "lesson",
+      "language": "ru",
+      "title": "Основы нейронных сетей",
+      "description": "Conceptual theory section with examples",
+      "difficultyLevel": "intermediate",
+      "category": "theory"
+    }
+  ],
+  "testParameters": {
+    "runsPerScenario": 3,
+    "temperature": 0.7,
+    "maxTokens": 8000,
+    "waitBetweenRequests": 2000
+  },
+  "outputDirectory": "/tmp/quality-tests",
+  "expectedTotalCalls": 72,
+  "expectedDuration": "30-40 minutes"
+}

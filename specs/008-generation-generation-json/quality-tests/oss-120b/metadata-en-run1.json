@@ -1,0 +1,27 @@
+{
+  "course_title": "Introduction to Python Programming",
+  "course_description": "This beginner-level technical programming course introduces learners to the fundamentals of Python, one of the most popular and versatile programming languages. Participants will explore core concepts such as variables, data types, control structures, functions, and modules, while gaining hands‑up experience writing, testing, and debugging simple scripts. By the end of the course, students will be equipped to develop basic Python applications and continue their journey into more advanced software development topics.",
+  "course_overview": "The course is structured into eight progressive modules. Module 1 covers Python installation, IDE setup, and the interactive interpreter, giving learners the tools to write and execute code. Module 2 introduces variables, data types, and basic operators, with examples like calculating the area of a circle. Module 3 focuses on control flow, teaching if‑else statements and loops through practical tasks such as generating a multiplication table. Module 4 dives into functions, demonstrating how to define reusable code blocks and pass arguments, illustrated by a temperature‑conversion utility. Module 5 explores collections—lists, tuples, dictionaries, and sets—using a simple contact‑list project. Module 6 presents file I/O, guiding students to read from and write to text files, exemplified by a log‑parser script. Module 7 introduces error handling and debugging techniques, including try‑except blocks and the use of Python’s pdb debugger. The final module, Module 8, integrates all concepts in a capstone project where learners build a text‑based adventure game, applying loops, functions, data structures, and file persistence. Throughout, quizzes, coding exercises, and peer code reviews reinforce learning and provide immediate feedback.",
+  "target_audience": "This course is designed for high school seniors planning to study computer science, career‑changing professionals with no prior coding experience, non‑technical staff (e.g., marketers or analysts) who need basic automation skills, and hobbyists who want a structured entry point into programming.",
+  "estimated_duration_hours": 40,
+  "difficulty_level": "beginner",
+  "prerequisites": [
+    "Basic computer literacy (ability to use a mouse, keyboard, and file system)",
+    "Access to a computer running Windows, macOS, or Linux"
+  ],
+  "learning_outcomes": [
+    "Define core Python syntax elements, including variables, data types, operators, and control structures, to write correct statements",
+    "Build reusable functions and modules that solve specific problems, such as converting temperatures or calculating statistical measures",
+    "Create and manipulate data collections like lists, dictionaries, and sets to organize and process information efficiently",
+    "Analyze program output and debug errors using Python's traceback information and pdb debugger to improve code reliability",
+    "Implement a complete, file‑based Python application (e.g., a text‑based adventure game) that integrates input handling, data storage, and control flow"
+  ],
+  "course_tags": [
+    "python",
+    "programming",
+    "beginners",
+    "coding",
+    "software development",
+    "computer science"
+  ]
+}

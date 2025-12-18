@@ -1,0 +1,102 @@
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "A comprehensive hands-on programming section covering Python variables, fundamental data types, type conversion, and practical exercises to build strong programming fundamentals.",
+  "learning_objectives": [
+    "Define and assign variables using proper Python naming conventions",
+    "Identify and use the four fundamental Python data types (int, float, str, bool)",
+    "Perform type conversion and validate data types using type() function",
+    "Create and manipulate collection data types (list, tuple, dictionary, set)",
+    "Debug common variable and data type errors through practical examples"
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Introduction to Variables and Assignment",
+      "lesson_objective": "Create and manage variables using proper Python naming conventions and understand variable assignment",
+      "key_topics": [
+        "Variable naming rules and conventions (snake_case)",
+        "Dynamic typing in Python",
+        "Multiple assignment and swapping variables",
+        "Memory references and variable reuse",
+        "Constants and best practices"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Variable Naming Practice",
+          "exercise_instructions": "Create 5 variables with different valid names following Python conventions and assign them appropriate values (string, integer, float, boolean)."
+        },
+        {
+          "exercise_title": "Multiple Assignment Challenge",
+          "exercise_instructions": "Use multiple assignment to create 3 variables at once, then swap their values without using temporary variables."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Core Data Types: Numbers and Strings",
+      "lesson_objective": "Utilize numeric data types (int, float) and string manipulation techniques for text processing",
+      "key_topics": [
+        "Integers vs floats and arithmetic operations",
+        "String creation, indexing, and slicing",
+        "String methods (upper(), lower(), split(), replace())",
+        "Escape characters and raw strings",
+        "String formatting with f-strings and format()"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Calculator Program",
+          "exercise_instructions": "Create variables to store two numbers and perform all basic arithmetic operations (addition, subtraction, multiplication, division, modulus), printing each result with descriptive labels."
+        },
+        {
+          "exercise_title": "Personal Introduction",
+          "exercise_instructions": "Create variables for name, age, and favorite color, then format and print a personalized introduction using f-strings with proper capitalization and spacing."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "Boolean Logic and Conditional Data",
+      "lesson_objective": "Apply boolean data type and logical operators for decision-making in Python programs",
+      "key_topics": [
+        "Boolean values (True/False) and their applications",
+        "Comparison operators (==, !=, <, >, <=, >=)",
+        "Logical operators (and, or, not)",
+        "Truthy and falsy values in Python",
+        "Converting other types to booleans"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Age Verification System",
+          "exercise_instructions": "Create variables for age and has_license, then use boolean logic to determine if someone can drive, printing appropriate messages for different combinations."
+        },
+        {
+          "exercise_title": "Grade Classification",
+          "exercise_instructions": "Create a variable for a numerical score (0-100) and use comparison operators to classify it as 'A', 'B', 'C', 'D', or 'F', storing the result in a new variable."
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "Collection Data Types and Operations",
+      "lesson_objective": "Create and manipulate Python collection data types for storing multiple values efficiently",
+      "key_topics": [
+        "Lists: creation, indexing, append(), remove(), len()",
+        "Tuples: immutable sequences and tuple methods",
+        "Dictionaries: key-value pairs, get(), keys(), values()",
+        "Sets: unique values and set operations (union, intersection)",
+        "Type checking collections with type() and isinstance()"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Student Grade Tracker",
+          "exercise_instructions": "Create a list of 5 test scores, calculate the average using Python operations, and determine if each score is passing (>= 70) using list comprehension."
+        },
+        {
+          "exercise_title": "Contact Book Dictionary",
+          "exercise_instructions": "Create a dictionary to store contact information with names as keys and phone numbers as values, then add, update, and retrieve contacts using appropriate dictionary methods."
+        }
+      ]
+    }
+  ]
+}

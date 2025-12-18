@@ -1,0 +1,99 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://megacampusai.com/schemas/summarization-job.json",
+  "title": "SummarizationJobData",
+  "description": "BullMQ job payload for Stage 3 document summarization",
+  "type": "object",
+  "required": [
+    "course_id",
+    "organization_id",
+    "file_id",
+    "correlation_id",
+    "extracted_text",
+    "original_filename",
+    "strategy",
+    "model"
+  ],
+  "properties": {
+    "course_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Course identifier"
+    },
+    "organization_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Organization identifier for multi-tenant isolation"
+    },
+    "file_id": {
+      "type": "string",
+      "format": "uuid",
+      "description": "File catalog identifier"
+    },
+    "correlation_id": {
+      "type": "string",
+      "description": "Distributed tracing correlation ID"
+    },
+    "extracted_text": {
+      "type": "string",
+      "minLength": 1,
+      "description": "Raw text from Stage 2 extraction (source for summarization)"
+    },
+    "original_filename": {
+      "type": "string",
+      "description": "User-uploaded file name (for logging/debugging)"
+    },
+    "strategy": {
+      "type": "string",
+      "enum": [
+        "full_text",
+        "map_reduce",
+        "refine",
+        "map_rerank",
+        "stuffing",
+        "hierarchical"
+      ],
+      "description": "Summarization strategy to use (from research decision)"
+    },
+    "model": {
+      "type": "string",
+      "pattern": "^[a-z0-9-]+/[a-z0-9-]+$",
+      "description": "OpenRouter model ID (e.g., 'openai/gpt-oss-20b')",
+      "examples": [
+        "openai/gpt-oss-20b",
+        "anthropic/claude-3.5-sonnet",
+        "google/gemini-1.5-pro"
+      ]
+    },
+    "no_summary_threshold_tokens": {
+      "type": "number",
+      "minimum": 0,
+      "default": 3000,
+      "description": "Token count below which to bypass summarization (use full text)"
+    },
+    "quality_threshold": {
+      "type": "number",
+      "minimum": 0.0,
+      "maximum": 1.0,
+      "default": 0.75,
+      "description": "Minimum semantic similarity score for quality check"
+    },
+    "max_output_tokens": {
+      "type": "number",
+      "minimum": 1,
+      "default": 200000,
+      "description": "Maximum tokens for summary output (Stage 4 context window constraint)"
+    },
+    "retry_attempt": {
+      "type": "number",
+      "minimum": 0,
+      "default": 0,
+      "description": "Retry attempt number (0 = first attempt, 1+ = retry)"
+    },
+    "previous_strategy": {
+      "type": "string",
+      "description": "Previous strategy used (for retry escalation tracking)"
+    }
+  },
+  "additionalProperties": false
+}

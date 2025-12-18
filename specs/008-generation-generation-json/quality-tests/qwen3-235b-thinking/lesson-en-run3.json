@@ -1,0 +1,65 @@
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "This hands-on section provides practical experience with Python's core data handling concepts. Students will write executable code to manipulate variables, convert data types, and solve real-world problems through incremental exercises that build foundational programming skills.",
+  "learning_objectives": [
+    "Declare and initialize variables using valid Python naming conventions",
+    "Identify and differentiate between int, float, str, and bool data types in code",
+    "Convert between fundamental data types using explicit conversion functions",
+    "Validate data types using type() and handle type-related errors in user input",
+    "Construct programs that process user input through appropriate type conversions"
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Variable Declaration and Basic Data Types",
+      "lesson_objective": "Students will declare variables of four core types using proper syntax and verify their types through execution.",
+      "key_topics": [
+        "Variable naming rules and PEP 8 conventions",
+        "Literal representation of integers, floats, strings, and booleans",
+        "Assignment operator (=) usage patterns",
+        "Runtime type verification with type() function"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Personal Profile Variables",
+          "exercise_instructions": "Declare variables: age (integer), temperature (float), city (string), and is_student (boolean). Print each variable with its explicit type using type()."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Type Conversion Techniques",
+      "lesson_objective": "Students will convert between data types using built-in functions and predict conversion outcomes.",
+      "key_topics": [
+        "Explicit conversion with int(), float(), str()",
+        "Handling truncation in numeric conversions",
+        "Boolean interpretation of empty/non-empty values",
+        "Common conversion error scenarios"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Data Transformation Challenge",
+          "exercise_instructions": "Convert the string '199' to an integer, the float 3.1415 to a string, the boolean True to an integer, and the integer 0 to a boolean. Print each converted value with its new type."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "User Input Processing",
+      "lesson_objective": "Students will capture and convert user input to appropriate data types for calculations.",
+      "key_topics": [
+        "Input() function string handling",
+        "Numeric conversion of user input",
+        "Error prevention in type-sensitive operations",
+        "Concatenation of mixed-type values"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Temperature Converter",
+          "exercise_instructions": "Prompt user for Celsius temperature as string input. Convert to float, calculate Fahrenheit (F = C * 9/5 + 32), then print result formatted as 'X°C = Y°F' using type-appropriate operations."
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,75 @@
+{
+  "section_number": 1,
+  "section_title": "Hands-On Variables and Data Types in Python",
+  "section_description": "Practical coding section focusing on variable declaration, core data types, and type manipulation through interactive exercises.",
+  "learning_objectives": [
+    "Declare and assign values to variables following Python naming conventions",
+    "Identify and differentiate between int, float, str, and bool data types",
+    "Convert between data types using built-in type conversion functions",
+    "Use the type() function to verify variable data types during program execution"
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Variable Fundamentals and Declaration",
+      "lesson_objective": "Create and assign values to variables using valid Python naming conventions and syntax.",
+      "key_topics": [
+        "What variables represent in memory",
+        "Valid variable naming rules",
+        "Assignment operator (=) usage",
+        "Case sensitivity in names",
+        "Reassigning variable values"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Personal Profile Variables",
+          "exercise_instructions": "Declare three variables: name (string), age (integer), and is_student (boolean). Assign your personal details and print all three."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Core Data Types Exploration",
+      "lesson_objective": "Recognize and utilize Python's primary data types through practical value assignment.",
+      "key_topics": [
+        "Integer vs float number types",
+        "String literal creation methods",
+        "Boolean true/false representation",
+        "NoneType significance",
+        "Using type() for verification"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Data Type Identification Challenge",
+          "exercise_instructions": "Create variables with these values: 3.14, '42', False, 100, and None. Print each variable's data type using type()."
+        },
+        {
+          "exercise_title": "Type Verification Drill",
+          "exercise_instructions": "Write code that checks if a variable containing 25 is an integer, then verify if 'True' is a string. Print both results."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "Type Conversion Techniques",
+      "lesson_objective": "Convert variables between data types using explicit conversion functions and handle common conversion scenarios.",
+      "key_topics": [
+        "Implicit vs explicit type conversion",
+        "int() and float() conversion rules",
+        "str() for value stringification",
+        "Conversion error prevention",
+        "Practical conversion use cases"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Temperature Converter",
+          "exercise_instructions": "Convert 72.5 (Fahrenheit) to integer Celsius using: celsius = int((fahr - 32) * 5/9). Print both values with labels."
+        },
+        {
+          "exercise_title": "User Input Processor",
+          "exercise_instructions": "Ask user for birth year, convert input to integer, calculate age, then convert age to string for a greeting message."
+        }
+      ]
+    }
+  ]
+}

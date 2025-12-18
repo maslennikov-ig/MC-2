@@ -1,0 +1,29 @@
+{
+  "course_title": "Introduction to Python Programming",
+  "course_description": "This beginner-level technical programming course introduces core concepts of Python, one of the world's most popular and versatile programming languages. Designed for individuals with little to no prior coding experience, the curriculum covers syntax fundamentals, data structures, control flow, and basic problem-solving techniques. Through hands-on exercises and real-world examples, learners will build a solid foundation for further study in software development, data analysis, or automation. The course emphasizes practical application and includes interactive coding challenges to reinforce key concepts, preparing students for entry-level technical roles or advanced programming studies.",
+  "course_overview": "This comprehensive course begins with setting up the Python development environment and understanding basic syntax. Module 1 covers variables, data types, and operators through practical examples like calculating BMI or converting temperatures between Celsius and Fahrenheit. Module 2 dives into control structures (if/else, loops) by building a number guessing game and a currency converter application. Module 3 explores data structures (lists, tuples, dictionaries) by creating a student gradebook system that calculates GPAs. Module 4 introduces functions and modules through developing a library management helper with book checkout/return logic. Module 5 covers file handling by processing CSV weather data to generate monthly climate reports. Finally, Module 6 provides an introduction to object-oriented programming by designing an e-commerce product class with inventory tracking. Each module includes hands-on coding exercises, debugging challenges, and a capstone project where learners build a personal expense tracker application that categorizes transactions and visualizes spending patterns.",
+  "target_audience": "Ideal for career changers seeking entry into tech roles, college students needing programming skills for STEM fields, and professionals from non-technical backgrounds (e.g., finance, marketing) looking to automate repetitive tasks. Specific personas include: 1) Sarah, a recent high school graduate exploring software development careers; 2) David, an accountant wanting to automate spreadsheet reports; 3) Maria, a biology researcher needing to process experimental data; and 4) James, a small business owner aiming to build simple web tools.",
+  "estimated_duration_hours": 25.0,
+  "difficulty_level": "beginner",
+  "prerequisites": [
+    "Basic computer literacy (file management, web browsing)",
+    "No prior programming experience required"
+  ],
+  "learning_outcomes": [
+    "Define core programming concepts including variables, data types, and control structures",
+    "Build functional Python scripts that process user input and generate formatted output",
+    "Create data-driven applications using lists, dictionaries, and file handling techniques",
+    "Analyze code for logical errors and debug using print statements and basic tools",
+    "Design modular programs by writing reusable functions and importing standard libraries",
+    "Implement object-oriented principles to construct simple class-based systems"
+  ],
+  "course_tags": [
+    "python",
+    "programming",
+    "beginner",
+    "coding",
+    "software development",
+    "data structures",
+    "automation"
+  ]
+}

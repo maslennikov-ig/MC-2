@@ -1,0 +1,98 @@
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "This section introduces the fundamental concepts of variables and data types in Python. Learners will understand how to store and manipulate different kinds of data using variables. These building blocks are essential for writing effective Python programs.",
+  "learning_objectives": [
+    "Declare and assign values to variables in Python.",
+    "Identify and use the four basic data types: integers, floats, strings, and booleans.",
+    "Use the type() function to check the data type of a variable.",
+    "Convert between data types using type conversion functions.",
+    "Apply variables and data types to solve simple programming problems."
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Introduction to Variables",
+      "lesson_objective": "Declare and assign values to variables using proper naming conventions.",
+      "key_topics": [
+        "What is a variable?",
+        "Variable assignment with =",
+        "Valid variable names",
+        "Dynamic typing",
+        "Overwriting variable values"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Variable Declaration Practice",
+          "exercise_instructions": "Create three variables: 'name', 'age', and 'city'. Assign your name as a string, your age as a number, and your city as a string. Print each variable on a separate line."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Basic Data Types",
+      "lesson_objective": "Identify and use integers, floats, strings, and booleans in Python.",
+      "key_topics": [
+        "int: whole numbers",
+        "float: decimal numbers",
+        "str: text in quotes",
+        "bool: True and False",
+        "Using type() to inspect types"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Data Type Identification",
+          "exercise_instructions": "Create one variable of each type: int, float, str, and bool. Use the type() function to print the data type of each variable."
+        },
+        {
+          "exercise_title": "Boolean Logic Practice",
+          "exercise_instructions": "Create two boolean variables: 'is_sunny' and 'is_warm'. Assign them appropriate True or False values based on a hypothetical day. Print both variables."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "String Manipulation",
+      "lesson_objective": "Create and manipulate strings using concatenation and basic methods.",
+      "key_topics": [
+        "Creating strings with single or double quotes",
+        "String concatenation with +",
+        "Using len() function",
+        "Basic string methods: .upper(), .lower()",
+        "Escape characters like \\n and \\t"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Personal Introduction String",
+          "exercise_instructions": "Using the variables from Exercise 1, create a new string that says 'My name is X, I am Y years old, and I live in Z.' using string concatenation. Print the result."
+        },
+        {
+          "exercise_title": "String Transformation",
+          "exercise_instructions": "Take your name string and print it in uppercase, then in lowercase. Also print the length of your name using len()."
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "Type Conversion",
+      "lesson_objective": "Convert between data types using int(), float(), str(), and bool().",
+      "key_topics": [
+        "Implicit vs explicit type conversion",
+        "Converting number to string",
+        "Converting string to number",
+        "Converting to boolean",
+        "Handling conversion errors"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Age Conversion Challenge",
+          "exercise_instructions": "Create a string variable called 'age_str' with your age as text (e.g., '25'). Convert it to an integer and store it in 'age_int'. Print the type of both variables to confirm the conversion."
+        },
+        {
+          "exercise_title": "Temperature Converter Setup",
+          "exercise_instructions": "Create a float variable 'temp_c' with a Celsius temperature (e.g., 23.5). Convert it to a string and concatenate it into a message: 'The temperature is X degrees Celsius.'"
+        }
+      ]
+    }
+  ]
+}

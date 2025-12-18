@@ -1,0 +1,94 @@
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "This section provides hands‑on experience with Python variables and core data types. Learners will practice declaring, assigning, and manipulating different types of data, and will complete coding exercises that reinforce each concept.",
+  "learning_objectives": [
+    "Students will be able to declare and assign variables using proper naming conventions.",
+    "Students will be able to identify and use Python's numeric, string, and boolean data types.",
+    "Students will be able to perform type conversion and basic operations on each data type.",
+    "Students will be able to write short scripts that combine variables and data type operations to solve problems."
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Assigning and Updating Variables",
+      "lesson_objective": "Students will be able to declare variables, assign initial values, and update them correctly in Python.",
+      "key_topics": [
+        "Variable naming rules and conventions",
+        "Assignment operator (=)",
+        "Reassigning variable values",
+        "Multiple assignment in a single statement"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Variable Declaration Practice",
+          "exercise_instructions": "Create three variables named age, height_cm, and is_student. Assign appropriate values (e.g., 25, 170, True). Then update age to a new value and print all three variables."
+        },
+        {
+          "exercise_title": "Swap Values Without Temporary Variable",
+          "exercise_instructions": "Initialize variables a = 5 and b = 10. Swap their values using multiple assignment and print the result."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Understanding Python Numeric Types",
+      "lesson_objective": "Students will be able to differentiate between int, float, and complex types and perform basic arithmetic operations.",
+      "key_topics": [
+        "Integer (int) type",
+        "Floating‑point (float) type",
+        "Complex number (complex) type",
+        "Arithmetic operators (+, -, *, /, //, %, **)",
+        "Explicit type conversion functions (int(), float(), complex())"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Numeric Operations Quiz",
+          "exercise_instructions": "Write a script that defines variables int_num = 7, float_num = 3.5, and complex_num = 2 + 3j. Perform addition, multiplication, and exponentiation between each pair, convert results to appropriate types, and print the outcomes."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "Working with Strings and Basic String Operations",
+      "lesson_objective": "Students will be able to create string literals, concatenate, slice, and apply common string methods.",
+      "key_topics": [
+        "String literals and escape sequences",
+        "String concatenation using + and f‑strings",
+        "Indexing and slicing syntax",
+        "String methods: upper(), lower(), replace(), split(), strip()"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "String Manipulation Challenge",
+          "exercise_instructions": "Create a variable greeting = \"Hello, World!\". Use slicing to extract \"World\", convert it to uppercase, replace the exclamation mark with a period, and finally print the modified string using an f‑string."
+        },
+        {
+          "exercise_title": "Parse CSV Line",
+          "exercise_instructions": "Given a string csv_line = \"Alice,30,New York\", split the string into a list of values, strip any whitespace, and assign each part to variables name, age, city. Print a formatted sentence: \"Alice is 30 years old and lives in New York.\""
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "Boolean Values and Logical Operations",
+      "lesson_objective": "Students will be able to use boolean literals and apply logical operators in conditional statements.",
+      "key_topics": [
+        "Boolean type (bool) and literals True/False",
+        "Comparison operators (==, !=, >, <, >=, <=)",
+        "Logical operators (and, or, not)",
+        "Using booleans in if statements"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Eligibility Checker",
+          "exercise_instructions": "Write a program that asks for a user's age (integer) and membership status (True/False). Determine eligibility for a discount: age under 18 or membership True. Print \"Eligible for discount\" or \"Not eligible\" accordingly."
+        },
+        {
+          "exercise_title": "Logical Expression Truth Table",
+          "exercise_instructions": "Create variables a = True, b = False. Compute and print the results of a and b, a or b, not a, and (a and not b) or (b and not a). Explain the output in comments."
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,23 @@
+{
+  "course_title": "Introduction to Python Programming",
+  "course_description": "This beginner-level technical programming course provides a comprehensive introduction to Python, one of the most widely used languages in software development, data analysis, and automation. Learners will gain hands‑on experience writing, testing, and debugging Python code, covering essential concepts such as variables, data types, control structures, functions, and file handling. By the end of the course, participants will be equipped to create small applications and continue their learning journey into more advanced topics.",
+  "course_overview": "The course is organized into six progressive modules that guide learners from fundamental concepts to a practical capstone project. Module 1 introduces the Python interpreter, basic syntax, and data types such as integers, floats, strings, lists, tuples, and dictionaries, with hands‑on exercises like calculating the average of a numeric list. Module 2 covers control flow, demonstrating if‑elif‑else statements and loop constructs through examples such as generating the Fibonacci sequence. Module 3 focuses on functions, parameter passing, and scope, including a lab where students create a reusable calculator function library. Module 4 explores data structures and algorithmic thinking, using real‑world scenarios like sorting a list of student grades. Module 5 teaches file input/output and exception handling, guiding learners to read CSV files, process the data, and write results to a new file. The final module integrates all skills in a capstone project that automates a simple inventory management task, reinforcing best practices and code readability.",
+  "target_audience": "High school seniors planning to study computer science, career changers with no prior coding experience, and self‑taught hobbyists seeking a structured foundation in Python programming.",
+  "estimated_duration_hours": 40,
+  "difficulty_level": "beginner",
+  "prerequisites": [],
+  "learning_outcomes": [
+    "Define core Python syntax and data types, including strings, lists, dictionaries, and tuples",
+    "Build simple algorithms using control flow statements such as if/else and loops",
+    "Create reusable functions and modules to encapsulate logic and improve code maintainability",
+    "Analyze program output and debug common errors using built‑in tools and exception handling",
+    "Implement a small end‑to‑end project that reads, processes, and writes data to files"
+  ],
+  "course_tags": [
+    "python",
+    "programming",
+    "beginner",
+    "software development",
+    "coding fundamentals"
+  ]
+}

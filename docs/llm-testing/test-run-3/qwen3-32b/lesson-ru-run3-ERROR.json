@@ -1,0 +1,9 @@
+{
+  "model": "Qwen3 32B",
+  "modelSlug": "qwen3-32b",
+  "scenario": "lesson-ru",
+  "runNumber": 3,
+  "error": "Unterminated string in JSON at position 556 (line 9 column 58)",
+  "duration": 200875,
+  "timestamp": "2025-11-14T07:20:38.073Z"
+}

@@ -1,0 +1,35 @@
+{
+  "course_title": "Introduction to Python Programming",
+  "course_description": "This hands-on course introduces programming fundamentals through Python, perfect for absolute beginners. Learn syntax, data types, control structures, and problem-solving while building real projects. No prior experience required. Master the basics of one of the world's most popular programming languages.",
+  "course_overview": "A comprehensive introduction to Python programming designed for absolute beginners. This course covers fundamental programming concepts including variables, data types, control structures, functions, file handling, and object-oriented programming basics. Students will learn Python syntax and best practices while working on practical projects that solve real problems. The curriculum emphasizes hands-on learning through coding exercises, interactive examples, debugging techniques, and step-by-step problem decomposition. By the end of this course, students will have the skills to write Python programs for automation tasks, perform basic data analysis, and create simple applications that can be shared with others.",
+  "target_audience": "Perfect for beginners with no programming experience who want to start their coding journey and learn a versatile, beginner-friendly language",
+  "estimated_duration_hours": 45,
+  "difficulty_level": "beginner",
+  "prerequisites": [
+    "No prior programming experience required",
+    "Basic computer literacy",
+    "Familiarity with using a web browser and file management",
+    "High school level mathematics understanding"
+  ],
+  "learning_outcomes": [
+    "Explain fundamental programming concepts including variables, data types, and control structures",
+    "Create Python programs using functions, loops, and conditional statements to solve problems",
+    "Apply object-oriented programming principles to design and implement simple classes and objects",
+    "Analyze and debug Python code using appropriate tools and error handling techniques",
+    "Develop file input/output operations to read from and write to various file formats",
+    "Implement basic data structures including lists, dictionaries, sets, and tuples in practical scenarios",
+    "Design and build small-scale Python applications that integrate multiple programming concepts"
+  ],
+  "course_tags": [
+    "Python",
+    "Programming Fundamentals",
+    "Beginner Coding",
+    "Data Types",
+    "Control Structures",
+    "Functions",
+    "Object-Oriented Programming",
+    "File Handling",
+    "Problem Solving",
+    "Automation"
+  ]
+}

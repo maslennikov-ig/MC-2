@@ -1,0 +1,32 @@
+{
+  "course_title": "Introduction to Python Programming",
+  "course_description": "This beginner-level course provides a solid foundation in Python programming, covering essential concepts for new programmers. Through hands-on exercises and real-world examples, students will master syntax, data structures, control flow, and basic scripting techniques. The curriculum includes practical projects such as building a calculator, creating simple games, and automating file management tasks, ensuring learners can apply their knowledge immediately. With step-by-step guidance, this course is designed for those with little to no programming experience to confidently start developing their own Python applications.",
+  "course_overview": "This course begins with an introduction to Python's role in modern programming, followed by core concepts including variables, data types, and operators. Students will learn to construct and debug simple programs using loops and conditionals, with examples like a temperature conversion tool and a basic inventory management system. The curriculum then progresses to functions and modules, teaching how to organize code effectively through projects such as a personal budget calculator. Data structures like lists, tuples, dictionaries, and sets will be explored in depth, with practical applications including data aggregation and filtering exercises. Learners will also gain experience with file handling, creating scripts to read and write text files, and manipulate CSV data using the standard library. The course concludes with an introduction to error handling and basic use of external libraries like NumPy for numerical operations and Matplotlib for simple visualizations. Each module includes guided coding exercises and real-world challenges to reinforce understanding and build practical skills.",
+  "target_audience": "High school students new to programming, early-career professionals in non-technical fields seeking to transition into software development, and hobbyists interested in automating everyday tasks or exploring data science. Ideal for individuals with little to no prior coding experience who wish to build practical Python skills through applied learning.",
+  "estimated_duration_hours": 10,
+  "difficulty_level": "beginner",
+  "prerequisites": [
+    "Basic computer literacy",
+    "Familiarity with using a text editor or code IDE",
+    "No prior programming experience required"
+  ],
+  "learning_outcomes": [
+    "Define core Python syntax and grammar rules",
+    "Build command-line applications using control structures and functions",
+    "Analyze runtime errors through debugging techniques",
+    "Create modular programs using custom functions and libraries",
+    "Implement loops and conditional statements for data processing",
+    "Process and manipulate data using Python lists, tuples, dictionaries, and sets",
+    "Utilize standard libraries (os, sys, datetime) for file and system operations"
+  ],
+  "course_tags": [
+    "python",
+    "programming_fundamentals",
+    "scripting",
+    "data_structures",
+    "control_flow",
+    "functions",
+    "beginner_friendly",
+    "hands_on_projects"
+  ]
+}

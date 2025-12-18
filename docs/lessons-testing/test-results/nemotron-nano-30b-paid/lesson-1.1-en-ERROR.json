@@ -1,0 +1,8 @@
+{
+  "model": "Nemotron 3 Nano 30B (Paid)",
+  "modelSlug": "nemotron-nano-30b-paid",
+  "lessonId": "1.1-en",
+  "error": "HTTP 404: {\"error\":{\"message\":\"No endpoints found for nvidia/nemotron-3-nano-30b-a3b.\",\"code\":404},\"user_id\":\"user_36Q7KLG3qD9y2MTheYVcCmF5r3c\"}",
+  "duration": 68,
+  "timestamp": "2025-12-16T11:23:32.441Z"
+}

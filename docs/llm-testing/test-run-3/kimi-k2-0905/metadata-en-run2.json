@@ -1,0 +1,32 @@
+{
+  "course_title": "Introduction to Python Programming",
+  "course_description": "Learn Python from scratch: write real code, automate tasks, and build simple apps in just one course—no prior experience required.",
+  "course_overview": "This hands-on course takes absolute beginners from zero to confident Python coder. You will set up a modern development environment, master core syntax and data structures, control program flow with loops and functions, interact with files and APIs, and finish by creating a small portfolio project. Every module mixes short lectures with interactive labs and auto-graded exercises so you immediately apply what you learn. By the end, you will be able to read, write, debug, and extend Python scripts that solve practical problems in data, web, and automation domains.",
+  "target_audience": "Aspiring programmers, analysts, and professionals who want a marketable first language with no previous coding background.",
+  "estimated_duration_hours": 25,
+  "difficulty_level": "beginner",
+  "prerequisites": [
+    "Basic computer literacy",
+    "Ability to install software on your machine",
+    "High-school algebra comfort"
+  ],
+  "learning_outcomes": [
+    "Set up VS Code and a Python 3 virtual environment on Windows, macOS, or Linux",
+    "Explain and apply variables, operators, and built-in data types (int, float, str, list, dict)",
+    "Construct programs using conditionals, loops, and functions following PEP 8 style",
+    "Read from and write to text, CSV, and JSON files with error handling",
+    "Import and use standard-library modules to automate OS and web tasks",
+    "Debug runtime errors using IDLE/VS Code debugger and stack traces",
+    "Design and test a 200-line terminal or data project that meets user requirements"
+  ],
+  "course_tags": [
+    "Python",
+    "Programming",
+    "Beginner",
+    "Automation",
+    "Data",
+    "Scripting",
+    "VS Code",
+    "PEP 8"
+  ]
+}

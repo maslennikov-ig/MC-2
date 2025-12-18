@@ -1,0 +1,30 @@
+{
+  "course_title": "Introduction to Python Programming",
+  "course_description": "Master Python fundamentals from scratch in this hands-on beginner course. Learn core programming concepts, syntax, and problem-solving techniques through practical exercises. Build foundational skills to create scripts, automate tasks, and prepare for advanced topics in data science or web development—all with zero prior coding experience required.",
+  "course_overview": "This comprehensive course delivers a structured foundation in Python programming for absolute beginners. Starting with installation and basic syntax, you'll progress through variables, data types, control structures, functions, and file handling. Practical modules include debugging techniques, error handling, and building real-world projects like a number-guessing game and data analysis scripts. The curriculum emphasizes hands-on coding with immediate feedback, culminating in portfolio-ready projects that demonstrate proficiency in writing clean, efficient Python code for diverse applications.",
+  "target_audience": "Absolute beginners with no programming experience, including students, career changers, and professionals seeking foundational technical skills for automation or data analysis.",
+  "estimated_duration_hours": 28.5,
+  "difficulty_level": "beginner",
+  "prerequisites": [
+    "Basic computer navigation skills (file management, web browsing)",
+    "No prior coding knowledge required"
+  ],
+  "learning_outcomes": [
+    "Write executable Python programs using variables, operators, and core data types",
+    "Implement control flow structures including loops and conditional statements",
+    "Create and debug functions to solve computational problems",
+    "Manipulate strings and data structures (lists, dictionaries, tuples)",
+    "Read/write data from/to files for persistent storage solutions",
+    "Apply error handling techniques to build robust scripts"
+  ],
+  "course_tags": [
+    "Python",
+    "Programming Fundamentals",
+    "Beginner Coding",
+    "Software Development",
+    "Data Structures",
+    "Hands-on Programming",
+    "Scripting",
+    "Computer Science"
+  ]
+}

@@ -1,0 +1,103 @@
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "In this section, learners will explore how to store and manipulate information using variables and the fundamental data types in Python. They will gain hands‑on experience creating variables, understanding type semantics, and converting between types.",
+  "learning_objectives": [
+    "Declare and assign variables using appropriate naming conventions.",
+    "Identify and use Python’s built-in data types: int, float, str, bool, list, tuple, and dict.",
+    "Perform type conversion and use the type() function to inspect data types.",
+    "Apply variables and data types in simple arithmetic and string operations."
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Understanding Variables and Naming Rules",
+      "lesson_objective": "Create variables following Python naming conventions and assign values of various types.",
+      "key_topics": [
+        "Variable assignment",
+        "Naming conventions",
+        "Case sensitivity",
+        "Dynamic typing"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Simple Variable Assignment",
+          "exercise_instructions": "Open a Python interpreter or script file. Create three variables: an integer named 'age', a float named 'price', and a string named 'city'. Assign appropriate values and print each variable."
+        },
+        {
+          "exercise_title": "Invalid Names Identification",
+          "exercise_instructions": "List five examples of illegal variable names in Python and explain why each is invalid."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Core Primitive Data Types",
+      "lesson_objective": "Demonstrate the use of int, float, str, and bool types and perform basic operations.",
+      "key_topics": [
+        "int",
+        "float",
+        "str",
+        "bool",
+        "Arithmetic operators",
+        "String concatenation",
+        "Boolean logic"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Arithmetic Operations",
+          "exercise_instructions": "Write a script that defines two numeric variables, performs addition, subtraction, multiplication, division, and prints the results."
+        },
+        {
+          "exercise_title": "String and Boolean Practice",
+          "exercise_instructions": "Create a string variable 'greeting' with value 'Hello', concatenate it with another string variable 'name' set to your name, and print the result. Then create a boolean variable 'is_student' set to True and print its type."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "Collections: Lists, Tuples, and Dictionaries",
+      "lesson_objective": "Create and manipulate list, tuple, and dictionary objects.",
+      "key_topics": [
+        "list creation",
+        "list indexing and slicing",
+        "tuple immutability",
+        "dictionary key-value pairs",
+        "basic methods (append, pop, keys, values)"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "List Manipulation",
+          "exercise_instructions": "Create a list of your favorite fruits. Add a new fruit using append, remove the second fruit using pop, and print the final list."
+        },
+        {
+          "exercise_title": "Dictionary Lookup",
+          "exercise_instructions": "Create a dictionary mapping country names to their capitals for three countries. Retrieve and print the capital of one country using its key."
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "Type Conversion and Inspection",
+      "lesson_objective": "Convert between data types and use type() to verify conversions.",
+      "key_topics": [
+        "type() function",
+        "int()",
+        "float()",
+        "str()",
+        "bool()",
+        "implicit conversion in expressions"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Explicit Conversions",
+          "exercise_instructions": "Given a string variable 'num_str' = '123', convert it to an integer, add 10, and print the result and its type."
+        },
+        {
+          "exercise_title": "Mixed-Type Expression",
+          "exercise_instructions": "Write an expression that adds an integer 5 to a float 2.5, then concatenates the result with a string ' is the sum'. Ensure proper conversion so the code runs without errors, and print the final string."
+        }
+      ]
+    }
+  ]
+}

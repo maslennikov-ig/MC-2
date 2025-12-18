@@ -1,0 +1,93 @@
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "A hands-on programming section covering the fundamentals of variables, data types, and basic operations in Python. Students will learn to declare variables, understand different data types, perform type conversion, and work with user input through practical exercises.",
+  "learning_objectives": [
+    "Declare and assign values to variables using proper Python syntax",
+    "Identify and use core Python data types including integers, floats, strings, and booleans",
+    "Perform type conversion between different data types",
+    "Utilize input() function to capture and process user input"
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Declaring Variables and Basic Assignment",
+      "lesson_objective": "Students will be able to declare variables using valid Python identifiers and assign values using the assignment operator.",
+      "key_topics": ["Python variable naming rules and conventions", "Assignment operator (=) usage", "Printing variable values to console", "Variable reassignment"],
+      "exercises": [
+        {
+          "exercise_title": "Variable Declaration Practice",
+          "exercise_instructions": "Create three variables: one for your name, one for your age, and one for your favorite color. Print each variable's value to the console."
+        },
+        {
+          "exercise_title": "Value Reassignment",
+          "exercise_instructions": "Create a variable called 'score' with an initial value of 10. Print it, then reassign it to 25 and print the new value."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Working with Numeric Data Types",
+      "lesson_objective": "Students will be able to perform basic arithmetic operations with integer and float data types.",
+      "key_topics": ["Integer vs float data types", "Basic arithmetic operations (+, -, *, /)", "Integer division (//) and modulus (%)", "Order of operations (PEMDAS)"],
+      "exercises": [
+        {
+          "exercise_title": "Temperature Conversion",
+          "exercise_instructions": "Convert a temperature of 98.6 degrees Fahrenheit to Celsius using the formula: celsius = (fahrenheit - 32) * 5/9. Store both values in variables and print the result."
+        },
+        {
+          "exercise_title": "Arithmetic Operations",
+          "exercise_instructions": "Calculate the area and perimeter of a rectangle with length 8.5 and width 5.2. Store each calculation in separate variables and print both results."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "String Manipulation and Operations",
+      "lesson_objective": "Students will be able to create string variables and perform basic string operations and concatenation.",
+      "key_topics": ["String creation with single and double quotes", "String concatenation using + operator", "String repetition with * operator", "String methods: upper(), lower(), title()"],
+      "exercises": [
+        {
+          "exercise_title": "String Concatenation",
+          "exercise_instructions": "Create three string variables for first name, last name, and a greeting message. Concatenate them to form a complete greeting and print it."
+        },
+        {
+          "exercise_title": "String Repetition",
+          "exercise_instructions": "Create a string variable containing a single word and use the repetition operator to print it 5 times in a row without spaces."
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "Type Conversion and Boolean Logic",
+      "lesson_objective": "Students will be able to convert between data types and work with boolean values and comparisons.",
+      "key_topics": ["Type conversion functions: int(), float(), str()", "Boolean data type (True/False)", "Comparison operators (==, !=, >, <, >=, <=)", "Boolean expressions evaluation"],
+      "exercises": [
+        {
+          "exercise_title": "Type Conversion Practice",
+          "exercise_instructions": "Create a string variable containing '123', convert it to an integer, add 7 to it, then convert the result back to a string and print it."
+        },
+        {
+          "exercise_title": "Comparison Operations",
+          "exercise_instructions": "Create two variables with different numeric values. Write and print the results of three different comparison operations between them (e.g., greater than, equal to, not equal to)."
+        }
+      ]
+    },
+    {
+      "lesson_number": 5,
+      "lesson_title": "User Input and Dynamic Variables",
+      "lesson_objective": "Students will be able to capture user input and process it with appropriate data types.",
+      "key_topics": ["input() function usage", "Processing numeric input with type conversion", "Combining input with string formatting", "Basic input validation concepts"],
+      "exercises": [
+        {
+          "exercise_title": "Interactive Calculator",
+          "exercise_instructions": "Prompt the user to enter two numbers. Convert the inputs to floats, calculate their sum, product, and average, then print all three results."
+        },
+        {
+          "exercise_title": "Personalized Message Generator",
+          "exercise_instructions": "Ask the user for their name, age, and favorite food. Create a personalized message that incorporates all three pieces of information and print it."
+        }
+      ]
+    }
+  ]
+}

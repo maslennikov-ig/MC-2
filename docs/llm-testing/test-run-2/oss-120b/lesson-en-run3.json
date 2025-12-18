@@ -1,0 +1,83 @@
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "This hands‑on section guides learners through creating variables, understanding Python's core data types, manipulating collections, and performing type conversions. Each lesson includes practical exercises to reinforce concepts.",
+  "learning_objectives": [
+    "Students will be able to declare and assign variables using appropriate naming conventions.",
+    "Students will be able to differentiate between mutable and immutable data types.",
+    "Students will be able to perform type conversion and use built-in functions to inspect data types.",
+    "Students will be able to apply variables and data types in practical coding exercises."
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Creating and Naming Variables in Python",
+      "lesson_objective": "Students will be able to create variables with valid identifiers and assign values of various types.",
+      "key_topics": [
+        "Valid identifier rules",
+        "Assignment operator",
+        "Case sensitivity",
+        "Dynamic typing"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Variable Declaration Practice",
+          "exercise_instructions": "Write a script that declares at least five variables of different types (int, float, string, bool, list). Use meaningful names and print each variable."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Understanding Primitive Data Types",
+      "lesson_objective": "Students will be able to identify and use Python's primitive data types correctly.",
+      "key_topics": [
+        "Integers and arithmetic",
+        "Floating-point numbers",
+        "Strings and concatenation",
+        "Booleans and logical operations"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Data Type Exploration",
+          "exercise_instructions": "Create variables for each primitive type, perform an operation appropriate to the type (e.g., add two integers, concatenate two strings), and print the results with type() output."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "Working with Collections: Lists, Tuples, and Dictionaries",
+      "lesson_objective": "Students will be able to create, access, and modify list, tuple, and dictionary structures.",
+      "key_topics": [
+        "List creation and indexing",
+        "Tuple immutability",
+        "Dictionary key-value pairs",
+        "Common methods: append, pop, get"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Collection Manipulation",
+          "exercise_instructions": "Construct a list of five numbers, a tuple of three strings, and a dictionary mapping three names to ages. Perform at least two modifications on the list, attempt to modify the tuple (observe error), and update one dictionary entry. Print all structures after changes."
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "Type Conversion and Inspecting Types",
+      "lesson_objective": "Students will be able to convert between data types and use built-in functions to inspect variable types.",
+      "key_topics": [
+        "int() casting",
+        "float() casting",
+        "str() casting",
+        "list() and tuple() from iterables",
+        "type() function",
+        "isinstance() checks"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Conversion Challenges",
+          "exercise_instructions": "Given a string '123', convert it to int and add 10. Convert a float 9.87 to string and concatenate with ' dollars'. Create a list from a tuple of characters and verify its type. Use isinstance() to check if a variable is a list."
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,29 @@
+{
+  "course_title": "Introduction to Python Programming",
+  "course_description": "This beginner-friendly course introduces Python fundamentals, guiding learners through variables, data types, control flow, functions, and basic data structures, enabling them to write and run simple programs with confidence.",
+  "course_overview": "In this hands-on introductory course, students will explore the core concepts of Python programming through interactive lectures, live coding demos, and practical exercises. Starting with setting up a development environment, the curriculum covers variables, operators, data types, strings, lists, dictionaries, conditionals, loops, functions, and simple file I/O. Learners will practice writing and debugging code in real time, develop small projects such as a calculator and a text-based game, and gain confidence to continue their coding journey. No prior programming experience is required, but participants should be comfortable using a computer and navigating the internet.",
+  "target_audience": "Aspiring programmers, students, career changers, or anyone with basic computer skills who wants to learn how to think computationally and create functional software using Python.",
+  "estimated_duration_hours": 40,
+  "difficulty_level": "beginner",
+  "prerequisites": [
+    "Basic computer literacy",
+    "Access to a personal computer",
+    "Internet connection"
+  ],
+  "learning_outcomes": [
+    "Write simple Python scripts that perform calculations and data manipulation",
+    "Explain core programming concepts such as variables, control flow, and functions",
+    "Apply conditional statements and loops to solve logical problems",
+    "Create reusable functions and modules to organize code",
+    "Debug Python code using error messages and built-in tools",
+    "Demonstrate the ability to read from and write to files"
+  ],
+  "course_tags": [
+    "Python",
+    "Programming",
+    "Beginner",
+    "Software Development",
+    "Scripting",
+    "Computer Science"
+  ]
+}

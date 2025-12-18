@@ -1,0 +1,94 @@
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "Master the fundamentals of Python variables and data types through interactive coding exercises, real-world examples, and progressive challenges that build from basic assignments to complex type manipulations.",
+  "learning_objectives": [
+    "Create and assign values to variables using proper Python naming conventions",
+    "Differentiate between immutable and mutable data types with practical examples",
+    "Convert between data types using casting methods and handle conversion errors",
+    "Apply string formatting techniques to create dynamic output messages",
+    "Manipulate collections (lists, tuples, dictionaries) using built-in methods"
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Variable Assignment and Naming Conventions",
+      "lesson_objective": "Students will correctly declare variables using snake_case naming and assign values while avoiding Python reserved keywords",
+      "key_topics": ["snake_case convention rules", "reserved keywords list", "dynamic typing behavior", "variable reassignment patterns", "memory reference basics"],
+      "exercises": [
+        {
+          "exercise_title": "Fix Invalid Variable Names",
+          "exercise_instructions": "Given a list of 10 invalid variable names containing spaces, hyphens, or keywords, rewrite each using proper snake_case convention while preserving the intended meaning"
+        },
+        {
+          "exercise_title": "Swap Values Without Temporary Variable",
+          "exercise_instructions": "Create a program that swaps the values of two variables in a single line using tuple unpacking, then verify the swap by printing both variables"
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Numeric Types and Arithmetic Operations",
+      "lesson_objective": "Students will perform calculations using integers, floats, and complex numbers while handling precision errors and type conversions",
+      "key_topics": ["integer vs float division", "floating-point precision errors", "complex number syntax", "type() function usage", "arithmetic operator precedence"],
+      "exercises": [
+        {
+          "exercise_title": "Calculate Compound Interest",
+          "exercise_instructions": "Write a function that calculates compound interest for given principal, rate, and time, returning results as both float and rounded integer values"
+        },
+        {
+          "exercise_title": "Convert Temperature Scales",
+          "exercise_instructions": "Create a converter that transforms Celsius to Fahrenheit and Kelvin, handling both integer and decimal inputs while maintaining precision"
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "String Manipulation and Formatting Techniques",
+      "lesson_objective": "Students will manipulate strings using slicing, concatenation, and f-strings to create formatted output from dynamic data",
+      "key_topics": ["string slicing patterns", "f-string expressions", "escape character sequences", "string method chaining", "unicode character handling"],
+      "exercises": [
+        {
+          "exercise_title": "Extract Email Components",
+          "exercise_instructions": "Given an email address string, extract the username and domain using string slicing, then format them into a readable message using f-strings"
+        },
+        {
+          "exercise_title": "Create Password Validator",
+          "exercise_instructions": "Build a function that checks if a password contains at least 8 characters, one uppercase, one lowercase, and one number using string methods"
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "List and Tuple Operations for Data Storage",
+      "lesson_objective": "Students will create and modify lists using append, extend, and insert methods while understanding tuple immutability through practical examples",
+      "key_topics": ["list vs tuple mutability", "nested list structures", "list comprehension basics", "tuple unpacking patterns", "indexing and slicing collections"],
+      "exercises": [
+        {
+          "exercise_title": "Manage Shopping Cart Data",
+          "exercise_instructions": "Create a shopping cart system using lists that can add items, remove specific products by name, and calculate the total price from a separate price list"
+        },
+        {
+          "exercise_title": "Process Student Grades",
+          "exercise_instructions": "Store student names and grades in parallel lists, then calculate each student's average and find the class highest and lowest scores"
+        }
+      ]
+    },
+    {
+      "lesson_number": 5,
+      "lesson_title": "Dictionary Structures for Key-Value Relationships",
+      "lesson_objective": "Students will build and access dictionaries to store structured data, using keys to retrieve, update, and delete values efficiently",
+      "key_topics": ["dictionary key requirements", "nested dictionary access", "dict.get() method usage", "updating key-value pairs", "dictionary iteration patterns"],
+      "exercises": [
+        {
+          "exercise_title": "Build Phone Directory",
+          "exercise_instructions": "Create a phone directory that stores names as keys and phone numbers as values, implementing search, update, and delete functionality with user input"
+        },
+        {
+          "exercise_title": "Track Inventory Levels",
+          "exercise_instructions": "Design an inventory system using dictionaries where product names map to quantities, including functions to add stock, sell items, and check low stock alerts"
+        }
+      ]
+    }
+  ]
+}

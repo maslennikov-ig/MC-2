@@ -1,0 +1,48 @@
+{
+  "model": "Devstral 2512 (Sequential)",
+  "modelSlug": "devstral-2512-seq",
+  "modelApiName": "mistralai/devstral-2512:free",
+  "lessonId": "1.2",
+  "lessonTitle": "Ценообразование на билеты: как работают скидки и тарифы",
+  "language": "ru",
+  "duration": 35668,
+  "timestamp": "2025-12-16T11:21:38.539Z",
+  "parseSuccess": true,
+  "parseError": null,
+  "usage": {
+    "prompt_tokens": 624,
+    "completion_tokens": 1704,
+    "total_tokens": 2328,
+    "cost": 0,
+    "is_byok": false,
+    "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "audio_tokens": 0,
+      "video_tokens": 0
+    },
+    "cost_details": {
+      "upstream_inference_cost": null,
+      "upstream_inference_prompt_cost": 0,
+      "upstream_inference_completions_cost": 0
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 0,
+      "image_tokens": 0
+    }
+  },
+  "quality": {
+    "hasIntro": true,
+    "hasSections": true,
+    "hasExamples": true,
+    "hasExercises": true,
+    "hasSummary": true,
+    "sectionsCount": 3,
+    "examplesCount": 2,
+    "exercisesCount": 2,
+    "totalWordCount": 381,
+    "introWordCount": 66,
+    "coversObjectives": 3,
+    "coversTopics": 5,
+    "qualityScore": 100
+  }
+}

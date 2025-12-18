@@ -1,0 +1,82 @@
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "Hands-on programming section with practical exercises where students declare variables, manipulate data types, and solve real-world problems through incremental coding challenges",
+  "learning_objectives": [
+    "Declare variables with meaningful names following Python conventions",
+    "Identify and convert between core data types (int, float, str, bool) accurately",
+    "Use type() function to verify data types during program execution",
+    "Apply string formatting techniques to incorporate variables in output messages",
+    "Troubleshoot type-related errors in arithmetic and string operations"
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Variable Declaration and Naming Conventions",
+      "lesson_objective": "Students will declare variables using snake_case naming rules and assign values of different data types",
+      "key_topics": [
+        "Valid variable naming rules (alphabet characters, numbers, underscores)",
+        "Reserved keywords prohibited in variable names",
+        "Dynamic typing in Python assignments",
+        "Reassigning variable values"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Personal Profile Variables",
+          "exercise_instructions": "Declare three variables: user_age (integer), full_name (string), and is_subscribed (boolean). Assign realistic values matching your personal details. Print all three variables with descriptive labels using separate print statements."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Core Data Type Identification",
+      "lesson_objective": "Students will distinguish between int, float, str, and bool data types using type() verification",
+      "key_topics": [
+        "Integer vs. float numeric representations",
+        "String literal delimiters (single, double, triple quotes)",
+        "Boolean truth values in conditional contexts",
+        "Using type() to inspect variables"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Data Type Detective",
+          "exercise_instructions": "Create four variables: distance_km (float), product_name (string), is_available (boolean), and inventory_count (integer). Print each variable's value followed by its data type in parentheses using this format: 'Value: 42 | Type: <class 'int'>'"
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "Type Conversion and Arithmetic",
+      "lesson_objective": "Students will convert between data types and predict operation results with mixed types",
+      "key_topics": [
+        "Implicit type conversion rules in expressions",
+        "Explicit conversion with int(), float(), str()",
+        "String concatenation vs. numeric addition",
+        "Handling ValueError in invalid conversions"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Temperature Converter Challenge",
+          "exercise_instructions": "Declare temperature_str = '25.5'. Convert to float, then calculate Fahrenheit using formula (C * 9/5) + 32. Print the original Celsius string and converted Fahrenheit value with labels. Attempt to convert 'twenty-five' to integer and observe the error."
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "Dynamic String Formatting",
+      "lesson_objective": "Students will generate formatted strings incorporating variables using multiple techniques",
+      "key_topics": [
+        "String concatenation with type conversion",
+        "f-string literal syntax with expression evaluation",
+        "str.format() method with positional placeholders",
+        "Handling mixed data types in output"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Product Inventory Message",
+          "exercise_instructions": "Using product_name (string), stock_count (int), and price (float) variables, create three output versions: 1) Concatenation with explicit str() conversion 2) f-string with currency formatting 3) format() method. All should produce: 'Widget: 15 units at $19.99 each'"
+        }
+      ]
+    }
+  ]
+}

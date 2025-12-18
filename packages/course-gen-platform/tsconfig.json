@@ -1,0 +1,21 @@
+{
+  "extends": "../../tsconfig.json",
+  "compilerOptions": {
+    "outDir": "./dist",
+    "rootDir": "./src",
+    "composite": true,
+    "baseUrl": ".",
+    "paths": {
+      "@/*": ["./src/*"],
+      "@megacampus/shared-types": ["../shared-types/src"],
+      "@megacampus/shared-types/*": ["../shared-types/src/*"]
+    }
+  },
+  "references": [
+    {
+      "path": "../shared-types"
+    }
+  ],
+  "include": ["src/**/*"],
+  "exclude": ["node_modules", "dist", "tests", "examples", "**/__tests__"]
+}

@@ -1,0 +1,78 @@
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "This section introduces the fundamental concepts of variables and data types in Python. Students will learn how to declare variables, work with common data types, and perform basic type conversions to build a strong foundation for programming.",
+  "learning_objectives": [
+    "Understand how to declare and assign values to variables in Python",
+    "Demonstrate the use of common data types including integers, floats, strings, and booleans",
+    "Apply type conversion techniques between basic data types",
+    "Identify and resolve common type-related errors in simple programs"
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Introduction to Variables",
+      "lesson_objective": "Declare variables and assign values using different data types",
+      "key_topics": [
+        "Variable declaration syntax",
+        "Naming conventions",
+        "Integer and float data types",
+        "String data types",
+        "Boolean values"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Basic Variable Assignment",
+          "exercise_instructions": "Create variables to store your name, age, and favorite number. Print each variable's value and type using the type() function."
+        },
+        {
+          "exercise_title": "Data Type Identification",
+          "exercise_instructions": "Write a program that takes user input for a temperature value and determines whether it should be stored as an integer or float based on the presence of a decimal point."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Type Conversion",
+      "lesson_objective": "Convert between data types using built-in functions and operators",
+      "key_topics": [
+        "Implicit type conversion",
+        "Explicit type conversion (casting)",
+        "int(), float(), str(), bool() functions",
+        "Common conversion errors"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Unit Converter",
+          "exercise_instructions": "Write a program that converts user-input kilometers to miles. Ensure the input is converted from string to float before performing calculations."
+        },
+        {
+          "exercise_title": "Type Casting Practice",
+          "exercise_instructions": "Create a table showing conversions between all combinations of int, float, string, and boolean types using valid examples for each conversion."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "Dynamic Typing and Best Practices",
+      "lesson_objective": "Manage variable types dynamically while writing clean, maintainable code",
+      "key_topics": [
+        "Python's dynamic typing system",
+        "Type inference examples",
+        "Variable reuse and reassignment",
+        "Type hinting (PEP 484 basics)",
+        "Naming conventions for type clarity"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Dynamic Typing Demo",
+          "exercise_instructions": "Create a variable that changes types during execution (e.g., stores a number then a string). Use type hints to document each expected type."
+        },
+        {
+          "exercise_title": "Debugging Type Errors",
+          "exercise_instructions": "Fix a provided code snippet that contains type-related errors when combining strings and numbers in output statements."
+        }
+      ]
+    }
+  ]
+}

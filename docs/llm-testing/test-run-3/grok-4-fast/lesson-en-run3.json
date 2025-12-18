@@ -1,0 +1,107 @@
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "This hands-on section explores the basics of variables and data types in Python, including declaration, usage, and practical exercises to reinforce learning.",
+  "learning_objectives": [
+    "Declare and assign variables using appropriate syntax in Python.",
+    "Identify and use common data types like integers, floats, strings, and booleans.",
+    "Perform basic operations with variables and understand type conversion.",
+    "Debug common errors related to variables and data types."
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Understanding Variables in Python",
+      "lesson_objective": "Students will be able to declare and assign values to variables correctly.",
+      "key_topics": [
+        "What are variables?",
+        "Variable naming conventions",
+        "Assignment operator (=)",
+        "Dynamic typing in Python",
+        "Scope basics"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Simple Variable Assignment",
+          "exercise_instructions": "Create variables for your name (string), age (integer), and height (float). Print each variable using the print() function."
+        },
+        {
+          "exercise_title": "Variable Reassignment",
+          "exercise_instructions": "Assign an integer to a variable, then reassign it to a string. Print the variable before and after reassignment to observe the change."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Primitive Data Types",
+      "lesson_objective": "Students will identify and utilize Python's primitive data types in code.",
+      "key_topics": [
+        "Integers (int)",
+        "Floating-point numbers (float)",
+        "Strings (str)",
+        "Booleans (bool)",
+        "None type",
+        "Using type() function"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Data Type Identification",
+          "exercise_instructions": "Declare variables of each primitive type (int, float, str, bool). Use type() to print the type of each variable."
+        },
+        {
+          "exercise_title": "String Manipulation Basics",
+          "exercise_instructions": "Create a string variable with your full name. Concatenate it with another string like ' is learning Python' and print the result."
+        },
+        {
+          "exercise_title": "Boolean Operations",
+          "exercise_instructions": "Assign True and False to boolean variables. Perform a simple comparison like age > 18 and print the boolean result."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "Operations and Type Conversion",
+      "lesson_objective": "Students will perform arithmetic and string operations while converting data types as needed.",
+      "key_topics": [
+        "Arithmetic operations (+, -, *, /, //, %)",
+        "String concatenation and repetition",
+        "Implicit and explicit type conversion",
+        "Using int(), float(), str(), bool() functions",
+        "Common type errors"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Arithmetic with Numbers",
+          "exercise_instructions": "Declare two integer variables, perform addition, subtraction, and division. Print the results and their types."
+        },
+        {
+          "exercise_title": "Type Conversion Practice",
+          "exercise_instructions": "Convert a string '42' to an integer, add 8 to it, then convert the result back to a string. Print each step."
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "Best Practices and Debugging",
+      "lesson_objective": "Students will apply best practices for variables and debug type-related issues.",
+      "key_topics": [
+        "Descriptive variable names",
+        "Avoiding reserved keywords",
+        "Handling TypeError",
+        "Using comments for clarity",
+        "Input validation basics",
+        "Constants with uppercase"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Debugging Type Errors",
+          "exercise_instructions": "Write code that attempts to add a string and an integer without conversion, causing an error. Fix it by converting types and print the corrected result."
+        },
+        {
+          "exercise_title": "Personal Info Calculator",
+          "exercise_instructions": "Create variables for birth year (int) and current year (int). Calculate age and store as a variable. Print a formatted string like 'I am X years old'."
+        }
+      ]
+    }
+  ]
+}

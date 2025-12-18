@@ -1,0 +1,19 @@
+{
+  "course_title": "Introduction to Python Programming",
+  "course_description": "Master the fundamentals of Python programming in this beginner-friendly course designed to transform you from complete novice to confident coder through hands-on projects and practical exercises.",
+  "course_overview": "This comprehensive introduction to Python programming is perfect for absolute beginners with no prior coding experience. You'll start with the basics of Python syntax and progress through essential programming concepts including variables, data types, control flow, functions, and object-oriented programming. Through a combination of video lessons, interactive coding exercises, and real-world projects, you'll build a solid foundation in Python that prepares you for further study in data science, web development, automation, or software engineering. The course emphasizes practical application over theoretical concepts, ensuring you can immediately apply what you learn to solve problems and create simple applications.",
+  "target_audience": "Absolute beginners to programming, career changers exploring tech, students needing programming fundamentals, or professionals seeking automation skills.",
+  "estimated_duration_hours": 24,
+  "difficulty_level": "beginner",
+  "prerequisites": ["Basic computer literacy", "Logical thinking ability", "No prior programming experience required"],
+  "learning_outcomes": [
+    "Identify and correctly use Python's basic syntax, data types, and operators",
+    "Apply control flow structures (conditionals and loops) to solve programming problems",
+    "Design and implement functions to create modular, reusable code",
+    "Utilize Python's built-in data structures (lists, dictionaries, tuples, sets) effectively",
+    "Debug code using common debugging techniques and error handling methods",
+    "Create simple object-oriented programs with classes and objects",
+    "Develop a complete Python project that demonstrates mastery of fundamental concepts"
+  ],
+  "course_tags": ["Python", "Programming", "Beginner", "Coding", "Computer Science", "Software Development", "Technical Skills", "Programming Fundamentals"]
+}

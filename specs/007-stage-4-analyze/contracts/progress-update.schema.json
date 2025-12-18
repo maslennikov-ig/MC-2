@@ -1,0 +1,123 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "$id": "https://megacampusai.com/schemas/progress-update.json",
+  "title": "Progress Update",
+  "description": "Real-time progress update structure for Stage 4 analysis (6 phases, 0-100%)",
+  "type": "object",
+  "required": ["courseId", "phase", "progress", "message", "status"],
+  "properties": {
+    "courseId": {
+      "type": "string",
+      "format": "uuid",
+      "description": "Unique identifier of the course being analyzed"
+    },
+    "phase": {
+      "type": "string",
+      "enum": [
+        "phase_0_preflight",
+        "phase_1_classification",
+        "phase_2_scope",
+        "phase_3_expert",
+        "phase_4_synthesis",
+        "phase_5_assembly"
+      ],
+      "description": "Current analysis phase"
+    },
+    "progress": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 100,
+      "description": "Overall analysis progress percentage (0-100)"
+    },
+    "message": {
+      "type": "string",
+      "description": "Localized progress message (Russian for production)"
+    },
+    "status": {
+      "type": "string",
+      "enum": ["analyzing_task", "completed", "failed"],
+      "description": "Current analysis status"
+    },
+    "estimated_time_remaining_ms": {
+      "type": ["integer", "null"],
+      "minimum": 0,
+      "description": "Estimated time remaining in milliseconds (null if unknown)"
+    },
+    "metadata": {
+      "type": "object",
+      "properties": {
+        "phase_start_time": {
+          "type": "string",
+          "format": "date-time",
+          "description": "ISO 8601 timestamp when current phase started"
+        },
+        "models_used": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "LLM models used so far"
+        },
+        "retry_count": {
+          "type": "integer",
+          "minimum": 0,
+          "description": "Total retries across all phases"
+        }
+      }
+    }
+  },
+  "examples": [
+    {
+      "courseId": "3f8e1cd4-0c6e-43cf-8264-57c470a6c102",
+      "phase": "phase_0_preflight",
+      "progress": 5,
+      "message": "Проверка документов...",
+      "status": "analyzing_task",
+      "estimated_time_remaining_ms": 550000,
+      "metadata": {
+        "phase_start_time": "2025-10-31T12:00:00Z",
+        "models_used": [],
+        "retry_count": 0
+      }
+    },
+    {
+      "courseId": "3f8e1cd4-0c6e-43cf-8264-57c470a6c102",
+      "phase": "phase_1_classification",
+      "progress": 20,
+      "message": "Базовая категоризация курса...",
+      "status": "analyzing_task",
+      "estimated_time_remaining_ms": 480000,
+      "metadata": {
+        "phase_start_time": "2025-10-31T12:00:10Z",
+        "models_used": ["openai/gpt-oss-20b"],
+        "retry_count": 0
+      }
+    },
+    {
+      "courseId": "3f8e1cd4-0c6e-43cf-8264-57c470a6c102",
+      "phase": "phase_3_expert",
+      "progress": 65,
+      "message": "Глубокий экспертный анализ...",
+      "status": "analyzing_task",
+      "estimated_time_remaining_ms": 120000,
+      "metadata": {
+        "phase_start_time": "2025-10-31T12:02:30Z",
+        "models_used": ["openai/gpt-oss-20b", "openai/gpt-oss-120b"],
+        "retry_count": 1
+      }
+    },
+    {
+      "courseId": "3f8e1cd4-0c6e-43cf-8264-57c470a6c102",
+      "phase": "phase_5_assembly",
+      "progress": 100,
+      "message": "Анализ завершен",
+      "status": "completed",
+      "estimated_time_remaining_ms": 0,
+      "metadata": {
+        "phase_start_time": "2025-10-31T12:09:45Z",
+        "models_used": ["openai/gpt-oss-20b", "openai/gpt-oss-120b"],
+        "retry_count": 1
+      }
+    }
+  ]
+}

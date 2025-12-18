@@ -1,0 +1,31 @@
+{
+  "course_title": "Introduction to Python Programming",
+  "course_description": "Kickstart your coding journey with Python! This beginner-friendly course teaches core programming concepts through hands-on projects. Learn syntax, problem-solving, and automation skills with zero prior experience needed – build your first program in week one.",
+  "course_overview": "This comprehensive course guides absolute beginners through Python fundamentals using practical, real-world applications. Starting with environment setup and basic syntax, you'll progress through variables, data types, control structures, functions, file handling, and error management. Each module features interactive coding exercises, debugging practice, and mini-projects like building a calculator or text analyzer. The curriculum emphasizes writing clean, readable code while developing computational thinking skills applicable to data analysis, web development, or automation paths. Final projects consolidate learning through practical problem-solving scenarios.",
+  "target_audience": "Absolute beginners with no programming background, career changers, and professionals needing automation skills for data tasks or workflow optimization",
+  "estimated_duration_hours": 28.5,
+  "difficulty_level": "beginner",
+  "prerequisites": [
+    "Basic computer navigation skills (file management, web browsing)",
+    "No prior coding experience required",
+    "Willingness to solve logical problems"
+  ],
+  "learning_outcomes": [
+    "Write executable Python scripts using variables, operators, and core data types",
+    "Implement conditional statements and loops to solve computational problems",
+    "Create and call functions with parameters to modularize code",
+    "Read and write data to text files for basic data persistence",
+    "Debug common syntax and logical errors using print statements and IDE tools",
+    "Apply string and list manipulation techniques to process real-world data"
+  ],
+  "course_tags": [
+    "Python",
+    "Programming Fundamentals",
+    "Beginner Coding",
+    "Software Development",
+    "Data Science",
+    "Automation",
+    "Computer Science",
+    "Web Development"
+  ]
+}

@@ -1,0 +1,48 @@
+{
+  "model": "GPT OSS 20B",
+  "modelSlug": "gpt-oss-20b",
+  "modelApiName": "openai/gpt-oss-20b",
+  "lessonId": "1.2",
+  "lessonTitle": "Ценообразование на билеты: как работают скидки и тарифы",
+  "language": "ru",
+  "duration": 12965,
+  "timestamp": "2025-12-16T10:29:41.708Z",
+  "parseSuccess": true,
+  "parseError": null,
+  "usage": {
+    "prompt_tokens": 631,
+    "completion_tokens": 2808,
+    "total_tokens": 3439,
+    "cost": 0.000357152,
+    "is_byok": false,
+    "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "audio_tokens": 0,
+      "video_tokens": 0
+    },
+    "cost_details": {
+      "upstream_inference_cost": null,
+      "upstream_inference_prompt_cost": 0.000020192,
+      "upstream_inference_completions_cost": 0.00033696
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 484,
+      "image_tokens": 0
+    }
+  },
+  "quality": {
+    "hasIntro": true,
+    "hasSections": true,
+    "hasExamples": true,
+    "hasExercises": true,
+    "hasSummary": true,
+    "sectionsCount": 4,
+    "examplesCount": 2,
+    "exercisesCount": 2,
+    "totalWordCount": 742,
+    "introWordCount": 78,
+    "coversObjectives": 3,
+    "coversTopics": 5,
+    "qualityScore": 100
+  }
+}

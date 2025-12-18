@@ -1,0 +1,18 @@
+{
+  "course_title": "Introduction to Python Programming",
+  "course_description": "This beginner-level technical course provides a comprehensive introduction to Python, one of the world's most popular programming languages. You will learn the foundational concepts of programming, including variables, data types, control flow, functions, and file handling. Through hands-on exercises and projects, you will build a solid understanding of how to write clean, efficient Python code and solve real-world problems, setting the stage for further exploration in web development, data science, automation, and more.",
+  "course_overview": "This course is your first step into the world of programming with Python. We start from absolute zero, ensuring you are comfortable with the basic building blocks like integers, strings, and booleans. You will then learn to control your program's flow using conditional statements (if/elif/else) and loops (for/while). A major focus is on functions, where you'll learn to write reusable blocks of code to make your programs more organized and powerful. We will also cover data structures like lists and dictionaries to manage collections of information. The course culminates in practical projects, such as building a simple number-guessing game, a text-based to-do list application that can save tasks to a file, and a script that automates renaming a batch of files. By the end, you will not only understand Python syntax but also know how to apply it to create useful, functional scripts.",
+  "target_audience": "Absolute beginners with no prior coding experience; career changers looking to enter the tech industry in roles like data analysis or automation; students from non-technical majors (e.g., biology, business) seeking to add a technical skill; professionals in administrative or operational roles looking to automate repetitive tasks using scripts.",
+  "estimated_duration_hours": 40,
+  "difficulty_level": "beginner",
+  "prerequisites": ["No prior programming experience required", "Basic computer literacy (saving files, using a web browser)", "Access to a computer with an internet connection to install necessary software"],
+  "learning_outcomes": [
+    "Define and apply fundamental programming concepts such as variables, data types, and basic operators.",
+    "Build control structures using conditional statements and loops to manage program logic and flow.",
+    "Create reusable functions with parameters to structure code and avoid repetition.",
+    "Analyze and manipulate data stored in core Python data structures like lists and dictionaries.",
+    "Construct Python scripts that read from and write to external files for data persistence.",
+    "Develop simple applications by integrating core concepts to solve practical problems."
+  ],
+  "course_tags": ["python", "programming", "beginner", "coding", "software development", "automation", "scripting", "computer science", "data structures", "functions"]
+}

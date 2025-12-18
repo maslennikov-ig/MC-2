@@ -1,0 +1,32 @@
+{
+  "course_title": "Introduction to Python Programming",
+  "course_description": "Master the fundamentals of Python programming with hands-on projects and real-world examples. Perfect for beginners with no coding experience who want to build practical programming skills.",
+  "course_overview": "This comprehensive course introduces students to Python programming from the ground up. Students will learn syntax, data types, control structures, functions, object-oriented programming, and best practices. Through practical exercises and projects, learners will build confidence in problem-solving and Python development. The course covers essential concepts including variables, loops, conditionals, functions, modules, file handling, and error management. By the end, students will have created multiple Python applications and be prepared for intermediate-level programming.",
+  "target_audience": "Absolute beginners with no programming experience, career changers seeking tech skills, and professionals wanting to learn Python for automation or data analysis",
+  "estimated_duration_hours": 25,
+  "difficulty_level": "beginner",
+  "prerequisites": [
+    "Basic computer literacy",
+    "Access to a computer with internet connection",
+    "Willingness to learn and practice programming concepts",
+    "No prior programming experience required"
+  ],
+  "learning_outcomes": [
+    "Analyze and solve basic programming problems using Python syntax and logic",
+    "Apply fundamental programming concepts including variables, functions, and control structures",
+    "Create Python scripts and small applications using object-oriented programming principles",
+    "Implement file handling and data manipulation techniques in Python programs",
+    "Design simple algorithms to address real-world problems using Python",
+    "Evaluate code quality and apply Python best practices for clean, maintainable code"
+  ],
+  "course_tags": [
+    "Python",
+    "Programming Fundamentals",
+    "Beginner Friendly",
+    "Object-Oriented Programming",
+    "Problem Solving",
+    "Software Development",
+    "Hands-on Learning",
+    "Career Development"
+  ]
+}

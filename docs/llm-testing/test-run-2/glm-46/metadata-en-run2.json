@@ -1,0 +1,20 @@
+
+{
+  "course_title": "Introduction to Python Programming",
+  "course_description": "This beginner-level technical programming course introduces students to the fundamentals of Python programming. Through hands-on exercises and practical projects, participants will learn to write clean, efficient Python code while developing problem-solving skills essential for software development. The course covers core concepts including variables, data types, control structures, functions, and basic object-oriented programming principles, providing a solid foundation for further study in computer science or data analysis.",
+  "course_overview": "Introduction to Python Programming is a comprehensive beginner course designed to take students from zero programming knowledge to writing functional Python applications. The curriculum begins with Python syntax basics, including variable declaration, data types (integers, floats, strings, booleans), and operators. Students will then progress to control structures, learning to implement conditional statements (if/elif/else) and loops (for and while) to control program flow. The course covers essential data structures including lists, tuples, dictionaries, and sets, with practical examples like managing inventories or analyzing simple datasets. Function design and implementation form a major component, where students learn to create reusable code blocks with parameters and return values. Basic file I/O operations are introduced through exercises in reading and writing text files. The course concludes with an introduction to object-oriented programming concepts, including classes, objects, and methods. Throughout the course, students will build several mini-projects such as a calculator application, a simple contact book, and a basic text analysis tool, gradually building confidence and practical skills. Each module includes coding challenges that reinforce concepts and develop debugging techniques using Python's built-in tools and error messages.",
+  "target_audience": "This course is ideal for absolute beginners with no prior programming experience, career changers transitioning to tech roles, college students in non-computer science majors who need programming skills, data analysts looking to expand into programming, hobbyists interested in creating personal projects, and professionals seeking to automate repetitive tasks at work.",
+  "estimated_duration_hours": 40,
+  "difficulty_level": "beginner",
+  "prerequisites": ["Basic computer literacy", "Familiarity with operating systems (Windows/Mac/Linux)", "Logical thinking ability", "High school mathematics knowledge"],
+  "learning_outcomes": [
+    "Define fundamental programming concepts including variables, data types, and operators",
+    "Build conditional statements and loops to control program flow",
+    "Create functions with parameters and return values to implement modular code",
+    "Implement lists, dictionaries, and other data structures to organize and manipulate data",
+    "Analyze and debug code using Python's error messages and debugging tools",
+    "Design simple object-oriented programs using classes and objects",
+    "Develop basic Python applications that solve real-world problems"
+  ],
+  "course_tags": ["Python", "Programming", "Beginner", "Computer Science", "Software Development", "Coding", "Programming Fundamentals", "Object-Oriented Programming"]
+}

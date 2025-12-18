@@ -1,0 +1,126 @@
+{
+  "testRunId": "2025-11-14-v5-glm-46",
+  "model": "GLM 4.6",
+  "modelSlug": "glm-46",
+  "apiName": "z-ai/glm-4.6",
+  "timestamp": "2025-11-14T10:43:06.069Z",
+  "duration": 176514,
+  "durationMinutes": "2.94",
+  "scenarios": 4,
+  "runsPerScenario": 3,
+  "totalTests": 12,
+  "successfulTests": 11,
+  "failedTests": 1,
+  "successRate": "91.67",
+  "avgTestDuration": "104906",
+  "results": [
+    {
+      "model": "GLM 4.6",
+      "modelSlug": "glm-46",
+      "scenario": "metadata-en",
+      "runNumber": 1,
+      "success": true,
+      "duration": 45480,
+      "contentLength": 2167
+    },
+    {
+      "model": "GLM 4.6",
+      "modelSlug": "glm-46",
+      "scenario": "metadata-en",
+      "runNumber": 2,
+      "success": true,
+      "duration": 61724,
+      "contentLength": 1949
+    },
+    {
+      "model": "GLM 4.6",
+      "modelSlug": "glm-46",
+      "scenario": "metadata-en",
+      "runNumber": 3,
+      "success": true,
+      "duration": 51059,
+      "contentLength": 1861
+    },
+    {
+      "model": "GLM 4.6",
+      "modelSlug": "glm-46",
+      "scenario": "metadata-ru",
+      "runNumber": 1,
+      "success": true,
+      "duration": 127255,
+      "contentLength": 1998
+    },
+    {
+      "model": "GLM 4.6",
+      "modelSlug": "glm-46",
+      "scenario": "metadata-ru",
+      "runNumber": 2,
+      "success": true,
+      "duration": 65787,
+      "contentLength": 1961
+    },
+    {
+      "model": "GLM 4.6",
+      "modelSlug": "glm-46",
+      "scenario": "metadata-ru",
+      "runNumber": 3,
+      "success": true,
+      "duration": 112536,
+      "contentLength": 1814
+    },
+    {
+      "model": "GLM 4.6",
+      "modelSlug": "glm-46",
+      "scenario": "lesson-en",
+      "runNumber": 1,
+      "success": true,
+      "duration": 120236,
+      "contentLength": 4194
+    },
+    {
+      "model": "GLM 4.6",
+      "modelSlug": "glm-46",
+      "scenario": "lesson-en",
+      "runNumber": 2,
+      "success": false,
+      "duration": 112258,
+      "error": "Expected ',' or ']' after array element in JSON at position 1659 (line 34 column 6)"
+    },
+    {
+      "model": "GLM 4.6",
+      "modelSlug": "glm-46",
+      "scenario": "lesson-en",
+      "runNumber": 3,
+      "success": true,
+      "duration": 173486,
+      "contentLength": 6753
+    },
+    {
+      "model": "GLM 4.6",
+      "modelSlug": "glm-46",
+      "scenario": "lesson-ru",
+      "runNumber": 1,
+      "success": true,
+      "duration": 176514,
+      "contentLength": 4968
+    },
+    {
+      "model": "GLM 4.6",
+      "modelSlug": "glm-46",
+      "scenario": "lesson-ru",
+      "runNumber": 2,
+      "success": true,
+      "duration": 128081,
+      "contentLength": 5717
+    },
+    {
+      "model": "GLM 4.6",
+      "modelSlug": "glm-46",
+      "scenario": "lesson-ru",
+      "runNumber": 3,
+      "success": true,
+      "duration": 84450,
+      "contentLength": 5460
+    }
+  ]
+}

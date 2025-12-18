@@ -1,0 +1,81 @@
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "This foundational section introduces the basic building blocks of any Python program: variables and data types. You will learn how to store information using variables and explore the core data types Python uses to represent different kinds of data.",
+  "learning_objectives": [
+    "Assign values to variables using the assignment operator (=).",
+    "Identify and use the four primitive data types: integers, floats, strings, and booleans.",
+    "Check the data type of any value using the type() function.",
+    "Perform basic operations and concatenation appropriate to each data type."
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "What is a Variable? Storing Information",
+      "lesson_objective": "Assign a value to a variable and print its value to the console.",
+      "key_topics": [
+        "Definition of a variable as a named container for data",
+        "The assignment operator (=)",
+        "Naming conventions and rules for variables (e.g., snake_case, cannot start with a number)",
+        "Using the print() function to display a variable's value"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Your First Variables",
+          "exercise_instructions": "1. Create a variable named 'greeting' and assign it the value 'Hello, World!'. 2. Create a variable named 'year' and assign it the value 2024. 3. Print both variables to the console."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Numbers and Booleans: Integers, Floats, and Truth Values",
+      "lesson_objective": "Perform basic arithmetic operations and use boolean values in expressions.",
+      "key_topics": [
+        "Integer data type (int) for whole numbers",
+        "Float data type (float) for decimal numbers",
+        "Basic arithmetic operators (+, -, *, /)",
+        "Boolean data type (bool) with values True and False",
+        "Comparison operators (==, !=, >, <) that return booleans"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Calculator Practice",
+          "exercise_instructions": "1. Calculate the area of a rectangle. Create variables for length (15.5) and width (4), then calculate the area and store it in a variable. Print the result. 2. Create a variable 'is_sunny' and set it to True. Create a variable 'is_weekend' and set it to False. Print both."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "Working with Text: The String Data Type",
+      "lesson_objective": "Create strings, concatenate them, and use basic string methods.",
+      "key_topics": [
+        "Defining strings with single (' ') or double (\" \") quotes",
+        "String concatenation using the plus (+) operator",
+        "The len() function to get a string's length",
+        "Introduction to methods like .upper() and .lower()"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "String Manipulation",
+          "exercise_instructions": "1. Create two string variables: first_name and last_name, with your name. 2. Concatenate them into a new variable called full_name with a space in between. 3. Print the full_name in all uppercase letters using a method."
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "Finding Type and Dynamic Typing",
+      "lesson_objective": "Use the type() function to identify an object's data type and understand dynamic typing.",
+      "key_topics": [
+        "Using the type() function to inspect data type",
+        "Concept of dynamic typing (a variable can change type)",
+        "Common type-related errors and how to read them"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Type Investigator",
+          "exercise_instructions": "1. Create a variable 'mystery_var' and assign it the value 100. 2. Use the type() function to check its type and print the result. 3. Reassign 'mystery_var' to the value 'One hundred'. 4. Use type() again to check its new type and print the result."
+        }
+      ]
+    }
+  ]
+}

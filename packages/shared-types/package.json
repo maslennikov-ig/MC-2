@@ -1,0 +1,57 @@
+{
+  "name": "@megacampus/shared-types",
+  "version": "0.26.8",
+  "type": "module",
+  "description": "Shared TypeScript types and schemas for MegaCampusAI",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "default": "./dist/index.js"
+    },
+    "./*": {
+      "types": "./dist/*.d.ts",
+      "default": "./dist/*.js"
+    },
+    "./lms": {
+      "types": "./dist/lms/index.d.ts",
+      "default": "./dist/lms/index.js"
+    },
+    "./lms/*": {
+      "types": "./dist/lms/*.d.ts",
+      "default": "./dist/lms/*.js"
+    }
+  },
+  "typesVersions": {
+    "*": {
+      "*": [
+        "./dist/*.d.ts"
+      ],
+      "lms": [
+        "./dist/lms/index.d.ts"
+      ],
+      "lms/*": [
+        "./dist/lms/*.d.ts"
+      ]
+    }
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "lint": "eslint src",
+    "type-check": "tsc --noEmit",
+    "test": "vitest run",
+    "test:watch": "vitest",
+    "test:unit": "vitest run tests/"
+  },
+  "comments": {
+    "types-regeneration": "To regenerate database.types.ts, use the MCP Supabase tool: mcp__supabase__generate_typescript_types. Then update packages/shared-types/src/database.types.ts"
+  },
+  "dependencies": {
+    "zod": "^3.22.4"
+  },
+  "devDependencies": {
+    "@types/node": "^24.10.1",
+    "vitest": "^4.0.15"
+  }
+}

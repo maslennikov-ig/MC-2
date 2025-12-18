@@ -1,0 +1,45 @@
+{
+  "name": "megacampus-monorepo",
+  "version": "0.26.8",
+  "private": true,
+  "description": "MegaCampusAI - Stage 0: Foundation Infrastructure",
+  "scripts": {
+    "dev": "pnpm --filter course-gen-platform dev",
+    "build": "pnpm -r build",
+    "test": "pnpm -r test",
+    "lint": "pnpm -r lint",
+    "format": "prettier --write \"**/*.{ts,tsx,js,jsx,json,md}\"",
+    "format:check": "prettier --check \"**/*.{ts,tsx,js,jsx,json,md}\"",
+    "type-check": "pnpm -r type-check",
+    "supabase": "supabase",
+    "supabase:status": "supabase status",
+    "supabase:start": "supabase start",
+    "supabase:stop": "supabase stop",
+    "supabase:migration:up": "supabase migration up",
+    "supabase:migration:new": "supabase migration new"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.0.0",
+    "@types/jsdom": "^27.0.0",
+    "@types/node": "^24.10.1",
+    "eslint": "^9.0.0",
+    "globals": "^16.0.0",
+    "prettier": "^3.1.0",
+    "supabase": "^2.58.5",
+    "typescript": "^5.3.3",
+    "typescript-eslint": "^8.0.0"
+  },
+  "engines": {
+    "node": ">=20.0.0",
+    "pnpm": ">=8.0.0"
+  },
+  "packageManager": "pnpm@8.15.0",
+  "pnpm": {
+    "overrides": {
+      "esbuild": ">=0.25.0"
+    }
+  },
+  "dependencies": {
+    "jsdom": "^27.2.0"
+  }
+}

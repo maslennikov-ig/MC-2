@@ -1,0 +1,33 @@
+{
+  "course_title": "Introduction to Python Programming",
+  "course_description": "This comprehensive beginner-level course introduces fundamental Python programming concepts through hands-on exercises and real-world applications. Students will master variables, data structures, control flow, functions, and basic object-oriented programming while building practical projects. The curriculum emphasizes problem-solving skills and best practices for writing clean, efficient code in professional development environments.",
+  "course_overview": "This immersive course provides a complete foundation in Python programming for absolute beginners. The curriculum begins with environment setup using VS Code and terminal navigation, progressing through core concepts including variables, primitive data types (integers, floats, strings, booleans), and operators. Students explore control flow through conditional statements and loops to solve problems like calculating Fibonacci sequences or finding prime numbers. The data structures module covers lists for inventory management, dictionaries for contact books, tuples for coordinates, and sets for unique tag collections. Functions are taught with parameter passing, return values, scope, and lambda expressions for sorting algorithms. File handling includes reading configuration files and parsing CSV data with the csv module. Error handling covers try/except blocks for robust applications. The object-oriented programming section introduces classes to model real-world entities like bank accounts or vehicles. Throughout the course, students complete incremental labs: a number guessing game, a text-based adventure, a personal finance tracker, and culminate in a final project building a command-line task manager with data persistence. Emphasis is placed on PEP 8 style guidelines, debugging techniques using print statements and pdb, and version control basics with Git. The course includes 50+ hands-on coding exercises, 10 quizzes, and 4 major projects to reinforce learning.",
+  "target_audience": "Aspiring software developers with no prior coding experience seeking to enter the tech industry; data analysts transitioning from Excel who need programming skills for automation; STEM students requiring Python for research projects and data analysis; career changers from non-technical fields looking to build a programming foundation; and professionals in finance, marketing, or operations who want to automate repetitive tasks and work with data more effectively.",
+  "estimated_duration_hours": 45,
+  "difficulty_level": "beginner",
+  "prerequisites": [
+    "Basic computer literacy including file management and software installation",
+    "High school level mathematics (algebra)",
+    "No prior programming experience required"
+  ],
+  "learning_outcomes": [
+    "Define and implement Python variables, data types, and operators to solve computational problems",
+    "Build control flow structures using conditional statements and loops to process data iteratively",
+    "Create and manipulate lists, dictionaries, tuples, and sets to store and organize complex information",
+    "Design reusable functions with proper parameters, return values, and scope to modularize code",
+    "Analyze and handle runtime errors using try/except blocks to develop robust applications",
+    "Construct class-based objects with attributes and methods to model real-world entities",
+    "Evaluate code efficiency and apply PEP 8 style guidelines to write professional-quality Python programs"
+  ],
+  "course_tags": [
+    "python",
+    "programming",
+    "beginner",
+    "software development",
+    "coding",
+    "automation",
+    "data analysis",
+    "object-oriented programming",
+    "scripting"
+  ]
+}

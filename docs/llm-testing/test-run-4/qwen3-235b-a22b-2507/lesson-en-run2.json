@@ -1,0 +1,90 @@
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "This section introduces the fundamental concepts of variables and data types in Python. Learners will understand how to store and manipulate different kinds of data using variables. These building blocks are essential for writing effective Python programs.",
+  "learning_objectives": [
+    "Declare and assign values to variables in Python.",
+    "Identify and use common data types including integers, floats, strings, and booleans.",
+    "Use the type() function to check the data type of a variable.",
+    "Convert between different data types using type casting.",
+    "Apply variables and data types to solve simple programming problems."
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Introduction to Variables",
+      "lesson_objective": "Declare and assign values to variables using proper naming conventions.",
+      "key_topics": [
+        "What is a variable?",
+        "Variable assignment with =",
+        "Valid variable names",
+        "Dynamic typing",
+        "Reassigning variables"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Create Your First Variables",
+          "exercise_instructions": "Create three variables: 'name' (string), 'age' (integer), and 'height' (float). Assign your own information to them and print each variable on a separate line."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Understanding Basic Data Types",
+      "lesson_objective": "Identify and use integers, floats, strings, and booleans in Python programs.",
+      "key_topics": [
+        "Integer (int)",
+        "Float (float)",
+        "String (str)",
+        "Boolean (bool)",
+        "Using quotes for strings",
+        "Boolean values: True and False"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Data Type Identification",
+          "exercise_instructions": "Create one variable for each data type: int, float, str, and bool. Use the type() function to print the data type of each variable."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "Working with Strings",
+      "lesson_objective": "Manipulate strings using concatenation and basic string methods.",
+      "key_topics": [
+        "String concatenation with +",
+        "String length with len()",
+        "Accessing characters by index",
+        "String methods: upper(), lower()",
+        "Escape characters"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "String Practice",
+          "exercise_instructions": "Create two string variables: 'first_name' and 'last_name'. Concatenate them into a full name and print it in uppercase. Then print the length of the full name."
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "Type Conversion and Checking",
+      "lesson_objective": "Convert between data types and verify types using built-in functions.",
+      "key_topics": [
+        "Using type() to check data type",
+        "Converting with int(), float(), str()",
+        "Implicit vs explicit conversion",
+        "Handling conversion errors"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Type Conversion Challenge",
+          "exercise_instructions": "Create a string variable with a number (e.g., '25'). Convert it to an integer, then to a float. Print the value and type at each step."
+        },
+        {
+          "exercise_title": "User Age Calculator",
+          "exercise_instructions": "Ask the user to input their birth year as a string. Convert it to an integer, subtract it from 2024, and print their approximate age as a formatted string."
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,102 @@
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "Build a solid foundation in Python by creating variables, exploring built-in data types, and practicing with interactive coding exercises.",
+  "learning_objectives": [
+    "Declare and assign values to variables using proper Python naming conventions",
+    "Differentiate between int, float, str, list, tuple, dict, and bool data types",
+    "Convert between data types using casting functions int(), float(), str(), and list()",
+    "Predict and debug type-related errors in small Python programs",
+    "Select the appropriate data type for a given real-world scenario"
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Creating Variables and Basic Data Types",
+      "lesson_objective": "Correctly declare variables and identify the int, float, and str data types in Python.",
+      "key_topics": [
+        "Variable declaration and assignment",
+        "Naming rules and conventions",
+        "Integer and float literals",
+        "String literals and quotation marks",
+        "The type() function"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Store Your Info",
+          "exercise_instructions": "Create three variables: age (int), height_meters (float), and full_name (str). Print each variable on a separate line followed by its type using the type() function."
+        },
+        {
+          "exercise_title": "Swap Values",
+          "exercise_instructions": "Declare two variables a=5 and b=10. Swap their values without reassigning the numbers directly (use a third variable). Print the swapped values."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Working with Collections: Lists and Tuples",
+      "lesson_objective": "Manipulate list and tuple objects by indexing, slicing, and using common methods.",
+      "key_topics": [
+        "List creation and indexing",
+        "Mutable vs immutable types",
+        "Tuple packing and unpacking",
+        "List methods append(), pop(), sort()",
+        "Slicing syntax [:]"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Shopping List Manager",
+          "exercise_instructions": "Start with an empty list called shopping. Append 'milk', 'bread', and 'eggs'. Remove 'bread' using pop() by index. Insert 'butter' at position 1. Print the final list."
+        },
+        {
+          "exercise_title": "Coordinate Tuple",
+          "exercise_instructions": "Create a tuple point with two numbers (x, y). Unpack it into variables x and y. Compute the distance from origin (0, 0) using (x**2 + y**2)**0.5 and print the result."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "Dictionaries and Boolean Logic",
+      "lesson_objective": "Construct dictionaries to map keys to values and evaluate Boolean expressions.",
+      "key_topics": [
+        "Dictionary syntax {key: value}",
+        "Adding and updating entries",
+        "The bool type and truthiness",
+        "Comparison operators == != < >",
+        "Membership operator in"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Phonebook Lookup",
+          "exercise_instructions": "Build a dictionary phonebook with three names and numbers. Prompt the user for a name (input()) and print the corresponding number or 'Not found' if absent."
+        },
+        {
+          "exercise_title": "Even or Odd Checker",
+          "exercise_instructions": "Read an integer from input(). Store in variable n. Print True if n is even and positive, otherwise print False. Use a single Boolean expression."
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "Type Conversion and Input Handling",
+      "lesson_objective": "Safely convert user input strings to numeric types and handle conversion errors.",
+      "key_topics": [
+        "int() and float() casting",
+        "str() conversion",
+        "input() always returns str",
+        "ValueError handling",
+        "f-strings for formatting"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Temperature Converter",
+          "exercise_instructions": "Ask the user for a Celsius temperature (input()). Convert to float, then compute Fahrenheit using (C * 9/5) + 32. Print the result in an f-string formatted to one decimal place."
+        },
+        {
+          "exercise_title": "String to List",
+          "exercise_instructions": "Read a sentence from input(). Convert it to a list of words using split(). Print the list and its length. Then join the words back into a single string with '-' between them."
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,30 @@
+{
+  "course_title": "Introduction to Python Programming",
+  "course_description": "A hands-on, beginner-friendly course that introduces core Python programming concepts, from variables and data types to control flow, functions, and basic object-oriented programming, preparing learners to write simple scripts and solve real-world problems.",
+  "course_overview": "This comprehensive beginner-level course guides students through the fundamentals of Python programming. It begins with setting up the development environment and covers essential topics such as variables, data types, operators, input/output, control structures (if statements, loops), functions, modules, file handling, and basic object-oriented programming concepts. Each module includes concise video lectures, hands-on coding exercises, and short quizzes to reinforce learning. Learners will complete a mini-project that combines the concepts to build a simple utility program. By the end, students will be able to write clean, efficient Python scripts and have a solid foundation for further study in data science, web development, or automation.",
+  "target_audience": "Aspiring software developers, students, and professionals with no prior programming experience who want to learn Python.",
+  "estimated_duration_hours": 30,
+  "difficulty_level": "beginner",
+  "prerequisites": [
+    "Basic computer literacy",
+    "Ability to install software on a personal computer",
+    "No prior programming experience required"
+  ],
+  "learning_outcomes": [
+    "Explain the role of variables and data types in Python.",
+    "Identify appropriate control flow structures for solving problems.",
+    "Design modular code using functions.",
+    "Implement basic file I/O operations.",
+    "Debug errors in Python scripts using appropriate techniques.",
+    "Create a simple utility program that integrates core concepts."
+  ],
+  "course_tags": [
+    "Python",
+    "Programming",
+    "Beginner",
+    "Data Types",
+    "Control Flow",
+    "Functions",
+    "Object-Oriented Programming"
+  ]
+}

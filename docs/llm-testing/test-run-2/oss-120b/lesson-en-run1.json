@@ -1,0 +1,81 @@
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "This section provides hands‑on practice with Python variables and data types. Learners will write code to declare variables, explore primitive types, perform type conversions, and use dynamic typing features through focused exercises.",
+  "learning_objectives": [
+    "Students will be able to declare variables with valid identifiers and assign initial values.",
+    "Students will be able to differentiate and use Python's primitive data types correctly.",
+    "Students will be able to convert values between data types using built‑in casting functions.",
+    "Students will be able to inspect variable types at runtime and reassign variables to different types."
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Creating and Naming Variables",
+      "lesson_objective": "Students will be able to declare variables, choose valid identifiers, and assign numeric and string values.",
+      "key_topics": [
+        "Variable declaration syntax",
+        "Identifier naming rules",
+        "Assigning integer, float, and string values",
+        "Case sensitivity in identifiers"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Define personal information variables",
+          "exercise_instructions": "Write a script that defines variables for a person's name, age, and height, then prints each variable on a separate line."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Understanding Primitive Data Types",
+      "lesson_objective": "Students will be able to identify and use int, float, str, and bool types correctly in simple operations.",
+      "key_topics": [
+        "Integer type and arithmetic operations",
+        "Floating‑point type and precision considerations",
+        "String type, quoting styles, and concatenation",
+        "Boolean type and truthiness in expressions"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Create variables of each primitive type",
+          "exercise_instructions": "Define one variable of type int, one of type float, one of type str, and one of type bool. Perform a basic calculation using the numeric variables and print all values."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "Type Conversion and Casting",
+      "lesson_objective": "Students will be able to convert between data types using built‑in functions and handle conversion errors gracefully.",
+      "key_topics": [
+        "int() and float() casting functions",
+        "str() conversion for display",
+        "bool() evaluation of different values",
+        "Catching ValueError exceptions during conversion"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Add two user‑provided numbers",
+          "exercise_instructions": "Write a program that prompts the user for two numbers as strings, converts them to floats, adds them, and prints the sum. Include error handling for invalid inputs."
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "Working with Dynamic Typing and Type Checking",
+      "lesson_objective": "Students will be able to use type() and isinstance() to inspect variables and understand Python's dynamic typing by reassigning variables to different types.",
+      "key_topics": [
+        "Dynamic typing concept in Python",
+        "type() function to reveal a variable's class",
+        "isinstance() for type checking in conditions",
+        "Reassigning a variable to a different data type"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Change variable types and inspect",
+          "exercise_instructions": "Create a variable assigned an integer value. Reassign it to a string, then to a list, printing the variable's value and its type after each reassignment."
+        }
+      ]
+    }
+  ]
+}

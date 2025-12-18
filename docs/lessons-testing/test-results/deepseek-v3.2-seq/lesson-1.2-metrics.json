@@ -1,0 +1,48 @@
+{
+  "model": "DeepSeek V3.2 (Sequential)",
+  "modelSlug": "deepseek-v3.2-seq",
+  "modelApiName": "deepseek/deepseek-v3.2",
+  "lessonId": "1.2",
+  "lessonTitle": "Ценообразование на билеты: как работают скидки и тарифы",
+  "language": "ru",
+  "duration": 40992,
+  "timestamp": "2025-12-16T11:16:15.003Z",
+  "parseSuccess": true,
+  "parseError": null,
+  "usage": {
+    "prompt_tokens": 599,
+    "completion_tokens": 2459,
+    "total_tokens": 3058,
+    "cost": 0.00115132,
+    "is_byok": false,
+    "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "audio_tokens": 0,
+      "video_tokens": 0
+    },
+    "cost_details": {
+      "upstream_inference_cost": null,
+      "upstream_inference_prompt_cost": 0.00016772,
+      "upstream_inference_completions_cost": 0.0009836
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 0,
+      "image_tokens": 0
+    }
+  },
+  "quality": {
+    "hasIntro": true,
+    "hasSections": true,
+    "hasExamples": true,
+    "hasExercises": true,
+    "hasSummary": true,
+    "sectionsCount": 4,
+    "examplesCount": 2,
+    "exercisesCount": 2,
+    "totalWordCount": 582,
+    "introWordCount": 88,
+    "coversObjectives": 3,
+    "coversTopics": 4,
+    "qualityScore": 100
+  }
+}

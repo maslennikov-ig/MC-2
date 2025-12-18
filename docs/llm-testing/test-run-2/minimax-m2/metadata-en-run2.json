@@ -1,0 +1,18 @@
+{
+  "course_title": "Introduction to Python Programming",
+  "course_description": "This beginner-level technical programming course introduces students to Python programming fundamentals, covering syntax, data structures, control flow, functions, and object-oriented concepts. Students will develop practical programming skills through hands-on coding exercises and real-world projects. The course emphasizes problem-solving techniques and best practices for writing clean, readable code.",
+  "course_overview": "The course begins with Python installation and setup, then progresses through basic syntax including variables, data types (strings, integers, floats, lists, dictionaries), and operators. Students learn control flow structures such as if statements, loops (for and while), and exception handling. The course covers functions and parameter passing, introduces object-oriented programming concepts including classes and objects, and explores file handling and basic data manipulation. Practical examples include building a calculator program, creating a student grade management system, developing a simple contact book application, and analyzing data from CSV files. Students work with popular libraries like requests for web data and matplotlib for basic data visualization. The curriculum emphasizes problem-solving techniques, debugging strategies, and code documentation best practices.",
+  "target_audience": "Complete programming beginners with no prior coding experience, professionals in non-technical roles seeking to transition into technology careers, students and educators looking to add programming skills, and business analysts or data professionals needing Python for data analysis and automation tasks.",
+  "estimated_duration_hours": 40,
+  "difficulty_level": "beginner",
+  "prerequisites": ["Basic computer literacy", "Familiarity with operating systems", "High school mathematics knowledge"],
+  "learning_outcomes": [
+    "Define fundamental Python syntax rules, data types, and operators with 95% accuracy",
+    "Build functional Python programs utilizing core programming constructs including loops, conditionals, and functions",
+    "Create object-oriented Python applications demonstrating inheritance, encapsulation, and polymorphism concepts",
+    "Analyze and debug Python code using systematic troubleshooting methodologies and error handling techniques",
+    "Construct data manipulation scripts employing Python's standard library and external packages like pandas and requests",
+    "Design practical software solutions integrating multiple programming concepts and following coding best practices"
+  ],
+  "course_tags": ["python", "programming", "beginner", "software development", "coding fundamentals", "object-oriented programming", "data structures", "automation"]
+}

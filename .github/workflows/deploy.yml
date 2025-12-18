@@ -1,0 +1,333 @@
+name: CD - Deploy to Production
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      skip_ci:
+        description: 'Skip CI checks (dangerous!)'
+        required: false
+        type: boolean
+        default: false
+
+env:
+  DEPLOY_HOST: '95.81.98.230'
+  DEPLOY_USER: 'claude-deploy'
+  DEPLOY_PATH: '/opt/megacampus'
+
+# Required permissions for various actions
+permissions:
+  contents: read
+  packages: write
+  checks: read
+
+jobs:
+  # Job 1: Run CI checks first (unless manually skipped)
+  ci-check:
+    name: Verify CI Passed
+    runs-on: ubuntu-latest
+    if: ${{ !inputs.skip_ci }}
+    timeout-minutes: 15
+
+    steps:
+      - name: Wait for CI Success check
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "Waiting for CI Success check on commit ${{ github.sha }}..."
+          MAX_ATTEMPTS=60
+          ATTEMPT=0
+
+          while [ $ATTEMPT -lt $MAX_ATTEMPTS ]; do
+            ATTEMPT=$((ATTEMPT + 1))
+            echo "Attempt $ATTEMPT/$MAX_ATTEMPTS..."
+
+            # Get check runs for this commit
+            CHECK_STATUS=$(gh api repos/${{ github.repository }}/commits/${{ github.sha }}/check-runs \
+              --jq '.check_runs[] | select(.name == "CI Success") | .status + ":" + .conclusion')
+
+            if [ -z "$CHECK_STATUS" ]; then
+              echo "CI Success check not found yet, waiting..."
+              sleep 15
+              continue
+            fi
+
+            STATUS=$(echo "$CHECK_STATUS" | cut -d: -f1)
+            CONCLUSION=$(echo "$CHECK_STATUS" | cut -d: -f2)
+
+            echo "CI Success status: $STATUS, conclusion: $CONCLUSION"
+
+            if [ "$STATUS" = "completed" ]; then
+              if [ "$CONCLUSION" = "success" ]; then
+                echo "CI Success check passed!"
+                exit 0
+              else
+                echo "CI Success check failed with conclusion: $CONCLUSION"
+                exit 1
+              fi
+            fi
+
+            echo "CI still running, waiting..."
+            sleep 15
+          done
+
+          echo "Timeout waiting for CI Success check"
+          exit 1
+
+  # Job 2: Build Docker images
+  build-images:
+    name: Build Docker Images
+    runs-on: ubuntu-latest
+    needs: [ci-check]
+    if: ${{ always() && (needs.ci-check.result == 'success' || inputs.skip_ci) }}
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Extract metadata for web
+        id: meta-web
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}/web
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push web image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./packages/web/Dockerfile
+          push: true
+          tags: ${{ steps.meta-web.outputs.tags }}
+          labels: ${{ steps.meta-web.outputs.labels }}
+          # Disable cache for web to ensure NEXT_PUBLIC_* vars are baked fresh
+          # These vars are inlined at build time and cache doesn't track ARG changes
+          no-cache: true
+          build-args: |
+            NODE_VERSION=20
+            BUILD_DATE=${{ github.event.head_commit.timestamp }}
+            VCS_REF=${{ github.sha }}
+            NEXT_PUBLIC_SUPABASE_URL=${{ secrets.SUPABASE_URL }}
+            NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}
+            SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_KEY }}
+            SUPABASE_JWT_SECRET=${{ secrets.SUPABASE_JWT_SECRET }}
+
+      - name: Extract metadata for API
+        id: meta-api
+        uses: docker/metadata-action@v5
+        with:
+          images: ghcr.io/${{ github.repository }}/api
+          tags: |
+            type=ref,event=branch
+            type=sha,prefix={{branch}}-
+            type=raw,value=latest,enable={{is_default_branch}}
+
+      - name: Build and push API image
+        uses: docker/build-push-action@v5
+        with:
+          context: .
+          file: ./packages/course-gen-platform/Dockerfile
+          push: true
+          tags: ${{ steps.meta-api.outputs.tags }}
+          labels: ${{ steps.meta-api.outputs.labels }}
+          cache-from: type=gha,scope=api
+          cache-to: type=gha,mode=max,scope=api
+          build-args: |
+            NODE_VERSION=20
+            BUILD_DATE=${{ github.event.head_commit.timestamp }}
+            VCS_REF=${{ github.sha }}
+
+      # docling-mcp build disabled - exceeds GitHub Actions disk space (~14GB for PyTorch/CUDA)
+      # Build manually on larger runner or dedicated build server
+      # - name: Extract metadata for docling-mcp
+      # - name: Build and push docling-mcp image
+
+  # Job 3: Deploy to production server
+  deploy:
+    name: Deploy to Production
+    runs-on: ubuntu-latest
+    needs: [build-images]
+    timeout-minutes: 15
+    environment:
+      name: production
+      url: https://ai.megacampus.ru
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ env.DEPLOY_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Copy deployment files to server
+        run: |
+          scp -i ~/.ssh/deploy_key \
+            docker-compose.production.yml \
+            ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }}:${{ env.DEPLOY_PATH }}/
+
+          scp -i ~/.ssh/deploy_key \
+            scripts/deploy.sh \
+            scripts/rollback.sh \
+            ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }}:${{ env.DEPLOY_PATH }}/scripts/
+
+      - name: Create .env.production from secrets
+        run: |
+          ssh -i ~/.ssh/deploy_key \
+            ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} \
+            "cat > ${{ env.DEPLOY_PATH }}/.env.production << 'ENVEOF'
+          # MegaCampus Production Environment
+          # Auto-generated by GitHub Actions deployment
+
+          # Application
+          NODE_ENV=production
+          PORT=4000
+          LOG_LEVEL=info
+
+          # Supabase
+          SUPABASE_URL=${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_KEY=${{ secrets.SUPABASE_SERVICE_KEY }}
+          NEXT_PUBLIC_SUPABASE_URL=${{ secrets.SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_KEY }}
+
+          # Redis (Docker internal)
+          REDIS_URL=redis://redis:6379
+
+          # Qdrant
+          QDRANT_URL=${{ secrets.QDRANT_URL }}
+          QDRANT_API_KEY=${{ secrets.QDRANT_API_KEY }}
+
+          # Jina AI
+          JINA_API_KEY=${{ secrets.JINA_API_KEY }}
+
+          # Encryption
+          ENCRYPTION_KEY=${{ secrets.ENCRYPTION_KEY }}
+
+          # OpenRouter (LLM)
+          OPENROUTER_API_KEY=${{ secrets.OPENROUTER_API_KEY }}
+
+          # URLs
+          NEXT_PUBLIC_SITE_URL=https://ai.megacampus.ru
+          NEXT_PUBLIC_APP_URL=https://ai.megacampus.ru
+
+          # CORS
+          CORS_ORIGIN=https://ai.megacampus.ru,https://megacampus.ai
+
+          # Docling (internal)
+          DOCLING_MCP_URL=http://docling-mcp:8000/mcp
+
+          # Course Generation Backend (internal)
+          COURSEGEN_BACKEND_URL=http://api:4000
+
+          # Performance
+          NEXT_TELEMETRY_DISABLED=1
+          NODE_OPTIONS=--max-old-space-size=2048
+          ENVEOF
+          chmod 600 ${{ env.DEPLOY_PATH }}/.env.production"
+
+      - name: Deploy to production
+        run: |
+          ssh -i ~/.ssh/deploy_key \
+            ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} \
+            "cd ${{ env.DEPLOY_PATH }} && GITHUB_TOKEN='${{ secrets.GITHUB_TOKEN }}' GITHUB_ACTOR='${{ github.actor }}' bash scripts/deploy.sh production latest"
+
+      - name: Verify deployment
+        run: |
+          echo "Waiting for services to start..."
+          sleep 30
+
+          # Check web service
+          if curl -f -s https://ai.megacampus.ru/api/health > /dev/null; then
+            echo "Web service is healthy"
+          else
+            echo "Web service health check failed!"
+            exit 1
+          fi
+
+          # Check API service
+          if ssh -i ~/.ssh/deploy_key \
+            ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} \
+            "curl -f -s http://localhost:4000/health" > /dev/null; then
+            echo "API service is healthy"
+          else
+            echo "API service health check failed!"
+            exit 1
+          fi
+
+      - name: Cleanup SSH key
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
+
+  # Job 4: Rollback on failure
+  rollback:
+    name: Rollback on Failure
+    runs-on: ubuntu-latest
+    needs: [deploy]
+    if: failure()
+    timeout-minutes: 10
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup SSH key
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ env.DEPLOY_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Execute rollback
+        run: |
+          ssh -i ~/.ssh/deploy_key \
+            ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} \
+            "cd ${{ env.DEPLOY_PATH }} && bash scripts/rollback.sh"
+
+      - name: Cleanup SSH key
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
+
+      - name: Notify rollback
+        run: |
+          echo "Deployment failed! Rollback executed."
+          echo "Check logs at: ${{ env.DEPLOY_HOST }}:${{ env.DEPLOY_PATH }}"
+
+  # Job 5: Notification
+  notify:
+    name: Send Notification
+    runs-on: ubuntu-latest
+    needs: [deploy]
+    if: always()
+
+    steps:
+      - name: Deployment status
+        run: |
+          if [ "${{ needs.deploy.result }}" == "success" ]; then
+            echo "Deployment to production completed successfully!"
+            echo "URL: https://ai.megacampus.ru"
+            echo "Commit: ${{ github.sha }}"
+            echo "Deployed by: ${{ github.actor }}"
+          else
+            echo "Deployment failed! Check logs for details."
+            exit 1
+          fi

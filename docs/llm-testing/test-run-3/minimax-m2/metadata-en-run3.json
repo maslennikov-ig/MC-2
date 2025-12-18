@@ -1,0 +1,33 @@
+{
+  "course_title": "Introduction to Python Programming",
+  "course_description": "Master the fundamentals of Python programming with hands-on projects and real-world examples. Perfect for beginners with no prior coding experience who want to build a solid foundation in programming.",
+  "course_overview": "Introduction to Python Programming is a comprehensive beginner-friendly course designed to teach you the essential concepts and skills needed to start programming in Python. Through a combination of theoretical concepts and practical exercises, you will learn Python syntax, data types, control structures, functions, and object-oriented programming fundamentals. The course includes multiple hands-on projects and coding challenges that reinforce your learning and help you apply Python to solve real-world problems. By the end of this course, you will have the confidence and skills to continue your programming journey or apply Python in your academic or professional work.",
+  "target_audience": "Complete beginners with no prior programming experience, students, career changers, and professionals seeking to learn Python fundamentals",
+  "estimated_duration_hours": 45,
+  "difficulty_level": "beginner",
+  "prerequisites": [
+    "Basic computer literacy",
+    "High school mathematics knowledge",
+    "Motivation to learn programming concepts",
+    "No prior coding experience required"
+  ],
+  "learning_outcomes": [
+    "Analyze and solve programming problems using Python syntax and logic",
+    "Create functional Python programs using variables, data types, and control structures",
+    "Implement user-defined functions and understand scope and modular programming",
+    "Design object-oriented programs with classes, objects, and inheritance",
+    "Debug and troubleshoot Python code using error handling and testing techniques",
+    "Apply Python programming concepts to real-world data processing tasks",
+    "Evaluate different programming approaches and select appropriate solutions"
+  ],
+  "course_tags": [
+    "Python",
+    "Programming Fundamentals",
+    "Beginner Coding",
+    "Software Development",
+    "Object-Oriented Programming",
+    "Data Structures",
+    "Problem Solving",
+    "Hands-on Projects"
+  ]
+}

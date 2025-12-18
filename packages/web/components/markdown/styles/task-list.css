@@ -1,0 +1,91 @@
+/**
+ * Task List Checkbox Styling
+ *
+ * Styles for GitHub Flavored Markdown task lists:
+ * - [ ] Unchecked item
+ * - [x] Checked item
+ *
+ * remark-gfm converts these to <ul class="contains-task-list"> with
+ * <li class="task-list-item"> containing <input type="checkbox">
+ */
+
+/* Task list container - remove default bullet points */
+.prose ul.contains-task-list {
+  list-style-type: none;
+  padding-left: 0;
+}
+
+.prose ul.contains-task-list > li.task-list-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+  padding-left: 0;
+}
+
+/* Checkbox styling */
+.prose ul.contains-task-list > li.task-list-item > input[type="checkbox"] {
+  /* Remove default appearance */
+  appearance: none;
+  -webkit-appearance: none;
+
+  /* Size and shape */
+  width: 1.125rem;
+  height: 1.125rem;
+  min-width: 1.125rem;
+  border-radius: 0.25rem;
+
+  /* Border */
+  border: 2px solid hsl(var(--border));
+
+  /* Background */
+  background-color: hsl(var(--background));
+
+  /* Position alignment */
+  margin-top: 0.25rem;
+
+  /* Cursor */
+  cursor: pointer;
+
+  /* Transition */
+  transition: all 0.15s ease-in-out;
+}
+
+/* Checkbox hover state */
+.prose ul.contains-task-list > li.task-list-item > input[type="checkbox"]:hover {
+  border-color: hsl(var(--primary));
+  background-color: hsl(var(--accent));
+}
+
+/* Checkbox focus state */
+.prose ul.contains-task-list > li.task-list-item > input[type="checkbox"]:focus {
+  outline: none;
+  ring: 2px;
+  ring-offset: 2px;
+  border-color: hsl(var(--ring));
+  box-shadow: 0 0 0 2px hsl(var(--ring) / 0.3);
+}
+
+/* Checked state */
+.prose ul.contains-task-list > li.task-list-item > input[type="checkbox"]:checked {
+  background-color: hsl(var(--primary));
+  border-color: hsl(var(--primary));
+
+  /* Checkmark using SVG background */
+  background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 16 16' fill='white' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M12.207 4.793a1 1 0 010 1.414l-5 5a1 1 0 01-1.414 0l-2-2a1 1 0 011.414-1.414L6.5 9.086l4.293-4.293a1 1 0 011.414 0z'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 0.75rem;
+}
+
+/* Checked text styling - strikethrough */
+.prose ul.contains-task-list > li.task-list-item:has(input[type="checkbox"]:checked) {
+  color: hsl(var(--muted-foreground));
+}
+
+/* Nested task lists */
+.prose ul.contains-task-list ul.contains-task-list {
+  margin-left: 1.5rem;
+  margin-top: 0.5rem;
+}
+
+/* Dark mode adjustments are handled by CSS variables (--primary, --border, etc.) */

@@ -1,0 +1,197 @@
+# Transactional Outbox Monitoring Alerts
+# Format: Prometheus Alertmanager compatible
+#
+# This configuration defines alert rules for monitoring the transactional outbox
+# pattern implementation. Alerts are categorized by severity (critical, warning)
+# and component (fsm_init, outbox_processor, defense_layers).
+#
+# Integration: Import these rules into Prometheus alerting configuration
+# Documentation: See runbooks/ directory for resolution procedures
+
+groups:
+  - name: transactional_outbox
+    interval: 60s
+    rules:
+      # ====================
+      # FSM Initialization Alerts
+      # ====================
+
+      - alert: FSMFailureRateHigh
+        expr: (fsm_init_failed / fsm_init_total) > 0.05
+        for: 5m
+        labels:
+          severity: critical
+          component: fsm_init
+          team: backend
+        annotations:
+          summary: "FSM initialization failure rate >5%"
+          description: "{{ $value | humanizePercentage }} of FSM initializations are failing. This indicates issues with database connectivity, Redis cache, or RPC function execution."
+          runbook: "docs/runbooks/fsm-initialization-failures.md"
+          dashboard: "https://grafana.example.com/d/transactional-outbox"
+          impact: "New course generation workflows cannot start. Users will see initialization errors."
+          action: "Check Supabase logs, Redis connectivity, and database RPC function status."
+
+      - alert: FSMCacheHitRateLow
+        expr: (fsm_init_cache_hits / fsm_init_total) < 0.20
+        for: 10m
+        labels:
+          severity: warning
+          component: fsm_init
+          team: backend
+        annotations:
+          summary: "FSM cache hit rate <20%"
+          description: "Redis cache is not performing effectively: {{ $value | humanizePercentage }} hit rate. Expected >50% for typical workloads."
+          runbook: "docs/runbooks/redis-cache-issues.md"
+          dashboard: "https://grafana.example.com/d/transactional-outbox"
+          impact: "Increased database load due to cache misses. Higher latency for FSM initialization."
+          action: "Check Redis memory usage, eviction policy, and connection pool health. Review cache TTL settings (currently 24h)."
+
+      - alert: FSMInitializationSlow
+        expr: histogram_quantile(0.95, fsm_init_duration_ms) > 500
+        for: 5m
+        labels:
+          severity: warning
+          component: fsm_init
+          team: backend
+        annotations:
+          summary: "FSM initialization p95 latency >500ms"
+          description: "95th percentile FSM initialization latency is {{ $value }}ms. Expected <500ms for healthy operation."
+          runbook: "docs/runbooks/fsm-performance-degradation.md"
+          dashboard: "https://grafana.example.com/d/transactional-outbox"
+          impact: "Slow course generation start times. User experience degradation."
+          action: "Check database query performance, Redis latency, and network connectivity. Review slow query logs."
+
+      # ====================
+      # Outbox Processor Alerts
+      # ====================
+
+      - alert: OutboxQueueDepthHigh
+        expr: outbox_queue_depth > 1000
+        for: 5m
+        labels:
+          severity: critical
+          component: outbox_processor
+          team: backend
+        annotations:
+          summary: "Outbox queue depth >1000 jobs"
+          description: "Background processor is falling behind: {{ $value }} pending jobs in outbox table. Normal queue depth is <100."
+          runbook: "docs/runbooks/outbox-queue-buildup.md"
+          dashboard: "https://grafana.example.com/d/transactional-outbox"
+          impact: "Delayed job creation in BullMQ. Course generation workflows will not progress."
+          action: "Check outbox processor health, BullMQ connectivity, and Redis availability. Consider scaling processor instances."
+
+      - alert: OutboxProcessorStalled
+        expr: (time() - outbox_last_processed_timestamp) > 300
+        for: 5m
+        labels:
+          severity: critical
+          component: outbox_processor
+          team: backend
+        annotations:
+          summary: "Outbox processor not running >5 minutes"
+          description: "No processing activity detected in {{ $value }} seconds. Processor may have crashed or is stuck."
+          runbook: "docs/runbooks/outbox-processor-stalled.md"
+          dashboard: "https://grafana.example.com/d/transactional-outbox"
+          impact: "No jobs are being created in BullMQ. All course generation workflows are blocked."
+          action: "Restart outbox processor. Check application logs for crashes, deadlocks, or resource exhaustion (CPU, memory)."
+
+      - alert: OutboxJobFailureRateHigh
+        expr: (outbox_jobs_failed / (outbox_jobs_created + outbox_jobs_failed)) > 0.10
+        for: 5m
+        labels:
+          severity: warning
+          component: outbox_processor
+          team: backend
+        annotations:
+          summary: "Outbox job creation failure rate >10%"
+          description: "{{ $value | humanizePercentage }} of BullMQ job creations are failing. Normal rate is <1%."
+          runbook: "docs/runbooks/bullmq-connection-issues.md"
+          dashboard: "https://grafana.example.com/d/transactional-outbox"
+          impact: "Some jobs are not being queued. Course generation workflows may be incomplete."
+          action: "Check BullMQ/Redis connectivity, job data validation, and queue configuration. Review error logs for patterns."
+
+      - alert: OutboxBatchProcessingSlow
+        expr: histogram_quantile(0.95, outbox_batch_duration_ms) > 5000
+        for: 5m
+        labels:
+          severity: warning
+          component: outbox_processor
+          team: backend
+        annotations:
+          summary: "Outbox batch processing p95 latency >5s"
+          description: "95th percentile batch processing time is {{ $value }}ms. Expected <5000ms for 100-job batches."
+          runbook: "docs/runbooks/outbox-performance-degradation.md"
+          dashboard: "https://grafana.example.com/d/transactional-outbox"
+          impact: "Slow job creation rate. Queue buildup may occur during high load."
+          action: "Check database query performance, Redis latency, and parallel processing settings. Review batch size (default 100)."
+
+      # ====================
+      # Defense Layer Alerts
+      # ====================
+
+      - alert: WorkerFallbackFrequencyHigh
+        expr: rate(worker_fallback_activations[5m]) > 10
+        for: 5m
+        labels:
+          severity: warning
+          component: defense_layers
+          team: backend
+        annotations:
+          summary: "Worker fallback activating >10 times/5min"
+          description: "Defense layers (Layer 2/3) are activating {{ $value }} times per 5 minutes. This indicates Layer 1 (API) is failing."
+          runbook: "docs/runbooks/frequent-fallback-activations.md"
+          dashboard: "https://grafana.example.com/d/transactional-outbox"
+          impact: "Primary FSM initialization path is unreliable. Fallback layers are compensating but should not be primary path."
+          action: "Investigate Layer 1 (API endpoint) failures. Check transactional outbox RPC function and database health."
+
+      - alert: Layer2FailureRateHigh
+        expr: (layer2_failures / layer2_activations) > 0.20
+        for: 5m
+        labels:
+          severity: warning
+          component: defense_layers
+          team: backend
+        annotations:
+          summary: "Layer 2 (QueueEvents backup) failure rate >20%"
+          description: "{{ $value | humanizePercentage }} of Layer 2 fallback attempts are failing. This is the backup for jobs created outside normal flow."
+          runbook: "docs/runbooks/queueevents-backup-failures.md"
+          dashboard: "https://grafana.example.com/d/transactional-outbox"
+          impact: "Layer 2 backup is unreliable. Layer 3 (worker validation) is the last line of defense."
+          action: "Check QueueEvents listener health, Redis connectivity, and command handler errors. Review logs for patterns."
+
+      - alert: Layer3FailureRateHigh
+        expr: (layer3_failures / layer3_activations) > 0.20
+        for: 5m
+        labels:
+          severity: critical
+          component: defense_layers
+          team: backend
+        annotations:
+          summary: "Layer 3 (Worker validation) failure rate >20%"
+          description: "{{ $value | humanizePercentage }} of Layer 3 fallback attempts are failing. This is the last line of defense."
+          runbook: "docs/runbooks/worker-validation-failures.md"
+          dashboard: "https://grafana.example.com/d/transactional-outbox"
+          impact: "All defense layers are failing. Workers will encounter 'FSM not found' errors and fail jobs."
+          action: "CRITICAL: All initialization paths are failing. Check database, Redis, and command handler. Escalate immediately."
+
+      # ====================
+      # Combined System Health
+      # ====================
+
+      - alert: TransactionalOutboxSystemUnhealthy
+        expr: |
+          (fsm_init_failed / fsm_init_total) > 0.05 OR
+          outbox_queue_depth > 1000 OR
+          (time() - outbox_last_processed_timestamp) > 300
+        for: 5m
+        labels:
+          severity: critical
+          component: transactional_outbox
+          team: backend
+        annotations:
+          summary: "Transactional outbox system is unhealthy"
+          description: "One or more critical health checks are failing. System may be degraded or down."
+          runbook: "docs/runbooks/system-health-failure.md"
+          dashboard: "https://grafana.example.com/d/transactional-outbox"
+          impact: "Course generation workflows are impacted. System may be partially or fully unavailable."
+          action: "Check all subsystems: FSM init, outbox processor, defense layers. Follow system health runbook."

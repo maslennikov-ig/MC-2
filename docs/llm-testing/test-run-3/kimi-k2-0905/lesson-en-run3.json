@@ -1,0 +1,102 @@
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "Build foundational Python skills by creating, naming, and converting variables while exploring integers, floats, strings, booleans, and type-checking through guided coding drills.",
+  "learning_objectives": [
+    "Declare and initialize variables using valid Python naming conventions",
+    "Predict and verify the data type of any literal or expression with type()",
+    "Convert between int, float, str, and bool without losing critical information",
+    "Diagnose and fix TypeError messages in mixed-type expressions",
+    "Select the optimal data type for storing user input and performing calculations"
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Declaring Variables and Basic Naming Rules",
+      "lesson_objective": "Correctly declare at least five variables that follow PEP 8 naming conventions and avoid reserved keywords.",
+      "key_topics": [
+        "valid identifiers",
+        "naming conventions",
+        "assignment operator",
+        "memory allocation",
+        "reserved keywords"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Fix the Illegal Names",
+          "exercise_instructions": "Open the starter file, rename the five illegal variables so the script runs without syntax errors, then print each corrected name."
+        },
+        {
+          "exercise_title": "PEP 8 Refactor Challenge",
+          "exercise_instructions": "Refactor the provided camelCase and PascalCase variable names into snake_case while preserving functionality."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Working with Numeric Types",
+      "lesson_objective": "Perform accurate arithmetic calculations by choosing between int and float types and casting when necessary.",
+      "key_topics": [
+        "int vs float",
+        "type() function",
+        "implicit conversion",
+        "explicit casting",
+        "rounding errors"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Shopping Cart Total",
+          "exercise_instructions": "Calculate the total price of three items including an 8.5 % sales tax; ensure the result is a rounded float with exactly two decimals."
+        },
+        {
+          "exercise_title": "Divide Without Crashing",
+          "exercise_instructions": "Write a script that divides two user-supplied integers and prints both the exact float quotient and the integer quotient."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "Strings and Boolean Logic",
+      "lesson_objective": "Manipulate string data and evaluate boolean expressions to control program flow.",
+      "key_topics": [
+        "string literals",
+        "escape sequences",
+        "boolean operators",
+        "truthiness",
+        "string methods"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Password Strength Checker",
+          "exercise_instructions": "Prompt for a password, then print True only if it contains at least eight characters, one digit, and one uppercase letter."
+        },
+        {
+          "exercise_title": "Type Guessing Game",
+          "exercise_instructions": "Given five mystery variables, use type() and print statements to reveal and label each type without altering the original code."
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "Mixed-Type Expressions and Type Conversion",
+      "lesson_objective": "Safely combine different data types in expressions by applying explicit conversion functions.",
+      "key_topics": [
+        "TypeError handling",
+        "str() vs repr()",
+        "bool() truth table",
+        "conversion pitfalls",
+        "user input casting"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Concatenate Without Errors",
+          "exercise_instructions": "Join the provided integer year, float price, and string product name into a single readable sentence using correct type conversion."
+        },
+        {
+          "exercise_title": "Input Calculator",
+          "exercise_instructions": "Read two numbers from input, convert them appropriately, then output their sum, difference, product, and quotient on separate lines."
+        }
+      ]
+    }
+  ]
+}

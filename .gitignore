@@ -1,0 +1,66 @@
+# --- Dependencies ---
+node_modules/
+.pnpm-store/
+
+# --- Build Outputs & Cache ---
+dist/
+build/
+.next/
+*.tsbuildinfo
+.eslintcache
+.cache/
+
+# --- Environment Variables & Secrets (CRITICAL) ---
+.env
+.env.local
+.env.development
+.env.test
+.env.production
+*.env
+*.env.local
+
+# Exception: Always commit the template so Jules/Devs know what keys are needed
+!.env.example
+
+# --- System & IDE Files ---
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
+*.log
+logs/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# --- Temporary Files ---
+.tmp/
+tmp/
+coverage/
+.nyc_output/
+
+# --- Agent/Tool Configurations ---
+# We WANT to commit agent commands and configs, but not their temp work folders
+.gemini/tmp/
+
+# We WANT to commit shared Claude configs, but not local user settings
+.claude/settings.local.json
+
+# Ignore generated MCP configs (specific to local paths)
+.mcp.json
+.mcp.local.json
+
+# --- Uploads/Binary Data ---
+packages/course-gen-platform/tests/test-data/*.pdf
+packages/course-gen-platform/tests/test-data/*.docx
+packages/course-gen-platform/uploads/
+
+# --- Lockfiles ---
+# Ignore lockfiles in workspace packages (use root lockfile)
+courseai-next/pnpm-lock.yaml
+packages/*/pnpm-lock.yaml
+*:Zone.Identifier
+# --- Sensitive Files (Excluded from Public Repo) ---
+settings.local.json
+scripts/setup-env.sh
+specs/002-main-entry-orchestrator/MANUAL-TESTING-GUIDE-RU.md

@@ -1,0 +1,126 @@
+{
+  "testRunId": "2025-11-14-v5-minimax-m2",
+  "model": "MiniMax M2",
+  "modelSlug": "minimax-m2",
+  "apiName": "minimax/minimax-m2",
+  "timestamp": "2025-11-14T10:41:10.215Z",
+  "duration": 60659,
+  "durationMinutes": "1.01",
+  "scenarios": 4,
+  "runsPerScenario": 3,
+  "totalTests": 12,
+  "successfulTests": 11,
+  "failedTests": 1,
+  "successRate": "91.67",
+  "avgTestDuration": "32706",
+  "results": [
+    {
+      "model": "MiniMax M2",
+      "modelSlug": "minimax-m2",
+      "scenario": "metadata-en",
+      "runNumber": 1,
+      "success": true,
+      "duration": 15995,
+      "contentLength": 2117
+    },
+    {
+      "model": "MiniMax M2",
+      "modelSlug": "minimax-m2",
+      "scenario": "metadata-en",
+      "runNumber": 2,
+      "success": true,
+      "duration": 26661,
+      "contentLength": 3037
+    },
+    {
+      "model": "MiniMax M2",
+      "modelSlug": "minimax-m2",
+      "scenario": "metadata-en",
+      "runNumber": 3,
+      "success": true,
+      "duration": 17205,
+      "contentLength": 2281
+    },
+    {
+      "model": "MiniMax M2",
+      "modelSlug": "minimax-m2",
+      "scenario": "metadata-ru",
+      "runNumber": 1,
+      "success": true,
+      "duration": 25288,
+      "contentLength": 2685
+    },
+    {
+      "model": "MiniMax M2",
+      "modelSlug": "minimax-m2",
+      "scenario": "metadata-ru",
+      "runNumber": 2,
+      "success": true,
+      "duration": 34604,
+      "contentLength": 2307
+    },
+    {
+      "model": "MiniMax M2",
+      "modelSlug": "minimax-m2",
+      "scenario": "metadata-ru",
+      "runNumber": 3,
+      "success": true,
+      "duration": 32487,
+      "contentLength": 2137
+    },
+    {
+      "model": "MiniMax M2",
+      "modelSlug": "minimax-m2",
+      "scenario": "lesson-en",
+      "runNumber": 1,
+      "success": true,
+      "duration": 29626,
+      "contentLength": 6414
+    },
+    {
+      "model": "MiniMax M2",
+      "modelSlug": "minimax-m2",
+      "scenario": "lesson-en",
+      "runNumber": 2,
+      "success": true,
+      "duration": 25542,
+      "contentLength": 4404
+    },
+    {
+      "model": "MiniMax M2",
+      "modelSlug": "minimax-m2",
+      "scenario": "lesson-en",
+      "runNumber": 3,
+      "success": true,
+      "duration": 26087,
+      "contentLength": 5171
+    },
+    {
+      "model": "MiniMax M2",
+      "modelSlug": "minimax-m2",
+      "scenario": "lesson-ru",
+      "runNumber": 1,
+      "success": false,
+      "duration": 60658,
+      "error": "Unexpected end of JSON input"
+    },
+    {
+      "model": "MiniMax M2",
+      "modelSlug": "minimax-m2",
+      "scenario": "lesson-ru",
+      "runNumber": 2,
+      "success": true,
+      "duration": 49419,
+      "contentLength": 8062
+    },
+    {
+      "model": "MiniMax M2",
+      "modelSlug": "minimax-m2",
+      "scenario": "lesson-ru",
+      "runNumber": 3,
+      "success": true,
+      "duration": 48898,
+      "contentLength": 6240
+    }
+  ]
+}

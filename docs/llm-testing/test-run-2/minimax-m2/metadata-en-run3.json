@@ -1,0 +1,36 @@
+{
+  "course_title": "Introduction to Python Programming",
+  "course_description": "A comprehensive beginner-level course designed to introduce students to Python programming fundamentals. This course covers essential programming concepts including variables, data types, control structures, functions, object-oriented programming, and file handling. Students will gain hands-on experience through practical coding exercises, projects, and real-world applications. The curriculum is structured to build confidence and competence in Python programming while providing a solid foundation for advanced topics.",
+  "course_overview": "This comprehensive Python course is structured around four main modules that progressively build programming competency. Module 1 introduces core concepts including variables, data types (integers, floats, strings, lists, dictionaries), basic input/output operations, and arithmetic operators with practical examples like calculating sales tax and formatting names. Module 2 covers control structures including conditional statements (if/elif/else), loops (for/while), and logical operators through projects such as a grade calculator and password validator. Module 3 focuses on functions, parameters, return values, scope, and introduces object-oriented programming with classes and objects, featuring examples like a bank account class and mathematical utility functions. Module 4 explores data structures, file handling, exception handling, and popular libraries such as requests and pandas through real-world projects including a contact manager and data analysis script. Each module includes hands-on coding exercises, mini-projects, and a comprehensive final project that combines all learned concepts.",
+  "target_audience": "This course is designed for complete programming beginners with no prior coding experience, career changers seeking to enter the technology industry, undergraduate students studying computer science or related fields, working professionals in non-technical roles looking to automate tasks, and hobbyists interested in learning programming for personal projects. Participants should have basic computer literacy, familiarity with operating systems, and motivation to solve problems systematically.",
+  "estimated_duration_hours": 40,
+  "difficulty_level": "beginner",
+  "prerequisites": [
+    "Basic computer literacy",
+    "Familiarity with Windows, macOS, or Linux operating systems",
+    "High school mathematics knowledge",
+    "No prior programming experience required"
+  ],
+  "learning_outcomes": [
+    "Define fundamental Python programming concepts including variables, data types, operators, and control structures using proper terminology",
+    "Build functional Python programs using functions, classes, and object-oriented programming principles to solve specific problems",
+    "Create data manipulation scripts using lists, dictionaries, tuples, and sets with appropriate data structures for given scenarios",
+    "Analyze and debug Python code using debugging tools, error handling, and best practices for code maintenance",
+    "Design complete Python applications incorporating file I/O operations, external libraries, and database connectivity",
+    "Implement user-interactive programs with graphical interfaces using tkinter or web frameworks for practical applications"
+  ],
+  "course_tags": [
+    "python programming",
+    "beginner coding",
+    "object-oriented programming",
+    "software development",
+    "data structures",
+    "functions",
+    "control structures",
+    "file handling",
+    "exception handling",
+    "libraries",
+    "automation",
+    "problem solving"
+  ]
+}

@@ -1,0 +1,9 @@
+{
+  "model": "OSS 120B",
+  "modelSlug": "oss-120b",
+  "scenario": "lesson-ru",
+  "runNumber": 2,
+  "error": "HTTP 401: {\"error\":{\"message\":\"No auth credentials found\",\"code\":401}}",
+  "timestamp": "2025-11-13T12:10:17.461Z",
+  "duration": 60
+}

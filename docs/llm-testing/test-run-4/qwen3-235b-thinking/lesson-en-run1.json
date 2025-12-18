@@ -1,0 +1,94 @@
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "This section covers the foundational concepts of storing and manipulating data in Python through variables and data types. You'll learn how to declare variables, understand different data types, and convert between them. Mastering these concepts is essential for writing effective Python programs.",
+  "learning_objectives": [
+    "Declare and assign values to variables following Python naming conventions",
+    "Identify and use the four basic data types: int, float, str, and bool",
+    "Check data types using the type() function",
+    "Convert between different data types using built-in conversion functions",
+    "Apply variables to solve simple real-world data storage problems"
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Understanding Variables",
+      "lesson_objective": "Declare and assign values to variables using proper naming conventions",
+      "key_topics": [
+        "What is a variable?",
+        "Assignment operator (=)",
+        "Valid variable naming rules",
+        "Overwriting variable values",
+        "Dynamic typing in Python"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Variable Declaration Practice",
+          "exercise_instructions": "Create three variables: your_name (string), birth_year (integer), and is_student (boolean). Assign appropriate values for yourself and print all three variables."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Basic Data Types",
+      "lesson_objective": "Identify and use the four fundamental Python data types in practical scenarios",
+      "key_topics": [
+        "Integer (int) data type",
+        "Floating-point (float) numbers",
+        "String (str) characteristics",
+        "Boolean (bool) values",
+        "Using type() to inspect data types"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Data Type Identification",
+          "exercise_instructions": "Create four variables: population (int), pi_value (float), greeting (str), and is_raining (bool). Print each variable along with its data type using type()."
+        },
+        {
+          "exercise_title": "Real-World Data Classification",
+          "exercise_instructions": "Identify the correct data type for: number of pets, price of coffee, 'Hello World', and whether water is boiling. Declare variables with these values and verify using type()."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "Type Conversion",
+      "lesson_objective": "Convert between different data types using built-in conversion functions",
+      "key_topics": [
+        "Implicit vs explicit type conversion",
+        "Converting to string with str()",
+        "Converting to integer with int()",
+        "Converting to float with float()",
+        "Handling conversion errors"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Basic Type Conversion",
+          "exercise_instructions": "Convert the integer 42 to a string, the string '3.14' to a float, and the float 99.9 to an integer. Print each converted value with its new data type."
+        },
+        {
+          "exercise_title": "Practical Conversion Challenge",
+          "exercise_instructions": "Ask the user for their age as input (which returns a string). Convert it to an integer, add 10 years, then convert back to string to print: 'In 10 years you will be [result] years old'."
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "Working with Strings",
+      "lesson_objective": "Perform basic string operations and understand string-specific behaviors",
+      "key_topics": [
+        "String concatenation with +",
+        "String length with len()",
+        "Escape characters",
+        "String immutability",
+        "Basic string methods"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "String Manipulation",
+          "exercise_instructions": "Create first_name and last_name variables. Concatenate them with a space to form full_name. Print the length of full_name and convert it to uppercase using .upper()."
+        }
+      ]
+    }
+  ]
+}

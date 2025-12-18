@@ -1,0 +1,126 @@
+{
+  "testRunId": "2025-11-14-v5-deepseek-v32-exp",
+  "model": "DeepSeek v3.2 Exp",
+  "modelSlug": "deepseek-v32-exp",
+  "apiName": "deepseek/deepseek-v3.2-exp",
+  "timestamp": "2025-11-14T10:41:55.410Z",
+  "duration": 105858,
+  "durationMinutes": "1.76",
+  "scenarios": 4,
+  "runsPerScenario": 3,
+  "totalTests": 12,
+  "successfulTests": 12,
+  "failedTests": 0,
+  "successRate": "100.00",
+  "avgTestDuration": "53528",
+  "results": [
+    {
+      "model": "DeepSeek v3.2 Exp",
+      "modelSlug": "deepseek-v32-exp",
+      "scenario": "metadata-en",
+      "runNumber": 1,
+      "success": true,
+      "duration": 26053,
+      "contentLength": 1794
+    },
+    {
+      "model": "DeepSeek v3.2 Exp",
+      "modelSlug": "deepseek-v32-exp",
+      "scenario": "metadata-en",
+      "runNumber": 2,
+      "success": true,
+      "duration": 24346,
+      "contentLength": 1615
+    },
+    {
+      "model": "DeepSeek v3.2 Exp",
+      "modelSlug": "deepseek-v32-exp",
+      "scenario": "metadata-en",
+      "runNumber": 3,
+      "success": true,
+      "duration": 22639,
+      "contentLength": 1404
+    },
+    {
+      "model": "DeepSeek v3.2 Exp",
+      "modelSlug": "deepseek-v32-exp",
+      "scenario": "metadata-ru",
+      "runNumber": 1,
+      "success": true,
+      "duration": 33395,
+      "contentLength": 1781
+    },
+    {
+      "model": "DeepSeek v3.2 Exp",
+      "modelSlug": "deepseek-v32-exp",
+      "scenario": "metadata-ru",
+      "runNumber": 2,
+      "success": true,
+      "duration": 34553,
+      "contentLength": 1857
+    },
+    {
+      "model": "DeepSeek v3.2 Exp",
+      "modelSlug": "deepseek-v32-exp",
+      "scenario": "metadata-ru",
+      "runNumber": 3,
+      "success": true,
+      "duration": 27724,
+      "contentLength": 1430
+    },
+    {
+      "model": "DeepSeek v3.2 Exp",
+      "modelSlug": "deepseek-v32-exp",
+      "scenario": "lesson-en",
+      "runNumber": 1,
+      "success": true,
+      "duration": 62517,
+      "contentLength": 4235
+    },
+    {
+      "model": "DeepSeek v3.2 Exp",
+      "modelSlug": "deepseek-v32-exp",
+      "scenario": "lesson-en",
+      "runNumber": 2,
+      "success": true,
+      "duration": 58587,
+      "contentLength": 4404
+    },
+    {
+      "model": "DeepSeek v3.2 Exp",
+      "modelSlug": "deepseek-v32-exp",
+      "scenario": "lesson-en",
+      "runNumber": 3,
+      "success": true,
+      "duration": 69645,
+      "contentLength": 5458
+    },
+    {
+      "model": "DeepSeek v3.2 Exp",
+      "modelSlug": "deepseek-v32-exp",
+      "scenario": "lesson-ru",
+      "runNumber": 1,
+      "success": true,
+      "duration": 105856,
+      "contentLength": 6761
+    },
+    {
+      "model": "DeepSeek v3.2 Exp",
+      "modelSlug": "deepseek-v32-exp",
+      "scenario": "lesson-ru",
+      "runNumber": 2,
+      "success": true,
+      "duration": 82093,
+      "contentLength": 5036
+    },
+    {
+      "model": "DeepSeek v3.2 Exp",
+      "modelSlug": "deepseek-v32-exp",
+      "scenario": "lesson-ru",
+      "runNumber": 3,
+      "success": true,
+      "duration": 94929,
+      "contentLength": 5846
+    }
+  ]
+}

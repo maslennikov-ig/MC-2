@@ -1,0 +1,120 @@
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "A hands-on introduction to the fundamental building blocks of Python programming. Students will learn how to store, manipulate, and manage different kinds of data, forming the core skills needed for all subsequent programming tasks.",
+  "learning_objectives": [
+    "Declare and assign values to variables using Python syntax",
+    "Identify and utilize the core built-in data types: integers, floats, strings, and booleans",
+    "Convert data between different types using explicit type casting",
+    "Apply variable naming conventions and best practices in code",
+    "Perform basic operations and manipulations on each data type"
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Creating Your First Variables",
+      "lesson_objective": "Students will be able to declare variables, assign different values to them, and print their contents to the console.",
+      "key_topics": [
+        "Variable assignment syntax using the equals sign (=)",
+        "The print() function for displaying output",
+        "Naming rules and conventions for variables (snake_case)",
+        "Understanding the difference between a variable name and its value"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Variable Setup and Print",
+          "exercise_instructions": "Create three variables: one for your name, one for your age, and one for your favorite color. Print each variable on a separate line."
+        },
+        {
+          "exercise_title": "Reassignment Practice",
+          "exercise_instructions": "Create a variable called 'score' and assign it the value 10. Print it. Then, reassign it to the value 25 and print it again to see the change."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Working with Numbers: Integers and Floats",
+      "lesson_objective": "Students will be able to perform arithmetic operations with integer and float data types and understand the difference between them.",
+      "key_topics": [
+        "Integer data type for whole numbers",
+        "Float data type for decimal numbers",
+        "Basic arithmetic operators (+, -, *, /, //, %, **)",
+        "Order of operations (PEMDAS) in Python expressions"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Basic Calculator",
+          "exercise_instructions": "Write a program that calculates the area of a rectangle. Create variables for length and width, then calculate and print the area."
+        },
+        {
+          "exercise_title": "Division Comparison",
+          "exercise_instructions": "Perform the calculation 10 / 3 and store the result in a variable. Then, perform 10 // 3 and store the result in another variable. Print both results and observe the difference."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "Manipulating Text with Strings",
+      "lesson_objective": "Students will be able to create string variables, use string methods, and combine strings through concatenation and f-strings.",
+      "key_topics": [
+        "String creation using single, double, and triple quotes",
+        "String concatenation with the + operator",
+        "Introduction to f-strings for formatted string literals",
+        "Common string methods: .upper(), .lower(), .strip()",
+        "Using the len() function to get string length"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Personalized Greeting",
+          "exercise_instructions": "Ask the user for their name and their favorite food using the input() function. Create a personalized message using an f-string that says: 'Hello [name]! I hear you love [food].' and print it."
+        },
+        {
+          "exercise_title": "String Method Chaining",
+          "exercise_instructions": "Create a variable with the string ' Python Programming ' (with extra spaces). Use a sequence of string methods to remove the spaces and convert the text to uppercase, then print the result."
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "Making Decisions with Booleans",
+      "lesson_objective": "Students will be able to create boolean variables and use comparison operators to evaluate conditions.",
+      "key_topics": [
+        "Boolean data type (True and False)",
+        "Comparison operators (==, !=, >, <, >=, <=)",
+        "Using the type() function to identify data types",
+        "Boolean expressions and their truth values"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Age Checker",
+          "exercise_instructions": "Create a variable for a person's age. Write a boolean expression to check if the person is 18 or older. Print the result of the expression."
+        },
+        {
+          "exercise_title": "Password Validator",
+          "exercise_instructions": "Create a variable for a user's input password and a variable for the correct password. Use a comparison operator to check if they match and print the boolean result."
+        }
+      ]
+    },
+    {
+      "lesson_number": 5,
+      "lesson_title": "Converting Between Data Types",
+      "lesson_objective": "Students will be able to convert data between strings, integers, and floats using type casting functions.",
+      "key_topics": [
+        "Type casting functions: str(), int(), float()",
+        "When and why type conversion is necessary",
+        "Handling potential errors from invalid conversions",
+        "Building strings that combine numbers and text"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Number to String Message",
+          "exercise_instructions": "Create an integer variable for a year (e.g., 2024). Convert it to a string and use it to create a message like 'The year is 2024.' and print it."
+        },
+        {
+          "exercise_title": "Numeric Input Calculator",
+          "exercise_instructions": "Use the input() function to ask the user for two numbers. Since input() returns a string, convert them to floats, add them together, and print the sum."
+        }
+      ]
+    }
+  ]
+}

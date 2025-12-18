@@ -1,0 +1,109 @@
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "This hands-on programming section explores Python variables and fundamental data types through interactive lessons and practical exercises, enabling learners to build core coding skills.",
+  "learning_objectives": [
+    "Declare and assign variables using proper Python syntax.",
+    "Identify and utilize basic data types including integers, floats, strings, and booleans.",
+    "Perform operations on variables while handling type conversions and common errors.",
+    "Apply best practices for variable naming and data type management in code."
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Introduction to Variables",
+      "lesson_objective": "Learners will be able to declare, assign, and print variables in Python code.",
+      "key_topics": [
+        "Definition and purpose of variables",
+        "Variable assignment using the equals operator",
+        "Naming conventions and rules",
+        "Printing variables with print() function",
+        "Basic variable scope"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "First Variable Assignment",
+          "exercise_instructions": "Write a Python script to create a variable named 'student_name' and assign it the string value 'Alice'. Then print the variable using print()."
+        },
+        {
+          "exercise_title": "Multiple Variable Declaration",
+          "exercise_instructions": "Declare three variables: 'age' (integer 22), 'height' (float 5.6), and 'is_student' (boolean True). Print each one on a separate line."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Understanding Data Types",
+      "lesson_objective": "Learners will identify Python's primitive data types and use type() to inspect them.",
+      "key_topics": [
+        "Integers (int) for whole numbers",
+        "Floats (float) for decimal numbers",
+        "Strings (str) for text data",
+        "Booleans (bool) for true/false values",
+        "Using type() and isinstance() functions"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Data Type Exploration",
+          "exercise_instructions": "Create four variables of different types: int, float, str, bool. Use type() to print the data type of each variable."
+        },
+        {
+          "exercise_title": "Type Inspection Practice",
+          "exercise_instructions": "Write code to check if a variable 'score' (assigned 95) is an integer using isinstance(score, int) and print the result."
+        },
+        {
+          "exercise_title": "Mixed Type Variables",
+          "exercise_instructions": "Assign values to variables 'pi' as float 3.14, 'message' as string 'Hello', and 'active' as bool False. Print their types."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "Operations on Variables and Types",
+      "lesson_objective": "Learners will execute arithmetic, concatenation, and conversion operations on variables.",
+      "key_topics": [
+        "Arithmetic operations (+, -, *, /, %)",
+        "String concatenation and repetition",
+        "Type conversion functions (int(), float(), str())",
+        "Handling TypeError exceptions",
+        "Basic input with input() and type handling"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Arithmetic Calculations",
+          "exercise_instructions": "Create two integer variables 'a' (10) and 'b' (3). Perform addition, subtraction, and division, then print the results."
+        },
+        {
+          "exercise_title": "String Concatenation",
+          "exercise_instructions": "Declare string variables 'first_name' ('John') and 'last_name' ('Doe'). Concatenate them with a space and print the full name."
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "Best Practices and Advanced Usage",
+      "lesson_objective": "Learners will implement PEP8 naming standards and debug common data type issues.",
+      "key_topics": [
+        "PEP8 variable naming guidelines",
+        "Dynamic typing in Python",
+        "Immutable data types (strings, tuples)",
+        "Common pitfalls like TypeError",
+        "Dynamic type checking in code"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Refactor Variable Names",
+          "exercise_instructions": "Take this code: x=5; y='test'. Refactor to use descriptive names like 'count' and 'label', then print both."
+        },
+        {
+          "exercise_title": "Type Conversion Challenge",
+          "exercise_instructions": "Use input() to get a number as string, convert it to float using float(), add 10, and print the result."
+        },
+        {
+          "exercise_title": "Debug Type Mismatch",
+          "exercise_instructions": "Identify and fix a TypeError in code where you're adding a string '5' to integer 3. Convert appropriately and print the sum."
+        }
+      ]
+    }
+  ]
+}

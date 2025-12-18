@@ -1,0 +1,126 @@
+{
+  "testRunId": "2025-11-14-v5-kimi-k2-thinking",
+  "model": "Kimi K2 Thinking",
+  "modelSlug": "kimi-k2-thinking",
+  "apiName": "moonshotai/kimi-k2-thinking",
+  "timestamp": "2025-11-14T10:41:24.854Z",
+  "duration": 75303,
+  "durationMinutes": "1.26",
+  "scenarios": 4,
+  "runsPerScenario": 3,
+  "totalTests": 12,
+  "successfulTests": 7,
+  "failedTests": 5,
+  "successRate": "58.33",
+  "avgTestDuration": "57209",
+  "results": [
+    {
+      "model": "Kimi K2 Thinking",
+      "modelSlug": "kimi-k2-thinking",
+      "scenario": "metadata-en",
+      "runNumber": 1,
+      "success": true,
+      "duration": 31005,
+      "contentLength": 1916
+    },
+    {
+      "model": "Kimi K2 Thinking",
+      "modelSlug": "kimi-k2-thinking",
+      "scenario": "metadata-en",
+      "runNumber": 2,
+      "success": true,
+      "duration": 46422,
+      "contentLength": 2284
+    },
+    {
+      "model": "Kimi K2 Thinking",
+      "modelSlug": "kimi-k2-thinking",
+      "scenario": "metadata-en",
+      "runNumber": 3,
+      "success": true,
+      "duration": 45882,
+      "contentLength": 2182
+    },
+    {
+      "model": "Kimi K2 Thinking",
+      "modelSlug": "kimi-k2-thinking",
+      "scenario": "metadata-ru",
+      "runNumber": 1,
+      "success": true,
+      "duration": 33614,
+      "contentLength": 2080
+    },
+    {
+      "model": "Kimi K2 Thinking",
+      "modelSlug": "kimi-k2-thinking",
+      "scenario": "metadata-ru",
+      "runNumber": 2,
+      "success": false,
+      "duration": 66280,
+      "error": "Unterminated string in JSON at position 1861 (line 17 column 15)"
+    },
+    {
+      "model": "Kimi K2 Thinking",
+      "modelSlug": "kimi-k2-thinking",
+      "scenario": "metadata-ru",
+      "runNumber": 3,
+      "success": true,
+      "duration": 56545,
+      "contentLength": 2447
+    },
+    {
+      "model": "Kimi K2 Thinking",
+      "modelSlug": "kimi-k2-thinking",
+      "scenario": "lesson-en",
+      "runNumber": 1,
+      "success": false,
+      "duration": 75302,
+      "error": "Expected ',' or ']' after array element in JSON at position 4269 (line 1 column 4270)"
+    },
+    {
+      "model": "Kimi K2 Thinking",
+      "modelSlug": "kimi-k2-thinking",
+      "scenario": "lesson-en",
+      "runNumber": 2,
+      "success": true,
+      "duration": 64561,
+      "contentLength": 5778
+    },
+    {
+      "model": "Kimi K2 Thinking",
+      "modelSlug": "kimi-k2-thinking",
+      "scenario": "lesson-en",
+      "runNumber": 3,
+      "success": false,
+      "duration": 74269,
+      "error": "Expected ',' or ']' after array element in JSON at position 4061 (line 81 column 6)"
+    },
+    {
+      "model": "Kimi K2 Thinking",
+      "modelSlug": "kimi-k2-thinking",
+      "scenario": "lesson-ru",
+      "runNumber": 1,
+      "success": false,
+      "duration": 74548,
+      "error": "Unterminated string in JSON at position 1485 (line 27 column 211)"
+    },
+    {
+      "model": "Kimi K2 Thinking",
+      "modelSlug": "kimi-k2-thinking",
+      "scenario": "lesson-ru",
+      "runNumber": 2,
+      "success": false,
+      "duration": 67058,
+      "error": "Unterminated string in JSON at position 1153 (line 18 column 34)"
+    },
+    {
+      "model": "Kimi K2 Thinking",
+      "modelSlug": "kimi-k2-thinking",
+      "scenario": "lesson-ru",
+      "runNumber": 3,
+      "success": true,
+      "duration": 51022,
+      "contentLength": 6106
+    }
+  ]
+}

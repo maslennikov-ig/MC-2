@@ -1,0 +1,34 @@
+{
+  "model": "Nemotron 3 Nano 30B",
+  "modelSlug": "nemotron-nano-30b",
+  "modelApiName": "nvidia/nemotron-3-nano-30b-a3b:free",
+  "lessonId": "1.1",
+  "lessonTitle": "Что такое нематериальный продукт: билет как товар",
+  "language": "ru",
+  "duration": 20745,
+  "timestamp": "2025-12-16T10:25:27.541Z",
+  "parseSuccess": false,
+  "parseError": "Expected ',' or '}' after property value in JSON at position 6176 (line 13 column 5)",
+  "usage": {
+    "prompt_tokens": 614,
+    "completion_tokens": 3583,
+    "total_tokens": 4197,
+    "cost": 0,
+    "is_byok": false,
+    "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "audio_tokens": 0,
+      "video_tokens": 0
+    },
+    "cost_details": {
+      "upstream_inference_cost": null,
+      "upstream_inference_prompt_cost": 0,
+      "upstream_inference_completions_cost": 0
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 1587,
+      "image_tokens": 0
+    }
+  },
+  "quality": null
+}

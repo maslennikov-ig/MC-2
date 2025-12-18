@@ -1,0 +1,33 @@
+{
+  "course_title": "Introduction to Python Programming",
+  "course_description": "This beginner-friendly course introduces the fundamentals of Python programming, including syntax, control structures, functions, and basic data structures. Through hands-on coding exercises and real-world examples, students will develop the ability to write simple scripts, automate tasks, and build a foundation for further exploration in software development, data analysis, or web programming. No prior programming experience required.",
+  "course_overview": "This course is designed for those new to programming, providing a solid introduction to Python. Students will learn essential concepts such as variables, data types, control flow, functions, and basic data structures like lists and dictionaries. The curriculum includes practical exercises on problem-solving, script writing, and debugging, along with topics in error handling and modular programming. By the end of the course, learners will complete small projects to apply their knowledge, preparing them for more advanced programming studies or practical applications in various fields.",
+  "target_audience": "Individuals with no prior programming experience seeking to enter software development, data science, or automation.",
+  "estimated_duration_hours": 15,
+  "difficulty_level": "beginner",
+  "prerequisites": [
+    "Basic computer literacy",
+    "Familiarity with using a command line interface",
+    "Curiosity about programming concepts"
+  ],
+  "learning_outcomes": [
+    "Write simple Python scripts to solve basic programming problems",
+    "Explain fundamental programming concepts such as variables, loops, and functions",
+    "Apply logical and conditional structures to control program flow",
+    "Debug and troubleshoot errors in Python code using development tools",
+    "Develop small applications using functions and basic data structures",
+    "Implement solutions to real-world problems through hands-on coding exercises"
+  ],
+  "course_tags": [
+    "Python",
+    "Programming Basics",
+    "Beginner Coding",
+    "Scripting",
+    "Data Structures",
+    "Problem Solving",
+    "Automation",
+    "Software Development",
+    "Data Analysis Fundamentals",
+    "Web Development Intro"
+  ]
+}

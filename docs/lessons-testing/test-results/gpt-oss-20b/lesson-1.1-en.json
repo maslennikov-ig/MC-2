@@ -1,0 +1,49 @@
+{
+  "title": "What is an Intangible Product: Ticket as a Product",
+  "intro": "Imagine you’re a sales manager at a bustling event company, juggling a catalog of tickets, merchandise, and digital experiences. While the physical goods you handle are tangible—handed over, stored, and shipped—tickets are a different beast. They’re promises, not possessions. In this bite‑sized lesson, you’ll discover what makes tickets intangible, compare them to everyday physical products, and learn how to treat them like a right to experience rather than an item of ownership. You’ll also explore why consumption happens instantly and can’t be returned, and how a Customer Relationship Management (CRM) system becomes your ticket‑sales navigator, guiding prospects from curiosity to seat reservation. By the end, you’ll be equipped to speak confidently about tickets as intangible assets and leverage CRM data to boost conversions. Ready to shift your mindset? Let’s dive in!",
+  "sections": [
+    {
+      "title": "Defining Intangible Products",
+      "content": "Intangible products are goods that lack physical form yet deliver value through services, experiences, or rights. Think of a software license, a subscription to a streaming platform, or a concert ticket. They are measured by quality, access, and time rather than weight or volume. For sales managers, recognizing this distinction is vital because it changes how you price, promote, and support these products.\n\nKey traits of intangibles:\n1. **No physical presence** – You can’t touch or stack them.\n2. **Consumption at purchase** – Value is realized immediately, often in real time.\n3. **Proprietary access** – Ownership of the product doesn’t transfer; you grant a right.\n\nUnderstanding these traits helps align sales strategies: you’ll focus on experience storytelling, trust-building, and post‑purchase support rather than inventory management.\n\nExample: A mobile app subscription is intangible—there’s no box, but there’s ongoing value delivered through updates and customer support.\n\nIn the next section, we’ll compare tickets to physical items to see how these principles play out in the event industry."
+    },
+    {
+      "title": "Tickets: Rights, Not Ownership",
+      "content": "A ticket is fundamentally a **right** to participate in an event, not a piece of property you can own or resell at will. When a customer pays for a concert ticket, they receive a digital or paper voucher that grants them access to a specific time, venue, and experience. They may transfer the right to another person, but they never own the event itself.\n\nWhy does this matter for sales managers?\n- **Pricing Strategy**: You set prices based on demand, seat value, and experience, not on material costs.\n- **Marketing Focus**: Emphasize the unique experience, atmosphere, and memories rather than a physical product.\n- **Customer Loyalty**: Build repeat business by ensuring the experience meets or exceeds expectations—there’s no product to return if it’s bad.\n\nConsider a VIP ticket that includes backstage access and a signed poster. The customer pays for the right to access exclusive content and memorabilia, but the ticket’s value is not tied to the poster’s resale price.\n\nNext, we’ll dissect five core differences between tickets and physical products to give you a concrete framework for selling tickets effectively."
+    },
+    {
+      "title": "Ticket vs Physical Product: Five Key Differences",
+      "content": "| Difference | Ticket (Intangible) | Physical Product |\n|---|---|---|\n| **Form** | No tangible shape | Physical object |\n| **Ownership Transfer** | Right to attend, not ownership | Ownership of the item |\n| **Consumption Timing** | Immediate (on event day) | Can be stored, used later |\n| **Refundability** | Typically non‑refundable | Often refundable or returnable |\n| **Inventory Impact** | Seats are limited but not stored | Inventory counted in warehouses |\n\n1. **No Physical Form** – Sellers can’t showcase a ticket in a showroom; they must rely on visuals, descriptions, and testimonials.\n2. **Right, Not Ownership** – This legal nuance shapes how you communicate value and handle resales.\n3. **Immediate Consumption** – The event itself is the product; if the event occurs, the customer has consumed the ticket.\n4. **Non‑Refundable** – Once purchased, most tickets cannot be returned, so accuracy and trust are paramount.\n5. **Seat Capacity, Not Stock** – You’re selling a limited number of access slots rather than physical goods.\n\nPractical Insight: When launching a new concert, use tiered pricing to reflect different seat categories rather than product variants. Highlight the experiential difference (e.g., front‑row view vs balcony view) instead of a product spec sheet.\n\nIn the following section, we’ll look at how consumption traits influence sales tactics and how a CRM can act as your navigator through the ticket sales journey."
+    },
+    {
+      "title": "Consumption Characteristics & CRM as the Navigator",
+      "content": "Tickets consume instantly: the moment the event starts, the customer’s experience is complete. Because of this immediacy, sales managers must focus on **pre‑event engagement**—sending reminders, providing event details, and building anticipation.\n\n**Non‑Refundable Nature** means accuracy is critical. Double‑check seat assignments, delivery of e‑tickets, and event policies. A mistake can cost trust—and a potential future sale.\n\nEnter the CRM: think of it as a **navigator** guiding prospects from curiosity to booked seat. In practice:\n1. **Lead Capture** – Use event interest forms to gather data.\n2. **Segmentation** – Group contacts by event genre, past attendance, or price sensitivity.\n3. **Personalized Journeys** – Trigger tailored emails: early‑bird discounts for frequent attendees, or exclusive backstage passes for high‑value leads.\n4. **Post‑Purchase Touches** – Send event reminders, QR code confirmations, and post‑event surveys.\n5. **Analytics** – Track conversion rates, average ticket price, and churn to refine future campaigns.\n\nBy treating the CRM as your ticket sales navigator, you can map each prospect’s path, mitigate risk of last‑minute cancellations, and maximize revenue per contact.\n\nExample: A CRM workflow could automatically send a “Your seat is confirmed” email 48 hours before the event, reducing no‑show rates and improving the customer experience."
+    }
+  ],
+  "examples": [
+    {
+      "title": "Concert Ticket vs Physical Merchandise",
+      "content": "A concert ticket grants entry to a live performance. It’s sold, consumed at the event, and non‑refundable. In contrast, a physical CD or t‑shirt is an object you can hold, store, and return if unsatisfied. The ticket’s value lies in the experience and memories, while the CD’s value is the tangible music file and packaging."
+    },
+    {
+      "title": "Online Webinar Ticket vs Training Kit",
+      "content": "Purchasing a webinar ticket provides instant access to a live online session; the content is delivered in real time and cannot be refunded. Buying a training kit, however, gives you a set of printed manuals and tools that can be used over weeks, returned if defective, and resold."
+    }
+  ],
+  "exercises": [
+    {
+      "question": "List five differences between tickets and physical products that you would highlight to a new sales team member.",
+      "hints": [
+        "Think about form, ownership, and consumption."
+      ],
+      "answers": []
+    },
+    {
+      "question": "Write a short paragraph explaining how a CRM system can act as a navigator for a ticket sales process. Include at least one specific CRM feature you would use.",
+      "hints": [
+        "Consider lead capture, segmentation, automation, and analytics."
+      ],
+      "answers": []
+    }
+  ],
+  "summary": "- Tickets are intangible rights, not physical goods.\n- They differ from physical products in form, ownership, consumption timing, refundability, and inventory.\n- Intangible products are measured by experience, access, and time.\n- Consumption of tickets is immediate and non‑refundable, demanding accurate pre‑event engagement.\n- A CRM functions as a navigator, guiding prospects through personalized journeys and analytics to maximize ticket sales."
+}

@@ -1,0 +1,34 @@
+ {
+  "course_title": "Introduction to Python Programming",
+  "course_description": "This comprehensive beginner-level technical programming course provides a solid foundation in Python programming. Students will learn fundamental concepts including variables, data types, control structures, functions, and basic object-oriented programming. Through hands-on exercises and real-world examples, participants will develop practical coding skills and problem-solving abilities using Python's clean syntax and powerful standard library.",
+  "course_overview": "This course systematically introduces Python programming through a structured curriculum. Module 1 covers environment setup with Anaconda and VS Code, writing your first 'Hello World' script, and understanding Python's interpreter. Module 2 explores core data types including integers, floats, strings, lists, dictionaries, and tuples with practical examples like creating a student grade calculator and analyzing text data. Module 3 dives into control flow with if-else statements, for and while loops, developing programs such as a number guessing game and a prime number generator. Module 4 focuses on functions, covering parameter passing, return values, scope, and lambda functions, culminating in building a modular expense tracker. Module 5 introduces file handling for reading/writing CSV and JSON files, creating a contact management system. Module 6 presents basic object-oriented programming concepts: classes, objects, methods, and inheritance through a library catalog project. Module 7 addresses error handling with try-except blocks and debugging techniques using pdb. Module 8 explores the standard library including datetime, random, and os modules for automation tasks. Each module includes 5-10 hands-on coding exercises, 2-3 mini-projects, and weekly challenges like building a personal budget analyzer or a simple web scraper. The course concludes with a capstone project where students develop a fully functional task management application with file persistence, demonstrating mastery of variables, functions, file I/O, and basic OOP concepts.",
+  "target_audience": "Aspiring programmers with no prior coding experience seeking to enter the tech industry, including career changers from non-technical backgrounds such as marketing, sales, or healthcare professionals. University students in non-CS majors (e.g., biology, economics, psychology) who need programming skills for data analysis and research projects. High school students preparing for computer science studies or technical internships. Professionals in roles like business analysts, product managers, or QA testers who want to automate tasks and improve technical communication with development teams. Hobbyists and entrepreneurs looking to build prototypes or understand software development fundamentals before hiring technical staff. Each persona shares a common goal: acquiring practical Python skills for immediate application in academic, professional, or personal projects.",
+  "estimated_duration_hours": 30,
+  "difficulty_level": "beginner",
+  "prerequisites": [
+    "Basic computer literacy (file management, installing software)",
+    "High school level mathematics (algebra)",
+    "Access to a computer with internet connection",
+    "No prior programming experience required"
+  ],
+  "learning_outcomes": [
+    "Define and implement Python variables, data types, and control structures to solve computational problems",
+    "Build reusable functions with proper parameters, return values, and error handling mechanisms",
+    "Create Python programs that read from and write to files in CSV and JSON formats",
+    "Analyze and debug Python code using systematic techniques and the pdb debugger",
+    "Design and implement object-oriented solutions using classes, objects, and inheritance",
+    "Evaluate and select appropriate Python data structures and algorithms for specific tasks"
+  ],
+  "course_tags": [
+    "python",
+    "programming",
+    "beginner",
+    "coding",
+    "software development",
+    "automation",
+    "data analysis",
+    "object-oriented programming",
+    "scripting",
+    "technical skills"
+  ]
+}

@@ -1,0 +1,233 @@
+# MegaCampus Production Docker Compose
+# Full production stack with all services
+# Usage: docker compose -f docker-compose.production.yml up -d
+
+services:
+  # ============================================
+  # INFRASTRUCTURE SERVICES
+  # ============================================
+
+  # Redis for BullMQ queues and caching
+  redis:
+    image: redis:7-alpine
+    container_name: megacampus-redis
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:6379:6379"
+    volumes:
+      - redis-data:/data
+    command: redis-server --appendonly yes --maxmemory 1gb --maxmemory-policy noeviction
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 3s
+      retries: 3
+    networks:
+      - megacampus
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # Docling MCP Server for document processing (internal - behind nginx proxy)
+  # NOTE: Image built manually on server (too large for GitHub Actions)
+  docling-mcp-internal:
+    image: ghcr.io/maslennikov-ig/megacampusai/docling-mcp:latest
+    container_name: megacampus-docling-mcp-internal
+    restart: unless-stopped
+    # No external ports - only accessible via nginx proxy
+    volumes:
+      - ./data/uploads:/app/uploads:ro
+      - docling-models:/app/models
+      - docling-cache:/app/cache
+      # Shared JSON cache - worker reads from here
+      - docling-json-cache:/usr/local/lib/python3.12/site-packages/_cache
+    environment:
+      - DOCLING_CACHE_DIR=/app/cache
+      - DOCLING_MODELS_PATH=/app/models
+      - DOCLING_LOG_LEVEL=INFO
+      - MCP_TRANSPORT=streamable-http
+      - MCP_HOST=0.0.0.0
+      - MCP_PORT=8000
+      - PYTHONUNBUFFERED=1
+    healthcheck:
+      test: ["CMD-SHELL", "python -c \"import socket; s=socket.socket(); s.connect(('localhost', 8000)); s.close()\" || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    networks:
+      - megacampus
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 4G
+        reservations:
+          memory: 2G
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
+
+  # Nginx proxy for Docling MCP - rewrites Host header to bypass DNS rebinding protection
+  docling-mcp:
+    image: nginx:alpine
+    container_name: megacampus-docling-mcp
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:8000:8000"
+    volumes:
+      - ./nginx-docling-proxy.conf:/etc/nginx/conf.d/default.conf:ro
+    depends_on:
+      docling-mcp-internal:
+        condition: service_healthy
+    # No healthcheck needed - docling-mcp-internal has its own healthcheck
+    # and nginx is just a transparent proxy
+    networks:
+      - megacampus
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ============================================
+  # APPLICATION SERVICES
+  # ============================================
+
+  # Next.js Web Application
+  web:
+    image: ghcr.io/maslennikov-ig/megacampusai/web:latest
+    container_name: megacampus-web
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:3000:3000"
+    env_file:
+      - .env.production
+    environment:
+      - NODE_ENV=production
+      - PORT=3000
+      - NEXT_PUBLIC_SITE_URL=${NEXT_PUBLIC_SITE_URL:-https://megacampus.ai}
+      - NEXT_PUBLIC_API_URL=http://api:4000
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/api/health', (r) => {r.statusCode === 200 ? process.exit(0) : process.exit(1)}).on('error', () => process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    networks:
+      - megacampus
+    depends_on:
+      redis:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
+
+  # API Server (Express + tRPC)
+  api:
+    image: ghcr.io/maslennikov-ig/megacampusai/api:latest
+    container_name: megacampus-api
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:4000:4000"
+    env_file:
+      - .env.production
+    environment:
+      - NODE_ENV=production
+      - PORT=4000
+      - REDIS_URL=redis://redis:6379
+      - DOCLING_MCP_URL=http://docling-mcp:8000/mcp
+    volumes:
+      - ./data/uploads:/app/uploads
+    healthcheck:
+      test: ["CMD", "node", "-e", "require('http').get('http://localhost:4000/health', (r) => {r.statusCode === 200 ? process.exit(0) : process.exit(1)}).on('error', () => process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    networks:
+      - megacampus
+    depends_on:
+      redis:
+        condition: service_healthy
+      docling-mcp-internal:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
+
+  # BullMQ Worker for background jobs
+  worker:
+    image: ghcr.io/maslennikov-ig/megacampusai/api:latest
+    container_name: megacampus-worker
+    restart: unless-stopped
+    command: ["tsx", "dist/orchestrator/worker-entrypoint.js"]
+    env_file:
+      - .env.production
+    environment:
+      - NODE_ENV=production
+      - REDIS_URL=redis://redis:6379
+      - DOCLING_MCP_URL=http://docling-mcp:8000/mcp
+      # Path to shared docling JSON cache
+      - DOCLING_CACHE_PATH=/app/docling-cache
+    volumes:
+      - ./data/uploads:/app/uploads
+      # Shared JSON cache from docling-mcp
+      - docling-json-cache:/app/docling-cache:ro
+    networks:
+      - megacampus
+    depends_on:
+      redis:
+        condition: service_healthy
+      docling-mcp-internal:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
+
+networks:
+  megacampus:
+    driver: bridge
+
+volumes:
+  redis-data:
+    driver: local
+  docling-models:
+    driver: local
+  docling-cache:
+    driver: local
+  # Shared volume for docling JSON output - written by docling-mcp, read by worker
+  docling-json-cache:
+    driver: local

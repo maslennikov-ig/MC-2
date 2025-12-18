@@ -1,0 +1,35 @@
+{
+  "course_title": "Introduction to Python Programming",
+  "course_description": "Master the fundamentals of Python programming in this beginner-friendly course. Learn to write clean, efficient code, solve real-world problems, and build a solid foundation for your programming career.",
+  "course_overview": "This comprehensive introductory course takes you from zero programming knowledge to writing functional Python code. You'll start with basic syntax and gradually progress to more complex concepts like data structures, control flow, functions, and object-oriented programming. Through hands-on exercises and real-world projects, you'll develop practical coding skills while understanding programming principles that apply across languages. By the end, you'll have the confidence to tackle basic programming challenges and continue your Python learning journey.",
+  "target_audience": "Absolute beginners with no prior programming experience, career changers exploring tech, students supplementing their education, and professionals needing to add Python to their skill set.",
+  "estimated_duration_hours": 30,
+  "difficulty_level": "beginner",
+  "prerequisites": [
+    "Basic computer literacy",
+    "Familiarity with downloading and installing software",
+    "Logical thinking and problem-solving mindset"
+  ],
+  "learning_outcomes": [
+    "Create Python programs that use variables, data types, and operators to solve basic problems",
+    "Apply control flow structures including conditionals and loops to implement program logic",
+    "Design and implement functions to organize code and promote reusability",
+    "Utilize Python's built-in data structures to store and manipulate collections of data",
+    "Analyze and debug code to identify and fix common programming errors",
+    "Develop basic object-oriented programs using classes and objects",
+    "Demonstrate proficiency in reading and writing to files for data persistence",
+    "Evaluate appropriate Python solutions for given programming challenges"
+  ],
+  "course_tags": [
+    "Python",
+    "Programming",
+    "Beginner",
+    "Coding",
+    "Software Development",
+    "Computer Science",
+    "Syntax",
+    "Data Types",
+    "Functions",
+    "Object-Oriented Programming"
+  ]
+}

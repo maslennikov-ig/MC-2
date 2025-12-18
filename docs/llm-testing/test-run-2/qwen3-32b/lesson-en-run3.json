@@ -1,0 +1,119 @@
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "This section provides hands-on experience with Python variables and core data types. Students will practice declaring variables, manipulating different data types, and converting between types through structured exercises and real-world coding scenarios.",
+  "learning_objectives": [
+    "Declare and assign variables using valid Python syntax",
+    "Distinguish between integer, float, string, and boolean data types",
+    "Perform explicit and implicit type conversion operations",
+    "Manipulate strings using concatenation, formatting, and built-in methods",
+    "Implement type hints for improved code clarity and validation"
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Declaring Variables and Basic Operations",
+      "lesson_objective": "Students will be able to declare variables and perform basic operations using integers, floats, and strings",
+      "key_topics": [
+        "Variable declaration syntax",
+        "Assignment operator usage",
+        "Naming conventions (PEP8)",
+        "Dynamic typing behavior"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Variable Declaration Practice",
+          "exercise_instructions": "Create variables to store personal information (name, age, height in meters). Print each variable with a descriptive label."
+        },
+        {
+          "exercise_title": "Arithmetic with Variables",
+          "exercise_instructions": "Declare two numeric variables and perform addition, subtraction, multiplication, and division operations. Display the results with formatted output."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "String Manipulation and Formatting",
+      "lesson_objective": "Students will demonstrate proficiency in string operations and formatting techniques",
+      "key_topics": [
+        "String concatenation and interpolation",
+        "f-string syntax and usage",
+        "Common string methods (upper(), lower(), split(), etc.)",
+        "String slicing techniques"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Personalized Message Generator",
+          "exercise_instructions": "Create a program that combines user input with string methods to generate a formatted message containing their name in uppercase and birth year extracted from a full date string."
+        },
+        {
+          "exercise_title": "Text Analysis Practice",
+          "exercise_instructions": "Analyze a sample text string by counting characters, splitting into words, and creating a reversed version using slicing."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "Boolean Logic and Type Conversion",
+      "lesson_objective": "Students will implement boolean logic and perform type conversion between primitive data types",
+      "key_topics": [
+        "Boolean type and truth values",
+        "Comparison operators",
+        "Explicit type conversion (str(), int(), float())",
+        "Implicit type coercion scenarios"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Type Conversion Challenges",
+          "exercise_instructions": "Write code that converts user-provided string inputs to numeric types and handles invalid conversions using try-except blocks."
+        },
+        {
+          "exercise_title": "Data Type Inspector",
+          "exercise_instructions": "Create a function that accepts a variable and returns its data type as a string, then test with different data type inputs."
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "Working with Composite Data Types",
+      "lesson_objective": "Students will create and manipulate composite data types including lists and dictionaries",
+      "key_topics": [
+        "List declaration and indexing",
+        "Dictionary key-value pairs",
+        "Mutable vs immutable types",
+        "Common list and dictionary operations"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Shopping List Manager",
+          "exercise_instructions": "Implement a program that maintains a list of grocery items, allowing users to add, remove, and display items by index."
+        },
+        {
+          "exercise_title": "Contact Information Storage",
+          "exercise_instructions": "Create a dictionary to store personal contact details (name, phone, email) and demonstrate adding/modifying entries and accessing specific values."
+        }
+      ]
+    },
+    {
+      "lesson_number": 5,
+      "lesson_title": "Type Hints and Validation",
+      "lesson_objective": "Students will apply type hints to functions and validate type consistency in code",
+      "key_topics": [
+        "Python type hint syntax",
+        "Using mypy for type validation",
+        "Type hinting for function parameters/returns",
+        "Type checking best practices"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Type-Annotated Calculator",
+          "exercise_instructions": "Rewrite a basic calculator function with type hints for inputs and return values, then validate it using mypy."
+        },
+        {
+          "exercise_title": "Data Processing with Validation",
+          "exercise_instructions": "Create a function that processes temperature data with type hints, and handles invalid inputs using type checks."
+        }
+      ]
+    }
+  ]
+}

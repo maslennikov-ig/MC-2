@@ -1,0 +1,29 @@
+{
+  "course_title": "Introduction to Python Programming",
+  "course_description": "This beginner-level course provides a comprehensive foundation in Python programming for individuals with no prior coding experience. Students will master core programming concepts through hands-on exercises and real-world examples, learning to write clean, efficient code while developing problem-solving skills essential for software development, data analysis, and automation tasks. The curriculum emphasizes practical application with immediate feedback through coding challenges and project-based learning.",
+  "course_overview": "This structured 6-module course begins with Python installation and environment setup (IDLE/VS Code), progressing through foundational concepts with concrete examples. Module 1 covers variables and data types through building a unit converter (miles to kilometers). Module 2 implements control flow by creating a grade calculator using if-else statements and a multiplication table generator with for-loops. Module 3 explores data structures by developing a shopping list manager (lists) and contact book application (dictionaries). Module 4 teaches function creation through a temperature conversion tool and password strength checker. Module 5 handles file operations by building a sales data analyzer that processes CSV files. Module 6 culminates in a capstone project: a quiz application with score tracking. Each module includes automated coding exercises, debugging practice on intentionally flawed code snippets, and real-world analogies like comparing loops to assembly lines. The course provides immediate application through 50+ interactive coding challenges and 8 graded projects simulating workplace tasks.",
+  "target_audience": "Career changers transitioning into tech roles (e.g., marketing professionals automating reports), non-STEM college students needing programming for research (e.g., psychology majors analyzing survey data), administrative staff seeking workflow automation (e.g., HR coordinators processing employee records), and hobbyists building personal projects (e.g., gamers creating simple text adventures). Specific personas: Jane (42, former teacher learning to build classroom tools), Alex (19, biology undergrad analyzing lab data), and Sam (31, sales manager automating client reports).",
+  "estimated_duration_hours": 40,
+  "difficulty_level": "beginner",
+  "prerequisites": [
+    "Basic computer literacy (file management, web browsing)",
+    "No prior programming experience required",
+    "Access to a computer with internet connection"
+  ],
+  "learning_outcomes": [
+    "Define programming terminology including variables, loops, and functions using Python syntax examples",
+    "Build executable programs that solve real-world problems, such as a currency converter or BMI calculator",
+    "Create and manipulate data structures (lists, dictionaries) to organize information for applications like inventory trackers",
+    "Analyze code for logical errors using debugging techniques on provided code snippets with intentional bugs",
+    "Design modular functions that perform specific tasks, such as password validators meeting security requirements"
+  ],
+  "course_tags": [
+    "python",
+    "programming_fundamentals",
+    "beginner_coding",
+    "data_structures",
+    "software_development",
+    "automation",
+    "problem_solving"
+  ]
+}

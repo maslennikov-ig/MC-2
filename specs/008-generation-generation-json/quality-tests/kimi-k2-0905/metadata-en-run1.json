@@ -1,0 +1,18 @@
+{
+  "course_title": "Introduction to Python Programming",
+  "course_description": "A hands-on beginner course that teaches core Python 3 syntax, control flow, functions, and basic data structures through short video lessons, interactive Jupyter notebooks, and 30+ bite-sized coding challenges. Learners will write, test, and debug real scripts in VS Code, use the standard library to automate simple tasks, and finish with a capstone project that processes a CSV file to generate a summary report. No prior coding experience required; only basic computer literacy is expected.",
+  "course_overview": "The course is structured in four progressive modules. Module 1 introduces the Python runtime, VS Code setup, and the REPL, culminating in a ‘Hello, World’ script that accepts user input. Module 2 covers variables, numeric and string operations, Boolean logic, and loops by building a console-based guess-the-number game that tracks attempts. Module 3 explores lists, tuples, sets, dictionaries, and file I/O through a contact-book mini-project that saves and loads JSON data. Module 4 teaches functions, the import system, pip, virtual environments, and error handling while learners create a CSV parser that calculates average sales per region and outputs a formatted report. Each lesson contains a 5–7 minute video, an annotated notebook, and 3–5 auto-graded exercises. A final peer-reviewed capstone asks learners to extend the parser to filter by date ranges and visualize results with matplotlib. Estimated completion time is 18–22 hours including projects, with optional bonus challenges on list comprehensions and lambda functions.",
+  "targetaudience": "University freshmen in non-CS majors who need computational skills for statistics courses, marketing analysts migrating from Excel to automation, hobbyist gamers wanting to mod Minecraft with Python scripts, and early-career QA testers tasked with writing small test utilities. All personas share basic computer folder navigation skills but have never written code.",
+  "estimated_duration_hours": 20,
+  "difficulty_level": "beginner",
+  "prerequisites": ["basic computer literacy (create folders, install software)", "high-school algebra (variables and functions concept)", "access to Windows 10/macOS 11/Linux with admin rights"],
+  "learning_outcomes": [
+    "Define and run Python 3 scripts using VS Code integrated terminal",
+    "Build interactive console programs that accept input and validate data",
+    "Create reusable functions with docstrings and unit tests",
+    "Analyze CSV files with the csv module and compute aggregate statistics",
+    "Implement loops and comprehensions to transform lists and dictionaries",
+    "Debug syntax and runtime errors using traceback and breakpoint skills"
+  ],
+  "course_tags": ["python", "automation", "csv", "scripting", "vscode", "beginner", "capstone"]
+}

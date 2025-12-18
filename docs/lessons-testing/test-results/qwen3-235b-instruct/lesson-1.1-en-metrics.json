@@ -1,0 +1,48 @@
+{
+  "model": "Qwen3 235B Instruct",
+  "modelSlug": "qwen3-235b-instruct",
+  "modelApiName": "qwen/qwen3-235b-a22b-2507",
+  "lessonId": "1.1-en",
+  "lessonTitle": "What is an Intangible Product: Ticket as a Product",
+  "language": "en",
+  "duration": 73494,
+  "timestamp": "2025-12-16T10:57:16.391Z",
+  "parseSuccess": true,
+  "parseError": null,
+  "usage": {
+    "prompt_tokens": 541,
+    "completion_tokens": 1339,
+    "total_tokens": 1880,
+    "cost": 0.000660248,
+    "is_byok": false,
+    "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "audio_tokens": 0,
+      "video_tokens": 0
+    },
+    "cost_details": {
+      "upstream_inference_cost": null,
+      "upstream_inference_prompt_cost": 0.000038952,
+      "upstream_inference_completions_cost": 0.000621296
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 0,
+      "image_tokens": 0
+    }
+  },
+  "quality": {
+    "hasIntro": true,
+    "hasSections": true,
+    "hasExamples": true,
+    "hasExercises": true,
+    "hasSummary": true,
+    "sectionsCount": 3,
+    "examplesCount": 2,
+    "exercisesCount": 2,
+    "totalWordCount": 624,
+    "introWordCount": 110,
+    "coversObjectives": 3,
+    "coversTopics": 5,
+    "qualityScore": 100
+  }
+}

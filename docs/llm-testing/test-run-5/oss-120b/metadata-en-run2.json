@@ -1,0 +1,29 @@
+{
+  "course_title": "Introduction to Python Programming",
+  "course_description": "Learn the fundamentals of Python, one of the most versatile and in-demand programming languages. This beginner-friendly course guides you through core concepts, syntax, and practical problem‑solving techniques, empowering you to write your own scripts and build simple applications.",
+  "course_overview": "This course provides a step‑by‑step introduction to Python programming for absolute beginners. Starting with setting up the development environment, you will explore data types, variables, control flow, functions, and basic data structures such as lists and dictionaries. Interactive coding exercises, real‑world examples, and mini‑projects reinforce learning, while quizzes and debugging sessions develop problem‑solving skills. By the end of the course, you will have built several functional scripts and be prepared to continue your journey into more advanced Python topics and software development practices.",
+  "target_audience": "Individuals with little or no programming experience who want to acquire practical coding skills, students exploring computer science, professionals seeking to automate tasks, and hobbyists interested in creating software with Python.",
+  "estimated_duration_hours": 40,
+  "difficulty_level": "beginner",
+  "prerequisites": [
+    "Basic computer literacy",
+    "Access to a laptop or desktop computer",
+    "Internet connection for downloading tools and resources",
+    "Willingness to learn and experiment"
+  ],
+  "learning_outcomes": [
+    "Explain core Python concepts such as variables, data types, and control structures",
+    "Write syntactically correct Python code to solve simple problems",
+    "Debug and troubleshoot common errors in Python scripts",
+    "Apply functions and basic data structures to organize code efficiently",
+    "Create small, functional programs that read input, process data, and produce output"
+  ],
+  "course_tags": [
+    "Python",
+    "Programming",
+    "Beginner",
+    "Software Development",
+    "Scripting",
+    "Coding Fundamentals"
+  ]
+}

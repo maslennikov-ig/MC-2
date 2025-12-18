@@ -1,0 +1,52 @@
+# Source files (only publish compiled .js and .d.ts files)
+src/
+*.ts
+!*.d.ts
+
+# Build artifacts
+tsconfig.tsbuildinfo
+.tsbuildinfo
+
+# Development files
+.eslintrc*
+.prettierrc*
+tsconfig.json
+
+# Version control
+.git
+.gitignore
+
+# CI/CD
+.github/
+.gitlab-ci.yml
+
+# Documentation (README is included)
+docs/
+*.md
+!README.md
+
+# Tests
+test/
+tests/
+__tests__/
+*.test.ts
+*.spec.ts
+
+# Node modules
+node_modules/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Misc
+*.log
+coverage/
+.nyc_output/

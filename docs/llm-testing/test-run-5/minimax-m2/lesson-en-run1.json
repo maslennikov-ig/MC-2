@@ -1,0 +1,125 @@
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "This section introduces the fundamental concepts of variables and data types in Python programming. Students will learn how to store, manipulate, and convert different types of data using Python's built-in data types. These concepts form the foundation for all future programming work.",
+  "learning_objectives": [
+    "Create and assign values to variables using appropriate naming conventions",
+    "Distinguish between and use numeric data types (int, float) in Python",
+    "Manipulate string data using basic string operations and methods",
+    "Use boolean values and the None value effectively in Python programs",
+    "Perform type checking and conversion operations between different data types"
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Introduction to Variables in Python",
+      "lesson_objective": "Create, assign, and name variables correctly following Python naming conventions",
+      "key_topics": [
+        "What are variables and how they store data",
+        "Variable assignment using the equals sign (=)",
+        "Python variable naming rules and conventions",
+        "Variable reassignment and multiple assignment",
+        "Using variables in simple expressions"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Variable Creation Practice",
+          "exercise_instructions": "Create the following variables with appropriate names and values: age (integer), price (float), name (string), and is_student (boolean). Then print each variable using print() statements."
+        },
+        {
+          "exercise_title": "Variable Naming Challenge",
+          "exercise_instructions": "Create variables for storing a person's first name, last name, full name, and age. Use snake_case naming convention. Then reassign the age variable to a new value and print all variables."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Numeric Data Types: Integers and Floats",
+      "lesson_objective": "Use integer and float data types to perform arithmetic operations in Python",
+      "key_topics": [
+        "Integer (int) data type and its characteristics",
+        "Float data type for decimal numbers",
+        "Basic arithmetic operations: +, -, *, /, //, %, **",
+        "Operator precedence in expressions",
+        "Working with large numbers and scientific notation"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Arithmetic Calculator",
+          "exercise_instructions": "Create variables for two numbers (a = 15 and b = 4). Perform and print the results of addition, subtraction, multiplication, division, floor division, modulo, and exponentiation using these variables."
+        },
+        {
+          "exercise_title": "Real-world Calculation",
+          "exercise_instructions": "Create variables for the price of an item (price = 19.99), quantity (quantity = 3), and tax rate (0.08). Calculate and print the subtotal, tax amount, and total cost."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "String Data Type and Basic Operations",
+      "lesson_objective": "Create, manipulate, and format strings using Python's string methods and operations",
+      "key_topics": [
+        "Creating strings using single quotes, double quotes, and triple quotes",
+        "String concatenation using + operator",
+        "String repetition using * operator",
+        "Basic string methods: .upper(), .lower(), .strip(), .replace()",
+        "String formatting with f-strings"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "String Manipulation",
+          "exercise_instructions": "Create a string variable with your name. Use string methods to convert it to uppercase, lowercase, and create a version with spaces removed. Print each result."
+        },
+        {
+          "exercise_title": "Personal Introduction",
+          "exercise_instructions": "Create variables for first_name, last_name, and age. Use f-string formatting to create and print a personalized introduction like 'Hello, my name is John Doe and I am 25 years old.'"
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "Boolean and None Data Types",
+      "lesson_objective": "Use boolean values and None to represent true/false states and absence of value",
+      "key_topics": [
+        "Boolean data type with True and False values",
+        "Comparison operators: ==, !=, <, >, <=, >=",
+        "Logical operators: and, or, not",
+        "None data type and its purpose",
+        "Using booleans in conditional statements"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Boolean Comparisons",
+          "exercise_instructions": "Create variables a = 10, b = 5, and c = 'hello'. Compare a and b using all comparison operators and print the results as boolean values."
+        },
+        {
+          "exercise_title": "Logical Operations",
+          "exercise_instructions": "Create boolean variables is_adult = True, has_license = False, and has_car = True. Use logical operators to determine and print whether the person can drive legally."
+        }
+      ]
+    },
+    {
+      "lesson_number": 5,
+      "lesson_title": "Type Checking and Conversion",
+      "lesson_objective": "Identify data types and convert between different types using type() and conversion functions",
+      "key_topics": [
+        "Using type() function to check data types",
+        "Converting to integer using int() function",
+        "Converting to float using float() function",
+        "Converting to string using str() function",
+        "Converting to boolean using bool() function",
+        "Handling conversion errors"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Type Investigation",
+          "exercise_instructions": "Create variables of different types: num = 42, pi = 3.14, text = 'Python', is_fun = True. Use type() function to print the data type of each variable."
+        },
+        {
+          "exercise_title": "Type Conversion Practice",
+          "exercise_instructions": "Convert the string '123' to an integer, add 50, then convert the result back to a string. Also convert the float 3.14159 to an integer and a string. Print all results with their types."
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,407 @@
+{
+  "testRunId": "2025-11-30-run6-3-models",
+  "testVersion": "run6",
+  "executionMode": "PARALLEL",
+  "timestamp": "2025-11-30T17:37:03.801Z",
+  "duration": 46801,
+  "durationMinutes": "0.78",
+  "models": 3,
+  "scenarios": 4,
+  "runsPerScenario": 3,
+  "totalTests": 36,
+  "successfulTests": 36,
+  "failedTests": 0,
+  "successRate": "100.00",
+  "avgTestDuration": "12959",
+  "results": [
+    {
+      "model": "Kimi Linear 48B",
+      "modelSlug": "kimi-linear-48b",
+      "scenario": "metadata-en",
+      "runNumber": 1,
+      "success": true,
+      "duration": 3458,
+      "contentLength": 2358,
+      "parseError": null
+    },
+    {
+      "model": "Kimi Linear 48B",
+      "modelSlug": "kimi-linear-48b",
+      "scenario": "metadata-en",
+      "runNumber": 2,
+      "success": true,
+      "duration": 2948,
+      "contentLength": 2119,
+      "parseError": null
+    },
+    {
+      "model": "Kimi Linear 48B",
+      "modelSlug": "kimi-linear-48b",
+      "scenario": "metadata-en",
+      "runNumber": 3,
+      "success": true,
+      "duration": 2643,
+      "contentLength": 1857,
+      "parseError": null
+    },
+    {
+      "model": "Kimi Linear 48B",
+      "modelSlug": "kimi-linear-48b",
+      "scenario": "metadata-ru",
+      "runNumber": 1,
+      "success": true,
+      "duration": 3745,
+      "contentLength": 1404,
+      "parseError": null
+    },
+    {
+      "model": "Kimi Linear 48B",
+      "modelSlug": "kimi-linear-48b",
+      "scenario": "metadata-ru",
+      "runNumber": 2,
+      "success": true,
+      "duration": 4388,
+      "contentLength": 1370,
+      "parseError": null
+    },
+    {
+      "model": "Kimi Linear 48B",
+      "modelSlug": "kimi-linear-48b",
+      "scenario": "metadata-ru",
+      "runNumber": 3,
+      "success": true,
+      "duration": 4551,
+      "contentLength": 1535,
+      "parseError": null
+    },
+    {
+      "model": "Kimi Linear 48B",
+      "modelSlug": "kimi-linear-48b",
+      "scenario": "lesson-en",
+      "runNumber": 1,
+      "success": true,
+      "duration": 7872,
+      "contentLength": 5389,
+      "parseError": null
+    },
+    {
+      "model": "Kimi Linear 48B",
+      "modelSlug": "kimi-linear-48b",
+      "scenario": "lesson-en",
+      "runNumber": 2,
+      "success": true,
+      "duration": 5725,
+      "contentLength": 3537,
+      "parseError": null
+    },
+    {
+      "model": "Kimi Linear 48B",
+      "modelSlug": "kimi-linear-48b",
+      "scenario": "lesson-en",
+      "runNumber": 3,
+      "success": true,
+      "duration": 7406,
+      "contentLength": 5178,
+      "parseError": null
+    },
+    {
+      "model": "Kimi Linear 48B",
+      "modelSlug": "kimi-linear-48b",
+      "scenario": "lesson-ru",
+      "runNumber": 1,
+      "success": true,
+      "duration": 6680,
+      "contentLength": 2741,
+      "parseError": null
+    },
+    {
+      "model": "Kimi Linear 48B",
+      "modelSlug": "kimi-linear-48b",
+      "scenario": "lesson-ru",
+      "runNumber": 2,
+      "success": true,
+      "duration": 8461,
+      "contentLength": 3449,
+      "parseError": null
+    },
+    {
+      "model": "Kimi Linear 48B",
+      "modelSlug": "kimi-linear-48b",
+      "scenario": "lesson-ru",
+      "runNumber": 3,
+      "success": true,
+      "duration": 8299,
+      "contentLength": 3509,
+      "parseError": null
+    },
+    {
+      "model": "Qwen3 235B A22B 2507",
+      "modelSlug": "qwen3-235b-a22b-2507",
+      "scenario": "metadata-en",
+      "runNumber": 1,
+      "success": true,
+      "duration": 12442,
+      "contentLength": 1627,
+      "parseError": null
+    },
+    {
+      "model": "Qwen3 235B A22B 2507",
+      "modelSlug": "qwen3-235b-a22b-2507",
+      "scenario": "metadata-en",
+      "runNumber": 2,
+      "success": true,
+      "duration": 10497,
+      "contentLength": 1744,
+      "parseError": null
+    },
+    {
+      "model": "Qwen3 235B A22B 2507",
+      "modelSlug": "qwen3-235b-a22b-2507",
+      "scenario": "metadata-en",
+      "runNumber": 3,
+      "success": true,
+      "duration": 11361,
+      "contentLength": 1989,
+      "parseError": null
+    },
+    {
+      "model": "Qwen3 235B A22B 2507",
+      "modelSlug": "qwen3-235b-a22b-2507",
+      "scenario": "metadata-ru",
+      "runNumber": 1,
+      "success": true,
+      "duration": 16318,
+      "contentLength": 1628,
+      "parseError": null
+    },
+    {
+      "model": "Qwen3 235B A22B 2507",
+      "modelSlug": "qwen3-235b-a22b-2507",
+      "scenario": "metadata-ru",
+      "runNumber": 2,
+      "success": true,
+      "duration": 15883,
+      "contentLength": 1554,
+      "parseError": null
+    },
+    {
+      "model": "Qwen3 235B A22B 2507",
+      "modelSlug": "qwen3-235b-a22b-2507",
+      "scenario": "metadata-ru",
+      "runNumber": 3,
+      "success": true,
+      "duration": 21124,
+      "contentLength": 1704,
+      "parseError": null
+    },
+    {
+      "model": "Qwen3 235B A22B 2507",
+      "modelSlug": "qwen3-235b-a22b-2507",
+      "scenario": "lesson-en",
+      "runNumber": 1,
+      "success": true,
+      "duration": 27005,
+      "contentLength": 3650,
+      "parseError": null
+    },
+    {
+      "model": "Qwen3 235B A22B 2507",
+      "modelSlug": "qwen3-235b-a22b-2507",
+      "scenario": "lesson-en",
+      "runNumber": 2,
+      "success": true,
+      "duration": 22165,
+      "contentLength": 3443,
+      "parseError": null
+    },
+    {
+      "model": "Qwen3 235B A22B 2507",
+      "modelSlug": "qwen3-235b-a22b-2507",
+      "scenario": "lesson-en",
+      "runNumber": 3,
+      "success": true,
+      "duration": 25644,
+      "contentLength": 3746,
+      "parseError": null
+    },
+    {
+      "model": "Qwen3 235B A22B 2507",
+      "modelSlug": "qwen3-235b-a22b-2507",
+      "scenario": "lesson-ru",
+      "runNumber": 1,
+      "success": true,
+      "duration": 35034,
+      "contentLength": 3796,
+      "parseError": null
+    },
+    {
+      "model": "Qwen3 235B A22B 2507",
+      "modelSlug": "qwen3-235b-a22b-2507",
+      "scenario": "lesson-ru",
+      "runNumber": 2,
+      "success": true,
+      "duration": 44775,
+      "contentLength": 4703,
+      "parseError": null
+    },
+    {
+      "model": "Qwen3 235B A22B 2507",
+      "modelSlug": "qwen3-235b-a22b-2507",
+      "scenario": "lesson-ru",
+      "runNumber": 3,
+      "success": true,
+      "duration": 33300,
+      "contentLength": 3457,
+      "parseError": null
+    },
+    {
+      "model": "Qwen Plus 2025-07-28",
+      "modelSlug": "qwen-plus-2025-07-28",
+      "scenario": "metadata-en",
+      "runNumber": 1,
+      "success": true,
+      "duration": 6071,
+      "contentLength": 1812,
+      "parseError": null
+    },
+    {
+      "model": "Qwen Plus 2025-07-28",
+      "modelSlug": "qwen-plus-2025-07-28",
+      "scenario": "metadata-en",
+      "runNumber": 2,
+      "success": true,
+      "duration": 6142,
+      "contentLength": 1826,
+      "parseError": null
+    },
+    {
+      "model": "Qwen Plus 2025-07-28",
+      "modelSlug": "qwen-plus-2025-07-28",
+      "scenario": "metadata-en",
+      "runNumber": 3,
+      "success": true,
+      "duration": 6727,
+      "contentLength": 2021,
+      "parseError": null
+    },
+    {
+      "model": "Qwen Plus 2025-07-28",
+      "modelSlug": "qwen-plus-2025-07-28",
+      "scenario": "metadata-ru",
+      "runNumber": 1,
+      "success": true,
+      "duration": 8679,
+      "contentLength": 1749,
+      "parseError": null
+    },
+    {
+      "model": "Qwen Plus 2025-07-28",
+      "modelSlug": "qwen-plus-2025-07-28",
+      "scenario": "metadata-ru",
+      "runNumber": 2,
+      "success": true,
+      "duration": 8607,
+      "contentLength": 1616,
+      "parseError": null
+    },
+    {
+      "model": "Qwen Plus 2025-07-28",
+      "modelSlug": "qwen-plus-2025-07-28",
+      "scenario": "metadata-ru",
+      "runNumber": 3,
+      "success": true,
+      "duration": 8176,
+      "contentLength": 1609,
+      "parseError": null
+    },
+    {
+      "model": "Qwen Plus 2025-07-28",
+      "modelSlug": "qwen-plus-2025-07-28",
+      "scenario": "lesson-en",
+      "runNumber": 1,
+      "success": true,
+      "duration": 10875,
+      "contentLength": 3701,
+      "parseError": null
+    },
+    {
+      "model": "Qwen Plus 2025-07-28",
+      "modelSlug": "qwen-plus-2025-07-28",
+      "scenario": "lesson-en",
+      "runNumber": 2,
+      "success": true,
+      "duration": 11623,
+      "contentLength": 3714,
+      "parseError": null
+    },
+    {
+      "model": "Qwen Plus 2025-07-28",
+      "modelSlug": "qwen-plus-2025-07-28",
+      "scenario": "lesson-en",
+      "runNumber": 3,
+      "success": true,
+      "duration": 9594,
+      "contentLength": 3335,
+      "parseError": null
+    },
+    {
+      "model": "Qwen Plus 2025-07-28",
+      "modelSlug": "qwen-plus-2025-07-28",
+      "scenario": "lesson-ru",
+      "runNumber": 1,
+      "success": true,
+      "duration": 15490,
+      "contentLength": 3601,
+      "parseError": null
+    },
+    {
+      "model": "Qwen Plus 2025-07-28",
+      "modelSlug": "qwen-plus-2025-07-28",
+      "scenario": "lesson-ru",
+      "runNumber": 2,
+      "success": true,
+      "duration": 15658,
+      "contentLength": 3768,
+      "parseError": null
+    },
+    {
+      "model": "Qwen Plus 2025-07-28",
+      "modelSlug": "qwen-plus-2025-07-28",
+      "scenario": "lesson-ru",
+      "runNumber": 3,
+      "success": true,
+      "duration": 17159,
+      "contentLength": 4055,
+      "parseError": null
+    }
+  ],
+  "modelSummary": [
+    {
+      "model": "Kimi Linear 48B",
+      "slug": "kimi-linear-48b",
+      "apiName": "moonshotai/kimi-linear-48b-a3b-instruct",
+      "totalTests": 12,
+      "successful": 12,
+      "failed": 0,
+      "successRate": "100.0"
+    },
+    {
+      "model": "Qwen3 235B A22B 2507",
+      "slug": "qwen3-235b-a22b-2507",
+      "apiName": "qwen/qwen3-235b-a22b-2507",
+      "totalTests": 12,
+      "successful": 12,
+      "failed": 0,
+      "successRate": "100.0"
+    },
+    {
+      "model": "Qwen Plus 2025-07-28",
+      "slug": "qwen-plus-2025-07-28",
+      "apiName": "qwen/qwen-plus-2025-07-28",
+      "totalTests": 12,
+      "successful": 12,
+      "failed": 0,
+      "successRate": "100.0"
+    }
+  ]
+}

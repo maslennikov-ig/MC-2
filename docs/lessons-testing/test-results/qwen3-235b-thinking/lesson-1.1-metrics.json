@@ -1,0 +1,48 @@
+{
+  "model": "Qwen3 235B Thinking",
+  "modelSlug": "qwen3-235b-thinking",
+  "modelApiName": "qwen/qwen3-235b-a22b-thinking-2507",
+  "lessonId": "1.1",
+  "lessonTitle": "Что такое нематериальный продукт: билет как товар",
+  "language": "ru",
+  "duration": 206076,
+  "timestamp": "2025-12-16T10:34:01.244Z",
+  "parseSuccess": true,
+  "parseError": null,
+  "usage": {
+    "prompt_tokens": 605,
+    "completion_tokens": 3393,
+    "total_tokens": 3998,
+    "cost": 0.00211445,
+    "is_byok": false,
+    "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "audio_tokens": 0,
+      "video_tokens": 0
+    },
+    "cost_details": {
+      "upstream_inference_cost": null,
+      "upstream_inference_prompt_cost": 0.00007865,
+      "upstream_inference_completions_cost": 0.0020358
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 1326,
+      "image_tokens": 0
+    }
+  },
+  "quality": {
+    "hasIntro": true,
+    "hasSections": true,
+    "hasExamples": true,
+    "hasExercises": true,
+    "hasSummary": true,
+    "sectionsCount": 3,
+    "examplesCount": 2,
+    "exercisesCount": 2,
+    "totalWordCount": 471,
+    "introWordCount": 88,
+    "coversObjectives": 3,
+    "coversTopics": 5,
+    "qualityScore": 100
+  }
+}

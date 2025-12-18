@@ -1,0 +1,101 @@
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python: Foundations and Practice",
+  "section_description": "Interactive section covering Python variables, core data types, and practical type manipulation through hands-on coding exercises.",
+  "learning_objectives": [
+    "Declare variables following Python naming conventions",
+    "Identify and differentiate between integer, float, string, and boolean data types",
+    "Convert between data types using type casting functions",
+    "Use the type() function to verify variable data types during runtime"
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Variables and Assignment Fundamentals",
+      "lesson_objective": "Create valid variables and assign values following Python naming rules",
+      "key_topics": [
+        "Variable declaration syntax",
+        "Naming conventions (snake_case)",
+        "Dynamic typing concept",
+        "Multiple assignment",
+        "Reserved keywords"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Personal Information Variables",
+          "exercise_instructions": "Create three variables: 'user_name' (string), 'user_age' (integer), and 'is_student' (boolean). Assign your details and print them."
+        },
+        {
+          "exercise_title": "Value Swapping Challenge",
+          "exercise_instructions": "Declare variables 'a=10' and 'b=20'. Swap their values without using a temporary variable and print the results."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Numeric Data Types Deep Dive",
+      "lesson_objective": "Perform calculations using integers and floats while identifying type differences",
+      "key_topics": [
+        "Integer vs float representation",
+        "Arithmetic operators (+, -, *, /, **)",
+        "Division behavior (/ vs //)",
+        "Scientific notation",
+        "Type conversion between numbers"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Circle Area Calculator",
+          "exercise_instructions": "Calculate the area of a circle with radius 7.5 using pi=3.14. Store radius as float, compute area, and print the result with 2 decimal places."
+        },
+        {
+          "exercise_title": "Temperature Converter",
+          "exercise_instructions": "Convert 98.6°F to Celsius using the formula (F-32)*5/9. Store as float variable and print the result."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "String Manipulation Essentials",
+      "lesson_objective": "Modify strings using indexing, slicing, and common methods",
+      "key_topics": [
+        "Single vs double quotes",
+        "String concatenation",
+        "Indexing and slicing",
+        "Common methods (upper, lower, strip)",
+        "f-string formatting"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Name Formatter",
+          "exercise_instructions": "Create 'first_name' and 'last_name' variables. Print a formatted string 'Hello, FIRST LAST!' with names in uppercase using f-strings."
+        },
+        {
+          "exercise_title": "Substring Extractor",
+          "exercise_instructions": "Given 'text = \"Programming is fun\"', extract and print the word 'fun' using slicing operations."
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "Type Identification and Conversion",
+      "lesson_objective": "Verify data types and convert between string, integer, and float types",
+      "key_topics": [
+        "Using type() function",
+        "str(), int(), float() conversions",
+        "Boolean truth values",
+        "Type errors prevention",
+        "Checking type compatibility"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Type Detective",
+          "exercise_instructions": "Create variables: num_str='42', num_int=42, num_float=42.0. Print each variable's type using type() function."
+        },
+        {
+          "exercise_title": "Data Converter Challenge",
+          "exercise_instructions": "Convert string '3.14' to float, then to integer. Print both converted values and their types to observe precision loss."
+        }
+      ]
+    }
+  ]
+}

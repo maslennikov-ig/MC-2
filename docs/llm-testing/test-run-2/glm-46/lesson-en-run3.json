@@ -1,0 +1,103 @@
+
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "This hands-on programming section introduces the fundamental concepts of variables and data types in Python. Students will learn how to store, manipulate, and convert different types of data, and practice these concepts through interactive coding exercises.",
+  "learning_objectives": [
+    "Declare and initialize variables using proper naming conventions",
+    "Identify and use Python's basic data types including integers, floats, strings, and booleans",
+    "Perform type conversion between different data types",
+    "Create and manipulate simple data structures like lists and dictionaries",
+    "Apply variable and data type concepts to solve programming problems"
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Variable Declaration and Naming Conventions",
+      "lesson_objective": "Students will be able to properly declare variables and follow Python naming conventions",
+      "key_topics": [
+        "Variable assignment using = operator",
+        "Python naming rules and conventions",
+        "Variable reassignment and updating",
+        "Reserved keywords in Python",
+        "Best practices for variable naming"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Declare Your Variables",
+          "exercise_instructions": "Create variables to store your name, age, height, and favorite color. Use appropriate naming conventions and assign values that match the data each variable should hold."
+        },
+        {
+          "exercise_title": "Fix the Invalid Names",
+          "exercise_instructions": "Given a list of invalid variable names, identify why each is invalid and rewrite them following Python naming conventions. Examples: 2name, my-var, class, first name, total$."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Working with Numbers and Strings",
+      "lesson_objective": "Students will be able to use numeric and string data types and perform basic operations on them",
+      "key_topics": [
+        "Integer and float data types",
+        "Arithmetic operations with numbers",
+        "String creation and manipulation",
+        "String methods and operations",
+        "String formatting techniques"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Calculator Exercise",
+          "exercise_instructions": "Write a program that calculates the area of a rectangle using variables for length and width. Display the result with appropriate text labels."
+        },
+        {
+          "exercise_title": "String Manipulation",
+          "exercise_instructions": "Create a string variable containing your full name. Write code to extract and display your first name and last name separately, convert the entire name to uppercase, and count the number of characters."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "Type Conversion and Checking",
+      "lesson_objective": "Students will be able to convert between data types and check the type of variables",
+      "key_topics": [
+        "Implicit vs explicit type conversion",
+        "Using int(), float(), str() functions",
+        "Type checking with type() and isinstance()",
+        "Handling type conversion errors",
+        "Practical applications of type conversion"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "String to Number Conversion",
+          "exercise_instructions": "Create a program that accepts input as strings representing numbers, converts them to appropriate numeric types, performs calculations, and displays results. Handle potential conversion errors."
+        },
+        {
+          "exercise_title": "Type Detection Program",
+          "exercise_instructions": "Write a function that accepts a variable and returns a descriptive string indicating its type. Test your function with variables of different types including integers, floats, strings, and booleans."
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "Boolean Data Type and Operations",
+      "lesson_objective": "Students will be able to use boolean values and logical operations in programming",
+      "key_topics": [
+        "Boolean values True and False",
+        "Comparison operators",
+        "Logical operators (and, or, not)",
+        "Truth values of different data types",
+        "Boolean expressions in conditional statements"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Logical Expression Builder",
+          "exercise_instructions": "Create variables representing different conditions (e.g., has_ticket, is_adult, is_student). Write boolean expressions to determine eligibility for different scenarios like discounts or entry requirements."
+        },
+        {
+          "exercise_title": "Truth Value Tester",
+          "exercise_instructions": "Write a program that tests the truthiness of different values including empty strings, zero, non-zero numbers, empty lists, non-empty lists, None, and boolean values. Print the results with explanations."
+        }
+      ]
+    }
+  ]
+}

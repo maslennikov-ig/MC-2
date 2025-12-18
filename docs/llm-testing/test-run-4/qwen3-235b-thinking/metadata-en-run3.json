@@ -1,0 +1,31 @@
+{
+  "course_title": "Introduction to Python Programming",
+  "course_description": "Master Python fundamentals with hands-on projects! This beginner-friendly course teaches core programming concepts, syntax, and problem-solving skills through real-world examples. Build confidence writing scripts, automating tasks, and creating simple applications—no prior coding experience needed. Launch your tech career in just weeks.",
+  "course_overview": "This comprehensive course guides absolute beginners from zero to functional Python proficiency. Starting with environment setup and syntax basics, learners progressively master variables, data types, control structures, functions, and file operations. Practical modules include debugging techniques, error handling, and building command-line utilities. The curriculum emphasizes applied learning through 15+ coding exercises, 3 portfolio projects (including a text-based game and data analyzer), and industry best practices. Final assessment validates ability to solve real automation problems using Python's standard library.",
+  "target_audience": "Absolute beginners with no coding background, career switchers, and professionals needing automation skills for data tasks or workflow efficiency.",
+  "estimated_duration_hours": 28.5,
+  "difficulty_level": "beginner",
+  "prerequisites": [
+    "Basic computer navigation skills",
+    "Familiarity with file management concepts",
+    "Willingness to solve logical puzzles"
+  ],
+  "learning_outcomes": [
+    "Write executable Python scripts using variables and operators",
+    "Implement control flow with conditional statements and loops",
+    "Create reusable functions with parameters and return values",
+    "Process text files for data input/output operations",
+    "Debug syntax and logic errors using print statements",
+    "Develop modular programs following PEP-8 style guidelines"
+  ],
+  "course_tags": [
+    "Python",
+    "Programming Fundamentals",
+    "Beginner Coding",
+    "Automation",
+    "Scripting",
+    "Data Processing",
+    "Software Development",
+    "Career Launch"
+  ]
+}

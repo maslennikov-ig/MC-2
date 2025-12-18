@@ -1,0 +1,109 @@
+{
+  "timezone": "Europe/Moscow",
+  "reporting_cadence": "Friday-Thursday",
+  "last_updated": "2025-11-21T12:57:58.154479+03:00",
+  "weeks": [
+    {
+      "week_start": "2025-11-14",
+      "week_end": "2025-11-20",
+      "week_number": "2025-W47",
+      "report_file": "2025-11-20-weekly-summary.md",
+      "metrics": {
+        "commits": 50,
+        "releases": 11,
+        "files_changed": 318,
+        "lines_added": 28600,
+        "lines_removed": 5200,
+        "departments_active": 6
+      },
+      "by_department": {
+        "Development": {
+          "commits": 28,
+          "files": 180
+        },
+        "Documentation": {
+          "commits": 10,
+          "files": 85
+        },
+        "Testing": {
+          "commits": 7,
+          "files": 35
+        },
+        "Infrastructure": {
+          "commits": 3,
+          "files": 12
+        },
+        "Research": {
+          "commits": 1,
+          "files": 4
+        },
+        "Meta": {
+          "commits": 1,
+          "files": 2
+        }
+      },
+      "top_contributors": [
+        "maslennikov-ig",
+        "Dahgoth"
+      ],
+      "focus_themes": [
+        "Stage 5 Generation Pipeline Implementation",
+        "Quality Validation Framework",
+        "Transactional Outbox Pattern"
+      ],
+      "velocity_trend": "+25.0%",
+      "generated_at": "2025-11-21T12:57:58.154479+03:00"
+    },
+    {
+      "week_start": "2025-11-21",
+      "week_end": "2025-11-27",
+      "week_number": "2025-W48",
+      "report_file": "2025-11-27-weekly-summary.md",
+      "metrics": {
+        "commits": 50,
+        "releases": 11,
+        "files_changed": 318,
+        "lines_added": 28600,
+        "lines_removed": 5200,
+        "departments_active": 6
+      },
+      "by_department": {
+        "Development": {
+          "commits": 28,
+          "files": 180
+        },
+        "Documentation": {
+          "commits": 10,
+          "files": 85
+        },
+        "Testing": {
+          "commits": 7,
+          "files": 35
+        },
+        "Infrastructure": {
+          "commits": 3,
+          "files": 12
+        },
+        "Research": {
+          "commits": 1,
+          "files": 4
+        },
+        "Meta": {
+          "commits": 1,
+          "files": 2
+        }
+      },
+      "top_contributors": [
+        "Igor Maslennikov",
+        "Dahgoth"
+      ],
+      "focus_themes": [
+        "Semantic Matching Refinement",
+        "Multilingual Validation",
+        "Infrastructure Resilience"
+      ],
+      "velocity_trend": "+25%",
+      "generated_at": "2025-11-28T09:00:00+03:00"
+    }
+  ]
+}

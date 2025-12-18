@@ -1,0 +1,9 @@
+{
+  "model": "Qwen3 235B A22B",
+  "modelSlug": "qwen3-235b-a22b",
+  "scenario": "metadata-ru",
+  "runNumber": 3,
+  "error": "Unexpected end of JSON input",
+  "duration": 17879,
+  "timestamp": "2025-11-14T07:17:34.477Z"
+}

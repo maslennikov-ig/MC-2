@@ -1,0 +1,103 @@
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "An interactive, hands‑on section where learners write Python code to declare variables, explore primitive data types, perform arithmetic, and manipulate strings through guided exercises.",
+  "learning_objectives": [
+    "Define and assign variables using correct Python syntax.",
+    "Identify and use Python's built-in data types such as int, float, bool, str, and None.",
+    "Apply arithmetic operators and string operations to solve practical coding tasks."
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Introducing Variables and Assignment",
+      "lesson_objective": "Students will be able to create variables, assign values of different types, and follow naming conventions correctly.",
+      "key_topics": [
+        "Variables and identifiers",
+        "Assignment operator (=)",
+        "Naming rules and conventions",
+        "Basic data type overview",
+        "Printing variables"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Create Basic Variables",
+          "exercise_instructions": "Write Python code that declares an integer, a float, and a string variable, assigns them values, and prints each variable to the console."
+        },
+        {
+          "exercise_title": "Variable Naming Practice",
+          "exercise_instructions": "Attempt to create variables with both valid and invalid names; run the code and comment on why the invalid names raise syntax errors."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Exploring Primitive Data Types in Python",
+      "lesson_objective": "Learners will identify, create, and inspect Python's primitive data types using the type() function and perform safe conversions.",
+      "key_topics": [
+        "Integers",
+        "Floating‑point numbers",
+        "Booleans",
+        "Strings",
+        "NoneType",
+        "type() inspection",
+        "Type conversion functions"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Type Inspection",
+          "exercise_instructions": "Create variables of each primitive type, use type() to display their types, and write a brief comment explaining each output."
+        },
+        {
+          "exercise_title": "Conversion Challenges",
+          "exercise_instructions": "Convert between compatible types (e.g., int to float, string to int) using int(), float(), str() and handle any ValueError exceptions with try/except blocks."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "Performing Arithmetic Operations and Understanding Precedence",
+      "lesson_objective": "Students will execute arithmetic expressions, understand operator precedence, and correctly apply floor division, modulus, and exponentiation.",
+      "key_topics": [
+        "Arithmetic operators (+, -, *, /)",
+        "Floor division (//)",
+        "Modulus (%)",
+        "Exponentiation (**)",
+        "Operator precedence rules",
+        "Rounding functions"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Calculator Script",
+          "exercise_instructions": "Write a program that prompts the user for two numbers and prints the sum, difference, product, true division, floor division, modulus, and power of the numbers."
+        },
+        {
+          "exercise_title": "Operator Precedence Quiz",
+          "exercise_instructions": "Evaluate a list of mixed expressions without parentheses, then add parentheses to alter the results; explain how precedence changed each outcome."
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "String Manipulation and Basic Operations",
+      "lesson_objective": "Learners will manipulate string variables using concatenation, f‑strings, indexing, slicing, and common string methods.",
+      "key_topics": [
+        "String literals and quoting",
+        "Concatenation and f‑strings",
+        "Indexing and slicing",
+        "Escape characters",
+        "Methods: upper(), lower(), strip(), split()"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Build a Formatted Report",
+          "exercise_instructions": "Create variables for a person's name, age, and city, then produce a formatted sentence using an f‑string and print it."
+        },
+        {
+          "exercise_title": "String Slicing Practice",
+          "exercise_instructions": "Given a sample sentence, extract specific substrings using slicing, then apply methods like upper() and split() and display the results."
+        }
+      ]
+    }
+  ]
+}

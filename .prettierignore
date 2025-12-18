@@ -1,0 +1,33 @@
+# Directories not part of the monorepo workspace
+courseai-next
+spec-test
+
+# Build outputs
+dist
+node_modules
+build
+.next
+.turbo
+
+# Generated files
+database.types.ts
+*.tsbuildinfo
+
+# Logs
+*.log
+test-results.log
+test-output.log
+
+# Git and lockfiles
+.git
+pnpm-lock.yaml
+
+# IDE and system files
+.DS_Store
+.vscode
+.idea
+
+# Test artifacts
+coverage
+.nyc_output
+uploads

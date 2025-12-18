@@ -1,0 +1,94 @@
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "A hands-on introduction to variables and core data types in Python, including practical exercises to reinforce understanding.",
+  "learning_objectives": [
+    "Declare and assign variables in Python",
+    "Identify and use basic data types: int, float, str, and bool",
+    "Use type() to inspect variable data types",
+    "Perform basic operations between compatible data types",
+    "Convert between data types using type casting"
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Introduction to Variables",
+      "lesson_objective": "Create and assign values to variables using proper naming conventions",
+      "key_topics": [
+        "Variable declaration",
+        "Assignment operator",
+        "Variable naming rules",
+        "Dynamic typing",
+        "Reassigning variables"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Declare and Print Variables",
+          "exercise_instructions": "Declare three variables: name, age, and city. Assign appropriate values and print each one."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Core Data Types in Python",
+      "lesson_objective": "Identify and use int, float, str, and bool data types correctly in code",
+      "key_topics": [
+        "Integer (int)",
+        "Floating-point (float)",
+        "String (str)",
+        "Boolean (bool)",
+        "Checking types with type()"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Type Identification",
+          "exercise_instructions": "Create one variable of each core type and use type() to print its data type."
+        },
+        {
+          "exercise_title": "Boolean Logic Practice",
+          "exercise_instructions": "Create two boolean variables with True and False, then print their logical 'and' and 'or' results."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "String Operations",
+      "lesson_objective": "Manipulate strings using concatenation, indexing, and built-in methods",
+      "key_topics": [
+        "String concatenation",
+        "String formatting (f-strings)",
+        "Indexing and slicing",
+        "Common string methods",
+        "Escape characters"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Personal Introduction with f-strings",
+          "exercise_instructions": "Use an f-string to print a sentence introducing yourself using previously declared variables."
+        },
+        {
+          "exercise_title": "String Method Practice",
+          "exercise_instructions": "Take a string and apply upper(), lower(), and strip() methods, printing the result of each."
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "Type Conversion and Casting",
+      "lesson_objective": "Convert data between types using int(), float(), str(), and bool() functions",
+      "key_topics": [
+        "Implicit vs explicit conversion",
+        "Converting to int",
+        "Converting to float",
+        "Converting to string",
+        "Converting to boolean"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Temperature Converter",
+          "exercise_instructions": "Convert a temperature from string to float, then convert it from Celsius to Fahrenheit and print the result."
+        }
+      ]
+    }
+  ]
+}

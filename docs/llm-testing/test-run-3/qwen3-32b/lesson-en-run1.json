@@ -1,0 +1,115 @@
+{
+  "section_number": 1,
+  "section_title": "Understanding Variables and Data Types in Python",
+  "section_description": "Learn to declare variables and use basic data types in Python through interactive exercises.",
+  "learning_objectives": [
+    "Declare and assign variables in Python",
+    "Use integer, float, string, and boolean data types",
+    "Perform type conversion between data types",
+    "Write programs demonstrating variable scope and reassignment",
+    "Debug common variable type-related errors"
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Declaring and Assigning Variables",
+      "lesson_objective": "Students will correctly declare and assign variables using valid syntax",
+      "key_topics": [
+        "Variable syntax rules",
+        "Naming conventions (PEP8)",
+        "Assignment operators (=)",
+        "Dynamic typing in Python"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Print Variable Values",
+          "exercise_instructions": "Create three variables with different values and print each one using the print() function"
+        },
+        {
+          "exercise_title": "Variable Reassignment",
+          "exercise_instructions": "Declare a variable with an initial value, then reassign it to a new value and print both results"
+        },
+        {
+          "exercise_title": "Multi-Variable Assignment",
+          "exercise_instructions": "Assign multiple variables in a single line and verify their values with print statements"
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Basic Data Types and Operations",
+      "lesson_objective": "Students will implement integer, float, string, and boolean data types in code examples",
+      "key_topics": [
+        "Integer vs. float arithmetic",
+        "String concatenation and formatting",
+        "Boolean logic (True/False)",
+        "Comparison operators (==, !=, >, <)"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Data Type Identification",
+          "exercise_instructions": "Write code to determine and print the data type of several variables using type()"
+        },
+        {
+          "exercise_title": "Arithmetic Operations",
+          "exercise_instructions": "Create variables of numeric types and perform arithmetic operations (addition, division, modulus)"
+        },
+        {
+          "exercise_title": "String Manipulation",
+          "exercise_instructions": "Combine two strings using concatenation and format a string with variables using f-strings"
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "Type Conversion and Casting",
+      "lesson_objective": "Students will successfully convert between data types using built-in functions",
+      "key_topics": [
+        "Implicit type conversion",
+        "Explicit casting (int(), float(), str())",
+        "Conversion errors and exceptions",
+        "Practical use cases for conversion"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Number Conversion",
+          "exercise_instructions": "Convert a string containing a number to integer and float types, then perform calculations"
+        },
+        {
+          "exercise_title": "Error Handling Practice",
+          "exercise_instructions": "Attempt to convert incompatible values and handle resulting errors with try/except blocks"
+        },
+        {
+          "exercise_title": "Mixed Type Calculations",
+          "exercise_instructions": "Create a program that accepts user input as strings and converts them to appropriate numeric types for calculations"
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "Boolean Logic and Conditional Types",
+      "lesson_objective": "Students will create and evaluate boolean expressions for conditional logic",
+      "key_topics": [
+        "Boolean values (True/False)",
+        "Logical operators (and, or, not)",
+        "Comparison operators",
+        "Truthiness evaluation",
+        "Conditional type checks"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Validation Checks",
+          "exercise_instructions": "Write boolean expressions to validate if a number is positive, if a string is empty, and if two values are equal"
+        },
+        {
+          "exercise_title": "Age Eligibility Checker",
+          "exercise_instructions": "Create a program that checks if a user's age (as input) meets minimum requirements for a service using boolean logic"
+        },
+        {
+          "exercise_title": "Type Evaluation",
+          "exercise_instructions": "Implement conditionals to check and respond to different data types of user input"
+        }
+      ]
+    }
+  ]
+}

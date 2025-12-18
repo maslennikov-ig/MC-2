@@ -1,0 +1,543 @@
+/**
+ * Stage 4: Minimum Lesson Constraint - Integration Test
+ *
+ * Test Objective: Verify that Phase 2 (Scope Analysis) correctly enforces the
+ * minimum 10 lessons requirement (FR-015) and fails gracefully with a clear
+ * error message when scope is insufficient.
+ *
+ * Test Flow:
+ * 1. Setup: Create test course with VERY NARROW topic unlikely to generate ≥10 lessons
+ * 2. Trigger: Add STRUCTURE_ANALYSIS job with minimal scope inputs
+ * 3. Wait: Poll for job failure (should fail quickly in Phase 2)
+ * 4. Verify:
+ *    - Job fails (success = false)
+ *    - Error code = 'MINIMUM_LESSONS_NOT_MET'
+ *    - Error message contains "Insufficient scope for minimum 10 lessons"
+ *    - Error message contains estimated lesson count (e.g., "estimated: 3")
+ *    - No retries occurred (retry_count = 0) - this is NOT a quality issue
+ *
+ * Prerequisites:
+ * - Redis >= 5.0.0 running at redis://localhost:6379
+ * - Supabase database accessible with migrations applied
+ * - Stage 4 analysis worker running or registered
+ * - OpenRouter API key in .env (or mock enabled)
+ * - Stage 4 migrations complete (courses.analysis_result JSONB column)
+ *
+ * Test execution: pnpm test tests/integration/stage4-minimum-lesson-constraint.test.ts
+ *
+ * Reference: specs/007-stage-4-analyze/research.md section 4
+ * Reference: specs/007-stage-4-analyze/quickstart.md "Common Issues & Solutions" Issue 1
+ */
+
+import { describe, it, expect, beforeAll, afterAll, afterEach } from 'vitest';
+import { getQueue, addJob, closeQueue } from '../../src/orchestrator/queue';
+import { getSupabaseAdmin } from '../../src/shared/supabase/admin';
+import { getRedisClient } from '../../src/shared/cache/redis';
+import { JobType } from '@megacampus/shared-types';
+import type { StructureAnalysisJob } from '@megacampus/shared-types';
+import {
+  setupTestFixtures,
+  cleanupTestFixtures,
+  cleanupTestJobs,
+  TEST_ORGS,
+  TEST_USERS,
+} from '../fixtures';
+
+// ============================================================================
+// Test Utilities
+// ============================================================================
+
+/**
+ * Generate unique correlation ID for tracing
+ */
+function generateCorrelationId(): string {
+  return `test-min-lessons-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+/**
+ * Wait for job to reach specific state in database
+ *
+ * This is the primary method for checking job state since jobs may be
+ * removed from Redis after completion but persist in the database.
+ *
+ * @param jobId - BullMQ job ID
+ * @param targetState - Target job state(s) to wait for
+ * @param timeout - Maximum wait time in milliseconds (default: 120000 = 2 minutes)
+ * @returns Job status record from database
+ */
+async function waitForJobStateDB(
+  jobId: string,
+  targetState: string | string[],
+  timeout: number = 120000 // 2 minutes for analysis workflow
+): Promise<any> {
+  const supabase = getSupabaseAdmin();
+  const startTime = Date.now();
+  const targetStates = Array.isArray(targetState) ? targetState : [targetState];
+
+  while (Date.now() - startTime < timeout) {
+    const { data: jobStatus, error } = await supabase
+      .from('job_status')
+      .select('*')
+      .eq('job_id', jobId)
+      .maybeSingle();
+
+    if (!error && jobStatus && targetStates.includes(jobStatus.status)) {
+      return jobStatus;
+    }
+
+    // Wait 1 second before checking again
+    await new Promise(resolve => setTimeout(resolve, 1000));
+  }
+
+  // Final check before throwing
+  const { data: finalStatus } = await supabase
+    .from('job_status')
+    .select('*')
+    .eq('job_id', jobId)
+    .maybeSingle();
+
+  const actualState = finalStatus ? finalStatus.status : 'not found in DB';
+
+  throw new Error(
+    `Timeout waiting for job ${jobId} to reach DB state(s): ${targetStates.join(', ')}. ` +
+      `Current state: ${actualState}. ` +
+      `This may indicate worker is not running or job is stuck.`
+  );
+}
+
+/**
+ * Get job error details from database
+ *
+ * @param jobId - BullMQ job ID
+ * @returns Error message and details from job_status table
+ */
+async function getJobErrorFromDB(jobId: string): Promise<{
+  error_message: string | null;
+  error_code: string | null;
+  error_stack: string | null;
+  attempts: number;
+} | null> {
+  const supabase = getSupabaseAdmin();
+  const { data, error } = await supabase
+    .from('job_status')
+    .select('error_message, attempts, max_attempts')
+    .eq('job_id', jobId)
+    .maybeSingle();
+
+  if (error || !data) {
+    return null;
+  }
+
+  // Parse error_message if it's JSON (BullMQ stores error as string)
+  let errorCode: string | null = null;
+  let errorMessage: string | null = data.error_message;
+  let errorStack: string | null = null;
+
+  if (errorMessage) {
+    // Try to extract error code from message
+    if (errorMessage.includes('MINIMUM_LESSONS_NOT_MET')) {
+      errorCode = 'MINIMUM_LESSONS_NOT_MET';
+    } else if (errorMessage.includes('Insufficient scope for minimum 10 lessons')) {
+      errorCode = 'MINIMUM_LESSONS_NOT_MET';
+    }
+  }
+
+  return {
+    error_message: errorMessage,
+    error_code: errorCode,
+    error_stack: errorStack,
+    attempts: data.attempts || 0,
+  };
+}
+
+// ============================================================================
+// Test Suite Setup
+// ============================================================================
+
+describe('Stage 4: Minimum Lesson Constraint (Integration)', () => {
+  let testCourseId: string;
+  let shouldSkipTests = false;
+
+  beforeAll(async () => {
+    // Check Redis availability
+    try {
+      const redis = getRedisClient();
+      await redis.ping();
+    } catch (error) {
+      console.warn('⚠️  Redis not available - tests will be skipped');
+      console.warn('   Start Redis: docker run -d -p 6379:6379 redis:7-alpine');
+      shouldSkipTests = true;
+      return;
+    }
+
+    // Setup test fixtures (organizations, users, courses)
+    await setupTestFixtures();
+
+    // Clean up any existing test jobs to start fresh
+    await cleanupTestJobs(true); // obliterate = true
+  }, 60000); // 60s timeout for setup
+
+  afterEach(async () => {
+    if (shouldSkipTests) return;
+
+    // Clean up test jobs after each test
+    await cleanupTestJobs();
+  });
+
+  afterAll(async () => {
+    if (shouldSkipTests) {
+      const redis = getRedisClient();
+      try {
+        await redis.quit();
+      } catch {
+        // Ignore
+      }
+      return;
+    }
+
+    // Clean up test course if created
+    if (testCourseId) {
+      const supabase = getSupabaseAdmin();
+      await supabase.from('courses').delete().eq('id', testCourseId);
+    }
+
+    // Close queue
+    try {
+      await closeQueue();
+    } catch (error) {
+      console.warn('Failed to close queue:', error);
+    }
+
+    // Clean up test fixtures
+    await cleanupTestFixtures();
+
+    // Close Redis
+    const redis = getRedisClient();
+    try {
+      await redis.quit();
+    } catch {
+      // Ignore
+    }
+  }, 60000); // 60s timeout for teardown
+
+  // ==========================================================================
+  // Test 1: Narrow Topic with Long Lesson Duration → <10 Lessons
+  // ==========================================================================
+
+  it.skipIf(shouldSkipTests)(
+    'should fail with MINIMUM_LESSONS_NOT_MET error when scope < 10 lessons',
+    async () => {
+      const supabase = getSupabaseAdmin();
+
+      // =====================================================================
+      // STEP 1: Create test course with VERY NARROW topic
+      // =====================================================================
+      // Using "How to boil water" - an extremely narrow topic that:
+      // - Can be covered in ~5-10 minutes of content
+      // - Has no depth (simple procedure)
+      // - No complex concepts or prerequisites
+      // - Combined with 30-min lessons → likely 1-2 lessons total
+      const { data: course, error: courseError } = await supabase
+        .from('courses')
+        .insert({
+          organization_id: TEST_ORGS.premium.id,
+          user_id: TEST_USERS.instructor1.id,
+          title: 'Test Course - How to Boil Water',
+          slug: `test-narrow-topic-${Date.now()}`,
+          generation_status: 'processing_documents', // Stage 3 in progress (will skip barrier)
+          status: 'draft',
+        })
+        .select()
+        .single();
+
+      if (courseError || !course) {
+        throw new Error(
+          `Failed to create test course: ${courseError?.message || 'Unknown error'}`
+        );
+      }
+
+      testCourseId = course.id;
+
+      console.log(`✓ Test course created with narrow topic: ${testCourseId}`);
+
+      // =====================================================================
+      // STEP 2: Create STRUCTURE_ANALYSIS job with minimal scope
+      // =====================================================================
+      const jobData: StructureAnalysisJob = {
+        course_id: testCourseId,
+        organization_id: TEST_ORGS.premium.id,
+        user_id: TEST_USERS.instructor1.id,
+        input: {
+          topic: 'How to boil water', // VERY narrow topic
+          language: 'en', // English input
+          style: 'conversational',
+          target_audience: 'beginner',
+          difficulty: 'beginner',
+          lesson_duration_minutes: 30, // Long lessons = fewer total lessons
+          // NO answers (user requirements) - minimal scope
+          // NO document_summaries - no additional content
+        },
+        priority: 5,
+        attempt_count: 0,
+        created_at: new Date().toISOString(),
+      };
+
+      const job = await addJob(JobType.STRUCTURE_ANALYSIS, jobData);
+      expect(job.id).toBeDefined();
+
+      console.log(`✓ STRUCTURE_ANALYSIS job created: ${job.id}`);
+      console.log(`⏳ Waiting for Phase 2 to fail (should be quick - 30-60 seconds)...`);
+
+      // =====================================================================
+      // STEP 3: Wait for job failure (should fail quickly in Phase 2)
+      // =====================================================================
+      // Phase 2 should fail within 30-60 seconds when it calculates <10 lessons
+      const jobStatus = await waitForJobStateDB(job.id!, 'failed', 120000); // 2 min max
+
+      expect(jobStatus).toBeDefined();
+      expect(jobStatus.status).toBe('failed');
+
+      console.log(`✓ Job failed as expected (status: failed)`);
+
+      // =====================================================================
+      // STEP 4: Verify error code = MINIMUM_LESSONS_NOT_MET
+      // =====================================================================
+      const errorDetails = await getJobErrorFromDB(job.id!);
+      expect(errorDetails).toBeDefined();
+      expect(errorDetails?.error_code).toBe('MINIMUM_LESSONS_NOT_MET');
+
+      console.log(`✓ Error code verified: ${errorDetails?.error_code}`);
+
+      // =====================================================================
+      // STEP 5: Verify error message contains expected text
+      // =====================================================================
+      expect(errorDetails?.error_message).toBeDefined();
+      expect(errorDetails?.error_message).toContain('Insufficient scope for minimum 10 lessons');
+
+      console.log(`✓ Error message contains "Insufficient scope for minimum 10 lessons"`);
+
+      // =====================================================================
+      // STEP 6: Verify error message contains estimated lesson count
+      // =====================================================================
+      // Error message should include text like "estimated: 3" or "(estimated: 3)"
+      const estimatedLessonMatch = errorDetails?.error_message?.match(
+        /estimated:\s*(\d+)|estimated\s*(\d+)/i
+      );
+      expect(estimatedLessonMatch).toBeDefined();
+
+      const estimatedLessons = parseInt(
+        estimatedLessonMatch?.[1] || estimatedLessonMatch?.[2] || '0'
+      );
+      expect(estimatedLessons).toBeGreaterThan(0);
+      expect(estimatedLessons).toBeLessThan(10); // Should be < 10
+
+      console.log(`✓ Estimated lesson count in error message: ${estimatedLessons} lessons`);
+
+      // =====================================================================
+      // STEP 7: Verify NO retries occurred (this is NOT a quality issue)
+      // =====================================================================
+      // CRITICAL: minimum lesson constraint should NOT trigger retries
+      // This is a user input issue, not an LLM quality issue
+      expect(errorDetails?.attempts).toBe(1); // Only 1 attempt (initial), no retries
+
+      console.log(`✓ No retries occurred (attempts: ${errorDetails?.attempts})`);
+
+      // =====================================================================
+      // STEP 8: Verify course analysis_result is NOT populated
+      // =====================================================================
+      const { data: finalCourse, error: finalError } = await supabase
+        .from('courses')
+        .select('analysis_result')
+        .eq('id', testCourseId)
+        .single();
+
+      expect(finalError).toBeNull();
+      expect(finalCourse).toBeDefined();
+      expect(finalCourse.analysis_result).toBeNull(); // Should remain NULL on failure
+
+      console.log(`✓ Course analysis_result remains NULL (not populated on failure)`);
+
+      // =====================================================================
+      // Test Summary
+      // =====================================================================
+      console.log('\n📊 Test Summary:');
+      console.log(`   ✓ Narrow topic: "How to boil water"`);
+      console.log(`   ✓ Lesson duration: 30 minutes`);
+      console.log(`   ✓ Estimated lessons: ${estimatedLessons} (< 10)`);
+      console.log(`   ✓ Error code: MINIMUM_LESSONS_NOT_MET`);
+      console.log(`   ✓ Retry count: ${errorDetails?.attempts} (no retries)`);
+      console.log(`   ✓ Job failed in Phase 2 as expected`);
+    },
+    150000 // 2.5-minute test timeout (allows time for worker processing)
+  );
+
+  // ==========================================================================
+  // Test 2: Another Narrow Topic - "Making a Cup of Tea"
+  // ==========================================================================
+
+  it.skipIf(shouldSkipTests)(
+    'should fail with clear error message for another narrow topic',
+    async () => {
+      const supabase = getSupabaseAdmin();
+
+      // Create test course with another extremely narrow topic
+      const { data: course, error: courseError } = await supabase
+        .from('courses')
+        .insert({
+          organization_id: TEST_ORGS.premium.id,
+          user_id: TEST_USERS.instructor1.id,
+          title: 'Test Course - Making a Cup of Tea',
+          slug: `test-narrow-tea-${Date.now()}`,
+          generation_status: 'processing_documents',
+          status: 'draft',
+        })
+        .select()
+        .single();
+
+      if (courseError || !course) {
+        throw new Error(
+          `Failed to create test course: ${courseError?.message || 'Unknown error'}`
+        );
+      }
+
+      const courseId = course.id;
+
+      console.log(`✓ Test course created: ${courseId}`);
+
+      // Create STRUCTURE_ANALYSIS job
+      const jobData: StructureAnalysisJob = {
+        course_id: courseId,
+        organization_id: TEST_ORGS.premium.id,
+        user_id: TEST_USERS.instructor1.id,
+        input: {
+          topic: 'Making a cup of tea', // Another narrow topic
+          language: 'en',
+          style: 'conversational',
+          target_audience: 'beginner',
+          difficulty: 'beginner',
+          lesson_duration_minutes: 45, // Even longer lessons
+          // Minimal scope
+        },
+        priority: 5,
+        attempt_count: 0,
+        created_at: new Date().toISOString(),
+      };
+
+      const job = await addJob(JobType.STRUCTURE_ANALYSIS, jobData);
+      console.log(`✓ STRUCTURE_ANALYSIS job created: ${job.id}`);
+
+      // Wait for failure
+      console.log(`⏳ Waiting for Phase 2 to fail...`);
+      const jobStatus = await waitForJobStateDB(job.id!, 'failed', 120000);
+
+      expect(jobStatus.status).toBe('failed');
+
+      // Verify error details
+      const errorDetails = await getJobErrorFromDB(job.id!);
+      expect(errorDetails?.error_code).toBe('MINIMUM_LESSONS_NOT_MET');
+      expect(errorDetails?.error_message).toContain('Insufficient scope');
+      expect(errorDetails?.attempts).toBe(1); // No retries
+
+      // Extract estimated lesson count
+      const estimatedLessonMatch = errorDetails?.error_message?.match(
+        /estimated:\s*(\d+)/i
+      );
+      const estimatedLessons = parseInt(estimatedLessonMatch?.[1] || '0');
+      expect(estimatedLessons).toBeLessThan(10);
+
+      console.log(`✓ Test passed: ${estimatedLessons} lessons < 10, error code verified`);
+
+      // Cleanup
+      await supabase.from('courses').delete().eq('id', courseId);
+    },
+    150000 // 2.5-minute test timeout
+  );
+
+  // ==========================================================================
+  // Test 3: Verify Sufficient Topic Passes (Control Test)
+  // ==========================================================================
+
+  it.skipIf(shouldSkipTests)(
+    'should pass analysis for sufficiently broad topic (control test)',
+    async () => {
+      const supabase = getSupabaseAdmin();
+
+      // Create test course with broad topic that SHOULD generate ≥10 lessons
+      const { data: course, error: courseError } = await supabase
+        .from('courses')
+        .insert({
+          organization_id: TEST_ORGS.premium.id,
+          user_id: TEST_USERS.instructor1.id,
+          title: 'Test Course - Web Development Fundamentals',
+          slug: `test-broad-topic-${Date.now()}`,
+          generation_status: 'processing_documents',
+          status: 'draft',
+        })
+        .select()
+        .single();
+
+      if (courseError || !course) {
+        throw new Error(
+          `Failed to create test course: ${courseError?.message || 'Unknown error'}`
+        );
+      }
+
+      const courseId = course.id;
+
+      console.log(`✓ Test course created with broad topic: ${courseId}`);
+
+      // Create STRUCTURE_ANALYSIS job with broad topic
+      const jobData: StructureAnalysisJob = {
+        course_id: courseId,
+        organization_id: TEST_ORGS.premium.id,
+        user_id: TEST_USERS.instructor1.id,
+        input: {
+          topic: 'Web Development Fundamentals', // Broad topic
+          language: 'en',
+          style: 'professional',
+          target_audience: 'beginner',
+          difficulty: 'beginner',
+          lesson_duration_minutes: 15, // Standard lesson duration
+          answers: 'Cover HTML, CSS, JavaScript basics', // Additional scope
+        },
+        priority: 5,
+        attempt_count: 0,
+        created_at: new Date().toISOString(),
+      };
+
+      const job = await addJob(JobType.STRUCTURE_ANALYSIS, jobData);
+      console.log(`✓ STRUCTURE_ANALYSIS job created: ${job.id}`);
+
+      // Wait for completion (should succeed)
+      console.log(`⏳ Waiting for analysis to complete (should pass)...`);
+      const jobStatus = await waitForJobStateDB(job.id!, 'completed', 120000);
+
+      expect(jobStatus.status).toBe('completed');
+
+      console.log(`✓ Job completed successfully (control test passed)`);
+
+      // Verify analysis_result is populated
+      const { data: finalCourse, error: finalError } = await supabase
+        .from('courses')
+        .select('analysis_result')
+        .eq('id', courseId)
+        .single();
+
+      expect(finalError).toBeNull();
+      expect(finalCourse.analysis_result).toBeDefined();
+      expect(finalCourse.analysis_result).not.toBeNull();
+
+      // Verify minimum 10 lessons met
+      const analysisResult = finalCourse.analysis_result as any;
+      expect(analysisResult.recommended_structure.total_lessons).toBeGreaterThanOrEqual(10);
+
+      console.log(
+        `✓ Control test passed: ${analysisResult.recommended_structure.total_lessons} lessons ≥ 10`
+      );
+
+      // Cleanup
+      await supabase.from('courses').delete().eq('id', courseId);
+    },
+    150000 // 2.5-minute test timeout
+  );
+});

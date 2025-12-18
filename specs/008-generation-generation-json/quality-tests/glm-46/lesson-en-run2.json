@@ -1,0 +1,102 @@
+
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "Hands-on programming section with exercises covering Python variables and fundamental data types including numbers, strings, booleans, and None. Students will learn how to declare variables, work with different data types, and perform basic operations on them.",
+  "learning_objectives": [
+    "Declare and assign variables in Python following naming conventions",
+    "Identify and work with numeric data types (integers and floats)",
+    "Manipulate strings using basic operations and methods",
+    "Apply boolean values for logical expressions",
+    "Use the None type for representing null values"
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Understanding Variables in Python",
+      "lesson_objective": "Students will be able to create variables, follow Python naming conventions, and perform basic variable assignments and reassignments.",
+      "key_topics": [
+        "Variable assignment syntax",
+        "Variable naming rules and conventions",
+        "Dynamic typing in Python",
+        "Variable reassignment"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Variable Declaration Practice",
+          "exercise_instructions": "Create five valid variables with different data types. Follow Python naming conventions. Then, reassign two of these variables with new values and print the results."
+        },
+        {
+          "exercise_title": "Identifying Invalid Variable Names",
+          "exercise_instructions": "Given a list of 10 variable names, identify which ones are invalid according to Python naming rules and explain why each is invalid."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Numeric Data Types and Operations",
+      "lesson_objective": "Students will be able to work with integers and floats, perform arithmetic operations, and understand type conversion between numeric types.",
+      "key_topics": [
+        "Integer (int) data type",
+        "Floating-point (float) data type",
+        "Basic arithmetic operators",
+        "Type casting between int and float",
+        "Order of operations"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Calculator Program",
+          "exercise_instructions": "Write a simple calculator that performs addition, subtraction, multiplication, and division using variables of both int and float types. Test with various numeric inputs."
+        },
+        {
+          "exercise_title": "Type Conversion Challenges",
+          "exercise_instructions": "Given a list of mixed numbers, convert them to integers and floats. Observe and explain what happens during conversion, especially with decimal values."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "String Manipulation Techniques",
+      "lesson_objective": "Students will be able to create strings, concatenate them, use string methods, and access string characters using indexing.",
+      "key_topics": [
+        "String creation and literals",
+        "String concatenation and formatting",
+        "String indexing and slicing",
+        "Common string methods",
+        "Escape characters"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "String Formatting Practice",
+          "exercise_instructions": "Create a program that takes user input for their name and age, then prints a formatted sentence introducing them using at least three different string formatting methods."
+        },
+        {
+          "exercise_title": "Text Processing",
+          "exercise_instructions": "Write a program that takes a paragraph of text and performs the following operations: convert to lowercase, count words, find the first and last character, and extract a substring from the middle."
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "Boolean Values and None Type",
+      "lesson_objective": "Students will be able to use boolean values for logical expressions, understand truthiness in Python, and utilize the None type for representing null values.",
+      "key_topics": [
+        "Boolean data type",
+        "Comparison operators",
+        "Logical operators",
+        "Truthiness and falsiness",
+        "None type and its uses"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Comparison Practice",
+          "exercise_instructions": "Create variables of different types and compare them using all comparison operators. Print the results and explain why each comparison evaluates to True or False."
+        },
+        {
+          "exercise_title": "Truthiness Exploration",
+          "exercise_instructions": "Test various values (0, empty string, empty list, None, etc.) in boolean contexts. Create a program that demonstrates which values evaluate to False in Python."
+        }
+      ]
+    }
+  ]
+}

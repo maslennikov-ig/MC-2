@@ -1,0 +1,83 @@
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "This section introduces the fundamental building blocks of any Python program: variables and data types. You will learn how to store information using variables and explore the core data types that Python uses to represent different kinds of data.",
+  "learning_objectives": [
+    "Assign values to variables using the correct naming conventions and syntax.",
+    "Identify and use the four core data types: integers, floats, strings, and booleans.",
+    "Determine the data type of any value using the type() function.",
+    "Convert between different data types using built-in functions like int(), str(), and float()."
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "What is a Variable?",
+      "lesson_objective": "Assign values to variables and print their contents to the console.",
+      "key_topics": [
+        "Definition of a variable as a named container for data",
+        "The assignment operator (=)",
+        "Variable naming rules and conventions (snake_case)",
+        "Printing variable values using the print() function"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Your First Variables",
+          "exercise_instructions": "Create a new Python script. 1. Create a variable named 'greeting' and assign it the value 'Hello, World!'. 2. Create a variable named 'year' and assign it the value 2024. 3. Use the print() function to print both variables to the console."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Exploring Basic Data Types",
+      "lesson_objective": "Identify and create the four core primitive data types in Python.",
+      "key_topics": [
+        "Integers (int): whole numbers",
+        "Floating-point numbers (float): decimal numbers",
+        "Strings (str): sequences of text within quotes",
+        "Booleans (bool): True and False values",
+        "Using the type() function to check a value's type"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Type Detective",
+          "exercise_instructions": "Create a script that does the following: 1. Create one variable for each core data type (int, float, str, bool). 2. Print each variable using print(). 3. Use the type() function on each variable and print the result to confirm its data type."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "Working with Strings",
+      "lesson_objective": "Create, manipulate, and combine string values.",
+      "key_topics": [
+        "Defining strings with single quotes (') and double quotes (\")",
+        "String concatenation using the plus (+) operator",
+        "The len() function to get a string's length",
+        "Introduction to f-strings for embedding variables in strings"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "String Builder",
+          "exercise_instructions": "1. Create two string variables, one for your first name and one for your last name. 2. Concatenate them with a space in between and print the full name. 3. Use an f-string to create a sentence that says 'My name is [full name] and it is [length of full name] characters long.' Print the sentence."
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "Type Conversion",
+      "lesson_objective": "Convert values from one data type to another using explicit casting.",
+      "key_topics": [
+        "The concept of type conversion (casting)",
+        "The int() function to convert to an integer",
+        "The str() function to convert to a string",
+        "The float() function to convert to a float",
+        "Common conversion scenarios and errors"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Converting Calculator",
+          "exercise_instructions": "1. Create a variable 'num_str' with the value '123'. 2. Convert it to an integer and store it in a new variable. 3. Print both the original string and the converted integer, along with their types. 4. Try converting the integer back to a string and concatenate it with another string to prove it's now text."
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,110 @@
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "This section covers the basics of variables and data types, which are the building blocks of any Python program. Learners will explore how to create and manipulate variables while understanding the core data types like integers, floats, strings, and booleans. By the end of this section, you will be able to write simple scripts that handle different types of data effectively.",
+  "learning_objectives": [
+    "Declare and assign values to variables in Python code.",
+    "Identify and differentiate between integer, float, string, and boolean data types.",
+    "Perform basic operations and type conversions on variables.",
+    "Debug common errors related to data types and variable usage.",
+    "Write simple expressions using variables of various data types."
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Introduction to Variables",
+      "lesson_objective": "By the end of this lesson, learners will be able to declare variables and assign values without using explicit type declarations.",
+      "key_topics": [
+        "What are variables in Python?",
+        "Variable naming conventions and rules",
+        "Assigning values to variables",
+        "Dynamic typing in Python",
+        "Printing variable values using print()"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Create Your First Variable",
+          "exercise_instructions": "1. Open a Python interpreter or IDE. 2. Declare a variable named 'name' and assign it the string value 'Python'. 3. Declare a variable named 'age' and assign it the integer value 25. 4. Use print() to display both variables."
+        },
+        {
+          "exercise_title": "Variable Naming Practice",
+          "exercise_instructions": "1. Create three variables following Python naming rules: one for a person's full name (string), one for height (float), and one for is_student (boolean). 2. Assign appropriate values. 3. Print all three variables."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Understanding Data Types",
+      "lesson_objective": "Learners will identify and use the four primitive data types: int, float, str, and bool, including how to check types with type().",
+      "key_topics": [
+        "Integer (int) data type",
+        "Float (float) data type",
+        "String (str) data type and escaping characters",
+        "Boolean (bool) data type",
+        "Using type() function to inspect data types"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Explore Data Types",
+          "exercise_instructions": "1. Create variables of each data type: an integer 42, a float 3.14, a string 'Hello', and a boolean True. 2. Use type() on each and print the results. 3. Modify the string by adding another string and print the new value."
+        },
+        {
+          "exercise_title": "Type Identification",
+          "exercise_instructions": "1. Assign the following values to variables: 10, 2.5, 'data', False. 2. Use type() to determine and print the type of each variable. 3. Experiment by reassigning an integer variable to a string and observe the type change."
+        },
+        {
+          "exercise_title": "Boolean Basics",
+          "exercise_instructions": "1. Create boolean variables: is_adult = True, is_minor = False. 2. Print them and use type() to confirm. 3. Assign a non-boolean value like 1 to a variable and print bool(1) to see conversion."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "Operations and Type Conversion",
+      "lesson_objective": "Learners will perform arithmetic and string operations on variables and convert between data types using functions like int(), float(), str().",
+      "key_topics": [
+        "Arithmetic operations on numbers (+, -, *, /, //, %)",
+        "String concatenation and repetition",
+        "Boolean operations (and, or, not)",
+        "Explicit type conversion functions",
+        "Common type errors and how to avoid them"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Basic Arithmetic",
+          "exercise_instructions": "1. Create integer variables a = 10 and b = 3. 2. Perform addition, subtraction, multiplication, division, floor division, and modulus operations. 3. Print each result."
+        },
+        {
+          "exercise_title": "String Operations",
+          "exercise_instructions": "1. Declare two string variables: first_name = 'John' and last_name = 'Doe'. 2. Concatenate them to form full_name. 3. Repeat the full_name string three times using * and print it."
+        },
+        {
+          "exercise_title": "Type Conversion Practice",
+          "exercise_instructions": "1. Convert the string '123' to an integer and add 5 to it, then print the result. 2. Convert the float 4.7 to an integer and print it. 3. Convert the integer 100 to a string and concatenate with 'percent', then print."
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "Working with Variables in Expressions",
+      "lesson_objective": "Learners will combine variables in expressions, handle mixed data types, and write simple programs using variables.",
+      "key_topics": [
+        "Combining data types in expressions",
+        "Order of operations (PEMDAS/BODMAS)",
+        "Updating variable values",
+        "Simple input with input() and variable assignment",
+        "Best practices for variable usage"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Expression Building",
+          "exercise_instructions": "1. Create variables: length = 5.0, width = 3. 2. Calculate area using multiplication and print it. 3. Update width to 4 and recalculate, then print the new area."
+        },
+        {
+          "exercise_title": "Mixed Type Expression",
+          "exercise_instructions": "1. Use input() to get a user's age as a string. 2. Convert it to an integer. 3. Create a boolean variable is_eligible = (age >= 18). 4. Print a message using string concatenation: 'You are eligible: ' + str(is_eligible)."
+        }
+      ]
+    }
+  ]
+}

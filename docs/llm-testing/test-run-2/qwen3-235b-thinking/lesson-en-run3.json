@@ -1,0 +1,82 @@
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "This hands-on section provides practical experience with Python's core data structures through interactive coding exercises. Students will build foundational skills in variable manipulation, type conversion, and data validation while solving real-world scenarios.",
+  "learning_objectives": [
+    "Declare variables following Python naming conventions",
+    "Identify and differentiate between string, integer, float, and boolean data types",
+    "Convert between data types using built-in functions",
+    "Determine mutability characteristics of different data structures",
+    "Validate variable types during program execution"
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Variable Declaration and Basic Type Identification",
+      "lesson_objective": "Students will correctly declare variables with valid names and identify string, integer, and float data types using type()",
+      "key_topics": [
+        "Variable naming rules and conventions",
+        "Assigning string values with single/double quotes",
+        "Integer vs float representation",
+        "Using type() for runtime type checking"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Personal Profile Builder",
+          "exercise_instructions": "Create variables for your first_name (string), birth_year (integer), and height_meters (float). Print each variable with its data type using type()."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "String Manipulation and Type Conversion",
+      "lesson_objective": "Students will convert numeric inputs to strings and manipulate text using concatenation and string methods",
+      "key_topics": [
+        "String concatenation techniques",
+        "str() and int() conversion functions",
+        "Common string methods: upper(), lower(), strip()",
+        "Handling type conversion errors"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Product Label Generator",
+          "exercise_instructions": "Convert price (9.99) and quantity (5) to strings. Create a product label showing 'Total: $49.95' using string concatenation and currency formatting."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "Numeric Operations and Type Casting",
+      "lesson_objective": "Students will perform arithmetic operations on numeric types and safely convert between integers and floats",
+      "key_topics": [
+        "Arithmetic operators: +, -, *, /, **",
+        "Division vs floor division",
+        "float() and int() conversion rules",
+        "Precision handling in floating point operations"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Currency Exchange Calculator",
+          "exercise_instructions": "Convert 150 USD to Euros using an exchange rate of 0.93. Calculate and print the result as a float rounded to two decimal places, then convert to integer cents."
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "Boolean Logic and Mutability Concepts",
+      "lesson_objective": "Students will evaluate boolean expressions and demonstrate understanding of mutable vs immutable types",
+      "key_topics": [
+        "Boolean comparison operators",
+        "Truth value testing",
+        "id() function for memory inspection",
+        "List mutability vs tuple immutability"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Data Structure Mutability Test",
+          "exercise_instructions": "Create a list [1,2,3] and a tuple (1,2,3). Print their memory IDs, attempt to change the first element, and explain the outcome based on mutability."
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,130 @@
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "This hands-on programming section introduces students to fundamental concepts of variables and data types in Python. Students will learn how to create and manage variables, work with different data types including numeric, string, and boolean values, and understand type conversion and operations. The section emphasizes practical application through coding exercises and real-world examples.",
+  "learning_objectives": [
+    "Create and name variables following Python conventions",
+    "Distinguish and work with numeric data types (int and float)",
+    "Manipulate and format string data using string methods",
+    "Apply boolean logic and comparison operators in expressions",
+    "Convert between different data types safely and effectively"
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Variable Assignment and Naming Conventions",
+      "lesson_objective": "Students will be able to create variables with proper naming conventions and understand Python's variable assignment syntax",
+      "key_topics": [
+        "variable assignment syntax with equals sign",
+        "valid identifier naming rules (letters, numbers, underscores)",
+        "case sensitivity in variable names",
+        "underscore_separated naming convention",
+        "reserved keywords that cannot be used as variable names",
+        "multiple assignment in single statement",
+        "variable reassignment and value changes"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Create Valid Variable Names",
+          "exercise_instructions": "Create 8 variables with valid names following Python conventions: store your age as an integer, create a variable for favorite color, store a temperature value, create a boolean flag for is_student, name a variable for total_score, create a list for shopping items, store a website URL, and create a variable for pi_value. Ensure all variable names follow snake_case convention and are descriptive."
+        },
+        {
+          "exercise_title": "Identify Invalid Identifiers",
+          "exercise_instructions": "Examine the following names and identify which are invalid Python variable identifiers: 2fast, my-variable, my_variable, _private, class, MY_CONSTANT, user name, is_empty. For each valid identifier, create a variable with that name and assign an appropriate value. For invalid identifiers, explain why they cannot be used."
+        },
+        {
+          "exercise_title": "Multiple Assignment Practice",
+          "exercise_instructions": "Use multiple assignment to create variables for coordinates x=10, y=20, z=30. Then demonstrate variable swapping by exchanging values between x and y without using a temporary variable. Finally, create a single line that assigns the same value 'unknown' to three variables named status1, status2, and status3."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Numeric Data Types and Mathematical Operations",
+      "lesson_objective": "Students will be able to perform mathematical operations with integers and floats, and convert between numeric types",
+      "key_topics": [
+        "integer type (int) for whole numbers",
+        "floating-point type (float) for decimal numbers",
+        "arithmetic operators: +, -, *, /, //, %, **",
+        "operator precedence and parentheses",
+        "type() function to check data types",
+        "implicit and explicit type conversion",
+        "int() and float() conversion functions",
+        "common mathematical functions from math module"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Arithmetic Operations with Mixed Types",
+          "exercise_instructions": "Create variables a=15 and b=4.5. Perform and print results for: addition (a+b), subtraction (a-b), multiplication (a*b), division (a/b), floor division (a//b), modulus (a%b), and exponentiation (a**b). Use type() to verify the data type of each result."
+        },
+        {
+          "exercise_title": "Temperature Conversion Calculator",
+          "exercise_instructions": "Create variables for celsius_temp = 25.5 and fahrenheit_temp = 78.8. Convert celsius to fahrenheit using the formula F = C * 9/5 + 32, and convert fahrenheit to celsius using C = (F - 32) * 5/9. Print both conversions with appropriate labels and verify the results are floating-point numbers."
+        },
+        {
+          "exercise_title": "Type Conversion Challenges",
+          "exercise_instructions": "Convert the string '42.7' to a float, then convert that result to an integer. Also convert the integer 100 to a float, then back to an integer. Use int() and float() functions appropriately and print the results with their types. Note any precision loss that occurs during conversion."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "String Creation, Manipulation, and Formatting",
+      "lesson_objective": "Students will be able to create strings, use string methods for manipulation, and format strings using different techniques",
+      "key_topics": [
+        "string creation using single, double, and triple quotes",
+        "escape sequences: \\n, \\t, \\\\, \\', \\\"",
+        "string concatenation using + operator",
+        "string repetition using * operator",
+        "string indexing and slicing",
+        "string methods: upper(), lower(), title(), strip(), split(), join()",
+        "f-string formatting for variable interpolation",
+        "format() method for string formatting",
+        "string length using len() function"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "String Manipulation Methods",
+          "exercise_instructions": "Create a string variable with the value '  Python Programming  '. Apply the following methods and print results: strip() to remove whitespace, upper() to convert to uppercase, lower() to convert to lowercase, title() for title case, and split() to create a list of words. Show the original string after each operation to demonstrate that strings are immutable."
+        },
+        {
+          "exercise_title": "Personal Information Formatter",
+          "exercise_instructions": "Create variables for first_name='Alice', last_name='Johnson', age=28, and email='alice.j@email.com'. Use f-string formatting to create a formatted string that reads: 'Name: Alice Johnson, Age: 28, Email: alice.j@email.com'. Then create the same formatted string using the format() method."
+        },
+        {
+          "exercise_title": "String Slicing and Concatenation",
+          "exercise_instructions": "Create a string variable message = 'PythonFundamentals2024'. Extract and print: the first 6 characters, the last 4 characters, characters from position 6 to 12 (inclusive), and every second character starting from position 0. Then concatenate these extracted parts to form a new string and print the result."
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "Boolean Values and Comparison Operations",
+      "lesson_objective": "Students will be able to use boolean values, comparison operators, and logical operators to create conditional expressions",
+      "key_topics": [
+        "boolean type with True and False values",
+        "comparison operators: ==, !=, <, >, <=, >=",
+        "logical operators: and, or, not",
+        "truthy and falsy values in Python",
+        "operator precedence with logical operators",
+        "chained comparisons (a < b < c)",
+        "is and is not operators for identity comparison",
+        "in and not in operators for membership testing"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Comparison Operations Practice",
+          "exercise_instructions": "Create variables: x = 10, y = 20, z = 10. Write and print results for the following comparisons: x == y, x != y, x < y, x >= z, y > x, z <= x. Then create a chained comparison to check if x is between 5 and 15, and print the result."
+        },
+        {
+          "exercise_title": "Logical Operator Combinations",
+          "exercise_instructions": "Using variables age = 25, has_license = True, and has_insurance = False, create and print results for: (age >= 18) and (has_license), (age < 21) or (has_insurance), not (has_insurance), and (age >= 21) and (has_license) and (has_insurance). Explain the boolean logic of each result."
+        },
+        {
+          "exercise_title": "Truthy and Falsy Values",
+          "exercise_instructions": "Test the truthiness of various values by creating variables: num = 0, num2 = 42, empty_str = '', text = 'hello', empty_list = [], and none_val = None. Use bool() function to convert each to boolean and print the results. Also test membership with 'p' in 'python' and 'z' in 'python', printing the boolean results."
+        }
+      ]
+    }
+  ]
+}

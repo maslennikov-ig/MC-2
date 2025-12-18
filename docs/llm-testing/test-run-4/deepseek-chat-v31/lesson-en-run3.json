@@ -1,0 +1,83 @@
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "This foundational section introduces the core concept of variables as containers for storing data. You will learn about the different basic data types Python uses to represent information and how to perform operations on them.",
+  "learning_objectives": [
+    "Declare and assign values to variables using correct Python syntax.",
+    "Identify and use the core data types: integers, floats, strings, and booleans.",
+    "Convert between different data types using built-in functions like int(), str(), and float().",
+    "Use the print() function to display variable values and combined text output."
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "What is a Variable? Storing Data with Names",
+      "lesson_objective": "Declare, assign a value to, and print a variable.",
+      "key_topics": [
+        "Understanding variables as named containers for data",
+        "The assignment operator (=)",
+        "Naming conventions and rules for variables",
+        "Using the print() function to display a variable's value"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Your First Variables",
+          "exercise_instructions": "1. Create a variable named 'greeting' and assign the string 'Hello, World!' to it. 2. Create a variable named 'year' and assign the integer 2024 to it. 3. Use the print() function to display the value of each variable on a separate line."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Python's Basic Data Types",
+      "lesson_objective": "Identify and create variables of type integer, float, string, and boolean.",
+      "key_topics": [
+        "Integers: whole numbers (e.g., 10, -5, 0)",
+        "Floats: numbers with decimal points (e.g., 3.14, -0.001)",
+        "Strings: sequences of text within quotes (e.g., 'hello', \"Python\")",
+        "Booleans: logical values True and False",
+        "Using the type() function to check a variable's type"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Type Detective",
+          "exercise_instructions": "1. Create four variables: one integer, one float, one string, and one boolean. 2. Use the print() and type() functions to print both the value and the data type of each variable. Your output should look like: 'Value: 100, Type: <class 'int'>'"
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "Dynamic Typing and Variable Reassignment",
+      "lesson_objective": "Reassign a variable to a value of a different type and explain the result.",
+      "key_topics": [
+        "Concept of dynamic typing in Python",
+        "How to change the value of an existing variable",
+        "How a variable's type can change when reassigned",
+        "Best practices for avoiding confusing reassignments"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "A Variable's Journey",
+          "exercise_instructions": "1. Create a variable named 'my_data' and assign it the integer 50. 2. Print its value and type. 3. Reassign 'my_data' to the string 'Fifty'. 4. Print its value and type again to observe the change."
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "Converting Between Data Types",
+      "lesson_objective": "Convert a variable from one data type to another using explicit type conversion.",
+      "key_topics": [
+        "Type conversion (casting)",
+        "The int() function for converting to integer",
+        "The float() function for converting to float",
+        "The str() function for converting to string",
+        "When conversion is useful (e.g., combining numbers and text in a print statement)"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Conversion Challenge",
+          "exercise_instructions": "1. Create a variable 'num_string' with the value '123' (as a string). 2. Convert 'num_string' to an integer and store it in a new variable 'real_int'. 3. Create a variable 'price' with the float value 9.99. 4. Use the str() function to create a sentence that says 'The price is $9.99' and print it. Use the 'price' variable in your conversion, do not just type the text."
+        }
+      ]
+    }
+  ]
+}

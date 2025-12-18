@@ -1,0 +1,7 @@
+<course url_name="MegaCampus_SAMPLE_COURSE_50_2025_Q1" display_name="Introduction to Web Development" org="MegaCampus" course="SAMPLE_COURSE_50" language="en" start="2025-01-15T00:00:00Z">
+  <chapter url_name="chapter_1_html_fundamentals"/>
+  <chapter url_name="chapter_2_css_styling"/>
+  <chapter url_name="chapter_3_javascript_basics"/>
+  <chapter url_name="chapter_4_dom_manipulation"/>
+  <chapter url_name="chapter_5_modern_frameworks"/>
+</course>

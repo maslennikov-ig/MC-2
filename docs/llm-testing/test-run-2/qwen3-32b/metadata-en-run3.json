@@ -1,0 +1,19 @@
+{
+  "course_title": "Introduction to Python Programming",
+  "course_description": "A beginner-level technical programming course designed to equip students with foundational Python skills. Topics include syntax, data types, control structures, functions, and basic problem-solving techniques. Through hands-on coding exercises and real-world examples, learners will develop the ability to write efficient, readable code and understand core programming principles.",
+  "course_overview": "This course starts with the fundamentals of Python, such as variables, loops, and conditionals, then progresses to more advanced beginner topics like error handling and file operations. Students will practice writing scripts for automated tasks (e.g., a calculator program or a script to analyze CSV data) and build small projects like a weather API query tool or a simple game using Pygame. The curriculum emphasizes practical coding experience, including debugging exercises, code optimization challenges, and collaborative pair-programming sessions. Learners will also explore Python’s ecosystem with libraries like NumPy and Pandas for data manipulation, and Flask for basic web development. By the end, students will have a portfolio of small programs demonstrating their ability to apply logic, structure code, and solve common programming problems.",
+  "target_audience": "Aspiring programmers with no prior coding experience, computer science students seeking foundational skills, professionals transitioning into tech roles, hobbyists interested in automation or data analysis, and educators aiming to integrate Python into their curriculum.",
+  "estimated_duration_hours": 20,
+  "difficulty_level": "beginner",
+  "prerequisites": ["Basic computer literacy", "Familiarity with problem-solving concepts", "Access to a Python-compatible development environment"],
+  "learning_outcomes": [
+    "Define core Python syntax and semantics including variables, functions, and modules",
+    "Build command-line applications that utilize control structures and data manipulation",
+    "Analyze and debug common runtime and logical errors in Python scripts",
+    "Implement basic file handling operations (read/write) with error handling",
+    "Create simple data visualizations using Matplotlib and Pandas",
+    "Design a modular program with user-defined functions and parameters",
+    "Apply Python to automate repetitive tasks like renaming files or scraping web data"
+  ],
+  "course_tags": ["python_basics", "coding_for_beginners", "scripting_languages", "problem_solving", "data_analysis", "automation"]
+}

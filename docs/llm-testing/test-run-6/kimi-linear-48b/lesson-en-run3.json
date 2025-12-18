@@ -1,0 +1,123 @@
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "Learn to declare variables and use Python's built-in data types through practical coding exercises.",
+  "learning_objectives": [
+    "Create and assign variables using different naming conventions",
+    "Demonstrate proper use of numeric, string, boolean, and collection data types",
+    "Convert between compatible data types using built-in functions",
+    "Write code that validates variable types before operations"
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Creating and Naming Variables",
+      "lesson_objective": "Create valid Python variables using descriptive names",
+      "keyTopics": [
+        "Variable assignment syntax",
+        "Valid identifier rules",
+        "PEP 8 naming conventions",
+        "Using underscores and camelCase",
+        "Avoiding reserved keywords"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Variable Declaration Practice",
+          "exercise_instructions": "Create variables for a person's name, age, and favorite number. Print each variable with a descriptive label."
+        },
+        {
+          "exercise_title": "Naming Convention Challenge",
+          "exercise_instructions": "Rewrite the variables using camelCase and then using underscores. Print both versions to verify they work."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Working with Numeric Data Types",
+      "lesson_objective": "Perform calculations using integers and floats",
+      "keyTopics": [
+        "int and float data types",
+        "Basic arithmetic operators",
+        "Type conversion between int and float",
+        "Handling division operations",
+        "Using the math module"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Temperature Converter",
+          "exercise_instructions": "Create a program that converts Celsius to Fahrenheit. Ask the user for Celsius temperature and display the result with proper rounding."
+        },
+        {
+          "exercise_title": "Average Calculator",
+          "exercise_instructions": "Create a program that calculates the average of 5 test scores. Ensure the result is stored as a float and printed with one decimal place."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "Using String and Boolean Types",
+      "lesson_objective": "Manipulate text and boolean values in Python programs",
+      "keyTopics": [
+        "String creation and concatenation",
+        "String methods and formatting",
+        "Boolean True/False values",
+        "Comparison operators",
+        "Using str() and bool() functions"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "User Profile Generator",
+          "exercise_instructions": "Create a program that asks for a user's first name, last name, and favorite quote. Display a formatted user profile using string concatenation."
+        },
+        {
+          "exercise_title": "Boolean Logic Quiz",
+          "exercise_instructions": "Create variables representing different conditions (is_raining, has_uniform, knows_rules). Write code that determines if a student can play outside."
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "Working with Collection Data Types",
+      "lesson_objective": "Store and access multiple values using lists and dictionaries",
+      "keyTopics": [
+        "Creating and accessing lists",
+        "List methods (append, insert, remove)",
+        "Dictionary key-value pairs",
+        "Accessing dictionary values",
+        "Iterating through collections"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Shopping List Manager",
+          "exercise_instructions": "Create a shopping list with 5 items. Add 2 more items, remove 1 item, and display the final list with numbered items."
+        },
+        {
+          "exercise_title": "Contact Information Dictionary",
+          "exercise_instructions": "Create a dictionary with contact information (name, email, phone). Add a new field and display all information in a formatted way."
+        }
+      ]
+    },
+    {
+      "lesson_number": 5,
+      "lesson_title": "Type Conversion and Validation",
+      "lesson_objective": "Convert between data types and validate user input",
+      "keyTopics": [
+        "Using int(), float(), str(), bool()",
+        "Handling conversion errors",
+        "Using type() to check types",
+        "Input validation techniques",
+        "Creating robust data entry functions"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Safe Number Input",
+          "exercise_instructions": "Create a program that repeatedly asks for age until a valid integer is entered. Handle non-numeric input gracefully."
+        },
+        {
+          "exercise_title": "Temperature Type Validator",
+          "exercise_instructions": "Create a function that accepts a temperature value and converts it to the appropriate type. Validate that the input makes sense (e.g., temperature above absolute zero)."
+        }
+      ]
+    }
+  ]
+}

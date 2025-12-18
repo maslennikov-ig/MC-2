@@ -1,0 +1,110 @@
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "Learn how to store and manipulate data using Python's built-in types. By the end of this section, you will confidently create variables and convert between common data types.",
+  "learning_objectives": [
+    "Declare variables with descriptive names and assign values of different types",
+    "Distinguish between int, float, str, and bool data types and their use cases",
+    "Convert variables from one type to another using built-in functions",
+    "Predict and trace the output of code that manipulates variables"
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Creating and Naming Variables",
+      "lesson_objective": "Correctly declare at least three variables with meaningful names and assigned values.",
+      "key_topics": [
+        "Variable assignment with =",
+        "Valid and descriptive naming conventions",
+        "Reassignment and updating variables",
+        "Case sensitivity rules"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Personal Info Variables",
+          "exercise_instructions": "Create variables named first_name, age, and hobby. Assign your own first name, age, and favorite hobby to them. Print each variable on a separate line."
+        },
+        {
+          "exercise_title": "Fix the Names",
+          "exercise_instructions": "Given the invalid names 2nd_name, last name, and $score, rename them to follow Python conventions and assign any appropriate values."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Numbers and Math",
+      "lesson_objective": "Perform arithmetic operations and correctly choose between int and float types.",
+      "key_topics": [
+        "int vs float representation",
+        "Basic arithmetic operators + - * / // % **",
+        "Order of operations",
+        "Type function type()"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Shopping Cart Math",
+          "exercise_instructions": "Create variables price, quantity, and tax_rate. Calculate and print the total cost including tax, ensuring the result is a float rounded to two decimals."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "Strings and String Methods",
+      "lesson_objective": "Manipulate strings using at least four different string methods.",
+      "key_topics": [
+        "String creation with quotes",
+        "Concatenation and repetition",
+        "lower(), upper(), strip(), replace()",
+        "f-strings for formatting"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Clean and Format",
+          "exercise_instructions": "Start with the messy string '  HELLO world  '. Remove leading/trailing spaces, convert to title case, and replace 'world' with your name. Print the final result."
+        },
+        {
+          "exercise_title": "Story Template",
+          "exercise_instructions": "Use an f-string to create a sentence that includes variables for adjective, noun, and verb. Assign any values and print the complete sentence."
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "Booleans and Comparisons",
+      "lesson_objective": "Evaluate comparison expressions and predict their boolean results.",
+      "key_topics": [
+        "bool type True and False",
+        "Comparison operators == != < > <= >=",
+        "Logical operators and or not",
+        "Boolean conversion of other types"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Even or Odd",
+          "exercise_instructions": "Create a variable number with any integer. Write expressions to check if it is even and if it is positive. Print both boolean results."
+        }
+      ]
+    },
+    {
+      "lesson_number": 5,
+      "lesson_title": "Type Conversion",
+      "lesson_objective": "Convert variables among int, float, str, and bool without errors.",
+      "key_topics": [
+        "int(), float(), str(), bool() functions",
+        "Conversion rules and truncation",
+        "Input function returning strings",
+        "Common conversion pitfalls"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "String to Sum",
+          "exercise_instructions": "Given the strings '12' and '3.5', convert them to appropriate numeric types, add them together, and print the result as a float."
+        },
+        {
+          "exercise_title": "User Input Converter",
+          "exercise_instructions": "Use input() to get a number from the user. Convert it to an int, then to a float, then to a string. Print all three converted values with their types."
+        }
+      ]
+    }
+  ]
+}

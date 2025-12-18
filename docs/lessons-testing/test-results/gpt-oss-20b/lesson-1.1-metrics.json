@@ -1,0 +1,48 @@
+{
+  "model": "GPT OSS 20B",
+  "modelSlug": "gpt-oss-20b",
+  "modelApiName": "openai/gpt-oss-20b",
+  "lessonId": "1.1",
+  "lessonTitle": "Что такое нематериальный продукт: билет как товар",
+  "language": "ru",
+  "duration": 23400,
+  "timestamp": "2025-12-16T10:29:27.741Z",
+  "parseSuccess": true,
+  "parseError": null,
+  "usage": {
+    "prompt_tokens": 636,
+    "completion_tokens": 1746,
+    "total_tokens": 2382,
+    "cost": 0.00030642,
+    "is_byok": false,
+    "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "audio_tokens": 0,
+      "video_tokens": 0
+    },
+    "cost_details": {
+      "upstream_inference_cost": null,
+      "upstream_inference_prompt_cost": 0.00004452,
+      "upstream_inference_completions_cost": 0.0002619
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 403,
+      "image_tokens": 0
+    }
+  },
+  "quality": {
+    "hasIntro": true,
+    "hasSections": true,
+    "hasExamples": true,
+    "hasExercises": true,
+    "hasSummary": true,
+    "sectionsCount": 4,
+    "examplesCount": 1,
+    "exercisesCount": 2,
+    "totalWordCount": 480,
+    "introWordCount": 109,
+    "coversObjectives": 3,
+    "coversTopics": 5,
+    "qualityScore": 100
+  }
+}

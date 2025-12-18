@@ -1,0 +1,281 @@
+import { describe, it, expect, beforeAll, afterAll } from 'vitest';
+import { seedDatabase, cleanDatabase } from './seed-database';
+import { createClient } from '@supabase/supabase-js';
+import { config } from 'dotenv';
+import { resolve } from 'path';
+
+// Load environment variables
+config({ path: resolve(__dirname, '../../.env') });
+
+const supabaseUrl = process.env.SUPABASE_URL!;
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_KEY || process.env.SUPABASE_SERVICE_ROLE_KEY!;
+
+const supabase = createClient(supabaseUrl, supabaseServiceKey, {
+  auth: { persistSession: false }
+});
+
+describe('Database Seeding Tests', () => {
+  // Clean database before and after tests
+  beforeAll(async () => {
+    await cleanDatabase();
+  });
+
+  afterAll(async () => {
+    await cleanDatabase();
+  });
+
+  it('should successfully seed all test data', async () => {
+    const result = await seedDatabase();
+
+    expect(result.success).toBe(true);
+    expect(result.summary).toBeDefined();
+    expect(result.summary?.organizations).toBe(4);
+    expect(result.summary?.users).toBe(12);
+    expect(result.summary?.courses).toBe(4);
+    expect(result.summary?.sections).toBe(8);
+    expect(result.summary?.lessons).toBe(16);
+    expect(result.summary?.lessonContent).toBe(16);
+    expect(result.summary?.courseEnrollments).toBe(4);
+  });
+
+  it('should create organizations with correct tiers', async () => {
+    await seedDatabase();
+
+    const { data: orgs, error } = await supabase
+      .from('organizations')
+      .select('*')
+      .order('storage_quota_bytes', { ascending: true });
+
+    expect(error).toBeNull();
+    expect(orgs).toHaveLength(4);
+
+    // Check tier configurations
+    expect(orgs![0].tier).toBe('free');
+    expect(orgs![0].storage_quota_bytes).toBe('10485760');
+
+    expect(orgs![1].tier).toBe('basic_plus');
+    expect(orgs![1].storage_quota_bytes).toBe('104857600');
+
+    expect(orgs![2].tier).toBe('standard');
+    expect(orgs![2].storage_quota_bytes).toBe('1073741824');
+
+    expect(orgs![3].tier).toBe('premium');
+    expect(orgs![3].storage_quota_bytes).toBe('10737418240');
+  });
+
+  it('should create users with correct roles', async () => {
+    await seedDatabase();
+
+    const { data: users, error } = await supabase
+      .from('users')
+      .select('*')
+      .order('email', { ascending: true });
+
+    expect(error).toBeNull();
+    expect(users).toHaveLength(12);
+
+    // Count roles
+    const adminCount = users!.filter(u => u.role === 'admin').length;
+    const instructorCount = users!.filter(u => u.role === 'instructor').length;
+    const studentCount = users!.filter(u => u.role === 'student').length;
+
+    expect(adminCount).toBe(4);
+    expect(instructorCount).toBe(4);
+    expect(studentCount).toBe(4);
+  });
+
+  it('should create courses owned by instructors', async () => {
+    await seedDatabase();
+
+    const { data: courses, error } = await supabase
+      .from('courses')
+      .select(`
+        *,
+        user:users!courses_user_id_fkey(role)
+      `);
+
+    expect(error).toBeNull();
+    expect(courses).toHaveLength(4);
+
+    // All courses should be owned by instructors
+    courses!.forEach(course => {
+      expect(course.user.role).toBe('instructor');
+      expect(course.status).toBe('published');
+    });
+  });
+
+  it('should respect tier-specific file limits', async () => {
+    await seedDatabase();
+
+    const { data: files, error } = await supabase
+      .from('file_catalog')
+      .select(`
+        *,
+        organization:organizations!file_catalog_organization_id_fkey(tier)
+      `);
+
+    expect(error).toBeNull();
+
+    // Group files by organization tier
+    const filesByTier = files!.reduce((acc: Record<string, any[]>, file) => {
+      const tier = file.organization.tier;
+      if (!acc[tier]) acc[tier] = [];
+      acc[tier].push(file);
+      return acc;
+    }, {});
+
+    // Validate tier limits
+    expect(filesByTier['free']?.length || 0).toBe(0); // No files for free tier
+    expect(filesByTier['basic_plus']?.length).toBe(1); // 1 file for basic_plus
+    expect(filesByTier['standard']?.length).toBe(3); // 3 files for standard
+    expect(filesByTier['premium']?.length).toBe(10); // 10 files for premium
+  });
+
+  it('should create course enrollments for students', async () => {
+    await seedDatabase();
+
+    const { data: enrollments, error } = await supabase
+      .from('course_enrollments')
+      .select(`
+        *,
+        user:users!course_enrollments_user_id_fkey(role)
+      `);
+
+    expect(error).toBeNull();
+    expect(enrollments).toHaveLength(4);
+
+    // All enrollments should be for students
+    enrollments!.forEach(enrollment => {
+      expect(enrollment.user.role).toBe('student');
+      expect(enrollment.status).toBe('active');
+      expect(enrollment.progress).toEqual({
+        lessons_completed: [],
+        last_accessed: null
+      });
+    });
+  });
+
+  it('should create lessons with content', async () => {
+    await seedDatabase();
+
+    const { data: lessons, error } = await supabase
+      .from('lessons')
+      .select(`
+        *,
+        lesson_content!lesson_content_lesson_id_fkey(*)
+      `);
+
+    expect(error).toBeNull();
+    expect(lessons).toHaveLength(16);
+
+    // Each lesson should have content
+    lessons!.forEach(lesson => {
+      expect(lesson.lesson_content).toBeDefined();
+      expect(lesson.lesson_content.text_content).toContain('Sample lesson content');
+      expect(lesson.lesson_content.media_urls).toEqual([]);
+      expect(lesson.lesson_content.quiz_data).toBeNull();
+      expect(lesson.lesson_content.interactive_elements).toBeNull();
+    });
+  });
+
+  it('should maintain referential integrity', async () => {
+    await seedDatabase();
+
+    // Check that all foreign keys are valid
+    const queries = [
+      // Users belong to organizations
+      `SELECT u.id FROM users u
+       LEFT JOIN organizations o ON u.organization_id = o.id
+       WHERE o.id IS NULL`,
+
+      // Courses belong to organizations and users
+      `SELECT c.id FROM courses c
+       LEFT JOIN organizations o ON c.organization_id = o.id
+       LEFT JOIN users u ON c.user_id = u.id
+       WHERE o.id IS NULL OR u.id IS NULL`,
+
+      // Sections belong to courses
+      `SELECT s.id FROM sections s
+       LEFT JOIN courses c ON s.course_id = c.id
+       WHERE c.id IS NULL`,
+
+      // Lessons belong to sections
+      `SELECT l.id FROM lessons l
+       LEFT JOIN sections s ON l.section_id = s.id
+       WHERE s.id IS NULL`,
+
+      // Lesson content belongs to lessons
+      `SELECT lc.lesson_id FROM lesson_content lc
+       LEFT JOIN lessons l ON lc.lesson_id = l.id
+       WHERE l.id IS NULL`
+    ];
+
+    for (const query of queries) {
+      const { data, error } = await supabase.rpc('execute_sql', {
+        query_text: query
+      }).single();
+
+      if (!error && data) {
+        expect(data).toHaveLength(0);
+      }
+    }
+  });
+
+  it('should update organization storage usage correctly', async () => {
+    await seedDatabase();
+
+    const { data: orgs, error } = await supabase
+      .from('organizations')
+      .select(`
+        *,
+        file_catalog!file_catalog_organization_id_fkey(file_size)
+      `)
+      .order('tier', { ascending: true });
+
+    expect(error).toBeNull();
+
+    orgs!.forEach(org => {
+      const totalSize = org.file_catalog.reduce(
+        (sum: number, file: { file_size: string }) => sum + parseInt(file.file_size),
+        0
+      );
+
+      // Free tier should have no storage used
+      if (org.tier === 'free') {
+        expect(parseInt(org.storage_used_bytes)).toBe(0);
+      } else {
+        // Other tiers should have storage used equal to sum of file sizes
+        expect(parseInt(org.storage_used_bytes)).toBe(totalSize);
+      }
+    });
+  });
+
+  it('should clean database successfully', async () => {
+    await seedDatabase();
+    const cleanResult = await cleanDatabase();
+
+    expect(cleanResult.success).toBe(true);
+
+    // Verify all tables are empty
+    const tables = [
+      'organizations',
+      'users',
+      'courses',
+      'sections',
+      'lessons',
+      'lesson_content',
+      'file_catalog',
+      'course_enrollments'
+    ];
+
+    for (const table of tables) {
+      const { data, error } = await supabase
+        .from(table)
+        .select('id')
+        .limit(1);
+
+      expect(error).toBeNull();
+      expect(data).toHaveLength(0);
+    }
+  });
+});

@@ -1,0 +1,141 @@
+/* Code Block Component Styles */
+
+/* Base code-block styling */
+.code-block {
+  position: relative;
+  margin: 1.5em 0;
+  border-radius: 0.5rem;
+  background: hsl(var(--muted));
+  overflow: hidden;
+}
+
+/* Code header */
+.code-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 1rem;
+  background: hsl(var(--muted) / 0.5);
+  border-bottom: 1px solid hsl(var(--border));
+  font-size: 0.75rem;
+}
+
+/* Language badge */
+.language-badge {
+  background: hsl(var(--primary) / 0.1);
+  color: hsl(var(--primary));
+  padding: 0.125rem 0.5rem;
+  border-radius: 0.25rem;
+  font-weight: 500;
+}
+
+/* Filename */
+.filename {
+  font-family: var(--font-mono);
+  color: hsl(var(--muted-foreground));
+}
+
+/* Copy button */
+.copy-button {
+  margin-left: auto;
+  padding: 0.25rem;
+  border-radius: 0.25rem;
+  color: hsl(var(--muted-foreground));
+  transition: color 0.2s, background 0.2s;
+}
+
+.copy-button:hover {
+  color: hsl(var(--foreground));
+  background: hsl(var(--muted));
+}
+
+.copy-button:focus-visible {
+  outline: 2px solid hsl(var(--ring));
+  outline-offset: 2px;
+}
+
+/* Code content and pre */
+.code-content {
+  overflow-x: auto;
+}
+
+.code-content pre {
+  margin: 0;
+  padding: 1rem;
+  background: transparent;
+  overflow-x: auto;
+}
+
+.code-content code {
+  font-family: var(--font-mono);
+  font-size: 0.875rem;
+  line-height: 1.7;
+}
+
+/* Line numbers using CSS counters */
+.code-content[data-line-numbers="true"] code {
+  counter-reset: line;
+}
+
+.code-content[data-line-numbers="true"] code > .line::before {
+  counter-increment: line;
+  content: counter(line);
+  display: inline-block;
+  width: 2rem;
+  margin-right: 1rem;
+  text-align: right;
+  color: hsl(var(--muted-foreground));
+  user-select: none;
+}
+
+/* Line highlighting */
+.code-content .line[data-highlighted="true"],
+.code-content .line.highlighted {
+  background: hsl(var(--primary) / 0.1);
+  margin: 0 -1rem;
+  padding: 0 1rem;
+  border-left: 2px solid hsl(var(--primary));
+}
+
+/* Shiki theme integration (rehype-pretty-code variables) */
+
+/* Light mode */
+[data-theme="light"],
+html:not(.dark) pre[data-theme="light"] {
+  background-color: var(--shiki-light-bg);
+  color: var(--shiki-light);
+}
+
+html:not(.dark) pre[data-theme="light"] code span {
+  color: var(--shiki-light);
+}
+
+/* Dark mode */
+.dark [data-theme="dark"],
+.dark pre[data-theme="dark"] {
+  background-color: var(--shiki-dark-bg);
+  color: var(--shiki-dark);
+}
+
+.dark pre[data-theme="dark"] code span {
+  color: var(--shiki-dark);
+}
+
+/* Hide the theme we're not using */
+html:not(.dark) [data-theme="dark"],
+.dark [data-theme="light"] {
+  display: none;
+}
+
+/* Responsive adjustments */
+@media (max-width: 640px) {
+  .code-content pre {
+    padding: 0.75rem;
+    font-size: 0.8rem;
+  }
+
+  .code-content[data-line-numbers="true"] code > .line::before {
+    width: 1.5rem;
+    margin-right: 0.5rem;
+  }
+}

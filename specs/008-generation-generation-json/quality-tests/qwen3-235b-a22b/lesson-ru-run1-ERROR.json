@@ -1,0 +1,9 @@
+{
+  "model": "Qwen3 235B A22B",
+  "modelSlug": "qwen3-235b-a22b",
+  "scenario": "lesson-ru",
+  "runNumber": 1,
+  "error": "Model only provided reasoning, no actual content (hit token limit during thinking)",
+  "timestamp": "2025-11-13T12:37:25.942Z",
+  "duration": 53224
+}

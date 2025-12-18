@@ -1,0 +1,28 @@
+{
+  "course_title": "Introduction to Python Programming",
+  "course_description": "Unlock the world of programming with Python! This beginner-level course provides a solid foundation in core coding concepts, from writing your first script to understanding data structures. No prior experience needed.",
+  "course_overview": "Welcome to 'Introduction to Python Programming,' your first step into the versatile and in-demand world of coding. This course is meticulously designed for absolute beginners. We'll start with the absolute basics, including setting up your development environment and writing your first lines of code. You'll then progress to essential programming concepts like variables, data types, operators, control flow (if/else statements, loops), functions, and basic data structures such as lists and dictionaries. Through a mix of concise video lectures, hands-on coding exercises, and small projects, you will build practical, real-world skills. We focus on writing clean, readable code and understanding the 'why' behind the syntax. By the end of this course, you will have the confidence and foundational knowledge to tackle more advanced topics or begin exploring Python's applications in data science, web development, and automation.",
+  "target_audience": "Aspiring programmers, data science enthusiasts, students, and professionals with no prior coding experience looking to learn a versatile programming language.",
+  "estimated_duration_hours": 30,
+  "difficulty_level": "beginner",
+  "prerequisites": [
+    "No prior programming experience is required.",
+    "Basic computer literacy (e.g., using a file system, installing applications)."
+  ],
+  "learning_outcomes": [
+    "Identify and explain fundamental programming concepts such as variables, data types, and operators.",
+    "Apply control flow constructs, including conditional statements and loops, to solve simple problems.",
+    "Create and use functions to write modular and reusable code.",
+    "Manipulate basic data structures like lists and dictionaries to store and retrieve collections of data.",
+    "Develop a simple command-line application that integrates the learned concepts."
+  ],
+  "course_tags": [
+    "Python",
+    "Programming",
+    "Coding",
+    "Beginner",
+    "Fundamentals",
+    "Scripting",
+    "No-Code-Experience"
+  ]
+}

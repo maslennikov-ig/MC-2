@@ -1,0 +1,126 @@
+{
+  "testRunId": "2025-11-14-v5-qwen3-235b-a22b",
+  "model": "Qwen3 235B A22B",
+  "modelSlug": "qwen3-235b-a22b",
+  "apiName": "qwen/qwen3-235b-a22b",
+  "timestamp": "2025-11-14T10:42:46.577Z",
+  "duration": 157016,
+  "durationMinutes": "2.62",
+  "scenarios": 4,
+  "runsPerScenario": 3,
+  "totalTests": 12,
+  "successfulTests": 0,
+  "failedTests": 12,
+  "successRate": "0.00",
+  "avgTestDuration": "67247",
+  "results": [
+    {
+      "model": "Qwen3 235B A22B",
+      "modelSlug": "qwen3-235b-a22b",
+      "scenario": "metadata-en",
+      "runNumber": 1,
+      "success": false,
+      "duration": 72055,
+      "error": "Unexpected end of JSON input"
+    },
+    {
+      "model": "Qwen3 235B A22B",
+      "modelSlug": "qwen3-235b-a22b",
+      "scenario": "metadata-en",
+      "runNumber": 2,
+      "success": false,
+      "duration": 9884,
+      "error": "Unexpected end of JSON input"
+    },
+    {
+      "model": "Qwen3 235B A22B",
+      "modelSlug": "qwen3-235b-a22b",
+      "scenario": "metadata-en",
+      "runNumber": 3,
+      "success": false,
+      "duration": 72321,
+      "error": "Unexpected end of JSON input"
+    },
+    {
+      "model": "Qwen3 235B A22B",
+      "modelSlug": "qwen3-235b-a22b",
+      "scenario": "metadata-ru",
+      "runNumber": 1,
+      "success": false,
+      "duration": 8233,
+      "error": "Unexpected end of JSON input"
+    },
+    {
+      "model": "Qwen3 235B A22B",
+      "modelSlug": "qwen3-235b-a22b",
+      "scenario": "metadata-ru",
+      "runNumber": 2,
+      "success": false,
+      "duration": 130107,
+      "error": "Unexpected end of JSON input"
+    },
+    {
+      "model": "Qwen3 235B A22B",
+      "modelSlug": "qwen3-235b-a22b",
+      "scenario": "metadata-ru",
+      "runNumber": 3,
+      "success": false,
+      "duration": 78328,
+      "error": "Unexpected end of JSON input"
+    },
+    {
+      "model": "Qwen3 235B A22B",
+      "modelSlug": "qwen3-235b-a22b",
+      "scenario": "lesson-en",
+      "runNumber": 1,
+      "success": false,
+      "duration": 54456,
+      "error": "Unexpected end of JSON input"
+    },
+    {
+      "model": "Qwen3 235B A22B",
+      "modelSlug": "qwen3-235b-a22b",
+      "scenario": "lesson-en",
+      "runNumber": 2,
+      "success": false,
+      "duration": 63569,
+      "error": "Unexpected end of JSON input"
+    },
+    {
+      "model": "Qwen3 235B A22B",
+      "modelSlug": "qwen3-235b-a22b",
+      "scenario": "lesson-en",
+      "runNumber": 3,
+      "success": false,
+      "duration": 157016,
+      "error": "Unexpected end of JSON input"
+    },
+    {
+      "model": "Qwen3 235B A22B",
+      "modelSlug": "qwen3-235b-a22b",
+      "scenario": "lesson-ru",
+      "runNumber": 1,
+      "success": false,
+      "duration": 78892,
+      "error": "Unexpected end of JSON input"
+    },
+    {
+      "model": "Qwen3 235B A22B",
+      "modelSlug": "qwen3-235b-a22b",
+      "scenario": "lesson-ru",
+      "runNumber": 2,
+      "success": false,
+      "duration": 8417,
+      "error": "Unexpected end of JSON input"
+    },
+    {
+      "model": "Qwen3 235B A22B",
+      "modelSlug": "qwen3-235b-a22b",
+      "scenario": "lesson-ru",
+      "runNumber": 3,
+      "success": false,
+      "duration": 73684,
+      "error": "Unexpected end of JSON input"
+    }
+  ]
+}

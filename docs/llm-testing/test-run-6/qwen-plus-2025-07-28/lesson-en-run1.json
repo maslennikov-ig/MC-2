@@ -1,0 +1,98 @@
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "A hands-on introduction to variables and core data types in Python, including practical exercises to reinforce understanding.",
+  "learning_objectives": [
+    "Declare and assign variables using proper Python syntax.",
+    "Identify and differentiate between major data types in Python.",
+    "Use type() to inspect the data type of a variable.",
+    "Convert between data types using type casting.",
+    "Apply variables and data types to solve simple programming problems."
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Introduction to Variables",
+      "lesson_objective": "Create and assign values to variables using correct naming conventions.",
+      "key_topics": [
+        "What is a variable?",
+        "Variable assignment with =",
+        "Valid variable names",
+        "Dynamic typing",
+        "Reassigning variables"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Declare and Print Variables",
+          "exercise_instructions": "Declare three variables: name, age, and city. Assign appropriate values and print them."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Core Data Types in Python",
+      "lesson_objective": "Recognize and use integers, floats, strings, and booleans in code.",
+      "key_topics": [
+        "Integer and float numbers",
+        "String literals",
+        "Boolean values True and False",
+        "Using type() function",
+        "Checking data types"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Identify Data Types",
+          "exercise_instructions": "Create variables of different types and use type() to print their data types."
+        },
+        {
+          "exercise_title": "Correct the Errors",
+          "exercise_instructions": "Fix syntax and type errors in a provided code snippet involving basic data types."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "Type Conversion and Casting",
+      "lesson_objective": "Convert values between string, integer, and float types using built-in functions.",
+      "key_topics": [
+        "Implicit vs explicit conversion",
+        "Using int() function",
+        "Using float() function",
+        "Using str() function",
+        "Handling conversion errors"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Convert User Input",
+          "exercise_instructions": "Write a program that takes a number as input and converts it to an integer and a float."
+        },
+        {
+          "exercise_title": "Data Type Puzzle",
+          "exercise_instructions": "Convert between types to make the given expressions evaluate correctly and print expected outputs."
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "Practical Applications of Variables",
+      "lesson_objective": "Apply variables and data types to perform basic calculations and formatting.",
+      "key_topics": [
+        "Storing calculation results",
+        "Using variables in strings (f-strings)",
+        "Combining different types",
+        "Order of operations",
+        "Debugging type mismatches"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Calculate Area of a Rectangle",
+          "exercise_instructions": "Ask the user for length and width, then calculate and print the area using variables."
+        },
+        {
+          "exercise_title": "Personalized Greeting",
+          "exercise_instructions": "Use user input and f-strings to generate a personalized greeting message."
+        }
+      ]
+    }
+  ]
+}

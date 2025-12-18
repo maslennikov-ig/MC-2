@@ -1,0 +1,53 @@
+{
+  "testRunId": "2025-11-14-deepseek-v31-terminus",
+  "testVersion": "terminus-eval",
+  "date": "2025-11-14",
+  "purpose": "Testing new DeepSeek v3.1 Terminus model for comparison with current leaders",
+  "outputDirectory": "docs/llm-testing/test-run-terminus",
+  "models": [
+    {
+      "name": "DeepSeek v3.1 Terminus",
+      "slug": "deepseek-v31-terminus",
+      "apiName": "deepseek/deepseek-v3.1-terminus",
+      "description": "New Terminus version to test against leaders"
+    }
+  ],
+  "testScenarios": [
+    {
+      "id": "metadata-en",
+      "entityId": "metadata",
+      "language": "en",
+      "title": "Introduction to Python Programming",
+      "description": "Beginner-level technical programming course"
+    },
+    {
+      "id": "metadata-ru",
+      "entityId": "metadata",
+      "language": "ru",
+      "title": "Машинное обучение для начинающих",
+      "description": "Intermediate-level conceptual ML course"
+    },
+    {
+      "id": "lesson-en",
+      "entityId": "lesson",
+      "language": "en",
+      "title": "Variables and Data Types in Python",
+      "description": "Hands-on programming section with exercises"
+    },
+    {
+      "id": "lesson-ru",
+      "entityId": "lesson",
+      "language": "ru",
+      "title": "Основы нейронных сетей",
+      "description": "Conceptual theory section with examples"
+    }
+  ],
+  "testParameters": {
+    "runsPerScenario": 3,
+    "temperature": 0.7,
+    "maxTokens": 8000,
+    "waitBetweenRequests": 500,
+    "timeout": 120000,
+    "retryOnError": false
+  }
+}

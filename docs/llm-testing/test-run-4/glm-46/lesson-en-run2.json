@@ -1,0 +1,126 @@
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "This section introduces the fundamental building blocks of Python programming: variables and data types. Students will learn how to store, manipulate, and work with different types of data in Python programs.",
+  "learning_objectives": [
+    "Create and use variables to store data in Python",
+    "Identify and work with basic data types (integers, floats, strings, booleans)",
+    "Perform type conversion between different data types",
+    "Apply string operations and formatting techniques",
+    "Use appropriate data types to solve programming problems"
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Introduction to Variables",
+      "lesson_objective": "Understand how to create, name, and assign values to variables in Python",
+      "key_topics": [
+        "What are variables",
+        "Variable naming conventions and rules",
+        "Variable assignment using the = operator",
+        "Variable reassignment",
+        "Multiple assignment",
+        "Deleting variables with del",
+        "Variable scope basics"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Variable Creation and Assignment",
+          "exercise_instructions": "Create five variables with appropriate names to store your first name, last name, age, height in centimeters, and whether you are a student (True/False). Print each variable on a separate line."
+        },
+        {
+          "exercise_title": "Variable Reassignment",
+          "exercise_instructions": "Create a variable called 'counter' and assign it the value 0. Increment the counter by 1 three times, printing its value after each increment. Then, reassign the counter to 100 and print the final value."
+        },
+        {
+          "exercise_title": "Multiple Assignment",
+          "exercise_instructions": "Use multiple assignment to create three variables (x, y, z) with values 10, 20, and 30 in a single line. Then use multiple assignment to swap the values of x and y. Print all three variables after the swap."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Basic Data Types",
+      "lesson_objective": "Identify and work with Python's basic data types: integers, floats, strings, and booleans",
+      "key_topics": [
+        "Integers (int)",
+        "Floating-point numbers (float)",
+        "Strings (str)",
+        "Booleans (bool)",
+        "None type",
+        "Checking data types with type() function",
+        "Basic operations for each data type"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Data Type Identification",
+          "exercise_instructions": "Create one example of each basic data type (integer, float, string, boolean, and None). Use the type() function to verify the type of each variable and print the results."
+        },
+        {
+          "exercise_title": "Data Type Operations",
+          "exercise_instructions": "Create two integer variables and perform addition, subtraction, multiplication, and division. Create two string variables and concatenate them. Create two boolean variables and perform logical operations (and, or, not). Print all results."
+        },
+        {
+          "exercise_title": "Data Type Challenges",
+          "exercise_instructions": "Try to perform operations between different data types (e.g., adding a string and an integer, multiplying a string and an integer, etc.). Observe and document which combinations work and which raise errors."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "Type Conversion",
+      "lesson_objective": "Convert between different data types using built-in Python functions",
+      "key_topics": [
+        "Implicit type conversion",
+        "Explicit type conversion functions (int(), float(), str(), bool())",
+        "Converting strings to numbers",
+        "Converting numbers to strings",
+        "Converting between different numeric types",
+        "Common conversion errors",
+        "Practical applications of type conversion"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Basic Type Conversion",
+          "exercise_instructions": "Create a string variable containing '123' and convert it to an integer. Create an integer variable containing 45 and convert it to a string. Create a float variable containing 6.78 and convert it to an integer. Print the original variables and their converted versions along with their types."
+        },
+        {
+          "exercise_title": "Conversion Error Handling",
+          "exercise_instructions": "Try to convert the string 'hello' to an integer using int() and observe the error. Use a try-except block to catch this error and print a user-friendly message instead."
+        },
+        {
+          "exercise_title": "Practical Conversion",
+          "exercise_instructions": "Write a program that reads two numbers as input (which will be strings), converts them to floats, calculates their sum, and then converts the result back to a string to display in a formatted message like 'The sum of X and Y is Z'."
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "String Operations",
+      "lesson_objective": "Manipulate and format strings using Python's built-in string methods and operations",
+      "key_topics": [
+        "String concatenation",
+        "String repetition with * operator",
+        "String indexing and slicing",
+        "String methods: upper(), lower(), title(), capitalize()",
+        "String methods: strip(), lstrip(), rstrip()",
+        "String methods: find(), replace(), split()",
+        "String formatting with f-strings"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "String Manipulation",
+          "exercise_instructions": "Create a string with your full name in all lowercase. Convert it to title case, then extract just your first name using slicing, and finally print the result in all uppercase."
+        },
+        {
+          "exercise_title": "String Methods Practice",
+          "exercise_instructions": "Create a string with extra spaces at the beginning and end, and with mixed capitalization. Use string methods to remove the extra spaces and standardize the capitalization. Then find the position of a specific character and replace it with another character."
+        },
+        {
+          "exercise_title": "String Formatting",
+          "exercise_instructions": "Create variables for a product name (string), price (float), and quantity (integer). Use an f-string to create a receipt that shows the product name, price, quantity, and total cost (price × quantity) formatted to two decimal places."
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,94 @@
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "A hands-on programming section where students will learn to create, manipulate, and manage variables and data types in Python through practical exercises. Covers fundamental concepts, type conversion, user input, and dynamic typing.",
+  "learning_objectives": [
+    "Define and assign different data types to variables",
+    "Convert between different data types using built-in functions",
+    "Capture user input and store it in appropriately typed variables",
+    "Manipulate strings using common methods and formatting",
+    "Identify and handle type-related errors in code"
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Creating Your First Variables",
+      "lesson_objective": "Students will be able to declare variables and assign values of numeric and text data types.",
+      "key_topics": ["Variable assignment syntax", "Naming conventions and rules", "Integer and float data types", "String creation with single and double quotes"],
+      "exercises": [
+        {
+          "exercise_title": "Variable Declaration Practice",
+          "exercise_instructions": "Create three variables: one storing your age as an integer, one storing the value of pi as a float, and one storing your name as a string. Print each variable."
+        },
+        {
+          "exercise_title": "Mathematical Operations",
+          "exercise_instructions": "Create two variables holding numbers. Perform addition, subtraction, multiplication, and division on them, storing each result in a new variable. Print all results."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Understanding Boolean and None Types",
+      "lesson_objective": "Students will be able to use boolean logic and the None type to represent truth values and absence of value.",
+      "key_topics": ["Boolean values True and False", "Comparison operators", "Logical operators (and, or, not)", "The None type and its use cases"],
+      "exercises": [
+        {
+          "exercise_title": "Boolean Comparisons",
+          "exercise_instructions": "Create variables for two different numbers. Write comparisons to check if they are equal, if one is greater, and if one is less than or equal to the other. Print the result of each comparison."
+        },
+        {
+          "exercise_title": "Logical Operations",
+          "exercise_instructions": "Create a variable representing a user's age and another representing if they have a membership. Write a boolean expression that checks if the user is over 18 AND has a membership. Print the result."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "Converting Between Data Types",
+      "lesson_objective": "Students will be able to convert values between strings, integers, and floats using type casting functions.",
+      "key_topics": ["The str() function", "The int() function", "The float() function", "Handling conversion errors"],
+      "exercises": [
+        {
+          "exercise_title": "Type Conversion Practice",
+          "exercise_instructions": "Ask the user for a number as input (which is a string). Convert it to an integer and a float. Perform a mathematical operation on each converted value and print the results."
+        },
+        {
+          "exercise_title": "String Concatenation with Numbers",
+          "exercise_instructions": "Create a variable with a number. Convert it to a string and concatenate it with another string to create a message like 'Your score is: 95'. Print the final message."
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "Working with User Input and Dynamic Typing",
+      "lesson_objective": "Students will be able to capture user input and understand Python's dynamic typing system.",
+      "key_topics": ["The input() function", "Determining data type with type()", "Dynamic vs. static typing", "Best practices for handling user input"],
+      "exercises": [
+        {
+          "exercise_title": "User Information Collector",
+          "exercise_instructions": "Write a program that asks the user for their name, age, and favorite number. Store each response in a variable and print a summary message using all three values."
+        },
+        {
+          "exercise_title": "Type Investigation",
+          "exercise_instructions": "Create three variables with a string, integer, and float. Use the type() function on each variable and print the result. Then, use the input() function and print the type of the value it returns."
+        }
+      ]
+    },
+    {
+      "lesson_number": 5,
+      "lesson_title": "String Manipulation and Formatting",
+      "lesson_objective": "Students will be able to manipulate string data using methods and formatted string literals.",
+      "key_topics": ["String methods: .upper(), .lower(), .strip()", "String indexing and slicing", "f-strings for formatting", "Escape sequences"],
+      "exercises": [
+        {
+          "exercise_title": "Basic String Methods",
+          "exercise_instructions": "Ask the user to input a string with extra spaces. Use the .strip() method to remove leading and trailing spaces, then convert it to uppercase. Print the original and modified strings."
+        },
+        {
+          "exercise_title": "Creating Formatted Messages",
+          "exercise_instructions": "Create variables for an item name and its price. Use an f-string to create a neatly formatted message like 'The price of apple is $1.20' and print it."
+        }
+      ]
+    }
+  ]
+}

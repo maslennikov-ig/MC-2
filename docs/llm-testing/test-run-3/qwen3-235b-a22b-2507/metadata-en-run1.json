@@ -1,0 +1,34 @@
+{
+  "course_title": "Introduction to Python Programming",
+  "course_description": "Master the fundamentals of Python programming with hands-on exercises and real-world examples. Perfect for beginners with no prior coding experience who want to build a strong foundation in software development.",
+  "course_overview": "This comprehensive course introduces learners to the core concepts of Python programming, including variables, data types, control structures, functions, and file handling. Through interactive coding exercises, quizzes, and mini-projects, students will gain practical experience writing clean, efficient Python code. The course also covers best practices in coding style and debugging techniques. By the end, learners will be able to write basic Python programs and solve simple computational problems, preparing them for more advanced topics in data science, web development, or automation.",
+  "target_audience": "Beginners with little to no programming experience who want to learn Python for career advancement or personal projects.",
+  "estimated_duration_hours": 25,
+  "difficulty_level": "beginner",
+  "prerequisites": [
+    "Basic computer literacy",
+    "Familiarity with using a web browser and text editor",
+    "No prior programming experience required"
+  ],
+  "learning_outcomes": [
+    "Define and use basic Python syntax and data types",
+    "Write and execute control flow statements using loops and conditionals",
+    "Create and use functions to solve programming tasks",
+    "Manipulate strings and data structures such as lists and dictionaries",
+    "Read from and write to files using Python",
+    "Debug simple Python programs using error messages and print statements",
+    "Apply problem-solving skills to develop small Python applications"
+  ],
+  "course_tags": [
+    "Python",
+    "Programming",
+    "Beginner",
+    "Coding",
+    "Software Development",
+    "Data Types",
+    "Functions",
+    "Control Flow",
+    "File Handling",
+    "Debugging"
+  ]
+}

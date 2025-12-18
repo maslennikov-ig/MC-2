@@ -1,0 +1,123 @@
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "This hands-on programming section introduces students to Python variables and fundamental data types through practical coding exercises. Students will learn variable naming conventions, declaration methods, and proper usage of integers, floats, strings, booleans, and complex numbers. The section emphasizes real-world applications and type conversion techniques through progressively challenging exercises that build programming proficiency.",
+  "learning_objectives": [
+    "Declare and assign values to Python variables using proper naming conventions",
+    "Distinguish and utilize different numeric data types including integers, floats, and complex numbers",
+    "Create, modify, and manipulate string variables using various string methods and operations",
+    "Apply boolean logic and comparison operators to make decisions in code",
+    "Convert between different data types safely and handle type conversion errors",
+    "Implement variables in practical programming scenarios using proper data type selection"
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Declaring and Naming Python Variables",
+      "lesson_objective": "Students will correctly declare variables, apply Python naming conventions, and identify invalid variable names through hands-on coding exercises.",
+      "key_topics": [
+        "Variable assignment syntax using equals sign",
+        "Python naming rules and restrictions (cannot start with numbers, cannot use keywords)",
+        "Snake_case naming convention for multi-word variables",
+        "Case sensitivity in variable names (my_var vs My_var)",
+        "Variable reassignment and multiple assignment techniques"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Variable Declaration Practice",
+          "exercise_instructions": "Create a Python script that declares 10 variables with different valid names (like user_age, total_score, etc.) and assign appropriate values to each. Print each variable name and its value. Ensure at least 3 variables use snake_case with multiple words."
+        },
+        {
+          "exercise_title": "Naming Convention Detective",
+          "exercise_instructions": "Write code that attempts to create variables with these names: '2nd_place', 'for', 'user-name', 'MyVariable', 'score_total'. For each one, either create the variable successfully or catch the error and explain why it failed. Document which names are invalid and why."
+        },
+        {
+          "exercise_title": "Variable Swapping Exercise",
+          "exercise_instructions": "Declare two variables 'a' and 'b' with different values. Use Python's multiple assignment feature to swap their values without using a temporary variable. Print the before and after values to verify the swap worked correctly."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Working with Numeric Data Types",
+      "lesson_objective": "Students will create, manipulate, and perform operations on integers, floats, and complex numbers while demonstrating understanding of numeric precision and overflow limitations.",
+      "key_topics": [
+        "Integer type declaration and range limitations",
+        "Float type creation and scientific notation usage",
+        "Complex number syntax using 'j' notation",
+        "Basic arithmetic operations with different numeric types",
+        "Division behavior differences (// vs / operators)",
+        "Type checking using type() function and isinstance()"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Numeric Type Explorer",
+          "exercise_instructions": "Create variables of different numeric types: an integer (42), a float (3.14159), and a complex number (2+3j). Use the type() function to print the type of each variable. Perform arithmetic operations between different types and observe the resulting type."
+        },
+        {
+          "exercise_title": "Calculator Operations Lab",
+          "exercise_instructions": "Build a simple calculator using variables that performs addition, subtraction, multiplication, division, floor division, and modulo operations on two numbers. Display both the operation performed and the result. Test with both integer and float inputs to see different behaviors."
+        },
+        {
+          "exercise_title": "Precision and Limits Investigation",
+          "exercise_instructions": "Experiment with very large integers and very small floats in Python. Create variables to test Python's handling of: 1) extremely large numbers, 2) numbers close to zero, 3) division by zero (use try/except). Print the results and any error messages encountered."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "String Manipulation and Type Conversion",
+      "lesson_objective": "Students will create string variables, apply string methods for manipulation, and safely convert between strings and numeric types while handling conversion errors.",
+      "key_topics": [
+        "String creation using single quotes, double quotes, and triple quotes",
+        "String concatenation using + operator and f-strings",
+        "String methods: .upper(), .lower(), .strip(), .split(), .replace()",
+        "String indexing and slicing techniques",
+        "Converting strings to numbers using int() and float()",
+        "Converting numbers to strings using str()",
+        "Handling conversion errors with try/except blocks"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "String Method Mastery",
+          "exercise_instructions": "Create a string variable with the value '  Python Programming  '. Use at least 5 different string methods to modify and display the string: remove whitespace, change case, split into words, replace a substring, and combine multiple methods. Show the result after each operation."
+        },
+        {
+          "exercise_title": "Personal Information Formatter",
+          "exercise_instructions": "Create variables for a person's name, age, height, and favorite number. Use f-strings to create a formatted introduction sentence that incorporates all these variables. Also create separate variables for string versions of age and height, demonstrating type conversion."
+        },
+        {
+          "exercise_title": "Safe Type Conversion Challenge",
+          "exercise_instructions": "Write code that attempts to convert string inputs ('123', '45.67', 'hello', '100.0') to integers and floats. Use try/except blocks to handle conversion failures gracefully. For each string, print whether the conversion was successful and what the converted value is, or what error occurred."
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "Boolean Logic and Comparison Operations",
+      "lesson_objective": "Students will utilize boolean values, comparison operators, and logical operators to create conditional expressions and make decisions in code.",
+      "key_topics": [
+        "Boolean literals True and False creation",
+        "Comparison operators: ==, !=, <, >, <=, >=",
+        "Logical operators: and, or, not with truth tables",
+        "Boolean evaluation of different data types (truthy/falsy values)",
+        "Using booleans in conditional statements and variable assignments",
+        "Chaining comparisons and operator precedence"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Comparison Operator Practice",
+          "exercise_instructions": "Create variables with different values (numbers, strings) and test all comparison operators between them. For each comparison, print the expression and its boolean result. Include comparisons between different data types (int vs float, string vs number)."
+        },
+        {
+          "exercise_title": "Logical Operator Truth Tables",
+          "exercise_instructions": "Create boolean variables p and q with different combinations of True/False values. Test all logical operators (and, or, not) with these variables and print the results to demonstrate how logical operators work with different boolean combinations."
+        },
+        {
+          "exercise_title": "Decision Making with Booleans",
+          "exercise_instructions": "Create a simple age verification system using variables for user_age, minimum_age, and has_permission. Use boolean expressions to determine: 1) if user is old enough, 2) if permission is granted, 3) if both conditions are met for access. Print clear messages based on the boolean results."
+        }
+      ]
+    }
+  ]
+}

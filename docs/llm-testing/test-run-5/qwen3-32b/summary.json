@@ -1,0 +1,126 @@
+{
+  "testRunId": "2025-11-14-v5-qwen3-32b",
+  "model": "Qwen3 32B",
+  "modelSlug": "qwen3-32b",
+  "apiName": "qwen/qwen3-32b",
+  "timestamp": "2025-11-14T10:41:17.404Z",
+  "duration": 67848,
+  "durationMinutes": "1.13",
+  "scenarios": 4,
+  "runsPerScenario": 3,
+  "totalTests": 12,
+  "successfulTests": 12,
+  "failedTests": 0,
+  "successRate": "100.00",
+  "avgTestDuration": "41714",
+  "results": [
+    {
+      "model": "Qwen3 32B",
+      "modelSlug": "qwen3-32b",
+      "scenario": "metadata-en",
+      "runNumber": 1,
+      "success": true,
+      "duration": 24802,
+      "contentLength": 1575
+    },
+    {
+      "model": "Qwen3 32B",
+      "modelSlug": "qwen3-32b",
+      "scenario": "metadata-en",
+      "runNumber": 2,
+      "success": true,
+      "duration": 26209,
+      "contentLength": 1663
+    },
+    {
+      "model": "Qwen3 32B",
+      "modelSlug": "qwen3-32b",
+      "scenario": "metadata-en",
+      "runNumber": 3,
+      "success": true,
+      "duration": 43465,
+      "contentLength": 1959
+    },
+    {
+      "model": "Qwen3 32B",
+      "modelSlug": "qwen3-32b",
+      "scenario": "metadata-ru",
+      "runNumber": 1,
+      "success": true,
+      "duration": 31185,
+      "contentLength": 1445
+    },
+    {
+      "model": "Qwen3 32B",
+      "modelSlug": "qwen3-32b",
+      "scenario": "metadata-ru",
+      "runNumber": 2,
+      "success": true,
+      "duration": 29276,
+      "contentLength": 1718
+    },
+    {
+      "model": "Qwen3 32B",
+      "modelSlug": "qwen3-32b",
+      "scenario": "metadata-ru",
+      "runNumber": 3,
+      "success": true,
+      "duration": 43201,
+      "contentLength": 1712
+    },
+    {
+      "model": "Qwen3 32B",
+      "modelSlug": "qwen3-32b",
+      "scenario": "lesson-en",
+      "runNumber": 1,
+      "success": true,
+      "duration": 43803,
+      "contentLength": 4554
+    },
+    {
+      "model": "Qwen3 32B",
+      "modelSlug": "qwen3-32b",
+      "scenario": "lesson-en",
+      "runNumber": 2,
+      "success": true,
+      "duration": 39971,
+      "contentLength": 4233
+    },
+    {
+      "model": "Qwen3 32B",
+      "modelSlug": "qwen3-32b",
+      "scenario": "lesson-en",
+      "runNumber": 3,
+      "success": true,
+      "duration": 49983,
+      "contentLength": 3517
+    },
+    {
+      "model": "Qwen3 32B",
+      "modelSlug": "qwen3-32b",
+      "scenario": "lesson-ru",
+      "runNumber": 1,
+      "success": true,
+      "duration": 67846,
+      "contentLength": 4478
+    },
+    {
+      "model": "Qwen3 32B",
+      "modelSlug": "qwen3-32b",
+      "scenario": "lesson-ru",
+      "runNumber": 2,
+      "success": true,
+      "duration": 44801,
+      "contentLength": 3695
+    },
+    {
+      "model": "Qwen3 32B",
+      "modelSlug": "qwen3-32b",
+      "scenario": "lesson-ru",
+      "runNumber": 3,
+      "success": true,
+      "duration": 56031,
+      "contentLength": 4292
+    }
+  ]
+}

@@ -1,0 +1,30 @@
+{
+  "course_title": "Introduction to Python Programming",
+  "course_description": "This comprehensive beginner-level course provides a practical foundation in Python programming for absolute newcomers. Students will master core programming concepts through hands-on exercises, building real-world applications while learning industry best practices. The curriculum covers syntax fundamentals, problem-solving techniques, and debugging strategies essential for launching a technical career. Participants gain confidence in writing efficient code and develop transferable skills applicable to data analysis, web development, and automation projects. Includes interactive coding challenges, peer-reviewed assignments, and instructor feedback to solidify understanding of computational thinking principles.",
+  "course_overview": "This structured 5-module course begins with environment setup and 'Hello World' implementation, progressing systematically through foundational concepts. Module 1 covers variables and data types through practical exercises like building a currency converter that calculates exchange rates. Module 2 explores control structures via interactive projects including a quiz application with scoring logic and a temperature converter using conditional statements. Module 3 develops function-writing skills by creating reusable tools such as a math operations library and text analysis utilities. Module 4 implements file handling through real-world tasks like processing sales data CSV files to generate revenue reports. Module 5 introduces error handling and debugging with hands-on scenarios fixing broken code in a password validation system. Each module features bite-sized video lessons, automated coding exercises with instant feedback, and milestone projects culminating in a final capstone where students build a contact management system with search functionality. The curriculum emphasizes readable code practices, version control basics with Git, and preparation for industry-standard development workflows.",
+  "target_audience": "Absolute beginners including career changers transitioning into tech roles, high school students preparing for AP Computer Science, marketing professionals automating report generation, finance analysts processing spreadsheet data, and non-technical entrepreneurs developing MVP prototypes. Specifically designed for learners with no prior coding experience but basic computer literacy who seek structured, project-based instruction to overcome initial programming hurdles.",
+  "estimated_duration_hours": 40.0,
+  "difficulty_level": "beginner",
+  "prerequisites": [
+    "Basic computer operation skills (file management, web browsing)",
+    "Familiarity with standard keyboard/mouse operations",
+    "No prior programming experience required"
+  ],
+  "learning_outcomes": [
+    "Define and implement core programming constructs including variables, data types, and operators in Python scripts",
+    "Construct conditional statements and loop structures to solve computational problems like grade calculators",
+    "Create modular functions with parameters and return values for reusable code components",
+    "Implement file input/output operations to process structured data from text files",
+    "Debug syntax and logical errors using print statements and IDE debugging tools",
+    "Build a command-line application that processes user input and generates formatted output"
+  ],
+  "course_tags": [
+    "python",
+    "programming_fundamentals",
+    "beginner_coding",
+    "software_development",
+    "data_analysis",
+    "automation",
+    "web_development"
+  ]
+}

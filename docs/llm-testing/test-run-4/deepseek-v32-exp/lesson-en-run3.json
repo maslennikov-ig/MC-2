@@ -1,0 +1,89 @@
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "This section introduces the foundational concepts of storing and manipulating data in Python. You will learn how to create variables to hold different types of information and understand the core data types Python uses. Mastering these concepts is the first step to writing functional Python programs.",
+  "learning_objectives": [
+    "Declare and assign values to variables using proper naming conventions.",
+    "Identify and use the core data types: strings, integers, floats, and booleans.",
+    "Convert values between different data types using built-in functions.",
+    "Use the print() function to display variable values and combined messages."
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "What are Variables?",
+      "lesson_objective": "Declare variables, assign values to them, and print their contents.",
+      "key_topics": [
+        "Understanding variables as named containers for data",
+        "The assignment operator (=)",
+        "Rules for naming variables (e.g., no spaces, cannot start with a number)",
+        "Using the print() function to display a variable's value",
+        "Dynamic typing in Python"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Your First Variables",
+          "exercise_instructions": "1. Create a variable named 'greeting' and assign the value 'Hello, World!' to it. 2. Create a variable named 'year' and assign the value 2024 to it. 3. Use the print() function to display the value of each variable on a separate line."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Exploring Numeric Data Types",
+      "lesson_objective": "Create and perform basic arithmetic operations with integer and float data types.",
+      "key_topics": [
+        "Integer data type (int) for whole numbers",
+        "Float data type (float) for decimal numbers",
+        "Basic arithmetic operators: +, -, *, /",
+        "Integer division (//) and modulo (%) operators",
+        "Using variables in arithmetic expressions"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Basic Calculator",
+          "exercise_instructions": "1. Create two variables, 'num1' and 'num2', and assign them integer values of your choice. 2. Calculate their sum, product, and the result of num1 divided by num2. 3. Store each result in a new variable and print all three results."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "Working with Text and Booleans",
+      "lesson_objective": "Create string variables, use string methods, and work with boolean values.",
+      "key_topics": [
+        "String data type (str) for text",
+        "Defining strings with single, double, and triple quotes",
+        "String concatenation using the + operator",
+        "Boolean data type (bool) for True/False values",
+        "Comparison operators (==, !=, >, <) that return booleans"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "String Manipulation",
+          "exercise_instructions": "1. Create a variable 'first_name' and a variable 'last_name' with your name. 2. Concatenate them into a new variable called 'full_name' with a space in between. 3. Print the full_name and its length using the len() function."
+        },
+        {
+          "exercise_title": "Boolean Comparisons",
+          "exercise_instructions": "1. Create two variables, 'a' and 'b', with different numeric values. 2. Write print statements to check if a is equal to b, if a is greater than b, and if a is not equal to b. 3. Observe and record the boolean output for each."
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "Type Conversion and Dynamic Typing",
+      "lesson_objective": "Convert variables between string, integer, and float types and understand dynamic typing.",
+      "key_topics": [
+        "The type() function to check a variable's data type",
+        "Converting with str(), int(), and float() functions",
+        "Common errors during conversion (e.g., converting text to a number)",
+        "How Python allows variables to change type (dynamic typing)",
+        "Input from users with the input() function (always returns a string)"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Data Type Converter",
+          "exercise_instructions": "1. Create a variable 'user_input' and assign it a value from the input() function. 2. Print the type of the user_input. 3. Convert user_input to an integer and a float, storing each in a new variable. 4. Print the new variables and their types. (Note: Enter a number for this exercise to work correctly)."
+        }
+      ]
+    }
+  ]
+}

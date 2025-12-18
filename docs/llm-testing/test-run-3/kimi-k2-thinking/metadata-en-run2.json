@@ -1,0 +1,32 @@
+{
+  "course_title": "Introduction to Python Programming",
+  "course_description": "Learn Python programming from scratch in this hands-on beginner course. Master fundamentals like variables, functions, and data structures while building real-world projects. No prior coding experience needed.",
+  "course_overview": "Introduction to Python Programming provides a comprehensive foundation in one of the world's most popular programming languages. This course takes you from absolute basics to writing functional Python programs through interactive lessons and hands-on projects. You'll explore core programming concepts including variables, data types, control flow, functions, lists, dictionaries, and file operations. By the end, you'll have built several practical applications including a calculator, data analyzer, and simple game, establishing a solid base for further Python specialization in web development, data science, or automation.",
+  "target_audience": "Complete beginners with no programming experience, students considering a career in tech, professionals looking to automate tasks, and anyone curious about coding.",
+  "estimated_duration_hours": 30,
+  "difficulty_level": "beginner",
+  "prerequisites": [
+    "Basic computer literacy and file management skills",
+    "No prior programming experience required",
+    "A computer with internet access and Python installed"
+  ],
+  "learning_outcomes": [
+    "Demonstrate proficiency in Python syntax and core programming concepts",
+    "Apply variables, data types, and control structures to solve programming problems",
+    "Create and utilize functions to write modular and reusable code",
+    "Implement data structures including lists and dictionaries to manage complex information",
+    "Develop interactive programs that handle user input and file operations",
+    "Analyze and debug code to identify and fix common programming errors"
+  ],
+  "course_tags": [
+    "Python",
+    "Programming",
+    "Beginner",
+    "Coding",
+    "Software Development",
+    "Automation",
+    "Data Science",
+    "Web Development",
+    "Scripting"
+  ]
+}

@@ -1,0 +1,31 @@
+{
+  "course_title": "Introduction to Python Programming",
+  "course_description": "Kickstart your technical career! This beginner-level course provides a hands-on introduction to Python, the world's most versatile and in-demand programming language, covering fundamental syntax, data structures, and control flow.",
+  "course_overview": "This comprehensive introductory course is designed for absolute beginners with no prior coding experience. Students will learn the core concepts of programming using Python 3, starting with setting up the development environment. Modules cover essential topics such as variable declaration, data types (integers, floats, strings, booleans), conditional statements (if/elif/else), looping constructs (for and while loops), functions, and basic data structures like lists, tuples, and dictionaries. By the end of the course, learners will be able to write, debug, and execute simple Python scripts, laying a solid foundation for further specialization in data science, web development, or automation.",
+  "target_audience": "Individuals new to programming, career changers, students in STEM fields, business analysts, and anyone seeking a foundational understanding of modern software development using Python.",
+  "estimated_duration_hours": 30,
+  "difficulty_level": "beginner",
+  "prerequisites": [
+    "Basic computer literacy and file management skills",
+    "Access to a reliable internet connection",
+    "Willingness to practice coding exercises"
+  ],
+  "learning_outcomes": [
+    "Identify and utilize fundamental Python data types, including integers, strings, and booleans.",
+    "Construct and debug control flow structures (if/else statements and loops) to manage program execution.",
+    "Define and invoke user-defined functions with parameters to promote code reusability.",
+    "Implement core Python data structures (lists, dictionaries, and tuples) to organize and retrieve data effectively.",
+    "Write simple, executable Python scripts to solve basic computational problems.",
+    "Explain the principles of object-oriented programming (classes and objects) at an introductory level."
+  ],
+  "course_tags": [
+    "Python",
+    "Programming Fundamentals",
+    "Coding",
+    "Beginner",
+    "Software Development",
+    "Scripting",
+    "Data Structures",
+    "Introduction"
+  ]
+}

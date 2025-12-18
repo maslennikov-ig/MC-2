@@ -1,0 +1,77 @@
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "Hands-on programming section with exercises focusing on practical implementation of variables and core data types through immediate coding practice and real-world examples",
+  "learning_objectives": [
+    "Declare and assign variables following Python naming conventions",
+    "Identify and differentiate between primitive data types in code execution",
+    "Convert between numeric and string data types using built-in functions",
+    "Manipulate string data using indexing, slicing, and common methods",
+    "Perform arithmetic operations while handling type-specific constraints"
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Variable Declaration and Primitive Data Types",
+      "lesson_objective": "Students will declare variables with valid identifiers and assign values of integer, float, string, and boolean types",
+      "key_topics": [
+        "Variable naming rules and PEP8 conventions",
+        "Integer vs float representation in memory",
+        "String literal creation with single/double quotes",
+        "Boolean states in conditional logic"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Personal Profile Variables",
+          "exercise_instructions": "Create four variables: 'user_age' (integer), 'account_balance' (float), 'full_name' (string), and 'is_active' (boolean). Assign realistic values representing your personal details and print each with a descriptive label."
+        },
+        {
+          "exercise_title": "Data Type Identification Drill",
+          "exercise_instructions": "Analyze these assignments: x = 42, y = '3.14', z = False, w = 0.0. Write comments above each line specifying the exact data type using Python's type terminology."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Type Conversion and Type Checking",
+      "lesson_objective": "Students will convert between string, integer, and float types while verifying conversions using type checking",
+      "key_topics": [
+        "type() function for runtime verification",
+        "int() and float() conversion edge cases",
+        "str() for non-string object conversion",
+        "Handling ValueError exceptions in conversions"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Temperature Unit Converter",
+          "exercise_instructions": "Convert 98.6 Fahrenheit to Celsius using the formula (F-32)*5/9. Store the result as a float, then convert to integer for whole degrees. Print both values with their types confirmed using type()."
+        },
+        {
+          "exercise_title": "Input Validation Challenge",
+          "exercise_instructions": "Create a program that takes user input for age. Convert the input to integer only if it contains digits, otherwise print 'Invalid age format'. Verify the conversion using type checking before printing."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "String Manipulation Techniques",
+      "lesson_objective": "Students will modify strings using slicing, concatenation, and built-in methods to solve text processing tasks",
+      "key_topics": [
+        "Zero-based indexing and negative positions",
+        "Slice notation with start:stop:step",
+        "Case conversion methods (upper/lower/title)",
+        "Whitespace stripping and substring replacement"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Email Formatter",
+          "exercise_instructions": "Take the string '  user@example.com  '. Remove extra spaces, convert to lowercase, and replace 'example' with 'gmail'. Print the cleaned email address and its length."
+        },
+        {
+          "exercise_title": "Palindrome Checker Setup",
+          "exercise_instructions": "Extract the first 5 characters from 'Racecar' using slicing, convert to lowercase, and store in a variable. Print the extracted substring and verify it matches 'race' using boolean comparison."
+        }
+      ]
+    }
+  ]
+}

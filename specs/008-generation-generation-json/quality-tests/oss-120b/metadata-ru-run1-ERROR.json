@@ -1,0 +1,9 @@
+{
+  "model": "OSS 120B",
+  "modelSlug": "oss-120b",
+  "scenario": "metadata-ru",
+  "runNumber": 1,
+  "error": "HTTP 401: {\"error\":{\"message\":\"No auth credentials found\",\"code\":401}}",
+  "timestamp": "2025-11-13T12:10:03.026Z",
+  "duration": 59
+}

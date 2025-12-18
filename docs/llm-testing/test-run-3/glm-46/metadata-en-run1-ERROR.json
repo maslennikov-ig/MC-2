@@ -1,0 +1,9 @@
+{
+  "model": "GLM 4.6",
+  "modelSlug": "glm-46",
+  "scenario": "metadata-en",
+  "runNumber": 1,
+  "error": "OpenAI or Azure OpenAI API key or Token Provider not found",
+  "duration": 0,
+  "timestamp": "2025-11-14T07:16:14.477Z"
+}

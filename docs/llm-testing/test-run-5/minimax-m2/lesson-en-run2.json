@@ -1,0 +1,94 @@
+{
+  "course": "Introduction to Python Programming (Beginner)",
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "This section introduces variables and Python's core data types. You will learn how to create variables, assign and reassign values, and perform type conversions. By the end, you will be comfortable working with numbers, strings, and booleans in simple programs.",
+  "learning_objectives": [
+    "Create variables using valid names and the assignment operator",
+    "Use integers, floats, strings, and booleans in code and understand dynamic typing",
+    "Apply basic operators for numbers and strings, including f-strings",
+    "Convert between int, float, and str using int(), float(), str(), and bool()",
+    "Build a small program that uses variables and data types with print() and input()"
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "What Is a Variable? Naming and Assignment",
+      "lesson_objective": "Declare variables, use valid names, and reassign values.",
+      "key_topics": [
+        "Variable concept and the assignment operator",
+        "Naming rules: letters, digits, underscores; no leading digits",
+        "Reserved keywords",
+        "Reassignment and multiple assignment",
+        "Dynamic typing: variables can change types"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Assign and Reassign Variables",
+          "exercise_instructions": "Create a file named lesson1_ex1.py. Write code that does the following:\n1) Create a variable age and assign your age as an integer.\n2) Print the variable.\n3) Reassign age to age + 1.\n4) Print the variable again."
+        },
+        {
+          "exercise_title": "Multiple Assignment Practice",
+          "exercise_instructions": "In the same file, add code that uses multiple assignment to set x, y, z to 10, 20, 30 in one line. Print x, y, z on separate lines."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Core Data Types: int, float, str, bool",
+      "lesson_objective": "Work with Python's basic data types and literals.",
+      "key_topics": [
+        "Numbers: integers and floats",
+        "Strings: single/double/triple quotes",
+        "Booleans: True/False",
+        "Type checking with type()",
+        "Dynamic typing implications"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Explore Types with type()",
+          "exercise_instructions": "Create a file named lesson2_ex1.py. Define variables a = 10, b = 3.14, c = \"hello\", d = True. Print each variable followed by its type using type()."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "Operators and Expressions",
+      "lesson_objective": "Perform calculations and string operations using operators.",
+      "key_topics": [
+        "Arithmetic operators: +, -, *, /, //, %, **",
+        "Comparison operators: ==, !=, <, >, <=, >=",
+        "Boolean operators: and, or, not",
+        "String concatenation and repetition",
+        "Order of operations"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Arithmetic Practice",
+          "exercise_instructions": "Create a file named lesson3_ex1.py. Define hours = 7 and rate = 20. Compute gross_pay = hours * rate. Print gross_pay with a descriptive label."
+        },
+        {
+          "exercise_title": "String Practice",
+          "exercise_instructions": "In the same file, define name = \"Ada\" and greeting = \"Hello, \". Print greeting + name + \"!\"."
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "Type Conversion and Input",
+      "lesson_objective": "Convert between types and read user input safely.",
+      "key_topics": [
+        "Converting with int(), float(), str(), bool()",
+        "String formatting with f-strings",
+        "Reading input with input()",
+        "Common pitfalls in conversions"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Greeting with Input",
+          "exercise_instructions": "Create a file named lesson4_ex1.py. Use input() to ask for your name, store it in name. Use input() to ask for your age, convert it to an int, and store it in age. Compute next_year_age = age + 1. Print an f-string like \"Hello, [name]! Next year you will be [next_year_age].\""
+        }
+      ]
+    }
+  ]
+}

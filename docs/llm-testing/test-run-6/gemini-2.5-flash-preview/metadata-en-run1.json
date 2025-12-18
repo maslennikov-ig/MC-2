@@ -1,0 +1,30 @@
+{
+  "course_title": "Introduction to Python Programming",
+  "course_description": "Kickstart your technical career by mastering Python, the most versatile and in-demand programming language today. Learn core concepts through hands-on coding exercises.",
+  "course_overview": "This comprehensive beginner-level course provides a solid foundation in Python programming. Students will start with setting up their development environment and move quickly into fundamental concepts such as variables, data types, control flow (conditionals and loops), and basic data structures (lists, tuples, dictionaries). The curriculum emphasizes practical application, ensuring learners can write functional, clean, and efficient Python code by the course's conclusion. It is designed for absolute beginners with no prior coding experience, preparing them for more advanced topics like object-oriented programming (OOP) and web development.",
+  "target_audience": "Absolute beginners interested in coding, students seeking a foundational programming language, career changers entering tech, and analysts needing scripting skills.",
+  "estimated_duration_hours": 40,
+  "difficulty_level": "beginner",
+  "prerequisites": [
+    "Basic computer literacy",
+    "Ability to navigate a file system",
+    "Strong motivation to learn programming"
+  ],
+  "learning_outcomes": [
+    "Define and utilize Python's fundamental data types (integers, strings, booleans, floats) correctly.",
+    "Implement control flow structures (if/elif/else, while, for loops) to manage program execution.",
+    "Construct and manipulate core Python data structures, including lists, dictionaries, and tuples.",
+    "Write modular, readable code by defining and calling custom functions.",
+    "Apply basic input/output operations to interact with files and user input.",
+    "Debug simple Python scripts and interpret common error messages."
+  ],
+  "course_tags": [
+    "Python",
+    "Programming Fundamentals",
+    "Coding Basics",
+    "Scripting",
+    "Data Types",
+    "Beginner Programming",
+    "Software Development"
+  ]
+}

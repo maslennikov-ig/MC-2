@@ -1,0 +1,65 @@
+# Introduction to Machine Learning - Введение в машинное обучение
+
+Machine learning is a revolutionary field of artificial intelligence that enables computers to learn from data without being explicitly programmed. This course material provides a comprehensive introduction to fundamental concepts and practical applications.
+
+Машинное обучение - это революционная область искусственного интеллекта, которая позволяет компьютерам обучаться на данных без явного программирования. Этот учебный материал содержит всестороннее введение в основные концепции и практические приложения.
+
+## Chapter 1: Supervised Learning - Глава 1: Обучение с учителем
+
+Supervised learning represents one of the most fundamental paradigms in machine learning. In this approach, we train models using labeled datasets where each input example is paired with the correct output. The model learns to map inputs to outputs by identifying patterns in the training data.
+
+Обучение с учителем представляет собой одну из самых фундаментальных парадигм машинного обучения. При таком подходе мы обучаем модели, используя размеченные наборы данных, где каждый входной пример сопоставлен с правильным выходом.
+
+### 1.1 Classification Algorithms - Классификационные алгоритмы
+
+Classification is the task of predicting discrete categories or classes. Common algorithms include decision trees, support vector machines, neural networks, and ensemble methods like random forests and gradient boosting. Each algorithm has unique strengths suited for different types of problems.
+
+Классификация - это задача предсказания дискретных категорий или классов. Распространенные алгоритмы включают деревья решений, метод опорных векторов, нейронные сети и ансамблевые методы.
+
+### 1.2 Regression Algorithms - Алгоритмы регрессии
+
+Regression algorithms predict continuous numerical values rather than discrete categories. Linear regression forms the foundation, with more advanced techniques including polynomial regression, ridge regression, lasso regression, and neural network-based regression models providing greater flexibility and accuracy.
+
+Регрессионные алгоритмы предсказывают непрерывные числовые значения, а не дискретные категории. Линейная регрессия составляет основу, а более продвинутые техники обеспечивают большую гибкость и точность.
+
+## Chapter 2: Unsupervised Learning - Глава 2: Обучение без учителя
+
+Unsupervised learning discovers hidden patterns in unlabeled data without predefined outputs. This paradigm includes clustering, dimensionality reduction, and anomaly detection. These techniques reveal intrinsic structure within datasets and enable exploratory data analysis.
+
+Обучение без учителя обнаруживает скрытые паттерны в неразмеченных данных без предопределенных выходов. Эта парадигма включает кластеризацию, снижение размерности и обнаружение аномалий.
+
+### 2.1 Clustering Methods - Методы кластеризации
+
+Clustering groups similar data points together based on their features. K-means clustering provides a simple yet effective approach, while hierarchical clustering builds tree-like structures of clusters. DBSCAN handles clusters of arbitrary shapes and identifies outliers naturally.
+
+Кластеризация группирует похожие точки данных вместе на основе их признаков. K-means кластеризация предоставляет простой, но эффективный подход, в то время как иерархическая кластеризация строит древовидные структуры кластеров.
+
+### 2.2 Dimensionality Reduction - Снижение размерности
+
+High-dimensional data often contains redundant information and computational challenges. Principal Component Analysis (PCA) transforms data into a lower-dimensional space while preserving maximum variance. t-SNE and UMAP provide powerful visualization techniques for complex datasets.
+
+Высокоразмерные данные часто содержат избыточную информацию и вычислительные проблемы. Анализ главных компонент (PCA) преобразует данные в пространство меньшей размерности, сохраняя максимальную дисперсию.
+
+## Chapter 3: Deep Learning - Глава 3: Глубокое обучение
+
+Deep learning leverages neural networks with multiple layers to learn hierarchical representations of data. This field has achieved breakthrough results in computer vision, natural language processing, speech recognition, and many other domains through architectures like convolutional neural networks and transformers.
+
+Глубокое обучение использует нейронные сети с несколькими слоями для изучения иерархических представлений данных. Эта область достигла прорывных результатов в компьютерном зрении, обработке естественного языка, распознавании речи и многих других областях.
+
+### 3.1 Convolutional Neural Networks - Сверточные нейронные сети
+
+CNNs excel at processing grid-like data such as images. Convolutional layers apply learned filters to detect features at multiple scales, while pooling layers reduce spatial dimensions. This architecture has revolutionized computer vision tasks including object detection and image segmentation.
+
+CNN превосходны в обработке данных в виде сетки, таких как изображения. Сверточные слои применяют обученные фильтры для обнаружения признаков на разных масштабах, а слои пулинга уменьшают пространственные размерности.
+
+### 3.2 Transformer Architecture - Архитектура трансформеров
+
+Transformers process sequential data through self-attention mechanisms, enabling parallel processing and capturing long-range dependencies. BERT, GPT, and their variants dominate natural language understanding and generation tasks, demonstrating remarkable capabilities in translation, summarization, and question answering.
+
+Трансформеры обрабатывают последовательные данные через механизмы самовнимания, обеспечивая параллельную обработку и захват долгосрочных зависимостей. BERT, GPT и их варианты доминируют в задачах понимания и генерации естественного языка.
+
+## Conclusion - Заключение
+
+Machine learning continues to evolve rapidly, with new architectures, algorithms, and applications emerging constantly. Understanding these fundamental concepts provides a solid foundation for exploring advanced topics and implementing real-world solutions. The field promises exciting developments in artificial intelligence and its applications across industries.
+
+Машинное обучение продолжает быстро развиваться, постоянно появляются новые архитектуры, алгоритмы и приложения. Понимание этих фундаментальных концепций обеспечивает прочную основу для изучения продвинутых тем и реализации реальных решений.

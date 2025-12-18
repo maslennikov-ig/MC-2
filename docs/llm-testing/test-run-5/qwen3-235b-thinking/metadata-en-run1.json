@@ -1,0 +1,32 @@
+{
+  "course_title": "Introduction to Python Programming",
+  "course_description": "Master Python fundamentals from scratch in this hands-on beginner course. Learn to write clean, efficient code through real-world projects while building a rock-solid foundation for data science, web development, and automation careers.",
+  "course_overview": "This comprehensive course covers Python syntax, data types, control structures, functions, file handling, and basic object-oriented programming. Through 50+ interactive exercises and 3 portfolio projects (including a weather data analyzer and quiz application), students gain practical experience solving real problems. The curriculum emphasizes debugging techniques, code readability best practices, and transition pathways to advanced Python domains.",
+  "target_audience": "Absolute beginners with no coding experience, career switchers, and students seeking essential programming skills for technical roles",
+  "estimated_duration_hours": 28.5,
+  "difficulty_level": "beginner",
+  "prerequisites": [
+    "Basic computer literacy",
+    "Familiarity with web browsers",
+    "No prior programming experience required"
+  ],
+  "learning_outcomes": [
+    "Write executable Python scripts using variables, loops, and conditionals",
+    "Explain core programming concepts including data types and functions",
+    "Create modular programs by defining and calling custom functions",
+    "Debug syntax and logic errors using Python's error messages",
+    "Manipulate text files through reading and writing operations",
+    "Apply object-oriented principles to design simple classes"
+  ],
+  "course_tags": [
+    "Python",
+    "Programming",
+    "Beginner",
+    "Coding",
+    "Software Development",
+    "Computer Science",
+    "Data Science",
+    "Web Development",
+    "Automation"
+  ]
+}

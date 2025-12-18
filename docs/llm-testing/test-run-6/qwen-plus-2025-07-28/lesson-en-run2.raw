@@ -1,0 +1,98 @@
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "A hands-on introduction to variables and core data types in Python, including practical exercises to reinforce learning.",
+  "learning_objectives": [
+    "Declare and assign variables using correct Python syntax",
+    "Identify and differentiate between major data types in Python",
+    "Use type() to inspect the data type of a variable",
+    "Convert between data types using built-in functions",
+    "Apply variables and data types to solve simple programming problems"
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Introduction to Variables",
+      "lesson_objective": "Create and assign values to variables using proper naming conventions",
+      "key_topics": [
+        "What is a variable",
+        "Variable assignment with =",
+        "Valid variable names",
+        "Dynamic typing",
+        "Reassigning variables"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Declare and Print Variables",
+          "exercise_instructions": "Declare three variables: name, age, and city. Assign appropriate values and print each one."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Core Data Types: Strings and Numbers",
+      "lesson_objective": "Use strings and numeric types (int, float) appropriately in variables",
+      "key_topics": [
+        "String data type",
+        "Integer and float types",
+        "Quoted vs unquoted values",
+        "Basic arithmetic operations",
+        "String concatenation"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Mix Strings and Numbers",
+          "exercise_instructions": "Create variables for product name and price. Print a sentence combining both values."
+        },
+        {
+          "exercise_title": "Perform Calculations",
+          "exercise_instructions": "Declare two number variables, perform addition, subtraction, multiplication, and division, then print results."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "Boolean and None Types",
+      "lesson_objective": "Use Boolean values and None to represent logical states in code",
+      "key_topics": [
+        "Boolean values: True and False",
+        "Comparison operators",
+        "The None type",
+        "Use cases for None",
+        "Truthiness in Python"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Evaluate Simple Conditions",
+          "exercise_instructions": "Create two variables with numeric values. Use comparison operators to generate and print Boolean results."
+        },
+        {
+          "exercise_title": "Work with None",
+          "exercise_instructions": "Declare a variable and assign None. Print its type and value to confirm."
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "Type Inspection and Conversion",
+      "lesson_objective": "Inspect variable types and convert between common data types",
+      "key_topics": [
+        "Using type() function",
+        "str(), int(), float() functions",
+        "Converting strings to numbers",
+        "Handling conversion errors",
+        "Implicit vs explicit conversion"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Check and Convert Types",
+          "exercise_instructions": "Declare a number as a string. Convert it to an integer, then verify the new type using type()."
+        },
+        {
+          "exercise_title": "Build a Simple Converter",
+          "exercise_instructions": "Write code that converts a user's age (as string input) to an integer and prints it."
+        }
+      ]
+    }
+  ]
+}

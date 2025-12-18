@@ -1,0 +1,30 @@
+{
+  "course_title": "Introduction to Python Programming",
+  "course_description": "Master Python fundamentals from scratch! This hands-on course teaches core programming concepts, syntax, and problem-solving techniques through practical exercises. Perfect for absolute beginners with no coding experience – build your first applications while learning industry best practices.",
+  "course_overview": "This comprehensive course provides a structured foundation in Python programming for novices. Starting with installation and basic syntax, learners progress through variables, data types, control structures, functions, and file handling. Real-world projects include building calculators, text analyzers, and simple automation scripts. The curriculum emphasizes readable code, debugging skills, and computational thinking while introducing object-oriented programming concepts. Final modules cover error handling and preparing for advanced Python paths like data analysis or web development.",
+  "target_audience": "Absolute beginners with no prior coding experience, including students, career switchers, and professionals seeking automation skills for office tasks.",
+  "estimated_duration_hours": 28.5,
+  "difficulty_level": "beginner",
+  "prerequisites": [
+    "Basic computer operation familiarity",
+    "No programming background required"
+  ],
+  "learning_outcomes": [
+    "Write executable Python scripts using variables, operators, and data types",
+    "Implement conditional logic and iterative loops to solve computational problems",
+    "Create and manipulate core data structures including lists, dictionaries, and tuples",
+    "Develop modular programs through custom function definition and parameter handling",
+    "Read from and write to text files for data persistence operations",
+    "Apply debugging techniques to identify and resolve common syntax and logic errors"
+  ],
+  "course_tags": [
+    "Python",
+    "Programming Fundamentals",
+    "Beginner Coding",
+    "Software Development",
+    "Data Structures",
+    "Automation",
+    "Scripting",
+    "Bloom's Taxonomy"
+  ]
+}

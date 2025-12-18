@@ -1,0 +1,123 @@
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "This hands-on programming section introduces fundamental concepts of variables, data types, and type operations in Python. Students will learn to declare variables following Python naming conventions, work with numeric types (integers and floats), manipulate string data, and apply boolean logic. Through practical coding exercises, students will develop proficiency in type checking, conversion, and data type-specific operations essential for Python programming.",
+  "learning_objectives": [
+    "Declare variables using proper Python naming conventions and syntax",
+    "Distinguish between integer, float, string, and boolean data types",
+    "Perform type checking and conversion operations on different data types",
+    "Apply string methods and formatting techniques to manipulate text data",
+    "Use boolean expressions and comparison operators in conditional logic",
+    "Implement type-specific operations and functions for each fundamental data type"
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Python Variables and Naming Conventions",
+      "lesson_objective": "Students will be able to create variables with meaningful names, understand Python's naming rules, and use different variable assignment techniques including multiple assignment and swapping.",
+      "key_topics": [
+        "Variable declaration and assignment syntax",
+        "Python identifier naming rules and best practices",
+        "Descriptive variable names and naming conventions",
+        "Multiple assignment and simultaneous variable declaration",
+        "Variable swapping using tuple unpacking",
+        "Understanding variable references and object identity"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Personal Information Variables",
+          "exercise_instructions": "Create variables to store personal information including name, age, height, and student status. Use descriptive variable names and display each variable with its value using print statements."
+        },
+        {
+          "exercise_title": "Multiple Assignment Challenge",
+          "exercise_instructions": "Use multiple assignment to declare three variables x, y, and z simultaneously with values 10, 20, and 30. Then swap x and y values using tuple unpacking, and print all three values."
+        },
+        {
+          "exercise_title": "Variable Naming Analysis",
+          "exercise_instructions": "Create a Python script that declares variables with both valid and invalid names. Include examples like 'my_variable', '2nd_attempt', 'class', and 'student-name'. Observe which names work and which cause errors, documenting the rules."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Working with Numeric Data Types",
+      "lesson_objective": "Students will be able to distinguish between integers and floats, perform arithmetic operations with proper precedence, and use numeric functions for mathematical calculations.",
+      "key_topics": [
+        "Integer vs float distinction and creation",
+        "Basic arithmetic operations (+, -, *, /, //, %, **)",
+        "Operator precedence and parentheses usage",
+        "Built-in numeric functions (abs, round, min, max)",
+        "Type conversion between numeric types",
+        "Large number handling and scientific notation"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Calculator Operations",
+          "exercise_instructions": "Create a program that performs various calculations: addition of two numbers, division with float result, integer division, remainder calculation, and exponentiation. Display each operation and its result with descriptive labels."
+        },
+        {
+          "exercise_title": "Temperature Converter",
+          "exercise_instructions": "Write a program that converts temperatures between Celsius and Fahrenheit. Use variables to store conversion formulas and display both original and converted temperatures with proper formatting."
+        },
+        {
+          "exercise_title": "Numeric Function Exploration",
+          "exercise_instructions": "Create variables with different numeric values and experiment with built-in functions: use abs() on negative numbers, round() with various decimal places, min() and max() with number lists, and demonstrate type conversion using int() and float()."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "String Manipulation and Operations",
+      "lesson_objective": "Students will be able to create strings using different quotation methods, apply string methods for modification, perform string concatenation and repetition, and format strings using various techniques.",
+      "key_topics": [
+        "String creation with single, double, and triple quotes",
+        "String concatenation and repetition operations",
+        "String indexing and slicing techniques",
+        "Essential string methods (upper, lower, strip, split, replace)",
+        "String formatting with f-strings and format() method",
+        "Escape sequences and raw strings"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Personal Bio String Builder",
+          "exercise_instructions": "Create variables for first name, last name, age, and hobby. Build a personal bio string using f-string formatting that displays 'Hi, I'm [full name] and I'm [age] years old. I love [hobby].' Apply string methods to ensure proper capitalization."
+        },
+        {
+          "exercise_title": "Text Processing Challenge",
+          "exercise_instructions": "Take a messy string with extra spaces and inconsistent casing. Use string methods to clean it up: remove leading/trailing spaces, convert to title case, split into words, and then reassemble with proper formatting."
+        },
+        {
+          "exercise_title": "Story Template System",
+          "exercise_instructions": "Create a story template using string formatting that incorporates user inputs. Include placeholders for character name, location, and action. Test with different values and demonstrate both f-string and format() method approaches."
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "Boolean Logic and Type Conversions",
+      "lesson_objective": "Students will be able to work with boolean values, create comparison expressions, understand truthy and falsy values, and perform safe type conversions with error handling.",
+      "key_topics": [
+        "Boolean values (True, False) and their creation",
+        "Comparison operators (==, !=, <, >, <=, >=)",
+        "Boolean operators (and, or, not) and operator precedence",
+        "Truthy and falsy values in Python",
+        "Type checking with isinstance() function",
+        "Safe type conversion with try-except blocks"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "User Input Validator",
+          "exercise_instructions": "Create a program that takes user input and validates it. Convert input to integer for age checking, use comparison operators to verify age ranges, and boolean logic to check multiple conditions. Handle conversion errors gracefully."
+        },
+        {
+          "exercise_title": "Boolean Expression Analyzer",
+          "exercise_instructions": "Write a program that demonstrates boolean logic with various scenarios: age verification (18+), temperature checking (freezing/normal/hot), and password strength validation. Show how different boolean expressions evaluate."
+        },
+        {
+          "exercise_title": "Type Safety Inspector",
+          "exercise_instructions": "Create a function that takes mixed data types and safely converts them. Use isinstance() to check types before conversion, demonstrate conversion of strings to numbers, and show error handling for invalid conversions. Test with valid and invalid inputs."
+        }
+      ]
+    }
+  ]
+}

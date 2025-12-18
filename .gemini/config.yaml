@@ -1,0 +1,15 @@
+version: 1
+settings:
+  code_review: true
+  
+  ignore:
+    - "**/package-lock.json"
+    - "**/pnpm-lock.yaml"
+    - "**/yarn.lock"
+    - "**/*.min.js"
+    - "**/*.min.css"
+    - "dist/**"
+    - ".next/**"
+    - "node_modules/**"
+    - "**/*.map"
+    - "**/*.svg"

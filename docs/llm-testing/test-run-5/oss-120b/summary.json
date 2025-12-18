@@ -1,0 +1,126 @@
+{
+  "testRunId": "2025-11-14-v5-oss-120b",
+  "model": "OSS 120B",
+  "modelSlug": "oss-120b",
+  "apiName": "openai/gpt-oss-120b",
+  "timestamp": "2025-11-14T10:41:03.911Z",
+  "duration": 54351,
+  "durationMinutes": "0.91",
+  "scenarios": 4,
+  "runsPerScenario": 3,
+  "totalTests": 12,
+  "successfulTests": 12,
+  "failedTests": 0,
+  "successRate": "100.00",
+  "avgTestDuration": "29167",
+  "results": [
+    {
+      "model": "OSS 120B",
+      "modelSlug": "oss-120b",
+      "scenario": "metadata-en",
+      "runNumber": 1,
+      "success": true,
+      "duration": 36885,
+      "contentLength": 1732
+    },
+    {
+      "model": "OSS 120B",
+      "modelSlug": "oss-120b",
+      "scenario": "metadata-en",
+      "runNumber": 2,
+      "success": true,
+      "duration": 17530,
+      "contentLength": 2106
+    },
+    {
+      "model": "OSS 120B",
+      "modelSlug": "oss-120b",
+      "scenario": "metadata-en",
+      "runNumber": 3,
+      "success": true,
+      "duration": 17624,
+      "contentLength": 1873
+    },
+    {
+      "model": "OSS 120B",
+      "modelSlug": "oss-120b",
+      "scenario": "metadata-ru",
+      "runNumber": 1,
+      "success": true,
+      "duration": 20233,
+      "contentLength": 1781
+    },
+    {
+      "model": "OSS 120B",
+      "modelSlug": "oss-120b",
+      "scenario": "metadata-ru",
+      "runNumber": 2,
+      "success": true,
+      "duration": 18258,
+      "contentLength": 1929
+    },
+    {
+      "model": "OSS 120B",
+      "modelSlug": "oss-120b",
+      "scenario": "metadata-ru",
+      "runNumber": 3,
+      "success": true,
+      "duration": 17194,
+      "contentLength": 1932
+    },
+    {
+      "model": "OSS 120B",
+      "modelSlug": "oss-120b",
+      "scenario": "lesson-en",
+      "runNumber": 1,
+      "success": true,
+      "duration": 40048,
+      "contentLength": 4774
+    },
+    {
+      "model": "OSS 120B",
+      "modelSlug": "oss-120b",
+      "scenario": "lesson-en",
+      "runNumber": 2,
+      "success": true,
+      "duration": 29450,
+      "contentLength": 4508
+    },
+    {
+      "model": "OSS 120B",
+      "modelSlug": "oss-120b",
+      "scenario": "lesson-en",
+      "runNumber": 3,
+      "success": true,
+      "duration": 42335,
+      "contentLength": 4687
+    },
+    {
+      "model": "OSS 120B",
+      "modelSlug": "oss-120b",
+      "scenario": "lesson-ru",
+      "runNumber": 1,
+      "success": true,
+      "duration": 26183,
+      "contentLength": 5285
+    },
+    {
+      "model": "OSS 120B",
+      "modelSlug": "oss-120b",
+      "scenario": "lesson-ru",
+      "runNumber": 2,
+      "success": true,
+      "duration": 29917,
+      "contentLength": 5760
+    },
+    {
+      "model": "OSS 120B",
+      "modelSlug": "oss-120b",
+      "scenario": "lesson-ru",
+      "runNumber": 3,
+      "success": true,
+      "duration": 54350,
+      "contentLength": 5585
+    }
+  ]
+}

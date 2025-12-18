@@ -1,0 +1,81 @@
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "This section introduces the fundamental concepts of variables and data types in Python. Students will learn how to declare variables, work with basic data types, and perform type conversion to manipulate data effectively.",
+  "learning_objectives": [
+    "Declare and assign values to variables using valid Python syntax.",
+    "Identify and use Python's basic data types (integers, floats, strings, booleans).",
+    "Convert between different data types using built-in functions.",
+    "Troubleshoot common type-related errors in Python code."
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Introduction to Variables",
+      "lesson_objective": "Understand how to create and manage variables in Python.",
+      "key_topics": [
+        "Variable declaration and assignment",
+        "Naming conventions",
+        "Dynamic typing",
+        "Reassigning variables"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Create and Print Variables",
+          "exercise_instructions": "1. Write a Python script that declares three variables (e.g., name, age, is_student). 2. Assign appropriate values to each variable. 3. Print each variable's value to the console."
+        },
+        {
+          "exercise_title": "Variable Swapping",
+          "exercise_instructions": "1. Declare two variables with numeric values. 2. Swap their values without using a temporary variable. 3. Print the new values to verify the swap."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Python Data Types",
+      "lesson_objective": "Recognize and utilize Python's core data types in practical scenarios.",
+      "key_topics": [
+        "Integers and floats",
+        "Strings and string operations",
+        "Boolean values",
+        "Type checking with type()",
+        "Common methods for each data type"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Data Type Identification",
+          "exercise_instructions": "1. Write a program that takes user input. 2. Use the type() function to determine and print the data type of the input."
+        },
+        {
+          "exercise_title": "String Manipulation",
+          "exercise_instructions": "1. Create a string variable with your full name. 2. Use string methods to convert it to uppercase, lowercase, and count the characters. 3. Print the results."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "Type Conversion",
+      "lesson_objective": "Convert between data types and handle type-related operations.",
+      "key_topics": [
+        "Implicit vs explicit type conversion",
+        "int(), float(), str(), bool() functions",
+        "Handling conversion errors",
+        "Practical use cases for type conversion"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Convert User Input to Numbers",
+          "exercise_instructions": "1. Prompt the user to enter a number as input. 2. Convert the input to an integer and a float. 3. Print both converted values."
+        },
+        {
+          "exercise_title": "Calculate Area of a Rectangle",
+          "exercise_instructions": "1. Declare variables for length and width as strings. 2. Convert them to numeric types. 3. Calculate and print the area and perimeter."
+        },
+        {
+          "exercise_title": "Type Conversion Errors",
+          "exercise_instructions": "1. Write code that attempts to convert a non-numeric string to an integer. 2. Use a try-except block to catch the error and display a custom message."
+        }
+      ]
+    }
+  ]
+}

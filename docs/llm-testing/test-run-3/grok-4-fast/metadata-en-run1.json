@@ -1,0 +1,31 @@
+{
+  "course_title": "Introduction to Python Programming",
+  "course_description": "Embark on your programming journey with this beginner-friendly course on Python, the accessible and powerful language used in web development, data science, and automation. Learn core concepts through interactive lessons and hands-on projects to build a solid foundation in coding.",
+  "course_overview": "This comprehensive introductory course demystifies Python programming for newcomers. Starting from the ground up, you'll explore essential topics including variables, data types, operators, control flow with if-statements and loops, functions, lists, dictionaries, and file handling. The curriculum emphasizes practical application through coding exercises, quizzes, and mini-projects like building a simple calculator or text analyzer. By the end, you'll be equipped to write, test, and debug basic Python scripts, setting the stage for more advanced studies in software development, data analysis, or automation. No prior experience needed—just curiosity and a computer.",
+  "target_audience": "Ideal for absolute beginners, including high school or college students, professionals transitioning to tech careers, hobbyists, and anyone curious about coding without prior experience.",
+  "estimated_duration_hours": 25,
+  "difficulty_level": "beginner",
+  "prerequisites": [
+    "Basic computer literacy and familiarity with using a keyboard",
+    "No prior programming knowledge required"
+  ],
+  "learning_outcomes": [
+    "Explain fundamental Python syntax and data types.",
+    "Write basic programs using variables, loops, and conditional statements.",
+    "Debug and troubleshoot simple errors in Python code.",
+    "Create reusable functions to organize and modularize code.",
+    "Apply Python basics to develop simple applications or scripts."
+  ],
+  "course_tags": [
+    "Python",
+    "Programming",
+    "Beginner",
+    "Coding Fundamentals",
+    "Data Types",
+    "Functions",
+    "Loops",
+    "Debugging",
+    "Software Development",
+    "Computer Science"
+  ]
+}

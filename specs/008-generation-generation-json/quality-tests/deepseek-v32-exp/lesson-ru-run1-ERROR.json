@@ -1,0 +1,9 @@
+{
+  "model": "DeepSeek v3.2 Exp",
+  "modelSlug": "deepseek-v32-exp",
+  "scenario": "lesson-ru",
+  "runNumber": 1,
+  "error": "The operation was aborted due to timeout",
+  "timestamp": "2025-11-13T12:16:42.981Z",
+  "duration": 65804
+}

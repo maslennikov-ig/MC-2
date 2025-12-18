@@ -1,0 +1,118 @@
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "A hands-on introduction to the fundamental building blocks of Python programming. This section covers how to create variables, assign values, and work with core data types like integers, floats, strings, and booleans. Students will practice type conversion and write small programs to reinforce their understanding.",
+  "learning_objectives": [
+    "Create and assign values to variables using Python syntax",
+    "Identify and use the core data types: integers, floats, strings, and booleans",
+    "Convert between different data types using built-in functions",
+    "Write a simple program that uses variables and performs basic operations"
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Creating and Using Variables",
+      "lesson_objective": "Students will be able to create variables, assign values of different types, and print their values to the console.",
+      "key_topics": [
+        "Variable assignment syntax",
+        "Naming conventions and rules",
+        "The print() function for output",
+        "Reassigning variable values"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Your First Variables",
+          "exercise_instructions": "Create three variables: one storing your name, one storing your age, and one storing your favorite color. Print each variable's value on a separate line."
+        },
+        {
+          "exercise_title": "Variable Reassignment",
+          "exercise_instructions": "Create a variable called 'score' and assign it the value 10. Print it. Then, reassign it to the value 25 and print it again."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Working with Numbers: Integers and Floats",
+      "lesson_objective": "Students will be able to perform basic arithmetic operations with numeric data types and identify the difference between integers and floats.",
+      "key_topics": [
+        "Integer and float data types",
+        "Basic arithmetic operators (+, -, *, /, **)",
+        "Integer vs. float division",
+        "Order of operations (PEMDAS)"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Simple Calculator",
+          "exercise_instructions": "Write a program that calculates the area of a rectangle. Create variables for length and width, assign them numeric values, and compute the area. Print the result."
+        },
+        {
+          "exercise_title": "Temperature Conversion",
+          "exercise_instructions": "Convert a temperature from Fahrenheit to Celsius. Store the Fahrenheit value in a variable, perform the conversion (C = (F - 32) * 5/9), and print the result."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "Manipulating Text with Strings",
+      "lesson_objective": "Students will be able to create, concatenate, and use basic string methods to manipulate text data.",
+      "key_topics": [
+        "String creation with single, double, and triple quotes",
+        "String concatenation using the + operator",
+        "The len() function",
+        "Basic string methods: .upper(), .lower(), .title()"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Greeting Generator",
+          "exercise_instructions": "Create two variables, one for a first name and one for a last name. Concatenate them to form a full name and print a greeting message like 'Hello, [Full Name]!'."
+        },
+        {
+          "exercise_title": "String Transformation",
+          "exercise_instructions": "Take a string in all lowercase letters and print it in all uppercase. Then, take a string in all uppercase and print it with the first letter of each word capitalized (title case)."
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "Making Decisions with Booleans and Comparisons",
+      "lesson_objective": "Students will be able to use comparison and logical operators to create Boolean expressions and evaluate their truth values.",
+      "key_topics": [
+        "Boolean data type (True, False)",
+        "Comparison operators (==, !=, >, <, >=, <=",
+        "Logical operators (and, or, not)",
+        "Evaluating complex Boolean expressions"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Age Checker",
+          "exercise_instructions": "Create a variable for a person's age. Write a Boolean expression to check if the person is both older than 12 and younger than 20. Print the result of this expression."
+        },
+        {
+          "exercise_title": "Password Validator",
+          "exercise_instructions": "Check if a given password string meets two criteria: it is at least 8 characters long, and it does not equal the string 'password'. Print the Boolean result."
+        }
+      ]
+    },
+    {
+      "lesson_number": 5,
+      "lesson_title": "Converting Between Data Types",
+      "lesson_objective": "Students will be able to convert between strings, integers, and floats using type casting functions and handle common conversion errors.",
+      "key_topics": [
+        "Type casting functions: str(), int(), float()",
+        "Converting user input (which is a string) to numbers",
+        "Handling ValueError exceptions during conversion",
+        "Building strings containing numbers"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Number Parser",
+          "exercise_instructions": "Create a variable with a string value of '125'. Convert it to an integer and add 25 to it. Print the final result."
+        },
+        {
+          "exercise_title": "User Info Formatter",
+          "exercise_instructions": "Ask the user for their age (as input). Convert the input to an integer. Then, create a message that says 'You are [age] years old.' and print it. Ensure the age in the message is a number, not a string."
+        }
+      ]
+    }
+  ]
+}

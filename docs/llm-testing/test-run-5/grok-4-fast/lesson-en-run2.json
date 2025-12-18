@@ -1,0 +1,105 @@
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "This section introduces the foundational elements of Python programming by covering variables and data types. Learners will discover how to store and manipulate data using variables, while exploring core data types like integers, floats, strings, and booleans. By completing this section, beginners will gain confidence in handling basic data structures in Python code.",
+  "learning_objectives": [
+    "Define variables and assign values to them in Python code.",
+    "Identify and utilize primitive data types including int, float, str, and bool.",
+    "Perform basic operations and type conversions on data types.",
+    "Write simple programs that declare variables and output their values."
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Understanding Variables",
+      "lesson_objective": "Explain the purpose of variables and demonstrate how to declare and assign values in Python.",
+      "key_topics": [
+        "What is a variable?",
+        "Variable naming conventions",
+        "Assignment operator (=)",
+        "Dynamic typing in Python",
+        "Printing variable values with print()"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Declare Your First Variable",
+          "exercise_instructions": "Create a Python script. Declare a variable named 'name' and assign it the string value 'Python Beginner'. Use the print() function to output the value. Run the script and verify the output."
+        },
+        {
+          "exercise_title": "Multiple Variable Assignments",
+          "exercise_instructions": "In a new script, assign your age to a variable 'age' as an integer and your favorite number to 'favorite_num' as a float. Print both variables on separate lines. Ensure no syntax errors occur."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Primitive Data Types",
+      "lesson_objective": "Identify and work with Python's basic data types: integers, floats, strings, and booleans.",
+      "key_topics": [
+        "Integers (int)",
+        "Floats (float)",
+        "Strings (str) and escaping characters",
+        "Booleans (bool): True and False",
+        "Using type() function to check data types"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Data Type Exploration",
+          "exercise_instructions": "Write a script that declares variables of each type: an integer (e.g., 42), a float (e.g., 3.14), a string (e.g., 'Hello'), and a boolean (True). Use type() to print the type of each and observe the outputs."
+        },
+        {
+          "exercise_title": "String Manipulation Basics",
+          "exercise_instructions": "Declare a string variable with your full name. Concatenate it with another string ' is learning Python.' Print the result. Then, declare a boolean variable indicating if you like programming (True or False) and print it."
+        },
+        {
+          "exercise_title": "Numeric Types Practice",
+          "exercise_instructions": "Create integer and float variables representing height in cm and weight in kg. Use type() to confirm their types, then print a message like 'Height: X cm, Weight: Y kg'."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "Operations and Type Conversion",
+      "lesson_objective": "Apply arithmetic and string operations on data types and convert between them using built-in functions.",
+      "key_topics": [
+        "Arithmetic operations on numbers (+, -, *, /, //, %)",
+        "String concatenation and repetition",
+        "Boolean operations (and, or, not)",
+        "Type conversion: int(), float(), str(), bool()",
+        "Common errors like TypeError"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Basic Arithmetic",
+          "exercise_instructions": "Declare two integer variables, say 10 and 3. Perform addition, subtraction, multiplication, and division. Print each result. Then, convert the division result to an integer using int() and print it."
+        },
+        {
+          "exercise_title": "Type Conversion Challenge",
+          "exercise_instructions": "Write a script with a string '100' and a float 5.5. Convert the string to int, add it to the float after converting the float to int, and print the sum. Handle any potential errors by checking types first."
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "Practical Applications",
+      "lesson_objective": "Combine variables and data types to build simple interactive programs using input.",
+      "key_topics": [
+        "Using input() for user data",
+        "Combining data types in expressions",
+        "Simple calculations with user input",
+        "Best practices for variable usage",
+        "Debugging common variable issues"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "User Greeting Program",
+          "exercise_instructions": "Create a script that uses input() to get the user's name (string) and age (convert to int). Print a greeting like 'Hello, [name]! You are [age] years old.' Test with sample inputs."
+        },
+        {
+          "exercise_title": "Simple Calculator",
+          "exercise_instructions": "Use input() to get two numbers as strings, convert them to floats, and perform addition and multiplication. Output the results in a formatted string. Ensure conversions handle decimal inputs."
+        }
+      ]
+    }
+  ]
+}

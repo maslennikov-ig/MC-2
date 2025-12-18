@@ -1,0 +1,98 @@
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "This section introduces the fundamental building blocks of Python programs: variables and the core data types. Learners will practice creating, naming, and manipulating variables to store and process information.",
+  "learning_objectives": [
+    "Define and assign values to variables using correct naming conventions.",
+    "Identify and use Python's primary data types: integers, floats, strings, booleans, and None.",
+    "Perform basic operations with numeric and string data types.",
+    "Explain type conversion and when it is necessary.",
+    "Debug simple type‑related errors in code snippets."
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Understanding Variables",
+      "lesson_objective": "Create and assign variables following Python naming rules and retrieve their values.",
+      "key_topics": [
+        "Variable naming conventions",
+        "Assignment operator (=)",
+        "Dynamic typing",
+        "The REPL and variable inspection"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Variable Creation Practice",
+          "exercise_instructions": "Open a Python interpreter. Create variables named `age`, `first_name`, and `is_student` with appropriate values. Print each variable on a separate line."
+        },
+        {
+          "exercise_title": "Naming Convention Check",
+          "exercise_instructions": "Write five variable assignments that intentionally violate naming rules (e.g., starting with a number, using spaces). Run the code to observe the syntax errors, then correct them."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Numeric Data Types",
+      "lesson_objective": "Perform arithmetic operations using integers and floats and understand type differences.",
+      "key_topics": [
+        "int and float types",
+        "Arithmetic operators (+, -, *, /, //, %, **)",
+        "Operator precedence",
+        "Type casting with int() and float()"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Simple Calculator",
+          "exercise_instructions": "Write a script that asks the user for two numbers, stores them as floats, and then prints the sum, difference, product, quotient, integer division, remainder, and exponentiation results."
+        },
+        {
+          "exercise_title": "Mixed‑Type Expressions",
+          "exercise_instructions": "Create variables `a = 7` (int) and `b = 3.5` (float). Compute and print the result of `a * b`. Then cast the result to an int and print the casted value."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "Working with Strings",
+      "lesson_objective": "Manipulate string variables using concatenation, slicing, and built‑in methods.",
+      "key_topics": [
+        "String literals and escape characters",
+        "Concatenation (+) and repetition (*)",
+        "Indexing and slicing",
+        "Common string methods (upper, lower, strip, replace, split)"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "String Formatter",
+          "exercise_instructions": "Define variables `first = \"Ada\"` and `last = \"Lovelace\"`. Use string concatenation and f‑strings to create and print the full name in the format \"Last, First\"."
+        },
+        {
+          "exercise_title": "Slice and Transform",
+          "exercise_instructions": "Given the string `quote = \"Python is fun!\"`, extract the word \"Python\" using slicing, convert it to uppercase, and print the result."
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "Booleans, None, and Type Conversion",
+      "lesson_objective": "Apply boolean logic, understand the None type, and convert between data types safely.",
+      "key_topics": [
+        "bool type and truthy/falsy values",
+        "Logical operators (and, or, not)",
+        "The None singleton",
+        "Explicit conversion functions (str(), int(), float(), bool())"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Logical Conditions",
+          "exercise_instructions": "Create variables `x = 10` and `y = 20`. Write an if‑else block that prints \"x is smaller\" when `x < y` is True, otherwise prints \"x is not smaller\"."
+        },
+        {
+          "exercise_title": "Handling None",
+          "exercise_instructions": "Assign `result = None`. Write a function `process(value)` that returns the string \"No data\" if `value` is None, otherwise returns `str(value)`. Test the function with both None and a numeric argument."
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,181 @@
+{
+  "model": "DeepSeek v3.2 Exp",
+  "modelSlug": "deepseek-v32-exp",
+  "timestamp": "2025-11-13T12:20:11.783Z",
+  "overallQuality": 0.9654545454545456,
+  "metadataQuality": 0.9866666666666667,
+  "lessonQuality": 0.9400000000000002,
+  "analyses": [
+    {
+      "scenario": "lesson-en",
+      "runNumber": 1,
+      "schemaScore": {
+        "validJSON": true,
+        "hasRequiredFields": true,
+        "usesSnakeCase": true,
+        "correctDataTypes": true,
+        "score": 1
+      },
+      "contentScore": 1,
+      "languageScore": 1,
+      "overallScore": 1,
+      "issues": []
+    },
+    {
+      "scenario": "lesson-en",
+      "runNumber": 2,
+      "schemaScore": {
+        "validJSON": true,
+        "hasRequiredFields": true,
+        "usesSnakeCase": true,
+        "correctDataTypes": true,
+        "score": 1
+      },
+      "contentScore": 0.8,
+      "languageScore": 1,
+      "overallScore": 0.9200000000000002,
+      "issues": [
+        "Topics are generic (e.g., \"Introduction to...\")"
+      ]
+    },
+    {
+      "scenario": "lesson-en",
+      "runNumber": 3,
+      "schemaScore": {
+        "validJSON": true,
+        "hasRequiredFields": true,
+        "usesSnakeCase": true,
+        "correctDataTypes": true,
+        "score": 1
+      },
+      "contentScore": 0.8,
+      "languageScore": 1,
+      "overallScore": 0.9200000000000002,
+      "issues": [
+        "Topics are generic (e.g., \"Introduction to...\")"
+      ]
+    },
+    {
+      "scenario": "lesson-ru",
+      "runNumber": 2,
+      "schemaScore": {
+        "validJSON": true,
+        "hasRequiredFields": true,
+        "usesSnakeCase": true,
+        "correctDataTypes": true,
+        "score": 1
+      },
+      "contentScore": 1,
+      "languageScore": 0.8500000000000001,
+      "overallScore": 0.9700000000000001,
+      "issues": []
+    },
+    {
+      "scenario": "lesson-ru",
+      "runNumber": 3,
+      "schemaScore": {
+        "validJSON": true,
+        "hasRequiredFields": true,
+        "usesSnakeCase": true,
+        "correctDataTypes": true,
+        "score": 1
+      },
+      "contentScore": 0.8,
+      "languageScore": 0.8500000000000001,
+      "overallScore": 0.8900000000000001,
+      "issues": [
+        "Topics are generic (e.g., \"Introduction to...\")"
+      ]
+    },
+    {
+      "scenario": "metadata-en",
+      "runNumber": 1,
+      "schemaScore": {
+        "validJSON": true,
+        "hasRequiredFields": true,
+        "usesSnakeCase": true,
+        "correctDataTypes": true,
+        "score": 1
+      },
+      "contentScore": 0.9999999999999999,
+      "languageScore": 1,
+      "overallScore": 1,
+      "issues": []
+    },
+    {
+      "scenario": "metadata-en",
+      "runNumber": 2,
+      "schemaScore": {
+        "validJSON": true,
+        "hasRequiredFields": true,
+        "usesSnakeCase": true,
+        "correctDataTypes": true,
+        "score": 1
+      },
+      "contentScore": 0.9999999999999999,
+      "languageScore": 1,
+      "overallScore": 1,
+      "issues": []
+    },
+    {
+      "scenario": "metadata-en",
+      "runNumber": 3,
+      "schemaScore": {
+        "validJSON": true,
+        "hasRequiredFields": true,
+        "usesSnakeCase": true,
+        "correctDataTypes": true,
+        "score": 1
+      },
+      "contentScore": 0.8999999999999999,
+      "languageScore": 1,
+      "overallScore": 0.96,
+      "issues": []
+    },
+    {
+      "scenario": "metadata-ru",
+      "runNumber": 1,
+      "schemaScore": {
+        "validJSON": true,
+        "hasRequiredFields": true,
+        "usesSnakeCase": true,
+        "correctDataTypes": true,
+        "score": 1
+      },
+      "contentScore": 0.9999999999999999,
+      "languageScore": 1,
+      "overallScore": 1,
+      "issues": []
+    },
+    {
+      "scenario": "metadata-ru",
+      "runNumber": 2,
+      "schemaScore": {
+        "validJSON": true,
+        "hasRequiredFields": true,
+        "usesSnakeCase": true,
+        "correctDataTypes": true,
+        "score": 1
+      },
+      "contentScore": 0.8999999999999999,
+      "languageScore": 1,
+      "overallScore": 0.96,
+      "issues": []
+    },
+    {
+      "scenario": "metadata-ru",
+      "runNumber": 3,
+      "schemaScore": {
+        "validJSON": true,
+        "hasRequiredFields": true,
+        "usesSnakeCase": true,
+        "correctDataTypes": true,
+        "score": 1
+      },
+      "contentScore": 0.9999999999999999,
+      "languageScore": 1,
+      "overallScore": 1,
+      "issues": []
+    }
+  ]
+}

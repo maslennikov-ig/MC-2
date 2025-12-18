@@ -1,0 +1,9 @@
+{
+  "model": "Kimi K2 0905",
+  "modelSlug": "kimi-k2-0905",
+  "scenario": "metadata-ru",
+  "runNumber": 1,
+  "error": "HTTP 401: {\"error\":{\"message\":\"No auth credentials found\",\"code\":401}}",
+  "timestamp": "2025-11-13T12:09:30.422Z",
+  "duration": 69
+}
