@@ -38,7 +38,7 @@ services:
   # Docling MCP Server for document processing (internal - behind nginx proxy)
   # NOTE: Image built manually on server (too large for GitHub Actions)
   docling-mcp-internal:
-    image: ghcr.io/maslennikov-ig/mc-2/docling-mcp:latest
+    image: ghcr.io/maslennikov-ig/MC-2/docling-mcp:latest
     pull_policy: if_not_present  # Don't pull if local image exists (too large: 8GB)
     container_name: megacampus-docling-mcp-internal
     restart: unless-stopped
@@ -106,7 +106,7 @@ services:
 
   # Next.js Web Application
   web:
-    image: ghcr.io/maslennikov-ig/mc-2/web:latest
+    image: ghcr.io/maslennikov-ig/MC-2/web:latest
     container_name: megacampus-web
     restart: unless-stopped
     ports:
@@ -142,7 +142,7 @@ services:
 
   # API Server (Express + tRPC)
   api:
-    image: ghcr.io/maslennikov-ig/mc-2/api:latest
+    image: ghcr.io/maslennikov-ig/MC-2/api:latest
     container_name: megacampus-api
     restart: unless-stopped
     ports:
@@ -182,7 +182,7 @@ services:
 
   # BullMQ Worker for background jobs
   worker:
-    image: ghcr.io/maslennikov-ig/mc-2/api:latest
+    image: ghcr.io/maslennikov-ig/MC-2/api:latest
     container_name: megacampus-worker
     restart: unless-stopped
     command: ["tsx", "dist/orchestrator/worker-entrypoint.js"]
