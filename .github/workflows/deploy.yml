@@ -182,6 +182,7 @@ jobs:
         run: |
           scp -i ~/.ssh/deploy_key \
             docker-compose.production.yml \
+            nginx-docling-proxy.conf \
             ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }}:${{ env.DEPLOY_PATH }}/
 
           scp -i ~/.ssh/deploy_key \

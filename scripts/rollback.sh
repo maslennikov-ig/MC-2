@@ -105,16 +105,18 @@ cat "${LATEST_BACKUP}"
 log_step "Stopping current containers..."
 docker compose -f "${COMPOSE_FILE}" down
 
-# Pull previous images
-log_step "Pulling previous images..."
-log_warn "Note: This assumes previous images are still available in the registry"
+# Rollback strategy: use locally cached images
+# We don't try to pull during rollback as GITHUB_TOKEN may not be available
+log_step "Starting services with cached images..."
+log_warn "Using locally cached images (not pulling from registry)"
 
-# Try to pull the 'previous' tag or the second most recent tag
-docker compose -f "${COMPOSE_FILE}" pull || log_warn "Some images may not be available"
-
-# Start services with previous images
-log_step "Starting services with previous version..."
-docker compose -f "${COMPOSE_FILE}" up -d
+# Try to start services with existing local images
+# If images don't exist locally, this will fail and that's expected
+docker compose -f "${COMPOSE_FILE}" up -d --no-pull || {
+    log_error "Failed to start services with local images"
+    log_error "Manual intervention required: docker compose up -d"
+    exit 1
+}
 
 # Wait for services to start
 log_info "Waiting for services to initialize..."

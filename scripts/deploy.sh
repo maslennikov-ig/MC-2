@@ -120,9 +120,11 @@ else
     log_warn "GITHUB_TOKEN not set, assuming already logged in"
 fi
 
-# Pull latest images (all images should be in ghcr.io now)
+# Pull latest images (skip docling-mcp - built manually, too large for CI)
 log_step "Pulling latest Docker images..."
-docker compose -f "${COMPOSE_FILE}" pull || error_exit "Failed to pull images"
+# Pull specific services, excluding docling-mcp which has pull_policy: if_not_present
+docker compose -f "${COMPOSE_FILE}" pull redis web api || error_exit "Failed to pull images"
+log_info "Skipping docling-mcp pull (built manually on server)"
 
 # Check if any services are running
 if docker compose -f "${COMPOSE_FILE}" ps --quiet | grep -q .; then
