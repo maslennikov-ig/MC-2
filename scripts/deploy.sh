@@ -102,7 +102,12 @@ backup_state
 if [ -d ".git" ]; then
     log_step "Pulling latest code from git..."
     git fetch origin
-    git reset --hard origin/main
+
+    # Detect current branch
+    CURRENT_BRANCH=$(git rev-parse --abbrev-ref HEAD)
+    log_info "Current branch: ${CURRENT_BRANCH}"
+
+    git reset --hard origin/${CURRENT_BRANCH}
 else
     log_warn "Not a git repository, skipping git pull"
 fi
