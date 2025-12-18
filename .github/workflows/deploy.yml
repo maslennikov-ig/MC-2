@@ -321,31 +321,21 @@ jobs:
 
     steps:
       - name: Send Telegram notification
+        env:
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+          DEPLOY_RESULT: ${{ needs.deploy.result }}
+          COMMIT_SHA: ${{ github.sha }}
+          ACTOR: ${{ github.actor }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          if [ "${{ needs.deploy.result }}" == "success" ]; then
-            STATUS="✅ SUCCESS"
-            MESSAGE="🚀 *MegaCampus Deploy*
-
-${STATUS}
-
-📦 Commit: \`${{ github.sha }}\`
-👤 Author: ${{ github.actor }}
-🔗 [View on GitHub](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
-
-🌐 https://ai.megacampus.ru"
+          if [ "$DEPLOY_RESULT" == "success" ]; then
+            MESSAGE="🚀 *MegaCampus Deploy*%0A%0A✅ SUCCESS%0A%0A📦 Commit: \`${COMMIT_SHA:0:7}\`%0A👤 Author: $ACTOR%0A🔗 [View on GitHub]($RUN_URL)%0A%0A🌐 https://ai.megacampus.ru"
           else
-            STATUS="❌ FAILED"
-            MESSAGE="🚀 *MegaCampus Deploy*
-
-${STATUS}
-
-📦 Commit: \`${{ github.sha }}\`
-👤 Author: ${{ github.actor }}
-🔗 [View logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
+            MESSAGE="🚀 *MegaCampus Deploy*%0A%0A❌ FAILED%0A%0A📦 Commit: \`${COMMIT_SHA:0:7}\`%0A👤 Author: $ACTOR%0A🔗 [View logs]($RUN_URL)"
           fi
-
-          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
-            -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
-            -d parse_mode="Markdown" \
-            -d disable_web_page_preview="true" \
-            -d text="$MESSAGE"
+          curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
+            -d "chat_id=${TELEGRAM_CHAT_ID}" \
+            -d "parse_mode=Markdown" \
+            -d "disable_web_page_preview=true" \
+            -d "text=${MESSAGE}"
