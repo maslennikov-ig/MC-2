@@ -312,22 +312,40 @@ jobs:
           echo "Deployment failed! Rollback executed."
           echo "Check logs at: ${{ env.DEPLOY_HOST }}:${{ env.DEPLOY_PATH }}"
 
-  # Job 5: Notification
+  # Job 5: Telegram Notification
   notify:
-    name: Send Notification
+    name: Send Telegram Notification
     runs-on: ubuntu-latest
     needs: [deploy]
     if: always()
 
     steps:
-      - name: Deployment status
+      - name: Send Telegram notification
         run: |
           if [ "${{ needs.deploy.result }}" == "success" ]; then
-            echo "Deployment to production completed successfully!"
-            echo "URL: https://ai.megacampus.ru"
-            echo "Commit: ${{ github.sha }}"
-            echo "Deployed by: ${{ github.actor }}"
+            STATUS="✅ SUCCESS"
+            MESSAGE="🚀 *MegaCampus Deploy*
+
+${STATUS}
+
+📦 Commit: \`${{ github.sha }}\`
+👤 Author: ${{ github.actor }}
+🔗 [View on GitHub](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})
+
+🌐 https://ai.megacampus.ru"
           else
-            echo "Deployment failed! Check logs for details."
-            exit 1
+            STATUS="❌ FAILED"
+            MESSAGE="🚀 *MegaCampus Deploy*
+
+${STATUS}
+
+📦 Commit: \`${{ github.sha }}\`
+👤 Author: ${{ github.actor }}
+🔗 [View logs](${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }})"
           fi
+
+          curl -s -X POST "https://api.telegram.org/bot${{ secrets.TELEGRAM_BOT_TOKEN }}/sendMessage" \
+            -d chat_id="${{ secrets.TELEGRAM_CHAT_ID }}" \
+            -d parse_mode="Markdown" \
+            -d disable_web_page_preview="true" \
+            -d text="$MESSAGE"
