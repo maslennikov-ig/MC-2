@@ -38,7 +38,7 @@ services:
   # Docling MCP Server for document processing (internal - behind nginx proxy)
   # NOTE: Image built manually on server (too large for GitHub Actions)
   docling-mcp-internal:
-    image: ghcr.io/maslennikov-ig/mc-2/docling-mcp:latest
+    image: ghcr.io/maslennikov-ig/megacampusai/docling-mcp:latest
     container_name: megacampus-docling-mcp-internal
     restart: unless-stopped
     # No external ports - only accessible via nginx proxy
