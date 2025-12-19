@@ -9,6 +9,7 @@ RUN corepack enable pnpm
 # Copy workspace configuration and all package.json files for monorepo
 COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 COPY packages/shared-types/package.json ./packages/shared-types/
+COPY packages/shared-logger/package.json ./packages/shared-logger/
 COPY packages/course-gen-platform/package.json ./packages/course-gen-platform/
 COPY packages/trpc-client-sdk/package.json ./packages/trpc-client-sdk/
 COPY packages/web/package.json ./packages/web/
@@ -26,6 +27,7 @@ RUN corepack enable pnpm
 # Copy all node_modules from deps stage (includes workspace packages)
 COPY --from=deps /app/node_modules ./node_modules
 COPY --from=deps /app/packages/shared-types/node_modules ./packages/shared-types/node_modules
+COPY --from=deps /app/packages/shared-logger/node_modules ./packages/shared-logger/node_modules
 COPY --from=deps /app/packages/course-gen-platform/node_modules ./packages/course-gen-platform/node_modules
 COPY --from=deps /app/packages/trpc-client-sdk/node_modules ./packages/trpc-client-sdk/node_modules
 COPY --from=deps /app/packages/web/node_modules ./packages/web/node_modules
@@ -40,6 +42,7 @@ RUN rm -rf tests __tests__ scripts/test-* **/*.test.* **/*.spec.*
 # Also clean workspace package dist directories to ensure fresh builds
 RUN rm -rf packages/web/.next node_modules/.cache tsconfig.tsbuildinfo
 RUN rm -rf packages/shared-types/dist packages/shared-types/tsconfig.tsbuildinfo
+RUN rm -rf packages/shared-logger/dist packages/shared-logger/tsconfig.tsbuildinfo
 RUN rm -rf packages/course-gen-platform/dist packages/course-gen-platform/tsconfig.tsbuildinfo
 RUN rm -rf packages/trpc-client-sdk/dist packages/trpc-client-sdk/tsconfig.tsbuildinfo
 
@@ -56,8 +59,9 @@ ENV NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
 ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
 ENV SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
 ENV SUPABASE_JWT_SECRET=${SUPABASE_JWT_SECRET}
-# Build shared-types first (other packages depend on it)
+# Build shared packages first (other packages depend on them)
 RUN pnpm --filter @megacampus/shared-types build
+RUN pnpm --filter @megacampus/shared-logger build
 # Build all remaining packages
 RUN pnpm build
 
