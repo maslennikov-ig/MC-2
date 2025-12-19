@@ -105,10 +105,13 @@ jobs:
       - name: Clean build artifacts
         run: |
           rm -rf packages/shared-types/dist
+          rm -rf packages/shared-logger/dist
           rm -f packages/*/tsconfig.tsbuildinfo
 
-      - name: Build shared-types
-        run: pnpm --filter @megacampus/shared-types build
+      - name: Build shared packages
+        run: |
+          pnpm --filter @megacampus/shared-types build
+          pnpm --filter @megacampus/shared-logger build
 
       - name: Run type check
         run: pnpm type-check
@@ -141,12 +144,15 @@ jobs:
       - name: Clean build artifacts
         run: |
           rm -rf packages/shared-types/dist
+          rm -rf packages/shared-logger/dist
           rm -rf packages/course-gen-platform/dist
           rm -rf packages/trpc-client-sdk/dist
           rm -f packages/*/tsconfig.tsbuildinfo
 
-      - name: Build shared-types
-        run: pnpm --filter @megacampus/shared-types build
+      - name: Build shared packages
+        run: |
+          pnpm --filter @megacampus/shared-types build
+          pnpm --filter @megacampus/shared-logger build
 
       - name: Build course-gen-platform
         run: pnpm --filter @megacampus/course-gen-platform build
@@ -194,8 +200,10 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Build shared-types
-        run: pnpm --filter @megacampus/shared-types build
+      - name: Build shared packages
+        run: |
+          pnpm --filter @megacampus/shared-types build
+          pnpm --filter @megacampus/shared-logger build
 
       - name: Run tests
         run: pnpm test
