@@ -186,6 +186,9 @@ services:
     container_name: megacampus-worker
     restart: unless-stopped
     command: ["tsx", "dist/orchestrator/worker-entrypoint.js"]
+    # Worker doesn't expose HTTP - disable healthcheck inherited from api image
+    healthcheck:
+      disable: true
     env_file:
       - .env.production
     environment:
