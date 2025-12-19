@@ -12,12 +12,15 @@
 import { getModelForPhase } from '@/shared/llm/langchain-models';
 import { trackPhaseExecution } from './observability';
 import type { ResearchFlag } from '@megacampus/shared-types/analysis-result';
+import { estimateTokenCount } from '@megacampus/shared-types';
 import { z } from 'zod';
 
 export interface ResearchFlagInput {
   topic: string;
   course_category: string;
   document_summaries?: string[];
+  /** Language for dynamic tier selection (ru, en, or undefined for 'any' fallback) */
+  language?: string;
 }
 
 /**
@@ -142,9 +145,15 @@ export async function detectResearchFlags(
   input: ResearchFlagInput,
   course_id: string = 'standalone'
 ): Promise<ResearchFlag[]> {
-  // Use 120B model for expert-level judgment
-  const model = await getModelForPhase('stage_4_expert', course_id);
-  const modelId = 'openai/gpt-oss-120b';
+  // Estimate token count from document summaries for dynamic tier selection
+  const estimatedTokenCount = input.document_summaries
+    ? estimateTokenCount(input.document_summaries, input.language)
+    : 0;
+
+  // Use 120B model for expert-level judgment (with dynamic tier selection)
+  // Language is passed to service which handles 'any' fallback for unknown languages
+  const model = await getModelForPhase('stage_4_expert', course_id, estimatedTokenCount, input.language);
+  const modelId = model.model || 'openai/gpt-oss-120b'; // Get modelId from ChatOpenAI instance
 
   // Build prompt
   const prompt = buildResearchFlagPrompt(input);

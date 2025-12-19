@@ -1,9 +1,11 @@
-import React from 'react';
-import { ArrowLeft, Shield, Sun, Moon, Maximize, Minimize } from 'lucide-react';
+import React, { useState, useCallback } from 'react';
+import { ArrowLeft, Shield, Sun, Moon, Maximize, Minimize, Hash, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import Link from 'next/link';
 import { StatsBar } from './StatsBar';
 import { useTheme } from 'next-themes';
+import { toast } from 'sonner';
 
 interface GraphHeaderProps {
     title: string;
@@ -14,10 +16,21 @@ interface GraphHeaderProps {
     isDark?: boolean;
     isFullscreen?: boolean;
     onToggleFullscreen?: () => void;
+    /** Human-readable generation code (e.g., "ABC-1234") for debugging */
+    generationCode?: string | null;
 }
 
-export const GraphHeader = ({ title, progress, isAdmin, onOpenAdminPanel, isDark, isFullscreen, onToggleFullscreen }: GraphHeaderProps) => {
+export const GraphHeader = ({ title, progress, isAdmin, onOpenAdminPanel, isDark, isFullscreen, onToggleFullscreen, generationCode }: GraphHeaderProps) => {
     const { setTheme } = useTheme();
+    const [copied, setCopied] = useState(false);
+
+    const handleCopyCode = useCallback(() => {
+        if (!generationCode) return;
+        navigator.clipboard.writeText(generationCode);
+        setCopied(true);
+        toast.success('Код генерации скопирован');
+        setTimeout(() => setCopied(false), 2000);
+    }, [generationCode]);
 
     return (
         <div className={`px-4 py-3 flex items-center justify-between shadow-sm relative z-20 border-b ${
@@ -49,6 +62,27 @@ export const GraphHeader = ({ title, progress, isAdmin, onOpenAdminPanel, isDark
                 </div>
             </div>
             <div className="flex items-center gap-2">
+                {/* Generation Code */}
+                {generationCode && (
+                    <TooltipProvider delayDuration={200}>
+                        <Tooltip>
+                            <TooltipTrigger asChild>
+                                <Button
+                                    variant="ghost"
+                                    size="icon"
+                                    onClick={handleCopyCode}
+                                    className={`${isDark ? 'text-slate-400 hover:text-cyan-400' : 'text-slate-500 hover:text-cyan-600'} transition-colors`}
+                                >
+                                    {copied ? <Check size={18} className="text-green-500" /> : <Hash size={18} />}
+                                </Button>
+                            </TooltipTrigger>
+                            <TooltipContent side="bottom" className="flex flex-col items-center gap-1">
+                                <span className="font-mono font-semibold">{generationCode}</span>
+                                <span className="text-xs opacity-70">Нажмите для копирования</span>
+                            </TooltipContent>
+                        </Tooltip>
+                    </TooltipProvider>
+                )}
                 <StatsBar progress={progress} isDark={isDark} />
                 {/* Fullscreen Toggle */}
                 {onToggleFullscreen && (

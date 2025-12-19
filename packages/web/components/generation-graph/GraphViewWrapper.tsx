@@ -32,6 +32,8 @@ export interface GraphViewWrapperProps {
    * Ensures consistency with CelestialHeader progress display.
    */
   progressPercentage?: number;
+  /** Human-readable generation code (e.g., "ABC-1234") for debugging */
+  generationCode?: string | null;
 }
 
 /**
@@ -48,8 +50,8 @@ export interface GraphViewWrapperProps {
  *   return <GraphViewWrapper courseId="123" courseTitle="My Course" />;
  * }
  */
-export function GraphViewWrapper({ courseId, courseTitle, hasDocuments, failedAtStage, progressPercentage }: GraphViewWrapperProps) {
-  return <GraphViewDynamic courseId={courseId} courseTitle={courseTitle} hasDocuments={hasDocuments} failedAtStage={failedAtStage} progressPercentage={progressPercentage} />;
+export function GraphViewWrapper({ courseId, courseTitle, hasDocuments, failedAtStage, progressPercentage, generationCode }: GraphViewWrapperProps) {
+  return <GraphViewDynamic courseId={courseId} courseTitle={courseTitle} hasDocuments={hasDocuments} failedAtStage={failedAtStage} progressPercentage={progressPercentage} generationCode={generationCode} />;
 }
 
 // Default export for dynamic import compatibility

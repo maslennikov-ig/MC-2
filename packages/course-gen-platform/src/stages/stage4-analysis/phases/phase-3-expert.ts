@@ -20,6 +20,7 @@ import { getModelForPhase } from '@/shared/llm/langchain-models';
 import { trackPhaseExecution, storeTraceData } from '../utils/observability';
 import { detectResearchFlags } from '../utils/research-flag-detector';
 import type { Phase3Output, Phase1Output, Phase2Output } from '@megacampus/shared-types/analysis-result';
+import { estimateTokenCount } from '@megacampus/shared-types';
 import { z } from 'zod';
 import { UnifiedRegenerator } from '@/shared/regeneration';
 import { zodToPromptSchema } from '@/shared/utils/zod-to-prompt-schema';
@@ -224,12 +225,20 @@ Respond ONLY with valid JSON (no markdown, no code blocks, no explanations):
 }
 
 export async function runPhase3Expert(input: Phase3Input): Promise<Phase3Output> {
-  const { course_id, topic, document_summaries, phase1_output } = input;
+  const { course_id, topic, document_summaries, phase1_output, language } = input;
   let totalDurationMs = 0;
   let totalInputTokens = 0;
   let totalOutputTokens = 0;
-  const model = await getModelForPhase('stage_4_expert', course_id);
-  const modelId = 'openai/gpt-oss-120b';
+
+  // Estimate token count from document summaries for dynamic tier selection
+  // Phase 3 receives raw summary strings - use character-based estimation
+  // (Phase 4 uses accurate summary_metadata.summary_tokens when available)
+  const estimatedTokenCount = document_summaries
+    ? estimateTokenCount(document_summaries, language)
+    : 0;
+
+  const model = await getModelForPhase('stage_4_expert', course_id, estimatedTokenCount, language);
+  const modelId = model.model || 'openai/gpt-oss-120b'; // Get modelId from ChatOpenAI instance
   const prompt = buildPhase3Prompt(input);
   const mainPhaseStartTime = Date.now();
   const mainPhaseOutput = await trackPhaseExecution(
@@ -310,7 +319,12 @@ export async function runPhase3Expert(input: Phase3Input): Promise<Phase3Output>
   );
   totalDurationMs += Date.now() - mainPhaseStartTime;
   const research_flags = await detectResearchFlags(
-    { topic, course_category: phase1_output.course_category.primary, document_summaries: document_summaries || undefined },
+    {
+      topic,
+      course_category: phase1_output.course_category.primary,
+      document_summaries: document_summaries || undefined,
+      language: (language === 'ru' || language === 'en') ? language : undefined,
+    },
     course_id
   );
   const phase3Output: Phase3Output = {

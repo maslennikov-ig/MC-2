@@ -2,6 +2,63 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAdminClient } from '@/lib/supabase/client-factory'
 import { logger } from '@/lib/logger'
 import { withDevBypass, withAuth, AuthUser } from '@/lib/auth'
+import { createClient } from '@/lib/supabase/server'
+
+/**
+ * Calls the tRPC cleanup endpoint to clean up external resources
+ * (Qdrant vectors, Redis, RAG context, files) before database deletion
+ */
+async function cleanupCourseResources(courseId: string, accessToken: string): Promise<{
+  success: boolean;
+  vectorsDeleted?: number;
+  filesDeleted?: number;
+  errors?: string[];
+}> {
+  const backendUrl = process.env.COURSEGEN_BACKEND_URL || 'http://localhost:3456';
+  const tRPCUrl = `${backendUrl}/trpc`;
+
+  try {
+    const response = await fetch(`${tRPCUrl}/generation.cleanupCourse`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        Authorization: `Bearer ${accessToken}`,
+      },
+      body: JSON.stringify({ courseId }),
+    });
+
+    const data = await response.json();
+
+    if (!response.ok) {
+      logger.warn('Cleanup tRPC call failed', {
+        courseId,
+        status: response.status,
+        error: data,
+      });
+      return {
+        success: false,
+        errors: [data.error?.message || 'Cleanup request failed'],
+      };
+    }
+
+    const result = data.result?.data;
+    return {
+      success: result?.success ?? false,
+      vectorsDeleted: result?.qdrant?.vectorsDeleted,
+      filesDeleted: result?.files?.filesDeleted,
+      errors: result?.errors,
+    };
+  } catch (error) {
+    logger.error('Failed to call cleanup endpoint:', {
+      courseId,
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return {
+      success: false,
+      errors: [error instanceof Error ? error.message : 'Unknown cleanup error'],
+    };
+  }
+}
 
 async function handleDeleteCourse(
   _request: NextRequest,
@@ -10,10 +67,10 @@ async function handleDeleteCourse(
 ) {
   const { slug } = await params
   logger.devLog('DELETE course request:', { slug, user })
-  
+
   // Use admin client for server-side operations
   const supabase = getAdminClient()
-  
+
   // First get the course and check ownership
   const { data: courseData, error: fetchError } = await supabase
     .from('courses')
@@ -62,17 +119,51 @@ async function handleDeleteCourse(
     )
   }
   
-  logger.devLog('Ownership check passed:', { 
-    isDevelopmentBypass, 
-    isSuperAdmin, 
-    isNoOwnerCourse, 
+  logger.devLog('Ownership check passed:', {
+    isDevelopmentBypass,
+    isSuperAdmin,
+    isNoOwnerCourse,
     isOwner,
-    userRole: user.role 
+    userRole: user.role
   })
-  
+
   const id = courseData.id
   logger.devLog('DELETE request for course:', slug, 'id:', id, 'by user:', user.email)
-  
+
+  // Step 1: Clean up external resources BEFORE database deletion
+  // Get user's access token for tRPC call
+  const userSupabase = await createClient()
+  const { data: sessionData } = await userSupabase.auth.getSession()
+  const accessToken = sessionData.session?.access_token
+
+  if (accessToken) {
+    try {
+      const cleanupResult = await cleanupCourseResources(id, accessToken)
+
+      if (!cleanupResult.success) {
+        logger.warn('Some cleanup operations failed, proceeding with deletion', {
+          courseId: id,
+          errors: cleanupResult.errors,
+        })
+      } else {
+        logger.info('Course cleanup completed successfully', {
+          courseId: id,
+          vectorsDeleted: cleanupResult.vectorsDeleted,
+          filesDeleted: cleanupResult.filesDeleted,
+        })
+      }
+    } catch (cleanupError) {
+      // Log but don't block deletion - cleanup is best-effort
+      logger.error('Course cleanup failed, proceeding with deletion:', {
+        courseId: id,
+        error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
+      })
+    }
+  } else {
+    logger.warn('No access token available for cleanup, skipping external resource cleanup', { courseId: id })
+  }
+
+  // Step 2: Delete database records
   try {
     // Delete in correct order to avoid foreign key constraint violations
     // Note: Tests/questions tables will be added in future database schema updates

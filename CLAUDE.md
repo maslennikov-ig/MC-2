@@ -180,6 +180,12 @@ Reasons NOT to unify:
 
 ---
 
+## Server Access
+
+Production server SSH available. See `.claude/local.md` for IP and details (gitignored).
+
+---
+
 ## Reference Docs
 
 - Agent orchestration: `docs/Agents Ecosystem/AGENT-ORCHESTRATION.md`

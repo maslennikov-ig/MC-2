@@ -13,6 +13,7 @@ interface AdminMessages {
     navigation?: {
       generations?: string;
       history?: string;
+      users?: string;
       pipeline?: string;
     };
   };
@@ -71,9 +72,14 @@ export default async function AdminLayout({
                   {messages.admin?.navigation?.history || 'History'}
                 </Link>
                 {role === 'superadmin' && (
-                  <Link className="admin-nav-link admin-nav-link-active px-3 py-2 rounded-md" href="/admin/pipeline">
-                    {messages.admin?.navigation?.pipeline || 'Pipeline'}
-                  </Link>
+                  <>
+                    <Link className="admin-nav-link px-3 py-2 rounded-md" href="/admin/users">
+                      {messages.admin?.navigation?.users || 'Users'}
+                    </Link>
+                    <Link className="admin-nav-link admin-nav-link-active px-3 py-2 rounded-md" href="/admin/pipeline">
+                      {messages.admin?.navigation?.pipeline || 'Pipeline'}
+                    </Link>
+                  </>
                 )}
               </nav>
             </div>

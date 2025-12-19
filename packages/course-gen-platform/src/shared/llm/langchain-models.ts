@@ -275,13 +275,22 @@ export async function createOpenRouterModelAsync(
  */
 export async function getModelForPhase(
   phase: PhaseName,
-  courseId?: string
+  courseId?: string,
+  tokenCount?: number,
+  language?: string  // Supports 'ru', 'en', or any other (uses 'any' reserve settings as fallback)
 ): Promise<ChatOpenAI> {
   try {
-    const config = await modelConfigService.getModelForPhase(phase, courseId);
+    const config = await modelConfigService.getModelForPhase(phase, courseId, tokenCount, language);
 
     if (config.source === 'database') {
-      logger.info({ phase, modelId: config.modelId, source: 'database' }, 'Using database model config');
+      logger.info({
+        phase,
+        modelId: config.modelId,
+        tier: config.tier,
+        tokenCount,
+        language,
+        source: 'database'
+      }, 'Using database model config');
     } else {
       logger.info({ phase, modelId: config.modelId, source: 'hardcoded' }, 'Using hardcoded fallback model config');
     }

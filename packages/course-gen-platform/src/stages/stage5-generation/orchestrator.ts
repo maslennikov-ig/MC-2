@@ -400,6 +400,7 @@ export class GenerationOrchestrator {
         stepName: 'generate_course_metadata',
         inputData: {},
         outputData: { metadata: finalState.metadata },
+        modelUsed: finalState.modelUsed.metadata || null,
         durationMs: finalState.phaseDurations.generate_metadata || 0
       });
     }
@@ -411,6 +412,7 @@ export class GenerationOrchestrator {
       stepName: 'generate_sections_batch',
       inputData: {},
       outputData: { sectionsCount: finalState.sections.length },
+      modelUsed: finalState.modelUsed.sections || null,
       durationMs: finalState.phaseDurations.generate_sections || 0
     });
 
@@ -421,6 +423,7 @@ export class GenerationOrchestrator {
       stepName: 'quality_check',
       inputData: {},
       outputData: { qualityScores: finalState.qualityScores },
+      modelUsed: finalState.modelUsed.validation || null,
       durationMs: finalState.phaseDurations.validate_quality || 0
     });
 

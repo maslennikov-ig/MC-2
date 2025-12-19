@@ -147,6 +147,7 @@ export default async function CourseGeneratingPage({ params }: PageProps) {
           redirectDelay={3000}
           userRole={userRole}
           failedAtStage={course.failed_at_stage}
+          generationCode={course.generation_code}
         />
       </GenerationRealtimeProvider>
     </GenerationErrorBoundary>

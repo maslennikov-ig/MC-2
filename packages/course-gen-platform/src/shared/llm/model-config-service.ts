@@ -79,12 +79,16 @@ export interface PhaseModelConfig {
   temperature: number;
   /** Max output tokens */
   maxTokens: number;
+  /** Max context tokens for the model (used for dynamic threshold calculation) */
+  maxContextTokens: number | null;
   /** Quality threshold for phase validation (0-1). NULL uses hardcoded default. */
   qualityThreshold: number | null;
   /** Maximum retry attempts for phase (0-10). Default 3. */
   maxRetries: number;
   /** Phase timeout in milliseconds. NULL means no timeout (infinite). */
   timeoutMs: number | null;
+  /** Context tier used (standard or extended) */
+  tier: 'standard' | 'extended';
   /** Source of configuration */
   source: 'database' | 'hardcoded';
 }
@@ -265,11 +269,31 @@ class StaleWhileRevalidateCache<T> {
 // SERVICE IMPLEMENTATION
 // ============================================================================
 
+/**
+ * Normalize language code for reserve percent lookup
+ *
+ * - Known languages ('ru', 'en') use their specific reserves
+ * - Unknown languages fallback to 'any' reserve settings
+ * - Undefined language defaults to 'en' (English)
+ *
+ * @param language - Language code or undefined
+ * @returns Normalized language code for database lookup
+ */
+function normalizeLanguageForReserve(language: string | undefined): string {
+  if (!language) return 'en'; // Default fallback to English
+  if (language === 'ru' || language === 'en') return language;
+  return 'any'; // Unknown language uses 'any' reserve
+}
+
 class ModelConfigServiceImpl {
   private stageCache = new StaleWhileRevalidateCache<ModelConfigResult>();
   private phaseCache = new StaleWhileRevalidateCache<PhaseModelConfig>();
   private judgeCache = new StaleWhileRevalidateCache<JudgeModelsResult>();
-  private reserveSettingsCache = new StaleWhileRevalidateCache<Map<string, number>>();
+  // Reserve settings change rarely (admin action only) - use longer TTL
+  private reserveSettingsCache = new StaleWhileRevalidateCache<Map<string, number>>(
+    30 * 60 * 1000, // 30 minutes fresh TTL (vs 5 min for configs)
+    24 * 60 * 60 * 1000 // 24 hours max age
+  );
 
   /**
    * Get model configuration for stage-based routing (Stages 3-6)
@@ -352,47 +376,105 @@ class ModelConfigServiceImpl {
    *
    * @param phaseName - Phase name (e.g., 'stage_4_classification')
    * @param courseId - Optional course ID for course-specific overrides
+   * @param tokenCount - Optional token count for tier selection. If provided, selects
+   *                     'extended' tier when > STAGE4_CONTEXT_THRESHOLD (260K), otherwise 'standard'.
+   *                     If not provided, defaults to 'standard' tier.
    * @returns Phase model configuration
    * @throws Error if database unavailable and no cached data exists
    */
-  async getModelForPhase(phaseName: string, courseId?: string): Promise<PhaseModelConfig> {
-    const cacheKey = `phase:${phaseName}:${courseId || 'global'}`;
+  async getModelForPhase(
+    phaseName: string,
+    courseId?: string,
+    tokenCount?: number,
+    language?: string  // Supports 'ru', 'en', or any other language (falls back to 'any' for reserve calculation)
+  ): Promise<PhaseModelConfig> {
+    // Step 0: Determine tier using dynamic threshold calculation
+    // First, we need to get the standard tier config to know the primary model's max_context
+    // Then calculate dynamic threshold: max_context * (1 - reserve_percent)
+    let tier: 'standard' | 'extended' = 'standard';
+
+    if (tokenCount !== undefined) {
+      // Parallel fetch both tiers to avoid N+1 query
+      const [standardConfig, extendedConfig] = await Promise.all([
+        this.fetchPhaseConfigFromDb(phaseName, courseId, 'standard'),
+        this.fetchPhaseConfigFromDb(phaseName, courseId, 'extended'),
+      ]);
+
+      if (standardConfig && standardConfig.maxContextTokens !== null && standardConfig.maxContextTokens > 0) {
+        // Calculate dynamic threshold using language-specific reserve
+        const lang = normalizeLanguageForReserve(language);
+        const dynamicThreshold = await this.calculateDynamicThreshold(
+          standardConfig.maxContextTokens,
+          lang
+        );
+
+        tier = tokenCount > dynamicThreshold ? 'extended' : 'standard';
+
+        logger.debug({
+          phaseName,
+          tokenCount,
+          language: lang,
+          maxContext: standardConfig.maxContextTokens,
+          dynamicThreshold,
+          selectedTier: tier,
+        }, 'Dynamic tier determination for phase');
+
+        // Use pre-fetched config - avoid second DB query
+        const selectedConfig = tier === 'extended' ? extendedConfig : standardConfig;
+        if (selectedConfig) {
+          const cacheKey = `phase:${phaseName}:${courseId || 'global'}:${tier}`;
+          this.phaseCache.set(cacheKey, selectedConfig);
+          return selectedConfig;
+        }
+      } else {
+        // Fallback to hardcoded threshold if no standard config found
+        tier = tokenCount > STAGE4_CONTEXT_THRESHOLD ? 'extended' : 'standard';
+        logger.warn({
+          phaseName,
+          tokenCount,
+          fallbackThreshold: STAGE4_CONTEXT_THRESHOLD,
+          selectedTier: tier,
+        }, 'Using hardcoded threshold fallback - no standard tier config found');
+      }
+    }
+
+    const cacheKey = `phase:${phaseName}:${courseId || 'global'}:${tier}`;
 
     // Step 1: Check cache - return fresh data immediately
     const cached = this.phaseCache.get(cacheKey);
     if (cached && !cached.isStale) {
-      logger.debug({ cacheKey, age: cached.age }, 'Phase config cache hit (fresh)');
+      logger.debug({ cacheKey, age: cached.age, tier }, 'Phase config cache hit (fresh)');
       return cached.data;
     }
 
     // Step 2: Try database lookup
     try {
-      const dbConfig = await this.fetchPhaseConfigFromDb(phaseName, courseId);
+      const dbConfig = await this.fetchPhaseConfigFromDb(phaseName, courseId, tier);
       if (dbConfig) {
         logger.info(
-          { phaseName, courseId, modelId: dbConfig.modelId, source: 'database' },
+          { phaseName, courseId, tier, tokenCount, modelId: dbConfig.modelId, source: 'database' },
           'Using fresh database phase config'
         );
         this.phaseCache.set(cacheKey, dbConfig);
         return dbConfig;
       }
     } catch (err) {
-      logger.error({ phaseName, courseId, error: err }, 'Database phase lookup failed');
+      logger.error({ phaseName, courseId, tier, error: err }, 'Database phase lookup failed');
     }
 
     // Step 3: Use stale cache if available
     if (cached) {
       const ageMinutes = Math.round(cached.age / 60000);
       logger.warn(
-        { phaseName, courseId, ageMinutes, modelId: cached.data.modelId },
+        { phaseName, courseId, tier, ageMinutes, modelId: cached.data.modelId },
         'Using STALE phase config due to database error - DATA MAY BE OUTDATED'
       );
       return cached.data;
     }
 
     // Step 4: No cache, no database - explicit failure
-    const errorMsg = `Cannot get phase config for "${phaseName}"${courseId ? ` (course: ${courseId})` : ''}: database unavailable and no cached data`;
-    logger.fatal({ phaseName, courseId }, errorMsg);
+    const errorMsg = `Cannot get phase config for "${phaseName}"${courseId ? ` (course: ${courseId})` : ''} tier "${tier}": database unavailable and no cached data`;
+    logger.fatal({ phaseName, courseId, tier }, errorMsg);
     throw new Error(errorMsg);
   }
 
@@ -738,18 +820,20 @@ class ModelConfigServiceImpl {
 
   private async fetchPhaseConfigFromDb(
     phaseName: string,
-    courseId?: string
+    courseId?: string,
+    tier: 'standard' | 'extended' = 'standard'
   ): Promise<PhaseModelConfig | null> {
     const supabase = getSupabaseAdmin();
 
-    // Priority 1: Course-specific override
+    // Priority 1: Course-specific override (with tier filter)
     if (courseId) {
       const { data: courseOverride } = await supabase
         .from('llm_model_config')
-        .select('model_id, fallback_model_id, temperature, max_tokens, quality_threshold, max_retries, timeout_ms')
+        .select('model_id, fallback_model_id, temperature, max_tokens, max_context_tokens, quality_threshold, max_retries, timeout_ms, context_tier')
         .eq('config_type', 'course_override')
         .eq('course_id', courseId)
         .eq('phase_name', phaseName)
+        .eq('context_tier', tier)
         .eq('is_active', true)
         .maybeSingle();
 
@@ -759,25 +843,28 @@ class ModelConfigServiceImpl {
           fallbackModelId: courseOverride.fallback_model_id || null,
           temperature: courseOverride.temperature || 0.7,
           maxTokens: courseOverride.max_tokens || 4096,
+          maxContextTokens: courseOverride.max_context_tokens || null,
           qualityThreshold: courseOverride.quality_threshold,
           maxRetries: courseOverride.max_retries ?? 3,
           timeoutMs: courseOverride.timeout_ms,
+          tier: (courseOverride.context_tier as 'standard' | 'extended') || tier,
           source: 'database',
         };
       }
     }
 
-    // Priority 2: Global default configuration
+    // Priority 2: Global default configuration (with tier filter)
     const { data: globalConfig, error } = await supabase
       .from('llm_model_config')
-      .select('model_id, fallback_model_id, temperature, max_tokens, quality_threshold, max_retries, timeout_ms')
+      .select('model_id, fallback_model_id, temperature, max_tokens, max_context_tokens, quality_threshold, max_retries, timeout_ms, context_tier')
       .eq('config_type', 'global')
       .eq('phase_name', phaseName)
+      .eq('context_tier', tier)
       .eq('is_active', true)
       .maybeSingle();
 
     if (error) {
-      logger.warn({ phaseName, error }, 'Error fetching phase config from DB');
+      logger.warn({ phaseName, tier, error }, 'Error fetching phase config from DB');
       return null;
     }
 
@@ -790,9 +877,11 @@ class ModelConfigServiceImpl {
       fallbackModelId: globalConfig.fallback_model_id || null,
       temperature: globalConfig.temperature || 0.7,
       maxTokens: globalConfig.max_tokens || 4096,
+      maxContextTokens: globalConfig.max_context_tokens || null,
       qualityThreshold: globalConfig.quality_threshold,
       maxRetries: globalConfig.max_retries ?? 3,
       timeoutMs: globalConfig.timeout_ms,
+      tier: (globalConfig.context_tier as 'standard' | 'extended') || tier,
       source: 'database',
     };
   }

@@ -30,8 +30,17 @@ export type UserListItem = {
   role: Database['public']['Enums']['role'];
   organizationId: string;
   organizationName: string;
+  isActive: boolean;
   createdAt: string;
   updatedAt: string | null;
+};
+
+/**
+ * Response shape for listUsers endpoint with pagination support
+ */
+export type UserListResponse = {
+  users: UserListItem[];
+  totalCount: number;
 };
 
 /**

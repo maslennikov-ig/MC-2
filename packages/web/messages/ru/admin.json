@@ -3,7 +3,61 @@
   "navigation": {
     "generations": "Генерации",
     "history": "История",
+    "users": "Пользователи",
     "pipeline": "Пайплайн"
+  },
+  "users": {
+    "title": "Управление пользователями",
+    "description": "Управление учетными записями, ролями и правами доступа пользователей",
+    "table": {
+      "email": "Email",
+      "name": "Имя",
+      "organization": "Организация",
+      "role": "Роль",
+      "status": "Статус",
+      "created": "Создан",
+      "actions": "Действия",
+      "noUsers": "Пользователи не найдены"
+    },
+    "filters": {
+      "searchPlaceholder": "Поиск по email или имени...",
+      "roleLabel": "Роль",
+      "statusLabel": "Статус",
+      "allRoles": "Все роли",
+      "allStatuses": "Все статусы"
+    },
+    "roles": {
+      "student": "Студент",
+      "instructor": "Преподаватель",
+      "admin": "Администратор",
+      "superadmin": "Суперадминистратор"
+    },
+    "status": {
+      "active": "Активен",
+      "inactive": "Неактивен",
+      "you": "(Вы)"
+    },
+    "actions": {
+      "changeRole": "Изменить роль",
+      "toggleActivation": "Переключить активацию",
+      "refresh": "Обновить"
+    },
+    "pagination": {
+      "showing": "Показано {from} - {to} из {total} результатов",
+      "previous": "Назад",
+      "next": "Вперед"
+    },
+    "success": {
+      "roleUpdated": "Роль пользователя успешно обновлена",
+      "userActivated": "Пользователь успешно активирован",
+      "userDeactivated": "Пользователь успешно деактивирован"
+    },
+    "errors": {
+      "loadFailed": "Не удалось загрузить пользователей",
+      "roleUpdateFailed": "Не удалось обновить роль пользователя",
+      "activationFailed": "Не удалось изменить статус активации",
+      "cannotAssignSuperadmin": "Роль суперадминистратора не может быть назначена через UI в целях безопасности"
+    }
   },
   "pipeline": {
     "title": "Конфигурация пайплайна",

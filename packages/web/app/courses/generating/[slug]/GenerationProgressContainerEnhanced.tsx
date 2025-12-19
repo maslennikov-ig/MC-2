@@ -45,6 +45,8 @@ interface GenerationProgressContainerProps {
   redirectDelay?: number;
   userRole?: string | null;
   failedAtStage?: number | null;
+  /** Human-readable generation code (e.g., "ABC-1234") for debugging */
+  generationCode?: string | null;
 }
 
 // Session storage keys
@@ -202,6 +204,7 @@ export default function GenerationProgressContainerEnhanced({
   redirectDelay = 3000,
   userRole: _userRole = null,
   failedAtStage,
+  generationCode,
 }: GenerationProgressContainerProps) {
   const router = useRouter();
   // isDark - DISABLED: MissionControlBanner moved to GraphView
@@ -815,7 +818,7 @@ export default function GenerationProgressContainerEnhanced({
 
             {/* Celestial Journey - REPLACED by GraphView */}
             <div className="h-[700px] w-full border rounded-xl overflow-hidden shadow-xl bg-slate-50 relative z-0">
-              <GraphViewWrapper courseId={courseId} courseTitle={courseTitle} hasDocuments={state.progress?.has_documents} failedAtStage={failedAtStage} progressPercentage={state.progress?.percentage} />
+              <GraphViewWrapper courseId={courseId} courseTitle={courseTitle} hasDocuments={state.progress?.has_documents} failedAtStage={failedAtStage} progressPercentage={state.progress?.percentage} generationCode={generationCode} />
             </div>
 
             {showDebugInfo && (

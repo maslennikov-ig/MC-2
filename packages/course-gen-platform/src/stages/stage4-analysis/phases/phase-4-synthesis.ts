@@ -98,13 +98,21 @@ export async function runPhase4Synthesis(
   const startTime = Date.now();
   const documentCount = input.document_summaries?.length || 0;
 
+  // Calculate total tokens from document summaries for dynamic tier selection
+  // Phase 4 uses accurate summary_metadata.summary_tokens from Stage 3
+  // (Unlike Phase 3 which uses character-based estimation for raw strings)
+  const totalTokens = input.document_summaries?.reduce(
+    (sum, doc) => sum + (doc.summary_metadata?.summary_tokens || 0),
+    0
+  ) || 0;
+
   // Adaptive model selection based on document count
   // <3 docs → simple synthesis (20B)
   // ≥3 docs → complex synthesis (120B)
+  // Language is passed to service which handles 'any' fallback for unknown languages
   const phaseName = documentCount < 3 ? 'stage_4_synthesis' : 'stage_4_expert';
-  const model = await getModelForPhase(phaseName);
-  const modelId =
-    documentCount < 3 ? 'openai/gpt-oss-20b' : 'openai/gpt-oss-120b';
+  const model = await getModelForPhase(phaseName, input.course_id, totalTokens, input.language);
+  const modelId = model.model || (documentCount < 3 ? 'openai/gpt-oss-20b' : 'openai/gpt-oss-120b'); // Get modelId from ChatOpenAI instance
 
   // Build synthesis prompt
   const prompt = buildPhase4Prompt(input, documentCount);

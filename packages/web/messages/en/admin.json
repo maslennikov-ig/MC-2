@@ -3,7 +3,61 @@
   "navigation": {
     "generations": "Generations",
     "history": "History",
+    "users": "Users",
     "pipeline": "Pipeline"
+  },
+  "users": {
+    "title": "User Management",
+    "description": "Manage user accounts, roles, and permissions across the platform",
+    "table": {
+      "email": "Email",
+      "name": "Name",
+      "organization": "Organization",
+      "role": "Role",
+      "status": "Status",
+      "created": "Created",
+      "actions": "Actions",
+      "noUsers": "No users found"
+    },
+    "filters": {
+      "searchPlaceholder": "Search by email or name...",
+      "roleLabel": "Role",
+      "statusLabel": "Status",
+      "allRoles": "All Roles",
+      "allStatuses": "All Statuses"
+    },
+    "roles": {
+      "student": "Student",
+      "instructor": "Instructor",
+      "admin": "Admin",
+      "superadmin": "Superadmin"
+    },
+    "status": {
+      "active": "Active",
+      "inactive": "Inactive",
+      "you": "(You)"
+    },
+    "actions": {
+      "changeRole": "Change role",
+      "toggleActivation": "Toggle activation",
+      "refresh": "Refresh"
+    },
+    "pagination": {
+      "showing": "Showing {from} to {to} of {total} results",
+      "previous": "Previous",
+      "next": "Next"
+    },
+    "success": {
+      "roleUpdated": "User role updated successfully",
+      "userActivated": "User activated successfully",
+      "userDeactivated": "User deactivated successfully"
+    },
+    "errors": {
+      "loadFailed": "Failed to load users",
+      "roleUpdateFailed": "Failed to update user role",
+      "activationFailed": "Failed to toggle user activation",
+      "cannotAssignSuperadmin": "Superadmin role cannot be assigned via UI for security reasons"
+    }
   },
   "pipeline": {
     "title": "Pipeline Configuration",

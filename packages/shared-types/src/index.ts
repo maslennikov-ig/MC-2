@@ -52,3 +52,6 @@ export * from './lms';
 
 // Context Reserve Settings (Dynamic Threshold)
 export * from './context-reserve-settings';
+
+// Token Estimation Utilities
+export { estimateTokenCount, getCharsPerToken } from './token-estimation';

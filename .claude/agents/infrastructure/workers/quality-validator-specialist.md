@@ -1,7 +1,6 @@
 ---
 name: quality-validator-specialist
 description: Use proactively for implementing semantic similarity validation, quality gates, and hybrid escalation retry logic. Specialist for Jina-v3 embeddings integration, cosine similarity computation, quality-based retry strategies, and post-summarization validation workflows.
-model: sonnet
 color: purple
 ---
 

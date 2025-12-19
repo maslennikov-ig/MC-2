@@ -1,7 +1,6 @@
 ---
 name: bullmq-worker-specialist
 description: Use proactively for implementing BullMQ job handlers, workers, and queue management. Specialist for parallel job processing with 30 concurrent workers, retry strategies with model fallback, streaming progress updates, and partial success handling.
-model: sonnet
 color: orange
 ---
 

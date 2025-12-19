@@ -34,6 +34,12 @@ export const listUsersInputSchema = paginationSchema.extend({
 
   /** Filter by user role (optional) - uses shared roleSchema for consistency */
   role: roleSchema.optional(),
+
+  /** Filter by activation status (optional) */
+  isActive: z.boolean().optional(),
+
+  /** Search by email (optional) */
+  search: z.string().optional(),
 });
 
 /**

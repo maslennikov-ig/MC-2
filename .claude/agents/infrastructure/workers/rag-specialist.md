@@ -1,7 +1,6 @@
 ---
 name: rag-specialist
 description: Use proactively for RAG (Retrieval-Augmented Generation) context retrieval, caching, and vector search operations. Expert in Qdrant integration, section-level and lesson-level chunk retrieval, context caching for retry consistency, MMR search, and RAG lifecycle management.
-model: sonnet
 color: cyan
 ---
 

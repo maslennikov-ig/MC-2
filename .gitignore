@@ -45,6 +45,7 @@ coverage/
 
 # We WANT to commit shared Claude configs, but not local user settings
 .claude/settings.local.json
+.claude/local.md
 
 # Ignore generated MCP configs (specific to local paths)
 .mcp.json

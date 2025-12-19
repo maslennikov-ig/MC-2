@@ -34,6 +34,22 @@ import type {
 } from '../types/database-queries';
 
 /**
+ * UUID validation regex pattern
+ * Matches standard UUID format: xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx
+ */
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/**
+ * Validates that a string is a valid UUID format
+ *
+ * @param uuid - String to validate
+ * @returns True if valid UUID format
+ */
+function isValidUUID(uuid: string): boolean {
+  return UUID_REGEX.test(uuid);
+}
+
+/**
  * File upload metadata
  */
 export interface FileUploadMetadata {
@@ -747,6 +763,74 @@ export async function deleteVectorsForDocument(
     }, 'Failed to delete vectors for document (non-fatal, will be overwritten on upsert)');
 
     return { deleted: false };
+  }
+}
+
+/**
+ * Deletes ALL vectors for a course from Qdrant
+ *
+ * Used when deleting a course to clean up all associated vectors.
+ * This prevents orphaned vectors from accumulating in Qdrant.
+ *
+ * @param courseId - Course UUID
+ * @returns Object with deleted status and approximate count
+ */
+export async function deleteVectorsForCourse(
+  courseId: string
+): Promise<{ deleted: boolean; approximateCount: number }> {
+  // Validate UUID to prevent invalid queries
+  if (!isValidUUID(courseId)) {
+    logger.error({ courseId }, 'Invalid course UUID format');
+    return { deleted: false, approximateCount: 0 };
+  }
+
+  logger.info({
+    courseId,
+  }, 'Deleting all vectors for course');
+
+  try {
+    // Count vectors to be deleted (approximate for performance)
+    //
+    // Using approximate count (exact: false) because:
+    // - Qdrant approximate counts are ~99% accurate for most datasets
+    // - Exact counts can be 10-100x slower on large collections
+    // - For cleanup operations, approximate counts are sufficient for logging/metrics
+    // - We're deleting all matching vectors regardless of the count
+    const countResult = await qdrantClient.count(COLLECTION_CONFIG.name, {
+      filter: {
+        must: [{ key: 'course_id', match: { value: courseId } }],
+      },
+      exact: false,
+    });
+
+    const approximateCount = countResult.count;
+
+    if (approximateCount === 0) {
+      logger.info({ courseId }, 'No vectors found for course');
+      return { deleted: true, approximateCount: 0 };
+    }
+
+    // Delete all vectors for this course
+    await qdrantClient.delete(COLLECTION_CONFIG.name, {
+      filter: {
+        must: [{ key: 'course_id', match: { value: courseId } }],
+      },
+      wait: true,
+    });
+
+    logger.info({
+      courseId,
+      approximateCount,
+    }, 'Vectors deleted successfully for course');
+
+    return { deleted: true, approximateCount };
+  } catch (error) {
+    logger.error({
+      courseId,
+      error: error instanceof Error ? error.message : String(error),
+    }, 'Failed to delete vectors for course');
+
+    return { deleted: false, approximateCount: 0 };
   }
 }
 

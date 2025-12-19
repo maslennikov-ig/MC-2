@@ -26,6 +26,7 @@ import { ConcurrencyTracker } from '../../../shared/concurrency/tracker';
 import { InitializeFSMCommandHandler } from '../../../shared/fsm/fsm-initialization-command-handler';
 import { deleteVectorsForDocument } from '../../../shared/qdrant/lifecycle';
 import { generateGenerationCode } from '../../../shared/utils/generation-code';
+import { cleanupCourseResources } from '../../../shared/cleanup';
 import * as path from 'path';
 
 // Type aliases for Database tables
@@ -952,6 +953,120 @@ export const lifecycleRouter = router({
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
           message: 'Failed to restart stage',
+        });
+      }
+    }),
+
+  /**
+   * Cleanup course resources (Qdrant vectors, Redis, RAG context, files)
+   *
+   * Purpose: Cleans up all external resources associated with a course.
+   * Should be called BEFORE deleting the course from the database.
+   *
+   * Authorization: Requires instructor or admin role (course owner or superadmin)
+   *
+   * Input:
+   * - courseId: UUID of the course to clean up
+   *
+   * Output:
+   * - success: Overall success (all operations succeeded)
+   * - qdrant: Qdrant cleanup result
+   * - redis: Redis cleanup result
+   * - ragContext: RAG context cleanup result
+   * - files: Files cleanup result
+   * - durationMs: Total cleanup duration
+   * - errors: Array of error messages (non-fatal)
+   *
+   * @example
+   * ```typescript
+   * const result = await trpc.generation.cleanupCourse.mutate({
+   *   courseId: '123e4567-e89b-12d3-a456-426614174000',
+   * });
+   * // { success: true, qdrant: {...}, redis: {...}, files: {...}, ... }
+   * ```
+   */
+  cleanupCourse: instructorProcedure
+    .use(createRateLimiter({ requests: 10, window: 60 })) // 10 cleanup operations per minute
+    .input(z.object({ courseId: z.string().uuid('Invalid course ID') }))
+    .mutation(async ({ ctx, input }) => {
+      const { courseId } = input;
+      const supabase = getSupabaseAdmin();
+      const requestId = nanoid();
+
+      // Defensive check (should never happen due to instructorProcedure middleware)
+      if (!ctx.user) {
+        throw new TRPCError({
+          code: 'UNAUTHORIZED',
+          message: 'Authentication required',
+        });
+      }
+
+      const userId = ctx.user.id;
+      const userRole = ctx.user.role;
+
+      try {
+        // Step 1: Verify course exists and get organization_id
+        const { data: course, error: courseError } = await supabase
+          .from('courses')
+          .select('id, user_id, organization_id')
+          .eq('id', courseId)
+          .single();
+
+        if (courseError || !course) {
+          logger.warn({ requestId, userId, courseId, error: courseError }, 'Course not found for cleanup');
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'Course not found' });
+        }
+
+        // Step 2: Check permissions (owner or superadmin)
+        const isSuperAdmin = userRole === 'superadmin';
+        const isOwner = course.user_id === userId;
+        const isNoOwnerCourse = course.user_id === null;
+
+        if (!isSuperAdmin && !isOwner && !isNoOwnerCourse) {
+          logger.warn({
+            requestId,
+            userId,
+            courseId,
+            courseOwnerId: course.user_id,
+          }, 'Unauthorized cleanup attempt');
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'You do not have permission to cleanup this course',
+          });
+        }
+
+        logger.info({
+          requestId,
+          userId,
+          courseId,
+          organizationId: course.organization_id,
+        }, 'Starting course cleanup');
+
+        // Step 3: Execute cleanup
+        const cleanupResult = await cleanupCourseResources(courseId, course.organization_id);
+
+        logger.info({
+          requestId,
+          userId,
+          courseId,
+          success: cleanupResult.success,
+          durationMs: cleanupResult.durationMs,
+          errorCount: cleanupResult.errors.length,
+        }, 'Course cleanup completed');
+
+        return cleanupResult;
+      } catch (error) {
+        if (error instanceof TRPCError) throw error;
+
+        logger.error({
+          requestId,
+          courseId,
+          error: error instanceof Error ? error.message : String(error),
+        }, 'Unexpected error in cleanupCourse');
+
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to cleanup course resources',
         });
       }
     }),

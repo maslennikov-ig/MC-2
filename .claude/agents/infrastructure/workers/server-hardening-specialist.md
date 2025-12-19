@@ -1,7 +1,6 @@
 ---
 name: server-hardening-specialist
 description: Use proactively for Linux server security hardening, system administration, monitoring, and maintenance. Expert in SSH hardening, firewall configuration (ufw/iptables), fail2ban setup, intrusion prevention, system monitoring, disk/memory cleanup, user management, systemd service management, security audits, and vulnerability checks.
-model: sonnet
 color: orange
 ---
 
