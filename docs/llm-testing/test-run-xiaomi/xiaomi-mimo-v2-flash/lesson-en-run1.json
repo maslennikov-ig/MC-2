@@ -1,0 +1,102 @@
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "A hands-on introduction to storing information and understanding the different kinds of data Python can work with, including numbers, text, and booleans.",
+  "learning_objectives": [
+    "Declare and initialize variables using proper naming conventions",
+    "Identify and utilize core data types: int, float, str, and bool",
+    "Perform basic type casting and arithmetic operations",
+    "Verify data types using the type() function",
+    "Debug common errors related to variable assignment and type mismatches"
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Creating and Assigning Variables",
+      "lesson_objective": "Create variables using correct syntax and naming rules to store simple values.",
+      "key_topics": [
+        "Variable syntax (name = value)",
+        "Naming conventions (snake_case)",
+        "Reserved keywords",
+        "Assignment operator",
+        "Reassignment"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Variable Initialization",
+          "exercise_instructions": "Create three variables: 'user_age' with value 25, 'monthly_rate' with value 1500.50, and 'is_active' with value True. Print each variable to the console."
+        },
+        {
+          "exercise_title": "Reassignment Practice",
+          "exercise_instructions": "Create a variable 'score' with value 10. Update the variable to 15. Print the new value to verify the change."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Working with Strings and Integers",
+      "lesson_objective": "Differentiate between string and integer data types and perform basic concatenation.",
+      "key_topics": [
+        "String definition (quotes)",
+        "Integer definition (whole numbers)",
+        "Concatenation",
+        "Type conversion (str to int)",
+        "Input handling"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Message Construction",
+          "exercise_instructions": "Create a string variable 'greeting' saying 'Welcome back' and an integer variable 'year' with value 2024. Combine them to print: 'Welcome back, 2024'."
+        },
+        {
+          "exercise_title": "User Age Calculator",
+          "exercise_instructions": "Ask the user for their birth year using input(). Convert the input to an integer and subtract it from 2024 to calculate their age. Print the result."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "Floats, Booleans, and Type Checking",
+      "lesson_objective": "Use floating point numbers and boolean values, and verify data types using the type() function.",
+      "key_topics": [
+        "Floating point numbers",
+        "Boolean values (True/False)",
+        "The type() function",
+        "Comparisons",
+        "Type mismatches"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Price Calculation",
+          "exercise_instructions": "Create a float variable 'item_price' (e.g., 19.99) and an integer 'quantity' (e.g., 5). Calculate the total cost and print it. Use type() to verify the result is a float."
+        },
+        {
+          "exercise_title": "Boolean Logic",
+          "exercise_instructions": "Create two boolean variables: 'has_license' (True) and 'is_suspended' (False). Print the result of 'has_license and not is_suspended'."
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "Basic Arithmetic and Type Casting",
+      "lesson_objective": "Perform arithmetic operations and safely convert between data types.",
+      "key_topics": [
+        "Arithmetic operators (+, -, *, /)",
+        "Modulo operator (%)",
+        "Explicit type casting (int(), float(), str())",
+        "Order of operations",
+        "String formatting basics"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Even or Odd?",
+          "exercise_instructions": "Ask the user for a whole number. Convert input to an integer. Use the modulo operator (%) to check if the number is even or odd. Print the result."
+        },
+        {
+          "exercise_title": "Recipe Adjuster",
+          "exercise_instructions": "Create a variable 'original_cups' = 2.5. Ask the user for a scaling factor (e.g., 1.5). Calculate the new amount and print it as a formatted string: 'New amount: X cups'."
+        }
+      ]
+    }
+  ]
+}

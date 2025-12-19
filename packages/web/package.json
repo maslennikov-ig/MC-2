@@ -36,6 +36,7 @@
     "@emotion/is-prop-valid": "^1.4.0",
     "@googleapis/drive": "^18.0.0",
     "@hookform/resolvers": "^3.10.0",
+    "@megacampus/shared-logger": "workspace:*",
     "@megacampus/shared-types": "workspace:*",
     "@paper-design/shaders-react": "0.0.46",
     "@radix-ui/react-accordion": "^1.2.12",

@@ -65,3 +65,8 @@ packages/*/pnpm-lock.yaml
 settings.local.json
 scripts/setup-env.sh
 specs/002-main-entry-orchestrator/MANUAL-TESTING-GUIDE-RU.md
+
+# --- AI Memory & Private Data ---
+.gemini/memory.md
+.gemini/memories.md
+.gemini/private/

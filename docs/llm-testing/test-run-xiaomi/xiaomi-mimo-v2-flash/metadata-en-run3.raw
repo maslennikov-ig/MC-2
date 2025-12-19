@@ -1,0 +1,32 @@
+{
+  "course_title": "Introduction to Python Programming",
+  "course_description": "Learn the fundamentals of Python programming in this beginner-friendly course. Master syntax, data structures, and problem-solving skills to start building your own applications.",
+  "course_overview": "This comprehensive introductory course provides a thorough foundation in Python programming, covering everything from basic syntax and data types to control flow, functions, and object-oriented programming. Students will engage in hands-on coding exercises, real-world projects, and interactive challenges designed to build practical programming skills. By the end of the course, you'll be able to write clean, efficient Python code and understand how to apply these concepts to automate tasks, analyze data, or develop simple applications.",
+  "target_audience": "Absolute beginners, career changers, students, and professionals from non-technical backgrounds who want to learn programming fundamentals and build a strong foundation in Python.",
+  "estimated_duration_hours": 40,
+  "difficulty_level": "beginner",
+  "prerequisites": [
+    "Basic computer literacy",
+    "Familiarity with file management",
+    "No prior programming experience required"
+  ],
+  "learning_outcomes": [
+    "Analyze and write Python code using variables, data types, and operators",
+    "Design and implement control flow structures including loops and conditional statements",
+    "Create and manipulate data structures such as lists, dictionaries, tuples, and sets",
+    "Develop reusable code by writing and calling functions with parameters and return values",
+    "Apply object-oriented programming principles to create classes and objects",
+    "Debug and troubleshoot Python programs using error handling techniques",
+    "Build simple Python applications and scripts for real-world problem solving"
+  ],
+  "course_tags": [
+    "python",
+    "programming",
+    "beginner",
+    "coding",
+    "software development",
+    "computer science",
+    "data structures",
+    "object-oriented programming"
+  ]
+}

@@ -11,6 +11,7 @@ export * from './bullmq-jobs';
 export * from './summarization-job';
 export * from './summarization-result';
 export * from './model-config';
+export * from './model-defaults';
 export * from './analysis-job';
 export * from './analysis-schemas'; // Includes enhanced Analyze types
 export * from './generation-result';

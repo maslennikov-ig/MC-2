@@ -1,0 +1,97 @@
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "A practical introduction to storing information using variables and Python's core data types, with interactive coding exercises.",
+  "learning_objectives": [
+    "Declare and assign values to variables using correct Python syntax.",
+    "Identify and utilize fundamental data types: integers, floats, strings, and booleans.",
+    "Perform type conversion and verify data types using built-in functions.",
+    "Create and manipulate basic list structures to store collections of data."
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Creating and Using Variables",
+      "lesson_objective": "Write Python code to declare variables and print their values to the console.",
+      "key_topics": [
+        "Variable naming conventions",
+        "Assignment operator",
+        "Printing variables",
+        "Code execution"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Personal Bio Generator",
+          "exercise_instructions": "Create three variables: 'name', 'age', and 'city'. Assign appropriate values to each and print a sentence using these variables."
+        },
+        {
+          "exercise_title": "Variable Reassignment",
+          "exercise_instructions": "Initialize a variable called 'score' with the value 10. Print the score, then update the value to 25 and print it again to show the change."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Understanding Data Types",
+      "lesson_objective": "Differentiate between strings, integers, floats, and booleans in Python code.",
+      "key_topics": [
+        "String data type",
+        "Numeric types (int and float)",
+        "Boolean data type",
+        "Type checking"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Inventory List",
+          "exercise_instructions": "Create one variable for each data type: a string for 'product_name', an integer for 'quantity', a float for 'price', and a boolean for 'in_stock'. Print them out."
+        },
+        {
+          "exercise_title": "Type Identification",
+          "exercise_instructions": "Write a script that assigns a value to a variable, then uses the type() function to print the data type of that variable."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "Type Conversion and Casting",
+      "lesson_objective": "Convert data from one type to another to solve calculation and formatting problems.",
+      "key_topics": [
+        "Implicit vs. explicit conversion",
+        "int() function",
+        "str() function",
+        "float() function"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "The Price Calculator",
+          "exercise_instructions": "Define a string variable 'price_str' = '19.99'. Convert it to a float, multiply it by 2, and print the total cost."
+        },
+        {
+          "exercise_title": "User ID Formatter",
+          "exercise_instructions": "Define an integer variable 'user_id' = 5021. Convert it to a string and concatenate it with a prefix 'ID-' to create a formatted ID."
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "Introduction to Lists",
+      "lesson_objective": "Create a list, access elements by index, and modify list items.",
+      "key_topics": [
+        "List syntax (brackets)",
+        "Indexing and slicing",
+        "Modifying elements",
+        "List length"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Top 3 Favorites",
+          "exercise_instructions": "Create a list containing three strings representing your favorite foods. Print the second item in the list, then replace the first item with a new food."
+        },
+        {
+          "exercise_title": "Grocery List Manager",
+          "exercise_instructions": "Create a list of three grocery items. Use the append method to add a fourth item, then print the final list."
+        }
+      ]
+    }
+  ]
+}

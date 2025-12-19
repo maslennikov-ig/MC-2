@@ -1,0 +1,130 @@
+{
+  "section_number": 1,
+  "section_title": "Variables and Data Types in Python",
+  "section_description": "Master the fundamentals of Python programming by learning how to store, manipulate, and verify different types of data using variables and core data types.",
+  "learning_objectives": [
+    "Create and modify variables to store information",
+    "Identify and use primitive data types (int, float, str, bool)",
+    "Convert between data types using casting functions",
+    "Perform arithmetic and string operations",
+    "Validate data types using the type() function"
+  ],
+  "lessons": [
+    {
+      "lesson_number": 1,
+      "lesson_title": "Variable Assignment and Reassignment",
+      "lesson_objective": "Write Python code to initialize variables and update their values during program execution.",
+      "key_topics": [
+        "Assignment operator (=)",
+        "Variable naming conventions",
+        "Dynamic typing",
+        "Reassignment",
+        "Overwriting values"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Initialize User Profile",
+          "exercise_instructions": "Create three variables: 'username' (string), 'age' (integer), and 'is_active' (boolean). Print each variable's value."
+        },
+        {
+          "exercise_title": "Update Inventory Count",
+          "exercise_instructions": "Create an 'items' variable starting at 5. Reassign it to add 3 more items, then print the final count."
+        }
+      ]
+    },
+    {
+      "lesson_number": 2,
+      "lesson_title": "Primitive Data Types and Operations",
+      "lesson_objective": "Differentiate between int, float, str, and bool types and apply appropriate operations to each.",
+      "key_topics": [
+        "Integer (int)",
+        "Float (float)",
+        "String (str)",
+        "Boolean (bool)",
+        "Arithmetic operators",
+        "String concatenation",
+        "Comparison operators"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Calculate Total Price",
+          "exercise_instructions": "Create variables for item price (float) and quantity (int). Calculate and print the total cost including tax (8.25%)."
+        },
+        {
+          "exercise_title": "Build Full Name",
+          "exercise_instructions": "Create 'first_name' and 'last_name' variables. Combine them into a 'full_name' variable using concatenation and print the result."
+        }
+      ]
+    },
+    {
+      "lesson_number": 3,
+      "lesson_title": "Type Conversion and Validation",
+      "lesson_objective": "Convert data between types using str(), int(), float(), and validate types using type().",
+      "key_topics": [
+        "Explicit type casting",
+        "int() function",
+        "float() function",
+        "str() function",
+        "type() function",
+        "Type validation",
+        "String to number conversion"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Convert User Input",
+          "exercise_instructions": "Create a string variable 'age_input' = '25'. Convert it to an integer and verify using type(). Print the converted value."
+        },
+        {
+          "exercise_title": "Format Number as String",
+          "exercise_instructions": "Create a float variable 'pi_value' = 3.14159. Convert it to a string and append ' is pi' to the result. Print the final string."
+        }
+      ]
+    },
+    {
+      "lesson_number": 4,
+      "lesson_title": "Working with Strings",
+      "lesson_objective": "Manipulate strings using methods and f-strings to format output effectively.",
+      "key_topics": [
+        "String methods (.upper(), .lower(), .strip())",
+        "String indexing",
+        "String slicing",
+        "f-strings",
+        "len() function",
+        "Escape characters"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Email Formatter",
+          "exercise_instructions": "Create a 'name' variable. Use an f-string to generate an email address in the format 'name@example.com' and print it."
+        },
+        {
+          "exercise_title": "Clean User Input",
+          "exercise_instructions": "Create a string variable with extra spaces. Use .strip() and .lower() to clean it, then print the result."
+        }
+      ]
+    },
+    {
+      "lesson_number": 5,
+      "lesson_title": "Type Checking and Debugging",
+      "lesson_objective": "Use type checking to debug code and ensure data integrity in variable operations.",
+      "key_topics": [
+        "isinstance() function",
+        "type() vs isinstance()",
+        "Common type errors",
+        "Debugging strategies",
+        "Mixed type operations",
+        "Best practices"
+      ],
+      "exercises": [
+        {
+          "exercise_title": "Validate User Age",
+          "exercise_instructions": "Create a function that accepts a variable and prints whether it's an integer. Test with numbers and strings."
+        },
+        {
+          "exercise_title": "Type Safety Check",
+          "exercise_instructions": "Write code that attempts to add a string '5' to an integer 10. Use type checking to catch and handle the potential error."
+        }
+      ]
+    }
+  ]
+}

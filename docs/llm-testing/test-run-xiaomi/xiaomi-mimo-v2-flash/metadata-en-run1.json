@@ -1,0 +1,32 @@
+{
+  "course_title": "Introduction to Python Programming",
+  "course_description": "Learn the fundamentals of Python programming in this beginner-friendly course. Master syntax, data structures, and problem-solving to start building your own applications.",
+  "course_overview": "This comprehensive course introduces absolute beginners to the world of Python programming. You will start by setting up your development environment and learning basic syntax, then progress through core concepts including variables, data types, control flow, functions, and error handling. The curriculum covers essential data structures like lists, dictionaries, and sets, and introduces object-oriented programming principles. Through hands-on coding exercises and real-world projects, you will develop practical debugging skills and learn to write clean, efficient Python code that follows industry best practices.",
+  "target_audience": "Absolute beginners, career changers, students, and professionals from non-technical backgrounds who want to learn programming fundamentals with Python",
+  "estimated_duration_hours": 40,
+  "difficulty_level": "beginner",
+  "prerequisites": [
+    "Basic computer literacy",
+    "Familiarity with operating system file management",
+    "No prior programming experience required"
+  ],
+  "learning_outcomes": [
+    "Analyze problem statements and design algorithmic solutions using Python",
+    "Implement Python programs using variables, data types, and control structures",
+    "Create reusable functions and modules to organize code effectively",
+    "Apply object-oriented programming concepts to build structured applications",
+    "Debug and troubleshoot Python code using systematic error-handling techniques",
+    "Develop basic data processing applications using built-in data structures",
+    "Evaluate code quality and apply PEP 8 style guidelines"
+  ],
+  "course_tags": [
+    "Python",
+    "Programming",
+    "Beginner",
+    "Coding",
+    "Software Development",
+    "Computer Science",
+    "Data Structures",
+    "OOP"
+  ]
+}

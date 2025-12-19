@@ -142,6 +142,17 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
     // TODO: Implement edit mode or modal
   }, []);
 
+  // Handler for stage approval - marks completion state as auto-opened to prevent drawer flicker
+  const handleStageApproved = useCallback(() => {
+    // Mark the stage_X_complete state as auto-opened BEFORE closing
+    // This prevents the auto-select effect from reopening the drawer
+    if (data?.stageNumber && typeof window !== 'undefined') {
+      const key = `graphview_auto_opened_${courseInfo.id}_stage_${data.stageNumber}_complete`;
+      sessionStorage.setItem(key, 'true');
+    }
+    deselectNode();
+  }, [data?.stageNumber, courseInfo.id, deselectNode]);
+
   const handleRegenerateLesson = useCallback(() => {
     if (!lessonInfoForInspector) return;
 
@@ -473,7 +484,7 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
                         courseId={courseInfo.id}
                         courseSlug={courseSlug}
                         stageNumber={data.stageNumber}
-                        onApproved={deselectNode}
+                        onApproved={handleStageApproved}
                         onRegenerated={deselectNode}
                         variant="prominent"
                      />

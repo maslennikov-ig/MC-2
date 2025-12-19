@@ -1,0 +1,48 @@
+{
+  "model": "Xiaomi Mimo V2 Flash",
+  "modelSlug": "xiaomi-mimo-v2-flash",
+  "modelApiName": "xiaomi/mimo-v2-flash:free",
+  "lessonId": "1.1",
+  "lessonTitle": "Что такое нематериальный продукт: билет как товар",
+  "language": "ru",
+  "duration": 29116,
+  "timestamp": "2025-12-19T10:58:27.735Z",
+  "parseSuccess": true,
+  "parseError": null,
+  "usage": {
+    "prompt_tokens": 651,
+    "completion_tokens": 2417,
+    "total_tokens": 3068,
+    "cost": 0,
+    "is_byok": false,
+    "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "audio_tokens": 0,
+      "video_tokens": 0
+    },
+    "cost_details": {
+      "upstream_inference_cost": null,
+      "upstream_inference_prompt_cost": 0,
+      "upstream_inference_completions_cost": 0
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 0,
+      "image_tokens": 0
+    }
+  },
+  "quality": {
+    "hasIntro": true,
+    "hasSections": true,
+    "hasExamples": true,
+    "hasExercises": true,
+    "hasSummary": true,
+    "sectionsCount": 4,
+    "examplesCount": 2,
+    "exercisesCount": 2,
+    "totalWordCount": 612,
+    "introWordCount": 72,
+    "coversObjectives": 3,
+    "coversTopics": 5,
+    "qualityScore": 100
+  }
+}

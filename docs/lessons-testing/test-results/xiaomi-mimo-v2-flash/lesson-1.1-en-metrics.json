@@ -1,0 +1,48 @@
+{
+  "model": "Xiaomi Mimo V2 Flash",
+  "modelSlug": "xiaomi-mimo-v2-flash",
+  "modelApiName": "xiaomi/mimo-v2-flash:free",
+  "lessonId": "1.1-en",
+  "lessonTitle": "What is an Intangible Product: Ticket as a Product",
+  "language": "en",
+  "duration": 21604,
+  "timestamp": "2025-12-19T10:58:20.238Z",
+  "parseSuccess": true,
+  "parseError": null,
+  "usage": {
+    "prompt_tokens": 578,
+    "completion_tokens": 1785,
+    "total_tokens": 2363,
+    "cost": 0,
+    "is_byok": false,
+    "prompt_tokens_details": {
+      "cached_tokens": 0,
+      "audio_tokens": 0,
+      "video_tokens": 0
+    },
+    "cost_details": {
+      "upstream_inference_cost": null,
+      "upstream_inference_prompt_cost": 0,
+      "upstream_inference_completions_cost": 0
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 0,
+      "image_tokens": 0
+    }
+  },
+  "quality": {
+    "hasIntro": true,
+    "hasSections": true,
+    "hasExamples": true,
+    "hasExercises": true,
+    "hasSummary": true,
+    "sectionsCount": 4,
+    "examplesCount": 2,
+    "exercisesCount": 2,
+    "totalWordCount": 760,
+    "introWordCount": 98,
+    "coversObjectives": 3,
+    "coversTopics": 5,
+    "qualityScore": 100
+  }
+}

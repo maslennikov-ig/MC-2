@@ -6,7 +6,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { getPhaseName, getPhaseDescription } from '@/lib/generation-graph/phase-names';
+import { getPhaseName } from '@/lib/generation-graph/phase-names';
 
 interface PhaseSelectorProps {
   stageId: string;
@@ -45,23 +45,12 @@ export const PhaseSelector = ({
         <SelectContent>
           {phases.map((phase) => {
             const phaseName = getPhaseName(stageId, phase.phaseId, locale);
-            const phaseDescription = getPhaseDescription(stageId, phase.phaseId, locale);
             const timestamp = new Date(phase.timestamp).toLocaleTimeString(locale === 'ru' ? 'ru-RU' : 'en-US');
-            const statusLabel = locale === 'ru'
-              ? { pending: 'ожидание', active: 'выполняется', completed: 'завершено', error: 'ошибка' }[phase.status]
-              : phase.status;
 
             return (
               <SelectItem key={phase.phaseId} value={phase.phaseId} className="text-xs">
-                <div className="flex flex-col gap-0.5">
-                  <div className="font-medium">{phaseName}</div>
-                  {phaseDescription && (
-                    <div className="text-xs text-slate-500 dark:text-slate-400">{phaseDescription}</div>
-                  )}
-                  <div className="text-xs text-slate-400 dark:text-slate-500">
-                    {timestamp} ({statusLabel})
-                  </div>
-                </div>
+                <span className="font-medium">{phaseName}</span>
+                <span className="text-slate-400 dark:text-slate-500 ml-2">{timestamp}</span>
               </SelectItem>
             );
           })}

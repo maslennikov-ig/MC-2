@@ -1,0 +1,149 @@
+{
+  "testRunId": "2025-11-30-run6-3-models",
+  "testVersion": "run6",
+  "executionMode": "PARALLEL",
+  "timestamp": "2025-12-19T10:35:27.754Z",
+  "duration": 29247,
+  "durationMinutes": "0.49",
+  "models": 1,
+  "scenarios": 4,
+  "runsPerScenario": 3,
+  "totalTests": 12,
+  "successfulTests": 12,
+  "failedTests": 0,
+  "successRate": "100.00",
+  "avgTestDuration": "11181",
+  "results": [
+    {
+      "model": "Xiaomi Mimo V2 Flash",
+      "modelSlug": "xiaomi-mimo-v2-flash",
+      "scenario": "metadata-en",
+      "runNumber": 1,
+      "success": true,
+      "duration": 12202,
+      "contentLength": 2055,
+      "parseError": null
+    },
+    {
+      "model": "Xiaomi Mimo V2 Flash",
+      "modelSlug": "xiaomi-mimo-v2-flash",
+      "scenario": "metadata-en",
+      "runNumber": 2,
+      "success": true,
+      "duration": 5297,
+      "contentLength": 1894,
+      "parseError": null
+    },
+    {
+      "model": "Xiaomi Mimo V2 Flash",
+      "modelSlug": "xiaomi-mimo-v2-flash",
+      "scenario": "metadata-en",
+      "runNumber": 3,
+      "success": true,
+      "duration": 5889,
+      "contentLength": 2075,
+      "parseError": null
+    },
+    {
+      "model": "Xiaomi Mimo V2 Flash",
+      "modelSlug": "xiaomi-mimo-v2-flash",
+      "scenario": "metadata-ru",
+      "runNumber": 1,
+      "success": true,
+      "duration": 7502,
+      "contentLength": 1780,
+      "parseError": null
+    },
+    {
+      "model": "Xiaomi Mimo V2 Flash",
+      "modelSlug": "xiaomi-mimo-v2-flash",
+      "scenario": "metadata-ru",
+      "runNumber": 2,
+      "success": true,
+      "duration": 6907,
+      "contentLength": 1504,
+      "parseError": null
+    },
+    {
+      "model": "Xiaomi Mimo V2 Flash",
+      "modelSlug": "xiaomi-mimo-v2-flash",
+      "scenario": "metadata-ru",
+      "runNumber": 3,
+      "success": true,
+      "duration": 6940,
+      "contentLength": 1594,
+      "parseError": null
+    },
+    {
+      "model": "Xiaomi Mimo V2 Flash",
+      "modelSlug": "xiaomi-mimo-v2-flash",
+      "scenario": "lesson-en",
+      "runNumber": 1,
+      "success": true,
+      "duration": 10674,
+      "contentLength": 4462,
+      "parseError": null
+    },
+    {
+      "model": "Xiaomi Mimo V2 Flash",
+      "modelSlug": "xiaomi-mimo-v2-flash",
+      "scenario": "lesson-en",
+      "runNumber": 2,
+      "success": true,
+      "duration": 9770,
+      "contentLength": 4053,
+      "parseError": null
+    },
+    {
+      "model": "Xiaomi Mimo V2 Flash",
+      "modelSlug": "xiaomi-mimo-v2-flash",
+      "scenario": "lesson-en",
+      "runNumber": 3,
+      "success": true,
+      "duration": 11816,
+      "contentLength": 5135,
+      "parseError": null
+    },
+    {
+      "model": "Xiaomi Mimo V2 Flash",
+      "modelSlug": "xiaomi-mimo-v2-flash",
+      "scenario": "lesson-ru",
+      "runNumber": 1,
+      "success": true,
+      "duration": 27422,
+      "contentLength": 6539,
+      "parseError": null
+    },
+    {
+      "model": "Xiaomi Mimo V2 Flash",
+      "modelSlug": "xiaomi-mimo-v2-flash",
+      "scenario": "lesson-ru",
+      "runNumber": 2,
+      "success": true,
+      "duration": 16613,
+      "contentLength": 4709,
+      "parseError": null
+    },
+    {
+      "model": "Xiaomi Mimo V2 Flash",
+      "modelSlug": "xiaomi-mimo-v2-flash",
+      "scenario": "lesson-ru",
+      "runNumber": 3,
+      "success": true,
+      "duration": 13139,
+      "contentLength": 3986,
+      "parseError": null
+    }
+  ],
+  "modelSummary": [
+    {
+      "model": "Xiaomi Mimo V2 Flash",
+      "slug": "xiaomi-mimo-v2-flash",
+      "apiName": "xiaomi/mimo-v2-flash:free",
+      "totalTests": 12,
+      "successful": 12,
+      "failed": 0,
+      "successRate": "100.0"
+    }
+  ]
+}

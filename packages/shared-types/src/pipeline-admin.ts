@@ -16,6 +16,8 @@ import { promptTemplateSchema } from './prompt-template';
 // =============================================================================
 
 export const phaseNameSchema = z.enum([
+  // Global default (admin-configurable fallback)
+  'global_default',
   // Stage 2: Document Processing (Summarization)
   'stage_2_summarization',
   'stage_2_standard_ru',
@@ -29,13 +31,25 @@ export const phaseNameSchema = z.enum([
   'stage_4_scope',
   'stage_4_expert',
   'stage_4_synthesis',
+  'stage_4_standard_ru',
+  'stage_4_standard_en',
+  'stage_4_extended_ru',
+  'stage_4_extended_en',
   // Stage 5: Structure Generation
   'stage_5_metadata',
   'stage_5_sections',
+  'stage_5_standard_ru',
+  'stage_5_standard_en',
+  'stage_5_extended_ru',
+  'stage_5_extended_en',
   // Stage 6: Lesson Content
   'stage_6_rag_planning',
   'stage_6_judge',
   'stage_6_refinement',
+  'stage_6_standard_ru',
+  'stage_6_standard_en',
+  'stage_6_extended_ru',
+  'stage_6_extended_en',
   // Stage 6: Targeted Refinement phases
   'stage_6_arbiter',
   'stage_6_patcher',

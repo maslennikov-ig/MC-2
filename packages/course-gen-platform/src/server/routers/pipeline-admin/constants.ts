@@ -6,6 +6,7 @@
  */
 
 import type { PhaseName } from '@megacampus/shared-types';
+import { DEFAULT_MODEL_ID, DEFAULT_FALLBACK_MODEL_ID, MODEL_DEFAULTS } from '@megacampus/shared-types';
 
 // =============================================================================
 // Static Stage Definitions
@@ -99,123 +100,222 @@ export interface DefaultModelConfig {
 /**
  * Hardcoded default model configurations for each phase
  * Used by resetModelConfigToDefault procedure
- * Source: packages/course-gen-platform/src/shared/llm/langchain-models.ts
+ *
+ * NOTE: These are LAST RESORT fallbacks. Primary source is database.
+ * Uses DEFAULT_MODEL_ID (Xiaomi MiMo V2 Flash) for standard phases.
+ * Extended phases use Gemini 2.5 Flash for large context.
  */
 export const DEFAULT_MODEL_CONFIGS: Record<PhaseName, DefaultModelConfig> = {
+  // Global default (admin-configurable fallback)
+  global_default: {
+    modelId: DEFAULT_MODEL_ID,
+    temperature: MODEL_DEFAULTS.temperature,
+    maxTokens: MODEL_DEFAULTS.maxTokens,
+    fallbackModelId: DEFAULT_FALLBACK_MODEL_ID,
+  },
+  // Stage 2: Document Processing
+  stage_2_summarization: {
+    modelId: DEFAULT_MODEL_ID,
+    temperature: 0.7,
+    maxTokens: 10000,
+    fallbackModelId: DEFAULT_FALLBACK_MODEL_ID,
+  },
+  stage_2_standard_ru: {
+    modelId: DEFAULT_MODEL_ID,
+    temperature: 0.7,
+    maxTokens: 10000,
+    fallbackModelId: DEFAULT_FALLBACK_MODEL_ID,
+  },
+  stage_2_standard_en: {
+    modelId: DEFAULT_MODEL_ID,
+    temperature: 0.7,
+    maxTokens: 10000,
+    fallbackModelId: DEFAULT_FALLBACK_MODEL_ID,
+  },
+  stage_2_extended_ru: {
+    modelId: 'google/gemini-2.5-flash',
+    temperature: 0.7,
+    maxTokens: 15000,
+    fallbackModelId: DEFAULT_MODEL_ID,
+  },
+  stage_2_extended_en: {
+    modelId: 'google/gemini-2.5-flash',
+    temperature: 0.7,
+    maxTokens: 15000,
+    fallbackModelId: DEFAULT_MODEL_ID,
+  },
+  // Stage 3: Classification
+  stage_3_classification: {
+    modelId: DEFAULT_MODEL_ID,
+    temperature: 0.0,
+    maxTokens: 2048,
+    fallbackModelId: DEFAULT_FALLBACK_MODEL_ID,
+  },
+  // Stage 4: Analysis
   stage_4_classification: {
-    modelId: 'openai/gpt-oss-20b',
+    modelId: DEFAULT_MODEL_ID,
     temperature: 0.7,
     maxTokens: 4096,
-    fallbackModelId: 'openai/gpt-oss-120b',
+    fallbackModelId: DEFAULT_FALLBACK_MODEL_ID,
   },
   stage_4_scope: {
-    modelId: 'openai/gpt-oss-20b',
+    modelId: DEFAULT_MODEL_ID,
     temperature: 0.7,
     maxTokens: 4096,
-    fallbackModelId: 'openai/gpt-oss-120b',
+    fallbackModelId: DEFAULT_FALLBACK_MODEL_ID,
   },
   stage_4_expert: {
-    modelId: 'openai/gpt-oss-120b',
+    modelId: DEFAULT_MODEL_ID,
     temperature: 0.5,
     maxTokens: 8000,
-    fallbackModelId: 'moonshotai/kimi-k2-0905',
+    fallbackModelId: DEFAULT_FALLBACK_MODEL_ID,
   },
   stage_4_synthesis: {
-    modelId: 'openai/gpt-oss-20b',
+    modelId: DEFAULT_MODEL_ID,
     temperature: 0.7,
     maxTokens: 6000,
-    fallbackModelId: 'openai/gpt-oss-120b',
+    fallbackModelId: DEFAULT_FALLBACK_MODEL_ID,
   },
-  stage_6_rag_planning: {
-    modelId: 'openai/gpt-oss-20b',
+  stage_4_standard_ru: {
+    modelId: DEFAULT_MODEL_ID,
+    temperature: MODEL_DEFAULTS.temperature,
+    maxTokens: MODEL_DEFAULTS.maxTokens,
+    fallbackModelId: DEFAULT_FALLBACK_MODEL_ID,
+  },
+  stage_4_standard_en: {
+    modelId: DEFAULT_MODEL_ID,
+    temperature: MODEL_DEFAULTS.temperature,
+    maxTokens: MODEL_DEFAULTS.maxTokens,
+    fallbackModelId: DEFAULT_FALLBACK_MODEL_ID,
+  },
+  stage_4_extended_ru: {
+    modelId: 'google/gemini-2.5-flash',
+    temperature: 0.7,
+    maxTokens: 15000,
+    fallbackModelId: DEFAULT_MODEL_ID,
+  },
+  stage_4_extended_en: {
+    modelId: 'google/gemini-2.5-flash',
+    temperature: 0.7,
+    maxTokens: 15000,
+    fallbackModelId: DEFAULT_MODEL_ID,
+  },
+  // Stage 5: Structure Generation
+  stage_5_metadata: {
+    modelId: DEFAULT_MODEL_ID,
     temperature: 0.7,
     maxTokens: 4096,
-    fallbackModelId: 'openai/gpt-oss-120b',
+    fallbackModelId: DEFAULT_FALLBACK_MODEL_ID,
   },
+  stage_5_sections: {
+    modelId: DEFAULT_MODEL_ID,
+    temperature: 0.7,
+    maxTokens: 8000,
+    fallbackModelId: DEFAULT_FALLBACK_MODEL_ID,
+  },
+  stage_5_standard_ru: {
+    modelId: DEFAULT_MODEL_ID,
+    temperature: MODEL_DEFAULTS.temperature,
+    maxTokens: MODEL_DEFAULTS.maxTokens,
+    fallbackModelId: DEFAULT_FALLBACK_MODEL_ID,
+  },
+  stage_5_standard_en: {
+    modelId: DEFAULT_MODEL_ID,
+    temperature: MODEL_DEFAULTS.temperature,
+    maxTokens: MODEL_DEFAULTS.maxTokens,
+    fallbackModelId: DEFAULT_FALLBACK_MODEL_ID,
+  },
+  stage_5_extended_ru: {
+    modelId: 'google/gemini-2.5-flash',
+    temperature: 0.7,
+    maxTokens: 15000,
+    fallbackModelId: DEFAULT_MODEL_ID,
+  },
+  stage_5_extended_en: {
+    modelId: 'google/gemini-2.5-flash',
+    temperature: 0.7,
+    maxTokens: 15000,
+    fallbackModelId: DEFAULT_MODEL_ID,
+  },
+  // Stage 6: Lesson Content
+  stage_6_rag_planning: {
+    modelId: DEFAULT_MODEL_ID,
+    temperature: 0.7,
+    maxTokens: 4096,
+    fallbackModelId: DEFAULT_FALLBACK_MODEL_ID,
+  },
+  stage_6_judge: {
+    modelId: DEFAULT_MODEL_ID,
+    temperature: 0.3,
+    maxTokens: 4096,
+    fallbackModelId: DEFAULT_FALLBACK_MODEL_ID,
+  },
+  stage_6_refinement: {
+    modelId: DEFAULT_MODEL_ID,
+    temperature: 0.5,
+    maxTokens: 8000,
+    fallbackModelId: DEFAULT_FALLBACK_MODEL_ID,
+  },
+  stage_6_standard_ru: {
+    modelId: DEFAULT_MODEL_ID,
+    temperature: MODEL_DEFAULTS.temperature,
+    maxTokens: MODEL_DEFAULTS.maxTokens,
+    fallbackModelId: DEFAULT_FALLBACK_MODEL_ID,
+  },
+  stage_6_standard_en: {
+    modelId: DEFAULT_MODEL_ID,
+    temperature: MODEL_DEFAULTS.temperature,
+    maxTokens: MODEL_DEFAULTS.maxTokens,
+    fallbackModelId: DEFAULT_FALLBACK_MODEL_ID,
+  },
+  stage_6_extended_ru: {
+    modelId: 'google/gemini-2.5-flash',
+    temperature: 0.7,
+    maxTokens: 15000,
+    fallbackModelId: DEFAULT_MODEL_ID,
+  },
+  stage_6_extended_en: {
+    modelId: 'x-ai/grok-4.1-fast',
+    temperature: 0.7,
+    maxTokens: 15000,
+    fallbackModelId: DEFAULT_MODEL_ID,
+  },
+  // Stage 6: Targeted Refinement phases
+  stage_6_arbiter: {
+    modelId: DEFAULT_MODEL_ID,
+    temperature: 0.0,
+    maxTokens: 2048,
+    fallbackModelId: DEFAULT_FALLBACK_MODEL_ID,
+  },
+  stage_6_patcher: {
+    modelId: DEFAULT_MODEL_ID,
+    temperature: 0.1,
+    maxTokens: 1000,
+    fallbackModelId: DEFAULT_FALLBACK_MODEL_ID,
+  },
+  stage_6_section_expander: {
+    modelId: DEFAULT_MODEL_ID,
+    temperature: 0.7,
+    maxTokens: 2000,
+    fallbackModelId: DEFAULT_FALLBACK_MODEL_ID,
+  },
+  stage_6_delta_judge: {
+    modelId: DEFAULT_MODEL_ID,
+    temperature: 0.0,
+    maxTokens: 512,
+    fallbackModelId: DEFAULT_FALLBACK_MODEL_ID,
+  },
+  // Special phases
   emergency: {
     modelId: 'x-ai/grok-4-fast',
     temperature: 0.7,
     maxTokens: 30000,
+    fallbackModelId: 'google/gemini-2.5-flash',
   },
   quality_fallback: {
-    modelId: 'moonshotai/kimi-k2-0905',
+    modelId: DEFAULT_MODEL_ID,
     temperature: 0.3,
     maxTokens: 16000,
-  },
-  stage_2_summarization: {
-    modelId: 'openai/gpt-oss-20b',
-    temperature: 0.7,
-    maxTokens: 10000,
-    fallbackModelId: 'openai/gpt-oss-120b',
-  },
-  stage_2_standard_ru: {
-    modelId: 'openai/gpt-oss-20b',
-    temperature: 0.7,
-    maxTokens: 10000,
-    fallbackModelId: 'openai/gpt-oss-120b',
-  },
-  stage_2_standard_en: {
-    modelId: 'openai/gpt-oss-20b',
-    temperature: 0.7,
-    maxTokens: 10000,
-    fallbackModelId: 'openai/gpt-oss-120b',
-  },
-  stage_2_extended_ru: {
-    modelId: 'openai/gpt-oss-120b',
-    temperature: 0.7,
-    maxTokens: 15000,
-    fallbackModelId: 'x-ai/grok-4-fast',
-  },
-  stage_2_extended_en: {
-    modelId: 'openai/gpt-oss-120b',
-    temperature: 0.7,
-    maxTokens: 15000,
-    fallbackModelId: 'x-ai/grok-4-fast',
-  },
-  stage_3_classification: {
-    modelId: 'openai/gpt-oss-20b',
-    temperature: 0.0,
-    maxTokens: 2048,
-  },
-  stage_5_metadata: {
-    modelId: 'openai/gpt-oss-20b',
-    temperature: 0.7,
-    maxTokens: 4096,
-  },
-  stage_5_sections: {
-    modelId: 'openai/gpt-oss-20b',
-    temperature: 0.7,
-    maxTokens: 8000,
-  },
-  stage_6_judge: {
-    modelId: 'openai/gpt-oss-120b',
-    temperature: 0.3,
-    maxTokens: 4096,
-  },
-  stage_6_refinement: {
-    modelId: 'openai/gpt-oss-120b',
-    temperature: 0.5,
-    maxTokens: 8000,
-  },
-  // Stage 6: Targeted Refinement phases
-  stage_6_arbiter: {
-    modelId: 'openai/gpt-oss-20b',
-    temperature: 0.0,
-    maxTokens: 2048,
-  },
-  stage_6_patcher: {
-    modelId: 'openai/gpt-oss-120b',
-    temperature: 0.1,
-    maxTokens: 1000,
-  },
-  stage_6_section_expander: {
-    modelId: 'openai/gpt-oss-120b',
-    temperature: 0.7,
-    maxTokens: 2000,
-  },
-  stage_6_delta_judge: {
-    modelId: 'openai/gpt-oss-20b',
-    temperature: 0.0,
-    maxTokens: 512,
+    fallbackModelId: DEFAULT_FALLBACK_MODEL_ID,
   },
 };

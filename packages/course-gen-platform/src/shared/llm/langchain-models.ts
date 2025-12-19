@@ -24,6 +24,7 @@
 
 import { ChatOpenAI } from '@langchain/openai';
 import type { PhaseName } from '@megacampus/shared-types/model-config';
+import { DEFAULT_MODEL_ID, MODEL_DEFAULTS } from '@megacampus/shared-types';
 import { createModelConfigService } from './model-config-service';
 import logger from '../logger';
 import { getOpenRouterApiKey, getApiKeySync } from '../services/api-key-service';
@@ -43,125 +44,195 @@ const modelConfigService = createModelConfigService();
  * Hardcoded fallback configurations for each phase
  * Used when database is unavailable or config not found
  *
- * Per-phase defaults:
- * - Phase 1 (Classification): 20B model (simple task, cheap)
- * - Phase 2 (Scope): 20B model (mathematical, cheap)
- * - Phase 3 (Expert): 120B model (critical quality, expensive)
- * - Phase 4 (Synthesis): 20B model default (will escalate to 120B for >=3 docs)
- * - Phase 6 (RAG Planning): 20B model (lightweight mapping task, cheap)
- * - Emergency: Grok 4 Fast (context overflow handling)
- * - Quality Fallback: Kimi K2 (high quality fallback for validation failures)
+ * NOTE: These are LAST RESORT fallbacks. Primary source is database.
+ * All standard phases now use DEFAULT_MODEL_ID (Xiaomi MiMo V2 Flash).
+ * Special phases (emergency, quality_fallback) keep specific models.
+ *
+ * Hierarchy:
+ * 1. DB config for specific phase
+ * 2. DB global_default config
+ * 3. These hardcoded constants
  */
 const PHASE_FALLBACK_CONFIG: Record<
   PhaseName,
   { modelId: string; temperature: number; maxTokens: number }
 > = {
+  // Stage 3: Classification
+  stage_3_classification: {
+    modelId: DEFAULT_MODEL_ID,
+    temperature: 0.0,                    // Deterministic for classification
+    maxTokens: 2048,
+  },
+  // Stage 4: Analysis phases
   stage_4_classification: {
-    modelId: 'openai/gpt-oss-20b',
+    modelId: DEFAULT_MODEL_ID,
     temperature: 0.7,
     maxTokens: 4096,
   },
   stage_4_scope: {
-    modelId: 'openai/gpt-oss-20b',
+    modelId: DEFAULT_MODEL_ID,
     temperature: 0.7,
     maxTokens: 4096,
   },
   stage_4_expert: {
-    modelId: 'openai/gpt-oss-120b',
+    modelId: DEFAULT_MODEL_ID,
     temperature: 0.5,
     maxTokens: 8000,
   },
   stage_4_synthesis: {
-    modelId: 'openai/gpt-oss-20b',
+    modelId: DEFAULT_MODEL_ID,
     temperature: 0.7,
     maxTokens: 6000,
   },
-  stage_6_rag_planning: {
-    modelId: 'openai/gpt-oss-20b',
+  stage_4_standard_ru: {
+    modelId: DEFAULT_MODEL_ID,
+    temperature: MODEL_DEFAULTS.temperature,
+    maxTokens: MODEL_DEFAULTS.maxTokens,
+  },
+  stage_4_standard_en: {
+    modelId: DEFAULT_MODEL_ID,
+    temperature: MODEL_DEFAULTS.temperature,
+    maxTokens: MODEL_DEFAULTS.maxTokens,
+  },
+  stage_4_extended_ru: {
+    modelId: 'google/gemini-2.5-flash',  // Extended context
     temperature: 0.7,
-    maxTokens: 4096,
+    maxTokens: 15000,
   },
-  emergency: {
-    modelId: 'x-ai/grok-4-fast',       // Updated 2025-11-13: Grok 4 Fast for large context (2M tokens)
+  stage_4_extended_en: {
+    modelId: 'google/gemini-2.5-flash',  // Extended context
     temperature: 0.7,
-    maxTokens: 30000,                   // Grok 4 supports up to 30K output tokens
+    maxTokens: 15000,
   },
-  quality_fallback: {
-    modelId: 'moonshotai/kimi-k2-0905', // S-TIER quality model for validation failure recovery
-    temperature: 0.3,                    // Lower temp for precision
-    maxTokens: 16000,                    // Sufficient for structured output
-  },
-  stage_3_classification: {
-    modelId: 'openai/gpt-oss-20b',
-    temperature: 0.0,                    // Deterministic for classification
-    maxTokens: 2048,
-  },
+  // Stage 5: Generation phases
   stage_5_metadata: {
-    modelId: 'openai/gpt-oss-20b',
+    modelId: DEFAULT_MODEL_ID,
     temperature: 0.7,
     maxTokens: 4096,
   },
   stage_5_sections: {
-    modelId: 'openai/gpt-oss-20b',
+    modelId: DEFAULT_MODEL_ID,
     temperature: 0.7,
     maxTokens: 8000,
   },
-  stage_6_judge: {
-    modelId: 'openai/gpt-oss-120b',      // High quality for validation
-    temperature: 0.3,
-    maxTokens: 4096,
+  stage_5_standard_ru: {
+    modelId: DEFAULT_MODEL_ID,
+    temperature: MODEL_DEFAULTS.temperature,
+    maxTokens: MODEL_DEFAULTS.maxTokens,
   },
-  stage_6_refinement: {
-    modelId: 'openai/gpt-oss-120b',      // High quality for refinement
-    temperature: 0.5,
-    maxTokens: 8000,
+  stage_5_standard_en: {
+    modelId: DEFAULT_MODEL_ID,
+    temperature: MODEL_DEFAULTS.temperature,
+    maxTokens: MODEL_DEFAULTS.maxTokens,
+  },
+  stage_5_extended_ru: {
+    modelId: 'google/gemini-2.5-flash',  // Extended context
+    temperature: 0.7,
+    maxTokens: 15000,
+  },
+  stage_5_extended_en: {
+    modelId: 'google/gemini-2.5-flash',  // Extended context
+    temperature: 0.7,
+    maxTokens: 15000,
   },
   // Stage 2: Summarization phases
   stage_2_summarization: {
-    modelId: 'openai/gpt-oss-20b',
+    modelId: DEFAULT_MODEL_ID,
     temperature: 0.7,
     maxTokens: 10000,
   },
   stage_2_standard_ru: {
-    modelId: 'openai/gpt-oss-20b',
+    modelId: DEFAULT_MODEL_ID,
     temperature: 0.7,
     maxTokens: 10000,
   },
   stage_2_standard_en: {
-    modelId: 'openai/gpt-oss-20b',
+    modelId: DEFAULT_MODEL_ID,
     temperature: 0.7,
     maxTokens: 10000,
   },
   stage_2_extended_ru: {
-    modelId: 'openai/gpt-oss-120b',
+    modelId: 'google/gemini-2.5-flash',  // Extended context
     temperature: 0.7,
     maxTokens: 15000,
   },
   stage_2_extended_en: {
-    modelId: 'openai/gpt-oss-120b',
+    modelId: 'google/gemini-2.5-flash',  // Extended context
     temperature: 0.7,
     maxTokens: 15000,
   },
-  // Stage 6: Targeted Refinement phases
+  // Stage 6: Lesson generation phases
+  stage_6_rag_planning: {
+    modelId: DEFAULT_MODEL_ID,
+    temperature: 0.7,
+    maxTokens: 4096,
+  },
+  stage_6_judge: {
+    modelId: DEFAULT_MODEL_ID,
+    temperature: 0.3,
+    maxTokens: 4096,
+  },
+  stage_6_refinement: {
+    modelId: DEFAULT_MODEL_ID,
+    temperature: 0.5,
+    maxTokens: 8000,
+  },
   stage_6_arbiter: {
-    modelId: 'openai/gpt-oss-20b',
+    modelId: DEFAULT_MODEL_ID,
     temperature: 0.0,                       // Deterministic for agreement scoring
     maxTokens: 2048,
   },
   stage_6_patcher: {
-    modelId: 'openai/gpt-oss-120b',         // High quality for surgical edits
+    modelId: DEFAULT_MODEL_ID,
     temperature: 0.1,                       // Low temp for precise editing
     maxTokens: 1000,                        // Small output for patches
   },
   stage_6_section_expander: {
-    modelId: 'openai/gpt-oss-120b',         // High quality for section regeneration
+    modelId: DEFAULT_MODEL_ID,
     temperature: 0.7,                       // Moderate creativity
     maxTokens: 2000,                        // Larger output for full sections
   },
   stage_6_delta_judge: {
-    modelId: 'openai/gpt-oss-20b',          // Lightweight verification
+    modelId: DEFAULT_MODEL_ID,
     temperature: 0.0,                       // Deterministic for validation
     maxTokens: 512,                         // Small focused output
+  },
+  stage_6_standard_ru: {
+    modelId: DEFAULT_MODEL_ID,
+    temperature: MODEL_DEFAULTS.temperature,
+    maxTokens: MODEL_DEFAULTS.maxTokens,
+  },
+  stage_6_standard_en: {
+    modelId: DEFAULT_MODEL_ID,
+    temperature: MODEL_DEFAULTS.temperature,
+    maxTokens: MODEL_DEFAULTS.maxTokens,
+  },
+  stage_6_extended_ru: {
+    modelId: 'google/gemini-2.5-flash',  // Extended context
+    temperature: 0.7,
+    maxTokens: 15000,
+  },
+  stage_6_extended_en: {
+    modelId: 'x-ai/grok-4.1-fast',       // Extended context, Grok for EN
+    temperature: 0.7,
+    maxTokens: 15000,
+  },
+  // Special phases (keep specific models)
+  emergency: {
+    modelId: 'x-ai/grok-4-fast',         // Large context (2M tokens)
+    temperature: 0.7,
+    maxTokens: 30000,
+  },
+  quality_fallback: {
+    modelId: DEFAULT_MODEL_ID,           // Updated: use MiMo for quality fallback too
+    temperature: 0.3,
+    maxTokens: 16000,
+  },
+  // Global default (used when phase not found)
+  global_default: {
+    modelId: DEFAULT_MODEL_ID,
+    temperature: MODEL_DEFAULTS.temperature,
+    maxTokens: MODEL_DEFAULTS.maxTokens,
   },
 };
 

@@ -1,27 +1,19 @@
 /**
- * Pino structured JSON logger with contextual fields
- * @module logger
+ * Logger for course-gen-platform
+ * Re-exports from shared logger package for centralized configuration.
  *
  * Also exports error logging types and services for centralized error management.
  */
+export {
+  logger as default,
+  logger,
+  createChildLogger,
+  createModuleLogger,
+  createRequestLogger,
+} from '@megacampus/shared-logger';
 
-import pino from 'pino';
+export type { Logger } from 'pino';
 
-const logger = pino({
-  level: process.env.LOG_LEVEL || 'info',
-  base: {
-    service: 'course-generator',
-    environment: process.env.NODE_ENV || 'development',
-    version: process.env.APP_VERSION || '0.0.0',
-  },
-  transport: process.env.NODE_ENV === 'development'
-    ? { target: 'pino-pretty', options: { colorize: true } }
-    : undefined,
-});
-
-export default logger;
-export { logger };
-
-// Re-export error logging types and services
+// Re-export error logging types and services (these are local)
 export * from './types';
 export * from './error-service';

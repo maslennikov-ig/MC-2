@@ -318,6 +318,43 @@ function GraphViewInner({ courseId, courseTitle, hasDocuments = true, failedAtSt
     fetchCourseStructure();
   }, [courseId, initializeFromCourseStructure]);
 
+  // Re-fetch course structure when Stage 5 becomes complete
+  // This ensures lesson nodes appear immediately after Stage 5 approval
+  const prevPipelineStatus = useRef<string | null>(null);
+  useEffect(() => {
+    // Only trigger on transition TO stage_5_complete
+    const wasNotComplete = prevPipelineStatus.current !== 'stage_5_complete';
+    const isNowComplete = pipelineStatus === 'stage_5_complete';
+    prevPipelineStatus.current = pipelineStatus ?? null;
+
+    if (wasNotComplete && isNowComplete) {
+      // Reset the initialization flag to allow re-fetch
+      courseStructureInitialized.current = false;
+
+      // Fetch fresh course structure
+      const fetchCourseStructure = async () => {
+        const supabase = createClient();
+        const { data, error } = await supabase
+          .from('courses')
+          .select('course_structure')
+          .eq('id', courseId)
+          .single();
+
+        if (error) {
+          console.error('[GraphView] Failed to fetch course structure after Stage 5:', error);
+          return;
+        }
+
+        if (data?.course_structure) {
+          initializeFromCourseStructure(data.course_structure as CourseStructure, []);
+          courseStructureInitialized.current = true;
+        }
+      };
+
+      fetchCourseStructure();
+    }
+  }, [pipelineStatus, courseId, initializeFromCourseStructure]);
+
   // Initialize documents from file catalog (prevents premature stage completion)
   const documentsInitialized = useRef(false);
   useEffect(() => {

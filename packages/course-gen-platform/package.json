@@ -30,6 +30,7 @@
     "type-check": "tsc --noEmit"
   },
   "dependencies": {
+    "@megacampus/shared-logger": "workspace:*",
     "@bull-board/api": "^5.14.0",
     "@bull-board/express": "^5.14.0",
     "@langchain/core": "^1.1.5",

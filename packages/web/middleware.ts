@@ -4,7 +4,13 @@ import { updateSession } from '@/lib/supabase/middleware'
 export async function middleware(request: NextRequest) {
   // Update Supabase session for all requests
   // i18n is handled via cookies/headers without URL rewrites (localePrefix: 'never')
-  return updateSession(request)
+  const response = await updateSession(request)
+
+  // Add request ID for logging correlation
+  const requestId = request.headers.get('x-request-id') || crypto.randomUUID()
+  response.headers.set('x-request-id', requestId)
+
+  return response
 }
 
 export const config = {

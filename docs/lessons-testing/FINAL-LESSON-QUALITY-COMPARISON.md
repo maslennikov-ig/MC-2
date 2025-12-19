@@ -10,20 +10,31 @@
 
 | # | Модель | API Name | RU | EN | JSON | Score | Скорость | Рейтинг |
 |---|--------|----------|----|----|------|-------|----------|---------|
-| 1 | **Qwen3 235B Instruct** | `qwen/qwen3-235b-a22b-2507` | 2/2 | 2/2 | 100% | **100** | 74s | **A+** |
-| 2 | **Qwen3 235B Thinking** | `qwen/qwen3-235b-a22b-thinking-2507` | 2/2 | 2/2 | 100% | **100** | 175s | A+ |
-| 3 | **Nemotron Nano 9B V2** | `nvidia/nemotron-nano-9b-v2` | 2/2 | 2/2 | 100% | **100** | 83s | **A** |
-| 4 | **GPT-OSS-120B** | `openai/gpt-oss-120b` | 2/2 | 2/2 | 100% | **95** | ~90s | A |
-| 5 | DeepSeek V3.2 | `deepseek/deepseek-v3.2` | 1/2 | 2/2 | 75% | 100* | 880s | B |
-| 6 | Devstral 2512 | `mistralai/devstral-2512:free` | 1/2 | 2/2 | 75% | 100* | 186s | B |
-| 7 | GPT-OSS-20B | `openai/gpt-oss-20b` | 2/2 | 2/2 | 100% | 85 | ~100s | B- |
-| 8 | Nemotron Nano 30B (free) | `nvidia/nemotron-3-nano-30b-a3b:free` | 0/2 | 0/2 | 0% | 0 | N/A | F |
+| 1 | **Xiaomi Mimo V2 Flash** | `xiaomi/mimo-v2-flash:free` | 2/2 | 2/2 | 100% | **92** | **34s** | **S (Speed)** |
+| 2 | **Qwen3 235B Instruct** | `qwen/qwen3-235b-a22b-2507` | 2/2 | 2/2 | 100% | **100** | 74s | **A+** |
+| 3 | **Qwen3 235B Thinking** | `qwen/qwen3-235b-a22b-thinking-2507` | 2/2 | 2/2 | 100% | **100** | 175s | A+ |
+| 4 | **Nemotron Nano 9B V2** | `nvidia/nemotron-nano-9b-v2` | 2/2 | 2/2 | 100% | **100** | 83s | **A** |
+| 5 | **GPT-OSS-120B** | `openai/gpt-oss-120b` | 2/2 | 2/2 | 100% | **95** | ~90s | A |
+| 6 | DeepSeek V3.2 | `deepseek/deepseek-v3.2` | 1/2 | 2/2 | 75% | 100* | 880s | B |
+| 7 | Devstral 2512 | `mistralai/devstral-2512:free` | 1/2 | 2/2 | 75% | 100* | 186s | B |
+| 8 | GPT-OSS-20B | `openai/gpt-oss-20b` | 2/2 | 2/2 | 100% | 85 | ~100s | B- |
+| 9 | Nemotron Nano 30B (free) | `nvidia/nemotron-3-nano-30b-a3b:free` | 0/2 | 0/2 | 0% | 0 | N/A | F |
 
 *\* Score только для успешных тестов*
 
 ---
 
 ## Ключевые открытия
+
+### 0. Xiaomi Mimo V2 Flash — Чемпион скорости
+
+**Результат:** 4/4 тестов, ~92/100, **34 секунды**
+
+Модель показала феноменальную скорость при высоком качестве:
+- **Самая быстрая** из всех протестированных (в 2x быстрее Qwen).
+- Качественный русский и английский язык.
+- Стабильный JSON.
+- Идеальный выбор для real-time задач или массовой генерации.
 
 ### 1. Nemotron Nano 9B V2 — новый сильный кандидат
 

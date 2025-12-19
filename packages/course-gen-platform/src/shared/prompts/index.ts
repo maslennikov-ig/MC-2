@@ -14,4 +14,5 @@ export {
   DEFAULT_RAG_MAX_TOKENS,
 } from './prompt-utils';
 
-export { PromptService } from './prompt-service';
+export type { PromptService } from './prompt-service';
+export { createPromptService } from './prompt-service';

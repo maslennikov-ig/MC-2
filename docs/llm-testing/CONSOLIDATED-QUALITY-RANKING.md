@@ -204,130 +204,21 @@ Strengths:
 
 ---
 
-### 3. English Lessons (Pedagogical Progression, Exercise Quality)
+## 4. Русские уроки (RU Lessons)
 
-**Scoring Criteria:**
-- Step-by-step instructions
-- Concrete values provided (e.g., x=19.99, not "some value")
-- Formulas given in exercises
-- Real-world scenarios
-- Auto-gradable (expected results specified)
+| Место | Модель | Оценка | Почему лучшая |
+|-------|--------|--------|---------------|
+| 🥇 | **Xiaomi Mimo V2 Flash** | **9.3/10** | **New Leader!** 5 complete lessons, исключительная конкретика (матрицы [[0.2, 0.4]], вектора [0.5, -0.3]), профессиональный сленг (батч, лосс, тензоры), auto-gradable exercises. |
+| 🥈 | **Qwen3 235B A22B-2507** | 9.2/10 | 5 complete lessons, конкретные numeric values, специфичная архитектура, естественный русский. |
+| 🥉 | **DeepSeek v3.1 Terminus** | 8.9/10 | 5 complete lessons, конкретные values, упоминает Keras/TensorFlow. |
 
-#### Top 3 Models:
+## 5. Английские уроки (EN Lessons)
 
-**🥇 Kimi K2-0905 (9.4/10 in Run 4) ⭐ DRAMATIC IMPROVEMENT**
-
-**Notable:** Improved from 8.2 in Run 3 to 9.4 in Run 4 (+1.2 points)
-
-Run 4 Exercise Sample:
-```json
-{
-  "exercise_title": "Shopping Cart Math",
-  "exercise_instructions": "1. Create variables: price_item1 = 19.99, price_item2 = 7.49, quantity1 = 3, quantity2 = 2. 2. Compute total cost as a float. 3. Compute total_items as an int. 4. Print both results with descriptive labels."
-}
-```
-
-**Why Best:**
-- ✅ Concrete values: price_item1 = 19.99 (SPECIFIC)
-- ✅ Numbered steps: 1, 2, 3, 4
-- ✅ Type specifications: "as a float", "as an int"
-- ✅ Real scenario: Shopping cart (relatable)
-- ✅ Testable: Can check total = 79.95
-
-**🥈 DeepSeek Chat v3.1 (9.25/10 avg)**
-
-Run 4 Exercise:
-```json
-{
-  "exercise_title": "Type Detective",
-  "exercise_instructions": "1. Create one variable for each core data type (int, float, str, bool). 2. Print each variable using print(). 3. Use the type() function on each variable and print the result to confirm its data type."
-}
-```
-
-Strengths:
-- ✅ Clear progression across 4 lessons
-- ✅ Numbered instructions
-- ✅ Verification built-in: "confirm its data type"
-- ✅ Consistent 9.2-9.3 quality both runs
-
-**🥉 MiniMax M2 (8.8/10 avg)**
-
-Strengths:
-- ✅ List comprehensions (advanced)
-- ✅ OOP principles taught
-- ✅ CRUD operations in exercises
-- ✅ Highly stable
-
----
-
-### 4. Russian Lessons (Математическая строгость, Конкретность)
-
-**Scoring Criteria:**
-- Concrete numerical values in exercises
-- Expected results provided (e.g., "результат ≈ 0.8176")
-- Modern tools specified (e.g., playground.tensorflow.org)
-- Mathematical rigor (formulas, derivations)
-- Verifiable outcomes
-
-#### Top 3 Models:
-
-**🥇 Kimi K2-0905 (9.75/10 avg) ⭐ MATHEMATICAL CHAMPION**
-
-Run 4 Exercise Sample:
-```json
-{
-  "exercise_title": "Реализовать нейрон-сигмоиду",
-  "exercise_instructions": "Создайте функцию neuron(x, w, b), которая принимает вектор признаков x, вектор весов w и смещение b, возвращает вероятность после сигмоиды. Проверьте на x=[0.5, -1.2], w=[2.0, -3.0], b=0.4; убедитесь, что результат ≈ 0.8176."
-}
-```
-
-**Why Best:**
-- ✅ Concrete inputs: x=[0.5, -1.2], w=[2.0, -3.0], b=0.4
-- ✅ Expected output: ≈ 0.8176 (AUTO-GRADABLE!)
-- ✅ Mathematical precision: Can verify programmatically
-- ✅ Production tools: Uses playground.tensorflow.org in other exercises
-- ✅ 3D visualization: "постройте 3D-график сигмоиды"
-
-**Comparison with Others:**
-
-Kimi K2-0905:
-```
-"убедитесь, что результат ≈ 0.8176"
-```
-
-vs MiniMax M2:
-```
-"вычислите выход нейрона" (no expected result)
-```
-
-vs Qwen3-235B-A22B-2507:
-```
-"Вычислите выход нейрона с сигмоидной активацией" (no expected result)
-```
-
-**Impact:** Providing expected results increases auto-gradability by 90%.
-
-**🥈 MiniMax M2 (8.65/10 avg)**
-
-Run 3 Exercise:
-```json
-"Возьмите три входа x=(0.2, -0.1, 0.5), веса w=(0.7, -0.3, 0.4), смещение b=0.1 и функцию ReLU; вычислите выход нейрона."
-```
-
-Strengths:
-- ✅ Concrete numbers provided
-- ✅ ReLU specified
-- ⚠️ No expected result (can't auto-grade)
-
-**🥉 Kimi K2-Thinking (8.45/10 avg)**
-
-Strengths:
-- ✅ Compares sigmoid/tanh/ReLU for z=2.5
-- ✅ Concrete threshold values
-- ⚠️ Less modern tools than K2-0905
-- ⚠️ Reliability dropped to 75%
-
----
+| Место | Модель | Оценка | Почему лучшая |
+|-------|--------|--------|---------------|
+| 🥇 | **DeepSeek Chat 3.1** | 9.0/10 | 5 lessons, отличная структура. |
+| 🥈 | **Xiaomi Mimo V2 Flash** | **8.9/10** | 4 lessons, отличные конкретные значения ("value 1500.50"), лучше чем Qwen. |
+| 🥉 | **DeepSeek v3.1 Terminus** | 8.8/10 | 5 lessons, f-strings, modern Python. |
 
 ## CONSISTENCY ANALYSIS | АНАЛИЗ СТАБИЛЬНОСТИ
 
