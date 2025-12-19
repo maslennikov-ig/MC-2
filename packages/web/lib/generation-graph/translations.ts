@@ -30,6 +30,12 @@ export const GRAPH_TRANSLATIONS: GraphTranslations & {
     fitView: { ru: 'Вписать', en: 'Fit View' },
     zoomIn: { ru: 'Приблизить', en: 'Zoom In' },
     zoomOut: { ru: 'Отдалить', en: 'Zoom Out' },
+    approveAndContinue: { ru: 'Подтвердить и продолжить', en: 'Approve and Continue' },
+    approvalFailed: { ru: 'Не удалось подтвердить', en: 'Approval Failed' },
+    regenerate: { ru: 'Перегенерировать', en: 'Regenerate' },
+    regenerating: { ru: 'Перегенерация...', en: 'Regenerating...' },
+    regenerationStarted: { ru: 'Перегенерация запущена', en: 'Regeneration started' },
+    regenerationFailed: { ru: 'Ошибка перегенерации', en: 'Regeneration Failed' },
   },
   drawer: {
     input: { ru: 'Входные данные', en: 'Input' },

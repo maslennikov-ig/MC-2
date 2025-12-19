@@ -513,6 +513,12 @@ export interface GraphTranslations {
     fitView: { ru: string; en: string };
     zoomIn: { ru: string; en: string };
     zoomOut: { ru: string; en: string };
+    approveAndContinue: { ru: string; en: string };
+    approvalFailed: { ru: string; en: string };
+    regenerate: { ru: string; en: string };
+    regenerating: { ru: string; en: string };
+    regenerationStarted: { ru: string; en: string };
+    regenerationFailed: { ru: string; en: string };
   };
   drawer: {
     input: { ru: string; en: string };
