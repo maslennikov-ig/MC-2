@@ -22,9 +22,11 @@ import { ActivityTab } from './ActivityTab';
 import { RefinementChat } from './RefinementChat';
 import { useRefinement } from '../hooks/useRefinement';
 import { useStaticGraph } from '../contexts/StaticGraphContext';
+import { useGenerationRealtime } from '@/components/generation-monitoring/realtime-provider';
 import { useLessonContent } from '../hooks/useLessonContent';
 import { useNodeStatus } from '../hooks/useNodeStatus';
 import { TraceAttempt } from '@megacampus/shared-types';
+import { isAwaitingApproval as getAwaitingStageNumber } from '@/lib/generation-graph/utils';
 import { toast } from 'sonner';
 import { approveLesson } from '@/app/actions/lesson-actions';
 // Stage 6 "Glass Factory" UI components
@@ -77,11 +79,17 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
 
   // Get realtime status from context (more reliable than node data)
   const realtimeStatus = useNodeStatus(selectedNodeId || '');
+  const { status: generationStatus } = useGenerationRealtime();
+
+  // Check if THIS stage is awaiting approval based on course generation_status
+  // generationStatus contains the raw generation_status like 'stage_5_awaiting_approval'
+  const awaitingStageNumber = getAwaitingStageNumber(generationStatus || '');
+  const isThisStageAwaiting = awaitingStageNumber !== null && data?.stageNumber === awaitingStageNumber;
 
   // Editing permission:
   // - When stage is awaiting approval, EVERYONE can edit (to review/change before approving)
   // - Otherwise, admins get read-only view, owners can edit
-  const isAwaitingApproval = realtimeStatus?.status === 'awaiting' || data?.status === 'awaiting';
+  const isAwaitingApproval = isThisStageAwaiting || realtimeStatus?.status === 'awaiting' || data?.status === 'awaiting';
   const canEdit = isAwaitingApproval || !isAdmin;
 
   // Detect if this is a lesson node and extract lessonId for content fetching
@@ -455,8 +463,8 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
           ) : (
             /* Default tab-based UI for other node types */
             <>
-              {/* Approval Controls */}
-              {displayData?.status === 'awaiting' && (
+              {/* Approval Controls - show when stage is awaiting approval */}
+              {isAwaitingApproval && (
                  <div className="mb-6">
                      <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3 mb-2 text-sm text-yellow-800">
                          {t('drawer.awaitingMessage')}
@@ -464,7 +472,7 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
                      <ApprovalControls
                         courseId={courseInfo.id}
                         stageNumber={data?.stageNumber || 0}
-                        onApproved={() => {}}
+                        onApproved={deselectNode}
                         onRejected={() => {}}
                      />
                  </div>
