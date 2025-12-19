@@ -27,6 +27,7 @@ COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
 
 # Copy all package.json files for workspace
 COPY packages/shared-types/package.json ./packages/shared-types/
+COPY packages/shared-logger/package.json ./packages/shared-logger/
 COPY packages/course-gen-platform/package.json ./packages/course-gen-platform/
 
 # Install all dependencies (including dev dependencies for build)
@@ -42,11 +43,16 @@ COPY tsconfig.json ./
 # Copy source code for shared-types
 COPY packages/shared-types ./packages/shared-types
 
+# Copy source code for shared-logger
+COPY packages/shared-logger ./packages/shared-logger
+
 # Clean any stale dist files that might have been copied from local dev
 RUN rm -rf packages/shared-types/dist packages/shared-types/tsconfig.tsbuildinfo
+RUN rm -rf packages/shared-logger/dist packages/shared-logger/tsconfig.tsbuildinfo
 
-# Build shared-types first
+# Build shared packages first (shared-types, then shared-logger)
 RUN pnpm --filter @megacampus/shared-types build
+RUN pnpm --filter @megacampus/shared-logger build
 
 # Copy source code for course-gen-platform
 COPY packages/course-gen-platform ./packages/course-gen-platform
@@ -93,6 +99,9 @@ COPY --from=builder --chown=nodejs:nodejs /app/packages/course-gen-platform/pack
 # Copy shared-types workspace package (not included in pruned)
 COPY --from=builder --chown=nodejs:nodejs /app/packages/shared-types/dist ./node_modules/@megacampus/shared-types/dist
 COPY --from=builder --chown=nodejs:nodejs /app/packages/shared-types/package.json ./node_modules/@megacampus/shared-types/package.json
+# Copy shared-logger workspace package (not included in pruned)
+COPY --from=builder --chown=nodejs:nodejs /app/packages/shared-logger/dist ./node_modules/@megacampus/shared-logger/dist
+COPY --from=builder --chown=nodejs:nodejs /app/packages/shared-logger/package.json ./node_modules/@megacampus/shared-logger/package.json
 # Copy production tsconfig for tsx path alias resolution
 COPY --from=builder --chown=nodejs:nodejs /app/packages/course-gen-platform/tsconfig.production.json ./tsconfig.json
 
