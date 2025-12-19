@@ -465,15 +465,16 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
             <>
               {/* Approval Controls - show when stage is awaiting approval */}
               {isAwaitingApproval && (
-                 <div className="mb-6">
-                     <div className="bg-yellow-50 border border-yellow-200 rounded-md p-3 mb-2 text-sm text-yellow-800">
+                 <div className="mb-6 p-4 rounded-lg border bg-gradient-to-r from-purple-50 to-indigo-50 border-purple-200 dark:from-purple-900/20 dark:to-indigo-900/20 dark:border-purple-700">
+                     <p className="text-sm text-purple-700 dark:text-purple-300 mb-3">
                          {t('drawer.awaitingMessage')}
-                     </div>
+                     </p>
                      <ApprovalControls
                         courseId={courseInfo.id}
                         stageNumber={data?.stageNumber || 0}
                         onApproved={deselectNode}
                         onRejected={() => {}}
+                        variant="prominent"
                      />
                  </div>
               )}

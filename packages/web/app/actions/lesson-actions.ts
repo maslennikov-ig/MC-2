@@ -1,6 +1,7 @@
 'use server';
 
 import { getBackendAuthHeaders, TRPC_URL } from '@/lib/auth';
+import { extractApiError } from '@/lib/api-error-handler';
 
 /**
  * Approve a lesson after review
@@ -21,8 +22,7 @@ export async function approveLesson(
   });
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ message: 'Unknown error' }));
-    throw new Error(error.message || 'Failed to approve lesson');
+    await extractApiError(response, 'Failed to approve lesson');
   }
 
   const data = await response.json();
@@ -49,8 +49,7 @@ export async function updateLessonContent(
   });
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ message: 'Unknown error' }));
-    throw new Error(error.message || 'Failed to update lesson content');
+    await extractApiError(response, 'Failed to update lesson content');
   }
 
   const data = await response.json();
@@ -77,8 +76,7 @@ export async function regenerateLesson(
   });
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ message: 'Unknown error' }));
-    throw new Error(error.message || 'Failed to regenerate lesson');
+    await extractApiError(response, 'Failed to regenerate lesson');
   }
 
   const data = await response.json();

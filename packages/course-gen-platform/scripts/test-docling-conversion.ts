@@ -506,7 +506,9 @@ async function testUnsupportedFormat(): Promise<TestResult> {
       }
     } finally {
       // Cleanup
-      await fs.unlink(unsupportedPath).catch(() => {});
+      await fs.unlink(unsupportedPath).catch((err) => {
+        logger.warn('Failed to cleanup test file', { path: unsupportedPath, error: err });
+      });
     }
 
     const passed = errorCaught && correctErrorCode;

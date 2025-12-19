@@ -3,6 +3,7 @@
 import { createClient } from '@/lib/supabase/server';
 import { revalidatePath } from 'next/cache';
 import { getBackendAuthHeaders, TRPC_URL } from '@/lib/auth';
+import { extractApiError } from '@/lib/api-error-handler';
 
 export async function triggerStage6ForLesson(lessonId: string) {
   const headers = await getBackendAuthHeaders();
@@ -78,8 +79,7 @@ export async function startGeneration(courseId: string) {
   });
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ message: 'Unknown error' }));
-    throw new Error(error.message || 'Failed to start generation');
+    await extractApiError(response, 'Failed to start generation');
   }
 
   revalidatePath('/courses/generating/[slug]', 'page');
@@ -100,8 +100,7 @@ export async function approveStage(courseId: string, currentStage: number) {
   });
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ message: 'Unknown error' }));
-    throw new Error(error.message || 'Failed to approve stage');
+    await extractApiError(response, 'Failed to approve stage');
   }
 
   revalidatePath('/courses/generating/[slug]', 'page');
@@ -141,8 +140,7 @@ export async function getStageResults(courseId: string, stage: number) {
   });
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ message: 'Unknown error' }));
-    throw new Error(error.message || 'Failed to get stage results');
+    await extractApiError(response, 'Failed to get stage results');
   }
 
   const data = await response.json();
@@ -168,8 +166,7 @@ export async function updateFieldAction(
   });
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ message: 'Unknown error' }));
-    throw new Error(error.message || 'Failed to update field');
+    await extractApiError(response, 'Failed to update field');
   }
 
   revalidatePath('/courses/generating/[slug]', 'page');
@@ -203,8 +200,7 @@ export async function addElementAction(
   });
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ message: 'Unknown error' }));
-    throw new Error(error.message || 'Failed to add element');
+    await extractApiError(response, 'Failed to add element');
   }
 
   revalidatePath('/courses/generating/[slug]', 'page');
@@ -237,8 +233,7 @@ export async function regenerateBlockAction(
   });
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ message: 'Unknown error' }));
-    throw new Error(error.message || 'Failed to regenerate block');
+    await extractApiError(response, 'Failed to regenerate block');
   }
 
   revalidatePath('/courses/generating/[slug]', 'page');
@@ -266,8 +261,7 @@ export async function getBlockDependenciesAction(
   );
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ message: 'Unknown error' }));
-    throw new Error(error.message || 'Failed to get block dependencies');
+    await extractApiError(response, 'Failed to get block dependencies');
   }
 
   const data = await response.json();
@@ -297,8 +291,7 @@ export async function cascadeUpdateAction(
   });
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ message: 'Unknown error' }));
-    throw new Error(error.message || 'Failed to perform cascade update');
+    await extractApiError(response, 'Failed to perform cascade update');
   }
 
   revalidatePath('/courses/generating/[slug]', 'page');
@@ -333,8 +326,7 @@ export async function deleteElementAction(
   });
 
   if (!response.ok) {
-    const error = await response.json().catch(() => ({ message: 'Unknown error' }));
-    throw new Error(error.message || 'Failed to delete element');
+    await extractApiError(response, 'Failed to delete element');
   }
 
   revalidatePath('/courses/generating/[slug]', 'page');

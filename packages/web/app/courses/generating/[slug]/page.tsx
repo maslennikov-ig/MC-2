@@ -4,6 +4,8 @@ import { GenerationProgress, GenerationStep, CourseStatus } from '@/types/course
 import GenerationProgressContainerEnhanced from './GenerationProgressContainerEnhanced';
 import GenerationErrorBoundary from './GenerationErrorBoundary';
 import { GenerationRealtimeProvider } from '@/components/generation-monitoring/realtime-provider';
+import { NextIntlClientProvider } from 'next-intl';
+import { getMessages, getLocale } from 'next-intl/server';
 
 /** Default fallback when lessons count is unknown (before Stage 4 analysis completes) */
 const DEFAULT_LESSONS_COUNT = 5;
@@ -134,22 +136,28 @@ export default async function CourseGeneratingPage({ params }: PageProps) {
   // Use generation_status for workflow state, fallback to 'pending' if not set
   const generationStatus = (course.generation_status || 'pending') as CourseStatus;
 
+  // Get locale and messages for client components
+  const locale = await getLocale();
+  const messages = await getMessages();
+
   return (
-    <GenerationErrorBoundary>
-      <GenerationRealtimeProvider courseId={course.id} initialStatus={generationStatus}>
-        <GenerationProgressContainerEnhanced
-          courseId={course.id}
-          slug={course.slug || ''}
-          initialProgress={generationProgress}
-          initialStatus={generationStatus}
-          courseTitle={course.title || 'Untitled Course'}
-          autoRedirect={true}
-          redirectDelay={3000}
-          userRole={userRole}
-          failedAtStage={course.failed_at_stage}
-          generationCode={course.generation_code}
-        />
-      </GenerationRealtimeProvider>
-    </GenerationErrorBoundary>
+    <NextIntlClientProvider locale={locale} messages={messages}>
+      <GenerationErrorBoundary>
+        <GenerationRealtimeProvider courseId={course.id} initialStatus={generationStatus}>
+          <GenerationProgressContainerEnhanced
+            courseId={course.id}
+            slug={course.slug || ''}
+            initialProgress={generationProgress}
+            initialStatus={generationStatus}
+            courseTitle={course.title || 'Untitled Course'}
+            autoRedirect={true}
+            redirectDelay={3000}
+            userRole={userRole}
+            failedAtStage={course.failed_at_stage}
+            generationCode={course.generation_code}
+          />
+        </GenerationRealtimeProvider>
+      </GenerationErrorBoundary>
+    </NextIntlClientProvider>
   );
 }

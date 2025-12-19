@@ -597,8 +597,8 @@ export async function handleFileDelete(fileId: string): Promise<FileDeleteResult
     courseId: typedFileRecord.course_id,
   }, 'Deleting vectors');
 
-  // @ts-expect-error - Result intentionally unused, delete operation is fire-and-forget
-  const _deleteResult = await qdrantClient.delete(COLLECTION_CONFIG.name, {
+  // Delete operation is fire-and-forget, result not needed
+  await qdrantClient.delete(COLLECTION_CONFIG.name, {
     filter: {
       must: [
         { key: 'document_id', match: { value: fileId } },

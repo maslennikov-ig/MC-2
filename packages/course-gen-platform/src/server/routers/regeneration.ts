@@ -439,7 +439,12 @@ export const regenerationRouter = router({
 
       } catch (error) {
         if (concurrencyTracker) {
-          await concurrencyTracker.release(userId).catch(() => {});
+          await concurrencyTracker.release(userId).catch((releaseErr) => {
+            logger.error({
+              userId,
+              error: releaseErr,
+            }, 'Failed to release concurrency tracker in error handler');
+          });
         }
 
         if (error instanceof TRPCError) {

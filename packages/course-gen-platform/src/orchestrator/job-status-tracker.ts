@@ -34,6 +34,31 @@ export enum JobStatus {
 }
 
 /**
+ * Job status update interface for updateJobStatus function
+ * Accepts Date objects which are converted to ISO strings before database write
+ */
+interface JobStatusUpdate {
+  status?: JobStatus | 'failed'; // Allow both enum and literal for flexibility
+  attempts?: number;
+  started_at?: Date;
+  completed_at?: Date;
+  failed_at?: Date;
+  cancelled?: boolean;
+  cancelled_at?: string;
+  cancelled_by?: string;
+  error_message?: string;
+  error_stack?: string;
+  progress?: Record<string, unknown>;
+  updated_at?: string;
+}
+
+/**
+ * Job status database update type for direct Supabase writes
+ * All date fields must be ISO strings matching database schema
+ */
+type JobStatusDbUpdate = Database['public']['Tables']['job_status']['Update'];
+
+/**
  * Create job status record in database
  *
  * @param {Job<JobData>} job - BullMQ job instance
@@ -104,16 +129,7 @@ export async function createJobStatus(job: Job<JobData>): Promise<void> {
  */
 export async function updateJobStatus(
   jobId: string,
-  updates: {
-    status?: JobStatus;
-    progress?: Record<string, unknown>;
-    error_message?: string;
-    error_stack?: string;
-    attempts?: number;
-    started_at?: Date;
-    completed_at?: Date;
-    failed_at?: Date;
-  },
+  updates: JobStatusUpdate,
   options?: {
     onlyIfNotCompleted?: boolean;
   }
@@ -322,7 +338,7 @@ export async function markJobActive(job: Job<JobData>): Promise<void> {
       return;
     }
 
-    const updates: any = {
+    const updates: JobStatusUpdate = {
       status: JobStatus.ACTIVE,
       attempts: currentAttempt,
     };
@@ -578,7 +594,7 @@ export async function markJobCancelled(jobId: string, cancelledBy?: string): Pro
       }
     }
 
-    const updates: any = {
+    const updates: JobStatusDbUpdate = {
       status: 'failed', // Use 'failed' status but with cancelled flag
       cancelled: true,
       error_message: 'Job cancelled by user request',
@@ -645,7 +661,7 @@ export async function markJobFailed(job: Job<JobData>, error: Error): Promise<vo
       errorMessage = String(error);
     }
 
-    const updates: any = {
+    const updates: JobStatusUpdate = {
       status: isFinalFailure ? JobStatus.FAILED : JobStatus.DELAYED,
       error_message: errorMessage,
       error_stack: error.stack || undefined,

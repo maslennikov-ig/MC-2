@@ -11,9 +11,30 @@
  */
 
 import OpenAI from 'openai';
+import type { ChatCompletionMessageParam, ChatCompletionCreateParamsNonStreaming } from 'openai/resources/chat/completions';
 import logger from '../../shared/logger';
 import { retryWithBackoff } from '../../shared/utils/retry';
 import { getOpenRouterApiKey, getApiKeySync } from '../services/api-key-service';
+
+/**
+ * OpenRouter-specific extension for cache_control
+ * Used with Anthropic models via OpenRouter
+ */
+type MessageWithCacheControl = ChatCompletionMessageParam & {
+  cache_control?: { type: string };
+};
+
+/**
+ * OpenRouter-specific request options
+ * Extends standard OpenAI params with provider-specific fields
+ */
+type OpenRouterRequestOptions = ChatCompletionCreateParamsNonStreaming & {
+  extra_body?: {
+    provider?: {
+      cache_control?: boolean;
+    };
+  };
+};
 
 /**
  * Options for LLM completion requests
@@ -200,7 +221,7 @@ export class LLMClient {
           throw new Error('LLM client not initialized');
         }
         // Build messages array
-        const messages: any[] = [
+        const messages: MessageWithCacheControl[] = [
           { role: 'system', content: systemPrompt },
           { role: 'user', content: prompt },
         ];
@@ -212,7 +233,7 @@ export class LLMClient {
         }
 
         // Build request options
-        const requestOptions: any = {
+        const requestOptions: OpenRouterRequestOptions = {
           model,
           messages,
           max_tokens: maxTokens,

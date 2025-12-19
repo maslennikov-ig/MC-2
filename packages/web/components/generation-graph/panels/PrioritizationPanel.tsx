@@ -29,12 +29,11 @@ import {
   AlertTriangle,
   FileText,
   X,
-  Rocket,
 } from 'lucide-react';
 import { createClient } from '@/lib/supabase/client';
 import { updateDocumentPriority } from '@/app/actions/courses';
-import { approveStage } from '@/app/actions/admin-generation';
 import { toast } from 'sonner';
+import { ApprovalControls } from '../controls/ApprovalControls';
 
 export type DocumentPriority = 'CORE' | 'IMPORTANT' | 'SUPPLEMENTARY';
 
@@ -78,7 +77,6 @@ export function PrioritizationPanel({
   const [documents, setDocuments] = useState<DocumentWithPriority[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [updatingIds, setUpdatingIds] = useState<Set<string>>(new Set());
-  const [isApproving, setIsApproving] = useState(false);
 
   // Fetch documents with priorities
   useEffect(() => {
@@ -163,21 +161,12 @@ export function PrioritizationPanel({
     }
   }, [courseId]);
 
-  // Handle approve
-  const handleApprove = useCallback(async () => {
-    setIsApproving(true);
-    try {
-      await approveStage(courseId, 3);
-      toast.success('Приоритизация подтверждена. Переход к следующему этапу...');
-      onApproved?.();
-      onClose();
-    } catch (error) {
-      console.error('[PrioritizationPanel] Error approving:', error);
-      toast.error('Не удалось подтвердить приоритизацию');
-    } finally {
-      setIsApproving(false);
-    }
-  }, [courseId, onApproved, onClose]);
+  // Handle approved callback - close panel and notify parent
+  const handleApproved = useCallback(() => {
+    toast.success('Приоритизация подтверждена. Переход к следующему этапу...');
+    onApproved?.();
+    onClose();
+  }, [onApproved, onClose]);
 
   // Count by priority
   const counts = {
@@ -418,18 +407,14 @@ export function PrioritizationPanel({
                   isDark ? 'border-slate-700 bg-slate-800/50' : 'border-slate-200 bg-slate-50'
                 }`}
               >
-                <Button
-                  onClick={handleApprove}
-                  disabled={isApproving || isLoading}
-                  className="bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 text-white shadow-lg shadow-purple-500/25"
-                >
-                  {isApproving ? (
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
-                  ) : (
-                    <Rocket className="w-4 h-4 mr-2" />
-                  )}
-                  Подтвердить и продолжить
-                </Button>
+                <ApprovalControls
+                  courseId={courseId}
+                  stageNumber={3}
+                  onApproved={handleApproved}
+                  onRejected={onClose}
+                  variant="prominent"
+                  showReject={false}
+                />
               </div>
             </div>
           </motion.div>

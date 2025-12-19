@@ -163,3 +163,39 @@ export function withErrorHandler<T extends (...args: Parameters<T>) => Promise<N
     }
   }) as T
 }
+
+/**
+ * Response shape from failed API calls in server actions
+ */
+export interface ActionApiErrorResponse {
+  message?: string;
+  error?: string;
+}
+
+/**
+ * Extract error message from a failed fetch response and throw an Error
+ *
+ * Used in server actions to standardize error handling when calling
+ * backend tRPC endpoints or other APIs.
+ *
+ * @param response - The failed fetch Response object
+ * @param fallbackMessage - Default message if no error details available
+ * @throws Error with extracted or fallback message
+ *
+ * @example
+ * ```typescript
+ * if (!response.ok) {
+ *   await extractApiError(response, 'Failed to start generation');
+ * }
+ * ```
+ */
+export async function extractApiError(
+  response: Response,
+  fallbackMessage: string
+): Promise<never> {
+  const errorData: ActionApiErrorResponse = await response
+    .json()
+    .catch(() => ({ message: 'Unknown error' }));
+
+  throw new Error(errorData.message || errorData.error || fallbackMessage);
+}
