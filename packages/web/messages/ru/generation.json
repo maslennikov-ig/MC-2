@@ -179,5 +179,15 @@
     "restartingButton": "Перезапуск...",
     "cancelButton": "Отмена",
     "buttonTooltip": "Перезапустить с этого этапа"
+  },
+  "missionControl": {
+    "stage5": {
+      "compact": "Проверить",
+      "full": "Проверить структуру"
+    },
+    "default": {
+      "compact": "Запуск",
+      "full": "Подтвердить и продолжить"
+    }
   }
 }

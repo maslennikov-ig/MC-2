@@ -99,6 +99,8 @@ export interface GraphViewProps {
    * Ensures consistency with CelestialHeader progress display.
    */
   progressPercentage?: number;
+  /** Human-readable generation code (e.g., "ABC-1234") for debugging */
+  generationCode?: string | null;
 }
 
 /**
@@ -139,7 +141,7 @@ function GraphInteractions({ setIsPanning }: GraphInteractionsProps) {
  *
  * @param props - Component props
  */
-function GraphViewInner({ courseId, courseTitle, hasDocuments = true, failedAtStage, progressPercentage }: GraphViewProps) {
+function GraphViewInner({ courseId, courseTitle, hasDocuments = true, failedAtStage, progressPercentage, generationCode }: GraphViewProps) {
   const { isTablet } = useBreakpoint(768);
   const nodesInitialized = useNodesInitialized();
   const { fitView, getNodes, setCenter } = useReactFlow();
@@ -593,6 +595,7 @@ function GraphViewInner({ courseId, courseTitle, hasDocuments = true, failedAtSt
              isDark={isDark}
              isFullscreen={isFullscreen}
              onToggleFullscreen={toggleFullscreen}
+             generationCode={generationCode}
           />
           <div className="relative flex-1 w-full overflow-hidden">
             {/* Degradation Mode Indicator */}
@@ -673,7 +676,12 @@ function GraphViewInner({ courseId, courseTitle, hasDocuments = true, failedAtSt
                                     selectNode('stage_3');
                                     return;
                                 }
-                                // For other stages (2, 4, 5, 6): approve and continue
+                                // For stage 5, open Stage 5 node modal for structure approval
+                                if (awaitingStage === 5) {
+                                    selectNode('stage_5');
+                                    return;
+                                }
+                                // For other stages (2, 4, 6): approve and continue
                                 setIsProcessingBanner(true);
                                 try {
                                     await approveStage(courseId, awaitingStage);
@@ -719,7 +727,7 @@ function GraphViewInner({ courseId, courseTitle, hasDocuments = true, failedAtSt
             {isAdmin && <AdminPanel isOpen={isAdminPanelOpen} onClose={() => setIsAdminPanelOpen(false)} />}
 
             {/* Selection toolbar for Stage 6 partial generation - only show when lessons exist */}
-            {nodes.some(n => n.type === 'lesson') && <SelectionToolbar />}
+            {nodes.some(n => n.type === 'lesson') && <SelectionToolbar courseId={courseId} />}
           </div>
         </div>
         </FullscreenProvider>

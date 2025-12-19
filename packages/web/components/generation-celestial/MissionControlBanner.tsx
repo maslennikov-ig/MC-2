@@ -1,6 +1,7 @@
 'use client';
 
 import { useState } from 'react';
+import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Rocket, X, Eye, AlertTriangle, ChevronUp, ChevronDown } from 'lucide-react';
@@ -26,9 +27,18 @@ export function MissionControlBanner({
   isDark = false
 }: MissionControlBannerProps) {
   const [isExpanded, setIsExpanded] = useState(false);
-  
+  const t = useTranslations('generation.missionControl');
+
   // Find stage name safely
   const stageName = Object.values(STAGE_CONFIG).find(s => s.number === awaitingStage)?.name || `Stage ${awaitingStage}`;
+
+  // Custom button text for different stages
+  const getButtonText = (compact: boolean) => {
+    if (awaitingStage === 5) {
+      return compact ? t('stage5.compact') : t('stage5.full');
+    }
+    return compact ? t('default.compact') : t('default.full');
+  };
 
   return (
     <div className="fixed bottom-6 left-0 right-0 z-50 px-4 pointer-events-none flex justify-center">
@@ -90,7 +100,7 @@ export function MissionControlBanner({
                   ) : (
                     <>
                       <Rocket className="w-3 h-3 mr-1.5" />
-                      Запуск
+                      {getButtonText(true)}
                     </>
                   )}
                 </Button>
@@ -161,7 +171,7 @@ export function MissionControlBanner({
                       ) : (
                         <>
                           <Rocket className="w-4 h-4 mr-2" />
-                          Подтвердить и продолжить
+                          {getButtonText(false)}
                         </>
                       )}
                     </Button>

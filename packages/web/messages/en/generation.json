@@ -179,5 +179,15 @@
     "restartingButton": "Restarting...",
     "cancelButton": "Cancel",
     "buttonTooltip": "Restart from this stage"
+  },
+  "missionControl": {
+    "stage5": {
+      "compact": "Review",
+      "full": "Review Structure"
+    },
+    "default": {
+      "compact": "Launch",
+      "full": "Confirm and Continue"
+    }
   }
 }
