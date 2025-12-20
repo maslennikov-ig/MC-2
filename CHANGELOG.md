@@ -25,6 +25,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.26.9] - 2025-12-20
+
+### Added
+- **error-pages**: add shared error state components with i18n and theme support (aaa0990)
+- **models**: centralize default model config with Xiaomi MiMo V2 Flash (a9566b2)
+- **approval-controls**: unify approval UI with regenerate support (d857c80)
+- **stage5-6**: add structure approval flow and generate all button (4e0fea1)
+- **deploy**: add Telegram notifications for deploy status (8fb0dff)
+
+### Changed
+- **web**: skip eslint during builds for faster CI (e64a6d8)
+
+### Fixed
+- **courses**: cleanup external resources when deleting course (f53ad93)
+- **docker**: add shared-logger package to web Dockerfile (dd8f160)
+- **docker**: add shared-logger package to Docker build (01839ff)
+- **ci**: add shared-logger build step to CI workflow (1474970)
+- **llm**: optimize model config service with parallel fetch and token utility (fb95a94)
+- **stage5**: show ApprovalControls when stage awaiting approval (cfb92e3)
+- **docker**: disable healthcheck for worker container (2584444)
+- **deploy**: skip docling-mcp pull, improve rollback (5855fa5)
+- Use lowercase mc-2 for ghcr.io image paths (52be950)
+- **deploy**: fix case sensitivity in ghcr.io paths (MC-2 not mc-2) (1d303ff)
+- **deploy**: add pull_policy for docling-mcp, use mc-2 registry (03c3310)
+- **deploy**: fix YAML syntax in Telegram notification (33d957d)
+- **deploy**: use megacampusai registry for docling-mcp (too large to rebuild) (a7275f7)
+- **deploy**: update image paths to mc-2 registry (b1cdfad)
+
+### Other
+- **scripts**: update automation scripts (51eef5a)
+- **agents**: update agent configurations (3007100)
+- **agents**: update agent configurations (101d02c)
+- Initial commit: MegaCampus 2.0 AI Course Generation Platform (d502e3a)
+
 ## [0.26.8] - 2025-12-18
 
 ### Other
