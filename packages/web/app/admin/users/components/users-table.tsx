@@ -7,15 +7,16 @@ import { Input } from '@/components/ui/input';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { listUsersAction } from '@/app/actions/admin-users';
+import { listUsersAction, getCurrentUserRoleAction } from '@/app/actions/admin-users';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { RoleBadge } from '@/components/common/role-badge';
 import { RoleSelect } from './role-select';
 import { ActivationSwitch } from './activation-switch';
+import { DeleteButton } from './delete-button';
 import { useTranslations } from 'next-intl';
 import { createBrowserClient } from '@supabase/ssr';
-import type { UserListItem } from '@/app/actions/admin-users';
+import type { UserListItem, UserRole } from '@/app/actions/admin-users';
 
 /** Debounce timeout for search input in milliseconds */
 const SEARCH_DEBOUNCE_MS = 300;
@@ -32,6 +33,7 @@ export function UsersTable() {
   const [statusFilter, setStatusFilter] = useState<string>('all');
   const [error, setError] = useState<string | null>(null);
   const [currentUserId, setCurrentUserId] = useState<string | null | 'loading'>('loading');
+  const [currentUserRole, setCurrentUserRole] = useState<UserRole | 'loading'>('loading');
 
   useEffect(() => {
     const supabase = createBrowserClient(
@@ -45,6 +47,16 @@ export function UsersTable() {
       setCurrentUserId(null);
       toast.error('Failed to identify current user. Some actions disabled for safety.');
     });
+
+    // Fetch current user's role
+    getCurrentUserRoleAction()
+      .then((result) => {
+        setCurrentUserRole(result.role);
+      })
+      .catch((err) => {
+        console.error('Failed to fetch current user role:', err);
+        setCurrentUserRole('admin'); // Default to admin (safer - less permissions)
+      });
   }, []);
 
   const loadData = useCallback(async () => {
@@ -86,6 +98,10 @@ export function UsersTable() {
     loadData();
   }, [loadData]);
 
+  const handleUserDeleted = useCallback(() => {
+    loadData();
+  }, [loadData]);
+
   const totalPages = Math.ceil(totalCount / pageSize);
 
   const getStatusBadge = (isActive: boolean) => {
@@ -102,6 +118,9 @@ export function UsersTable() {
       </Badge>
     );
   };
+
+  const isRoleLoaded = currentUserRole !== 'loading';
+  const isSuperadmin = currentUserRole === 'superadmin';
 
   return (
     <div className="space-y-4">
@@ -181,49 +200,65 @@ export function UsersTable() {
                   </td>
                 </tr>
               ) : (
-                data.map((user) => (
-                  <tr
-                    key={user.id}
-                    className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted"
-                  >
-                    <td className="p-4 align-middle">
-                      <div className="flex items-center gap-2">
-                        <Mail className="h-4 w-4 text-muted-foreground" />
-                        <span className="font-medium">{user.email}</span>
-                      </div>
-                    </td>
-                    <td className="p-4 align-middle">
-                      <div className="flex items-center gap-2 text-muted-foreground">
-                        <Building2 className="h-4 w-4" />
-                        <span>{user.organizationName}</span>
-                      </div>
-                    </td>
-                    <td className="p-4 align-middle">
-                      <RoleBadge role={user.role} />
-                    </td>
-                    <td className="p-4 align-middle">
-                      {getStatusBadge(user.isActive)}
-                    </td>
-                    <td className="p-4 align-middle text-muted-foreground">
-                      {user.createdAt && formatDistanceToNow(new Date(user.createdAt), { addSuffix: true })}
-                    </td>
-                    <td className="p-4 align-middle">
-                      <div className="flex items-center justify-end gap-3">
-                        <RoleSelect
-                          userId={user.id}
-                          currentRole={user.role}
-                          onRoleUpdated={handleRoleUpdate}
-                        />
-                        <ActivationSwitch
-                          userId={user.id}
-                          isActive={user.isActive}
-                          disabled={currentUserId === 'loading' || user.id === currentUserId}
-                          onToggled={handleActivationToggle}
-                        />
-                      </div>
-                    </td>
-                  </tr>
-                ))
+                data.map((user) => {
+                  const isCurrentUser = currentUserId === user.id;
+                  return (
+                    <tr
+                      key={user.id}
+                      className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted"
+                    >
+                      <td className="p-4 align-middle">
+                        <div className="flex items-center gap-2">
+                          <Mail className="h-4 w-4 text-muted-foreground" />
+                          <span className="font-medium">{user.email}</span>
+                        </div>
+                      </td>
+                      <td className="p-4 align-middle">
+                        <div className="flex items-center gap-2 text-muted-foreground">
+                          <Building2 className="h-4 w-4" />
+                          <span>{user.organizationName}</span>
+                        </div>
+                      </td>
+                      <td className="p-4 align-middle">
+                        <RoleBadge role={user.role} />
+                      </td>
+                      <td className="p-4 align-middle">
+                        {getStatusBadge(user.isActive)}
+                      </td>
+                      <td className="p-4 align-middle text-muted-foreground">
+                        {user.createdAt && formatDistanceToNow(new Date(user.createdAt), { addSuffix: true })}
+                      </td>
+                      <td className="p-4 align-middle">
+                        <div className="flex items-center justify-end gap-3">
+                          {isRoleLoaded && (
+                            <RoleSelect
+                              userId={user.id}
+                              currentRole={user.role}
+                              currentUserRole={currentUserRole as UserRole}
+                              onRoleUpdated={handleRoleUpdate}
+                            />
+                          )}
+                          <ActivationSwitch
+                            userId={user.id}
+                            isActive={user.isActive}
+                            disabled={currentUserId === 'loading' || isCurrentUser}
+                            onToggled={handleActivationToggle}
+                          />
+                          {isRoleLoaded && isSuperadmin && (
+                            <DeleteButton
+                              userId={user.id}
+                              userEmail={user.email}
+                              userRole={user.role}
+                              currentUserRole={currentUserRole as UserRole}
+                              isCurrentUser={isCurrentUser}
+                              onDeleted={handleUserDeleted}
+                            />
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  );
+                })
               )}
             </tbody>
           </table>

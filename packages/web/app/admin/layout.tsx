@@ -6,11 +6,15 @@ import { NextIntlClientProvider } from 'next-intl';
 import { getMessages, getLocale } from 'next-intl/server';
 import { LanguageSwitcher } from '@/components/language-switcher';
 import { AdminUserMenu } from './components/admin-user-menu';
+import { AdminNav } from './components/admin-nav';
+import Logo from '@/components/common/logo';
+import { BookOpen, Plus } from 'lucide-react';
 
 interface AdminMessages {
   admin?: {
     dashboard?: string;
     navigation?: {
+      dashboard?: string;
       generations?: string;
       history?: string;
       users?: string;
@@ -52,36 +56,36 @@ export default async function AdminLayout({
 
   return (
     <NextIntlClientProvider locale={locale} messages={messages}>
-      <div className="min-h-screen admin-bg-grid">
-        <header className="sticky top-0 z-50 w-full admin-header-glass">
+      <div className="min-h-screen admin-bg-grid bg-gray-50 dark:bg-transparent">
+        <header className="sticky top-0 z-50 w-full admin-header-glass bg-white/80 dark:bg-transparent border-b border-gray-200 dark:border-transparent">
           <div className="flex h-16 items-center justify-between px-6">
-            <div className="flex items-center gap-8">
-              <Link
-                className="flex items-center space-x-2 group"
-                href="/admin/generation/history"
-              >
-                <span className="hidden font-bold text-lg sm:inline-block bg-gradient-to-r from-cyan-400 to-purple-400 bg-clip-text text-transparent group-hover:from-cyan-300 group-hover:to-purple-300 transition-all">
-                  {messages.admin?.dashboard || 'Admin Dashboard'}
-                </span>
-              </Link>
-              <nav className="flex items-center space-x-1 text-sm font-medium">
-                <Link className="admin-nav-link px-3 py-2 rounded-md" href="/admin/generation/history">
-                  {messages.admin?.navigation?.generations || 'Generations'}
+            <div className="flex items-center gap-4 sm:gap-6">
+              {/* Logo - links to main site */}
+              <Logo variant="compact" size="sm" href="/" />
+
+              {/* Quick action buttons */}
+              <div className="hidden sm:flex items-center gap-2">
+                <Link
+                  href="/courses"
+                  className="group text-gray-700 dark:text-gray-300 hover:text-purple-600 dark:hover:text-purple-400 text-sm font-medium px-3 py-2 rounded-full bg-gray-100 dark:bg-slate-800 border border-gray-200 dark:border-slate-700 hover:bg-purple-50 dark:hover:bg-purple-500/10 hover:border-purple-200 dark:hover:border-purple-500/30 transition-all flex items-center gap-1.5"
+                >
+                  <BookOpen className="w-4 h-4" />
+                  <span>Каталог</span>
                 </Link>
-                <Link className="admin-nav-link px-3 py-2 rounded-md" href="/admin/generation/history">
-                  {messages.admin?.navigation?.history || 'History'}
+                <Link
+                  href="/create"
+                  className="group text-gray-700 dark:text-gray-300 hover:text-purple-600 dark:hover:text-purple-400 text-sm font-medium px-3 py-2 rounded-full bg-gradient-to-r from-purple-50 to-blue-50 dark:from-purple-500/5 dark:to-blue-500/5 border border-purple-200 dark:border-purple-500/20 hover:from-purple-100 hover:to-blue-100 dark:hover:from-purple-500/10 dark:hover:to-blue-500/10 transition-all flex items-center gap-1.5"
+                >
+                  <Plus className="w-4 h-4 text-purple-600 dark:text-purple-400" />
+                  <span>Создать курс</span>
                 </Link>
-                {role === 'superadmin' && (
-                  <>
-                    <Link className="admin-nav-link px-3 py-2 rounded-md" href="/admin/users">
-                      {messages.admin?.navigation?.users || 'Users'}
-                    </Link>
-                    <Link className="admin-nav-link admin-nav-link-active px-3 py-2 rounded-md" href="/admin/pipeline">
-                      {messages.admin?.navigation?.pipeline || 'Pipeline'}
-                    </Link>
-                  </>
-                )}
-              </nav>
+              </div>
+
+              {/* Divider */}
+              <div className="hidden sm:block h-6 w-px bg-gray-200 dark:bg-slate-700" />
+
+              {/* Admin navigation */}
+              <AdminNav role={role} messages={messages} />
             </div>
             <div className="flex items-center gap-3">
               <LanguageSwitcher />

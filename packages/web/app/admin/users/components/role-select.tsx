@@ -5,21 +5,25 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { updateUserRoleAction } from '@/app/actions/admin-users';
 import { toast } from 'sonner';
 import { useTranslations } from 'next-intl';
-import type { UserRole } from '@/types/database';
+import type { UserRole } from '@/app/actions/admin-users';
 
 interface RoleSelectProps {
   userId: string;
   currentRole: UserRole;
+  currentUserRole: UserRole;
   onRoleUpdated?: () => void;
 }
 
-export function RoleSelect({ userId, currentRole, onRoleUpdated }: RoleSelectProps) {
+export function RoleSelect({ userId, currentRole, currentUserRole, onRoleUpdated }: RoleSelectProps) {
   const t = useTranslations('admin.users');
   const [role, setRole] = useState<UserRole>(currentRole);
   const [updating, setUpdating] = useState(false);
 
+  const isSuperadmin = currentUserRole === 'superadmin';
+
   const handleRoleChange = async (newRole: string) => {
-    if (newRole === 'superadmin') {
+    // Only superadmins can assign superadmin role
+    if (newRole === 'superadmin' && !isSuperadmin) {
       toast.error(t('errors.cannotAssignSuperadmin'));
       return;
     }
@@ -30,7 +34,7 @@ export function RoleSelect({ userId, currentRole, onRoleUpdated }: RoleSelectPro
     try {
       await updateUserRoleAction({
         userId,
-        role: newRole as 'student' | 'instructor' | 'admin',
+        role: newRole as UserRole,
       });
 
       setRole(newRole as UserRole);
@@ -45,8 +49,8 @@ export function RoleSelect({ userId, currentRole, onRoleUpdated }: RoleSelectPro
     }
   };
 
-  // Disable role change for superadmin (safety)
-  if (currentRole === 'superadmin') {
+  // Non-superadmins cannot modify superadmin users at all
+  if (currentRole === 'superadmin' && !isSuperadmin) {
     return (
       <Select value={role} disabled>
         <SelectTrigger className="w-[130px]" aria-label={t('actions.changeRole')}>
@@ -69,6 +73,9 @@ export function RoleSelect({ userId, currentRole, onRoleUpdated }: RoleSelectPro
         <SelectItem value="student">{t('roles.student')}</SelectItem>
         <SelectItem value="instructor">{t('roles.instructor')}</SelectItem>
         <SelectItem value="admin">{t('roles.admin')}</SelectItem>
+        {isSuperadmin && (
+          <SelectItem value="superadmin">{t('roles.superadmin')}</SelectItem>
+        )}
       </SelectContent>
     </Select>
   );

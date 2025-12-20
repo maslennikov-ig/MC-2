@@ -27,6 +27,7 @@ import {
   saveUserPreferences,
   type UserPreferences as UserPrefs
 } from '@/lib/user-preferences'
+import { ProfileHeader as MainProfileHeader } from './_components/profile-header'
 
 // Safe storage utilities
 const safeStorage = {
@@ -666,8 +667,11 @@ export default function ProfilePage() {
       }}
     >
       <div className="min-h-screen bg-background relative" role="main">
+      {/* Main Application Header */}
+      <MainProfileHeader />
+
       {/* Navigation Header */}
-      <div className="sticky top-0 z-50 bg-background border-b">
+      <div className="sticky top-[73px] z-40 bg-background border-b">
         <div className="container max-w-6xl mx-auto px-4 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">

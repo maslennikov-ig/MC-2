@@ -1,10 +1,28 @@
 {
   "dashboard": "Admin Dashboard",
+  "welcome": "Welcome back!",
   "navigation": {
+    "dashboard": "Overview",
     "generations": "Generations",
     "history": "History",
     "users": "Users",
     "pipeline": "Pipeline"
+  },
+  "stats": {
+    "overview": "Platform overview",
+    "users": "Users",
+    "courses": "Courses",
+    "lessons": "Lessons",
+    "generations": "Generations",
+    "active": "Active",
+    "newThisWeek": "this week",
+    "errorsLast24h": "Errors in the last 24h"
+  },
+  "quickActions": {
+    "title": "Quick Actions",
+    "viewGenerations": "View Generations",
+    "manageUsers": "Manage Users",
+    "pipelineConfig": "Pipeline Config"
   },
   "users": {
     "title": "User Management",
@@ -40,7 +58,15 @@
     "actions": {
       "changeRole": "Change role",
       "toggleActivation": "Toggle activation",
-      "refresh": "Refresh"
+      "refresh": "Refresh",
+      "delete": "Delete user"
+    },
+    "deleteDialog": {
+      "title": "Delete User",
+      "description": "Are you sure you want to delete {email}? This action cannot be undone.",
+      "cancel": "Cancel",
+      "confirm": "Delete",
+      "deleting": "Deleting..."
     },
     "pagination": {
       "showing": "Showing {from} to {to} of {total} results",
@@ -50,13 +76,15 @@
     "success": {
       "roleUpdated": "User role updated successfully",
       "userActivated": "User activated successfully",
-      "userDeactivated": "User deactivated successfully"
+      "userDeactivated": "User deactivated successfully",
+      "userDeleted": "User deleted successfully"
     },
     "errors": {
       "loadFailed": "Failed to load users",
       "roleUpdateFailed": "Failed to update user role",
       "activationFailed": "Failed to toggle user activation",
-      "cannotAssignSuperadmin": "Superadmin role cannot be assigned via UI for security reasons"
+      "cannotAssignSuperadmin": "Only superadmins can assign the superadmin role",
+      "deleteFailed": "Failed to delete user"
     }
   },
   "pipeline": {

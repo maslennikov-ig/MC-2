@@ -14,7 +14,11 @@ export interface ListUsersParams {
 
 export interface UpdateUserRoleParams {
   userId: string;
-  role: 'student' | 'instructor' | 'admin';
+  role: 'student' | 'instructor' | 'admin' | 'superadmin';
+}
+
+export interface DeleteUserParams {
+  userId: string;
 }
 
 export interface ToggleUserActivationParams {
@@ -131,6 +135,63 @@ export async function toggleUserActivationAction(params: ToggleUserActivationPar
     return json.result.data;
   } catch (error) {
     console.error('Toggle User Activation Server Action Error:', error);
+    throw error;
+  }
+}
+
+export async function deleteUserAction(params: DeleteUserParams) {
+  const headers = await getBackendAuthHeaders();
+
+  try {
+    const res = await fetch(`${TRPC_URL}/admin.deleteUser`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(params),
+    });
+
+    if (!res.ok) {
+      const text = await res.text();
+      console.error('Delete user failed:', text);
+      throw new Error(`Failed to delete user: ${res.statusText}`);
+    }
+
+    const json = await res.json();
+
+    if (json.error) {
+      throw new Error(json.error.message);
+    }
+
+    return json.result.data;
+  } catch (error) {
+    console.error('Delete User Server Action Error:', error);
+    throw error;
+  }
+}
+
+export async function getCurrentUserRoleAction(): Promise<{ role: Role }> {
+  const headers = await getBackendAuthHeaders();
+
+  try {
+    const res = await fetch(`${TRPC_URL}/admin.getCurrentUserRole`, {
+      headers,
+      cache: 'no-store',
+    });
+
+    if (!res.ok) {
+      const text = await res.text();
+      console.error('Get current user role failed:', text);
+      throw new Error(`Failed to get current user role: ${res.statusText}`);
+    }
+
+    const json = await res.json();
+
+    if (json.error) {
+      throw new Error(json.error.message);
+    }
+
+    return json.result.data as { role: Role };
+  } catch (error) {
+    console.error('Get Current User Role Server Action Error:', error);
     throw error;
   }
 }

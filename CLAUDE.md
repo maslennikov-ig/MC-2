@@ -200,9 +200,10 @@ Production server SSH available. See `.claude/local.md` for IP and details (giti
 **Internationalization (i18n)**:
 - Library: `next-intl` (v4.5.8)
 - Locales: `ru` (default), `en`
-- Switcher component: `LanguageSwitcher`
-- Translations: `packages/web/messages/{ru,en}.json`
-- Hooks: `useTranslations()` (client), `getTranslations()` (server)
+- Translations: `packages/web/messages/{locale}/{namespace}.json`
+- Namespaces: defined in `src/i18n/request.ts` → `NAMESPACES` array
+- To add namespace: create JSON files + add to `NAMESPACES` array
+- Hooks: `useTranslations('namespace')` (client), `getTranslations('namespace')` (server)
 
 ## Recent Changes
 - 013-n8n-graph-view: Added Immer for state management

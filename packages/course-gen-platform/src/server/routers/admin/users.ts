@@ -44,6 +44,13 @@ const getUserByIdInputSchema = z.object({
   userId: z.string().uuid('Invalid user ID'),
 });
 
+/**
+ * Input schema for deleteUser mutation
+ */
+const deleteUserInputSchema = z.object({
+  userId: z.string().uuid('Invalid user ID'),
+});
+
 export const usersRouter = router({
   /**
    * List users with pagination and filtering
@@ -278,19 +285,29 @@ export const usersRouter = router({
    * Validations:
    * - Cannot change own role
    * - Cannot demote the last superadmin
+   * - Admins can only assign non-superadmin roles
+   * - Superadmins can assign any role
    */
-  updateUserRole: superadminProcedure
+  updateUserRole: adminProcedure
     .input(updateUserRoleInputSchema)
     .mutation(async ({ ctx, input }) => {
       const { userId, role } = input;
-      // superadminProcedure guarantees ctx.user is non-null
+      // adminProcedure guarantees ctx.user is non-null
       const currentUser = ctx.user!;
 
       // Validation: Cannot change own role
       if (userId === currentUser.id) {
         throw new TRPCError({
           code: 'BAD_REQUEST',
-          message: 'Cannot change your own role. Ask another superadmin to make this change.',
+          message: 'Cannot change your own role. Ask another admin to make this change.',
+        });
+      }
+
+      // Validation: Only superadmins can assign superadmin role
+      if (role === 'superadmin' && currentUser.role !== 'superadmin') {
+        throw new TRPCError({
+          code: 'FORBIDDEN',
+          message: 'Only superadmins can assign the superadmin role.',
         });
       }
 
@@ -315,6 +332,14 @@ export const usersRouter = router({
           throw new TRPCError({
             code: 'INTERNAL_SERVER_ERROR',
             message: ErrorMessages.databaseError('User lookup', fetchError.message),
+          });
+        }
+
+        // Validation: Admins cannot modify superadmin users
+        if (targetUser.role === 'superadmin' && currentUser.role !== 'superadmin') {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'Only superadmins can modify superadmin users.',
           });
         }
 
@@ -513,6 +538,128 @@ export const usersRouter = router({
         });
       }
     }),
+
+  /**
+   * Delete a user from the system
+   * Validations:
+   * - Cannot delete own account
+   * - Cannot delete the last superadmin
+   * - Deletes from both users table and auth.users
+   */
+  deleteUser: superadminProcedure
+    .input(deleteUserInputSchema)
+    .mutation(async ({ ctx, input }) => {
+      const { userId } = input;
+      const currentUser = ctx.user!;
+
+      // Validation: Cannot delete own account
+      if (userId === currentUser.id) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Cannot delete your own account.',
+        });
+      }
+
+      try {
+        const supabase = getSupabaseAdmin();
+
+        // Check if user exists and get their role
+        const { data: targetUser, error: fetchError } = await supabase
+          .from('users')
+          .select('id, email, role')
+          .eq('id', userId)
+          .single();
+
+        if (fetchError) {
+          if (fetchError.code === 'PGRST116') {
+            throw new TRPCError({
+              code: 'NOT_FOUND',
+              message: ErrorMessages.notFound('User', userId),
+            });
+          }
+          logger.error({ err: fetchError.message, userId }, 'Failed to fetch user for deletion');
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: ErrorMessages.databaseError('User lookup', fetchError.message),
+          });
+        }
+
+        // Validation: Cannot delete the last superadmin
+        if (targetUser.role === 'superadmin') {
+          const { count, error: countError } = await supabase
+            .from('users')
+            .select('*', { count: 'exact', head: true })
+            .eq('role', 'superadmin');
+
+          if (countError) {
+            logger.error({ err: countError.message }, 'Failed to count superadmins');
+            throw new TRPCError({
+              code: 'INTERNAL_SERVER_ERROR',
+              message: ErrorMessages.databaseError('Superadmin count', countError.message),
+            });
+          }
+
+          if (count !== null && count <= 1) {
+            throw new TRPCError({
+              code: 'BAD_REQUEST',
+              message: 'Cannot delete the last superadmin.',
+            });
+          }
+        }
+
+        // Delete from users table first (this will cascade if configured, or just delete the profile)
+        const { error: deleteError } = await supabase
+          .from('users')
+          .delete()
+          .eq('id', userId);
+
+        if (deleteError) {
+          logger.error({ err: deleteError.message, userId }, 'Failed to delete user from users table');
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: ErrorMessages.databaseError('User deletion', deleteError.message),
+          });
+        }
+
+        // Delete from auth.users (this requires admin client)
+        const { error: authDeleteError } = await supabase.auth.admin.deleteUser(userId);
+
+        if (authDeleteError) {
+          logger.error({ err: authDeleteError.message, userId }, 'Failed to delete user from auth.users');
+          // Note: We don't throw here because the user profile is already deleted
+          // The auth user will be orphaned but won't have access to the system
+        }
+
+        logger.info({ userId, email: targetUser.email }, 'User deleted');
+
+        return { success: true, deletedUserId: userId };
+      } catch (error) {
+        if (error instanceof TRPCError) {
+          throw error;
+        }
+
+        logger.error({
+          err: error instanceof Error ? error.message : String(error),
+          userId,
+        }, 'Unexpected error in deleteUser');
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: ErrorMessages.internalError(
+            'User deletion',
+            error instanceof Error ? error.message : undefined
+          ),
+        });
+      }
+    }),
+
+  /**
+   * Get the current user's role
+   * Used by the frontend to determine which role options to show
+   */
+  getCurrentUserRole: adminProcedure.query(async ({ ctx }) => {
+    const currentUser = ctx.user!;
+    return { role: currentUser.role };
+  }),
 });
 
 export type UsersRouter = typeof usersRouter;

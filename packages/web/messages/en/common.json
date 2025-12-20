@@ -10,5 +10,46 @@
   "export": "Export",
   "import": "Import",
   "refresh": "Refresh",
-  "na": "N/A"
+  "na": "N/A",
+  "errors": {
+    "notFound": {
+      "title": "Page Not Found",
+      "message": "The requested page does not exist or has been moved",
+      "goHome": "Go Home",
+      "goBack": "Go Back"
+    },
+    "generic": {
+      "title": "Something Went Wrong",
+      "message": "An unexpected error occurred. Please try again.",
+      "tryAgain": "Try Again",
+      "errorDetails": "Error Details (dev mode)"
+    },
+    "unauthorized": {
+      "title": "Authorization Required",
+      "message": "This page is only available to logged-in users.",
+      "signIn": "Sign In",
+      "register": "Register"
+    },
+    "forbidden": {
+      "title": "Access Denied",
+      "message": "You don't have permission for this action. Only instructors or administrators have this access.",
+      "hint": "💡 Once your role is elevated, this page will automatically refresh",
+      "yourRole": "Your current role:",
+      "requiredRoles": "Required roles:",
+      "returnToCourses": "Return to Courses",
+      "contactAdmin": "Contact Administrator",
+      "roles": {
+        "student": "Student",
+        "instructor": "Instructor",
+        "admin": "Administrator",
+        "superadmin": "Super Admin",
+        "unauthenticated": "Not Authenticated",
+        "unknown": "Unknown Role"
+      }
+    },
+    "global": {
+      "title": "Critical Error",
+      "message": "A serious error occurred. Please try refreshing the page."
+    }
+  }
 }

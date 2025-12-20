@@ -19,6 +19,7 @@ import { createDraftSession, updateDraftSession, materializeDraftSession } from 
 import type { DraftFormData } from '@/lib/draft-session'
 import { FileUpload, readFileAsBase64 } from '@/components/forms/file-upload'
 import type { UploadedFile, FileUploadStatus } from '@/components/forms/file-upload'
+import { AuthRequiredState, PermissionDeniedState } from '@/components/common/error-states'
 import {
   FileText,
   AlertCircle,
@@ -751,64 +752,29 @@ export default function CreateCourseForm() {
     )
   }
 
-  // Show restriction notice for students
+  // Show restriction notice for unauthenticated users
+  if (!canCreate && userRole === 'unauthenticated') {
+    return (
+      <div className="w-full max-w-5xl mx-auto">
+        <AuthRequiredState
+          variant="card"
+          onSignIn={() => authModal.open('login')}
+          onRegister={() => authModal.open('register')}
+        />
+      </div>
+    )
+  }
+
+  // Show restriction notice for authenticated users without permissions
   if (!canCreate) {
     return (
       <div className="w-full max-w-5xl mx-auto">
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          className="bg-gradient-to-br from-orange-500/10 to-red-500/10 backdrop-blur-xl rounded-2xl p-8 border border-orange-500/30"
-        >
-          <div className="text-center">
-            <div className="w-20 h-20 bg-orange-500/20 rounded-full flex items-center justify-center mx-auto mb-6">
-              <AlertCircle className="w-10 h-10 text-orange-400" />
-            </div>
-
-            <h2 className="text-3xl font-bold text-slate-900 dark:text-white mb-4">
-              Создание курсов доступно только инструкторам
-            </h2>
-
-            <p className="text-slate-700 dark:text-white/80 text-lg mb-2">
-              Ваша текущая роль: <span className="font-semibold text-orange-600 dark:text-orange-300">{
-                userRole === 'student' ? 'Студент' :
-                userRole === 'instructor' ? 'Инструктор' :
-                userRole === 'admin' ? 'Администратор' :
-                userRole === 'superadmin' ? 'Суперадмин' :
-                userRole
-              }</span>
-            </p>
-
-            <p className="text-slate-600 dark:text-white/70 mb-8 max-w-2xl mx-auto">
-              Для создания собственных курсов необходимо повысить вашу роль до инструктора или администратора.
-              Обратитесь к администратору вашей организации для получения соответствующих прав доступа.
-            </p>
-
-            <div className="flex flex-col sm:flex-row gap-4 justify-center items-center">
-              <button
-                onClick={() => router.push('/courses')}
-                className="inline-flex items-center gap-2 px-6 py-3 bg-slate-100 dark:bg-white/10 hover:bg-slate-200 dark:hover:bg-white/20 text-slate-700 dark:text-white rounded-xl transition-all border border-slate-200 dark:border-white/20"
-              >
-                <BookOpen className="w-5 h-5" />
-                Вернуться к курсам
-              </button>
-
-              <button
-                onClick={() => router.push('/profile')}
-                className="inline-flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 text-white font-semibold rounded-xl transition-all shadow-lg"
-              >
-                <Mail className="w-5 h-5" />
-                Связаться с администратором
-              </button>
-            </div>
-
-            <div className="mt-8 pt-6 border-t border-slate-200 dark:border-white/10">
-              <p className="text-slate-500 dark:text-white/50 text-sm">
-                💡 После повышения роли страница автоматически обновится и вы сможете создавать курсы
-              </p>
-            </div>
-          </div>
-        </motion.div>
+        <PermissionDeniedState
+          variant="card"
+          userRole={userRole}
+          returnUrl="/courses"
+          contactUrl="/profile"
+        />
       </div>
     )
   }
