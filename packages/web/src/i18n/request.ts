@@ -1,4 +1,5 @@
 import { getRequestConfig } from 'next-intl/server';
+import { headers, cookies } from 'next/headers';
 import { routing } from './routing';
 
 /**
@@ -42,7 +43,22 @@ async function loadAllMessages(locale: string): Promise<Messages> {
 }
 
 export default getRequestConfig(async ({ requestLocale }) => {
+  // Try to get locale from multiple sources:
+  // 1. requestLocale (from next-intl middleware if used)
+  // 2. x-next-intl-locale header (set by our middleware from cookie)
+  // 3. NEXT_LOCALE cookie directly
+  // 4. Default locale
   let locale = await requestLocale;
+
+  if (!locale) {
+    const headersList = await headers();
+    locale = headersList.get('x-next-intl-locale') || undefined;
+  }
+
+  if (!locale) {
+    const cookieStore = await cookies();
+    locale = cookieStore.get('NEXT_LOCALE')?.value;
+  }
 
   // Validate locale
   if (!locale || !routing.locales.includes(locale as (typeof routing.locales)[number])) {

@@ -39,7 +39,7 @@ const SECTION_RAG_DEFAULTS = {
   SCORE_THRESHOLD: 0.7,
   /** Maximum token budget for RAG context */
   MAX_TOKENS: 40_000,
-  /** Enable hybrid search (dense + sparse) */
+  /** Enable hybrid search (dense + sparse) - ENABLED: sparse vectors now uploaded + native Query API with server-side RRF */
   ENABLE_HYBRID: true,
   /** Chunks per query to request (may return fewer after deduplication) */
   CHUNKS_PER_QUERY: 15,

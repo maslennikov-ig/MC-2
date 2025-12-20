@@ -12,12 +12,15 @@ export function getTransportConfig(): TransportConfig {
   const isDevelopment = process.env.NODE_ENV !== 'production';
 
   if (isDevelopment) {
+    // Use sync mode in development to avoid worker thread issues with HMR
+    // This prevents "the worker has exited" errors when Next.js hot-reloads modules
     return {
       target: 'pino-pretty',
       options: {
         colorize: true,
         translateTime: 'SYS:standard',
         ignore: 'pid,hostname',
+        sync: true,
       },
     };
   }

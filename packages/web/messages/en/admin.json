@@ -87,6 +87,65 @@
       "deleteFailed": "Failed to delete user"
     }
   },
+  "history": {
+    "title": "Generation History",
+    "description": "View and manage course generation history",
+    "table": {
+      "code": "Code",
+      "user": "User",
+      "title": "Title",
+      "status": "Status",
+      "language": "Language",
+      "difficulty": "Difficulty",
+      "started": "Started",
+      "duration": "Duration",
+      "actions": "Actions"
+    },
+    "filters": {
+      "searchPlaceholder": "Search by code, title or email...",
+      "allStatuses": "All Statuses",
+      "allLanguages": "All Languages"
+    },
+    "status": {
+      "pending": "Pending",
+      "stage_2_processing": "Stage 2: Processing",
+      "stage_3_summarizing": "Stage 3: Summarizing",
+      "stage_4_analyzing": "Stage 4: Analyzing",
+      "stage_5_generating": "Stage 5: Generating",
+      "finalizing": "Finalizing",
+      "completed": "Completed",
+      "failed": "Failed",
+      "cancelled": "Cancelled"
+    },
+    "languages": {
+      "ru": "Russian",
+      "en": "English"
+    },
+    "difficulty": {
+      "beginner": "Beginner",
+      "intermediate": "Intermediate",
+      "advanced": "Advanced"
+    },
+    "duration": {
+      "lessThanMinute": "< 1 min",
+      "minutes": "{count} min",
+      "hoursMinutes": "{hours}h {minutes}m",
+      "inProgress": "In progress"
+    },
+    "actions": {
+      "openWorkflow": "Open Workflow",
+      "adminPanel": "Admin Panel"
+    },
+    "empty": {
+      "title": "No generations found",
+      "subtitle": "Try adjusting your filters or search query"
+    },
+    "pagination": {
+      "showing": "Showing {from} to {to} of {total} results",
+      "previous": "Previous",
+      "next": "Next"
+    }
+  },
   "pipeline": {
     "title": "Pipeline Configuration",
     "description": "Manage LLM models, prompts, and global settings for the course generation pipeline",

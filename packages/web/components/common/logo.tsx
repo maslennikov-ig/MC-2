@@ -111,12 +111,11 @@ export default function Logo({
       priority
       quality={90}
       className={cn(
-        "object-contain",
+        "object-contain w-auto h-auto",
         variant === "icon" && "rounded-lg",
         effectiveForceTheme === "light" ? "hidden" : "hidden dark:block",
         effectiveForceTheme === "dark" && "block"
       )}
-      style={{ width: "auto", height: "auto" }}
     />
   )
 
@@ -129,12 +128,11 @@ export default function Logo({
       priority
       quality={90}
       className={cn(
-        "object-contain",
+        "object-contain w-auto h-auto",
         variant === "icon" && "rounded-lg",
         effectiveForceTheme === "dark" ? "hidden" : "block dark:hidden",
         effectiveForceTheme === "light" && "block"
       )}
-      style={{ width: "auto", height: "auto" }}
     />
   )
 

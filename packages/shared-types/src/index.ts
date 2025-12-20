@@ -33,6 +33,8 @@ export * from './judge-thresholds';
 
 // NOTE: analysis-result.ts is NOT exported directly to avoid conflicts
 // All analysis types are available via Zod schema inference in analysis-schemas.ts
+// Runtime type guards for AnalysisResult
+export { isAnalysisResult, parseAnalysisResult } from './analysis-guards';
 export * from './generation-graph';
 
 // Admin Pipeline Dashboard Types (v0.23.0+)

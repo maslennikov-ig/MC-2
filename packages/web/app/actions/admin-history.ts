@@ -7,6 +7,7 @@ interface HistoryParams {
   offset: number;
   search?: string;
   status?: string;
+  language?: 'ru' | 'en' | 'all';
 }
 
 export async function getGenerationHistoryAction(params: HistoryParams) {
@@ -19,6 +20,7 @@ export async function getGenerationHistoryAction(params: HistoryParams) {
 
   if (params.search) queryInput.search = params.search;
   if (params.status && params.status !== 'all') queryInput.status = params.status;
+  if (params.language && params.language !== 'all') queryInput.language = params.language;
 
   const query = encodeURIComponent(JSON.stringify(queryInput));
 
@@ -35,7 +37,7 @@ export async function getGenerationHistoryAction(params: HistoryParams) {
     }
 
     const json = await res.json();
-    
+
     if (json.error) {
       throw new Error(json.error.message);
     }

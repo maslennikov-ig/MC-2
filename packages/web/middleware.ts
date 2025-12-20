@@ -1,10 +1,21 @@
 import { type NextRequest } from 'next/server'
 import { updateSession } from '@/lib/supabase/middleware'
 
+const SUPPORTED_LOCALES = ['ru', 'en'] as const;
+const DEFAULT_LOCALE = 'ru';
+
 export async function middleware(request: NextRequest) {
   // Update Supabase session for all requests
-  // i18n is handled via cookies/headers without URL rewrites (localePrefix: 'never')
   const response = await updateSession(request)
+
+  // Handle i18n: read locale from NEXT_LOCALE cookie
+  const cookieLocale = request.cookies.get('NEXT_LOCALE')?.value;
+  const locale = SUPPORTED_LOCALES.includes(cookieLocale as typeof SUPPORTED_LOCALES[number])
+    ? cookieLocale
+    : DEFAULT_LOCALE;
+
+  // Set locale header for next-intl to read
+  response.headers.set('x-next-intl-locale', locale!);
 
   // Add request ID for logging correlation
   const requestId = request.headers.get('x-request-id') || crypto.randomUUID()

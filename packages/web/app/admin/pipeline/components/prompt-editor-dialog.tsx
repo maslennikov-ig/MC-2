@@ -1,10 +1,10 @@
 /**
  * PromptEditorDialog Component (T044)
  *
- * Modern dark-themed prompt template editor with CodeMirror.
+ * Theme-aware prompt template editor with CodeMirror.
  *
  * Features:
- * - Dark Tokyo Night theme for CodeMirror
+ * - Theme-aware editor (Tokyo Night in dark, default light in light mode)
  * - Clickable variable chips that insert at cursor position
  * - Clean visual hierarchy with clear sections
  * - Real-time XML validation
@@ -20,6 +20,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'sonner';
+import { useTheme } from 'next-themes';
 import CodeMirror, { ReactCodeMirrorRef } from '@uiw/react-codemirror';
 import { xml } from '@codemirror/lang-xml';
 import { tokyoNight } from '@uiw/codemirror-theme-tokyo-night';
@@ -99,7 +100,7 @@ const stageColors: Record<string, string> = {
 };
 
 /**
- * Modern dark-themed prompt editor dialog
+ * Theme-aware prompt editor dialog
  */
 export function PromptEditorDialog({
   open,
@@ -107,6 +108,7 @@ export function PromptEditorDialog({
   prompt,
   onSaved,
 }: PromptEditorDialogProps) {
+  const { resolvedTheme } = useTheme();
   const [templateContent, setTemplateContent] = useState('');
   const [xmlError, setXmlError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<string>('editor');
@@ -242,11 +244,11 @@ export function PromptEditorDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-6xl max-h-[95vh] flex flex-col bg-zinc-950 border-zinc-800">
-        <DialogHeader className="pb-4 border-b border-zinc-800">
+      <DialogContent className="max-w-6xl max-h-[95vh] flex flex-col bg-white dark:bg-zinc-950 border-gray-200 dark:border-zinc-800">
+        <DialogHeader className="pb-4 border-b border-gray-200 dark:border-zinc-800">
           <div className="flex items-center justify-between">
             <div className="space-y-1">
-              <DialogTitle className="text-xl font-semibold text-zinc-100">
+              <DialogTitle className="text-xl font-semibold text-gray-900 dark:text-zinc-100">
                 Edit Prompt Template
               </DialogTitle>
               <DialogDescription asChild>
@@ -254,8 +256,8 @@ export function PromptEditorDialog({
                   <Badge variant="outline" className={cn('font-mono text-xs', stageColor)}>
                     {prompt.stage.replace('_', ' ').toUpperCase()}
                   </Badge>
-                  <span className="text-zinc-500">{prompt.promptKey}</span>
-                  <Badge variant="secondary" className="bg-zinc-800 text-zinc-400 text-xs">
+                  <span className="text-gray-500 dark:text-zinc-500">{prompt.promptKey}</span>
+                  <Badge variant="secondary" className="bg-gray-100 dark:bg-zinc-800 text-gray-600 dark:text-zinc-400 text-xs">
                     v{prompt.version}
                   </Badge>
                 </div>
@@ -268,26 +270,26 @@ export function PromptEditorDialog({
           {/* Name and Description row */}
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
-              <Label htmlFor="promptName" className="text-zinc-400 text-sm">
+              <Label htmlFor="promptName" className="text-gray-600 dark:text-zinc-400 text-sm">
                 Name
               </Label>
               <Input
                 id="promptName"
                 {...register('promptName')}
-                className="bg-zinc-900 border-zinc-700 text-zinc-100 focus:border-cyan-500"
+                className="bg-gray-50 dark:bg-zinc-900 border-gray-200 dark:border-zinc-700 text-gray-900 dark:text-zinc-100 focus:border-purple-500 dark:focus:border-cyan-500"
               />
               {errors.promptName && (
                 <p className="text-sm text-red-400">{errors.promptName.message}</p>
               )}
             </div>
             <div className="space-y-2">
-              <Label htmlFor="promptDescription" className="text-zinc-400 text-sm">
+              <Label htmlFor="promptDescription" className="text-gray-600 dark:text-zinc-400 text-sm">
                 Description
               </Label>
               <Input
                 id="promptDescription"
                 {...register('promptDescription')}
-                className="bg-zinc-900 border-zinc-700 text-zinc-100 focus:border-cyan-500"
+                className="bg-gray-50 dark:bg-zinc-900 border-gray-200 dark:border-zinc-700 text-gray-900 dark:text-zinc-100 focus:border-purple-500 dark:focus:border-cyan-500"
                 placeholder="Brief description of this prompt..."
               />
             </div>
@@ -297,11 +299,11 @@ export function PromptEditorDialog({
           {prompt.variables && prompt.variables.length > 0 && (
             <div className="space-y-2">
               <div className="flex items-center gap-2">
-                <Sparkles className="h-4 w-4 text-cyan-400" />
-                <span className="text-sm font-medium text-zinc-300">
+                <Sparkles className="h-4 w-4 text-purple-500 dark:text-cyan-400" />
+                <span className="text-sm font-medium text-gray-700 dark:text-zinc-300">
                   Available Variables
                 </span>
-                <span className="text-xs text-zinc-500">
+                <span className="text-xs text-gray-500 dark:text-zinc-500">
                   (click to insert at cursor)
                 </span>
               </div>
@@ -319,15 +321,15 @@ export function PromptEditorDialog({
                           }}
                           className={cn(
                             'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-mono',
-                            'bg-zinc-800/80 border border-zinc-700 text-cyan-400',
-                            'hover:bg-zinc-700 hover:border-cyan-500/50 transition-colors',
-                            'focus:outline-none focus:ring-2 focus:ring-cyan-500/30',
+                            'bg-gray-100 dark:bg-zinc-800/80 border border-gray-300 dark:border-zinc-700 text-purple-500 dark:text-cyan-400',
+                            'hover:bg-gray-200 dark:hover:bg-zinc-700 hover:border-purple-500/50 dark:hover:border-cyan-500/50 transition-colors',
+                            'focus:outline-none focus:ring-2 focus:ring-purple-500/30 dark:focus:ring-cyan-500/30',
                             variable.required && 'border-amber-500/30'
                           )}
                         >
-                          <span className="text-zinc-500">{'{{'}</span>
+                          <span className="text-gray-500 dark:text-zinc-500">{'{{'}</span>
                           {variable.name}
-                          <span className="text-zinc-500">{'}}'}</span>
+                          <span className="text-gray-500 dark:text-zinc-500">{'}}'}</span>
                           {variable.required && (
                             <span className="text-amber-400 text-[10px]">*</span>
                           )}
@@ -335,19 +337,19 @@ export function PromptEditorDialog({
                       </TooltipTrigger>
                       <TooltipContent
                         side="bottom"
-                        className="bg-zinc-900 border-zinc-700 text-zinc-100 max-w-xs"
+                        className="bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700 text-gray-900 dark:text-zinc-100 max-w-xs"
                       >
                         <div className="space-y-1">
                           <p className="font-medium">{variable.description}</p>
                           {variable.example && (
-                            <p className="text-xs text-zinc-400">
-                              Example: <code className="text-cyan-400">{variable.example}</code>
+                            <p className="text-xs text-gray-600 dark:text-zinc-400">
+                              Example: <code className="text-purple-500 dark:text-cyan-400">{variable.example}</code>
                             </p>
                           )}
                           {variable.required && (
                             <p className="text-xs text-amber-400">Required variable</p>
                           )}
-                          <p className="text-[10px] text-zinc-500 mt-2">
+                          <p className="text-[10px] text-gray-500 dark:text-zinc-500 mt-2">
                             Right-click to copy
                           </p>
                         </div>
@@ -366,17 +368,17 @@ export function PromptEditorDialog({
             className="flex-1 flex flex-col min-h-0"
           >
             <div className="flex items-center justify-between">
-              <TabsList className="bg-zinc-900 border border-zinc-800">
+              <TabsList className="bg-gray-100 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800">
                 <TabsTrigger
                   value="editor"
-                  className="data-[state=active]:bg-zinc-800 data-[state=active]:text-cyan-400"
+                  className="data-[state=active]:bg-white dark:data-[state=active]:bg-zinc-800 data-[state=active]:text-purple-500 dark:data-[state=active]:text-cyan-400"
                 >
                   <Code2 className="h-4 w-4 mr-2" />
                   Editor
                 </TabsTrigger>
                 <TabsTrigger
                   value="preview"
-                  className="data-[state=active]:bg-zinc-800 data-[state=active]:text-cyan-400"
+                  className="data-[state=active]:bg-white dark:data-[state=active]:bg-zinc-800 data-[state=active]:text-purple-500 dark:data-[state=active]:text-cyan-400"
                 >
                   <Eye className="h-4 w-4 mr-2" />
                   Preview
@@ -400,12 +402,12 @@ export function PromptEditorDialog({
             </div>
 
             <TabsContent value="editor" className="flex-1 min-h-0 mt-3">
-              <div className="h-[400px] rounded-lg overflow-hidden border border-zinc-800 bg-[#1a1b26]">
+              <div className="h-[400px] rounded-lg overflow-hidden border border-gray-200 dark:border-zinc-800 bg-gray-50 dark:bg-[#1a1b26]">
                 <CodeMirror
                   ref={editorRef}
                   value={templateContent}
                   height="400px"
-                  theme={tokyoNight}
+                  theme={resolvedTheme === 'dark' ? tokyoNight : undefined}
                   extensions={[xml()]}
                   onChange={handleTemplateChange}
                   className="text-sm"
@@ -430,15 +432,15 @@ export function PromptEditorDialog({
             <TabsContent value="preview" className="flex-1 min-h-0 mt-3 space-y-3">
               {/* Preview variable inputs */}
               {prompt.variables && prompt.variables.length > 0 && (
-                <div className="p-3 rounded-lg bg-zinc-900/50 border border-zinc-800 space-y-3">
-                  <div className="flex items-center gap-2 text-xs text-zinc-400">
+                <div className="p-3 rounded-lg bg-gray-50 dark:bg-zinc-900/50 border border-gray-200 dark:border-zinc-800 space-y-3">
+                  <div className="flex items-center gap-2 text-xs text-gray-600 dark:text-zinc-400">
                     <Info className="h-3.5 w-3.5" />
                     <span>Enter test values to preview variable substitution</span>
                   </div>
                   <div className="grid grid-cols-3 gap-3">
                     {prompt.variables.slice(0, 6).map((variable) => (
                       <div key={variable.name} className="space-y-1">
-                        <Label className="text-xs font-mono text-zinc-500">
+                        <Label className="text-xs font-mono text-gray-500 dark:text-zinc-500">
                           {variable.name}
                         </Label>
                         <Input
@@ -450,7 +452,7 @@ export function PromptEditorDialog({
                             }))
                           }
                           placeholder={variable.example || variable.name}
-                          className="h-8 text-xs bg-zinc-900 border-zinc-700 text-zinc-100"
+                          className="h-8 text-xs bg-white dark:bg-zinc-900 border-gray-200 dark:border-zinc-700 text-gray-900 dark:text-zinc-100"
                         />
                       </div>
                     ))}
@@ -459,16 +461,16 @@ export function PromptEditorDialog({
               )}
 
               {/* Preview output */}
-              <ScrollArea className="h-[320px] rounded-lg border border-zinc-800 bg-[#1a1b26]">
-                <pre className="p-4 text-sm text-zinc-300 whitespace-pre-wrap font-mono leading-relaxed">
+              <ScrollArea className="h-[320px] rounded-lg border border-gray-200 dark:border-zinc-800 bg-gray-50 dark:bg-[#1a1b26]">
+                <pre className="p-4 text-sm text-gray-700 dark:text-zinc-300 whitespace-pre-wrap font-mono leading-relaxed">
                   {preview}
                 </pre>
               </ScrollArea>
             </TabsContent>
           </Tabs>
 
-          <DialogFooter className="pt-4 border-t border-zinc-800 flex items-center justify-between">
-            <div className="text-xs text-zinc-500">
+          <DialogFooter className="pt-4 border-t border-gray-200 dark:border-zinc-800 flex items-center justify-between">
+            <div className="text-xs text-gray-500 dark:text-zinc-500">
               {isDirty ? (
                 <span className="text-amber-400">Unsaved changes</span>
               ) : (
@@ -481,14 +483,14 @@ export function PromptEditorDialog({
                 variant="ghost"
                 onClick={() => onOpenChange(false)}
                 disabled={isSubmitting}
-                className="text-zinc-400 hover:text-zinc-100 hover:bg-zinc-800"
+                className="text-gray-600 dark:text-zinc-400 hover:text-gray-900 dark:hover:text-zinc-100 hover:bg-gray-100 dark:hover:bg-zinc-800"
               >
                 Cancel
               </Button>
               <Button
                 type="submit"
                 disabled={isSubmitting || !!xmlError || !isDirty}
-                className="bg-cyan-600 hover:bg-cyan-500 text-white"
+                className="bg-purple-600 hover:bg-purple-500 dark:bg-cyan-600 dark:hover:bg-cyan-500 text-white"
               >
                 {isSubmitting && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
                 Save Changes

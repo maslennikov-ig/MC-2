@@ -81,12 +81,13 @@ export const DEFAULT_BM25_PARAMS: BM25Parameters = {
 };
 
 /**
- * Default tokenization options
+ * Default tokenization options (with stopwords enabled for better BM25)
  */
 export const DEFAULT_TOKENIZATION_OPTIONS: TokenizationOptions = {
   lowercase: true,
   min_token_length: 2,
-  remove_stopwords: false,
+  remove_stopwords: true,
+  stopwords: undefined, // Will be set to COMBINED_STOPWORDS after it's defined
 };
 
 /**
@@ -120,6 +121,74 @@ export const ENGLISH_STOPWORDS = new Set([
 ]);
 
 /**
+ * Common Russian stop words (basic set)
+ */
+export const RUSSIAN_STOPWORDS = new Set([
+  'и',
+  'в',
+  'во',
+  'не',
+  'что',
+  'он',
+  'на',
+  'я',
+  'с',
+  'со',
+  'как',
+  'а',
+  'то',
+  'все',
+  'она',
+  'так',
+  'его',
+  'но',
+  'да',
+  'ты',
+  'к',
+  'у',
+  'же',
+  'вы',
+  'за',
+  'бы',
+  'по',
+  'только',
+  'её',
+  'мне',
+  'было',
+  'вот',
+  'от',
+  'меня',
+  'ещё',
+  'нет',
+  'о',
+  'из',
+  'ему',
+  'теперь',
+  'когда',
+  'уже',
+  'вам',
+  'ни',
+  'быть',
+  'был',
+  'была',
+  'были',
+  'мы',
+  'это',
+  'эта',
+  'эти',
+  'этот',
+  'который',
+]);
+
+/**
+ * Combined English + Russian stop words
+ */
+export const COMBINED_STOPWORDS = new Set([...ENGLISH_STOPWORDS, ...RUSSIAN_STOPWORDS]);
+
+// Set the default stopwords after COMBINED_STOPWORDS is defined
+DEFAULT_TOKENIZATION_OPTIONS.stopwords = COMBINED_STOPWORDS;
+
+/**
  * BM25 Scorer with corpus statistics tracking
  */
 export class BM25Scorer {
@@ -150,22 +219,27 @@ export class BM25Scorer {
   /**
    * Tokenizes text into terms
    *
+   * Supports both Cyrillic (Russian) and Latin text with proper normalization.
+   *
    * @param text - Input text
    * @returns Array of tokens
    */
   private tokenize(text: string): string[] {
-    // Split by whitespace and punctuation
-    let tokens = text.split(/[\s.,!?;:()[\]{}'"]+/).filter(token => token.length > 0);
-
-    // Convert to lowercase
+    // Normalize text: lowercase and normalize ё→е (commonly interchanged in Russian)
+    let normalizedText = text;
     if (this.tokenizationOptions.lowercase) {
-      tokens = tokens.map(t => t.toLowerCase());
+      normalizedText = text.toLowerCase().replace(/ё/g, 'е');
     }
+
+    // Extract words using regex that supports both Cyrillic and Latin
+    // This properly handles Russian text without splitting on Cyrillic punctuation issues
+    const matches = normalizedText.match(/[a-zа-яё0-9]+/gi);
+    let tokens: string[] = matches ? [...matches] : [];
 
     // Filter by minimum length
     tokens = tokens.filter(t => t.length >= this.tokenizationOptions.min_token_length);
 
-    // Remove stop words
+    // Remove stop words (supports both English and Russian)
     if (this.tokenizationOptions.remove_stopwords && this.tokenizationOptions.stopwords) {
       tokens = tokens.filter(t => !this.tokenizationOptions.stopwords!.has(t));
     }

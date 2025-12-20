@@ -393,6 +393,11 @@ function GraphViewInner({ courseId, courseTitle, hasDocuments = true, failedAtSt
       if (nodes.length > 0 && (countChanged || isInitialLoad || collapseChanged)) {
           prevNodeCount.current = nodes.length;
 
+          // Preserve viewport when collapse state changes (avoid scroll jump)
+          if (collapseChanged && !isInitialLoad) {
+              preserveViewport();
+          }
+
           // Increment generation to track this layout request
           const currentGeneration = ++layoutGenerationRef.current;
 
@@ -413,10 +418,13 @@ function GraphViewInner({ courseId, courseTitle, hasDocuments = true, failedAtSt
                   requestAnimationFrame(() => {
                       fitView({ padding: 0.15, minZoom: 0.6, maxZoom: 1.2, duration: 400 });
                   });
+              } else if (collapseChanged) {
+                  // Restore viewport after layout when collapse changed
+                  restoreViewport();
               }
           });
       }
-  }, [nodes, edges, layoutNodes, setNodes, fitView, moduleCollapseSignature]); // Added moduleCollapseSignature
+  }, [nodes, edges, layoutNodes, setNodes, fitView, moduleCollapseSignature, preserveViewport, restoreViewport]);
   
   // Selection
   const { selectNode, deselectNode } = useNodeSelection();

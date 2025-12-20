@@ -282,10 +282,10 @@ export function StageDetailSheet({
     <Sheet open={open} onOpenChange={onOpenChange}>
       <SheetContent
         side="right"
-        className="w-full sm:max-w-xl md:max-w-2xl bg-zinc-950 border-zinc-800 p-0 flex flex-col"
+        className="w-full sm:max-w-xl md:max-w-2xl bg-white dark:bg-zinc-950 border-gray-200 dark:border-zinc-800 p-0 flex flex-col"
       >
         {/* Header */}
-        <SheetHeader className="p-6 pb-4 border-b border-zinc-800">
+        <SheetHeader className="p-6 pb-4 border-b border-gray-200 dark:border-zinc-800">
           <div className="flex items-center gap-3">
             <div className={cn(
               'w-12 h-12 rounded-xl flex items-center justify-center',
@@ -294,10 +294,10 @@ export function StageDetailSheet({
               <span className="text-xl font-bold text-white">{stage.number}</span>
             </div>
             <div className="flex-1">
-              <SheetTitle className="text-xl font-semibold text-zinc-100">
+              <SheetTitle className="text-xl font-semibold text-gray-900 dark:text-zinc-100">
                 {stage.name}
               </SheetTitle>
-              <SheetDescription className="text-zinc-400 mt-1">
+              <SheetDescription className="text-gray-600 dark:text-zinc-400 mt-1">
                 {stage.description}
               </SheetDescription>
             </div>
@@ -318,34 +318,34 @@ export function StageDetailSheet({
         {/* Tabs */}
         <Tabs value={activeTab} onValueChange={setActiveTab} className="flex-1 flex flex-col min-h-0">
           <div className="px-6 pt-4">
-            <TabsList className="bg-zinc-900 border border-zinc-800 w-full grid grid-cols-3">
+            <TabsList className="bg-gray-100 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 w-full grid grid-cols-3">
               <TabsTrigger
                 value="overview"
-                className="data-[state=active]:bg-zinc-800 data-[state=active]:text-cyan-400"
+                className="data-[state=active]:bg-gray-200 dark:data-[state=active]:bg-zinc-800 data-[state=active]:text-purple-500 dark:data-[state=active]:text-cyan-400"
               >
                 <Layers className="h-4 w-4 mr-2" />
                 Overview
               </TabsTrigger>
               <TabsTrigger
                 value="models"
-                className="data-[state=active]:bg-zinc-800 data-[state=active]:text-cyan-400"
+                className="data-[state=active]:bg-gray-200 dark:data-[state=active]:bg-zinc-800 data-[state=active]:text-purple-500 dark:data-[state=active]:text-cyan-400"
               >
                 <Cpu className="h-4 w-4 mr-2" />
                 Models
                 {models.length > 0 && (
-                  <Badge variant="secondary" className="ml-2 bg-zinc-700 text-zinc-300 text-xs">
+                  <Badge variant="secondary" className="ml-2 bg-gray-200 dark:bg-zinc-700 text-gray-700 dark:text-zinc-300 text-xs">
                     {models.length}
                   </Badge>
                 )}
               </TabsTrigger>
               <TabsTrigger
                 value="prompts"
-                className="data-[state=active]:bg-zinc-800 data-[state=active]:text-cyan-400"
+                className="data-[state=active]:bg-gray-200 dark:data-[state=active]:bg-zinc-800 data-[state=active]:text-purple-500 dark:data-[state=active]:text-cyan-400"
               >
                 <FileText className="h-4 w-4 mr-2" />
                 Prompts
                 {prompts.length > 0 && (
-                  <Badge variant="secondary" className="ml-2 bg-zinc-700 text-zinc-300 text-xs">
+                  <Badge variant="secondary" className="ml-2 bg-gray-200 dark:bg-zinc-700 text-gray-700 dark:text-zinc-300 text-xs">
                     {prompts.length}
                   </Badge>
                 )}
@@ -358,15 +358,15 @@ export function StageDetailSheet({
             <TabsContent value="overview" className="mt-0 space-y-6">
               {/* Stats Cards */}
               <div className="grid grid-cols-2 gap-4">
-                <Card className="bg-zinc-900/50 border-zinc-800">
+                <Card className="bg-gray-50 dark:bg-zinc-900/50 border-gray-200 dark:border-zinc-800">
                   <CardContent className="p-4">
                     <div className="flex items-center gap-3">
                       <div className="p-2 rounded-lg bg-purple-500/10">
                         <Clock className="h-5 w-5 text-purple-400" />
                       </div>
                       <div>
-                        <p className="text-xs text-zinc-500 uppercase tracking-wide">Avg Time</p>
-                        <p className="text-lg font-semibold text-zinc-100">
+                        <p className="text-xs text-gray-500 dark:text-zinc-500 uppercase tracking-wide">Avg Time</p>
+                        <p className="text-lg font-semibold text-gray-900 dark:text-zinc-100">
                           {stage.avgExecutionTime ? formatDuration(stage.avgExecutionTime) : 'N/A'}
                         </p>
                       </div>
@@ -374,15 +374,15 @@ export function StageDetailSheet({
                   </CardContent>
                 </Card>
 
-                <Card className="bg-zinc-900/50 border-zinc-800">
+                <Card className="bg-gray-50 dark:bg-zinc-900/50 border-gray-200 dark:border-zinc-800">
                   <CardContent className="p-4">
                     <div className="flex items-center gap-3">
                       <div className="p-2 rounded-lg bg-amber-500/10">
                         <DollarSign className="h-5 w-5 text-amber-400" />
                       </div>
                       <div>
-                        <p className="text-xs text-zinc-500 uppercase tracking-wide">Avg Cost</p>
-                        <p className="text-lg font-semibold text-zinc-100">
+                        <p className="text-xs text-gray-500 dark:text-zinc-500 uppercase tracking-wide">Avg Cost</p>
+                        <p className="text-lg font-semibold text-gray-900 dark:text-zinc-100">
                           {stage.avgCost !== null ? `$${stage.avgCost.toFixed(4)}` : 'N/A'}
                         </p>
                       </div>
@@ -392,28 +392,28 @@ export function StageDetailSheet({
               </div>
 
               {/* Stage Info */}
-              <Card className="bg-zinc-900/50 border-zinc-800">
+              <Card className="bg-gray-50 dark:bg-zinc-900/50 border-gray-200 dark:border-zinc-800">
                 <CardHeader className="pb-3">
-                  <CardTitle className="text-sm font-medium text-zinc-300 flex items-center gap-2">
-                    <Settings2 className="h-4 w-4 text-zinc-500" />
+                  <CardTitle className="text-sm font-medium text-gray-700 dark:text-zinc-300 flex items-center gap-2">
+                    <Settings2 className="h-4 w-4 text-gray-500 dark:text-zinc-500" />
                     Stage Configuration
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
-                  <div className="flex justify-between items-center py-2 border-b border-zinc-800">
-                    <span className="text-sm text-zinc-400">Linked Models</span>
-                    <span className="text-sm font-medium text-zinc-200">
+                  <div className="flex justify-between items-center py-2 border-b border-gray-200 dark:border-zinc-800">
+                    <span className="text-sm text-gray-600 dark:text-zinc-400">Linked Models</span>
+                    <span className="text-sm font-medium text-gray-800 dark:text-zinc-200">
                       {stage.linkedModels.length} phases
                     </span>
                   </div>
-                  <div className="flex justify-between items-center py-2 border-b border-zinc-800">
-                    <span className="text-sm text-zinc-400">Linked Prompts</span>
-                    <span className="text-sm font-medium text-zinc-200">
+                  <div className="flex justify-between items-center py-2 border-b border-gray-200 dark:border-zinc-800">
+                    <span className="text-sm text-gray-600 dark:text-zinc-400">Linked Prompts</span>
+                    <span className="text-sm font-medium text-gray-800 dark:text-zinc-200">
                       {stage.linkedPrompts.length} templates
                     </span>
                   </div>
                   <div className="flex justify-between items-center py-2">
-                    <span className="text-sm text-zinc-400">Status</span>
+                    <span className="text-sm text-gray-600 dark:text-zinc-400">Status</span>
                     <Badge
                       variant="outline"
                       className={cn(
@@ -431,10 +431,10 @@ export function StageDetailSheet({
 
               {/* Linked Phases */}
               {stage.linkedModels.length > 0 && (
-                <Card className="bg-zinc-900/50 border-zinc-800">
+                <Card className="bg-gray-50 dark:bg-zinc-900/50 border-gray-200 dark:border-zinc-800">
                   <CardHeader className="pb-3">
-                    <CardTitle className="text-sm font-medium text-zinc-300 flex items-center gap-2">
-                      <Cpu className="h-4 w-4 text-zinc-500" />
+                    <CardTitle className="text-sm font-medium text-gray-700 dark:text-zinc-300 flex items-center gap-2">
+                      <Cpu className="h-4 w-4 text-gray-500 dark:text-zinc-500" />
                       LLM Phases
                     </CardTitle>
                   </CardHeader>
@@ -444,7 +444,7 @@ export function StageDetailSheet({
                         <Badge
                           key={phase}
                           variant="outline"
-                          className="bg-cyan-500/10 text-cyan-400 border-cyan-500/30 font-mono text-xs"
+                          className="bg-purple-500/10 dark:bg-cyan-500/10 text-purple-500 dark:text-cyan-400 border-purple-500/30 dark:border-cyan-500/30 font-mono text-xs"
                         >
                           {phase}
                         </Badge>
@@ -460,15 +460,15 @@ export function StageDetailSheet({
               {isLoading ? (
                 <div className="space-y-3">
                   {[1, 2, 3].map((i) => (
-                    <Skeleton key={i} className="h-24 w-full bg-zinc-800" />
+                    <Skeleton key={i} className="h-24 w-full bg-gray-200 dark:bg-zinc-800" />
                   ))}
                 </div>
               ) : models.length === 0 ? (
-                <Card className="bg-zinc-900/50 border-zinc-800">
+                <Card className="bg-gray-50 dark:bg-zinc-900/50 border-gray-200 dark:border-zinc-800">
                   <CardContent className="p-8 text-center">
-                    <Cpu className="h-12 w-12 mx-auto text-zinc-600 mb-3" />
-                    <p className="text-zinc-400">No models configured for this stage</p>
-                    <p className="text-xs text-zinc-500 mt-1">
+                    <Cpu className="h-12 w-12 mx-auto text-gray-400 dark:text-zinc-600 mb-3" />
+                    <p className="text-gray-600 dark:text-zinc-400">No models configured for this stage</p>
+                    <p className="text-xs text-gray-500 dark:text-zinc-500 mt-1">
                       This stage may not use LLM calls
                     </p>
                   </CardContent>
@@ -477,9 +477,9 @@ export function StageDetailSheet({
                 <>
                   {/* Stage 6: Show CLEV Judge Configurations first */}
                   {stage.number === 6 && judgeConfigs.length > 0 && (
-                    <Card className="bg-zinc-900/50 border-zinc-800">
+                    <Card className="bg-gray-50 dark:bg-zinc-900/50 border-gray-200 dark:border-zinc-800">
                       <CardHeader className="pb-3">
-                        <CardTitle className="text-sm font-medium text-zinc-300 flex items-center gap-2">
+                        <CardTitle className="text-sm font-medium text-gray-700 dark:text-zinc-300 flex items-center gap-2">
                           <Shield className="h-4 w-4 text-amber-400" />
                           CLEV Judges Configuration
                           <Badge
@@ -491,20 +491,20 @@ export function StageDetailSheet({
                         </CardTitle>
                       </CardHeader>
                       <CardContent>
-                        <p className="text-xs text-zinc-500 mb-4">
+                        <p className="text-xs text-gray-500 dark:text-zinc-500 mb-4">
                           Three-judge voting system for lesson quality evaluation. Each language uses
                           primary/secondary/tiebreaker judges with weighted votes.
                         </p>
 
                         {/* Judge Configs Table */}
-                        <div className="border border-zinc-800 rounded-lg overflow-hidden">
+                        <div className="border border-gray-200 dark:border-zinc-800 rounded-lg overflow-hidden">
                           <Table>
                             <TableHeader>
-                              <TableRow className="bg-zinc-900/50 hover:bg-zinc-900/50">
-                                <TableHead className="text-zinc-400 font-medium w-24">Language</TableHead>
-                                <TableHead className="text-zinc-400 font-medium">Primary Judge</TableHead>
-                                <TableHead className="text-zinc-400 font-medium">Secondary Judge</TableHead>
-                                <TableHead className="text-zinc-400 font-medium">Tiebreaker</TableHead>
+                              <TableRow className="bg-gray-100 dark:bg-zinc-900/50 hover:bg-gray-100 dark:hover:bg-zinc-900/50">
+                                <TableHead className="text-gray-600 dark:text-zinc-400 font-medium w-24">Language</TableHead>
+                                <TableHead className="text-gray-600 dark:text-zinc-400 font-medium">Primary Judge</TableHead>
+                                <TableHead className="text-gray-600 dark:text-zinc-400 font-medium">Secondary Judge</TableHead>
+                                <TableHead className="text-gray-600 dark:text-zinc-400 font-medium">Tiebreaker</TableHead>
                               </TableRow>
                             </TableHeader>
                             <TableBody>
@@ -517,8 +517,8 @@ export function StageDetailSheet({
                                 const langLabel = languageLabels[langConfig.language] || { emoji: '🌐', name: langConfig.language };
 
                                 return (
-                                  <TableRow key={langConfig.language} className="border-zinc-800">
-                                    <TableCell className="font-medium text-zinc-300">
+                                  <TableRow key={langConfig.language} className="border-gray-200 dark:border-zinc-800">
+                                    <TableCell className="font-medium text-gray-700 dark:text-zinc-300">
                                       <div className="flex items-center gap-2">
                                         <span className="text-lg">{langLabel.emoji}</span>
                                         <span className="text-sm">{langLabel.name}</span>
@@ -526,11 +526,11 @@ export function StageDetailSheet({
                                     </TableCell>
                                     <TableCell
                                       onClick={() => handleJudgeClick(langConfig.primary)}
-                                      className="cursor-pointer hover:bg-zinc-800/50 transition-colors"
+                                      className="cursor-pointer hover:bg-gray-100 dark:hover:bg-zinc-800/50 transition-colors"
                                     >
                                       <div className="space-y-1">
                                         <div className="flex items-center gap-2">
-                                          <code className="text-xs text-cyan-400 bg-zinc-800/50 px-2 py-0.5 rounded font-mono">
+                                          <code className="text-xs text-purple-500 dark:text-cyan-400 bg-gray-100 dark:bg-zinc-800/50 px-2 py-0.5 rounded font-mono">
                                             {langConfig.primary.displayName}
                                           </code>
                                           <Badge
@@ -540,7 +540,7 @@ export function StageDetailSheet({
                                             {langConfig.primary.weight.toFixed(2)}
                                           </Badge>
                                         </div>
-                                        <div className="flex items-center gap-2 text-xs text-zinc-500">
+                                        <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-zinc-500">
                                           <span>T: {langConfig.primary.temperature}</span>
                                           <span>•</span>
                                           <span>Max: {langConfig.primary.maxTokens}</span>
@@ -549,11 +549,11 @@ export function StageDetailSheet({
                                     </TableCell>
                                     <TableCell
                                       onClick={() => handleJudgeClick(langConfig.secondary)}
-                                      className="cursor-pointer hover:bg-zinc-800/50 transition-colors"
+                                      className="cursor-pointer hover:bg-gray-100 dark:hover:bg-zinc-800/50 transition-colors"
                                     >
                                       <div className="space-y-1">
                                         <div className="flex items-center gap-2">
-                                          <code className="text-xs text-cyan-400 bg-zinc-800/50 px-2 py-0.5 rounded font-mono">
+                                          <code className="text-xs text-purple-500 dark:text-cyan-400 bg-gray-100 dark:bg-zinc-800/50 px-2 py-0.5 rounded font-mono">
                                             {langConfig.secondary.displayName}
                                           </code>
                                           <Badge
@@ -563,7 +563,7 @@ export function StageDetailSheet({
                                             {langConfig.secondary.weight.toFixed(2)}
                                           </Badge>
                                         </div>
-                                        <div className="flex items-center gap-2 text-xs text-zinc-500">
+                                        <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-zinc-500">
                                           <span>T: {langConfig.secondary.temperature}</span>
                                           <span>•</span>
                                           <span>Max: {langConfig.secondary.maxTokens}</span>
@@ -572,11 +572,11 @@ export function StageDetailSheet({
                                     </TableCell>
                                     <TableCell
                                       onClick={() => handleJudgeClick(langConfig.tiebreaker)}
-                                      className="cursor-pointer hover:bg-zinc-800/50 transition-colors"
+                                      className="cursor-pointer hover:bg-gray-100 dark:hover:bg-zinc-800/50 transition-colors"
                                     >
                                       <div className="space-y-1">
                                         <div className="flex items-center gap-2">
-                                          <code className="text-xs text-cyan-400 bg-zinc-800/50 px-2 py-0.5 rounded font-mono">
+                                          <code className="text-xs text-purple-500 dark:text-cyan-400 bg-gray-100 dark:bg-zinc-800/50 px-2 py-0.5 rounded font-mono">
                                             {langConfig.tiebreaker.displayName}
                                           </code>
                                           <Badge
@@ -586,7 +586,7 @@ export function StageDetailSheet({
                                             {langConfig.tiebreaker.weight.toFixed(2)}
                                           </Badge>
                                         </div>
-                                        <div className="flex items-center gap-2 text-xs text-zinc-500">
+                                        <div className="flex items-center gap-2 text-xs text-gray-500 dark:text-zinc-500">
                                           <span>T: {langConfig.tiebreaker.temperature}</span>
                                           <span>•</span>
                                           <span>Max: {langConfig.tiebreaker.maxTokens}</span>
@@ -605,19 +605,19 @@ export function StageDetailSheet({
 
                   {/* Header */}
                   <div className="flex items-center gap-2">
-                    <Database className="h-4 w-4 text-cyan-400" />
-                    <h3 className="text-sm font-medium text-zinc-300">
+                    <Database className="h-4 w-4 text-purple-500 dark:text-cyan-400" />
+                    <h3 className="text-sm font-medium text-gray-700 dark:text-zinc-300">
                       Model Configurations
                     </h3>
                     <Badge
                       variant="outline"
-                      className="bg-cyan-500/10 text-cyan-400 border-cyan-500/30 text-xs"
+                      className="bg-purple-500/10 dark:bg-cyan-500/10 text-purple-500 dark:text-cyan-400 border-purple-500/30 dark:border-cyan-500/30 text-xs"
                     >
                       Database
                     </Badge>
                   </div>
 
-                  <p className="text-xs text-zinc-500">
+                  <p className="text-xs text-gray-500 dark:text-zinc-500">
                     Models are automatically selected based on content language and document size.
                     All configurations are editable and stored in the database.
                   </p>
@@ -644,9 +644,9 @@ export function StageDetailSheet({
                           if (!hasModels) return null;
 
                           return (
-                            <Card key={lang} className="bg-zinc-900/50 border-zinc-800">
+                            <Card key={lang} className="bg-gray-50 dark:bg-zinc-900/50 border-gray-200 dark:border-zinc-800">
                               <CardHeader className="pb-3">
-                                <CardTitle className="text-sm font-medium text-zinc-300 flex items-center gap-2">
+                                <CardTitle className="text-sm font-medium text-gray-700 dark:text-zinc-300 flex items-center gap-2">
                                   <span className="text-lg">{languageLabels[lang].emoji}</span>
                                   {languageLabels[lang].name}
                                 </CardTitle>
@@ -699,13 +699,13 @@ export function StageDetailSheet({
                                               <div className="flex items-center gap-2">
                                                 <Badge
                                                   variant="outline"
-                                                  className="bg-zinc-800/50 text-zinc-300 border-zinc-700 font-mono text-xs"
+                                                  className="bg-gray-100 dark:bg-zinc-800/50 text-gray-700 dark:text-zinc-300 border-gray-300 dark:border-zinc-700 font-mono text-xs"
                                                 >
                                                   {model.phaseName}
                                                 </Badge>
                                                 <Badge
                                                   variant="secondary"
-                                                  className="bg-zinc-800 text-zinc-400 text-xs"
+                                                  className="bg-gray-200 dark:bg-zinc-800 text-gray-600 dark:text-zinc-400 text-xs"
                                                 >
                                                   v{model.version}
                                                 </Badge>
@@ -722,19 +722,19 @@ export function StageDetailSheet({
                                               {/* Primary and fallback models */}
                                               <div className="space-y-1.5">
                                                 <div className="flex items-center gap-2">
-                                                  <span className="text-xs text-zinc-500 w-16">
+                                                  <span className="text-xs text-gray-500 dark:text-zinc-500 w-16">
                                                     Primary:
                                                   </span>
-                                                  <code className="text-xs text-cyan-400 bg-zinc-800/50 px-2 py-0.5 rounded font-mono truncate">
+                                                  <code className="text-xs text-purple-500 dark:text-cyan-400 bg-gray-100 dark:bg-zinc-800/50 px-2 py-0.5 rounded font-mono truncate">
                                                     {model.modelId}
                                                   </code>
                                                 </div>
                                                 {model.fallbackModelId && (
                                                   <div className="flex items-center gap-2">
-                                                    <span className="text-xs text-zinc-500 w-16">
+                                                    <span className="text-xs text-gray-500 dark:text-zinc-500 w-16">
                                                       Fallback:
                                                     </span>
-                                                    <code className="text-xs text-amber-400/80 bg-zinc-800/50 px-2 py-0.5 rounded font-mono truncate">
+                                                    <code className="text-xs text-amber-500 dark:text-amber-400/80 bg-gray-100 dark:bg-zinc-800/50 px-2 py-0.5 rounded font-mono truncate">
                                                       {model.fallbackModelId}
                                                     </code>
                                                   </div>
@@ -742,7 +742,7 @@ export function StageDetailSheet({
                                               </div>
 
                                               {/* Model parameters */}
-                                              <div className="flex flex-wrap gap-3 text-xs text-zinc-500">
+                                              <div className="flex flex-wrap gap-3 text-xs text-gray-500 dark:text-zinc-500">
                                                 {model.maxContextTokens && (
                                                   <div className="flex items-center gap-1">
                                                     <Layers className="h-3.5 w-3.5" />
@@ -769,7 +769,7 @@ export function StageDetailSheet({
                                             </div>
 
                                             {/* Chevron indicator */}
-                                            <ChevronRight className="h-5 w-5 text-zinc-600 group-hover:text-cyan-400 transition-colors flex-shrink-0" />
+                                            <ChevronRight className="h-5 w-5 text-gray-400 dark:text-zinc-600 group-hover:text-purple-500 dark:group-hover:text-cyan-400 transition-colors flex-shrink-0" />
                                           </div>
                                         </div>
                                       ))}
@@ -792,15 +792,15 @@ export function StageDetailSheet({
               {isLoading ? (
                 <div className="space-y-3">
                   {[1, 2, 3].map((i) => (
-                    <Skeleton key={i} className="h-24 w-full bg-zinc-800" />
+                    <Skeleton key={i} className="h-24 w-full bg-gray-200 dark:bg-zinc-800" />
                   ))}
                 </div>
               ) : prompts.length === 0 ? (
-                <Card className="bg-zinc-900/50 border-zinc-800">
+                <Card className="bg-gray-50 dark:bg-zinc-900/50 border-gray-200 dark:border-zinc-800">
                   <CardContent className="p-8 text-center">
-                    <FileText className="h-12 w-12 mx-auto text-zinc-600 mb-3" />
-                    <p className="text-zinc-400">No prompts configured for this stage</p>
-                    <p className="text-xs text-zinc-500 mt-1">
+                    <FileText className="h-12 w-12 mx-auto text-gray-400 dark:text-zinc-600 mb-3" />
+                    <p className="text-gray-600 dark:text-zinc-400">No prompts configured for this stage</p>
+                    <p className="text-xs text-gray-500 dark:text-zinc-500 mt-1">
                       This stage may not use prompt templates
                     </p>
                   </CardContent>
@@ -809,7 +809,7 @@ export function StageDetailSheet({
                 prompts.map((prompt) => (
                   <Card
                     key={prompt.id}
-                    className="bg-zinc-900/50 border-zinc-800 hover:border-zinc-700 transition-colors group cursor-pointer"
+                    className="bg-gray-50 dark:bg-zinc-900/50 border-gray-200 dark:border-zinc-800 hover:border-gray-300 dark:hover:border-zinc-700 transition-colors group cursor-pointer"
                     onClick={() => onEditPrompt?.(prompt)}
                   >
                     <CardContent className="p-4">
@@ -824,29 +824,29 @@ export function StageDetailSheet({
                             </Badge>
                             <Badge
                               variant="secondary"
-                              className="bg-zinc-800 text-zinc-400 text-xs"
+                              className="bg-gray-200 dark:bg-zinc-800 text-gray-600 dark:text-zinc-400 text-xs"
                             >
                               v{prompt.version}
                             </Badge>
                           </div>
-                          <p className="font-medium text-zinc-200 mb-1">
+                          <p className="font-medium text-gray-800 dark:text-zinc-200 mb-1">
                             {prompt.promptName}
                           </p>
                           {prompt.promptDescription && (
-                            <p className="text-xs text-zinc-500 line-clamp-2">
+                            <p className="text-xs text-gray-500 dark:text-zinc-500 line-clamp-2">
                               {prompt.promptDescription}
                             </p>
                           )}
                           {prompt.variables && prompt.variables.length > 0 && (
                             <div className="flex items-center gap-2 mt-2">
-                              <Sparkles className="h-3 w-3 text-cyan-400" />
-                              <span className="text-xs text-zinc-500">
+                              <Sparkles className="h-3 w-3 text-purple-500 dark:text-cyan-400" />
+                              <span className="text-xs text-gray-500 dark:text-zinc-500">
                                 {prompt.variables.length} variables
                               </span>
                             </div>
                           )}
                         </div>
-                        <ChevronRight className="h-5 w-5 text-zinc-600 group-hover:text-cyan-400 transition-colors" />
+                        <ChevronRight className="h-5 w-5 text-gray-400 dark:text-zinc-600 group-hover:text-purple-500 dark:group-hover:text-cyan-400 transition-colors" />
                       </div>
                     </CardContent>
                   </Card>

@@ -2,25 +2,29 @@
 
 import React, { useCallback, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Play, X, CheckSquare, Square, Rocket } from 'lucide-react';
+import { Play, X, CheckSquare, Rocket, ChevronUp, ChevronDown, Sparkles } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { useOptionalPartialGenerationContext } from '../contexts/PartialGenerationContext';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
 import type { CourseStructure } from '@megacampus/shared-types';
+import { useTheme } from 'next-themes';
 
 interface SelectionToolbarProps {
   courseId?: string;
 }
 
 /**
- * Floating toolbar that appears when items are selected for partial generation.
- * Shows selection count and provides "Generate Selected" action.
- * Also provides "Generate All" button to start full course generation.
+ * Stage 6 Control Banner - consistent with MissionControlBanner design.
+ * Shows after Stage 5 is complete and lesson nodes are visible.
+ * Provides "Generate All" and "Select Lessons" actions.
  */
 export function SelectionToolbar({ courseId }: SelectionToolbarProps) {
-  // Use optional hook - returns null when not inside PartialGenerationProvider
   const contextValue = useOptionalPartialGenerationContext();
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(false);
+  const { resolvedTheme } = useTheme();
+  const isDark = resolvedTheme === 'dark';
 
   /**
    * Generate ALL lessons in the course
@@ -30,7 +34,6 @@ export function SelectionToolbar({ courseId }: SelectionToolbarProps) {
 
     setIsGeneratingAll(true);
     try {
-      // Fetch course structure to get all section IDs
       const supabase = createClient();
       const { data, error } = await supabase
         .from('courses')
@@ -51,7 +54,6 @@ export function SelectionToolbar({ courseId }: SelectionToolbarProps) {
         return;
       }
 
-      // Generate all sections (this generates all lessons in them)
       const response = await fetch(`/api/coursegen/partial-generate`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -93,112 +95,154 @@ export function SelectionToolbar({ courseId }: SelectionToolbarProps) {
     isGenerating,
   } = contextValue;
 
+  const isProcessing = isGeneratingAll || isGenerating;
+
   return (
-    <AnimatePresence>
-      {/* Left side buttons: Selection Mode + Generate All */}
-      <motion.div
-        initial={{ opacity: 0, y: 20 }}
-        animate={{ opacity: 1, y: 0 }}
-        exit={{ opacity: 0, y: 20 }}
-        className="fixed bottom-4 left-4 z-50 flex items-center gap-2"
-      >
-        {/* Generate All Button */}
-        {courseId && (
-          <button
-            onClick={generateAllLessons}
-            disabled={isGeneratingAll || isGenerating}
-            className={`
-              flex items-center gap-2 px-4 py-2 rounded-lg shadow-lg transition-all
-              ${isGeneratingAll || isGenerating
-                ? 'bg-slate-400 text-white cursor-not-allowed'
-                : 'bg-gradient-to-r from-emerald-500 to-teal-600 text-white hover:from-emerald-600 hover:to-teal-700'
-              }
-            `}
-            title="Запустить генерацию всех уроков"
-          >
-            <Rocket size={18} />
-            <span className="text-sm font-medium">
-              {isGeneratingAll ? 'Загрузка...' : 'Всё'}
-            </span>
-          </button>
-        )}
-
-        {/* Selection Mode Toggle Button */}
-        <button
-          onClick={() => {
-            if (isSelectionMode) {
-              clearSelection();
-            }
-            setSelectionMode(!isSelectionMode);
-          }}
-          className={`
-            flex items-center gap-2 px-4 py-2 rounded-lg shadow-lg transition-all
-            ${isSelectionMode
-              ? 'bg-purple-600 text-white hover:bg-purple-700'
-              : 'bg-white dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700 border border-slate-200 dark:border-slate-700'
-            }
-          `}
-          title={isSelectionMode ? 'Выйти из режима выбора' : 'Режим выбора'}
-        >
-          {isSelectionMode ? <CheckSquare size={18} /> : <Square size={18} />}
-          <span className="text-sm font-medium">
-            {isSelectionMode ? 'Выбор' : 'Выбрать'}
-          </span>
-        </button>
-      </motion.div>
-
-      {/* Floating Action Bar - shown when items are selected */}
-      {hasSelection && (
+    <>
+      {/* Main Control Banner - matches MissionControlBanner design */}
+      <div className="fixed bottom-6 left-0 right-0 z-50 px-4 pointer-events-none flex justify-center">
         <motion.div
-          initial={{ opacity: 0, y: 20, scale: 0.95 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: 20, scale: 0.95 }}
-          className="fixed bottom-4 left-1/2 -translate-x-1/2 z-50"
+          initial={{ y: 50, opacity: 0 }}
+          animate={{ y: 0, opacity: 1 }}
+          exit={{ y: 50, opacity: 0 }}
+          className="w-full max-w-3xl pointer-events-auto"
         >
-          <div className="flex items-center gap-3 px-4 py-3 bg-white dark:bg-slate-800 rounded-xl shadow-xl border border-slate-200 dark:border-slate-700">
-            {/* Selection Count */}
-            <div className="flex items-center gap-2">
-              <div className="w-8 h-8 rounded-full bg-blue-100 dark:bg-blue-900/30 flex items-center justify-center">
-                <span className="text-sm font-bold text-blue-600 dark:text-blue-400">
-                  {selectedCount}
-                </span>
+          <div className={`backdrop-blur-md rounded-xl shadow-lg overflow-hidden ${
+            isDark
+              ? 'bg-gray-900/95 border border-purple-500/30'
+              : 'bg-white/95 border border-purple-200/50 shadow-purple-500/10'
+          }`}>
+
+            {/* Header with both buttons visible */}
+            <div className="px-4 py-3 flex items-center justify-between gap-3">
+              {/* Left: Icon + Title + Expand toggle */}
+              <div
+                className={`flex items-center gap-3 overflow-hidden cursor-pointer transition-colors rounded-lg px-2 py-1 -mx-2 ${
+                  isDark ? 'hover:bg-white/5' : 'hover:bg-slate-50'
+                }`}
+                onClick={() => setIsExpanded(!isExpanded)}
+              >
+                <div className={`p-2 rounded-full border shrink-0 ${
+                  isDark
+                    ? 'bg-purple-500/10 border-purple-500/30 text-purple-400'
+                    : 'bg-purple-50 border-purple-200 text-purple-600'
+                }`}>
+                  <Sparkles className="w-4 h-4" />
+                </div>
+                <div className="flex items-center gap-2 min-w-0">
+                  <h3 className={`text-sm font-bold truncate ${isDark ? 'text-gray-100' : 'text-gray-900'}`}>
+                    Этап 6: Генерация
+                  </h3>
+                  {isProcessing && (
+                    <div className="w-1.5 h-1.5 bg-purple-500 rounded-full animate-pulse shrink-0" />
+                  )}
+                  <div className={`${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
+                    {isExpanded ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
+                  </div>
+                </div>
               </div>
-              <span className="text-sm text-slate-600 dark:text-slate-400">
-                {selectedCount === 1 ? 'урок выбран' :
-                 selectedCount < 5 ? 'урока выбрано' : 'уроков выбрано'}
-              </span>
+
+              {/* Right: Action buttons */}
+              <div className="flex items-center gap-2 shrink-0">
+                {/* Selection mode toggle / Cancel button */}
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  onClick={() => {
+                    if (isSelectionMode) {
+                      clearSelection();
+                      setSelectionMode(false);
+                    } else {
+                      setSelectionMode(true);
+                    }
+                  }}
+                  className={`h-9 px-4 text-sm font-medium ${
+                    isDark
+                      ? 'bg-gray-800 text-gray-200 hover:bg-gray-700 border-gray-700'
+                      : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border-gray-200'
+                  }`}
+                >
+                  {isSelectionMode ? (
+                    <>
+                      <X className="w-3.5 h-3.5 mr-1.5" />
+                      Отмена
+                    </>
+                  ) : (
+                    <>
+                      <CheckSquare className="w-3.5 h-3.5 mr-1.5" />
+                      Выбрать уроки
+                    </>
+                  )}
+                </Button>
+
+                {/* Main action button - changes based on selection */}
+                <Button
+                  size="sm"
+                  onClick={hasSelection ? generateSelected : generateAllLessons}
+                  disabled={isProcessing}
+                  className="h-9 px-5 text-sm font-medium bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 text-white transition-all shadow-lg shadow-purple-500/25 border-0"
+                >
+                  {isProcessing ? (
+                    <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                  ) : hasSelection ? (
+                    <>
+                      <Play className="w-3.5 h-3.5 mr-1.5" />
+                      Сгенерировать {selectedCount} {selectedCount === 1 ? 'урок' : selectedCount < 5 ? 'урока' : 'уроков'}
+                    </>
+                  ) : (
+                    <>
+                      <Rocket className="w-3.5 h-3.5 mr-1.5" />
+                      Запустить всё
+                    </>
+                  )}
+                </Button>
+              </div>
             </div>
 
-            {/* Divider */}
-            <div className="w-px h-8 bg-slate-200 dark:bg-slate-700" />
-
-            {/* Generate Button */}
-            <button
-              onClick={generateSelected}
-              disabled={isGenerating}
-              className={`
-                flex items-center gap-2 px-4 py-2 rounded-lg font-medium transition-all
-                ${isGenerating
-                  ? 'bg-slate-100 dark:bg-slate-700 text-slate-400 cursor-not-allowed'
-                  : 'bg-emerald-600 text-white hover:bg-emerald-700 shadow-sm'
-                }
-              `}
-            >
-              <Play size={16} />
-              <span>Сгенерировать</span>
-            </button>
-
-            {/* Clear Selection */}
-            <button
-              onClick={clearSelection}
-              className="p-2 rounded-lg text-slate-500 hover:bg-slate-100 dark:hover:bg-slate-700 transition-colors"
-              title="Очистить выбор"
-            >
-              <X size={18} />
-            </button>
+            {/* Expanded Details - stage description */}
+            <AnimatePresence>
+              {isExpanded && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: 'auto', opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <div className={`px-4 pb-4 pt-0 ${isDark ? 'border-t border-white/5' : 'border-t border-slate-100'}`}>
+                    <div className={`pt-3 text-sm ${isDark ? 'text-gray-400' : 'text-gray-600'}`}>
+                      <p>Структура курса готова. Выберите способ генерации контента:</p>
+                      <ul className="mt-2 ml-4 list-disc space-y-1">
+                        <li><strong className={isDark ? 'text-gray-300' : 'text-gray-700'}>Запустить всё</strong> — сгенерировать контент для всех уроков сразу</li>
+                        <li><strong className={isDark ? 'text-gray-300' : 'text-gray-700'}>Выбрать</strong> — выбрать отдельные уроки и сгенерировать только их</li>
+                      </ul>
+                    </div>
+                  </div>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         </motion.div>
-      )}
-    </AnimatePresence>
+      </div>
+
+    </>
+  );
+}
+
+function Loader2({ className }: { className?: string }) {
+  return (
+    <svg
+      xmlns="http://www.w3.org/2000/svg"
+      width="24"
+      height="24"
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      className={className}
+    >
+      <path d="M21 12a9 9 0 1 1-6.219-8.56" />
+    </svg>
   );
 }

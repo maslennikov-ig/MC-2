@@ -164,7 +164,7 @@ export function ModelsConfig() {
         <div className="font-medium">
           <Badge
             variant="outline"
-            className="bg-gradient-to-r from-cyan-500/10 to-purple-500/10 border-cyan-500/30 text-cyan-400"
+            className="bg-gradient-to-r from-purple-500/10 to-purple-500/10 dark:from-cyan-500/10 dark:to-purple-500/10 border-purple-500/30 dark:border-cyan-500/30 text-purple-500 dark:text-cyan-400"
           >
             {row.original.phaseName}
           </Badge>
@@ -358,7 +358,7 @@ export function ModelsConfig() {
           size="sm"
           onClick={handleRefreshCache}
           disabled={isRefreshingCache}
-          className="border-cyan-500/30 text-cyan-400 hover:bg-cyan-500/10 hover:text-cyan-300 transition-all"
+          className="border-purple-500/30 dark:border-cyan-500/30 text-purple-500 dark:text-cyan-400 hover:bg-purple-500/10 dark:hover:bg-cyan-500/10 hover:text-purple-600 dark:hover:text-cyan-300 transition-all"
         >
           {isRefreshingCache ? (
             <Loader2 className="h-4 w-4 mr-2 animate-spin" />
@@ -375,7 +375,7 @@ export function ModelsConfig() {
           placeholder="Filter by phase name..."
           value={(table.getColumn('phaseName')?.getFilterValue() as string) ?? ''}
           onChange={(event) => table.getColumn('phaseName')?.setFilterValue(event.target.value)}
-          className="max-w-sm bg-transparent border-cyan-500/20 focus:border-cyan-500/50 text-white placeholder:text-gray-500"
+          className="max-w-sm bg-transparent border-purple-500/20 dark:border-cyan-500/20 focus:border-purple-500/50 dark:focus:border-cyan-500/50 text-gray-900 dark:text-white placeholder:text-gray-500"
         />
       </div>
 
@@ -397,11 +397,11 @@ export function ModelsConfig() {
 
       {/* Data table */}
       {!isLoading && !error && (
-        <div className="rounded-xl border border-cyan-500/10 admin-glass-card overflow-hidden">
+        <div className="rounded-xl border border-purple-500/10 dark:border-cyan-500/10 admin-glass-card overflow-hidden">
           <Table>
             <TableHeader className="sticky top-0 backdrop-blur-xl bg-[rgb(var(--admin-bg-primary))]/90 z-10">
               {table.getHeaderGroups().map((headerGroup) => (
-                <TableRow key={headerGroup.id} className="border-b border-cyan-500/10 hover:bg-transparent">
+                <TableRow key={headerGroup.id} className="border-b border-purple-500/10 dark:border-cyan-500/10 hover:bg-transparent">
                   {headerGroup.headers.map((header) => (
                     <TableHead key={header.id} className="font-semibold" style={{ color: 'rgb(var(--admin-text-secondary))' }}>
                       {header.isPlaceholder

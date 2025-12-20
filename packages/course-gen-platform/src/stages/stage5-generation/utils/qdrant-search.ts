@@ -49,7 +49,7 @@ const TOKEN_BUDGET = {
 const RAG_DEFAULTS = {
   CHUNK_LIMIT: 5,                  // Default number of chunks to retrieve
   SCORE_THRESHOLD: 0.7,            // Minimum similarity score
-  ENABLE_HYBRID: true,             // Use hybrid search (dense + sparse)
+  ENABLE_HYBRID: true,             // ENABLED: sparse vectors uploaded + native Query API with server-side RRF
 } as const;
 
 // ============================================================================

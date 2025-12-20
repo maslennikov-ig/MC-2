@@ -278,7 +278,30 @@ export const generationMonitoringRouter = router({
     .input(
       z.object({
         organizationId: z.string().uuid().optional(),
-        status: z.enum(['completed', 'failed', 'cancelled']).optional(),
+        status: z.enum([
+          'pending',
+          'stage_2_init',
+          'stage_2_processing',
+          'stage_2_complete',
+          'stage_2_awaiting_approval',
+          'stage_3_init',
+          'stage_3_summarizing',
+          'stage_3_complete',
+          'stage_3_awaiting_approval',
+          'stage_4_init',
+          'stage_4_analyzing',
+          'stage_4_complete',
+          'stage_4_awaiting_approval',
+          'stage_5_init',
+          'stage_5_generating',
+          'stage_5_complete',
+          'stage_5_awaiting_approval',
+          'finalizing',
+          'completed',
+          'failed',
+          'cancelled',
+        ]).optional(),
+        language: z.enum(['ru', 'en']).optional(),
         search: z.string().optional(),
         limit: z.number().min(1).max(100).default(20),
         offset: z.number().min(0).default(0),
@@ -287,15 +310,35 @@ export const generationMonitoringRouter = router({
     .query(async ({ input }) => {
       try {
         const supabase = getSupabaseAdmin();
+
+        // Build query with specific columns and user join
         let query = supabase
           .from('courses')
-          .select('*', { count: 'exact' })
+          .select(`
+            id,
+            slug,
+            generation_code,
+            title,
+            generation_status,
+            language,
+            difficulty,
+            generation_started_at,
+            generation_completed_at,
+            created_at,
+            error_message,
+            user_id
+          `, { count: 'exact' })
           .not('generation_status', 'is', null)
           .order('created_at', { ascending: false });
 
         if (input.organizationId) query = query.eq('organization_id', input.organizationId);
         if (input.status) query = query.eq('generation_status', input.status);
-        if (input.search) query = query.ilike('title', `%${input.search}%`);
+        if (input.language) query = query.eq('language', input.language);
+
+        // Enhanced search: search across generation_code and title
+        if (input.search) {
+          query = query.or(`title.ilike.%${input.search}%,generation_code.ilike.%${input.search}%`);
+        }
 
         query = query.range(input.offset, input.offset + input.limit - 1);
 
@@ -303,8 +346,21 @@ export const generationMonitoringRouter = router({
 
         if (error) throw error;
 
+        // Fetch user emails for all courses
+        const { data: users } = await supabase.auth.admin.listUsers();
+
+        const userEmailMap = new Map(
+          users?.users.map(u => [u.id, u.email || 'Unknown']) || []
+        );
+
+        // Combine course data with user emails
+        const coursesWithUsers = (data || []).map(course => ({
+          ...course,
+          user_email: userEmailMap.get(course.user_id) || 'Unknown',
+        }));
+
         return {
-          courses: data || [],
+          courses: coursesWithUsers,
           totalCount: count || 0,
         };
       } catch (error) {

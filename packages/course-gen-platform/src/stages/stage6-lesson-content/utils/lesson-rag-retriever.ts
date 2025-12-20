@@ -49,7 +49,7 @@ export const LESSON_RAG_CONFIG = {
   MAX_CHUNKS: 10,
   /** Score threshold - lowered to capture all relevant chunks (reranker handles quality) */
   SCORE_THRESHOLD: 0.25,
-  /** Enable hybrid search (dense + sparse) */
+  /** Enable hybrid search (dense + sparse) - ENABLED: sparse vectors now uploaded + native Query API with server-side RRF */
   ENABLE_HYBRID: true,
   /** Token budget for lesson-level context */
   MAX_TOKENS: 20_000,
@@ -236,15 +236,29 @@ export async function retrieveLessonContext(
 
   for (const query of queries) {
     try {
+      const primaryDocIds = lessonSpec.rag_context?.primary_documents;
+      const filteringByDocs = primaryDocIds && primaryDocIds.length > 0;
+
+      // Log primary_documents filtering status on first query only
+      if (queries.indexOf(query) === 0) {
+        logger.debug({
+          lessonId: lessonSpec.lesson_id,
+          filteringByDocs,
+          documentCount: primaryDocIds?.length ?? 0,
+        }, filteringByDocs
+          ? `RAG filtering by ${primaryDocIds.length} documents`
+          : 'RAG searching all course documents');
+      }
+
       const searchOptions: SearchOptions = {
         limit: Math.ceil(candidateCount / queries.length) + 2, // Extra for deduplication
         score_threshold: LESSON_RAG_CONFIG.SCORE_THRESHOLD,
         enable_hybrid: LESSON_RAG_CONFIG.ENABLE_HYBRID,
         filters: {
           course_id: courseId,
-          // Filter by primary documents if specified
-          ...(lessonSpec.rag_context?.primary_documents?.length && {
-            document_ids: lessonSpec.rag_context.primary_documents,
+          // Filter by primary documents if specified (empty array = search all)
+          ...(filteringByDocs && {
+            document_ids: primaryDocIds,
           }),
         },
       };
@@ -772,14 +786,30 @@ async function retrieveSectionContextFresh(params: {
 
   for (const query of queries) {
     try {
+      const primaryDocIds = lessonSpec.rag_context?.primary_documents;
+      const filteringByDocs = primaryDocIds && primaryDocIds.length > 0;
+
+      // Log primary_documents filtering status on first query only
+      if (queries.indexOf(query) === 0) {
+        logger.debug({
+          lessonId: lessonSpec.lesson_id,
+          sectionTitle: section.title,
+          filteringByDocs,
+          documentCount: primaryDocIds?.length ?? 0,
+        }, filteringByDocs
+          ? `Section RAG filtering by ${primaryDocIds.length} documents`
+          : 'Section RAG searching all course documents');
+      }
+
       const searchOptions: SearchOptions = {
         limit: 3, // Fewer per query since we have multiple sections
         score_threshold: LESSON_RAG_CONFIG.SCORE_THRESHOLD,
         enable_hybrid: LESSON_RAG_CONFIG.ENABLE_HYBRID,
         filters: {
           course_id: courseId,
-          ...(lessonSpec.rag_context?.primary_documents?.length && {
-            document_ids: lessonSpec.rag_context.primary_documents,
+          // Filter by primary documents if specified (empty array = search all)
+          ...(filteringByDocs && {
+            document_ids: primaryDocIds,
           }),
         },
       };

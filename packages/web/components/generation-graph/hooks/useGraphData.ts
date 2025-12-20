@@ -431,13 +431,19 @@ export function useGraphData(options: UseGraphDataOptions = {}) {
 
   // Ref to store node positions for layout preservation (avoids dependency cycles)
   const nodePositionsRef = useRef<Map<string, { x: number; y: number }>>(new Map());
+  // Ref to store module collapsed states for preservation during trace updates
+  const moduleCollapsedRef = useRef<Map<string, boolean>>(new Map());
   const getFilenameRef = useRef(getFilename);
 
-  // Update positions ref when nodes change
+  // Update positions ref and collapsed states when nodes change
   useEffect(() => {
     nodes.forEach(n => {
       if (n.position) {
         nodePositionsRef.current.set(n.id, n.position);
+      }
+      // Preserve module collapsed state
+      if (n.type === 'module' && n.data?.isCollapsed !== undefined) {
+        moduleCollapsedRef.current.set(n.id, n.data.isCollapsed as boolean);
       }
     });
   }, [nodes]);
@@ -1384,7 +1390,8 @@ export function useGraphData(options: UseGraphDataOptions = {}) {
 
                 // Default to collapsed if > 5 modules (better UX for large courses)
                 const defaultCollapsed = modules.length > 5;
-                const isCollapsed = (item.data?.isCollapsed as boolean) ?? defaultCollapsed;
+                // Use preserved state from ref (set by user clicks), then item.data, then default
+                const isCollapsed = moduleCollapsedRef.current.get(item.id) ?? (item.data?.isCollapsed as boolean) ?? defaultCollapsed;
 
                 newNodes.push({
                     id: item.id,
@@ -1415,10 +1422,10 @@ export function useGraphData(options: UseGraphDataOptions = {}) {
             });
 
             // Second: add all lesson nodes (children)
-            // Build lookup for module isCollapsed state (using same default logic)
+            // Build lookup for module isCollapsed state using preserved state from ref
             const defaultCollapsedForLessons = modules.length > 5;
             const moduleCollapsedMap = new Map(
-                moduleItems.map(m => [m.id, (m.data?.isCollapsed as boolean) ?? defaultCollapsedForLessons])
+                moduleItems.map(m => [m.id, moduleCollapsedRef.current.get(m.id) ?? (m.data?.isCollapsed as boolean) ?? defaultCollapsedForLessons])
             );
 
             lessonItems.forEach(item => {

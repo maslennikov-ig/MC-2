@@ -87,6 +87,65 @@
       "deleteFailed": "Не удалось удалить пользователя"
     }
   },
+  "history": {
+    "title": "История генераций",
+    "description": "Просмотр и управление историей генерации курсов",
+    "table": {
+      "code": "Код",
+      "user": "Пользователь",
+      "title": "Название",
+      "status": "Статус",
+      "language": "Язык",
+      "difficulty": "Сложность",
+      "started": "Начало",
+      "duration": "Длительность",
+      "actions": "Действия"
+    },
+    "filters": {
+      "searchPlaceholder": "Поиск по коду, названию или email...",
+      "allStatuses": "Все статусы",
+      "allLanguages": "Все языки"
+    },
+    "status": {
+      "pending": "Ожидание",
+      "stage_2_processing": "Этап 2: Обработка",
+      "stage_3_summarizing": "Этап 3: Суммаризация",
+      "stage_4_analyzing": "Этап 4: Анализ",
+      "stage_5_generating": "Этап 5: Генерация",
+      "finalizing": "Финализация",
+      "completed": "Завершено",
+      "failed": "Ошибка",
+      "cancelled": "Отменено"
+    },
+    "languages": {
+      "ru": "Русский",
+      "en": "Английский"
+    },
+    "difficulty": {
+      "beginner": "Начальный",
+      "intermediate": "Средний",
+      "advanced": "Продвинутый"
+    },
+    "duration": {
+      "lessThanMinute": "< 1 мин",
+      "minutes": "{count} мин",
+      "hoursMinutes": "{hours}ч {minutes}м",
+      "inProgress": "В процессе"
+    },
+    "actions": {
+      "openWorkflow": "Открыть Workflow",
+      "adminPanel": "Панель администратора"
+    },
+    "empty": {
+      "title": "Генерации не найдены",
+      "subtitle": "Попробуйте изменить фильтры или поисковый запрос"
+    },
+    "pagination": {
+      "showing": "Показано {from} - {to} из {total} результатов",
+      "previous": "Назад",
+      "next": "Вперёд"
+    }
+  },
   "pipeline": {
     "title": "Конфигурация пайплайна",
     "description": "Управление LLM моделями, промптами и глобальными настройками генерации курсов",

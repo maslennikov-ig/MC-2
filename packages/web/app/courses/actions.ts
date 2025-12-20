@@ -7,6 +7,7 @@ import type { CourseStructureData } from '@/types/database'
 import { logger } from '@/lib/logger'
 import { PostgrestError } from '@supabase/supabase-js'
 import { generateSlug } from '@/lib/utils/slug'
+import { getBackendAuthHeaders, TRPC_URL } from '@/lib/auth'
 
 // Type definitions
 type StatisticsQueryResponse = {
@@ -273,16 +274,64 @@ export async function getCourses({
 }
 
 /**
+ * Clean up external course resources via tRPC backend
+ * Cleans: Qdrant vectors, Redis keys, RAG context cache, physical files
+ *
+ * @param courseId - Course UUID to clean up
+ * @returns Cleanup result or null if cleanup failed
+ */
+async function cleanupCourseResources(courseId: string): Promise<{
+  success: boolean;
+  errors: string[];
+} | null> {
+  try {
+    const headers = await getBackendAuthHeaders()
+
+    const response = await fetch(`${TRPC_URL}/generation.lifecycle.cleanupCourse`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ courseId }),
+    })
+
+    if (!response.ok) {
+      const errorData = await response.json().catch(() => ({}))
+      logger.warn('Course cleanup request failed', {
+        courseId,
+        status: response.status,
+        error: errorData,
+      })
+      return null
+    }
+
+    const data = await response.json()
+    return data?.result?.data || null
+  } catch (error) {
+    logger.error('Failed to cleanup course resources', {
+      courseId,
+      error: error instanceof Error ? error.message : String(error),
+    })
+    return null
+  }
+}
+
+/**
  * Delete course with RLS enforcement
+ *
+ * Cleanup order:
+ * 1. Clean external resources (Qdrant vectors, Redis, RAG cache, files) via tRPC
+ * 2. Delete database records (assets, lessons, sections, course)
+ *
+ * The cleanup is best-effort - if it fails, we still proceed with database deletion
+ * to avoid orphaned database records. External resources can be cleaned up manually if needed.
  */
 export async function deleteCourse(courseSlug: string) {
   const supabase = await getUserClient()
   const user = await getCurrentUser()
-  
+
   if (!user) {
     throw new Error('Unauthorized')
   }
-  
+
   try {
     // Get course - RLS will check access
     const { data: course, error: fetchError } = await supabase
@@ -290,52 +339,70 @@ export async function deleteCourse(courseSlug: string) {
       .select('id, title')
       .eq('slug', courseSlug)
       .single() as { data: { id: string; title: string } | null; error: PostgrestError | null }
-    
+
     if (fetchError || !course) {
       throw new Error('Course not found or access denied')
     }
-    
+
+    const courseId = course.id
+
+    // Step 1: Clean external resources BEFORE database deletion
+    // This ensures Qdrant vectors, Redis keys, RAG cache, and physical files are removed
+    const cleanupResult = await cleanupCourseResources(courseId)
+
+    if (cleanupResult) {
+      if (cleanupResult.success) {
+        logger.info('Course external resources cleaned up successfully', { courseId })
+      } else {
+        // Log warning but continue with deletion - cleanup is best-effort
+        logger.warn('Some course resources failed to clean up', {
+          courseId,
+          errors: cleanupResult.errors,
+        })
+      }
+    } else {
+      // Cleanup request failed entirely - log and continue
+      logger.warn('Could not cleanup course resources, proceeding with deletion', { courseId })
+    }
+
+    // Step 2: Delete database records
     // For cascade deletes, we need admin client
     // but first verify user has permission via RLS
     const adminClient = getAdminClient()
-    
-    // Delete in correct order
-    const courseId = course.id
 
-    // Note: Tests/questions tables will be added in future database schema updates
-    // Currently these tables don't exist in the database: tests, questions, user_favorites
+    // Delete in correct order (respecting foreign key constraints)
 
-    // 1. Delete assets
+    // 2a. Delete assets
     await adminClient.from('assets').delete().eq('course_id', courseId)
 
-    // 3. Delete lessons
+    // 2b. Delete lessons (via sections)
     const { data: sectionsData } = await adminClient
       .from('sections')
       .select('id')
       .eq('course_id', courseId)
-    
+
     if (sectionsData && sectionsData.length > 0) {
       const sectionIds = sectionsData.map(s => s.id)
       await adminClient.from('lessons').delete().in('section_id', sectionIds)
     }
-    
-    // 4. Delete sections
+
+    // 2c. Delete sections
     await adminClient.from('sections').delete().eq('course_id', courseId)
 
-    // Note: Document processing tables will be added in future database schema updates
-    // Currently these tables don't exist in the database
+    // 2d. Delete file_catalog entries (document metadata)
+    await adminClient.from('file_catalog').delete().eq('course_id', courseId)
 
-    // 5. Finally, delete the course using user client to enforce RLS
+    // 2e. Finally, delete the course using user client to enforce RLS
     const { error: deleteError } = await supabase
       .from('courses')
       .delete()
       .eq('id', courseId)
-    
+
     if (deleteError) {
       // RLS will block if user doesn't have permission
       throw new Error('Insufficient permissions to delete this course')
     }
-    
+
     revalidatePath('/courses')
     return { success: true, deletedTitle: course.title }
   } catch (error) {

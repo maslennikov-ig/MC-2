@@ -30,7 +30,7 @@ export async function executeQdrantUpload(
   const uploadResult = await uploadChunksToQdrant(embeddings, {
     batch_size: 100,
     wait: true,
-    enable_sparse: false,
+    enable_sparse: true, // Enable BM25 sparse vectors for hybrid search
   });
 
   await job.updateProgress(95);

@@ -76,9 +76,13 @@ export const GraphHeader = ({ title, progress, isAdmin, onOpenAdminPanel, isDark
                                     {copied ? <Check size={18} className="text-green-500" /> : <Hash size={18} />}
                                 </Button>
                             </TooltipTrigger>
-                            <TooltipContent side="bottom" className="flex flex-col items-center gap-1">
-                                <span className="font-mono font-semibold">{generationCode}</span>
-                                <span className="text-xs opacity-70">Нажмите для копирования</span>
+                            <TooltipContent
+                                side="top"
+                                className="flex flex-col items-center gap-1 px-3 py-2 bg-slate-900 dark:bg-slate-800 border border-slate-700 shadow-xl"
+                            >
+                                <span className="text-xs text-slate-400">Код генерации</span>
+                                <span className="font-mono font-bold text-cyan-400">{generationCode}</span>
+                                <span className="text-xs text-slate-500">Нажмите для копирования</span>
                             </TooltipContent>
                         </Tooltip>
                     </TooltipProvider>

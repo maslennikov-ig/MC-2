@@ -129,26 +129,26 @@
     --font-mono: var(--font-jetbrains-mono);
 
     /* ===== ADMIN PANEL DESIGN SYSTEM ===== */
-    /* Cyberpunk/Developer Terminal Theme */
+    /* Light Theme (default) */
 
-    /* Admin Background Layers */
-    --admin-bg-primary: 10 14 26;        /* #0a0e1a - Deep space blue */
-    --admin-bg-secondary: 17 24 39;      /* #111827 - Card backgrounds */
-    --admin-bg-tertiary: 30 41 59;       /* #1e293b - Elevated elements */
+    /* Admin Background Layers - Light Mode */
+    --admin-bg-primary: 248 250 252;     /* #f8fafc - Light gray */
+    --admin-bg-secondary: 255 255 255;   /* #ffffff - White cards */
+    --admin-bg-tertiary: 241 245 249;    /* #f1f5f9 - Elevated */
 
-    /* Admin Accent Colors */
+    /* Admin Accent Colors - same for both themes */
     --admin-accent-cyan: 6 182 212;      /* #06b6d4 - Primary actions */
     --admin-accent-purple: 139 92 246;   /* #8b5cf6 - Highlights */
     --admin-accent-amber: 251 191 36;    /* #fbbf24 - Warnings */
 
-    /* Admin Text Colors */
-    --admin-text-primary: 248 250 252;   /* #f8fafc - Headings */
-    --admin-text-secondary: 203 213 225; /* #cbd5e1 - Body text */
-    --admin-text-tertiary: 100 116 139;  /* #64748b - Labels */
+    /* Admin Text Colors - Light Mode (dark text) */
+    --admin-text-primary: 15 23 42;      /* #0f172a - Dark headings */
+    --admin-text-secondary: 51 65 85;    /* #334155 - Dark body */
+    --admin-text-tertiary: 100 116 139;  /* #64748b - Gray labels */
 
-    /* Admin Borders */
-    --admin-border: rgba(148, 163, 184, 0.1);
-    --admin-border-glow: rgba(6, 182, 212, 0.2);
+    /* Admin Borders - Light Mode */
+    --admin-border: rgba(148, 163, 184, 0.3);
+    --admin-border-glow: rgba(139, 92, 246, 0.2);
 
     /* Animation Durations */
     --duration-fast: 150ms;
@@ -191,6 +191,22 @@
     --info: 217 91% 60%;
     --danger: 0 63% 31%;
     --danger-light: 0 91% 71%;
+
+    /* ===== ADMIN PANEL DESIGN SYSTEM - DARK OVERRIDE ===== */
+
+    /* Admin Background Layers - Dark Mode */
+    --admin-bg-primary: 10 14 26;        /* #0a0e1a - Deep space blue */
+    --admin-bg-secondary: 17 24 39;      /* #111827 - Card backgrounds */
+    --admin-bg-tertiary: 30 41 59;       /* #1e293b - Elevated elements */
+
+    /* Admin Text Colors - Dark Mode (light text) */
+    --admin-text-primary: 248 250 252;   /* #f8fafc - Light headings */
+    --admin-text-secondary: 203 213 225; /* #cbd5e1 - Light body */
+    --admin-text-tertiary: 100 116 139;  /* #64748b - Gray labels */
+
+    /* Admin Borders - Dark Mode */
+    --admin-border: rgba(148, 163, 184, 0.1);
+    --admin-border-glow: rgba(6, 182, 212, 0.2);
   }
 
   /* Base typography and body styles */

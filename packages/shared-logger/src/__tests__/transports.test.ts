@@ -28,6 +28,7 @@ describe('getTransportConfig', () => {
           colorize: true,
           translateTime: 'SYS:standard',
           ignore: 'pid,hostname',
+          sync: true,
         },
       });
     });
@@ -137,6 +138,7 @@ describe('getTransportConfig', () => {
       expect(config.options).toHaveProperty('colorize', true);
       expect(config.options).toHaveProperty('translateTime', 'SYS:standard');
       expect(config.options).toHaveProperty('ignore', 'pid,hostname');
+      expect(config.options).toHaveProperty('sync', true);
     });
 
     it('production targets have correct log levels', () => {
