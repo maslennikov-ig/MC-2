@@ -6,7 +6,8 @@
     "generations": "Генерации",
     "history": "История",
     "users": "Пользователи",
-    "pipeline": "Пайплайн"
+    "pipeline": "Пайплайн",
+    "pricing": "Тарифы"
   },
   "stats": {
     "overview": "Обзор платформы",
@@ -184,6 +185,87 @@
       "models": "моделей",
       "prompts": "промптов",
       "active": "активен"
+    }
+  },
+  "pricing": {
+    "title": "Тарифные планы",
+    "description": "Управление настройками тарифов, квотами и ценами для платформы",
+    "tierNames": {
+      "trial": "Пробный",
+      "free": "Бесплатный",
+      "basic": "Базовый",
+      "standard": "Стандарт",
+      "premium": "Премиум"
+    },
+    "tier": "Тариф",
+    "displayName": "Название",
+    "storage": "Хранилище",
+    "maxFileSize": "Макс. размер файла",
+    "filesPerCourse": "Файлов/Курс",
+    "concurrentJobs": "Параллельных задач",
+    "price": "Цена",
+    "status": "Статус",
+    "active": "Активен",
+    "inactive": "Неактивен",
+    "edit": "Редактировать",
+    "editTier": "Редактирование тарифа",
+    "save": "Сохранить",
+    "saving": "Сохранение...",
+    "cancel": "Отмена",
+    "mimeTypes": "Допустимые MIME типы",
+    "extensions": "Допустимые расширения",
+    "features": "Функции (JSON)",
+    "table": {
+      "noTiers": "Тарифы не найдены"
+    },
+    "success": {
+      "tierUpdated": "Настройки тарифа успешно обновлены"
+    },
+    "errors": {
+      "loadFailed": "Не удалось загрузить настройки тарифов",
+      "updateFailed": "Не удалось обновить настройки тарифа",
+      "invalidJson": "Неверный формат JSON для функций",
+      "invalidMimeType": "Неверный формат MIME типа",
+      "storageExceedsLimit": "Квота хранилища не может превышать 1 ТБ",
+      "deactivateConfirmTitle": "Деактивировать тариф?",
+      "deactivateConfirmDescription": "Вы уверены, что хотите деактивировать этот тариф? Это может повлиять на пользователей с данным тарифом.",
+      "deactivateConfirm": "Деактивировать"
+    }
+  },
+  "monitoring": {
+    "title": "Здоровье системы",
+    "subtitle": "Статус компонентов платформы в реальном времени",
+    "overallHealthy": "Все системы работают",
+    "overallDegraded": "Некоторые системы работают с ограничениями",
+    "overallError": "Обнаружены проблемы",
+    "services": {
+      "redis": "Redis",
+      "redisDesc": "Очереди и кеширование",
+      "docling": "Docling MCP",
+      "doclingDesc": "Обработка документов",
+      "api": "API сервер",
+      "apiDesc": "Основной бэкенд",
+      "worker": "Воркер",
+      "workerDesc": "Фоновые задачи",
+      "supabase": "База данных",
+      "supabaseDesc": "PostgreSQL + Auth",
+      "qdrant": "Qdrant",
+      "qdrantDesc": "Векторная база"
+    },
+    "status": {
+      "healthy": "Работает",
+      "degraded": "Ограничен",
+      "error": "Ошибка",
+      "unknown": "Неизвестно",
+      "checking": "Проверка..."
+    },
+    "responseTime": "{time} мс",
+    "lastCheck": "Проверено",
+    "refresh": "Обновить",
+    "autoRefresh": "Автообновление",
+    "error": {
+      "fetchFailed": "Не удалось получить статус системы",
+      "unauthorized": "Недостаточно прав для просмотра"
     }
   }
 }

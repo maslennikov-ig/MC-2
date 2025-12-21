@@ -23,6 +23,7 @@ import {
   MAX_FILE_SIZE_BYTES,
 } from '@megacampus/shared-types';
 import { ValidationError } from '../../server/errors/typed-errors';
+import { getEffectiveTier, type Role } from '../tier/superadmin-bypass';
 
 // ============================================================================
 // Types
@@ -152,6 +153,7 @@ function getAllowedExtensionsDisplay(tier: Tier): string {
  *
  * @param fileSize - File size in bytes
  * @param tier - Organization tier
+ * @param userRole - Optional user role (superadmins bypass tier restrictions)
  * @returns Validation result
  *
  * @example
@@ -160,11 +162,22 @@ function getAllowedExtensionsDisplay(tier: Tier): string {
  * if (!result.valid) {
  *   console.error(result.error);
  * }
+ *
+ * // Superadmin bypass
+ * const superadminResult = validateFileSize(50 * 1024 * 1024, 'free', 'superadmin');
+ * // Returns valid: true (uses premium tier limits)
  * ```
  */
-export function validateFileSize(fileSize: number, tier: Tier): ValidationResult {
+export function validateFileSize(
+  fileSize: number,
+  tier: Tier,
+  userRole?: Role
+): ValidationResult {
+  // Apply superadmin bypass - use effective tier
+  const effectiveTier = getEffectiveTier(userRole, tier);
+
   // Free tier doesn't allow uploads
-  if (tier === 'free') {
+  if (effectiveTier === 'free') {
     return {
       valid: false,
       error: 'File uploads not allowed for free tier',
@@ -201,6 +214,7 @@ export function validateFileSize(fileSize: number, tier: Tier): ValidationResult
  *
  * @param mimeType - File MIME type
  * @param tier - Organization tier
+ * @param userRole - Optional user role (superadmins bypass tier restrictions)
  * @returns Validation result
  *
  * @example
@@ -209,14 +223,25 @@ export function validateFileSize(fileSize: number, tier: Tier): ValidationResult
  * if (!result.valid) {
  *   console.error(result.userMessage);
  * }
+ *
+ * // Superadmin bypass
+ * const superadminResult = validateFileMimeType('image/png', 'basic', 'superadmin');
+ * // Returns valid: true (uses premium tier MIME types)
  * ```
  */
-export function validateFileMimeType(mimeType: string, tier: Tier): ValidationResult {
-  const allowedMimeTypes = MIME_TYPES_BY_TIER[tier];
-  const allowedExtensions = getAllowedExtensionsDisplay(tier);
+export function validateFileMimeType(
+  mimeType: string,
+  tier: Tier,
+  userRole?: Role
+): ValidationResult {
+  // Apply superadmin bypass - use effective tier
+  const effectiveTier = getEffectiveTier(userRole, tier);
+
+  const allowedMimeTypes = MIME_TYPES_BY_TIER[effectiveTier];
+  const allowedExtensions = getAllowedExtensionsDisplay(effectiveTier);
 
   // Free tier doesn't allow uploads
-  if (tier === 'free') {
+  if (effectiveTier === 'free') {
     return {
       valid: false,
       error: 'File uploads not allowed for free tier',
@@ -258,6 +283,7 @@ export function validateFileMimeType(mimeType: string, tier: Tier): ValidationRe
  *
  * @param currentCount - Current number of files in the course
  * @param tier - Organization tier
+ * @param userRole - Optional user role (superadmins bypass tier restrictions)
  * @returns Validation result
  *
  * @example
@@ -266,13 +292,24 @@ export function validateFileMimeType(mimeType: string, tier: Tier): ValidationRe
  * if (!result.valid) {
  *   throw new ValidationError(result.userMessage);
  * }
+ *
+ * // Superadmin bypass
+ * const superadminResult = validateFileCount(5, 'basic', 'superadmin');
+ * // Returns valid: true (uses premium tier file count limit of 10)
  * ```
  */
-export function validateFileCount(currentCount: number, tier: Tier): ValidationResult {
-  const limit = FILE_COUNT_LIMITS_BY_TIER[tier];
+export function validateFileCount(
+  currentCount: number,
+  tier: Tier,
+  userRole?: Role
+): ValidationResult {
+  // Apply superadmin bypass - use effective tier
+  const effectiveTier = getEffectiveTier(userRole, tier);
+
+  const limit = FILE_COUNT_LIMITS_BY_TIER[effectiveTier];
 
   // Free tier doesn't allow uploads
-  if (tier === 'free') {
+  if (effectiveTier === 'free') {
     return {
       valid: false,
       error: 'File uploads not allowed for free tier',
@@ -318,6 +355,7 @@ export function validateFileCount(currentCount: number, tier: Tier): ValidationR
  * @param file - File input to validate
  * @param tier - Organization tier
  * @param currentFileCount - Current number of files in the course
+ * @param userRole - Optional user role (superadmins bypass tier restrictions)
  * @returns Detailed validation result with all checks
  * @throws {ValidationError} If validation fails (when throwOnError is true)
  *
@@ -333,17 +371,27 @@ export function validateFileCount(currentCount: number, tier: Tier): ValidationR
  *   console.error('Validation failed:', result.error);
  *   console.error('User message:', result.userMessage);
  * }
+ *
+ * // Superadmin bypass - all tier restrictions use premium limits
+ * const superadminResult = validateFile(
+ *   { filename: 'image.png', fileSize: 50 * 1024 * 1024, mimeType: 'image/png' },
+ *   'free',
+ *   5,
+ *   'superadmin'
+ * );
+ * // Returns valid: true
  * ```
  */
 export function validateFile(
   file: FileInput,
   tier: Tier,
-  currentFileCount: number
+  currentFileCount: number,
+  userRole?: Role
 ): FileValidationResult {
-  // Perform individual validation checks
-  const sizeCheck = validateFileSize(file.fileSize, tier);
-  const mimeTypeCheck = validateFileMimeType(file.mimeType, tier);
-  const countCheck = validateFileCount(currentFileCount, tier);
+  // Perform individual validation checks (userRole is passed to each for superadmin bypass)
+  const sizeCheck = validateFileSize(file.fileSize, tier, userRole);
+  const mimeTypeCheck = validateFileMimeType(file.mimeType, tier, userRole);
+  const countCheck = validateFileCount(currentFileCount, tier, userRole);
 
   // Determine overall validity
   const valid = sizeCheck.valid && mimeTypeCheck.valid && countCheck.valid;
@@ -389,6 +437,7 @@ export function validateFile(
  * @param file - File input to validate
  * @param tier - Organization tier
  * @param currentFileCount - Current number of files in the course
+ * @param userRole - Optional user role (superadmins bypass tier restrictions)
  * @throws {ValidationError} If validation fails
  *
  * @example
@@ -402,10 +451,19 @@ export function validateFile(
  *   }
  *   throw error;
  * }
+ *
+ * // Superadmin bypass
+ * validateFileOrThrow(fileInput, 'free', 5, 'superadmin');
+ * // No error thrown - uses premium tier limits
  * ```
  */
-export function validateFileOrThrow(file: FileInput, tier: Tier, currentFileCount: number): void {
-  const result = validateFile(file, tier, currentFileCount);
+export function validateFileOrThrow(
+  file: FileInput,
+  tier: Tier,
+  currentFileCount: number,
+  userRole?: Role
+): void {
+  const result = validateFile(file, tier, currentFileCount, userRole);
 
   if (!result.valid) {
     throw new ValidationError(result.userMessage || result.error || 'File validation failed');
@@ -420,6 +478,7 @@ export function validateFileOrThrow(file: FileInput, tier: Tier, currentFileCoun
  * Get file upload limits for a specific tier
  *
  * @param tier - Organization tier
+ * @param userRole - Optional user role (superadmins get premium tier limits)
  * @returns File upload limits and restrictions
  *
  * @example
@@ -427,18 +486,25 @@ export function validateFileOrThrow(file: FileInput, tier: Tier, currentFileCoun
  * const limits = getFileUploadLimits('standard');
  * console.log(`Max files: ${limits.maxFiles}`);
  * console.log(`Allowed formats: ${limits.allowedExtensions.join(', ')}`);
+ *
+ * // Superadmin gets premium limits
+ * const superadminLimits = getFileUploadLimits('free', 'superadmin');
+ * // Returns premium tier limits
  * ```
  */
-export function getFileUploadLimits(tier: Tier) {
-  const maxFileSize = FILE_SIZE_LIMITS_BY_TIER[tier] || MAX_FILE_SIZE_BYTES;
+export function getFileUploadLimits(tier: Tier, userRole?: Role) {
+  // Apply superadmin bypass - use effective tier
+  const effectiveTier = getEffectiveTier(userRole, tier);
+
+  const maxFileSize = FILE_SIZE_LIMITS_BY_TIER[effectiveTier] || MAX_FILE_SIZE_BYTES;
   return {
-    maxFiles: FILE_COUNT_LIMITS_BY_TIER[tier],
+    maxFiles: FILE_COUNT_LIMITS_BY_TIER[effectiveTier],
     maxFileSize,
     maxFileSizeMB: maxFileSize / (1024 * 1024),
-    allowedMimeTypes: MIME_TYPES_BY_TIER[tier],
-    allowedExtensions: FILE_EXTENSIONS_BY_TIER[tier],
-    allowedExtensionsDisplay: getAllowedExtensionsDisplay(tier),
-    uploadsEnabled: tier !== 'free',
+    allowedMimeTypes: MIME_TYPES_BY_TIER[effectiveTier],
+    allowedExtensions: FILE_EXTENSIONS_BY_TIER[effectiveTier],
+    allowedExtensionsDisplay: getAllowedExtensionsDisplay(effectiveTier),
+    uploadsEnabled: effectiveTier !== 'free',
   };
 }
 

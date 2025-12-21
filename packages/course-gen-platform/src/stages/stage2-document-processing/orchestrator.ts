@@ -485,10 +485,20 @@ export class DocumentProcessingOrchestrator {
 
       const currentStatus = course.generation_status as string;
 
-      // Only update if we're still in Stage 2 states
-      // Valid Stage 2 states: stage_2_init, stage_2_processing, stage_2_complete, stage_2_awaiting_approval
-      const stage2States = ['stage_2_init', 'stage_2_processing', 'stage_2_complete', 'stage_2_awaiting_approval'];
-      if (!stage2States.includes(currentStatus)) {
+      // Only update if we're still in early Stage 2 states
+      // If already in awaiting_approval or complete, don't try to regress to processing
+      const updatableStates = ['stage_2_init', 'stage_2_processing'];
+      const terminalStage2States = ['stage_2_complete', 'stage_2_awaiting_approval'];
+
+      if (terminalStage2States.includes(currentStatus)) {
+        logger.info(
+          { courseId, currentStatus },
+          'Course already in terminal Stage 2 state, skipping progress update (normal parallel processing race condition)'
+        );
+        return;
+      }
+
+      if (!updatableStates.includes(currentStatus)) {
         logger.info(
           { courseId, currentStatus },
           'Course already past Stage 2, skipping progress update (normal race condition)'

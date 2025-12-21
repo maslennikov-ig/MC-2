@@ -10,6 +10,11 @@
 import { getSupabaseAdmin } from '@/shared/supabase/admin';
 import { QuotaExceededError } from '@/server/errors/typed-errors';
 import type { Database } from '@megacampus/shared-types';
+import {
+  shouldBypassTierRestrictions,
+  SUPERADMIN_LIMITS,
+  type Role,
+} from '../tier/superadmin-bypass';
 
 // ============================================================================
 // TYPES
@@ -116,6 +121,7 @@ export function calculateUsagePercentage(used: number, total: number): number {
  *
  * @param organizationId - UUID of the organization
  * @param fileSize - Size of file to upload in bytes
+ * @param userRole - Optional user role (superadmins bypass quota restrictions)
  * @returns Promise with quota check result
  * @throws Error if database query fails
  *
@@ -127,12 +133,33 @@ export function calculateUsagePercentage(used: number, total: number): number {
  *     `Upload would exceed quota. Using ${result.currentUsageFormatted} of ${result.totalQuotaFormatted}`
  *   );
  * }
+ *
+ * // Superadmin bypass - always allowed with premium limits
+ * const superadminResult = await checkQuota(orgId, 5242880, 'superadmin');
+ * // Returns allowed: true with premium tier quota limits
  * ```
  */
 export async function checkQuota(
   organizationId: string,
-  fileSize: number
+  fileSize: number,
+  userRole?: Role
 ): Promise<QuotaCheckResult> {
+  // Superadmin bypass - always return allowed with premium limits
+  if (shouldBypassTierRestrictions(userRole)) {
+    const totalQuota = SUPERADMIN_LIMITS.storageQuotaBytes;
+    return {
+      allowed: true,
+      currentUsage: 0, // Not relevant for superadmin bypass
+      totalQuota,
+      availableSpace: totalQuota,
+      fileSize,
+      projectedUsage: fileSize,
+      currentUsageFormatted: formatBytes(0),
+      totalQuotaFormatted: formatBytes(totalQuota),
+      availableSpaceFormatted: formatBytes(totalQuota),
+    };
+  }
+
   const supabase = getSupabaseAdmin();
 
   // Validate inputs
@@ -295,6 +322,7 @@ export async function decrementQuota(organizationId: string, fileSize: number): 
  * Useful for displaying quota status to users.
  *
  * @param organizationId - UUID of the organization
+ * @param userRole - Optional user role (superadmins get premium tier limits)
  * @returns Promise with quota information
  * @throws Error if database query fails or organization not found
  *
@@ -303,9 +331,32 @@ export async function decrementQuota(organizationId: string, fileSize: number): 
  * const info = await getQuotaInfo(orgId);
  * console.log(`Using ${info.usagePercentage.toFixed(1)}% of storage`);
  * console.log(`${info.availableFormatted} remaining`);
+ *
+ * // Superadmin sees premium tier quota
+ * const superadminInfo = await getQuotaInfo(orgId, 'superadmin');
+ * // Returns quota info with premium tier limits (10 GB)
  * ```
  */
-export async function getQuotaInfo(organizationId: string): Promise<QuotaInfo> {
+export async function getQuotaInfo(
+  organizationId: string,
+  userRole?: Role
+): Promise<QuotaInfo> {
+  // Superadmin bypass - return premium tier limits
+  if (shouldBypassTierRestrictions(userRole)) {
+    const storageQuotaBytes = SUPERADMIN_LIMITS.storageQuotaBytes;
+    return {
+      organizationId,
+      storageUsedBytes: 0, // Superadmin is not tracked
+      storageQuotaBytes,
+      availableBytes: storageQuotaBytes,
+      usagePercentage: 0,
+      tier: 'premium',
+      storageUsedFormatted: formatBytes(0),
+      storageQuotaFormatted: formatBytes(storageQuotaBytes),
+      availableFormatted: formatBytes(storageQuotaBytes),
+    };
+  }
+
   const supabase = getSupabaseAdmin();
 
   // Validate input

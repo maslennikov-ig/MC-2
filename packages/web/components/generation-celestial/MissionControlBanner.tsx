@@ -4,7 +4,7 @@ import { useState } from 'react';
 import { useTranslations } from 'next-intl';
 import { Button } from '@/components/ui/button';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Rocket, X, Eye, AlertTriangle, ChevronUp, ChevronDown } from 'lucide-react';
+import { Rocket, Play, X, Eye, AlertTriangle, ChevronUp, ChevronDown } from 'lucide-react';
 import { STAGE_CONFIG } from './utils';
 
 interface MissionControlBannerProps {
@@ -32,13 +32,39 @@ export function MissionControlBanner({
   // Find stage name safely
   const stageName = Object.values(STAGE_CONFIG).find(s => s.number === awaitingStage)?.name || `Stage ${awaitingStage}`;
 
+  // Check if this is the initial launch stage
+  const isInitialStage = awaitingStage === 0;
+
+  // Get stage-specific translation key
+  const getStageKey = () => {
+    if (awaitingStage === 0) return 'stage0';
+    if (awaitingStage === 5) return 'stage5';
+    return 'default';
+  };
+
   // Custom button text for different stages
   const getButtonText = (compact: boolean) => {
-    if (awaitingStage === 5) {
-      return compact ? t('stage5.compact') : t('stage5.full');
-    }
-    return compact ? t('default.compact') : t('default.full');
+    const stageKey = getStageKey();
+    return compact ? t(`${stageKey}.compact`) : t(`${stageKey}.full`);
   };
+
+  // Get description text for the expanded view
+  const getDescription = () => {
+    const stageKey = getStageKey();
+    if (stageKey === 'default') {
+      return t('default.description', { stageName });
+    }
+    return t(`${stageKey}.description`);
+  };
+
+  // Get hint text for the collapsed view
+  const getHint = () => {
+    const stageKey = getStageKey();
+    return t(`${stageKey}.hint`);
+  };
+
+  // Get the appropriate icon for the button
+  const ButtonIcon = isInitialStage ? Play : Rocket;
 
   return (
     <div className="fixed bottom-6 left-0 right-0 z-50 px-4 pointer-events-none flex justify-center">
@@ -72,13 +98,13 @@ export function MissionControlBanner({
               <div className="flex flex-col min-w-0">
                 <div className="flex items-center gap-2">
                   <h3 className={`text-sm font-bold truncate ${isDark ? 'text-gray-100' : 'text-gray-900'}`}>
-                    {stageName}: Ожидание
+                    {stageName}: {t('awaitingStatus')}
                   </h3>
                   <div className="w-1.5 h-1.5 bg-amber-500 rounded-full animate-pulse shrink-0" />
                 </div>
                 {!isExpanded && (
                   <p className={`text-xs truncate ${isDark ? 'text-gray-400' : 'text-gray-500'}`}>
-                    Нажмите чтобы увидеть детали
+                    {getHint()}
                   </p>
                 )}
               </div>
@@ -99,7 +125,7 @@ export function MissionControlBanner({
                     <Loader2 className="w-3 h-3 animate-spin" />
                   ) : (
                     <>
-                      <Rocket className="w-3 h-3 mr-1.5" />
+                      <ButtonIcon className="w-3 h-3 mr-1.5" />
                       {getButtonText(true)}
                     </>
                   )}
@@ -126,7 +152,7 @@ export function MissionControlBanner({
               >
                 <div className={`px-4 pb-4 pt-0 space-y-4 ${isDark ? 'border-t border-white/5' : 'border-t border-slate-100'}`}>
                   <div className={`pt-4 text-sm ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-                    <p>Фаза <strong>{stageName}</strong> завершена. Пожалуйста, проверьте сгенерированные материалы перед переходом к следующему этапу.</p>
+                    <p>{getDescription()}</p>
                   </div>
 
                   <div className="flex items-center justify-between gap-3 flex-wrap">
@@ -143,21 +169,24 @@ export function MissionControlBanner({
                         }`}
                       >
                         <X className="w-3 h-3 mr-1.5" />
-                        Отмена
+                        {t('cancel')}
                       </Button>
-                      <Button
-                        variant="secondary"
-                        size="sm"
-                        onClick={onViewResults}
-                        className={`h-8 text-xs ${
-                          isDark
-                            ? 'bg-gray-800 text-gray-200 hover:bg-gray-700 border-gray-700'
-                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border-gray-200'
-                        }`}
-                      >
-                        <Eye className="w-3 h-3 mr-1.5" />
-                        Просмотр
-                      </Button>
+                      {/* Only show View button when there are results to view (not for initial stage) */}
+                      {!isInitialStage && (
+                        <Button
+                          variant="secondary"
+                          size="sm"
+                          onClick={onViewResults}
+                          className={`h-8 text-xs ${
+                            isDark
+                              ? 'bg-gray-800 text-gray-200 hover:bg-gray-700 border-gray-700'
+                              : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border-gray-200'
+                          }`}
+                        >
+                          <Eye className="w-3 h-3 mr-1.5" />
+                          {t('view')}
+                        </Button>
+                      )}
                     </div>
 
                     <Button
@@ -167,10 +196,10 @@ export function MissionControlBanner({
                       className="w-full sm:w-auto h-10 px-6 text-sm font-medium bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 text-white transition-all shadow-lg shadow-purple-500/25 border-0"
                     >
                       {isProcessing ? (
-                        "Подтверждение..."
+                        t('confirming')
                       ) : (
                         <>
-                          <Rocket className="w-4 h-4 mr-2" />
+                          <ButtonIcon className="w-4 h-4 mr-2" />
                           {getButtonText(false)}
                         </>
                       )}

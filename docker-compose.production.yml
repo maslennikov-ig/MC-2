@@ -197,10 +197,14 @@ services:
       - DOCLING_MCP_URL=http://docling-mcp:8000/mcp
       # Path to shared docling JSON cache
       - DOCLING_CACHE_PATH=/app/docling-cache
+      # LKG config persistence
+      - LKG_CONFIG_PATH=/app/data/lkg-config.json
     volumes:
       - ./data/uploads:/app/uploads
       # Shared JSON cache from docling-mcp
       - docling-json-cache:/app/docling-cache:ro
+      # LKG config persistence
+      - worker-data:/app/data
     networks:
       - megacampus
     depends_on:
@@ -234,4 +238,7 @@ volumes:
     driver: local
   # Shared volume for docling JSON output - written by docling-mcp, read by worker
   docling-json-cache:
+    driver: local
+  # Worker data persistence for LKG config
+  worker-data:
     driver: local

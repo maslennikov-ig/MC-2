@@ -7,6 +7,7 @@ import { Redis } from 'ioredis';
 import { getRedisClient } from '../cache/redis';
 import logger from '../logger';
 import { UserTier, ConcurrencyCheckResult } from '../types/concurrency';
+import { shouldBypassTierRestrictions, type Role } from '../tier/superadmin-bypass';
 
 export const TIER_LIMITS = {
   TRIAL: 5,
@@ -33,8 +34,32 @@ export class ConcurrencyTracker {
     this.globalLimit = parseInt(process.env.GLOBAL_CONCURRENCY_LIMIT || '3');
   }
 
-  async checkAndReserve(userId: string, tier: UserTier): Promise<ConcurrencyCheckResult> {
-    const userLimit = TIER_LIMITS[tier];
+  /**
+   * Check if a user can start a new concurrent job and reserve a slot
+   *
+   * @param userId - The user's ID
+   * @param tier - The user's tier (UPPERCASE format)
+   * @param userRole - Optional user role (superadmins get premium tier limits)
+   * @returns Promise with concurrency check result
+   *
+   * @example
+   * ```typescript
+   * // Regular user
+   * const result = await tracker.checkAndReserve(userId, 'BASIC');
+   *
+   * // Superadmin bypass - uses premium limits (10 concurrent jobs)
+   * const superadminResult = await tracker.checkAndReserve(userId, 'FREE', 'superadmin');
+   * ```
+   */
+  async checkAndReserve(
+    userId: string,
+    tier: UserTier,
+    userRole?: Role
+  ): Promise<ConcurrencyCheckResult> {
+    // Superadmin bypass - use premium tier limits
+    const effectiveTier: UserTier = shouldBypassTierRestrictions(userRole) ? 'PREMIUM' : tier;
+
+    const userLimit = TIER_LIMITS[effectiveTier];
     const globalLimit = this.globalLimit;
 
     // Lua script for atomic check-and-increment

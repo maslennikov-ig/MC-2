@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { ArrowLeft, Shield, Sun, Moon, Maximize, Minimize, Hash, Check } from 'lucide-react';
+import { ArrowLeft, Shield, Sun, Moon, Maximize, Minimize, Fingerprint, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import Link from 'next/link';
@@ -73,7 +73,7 @@ export const GraphHeader = ({ title, progress, isAdmin, onOpenAdminPanel, isDark
                                     onClick={handleCopyCode}
                                     className={`${isDark ? 'text-slate-400 hover:text-cyan-400' : 'text-slate-500 hover:text-cyan-600'} transition-colors`}
                                 >
-                                    {copied ? <Check size={18} className="text-green-500" /> : <Hash size={18} />}
+                                    {copied ? <Check size={18} className="text-green-500" /> : <Fingerprint size={18} />}
                                 </Button>
                             </TooltipTrigger>
                             <TooltipContent

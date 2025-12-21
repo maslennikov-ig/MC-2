@@ -181,13 +181,27 @@
     "buttonTooltip": "Restart from this stage"
   },
   "missionControl": {
+    "stage0": {
+      "compact": "Start",
+      "full": "Start Generation",
+      "description": "Everything is ready for course generation. Click the start button to begin the process.",
+      "hint": "Ready to start"
+    },
     "stage5": {
       "compact": "Review",
-      "full": "Review Structure"
+      "full": "Review Structure",
+      "description": "Course structure is ready. Please review the structure before content generation.",
+      "hint": "Click to see details"
     },
     "default": {
-      "compact": "Launch",
-      "full": "Confirm and Continue"
-    }
+      "compact": "Next",
+      "full": "Confirm and Continue",
+      "description": "Phase {{stageName}} is complete. Please review the results before proceeding to the next stage.",
+      "hint": "Click to see details"
+    },
+    "cancel": "Cancel",
+    "view": "View",
+    "confirming": "Confirming...",
+    "awaitingStatus": "Awaiting"
   }
 }

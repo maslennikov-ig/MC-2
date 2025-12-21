@@ -13,6 +13,7 @@ interface AdminNavProps {
         history?: string;
         users?: string;
         pipeline?: string;
+        pricing?: string;
       };
     };
   };
@@ -53,6 +54,14 @@ export function AdminNav({ role, messages }: AdminNavProps) {
             href="/admin/users"
           >
             {messages.admin?.navigation?.users || 'Users'}
+          </Link>
+          <Link
+            className={`admin-nav-link px-3 py-2 rounded-md text-gray-700 dark:text-gray-300 hover:text-purple-600 dark:hover:text-purple-400 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors ${
+              isActive('/admin/pricing') ? 'admin-nav-link-active bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400' : ''
+            }`}
+            href={'/admin/pricing' as any}
+          >
+            {messages.admin?.navigation?.pricing || 'Pricing'}
           </Link>
           <Link
             className={`admin-nav-link px-3 py-2 rounded-md text-gray-700 dark:text-gray-300 hover:text-purple-600 dark:hover:text-purple-400 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors ${

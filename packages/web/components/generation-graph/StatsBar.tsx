@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { Clock, Hash, Hourglass } from 'lucide-react';
+import { Clock, Sigma, Hourglass } from 'lucide-react';
 import { useGenerationRealtime } from '@/components/generation-monitoring/realtime-provider';
 
 interface StatsBarProps {
@@ -82,7 +82,7 @@ export const StatsBar = ({ progress = 0, isDark }: StatsBarProps) => {
                  </div>
              )}
              <div className="flex items-center gap-1.5" title="Всего токенов">
-                 <Hash size={14} className={isDark ? 'text-slate-500' : 'text-slate-400'}/>
+                 <Sigma size={14} className={isDark ? 'text-slate-500' : 'text-slate-400'}/>
                  <span>{tokens.toLocaleString()}</span>
              </div>
         </div>

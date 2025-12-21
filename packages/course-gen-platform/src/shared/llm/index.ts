@@ -96,3 +96,12 @@ export {
   type ContextOverflowFallback,
   type ExecuteWithContextFallbackResult,
 } from './context-overflow-handler';
+
+// Model Config Bunker Types
+export {
+  type PhaseModelConfig,
+  type ConfigMeta,
+  type ActiveConfig,
+  type ConfigSnapshot,
+  type BunkerHealth,
+} from './model-config-types';

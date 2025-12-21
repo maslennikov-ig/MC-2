@@ -21,6 +21,7 @@ import 'dotenv/config';
 import { startWorker } from './worker';
 import logger from '../shared/logger';
 import { validateEnvironment } from '../shared/config/env-validator';
+import { initializeModelConfigBunker, getModelConfigBunker } from '../shared/llm/model-config-bunker';
 
 // Validate environment
 validateEnvironment();
@@ -99,8 +100,22 @@ function stopMemoryMonitoring(): void {
 startMemoryMonitoring();
 
 // Cleanup on exit
-process.on('SIGINT', stopMemoryMonitoring);
-process.on('SIGTERM', stopMemoryMonitoring);
+process.on('SIGINT', () => {
+  stopMemoryMonitoring();
+  // Shutdown bunker (stops background sync timer)
+  const bunker = getModelConfigBunker();
+  if (bunker.isInitialized()) {
+    bunker.shutdown();
+  }
+});
+process.on('SIGTERM', () => {
+  stopMemoryMonitoring();
+  // Shutdown bunker (stops background sync timer)
+  const bunker = getModelConfigBunker();
+  if (bunker.isInitialized()) {
+    bunker.shutdown();
+  }
+});
 
 /**
  * Start the worker
@@ -108,6 +123,17 @@ process.on('SIGTERM', stopMemoryMonitoring);
 async function main() {
   try {
     logger.info('Starting BullMQ worker...');
+
+    // Initialize ModelConfigBunker BEFORE accepting jobs
+    // This loads configs from disk/Redis/DB with graceful fallbacks
+    logger.info('Initializing ModelConfigBunker...');
+    const bunker = await initializeModelConfigBunker();
+    const health = bunker.getHealth();
+    logger.info({
+      configCount: health.configCount,
+      cacheAge: health.cacheAge,
+      source: health.source,
+    }, 'ModelConfigBunker initialized');
 
     // Start worker with default concurrency (5)
     // Adjust concurrency based on server resources:

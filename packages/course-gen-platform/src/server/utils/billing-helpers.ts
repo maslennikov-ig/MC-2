@@ -12,7 +12,7 @@ import type { Database } from '@megacampus/shared-types';
  * Based on T017 database schema
  */
 export const STORAGE_QUOTA_BY_TIER: Record<Database['public']['Enums']['tier'], number> = {
-  trial: 104857600, // 100 MB (same as basic)
+  trial: 1073741824, // 1 GB (same as standard - full features for evaluation)
   free: 10485760, // 10 MB
   basic: 104857600, // 100 MB
   standard: 1073741824, // 1 GB

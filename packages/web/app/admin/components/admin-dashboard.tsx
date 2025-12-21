@@ -4,6 +4,7 @@ import Link from 'next/link';
 import type { Route } from 'next';
 import { Users, BookOpen, GraduationCap, Zap, AlertTriangle, ArrowRight } from 'lucide-react';
 import { useTranslations } from 'next-intl';
+import { SystemHealthMonitor } from './system-health-monitor';
 
 type AdminRoute = '/admin' | '/admin/users' | '/admin/pipeline' | '/admin/generation/history';
 
@@ -127,6 +128,9 @@ export function AdminDashboard({ stats, isSuperadmin = false }: AdminDashboardPr
           </span>
         </div>
       )}
+
+      {/* System Health Monitor (superadmin only) */}
+      {isSuperadmin && <SystemHealthMonitor autoRefreshInterval={30} />}
 
       {/* Quick actions */}
       <div>

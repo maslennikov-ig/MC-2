@@ -19,6 +19,7 @@ interface AdminMessages {
       history?: string;
       users?: string;
       pipeline?: string;
+      pricing?: string;
     };
   };
 }

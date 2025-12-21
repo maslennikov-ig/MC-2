@@ -6,7 +6,8 @@
     "generations": "Generations",
     "history": "History",
     "users": "Users",
-    "pipeline": "Pipeline"
+    "pipeline": "Pipeline",
+    "pricing": "Pricing"
   },
   "stats": {
     "overview": "Platform overview",
@@ -184,6 +185,87 @@
       "models": "models",
       "prompts": "prompts",
       "active": "active"
+    }
+  },
+  "pricing": {
+    "title": "Pricing Tiers",
+    "description": "Manage tier settings, quotas, and pricing for the platform",
+    "tierNames": {
+      "trial": "Trial",
+      "free": "Free",
+      "basic": "Basic",
+      "standard": "Standard",
+      "premium": "Premium"
+    },
+    "tier": "Tier",
+    "displayName": "Display Name",
+    "storage": "Storage",
+    "maxFileSize": "Max File Size",
+    "filesPerCourse": "Files/Course",
+    "concurrentJobs": "Concurrent Jobs",
+    "price": "Price",
+    "status": "Status",
+    "active": "Active",
+    "inactive": "Inactive",
+    "edit": "Edit",
+    "editTier": "Edit Tier Settings",
+    "save": "Save",
+    "saving": "Saving...",
+    "cancel": "Cancel",
+    "mimeTypes": "Allowed MIME Types",
+    "extensions": "Allowed Extensions",
+    "features": "Features (JSON)",
+    "table": {
+      "noTiers": "No tier settings found"
+    },
+    "success": {
+      "tierUpdated": "Tier settings updated successfully"
+    },
+    "errors": {
+      "loadFailed": "Failed to load tier settings",
+      "updateFailed": "Failed to update tier settings",
+      "invalidJson": "Invalid JSON format for features",
+      "invalidMimeType": "Invalid MIME type format",
+      "storageExceedsLimit": "Storage quota cannot exceed 1 TB",
+      "deactivateConfirmTitle": "Deactivate Tier?",
+      "deactivateConfirmDescription": "Are you sure you want to deactivate this tier? Users on this tier may be affected.",
+      "deactivateConfirm": "Deactivate"
+    }
+  },
+  "monitoring": {
+    "title": "System Health",
+    "subtitle": "Real-time status of platform components",
+    "overallHealthy": "All systems operational",
+    "overallDegraded": "Some systems degraded",
+    "overallError": "Issues detected",
+    "services": {
+      "redis": "Redis",
+      "redisDesc": "Queues and caching",
+      "docling": "Docling MCP",
+      "doclingDesc": "Document processing",
+      "api": "API Server",
+      "apiDesc": "Main backend",
+      "worker": "Worker",
+      "workerDesc": "Background jobs",
+      "supabase": "Database",
+      "supabaseDesc": "PostgreSQL + Auth",
+      "qdrant": "Qdrant",
+      "qdrantDesc": "Vector database"
+    },
+    "status": {
+      "healthy": "Healthy",
+      "degraded": "Degraded",
+      "error": "Error",
+      "unknown": "Unknown",
+      "checking": "Checking..."
+    },
+    "responseTime": "{time} ms",
+    "lastCheck": "Last check",
+    "refresh": "Refresh",
+    "autoRefresh": "Auto-refresh",
+    "error": {
+      "fetchFailed": "Failed to fetch system status",
+      "unauthorized": "Insufficient permissions to view"
     }
   }
 }
