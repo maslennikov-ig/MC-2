@@ -29,6 +29,7 @@ const __dirname = path.dirname(__filename);
 
 const SEED_PATH = path.join(__dirname, '../src/config/config-seed.json'); // Git-tracked
 const DIST_PATH = path.join(__dirname, '../dist/config-seed.json'); // Build artifact
+const MAX_SEED_SIZE_BYTES = 10 * 1024 * 1024; // 10MB max
 
 /**
  * Required phases that MUST be present in the seed file
@@ -186,13 +187,10 @@ async function main(): Promise<void> {
     const missingPhases = REQUIRED_PHASES.filter((p) => !phases.has(p));
 
     if (missingPhases.length > 0) {
-      console.error(
-        `[Config Seed] VALIDATION FAILED: Missing required phases: ${missingPhases.join(', ')}`
+      const availablePhases = Array.from(phases).sort().join(', ');
+      throw new Error(
+        `VALIDATION FAILED: Missing required phases: ${missingPhases.join(', ')}. Available phases: ${availablePhases}`
       );
-      console.error(
-        `[Config Seed] Available phases: ${Array.from(phases).sort().join(', ')}`
-      );
-      process.exit(1);
     }
 
     // VALIDATE: Run schema validation on each config
@@ -209,10 +207,7 @@ async function main(): Promise<void> {
     }
 
     if (invalidCount > 0) {
-      console.error(
-        `[Config Seed] VALIDATION FAILED: ${invalidCount} invalid config(s) found`
-      );
-      process.exit(1);
+      throw new Error(`VALIDATION FAILED: ${invalidCount} invalid config(s) found`);
     }
 
     console.log(
@@ -226,6 +221,15 @@ async function main(): Promise<void> {
 
     // Write to source file (will be committed)
     const content = JSON.stringify(sortedData, null, 2);
+
+    // Validate file size to prevent corrupted database from creating giant seed
+    const contentSize = Buffer.byteLength(content, 'utf-8');
+    if (contentSize > MAX_SEED_SIZE_BYTES) {
+      throw new Error(
+        `Seed file too large: ${(contentSize / 1024 / 1024).toFixed(2)}MB exceeds ${MAX_SEED_SIZE_BYTES / 1024 / 1024}MB limit`
+      );
+    }
+
     const tmpPath = `${SEED_PATH}.tmp`;
 
     try {
@@ -260,9 +264,9 @@ async function main(): Promise<void> {
     console.warn(`   Reason: ${errorMsg}`);
 
     if (!fs.existsSync(SEED_PATH)) {
-      console.error(`[Config Seed] FATAL: No DB access and no committed seed file found at ${SEED_PATH}`);
-      console.error(`   Please ensure config-seed.json exists or provide DB credentials.`);
-      process.exit(1);
+      throw new Error(
+        `FATAL: No DB access and no committed seed file found at ${SEED_PATH}. Please ensure config-seed.json exists or provide DB credentials.`
+      );
     }
 
     console.log(`[Config Seed] Using existing seed file: ${SEED_PATH}`);

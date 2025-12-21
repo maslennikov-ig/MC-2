@@ -408,6 +408,68 @@ export interface BunkerHealth {
    * - 'very_stale': Some configs > 60 minutes old (degraded)
    */
   source: 'fresh' | 'stale' | 'very_stale';
+
+  // ============================================================================
+  // DIAGNOSTIC METRICS (for observability)
+  // ============================================================================
+
+  /**
+   * Count of consecutive database sync failures
+   *
+   * Resets to 0 on successful sync. When this reaches MAX_SYNC_RETRIES (5),
+   * background sync is paused until manual intervention.
+   *
+   * @example 0 // Healthy - last sync succeeded
+   * @example 3 // Warning - 3 consecutive failures
+   * @example 5 // Critical - background sync paused
+   */
+  syncRetries: number;
+
+  /**
+   * Count of consecutive Redis write failures
+   *
+   * Resets to 0 on successful write. Escalates to error level logging
+   * after MAX_WRITE_FAILURES_BEFORE_ERROR (3) consecutive failures.
+   *
+   * @example 0 // Healthy - Redis writes working
+   * @example 2 // Warning - intermittent Redis issues
+   */
+  redisWriteFailures: number;
+
+  /**
+   * Count of consecutive LKG file write failures
+   *
+   * Resets to 0 on successful write. Escalates to error level logging
+   * after MAX_WRITE_FAILURES_BEFORE_ERROR (3) consecutive failures.
+   *
+   * @example 0 // Healthy - LKG writes working
+   * @example 4 // Critical - persistent disk write issues
+   */
+  lkgWriteFailures: number;
+
+  /**
+   * Unix timestamp (milliseconds) of last successful cache update
+   *
+   * Null if cache has never been updated (cold start without disk fallback).
+   * Use this to calculate exact staleness or detect stalled syncs.
+   *
+   * @example 1703174400000 // 2023-12-21T12:00:00Z
+   * @example null // Never synced (should not happen in production)
+   */
+  lastSyncAt: number | null;
+
+  /**
+   * Whether the background sync timer is currently active
+   *
+   * - true: Periodic database sync running (healthy)
+   * - false: Sync paused (max retries reached or shutdown)
+   *
+   * When false after initialization, check syncRetries to determine cause.
+   *
+   * @example true // Normal operation
+   * @example false // Sync paused - check syncRetries
+   */
+  timerActive: boolean;
 }
 
 /**

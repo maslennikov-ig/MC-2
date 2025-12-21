@@ -34,7 +34,6 @@ import type {
   ConfigMeta,
   ConfigSnapshot,
   BunkerHealth,
-  ConfigKeyComponents,
 } from './model-config-types';
 
 // ============================================================================
@@ -169,6 +168,12 @@ const ConfigRowSchema = z.object({
     .optional(),
 });
 
+/**
+ * Type inferred from ConfigRowSchema after Zod validation
+ * Used for type-safe access to validated config rows
+ */
+type ValidatedConfigRow = z.infer<typeof ConfigRowSchema>;
+
 // ============================================================================
 // UTILITY FUNCTIONS
 // ============================================================================
@@ -201,11 +206,9 @@ function buildKey(row: {
   language?: string | null;
 }): string {
   const tier = row.context_tier || 'standard';
-  const parts = [row.phase_name, tier];
-  if (row.language && row.language !== 'any') {
-    parts.push(row.language);
-  }
-  return parts.join(':');
+  return row.language && row.language !== 'any'
+    ? `${row.phase_name}:${tier}:${row.language}`
+    : `${row.phase_name}:${tier}`;
 }
 
 /**
@@ -237,7 +240,7 @@ function parseFloatSafe(
 }
 
 /**
- * Convert database row to PhaseModelConfig
+ * Convert validated database row to PhaseModelConfig
  *
  * Handles type conversions and optional fields:
  * - Parses string numbers to floats (temperature, quality_threshold, weight)
@@ -245,31 +248,26 @@ function parseFloatSafe(
  * - Maps database columns to typed interface
  * - Defaults context_tier to 'standard' if null
  *
- * @param row Raw database row
+ * @param row Zod-validated database row (already passed ConfigRowSchema validation)
  * @returns Typed PhaseModelConfig object
  */
-function rowToConfig(row: Record<string, unknown>): PhaseModelConfig {
-  const phaseName = row.phase_name as string;
+function rowToConfig(row: ValidatedConfigRow): PhaseModelConfig {
+  const phaseName = row.phase_name;
   return {
     phase_name: phaseName,
-    context_tier: (row.context_tier as 'standard' | 'extended' | null) || 'standard',
-    model_id: row.model_id as string,
-    fallback_model_id: row.fallback_model_id as string | null,
+    context_tier: row.context_tier || 'standard',
+    model_id: row.model_id,
+    fallback_model_id: row.fallback_model_id,
     // temperature is required (not nullable), so fall back to 0.7 if invalid
     temperature: parseFloatSafe(row.temperature, 'temperature', phaseName) ?? 0.7,
-    max_tokens: (row.max_tokens as number) || 4096,
-    max_context_tokens: row.max_context_tokens as number | null,
+    max_tokens: row.max_tokens || 4096,
+    max_context_tokens: row.max_context_tokens ?? null,
     quality_threshold: parseFloatSafe(row.quality_threshold, 'quality_threshold', phaseName),
-    max_retries: row.max_retries as number | null,
-    timeout_ms: row.timeout_ms as number | null,
-    language: row.language as string | undefined,
-    stage_number: row.stage_number as number | null | undefined,
-    judge_role: row.judge_role as
-      | 'primary'
-      | 'secondary'
-      | 'tiebreaker'
-      | null
-      | undefined,
+    max_retries: row.max_retries ?? null,
+    timeout_ms: row.timeout_ms ?? null,
+    language: row.language,
+    stage_number: row.stage_number ?? null,
+    judge_role: row.judge_role ?? null,
     weight: parseFloatSafe(row.weight, 'weight', phaseName),
   };
 }
@@ -684,8 +682,8 @@ export class ModelConfigBunker {
       for (const row of data) {
         const result = ConfigRowSchema.safeParse(row);
         if (result.success) {
-          const key = buildKey(row);
-          snapshot[key] = rowToConfig(row);
+          const key = buildKey(result.data);
+          snapshot[key] = rowToConfig(result.data);
           validCount++;
         } else {
           rejectCount++;
@@ -761,15 +759,16 @@ export class ModelConfigBunker {
           '[ModelConfigBunker] Sync failed, will retry with backoff'
         );
 
-        // Restart timer with new delay
+        // Restart timer with new delay (atomic swap to prevent race condition)
         if (this.syncTimer) {
           clearInterval(this.syncTimer);
-          this.syncTimer = setInterval(() => {
-            this.syncFromDatabase().catch(() => {
-              // Error already logged in syncFromDatabase
-            });
-          }, delayMs);
         }
+        // Always create new timer after clearing - ensures no window where timer is null
+        this.syncTimer = setInterval(() => {
+          this.syncFromDatabase().catch(() => {
+            // Error already logged in syncFromDatabase
+          });
+        }, delayMs);
       }
 
       logger.error({ error: err }, '[ModelConfigBunker] DB sync failed');
@@ -973,8 +972,8 @@ export class ModelConfigBunker {
         for (const row of parsed) {
           const result = ConfigRowSchema.safeParse(row);
           if (result.success) {
-            const key = buildKey(row as unknown as ConfigKeyComponents);
-            this.cache.set(key, rowToConfig(row));
+            const key = buildKey(result.data);
+            this.cache.set(key, rowToConfig(result.data));
             validCount++;
           } else {
             invalidCount++;
@@ -1069,6 +1068,12 @@ export class ModelConfigBunker {
       configCount: this.cache.size,
       cacheAge,
       source: cacheAge < 120 ? 'fresh' : cacheAge < 3600 ? 'stale' : 'very_stale',
+      // Diagnostic metrics for observability
+      syncRetries: this.syncRetries,
+      redisWriteFailures: this.redisWriteFailures,
+      lkgWriteFailures: this.lkgWriteFailures,
+      lastSyncAt: this.cacheUpdatedAt || null,
+      timerActive: this.syncTimer !== null,
     };
   }
 
