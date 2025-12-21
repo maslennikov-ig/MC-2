@@ -30,6 +30,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.26.12] - 2025-12-21
+
+### Fixed
+- **bunker**: ESM __dirname compatibility and config path alignment (2541596)
+
+### Other
+- update project files (89de372)
+
 ## [0.26.11] - 2025-12-21
 
 ### Fixed
