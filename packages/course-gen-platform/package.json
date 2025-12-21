@@ -1,6 +1,6 @@
 {
   "name": "@megacampus/course-gen-platform",
-  "version": "0.26.12",
+  "version": "0.26.13",
   "private": true,
   "type": "module",
   "description": "Main API server for MegaCampusAI course generation platform",
