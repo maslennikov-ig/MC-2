@@ -28,7 +28,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const SEED_PATH = path.join(__dirname, '../src/config/config-seed.json'); // Git-tracked
-const DIST_PATH = path.join(__dirname, '../dist/config-seed.json'); // Build artifact
+const DIST_PATH = path.join(__dirname, '../dist/config/config-seed.json'); // Build artifact (matches bunker relative path)
 const MAX_SEED_SIZE_BYTES = 10 * 1024 * 1024; // 10MB max
 
 /**
@@ -272,8 +272,12 @@ async function main(): Promise<void> {
     console.log(`[Config Seed] Using existing seed file: ${SEED_PATH}`);
   }
 
-  // Copy to dist if dist directory exists
-  if (fs.existsSync(distDir)) {
+  // Copy to dist if dist directory exists (create config subdirectory if needed)
+  const distRootDir = path.join(__dirname, '../dist');
+  if (fs.existsSync(distRootDir)) {
+    if (!fs.existsSync(distDir)) {
+      fs.mkdirSync(distDir, { recursive: true });
+    }
     fs.copyFileSync(SEED_PATH, DIST_PATH);
     console.log(`[Config Seed] Copied to ${DIST_PATH}`);
   } else {

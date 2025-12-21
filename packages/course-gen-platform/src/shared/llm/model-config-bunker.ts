@@ -24,7 +24,13 @@
 import fs from 'fs/promises';
 import { existsSync, copyFileSync, readFileSync } from 'fs';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import { z } from 'zod';
+
+// ESM compatibility: __dirname is not available in ES modules
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+
 import { getRedisClient } from '../cache/redis';
 import { getSupabaseAdmin } from '../supabase/admin';
 import logger from '../logger';
