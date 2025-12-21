@@ -210,6 +210,7 @@ async function checkRedis(): Promise<ServiceStatus> {
 
 /**
  * Check Docling MCP document processing service
+ * Uses tools/list method which is standard MCP protocol
  */
 async function checkDoclingMcp(): Promise<ServiceStatus> {
   const startTime = Date.now()
@@ -223,12 +224,14 @@ async function checkDoclingMcp(): Promise<ServiceStatus> {
     let response: Response | null = null
     let usedUrl = internalUrl
 
+    // Use tools/list - standard MCP method that should always be available
+    const mcpRequest = { jsonrpc: '2.0', method: 'tools/list', id: 1 }
+
     try {
-      // Docling MCP uses POST for health check via MCP protocol
       response = await fetchWithTimeout(internalUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ jsonrpc: '2.0', method: 'ping', id: 1 }),
+        body: JSON.stringify(mcpRequest),
       })
     } catch {
       // Try fallback URL
@@ -236,20 +239,39 @@ async function checkDoclingMcp(): Promise<ServiceStatus> {
       response = await fetchWithTimeout(fallbackUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ jsonrpc: '2.0', method: 'ping', id: 1 }),
+        body: JSON.stringify(mcpRequest),
       })
     }
 
     const responseTime = Date.now() - startTime
 
-    // Accept any response as healthy (MCP might return 200 or other success codes)
-    if (response.ok || response.status === 200) {
-      return {
-        name: 'Docling MCP',
-        status: 'healthy',
-        responseTime,
-        message: `Service responding at ${usedUrl.includes('docling-mcp:8000') ? 'internal' : 'external'} URL`,
-        lastCheck,
+    // Check if we got a valid JSON-RPC response
+    if (response.ok) {
+      try {
+        const data = await response.json()
+        // Valid JSON-RPC response has either result or error
+        if (data.jsonrpc === '2.0' && (data.result !== undefined || data.error !== undefined)) {
+          // Even if method returns error, service is responding correctly
+          const toolCount = data.result?.tools?.length
+          return {
+            name: 'Docling MCP',
+            status: 'healthy',
+            responseTime,
+            message: toolCount !== undefined
+              ? `${toolCount} tool(s) available`
+              : `Service responding at ${usedUrl.includes('docling-mcp:8000') ? 'internal' : 'external'} URL`,
+            lastCheck,
+          }
+        }
+      } catch {
+        // JSON parse failed but HTTP was OK - service is partially working
+        return {
+          name: 'Docling MCP',
+          status: 'degraded',
+          responseTime,
+          message: 'Invalid JSON-RPC response',
+          lastCheck,
+        }
       }
     }
 
