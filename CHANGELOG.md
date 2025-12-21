@@ -30,6 +30,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.26.11] - 2025-12-21
+
+### Fixed
+- **generation**: remove unused long-running notification feature (6b36081)
+
+### Other
+- update project files (83359c4)
+
 ## [0.26.9] - 2025-12-20
 
 ### Added
