@@ -14,8 +14,6 @@ import {
   ProgressAction,
 } from '@/types/course-generation';
 import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Button } from '@/components/ui/button';
-import { Mail, Clock } from 'lucide-react';
 // DISABLED: MissionControlBanner handlers moved to GraphView
 // import { approveStage, cancelGeneration, startGeneration } from '@/app/actions/admin-generation';
 import { GraphViewWrapper } from '@/components/generation-graph';
@@ -57,17 +55,12 @@ const STORAGE_KEY_TIMESTAMP = (courseId: string) => `${STORAGE_KEY_PREFIX}${cour
 // Enhanced action types
 type EnhancedProgressAction = ProgressAction
   | { type: 'RESTORE_STATE'; payload: ProgressState }
-  | { type: 'SET_LONG_RUNNING'; payload: boolean }
-  | { type: 'SET_EMAIL_NOTIFICATION'; payload: boolean }
   | { type: 'INCREMENT_RETRY'; payload: { stepIndex: number } }
   | { type: 'SHOW_TOAST'; payload: { type: 'success' | 'error' | 'warning' | 'info'; message: string } }
   | { type: 'CLEAR_TOAST' };
 
 // Enhanced state interface
 interface EnhancedProgressState extends ProgressState {
-  isLongRunning: boolean;
-  emailNotificationRequested: boolean;
-  longRunningStartTime?: Date;
   stepRetryCount: Map<number, number>;
   toast: {
     show: boolean;
@@ -148,19 +141,6 @@ function enhancedProgressReducer(state: EnhancedProgressState, action: EnhancedP
     case 'RESTORE_STATE':
       return action.payload as EnhancedProgressState;
 
-    case 'SET_LONG_RUNNING':
-      return {
-        ...state,
-        isLongRunning: action.payload,
-        longRunningStartTime: action.payload ? new Date() : undefined,
-      };
-
-    case 'SET_EMAIL_NOTIFICATION':
-      return {
-        ...state,
-        emailNotificationRequested: action.payload,
-      };
-
     case 'INCREMENT_RETRY':
       const newRetryCount = new Map(state.stepRetryCount);
       const currentCount = newRetryCount.get(action.payload.stepIndex) || 0;
@@ -213,7 +193,6 @@ export default function GenerationProgressContainerEnhanced({
   const [supabase, setSupabase] = useState<ReturnType<typeof createClient> | null>(null);
   const pollingInterval = useRef<NodeJS.Timeout | null>(null);
   const redirectTimeout = useRef<NodeJS.Timeout | null>(null);
-  const longRunningTimeout = useRef<NodeJS.Timeout | null>(null);
   const toastTimeout = useRef<NodeJS.Timeout | null>(null);
   const reconnectAttempts = useRef(0);
   const maxReconnectAttempts = 5;
@@ -277,8 +256,6 @@ export default function GenerationProgressContainerEnhanced({
       ],
       retryAttempts: 0,
       estimatedTime: 180,
-      isLongRunning: false,
-      emailNotificationRequested: false,
       stepRetryCount: new Map(),
       toast: null,
     };
@@ -380,38 +357,6 @@ export default function GenerationProgressContainerEnhanced({
     const remainingSteps = progress.total_steps - progress.current_step;
     return Math.max(10, remainingSteps * avgStepTime);
   }, []);
-
-  // Handle email notification request
-  const handleEmailNotification = useCallback(async () => {
-    try {
-      // This would call an API to set up email notification
-      dispatch({ type: 'SET_EMAIL_NOTIFICATION', payload: true });
-      showToast('success', 'You will receive an email when your course is ready');
-
-      // Store notification preference
-      if (typeof window !== 'undefined') {
-        localStorage.setItem(`email-notification-${courseId}`, 'true');
-      }
-    } catch {
-      showToast('error', 'Failed to set up email notification');
-    }
-  }, [courseId, showToast]);
-
-  // Check for long-running generation
-  useEffect(() => {
-    if (state.status !== 'completed' && state.status !== 'failed' && state.status !== 'cancelled') {
-      longRunningTimeout.current = setTimeout(() => {
-        dispatch({ type: 'SET_LONG_RUNNING', payload: true });
-        showToast('info', 'Your course is taking longer than expected, but we\'re still working on it!');
-      }, 5 * 60 * 1000); // 5 minutes
-    }
-
-    return () => {
-      if (longRunningTimeout.current) {
-        clearTimeout(longRunningTimeout.current);
-      }
-    };
-  }, [state.status, showToast]);
 
   // Handle progress update from database
   const handleProgressUpdate = useCallback((course: { generation_progress?: unknown; status?: string | null; generation_status?: string | null; error_message?: string | null; analysis_result?: unknown }) => {
@@ -777,33 +722,6 @@ export default function GenerationProgressContainerEnhanced({
             />
           )} */}
 
-          {/* Long-running generation notice */}
-          {state.isLongRunning && !state.emailNotificationRequested && (
-            <motion.div
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="mt-4 max-w-4xl mx-auto"
-            >
-              <Alert className="border-orange-200 bg-orange-50 dark:bg-orange-950/30">
-                <Clock className="h-4 w-4 text-orange-600" />
-                <AlertDescription className="flex items-center justify-between">
-                  <span className="text-sm">
-                    Your course is taking longer than expected, but we&apos;re still working on it!
-                  </span>
-                  <Button
-                    size="sm"
-                    variant="outline"
-                    onClick={handleEmailNotification}
-                    className="ml-4"
-                  >
-                    <Mail className="h-4 w-4 mr-2" />
-                    Notify me by email
-                  </Button>
-                </AlertDescription>
-              </Alert>
-            </motion.div>
-          )}
-
           <motion.div
             className="mt-8 space-y-6"
             initial={{ y: 20, opacity: 0 }}
@@ -835,8 +753,6 @@ export default function GenerationProgressContainerEnhanced({
                     retryAttempts: state.retryAttempts,
                     activeTab: state.activeTab,
                     activityCount: state.activityLog.length,
-                    isLongRunning: state.isLongRunning,
-                    emailNotification: state.emailNotificationRequested,
                     stepRetries: Array.from(state.stepRetryCount.entries()),
                   }, null, 2)}
                 </pre>
