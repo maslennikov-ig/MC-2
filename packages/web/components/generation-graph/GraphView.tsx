@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useDebouncedCallback } from 'use-debounce';
 import {
   ReactFlow,
   ReactFlowProvider,
@@ -60,6 +61,7 @@ import type { CourseStructure } from '@megacampus/shared-types';
 import { PartialGenerationProvider } from './contexts/PartialGenerationContext';
 import { SelectionToolbar } from './components/SelectionToolbar';
 import { useGenerationStore } from '@/stores/useGenerationStore';
+import { AppNode, AppEdge } from './types';
 
 // Define node and edge types OUTSIDE component to prevent re-creation on each render
 const nodeTypes: NodeTypes = {
@@ -257,11 +259,16 @@ function GraphViewInner({ courseId, courseTitle, hasDocuments = true, failedAtSt
   const areAllDocumentsComplete = useGenerationStore(state => state.areAllDocumentsComplete);
 
   // Graph State
-  const { nodes, edges, onNodesChange, onEdgesChange, processTraces, initializeFromCourseStructure, setNodes } = useGraphData({ getFilename, hasDocuments });
+  const { nodes, edges, onNodesChange, onEdgesChange, processTraces, initializeFromCourseStructure, setNodes, nodePositionsRef } = useGraphData({ getFilename, hasDocuments });
   const { layoutNodes, layoutError: _layoutError } = useGraphLayout();
-  const prevNodeCount = useRef(nodes.length);
   // Layout generation counter to prevent stale layout results (Fix #6: Race condition)
   const layoutGenerationRef = useRef(0);
+
+  // Ref to access latest nodes without adding to effect dependencies
+  const nodesRef = useRef(nodes);
+  useEffect(() => {
+    nodesRef.current = nodes;
+  }, [nodes]);
 
   // Fetch course structure on mount to initialize modules/lessons (Task 1: Stage 6 UI/UX)
   // This ensures the structure appears immediately even on page refresh
@@ -376,23 +383,81 @@ function GraphViewInner({ courseId, courseTitle, hasDocuments = true, failedAtSt
       .join(','),
     [nodes]
   );
-  const prevCollapseSignature = useRef(moduleCollapseSignature);
 
-  // Auto-layout when nodes are added/removed OR when module collapse state changes
-  useEffect(() => {
-      const collapseChanged = moduleCollapseSignature !== prevCollapseSignature.current;
-      const countChanged = nodes.length !== prevNodeCount.current;
-      const isInitialLoad = !initialFitDone.current;
+  // Create stable layout trigger based on structure, not content
+  // This prevents the effect from running on every node status update
+  const layoutTrigger = useMemo(() => ({
+    nodeCount: nodes.length,
+    moduleIds: nodes.filter(n => n.type === 'module').map(n => n.id).join(','),
+    collapseSignature: moduleCollapseSignature
+  }), [nodes, moduleCollapseSignature]);
 
-      // Update refs
-      if (collapseChanged) {
-          prevCollapseSignature.current = moduleCollapseSignature;
+  // Use ref to track previous trigger for comparison
+  const prevLayoutTrigger = useRef(layoutTrigger);
+
+  // Debounced layout function to prevent rapid layout calculations
+  const debouncedLayout = useDebouncedCallback(
+    async (
+      nodesToLayout: AppNode[],
+      edgesToLayout: AppEdge[],
+      generation: number,
+      wasCollapseChange: boolean
+    ) => {
+      if (layoutGenerationRef.current !== generation) {
+        return; // Stale request
       }
 
-      // Only layout if node count changes, collapse state changes, or initial load
-      if (nodes.length > 0 && (countChanged || isInitialLoad || collapseChanged)) {
-          prevNodeCount.current = nodes.length;
+      try {
+        const layoutedNodes = await layoutNodes(nodesToLayout, edgesToLayout);
 
+        if (layoutGenerationRef.current !== generation) {
+          return; // Another layout started
+        }
+
+        // CRITICAL: Save positions BEFORE setNodes to prevent race condition
+        // This ensures next graph rebuild has correct positions
+        layoutedNodes.forEach(n => {
+          if (n.position && !n.parentId) {
+            // Only save top-level node positions (lessons are relative to parent)
+            nodePositionsRef.current.set(n.id, n.position);
+          }
+        });
+
+        setNodes(layoutedNodes);
+
+        // Fit view after layout - comfortable zoom to see all nodes
+        if (!initialFitDone.current) {
+          initialFitDone.current = true;
+          requestAnimationFrame(() => {
+            fitView({ padding: 0.15, minZoom: 0.6, maxZoom: 1.2, duration: 400 });
+          });
+        } else if (wasCollapseChange) {
+          // Restore viewport after layout when collapse changed
+          restoreViewport();
+        }
+      } catch (error) {
+        console.error('[GraphView] Layout calculation failed:', error);
+        // Layout failed, but don't crash - nodes will stay at current positions
+      }
+    },
+    50, // 50ms debounce
+    { leading: true, trailing: true }
+  );
+
+  // Auto-layout when structure changes (node count, module IDs, or collapse state)
+  useEffect(() => {
+      const structureChanged =
+          layoutTrigger.nodeCount !== prevLayoutTrigger.current.nodeCount ||
+          layoutTrigger.moduleIds !== prevLayoutTrigger.current.moduleIds;
+      const collapseChanged =
+          layoutTrigger.collapseSignature !== prevLayoutTrigger.current.collapseSignature;
+      const isInitialLoad = !initialFitDone.current;
+
+      // Update ref for next comparison
+      prevLayoutTrigger.current = layoutTrigger;
+
+      // Only layout if structure changes, collapse state changes, or initial load
+      if (nodesRef.current.length > 0 && (structureChanged || isInitialLoad || collapseChanged)) {
           // Preserve viewport when collapse state changes (avoid scroll jump)
           if (collapseChanged && !isInitialLoad) {
               preserveViewport();
@@ -401,30 +466,15 @@ function GraphViewInner({ courseId, courseTitle, hasDocuments = true, failedAtSt
           // Increment generation to track this layout request
           const currentGeneration = ++layoutGenerationRef.current;
 
-          // Capture current edges to avoid stale closure (Fix #4)
-          const currentEdges = edges;
-
-          layoutNodes(nodes, currentEdges).then(layoutedNodes => {
-              // Discard stale results (Fix #6: Race condition)
-              if (layoutGenerationRef.current !== currentGeneration) {
-                  return;
-              }
-
-              setNodes(layoutedNodes);
-
-              // Fit view after layout - comfortable zoom to see all nodes
-              if (!initialFitDone.current) {
-                  initialFitDone.current = true;
-                  requestAnimationFrame(() => {
-                      fitView({ padding: 0.15, minZoom: 0.6, maxZoom: 1.2, duration: 400 });
-                  });
-              } else if (collapseChanged) {
-                  // Restore viewport after layout when collapse changed
-                  restoreViewport();
-              }
-          });
+          // Use debounced layout to prevent rapid layout calculations
+          debouncedLayout(nodesRef.current, edges, currentGeneration, collapseChanged && !isInitialLoad);
       }
-  }, [nodes, edges, layoutNodes, setNodes, fitView, moduleCollapseSignature, preserveViewport, restoreViewport]);
+
+      // Cleanup: cancel pending debounced calls on unmount or re-run
+      return () => {
+        debouncedLayout.cancel();
+      };
+  }, [layoutTrigger, edges, preserveViewport, debouncedLayout]);
   
   // Selection
   const { selectNode, deselectNode } = useNodeSelection();

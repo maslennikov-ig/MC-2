@@ -27,7 +27,7 @@ import { LessonGraphState, type LessonGraphStateType, type LessonGraphStateUpdat
 import { plannerNode, expanderNode, assemblerNode, smootherNode } from './nodes';
 import type { LessonSpecificationV2 } from '@megacampus/shared-types/lesson-specification-v2';
 import type { LessonContent, LessonContentBody, RAGChunk } from '@megacampus/shared-types/lesson-content';
-import type { JudgeRecommendation } from '@megacampus/shared-types/judge-types';
+import type { JudgeRecommendation, JudgeVerdict } from '@megacampus/shared-types/judge-types';
 import {
   executeCascadeEvaluation,
   type CascadeEvaluationInput,
@@ -73,6 +73,8 @@ export interface Stage6Input {
   ragContextId?: string;
   /** User instructions for refinement (optional) */
   userRefinementPrompt?: string;
+  /** Model override for fallback retry (optional) */
+  modelOverride?: string;
 }
 
 /**
@@ -487,9 +489,69 @@ async function judgeNode(state: LessonGraphStateType): Promise<LessonGraphStateU
     const cascadeResult: CascadeResult = await executeCascadeEvaluation(cascadeInput);
 
     // Extract verdict for decision making
-    const verdict = cascadeResult.clevResult?.verdicts?.[0]
+    let verdict = cascadeResult.clevResult?.verdicts?.[0]
       ?? cascadeResult.singleJudgeVerdict
       ?? null;
+
+    // If no verdict but heuristic failures exist, create synthetic verdict for targeted fix
+    if (!verdict && cascadeResult.heuristicResults) {
+      // Check for structural issues that can be fixed with targeted refinement
+      const structuralIssues = cascadeResult.heuristicResults.failureReasons
+        .filter(r => r.includes('Missing required sections'));
+
+      if (structuralIssues.length > 0 && state.lessonContent) {
+        // Parse missing section names from failure reasons
+        // Format: "Missing required sections: conclusion, examples"
+        const parsedIssues = structuralIssues.map(issue => {
+          // Extract section name after colon
+          const colonIndex = issue.indexOf(':');
+          const sectionPart = colonIndex > 0 ? issue.slice(colonIndex + 1).trim() : 'content';
+          // Take first section name if multiple
+          const sectionName = sectionPart.split(',')[0].trim().toLowerCase();
+          return {
+            description: issue,
+            // Use 'completeness' criterion - this triggers REGENERATE_SECTION in arbiter
+            // (pedagogical_structure with major severity would trigger SURGICAL_EDIT)
+            criterion: 'completeness' as const,
+            severity: 'major' as const,
+            location: sectionName || 'content',
+            suggestedFix: `Add the missing ${sectionName} section with appropriate content based on the lesson specification`,
+          };
+        });
+
+        // Create synthetic verdict for targeted fix
+        // Score 0.78 is in the 0.75-0.90 range which triggers TARGETED_FIX for localized issues
+        const syntheticVerdict: JudgeVerdict = {
+          judgeModel: 'heuristic-fixer',
+          overallScore: 0.78,
+          confidence: 'high' as const,
+          recommendation: 'ACCEPT_WITH_MINOR_REVISION' as JudgeRecommendation,
+          criteriaScores: {
+            learning_objective_alignment: 0.85,
+            pedagogical_structure: 0.8,
+            factual_accuracy: 0.9,
+            clarity_readability: 0.85,
+            engagement_examples: 0.8,
+            completeness: 0.55, // Low score for completeness issue (missing sections)
+          },
+          issues: parsedIssues,
+          strengths: ['Content quality is acceptable', 'Most sections are complete', 'Learning objectives addressed'],
+          temperature: 0.3,
+          passed: false,
+          durationMs: 0,
+          tokensUsed: 0,
+        };
+
+        // Assign synthetic verdict to be used by decision engine
+        verdict = syntheticVerdict;
+
+        logger.info({
+          lessonId: state.lessonSpec.lesson_id,
+          structuralIssues,
+          parsedLocations: parsedIssues.map(i => i.location),
+        }, 'Judge node: Created synthetic verdict for heuristic structural fix');
+      }
+    }
 
     if (!verdict) {
       logger.warn({
@@ -951,6 +1013,16 @@ export async function executeStage6(input: Stage6Input): Promise<Stage6Output> {
   try {
     const graph = getGraph();
 
+    // Validate modelOverride format (should be "provider/model-name")
+    let validatedModelOverride = input.modelOverride ?? null;
+    if (validatedModelOverride && !validatedModelOverride.includes('/')) {
+      logger.warn({
+        lessonId: input.lessonSpec.lesson_id,
+        modelOverride: validatedModelOverride,
+      }, 'ModelOverride format invalid (expected "provider/model-name"), falling back to database config');
+      validatedModelOverride = null;
+    }
+
     // Build initial state
     const initialState: Partial<LessonGraphStateType> = {
       lessonSpec: input.lessonSpec,
@@ -960,6 +1032,7 @@ export async function executeStage6(input: Stage6Input): Promise<Stage6Output> {
       ragChunks: input.ragChunks ?? [],
       ragContextId: input.ragContextId ?? null,
       userRefinementPrompt: input.userRefinementPrompt ?? null,
+      modelOverride: validatedModelOverride,
       currentNode: 'planner',
       errors: [],
       retryCount: 0,

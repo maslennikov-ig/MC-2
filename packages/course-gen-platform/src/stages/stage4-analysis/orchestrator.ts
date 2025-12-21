@@ -59,6 +59,75 @@ import type {
   Phase4Output,
 } from '@megacampus/shared-types/analysis-result';
 import type { Phase6Output } from './phases/phase-6-rag-planning';
+import type pino from 'pino';
+
+/**
+ * RT-004 style retry configuration for Stage 4 phases
+ * Matches Stage 5 pattern for consistency
+ *
+ * @see specs/008-generation-generation-json/research-decisions/rt-004-retry-strategy.md
+ */
+const RETRY_CONFIG = {
+  MAX_ATTEMPTS: 3,
+  BASE_DELAY_MS: 1000,
+} as const;
+
+/**
+ * Execute a phase with retry and exponential backoff
+ *
+ * Wraps LLM phase execution with retry logic to handle transient failures
+ * (rate limits, timeouts, temporary API errors).
+ *
+ * @param phaseName - Phase identifier for logging
+ * @param phaseFunc - Async function that executes the phase
+ * @param phaseLogger - Logger instance with context
+ * @returns Phase output
+ * @throws Error if all retry attempts fail
+ */
+async function executePhaseWithRetry<T>(
+  phaseName: string,
+  phaseFunc: () => Promise<T>,
+  phaseLogger: pino.Logger
+): Promise<T> {
+  let lastError: Error | null = null;
+
+  for (let attempt = 1; attempt <= RETRY_CONFIG.MAX_ATTEMPTS; attempt++) {
+    try {
+      if (attempt > 1) {
+        phaseLogger.info({
+          phase: phaseName,
+          attempt,
+          maxAttempts: RETRY_CONFIG.MAX_ATTEMPTS,
+        }, `Retry attempt ${attempt} for ${phaseName}`);
+      }
+
+      return await phaseFunc();
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+
+      phaseLogger.warn({
+        phase: phaseName,
+        attempt,
+        maxAttempts: RETRY_CONFIG.MAX_ATTEMPTS,
+        error: lastError.message,
+      }, `Phase ${phaseName} attempt ${attempt} failed`);
+
+      if (attempt < RETRY_CONFIG.MAX_ATTEMPTS) {
+        const delayMs = RETRY_CONFIG.BASE_DELAY_MS * Math.pow(2, attempt - 1);
+        phaseLogger.debug({
+          phase: phaseName,
+          delayMs,
+          nextAttempt: attempt + 1,
+        }, `Waiting ${delayMs}ms before retry`);
+        await new Promise(r => setTimeout(r, delayMs));
+      }
+    }
+  }
+
+  throw new Error(
+    `Phase ${phaseName} failed after ${RETRY_CONFIG.MAX_ATTEMPTS} attempts: ${lastError?.message || 'Unknown error'}`
+  );
+}
 
 /**
  * Main orchestration function for Stage 4 Analysis
@@ -236,19 +305,23 @@ export async function runAnalysisOrchestration(
     // =================================================================
     await startPhase(1, courseId, supabase, orchestrationLogger);
 
-    const phase1Output: Phase1Output = await runPhase1Classification({
-      course_id: courseId,
-      language: input.language,
-      topic: input.topic,
-      answers: input.answers || null,
-      document_summaries: input.document_summaries?.map(ds => ({
-        document_id: ds.document_id,
-        file_name: ds.file_name,
-        processed_content: ds.processed_content,
-      })) || null,
-      target_audience: input.target_audience,
-      lesson_duration_minutes: input.lesson_duration_minutes,
-    });
+    const phase1Output: Phase1Output = await executePhaseWithRetry(
+      'phase1_classification',
+      () => runPhase1Classification({
+        course_id: courseId,
+        language: input.language,
+        topic: input.topic,
+        answers: input.answers || null,
+        document_summaries: input.document_summaries?.map(ds => ({
+          document_id: ds.document_id,
+          file_name: ds.file_name,
+          processed_content: ds.processed_content,
+        })) || null,
+        target_audience: input.target_audience,
+        lesson_duration_minutes: input.lesson_duration_minutes,
+      }),
+      orchestrationLogger
+    );
 
     await completePhase(1, courseId, supabase, orchestrationLogger, {
       category: phase1Output.course_category.primary,
@@ -293,14 +366,18 @@ export async function runAnalysisOrchestration(
     // =================================================================
     await startPhase(2, courseId, supabase, orchestrationLogger);
 
-    const phase2Output: Phase2Output = await runPhase2Scope({
-      course_id: courseId,
-      language: input.language,
-      topic: input.topic,
-      answers: input.answers || null,
-      document_summaries: input.document_summaries?.map(ds => ds.processed_content) || null,
-      phase1_output: phase1Output,
-    });
+    const phase2Output: Phase2Output = await executePhaseWithRetry(
+      'phase2_scope',
+      () => runPhase2Scope({
+        course_id: courseId,
+        language: input.language,
+        topic: input.topic,
+        answers: input.answers || null,
+        document_summaries: input.document_summaries?.map(ds => ds.processed_content) || null,
+        phase1_output: phase1Output,
+      }),
+      orchestrationLogger
+    );
 
     // Minimum 10 lessons validation happens inside runPhase2Scope (FR-015)
 
@@ -336,15 +413,19 @@ export async function runAnalysisOrchestration(
 
     const documentSummariesText = input.document_summaries?.map(ds => ds.processed_content) || null;
 
-    const phase3Output: Phase3Output = await runPhase3Expert({
-      course_id: courseId,
-      language: input.language,
-      topic: input.topic,
-      answers: input.answers || null,
-      document_summaries: documentSummariesText,
-      phase1_output: phase1Output,
-      phase2_output: phase2Output,
-    });
+    const phase3Output: Phase3Output = await executePhaseWithRetry(
+      'phase3_expert',
+      () => runPhase3Expert({
+        course_id: courseId,
+        language: input.language,
+        topic: input.topic,
+        answers: input.answers || null,
+        document_summaries: documentSummariesText,
+        phase1_output: phase1Output,
+        phase2_output: phase2Output,
+      }),
+      orchestrationLogger
+    );
 
     await completePhase(3, courseId, supabase, orchestrationLogger, {
       teaching_style: phase3Output.pedagogical_strategy.teaching_style,
@@ -376,16 +457,20 @@ export async function runAnalysisOrchestration(
     // =================================================================
     await startPhase(4, courseId, supabase, orchestrationLogger);
 
-    const phase4Output: Phase4Output = await runPhase4Synthesis({
-      course_id: courseId,
-      language: input.language,
-      topic: input.topic,
-      answers: input.answers || null,
-      document_summaries: input.document_summaries || null,
-      phase1_output: phase1Output,
-      phase2_output: phase2Output,
-      phase3_output: phase3Output,
-    });
+    const phase4Output: Phase4Output = await executePhaseWithRetry(
+      'phase4_synthesis',
+      () => runPhase4Synthesis({
+        course_id: courseId,
+        language: input.language,
+        topic: input.topic,
+        answers: input.answers || null,
+        document_summaries: input.document_summaries || null,
+        phase1_output: phase1Output,
+        phase2_output: phase2Output,
+        phase3_output: phase3Output,
+      }),
+      orchestrationLogger
+    );
 
     await completePhase(4, courseId, supabase, orchestrationLogger, {
       content_strategy: phase4Output.content_strategy,
@@ -436,16 +521,20 @@ export async function runAnalysisOrchestration(
       await startPhase(6, courseId, supabase, orchestrationLogger);
 
       try {
-        phase6Output = await runPhase6RagPlanning({
-          course_id: courseId,
-          language: input.language,
-          sections_breakdown: phase2Output.recommended_structure.sections_breakdown,
-          document_summaries: input.document_summaries.map(ds => ({
-            document_id: ds.document_id,
-            file_name: ds.file_name,
-            processed_content: ds.processed_content,
-          })),
-        });
+        phase6Output = await executePhaseWithRetry(
+          'phase6_rag_planning',
+          () => runPhase6RagPlanning({
+            course_id: courseId,
+            language: input.language,
+            sections_breakdown: phase2Output.recommended_structure.sections_breakdown,
+            document_summaries: input.document_summaries!.map(ds => ({
+              document_id: ds.document_id,
+              file_name: ds.file_name,
+              processed_content: ds.processed_content,
+            })),
+          }),
+          orchestrationLogger
+        );
 
         // Calculate aggregate stats for logging (Analyze Enhancement A20)
         const totalSearchTerms = Object.values(phase6Output.document_relevance_mapping)

@@ -159,6 +159,12 @@ const GenerationStateAnnotation = Annotation.Root({
 
   // Error handling
   errors: Annotation<string[]>,
+
+  // Model override (for handler-level fallback retry)
+  modelOverride: Annotation<string | null>({
+    reducer: (x, y) => y ?? x,
+    default: () => null,
+  }),
 });
 
 /**
@@ -288,7 +294,12 @@ export class GenerationOrchestrator {
    * - Implemented in GenerationPhases methods
    * - Max 3 attempts per phase with exponential backoff
    *
+   * Model Fallback (Handler Level):
+   * - Handler calls execute() with modelOverride for fallback retry strategy
+   * - Primary model (language-specific) -> Fallback model (universal)
+   *
    * @param input - Generation job input from BullMQ queue
+   * @param modelOverride - Optional model override for fallback retry (passed from handler)
    * @returns GenerationResult with course_structure and generation_metadata
    * @throws Error if generation fails (validation errors, phase failures)
    *
@@ -309,12 +320,25 @@ export class GenerationOrchestrator {
    * ```
    */
   async execute(
-    input: GenerationJobInput
+    input: GenerationJobInput,
+    modelOverride?: string
   ): Promise<GenerationResult> {
-    this.logger.info(
-      { course_id: input.course_id },
-      'Starting 5-phase generation pipeline'
-    );
+    // Log model override if provided (fallback strategy from handler)
+    if (modelOverride) {
+      this.logger.info(
+        {
+          course_id: input.course_id,
+          modelOverride,
+          source: 'handler_fallback',
+        },
+        'Starting 5-phase generation pipeline with model override'
+      );
+    } else {
+      this.logger.info(
+        { course_id: input.course_id },
+        'Starting 5-phase generation pipeline'
+      );
+    }
 
     const startTime = Date.now();
 
@@ -323,9 +347,10 @@ export class GenerationOrchestrator {
       stage: 'stage_5',
       phase: 'init',
       stepName: 'start',
-      inputData: { 
+      inputData: {
         courseId: input.course_id,
-        topic: input.analysis_result?.course_category?.primary
+        topic: input.analysis_result?.course_category?.primary,
+        ...(modelOverride && { modelOverride, source: 'handler_fallback' }),
       },
       durationMs: 0
     });
@@ -355,6 +380,7 @@ export class GenerationOrchestrator {
       currentPhase: 'validate_input',
       phaseDurations: {},
       errors: [],
+      modelOverride: modelOverride || null, // Pass model override to state for phase access
     };
 
     this.logger.info('Initial state initialized, invoking StateGraph');

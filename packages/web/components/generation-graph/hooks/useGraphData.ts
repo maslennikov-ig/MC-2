@@ -1760,6 +1760,7 @@ export function useGraphData(options: UseGraphDataOptions = {}) {
     initializeFromCourseStructure,
     updateLessonStatuses,
     setNodes,
-    setEdges
+    setEdges,
+    nodePositionsRef
   };
 }

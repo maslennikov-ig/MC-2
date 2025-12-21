@@ -74,16 +74,22 @@ export function useGraphLayout() {
 
   /**
    * Applies a simple fallback grid layout when ELK fails.
-   * Places nodes in columns by stage number, with rows for parallel items.
+   * Places parent nodes (no parentId) in columns by stage number, with rows for parallel items.
+   * Child nodes (with parentId) are positioned RELATIVE to their parent.
    *
    * @param nodes - Array of nodes to layout
    * @returns Array of nodes with updated positions
    */
   const applyFallbackLayout = useCallback((nodes: AppNode[]): AppNode[] => {
-    const stageGroups = new Map<number, AppNode[]>();
+    const layoutedNodes: AppNode[] = [];
 
-    // Group nodes by stage
-    nodes.forEach(node => {
+    // Separate parent nodes (no parentId) from child nodes (have parentId)
+    const parentNodes = nodes.filter(n => !n.parentId);
+    const childNodes = nodes.filter(n => n.parentId);
+
+    // Group parent nodes by stage
+    const stageGroups = new Map<number, AppNode[]>();
+    parentNodes.forEach(node => {
       const stage = node.data?.stageNumber ?? 0;
       if (!stageGroups.has(stage)) {
         stageGroups.set(stage, []);
@@ -91,8 +97,7 @@ export function useGraphLayout() {
       stageGroups.get(stage)!.push(node);
     });
 
-    // Position nodes in columns by stage
-    const layoutedNodes: AppNode[] = [];
+    // Position parent nodes in columns by stage
     const sortedStages = Array.from(stageGroups.keys()).sort((a, b) => a - b);
 
     sortedStages.forEach((stage, colIndex) => {
@@ -103,6 +108,30 @@ export function useGraphLayout() {
           position: {
             x: colIndex * FALLBACK_HORIZONTAL_SPACING,
             y: rowIndex * FALLBACK_VERTICAL_SPACING,
+          },
+        });
+      });
+    });
+
+    // Group child nodes by parent
+    const childrenByParent = new Map<string, AppNode[]>();
+    childNodes.forEach(child => {
+      if (!child.parentId) return;
+      if (!childrenByParent.has(child.parentId)) {
+        childrenByParent.set(child.parentId, []);
+      }
+      childrenByParent.get(child.parentId)!.push(child);
+    });
+
+    // Position child nodes RELATIVE to their parents (0,0 = parent's top-left)
+    childrenByParent.forEach((children) => {
+      children.forEach((child, index) => {
+        layoutedNodes.push({
+          ...child,
+          position: {
+            x: LAYOUT_CONFIG.MODULE_PADDING,
+            y: LAYOUT_CONFIG.MODULE_HEADER_HEIGHT +
+               (index * (LAYOUT_CONFIG.LESSON_HEIGHT + LAYOUT_CONFIG.LESSON_GAP)),
           },
         });
       });

@@ -103,6 +103,8 @@ function extractTokenUsage(response: Awaited<ReturnType<ChatOpenAI['invoke']>>):
  * @param outline - Lesson outline
  * @param lessonSpec - Full lesson specification
  * @param ragChunks - All RAG chunks for the lesson
+ * @param language - Target language for content
+ * @param modelOverride - Optional model override for fallback retry
  * @returns Expanded section with content and metrics
  */
 async function expandSection(
@@ -110,7 +112,8 @@ async function expandSection(
   outline: string,
   lessonSpec: LessonSpecificationV2,
   ragChunks: RAGChunk[],
-  language: string
+  language: string,
+  modelOverride: string | null = null
 ): Promise<ExpandedSection> {
   const startTime = performance.now();
 
@@ -122,14 +125,15 @@ async function expandSection(
   const maxTokens = DEPTH_TOKEN_LIMITS[depth];
 
   // Get model from ModelConfigService (database-driven, throws on failure)
+  // Use modelOverride if present (for fallback retry strategy)
   const modelConfigService = createModelConfigService();
-  const phaseConfig = await modelConfigService.getModelForPhase('stage_6_refinement');
-  const modelId = phaseConfig.modelId;
+  const modelId = modelOverride
+    ?? (await modelConfigService.getModelForPhase('stage_6_refinement')).modelId;
 
   logger.debug({
     sectionTitle: section.title,
     modelId,
-    source: phaseConfig.source,
+    source: modelOverride ? 'override' : 'database',
   }, 'Using model config for section expansion');
 
   // Create LLM instance with section-specific temperature and depth-based token limit
@@ -211,6 +215,8 @@ async function expandSection(
  * @param lessonSpec - Full lesson specification
  * @param ragChunks - All RAG chunks
  * @param batchSize - Maximum concurrent expansions
+ * @param language - Target language for content
+ * @param modelOverride - Optional model override for fallback retry
  * @returns All expanded sections and accumulated errors
  */
 async function expandSectionsInBatches(
@@ -219,7 +225,8 @@ async function expandSectionsInBatches(
   lessonSpec: LessonSpecificationV2,
   ragChunks: RAGChunk[],
   batchSize: number,
-  language: string
+  language: string,
+  modelOverride: string | null = null
 ): Promise<{ sections: ExpandedSection[]; errors: string[] }> {
   const expandedSections: ExpandedSection[] = [];
   const errors: string[] = [];
@@ -230,7 +237,7 @@ async function expandSectionsInBatches(
 
     const batchResults = await Promise.allSettled(
       batch.map((section) =>
-        expandSection(section, outline, lessonSpec, ragChunks, language)
+        expandSection(section, outline, lessonSpec, ragChunks, language, modelOverride)
       )
     );
 
@@ -318,7 +325,8 @@ export async function expanderNode(
         lessonSpec,
         ragChunks,
         MAX_CONCURRENT_EXPANSIONS,
-        language
+        language,
+        state.modelOverride
       );
 
     // Convert to Map for state
@@ -388,8 +396,8 @@ export async function expanderNode(
 
     // Get model used for logging (already validated in expandSection)
     const modelConfigService = createModelConfigService();
-    const phaseConfig = await modelConfigService.getModelForPhase('stage_6_refinement');
-    const modelUsed = phaseConfig.modelId;
+    const modelUsed = state.modelOverride
+      ?? (await modelConfigService.getModelForPhase('stage_6_refinement')).modelId;
 
     // Log trace at completion
     await logTrace({

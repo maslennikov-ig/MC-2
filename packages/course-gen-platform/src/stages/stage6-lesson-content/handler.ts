@@ -1204,25 +1204,13 @@ function extractContentMarkdown(content: LessonContent): string {
  * - courseId: passed directly (same type)
  * - ragChunks: passed directly (handler requires, orchestrator optional)
  * - ragContextId: converted from `string | null` to `string | undefined`
- * - modelOverride: logged as warning (not supported by orchestrator)
+ * - modelOverride: passed to orchestrator for fallback model selection
  *
  * @param input - Stage 6 job input from handler
  * @returns Stage 6 output from orchestrator
  */
 async function executeStage6(input: Stage6JobInput): Promise<Stage6Output> {
   const { lessonSpec, courseId, ragChunks, ragContextId, language, modelOverride, userRefinementPrompt } = input;
-
-  // Log warning if modelOverride is provided (not currently supported by orchestrator)
-  if (modelOverride) {
-    logger.warn(
-      {
-        lessonId: lessonSpec.lesson_id,
-        courseId,
-        modelOverride,
-      },
-      'modelOverride provided but not currently supported by Stage 6 orchestrator - using default model selection'
-    );
-  }
 
   // Resolve lessonUuid for trace logging
   const lessonLabel = lessonSpec.lesson_id;
@@ -1237,6 +1225,7 @@ async function executeStage6(input: Stage6JobInput): Promise<Stage6Output> {
     ragChunks: ragChunks ?? [], // Default to empty array if undefined
     ragContextId: ragContextId ?? undefined, // Convert null to undefined
     userRefinementPrompt,
+    modelOverride, // Pass modelOverride for fallback retry
   };
 
   // Call the real orchestrator

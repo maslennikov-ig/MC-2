@@ -24,6 +24,7 @@ import { Job } from 'bullmq';
 import type { GenerationJobData, GenerationJobInput, GenerationResult } from '@megacampus/shared-types';
 import { CourseStructureSchema } from '@megacampus/shared-types/generation-result';
 import logger from '@/shared/logger';
+import type pino from 'pino';
 import { getSupabaseAdmin } from '@/shared/supabase/admin';
 import { GenerationOrchestrator } from './orchestrator';
 import { MetadataGenerator } from './utils/metadata-generator';
@@ -32,6 +33,22 @@ import { QualityValidator } from '../../shared/validation/quality-validator';
 import { sanitizeCourseStructure } from './utils/sanitize';
 import { qdrantClient } from '@/shared/qdrant/client';
 import { generationLockService } from '@/shared/locks';
+import { logTrace } from '../../shared/trace-logger';
+
+/**
+ * Model fallback configuration for Stage 5
+ * Similar to Stage 6 pattern for consistency
+ *
+ * @see specs/008-generation-generation-json/research-decisions/rt-004-retry-strategy.md
+ */
+const MODEL_FALLBACK = {
+  primary: {
+    ru: 'qwen/qwen3-235b-a22b-2507',
+    en: 'deepseek/deepseek-v3.1-terminus',
+  },
+  fallback: 'moonshotai/kimi-k2-0905',
+  maxPrimaryAttempts: 2,
+} as const;
 
 interface CourseStatusRow {
   generation_status: string;
@@ -195,6 +212,96 @@ function determinePhaseFromError(error: Error | string): string | undefined {
   }
 
   return undefined;
+}
+
+/**
+ * Execute generation with model fallback strategy
+ *
+ * Tries primary model (language-specific) up to maxPrimaryAttempts times,
+ * then falls back to universal fallback model.
+ *
+ * @see specs/008-generation-generation-json/research-decisions/rt-004-retry-strategy.md
+ *
+ * @param orchestrator - GenerationOrchestrator instance
+ * @param input - Generation job input
+ * @param modelConfig - Model fallback configuration
+ * @param phaseLogger - Pino logger instance with course context
+ * @returns GenerationResult from successful execution
+ * @throws Error if both primary and fallback models fail
+ */
+async function processWithFallback(
+  orchestrator: GenerationOrchestrator,
+  input: GenerationJobInput,
+  modelConfig: typeof MODEL_FALLBACK,
+  phaseLogger: pino.Logger
+): Promise<GenerationResult> {
+  const courseId = input.course_id;
+  const language = input.frontend_parameters?.language || 'ru';
+  const primaryModel = modelConfig.primary[language as keyof typeof modelConfig.primary]
+    || modelConfig.primary.ru;
+
+  // Try primary model
+  for (let attempt = 1; attempt <= modelConfig.maxPrimaryAttempts; attempt++) {
+    try {
+      phaseLogger.info({
+        courseId,
+        attempt,
+        maxAttempts: modelConfig.maxPrimaryAttempts,
+        model: primaryModel,
+        source: 'primary',
+      }, 'Stage 5: Attempting generation with primary model');
+
+      return await orchestrator.execute(input, primaryModel);
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
+
+      phaseLogger.warn({
+        courseId,
+        attempt,
+        maxAttempts: modelConfig.maxPrimaryAttempts,
+        model: primaryModel,
+        error: errorMessage,
+      }, 'Stage 5: Primary model attempt failed');
+
+      // Trace log for retry attempt
+      await logTrace({
+        courseId,
+        stage: 'stage_5',
+        phase: 'model_fallback',
+        stepName: 'primary_attempt_failed',
+        inputData: { attempt, model: primaryModel },
+        errorData: { error: errorMessage },
+        durationMs: 0,
+      });
+
+      if (attempt < modelConfig.maxPrimaryAttempts) {
+        const delayMs = 1000 * Math.pow(2, attempt - 1);
+        phaseLogger.debug({ courseId, delayMs }, 'Stage 5: Waiting before retry');
+        await new Promise(r => setTimeout(r, delayMs));
+      }
+    }
+  }
+
+  // Fallback to secondary model
+  phaseLogger.info({
+    courseId,
+    primaryModel,
+    fallbackModel: modelConfig.fallback,
+    reason: 'Primary model exhausted all attempts',
+  }, 'Stage 5: Falling back to secondary model');
+
+  // Trace log for fallback activation
+  await logTrace({
+    courseId,
+    stage: 'stage_5',
+    phase: 'model_fallback',
+    stepName: 'fallback_activated',
+    inputData: { primaryModel, fallbackModel: modelConfig.fallback },
+    outputData: { reason: 'Primary model exhausted all attempts' },
+    durationMs: 0,
+  });
+
+  return await orchestrator.execute(input, modelConfig.fallback);
 }
 
 /**
@@ -418,7 +525,7 @@ class Stage5GenerationHandler {
 
       jobLogger.info('Executing 5-phase generation pipeline');
 
-      const result: GenerationResult = await orchestrator.execute(input);
+      const result: GenerationResult = await processWithFallback(orchestrator, input, MODEL_FALLBACK, jobLogger);
 
       jobLogger.info(
         {

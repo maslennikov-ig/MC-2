@@ -369,14 +369,15 @@ export async function smootherNode(
     );
 
     // Get model from ModelConfigService (database-driven, throws on failure)
+    // Use modelOverride if present (for fallback retry strategy)
     const modelConfigService = createModelConfigService();
-    const phaseConfig = await modelConfigService.getModelForPhase('stage_6_refinement');
-    const modelId = phaseConfig.modelId;
+    const modelId = state.modelOverride
+      ?? (await modelConfigService.getModelForPhase('stage_6_refinement')).modelId;
 
     logger.info({
       lessonId: lessonSpec.lesson_id,
       modelId,
-      source: phaseConfig.source,
+      source: state.modelOverride ? 'override' : 'database',
     }, 'Using model config for smoother');
 
     // Create LLM instance

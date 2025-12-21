@@ -150,6 +150,16 @@ export const LessonGraphState = Annotation.Root({
     default: () => null,
   }),
 
+  /**
+   * Model override for fallback retry strategy
+   * When set, nodes should use this model instead of querying ModelConfigService
+   * Used by handler's processWithFallback() to switch to fallback model
+   */
+  modelOverride: Annotation<string | null>({
+    reducer: (x, y) => y ?? x,
+    default: () => null,
+  }),
+
   // ============================================================================
   // GENERATION PHASES
   // ============================================================================
