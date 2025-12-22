@@ -5,7 +5,7 @@ import { motion } from "framer-motion"
 import { Target, BookOpen, Activity, Clock, CheckCircle, Circle, PlayCircle, Film, X } from "lucide-react"
 import dynamic from "next/dynamic"
 
-import { MarkdownRendererClient } from "@/components/markdown"
+import { MarkdownRendererFull } from "@/components/markdown"
 import type { Lesson, Section, Asset, LessonActivity } from "@/types/database"
 
 // Type guard to check if activity is an object
@@ -321,7 +321,7 @@ export default function LessonContent({ lesson, section, assets }: LessonContent
 
       {/* Main Content */}
       <div className="mb-8 pb-8 border-b border-gray-200 dark:border-gray-800">
-        <MarkdownRendererClient content={markdownContent} preset="chat" />
+        <MarkdownRendererFull content={markdownContent} preset="lesson" />
       </div>
 
       {/* Practical Tasks */}

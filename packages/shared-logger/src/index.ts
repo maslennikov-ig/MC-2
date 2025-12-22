@@ -6,22 +6,55 @@
  * Features:
  * - Structured JSON logging
  * - Axiom transport in production
- * - pino-pretty in development
+ * - Synchronous stdout in development (prevents Next.js worker thread issues)
  * - PII redaction
  * - Custom error serialization
+ *
+ * Development Usage:
+ * - Default: JSON output to stdout (sync, no worker threads)
+ * - Pretty print: `pnpm dev | pino-pretty` or set PINO_PRETTY=1
+ *
+ * Production Usage:
+ * - Async transport to Axiom (if configured) and stdout
  */
-import pino, { Logger } from 'pino';
+import pino, { Logger, DestinationStream, LoggerOptions } from 'pino';
 import { getTransportConfig } from './transports';
 import type { ChildLoggerContext } from './types';
 
-const logger = pino({
+/**
+ * Creates the appropriate destination for logging.
+ *
+ * NOTE: This module is Node.js-only. For browser logging, use
+ * '@/lib/client-logger' in the web package.
+ *
+ * In development: Uses pino.destination with sync:true to avoid worker threads.
+ * This prevents "the worker has exited" errors in Next.js Server Components.
+ *
+ * In production: Uses async transports for better performance.
+ */
+function createLoggerDestination(): DestinationStream | undefined {
+  const transportConfig = getTransportConfig();
+
+  // If transport config is defined (production), let pino handle it
+  if (transportConfig) {
+    return undefined;
+  }
+
+  // Development: Use synchronous stdout destination
+  // This avoids worker threads that cause issues with Next.js HMR and Server Components
+  return pino.destination({
+    dest: 1, // stdout
+    sync: true, // Critical: synchronous writes prevent worker thread issues
+  });
+}
+
+const loggerOptions: LoggerOptions = {
   level: process.env.LOG_LEVEL || 'info',
   base: {
     service: process.env.SERVICE_NAME || 'megacampus',
     environment: process.env.NODE_ENV || 'development',
     version: process.env.APP_VERSION || '0.0.0',
   },
-  transport: getTransportConfig(),
   redact: {
     paths: [
       'password',
@@ -56,7 +89,19 @@ const logger = pino({
       } : undefined,
     }),
   },
-});
+};
+
+// Add transport config only in production (when it's defined)
+const transportConfig = getTransportConfig();
+if (transportConfig) {
+  loggerOptions.transport = transportConfig;
+}
+
+// Create logger with appropriate destination
+const destination = createLoggerDestination();
+const logger = destination
+  ? pino(loggerOptions, destination)
+  : pino(loggerOptions);
 
 /**
  * Creates a child logger with custom context fields

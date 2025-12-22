@@ -3,7 +3,7 @@
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { useSupabase } from '@/lib/supabase/browser-client';
 import { RealtimeChannel } from '@supabase/supabase-js';
-import { logger } from '@/lib/logger';
+import { logger } from '@/lib/client-logger';
 import {
   LessonInspectorData,
   PipelineNodeState,
@@ -343,8 +343,29 @@ function extractKeyPoints(content: string): string[] {
  *
  * Converts the structured content object (intro, sections, summary, exercises)
  * into a single markdown document for display in the Preview tab.
+ *
+ * Handles multiple content formats:
+ * 1. Raw markdown string in common field names
+ * 2. Structured content with intro/introduction, sections, summary, exercises
+ * 3. Fallback to body field if present
  */
 function buildMarkdownFromContent(content: Record<string, unknown>): string {
+  // Case 1: Check for raw markdown in common locations
+  if (content.markdown && typeof content.markdown === 'string') {
+    return content.markdown;
+  }
+  if (content.rawMarkdown && typeof content.rawMarkdown === 'string') {
+    return content.rawMarkdown;
+  }
+  if (content.raw_markdown && typeof content.raw_markdown === 'string') {
+    return content.raw_markdown;
+  }
+  // Check for text field (some content formats use this)
+  if (content.text && typeof content.text === 'string') {
+    return content.text;
+  }
+
+  // Case 2: Structured content
   const sections = content.sections as Array<Record<string, unknown>> | undefined;
   const exercises = content.exercises as Array<Record<string, unknown>> | undefined;
 
@@ -354,9 +375,10 @@ function buildMarkdownFromContent(content: Record<string, unknown>): string {
   parts.length = estimatedSize; // Pre-allocate
   let idx = 0;
 
-  // Introduction
-  if (content.intro && typeof content.intro === 'string') {
-    parts[idx++] = content.intro;
+  // Introduction (check both 'intro' and 'introduction')
+  const intro = content.intro || content.introduction;
+  if (intro && typeof intro === 'string') {
+    parts[idx++] = intro;
   }
 
   // Sections
@@ -391,7 +413,14 @@ function buildMarkdownFromContent(content: Record<string, unknown>): string {
 
   // Trim to actual size and join
   parts.length = idx;
-  return parts.join('\n\n');
+  const result = parts.join('\n\n');
+
+  // Case 3: If no structured content found, check for body field as fallback
+  if (!result && content.body && typeof content.body === 'string') {
+    return content.body;
+  }
+
+  return result;
 }
 
 /**
@@ -701,6 +730,8 @@ export function useLessonInspectorData({
   const fetchIdRef = useRef(0);
   // Store lesson UUID for realtime subscription
   const [lessonUuidForRealtime, setLessonUuidForRealtime] = useState<string | null>(null);
+  // Debounce timer ref for realtime updates
+  const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   /**
    * Fetch lesson data from database
@@ -961,6 +992,23 @@ export function useLessonInspectorData({
     }
   }, [enabled, lessonId, courseId, supabase, authLoading, session]);
 
+  /**
+   * Debounced fetch for realtime updates
+   * Batches rapid updates (500ms) to prevent constant page refreshes
+   */
+  const debouncedFetch = useCallback(() => {
+    // Clear existing timer
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current);
+    }
+
+    // Set new timer
+    debounceTimerRef.current = setTimeout(() => {
+      fetchLessonData();
+      debounceTimerRef.current = null;
+    }, 500); // 500ms debounce
+  }, [fetchLessonData]);
+
   // Initial fetch
   useEffect(() => {
     if (!authLoading && session) {
@@ -994,7 +1042,7 @@ export function useLessonInspectorData({
         },
         () => {
           logger.debug('New trace received for lesson', { lessonId, lessonUuidForRealtime });
-          fetchLessonData(); // Refetch all data
+          debouncedFetch(); // Debounced refetch to batch rapid updates
         }
       )
       .on(
@@ -1007,7 +1055,7 @@ export function useLessonInspectorData({
         },
         () => {
           logger.debug('Lesson content updated', { lessonId, lessonUuidForRealtime });
-          fetchLessonData(); // Refetch all data
+          debouncedFetch(); // Debounced refetch to batch rapid updates
         }
       )
       .subscribe((status) => {
@@ -1017,12 +1065,19 @@ export function useLessonInspectorData({
     channelRef.current = channel;
 
     return () => {
+      // Clear debounce timer
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current);
+        debounceTimerRef.current = null;
+      }
+
+      // Cleanup channel
       if (channelRef.current) {
         supabase.removeChannel(channelRef.current);
         channelRef.current = null;
       }
     };
-  }, [lessonId, lessonUuidForRealtime, supabase, authLoading, session, fetchLessonData]);
+  }, [lessonId, lessonUuidForRealtime, supabase, authLoading, session, debouncedFetch]);
 
   // Manual refetch function
   const refetch = useCallback(() => {

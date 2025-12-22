@@ -1,5 +1,17 @@
-import { NotFoundState } from '@/components/common/error-states'
+'use client';
 
+import Error from 'next/error';
+
+/**
+ * Root not-found page for requests that bypass middleware
+ * (e.g., direct file access, malformed URLs)
+ */
 export default function NotFound() {
-  return <NotFoundState variant="fullpage" />
+  return (
+    <html lang="en">
+      <body>
+        <Error statusCode={404} />
+      </body>
+    </html>
+  );
 }

@@ -9,7 +9,7 @@ import { LessonMatrix } from './LessonMatrix';
 import { ModuleDashboardFooter } from './ModuleDashboardFooter';
 import { useNodeSelection } from '../../hooks/useNodeSelection';
 import { Loader2, AlertCircle } from 'lucide-react';
-import { logger } from '@/lib/logger';
+import { logger } from '@/lib/client-logger';
 
 /**
  * Error fallback for ModuleDashboard

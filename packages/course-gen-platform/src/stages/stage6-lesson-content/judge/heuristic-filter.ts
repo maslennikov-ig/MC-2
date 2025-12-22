@@ -386,6 +386,15 @@ export function checkFleschKincaid(
 }
 
 /**
+ * Section header synonyms - alternative terms that satisfy the requirement
+ * Supports multilingual content and common variations
+ */
+const SECTION_SYNONYMS: Record<string, string[]> = {
+  conclusion: ['summary', 'заключение', 'итог', 'wrap-up', 'wrap up', 'key takeaways', 'key takeaway', 'closing', 'резюме'],
+  introduction: ['введение', 'вступление', 'intro', 'overview', 'обзор'],
+};
+
+/**
  * Check that required section headers are present
  *
  * @param content - Content to check
@@ -407,10 +416,16 @@ export function checkSectionHeaders(
 
   for (const required of requiredSections) {
     const requiredLower = required.toLowerCase();
-    // Check if the required section is in headers OR mentioned in content
-    const found =
-      headers.some((header) => header.includes(requiredLower)) ||
-      contentLower.includes(requiredLower);
+
+    // Get synonyms for this section (if any)
+    const synonyms = SECTION_SYNONYMS[requiredLower] || [];
+    const allTerms = [requiredLower, ...synonyms];
+
+    // Check if any of the terms (required or synonyms) are found
+    const found = allTerms.some(term =>
+      headers.some((header) => header.includes(term)) ||
+      contentLower.includes(term)
+    );
 
     if (found) {
       foundSections.push(required);

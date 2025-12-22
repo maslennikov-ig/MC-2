@@ -2,7 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { getSupabaseClient } from '@/lib/supabase/browser-client';
-import { logger } from '@/lib/logger';
+import { logger } from '@/lib/client-logger';
 import type { Database } from '@/types/database.generated';
 import type {
   ModuleDashboardData,

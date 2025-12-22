@@ -1,13 +1,26 @@
 /**
- * Logger for Next.js web application
+ * Server-side logger for Next.js web application
  *
- * Server-side: Uses Pino with Axiom transport via wrapper
- * Client-side: Uses structured console logging with color styling
+ * Uses Pino with Axiom transport via @megacampus/shared-logger.
+ *
+ * IMPORTANT: This module is SERVER-ONLY. Do NOT import in 'use client' components.
+ * For client-side logging, use '@/lib/client-logger' instead.
  *
  * NOTE: This wrapper accepts arguments in (message, ...args) order
  * for backward compatibility with existing console-style logging,
  * but internally converts to Pino's (object, message) format.
+ *
+ * @example
+ * ```typescript
+ * // Server Component, API Route, or Server Action
+ * import { logger } from '@/lib/logger';
+ *
+ * logger.info('Processing request', { userId });
+ * logger.error('Failed to process', error);
+ * ```
  */
+import 'server-only';
+
 import { createModuleLogger } from '@megacampus/shared-logger';
 import type { Logger as PinoLogger } from '@megacampus/shared-logger';
 
@@ -15,8 +28,35 @@ import type { Logger as PinoLogger } from '@megacampus/shared-logger';
 const pinoLogger = createModuleLogger('web');
 
 /**
+ * Check if value is an Error or error-like object
+ * Handles cross-realm errors (e.g., Supabase AuthError) where instanceof fails
+ */
+function isErrorLike(arg: unknown): arg is Error & { code?: string; status?: number } {
+  if (arg instanceof Error) return true;
+  if (!arg || typeof arg !== 'object') return false;
+  const obj = arg as Record<string, unknown>;
+  // Error-like: has message and either name, stack, or code
+  return typeof obj.message === 'string' &&
+    (typeof obj.name === 'string' || typeof obj.stack === 'string' || 'code' in obj);
+}
+
+/**
+ * Extract error properties for logging
+ */
+function extractErrorProps(arg: Error & { code?: string; status?: number }): Record<string, unknown> {
+  return {
+    error: arg.message,
+    ...(arg.stack ? { stack: arg.stack } : {}),
+    ...(arg.name ? { name: arg.name } : {}),
+    ...(arg.code ? { code: arg.code } : {}),
+    ...('status' in arg ? { status: arg.status } : {}),
+    ...(arg.cause ? { cause: String(arg.cause) } : {}),
+  };
+}
+
+/**
  * Convert variadic arguments to a data object for Pino
- * Handles Error objects, plain objects, and primitives
+ * Handles Error objects, error-like objects (e.g., AuthError), plain objects, and primitives
  * Optimized to avoid unnecessary object copies
  */
 function argsToObject(args: unknown[]): Record<string, unknown> | undefined {
@@ -25,14 +65,9 @@ function argsToObject(args: unknown[]): Record<string, unknown> | undefined {
   if (args.length === 1) {
     const arg = args[0];
 
-    // Handle Error objects with cause chain
-    if (arg instanceof Error) {
-      return {
-        error: arg.message,
-        stack: arg.stack,
-        name: arg.name,
-        ...(arg.cause ? { cause: String(arg.cause) } : {}),
-      };
+    // Handle Error and error-like objects (including Supabase AuthError)
+    if (isErrorLike(arg)) {
+      return extractErrorProps(arg);
     }
 
     // Fast path: plain objects - return as-is, let Pino serialize
@@ -49,10 +84,11 @@ function argsToObject(args: unknown[]): Record<string, unknown> | undefined {
   const result: Record<string, unknown> = {};
   for (let i = 0; i < args.length; i++) {
     const arg = args[i];
-    if (arg instanceof Error) {
+    if (isErrorLike(arg)) {
       const suffix = i > 0 ? String(i) : '';
       result[`error${suffix}`] = arg.message;
-      result[`stack${suffix}`] = arg.stack;
+      if (arg.stack) result[`stack${suffix}`] = arg.stack;
+      if (arg.code) result[`code${suffix}`] = arg.code;
     } else if (arg && typeof arg === 'object' && !Array.isArray(arg)) {
       Object.assign(result, arg);
     } else if (arg !== undefined) {
@@ -153,77 +189,5 @@ export function createApiLogger(route: string): FlexibleLogger {
 export function createActionLogger(action: string): FlexibleLogger {
   return logger.child({ action });
 }
-
-/**
- * Detect if running in development mode
- * Works in both Node.js and browser environments
- */
-const isDevelopment = (() => {
-  if (typeof window !== 'undefined') {
-    // Browser: use build-time injected value
-    return (
-      process.env.NEXT_PUBLIC_NODE_ENV === 'development' ||
-      process.env.NODE_ENV === 'development'
-    );
-  }
-  return process.env.NODE_ENV === 'development';
-})();
-
-/**
- * Client-side logger for browser environments
- *
- * Uses console.* with color styling for better visibility.
- * Safe to use in both client and server components.
- */
-export const clientLogger = {
-  /**
-   * Log debug message (development only)
-   */
-  debug: (msg: string, ...args: unknown[]) => {
-    if (!isDevelopment) return;
-    console.debug(
-      '%c[DEBUG]%c ' + msg,
-      'color: #888; font-weight: bold',
-      'color: inherit',
-      ...args
-    );
-  },
-
-  /**
-   * Log info message
-   */
-  info: (msg: string, ...args: unknown[]) => {
-    console.info(
-      '%c[INFO]%c ' + msg,
-      'color: #2196F3; font-weight: bold',
-      'color: inherit',
-      ...args
-    );
-  },
-
-  /**
-   * Log warning message
-   */
-  warn: (msg: string, ...args: unknown[]) => {
-    console.warn(
-      '%c[WARN]%c ' + msg,
-      'color: #FF9800; font-weight: bold',
-      'color: inherit',
-      ...args
-    );
-  },
-
-  /**
-   * Log error message
-   */
-  error: (msg: string, ...args: unknown[]) => {
-    console.error(
-      '%c[ERROR]%c ' + msg,
-      'color: #F44336; font-weight: bold',
-      'color: inherit',
-      ...args
-    );
-  },
-};
 
 export default logger;

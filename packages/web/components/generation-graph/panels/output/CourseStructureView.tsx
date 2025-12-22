@@ -6,7 +6,7 @@ import { CourseStructure, Section, Lesson } from '@megacampus/shared-types';
 import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
-import { Clock, Users, BookOpen, GraduationCap, Eye } from 'lucide-react';
+import { Clock, Users, BookOpen, GraduationCap, Eye, FileText, Target, ClipboardCheck, CheckCircle2 } from 'lucide-react';
 import { SectionAccordion } from './SectionAccordion';
 import { LessonRow } from './LessonRow';
 import { AddElementChat } from './AddElementChat';
@@ -357,6 +357,21 @@ export const CourseStructureView = ({
         {/* Course Description */}
         <p className="text-sm text-slate-700 dark:text-slate-300">{data.course_description}</p>
 
+        {/* Course Overview (collapsible for long content) */}
+        {data.course_overview && (
+          <LabeledValue
+            label={t.overview}
+            value={
+              <div className="flex items-start gap-2">
+                <FileText className="h-4 w-4 text-slate-500 dark:text-slate-400 mt-0.5 shrink-0" />
+                <p className="text-sm text-slate-700 dark:text-slate-300 whitespace-pre-wrap">
+                  {data.course_overview}
+                </p>
+              </div>
+            }
+          />
+        )}
+
         {/* Metadata Grid */}
         <div className="grid grid-cols-2 gap-4 pt-2 border-t border-slate-100 dark:border-slate-700">
           <LabeledValue
@@ -416,6 +431,64 @@ export const CourseStructureView = ({
           label={t.tags}
           value={<ChipList items={data.course_tags} />}
         />
+
+        {/* Learning Outcomes */}
+        {data.learning_outcomes && data.learning_outcomes.length > 0 && (
+          <LabeledValue
+            label={t.learningOutcomes}
+            value={
+              <div className="space-y-2">
+                {data.learning_outcomes.map((outcome, idx) => {
+                  // Handle both object format {id, text, language} and string format
+                  const text = typeof outcome === 'string' ? outcome : outcome.text;
+                  const key = typeof outcome === 'string' ? idx : outcome.id || idx;
+                  return (
+                    <div key={key} className="flex items-start gap-2">
+                      <Target className="h-4 w-4 text-green-500 dark:text-green-400 mt-0.5 shrink-0" />
+                      <span className="text-sm text-slate-700 dark:text-slate-300">{text}</span>
+                    </div>
+                  );
+                })}
+              </div>
+            }
+          />
+        )}
+
+        {/* Assessment Strategy */}
+        {data.assessment_strategy && (
+          <LabeledValue
+            label={t.assessment}
+            value={
+              <div className="space-y-2">
+                <div className="flex flex-wrap gap-2">
+                  {data.assessment_strategy.quiz_per_section && (
+                    <Badge variant="outline" className="text-xs flex items-center gap-1">
+                      <CheckCircle2 className="h-3 w-3" />
+                      {t.quizPerSection}
+                    </Badge>
+                  )}
+                  {data.assessment_strategy.final_exam && (
+                    <Badge variant="outline" className="text-xs flex items-center gap-1">
+                      <ClipboardCheck className="h-3 w-3" />
+                      {t.finalExam}
+                    </Badge>
+                  )}
+                  {data.assessment_strategy.practical_projects > 0 && (
+                    <Badge variant="outline" className="text-xs flex items-center gap-1">
+                      <BookOpen className="h-3 w-3" />
+                      {data.assessment_strategy.practical_projects} {t.practicalProjects}
+                    </Badge>
+                  )}
+                </div>
+                {data.assessment_strategy.assessment_description && (
+                  <p className="text-sm text-slate-600 dark:text-slate-400">
+                    {data.assessment_strategy.assessment_description}
+                  </p>
+                )}
+              </div>
+            }
+          />
+        )}
       </div>
 
       {/* Sections with Lessons */}

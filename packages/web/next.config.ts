@@ -172,7 +172,9 @@ const withPWA = require('next-pwa')({
 const nextConfig: NextConfig = {
   output: 'standalone',
   reactStrictMode: true,
-  typedRoutes: true,
+  // typedRoutes disabled - incompatible with [locale] dynamic segment in next-intl
+  // Routes like "/" are not recognized with dynamic locale prefix
+  typedRoutes: false,
   productionBrowserSourceMaps: false,
   compiler: {
     // Remove console.log, console.debug, console.info in production

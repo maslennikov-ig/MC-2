@@ -48,9 +48,26 @@ import type {
 
 /**
  * Path to Last Known Good (LKG) configuration file
- * @default /app/data/lkg-config.json
+ *
+ * In production (Docker): /app/data/lkg-config.json
+ * In development: {projectRoot}/.tmp/data/lkg-config.json
+ *
+ * @default /app/data/lkg-config.json (production) or .tmp/data/lkg-config.json (development)
  */
-const LKG_PATH = process.env.LKG_CONFIG_PATH || '/app/data/lkg-config.json';
+const LKG_PATH = (() => {
+  // Explicit override takes precedence
+  if (process.env.LKG_CONFIG_PATH) {
+    return process.env.LKG_CONFIG_PATH;
+  }
+
+  // In development, use local .tmp directory (git-ignored)
+  if (process.env.NODE_ENV !== 'production') {
+    return path.join(__dirname, '../../../../.tmp/data/lkg-config.json');
+  }
+
+  // Production default (Docker)
+  return '/app/data/lkg-config.json';
+})();
 
 /**
  * Path to build-time seed artifact

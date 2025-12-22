@@ -8,21 +8,41 @@ interface TransportTarget {
   level?: string;
 }
 
+/**
+ * Returns transport configuration for Pino logger.
+ *
+ * NOTE: This module is Node.js-only. For browser logging, use
+ * '@/lib/client-logger' in the web package.
+ *
+ * IMPORTANT: In development with Next.js, we return undefined to use
+ * synchronous stdout logging (via pino.destination in index.ts).
+ * This prevents "the worker has exited" errors caused by worker threads
+ * being terminated before logs are written.
+ *
+ * In production, we use async transports for better performance.
+ */
 export function getTransportConfig(): TransportConfig {
   const isDevelopment = process.env.NODE_ENV !== 'production';
 
   if (isDevelopment) {
-    // Use sync mode in development to avoid worker thread issues with HMR
-    // This prevents "the worker has exited" errors when Next.js hot-reloads modules
-    return {
-      target: 'pino-pretty',
-      options: {
-        colorize: true,
-        translateTime: 'SYS:standard',
-        ignore: 'pid,hostname',
-        sync: true,
-      },
-    };
+    // CRITICAL: Do NOT use pino.transport() in development with Next.js!
+    //
+    // pino.transport() ALWAYS creates worker threads, even with sync: true.
+    // The sync option only affects buffering inside the transport, not the
+    // worker thread itself.
+    //
+    // When Next.js Server Components finish rendering, worker threads are
+    // terminated, causing "the worker has exited" errors.
+    //
+    // Solution: Return undefined and use pino.destination(1) with sync: true
+    // in the main logger config. This writes directly to stdout without
+    // worker threads.
+    //
+    // For pretty printing in development, pipe output through pino-pretty:
+    //   pnpm dev | pino-pretty
+    //
+    // Or use the PINO_PRETTY=1 environment variable (handled in index.ts)
+    return undefined;
   }
 
   const targets: TransportTarget[] = [];

@@ -1,7 +1,7 @@
 "use client"
 
 import React, { useState, useCallback, useEffect, useRef, useMemo } from "react"
-import { logger } from "@/lib/logger"
+import { logger } from "@/lib/client-logger"
 import { useRouter } from "next/navigation"
 import { createClient } from '@/lib/supabase/client'
 import type { Route } from "next"

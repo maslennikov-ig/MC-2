@@ -6,7 +6,7 @@ import { useTranslations } from 'next-intl'
 import { AlertTriangle, Home, RefreshCw, ChevronDown, ChevronUp } from 'lucide-react'
 import { ErrorStateBase } from './error-state-base'
 import { cn } from '@/lib/utils'
-import { logger } from '@/lib/logger'
+import { logger } from '@/lib/client-logger'
 
 export interface ErrorStateProps {
   error?: Error & { digest?: string }

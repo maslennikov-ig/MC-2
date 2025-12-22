@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button"
 import { Icons } from "@/components/common/icons"
 import { toast } from "sonner"
 import { useAuthModal } from "@/lib/hooks/use-auth-modal"
-import { logger } from "@/lib/logger"
+import { logger } from "@/lib/client-logger"
 
 export function SocialButtons() {
   const [isGoogleLoading, setIsGoogleLoading] = useState(false)

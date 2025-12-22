@@ -1,7 +1,7 @@
 import { create } from 'zustand';
 import { immer } from 'zustand/middleware/immer';
 import { enableMapSet } from 'immer';
-import { logger } from '@/lib/logger';
+import { logger } from '@/lib/client-logger';
 import { GenerationTrace } from '@/components/generation-monitoring/realtime-provider';
 import {
   NodeStatus,

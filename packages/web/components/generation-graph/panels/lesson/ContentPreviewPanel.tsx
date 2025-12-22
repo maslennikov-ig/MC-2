@@ -2,7 +2,7 @@
 
 import React, { useState } from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
-import { MarkdownRendererClient } from '@/components/markdown';
+import { MarkdownRendererFull } from '@/components/markdown';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -44,10 +44,114 @@ export function ContentPreviewPanel({
 }: ContentPreviewPanelProps) {
   const [activeTab, setActiveTab] = useState<'preview' | 'markdown' | 'metadata'>('preview');
 
+  // Helper: Render error banner (compact version for when content exists)
+  const renderErrorBanner = () => (
+    <div className="flex items-center gap-3 p-4 bg-red-50 dark:bg-red-900/20 border-b border-red-200 dark:border-red-800">
+      <AlertCircle className="w-5 h-5 text-red-500 flex-shrink-0" />
+      <div className="flex-1 min-w-0">
+        <p className="text-sm font-medium text-red-700 dark:text-red-400">
+          Ошибка генерации
+        </p>
+        {errorMessage && (
+          <p className="text-xs text-red-600 dark:text-red-400/80 truncate" title={errorMessage}>
+            {errorMessage}
+          </p>
+        )}
+      </div>
+    </div>
+  );
+
+  // Helper: Render tab-based content (Preview/Markdown/Metadata)
+  const renderContentTabs = () => {
+    if (activeTab === 'preview') {
+      return (
+        <ScrollArea className="h-full">
+          <div className="p-6">
+            {rawMarkdown ? (
+              <ErrorBoundary
+                fallback={
+                  <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded text-sm text-red-700 dark:text-red-400">
+                    Ошибка отображения контента
+                  </div>
+                }
+              >
+                <MarkdownRendererFull content={rawMarkdown} preset="preview" />
+              </ErrorBoundary>
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-8">
+                Контент урока недоступен
+              </p>
+            )}
+          </div>
+        </ScrollArea>
+      );
+    }
+
+    if (activeTab === 'markdown') {
+      return (
+        <ScrollArea className="h-full">
+          <div className="p-6 space-y-3">
+            <div className="flex items-center justify-between">
+              <p className="text-xs text-muted-foreground">
+                Исходный текст в формате Markdown
+              </p>
+              {rawMarkdown && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  onClick={() => {
+                    navigator.clipboard.writeText(rawMarkdown);
+                  }}
+                  className="text-xs h-7"
+                >
+                  Скопировать
+                </Button>
+              )}
+            </div>
+            <pre className="p-4 bg-slate-900 dark:bg-slate-950 text-slate-50 rounded-lg overflow-auto text-xs font-mono whitespace-pre-wrap">
+              {rawMarkdown || 'Markdown контент недоступен'}
+            </pre>
+          </div>
+        </ScrollArea>
+      );
+    }
+
+    if (activeTab === 'metadata') {
+      return (
+        <ScrollArea className="h-full">
+          <div className="p-6">
+            {metadata ? (
+              <JsonViewer data={metadata} title="Метаданные урока" defaultExpanded={false} />
+            ) : (
+              <p className="text-sm text-muted-foreground text-center py-8">
+                Метаданные недоступны
+              </p>
+            )}
+          </div>
+        </ScrollArea>
+      );
+    }
+
+    return null;
+  };
+
   // Render content based on status
   const renderContent = () => {
     // Error state
     if (status === 'error') {
+      // If we have content, show error banner + content tabs
+      if (rawMarkdown || content) {
+        return (
+          <div className="flex flex-col h-full">
+            {renderErrorBanner()}
+            <div className="flex-1 overflow-hidden">
+              {renderContentTabs()}
+            </div>
+          </div>
+        );
+      }
+
+      // No content - show full error screen
       return (
         <div className="flex flex-col items-center justify-center p-8 text-center space-y-4">
           <AlertCircle className="w-12 h-12 text-red-500" />
@@ -124,83 +228,16 @@ export function ContentPreviewPanel({
       );
     }
 
-    // Completed state - render actual content
+    // Completed state - render actual content using shared helper
     if (status === 'completed') {
-      if (activeTab === 'preview') {
-        return (
-          <ScrollArea className="h-full">
-            <div className="p-6">
-              {rawMarkdown ? (
-                <ErrorBoundary
-                  fallback={
-                    <div className="p-4 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded text-sm text-red-700 dark:text-red-400">
-                      Ошибка отображения контента
-                    </div>
-                  }
-                >
-                  <MarkdownRendererClient content={rawMarkdown} />
-                </ErrorBoundary>
-              ) : (
-                <p className="text-sm text-muted-foreground text-center py-8">
-                  Контент урока недоступен
-                </p>
-              )}
-            </div>
-          </ScrollArea>
-        );
-      }
-
-      if (activeTab === 'markdown') {
-        return (
-          <ScrollArea className="h-full">
-            <div className="p-6 space-y-3">
-              <div className="flex items-center justify-between">
-                <p className="text-xs text-muted-foreground">
-                  Исходный текст в формате Markdown
-                </p>
-                {rawMarkdown && (
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    onClick={() => {
-                      navigator.clipboard.writeText(rawMarkdown);
-                    }}
-                    className="text-xs h-7"
-                  >
-                    Скопировать
-                  </Button>
-                )}
-              </div>
-              <pre className="p-4 bg-slate-900 dark:bg-slate-950 text-slate-50 rounded-lg overflow-auto text-xs font-mono whitespace-pre-wrap">
-                {rawMarkdown || 'Markdown контент недоступен'}
-              </pre>
-            </div>
-          </ScrollArea>
-        );
-      }
-
-      if (activeTab === 'metadata') {
-        return (
-          <ScrollArea className="h-full">
-            <div className="p-6">
-              {metadata ? (
-                <JsonViewer data={metadata} title="Метаданные урока" defaultExpanded={false} />
-              ) : (
-                <p className="text-sm text-muted-foreground text-center py-8">
-                  Метаданные недоступны
-                </p>
-              )}
-            </div>
-          </ScrollArea>
-        );
-      }
+      return renderContentTabs();
     }
 
     return null;
   };
 
-  // Action bar visibility
-  const showActions = status === 'completed';
+  // Action bar visibility - show for completed OR error with content (allows regeneration)
+  const showActions = status === 'completed' || (status === 'error' && (rawMarkdown || content));
 
   return (
     <div className={cn('flex flex-col h-full bg-white dark:bg-slate-950', className)}>

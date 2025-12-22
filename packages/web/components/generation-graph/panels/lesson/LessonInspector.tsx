@@ -165,6 +165,36 @@ export function LessonInspector({
   const moduleNumberMatch = data.moduleId.match(/\d+/);
   const moduleNumber = moduleNumberMatch ? parseInt(moduleNumberMatch[0]) : 1;
 
+  /**
+   * Extract actual error message from pipeline data
+   * Priority: 1. Pipeline node with error status, 2. Error log entry, 3. Default message
+   */
+  const getErrorMessage = (): string | undefined => {
+    if (data.status !== 'error') return undefined;
+
+    // Check pipeline nodes for error (iterate in reverse to get the latest error)
+    const errorNode = [...data.pipelineNodes].reverse().find(n => n.status === 'error');
+    if (errorNode?.errorMessage) {
+      // Return node name + error message for context
+      const nodeLabel = STAGE6_NODE_LABELS[errorNode.node as keyof typeof STAGE6_NODE_LABELS]?.ru || errorNode.node;
+      return `${nodeLabel}: ${errorNode.errorMessage}`;
+    }
+
+    // Check logs for error entries (get the latest one)
+    const errorLogs = data.logs.filter(l => l.level === 'error');
+    if (errorLogs.length > 0) {
+      const latestError = errorLogs[errorLogs.length - 1];
+      // Try to get error details from the log
+      if (latestError.details?.error && typeof latestError.details.error === 'string') {
+        return latestError.details.error;
+      }
+      return latestError.message;
+    }
+
+    // Default fallback
+    return 'Ошибка генерации урока';
+  };
+
   // Left panel: Pipeline
   const leftPanel = (
     <PipelinePanel
@@ -212,7 +242,7 @@ export function LessonInspector({
         }}
         judgeResult={data.judgeResult}
         status={data.status}
-        errorMessage={data.status === 'error' ? 'Ошибка генерации урока' : undefined}
+        errorMessage={getErrorMessage()}
         onApprove={onApprove || (() => {})}
         onEdit={onEdit || (() => {})}
         onRegenerate={onRegenerate || (() => {})}

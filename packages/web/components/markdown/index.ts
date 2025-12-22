@@ -20,6 +20,8 @@
 // Main renderers
 export { MarkdownRenderer } from './MarkdownRenderer';
 export { MarkdownRendererClient } from './MarkdownRendererClient';
+export { MarkdownRendererFull } from './MarkdownRendererFull';
+export type { MarkdownRendererFullProps } from './MarkdownRendererFull';
 
 // Components
 export { CodeBlock, MermaidDiagram, Callout, Heading, H1, H2, H3, H4, H5, H6, ResponsiveTable, Link, SkipToContent } from './components';

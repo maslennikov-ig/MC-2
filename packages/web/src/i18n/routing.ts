@@ -1,7 +1,8 @@
 import { defineRouting } from 'next-intl/routing';
+import { locales, defaultLocale } from './config';
 
 export const routing = defineRouting({
-  locales: ['ru', 'en'],
-  defaultLocale: 'ru',
-  localePrefix: 'never' // No URL prefixes - locale from cookie/header only
+  locales,
+  defaultLocale,
+  localePrefix: 'as-needed', // No prefix for default locale (ru), prefix for others (/en)
 });

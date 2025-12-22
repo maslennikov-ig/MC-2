@@ -1,4 +1,13 @@
 {
+  "metadata": {
+    "title": "MegaCampusAI - Automated Course Generation",
+    "description": "Create professional educational courses with artificial intelligence. Automatic document analysis, material structuring, and interactive content generation.",
+    "keywords": "courses, education, AI, artificial intelligence, learning, online courses, course generation",
+    "openGraph": {
+      "title": "MegaCampusAI - Automated Course Generation",
+      "description": "Create professional educational courses with artificial intelligence"
+    }
+  },
   "loading": "Loading...",
   "error": "Error",
   "save": "Save",

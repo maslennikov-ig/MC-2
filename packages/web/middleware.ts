@@ -1,41 +1,34 @@
-import { type NextRequest } from 'next/server'
-import { updateSession } from '@/lib/supabase/middleware'
+import createMiddleware from 'next-intl/middleware';
+import { type NextRequest } from 'next/server';
+import { routing } from '@/src/i18n/routing';
+import { updateSession } from '@/lib/supabase/middleware';
 
-const SUPPORTED_LOCALES = ['ru', 'en'] as const;
-const DEFAULT_LOCALE = 'ru';
+const handleI18nRouting = createMiddleware(routing);
 
 export async function middleware(request: NextRequest) {
-  // Update Supabase session for all requests
-  const response = await updateSession(request)
+  // Step 1: Handle i18n routing (locale detection, cookies)
+  const response = handleI18nRouting(request);
 
-  // Handle i18n: read locale from NEXT_LOCALE cookie
-  const cookieLocale = request.cookies.get('NEXT_LOCALE')?.value;
-  const locale = SUPPORTED_LOCALES.includes(cookieLocale as typeof SUPPORTED_LOCALES[number])
-    ? cookieLocale
-    : DEFAULT_LOCALE;
+  // Step 2: Update Supabase session (auth cookies)
+  // Pass the i18n response to preserve its headers and cookies
+  const finalResponse = await updateSession(request, response);
 
-  // Set locale header for next-intl to read
-  response.headers.set('x-next-intl-locale', locale!);
+  // Step 3: Add request ID for logging correlation
+  const requestId = request.headers.get('x-request-id') || crypto.randomUUID();
+  finalResponse.headers.set('x-request-id', requestId);
 
-  // Add request ID for logging correlation
-  const requestId = request.headers.get('x-request-id') || crypto.randomUUID()
-  response.headers.set('x-request-id', requestId)
-
-  return response
+  return finalResponse;
 }
 
 export const config = {
   matcher: [
     /*
-     * Match all request paths except for the ones starting with:
-     * - _next/static (static files)
-     * - _next/image (image optimization files)
-     * - favicon.ico (favicon file)
-     * - api (API routes including webhooks and trpc)
-     * - trpc (tRPC endpoints)
-     * Feel free to modify this pattern to include more paths.
+     * Match all request paths except for:
+     * - /api, /trpc (API routes)
+     * - /_next, /_vercel (Next.js internals)
+     * - Files with extensions (e.g., favicon.ico, *.svg)
      */
-    '/((?!_next/static|_next/image|favicon.ico|api|trpc|.*\\.(?:svg|png|jpg|jpeg|gif|webp)$).*)',
+    '/((?!api|trpc|_next|_vercel|.*\\..*).*)',
   ],
   // Allow dynamic code evaluation for Supabase libraries that use Node.js APIs
   // This suppresses Edge Runtime warnings for code that won't actually run on Edge
@@ -49,4 +42,4 @@ export const config = {
     '**/node_modules/@supabase/functions-js/**',
     '**/node_modules/@supabase/gotrue-js/**',
   ],
-}
+};

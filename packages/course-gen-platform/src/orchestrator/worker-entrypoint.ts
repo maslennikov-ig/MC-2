@@ -45,16 +45,24 @@ const MEMORY_THRESHOLDS = {
 const MEMORY_CHECK_INTERVAL_MS = 2000;
 
 /**
+ * Debug log throttle: log every Nth check when memory is normal
+ * With 2s interval: 15 checks = 30 seconds between debug logs
+ */
+const DEBUG_LOG_EVERY_N_CHECKS = 15;
+
+/**
  * Peak memory tracking
  */
 let peakHeapUsed = 0;
 let memoryMonitorInterval: NodeJS.Timeout | null = null;
+let memoryCheckCount = 0;
 
 /**
  * Start memory monitoring with threshold-based alerts
  */
 function startMemoryMonitoring(): void {
   memoryMonitorInterval = setInterval(() => {
+    memoryCheckCount++;
     const mem = process.memoryUsage();
     const heapMB = Math.round(mem.heapUsed / 1024 / 1024);
     const rssMB = Math.round(mem.rss / 1024 / 1024);
@@ -65,7 +73,7 @@ function startMemoryMonitoring(): void {
     }
     const peakMB = Math.round(peakHeapUsed / 1024 / 1024);
 
-    // Threshold-based logging
+    // Threshold-based logging - always log warnings/errors immediately
     if (heapMB >= MEMORY_THRESHOLDS.emergency) {
       logger.error({ heapMB, rssMB, peakMB, threshold: 'emergency' },
         'EMERGENCY: Memory critical, forcing GC');
@@ -79,8 +87,8 @@ function startMemoryMonitoring(): void {
     } else if (heapMB >= MEMORY_THRESHOLDS.warning) {
       logger.warn({ heapMB, rssMB, peakMB, threshold: 'warning' },
         'WARNING: Elevated memory usage');
-    } else {
-      // Only log debug every 5th check (10 seconds) to reduce log volume
+    } else if (memoryCheckCount % DEBUG_LOG_EVERY_N_CHECKS === 0) {
+      // Only log debug every Nth check (30 seconds) to reduce log volume
       logger.debug({ heapMB, rssMB, peakMB }, 'Memory status');
     }
   }, MEMORY_CHECK_INTERVAL_MS);

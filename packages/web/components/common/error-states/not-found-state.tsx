@@ -1,9 +1,7 @@
 'use client'
 
 import React from 'react'
-import Link from 'next/link'
-import type { Route } from 'next'
-import { useRouter } from 'next/navigation'
+import { Link, useRouter } from '@/src/i18n/navigation'
 import { useTranslations } from 'next-intl'
 import { FileQuestion, Home, ArrowLeft } from 'lucide-react'
 import { ErrorStateBase } from './error-state-base'
@@ -30,7 +28,7 @@ export function NotFoundState({
   const actions = (
     <>
       <Link
-        href={homeUrl as Route}
+        href={homeUrl}
         aria-label={t('goHome')}
         className={cn(
           'inline-flex items-center gap-2 px-6 py-3',

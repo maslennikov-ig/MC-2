@@ -10,7 +10,7 @@ import {
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import StageResultsPreview from '@/components/generation/StageResultsPreview';
 import { PrioritizationView } from '@/components/generation-graph/panels/output/PrioritizationView';
-import ActivityLog from '@/app/courses/generating/[slug]/ActivityLog';
+import ActivityLog from '@/app/[locale]/courses/generating/[slug]/ActivityLog';
 import { ActivityEntry } from '@/types/course-generation';
 import { STAGE_CONFIG } from './utils';
 

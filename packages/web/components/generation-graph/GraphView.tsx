@@ -416,9 +416,12 @@ function GraphViewInner({ courseId, courseTitle, hasDocuments = true, failedAtSt
 
         // CRITICAL: Save positions BEFORE setNodes to prevent race condition
         // This ensures next graph rebuild has correct positions
+        // Save ALL node positions including lessons (with parentId)
+        // Lessons need their positions saved because graph rebuild in useGraphData
+        // uses nodePositionsRef to restore positions, and without saved positions
+        // lessons would get {x: 0, y: 0} on every rebuild
         layoutedNodes.forEach(n => {
-          if (n.position && !n.parentId) {
-            // Only save top-level node positions (lessons are relative to parent)
+          if (n.position) {
             nodePositionsRef.current.set(n.id, n.position);
           }
         });

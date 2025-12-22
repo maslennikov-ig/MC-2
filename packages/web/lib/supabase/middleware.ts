@@ -2,9 +2,14 @@ import { createServerClient } from '@supabase/ssr'
 import { NextResponse, type NextRequest } from 'next/server'
 import { Database } from '@/types/database.generated'
 
-export async function updateSession(request: NextRequest) {
-  // Create initial response
-  let supabaseResponse = NextResponse.next({
+export async function updateSession(
+  request: NextRequest,
+  response?: NextResponse  // Optional: use provided response (e.g., from next-intl)
+) {
+  // Use provided response or create new one
+  // CRITICAL: When response is provided, we reuse it to preserve headers/cookies
+  // set by other middleware (e.g., next-intl's createMiddleware)
+  let supabaseResponse = response ?? NextResponse.next({
     request,
   })
 
@@ -19,12 +24,19 @@ export async function updateSession(request: NextRequest) {
         setAll(cookiesToSet) {
           // CRITICAL: Update request cookies first
           cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value))
-          
-          // CRITICAL: Create new response with updated request
-          supabaseResponse = NextResponse.next({
-            request,
-          })
-          
+
+          // CRITICAL: When response was provided, preserve its headers
+          // Otherwise, create new response with updated request
+          if (response) {
+            // Response was provided (e.g., from next-intl) - just update cookies
+            // Headers are already preserved on the original response object
+          } else {
+            // No response provided - create new one with updated request
+            supabaseResponse = NextResponse.next({
+              request,
+            })
+          }
+
           // CRITICAL: Set cookies on response
           cookiesToSet.forEach(({ name, value, options }) =>
             supabaseResponse.cookies.set(name, value, options)

@@ -933,36 +933,68 @@
 /* ===== SONNER TOAST STYLES ===== */
 [data-sonner-toaster] {
   z-index: 9999 !important;
+  --normal-bg: hsl(var(--background));
+  --normal-border: hsl(var(--border));
+  --normal-text: hsl(var(--foreground));
 }
 
 [data-sonner-toast] {
-  animation: toast-slide-in 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-  transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  font-family: var(--font-inter), system-ui, sans-serif;
+  border-radius: 12px;
+  padding: 16px;
+  box-shadow:
+    0 4px 6px -1px rgb(0 0 0 / 0.1),
+    0 2px 4px -2px rgb(0 0 0 / 0.1),
+    0 0 0 1px rgb(0 0 0 / 0.05);
 }
 
-[data-sonner-toast][data-removed="true"] {
-  animation: toast-slide-out 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+.dark [data-sonner-toast] {
+  box-shadow:
+    0 4px 6px -1px rgb(0 0 0 / 0.3),
+    0 2px 4px -2px rgb(0 0 0 / 0.2),
+    0 0 0 1px rgb(255 255 255 / 0.05);
 }
 
+/* Close button - top right, hidden until hover */
 [data-sonner-toast] [data-close-button] {
-  opacity: 0.6;
-  transition: opacity 0.2s;
-  background: rgba(255, 255, 255, 0.1);
-  border-radius: 6px;
-  padding: 4px;
   position: absolute !important;
   right: 8px !important;
   top: 8px !important;
+  left: auto !important;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  background: transparent;
+  border: none;
+  padding: 4px;
+  border-radius: 6px;
+  color: currentColor;
+}
+
+[data-sonner-toast]:hover [data-close-button] {
+  opacity: 0.6;
 }
 
 [data-sonner-toast] [data-close-button]:hover {
   opacity: 1;
-  background: rgba(255, 255, 255, 0.2);
+  background: rgb(0 0 0 / 0.1);
+}
+
+.dark [data-sonner-toast] [data-close-button]:hover {
+  background: rgb(255 255 255 / 0.1);
+}
+
+/* Smooth animations */
+[data-sonner-toast][data-mounted="true"] {
+  animation: toast-slide-in 0.3s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+[data-sonner-toast][data-removed="true"] {
+  animation: toast-slide-out 0.2s cubic-bezier(0.16, 1, 0.3, 1) forwards;
 }
 
 @keyframes toast-slide-in {
   from {
-    transform: translateX(100%);
+    transform: translateX(calc(100% + 24px));
     opacity: 0;
   }
   to {
@@ -977,9 +1009,14 @@
     opacity: 1;
   }
   to {
-    transform: translateX(100%);
+    transform: translateX(calc(100% + 24px));
     opacity: 0;
   }
+}
+
+/* Toast type icons */
+[data-sonner-toast] [data-icon] {
+  margin-right: 12px;
 }
 
 /* ===== REACT FLOW DARK MODE OVERRIDES ===== */

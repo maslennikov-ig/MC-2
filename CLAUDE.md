@@ -198,12 +198,8 @@ Production server SSH available. See `.claude/local.md` for IP and details (giti
 - Immer for nested state updates (packages/web) - use `produce()` instead of spread operators
 
 **Internationalization (i18n)**:
-- Library: `next-intl` (v4.5.8)
-- Locales: `ru` (default), `en`
-- Translations: `packages/web/messages/{locale}/{namespace}.json`
-- Namespaces: defined in `src/i18n/request.ts` → `NAMESPACES` array
-- To add namespace: create JSON files + add to `NAMESPACES` array
-- Hooks: `useTranslations('namespace')` (client), `getTranslations('namespace')` (server)
+- Config: `packages/web/src/i18n/config.ts` (Single Source of Truth)
+- Guide: `.claude/docs/i18n-guide.md` (full reference for translations)
 
 ## Recent Changes
 - 013-n8n-graph-view: Added Immer for state management

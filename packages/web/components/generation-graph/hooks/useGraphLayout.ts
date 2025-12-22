@@ -416,7 +416,14 @@ export function useGraphLayout() {
         return;
       }
 
-      moduleLessons.forEach((lessonNode, lessonIndex) => {
+      // Sort lessons by lessonOrder before positioning
+      const sortedLessons = [...moduleLessons].sort((a, b) => {
+        const aOrder = (a.data as Record<string, unknown>)?.lessonOrder as number | undefined;
+        const bOrder = (b.data as Record<string, unknown>)?.lessonOrder as number | undefined;
+        return (aOrder ?? 0) - (bOrder ?? 0);
+      });
+
+      sortedLessons.forEach((lessonNode, lessonIndex) => {
         // Position lesson relative to parent module (0,0)
         // y = HeaderHeight + (index × (LessonHeight + Gap))
         const lessonY = LAYOUT_CONFIG.MODULE_HEADER_HEIGHT +

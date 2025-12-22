@@ -7,16 +7,20 @@
  * @see https://next-intl.dev/docs/workflows/typescript
  */
 
+import type { Locale } from '@/src/i18n/config';
+
 // Import Russian messages as the source of truth for types (namespace-based)
 type CommonMessages = typeof import('../messages/ru/common.json');
 type AdminMessages = typeof import('../messages/ru/admin.json');
 type GenerationMessages = typeof import('../messages/ru/generation.json');
+type AuthMessages = typeof import('../messages/ru/auth.json');
 
 // Combined messages type matching the structure returned by request.ts
 type Messages = {
   common: CommonMessages;
   admin: AdminMessages;
   generation: GenerationMessages;
+  auth: AuthMessages;
 };
 
 declare global {
@@ -34,27 +38,16 @@ declare module 'next-intl' {
      * Example usage:
      * ```tsx
      * const t = useTranslations('generation');
-     * t('stages.stage_1'); // ✅ Type-safe
-     * t('invalid'); // ❌ TypeScript error
-     *
-     * const tCommon = useTranslations('common');
-     * tCommon('loading'); // ✅ Type-safe
+     * t('stages.stage_1'); // Type-safe
+     * t('invalid'); // TypeScript error
      * ```
      */
     Messages: Messages;
 
     /**
-     * Strictly typed locale values
-     *
-     * Ensures only valid locales ('ru' | 'en') can be used throughout the app.
-     * Example usage:
-     * ```tsx
-     * const locale = useLocale(); // Type: 'ru' | 'en'
-     * <Link href="/" locale="en" /> // ✅ Type-safe
-     * <Link href="/" locale="fr" /> // ❌ TypeScript error
-     * ```
+     * Strictly typed locale values from centralized config
      */
-    Locale: 'ru' | 'en';
+    Locale: Locale;
   }
 }
 

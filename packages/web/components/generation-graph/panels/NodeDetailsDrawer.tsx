@@ -387,62 +387,70 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
         )}
         data-testid="node-details-drawer"
       >
-        <SheetHeader className="pr-12">
-          <div className="flex items-center justify-between">
-            <SheetTitle className="flex items-center gap-2" data-testid="drawer-title">
-              {data?.stageNumber
-                ? t(`stages.stage_${data.stageNumber}`)
-                : data?.label
-                  ? String(data.label)
-                  : `Details: ${selectedNodeId}`}
-            </SheetTitle>
-            <div className="flex items-center gap-1">
-              {/* Restart Button - only for stages 2-6 with error/completed/awaiting */}
-              {canRestart && courseSlug && (
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setShowRestartDialog(true)}
-                        className="h-8 w-8 text-slate-500 hover:text-orange-600 hover:bg-orange-50"
-                        data-testid="drawer-restart-button"
-                      >
-                        <RotateCcw className="h-4 w-4" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      <p>{t('restart.buttonTooltip')}</p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              )}
-              {/* Only show expand button for non-lesson nodes */}
-              {!isStage6Lesson && (
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  onClick={toggleExpand}
-                  className="h-8 w-8 shrink-0"
-                  title={isExpanded ? t('drawer.collapse') : t('drawer.expand')}
-                  data-testid="drawer-expand-button"
-                >
-                  {isExpanded ? (
-                    <Minimize2 className="h-4 w-4" />
-                  ) : (
-                    <Maximize2 className="h-4 w-4" />
-                  )}
-                </Button>
-              )}
+        {/* Hide SheetHeader for lesson nodes - LessonInspector has its own header via LessonInspectorLayout */}
+        {!isStage6Lesson && (
+          <SheetHeader className="pr-12">
+            <div className="flex items-center justify-between">
+              <SheetTitle className="flex items-center gap-2" data-testid="drawer-title">
+                {data?.stageNumber
+                  ? t(`stages.stage_${data.stageNumber}`)
+                  : data?.label
+                    ? String(data.label)
+                    : `Details: ${selectedNodeId}`}
+              </SheetTitle>
+              <div className="flex items-center gap-1">
+                {/* Restart Button - only for stages 2-6 with error/completed/awaiting */}
+                {canRestart && courseSlug && (
+                  <TooltipProvider>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => setShowRestartDialog(true)}
+                          className="h-8 w-8 text-slate-500 hover:text-orange-600 hover:bg-orange-50"
+                          data-testid="drawer-restart-button"
+                        >
+                          <RotateCcw className="h-4 w-4" />
+                        </Button>
+                      </TooltipTrigger>
+                      <TooltipContent>
+                        <p>{t('restart.buttonTooltip')}</p>
+                      </TooltipContent>
+                    </Tooltip>
+                  </TooltipProvider>
+                )}
+                {/* Only show expand button for non-lesson nodes */}
+                {!isStage6Lesson && (
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    onClick={toggleExpand}
+                    className="h-8 w-8 shrink-0"
+                    title={isExpanded ? t('drawer.collapse') : t('drawer.expand')}
+                    data-testid="drawer-expand-button"
+                  >
+                    {isExpanded ? (
+                      <Minimize2 className="h-4 w-4" />
+                    ) : (
+                      <Maximize2 className="h-4 w-4" />
+                    )}
+                  </Button>
+                )}
+              </div>
             </div>
-          </div>
-          <SheetDescription>
-            Inspect stage data and execution metrics.
-          </SheetDescription>
-        </SheetHeader>
-        
-        <div className="mt-6 h-[calc(100vh-140px)]">
+            <SheetDescription>
+              Inspect stage data and execution metrics.
+            </SheetDescription>
+          </SheetHeader>
+        )}
+
+        {/* Adjust height and margin based on node type:
+            - Lesson nodes: full height (no header above), no top margin
+            - Other nodes: account for header height (140px), add top margin */}
+        <div className={cn(
+          isStage6Lesson ? 'h-full' : 'mt-6 h-[calc(100vh-140px)]'
+        )}>
           {/* Stage 6 "Glass Factory" UI: Module Dashboard */}
           {isStage6Module ? (
             <ModuleDashboard

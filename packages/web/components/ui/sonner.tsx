@@ -5,27 +5,35 @@ import { Toaster as Sonner } from "sonner"
 
 type ToasterProps = React.ComponentProps<typeof Sonner>
 
-const Toaster = ({ ...props }: ToasterProps) => {
-  const { theme = "system" } = useTheme()
+export function Toaster({ ...props }: ToasterProps) {
+  const { resolvedTheme } = useTheme()
 
   return (
     <Sonner
-      theme={theme as ToasterProps["theme"]}
-      className="toaster group"
+      theme={resolvedTheme === 'dark' ? 'dark' : 'light'}
+      position="bottom-right"
+      expand={false}
+      richColors
+      closeButton
+      visibleToasts={4}
+      gap={12}
+      offset="24px"
+      duration={4000}
       toastOptions={{
         classNames: {
-          toast:
-            "group toast group-[.toaster]:bg-white dark:group-[.toaster]:bg-gray-900 group-[.toaster]:text-gray-900 dark:group-[.toaster]:text-gray-100 group-[.toaster]:border-gray-200 dark:group-[.toaster]:border-gray-800 group-[.toaster]:shadow-lg",
-          description: "group-[.toast]:text-muted-foreground",
-          actionButton:
-            "group-[.toast]:bg-primary group-[.toast]:text-primary-foreground",
-          cancelButton:
-            "group-[.toast]:bg-muted group-[.toast]:text-muted-foreground",
+          toast: 'group toast font-sans',
+          title: 'text-sm font-medium',
+          description: 'text-sm opacity-90',
+          actionButton: 'bg-primary text-primary-foreground',
+          cancelButton: 'bg-muted text-muted-foreground',
+          closeButton: 'opacity-0 group-hover:opacity-100 transition-opacity',
+          success: 'border-green-500/20 bg-green-50 dark:bg-green-950/50 text-green-900 dark:text-green-100',
+          error: 'border-red-500/20 bg-red-50 dark:bg-red-950/50 text-red-900 dark:text-red-100',
+          warning: 'border-yellow-500/20 bg-yellow-50 dark:bg-yellow-950/50 text-yellow-900 dark:text-yellow-100',
+          info: 'border-blue-500/20 bg-blue-50 dark:bg-blue-950/50 text-blue-900 dark:text-blue-100',
         },
       }}
       {...props}
     />
   )
 }
-
-export { Toaster }
