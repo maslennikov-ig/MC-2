@@ -30,6 +30,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.26.14] - 2025-12-22
+
+### Other
+- update documentation (b94d5b7)
+
 ## [0.26.13] - 2025-12-21
 
 ### Other
