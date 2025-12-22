@@ -174,6 +174,13 @@ const nextConfig: NextConfig = {
   reactStrictMode: true,
   typedRoutes: true,
   productionBrowserSourceMaps: false,
+  compiler: {
+    // Remove console.log, console.debug, console.info in production
+    // Keep console.error and console.warn for debugging production issues
+    removeConsole: {
+      exclude: ['error', 'warn'],
+    },
+  },
   eslint: {
     dirs: ['app', 'components', 'lib', 'hooks', 'types'],
     ignoreDuringBuilds: true, // Speed up builds - lint separately in CI

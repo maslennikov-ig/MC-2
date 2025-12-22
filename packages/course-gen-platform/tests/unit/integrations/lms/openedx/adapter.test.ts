@@ -29,10 +29,10 @@ vi.mock('../../../../../src/integrations/lms/logger', () => ({
 
 // Mock OLX Generator (not needed for these tests)
 vi.mock('../../../../../src/integrations/lms/openedx/olx/generator', () => {
-  const MockOLXGenerator = vi.fn(function () {
-    // @ts-ignore
+  const MockOLXGenerator = vi.fn(function (this: any) {
+    // @ts-expect-error - Mocking class methods without full type definition
     this.generate = vi.fn();
-    // @ts-ignore
+    // @ts-expect-error - Mocking class methods without full type definition
     this.reset = vi.fn();
   });
   return { OLXGenerator: MockOLXGenerator };

@@ -38,7 +38,7 @@ export const GraphControls = memo(function GraphControls({ isDark }: GraphContro
     : 'p-2 hover:bg-slate-100 text-slate-600 rounded transition-colors disabled:opacity-50';
 
   return (
-    <div className={`absolute bottom-4 left-4 flex flex-col gap-1 shadow-md p-1 rounded-lg z-10 border ${
+    <div className={`nopan absolute bottom-4 left-4 flex flex-col gap-1 shadow-md p-1 rounded-lg z-10 border ${
       isDark
         ? 'bg-slate-800 border-slate-700'
         : 'bg-white border-slate-200'

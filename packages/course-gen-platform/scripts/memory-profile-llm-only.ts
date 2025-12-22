@@ -105,7 +105,7 @@ async function main() {
   logMemory('After GC');
 
   // Clear references
-  // @ts-ignore
+  // @ts-expect-error - Intentionally setting to null for memory cleanup profiling
   markdown = null;
   forceGC();
   logMemory('FINAL');
