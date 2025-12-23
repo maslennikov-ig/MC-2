@@ -22,6 +22,7 @@ import EndNode from './nodes/EndNode';
 import DocumentNode from './nodes/DocumentNode';
 import LessonNode from './nodes/LessonNode';
 import ModuleGroup from './nodes/ModuleGroup';
+import Stage2Group from './nodes/Stage2Group';
 import AnimatedEdge from './edges/AnimatedEdge';
 import DataFlowEdge from './edges/DataFlowEdge';
 import { StaticGraphProvider } from './contexts/StaticGraphContext';
@@ -73,6 +74,7 @@ const nodeTypes: NodeTypes = {
   document: DocumentNode,
   lesson: LessonNode,
   module: ModuleGroup,
+  stage2group: Stage2Group,
 };
 
 const edgeTypes: EdgeTypes = {
@@ -392,10 +394,10 @@ function GraphViewInner({ courseId, courseTitle, hasDocuments = true, failedAtSt
     initializeDocuments(files);
   }, [filenameMap, isCatalogLoading, hasDocuments, initializeDocuments]);
 
-  // Track module collapse states for relayout trigger
-  const moduleCollapseSignature = useMemo(() =>
+  // Track module and stage2group collapse states for relayout trigger
+  const collapseSignature = useMemo(() =>
     nodes
-      .filter(n => n.type === 'module')
+      .filter(n => n.type === 'module' || n.type === 'stage2group')
       .map(n => `${n.id}:${n.data?.isCollapsed}`)
       .join(','),
     [nodes]
@@ -405,9 +407,9 @@ function GraphViewInner({ courseId, courseTitle, hasDocuments = true, failedAtSt
   // This prevents the effect from running on every node status update
   const layoutTrigger = useMemo(() => ({
     nodeCount: nodes.length,
-    moduleIds: nodes.filter(n => n.type === 'module').map(n => n.id).join(','),
-    collapseSignature: moduleCollapseSignature
-  }), [nodes, moduleCollapseSignature]);
+    containerIds: nodes.filter(n => n.type === 'module' || n.type === 'stage2group').map(n => n.id).join(','),
+    collapseSignature
+  }), [nodes, collapseSignature]);
 
   // Use ref to track previous trigger for comparison
   const prevLayoutTrigger = useRef(layoutTrigger);
@@ -464,11 +466,11 @@ function GraphViewInner({ courseId, courseTitle, hasDocuments = true, failedAtSt
     { leading: true, trailing: true }
   );
 
-  // Auto-layout when structure changes (node count, module IDs, or collapse state)
+  // Auto-layout when structure changes (node count, container IDs, or collapse state)
   useEffect(() => {
       const structureChanged =
           layoutTrigger.nodeCount !== prevLayoutTrigger.current.nodeCount ||
-          layoutTrigger.moduleIds !== prevLayoutTrigger.current.moduleIds;
+          layoutTrigger.containerIds !== prevLayoutTrigger.current.containerIds;
       const collapseChanged =
           layoutTrigger.collapseSignature !== prevLayoutTrigger.current.collapseSignature;
       const isInitialLoad = !initialFitDone.current;

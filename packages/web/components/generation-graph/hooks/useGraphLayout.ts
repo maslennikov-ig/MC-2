@@ -11,14 +11,59 @@ const DEFAULT_NODE_HEIGHT = 120;
 const FALLBACK_HORIZONTAL_SPACING = 350;
 const FALLBACK_VERTICAL_SPACING = 150;
 
-// Two-Phase Layout Configuration for Stage 6 Modules
+/**
+ * Two-Phase Layout Configuration for Stage 6 Modules.
+ * Used by ELK layout algorithm and node dimension calculations.
+ *
+ * @remarks
+ * Phase 1: Calculate module heights based on lesson count
+ * Phase 2: ELK positions modules, then lessons are positioned within
+ *
+ * These values MUST match graph-builders.ts LAYOUT_CONFIG for consistent rendering.
+ * CSS styles in ModuleGroup.tsx should use min-h matching these values.
+ */
 const LAYOUT_CONFIG = {
+  /** Width of module container node */
   MODULE_WIDTH: 300,
-  MODULE_COLLAPSED_HEIGHT: 90, // Matches min-h-[90px] in ModuleGroup collapsed state (single-line title)
+  /** Height when collapsed - matches min-h-[90px] in ModuleGroup CSS */
+  MODULE_COLLAPSED_HEIGHT: 90,
+  /** Height of header area (title + expand button) */
   MODULE_HEADER_HEIGHT: 60,
+  /** Height of each lesson node inside module */
   LESSON_HEIGHT: 50,
+  /** Vertical gap between lesson nodes */
   LESSON_GAP: 10,
+  /** Internal padding inside module container */
   MODULE_PADDING: 15,
+} as const;
+
+/**
+ * Layout Configuration for Stage 2 Document Processing Container.
+ * Used by ELK layout algorithm and node dimension calculations.
+ *
+ * @remarks
+ * Stage 2 uses different dimensions than Stage 6 modules:
+ * - CONTAINER_WIDTH: 320 (vs 300) - wider for long filenames
+ * - CONTAINER_COLLAPSED_HEIGHT: 100 (vs 90) - taller for document count/progress
+ * - DOCUMENT_HEIGHT: 55 (vs 50) - slightly taller for status indicators
+ * - DOCUMENT_GAP: 8 (vs 10) - tighter spacing for compact list
+ * - CONTAINER_PADDING: 12 (vs 15) - less padding for more document space
+ *
+ * These values MUST match graph-builders.ts STAGE2_LAYOUT_CONFIG for consistent rendering.
+ */
+const STAGE2_LAYOUT_CONFIG = {
+  /** Width of stage2group container node */
+  CONTAINER_WIDTH: 320,
+  /** Height when collapsed - shows summary with document count */
+  CONTAINER_COLLAPSED_HEIGHT: 100,
+  /** Height of header area (title + progress bar) */
+  CONTAINER_HEADER_HEIGHT: 70,
+  /** Height of each document node inside container */
+  DOCUMENT_HEIGHT: 55,
+  /** Vertical gap between document nodes */
+  DOCUMENT_GAP: 8,
+  /** Internal padding inside container */
+  CONTAINER_PADDING: 12,
 } as const;
 
 /**
@@ -269,6 +314,29 @@ export function useGraphLayout() {
           };
         }
       }
+
+      // Handle Stage 2 group container dimensions
+      if (node.type === 'stage2group' && node.data) {
+        const isCollapsed = node.data.isCollapsed ?? false;
+        const totalDocuments = (node.data.totalDocuments as number) || 0;
+
+        if (isCollapsed) {
+          return {
+            width: STAGE2_LAYOUT_CONFIG.CONTAINER_WIDTH,
+            height: STAGE2_LAYOUT_CONFIG.CONTAINER_COLLAPSED_HEIGHT,
+          };
+        } else {
+          // Expanded: Header + (Documents × RowHeight) + Padding
+          const height = STAGE2_LAYOUT_CONFIG.CONTAINER_HEADER_HEIGHT +
+                        (totalDocuments * (STAGE2_LAYOUT_CONFIG.DOCUMENT_HEIGHT + STAGE2_LAYOUT_CONFIG.DOCUMENT_GAP)) +
+                        STAGE2_LAYOUT_CONFIG.CONTAINER_PADDING;
+          return {
+            width: STAGE2_LAYOUT_CONFIG.CONTAINER_WIDTH,
+            height: Math.max(height, 180), // Minimum height for visual balance
+          };
+        }
+      }
+
       return getNodeDimensions(node);
     };
 

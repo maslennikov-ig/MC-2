@@ -173,6 +173,7 @@ export const generationMonitoringRouter = router({
           ragChunks: [],
           ragContextId: null,
           language,
+          locale: 'ru', // TODO: Get from user session/profile
         });
 
         return { success: true, message: 'Lesson generation queued' };
@@ -258,6 +259,7 @@ export const generationMonitoringRouter = router({
             ragChunks: [],
             ragContextId: null,
             language,
+            locale: 'ru', // TODO: Get from user session/profile
           });
         }
 

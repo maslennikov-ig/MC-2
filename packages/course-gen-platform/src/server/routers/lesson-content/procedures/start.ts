@@ -89,6 +89,7 @@ export const startStage6 = protectedProcedure
             ragChunks: [], // Deprecated: RAG chunks are now fetched by handler via retrieveLessonContext()
             ragContextId: null,
             language: course.language, // Pass course language for content generation
+            locale: 'ru', // TODO: Get from user session/profile
           };
 
           // Deterministic job ID for deduplication

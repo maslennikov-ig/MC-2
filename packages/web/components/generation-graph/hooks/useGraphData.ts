@@ -36,6 +36,8 @@ export function useGraphData(options: UseGraphDataOptions = {}) {
   const nodePositionsRef = useRef<Map<string, { x: number; y: number }>>(new Map());
   // Ref to store module collapsed states for preservation during trace updates
   const moduleCollapsedRef = useRef<Map<string, boolean>>(new Map());
+  // Ref to store stage2group collapsed state for preservation during trace updates
+  const stage2CollapsedRef = useRef<boolean | undefined>(undefined);
   const getFilenameRef = useRef(getFilename);
 
   // Update positions ref and collapsed states when nodes change
@@ -47,6 +49,10 @@ export function useGraphData(options: UseGraphDataOptions = {}) {
       // Preserve module collapsed state
       if (n.type === 'module' && n.data?.isCollapsed !== undefined) {
         moduleCollapsedRef.current.set(n.id, n.data.isCollapsed as boolean);
+      }
+      // Preserve stage2group collapsed state
+      if (n.type === 'stage2group' && n.data?.isCollapsed !== undefined) {
+        stage2CollapsedRef.current = n.data.isCollapsed as boolean;
       }
     });
   }, [nodes]);
@@ -280,7 +286,8 @@ export function useGraphData(options: UseGraphDataOptions = {}) {
       getAttempts: (id) => attemptsMap.get(id) || [],
       getPhases: (id) => phasesMap.get(id) || [],
       getExistingPos: (id) => nodePositionsRef.current.get(id) || { x: 0, y: 0 },
-      getModuleCollapsed: (id) => moduleCollapsedRef.current.get(id)
+      getModuleCollapsed: (id) => moduleCollapsedRef.current.get(id),
+      getStage2Collapsed: () => stage2CollapsedRef.current
     });
 
     // Update State with Shallow Compare
@@ -294,7 +301,9 @@ export function useGraphData(options: UseGraphDataOptions = {}) {
                    currentNode.parentId !== newNode.parentId ||
                    currentNode.data?.status !== newNode.data?.status ||
                    currentNode.data?.currentStep !== newNode.data?.currentStep ||
-                   currentNode.data?.label !== newNode.data?.label;
+                   currentNode.data?.label !== newNode.data?.label ||
+                   // Compare isCollapsed for container nodes (module, stage2group)
+                   currentNode.data?.isCollapsed !== newNode.data?.isCollapsed;
         });
         return hasChanges ? newNodes : currentNodes;
     });

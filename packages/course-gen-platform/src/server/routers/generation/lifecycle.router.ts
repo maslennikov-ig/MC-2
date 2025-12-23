@@ -242,6 +242,7 @@ export const lifecycleRouter = router({
                 mimeType: file.mime_type,
                 chunkSize: 512,
                 chunkOverlap: 50,
+                locale: 'ru', // TODO: Get from user session/profile
               },
               options: { priority },
             };
@@ -794,6 +795,7 @@ export const lifecycleRouter = router({
           courseId,
           userId,
           createdAt: new Date().toISOString(),
+          locale: 'ru' as const, // TODO: Get from user session/profile
         };
 
         // Map stage number to job type and data

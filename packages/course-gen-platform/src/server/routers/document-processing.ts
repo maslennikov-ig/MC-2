@@ -277,6 +277,7 @@ export const documentProcessingRouter = router({
           chunkSize: 512,
           chunkOverlap: 50,
           createdAt: new Date().toISOString(),
+          locale: 'ru', // TODO: Get from user session/profile
         };
 
         const job = await addJob(

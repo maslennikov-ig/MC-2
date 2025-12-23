@@ -5,15 +5,54 @@ import { ParallelItem, DocumentWithSteps, PhaseData, Stage1CourseData } from '..
 import { calculateDocumentStatus } from './graph-transformers';
 import { GenerationTrace } from '@/components/generation-celestial/utils';
 
-// Layout constants for Stage 6 modules and lessons
-// These match the values in useGraphLayout.ts
+/**
+ * Layout constants for Stage 6 modules and lessons.
+ * Used to calculate parent node heights based on child count.
+ *
+ * @remarks
+ * These values MUST match useGraphLayout.ts LAYOUT_CONFIG for consistent rendering.
+ * Modules use larger dimensions since they contain lesson content with more detail.
+ */
 const LAYOUT_CONFIG = {
+  /** Width of module container node */
   MODULE_WIDTH: 300,
+  /** Height when module is collapsed (shows title only) */
   MODULE_COLLAPSED_HEIGHT: 90,
+  /** Height of module header area (title + expand button) */
   MODULE_HEADER_HEIGHT: 60,
+  /** Height of each lesson node inside module */
   LESSON_HEIGHT: 50,
+  /** Vertical gap between lesson nodes */
   LESSON_GAP: 10,
+  /** Internal padding inside module container */
   MODULE_PADDING: 15,
+} as const;
+
+/**
+ * Layout constants for Stage 2 document processing container.
+ * Used to calculate group node height based on document count.
+ *
+ * @remarks
+ * These values MUST match useGraphLayout.ts STAGE2_LAYOUT_CONFIG for consistent rendering.
+ * Stage 2 uses slightly different dimensions than Stage 6:
+ * - Wider container (320 vs 300) for longer filenames
+ * - Taller collapsed state (100 vs 90) for document count display
+ * - Smaller document nodes (55 vs 50) since documents show less detail
+ * - Tighter spacing (8 vs 10 gap, 12 vs 15 padding) for compact display
+ */
+const STAGE2_LAYOUT_CONFIG = {
+  /** Width of stage2group container node */
+  GROUP_WIDTH: 320,
+  /** Height when container is collapsed (shows summary only) */
+  GROUP_COLLAPSED_HEIGHT: 100,
+  /** Height of container header area (title + progress) */
+  GROUP_HEADER_HEIGHT: 70,
+  /** Height of each document node inside container */
+  DOCUMENT_HEIGHT: 55,
+  /** Vertical gap between document nodes */
+  DOCUMENT_GAP: 8,
+  /** Internal padding inside container */
+  GROUP_PADDING: 12,
 } as const;
 
 interface BuildGraphParams {
@@ -28,6 +67,181 @@ interface BuildGraphParams {
   getPhases: (id: string) => PhaseData[];
   getExistingPos: (id: string) => { x: number; y: number };
   getModuleCollapsed: (id: string) => boolean | undefined;
+  /** Get collapsed state for stage2group container */
+  getStage2Collapsed: () => boolean | undefined;
+}
+
+/**
+ * Builds Stage 2 group container node with nested document nodes.
+ * Similar pattern to buildModuleNodes but for document processing.
+ *
+ * @param documentSteps - Map of document ID to DocumentWithSteps
+ * @param getExistingPos - Function to get saved position for a node
+ * @param getStage2Collapsed - Function to get collapsed state for stage2group
+ * @param config - Stage configuration from GRAPH_STAGE_CONFIG
+ * @returns Object containing stage2group node and document child nodes
+ */
+function buildStage2Group(
+  documentSteps: Map<string, DocumentWithSteps>,
+  getExistingPos: (id: string) => { x: number; y: number },
+  getStage2Collapsed: () => boolean | undefined,
+  config: typeof GRAPH_STAGE_CONFIG['stage_2']
+): { stage2GroupNode: AppNode; documentNodes: AppNode[] } {
+  const documents = Array.from(documentSteps.values());
+  const documentNodes: AppNode[] = [];
+  const childIds: string[] = [];
+
+  // Calculate document statuses for group summary
+  let completedCount = 0;
+  let processingCount = 0;
+  let failedCount = 0;
+
+  documents.forEach((doc) => {
+    const docNodeId = `doc_${doc.id.replace(/[^a-zA-Z0-9-_]/g, '_')}`;
+    childIds.push(docNodeId);
+
+    const overallStatus = calculateDocumentStatus(doc.steps);
+
+    if (overallStatus === 'completed') completedCount++;
+    else if (overallStatus === 'active') processingCount++;
+    else if (overallStatus === 'error') failedCount++;
+  });
+
+  // Determine group status based on documents
+  let groupStatus: NodeStatus = 'pending';
+  if (failedCount > 0) {
+    groupStatus = 'error';
+  } else if (processingCount > 0) {
+    groupStatus = 'active';
+  } else if (documents.length > 0 && completedCount === documents.length) {
+    groupStatus = 'completed';
+  } else if (completedCount > 0) {
+    groupStatus = 'active';
+  }
+
+  // Default to collapsed when there are many documents
+  const defaultCollapsed = documents.length > 5;
+  const isCollapsed = getStage2Collapsed() ?? defaultCollapsed;
+
+  // Calculate group height based on collapse state
+  const groupHeight = isCollapsed
+    ? STAGE2_LAYOUT_CONFIG.GROUP_COLLAPSED_HEIGHT
+    : STAGE2_LAYOUT_CONFIG.GROUP_HEADER_HEIGHT +
+      (documents.length * (STAGE2_LAYOUT_CONFIG.DOCUMENT_HEIGHT + STAGE2_LAYOUT_CONFIG.DOCUMENT_GAP)) +
+      STAGE2_LAYOUT_CONFIG.GROUP_PADDING;
+
+  // Create Stage2Group container node
+  const stage2GroupNode: AppNode = {
+    id: 'stage2group',
+    type: 'stage2group',
+    position: getExistingPos('stage2group'),
+    style: {
+      width: STAGE2_LAYOUT_CONFIG.GROUP_WIDTH,
+      height: Math.max(groupHeight, 150),
+    },
+    data: {
+      stageNumber: 2 as const,
+      label: config.name,
+      icon: 'FileStack',
+      color: config.color,
+      status: groupStatus,
+      totalDocuments: documents.length,
+      completedDocuments: completedCount,
+      processingDocuments: processingCount,
+      failedDocuments: failedCount,
+      isCollapsed: isCollapsed,
+      childIds: childIds,
+    },
+  };
+
+  // Create document nodes as children of stage2group
+  documents.forEach((doc, index) => {
+    const docNodeId = `doc_${doc.id.replace(/[^a-zA-Z0-9-_]/g, '_')}`;
+    const overallStatus = calculateDocumentStatus(doc.steps);
+    const completedStages = doc.steps.filter(s => s.status === 'completed').length;
+    const totalStages = doc.steps.length;
+    const allAttempts = doc.steps.flatMap(s => s.attempts);
+
+    const stages = doc.steps.map((step, idx) => ({
+      stageId: step.id,
+      stageName: step.stepName,
+      stageNumber: idx + 1,
+      status: step.status,
+      attempts: step.attempts,
+      inputData: step.inputData as Record<string, unknown> | undefined,
+      outputData: step.outputData as Record<string, unknown> | undefined,
+    }));
+
+    // Calculate position relative to parent (stage2group)
+    const docY = STAGE2_LAYOUT_CONFIG.GROUP_HEADER_HEIGHT +
+                 (index * (STAGE2_LAYOUT_CONFIG.DOCUMENT_HEIGHT + STAGE2_LAYOUT_CONFIG.DOCUMENT_GAP));
+    const docX = STAGE2_LAYOUT_CONFIG.GROUP_PADDING;
+
+    documentNodes.push({
+      id: docNodeId,
+      type: 'document',
+      parentId: 'stage2group',
+      extent: 'parent',
+      position: { x: docX, y: docY },
+      hidden: isCollapsed,
+      draggable: false,
+      style: {
+        width: STAGE2_LAYOUT_CONFIG.GROUP_WIDTH - (2 * STAGE2_LAYOUT_CONFIG.GROUP_PADDING),
+        height: STAGE2_LAYOUT_CONFIG.DOCUMENT_HEIGHT,
+      },
+      data: {
+        ...config,
+        label: doc.name,
+        filename: doc.name,
+        documentId: doc.id,
+        status: overallStatus,
+        stageNumber: 2 as const,
+        color: config.color,
+        priority: doc.priority,
+        stages: stages,
+        completedStages,
+        totalStages,
+        attempts: allAttempts,
+        inputData: stages[0]?.inputData,
+        outputData: stages[stages.length - 1]?.outputData,
+        retryCount: allAttempts.filter(a => a.status === 'failed').length,
+      },
+    } as AppNode);
+  });
+
+  return { stage2GroupNode, documentNodes };
+}
+
+/**
+ * Builds an empty Stage 2 group for courses without documents.
+ * Still creates the container but with zero documents.
+ */
+function buildEmptyStage2Group(
+  getExistingPos: (id: string) => { x: number; y: number },
+  config: typeof GRAPH_STAGE_CONFIG['stage_2']
+): AppNode {
+  return {
+    id: 'stage2group',
+    type: 'stage2group',
+    position: getExistingPos('stage2group'),
+    style: {
+      width: STAGE2_LAYOUT_CONFIG.GROUP_WIDTH,
+      height: STAGE2_LAYOUT_CONFIG.GROUP_COLLAPSED_HEIGHT,
+    },
+    data: {
+      stageNumber: 2 as const,
+      label: config.name,
+      icon: 'FileStack',
+      color: config.color,
+      status: 'pending' as NodeStatus,
+      totalDocuments: 0,
+      completedDocuments: 0,
+      processingDocuments: 0,
+      failedDocuments: 0,
+      isCollapsed: true,
+      childIds: [],
+    },
+  };
 }
 
 export function buildGraph({
@@ -40,23 +254,25 @@ export function buildGraph({
   getAttempts,
   getPhases,
   getExistingPos,
-  getModuleCollapsed
+  getModuleCollapsed,
+  getStage2Collapsed
 }: BuildGraphParams): { nodes: AppNode[]; edges: AppEdge[] } {
   const newNodes: AppNode[] = [];
   const newEdges: AppEdge[] = [];
-  
+
   // Helper to get status
   const getStatus = (id: string) => stageStatuses[id] || 'pending';
-  
-  let prevNodeId = 'stage_1'; 
+
+  let prevNodeId = 'stage_1';
 
   for (let i = 1; i <= 6; i++) {
     const stageKey = `stage_${i}`;
     const config = GRAPH_STAGE_CONFIG[stageKey];
     const items = parallelItems.get(i);
 
-    // Handle skipped stages when no documents (Stage 2 and Stage 3 are skipped)
-    if (!hasDocuments && (i === 2 || i === 3)) {
+    // Handle skipped Stage 3 when no documents
+    // Note: Stage 2 is now always a container (stage2group), even when skipped
+    if (!hasDocuments && i === 3) {
       newNodes.push({
         id: stageKey,
         type: 'stage',
@@ -69,101 +285,103 @@ export function buildGraph({
         }
       });
 
-      if (i > 1) {
-        newEdges.push({
-          id: `e${prevNodeId}-${stageKey}`,
-          source: prevNodeId,
-          target: stageKey,
-          type: 'animated',
-          data: { status: 'idle', animated: false }
-        });
-      }
+      newEdges.push({
+        id: `e${prevNodeId}-${stageKey}`,
+        source: prevNodeId,
+        target: stageKey,
+        type: 'animated',
+        data: { status: 'idle', animated: false }
+      });
 
       prevNodeId = stageKey;
       continue;
     }
 
-    // Special handling for Stage 2: Documents
-    if (i === 2 && documentSteps.size > 0) {
-      const documentNodeIds: string[] = [];
+    // Special handling for Stage 2: Use Stage2Group container
+    // This replaces the old parallel document nodes with a single container
+    if (i === 2) {
+      const stage2Config = GRAPH_STAGE_CONFIG['stage_2'];
 
-      documentSteps.forEach((doc) => {
-        const docNodeId = `doc_${doc.id.replace(/[^a-zA-Z0-9-_]/g, '_')}`;
-        const overallStatus = calculateDocumentStatus(doc.steps);
-        const completedStages = doc.steps.filter(s => s.status === 'completed').length;
-        const totalStages = doc.steps.length;
-        const allAttempts = doc.steps.flatMap(s => s.attempts);
+      if (documentSteps.size > 0) {
+        // Build stage2group container with document children
+        const { stage2GroupNode, documentNodes } = buildStage2Group(
+          documentSteps,
+          getExistingPos,
+          getStage2Collapsed,
+          stage2Config
+        );
 
-        const stages = doc.steps.map((step, idx) => ({
-          stageId: step.id,
-          stageName: step.stepName,
-          stageNumber: idx + 1,
-          status: step.status,
-          attempts: step.attempts,
-          inputData: step.inputData as Record<string, unknown> | undefined,
-          outputData: step.outputData as Record<string, unknown> | undefined
-        }));
+        // Add stage2group container first (parent must be added before children in React Flow)
+        newNodes.push(stage2GroupNode);
 
-        newNodes.push({
-          id: docNodeId,
-          type: 'document',
-          position: getExistingPos(docNodeId),
-          data: {
-            ...config,
-            label: doc.name,
-            filename: doc.name,
-            documentId: doc.id,
-            status: overallStatus,
-            stageNumber: 2 as const,
-            color: config.color,
-            priority: doc.priority,
-            stages: stages,
-            completedStages,
-            totalStages,
-            attempts: allAttempts,
-            inputData: stages[0]?.inputData,
-            outputData: stages[stages.length - 1]?.outputData,
-            retryCount: allAttempts.filter(a => a.status === 'failed').length
-          }
-        } as AppNode);
+        // Add document nodes as children
+        documentNodes.forEach(docNode => {
+          newNodes.push(docNode);
+        });
 
+        // Edge from stage_1 to stage2group
         newEdges.push({
-          id: `e${prevNodeId}-${docNodeId}`,
+          id: `e${prevNodeId}-stage2group`,
           source: prevNodeId,
-          target: docNodeId,
+          target: 'stage2group',
           type: 'animated',
           data: { status: 'idle', animated: false }
         });
 
-        documentNodeIds.push(docNodeId);
-      });
+        prevNodeId = 'stage2group';
+      } else if (!hasDocuments) {
+        // No documents - create skipped stage2group
+        const skippedGroup: AppNode = {
+          id: 'stage2group',
+          type: 'stage2group',
+          position: getExistingPos('stage2group'),
+          style: {
+            width: STAGE2_LAYOUT_CONFIG.GROUP_WIDTH,
+            height: STAGE2_LAYOUT_CONFIG.GROUP_COLLAPSED_HEIGHT,
+          },
+          data: {
+            stageNumber: 2 as const,
+            label: stage2Config.name,
+            icon: 'FileStack',
+            color: stage2Config.color,
+            status: 'skipped' as NodeStatus,
+            totalDocuments: 0,
+            completedDocuments: 0,
+            processingDocuments: 0,
+            failedDocuments: 0,
+            isCollapsed: true,
+            childIds: [],
+          },
+        };
 
-      const mergeId = 'merge_stage_2';
-      newNodes.push({
-        id: mergeId,
-        type: 'merge',
-        position: getExistingPos(mergeId),
-        data: {
-          label: 'Merge',
-          status: 'pending',
-          stageNumber: null,
-          sourceIds: documentNodeIds,
-          color: '#94a3b8',
-          icon: 'GitMerge'
-        }
-      });
+        newNodes.push(skippedGroup);
 
-      documentNodeIds.forEach(nodeId => {
         newEdges.push({
-          id: `e${nodeId}-${mergeId}`,
-          source: nodeId,
-          target: mergeId,
+          id: `e${prevNodeId}-stage2group`,
+          source: prevNodeId,
+          target: 'stage2group',
           type: 'animated',
           data: { status: 'idle', animated: false }
         });
-      });
 
-      prevNodeId = mergeId;
+        prevNodeId = 'stage2group';
+      } else {
+        // hasDocuments is true but no documentSteps yet (waiting for data)
+        // Create empty stage2group in pending state
+        const emptyGroup = buildEmptyStage2Group(getExistingPos, stage2Config);
+        newNodes.push(emptyGroup);
+
+        newEdges.push({
+          id: `e${prevNodeId}-stage2group`,
+          source: prevNodeId,
+          target: 'stage2group',
+          type: 'animated',
+          data: { status: 'idle', animated: false }
+        });
+
+        prevNodeId = 'stage2group';
+      }
+
       continue;
     }
 

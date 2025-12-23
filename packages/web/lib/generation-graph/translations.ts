@@ -449,5 +449,87 @@ export const GRAPH_TRANSLATIONS: GraphTranslations & {
     systemUser: { ru: 'Система', en: 'System' },
     waitingForEvents: { ru: 'Ожидание событий...', en: 'Waiting for events...' },
     waitingToStart: { ru: 'Ожидание запуска', en: 'Waiting to start' },
+
+    // === STAGE 2 DASHBOARD (container) ===
+    dashboardTitle: { ru: 'Обработка документов', en: 'Document Processing' },
+    dashboardDesc: { ru: 'Обзор загруженных файлов и их обработки', en: 'Overview of uploaded files and their processing' },
+    totalDocs: { ru: 'Всего файлов', en: 'Total Files' },
+    completed: { ru: 'Обработано', en: 'Completed' },
+    processing: { ru: 'Обрабатывается', en: 'Processing' },
+    failed: { ru: 'С ошибками', en: 'Failed' },
+    noDocuments: { ru: 'Документы не загружены', en: 'No documents uploaded' },
+    retryFailed: { ru: 'Повторить ошибочные', en: 'Retry Failed' },
+    sortByPriority: { ru: 'По приоритету', en: 'By Priority' },
+    sortByName: { ru: 'По имени', en: 'By Name' },
+    sortByStatus: { ru: 'По статусу', en: 'By Status' },
+    stagesProgress: { ru: 'этапов', en: 'stages' },
+    expandContainer: { ru: 'Развернуть контейнер', en: 'Expand container' },
+    collapseContainer: { ru: 'Свернуть контейнер', en: 'Collapse container' },
+
+    // Dashboard table headers
+    tableDocument: { ru: 'Документ', en: 'Document' },
+    tablePriority: { ru: 'Приоритет', en: 'Priority' },
+    tableProgress: { ru: 'Прогресс', en: 'Progress' },
+    tableStatus: { ru: 'Статус', en: 'Status' },
+    tableTime: { ru: 'Время', en: 'Time' },
+    tableAction: { ru: 'Действие', en: 'Action' },
+
+    // Priority labels
+    priorityCore: { ru: 'Основной', en: 'Core' },
+    priorityImportant: { ru: 'Важный', en: 'Important' },
+    prioritySupplementary: { ru: 'Доп.', en: 'Supplementary' },
+
+    // Status labels
+    statusAwaiting: { ru: 'Ожидает', en: 'Awaiting' },
+    requiresAttention: { ru: 'Требует внимания', en: 'Requires attention' },
+
+    // Dashboard metrics
+    totalLabel: { ru: 'Всего', en: 'Total' },
+    readyLabel: { ru: 'Готово', en: 'Ready' },
+    inProgressLabel: { ru: 'В работе', en: 'In progress' },
+    errorsLabel: { ru: 'Ошибки', en: 'Errors' },
+    overallProgress: { ru: 'Общий прогресс', en: 'Overall progress' },
+    pagesLabel: { ru: 'страниц', en: 'pages' },
+    chunksLabel: { ru: 'чанков', en: 'chunks' },
+    retryErrors: { ru: 'Повторить ошибки', en: 'Retry errors' },
+    totalDocumentsCount: { ru: 'Всего: {count} документов', en: 'Total: {count} documents' },
+
+    // Actions
+    retryAction: { ru: 'Повторить', en: 'Retry' },
+    viewAction: { ru: 'Просмотр', en: 'View' },
+    openDocument: { ru: 'Открыть документ', en: 'Open document' },
+
+    // Error messages
+    displayError: { ru: 'Ошибка отображения документов', en: 'Display error' },
+    loadingError: { ru: 'Ошибка загрузки', en: 'Loading error' },
+    documentsNotFound: { ru: 'Документы не найдены', en: 'Documents not found' },
+    documentsNotFoundHint: { ru: 'Загрузите документы на Этапе 1, чтобы начать обработку', en: 'Upload documents in Stage 1 to start processing' },
+    noDocumentsToProcess: { ru: 'Нет документов для обработки', en: 'No documents to process' },
+    noDocumentsHint: { ru: 'Этот курс был создан без загруженных документов. Вернитесь к Этапу 1, чтобы добавить файлы.', en: 'This course was created without uploaded documents. Return to Stage 1 to add files.' },
+    loadingDocuments: { ru: 'Загрузка данных документов...', en: 'Loading document data...' },
+    tryAgain: { ru: 'Попробовать снова', en: 'Try again' },
+    headerLoadError: { ru: 'Ошибка загрузки заголовка', en: 'Header load error' },
+    tableLoadError: { ru: 'Ошибка загрузки таблицы документов', en: 'Document table load error' },
+    statsLoadError: { ru: 'Ошибка загрузки статистики', en: 'Statistics load error' },
+
+    // Time formatting
+    milliseconds: { ru: 'мс', en: 'ms' },
+    seconds: { ru: 'с', en: 's' },
+    minutes: { ru: 'м', en: 'm' },
+    perDoc: { ru: '/док', en: '/doc' },
+
+    // === STAGE 2 GROUP NODE ===
+    groupTitle: { ru: 'Обработка документов', en: 'Document Processing' },
+    stageLabel: { ru: 'Этап 2', en: 'Stage 2' },
+    documentsLabel: { ru: 'Документы', en: 'Documents' },
+    documentsCount: { ru: 'документов', en: 'documents' },
+    documentsCountShort: { ru: 'док', en: 'docs' },
+    documentsWithErrors: { ru: 'документ(ов) с ошибками', en: 'document(s) with errors' },
+    documentProcessingExpanded: { ru: 'Обработка документов развернуто', en: 'Document processing expanded' },
+    clickToExpand: { ru: 'Клик: развернуть/свернуть, двойной клик: открыть детали', en: 'Click: expand/collapse, double click: open details' },
+    clickToCollapse: { ru: 'Клик: свернуть, двойной клик: открыть детали', en: 'Click: collapse, double click: open details' },
+    statusReady: { ru: 'Готово', en: 'Ready' },
+    statusProcessing: { ru: 'Обработка', en: 'Processing' },
+    unknownError: { ru: 'Неизвестная ошибка', en: 'Unknown error' },
   },
 };

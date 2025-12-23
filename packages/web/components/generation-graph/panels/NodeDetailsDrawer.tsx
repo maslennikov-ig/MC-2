@@ -22,7 +22,8 @@ import { ActivityTab } from './ActivityTab';
 // Stage 1 "Course Passport" UI components
 import { Stage1InputTab, Stage1ProcessTab, Stage1OutputTab, Stage1ActivityTab } from './stage1';
 // Stage 2 "Document Processing" UI components
-import { Stage2InputTab, Stage2ProcessTab, Stage2OutputTab, Stage2ActivityTab } from './stage2';
+import { Stage2InputTab, Stage2ProcessTab, Stage2OutputTab, Stage2ActivityTab, Stage2Dashboard } from './stage2';
+import { useStage2DashboardData } from '../hooks/useStage2DashboardData';
 import { RefinementChat } from './RefinementChat';
 import { useRefinement } from '../hooks/useRefinement';
 import { useStaticGraph } from '../contexts/StaticGraphContext';
@@ -101,6 +102,8 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
   const isModuleNode = selectedNode?.type === 'module';
   // Stage 2 "Document Processing" UI: Detect if this is a document node
   const isDocumentNode = selectedNode?.type === 'document';
+  // Stage 2 "Document Processing" UI: Detect if this is the Stage 2 container node
+  const isStage2Group = selectedNode?.type === 'stage2group';
 
   // Stage 6 "Glass Factory" UI: Detect if this is a Stage 6 module or lesson
   const isStage6Module = isModuleNode;
@@ -196,6 +199,16 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
     courseId: courseInfo.id,
     moduleId: moduleIdForDashboard,
     enabled: isStage6Module && !!moduleIdForDashboard,
+  });
+
+  // Stage 2 "Document Processing" UI: Fetch stage 2 dashboard data
+  const {
+    data: stage2DashboardData,
+    isLoading: isLoadingStage2Dashboard,
+    error: stage2DashboardError,
+  } = useStage2DashboardData({
+    courseId: courseInfo.id || '',
+    enabled: isStage2Group && !!courseInfo.id, // Only enable if courseId exists
   });
 
   // Stage 6 "Glass Factory" UI: Fetch lesson inspector data
@@ -466,8 +479,17 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
         <div className={cn(
           isStage6Lesson ? 'h-full' : 'mt-6 h-[calc(100vh-140px)]'
         )}>
-          {/* Stage 6 "Glass Factory" UI: Module Dashboard */}
-          {isStage6Module ? (
+          {/* Stage 2 "Document Processing" UI: Stage2 Dashboard */}
+          {isStage2Group ? (
+            <Stage2Dashboard
+              data={stage2DashboardData}
+              isLoading={isLoadingStage2Dashboard}
+              error={stage2DashboardError}
+              onRetryFailed={() => {/* TODO: Implement retry failed */}}
+              className="h-full"
+            />
+          ) : /* Stage 6 "Glass Factory" UI: Module Dashboard */
+          isStage6Module ? (
             <ModuleDashboard
               data={moduleDashboardData}
               isLoading={isLoadingModuleDashboard}

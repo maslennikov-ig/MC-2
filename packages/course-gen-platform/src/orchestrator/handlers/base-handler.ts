@@ -16,6 +16,26 @@ import { metricsStore } from '../metrics';
 import { getSupabaseAdmin } from '../../shared/supabase/admin';
 import { JobCancelledError } from '../../server/errors/typed-errors';
 import { concurrencyTracker } from '../../shared/concurrency';
+import { getTranslator, type Locale, type TranslatorFn } from '../../shared/i18n';
+
+/**
+ * Cached translator instances per locale
+ * Since we only have 2 locales, this is more efficient than creating
+ * a new translator function for every progress update.
+ */
+const translatorCache = new Map<Locale, TranslatorFn>();
+
+/**
+ * Get cached translator instance for the specified locale
+ */
+function getCachedTranslator(locale: Locale): TranslatorFn {
+  let t = translatorCache.get(locale);
+  if (!t) {
+    t = getTranslator(locale);
+    translatorCache.set(locale, t);
+  }
+  return t;
+}
 
 /**
  * Job execution result
@@ -26,32 +46,6 @@ export interface JobResult {
   data?: unknown;
   error?: string;
 }
-
-/**
- * Step messages for course progress updates (Russian)
- */
-const STEP_MESSAGES = {
-  2: {
-    in_progress: 'Обработка документов началась',
-    completed: 'Обработка документов завершена',
-    failed: 'Ошибка при обработке документов',
-  },
-  3: {
-    in_progress: 'Анализ структуры курса',
-    completed: 'Структура курса определена',
-    failed: 'Ошибка при анализе структуры',
-  },
-  4: {
-    in_progress: 'Генерация контента',
-    completed: 'Контент сгенерирован',
-    failed: 'Ошибка при генерации контента',
-  },
-  5: {
-    in_progress: 'Финализация курса',
-    completed: 'Курс завершен',
-    failed: 'Ошибка при финализации',
-  },
-} as const;
 
 /**
  * Job type to step ID mapping
@@ -125,7 +119,7 @@ export abstract class BaseJobHandler<T extends JobData = JobData> {
    */
   async process(job: Job<T>): Promise<JobResult> {
     const startTime = Date.now();
-    const { courseId, userId } = job.data;
+    const { courseId, userId, locale = 'ru' } = job.data as JobData;
     const jobLogger = logger.child({
       jobId: job.id,
       jobType: this.jobType,
@@ -159,7 +153,8 @@ export abstract class BaseJobHandler<T extends JobData = JobData> {
           stepId,
           'in_progress',
           job.id!,
-          jobLogger
+          jobLogger,
+          locale as Locale
         );
       }
 
@@ -184,6 +179,7 @@ export abstract class BaseJobHandler<T extends JobData = JobData> {
             'completed',
             job.id!,
             jobLogger,
+            locale as Locale,
             { duration_ms: duration }
           );
         }
@@ -204,6 +200,7 @@ export abstract class BaseJobHandler<T extends JobData = JobData> {
             'failed',
             job.id!,
             jobLogger,
+            locale as Locale,
             {
               error_message: result.message || 'Job completed with failure',
               error_details: result.error || 'Unknown error',
@@ -239,6 +236,7 @@ export abstract class BaseJobHandler<T extends JobData = JobData> {
             'failed',
             job.id!,
             jobLogger,
+            locale as Locale,
             {
               error_message: error instanceof Error ? error.message : String(error),
               error_details: String(error),
@@ -474,7 +472,7 @@ export abstract class BaseJobHandler<T extends JobData = JobData> {
    * T021: Update course progress
    *
    * Updates the course generation progress via RPC with appropriate
-   * Russian messages based on job status.
+   * localized messages based on job status and user locale.
    *
    * @private
    * @param {SupabaseClient<Database>} supabase - Supabase admin client
@@ -483,6 +481,7 @@ export abstract class BaseJobHandler<T extends JobData = JobData> {
    * @param {'in_progress' | 'completed' | 'failed'} status - Step status
    * @param {string} jobId - Job ID
    * @param {Logger} jobLogger - Logger instance with job context
+   * @param {Locale} locale - User locale (ru/en)
    * @param {Record<string, unknown>} [metadata] - Additional metadata
    * @returns {Promise<void>}
    */
@@ -493,14 +492,13 @@ export abstract class BaseJobHandler<T extends JobData = JobData> {
     status: 'in_progress' | 'completed' | 'failed',
     jobId: string,
     jobLogger: Logger,
+    locale: Locale,
     metadata?: Record<string, unknown>
   ): Promise<void> {
     try {
-      // Get Russian message for this step and status
-      const message =
-        stepId in STEP_MESSAGES
-          ? STEP_MESSAGES[stepId as keyof typeof STEP_MESSAGES][status]
-          : `Step ${stepId} ${status}`;
+      const t = getCachedTranslator(locale);
+      // Get localized message for this step and status
+      const message = t(`steps.${stepId}.${status}`);
 
       await supabase.rpc('update_course_progress', {
         p_course_id: courseId,

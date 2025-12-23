@@ -6,6 +6,7 @@ import {
   DocumentNode,
   LessonNode,
   ModuleNode,
+  Stage2GroupNode,
   GraphEdge
 } from '@megacampus/shared-types';
 
@@ -36,6 +37,9 @@ export type LessonNodeData = Omit<LessonNode, 'id' | 'type'>;
 /** Module node data (module containers in stage 6) */
 export type ModuleNodeData = Omit<ModuleNode, 'id' | 'type'>;
 
+/** Stage 2 group node data (document container for stage 2) */
+export type Stage2GroupNodeData = Omit<Stage2GroupNode, 'id' | 'type'>;
+
 // React Flow Node definitions
 
 /** React Flow stage node type */
@@ -56,11 +60,14 @@ export type RFLessonNode = Node<LessonNodeData, 'lesson'>;
 /** React Flow module node type */
 export type RFModuleNode = Node<ModuleNodeData, 'module'>;
 
+/** React Flow stage 2 group node type */
+export type RFStage2GroupNode = Node<Stage2GroupNodeData, 'stage2group'>;
+
 /**
  * Union type of all possible graph nodes.
  * Used throughout the graph components for type-safe node handling.
  */
-export type AppNode = RFStageNode | RFMergeNode | RFEndNode | RFDocumentNode | RFLessonNode | RFModuleNode;
+export type AppNode = RFStageNode | RFMergeNode | RFEndNode | RFDocumentNode | RFLessonNode | RFModuleNode | RFStage2GroupNode;
 
 // Edge Data
 

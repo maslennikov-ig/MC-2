@@ -7,12 +7,13 @@
  * Node type enumeration
  */
 export type GraphNodeType =
-  | 'stage'     // Main pipeline stage (1-6)
-  | 'document'  // Parallel document in Stage 2
-  | 'lesson'    // Parallel lesson in Stage 6
-  | 'module'    // Collapsible module group
-  | 'merge'     // Convergence point after parallel
-  | 'end';      // Pipeline completion node
+  | 'stage'       // Main pipeline stage (1-6)
+  | 'document'    // Parallel document in Stage 2
+  | 'lesson'      // Parallel lesson in Stage 6
+  | 'module'      // Collapsible module group for Stage 6
+  | 'stage2group' // Collapsible document group for Stage 2
+  | 'merge'       // Convergence point after parallel
+  | 'end';        // Pipeline completion node
 
 /**
  * Node status enumeration
@@ -217,6 +218,32 @@ export interface ModuleNode extends GraphNode {
 
   /** Child lesson node IDs */
   childIds: string[];
+}
+
+/**
+ * Stage 2 Document Processing group node (collapsible container for documents)
+ */
+export interface Stage2GroupNode extends GraphNode {
+  type: 'stage2group';
+  stageNumber: 2;
+
+  /** Total documents in container */
+  totalDocuments: number;
+
+  /** Completed documents count */
+  completedDocuments: number;
+
+  /** Currently processing documents count */
+  processingDocuments: number;
+
+  /** Failed documents count */
+  failedDocuments: number;
+
+  /** Whether container is collapsed */
+  isCollapsed: boolean;
+
+  /** Child document node IDs */
+  childIds?: string[];
 }
 
 /**
@@ -834,6 +861,7 @@ export const NODE_TYPES_REGISTRY = {
   document: 'document',
   lesson: 'lesson',
   module: 'module',
+  stage2group: 'stage2group',
   merge: 'merge',
   end: 'end',
 } as const;

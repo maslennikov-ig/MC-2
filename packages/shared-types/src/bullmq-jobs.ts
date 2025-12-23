@@ -76,6 +76,7 @@ export const BaseJobDataSchema = z.object({
   userId: z.string().uuid(),
   jobType: z.nativeEnum(JobType),
   createdAt: z.string().datetime(),
+  locale: z.enum(['ru', 'en']).default('ru'),
 });
 
 export type BaseJobData = z.infer<typeof BaseJobDataSchema>;

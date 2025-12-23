@@ -26,22 +26,7 @@ import { executeEmbeddingGeneration } from './phases/phase-5-embedding';
 import { executeQdrantUpload } from './phases/phase-6-qdrant-upload';
 import { executePhase6Summarization } from './phases/phase-6-summarization';
 import { logTrace } from '../../shared/trace-logger';
-
-/**
- * Russian messages for Stage 2 progress updates
- */
-const STAGE2_MESSAGES = {
-  init: 'Инициализация обработки документа...',
-  docling_start: 'Конвертация документа...',
-  docling_complete: 'Документ сконвертирован',
-  storing: 'Сохранение результатов...',
-  chunking: 'Разбиение на фрагменты...',
-  embedding: 'Генерация эмбеддингов...',
-  qdrant: 'Индексация в векторной базе...',
-  summarizing: 'Создание резюме документа...',
-  finalizing: 'Финализация обработки...',
-  complete: 'Документ обработан',
-} as const;
+import { getTranslator } from '../../shared/i18n';
 
 /**
  * Document Processing Orchestrator
@@ -60,8 +45,9 @@ export class DocumentProcessingOrchestrator {
     jobData: DocumentProcessingJobData,
     job: Job<DocumentProcessingJobData>
   ): Promise<DocumentProcessingResult> {
-    const { fileId, filePath, courseId, organizationId } = jobData;
+    const { fileId, filePath, courseId, organizationId, locale = 'ru' } = jobData;
     const startTime = Date.now();
+    const t = getTranslator(locale);
 
     logger.info({
       fileId,
@@ -81,7 +67,7 @@ export class DocumentProcessingOrchestrator {
     // Step 1: Get file metadata and organization tier (5% progress)
     await this.updateProgress(job, 5, 'Fetching file metadata');
     // Update DB for UI real-time updates
-    await this.updateCourseProgressInDB(courseId, STAGE2_MESSAGES.init);
+    await this.updateCourseProgressInDB(courseId, t('stage2.init'));
     const { tier, mimeType } = await this.getFileMetadata(fileId);
 
     logger.info({
@@ -116,12 +102,12 @@ export class DocumentProcessingOrchestrator {
       // Phase 1: Docling Conversion (10-25% progress)
       await this.updateProgress(job, 10, 'Converting document with Docling');
       // Update DB for UI - Docling is the slowest operation
-      await this.updateCourseProgressInDB(courseId, STAGE2_MESSAGES.docling_start);
+      await this.updateCourseProgressInDB(courseId, t('stage2.docling_start'));
       processingResult = await executeDoclingConversion(filePath, tier, job);
 
       await this.checkCancellation(job);
       await this.updateProgress(job, 25, 'Document converted');
-      await this.updateCourseProgressInDB(courseId, STAGE2_MESSAGES.docling_complete);
+      await this.updateCourseProgressInDB(courseId, t('stage2.docling_complete'));
 
       await logTrace({
         courseId,
@@ -140,7 +126,7 @@ export class DocumentProcessingOrchestrator {
 
     // Step 3: Store results in database (30% progress)
     await this.updateProgress(job, 30, 'Storing processed data');
-    await this.updateCourseProgressInDB(courseId, STAGE2_MESSAGES.storing);
+    await this.updateCourseProgressInDB(courseId, t('stage2.storing'));
     await this.storeProcessedDocument(fileId, processingResult);
 
     logger.info({ fileId }, 'Processed data stored in database');
@@ -151,7 +137,7 @@ export class DocumentProcessingOrchestrator {
 
     // Phase 4: Chunking (35-50% progress)
     await this.updateProgress(job, 35, 'Chunking document');
-    await this.updateCourseProgressInDB(courseId, STAGE2_MESSAGES.chunking);
+    await this.updateCourseProgressInDB(courseId, t('stage2.chunking'));
     const chunkingStartTime = Date.now();
     const chunkingResult = await executeChunking(
       processingResult.markdown,
@@ -187,7 +173,7 @@ export class DocumentProcessingOrchestrator {
 
     // Phase 5: Embedding Generation (50-70% progress)
     await this.updateProgress(job, 50, 'Generating embeddings');
-    await this.updateCourseProgressInDB(courseId, STAGE2_MESSAGES.embedding);
+    await this.updateCourseProgressInDB(courseId, t('stage2.embedding'));
     const embeddingStartTime = Date.now();
     const batchResult = await executeEmbeddingGeneration(chunkingResult.enrichedChunks, job);
 
@@ -213,7 +199,7 @@ export class DocumentProcessingOrchestrator {
 
     // Phase 6: Qdrant Upload (70-80% progress)
     await this.updateProgress(job, 70, 'Uploading vectors to Qdrant');
-    await this.updateCourseProgressInDB(courseId, STAGE2_MESSAGES.qdrant);
+    await this.updateCourseProgressInDB(courseId, t('stage2.qdrant'));
     const uploadStartTime = Date.now();
     const uploadResult = await executeQdrantUpload(batchResult.embeddings, job);
 
@@ -236,7 +222,7 @@ export class DocumentProcessingOrchestrator {
 
     // Phase 7: Document Summarization (80-90% progress)
     await this.updateProgress(job, 80, 'Generating document summary');
-    await this.updateCourseProgressInDB(courseId, STAGE2_MESSAGES.summarizing);
+    await this.updateCourseProgressInDB(courseId, t('stage2.summarizing'));
     const summarizationStartTime = Date.now();
 
     try {
@@ -304,7 +290,7 @@ export class DocumentProcessingOrchestrator {
 
     // Step 9: Finalize (95% progress)
     await this.updateProgress(job, 95, 'Finalizing indexing');
-    await this.updateCourseProgressInDB(courseId, STAGE2_MESSAGES.finalizing);
+    await this.updateCourseProgressInDB(courseId, t('stage2.finalizing'));
 
     logger.info({
       fileId,

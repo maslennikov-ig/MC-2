@@ -338,6 +338,86 @@ export const config = {
 };
 ```
 
+## Backend i18n (BullMQ Workers)
+
+> Progress messages from course generation workers are localized via a lightweight i18n service.
+
+### Quick Reference
+
+| Item | Location |
+|------|----------|
+| Translator | `packages/course-gen-platform/src/shared/i18n/translator.ts` |
+| Messages | `packages/course-gen-platform/src/shared/i18n/messages.ts` |
+| Locale Schema | `packages/shared-types/src/bullmq-jobs.ts` (BaseJobDataSchema) |
+
+### Usage in Workers
+
+```typescript
+import { getTranslator } from '@/shared/i18n';
+
+const t = getTranslator(jobData.locale);
+await updateProgress(courseId, t('stage2.docling_start'));
+```
+
+### Translation Format
+
+Backend uses bilingual object format (not JSON files):
+
+```typescript
+// messages.ts
+export const BACKEND_TRANSLATIONS = {
+  stage2: {
+    init: { ru: 'Инициализация...', en: 'Initializing...' },
+    docling_start: { ru: 'Конвертация документа...', en: 'Converting document...' },
+  },
+  steps: {
+    '2': {
+      in_progress: { ru: 'Обработка документов', en: 'Processing documents' },
+      completed: { ru: 'Документы обработаны', en: 'Documents processed' },
+      failed: { ru: 'Ошибка обработки', en: 'Processing failed' },
+    },
+  },
+} as const;
+```
+
+### Key Files
+
+- **translator.ts**: `getTranslator(locale)` - factory returning translator function
+- **messages.ts**: `BACKEND_TRANSLATIONS` - translation key/value object
+- **index.ts**: Exports `getTranslator`, `Locale` type, `BACKEND_TRANSLATIONS`
+
+### Adding New Stage Messages
+
+1. Add keys to `messages.ts`:
+```typescript
+stage3: {
+  init: { ru: 'Классификация...', en: 'Classifying...' },
+  complete: { ru: 'Классификация завершена', en: 'Classification complete' },
+},
+```
+
+2. Use in stage handler:
+```typescript
+const t = getTranslator(job.data.locale);
+await this.updateCourseProgressInDB(courseId, t('stage3.init'));
+```
+
+### Locale Flow
+
+1. Job created with `locale` field from `BaseJobDataSchema`
+2. Worker reads `job.data.locale` (defaults to `'ru'`)
+3. Translator returns correct language string
+4. Progress message stored in DB via RPC
+5. UI receives localized message via Supabase Realtime
+
+### Current Limitations
+
+- **Hardcoded locale**: Currently `locale: 'ru'` is hardcoded in job creation (TODO: derive from user session)
+- **Stage coverage**: Only Stage 2 has detailed progress keys; other stages use generic step messages
+- **No pluralization**: Simple `{{param}}` interpolation only
+
+---
+
 ## Troubleshooting
 
 | Problem | Solution |
