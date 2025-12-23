@@ -105,6 +105,15 @@ export interface GraphViewProps {
   progressPercentage?: number;
   /** Human-readable generation code (e.g., "ABC-1234") for debugging */
   generationCode?: string | null;
+  /**
+   * Pre-loaded Stage 1 course data.
+   * When provided, Stage 1 node displays this data immediately
+   * instead of waiting for traces from generation.
+   */
+  stage1CourseData?: {
+    inputData: Record<string, unknown>;
+    outputData: Record<string, unknown>;
+  };
 }
 
 /**
@@ -145,7 +154,7 @@ function GraphInteractions({ setIsPanning }: GraphInteractionsProps) {
  *
  * @param props - Component props
  */
-function GraphViewInner({ courseId, courseTitle, hasDocuments = true, failedAtStage, progressPercentage, generationCode }: GraphViewProps) {
+function GraphViewInner({ courseId, courseTitle, hasDocuments = true, failedAtStage, progressPercentage, generationCode, stage1CourseData }: GraphViewProps) {
   const { isTablet } = useBreakpoint(768);
   const nodesInitialized = useNodesInitialized();
   const { fitView, getNodes, setCenter } = useReactFlow();
@@ -267,7 +276,7 @@ function GraphViewInner({ courseId, courseTitle, hasDocuments = true, failedAtSt
   const areAllDocumentsComplete = useGenerationStore(state => state.areAllDocumentsComplete);
 
   // Graph State
-  const { nodes, edges, onNodesChange, onEdgesChange, processTraces, initializeFromCourseStructure, setNodes, nodePositionsRef } = useGraphData({ getFilename, hasDocuments });
+  const { nodes, edges, onNodesChange, onEdgesChange, processTraces, initializeFromCourseStructure, setNodes, nodePositionsRef } = useGraphData({ getFilename, hasDocuments, stage1CourseData });
   const { layoutNodes, layoutError: _layoutError } = useGraphLayout();
   // Layout generation counter to prevent stale layout results (Fix #6: Race condition)
   const layoutGenerationRef = useRef(0);

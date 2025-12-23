@@ -22,7 +22,7 @@ export function StyleSection({ mounted, reorderedStyles }: StyleSectionProps) {
   const writingStyle = watch("writingStyle");
 
   const displayedStyles = useMemo(() => {
-    return showAllStyles ? reorderedStyles : reorderedStyles.slice(0, 12);
+    return showAllStyles ? reorderedStyles : reorderedStyles.slice(0, 4);
   }, [showAllStyles, reorderedStyles]);
 
   return (
@@ -94,7 +94,7 @@ export function StyleSection({ mounted, reorderedStyles }: StyleSectionProps) {
               className="inline-flex items-center gap-2 px-6 py-3 bg-slate-100 dark:bg-white/10 hover:bg-slate-200 dark:hover:bg-white/20 text-slate-700 dark:text-white rounded-xl transition-all border border-slate-200 dark:border-white/20 hover:border-purple-500/50 dark:hover:border-purple-400/50"
             >
               <ChevronDown className="w-5 h-5" />
-              <span className="font-medium text-sm sm:text-base">Ещё стили (+7)</span>
+              <span className="font-medium text-sm sm:text-base">Ещё стили (+15)</span>
             </button>
           </motion.div>
         )}

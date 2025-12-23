@@ -5,6 +5,8 @@ export const GRAPH_TRANSLATIONS: GraphTranslations & {
   analysisResult?: Record<string, { ru: string; en: string }>;
   courseStructure?: Record<string, { ru: string; en: string }>;
   restart?: Record<string, { ru: string; en: string }>;
+  stage1?: Record<string, { ru: string; en: string }>;
+  stageDescriptions?: Record<string, { ru: string; en: string }>;
 } = {
   stages: {
     stage_1: { ru: 'Инициализация курса', en: 'Course Initialization' },
@@ -47,6 +49,36 @@ export const GRAPH_TRANSLATIONS: GraphTranslations & {
     activity: { en: 'Activity', ru: 'Активность' },
     expand: { en: 'Expand to full width', ru: 'Развернуть на всю ширину' },
     collapse: { en: 'Collapse to half width', ru: 'Свернуть до половины' },
+  },
+  stageDescriptions: {
+    stage_1: {
+      ru: 'Паспорт курса — ваши исходные данные и параметры, которые определяют весь процесс генерации.',
+      en: 'Course passport — your source data and parameters that define the entire generation process.',
+    },
+    stage_2: {
+      ru: 'Извлечение и структурирование контента из загруженных документов с помощью AI.',
+      en: 'Extracting and structuring content from uploaded documents using AI.',
+    },
+    stage_3: {
+      ru: 'Классификация и приоритизация документов по важности для курса.',
+      en: 'Classifying and prioritizing documents by importance for the course.',
+    },
+    stage_4: {
+      ru: 'Глубокий анализ темы, определение ключевых концепций и связей между ними.',
+      en: 'Deep analysis of the topic, identifying key concepts and relationships between them.',
+    },
+    stage_5: {
+      ru: 'Формирование оптимальной структуры курса: модули, уроки, последовательность.',
+      en: 'Creating optimal course structure: modules, lessons, and sequence.',
+    },
+    stage_6: {
+      ru: 'Генерация контента уроков на основе структуры и материалов курса.',
+      en: 'Generating lesson content based on course structure and materials.',
+    },
+    default: {
+      ru: 'Просмотр данных и метрик выполнения этапа.',
+      en: 'View stage data and execution metrics.',
+    },
   },
   refinementChat: {
     buttonTooltip: { ru: 'Скорректировать результат', en: 'Adjust result' },
@@ -220,5 +252,89 @@ export const GRAPH_TRANSLATIONS: GraphTranslations & {
     buttonTooltip: { ru: 'Перезапустить с этого этапа', en: 'Restart from this stage' },
     restartFromError: { ru: 'Перезапустить', en: 'Restart' },
     errorDescription: { ru: 'Произошла ошибка на этом этапе', en: 'An error occurred at this stage' },
+  },
+  stage1: {
+    // Input Tab - Identity Card
+    identity: { ru: 'Идентификация', en: 'Identity' },
+    topic: { ru: 'Тема курса', en: 'Course Topic' },
+    description: { ru: 'Описание', en: 'Description' },
+    showMore: { ru: 'Читать далее', en: 'Show more' },
+    showLess: { ru: 'Свернуть', en: 'Show less' },
+
+    // Input Tab - Strategy Card
+    strategyAndLogistics: { ru: 'Стратегия и параметры', en: 'Strategy & Parameters' },
+    strategy: { ru: 'Стратегия', en: 'Strategy' },
+    strategyAuto: { ru: 'Авто', en: 'Auto' },
+    strategyFromScratch: { ru: 'С нуля', en: 'From Scratch' },
+    strategyExpand: { ru: 'Расширение', en: 'Expand' },
+    audience: { ru: 'Аудитория', en: 'Audience' },
+    style: { ru: 'Стиль', en: 'Style' },
+    lessonsCount: { ru: 'Уроков', en: 'Lessons' },
+    formats: { ru: 'Форматы', en: 'Formats' },
+    prerequisites: { ru: 'Предварительные требования', en: 'Prerequisites' },
+    learningOutcomes: { ru: 'Ожидаемые результаты', en: 'Learning Outcomes' },
+
+    // Input Tab - Files Card
+    knowledgeBase: { ru: 'База знаний', en: 'Knowledge Base' },
+    files: { ru: 'Файлы', en: 'Files' },
+    filesCount: { ru: 'файлов', en: 'files' },
+    noFiles: { ru: 'Без файлов', en: 'No files' },
+    notSpecified: { ru: 'Не указано', en: 'Not specified' },
+
+    // Format icons labels
+    formatText: { ru: 'Текст', en: 'Text' },
+    formatAudio: { ru: 'Аудио', en: 'Audio' },
+    formatVideo: { ru: 'Видео', en: 'Video' },
+    formatPresentation: { ru: 'Презентация', en: 'Presentation' },
+    formatTest: { ru: 'Тест', en: 'Test' },
+
+    // Process Tab - Validation Receipt
+    validationReceipt: { ru: 'Чек валидации', en: 'Validation Receipt' },
+    validation: { ru: 'Валидация данных', en: 'Input Validation' },
+    validationDesc: { ru: 'Проверка обязательных полей', en: 'Checking required fields' },
+    securityScan: { ru: 'Проверка безопасности', en: 'Security Scan' },
+    securityScanDesc: { ru: 'Сканирование файлов', en: 'Scanning files' },
+    storageUpload: { ru: 'Загрузка в облако', en: 'Storage Upload' },
+    storageUploadDesc: { ru: 'Сохранение файлов в хранилище', en: 'Saving files to storage' },
+    registry: { ru: 'Регистрация курса', en: 'Course Registry' },
+    registryDesc: { ru: 'Создание записи в базе данных', en: 'Creating database record' },
+    totalLatency: { ru: 'Общее время', en: 'Total Latency' },
+    stepSkipped: { ru: 'Пропущено', en: 'Skipped' },
+
+    // Output Tab - Course Passport
+    coursePassport: { ru: 'Паспорт курса', en: 'Course Passport' },
+    courseId: { ru: 'ID курса', en: 'Course ID' },
+    owner: { ru: 'Владелец', en: 'Owner' },
+    createdAt: { ru: 'Создан', en: 'Created' },
+    status: { ru: 'Статус', en: 'Status' },
+    readyForStage2: { ru: 'Готов к Этапу 2', en: 'Ready for Stage 2' },
+    initializationError: { ru: 'Ошибка инициализации', en: 'Initialization Error' },
+    copied: { ru: 'Скопировано', en: 'Copied' },
+    copyToClipboard: { ru: 'Копировать в буфер', en: 'Copy to clipboard' },
+    copyFailed: { ru: 'Ошибка копирования', en: 'Failed to copy' },
+    dateUnknown: { ru: 'Дата неизвестна', en: 'Date unknown' },
+    outputEmptyState: { ru: 'Паспорт курса появится здесь после завершения инициализации', en: 'Course passport will appear here after initialization completes' },
+
+    // Output Tab - Asset Map
+    assetMap: { ru: 'Карта файлов', en: 'Asset Map' },
+    storagePath: { ru: 'Путь в хранилище', en: 'Storage Path' },
+    noAssets: { ru: 'Нет загруженных файлов', en: 'No uploaded files' },
+
+    // Output Tab - Next Step
+    nextStep: { ru: 'Следующий этап', en: 'Next Step' },
+    documentClassification: { ru: 'Классификация документов', en: 'Document Classification' },
+    deepAnalysis: { ru: 'Глубокий анализ', en: 'Deep Analysis' },
+
+    // Activity Tab
+    activityLog: { ru: 'Журнал действий', en: 'Activity Log' },
+    userAction: { ru: 'Пользователь', en: 'User' },
+    systemAction: { ru: 'Система', en: 'System' },
+    courseCreated: { ru: 'Курс создан', en: 'Course created' },
+    topicUpdated: { ru: 'Тема обновлена', en: 'Topic updated' },
+    filesUploaded: { ru: 'Файлы загружены', en: 'Files uploaded' },
+    validationPassed: { ru: 'Валидация пройдена', en: 'Validation passed' },
+    validationFailed: { ru: 'Валидация не пройдена', en: 'Validation failed' },
+    triggeredStage2: { ru: 'Запущен Этап 2', en: 'Triggered Stage 2' },
+    noActivity: { ru: 'Нет активности', en: 'No activity recorded' },
   },
 };

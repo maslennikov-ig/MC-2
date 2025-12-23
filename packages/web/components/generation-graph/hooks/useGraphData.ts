@@ -28,7 +28,7 @@ import { buildGraph } from './use-graph-data/utils/graph-builders';
  * and parallel items (documents in stage 2, modules/lessons in stage 6).
  */
 export function useGraphData(options: UseGraphDataOptions = {}) {
-  const { getFilename, hasDocuments = true } = options;
+  const { getFilename, hasDocuments = true, stage1CourseData } = options;
   const [nodes, setNodes, onNodesChange] = useNodesState<AppNode>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<AppEdge>([]);
 
@@ -275,6 +275,7 @@ export function useGraphData(options: UseGraphDataOptions = {}) {
       stageStatuses,
       documentSteps,
       hasDocuments,
+      stage1CourseData,
       getTrace: (id) => traceMapRef.current[id],
       getAttempts: (id) => attemptsMap.get(id) || [],
       getPhases: (id) => phasesMap.get(id) || [],
@@ -311,7 +312,7 @@ export function useGraphData(options: UseGraphDataOptions = {}) {
         return hasChanges ? newEdges : currentEdges;
     });
 
-  }, [parallelItems, stageStatuses, documentSteps, attemptsMap, phasesMap, hasDocuments, setNodes, setEdges]);
+  }, [parallelItems, stageStatuses, documentSteps, attemptsMap, phasesMap, hasDocuments, stage1CourseData, setNodes, setEdges]);
 
   // Update document names when filenameMap becomes available
   useEffect(() => {

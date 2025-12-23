@@ -5,6 +5,7 @@ export { StatsBar } from './StatsBar';
 export { GenerationGraphErrorBoundary } from './GenerationGraphErrorBoundary';
 export { GraphSkeleton } from './GraphSkeleton';
 export { GraphViewWrapper } from './GraphViewWrapper';
+export type { Stage1CourseData, GraphViewWrapperProps } from './GraphViewWrapper';
 
 // Contexts
 export { useStaticGraph, StaticGraphProvider } from './contexts/StaticGraphContext';

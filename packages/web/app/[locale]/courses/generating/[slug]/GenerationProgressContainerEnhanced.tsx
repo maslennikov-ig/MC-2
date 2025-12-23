@@ -26,6 +26,7 @@ import {
   // StageResultsDrawer - DISABLED: Replaced by NodeDetailsDrawer in GraphView
 } from '@/components/generation-celestial';
 import StatsGrid from '@/components/generation/StatsGrid';
+import type { Stage1CourseData } from '@/components/generation-graph';
 
 /** Default fallback when lessons count is unknown (before Stage 4 analysis completes) */
 const DEFAULT_LESSONS_COUNT = 5;
@@ -45,6 +46,8 @@ interface GenerationProgressContainerProps {
   failedAtStage?: number | null;
   /** Human-readable generation code (e.g., "ABC-1234") for debugging */
   generationCode?: string | null;
+  /** Pre-loaded Stage 1 course data for immediate display */
+  stage1CourseData?: Stage1CourseData;
 }
 
 // Session storage keys
@@ -185,6 +188,7 @@ export default function GenerationProgressContainerEnhanced({
   userRole: _userRole = null,
   failedAtStage,
   generationCode,
+  stage1CourseData,
 }: GenerationProgressContainerProps) {
   const router = useRouter();
   // isDark - DISABLED: MissionControlBanner moved to GraphView
@@ -736,7 +740,7 @@ export default function GenerationProgressContainerEnhanced({
 
             {/* Celestial Journey - REPLACED by GraphView */}
             <div className="h-[700px] w-full border rounded-xl overflow-hidden shadow-xl bg-slate-50 relative z-0">
-              <GraphViewWrapper courseId={courseId} courseTitle={courseTitle} hasDocuments={state.progress?.has_documents} failedAtStage={failedAtStage} progressPercentage={state.progress?.percentage} generationCode={generationCode} />
+              <GraphViewWrapper courseId={courseId} courseTitle={courseTitle} hasDocuments={state.progress?.has_documents} failedAtStage={failedAtStage} progressPercentage={state.progress?.percentage} generationCode={generationCode} stage1CourseData={stage1CourseData} />
             </div>
 
             {showDebugInfo && (

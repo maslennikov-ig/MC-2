@@ -1,7 +1,7 @@
 import { AppNode, AppEdge } from '../../../types';
 import { GRAPH_STAGE_CONFIG } from '@/lib/generation-graph/constants';
 import { NodeStatus, TraceAttempt } from '@megacampus/shared-types';
-import { ParallelItem, DocumentWithSteps, PhaseData } from '../types';
+import { ParallelItem, DocumentWithSteps, PhaseData, Stage1CourseData } from '../types';
 import { calculateDocumentStatus } from './graph-transformers';
 import { GenerationTrace } from '@/components/generation-celestial/utils';
 
@@ -21,6 +21,8 @@ interface BuildGraphParams {
   stageStatuses: Record<string, NodeStatus>;
   documentSteps: Map<string, DocumentWithSteps>;
   hasDocuments: boolean;
+  /** Pre-loaded Stage 1 course data (for display before generation starts) */
+  stage1CourseData?: Stage1CourseData;
   getTrace: (id: string) => GenerationTrace | undefined;
   getAttempts: (id: string) => TraceAttempt[];
   getPhases: (id: string) => PhaseData[];
@@ -33,6 +35,7 @@ export function buildGraph({
   stageStatuses,
   documentSteps,
   hasDocuments,
+  stage1CourseData,
   getTrace,
   getAttempts,
   getPhases,
@@ -476,13 +479,32 @@ export function buildGraph({
       const phases = getPhases(stageKey);
       const latestAttempt = attempts[attempts.length - 1];
 
+      // For Stage 1: use pre-loaded course data if no traces exist yet
+      // This allows displaying course info BEFORE generation starts
+      const isStage1 = i === 1;
+      const hasStage1Preload = isStage1 && stage1CourseData;
+
+      // Stage 1 status: 'completed' if course data exists (course was created)
+      // Otherwise fall back to trace status or 'pending'
+      const effectiveStatus = hasStage1Preload && currentStatus === 'pending'
+        ? 'completed' as NodeStatus
+        : currentStatus;
+
+      // Stage 1 data: use preloaded data if no traces, otherwise use trace data
+      const effectiveInputData = isStage1
+        ? (latestAttempt?.inputData || stage1CourseData?.inputData)
+        : latestAttempt?.inputData;
+      const effectiveOutputData = isStage1
+        ? (latestAttempt?.outputData || stage1CourseData?.outputData)
+        : latestAttempt?.outputData;
+
       newNodes.push({
         id: stageKey,
         type: 'stage',
         position: getExistingPos(stageKey),
         data: {
           ...config,
-          status: currentStatus,
+          status: effectiveStatus,
           stageNumber: i as 1 | 2 | 3 | 4 | 5 | 6,
           label: config.name,
           duration: trace?.duration_ms,
@@ -491,8 +513,8 @@ export function buildGraph({
           currentStep: trace?.step_name,
           attempts: attempts,
           phases: phases.length > 0 ? phases : undefined,
-          inputData: latestAttempt?.inputData,
-          outputData: latestAttempt?.outputData,
+          inputData: effectiveInputData,
+          outputData: effectiveOutputData,
           retryCount: attempts.filter(a => a.status === 'failed').length
         }
       });

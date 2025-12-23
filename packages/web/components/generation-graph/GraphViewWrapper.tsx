@@ -13,6 +13,17 @@ const GraphViewDynamic = dynamic(
   }
 );
 
+/**
+ * Pre-loaded Stage 1 course data from database.
+ * Used to display course info BEFORE generation starts (no traces yet).
+ * Uses generic Record types for compatibility with GraphView/useGraphData.
+ * The Stage 1 panel components will validate and cast to specific types.
+ */
+export interface Stage1CourseData {
+  inputData: Record<string, unknown>;
+  outputData: Record<string, unknown>;
+}
+
 // Re-export props type from GraphView for type safety
 export interface GraphViewWrapperProps {
   courseId: string;
@@ -34,6 +45,12 @@ export interface GraphViewWrapperProps {
   progressPercentage?: number;
   /** Human-readable generation code (e.g., "ABC-1234") for debugging */
   generationCode?: string | null;
+  /**
+   * Pre-loaded Stage 1 course data.
+   * When provided, Stage 1 node displays this data immediately
+   * instead of waiting for traces from generation.
+   */
+  stage1CourseData?: Stage1CourseData;
 }
 
 /**
@@ -50,8 +67,8 @@ export interface GraphViewWrapperProps {
  *   return <GraphViewWrapper courseId="123" courseTitle="My Course" />;
  * }
  */
-export function GraphViewWrapper({ courseId, courseTitle, hasDocuments, failedAtStage, progressPercentage, generationCode }: GraphViewWrapperProps) {
-  return <GraphViewDynamic courseId={courseId} courseTitle={courseTitle} hasDocuments={hasDocuments} failedAtStage={failedAtStage} progressPercentage={progressPercentage} generationCode={generationCode} />;
+export function GraphViewWrapper({ courseId, courseTitle, hasDocuments, failedAtStage, progressPercentage, generationCode, stage1CourseData }: GraphViewWrapperProps) {
+  return <GraphViewDynamic courseId={courseId} courseTitle={courseTitle} hasDocuments={hasDocuments} failedAtStage={failedAtStage} progressPercentage={progressPercentage} generationCode={generationCode} stage1CourseData={stage1CourseData} />;
 }
 
 // Default export for dynamic import compatibility

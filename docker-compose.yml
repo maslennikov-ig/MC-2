@@ -32,8 +32,9 @@ services:
       - ./packages/course-gen-platform/uploads:/app/uploads:ro
       # Mount test fixtures for integration tests (read-only)
       - ./packages/course-gen-platform/tests:/app/tests:ro
-      # Persistent cache for document processing
-      - docling-cache:/app/cache
+      # Shared cache with host for backend to read DoclingDocument JSON files
+      # Docling saves to /usr/local/lib/python3.12/site-packages/_cache/ internally
+      - ./.tmp/docling-cache:/usr/local/lib/python3.12/site-packages/_cache
     # Note: Docling MCP server uses MCP protocol, not REST
     # Health check is disabled as /health endpoint doesn't exist
     networks:
@@ -46,8 +47,7 @@ networks:
 volumes:
   redis-data:
     driver: local
-  docling-cache:
-    driver: local
+  # docling-cache removed - using bind mount to .tmp/docling-cache for host access
 
 # Usage:
 #

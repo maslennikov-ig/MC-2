@@ -7,6 +7,7 @@ import GenerationProgressContainerEnhanced from './GenerationProgressContainerEn
 import GenerationErrorBoundary from './GenerationErrorBoundary';
 import { GenerationRealtimeProvider } from '@/components/generation-monitoring/realtime-provider';
 import { NextIntlClientProvider } from 'next-intl';
+import type { Stage1CourseData } from '@/components/generation-graph';
 
 /** Default fallback when lessons count is unknown (before Stage 4 analysis completes) */
 const DEFAULT_LESSONS_COUNT = 5;
@@ -139,6 +140,28 @@ export default async function CourseGeneratingPage({ params }: PageProps) {
   // Use generation_status for workflow state, fallback to 'pending' if not set
   const generationStatus = (course.generation_status || 'pending') as CourseStatus;
 
+  // Construct Stage 1 course data for immediate display (before generation starts)
+  const stage1CourseData: Stage1CourseData = {
+    inputData: {
+      topic: course.title || '',
+      course_description: course.course_description || '',
+      target_audience: course.target_audience || undefined,
+      style: course.style || undefined,
+      output_formats: (course.output_formats as Array<'text' | 'audio' | 'video' | 'presentation' | 'test'>) || ['text'],
+      estimated_lessons: course.estimated_lessons || undefined,
+      content_strategy: (course.content_strategy as 'auto' | 'create_from_scratch' | 'expand_and_enhance') || 'auto',
+      prerequisites: course.prerequisites || undefined,
+      learning_outcomes: course.learning_outcomes || undefined,
+      has_files: course.has_files || false,
+    },
+    outputData: {
+      courseId: course.id,
+      ownerId: course.user_id || '',
+      createdAt: course.created_at || new Date().toISOString(),
+      status: 'ready' as const,
+    },
+  };
+
   // Get messages for client components
   const messages = await getMessages();
 
@@ -157,6 +180,7 @@ export default async function CourseGeneratingPage({ params }: PageProps) {
             userRole={userRole}
             failedAtStage={course.failed_at_stage}
             generationCode={course.generation_code}
+            stage1CourseData={stage1CourseData}
           />
         </GenerationRealtimeProvider>
       </GenerationErrorBoundary>

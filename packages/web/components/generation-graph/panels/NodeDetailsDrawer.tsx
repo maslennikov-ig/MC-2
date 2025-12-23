@@ -19,6 +19,8 @@ import { InputTab } from './InputTab';
 import { ProcessTab } from './ProcessTab';
 import { OutputTab } from './OutputTab';
 import { ActivityTab } from './ActivityTab';
+// Stage 1 "Course Passport" UI components
+import { Stage1InputTab, Stage1ProcessTab, Stage1OutputTab, Stage1ActivityTab } from './stage1';
 import { RefinementChat } from './RefinementChat';
 import { useRefinement } from '../hooks/useRefinement';
 import { useStaticGraph } from '../contexts/StaticGraphContext';
@@ -447,7 +449,9 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
               </div>
             </div>
             <SheetDescription>
-              Inspect stage data and execution metrics.
+              {data?.stageNumber
+                ? t(`stageDescriptions.stage_${data.stageNumber}`)
+                : t('stageDescriptions.default')}
             </SheetDescription>
           </SheetHeader>
         )}
@@ -556,37 +560,64 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
                 </TabsList>
 
                 <TabsContent value="input" className="mt-4 space-y-4" data-testid="content-input">
-                  <InputTab inputData={displayData?.inputData} />
+                  {data?.stageNumber === 1 ? (
+                    <Stage1InputTab inputData={displayData?.inputData} />
+                  ) : (
+                    <InputTab inputData={displayData?.inputData} />
+                  )}
                 </TabsContent>
 
                 <TabsContent value="process" className="mt-4 space-y-4" data-testid="content-process">
-                  <ProcessTab
-                    duration={displayData?.duration}
-                    tokens={displayData?.tokens}
-                    model={displayData?.model}
-                    status={displayData?.status}
-                    attemptNumber={displayData?.attemptNumber}
-                    retryCount={displayData?.retryCount}
-                    qualityScore={displayData?.qualityScore}
-                  />
+                  {data?.stageNumber === 1 ? (
+                    <Stage1ProcessTab
+                      status={displayData?.status as 'pending' | 'completed' | 'error' | undefined}
+                      totalDurationMs={displayData?.duration}
+                    />
+                  ) : (
+                    <ProcessTab
+                      duration={displayData?.duration}
+                      tokens={displayData?.tokens}
+                      model={displayData?.model}
+                      status={displayData?.status}
+                      attemptNumber={displayData?.attemptNumber}
+                      retryCount={displayData?.retryCount}
+                      qualityScore={displayData?.qualityScore}
+                    />
+                  )}
                 </TabsContent>
 
                 <TabsContent value="output" className="mt-4 space-y-4" data-testid="content-output">
-                  <OutputTab
-                    outputData={displayData?.outputData}
-                    stageId={`stage_${data?.stageNumber}`}
-                    courseId={courseInfo.id}
-                    editable={canEdit}
-                    readOnly={isAdmin && !isAwaitingApproval}
-                    autoFocus={autoOpened}
-                    onApproved={deselectNode}
-                    nodeType={selectedNode?.type}
-                    isLoading={isLessonNode && isLoadingLessonContent}
-                  />
+                  {data?.stageNumber === 1 ? (
+                    <Stage1OutputTab
+                      outputData={displayData?.outputData}
+                      courseId={courseInfo.id}
+                    />
+                  ) : (
+                    <OutputTab
+                      outputData={displayData?.outputData}
+                      stageId={`stage_${data?.stageNumber}`}
+                      courseId={courseInfo.id}
+                      editable={canEdit}
+                      readOnly={isAdmin && !isAwaitingApproval}
+                      autoFocus={autoOpened}
+                      onApproved={deselectNode}
+                      nodeType={selectedNode?.type}
+                      isLoading={isLessonNode && isLoadingLessonContent}
+                    />
+                  )}
                 </TabsContent>
 
                 <TabsContent value="activity" className="mt-4 space-y-4" data-testid="content-activity">
-                  <ActivityTab nodeId={selectedNodeId} />
+                  {data?.stageNumber === 1 ? (
+                    <Stage1ActivityTab
+                      nodeId={selectedNodeId}
+                      courseId={courseInfo.id}
+                      inputData={data?.inputData}
+                      outputData={data?.outputData}
+                    />
+                  ) : (
+                    <ActivityTab nodeId={selectedNodeId} />
+                  )}
                 </TabsContent>
               </Tabs>
 

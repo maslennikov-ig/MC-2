@@ -107,6 +107,15 @@ export interface ParallelItem {
 }
 
 /**
+ * Pre-loaded Stage 1 course data from database.
+ * Used to display course info BEFORE generation starts (no traces yet).
+ */
+export interface Stage1CourseData {
+  inputData: Record<string, unknown>;
+  outputData: Record<string, unknown>;
+}
+
+/**
  * Options for the useGraphData hook.
  */
 export interface UseGraphDataOptions {
@@ -122,4 +131,10 @@ export interface UseGraphDataOptions {
    * @default true
    */
   hasDocuments?: boolean;
+  /**
+   * Pre-loaded Stage 1 course data.
+   * When provided, Stage 1 node displays this data immediately
+   * instead of waiting for traces from generation.
+   */
+  stage1CourseData?: Stage1CourseData;
 }
