@@ -1,6 +1,6 @@
 {
   "name": "@megacampus/shared-types",
-  "version": "0.26.16",
+  "version": "0.26.17",
   "type": "module",
   "description": "Shared TypeScript types and schemas for MegaCampusAI",
   "main": "dist/index.js",
