@@ -16,3 +16,11 @@ export type {
   RedisCleanupResult,
   FilesCleanupResult,
 } from './course-cleanup';
+
+export {
+  cleanupDoclingCache,
+  cleanupDoclingCacheForCourse,
+  DEFAULT_DOCLING_TTL_HOURS,
+} from './docling-cleanup';
+
+export type { DoclingCleanupResult } from './docling-cleanup';

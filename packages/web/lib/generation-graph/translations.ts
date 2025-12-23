@@ -6,6 +6,7 @@ export const GRAPH_TRANSLATIONS: GraphTranslations & {
   courseStructure?: Record<string, { ru: string; en: string }>;
   restart?: Record<string, { ru: string; en: string }>;
   stage1?: Record<string, { ru: string; en: string }>;
+  stage2?: Record<string, { ru: string; en: string }>;
   stageDescriptions?: Record<string, { ru: string; en: string }>;
 } = {
   stages: {
@@ -336,5 +337,117 @@ export const GRAPH_TRANSLATIONS: GraphTranslations & {
     validationFailed: { ru: 'Валидация не пройдена', en: 'Validation failed' },
     triggeredStage2: { ru: 'Запущен Этап 2', en: 'Triggered Stage 2' },
     noActivity: { ru: 'Нет активности', en: 'No activity recorded' },
+  },
+  stage2: {
+    // === INPUT TAB ===
+    // File DNA Card
+    fileDNA: { ru: 'Паспорт файла', en: 'File DNA' },
+    fileName: { ru: 'Имя файла', en: 'Filename' },
+    fileSize: { ru: 'Размер', en: 'Size' },
+    fileType: { ru: 'Тип', en: 'Type' },
+    pageCount: { ru: 'Страниц', en: 'Pages' },
+    heavyPayload: { ru: 'Большой файл', en: 'Heavy Payload' },
+    heavyPayloadHint: { ru: 'Обработка может занять больше времени', en: 'Processing may take longer' },
+
+    // Tier Card
+    tierCapabilities: { ru: 'Возможности обработки', en: 'Processing Capabilities' },
+    tierBasic: { ru: 'Базовый', en: 'Basic' },
+    tierStandard: { ru: 'Стандартный', en: 'Standard' },
+    tierPremium: { ru: 'Премиум', en: 'Premium' },
+    featureActive: { ru: 'Активно', en: 'Active' },
+    featureLocked: { ru: 'Заблокировано', en: 'Locked' },
+    featureDocling: { ru: 'Умное чтение', en: 'Smart Reading' },
+    featureOCR: { ru: 'Распознавание текста', en: 'Text Recognition' },
+    featureVisuals: { ru: 'Анализ медиа', en: 'Visual Analysis' },
+    featureEnhanced: { ru: 'Улучшенная обработка', en: 'Enhanced Processing' },
+    upgradeHint: { ru: 'Требуется Premium', en: 'Requires Premium' },
+
+    // Metadata Card
+    metadata: { ru: 'Метаданные', en: 'Metadata' },
+    uploadedBy: { ru: 'Загружен', en: 'Uploaded by' },
+    organization: { ru: 'Организация', en: 'Organization' },
+    pipelineId: { ru: 'ID обработки', en: 'Pipeline ID' },
+
+    // === PROCESS TAB ===
+    // Pipeline Header
+    pipeline: { ru: 'Конвейер обработки', en: 'Processing Pipeline' },
+    pipelineDesc: { ru: 'Превращаем документ в знания', en: 'Transforming document into knowledge' },
+
+    // Phase Names (User-friendly translations)
+    phaseDocling: { ru: 'Оцифровка', en: 'Digitization' },
+    phaseDoclingDesc: { ru: 'Умное чтение структуры документа', en: 'Smart document structure reading' },
+    phaseMarkdown: { ru: 'Очистка', en: 'Cleanup' },
+    phaseMarkdownDesc: { ru: 'Форматирование и очистка текста', en: 'Text formatting and cleanup' },
+    phaseImages: { ru: 'Анализ медиа', en: 'Visual Analysis' },
+    phaseImagesDesc: { ru: 'Распознавание изображений и таблиц', en: 'Image and table recognition' },
+    phaseChunking: { ru: 'Сегментация', en: 'Segmentation' },
+    phaseChunkingDesc: { ru: 'Разбиение на смысловые блоки', en: 'Splitting into semantic blocks' },
+    phaseEmbedding: { ru: 'Векторизация', en: 'AI Encoding' },
+    phaseEmbeddingDesc: { ru: 'Создание цифровых отпечатков смысла', en: 'Creating semantic fingerprints' },
+    phaseQdrant: { ru: 'Индексация', en: 'Knowledge Save' },
+    phaseQdrantDesc: { ru: 'Сохранение в базу знаний', en: 'Saving to knowledge base' },
+    phaseSummarization: { ru: 'Синтез', en: 'Insight Generation' },
+    phaseSummarizationDesc: { ru: 'Создание краткого резюме', en: 'Creating executive summary' },
+
+    // Phase Status
+    statusPending: { ru: 'Ожидание', en: 'Pending' },
+    statusActive: { ru: 'Выполняется', en: 'Processing' },
+    statusCompleted: { ru: 'Завершено', en: 'Completed' },
+    statusSkipped: { ru: 'Пропущено', en: 'Skipped' },
+    statusError: { ru: 'Ошибка', en: 'Error' },
+
+    // Terminal Footer
+    terminal: { ru: 'Журнал системы', en: 'System Log' },
+
+    // === OUTPUT TAB ===
+    // Summary Section
+    executiveSummary: { ru: 'Краткое резюме', en: 'Executive Summary' },
+    summaryEmpty: { ru: 'Файл успешно индексирован (слишком короткий для резюме)', en: 'File successfully indexed (too short for summary)' },
+
+    // Knowledge Atoms Grid
+    knowledgeAtoms: { ru: 'Извлечённые знания', en: 'Knowledge Atoms' },
+    atomPages: { ru: 'Страниц', en: 'Pages' },
+    atomChunks: { ru: 'Блоков', en: 'Chunks' },
+    atomVisuals: { ru: 'Медиа', en: 'Visuals' },
+    atomTokens: { ru: 'Токенов', en: 'Tokens' },
+
+    // Quality Section
+    qualityHealth: { ru: 'Качество обработки', en: 'Processing Quality' },
+    qualityHigh: { ru: 'Отличное качество', en: 'High fidelity' },
+    qualityHighDesc: { ru: 'Отлично для поиска', en: 'Excellent for search' },
+    qualityMedium: { ru: 'Хорошее качество', en: 'Good fidelity' },
+    qualityMediumDesc: { ru: 'Подходит для поиска', en: 'Suitable for search' },
+    qualityLow: { ru: 'Низкое качество', en: 'Low fidelity' },
+    qualityLowDesc: { ru: 'Рекомендуется загрузить более чёткий файл', en: 'Consider uploading a clearer file' },
+
+    // Actions
+    inspectMarkdown: { ru: 'Просмотреть текст', en: 'Inspect Markdown' },
+    vectorStatus: { ru: 'Статус индексации', en: 'Index Status' },
+    vectorIndexed: { ru: 'Проиндексирован', en: 'Indexed' },
+    vectorPending: { ru: 'Ожидает индексации', en: 'Pending Indexing' },
+    vectorFailed: { ru: 'Ошибка индексации', en: 'Indexing Failed' },
+
+    // === ACTIVITY TAB ===
+    activityLog: { ru: 'Журнал обработки', en: 'Processing Log' },
+    phaseGroup: { ru: 'Фаза', en: 'Phase' },
+    eventsCount: { ru: 'событий', en: 'events' },
+    actorUser: { ru: 'Пользователь', en: 'User' },
+    actorSystem: { ru: 'Система', en: 'System' },
+    actorAI: { ru: 'ИИ модель', en: 'AI Model' },
+    noActivity: { ru: 'Нет событий', en: 'No events recorded' },
+
+    // Tooltips for technical terms
+    tooltipChunks: { ru: 'Смысловые кусочки текста. Мы нарезаем документ, чтобы ИИ находил точный ответ, а не читал всю книгу целиком.', en: 'Semantic text fragments. We slice the document so AI finds precise answers instead of reading the whole book.' },
+    tooltipEmbeddings: { ru: 'Цифровой отпечаток смысла. Позволяет искать информацию не по ключевым словам, а по смыслу.', en: 'Semantic fingerprint. Enables searching by meaning, not just keywords.' },
+    tooltipDocling: { ru: 'Технология умного чтения, которая понимает не только буквы, но и структуру (таблицы, заголовки).', en: 'Smart reading technology that understands not just text, but structure (tables, headings).' },
+
+    // Missing i18n keys for Stage 2 UI
+    contentTruncated: { ru: 'Содержимое обрезано (превышает 100KB)', en: 'Content truncated (exceeds 100KB)' },
+    dbConnectionError: { ru: 'Ошибка подключения к базе', en: 'Database connection failed' },
+    noDataAvailable: { ru: 'Данные недоступны', en: 'No data available' },
+    processingEvent: { ru: 'Обработка события', en: 'Processing event' },
+    systemUser: { ru: 'Система', en: 'System' },
+    waitingForEvents: { ru: 'Ожидание событий...', en: 'Waiting for events...' },
+    waitingToStart: { ru: 'Ожидание запуска', en: 'Waiting to start' },
   },
 };

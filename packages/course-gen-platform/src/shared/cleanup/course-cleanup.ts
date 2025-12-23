@@ -12,11 +12,14 @@
  * @module shared/cleanup/course-cleanup
  */
 
+import path from 'path';
 import { logger } from '../logger/index.js';
 import { deleteVectorsForCourse } from '../qdrant/lifecycle';
 import { cleanupCourseRagContext } from '../rag/rag-cleanup';
+import { getSupabaseAdmin } from '../supabase/admin';
 import { cleanupRedisForCourse, type RedisCleanupResult } from './redis-cleanup';
 import { deleteUploadedFiles, type FilesCleanupResult } from './files-cleanup';
+import { cleanupDoclingCacheForCourse } from './docling-cleanup';
 
 /**
  * UUID validation regex pattern
@@ -58,6 +61,12 @@ export interface CourseCleanupResult {
   };
   /** Files cleanup result */
   files: FilesCleanupResult;
+  /** Docling cache cleanup result */
+  doclingCache: {
+    success: boolean;
+    filesDeleted: number;
+    bytesFreed: number;
+  };
   /** Total duration in milliseconds */
   durationMs: number;
   /** Any errors encountered (non-fatal) */
@@ -126,6 +135,7 @@ export async function cleanupCourseResources(
       redis: { success: false, keysDeleted: 0, patternsProcessed: [], error: 'Invalid UUID' },
       ragContext: { success: false, entriesDeleted: 0 },
       files: { success: false, filesDeleted: 0, bytesFreed: 0, error: 'Invalid UUID' },
+      doclingCache: { success: false, filesDeleted: 0, bytesFreed: 0 },
       durationMs: Date.now() - startTime,
       errors: ['Invalid UUID format'],
     };
@@ -205,7 +215,48 @@ export async function cleanupCourseResources(
     logger.error({ courseId, error: errorMsg }, '[Course Cleanup] Files cleanup error');
   }
 
+  // 5. Clean Docling cache
+  // Get file paths from file_catalog before cleaning up cache
+  let doclingCacheResult = { success: true, filesDeleted: 0, bytesFreed: 0 };
+  try {
+    const supabase = getSupabaseAdmin();
+    const { data: files, error: filesError } = await supabase
+      .from('file_catalog')
+      .select('storage_path')
+      .eq('course_id', courseId);
+
+    if (filesError) {
+      logger.warn({ courseId, error: filesError }, '[Course Cleanup] Failed to fetch file paths for Docling cache cleanup');
+      // Don't add to errors - this is non-critical
+    } else if (files && files.length > 0) {
+      // Generate absolute paths (matching how they were processed in document pipeline)
+      const basePath = process.env.DOCLING_UPLOADS_BASE_PATH || process.cwd();
+      const filePaths = files.map((f) => path.join(basePath, f.storage_path));
+
+      // Get cache directory
+      const cacheDir = process.env.DOCLING_CACHE_PATH || path.resolve(process.cwd(), '../../.tmp/docling-cache');
+
+      const doclingResult = await cleanupDoclingCacheForCourse(cacheDir, filePaths);
+      doclingCacheResult = {
+        success: doclingResult.errorCount === 0,
+        filesDeleted: doclingResult.deletedCount,
+        bytesFreed: doclingResult.totalSizeFreed,
+      };
+
+      if (doclingResult.errorCount > 0) {
+        errors.push(`Docling cache cleanup: ${doclingResult.errorCount} errors`);
+      }
+    }
+  } catch (error) {
+    const errorMsg = `Docling cache cleanup failed: ${error instanceof Error ? error.message : String(error)}`;
+    errors.push(errorMsg);
+    logger.error({ courseId, error: errorMsg }, '[Course Cleanup] Docling cache cleanup error');
+    doclingCacheResult.success = false;
+  }
+
   const durationMs = Date.now() - startTime;
+  // Note: Docling cache cleanup is best-effort and does not affect overall success
+  // It's a performance optimization, not a data integrity requirement
   const overallSuccess = qdrantResult.deleted &&
                          redisResult.success &&
                          ragResult.success &&
@@ -219,6 +270,7 @@ export async function cleanupCourseResources(
     redis: redisResult,
     ragContext: ragResult,
     files: filesResult,
+    doclingCache: doclingCacheResult,
     durationMs,
     errors,
   };
@@ -232,6 +284,8 @@ export async function cleanupCourseResources(
     ragEntriesDeleted: ragResult.entriesDeleted,
     filesDeleted: filesResult.filesDeleted,
     bytesFreed: filesResult.bytesFreed,
+    doclingCacheDeleted: doclingCacheResult.filesDeleted,
+    doclingCacheBytesFreed: doclingCacheResult.bytesFreed,
     durationMs,
     errorCount: errors.length,
   }, '[Course Cleanup] Cleanup complete');

@@ -21,6 +21,8 @@ import { OutputTab } from './OutputTab';
 import { ActivityTab } from './ActivityTab';
 // Stage 1 "Course Passport" UI components
 import { Stage1InputTab, Stage1ProcessTab, Stage1OutputTab, Stage1ActivityTab } from './stage1';
+// Stage 2 "Document Processing" UI components
+import { Stage2InputTab, Stage2ProcessTab, Stage2OutputTab, Stage2ActivityTab } from './stage2';
 import { RefinementChat } from './RefinementChat';
 import { useRefinement } from '../hooks/useRefinement';
 import { useStaticGraph } from '../contexts/StaticGraphContext';
@@ -97,6 +99,8 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
   // Detect if this is a lesson node and extract lessonId for content fetching
   const isLessonNode = selectedNode?.type === 'lesson';
   const isModuleNode = selectedNode?.type === 'module';
+  // Stage 2 "Document Processing" UI: Detect if this is a document node
+  const isDocumentNode = selectedNode?.type === 'document';
 
   // Stage 6 "Glass Factory" UI: Detect if this is a Stage 6 module or lesson
   const isStage6Module = isModuleNode;
@@ -562,6 +566,8 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
                 <TabsContent value="input" className="mt-4 space-y-4" data-testid="content-input">
                   {data?.stageNumber === 1 ? (
                     <Stage1InputTab inputData={displayData?.inputData} />
+                  ) : isDocumentNode ? (
+                    <Stage2InputTab inputData={displayData?.inputData} />
                   ) : (
                     <InputTab inputData={displayData?.inputData} />
                   )}
@@ -572,6 +578,13 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
                     <Stage1ProcessTab
                       status={displayData?.status as 'pending' | 'completed' | 'error' | undefined}
                       totalDurationMs={displayData?.duration}
+                    />
+                  ) : isDocumentNode ? (
+                    <Stage2ProcessTab
+                      phases={(data as any)?.phases}
+                      terminalLogs={(data as any)?.terminalLogs}
+                      status={displayData?.status as 'pending' | 'active' | 'completed' | 'error' | undefined}
+                      totalProgress={(data as any)?.progress}
                     />
                   ) : (
                     <ProcessTab
@@ -591,6 +604,12 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
                     <Stage1OutputTab
                       outputData={displayData?.outputData}
                       courseId={courseInfo.id}
+                    />
+                  ) : isDocumentNode ? (
+                    <Stage2OutputTab
+                      outputData={displayData?.outputData}
+                      courseId={courseInfo.id}
+                      documentId={(data as any)?.documentId}
                     />
                   ) : (
                     <OutputTab
@@ -614,6 +633,12 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
                       courseId={courseInfo.id}
                       inputData={data?.inputData}
                       outputData={data?.outputData}
+                    />
+                  ) : isDocumentNode ? (
+                    <Stage2ActivityTab
+                      nodeId={selectedNodeId}
+                      courseId={courseInfo.id}
+                      documentId={(data as any)?.documentId}
                     />
                   ) : (
                     <ActivityTab nodeId={selectedNodeId} />
