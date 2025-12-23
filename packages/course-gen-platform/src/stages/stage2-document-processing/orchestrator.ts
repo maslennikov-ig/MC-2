@@ -28,6 +28,22 @@ import { executePhase6Summarization } from './phases/phase-6-summarization';
 import { logTrace } from '../../shared/trace-logger';
 
 /**
+ * Russian messages for Stage 2 progress updates
+ */
+const STAGE2_MESSAGES = {
+  init: 'Инициализация обработки документа...',
+  docling_start: 'Конвертация документа...',
+  docling_complete: 'Документ сконвертирован',
+  storing: 'Сохранение результатов...',
+  chunking: 'Разбиение на фрагменты...',
+  embedding: 'Генерация эмбеддингов...',
+  qdrant: 'Индексация в векторной базе...',
+  summarizing: 'Создание резюме документа...',
+  finalizing: 'Финализация обработки...',
+  complete: 'Документ обработан',
+} as const;
+
+/**
  * Document Processing Orchestrator
  *
  * Coordinates multi-phase document processing pipeline with tier-based feature gating
@@ -64,6 +80,8 @@ export class DocumentProcessingOrchestrator {
 
     // Step 1: Get file metadata and organization tier (5% progress)
     await this.updateProgress(job, 5, 'Fetching file metadata');
+    // Update DB for UI real-time updates
+    await this.updateCourseProgressInDB(courseId, STAGE2_MESSAGES.init);
     const { tier, mimeType } = await this.getFileMetadata(fileId);
 
     logger.info({
@@ -97,10 +115,13 @@ export class DocumentProcessingOrchestrator {
       // STANDARD/PREMIUM tier: Docling processing
       // Phase 1: Docling Conversion (10-25% progress)
       await this.updateProgress(job, 10, 'Converting document with Docling');
+      // Update DB for UI - Docling is the slowest operation
+      await this.updateCourseProgressInDB(courseId, STAGE2_MESSAGES.docling_start);
       processingResult = await executeDoclingConversion(filePath, tier, job);
 
       await this.checkCancellation(job);
       await this.updateProgress(job, 25, 'Document converted');
+      await this.updateCourseProgressInDB(courseId, STAGE2_MESSAGES.docling_complete);
 
       await logTrace({
         courseId,
@@ -119,6 +140,7 @@ export class DocumentProcessingOrchestrator {
 
     // Step 3: Store results in database (30% progress)
     await this.updateProgress(job, 30, 'Storing processed data');
+    await this.updateCourseProgressInDB(courseId, STAGE2_MESSAGES.storing);
     await this.storeProcessedDocument(fileId, processingResult);
 
     logger.info({ fileId }, 'Processed data stored in database');
@@ -129,6 +151,7 @@ export class DocumentProcessingOrchestrator {
 
     // Phase 4: Chunking (35-50% progress)
     await this.updateProgress(job, 35, 'Chunking document');
+    await this.updateCourseProgressInDB(courseId, STAGE2_MESSAGES.chunking);
     const chunkingStartTime = Date.now();
     const chunkingResult = await executeChunking(
       processingResult.markdown,
@@ -164,6 +187,7 @@ export class DocumentProcessingOrchestrator {
 
     // Phase 5: Embedding Generation (50-70% progress)
     await this.updateProgress(job, 50, 'Generating embeddings');
+    await this.updateCourseProgressInDB(courseId, STAGE2_MESSAGES.embedding);
     const embeddingStartTime = Date.now();
     const batchResult = await executeEmbeddingGeneration(chunkingResult.enrichedChunks, job);
 
@@ -189,6 +213,7 @@ export class DocumentProcessingOrchestrator {
 
     // Phase 6: Qdrant Upload (70-80% progress)
     await this.updateProgress(job, 70, 'Uploading vectors to Qdrant');
+    await this.updateCourseProgressInDB(courseId, STAGE2_MESSAGES.qdrant);
     const uploadStartTime = Date.now();
     const uploadResult = await executeQdrantUpload(batchResult.embeddings, job);
 
@@ -211,6 +236,7 @@ export class DocumentProcessingOrchestrator {
 
     // Phase 7: Document Summarization (80-90% progress)
     await this.updateProgress(job, 80, 'Generating document summary');
+    await this.updateCourseProgressInDB(courseId, STAGE2_MESSAGES.summarizing);
     const summarizationStartTime = Date.now();
 
     try {
@@ -278,6 +304,7 @@ export class DocumentProcessingOrchestrator {
 
     // Step 9: Finalize (95% progress)
     await this.updateProgress(job, 95, 'Finalizing indexing');
+    await this.updateCourseProgressInDB(courseId, STAGE2_MESSAGES.finalizing);
 
     logger.info({
       fileId,
@@ -626,6 +653,59 @@ export class DocumentProcessingOrchestrator {
     const state = await job.getState();
     if (state === 'failed' || state === 'completed') {
       throw new Error('Job cancelled or already completed');
+    }
+  }
+
+  /**
+   * Update course progress in database for real-time UI updates
+   *
+   * This method updates the courses.generation_progress JSONB field via RPC,
+   * allowing the UI to see progress updates via Supabase Realtime.
+   *
+   * @param courseId - Course UUID
+   * @param message - Russian message to display in UI
+   * @param completed - Number of completed documents (optional)
+   * @param total - Total number of documents (optional)
+   */
+  private async updateCourseProgressInDB(
+    courseId: string,
+    message: string,
+    completed?: number,
+    total?: number
+  ): Promise<void> {
+    try {
+      const supabase = getSupabaseAdmin();
+
+      // Build message with document count if provided
+      const displayMessage = completed !== undefined && total !== undefined
+        ? `${message} (${completed}/${total})`
+        : message;
+
+      const { error: rpcError } = await supabase.rpc('update_course_progress', {
+        p_course_id: courseId,
+        p_step_id: 2, // Stage 2 = Document Processing
+        p_status: 'in_progress',
+        p_message: displayMessage,
+      });
+
+      if (rpcError) {
+        // Non-fatal: log warning but don't throw
+        logger.warn(
+          { courseId, error: rpcError.message, message: displayMessage },
+          'Failed to update course progress in DB (non-fatal)'
+        );
+      } else {
+        logger.debug(
+          { courseId, message: displayMessage },
+          'Course progress updated in DB'
+        );
+      }
+    } catch (err) {
+      // Non-fatal: log warning but don't throw
+      logger.warn(
+        { courseId, error: err instanceof Error ? err.message : String(err) },
+        'Exception while updating course progress (non-fatal)'
+      );
     }
   }
 }

@@ -28,6 +28,7 @@
     "seed:clean": "tsx tests/fixtures/seed-database.ts clean",
     "verify:qdrant": "tsx tools/verify/verify-qdrant-connection.ts",
     "qdrant:create-collection": "tsx src/shared/qdrant/create-collection.ts",
+    "cleanup:docling-cache": "tsx tools/maintenance/cleanup-docling-cache.ts",
     "lint": "eslint src --max-warnings=300",
     "type-check": "tsc --noEmit"
   },

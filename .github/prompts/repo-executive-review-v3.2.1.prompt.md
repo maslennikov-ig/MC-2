@@ -1,5 +1,4 @@
 ---
-agent: 'agent'
 description: 'Generate comprehensive weekly development summary with AI agent attribution for executive review (investor-safe)'
 ---
 
