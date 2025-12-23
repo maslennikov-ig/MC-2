@@ -198,19 +198,20 @@ function buildJudgePrompt(
         .join('\n\n')
     : 'No RAG context provided.';
 
-  // Format content for evaluation
+  // Format content for evaluation - provide full content for accurate evaluation
+  // Truncation caused low quality scores because judges couldn't assess complete content
   const contentSummary = `
 ## Introduction
-${lessonContent.intro.slice(0, 500)}...
+${lessonContent.intro}
 
 ## Sections (${lessonContent.sections.length} total)
-${lessonContent.sections.map((s) => `### ${s.title}\n${s.content.slice(0, 300)}...`).join('\n\n')}
+${lessonContent.sections.map((s) => `### ${s.title}\n${s.content}`).join('\n\n')}
 
 ## Examples (${lessonContent.examples.length} total)
-${lessonContent.examples.map((e) => `- ${e.title}`).join('\n')}
+${lessonContent.examples.map((e) => `- **${e.title}**: ${e.content.slice(0, 500)}${e.content.length > 500 ? '...' : ''}`).join('\n')}
 
 ## Exercises (${lessonContent.exercises.length} total)
-${lessonContent.exercises.map((e) => `- ${e.question.slice(0, 100)}...`).join('\n')}
+${lessonContent.exercises.map((e) => `- ${e.question}`).join('\n')}
 `;
 
   // Format rubric criteria
@@ -353,6 +354,30 @@ async function executeJudge(
       tokensUsed: verdict.tokensUsed,
       durationMs,
     }, 'Judge evaluation complete');
+
+    // Log detailed criteria scores for debugging
+    logger.debug({
+      msg: 'CLEV judge criteria scores',
+      judge: modelConfig.displayName,
+      criteriaScores: verdict.criteriaScores,
+      strengths: verdict.strengths,
+    });
+
+    // Log detailed issues for debugging quality problems
+    if (verdict.issues.length > 0) {
+      logger.warn({
+        msg: 'CLEV judge found issues',
+        judge: modelConfig.displayName,
+        issueCount: verdict.issues.length,
+        issues: verdict.issues.map((issue) => ({
+          criterion: issue.criterion,
+          severity: issue.severity,
+          location: issue.location,
+          description: issue.description,
+          suggestedFix: issue.suggestedFix,
+        })),
+      });
+    }
 
     return verdict;
   } catch (error) {

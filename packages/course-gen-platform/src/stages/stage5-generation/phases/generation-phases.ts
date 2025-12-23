@@ -46,6 +46,7 @@ import { V2LessonSpecGenerator } from './phase3-v2-spec-generator';
 import type { LessonSpecificationV2 } from '@megacampus/shared-types/lesson-specification-v2';
 import pLimit from 'p-limit';
 import { createModelConfigService, getEffectiveStageConfig } from '../../../shared/llm/model-config-service';
+import { logTrace } from '../../../shared/trace-logger';
 
 // ============================================================================
 // CONSTANTS
@@ -163,6 +164,16 @@ export class GenerationPhases {
    */
   async validateInput(state: GenerationState): Promise<GenerationState> {
     const startTime = Date.now();
+    const courseId = state.input.course_id;
+
+    await logTrace({
+      courseId,
+      stage: 'stage_5',
+      phase: 'validate_input',
+      stepName: 'phase_start',
+      inputData: { hasAnalysisResult: !!state.input.analysis_result },
+      durationMs: 0,
+    });
 
     try {
       this.logger.info({ phase: 'validate_input' }, 'Starting input validation');
@@ -181,6 +192,15 @@ export class GenerationPhases {
           'Input validation failed'
         );
 
+        await logTrace({
+          courseId,
+          stage: 'stage_5',
+          phase: 'validate_input',
+          stepName: 'phase_error',
+          errorData: { message: errorMessage, errors },
+          durationMs: Date.now() - startTime,
+        });
+
         return {
           ...state,
           errors: [...state.errors, errorMessage],
@@ -192,6 +212,15 @@ export class GenerationPhases {
       }
 
       this.logger.info({ phase: 'validate_input' }, 'Input validation passed');
+
+      await logTrace({
+        courseId,
+        stage: 'stage_5',
+        phase: 'validate_input',
+        stepName: 'phase_complete',
+        outputData: { valid: true },
+        durationMs: Date.now() - startTime,
+      });
 
       return {
         ...state,
@@ -206,6 +235,16 @@ export class GenerationPhases {
         { error, phase: 'validate_input' },
         'Input validation encountered unexpected error'
       );
+
+      await logTrace({
+        courseId,
+        stage: 'stage_5',
+        phase: 'validate_input',
+        stepName: 'phase_error',
+        errorData: { message: error instanceof Error ? error.message : String(error) },
+        durationMs: Date.now() - startTime,
+      });
+
       return {
         ...state,
         errors: [
@@ -242,7 +281,17 @@ export class GenerationPhases {
    */
   async generateMetadata(state: GenerationState): Promise<GenerationState> {
     const startTime = Date.now();
+    const courseId = state.input.course_id;
     let attempt = 0;
+
+    await logTrace({
+      courseId,
+      stage: 'stage_5',
+      phase: 'generate_metadata',
+      stepName: 'phase_start',
+      inputData: { maxAttempts: RETRY_CONFIG.MAX_ATTEMPTS },
+      durationMs: 0,
+    });
 
     while (attempt < RETRY_CONFIG.MAX_ATTEMPTS) {
       attempt++;
@@ -268,6 +317,18 @@ export class GenerationPhases {
           },
           'Metadata generation succeeded'
         );
+
+        await logTrace({
+          courseId,
+          stage: 'stage_5',
+          phase: 'generate_metadata',
+          stepName: 'phase_complete',
+          outputData: { hasTitle: !!result.metadata.course_title },
+          modelUsed: result.modelUsed,
+          tokensUsed: result.tokensUsed,
+          durationMs: Date.now() - startTime,
+          retryAttempt: attempt - 1,
+        });
 
         return {
           ...state,
@@ -296,6 +357,16 @@ export class GenerationPhases {
           { error, attempt, phase: 'generate_metadata' },
           'Metadata generation failed'
         );
+
+        await logTrace({
+          courseId,
+          stage: 'stage_5',
+          phase: 'generate_metadata',
+          stepName: 'attempt_failed',
+          errorData: { message: error instanceof Error ? error.message : String(error), attempt },
+          durationMs: Date.now() - startTime,
+          retryAttempt: attempt - 1,
+        });
 
         if (attempt >= RETRY_CONFIG.MAX_ATTEMPTS) {
           const errorMessage = `Metadata generation failed after ${RETRY_CONFIG.MAX_ATTEMPTS} attempts: ${error instanceof Error ? error.message : 'Unknown error'}`;
@@ -352,6 +423,7 @@ export class GenerationPhases {
    */
   async generateSections(state: GenerationState): Promise<GenerationState> {
     const startTime = Date.now();
+    const courseId = state.input.course_id;
 
     try {
       this.logger.info({ phase: 'generate_sections' }, 'Starting parallel section generation');
@@ -365,6 +437,15 @@ export class GenerationPhases {
 
       const totalSections =
         state.input.analysis_result.recommended_structure.sections_breakdown.length;
+
+      await logTrace({
+        courseId,
+        stage: 'stage_5',
+        phase: 'generate_sections',
+        stepName: 'phase_start',
+        inputData: { totalSections, maxConcurrency: PARALLEL_CONFIG.MAX_CONCURRENT_SECTIONS },
+        durationMs: 0,
+      });
 
       // Get retry attempts from database config
       let retryAttemptsPerSection = 3; // Default fallback
@@ -410,7 +491,8 @@ export class GenerationPhases {
         limit(() => this.generateSingleSectionWithRetry(
           sectionIndex,
           state.input,
-          this.qdrantClient
+          this.qdrantClient,
+          state.input.course_id
         ))
       );
 
@@ -490,6 +572,16 @@ export class GenerationPhases {
         `Section generation completed in ${Math.round(duration / 1000)}s (${allSections.length}/${totalSections} sections)`
       );
 
+      await logTrace({
+        courseId,
+        stage: 'stage_5',
+        phase: 'generate_sections',
+        stepName: 'phase_complete',
+        outputData: { totalSections: allSections.length, successCount: successfulResults.length, failureCount: finalFailures.length },
+        tokensUsed: totalTokensUsed,
+        durationMs: duration,
+      });
+
       // Build updated state
       let updatedState: GenerationState = {
         ...state,
@@ -550,15 +642,28 @@ export class GenerationPhases {
    * @param sectionIndex - Section index (0-based)
    * @param input - Generation job input
    * @param qdrantClient - Optional RAG client
+   * @param courseId - Course UUID for trace logging
    * @returns Section batch result
    * @throws Error if all retry attempts fail
    */
   private async generateSingleSectionWithRetry(
     sectionIndex: number,
     input: GenerationJobInput,
-    qdrantClient?: QdrantClient
+    qdrantClient?: QdrantClient,
+    courseId?: string
   ): Promise<SectionBatchResult> {
     const sectionStartTime = Date.now();
+
+    if (courseId) {
+      await logTrace({
+        courseId,
+        stage: 'stage_5',
+        phase: 'generate_sections',
+        stepName: `section_${sectionIndex + 1}_start`,
+        inputData: { sectionNumber: sectionIndex + 1 },
+        durationMs: 0,
+      });
+    }
 
     this.logger.info(
       {
@@ -588,6 +693,19 @@ export class GenerationPhases {
       },
       `Section ${sectionIndex + 1} generated in ${Math.round(sectionDuration / 1000)}s`
     );
+
+    if (courseId) {
+      await logTrace({
+        courseId,
+        stage: 'stage_5',
+        phase: 'generate_sections',
+        stepName: `section_${sectionIndex + 1}_complete`,
+        outputData: { lessonsGenerated: result.sections[0]?.lessons.length || 0 },
+        modelUsed: result.modelUsed,
+        tokensUsed: result.tokensUsed,
+        durationMs: sectionDuration,
+      });
+    }
 
     return result;
   }
@@ -750,6 +868,16 @@ export class GenerationPhases {
    */
   async validateQuality(state: GenerationState): Promise<GenerationState> {
     const startTime = Date.now();
+    const courseId = state.input.course_id;
+
+    await logTrace({
+      courseId,
+      stage: 'stage_5',
+      phase: 'validate_quality',
+      stepName: 'phase_start',
+      inputData: { sectionsCount: state.sections.length },
+      durationMs: 0,
+    });
 
     try {
       this.logger.info({ phase: 'validate_quality' }, 'Starting quality validation');
@@ -861,6 +989,16 @@ export class GenerationPhases {
         // Quality validation will be blocking on Stage 6 (actual lesson content generation)
       }
 
+      await logTrace({
+        courseId,
+        stage: 'stage_5',
+        phase: 'validate_quality',
+        stepName: 'phase_complete',
+        outputData: { overallScore: overall, passed: overall >= QUALITY_CONFIG.MIN_SIMILARITY },
+        qualityScore: overall,
+        durationMs: duration,
+      });
+
       // Always proceed - quality validation is non-blocking at this stage
       return {
         ...state,
@@ -922,6 +1060,16 @@ export class GenerationPhases {
    */
   async validateLessons(state: GenerationState): Promise<GenerationState> {
     const startTime = Date.now();
+    const courseId = state.input.course_id;
+
+    await logTrace({
+      courseId,
+      stage: 'stage_5',
+      phase: 'validate_lessons',
+      stepName: 'phase_start',
+      inputData: { minimumRequired: QUALITY_CONFIG.MIN_LESSONS },
+      durationMs: 0,
+    });
 
     try {
       this.logger.info({ phase: 'validate_lessons' }, 'Starting lesson count validation');
@@ -948,6 +1096,15 @@ export class GenerationPhases {
         },
         'Lesson count validation complete'
       );
+
+      await logTrace({
+        courseId,
+        stage: 'stage_5',
+        phase: 'validate_lessons',
+        stepName: 'phase_complete',
+        outputData: { totalLessons, passed: totalLessons >= QUALITY_CONFIG.MIN_LESSONS },
+        durationMs: duration,
+      });
 
       // Check if lesson count passed
       if (totalLessons < QUALITY_CONFIG.MIN_LESSONS) {

@@ -179,7 +179,8 @@ export async function plannerNode(
     stepName: 'planner_start',
     inputData: {
       lessonLabel: lessonSpec.lesson_id,
-      title: lessonSpec.title,
+      lessonTitle: lessonSpec.title,
+      moduleNumber: lessonSpec.lesson_id.split('.')[0],
       ragChunksCount: ragChunks.length,
       language,
     },
@@ -267,6 +268,8 @@ export async function plannerNode(
       stepName: 'planner_complete',
       inputData: {
         lessonLabel: lessonSpec.lesson_id,
+        lessonTitle: lessonSpec.title,
+        moduleNumber: lessonSpec.lesson_id.split('.')[0],
         language,
         temperature,
       },
@@ -315,6 +318,8 @@ export async function plannerNode(
       stepName: 'planner_error',
       inputData: {
         lessonLabel: lessonSpec.lesson_id,
+        lessonTitle: lessonSpec.title,
+        moduleNumber: lessonSpec.lesson_id.split('.')[0],
         language,
       },
       errorData: {

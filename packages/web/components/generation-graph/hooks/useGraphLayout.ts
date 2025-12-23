@@ -345,22 +345,17 @@ export function useGraphLayout() {
   const layoutNodes = useCallback(async (nodes: AppNode[], edges: AppEdge[], _options?: { newNodeIds?: string[] }): Promise<AppNode[]> => {
     if (nodes.length === 0) return nodes;
 
-    // PHASE 1: MACRO LAYOUT (ELK)
-    const graph = toElkGraph(nodes, edges);
+    // Separate top-level nodes (for ELK) and lessons
+    // Lessons are now positioned in buildGraph, not here
+    const topLevelNodes = nodes.filter(n => !n.parentId);
+    const lessonNodes = nodes.filter(n => n.parentId);
+
+    // PHASE 1: MACRO LAYOUT (ELK) - only top-level nodes
+    const graph = toElkGraph(topLevelNodes, edges);
     const layoutedGraph = await calculateLayout(graph);
 
     // Check if any node got positioned (ELK succeeded)
     const hasPositions = layoutedGraph.children?.some(c => c.x !== undefined && c.y !== undefined);
-
-    // Debug: Log module positions from ELK
-    const modulePositions = layoutedGraph.children?.filter(c => c.id.startsWith('module_'));
-    if (modulePositions && modulePositions.length > 0) {
-      console.log('[useGraphLayout] ELK module positions:', modulePositions.map(m => ({
-        id: m.id,
-        y: m.y,
-        height: m.height
-      })).sort((a, b) => (a.y ?? 0) - (b.y ?? 0)));
-    }
 
     // If ELK failed or didn't position nodes, use fallback
     if (!hasPositions) {
@@ -368,9 +363,8 @@ export function useGraphLayout() {
       return applyFallbackLayout(nodes);
     }
 
-    // Map back to AppNodes (top-level nodes from ELK)
-    const layoutedNodes = nodes.map(node => {
-      // Find node in layouted graph (only top-level nodes were sent to ELK)
+    // Map ELK results back to AppNodes (top-level only)
+    const layoutedTopLevel = topLevelNodes.map(node => {
       const findNode = (g: ElkGraph | ElkNode): ElkNode | null => {
         if (g.id === node.id) return g as ElkNode;
         if ('children' in g && g.children) {
@@ -394,59 +388,9 @@ export function useGraphLayout() {
       return node;
     });
 
-    // PHASE 2: MICRO LAYOUT (Deterministic positioning of lessons inside modules)
-    // Pre-group lessons by parent module for O(n) complexity (avoids O(n×m) nested filtering)
-    const lessonNodes = nodes.filter(node => node.parentId);
-    const modulesMap = new Map(layoutedNodes.filter(n => n.type === 'module').map(n => [n.id, n]));
-    const lessonsByModule = new Map<string, typeof lessonNodes>();
-
-    lessonNodes.forEach(lesson => {
-      if (!lesson.parentId) return;
-      if (!lessonsByModule.has(lesson.parentId)) {
-        lessonsByModule.set(lesson.parentId, []);
-      }
-      lessonsByModule.get(lesson.parentId)!.push(lesson);
-    });
-
-    // Position lessons by module
-    lessonsByModule.forEach((moduleLessons, moduleId) => {
-      const parentModule = modulesMap.get(moduleId);
-      if (!parentModule) {
-        console.warn(`[useGraphLayout] Orphaned lessons - parent module ${moduleId} not found`);
-        return;
-      }
-
-      // Sort lessons by lessonOrder before positioning
-      const sortedLessons = [...moduleLessons].sort((a, b) => {
-        const aOrder = (a.data as Record<string, unknown>)?.lessonOrder as number | undefined;
-        const bOrder = (b.data as Record<string, unknown>)?.lessonOrder as number | undefined;
-        return (aOrder ?? 0) - (bOrder ?? 0);
-      });
-
-      sortedLessons.forEach((lessonNode, lessonIndex) => {
-        // Position lesson relative to parent module (0,0)
-        // y = HeaderHeight + (index × (LessonHeight + Gap))
-        const lessonY = LAYOUT_CONFIG.MODULE_HEADER_HEIGHT +
-                       (lessonIndex * (LAYOUT_CONFIG.LESSON_HEIGHT + LAYOUT_CONFIG.LESSON_GAP));
-        const lessonX = LAYOUT_CONFIG.MODULE_PADDING;
-
-        // Find lesson in layoutedNodes and update position
-        const lessonIdx = layoutedNodes.findIndex(n => n.id === lessonNode.id);
-        if (lessonIdx >= 0) {
-          layoutedNodes[lessonIdx] = {
-            ...layoutedNodes[lessonIdx],
-            position: { x: lessonX, y: lessonY },
-            style: {
-              ...layoutedNodes[lessonIdx].style,
-              width: LAYOUT_CONFIG.MODULE_WIDTH - (2 * LAYOUT_CONFIG.MODULE_PADDING),
-              height: LAYOUT_CONFIG.LESSON_HEIGHT,
-            }
-          };
-        }
-      });
-    });
-
-    return layoutedNodes;
+    // Lessons already have correct positions from buildGraph
+    // Just merge: parents first (required by React Flow), then lessons
+    return [...layoutedTopLevel, ...lessonNodes];
   }, [toElkGraph, calculateLayout, applyFallbackLayout]);
 
   /**

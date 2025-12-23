@@ -102,6 +102,73 @@ export const SectionBreakdownSchema = z.object({
 });
 
 /**
+ * Extended SectionBreakdownSchema with key_topics/learning_objectives alignment validation.
+ *
+ * This ensures that each key_topic has some semantic relationship to at least one
+ * learning_objective, preventing Stage 6 regeneration loops caused by mismatch.
+ *
+ * Validation strategy (soft check - warning, not blocking):
+ * - Extract significant words (4+ chars) from learning_objectives
+ * - Check if at least 40% of key_topics share a word with objectives
+ * - This is a heuristic check; LLM may use synonyms or related concepts
+ */
+export const SectionBreakdownSchemaWithAlignment = SectionBreakdownSchema.refine(
+  (data) => {
+    const keyTopics = data.key_topics || [];
+    const objectives = data.learning_objectives || [];
+
+    if (keyTopics.length === 0 || objectives.length === 0) {
+      return true; // Skip validation if either is empty
+    }
+
+    // Common words to exclude (English and Russian verbs/connectors)
+    const commonWords = new Set([
+      'that', 'this', 'with', 'from', 'have', 'will', 'able', 'about', 'which', 'their',
+      'использовать', 'применять', 'понимать', 'уметь', 'знать', 'научиться', 'освоить',
+      'применение', 'понимание', 'умение', 'знание',
+    ]);
+
+    // Extract keywords from objectives (4+ char words, not common)
+    const objectiveKeywords = new Set<string>();
+    for (const obj of objectives) {
+      // Match both Latin and Cyrillic words
+      const words = obj.toLowerCase().match(/[a-zа-яё]{4,}/gi) || [];
+      for (const word of words) {
+        if (!commonWords.has(word.toLowerCase())) {
+          objectiveKeywords.add(word.toLowerCase());
+        }
+      }
+    }
+
+    // Check how many key_topics have keyword overlap
+    let matchedTopics = 0;
+    for (const topic of keyTopics) {
+      const topicWords = topic.toLowerCase().match(/[a-zа-яё]{4,}/gi) || [];
+      const hasOverlap = topicWords.some(word =>
+        objectiveKeywords.has(word.toLowerCase())
+      );
+      if (hasOverlap) {
+        matchedTopics++;
+      }
+    }
+
+    // Require at least 40% overlap (soft threshold)
+    const coverage = matchedTopics / keyTopics.length;
+    return coverage >= 0.4;
+  },
+  {
+    message:
+      'key_topics must have semantic alignment with learning_objectives. ' +
+      'At least 40% of key_topics should share keywords with objectives. ' +
+      'Misalignment causes Stage 6 content generation failures.',
+    path: ['key_topics'],
+  }
+);
+
+// Export the aligned schema as default for new code
+export { SectionBreakdownSchemaWithAlignment as SectionBreakdownSchemaAligned };
+
+/**
  * Phase 2 output schema: Scope and structure recommendations
  */
 export const Phase2OutputSchema = z.object({
@@ -467,6 +534,7 @@ export const AnalysisResultSchema = z.object({
  * Type exports for TypeScript inference
  */
 export type SectionBreakdown = z.infer<typeof SectionBreakdownSchema>;
+export type SectionBreakdownAligned = z.infer<typeof SectionBreakdownSchemaWithAlignment>;
 export type Phase1Output = z.infer<typeof Phase1OutputSchema>;
 export type Phase2Output = z.infer<typeof Phase2OutputSchema>;
 export type Phase2Input = z.infer<typeof Phase2InputSchema>;

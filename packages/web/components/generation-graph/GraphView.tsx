@@ -57,6 +57,8 @@ import { useKeyboardNavigation } from './hooks/useKeyboardNavigation';
 import { useUserRole } from './hooks/useUserRole';
 import { useFileCatalog } from './hooks/useFileCatalog';
 import { createClient } from '@/lib/supabase/client';
+import { useLocale } from 'next-intl';
+import { setTranslationLocale } from './hooks/use-graph-data/utils/step-translations';
 import type { CourseStructure } from '@megacampus/shared-types';
 import { PartialGenerationProvider } from './contexts/PartialGenerationContext';
 import { SelectionToolbar } from './components/SelectionToolbar';
@@ -148,6 +150,12 @@ function GraphViewInner({ courseId, courseTitle, hasDocuments = true, failedAtSt
   const nodesInitialized = useNodesInitialized();
   const { fitView, getNodes, setCenter } = useReactFlow();
   const initialFitDone = useRef(false);
+
+  // Sync locale for step name translations
+  const locale = useLocale();
+  useEffect(() => {
+    setTranslationLocale(locale);
+  }, [locale]);
 
   // Admin
   const { isAdmin } = useUserRole();
@@ -540,7 +548,8 @@ function GraphViewInner({ courseId, courseTitle, hasDocuments = true, failedAtSt
         pipelineStatus || 'draft',
         hasError,
         awaitingStage,
-        failedAtStage  // Pass failedAtStage from props
+        failedAtStage,  // Pass failedAtStage from props
+        hasDocuments    // Pass hasDocuments to mark stages 2,3 as skipped when no documents
       );
 
       nodeStatuses.set(stage.id, {

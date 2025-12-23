@@ -428,15 +428,33 @@ function calculateKeywordCoverage(
 ): number {
   const allText = extractTextContent(content).toLowerCase();
 
-  // Extract keywords from learning objectives
+  // Extract keywords from learning objectives (supports Latin and Cyrillic)
   const keywords = new Set<string>();
+
+  // Common words to exclude (English and Russian)
+  const commonWords = new Set([
+    // English
+    'that', 'this', 'with', 'from', 'have', 'will', 'able', 'about', 'which', 'their', 'when', 'what', 'your', 'more', 'been', 'some',
+    // Russian
+    'этот', 'этой', 'этих', 'этим', 'этого', 'который', 'которая', 'которое', 'которые', 'которых',
+    'более', 'менее', 'также', 'между', 'через', 'после', 'перед', 'около', 'вместе',
+    'быть', 'было', 'были', 'будет', 'будут', 'можно', 'нужно', 'должен', 'должна', 'должны',
+    'своих', 'свою', 'свои', 'своей', 'своего', 'всех', 'всей', 'всего',
+  ]);
+
   for (const objective of lessonSpec.learning_objectives) {
-    // Extract significant words (>3 chars, not common words)
-    const words = objective.objective.toLowerCase().match(/\b[a-z]{4,}\b/g) || [];
-    const commonWords = new Set(['that', 'this', 'with', 'from', 'have', 'will', 'able', 'about']);
-    for (const word of words) {
-      if (!commonWords.has(word)) {
-        keywords.add(word);
+    const text = objective.objective.toLowerCase();
+
+    // Extract Latin words (>3 chars)
+    const latinWords = text.match(/\b[a-z]{4,}\b/g) || [];
+
+    // Extract Cyrillic words (>3 chars) using Unicode property
+    const cyrillicWords = text.match(/[а-яёА-ЯЁ]{4,}/g) || [];
+
+    for (const word of [...latinWords, ...cyrillicWords]) {
+      const normalizedWord = word.toLowerCase();
+      if (!commonWords.has(normalizedWord)) {
+        keywords.add(normalizedWord);
       }
     }
   }
@@ -450,6 +468,14 @@ function calculateKeywordCoverage(
       foundCount++;
     }
   }
+
+  logger.debug({
+    msg: 'Keyword coverage calculation',
+    totalKeywords: keywords.size,
+    foundKeywords: foundCount,
+    coverage: (foundCount / keywords.size * 100).toFixed(0) + '%',
+    sampleKeywords: Array.from(keywords).slice(0, 5),
+  });
 
   return foundCount / keywords.size;
 }
@@ -665,19 +691,20 @@ function buildSingleJudgePrompt(
         .join('\n\n')
     : 'No RAG context provided.';
 
-  // Format content for evaluation
+  // Format content for evaluation - provide full content for accurate evaluation
+  // Truncation caused low quality scores because judges couldn't assess complete content
   const contentSummary = `
 ## Introduction
-${lessonContent.intro.slice(0, 500)}...
+${lessonContent.intro}
 
 ## Sections (${lessonContent.sections.length} total)
-${lessonContent.sections.map((s) => `### ${s.title}\n${s.content.slice(0, 300)}...`).join('\n\n')}
+${lessonContent.sections.map((s) => `### ${s.title}\n${s.content}`).join('\n\n')}
 
 ## Examples (${lessonContent.examples.length} total)
-${lessonContent.examples.map((e) => `- ${e.title}`).join('\n')}
+${lessonContent.examples.map((e) => `- **${e.title}**: ${e.content.slice(0, 500)}${e.content.length > 500 ? '...' : ''}`).join('\n')}
 
 ## Exercises (${lessonContent.exercises.length} total)
-${lessonContent.exercises.map((e) => `- ${e.question.slice(0, 100)}...`).join('\n')}
+${lessonContent.exercises.map((e) => `- ${e.question}`).join('\n')}
 `;
 
   // Format rubric criteria
@@ -895,6 +922,30 @@ async function executeSingleJudge(
       tokensUsed: verdict.tokensUsed,
       durationMs,
     });
+
+    // Log detailed criteria scores for debugging
+    logger.debug({
+      msg: 'Judge criteria scores',
+      judge: modelConfig.displayName,
+      criteriaScores: verdict.criteriaScores,
+      strengths: verdict.strengths,
+    });
+
+    // Log detailed issues for debugging quality problems
+    if (verdict.issues.length > 0) {
+      logger.warn({
+        msg: 'Judge found issues',
+        judge: modelConfig.displayName,
+        issueCount: verdict.issues.length,
+        issues: verdict.issues.map((issue) => ({
+          criterion: issue.criterion,
+          severity: issue.severity,
+          location: issue.location,
+          description: issue.description,
+          suggestedFix: issue.suggestedFix,
+        })),
+      });
+    }
 
     return verdict;
   } catch (error) {

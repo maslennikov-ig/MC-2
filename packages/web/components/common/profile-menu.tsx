@@ -12,9 +12,13 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
 import { Skeleton } from '@/components/ui/skeleton'
-import { User, Settings, BookOpen, LogOut, Sun, Moon } from 'lucide-react'
+import { User, Settings, BookOpen, LogOut, Sun, Moon, Globe } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import Link from 'next/link'
+import { Link } from '@/src/i18n/navigation'
+import { useLocale } from 'next-intl'
+import { useRouter, usePathname } from '@/src/i18n/navigation'
+import { setLocale } from '@/app/actions/i18n'
+import type { Locale } from '@/src/i18n/config'
 import { RoleBadge } from '@/components/common/role-badge'
 import type { UserRole } from '@/types/database'
 
@@ -56,7 +60,13 @@ export default function ProfileMenu({
 }: ProfileMenuProps) {
   const [mounted, setMounted] = useState(false)
   const [isOpen, setIsOpen] = useState(false)
+  const [isLocaleChanging, setIsLocaleChanging] = useState(false)
   const { theme, toggleTheme } = useThemeSync()
+
+  // Locale switching
+  const locale = useLocale() as Locale
+  const router = useRouter()
+  const pathname = usePathname()
 
   useEffect(() => {
     setMounted(true)
@@ -89,6 +99,24 @@ export default function ProfileMenu({
   // Handle theme toggle
   const handleThemeToggle = () => {
     toggleTheme()
+  }
+
+  // Handle language toggle
+  const handleLanguageToggle = async () => {
+    const newLocale: Locale = locale === 'ru' ? 'en' : 'ru'
+    setIsLocaleChanging(true)
+    try {
+      await setLocale(newLocale)
+      router.replace(pathname, { locale: newLocale })
+    } finally {
+      setIsLocaleChanging(false)
+    }
+  }
+
+  // Language display info
+  const languageInfo = {
+    ru: { flag: '🇷🇺', name: 'Русский', switchTo: 'English' },
+    en: { flag: '🇬🇧', name: 'English', switchTo: 'Русский' }
   }
 
   // Handle menu item clicks
@@ -254,7 +282,7 @@ export default function ProfileMenu({
 
         {/* Theme Toggle */}
         {mounted && (
-          <DropdownMenuItem 
+          <DropdownMenuItem
             role="menuitem"
             onSelect={handleThemeToggle}
             className={cn(
@@ -270,6 +298,33 @@ export default function ProfileMenu({
               )}
             </div>
             <span>Переключить тему</span>
+          </DropdownMenuItem>
+        )}
+
+        {/* Language Toggle */}
+        {mounted && (
+          <DropdownMenuItem
+            role="menuitem"
+            onSelect={handleLanguageToggle}
+            disabled={isLocaleChanging}
+            className={cn(
+              "flex items-center gap-3 px-3 py-2 cursor-pointer",
+              forceWhiteDropdown && "text-white hover:bg-slate-700 focus:bg-slate-700"
+            )}
+          >
+            <div className="w-4 h-4 flex items-center justify-center">
+              {isLocaleChanging ? (
+                <Globe className="h-4 w-4 animate-spin" aria-hidden="true" />
+              ) : (
+                <span className="text-sm" aria-hidden="true">{languageInfo[locale].flag}</span>
+              )}
+            </div>
+            <div className="flex flex-col">
+              <span>{languageInfo[locale].name}</span>
+              <span className="text-xs text-muted-foreground">
+                → {languageInfo[locale].switchTo}
+              </span>
+            </div>
           </DropdownMenuItem>
         )}
 

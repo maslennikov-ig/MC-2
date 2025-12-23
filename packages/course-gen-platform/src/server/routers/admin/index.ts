@@ -17,6 +17,7 @@
  * - generationMonitoring: getGenerationTrace, getCourseGenerationDetails, triggerStage6ForLesson,
  *                         regenerateLessonWithRefinement, getGenerationHistory, exportTraceData, finalizeCourse
  * - tiers: listTiers, getTier, updateTier, resetTierToDefaults
+ * - logs: list, getById, updateStatus, bulkUpdateStatus (error logs and generation traces)
  */
 
 import { router } from '../../trpc';
@@ -29,6 +30,7 @@ import { apiKeysRouter } from './api-keys';
 import { auditLogsRouter } from './audit-logs';
 import { generationMonitoringRouter } from './generation-monitoring';
 import { tiersRouter } from './tiers';
+import { logsRouter } from './logs';
 
 // Re-export shared types for external consumers
 export * from './shared/types';
@@ -63,6 +65,9 @@ export const adminRouter = router({
 
   // Tiers (4 procedures: listTiers, getTier, updateTier, resetTierToDefaults)
   ...tiersRouter._def.procedures,
+
+  // Logs (4 procedures: list, getById, updateStatus, bulkUpdateStatus)
+  logs: logsRouter,
 });
 
 /**

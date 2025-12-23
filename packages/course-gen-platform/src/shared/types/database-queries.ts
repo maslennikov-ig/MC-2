@@ -60,6 +60,11 @@ export interface DuplicateFileResult {
   storage_path: string;
   parsed_content: string | null;
   markdown_content: string | null;
+  processed_content: string | null;
+  processing_method: 'full_text' | 'hierarchical' | null;
+  summary_metadata: Record<string, unknown> | null;
+  chunk_count: number;
+  original_name: string | null;
 }
 
 /**

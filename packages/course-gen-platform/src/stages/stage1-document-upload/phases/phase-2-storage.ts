@@ -28,6 +28,7 @@ import { logger } from '../../../shared/logger/index.js';
 import { duplicateVectorsForNewCourse } from '../../../shared/qdrant/lifecycle';
 import type { Stage1Input, Phase2StorageOutput, RollbackContext } from '../types';
 import type { DuplicateFileResult } from '../../../shared/types/database-queries';
+import type { Json } from '@megacampus/shared-types';
 
 /**
  * UUID validation regex (RFC 4122)
@@ -318,6 +319,11 @@ export async function runPhase2Storage(
             reference_count: 1, // This reference counts as 1
             parsed_content: duplicateFile.parsed_content, // Reuse parsed content
             markdown_content: duplicateFile.markdown_content, // Reuse markdown
+            processed_content: duplicateFile.processed_content,
+            processing_method: duplicateFile.processing_method,
+            summary_metadata: duplicateFile.summary_metadata as Json | null,
+            chunk_count: duplicateFile.chunk_count,
+            original_name: duplicateFile.original_name ?? input.filename,
           });
 
         if (insertError) {

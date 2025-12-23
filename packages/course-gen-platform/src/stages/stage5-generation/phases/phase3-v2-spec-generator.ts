@@ -66,6 +66,65 @@ const V2_SPEC_DEFAULTS = {
 } as const;
 
 /**
+ * Validate alignment between key_topics and learning_objectives
+ *
+ * Ensures that section titles (from key_topics) have semantic overlap
+ * with learning objectives to prevent Stage 6 regeneration loops.
+ *
+ * @param section - Section breakdown to validate
+ * @returns Object with passed flag and warning message
+ */
+function validateKeyTopicsAlignment(section: SectionBreakdown): {
+  passed: boolean;
+  warningMessage: string | null;
+  coverage: number;
+} {
+  const keyTopics = section.key_topics || [];
+  const objectives = section.learning_objectives || [];
+
+  if (keyTopics.length === 0 || objectives.length === 0) {
+    return { passed: true, warningMessage: null, coverage: 1.0 };
+  }
+
+  // Extract significant words from objectives (4+ chars, not common words)
+  const commonWords = new Set([
+    'that', 'this', 'with', 'from', 'have', 'will', 'able', 'about', 'which', 'their',
+    'использовать', 'применять', 'понимать', 'уметь', 'знать', 'научиться', 'освоить',
+  ]);
+
+  const objectiveKeywords = new Set<string>();
+  for (const obj of objectives) {
+    const words = obj.toLowerCase().match(/[a-zа-яё]{4,}/g) || [];
+    for (const word of words) {
+      if (!commonWords.has(word)) {
+        objectiveKeywords.add(word);
+      }
+    }
+  }
+
+  // Check how many key_topics have overlap with objective keywords
+  let matchedTopics = 0;
+  for (const topic of keyTopics) {
+    const topicWords = topic.toLowerCase().match(/[a-zа-яё]{4,}/g) || [];
+    const hasOverlap = topicWords.some(word => objectiveKeywords.has(word));
+    if (hasOverlap) {
+      matchedTopics++;
+    }
+  }
+
+  const coverage = matchedTopics / keyTopics.length;
+  const passed = coverage >= 0.5; // At least 50% of topics should align
+
+  const warningMessage = passed
+    ? null
+    : `Low key_topics/learning_objectives alignment: ${(coverage * 100).toFixed(0)}% ` +
+      `(${matchedTopics}/${keyTopics.length} topics match). ` +
+      `This may cause Stage 6 regeneration loops.`;
+
+  return { passed, warningMessage, coverage };
+}
+
+/**
  * Bloom's Taxonomy action verb mapping for learning objectives
  * Maps common action verbs to their Bloom's level
  */
@@ -261,6 +320,21 @@ export class V2LessonSpecGenerator {
 
     // Infer semantic scaffolding for this section
     const scaffolding = inferSemanticScaffolding(section, analysisResult);
+
+    // Validate key_topics/learning_objectives alignment
+    const alignmentCheck = validateKeyTopicsAlignment(section);
+    if (!alignmentCheck.passed) {
+      logger.warn(
+        {
+          courseId,
+          sectionIndex,
+          sectionArea: section.area,
+          coverage: alignmentCheck.coverage,
+          warningMessage: alignmentCheck.warningMessage,
+        },
+        '[V2SpecGenerator] Key topics / learning objectives alignment warning'
+      );
+    }
 
     // Build RAG context from document_relevance_mapping
     const ragContext = this.buildRAGContext(sectionId, analysisResult);

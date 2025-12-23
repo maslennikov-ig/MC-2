@@ -21,8 +21,16 @@ const MediumNode = ({ id, data, selected }: NodeProps<RFStageNode>) => {
       <Handle type="target" position={Position.Left} className="!bg-slate-400 dark:!bg-slate-500 !w-2 !h-2" />
 
       <div className="flex flex-col">
-        <span className="text-[10px] text-slate-500 dark:text-slate-400 uppercase">Stage {data.stageNumber}</span>
-        <span className="text-xs font-medium text-slate-800 dark:text-slate-200 truncate max-w-[110px]">
+        <span className={`text-[10px] uppercase ${
+          currentStatus === 'skipped'
+            ? 'text-slate-400 dark:text-slate-500'
+            : 'text-slate-500 dark:text-slate-400'
+        }`}>Stage {data.stageNumber}</span>
+        <span className={`text-xs font-medium truncate max-w-[110px] ${
+          currentStatus === 'skipped'
+            ? 'text-slate-500 dark:text-slate-400 line-through'
+            : 'text-slate-800 dark:text-slate-200'
+        }`}>
             {data.label}
         </span>
       </div>

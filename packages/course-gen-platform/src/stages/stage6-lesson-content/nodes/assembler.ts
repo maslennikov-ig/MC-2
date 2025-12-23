@@ -286,6 +286,8 @@ export async function assemblerNode(
     stepName: 'assembler_start',
     inputData: {
       lessonLabel: lessonSpec.lesson_id,
+      lessonTitle: lessonSpec.title,
+      moduleNumber: lessonSpec.lesson_id.split('.')[0],
       expandedSectionsCount: expandedSections.size,
       exercisesCount: lessonSpec.exercises.length,
       language,
@@ -429,6 +431,8 @@ export async function assemblerNode(
       stepName: 'assembler_complete',
       inputData: {
         lessonLabel: lessonSpec.lesson_id,
+        lessonTitle: lessonSpec.title,
+        moduleNumber: lessonSpec.lesson_id.split('.')[0],
         language,
       },
       outputData: {
@@ -473,6 +477,8 @@ export async function assemblerNode(
       stepName: 'assembler_error',
       inputData: {
         lessonLabel: lessonSpec.lesson_id,
+        lessonTitle: lessonSpec.title,
+        moduleNumber: lessonSpec.lesson_id.split('.')[0],
         language,
       },
       errorData: {

@@ -8,6 +8,7 @@ import {
   TraceAttempt,
   DocumentStageData
 } from '@megacampus/shared-types';
+import { translateStepName } from '@/components/generation-graph/hooks/use-graph-data/utils/step-translations';
 
 // Enable Immer support for Map and Set
 enableMapSet();
@@ -41,20 +42,8 @@ const PHASE_TO_STEP_INDEX: Record<string, number> = {
   'finish': 6
 };
 
-/**
- * Step names translation (Russian)
- */
-const STEP_NAME_TRANSLATIONS: Record<string, string> = {
-  'init': 'Инициализация',
-  'start': 'Начало',
-  'processing': 'Обработка',
-  'chunking': 'Разбиение',
-  'embedding': 'Эмбеддинги',
-  'indexing': 'Индексация',
-  'summarization': 'Саммаризация',
-  'complete': 'Завершено',
-  'finish': 'Готово'
-};
+// Step name translations are now imported from step-translations.ts
+// which supports both Russian and English locales
 
 // ============================================================================
 // TYPES
@@ -213,10 +202,7 @@ function extractDocumentName(trace: GenerationTrace): string | null {
          inputData.file_name || inputData.filename || inputData.fileName || null;
 }
 
-function translateStepName(phase: string): string {
-  const lower = phase.toLowerCase();
-  return STEP_NAME_TRANSLATIONS[lower] || phase;
-}
+// translateStepName is now imported from step-translations.ts
 
 function traceToAttempt(trace: GenerationTrace, attemptNumber: number): TraceAttempt {
   return {

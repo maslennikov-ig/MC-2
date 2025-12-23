@@ -408,51 +408,6 @@ export class GenerationOrchestrator {
 
     const totalDuration = Date.now() - startTime;
 
-    // Trace logs for each phase
-    await logTrace({
-      courseId: input.course_id,
-      stage: 'stage_5',
-      phase: 'validate_input',
-      stepName: 'validate_schema',
-      inputData: {},
-      durationMs: finalState.phaseDurations.validate_input || 0
-    });
-
-    if (finalState.metadata) {
-      await logTrace({
-        courseId: input.course_id,
-        stage: 'stage_5',
-        phase: 'generate_metadata',
-        stepName: 'generate_course_metadata',
-        inputData: {},
-        outputData: { metadata: finalState.metadata },
-        modelUsed: finalState.modelUsed.metadata || null,
-        durationMs: finalState.phaseDurations.generate_metadata || 0
-      });
-    }
-
-    await logTrace({
-      courseId: input.course_id,
-      stage: 'stage_5',
-      phase: 'generate_sections',
-      stepName: 'generate_sections_batch',
-      inputData: {},
-      outputData: { sectionsCount: finalState.sections.length },
-      modelUsed: finalState.modelUsed.sections || null,
-      durationMs: finalState.phaseDurations.generate_sections || 0
-    });
-
-    await logTrace({
-      courseId: input.course_id,
-      stage: 'stage_5',
-      phase: 'validate_quality',
-      stepName: 'quality_check',
-      inputData: {},
-      outputData: { qualityScores: finalState.qualityScores },
-      modelUsed: finalState.modelUsed.validation || null,
-      durationMs: finalState.phaseDurations.validate_quality || 0
-    });
-
     this.logger.info(
       {
         course_id: input.course_id,

@@ -3,7 +3,7 @@ import { createClient } from '@/lib/supabase/server';
 import { redirect } from 'next/navigation';
 import { ReactNode } from 'react';
 import { getMessages } from 'next-intl/server';
-import { LanguageSwitcher } from '@/components/language-switcher';
+import { LanguageSwitcher } from '@/components/common/language-switcher';
 import { AdminUserMenu } from './components/admin-user-menu';
 import { AdminNav } from './components/admin-nav';
 import Logo from '@/components/common/logo';

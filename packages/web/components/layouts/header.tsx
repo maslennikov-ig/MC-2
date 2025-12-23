@@ -1,10 +1,11 @@
 "use client"
 
-import Link from "next/link"
+import { Link } from "@/src/i18n/navigation"
 import { motion } from "framer-motion"
 import { BookOpen, Plus } from "lucide-react"
 import Logo from "@/components/common/logo"
 import AuthButton from "@/components/common/auth-button"
+import { LanguageSwitcher } from "@/components/common/language-switcher"
 import { useSupabase } from "@/lib/supabase/browser-client"
 
 interface HeaderProps {
@@ -76,8 +77,9 @@ export default function Header({ darkMode = false }: HeaderProps = {}) {
           )}
         </nav>
 
-        {/* Auth Button - visible on all screen sizes */}
-        <div className="flex items-center">
+        {/* Language & Auth - visible on all screen sizes */}
+        <div className="flex items-center gap-1 sm:gap-2">
+          <LanguageSwitcher darkMode={darkMode} compact showChevron={false} />
           <AuthButton darkMode={darkMode} forceWhiteDropdown={darkMode} />
         </div>
       </motion.header>

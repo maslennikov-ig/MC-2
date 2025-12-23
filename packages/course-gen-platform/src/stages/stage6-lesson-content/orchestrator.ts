@@ -48,6 +48,7 @@ import { consolidateVerdicts } from './judge/arbiter';
 import type { ArbiterInput } from '@megacampus/shared-types/judge-types';
 import { logger } from '@/shared/logger';
 import { logTrace } from '@/shared/trace-logger';
+import { HANDLER_CONFIG } from './config';
 
 // ============================================================================
 // PUBLIC INTERFACES
@@ -446,6 +447,8 @@ async function judgeNode(state: LessonGraphStateType): Promise<LessonGraphStateU
     stepName: 'judge_start',
     inputData: {
       lessonLabel: state.lessonSpec.lesson_id,
+      lessonTitle: state.lessonSpec.title,
+      moduleNumber: state.lessonSpec.lesson_id.split('.')[0],
       hasSmoothedContent: Boolean(state.smoothedContent),
       refinementIterationCount: state.refinementIterationCount,
     },
@@ -499,7 +502,7 @@ async function judgeNode(state: LessonGraphStateType): Promise<LessonGraphStateU
       const structuralIssues = cascadeResult.heuristicResults.failureReasons
         .filter(r => r.includes('Missing required sections'));
 
-      if (structuralIssues.length > 0 && state.lessonContent) {
+      if (structuralIssues.length > 0 && contentBody) {
         // Parse missing section names from failure reasons
         // Format: "Missing required sections: conclusion, examples"
         const parsedIssues = structuralIssues.map(issue => {
@@ -582,6 +585,8 @@ async function judgeNode(state: LessonGraphStateType): Promise<LessonGraphStateU
         stepName: 'judge_complete',
         inputData: {
           lessonLabel: state.lessonSpec.lesson_id,
+          lessonTitle: state.lessonSpec.title,
+          moduleNumber: state.lessonSpec.lesson_id.split('.')[0],
           syntheticDecision: true,
         },
         outputData: enrichedOutput,
@@ -681,6 +686,9 @@ async function judgeNode(state: LessonGraphStateType): Promise<LessonGraphStateU
           content: tempLessonContent,
           arbiterOutput,
           operationMode,
+          ragChunks: state.ragChunks,
+          lessonSpec: state.lessonSpec,
+          language: state.language,
         };
 
         const refinementResult: TargetedRefinementOutput = await executeTargetedRefinement(refinementInput);
@@ -795,6 +803,8 @@ async function judgeNode(state: LessonGraphStateType): Promise<LessonGraphStateU
       stepName: 'judge_complete',
       inputData: {
         lessonLabel: state.lessonSpec.lesson_id,
+        lessonTitle: state.lessonSpec.title,
+        moduleNumber: state.lessonSpec.lesson_id.split('.')[0],
       },
       outputData: {
         ...enrichedOutput,
@@ -847,6 +857,8 @@ async function judgeNode(state: LessonGraphStateType): Promise<LessonGraphStateU
       stepName: 'judge_error',
       inputData: {
         lessonLabel: state.lessonSpec.lesson_id,
+        lessonTitle: state.lessonSpec.title,
+        moduleNumber: state.lessonSpec.lesson_id.split('.')[0],
       },
       errorData: {
         error: errorMessage,
@@ -879,16 +891,36 @@ async function judgeNode(state: LessonGraphStateType): Promise<LessonGraphStateU
  * @returns Next node name or END
  */
 function shouldRetryAfterJudge(state: LessonGraphStateType): string {
+  const maxRetries = HANDLER_CONFIG.MAX_REGENERATION_RETRIES;
+
   // Priority 1: If regeneration needed and we haven't exceeded retry limit, retry
-  if (state.needsRegeneration && state.retryCount < 2) {
+  if (state.needsRegeneration && state.retryCount < maxRetries) {
     logger.debug({
       lessonId: state.lessonSpec.lesson_id,
       retryCount: state.retryCount,
+      maxRetries,
     }, 'Judge routing: Routing to planner for regeneration');
     return 'planner';
   }
 
-  // Priority 2: If content was accepted or needs human review, end the graph
+  // Priority 2: Max retries exceeded - log error and end
+  if (state.needsRegeneration && state.retryCount >= maxRetries) {
+    logger.error({
+      lessonId: state.lessonSpec.lesson_id,
+      retryCount: state.retryCount,
+      maxRetries,
+      qualityScore: state.qualityScore,
+    }, 'Judge routing: Max regeneration retries exceeded - ending with failure');
+
+    // Add error to state via mutation (LangGraph allows this for annotations)
+    state.errors.push(
+      `Max regeneration retries (${maxRetries}) exceeded. Quality score: ${((state.qualityScore ?? 0) * 100).toFixed(1)}%. ` +
+      `Review LessonSpecification for key_topics/lesson_objectives mismatch.`
+    );
+    return '__end__';
+  }
+
+  // Priority 3: If content was accepted or needs human review, end the graph
   if (state.lessonContent !== null || state.needsHumanReview) {
     logger.debug({
       lessonId: state.lessonSpec.lesson_id,
@@ -898,7 +930,7 @@ function shouldRetryAfterJudge(state: LessonGraphStateType): string {
     return '__end__';
   }
 
-  // Default: end the graph (max retries exceeded or other condition)
+  // Default: end the graph (other condition)
   logger.debug({
     lessonId: state.lessonSpec.lesson_id,
     retryCount: state.retryCount,

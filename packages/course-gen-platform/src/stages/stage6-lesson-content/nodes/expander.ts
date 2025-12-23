@@ -309,6 +309,8 @@ export async function expanderNode(
     stepName: 'expander_start',
     inputData: {
       lessonLabel: lessonSpec.lesson_id,
+      lessonTitle: lessonSpec.title,
+      moduleNumber: lessonSpec.lesson_id.split('.')[0],
       sectionCount: lessonSpec.sections.length,
       ragChunksCount: ragChunks.length,
       language,
@@ -408,6 +410,8 @@ export async function expanderNode(
       stepName: 'expander_complete',
       inputData: {
         lessonLabel: lessonSpec.lesson_id,
+        lessonTitle: lessonSpec.title,
+        moduleNumber: lessonSpec.lesson_id.split('.')[0],
         language,
       },
       outputData: {
@@ -454,6 +458,8 @@ export async function expanderNode(
       stepName: 'expander_error',
       inputData: {
         lessonLabel: lessonSpec.lesson_id,
+        lessonTitle: lessonSpec.title,
+        moduleNumber: lessonSpec.lesson_id.split('.')[0],
         language,
       },
       errorData: {

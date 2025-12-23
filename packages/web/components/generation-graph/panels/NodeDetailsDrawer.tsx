@@ -387,6 +387,13 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
         )}
         data-testid="node-details-drawer"
       >
+        {/* Accessibility: Hidden title for lesson nodes (screen readers only) */}
+        {isStage6Lesson && (
+          <SheetTitle className="sr-only">
+            {data?.label || 'Lesson Details'}
+          </SheetTitle>
+        )}
+
         {/* Hide SheetHeader for lesson nodes - LessonInspector has its own header via LessonInspectorLayout */}
         {!isStage6Lesson && (
           <SheetHeader className="pr-12">
@@ -479,6 +486,22 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
               className="h-full"
               isApproving={isApproving}
             />
+          ) : realtimeStatus?.status === 'skipped' || data?.status === 'skipped' ? (
+            /* Skipped Stage - show informative message */
+            <div className="flex flex-col items-center justify-center h-full py-12 text-center">
+              <div className="w-16 h-16 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-4">
+                <svg className="w-8 h-8 text-slate-400 dark:text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M9 9l6 6m0-6l-6 6" strokeLinecap="round" />
+                  <circle cx="12" cy="12" r="10" />
+                </svg>
+              </div>
+              <h3 className="text-lg font-semibold text-slate-700 dark:text-slate-300 mb-2">
+                {t('status.skipped')}
+              </h3>
+              <p className="text-sm text-slate-500 dark:text-slate-400 max-w-xs">
+                {t('status.skippedDescription')}
+              </p>
+            </div>
           ) : (
             /* Default tab-based UI for other node types */
             <>

@@ -21,6 +21,7 @@ export const GRAPH_TRANSLATIONS: GraphTranslations & {
     error: { ru: 'Ошибка', en: 'Error' },
     awaiting: { ru: 'Ожидает подтверждения', en: 'Awaiting Approval' },
     skipped: { ru: 'Пропущено', en: 'Skipped' },
+    skippedDescription: { ru: 'Этот этап был пропущен, так как курс создан без загруженных документов.', en: 'This stage was skipped because the course was created without uploaded documents.' },
   },
   actions: {
     approve: { ru: 'Подтвердить', en: 'Approve' },

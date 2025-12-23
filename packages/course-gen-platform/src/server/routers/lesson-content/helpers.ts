@@ -11,6 +11,15 @@ import { logger } from '../../../shared/logger/index.js';
 import type { Language } from '@megacampus/shared-types';
 import type { LessonSpecificationV2 } from '@megacampus/shared-types/lesson-specification-v2';
 import type { AnalysisResult } from '@megacampus/shared-types/analysis-result';
+import type { SectionBreakdown } from '@megacampus/shared-types/analysis-schemas';
+import {
+  inferTargetAudience,
+  mapTone,
+  inferBloomLevel,
+  inferContentArchetype,
+  inferHookStrategy,
+  mapDepth,
+} from '../../../stages/stage5-generation/utils/semantic-scaffolding';
 
 /**
  * Verify user has access to course (course owner or same organization)
@@ -122,11 +131,46 @@ export function buildMinimalLessonSpec(
     ? 'DRM fallback: searching all documents'
     : 'DRM found: filtering by primary_documents');
 
-  // Build learning objectives with minimal structure
+  // Create a minimal SectionBreakdown for inference functions
+  // This allows us to reuse semantic-scaffolding inference
+  const sectionBreakdown: SectionBreakdown = {
+    area: lesson.lesson_title,
+    estimated_lessons: 1,
+    importance: 'important',
+    learning_objectives: lesson.lesson_objectives || [],
+    key_topics: lesson.key_topics || [],
+    pedagogical_approach: '',
+    difficulty_progression: 'flat',
+    difficulty: lesson.difficulty_level,
+  };
+
+  // Infer metadata from analysisResult (use defaults if not available)
+  const inferredTargetAudience = inferTargetAudience(analysisResult);
+  const inferredTone = mapTone(analysisResult?.generation_guidance?.tone);
+  const inferredContentArchetype = inferContentArchetype(sectionBreakdown);
+  const inferredHookStrategy = inferHookStrategy(
+    lesson.lesson_objectives || [],
+    lesson.key_topics || []
+  );
+  const inferredComplianceLevel = inferredContentArchetype === 'legal_warning' ? 'strict' : 'standard';
+  const inferredDepth = mapDepth(lesson.difficulty_level, 'important');
+
+  logger.debug({
+    requestId,
+    lessonId,
+    inferredTargetAudience,
+    inferredTone,
+    inferredContentArchetype,
+    inferredHookStrategy,
+    inferredComplianceLevel,
+    inferredDepth,
+  }, 'Inferred semantic scaffolding values for minimal lesson spec');
+
+  // Build learning objectives with inferred Bloom levels
   const learningObjectives = (lesson.lesson_objectives || ['Complete this lesson']).map((text, idx) => ({
     id: `LO-${lessonId}-${idx + 1}`,
     objective: text.length >= 10 ? text : `Learn about ${lesson.lesson_title}`,
-    bloom_level: 'understand' as const,
+    bloom_level: inferBloomLevel(text),
   }));
 
   // Build key points from key_topics
@@ -142,36 +186,72 @@ export function buildMinimalLessonSpec(
     keyPointsCount: keyPoints.length,
   }, 'Building minimal lesson spec from course_structure');
 
+  // Build sections from key_topics (like Stage 5 does) instead of hardcoded "Main Content"
+  // This ensures section titles match the actual content topics
+  const keyTopics = lesson.key_topics || [];
+  const sections: LessonSpecificationV2['sections'] = [];
+
+  if (keyTopics.length === 0) {
+    // No key_topics: use lesson title as the single content section
+    sections.push({
+      title: lesson.lesson_title,
+      content_archetype: inferredContentArchetype,
+      rag_context_id: String(sectionNumber),
+      constraints: {
+        depth: inferredDepth,
+        required_keywords: [],
+        prohibited_terms: [],
+      },
+      key_points_to_cover: [`Understand the core concepts of ${lesson.lesson_title}`],
+    });
+  } else {
+    // Create a section for each key_topic (matching Stage 5 behavior)
+    for (const topic of keyTopics) {
+      sections.push({
+        title: topic,
+        content_archetype: inferredContentArchetype,
+        rag_context_id: String(sectionNumber),
+        constraints: {
+          depth: inferredDepth,
+          required_keywords: [],
+          prohibited_terms: [],
+        },
+        key_points_to_cover: [`Define and explain ${topic}`],
+      });
+    }
+  }
+
+  // Always add Conclusion section (matching Stage 5 behavior, required by heuristic filter)
+  sections.push({
+    title: 'Conclusion',
+    content_archetype: inferredContentArchetype,
+    rag_context_id: String(sectionNumber),
+    constraints: {
+      depth: 'summary', // Conclusions are always summary depth
+      required_keywords: [],
+      prohibited_terms: [],
+    },
+    key_points_to_cover: ['Key takeaways from this lesson', 'Next steps for learners'],
+  });
+
   // Return minimal but valid LessonSpecificationV2
   return {
     lesson_id: lessonId,
     title: lesson.lesson_title,
     description: (lesson.lesson_objectives || [])[0] || `This lesson covers ${lesson.lesson_title}`,
     metadata: {
-      target_audience: 'practitioner',
-      tone: 'conversational-professional',
-      compliance_level: 'standard',
-      content_archetype: 'concept_explainer',
+      target_audience: inferredTargetAudience,
+      tone: inferredTone,
+      compliance_level: inferredComplianceLevel,
+      content_archetype: inferredContentArchetype,
     },
     learning_objectives: learningObjectives,
     intro_blueprint: {
-      hook_strategy: 'question',
+      hook_strategy: inferredHookStrategy,
       hook_topic: lesson.lesson_title,
       key_learning_objectives: learningObjectives.map(lo => lo.objective).join(', '),
     },
-    sections: [
-      {
-        title: 'Main Content',
-        content_archetype: 'concept_explainer',
-        rag_context_id: 'default',
-        constraints: {
-          depth: 'detailed_analysis',
-          required_keywords: lesson.key_topics || [],
-          prohibited_terms: [],
-        },
-        key_points_to_cover: keyPoints,
-      },
-    ],
+    sections,
     exercises: [],
     rag_context: {
       primary_documents: ragPlan?.primary_documents?.length ? ragPlan.primary_documents : [],

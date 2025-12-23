@@ -7,7 +7,8 @@
     "history": "History",
     "users": "Users",
     "pipeline": "Pipeline",
-    "pricing": "Pricing"
+    "pricing": "Pricing",
+    "logs": "Logs"
   },
   "stats": {
     "overview": "Platform overview",
@@ -267,5 +268,51 @@
       "fetchFailed": "Failed to fetch system status",
       "unauthorized": "Insufficient permissions to view"
     }
+  },
+  "logs": {
+    "title": "Logs",
+    "description": "Monitor and manage system logs",
+    "filters": {
+      "level": "Level",
+      "source": "Source",
+      "status": "Status",
+      "search": "Search messages...",
+      "dateFrom": "From",
+      "dateTo": "To",
+      "clear": "Clear filters"
+    },
+    "table": {
+      "timestamp": "Time",
+      "level": "Level",
+      "source": "Source",
+      "message": "Message",
+      "course": "Course",
+      "status": "Status"
+    },
+    "status": {
+      "new": "New",
+      "in_progress": "In Progress",
+      "resolved": "Resolved",
+      "ignored": "Ignored"
+    },
+    "levels": {
+      "WARNING": "Warning",
+      "ERROR": "Error",
+      "CRITICAL": "Critical"
+    },
+    "drawer": {
+      "title": "Log Details",
+      "stackTrace": "Stack Trace",
+      "metadata": "Metadata",
+      "notes": "Notes",
+      "saveStatus": "Save Status"
+    },
+    "bulk": {
+      "selected": "{count} selected",
+      "markResolved": "Mark Resolved",
+      "markIgnored": "Mark Ignored",
+      "clearSelection": "Clear Selection"
+    },
+    "empty": "No logs found"
   }
 }

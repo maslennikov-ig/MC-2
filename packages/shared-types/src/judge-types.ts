@@ -468,6 +468,8 @@ export const SectionExpanderInputSchema = z.object({
   }),
   /** Word count target */
   targetWordCount: z.number().int().min(50).max(2000).optional(),
+  /** Content language for generation (ISO 639-1 code: 'ru', 'en') */
+  language: z.string().optional(),
 });
 
 /** SectionExpanderInput type */

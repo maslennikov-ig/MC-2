@@ -18,6 +18,8 @@ import type {
   HookStrategyV2,
   SectionDepthV2,
   TargetAudienceV2,
+  ContentToneV2,
+  BloomLevelV2,
 } from '@megacampus/shared-types/lesson-specification-v2';
 import { CONTENT_ARCHETYPE_TEMPERATURES_V2 } from '@megacampus/shared-types/lesson-specification-v2';
 import type { SectionBreakdown } from '@megacampus/shared-types/analysis-schemas';
@@ -382,6 +384,100 @@ export function inferTargetAudience(analysisResult: AnalysisResult | null | unde
     reason: 'Default mapping to practitioner',
   }, 'Target audience inferred: practitioner');
   return 'practitioner';
+}
+
+// ============================================================================
+// TONE MAPPING
+// ============================================================================
+
+/**
+ * Map analysis tone to ContentToneV2
+ *
+ * Maps the generation_guidance.tone from AnalysisResult to the V2 ContentTone type.
+ *
+ * Mapping:
+ * - 'formal academic' -> 'formal'
+ * - All others -> 'conversational-professional'
+ *
+ * @param analysisTone - Tone from analysisResult.generation_guidance.tone
+ * @returns ContentToneV2 value
+ */
+export function mapTone(
+  analysisTone: 'conversational but precise' | 'formal academic' | 'casual friendly' | 'technical professional' | undefined
+): ContentToneV2 {
+  if (analysisTone === 'formal academic') {
+    logger.debug({
+      analysisTone,
+      mappedTone: 'formal',
+      reason: 'Formal academic tone maps to formal',
+    }, 'Tone mapped: formal');
+    return 'formal';
+  }
+
+  logger.debug({
+    analysisTone,
+    mappedTone: 'conversational-professional',
+    reason: 'Default/other tones map to conversational-professional',
+  }, 'Tone mapped: conversational-professional');
+  return 'conversational-professional';
+}
+
+// ============================================================================
+// BLOOM'S TAXONOMY INFERENCE
+// ============================================================================
+
+/**
+ * Bloom's Taxonomy keywords for level inference
+ */
+const BLOOM_KEYWORDS: Record<BloomLevelV2, string[]> = {
+  create: ['create', 'design', 'develop', 'formulate', 'build', 'invent', 'compose', 'generate', 'plan', 'produce'],
+  evaluate: ['evaluate', 'assess', 'judge', 'critique', 'recommend', 'justify', 'defend', 'prioritize'],
+  analyze: ['analyze', 'examine', 'compare', 'contrast', 'differentiate', 'distinguish', 'investigate', 'categorize'],
+  apply: ['apply', 'implement', 'execute', 'use', 'demonstrate', 'solve', 'practice', 'calculate'],
+  understand: ['understand', 'explain', 'describe', 'summarize', 'interpret', 'classify', 'discuss', 'identify'],
+  remember: ['remember', 'recall', 'list', 'define', 'name', 'recognize', 'state', 'repeat'],
+};
+
+/**
+ * Infer Bloom's Taxonomy level from learning objective text
+ *
+ * Analyzes the objective text for action verbs that indicate cognitive level.
+ * Checks levels in descending order of complexity.
+ *
+ * @param objective - Learning objective text
+ * @returns Inferred Bloom's level (defaults to 'remember')
+ *
+ * @example
+ * ```typescript
+ * inferBloomLevel('Create a REST API'); // 'create'
+ * inferBloomLevel('Understand the basics'); // 'understand'
+ * inferBloomLevel('List the features'); // 'remember'
+ * ```
+ */
+export function inferBloomLevel(objective: string): BloomLevelV2 {
+  const text = objective.toLowerCase();
+
+  // Check levels in descending order of complexity
+  const levels: BloomLevelV2[] = ['create', 'evaluate', 'analyze', 'apply', 'understand'];
+
+  for (const level of levels) {
+    if (BLOOM_KEYWORDS[level].some(keyword => text.includes(keyword))) {
+      logger.debug({
+        objective: objective.slice(0, 50),
+        bloomLevel: level,
+        reason: 'Matched keyword in objective',
+      }, 'Bloom level inferred');
+      return level;
+    }
+  }
+
+  // Default to remember for basic objectives
+  logger.debug({
+    objective: objective.slice(0, 50),
+    bloomLevel: 'remember',
+    reason: 'No specific keywords found, defaulting to remember',
+  }, 'Bloom level inferred: remember');
+  return 'remember';
 }
 
 // ============================================================================

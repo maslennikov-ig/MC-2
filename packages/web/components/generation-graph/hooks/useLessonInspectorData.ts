@@ -378,7 +378,15 @@ function buildMarkdownFromContent(content: Record<string, unknown>): string {
   // Introduction (check both 'intro' and 'introduction')
   const intro = content.intro || content.introduction;
   if (intro && typeof intro === 'string') {
-    parts[idx++] = intro;
+    parts[idx++] = `## Введение\n\n${intro}`;
+  }
+
+  // Main content (if present as a separate field)
+  if (content.mainContent && typeof content.mainContent === 'string') {
+    parts[idx++] = `## Основной контент\n\n${content.mainContent}`;
+  }
+  if (content.main_content && typeof content.main_content === 'string') {
+    parts[idx++] = `## Основной контент\n\n${content.main_content}`;
   }
 
   // Sections

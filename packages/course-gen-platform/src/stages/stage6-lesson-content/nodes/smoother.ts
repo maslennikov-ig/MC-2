@@ -356,6 +356,8 @@ export async function smootherNode(
     stepName: 'smoother_start',
     inputData: {
       lessonLabel: lessonSpec.lesson_id,
+      lessonTitle: lessonSpec.title,
+      moduleNumber: lessonSpec.lesson_id.split('.')[0],
       contentLength: assembledContent.length,
       language,
     },
@@ -455,6 +457,8 @@ export async function smootherNode(
       stepName: 'smoother_complete',
       inputData: {
         lessonLabel: lessonSpec.lesson_id,
+        lessonTitle: lessonSpec.title,
+        moduleNumber: lessonSpec.lesson_id.split('.')[0],
         language,
       },
       outputData: {
@@ -501,6 +505,8 @@ export async function smootherNode(
       stepName: 'smoother_error',
       inputData: {
         lessonLabel: lessonSpec.lesson_id,
+        lessonTitle: lessonSpec.title,
+        moduleNumber: lessonSpec.lesson_id.split('.')[0],
         language,
       },
       errorData: {

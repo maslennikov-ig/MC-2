@@ -504,6 +504,7 @@ export interface GraphTranslations {
     error: { ru: string; en: string };
     awaiting: { ru: string; en: string };
     skipped: { ru: string; en: string };
+    skippedDescription: { ru: string; en: string };
   };
   actions: {
     approve: { ru: string; en: string };

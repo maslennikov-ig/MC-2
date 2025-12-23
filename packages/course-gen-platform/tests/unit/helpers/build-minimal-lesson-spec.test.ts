@@ -21,15 +21,37 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { buildMinimalLessonSpec } from '@/server/routers/lesson-content/helpers';
 import type { AnalysisResult } from '@megacampus/shared-types/analysis-result';
 
-// Mock logger
-vi.mock('@/shared/logger', () => ({
-  logger: {
+// Mock logger - needs both named and default export for different import styles
+// Note: vi.mock is hoisted, so we must define inline
+vi.mock('@/shared/logger', () => {
+  const logger = {
     debug: vi.fn(),
     info: vi.fn(),
     warn: vi.fn(),
     error: vi.fn(),
-  },
-}));
+  };
+  return { default: logger, logger };
+});
+
+vi.mock('@/shared/logger/index.js', () => {
+  const logger = {
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+  };
+  return { default: logger, logger };
+});
+
+vi.mock('../../../src/shared/logger', () => {
+  const logger = {
+    debug: vi.fn(),
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+  };
+  return { default: logger, logger };
+});
 
 describe('buildMinimalLessonSpec', () => {
   const baseLesson = {
@@ -274,7 +296,7 @@ describe('buildMinimalLessonSpec', () => {
   });
 
   describe('complete LessonSpecificationV2 validation', () => {
-    it('should return valid LessonSpecificationV2 structure', () => {
+    it('should return valid LessonSpecificationV2 structure with sections from key_topics', () => {
       const spec = buildMinimalLessonSpec(
         lessonId,
         baseLesson,
@@ -303,13 +325,15 @@ describe('buildMinimalLessonSpec', () => {
       expect(spec.intro_blueprint.hook_strategy).toBe('question');
       expect(spec.intro_blueprint.hook_topic).toBe(baseLesson.lesson_title);
 
+      // NEW BEHAVIOR: sections are created from key_topics + Conclusion
       expect(spec.sections).toBeDefined();
-      expect(spec.sections).toHaveLength(1);
-      expect(spec.sections[0].title).toBe('Main Content');
+      expect(spec.sections).toHaveLength(4); // 3 key_topics + Conclusion
+      expect(spec.sections[0].title).toBe('supervised learning');
+      expect(spec.sections[1].title).toBe('unsupervised learning');
+      expect(spec.sections[2].title).toBe('neural networks');
+      expect(spec.sections[3].title).toBe('Conclusion');
       expect(spec.sections[0].content_archetype).toBe('concept_explainer');
-      expect(spec.sections[0].rag_context_id).toBe('default');
-      expect(spec.sections[0].constraints.required_keywords).toEqual(baseLesson.key_topics);
-      expect(spec.sections[0].key_points_to_cover).toHaveLength(3);
+      expect(spec.sections[0].rag_context_id).toBe('1'); // sectionNumber as string
 
       expect(spec.exercises).toEqual([]);
       expect(spec.rag_context).toBeDefined();
@@ -336,9 +360,11 @@ describe('buildMinimalLessonSpec', () => {
       expect(spec.learning_objectives).toHaveLength(1);
       expect(spec.learning_objectives[0].objective).toBe('Complete this lesson');
 
-      // Default key points (from lesson_title)
-      expect(spec.sections[0].key_points_to_cover).toEqual(['Minimal Lesson']);
-      expect(spec.sections[0].constraints.required_keywords).toEqual([]);
+      // NEW BEHAVIOR: No key_topics → single section with lesson_title + Conclusion
+      expect(spec.sections).toHaveLength(2);
+      expect(spec.sections[0].title).toBe('Minimal Lesson');
+      expect(spec.sections[0].key_points_to_cover).toEqual(['Understand the core concepts of Minimal Lesson']);
+      expect(spec.sections[1].title).toBe('Conclusion');
 
       // Default rag_context
       expect(spec.rag_context.primary_documents).toEqual([]);
@@ -370,10 +396,10 @@ describe('buildMinimalLessonSpec', () => {
       expect(spec.learning_objectives[1].objective).toBe('Valid objective');
     });
 
-    it('should create key points with minimum length validation (>= 5 chars)', () => {
+    it('should create sections from key_topics', () => {
       const lessonShortTopics = {
         lesson_title: 'Data Science',
-        key_topics: ['ML', 'AI', 'stats', 'python'], // 'ML' (2), 'AI' (2), 'stats' (5), 'python' (6)
+        key_topics: ['ML', 'AI', 'stats', 'python'], // 4 topics
       };
 
       const spec = buildMinimalLessonSpec(
@@ -384,13 +410,13 @@ describe('buildMinimalLessonSpec', () => {
         undefined
       );
 
-      // Topics < 5 chars get augmented, >= 5 remain as-is
-      expect(spec.sections[0].key_points_to_cover).toEqual([
-        'Introduction to ML',
-        'Introduction to AI',
-        'stats', // Exactly 5 chars, stays as-is
-        'python', // 6 chars, stays as-is
-      ]);
+      // NEW BEHAVIOR: Each key_topic becomes a section + Conclusion
+      expect(spec.sections).toHaveLength(5); // 4 topics + Conclusion
+      expect(spec.sections[0].title).toBe('ML');
+      expect(spec.sections[1].title).toBe('AI');
+      expect(spec.sections[2].title).toBe('stats');
+      expect(spec.sections[3].title).toBe('python');
+      expect(spec.sections[4].title).toBe('Conclusion');
     });
   });
 
@@ -483,7 +509,10 @@ describe('buildMinimalLessonSpec', () => {
         undefined
       );
 
-      expect(spec.sections[0].key_points_to_cover).toEqual(['Lesson Title']);
+      // NEW BEHAVIOR: null key_topics → single section with lesson_title + Conclusion
+      expect(spec.sections).toHaveLength(2);
+      expect(spec.sections[0].title).toBe('Lesson Title');
+      expect(spec.sections[1].title).toBe('Conclusion');
       expect(spec.rag_context.search_queries).toEqual(['Lesson Title']);
     });
 
@@ -522,11 +551,13 @@ describe('buildMinimalLessonSpec', () => {
 
       expect(spec.title).toBe('C++ & <JavaScript>: "Advanced" Programming');
       expect(spec.learning_objectives[0].objective).toBe('Learn C++ syntax & features');
-      expect(spec.sections[0].key_points_to_cover).toEqual([
-        'pointers & references',
-        '<generics>',
-        '"const" keyword',
-      ]);
+
+      // NEW BEHAVIOR: key_topics become section titles + Conclusion
+      expect(spec.sections).toHaveLength(4); // 3 topics + Conclusion
+      expect(spec.sections[0].title).toBe('pointers & references');
+      expect(spec.sections[1].title).toBe('<generics>');
+      expect(spec.sections[2].title).toBe('"const" keyword');
+      expect(spec.sections[3].title).toBe('Conclusion');
     });
 
     it('should handle empty analysisResult document_relevance_mapping object', () => {
@@ -578,6 +609,233 @@ describe('buildMinimalLessonSpec', () => {
       const spec = buildMinimalLessonSpec(lessonId, lesson, sectionNumber, requestId, undefined);
 
       expect(spec.description).toBe('This lesson covers React Hooks');
+    });
+  });
+
+  describe('semantic scaffolding inference', () => {
+    describe('target_audience inference from analysisResult', () => {
+      it('should infer practitioner when analysisResult is undefined', () => {
+        const spec = buildMinimalLessonSpec(lessonId, baseLesson, sectionNumber, requestId, undefined);
+        expect(spec.metadata.target_audience).toBe('practitioner');
+      });
+
+      it('should infer novice for beginner target audience', () => {
+        const analysisResult = {
+          topic_analysis: {
+            target_audience: 'beginner',
+          },
+        } as unknown as AnalysisResult;
+
+        const spec = buildMinimalLessonSpec(lessonId, baseLesson, sectionNumber, requestId, analysisResult);
+        expect(spec.metadata.target_audience).toBe('novice');
+      });
+
+      it('should infer executive for advanced audience with professional category', () => {
+        const analysisResult = {
+          topic_analysis: {
+            target_audience: 'advanced',
+          },
+          course_category: {
+            primary: 'professional',
+          },
+        } as unknown as AnalysisResult;
+
+        const spec = buildMinimalLessonSpec(lessonId, baseLesson, sectionNumber, requestId, analysisResult);
+        expect(spec.metadata.target_audience).toBe('executive');
+      });
+
+      it('should infer practitioner for intermediate target audience', () => {
+        const analysisResult = {
+          topic_analysis: {
+            target_audience: 'intermediate',
+          },
+        } as unknown as AnalysisResult;
+
+        const spec = buildMinimalLessonSpec(lessonId, baseLesson, sectionNumber, requestId, analysisResult);
+        expect(spec.metadata.target_audience).toBe('practitioner');
+      });
+    });
+
+    describe('tone inference from generation_guidance', () => {
+      it('should infer conversational-professional when analysisResult is undefined', () => {
+        const spec = buildMinimalLessonSpec(lessonId, baseLesson, sectionNumber, requestId, undefined);
+        expect(spec.metadata.tone).toBe('conversational-professional');
+      });
+
+      it('should infer formal for formal academic tone', () => {
+        const analysisResult = {
+          generation_guidance: {
+            tone: 'formal academic' as const,
+          },
+        } as unknown as AnalysisResult;
+
+        const spec = buildMinimalLessonSpec(lessonId, baseLesson, sectionNumber, requestId, analysisResult);
+        expect(spec.metadata.tone).toBe('formal');
+      });
+
+      it('should infer conversational-professional for conversational but precise tone', () => {
+        const analysisResult = {
+          generation_guidance: {
+            tone: 'conversational but precise' as const,
+          },
+        } as unknown as AnalysisResult;
+
+        const spec = buildMinimalLessonSpec(lessonId, baseLesson, sectionNumber, requestId, analysisResult);
+        expect(spec.metadata.tone).toBe('conversational-professional');
+      });
+
+      it('should infer conversational-professional for undefined tone', () => {
+        const analysisResult = {
+          generation_guidance: {},
+        } as unknown as AnalysisResult;
+
+        const spec = buildMinimalLessonSpec(lessonId, baseLesson, sectionNumber, requestId, analysisResult);
+        expect(spec.metadata.tone).toBe('conversational-professional');
+      });
+    });
+
+    describe('bloom_level inference from objective text', () => {
+      it('should infer understand for objective with "understand"', () => {
+        const lesson = {
+          lesson_title: 'Test',
+          lesson_objectives: ['Understand the concept of functions'],
+        };
+
+        const spec = buildMinimalLessonSpec(lessonId, lesson, sectionNumber, requestId, undefined);
+        expect(spec.learning_objectives[0].bloom_level).toBe('understand');
+      });
+
+      it('should infer create for objective with "create"', () => {
+        const lesson = {
+          lesson_title: 'Test',
+          lesson_objectives: ['Create a responsive web application'],
+        };
+
+        const spec = buildMinimalLessonSpec(lessonId, lesson, sectionNumber, requestId, undefined);
+        expect(spec.learning_objectives[0].bloom_level).toBe('create');
+      });
+
+      it('should infer analyze for objective with "analyze"', () => {
+        const lesson = {
+          lesson_title: 'Test',
+          lesson_objectives: ['Analyze the performance of algorithms'],
+        };
+
+        const spec = buildMinimalLessonSpec(lessonId, lesson, sectionNumber, requestId, undefined);
+        expect(spec.learning_objectives[0].bloom_level).toBe('analyze');
+      });
+
+      it('should infer apply for objective with "implement"', () => {
+        const lesson = {
+          lesson_title: 'Test',
+          lesson_objectives: ['Implement a sorting algorithm'],
+        };
+
+        const spec = buildMinimalLessonSpec(lessonId, lesson, sectionNumber, requestId, undefined);
+        expect(spec.learning_objectives[0].bloom_level).toBe('apply');
+      });
+
+      it('should infer evaluate for objective with "evaluate"', () => {
+        const lesson = {
+          lesson_title: 'Test',
+          lesson_objectives: ['Evaluate the effectiveness of different testing strategies'],
+        };
+
+        const spec = buildMinimalLessonSpec(lessonId, lesson, sectionNumber, requestId, undefined);
+        expect(spec.learning_objectives[0].bloom_level).toBe('evaluate');
+      });
+
+      it('should default to remember for unrecognized objective', () => {
+        const lesson = {
+          lesson_title: 'Test',
+          lesson_objectives: ['Complete this task successfully'],
+        };
+
+        const spec = buildMinimalLessonSpec(lessonId, lesson, sectionNumber, requestId, undefined);
+        expect(spec.learning_objectives[0].bloom_level).toBe('remember');
+      });
+    });
+
+    describe('content_archetype inference', () => {
+      it('should infer concept_explainer for standard lesson', () => {
+        const spec = buildMinimalLessonSpec(lessonId, baseLesson, sectionNumber, requestId, undefined);
+        expect(spec.metadata.content_archetype).toBe('concept_explainer');
+      });
+
+      it('should infer code_tutorial for programming content', () => {
+        // code_tutorial is triggered by keywords: code, implement, develop, algorithm, api, sdk, debug, refactor
+        const tutorialLesson = {
+          lesson_title: 'Implementing API Endpoints',
+          lesson_objectives: ['Develop RESTful API endpoints'],
+          key_topics: ['api design', 'implementation patterns'],
+        };
+
+        const spec = buildMinimalLessonSpec(lessonId, tutorialLesson, sectionNumber, requestId, undefined);
+        expect(spec.metadata.content_archetype).toBe('code_tutorial');
+      });
+
+      it('should infer case_study for case study lesson', () => {
+        const caseStudyLesson = {
+          lesson_title: 'Case Study: Netflix Architecture',
+          lesson_objectives: ['Analyze real-world system design'],
+          key_topics: ['microservices', 'scaling'],
+        };
+
+        const spec = buildMinimalLessonSpec(lessonId, caseStudyLesson, sectionNumber, requestId, undefined);
+        expect(spec.metadata.content_archetype).toBe('case_study');
+      });
+    });
+
+    describe('hook_strategy inference', () => {
+      it('should infer question as default hook strategy', () => {
+        const spec = buildMinimalLessonSpec(lessonId, baseLesson, sectionNumber, requestId, undefined);
+        expect(spec.intro_blueprint.hook_strategy).toBe('question');
+      });
+
+      it('should infer challenge for objectives with problem-solving verbs', () => {
+        const applyLesson = {
+          lesson_title: 'Building REST APIs',
+          lesson_objectives: ['Build scalable APIs using best practices'],
+          key_topics: ['REST', 'HTTP methods'],
+        };
+
+        const spec = buildMinimalLessonSpec(lessonId, applyLesson, sectionNumber, requestId, undefined);
+        expect(spec.intro_blueprint.hook_strategy).toBe('challenge');
+      });
+
+      it('should infer statistic for content with metrics and percentages', () => {
+        const statsLesson = {
+          lesson_title: 'Performance Analysis',
+          lesson_objectives: ['Measure and improve 50% latency'],
+          key_topics: ['metrics', 'performance data'],
+        };
+
+        const spec = buildMinimalLessonSpec(lessonId, statsLesson, sectionNumber, requestId, undefined);
+        expect(spec.intro_blueprint.hook_strategy).toBe('statistic');
+      });
+    });
+
+    describe('compliance_level inference', () => {
+      it('should use standard compliance for non-legal content', () => {
+        const spec = buildMinimalLessonSpec(lessonId, baseLesson, sectionNumber, requestId, undefined);
+        expect(spec.metadata.compliance_level).toBe('standard');
+      });
+
+      it('should use standard compliance even for legal content (importance not core)', () => {
+        // Note: legal_warning archetype requires importance='core' in SectionBreakdown,
+        // but buildMinimalLessonSpec uses importance='important' (hardcoded),
+        // so compliance_level will always be 'standard' in minimal spec context.
+        const legalLesson = {
+          lesson_title: 'Legal Requirements for Data Privacy',
+          lesson_objectives: ['Understand GDPR compliance requirements'],
+          key_topics: ['GDPR', 'data protection', 'legal obligations'],
+        };
+
+        const spec = buildMinimalLessonSpec(lessonId, legalLesson, sectionNumber, requestId, undefined);
+        // Content archetype won't be 'legal_warning' because importance !== 'core'
+        expect(spec.metadata.content_archetype).toBe('concept_explainer');
+        expect(spec.metadata.compliance_level).toBe('standard');
+      });
     });
   });
 });

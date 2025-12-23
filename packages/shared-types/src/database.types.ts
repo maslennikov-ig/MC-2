@@ -1,5 +1,3 @@
-/* eslint-disable @typescript-eslint/no-redundant-type-constituents */
-/* eslint-disable max-lines */
 export type Json =
   | string
   | number
@@ -1524,6 +1522,57 @@ export type Database = {
           },
         ]
       }
+      log_issue_status: {
+        Row: {
+          assigned_to: string | null
+          created_at: string
+          id: string
+          log_id: string
+          log_type: string
+          notes: string | null
+          status: string
+          updated_at: string
+          updated_by: string | null
+        }
+        Insert: {
+          assigned_to?: string | null
+          created_at?: string
+          id?: string
+          log_id: string
+          log_type: string
+          notes?: string | null
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Update: {
+          assigned_to?: string | null
+          created_at?: string
+          id?: string
+          log_id?: string
+          log_type?: string
+          notes?: string | null
+          status?: string
+          updated_at?: string
+          updated_by?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "log_issue_status_assigned_to_fkey"
+            columns: ["assigned_to"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "log_issue_status_updated_by_fkey"
+            columns: ["updated_by"]
+            isOneToOne: false
+            referencedRelation: "users"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       organizations: {
         Row: {
           created_at: string | null
@@ -2258,13 +2307,18 @@ export type Database = {
       find_duplicate_file: {
         Args: { p_hash: string }
         Returns: {
+          chunk_count: number
           file_id: string
           file_size: number
           markdown_content: string
           mime_type: string
+          original_name: string
           parsed_content: Json
+          processed_content: string
+          processing_method: string
           reference_count: number
           storage_path: string
+          summary_metadata: Json
           vector_status: string
         }[]
       }

@@ -116,14 +116,31 @@ const StageNode = (props: NodeProps<RFStageNode>) => {
 
       {/* Body */}
       <div className="flex items-center gap-3 p-3">
-        <div className={`flex h-10 w-10 items-center justify-center rounded-full text-slate-600 dark:text-slate-300 ${currentStatus === 'active' ? 'bg-white dark:bg-slate-700 shadow-sm' : 'bg-slate-100 dark:bg-slate-700'}`}>
-          <IconComponent size={20} className={currentStatus === 'active' ? 'text-blue-600 dark:text-blue-400 animate-spin-slow' : ''} />
+        <div className={`flex h-10 w-10 items-center justify-center rounded-full ${
+          currentStatus === 'skipped'
+            ? 'bg-slate-200 dark:bg-slate-600 text-slate-400 dark:text-slate-500'
+            : currentStatus === 'active'
+              ? 'bg-white dark:bg-slate-700 shadow-sm text-slate-600 dark:text-slate-300'
+              : 'bg-slate-100 dark:bg-slate-700 text-slate-600 dark:text-slate-300'
+        }`}>
+          <IconComponent size={20} className={
+            currentStatus === 'active' ? 'text-blue-600 dark:text-blue-400 animate-spin-slow' :
+            currentStatus === 'skipped' ? 'text-slate-400 dark:text-slate-500' : ''
+          } />
         </div>
         <div className="flex flex-col">
-          <span className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-wider">
+          <span className={`text-xs font-medium uppercase tracking-wider ${
+            currentStatus === 'skipped'
+              ? 'text-slate-400 dark:text-slate-500'
+              : 'text-slate-500 dark:text-slate-400'
+          }`}>
             Этап {data.stageNumber}
           </span>
-          <span className="text-sm font-semibold text-slate-900 dark:text-slate-100">
+          <span className={`text-sm font-semibold ${
+            currentStatus === 'skipped'
+              ? 'text-slate-500 dark:text-slate-400 line-through'
+              : 'text-slate-900 dark:text-slate-100'
+          }`}>
             {stageName}
           </span>
           {/* Substeps Display (T124) */}
@@ -151,6 +168,10 @@ const StageNode = (props: NodeProps<RFStageNode>) => {
             </span>
           ) : currentStatus === 'error' ? (
             <span className="text-red-600 dark:text-red-400 font-medium">{t('restart.errorDescription')}</span>
+          ) : currentStatus === 'skipped' ? (
+            <span className="text-slate-400 dark:text-slate-500 italic">
+              {t('status.skipped')}
+            </span>
           ) : (
             <span className="font-medium">{t(`status.${currentStatus}`)}</span>
           )}

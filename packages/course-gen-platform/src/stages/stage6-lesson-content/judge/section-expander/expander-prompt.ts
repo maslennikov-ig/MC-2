@@ -13,6 +13,7 @@
  */
 
 import type { SectionExpanderInput, TargetedIssue } from '@megacampus/shared-types';
+import { getLanguageName } from '@megacampus/shared-types';
 
 /**
  * Build prompt for Section-Expander LLM call
@@ -81,6 +82,9 @@ export function buildExpanderPrompt(input: SectionExpanderInput): string {
     ? `Next section starts with: "${input.contextAnchors.nextSectionStart}"`
     : 'This is the last section.';
 
+  // Get language name for output instruction (same pattern as assembler/smoother)
+  const languageName = getLanguageName(input.language || 'en');
+
   return `You are an expert educational content writer. Regenerate the following section to address identified issues.
 
 ## SECTION INFORMATION
@@ -103,6 +107,12 @@ ${ragContext}
 ## CONTEXT FOR COHERENCE
 ${prevContext}
 ${nextContext}
+
+<output_language>
+MANDATORY: Write ALL content in ${languageName}.
+Every word, example, and explanation must be in ${languageName}.
+DO NOT mix languages.
+</output_language>
 
 ## OUTPUT REQUIREMENTS
 1. Write a complete new section addressing ALL listed issues
@@ -252,3 +262,4 @@ export function validateTargetWordCount(count: number | undefined): number {
   }
   return Math.max(50, Math.min(2000, count));
 }
+

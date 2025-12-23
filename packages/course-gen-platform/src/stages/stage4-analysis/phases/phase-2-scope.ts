@@ -398,6 +398,27 @@ ${schemaDescription}
      - Difficulty level: beginner/intermediate/advanced
      - Prerequisites (array of section_ids that must be completed first, empty [] if none)
 
+**CRITICAL CONSTRAINT - KEY TOPICS / LEARNING OBJECTIVES ALIGNMENT:**
+
+Each item in \`key_topics\` MUST directly correspond to a \`learning_objective\` in the same section.
+- The key_topic should be the noun/concept/technique from the objective
+- DO NOT generate key_topics that are not covered by learning_objectives
+- The LLM generating lesson content will use key_topics as section titles
+- The LLM validating lesson content will check against learning_objectives
+- If they don't match, the lesson will fail quality validation!
+
+**Correct Alignment Example:**
+- learning_objective: "Apply the 'Time Compression' technique to accelerate decisions"
+  → key_topic: "Time Compression technique"
+- learning_objective: "Use 'Scarcity Principle' in event ticket context"
+  → key_topic: "Scarcity Principle in sales"
+- learning_objective: "Control emotional barriers through objection reframing"
+  → key_topic: "Emotional barriers and objection reframing"
+
+**Incorrect Example (CAUSES GENERATION FAILURE):**
+- learning_objective: "Apply Time Compression technique"
+  → key_topic: "Anchoring technique" ← WRONG! Topic doesn't match objective!
+
 4. **Scope Warning** (if applicable):
    - Warn if scope is very narrow or very broad
    - Warn if total_lessons is exactly 10 (borderline minimum)

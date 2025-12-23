@@ -7,7 +7,8 @@
     "history": "История",
     "users": "Пользователи",
     "pipeline": "Пайплайн",
-    "pricing": "Тарифы"
+    "pricing": "Тарифы",
+    "logs": "Логи"
   },
   "stats": {
     "overview": "Обзор платформы",
@@ -267,5 +268,51 @@
       "fetchFailed": "Не удалось получить статус системы",
       "unauthorized": "Недостаточно прав для просмотра"
     }
+  },
+  "logs": {
+    "title": "Логи",
+    "description": "Мониторинг и управление системными логами",
+    "filters": {
+      "level": "Уровень",
+      "source": "Источник",
+      "status": "Статус",
+      "search": "Поиск по сообщениям...",
+      "dateFrom": "С",
+      "dateTo": "По",
+      "clear": "Сбросить фильтры"
+    },
+    "table": {
+      "timestamp": "Время",
+      "level": "Уровень",
+      "source": "Источник",
+      "message": "Сообщение",
+      "course": "Курс",
+      "status": "Статус"
+    },
+    "status": {
+      "new": "Новый",
+      "in_progress": "В работе",
+      "resolved": "Решено",
+      "ignored": "Игнорируется"
+    },
+    "levels": {
+      "WARNING": "Предупреждение",
+      "ERROR": "Ошибка",
+      "CRITICAL": "Критическая"
+    },
+    "drawer": {
+      "title": "Детали лога",
+      "stackTrace": "Стек вызовов",
+      "metadata": "Метаданные",
+      "notes": "Заметки",
+      "saveStatus": "Сохранить статус"
+    },
+    "bulk": {
+      "selected": "{count} выбрано",
+      "markResolved": "Отметить решенным",
+      "markIgnored": "Игнорировать",
+      "clearSelection": "Снять выделение"
+    },
+    "empty": "Логи не найдены"
   }
 }

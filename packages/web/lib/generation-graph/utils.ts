@@ -144,6 +144,7 @@ export function isAwaitingApproval(status: string): number | null {
  * @param hasError - Whether pipeline has failed
  * @param awaitingStage - Stage awaiting approval (if any)
  * @param failedAtStage - Stage where failure occurred (from courses.failed_at_stage)
+ * @param hasDocuments - Whether the course has documents (stages 2,3 are skipped if false)
  */
 export function mapStatusToNodeStatus(
   stageNumber: number,
@@ -151,8 +152,13 @@ export function mapStatusToNodeStatus(
   overallStatus: string,
   hasError: boolean,
   awaitingStage: number | null,
-  failedAtStage?: number | null
+  failedAtStage?: number | null,
+  hasDocuments: boolean = true
 ): NodeStatus {
+  // Stages 2 and 3 are skipped when course has no documents
+  if (!hasDocuments && (stageNumber === 2 || stageNumber === 3)) {
+    return 'skipped';
+  }
   // Show error ONLY on the specific stage that failed
   if (hasError && failedAtStage !== undefined && failedAtStage !== null) {
     if (failedAtStage === stageNumber) {
