@@ -8,6 +8,8 @@ export const GRAPH_TRANSLATIONS: GraphTranslations & {
   stage1?: Record<string, { ru: string; en: string }>;
   stage2?: Record<string, { ru: string; en: string }>;
   stage3?: Record<string, { ru: string; en: string }>;
+  stage4?: Record<string, { ru: string; en: string }>;
+  stage5?: Record<string, { ru: string; en: string }>;
   stageDescriptions?: Record<string, { ru: string; en: string }>;
 } = {
   stages: {
@@ -631,5 +633,243 @@ export const GRAPH_TRANSLATIONS: GraphTranslations & {
     eventStrategySelected: { ru: 'Стратегия классификации: единый проход', en: 'Classification strategy: single pass' },
     eventClassificationComplete: { ru: 'Документы классифицированы', en: 'Documents classified' },
     eventRationalesGenerated: { ru: 'Обоснования сгенерированы для всех документов', en: 'Rationales generated for all documents' },
+  },
+  stage4: {
+    // Tab names (consistent with other stages)
+    inputTab: { ru: 'Бриф', en: 'Brief' },
+    processTab: { ru: 'Анализ', en: 'Analysis' },
+    outputTab: { ru: 'Чертёж', en: 'Blueprint' },
+    activityTab: { ru: 'Журнал', en: 'Journal' },
+
+    // === INPUT TAB ===
+    // Card A: Course Context
+    courseBrief: { ru: 'Бриф курса', en: 'Course Brief' },
+    courseBriefDesc: { ru: 'Условия задачи от заказчика', en: 'Project requirements from client' },
+    topicLabel: { ru: 'Тема', en: 'Topic' },
+    audienceLabel: { ru: 'Аудитория', en: 'Audience' },
+    styleLabel: { ru: 'Стиль', en: 'Style' },
+    lessonsRangeLabel: { ru: 'Уроков', en: 'Lessons' },
+    descriptionLabel: { ru: 'Описание', en: 'Description' },
+
+    // Card B: Knowledge Foundation
+    knowledgeFoundation: { ru: 'Фундамент знаний', en: 'Knowledge Foundation' },
+    knowledgeFoundationDesc: { ru: 'Отобранные материалы из Stage 3', en: 'Selected materials from Stage 3' },
+    coreSource: { ru: 'Ядро курса', en: 'Core Source' },
+    coreSourceHint: { ru: 'Главный документ, определяющий курс', en: 'Main document defining the course' },
+    importantSources: { ru: 'Ключевые материалы', en: 'Key Materials' },
+    supplementarySources: { ru: 'Дополнительные', en: 'Supporting' },
+    moreFiles: { ru: 'ещё файлов', en: 'more files' },
+    noDocumentsClassified: { ru: 'Нет классифицированных документов', en: 'No classified documents' },
+
+    // Card C: Technical Constraints
+    technicalConstraints: { ru: 'Технические параметры', en: 'Technical Parameters' },
+    tokenBudget: { ru: 'Бюджет токенов', en: 'Token Budget' },
+    modelUsed: { ru: 'Модель', en: 'Model' },
+
+    // === PROCESS TAB ===
+    // Pipeline header
+    analysisPipeline: { ru: 'Конвейер анализа', en: 'Analysis Pipeline' },
+    analysisPipelineDesc: { ru: 'Превращаем материалы в чертёж курса', en: 'Transforming materials into course blueprint' },
+
+    // Phase names (7 phases)
+    phaseAudit: { ru: 'Аудит данных', en: 'Data Audit' },
+    phaseAuditDesc: { ru: 'Проверка целостности входных данных', en: 'Input data integrity check' },
+    phaseClassify: { ru: 'Классификация', en: 'Classification' },
+    phaseClassifyDesc: { ru: 'Определение домена и категории курса', en: 'Determining course domain and category' },
+    phaseScoping: { ru: 'Планирование объёма', en: 'Scope Planning' },
+    phaseScopingDesc: { ru: 'Расчёт оптимального количества уроков', en: 'Calculating optimal lesson count' },
+    phaseStrategy: { ru: 'Педагогическая стратегия', en: 'Pedagogical Strategy' },
+    phaseStrategyDesc: { ru: 'Выбор стиля обучения и методов', en: 'Selecting teaching style and methods' },
+    phaseSynthesis: { ru: 'Синтез контента', en: 'Content Synthesis' },
+    phaseSynthesisDesc: { ru: 'Извлечение ключевых концепций', en: 'Extracting key concepts' },
+    phaseBlueprint: { ru: 'Сборка плана', en: 'Blueprint Assembly' },
+    phaseBlueprintDesc: { ru: 'Формирование итогового результата', en: 'Assembling final result' },
+    phaseMapping: { ru: 'RAG-планирование', en: 'RAG Mapping' },
+    phaseMappingDesc: { ru: 'Связывание документов с модулями', en: 'Mapping documents to modules' },
+
+    // Telemetry
+    telemetry: { ru: 'Телеметрия', en: 'Telemetry' },
+    processingTime: { ru: 'Время', en: 'Time' },
+    tokensUsed: { ru: 'Токены', en: 'Tokens' },
+    confidenceLevel: { ru: 'Уверенность', en: 'Confidence' },
+    complexityLevel: { ru: 'Сложность', en: 'Complexity' },
+
+    // Insight Terminal
+    insightTerminal: { ru: 'Поток решений AI', en: 'AI Decision Stream' },
+    insightDecision: { ru: 'Решение', en: 'Decision' },
+    insightInfo: { ru: 'Информация', en: 'Info' },
+    insightWarning: { ru: 'Предупреждение', en: 'Warning' },
+
+    // === OUTPUT TAB ===
+    // Hero card
+    analysisHero: { ru: 'Результат анализа', en: 'Analysis Result' },
+    categoryLabel: { ru: 'Категория', en: 'Category' },
+    lessonsLabel: { ru: 'Уроков', en: 'Lessons' },
+    modulesLabel: { ru: 'Модулей', en: 'Modules' },
+    durationLabel: { ru: 'Длительность', en: 'Duration' },
+    hoursShort: { ru: 'ч', en: 'h' },
+    minutesShort: { ru: 'мин', en: 'min' },
+
+    // Category names (for display)
+    categoryProfessional: { ru: 'Профессиональный', en: 'Professional' },
+    categoryPersonal: { ru: 'Личностный', en: 'Personal' },
+    categoryCreative: { ru: 'Творческий', en: 'Creative' },
+    categoryHobby: { ru: 'Хобби', en: 'Hobby' },
+    categorySpiritual: { ru: 'Духовный', en: 'Spiritual' },
+    categoryAcademic: { ru: 'Академический', en: 'Academic' },
+
+    // Teaching styles
+    styleHandsOn: { ru: 'Практико-ориентированный', en: 'Hands-on' },
+    styleTheoryFirst: { ru: 'Теория сначала', en: 'Theory-first' },
+    styleProjectBased: { ru: 'Проектный', en: 'Project-based' },
+    styleMixed: { ru: 'Смешанный', en: 'Mixed' },
+
+    // === ACTIVITY TAB ===
+    decisionJournal: { ru: 'Журнал решений', en: 'Decision Journal' },
+    phasePreparation: { ru: 'Подготовка', en: 'Preparation' },
+    phaseClassificationGroup: { ru: 'Классификация', en: 'Classification' },
+    phasePlanningGroup: { ru: 'Планирование', en: 'Planning' },
+    phaseSynthesisGroup: { ru: 'Синтез', en: 'Synthesis' },
+    phaseMappingGroup: { ru: 'Картирование', en: 'Mapping' },
+    actorSystem: { ru: 'Система', en: 'System' },
+    actorAI: { ru: 'AI', en: 'AI' },
+    actorUser: { ru: 'Пользователь', en: 'User' },
+    noEventsInPhase: { ru: 'Нет событий', en: 'No events' },
+
+    // Synthetic insight messages (templates)
+    insightDetectedTone: { ru: 'Обнаружен {tone} тон. Адаптирую стиль.', en: 'Detected {tone} tone. Adapting style.' },
+    insightContentDensity: { ru: 'Высокая плотность контента. Увеличиваю количество уроков до {count}.', en: 'High content density. Increasing lesson count to {count}.' },
+    insightCategorySelected: { ru: 'Определена категория: {category} (уверенность {confidence}%)', en: 'Category determined: {category} (confidence {confidence}%)' },
+    insightStrategySelected: { ru: 'Выбрана стратегия: {strategy}', en: 'Strategy selected: {strategy}' },
+    insightStructureRecommended: { ru: 'Рекомендована структура: {sections} модулей, {lessons} уроков', en: 'Recommended structure: {sections} modules, {lessons} lessons' },
+
+    // Empty states
+    emptyInput: { ru: 'Ожидание данных из Stage 3...', en: 'Waiting for Stage 3 data...' },
+    emptyProcess: { ru: 'Анализ ещё не начат', en: 'Analysis not started yet' },
+    emptyOutput: { ru: 'Результаты анализа появятся здесь', en: 'Analysis results will appear here' },
+    emptyActivity: { ru: 'События ещё не записаны', en: 'No events recorded yet' },
+
+    // Error states
+    errorAnalysis: { ru: 'Ошибка анализа', en: 'Analysis Error' },
+    retryAnalysis: { ru: 'Повторить анализ', en: 'Retry Analysis' },
+  },
+  stage5: {
+    // Tab names
+    inputTab: { ru: 'Чертёж', en: 'Blueprint' },
+    processTab: { ru: 'Сборка', en: 'Assembly' },
+    outputTab: { ru: 'Структура', en: 'Structure' },
+    activityTab: { ru: 'Журнал', en: 'Journal' },
+
+    // === INPUT TAB ===
+    blueprintReview: { ru: 'Ревизия чертежа', en: 'Blueprint Review' },
+    blueprintReviewDesc: { ru: 'Исходные данные из Stage 4', en: 'Source data from Stage 4' },
+
+    // Analysis summary
+    analysisCategory: { ru: 'Категория', en: 'Category' },
+    analysisConfidence: { ru: 'Уверенность', en: 'Confidence' },
+    analysisLessons: { ru: 'Уроков', en: 'Lessons' },
+    analysisComplexity: { ru: 'Сложность', en: 'Complexity' },
+    analysisStyle: { ru: 'Стиль обучения', en: 'Teaching Style' },
+
+    // Frontend parameters
+    frontendParams: { ru: 'Параметры курса', en: 'Course Parameters' },
+    courseTitle: { ru: 'Название курса', en: 'Course Title' },
+    courseLanguage: { ru: 'Язык', en: 'Language' },
+    userInstructions: { ru: 'Инструкции', en: 'Instructions' },
+
+    // Generation params
+    generationParams: { ru: 'Параметры генерации', en: 'Generation Parameters' },
+    batchSize: { ru: 'Размер батча', en: 'Batch Size' },
+    qualityThreshold: { ru: 'Порог качества', en: 'Quality Threshold' },
+    minLessons: { ru: 'Мин. уроков', en: 'Min Lessons' },
+
+    // === PROCESS TAB ===
+    forgePipeline: { ru: 'Конвейер сборки', en: 'Assembly Pipeline' },
+    forgePipelineDesc: { ru: 'Превращаем чертёж в структуру курса', en: 'Transforming blueprint into course structure' },
+
+    // Phase names (5 phases)
+    phaseValidateInput: { ru: 'Валидация входных данных', en: 'Input Validation' },
+    phaseValidateInputDesc: { ru: 'Проверка схемы данных', en: 'Schema validation' },
+    phaseGenerateMetadata: { ru: 'Генерация метаданных', en: 'Metadata Generation' },
+    phaseGenerateMetadataDesc: { ru: 'Название, описание, цели обучения', en: 'Title, description, learning outcomes' },
+    phaseGenerateSections: { ru: 'Генерация секций', en: 'Section Generation' },
+    phaseGenerateSectionsDesc: { ru: 'Модули и уроки (параллельно)', en: 'Modules and lessons (parallel)' },
+    phaseValidateQuality: { ru: 'Проверка качества', en: 'Quality Validation' },
+    phaseValidateQualityDesc: { ru: 'Семантическое сходство', en: 'Semantic similarity check' },
+    phaseValidateLessons: { ru: 'Проверка уроков', en: 'Lesson Validation' },
+    phaseValidateLessonsDesc: { ru: 'Минимум 10 уроков', en: 'Minimum 10 lessons' },
+
+    // Batch progress
+    batchProgress: { ru: 'Прогресс генерации', en: 'Generation Progress' },
+    batchOf: { ru: 'Батч {current} из {total}', en: 'Batch {current} of {total}' },
+    sectionsGenerated: { ru: 'Секций сгенерировано', en: 'Sections generated' },
+    parallelProcessing: { ru: 'Параллельная обработка', en: 'Parallel processing' },
+
+    // Telemetry
+    telemetry: { ru: 'Телеметрия', en: 'Telemetry' },
+    processingTime: { ru: 'Время', en: 'Time' },
+    tokensUsed: { ru: 'Токены', en: 'Tokens' },
+    costLabel: { ru: 'Стоимость', en: 'Cost' },
+    qualityScore: { ru: 'Качество', en: 'Quality' },
+    sectionsCount: { ru: 'Секций', en: 'Sections' },
+    lessonsCount: { ru: 'Уроков', en: 'Lessons' },
+
+    // === OUTPUT TAB ===
+    structurePreview: { ru: 'Структура курса', en: 'Course Structure' },
+    structurePreviewDesc: { ru: 'Сгенерированные модули и уроки', en: 'Generated modules and lessons' },
+    structureDesc: { ru: 'Модули и уроки', en: 'Modules and lessons' },
+
+    // Difficulty levels (for OutputTab)
+    beginner: { ru: 'Начальный', en: 'Beginner' },
+    intermediate: { ru: 'Средний', en: 'Intermediate' },
+    advanced: { ru: 'Продвинутый', en: 'Advanced' },
+
+    // Metadata card
+    metadataCard: { ru: 'Метаданные курса', en: 'Course Metadata' },
+    learningOutcomes: { ru: 'Цели обучения', en: 'Learning Outcomes' },
+    prerequisites: { ru: 'Предварительные знания', en: 'Prerequisites' },
+    difficulty: { ru: 'Сложность', en: 'Difficulty' },
+    duration: { ru: 'Длительность', en: 'Duration' },
+    tags: { ru: 'Теги', en: 'Tags' },
+
+    // Structure tree
+    sectionLabel: { ru: 'Модуль', en: 'Module' },
+    lessonLabel: { ru: 'Урок', en: 'Lesson' },
+    lessonsInSection: { ru: 'уроков в модуле', en: 'lessons in module' },
+    totalDuration: { ru: 'Общая длительность', en: 'Total duration' },
+    hoursShort: { ru: 'ч', en: 'h' },
+    minutesShort: { ru: 'мин', en: 'min' },
+
+    // Lesson types
+    lessonTypeTheory: { ru: 'Теория', en: 'Theory' },
+    lessonTypePractice: { ru: 'Практика', en: 'Practice' },
+    lessonTypeQuiz: { ru: 'Тест', en: 'Quiz' },
+    lessonTypeProject: { ru: 'Проект', en: 'Project' },
+
+    // === ACTIVITY TAB ===
+    assemblyJournal: { ru: 'Журнал сборки', en: 'Assembly Journal' },
+    phaseValidation: { ru: 'Валидация', en: 'Validation' },
+    phaseMetadata: { ru: 'Метаданные', en: 'Metadata' },
+    phaseSections: { ru: 'Секции', en: 'Sections' },
+    phaseQuality: { ru: 'Качество', en: 'Quality' },
+    phaseFinalization: { ru: 'Финализация', en: 'Finalization' },
+
+    // Synthetic insight messages
+    insightValidationPassed: { ru: 'Валидация пройдена', en: 'Validation passed' },
+    insightMetadataGenerated: { ru: 'Метаданные сгенерированы: {outcomes} целей обучения', en: 'Metadata generated: {outcomes} learning outcomes' },
+    insightBatchStarted: { ru: 'Запущен батч {batch}: {sections} секций', en: 'Batch {batch} started: {sections} sections' },
+    insightBatchCompleted: { ru: 'Батч {batch} завершён за {time}с', en: 'Batch {batch} completed in {time}s' },
+    insightQualityScore: { ru: 'Оценка качества: {score}% (порог: {threshold}%)', en: 'Quality score: {score}% (threshold: {threshold}%)' },
+    insightLessonsValidated: { ru: 'Проверено {count} уроков (минимум: {min})', en: 'Validated {count} lessons (minimum: {min})' },
+
+    // Empty states
+    emptyInput: { ru: 'Ожидание данных из Stage 4...', en: 'Waiting for Stage 4 data...' },
+    emptyProcess: { ru: 'Генерация ещё не начата', en: 'Generation not started yet' },
+    emptyOutput: { ru: 'Структура курса появится здесь', en: 'Course structure will appear here' },
+    emptyActivity: { ru: 'События ещё не записаны', en: 'No events recorded yet' },
+
+    // Error states
+    errorGeneration: { ru: 'Ошибка генерации', en: 'Generation Error' },
+    retryGeneration: { ru: 'Повторить генерацию', en: 'Retry Generation' },
   },
 };

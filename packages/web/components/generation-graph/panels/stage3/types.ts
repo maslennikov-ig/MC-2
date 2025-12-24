@@ -142,8 +142,10 @@ export interface TelemetryData {
   totalTokens: number;
   /** Number of documents processed */
   documentsProcessed: number;
-  /** Model used for classification */
-  model: string;
+  /** Model used for classification (deprecated - use tier) */
+  model?: string;
+  /** Organization tier for tier-based model naming */
+  tier?: string;
 }
 
 // ============================================================================

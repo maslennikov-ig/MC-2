@@ -844,8 +844,8 @@ function GraphViewInner({ courseId, courseTitle, hasDocuments = true, failedAtSt
             <NodeDetailsDrawer />
             {isAdmin && <AdminPanel isOpen={isAdminPanelOpen} onClose={() => setIsAdminPanelOpen(false)} />}
 
-            {/* Selection toolbar for Stage 6 partial generation - only show when lessons exist */}
-            {nodes.some(n => n.type === 'lesson') && <SelectionToolbar courseId={courseId} />}
+            {/* Selection toolbar for Stage 6 partial generation - show when lessons exist AND Stage 5 is approved */}
+            {nodes.some(n => n.type === 'lesson') && awaitingStage !== 5 && <SelectionToolbar courseId={courseId} />}
           </div>
         </div>
         </FullscreenProvider>

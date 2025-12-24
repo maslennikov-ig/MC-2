@@ -25,6 +25,10 @@ import { Stage1InputTab, Stage1ProcessTab, Stage1OutputTab, Stage1ActivityTab } 
 import { Stage2InputTab, Stage2ProcessTab, Stage2OutputTab, Stage2ActivityTab, Stage2Dashboard } from './stage2';
 // Stage 3 "Document Classification" UI components
 import { Stage3InputTab, Stage3ProcessTab, Stage3OutputTab, Stage3ActivityTab } from './stage3';
+// Stage 4 "Deep Analysis" UI components
+import { Stage4InputTab, Stage4ProcessTab, Stage4OutputTab, Stage4ActivityTab } from './stage4';
+// Stage 5 "Generation" UI components
+import { Stage5InputTab, Stage5ProcessTab, Stage5OutputTab, Stage5ActivityTab } from './stage5';
 import { useStage2DashboardData } from '../hooks/useStage2DashboardData';
 import { RefinementChat } from './RefinementChat';
 import { useRefinement } from '../hooks/useRefinement';
@@ -605,6 +609,16 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
                       courseId={courseInfo.id}
                       inputData={displayData?.inputData}
                     />
+                  ) : data?.stageNumber === 4 ? (
+                    <Stage4InputTab
+                      courseId={courseInfo.id}
+                      inputData={displayData?.inputData}
+                    />
+                  ) : data?.stageNumber === 5 ? (
+                    <Stage5InputTab
+                      courseId={courseInfo.id}
+                      inputData={displayData?.inputData}
+                    />
                   ) : (
                     <InputTab inputData={displayData?.inputData} />
                   )}
@@ -623,6 +637,17 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
                     />
                   ) : data?.stageNumber === 3 ? (
                     <Stage3ProcessTab
+                      courseId={courseInfo.id}
+                      status={displayData?.status as 'pending' | 'active' | 'completed' | 'error' | undefined}
+                    />
+                  ) : data?.stageNumber === 4 ? (
+                    <Stage4ProcessTab
+                      courseId={courseInfo.id}
+                      outputData={displayData?.outputData}
+                      status={displayData?.status as 'pending' | 'active' | 'completed' | 'error' | undefined}
+                    />
+                  ) : data?.stageNumber === 5 ? (
+                    <Stage5ProcessTab
                       courseId={courseInfo.id}
                       status={displayData?.status as 'pending' | 'active' | 'completed' | 'error' | undefined}
                     />
@@ -658,6 +683,21 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
                       isEditable={canEdit}
                       onApprove={deselectNode}
                     />
+                  ) : data?.stageNumber === 4 ? (
+                    <Stage4OutputTab
+                      courseId={courseInfo.id}
+                      outputData={displayData?.outputData}
+                      editable={canEdit}
+                      readOnly={isAdmin && !isAwaitingApproval}
+                      autoFocus={autoOpened}
+                      onApproved={handleStageApproved}
+                    />
+                  ) : data?.stageNumber === 5 ? (
+                    <Stage5OutputTab
+                      courseId={courseInfo.id}
+                      outputData={displayData?.outputData}
+                      editable={canEdit}
+                    />
                   ) : (
                     <OutputTab
                       outputData={displayData?.outputData}
@@ -689,6 +729,16 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
                     />
                   ) : data?.stageNumber === 3 ? (
                     <Stage3ActivityTab
+                      nodeId={selectedNodeId}
+                      courseId={courseInfo.id}
+                    />
+                  ) : data?.stageNumber === 4 ? (
+                    <Stage4ActivityTab
+                      nodeId={selectedNodeId}
+                      courseId={courseInfo.id}
+                    />
+                  ) : data?.stageNumber === 5 ? (
+                    <Stage5ActivityTab
                       nodeId={selectedNodeId}
                       courseId={courseInfo.id}
                     />

@@ -153,6 +153,29 @@ export interface PriorityConfigItem {
 }
 
 /**
+ * Tier-based Model Display Names
+ * Shows subscription tier name instead of actual model name for business reasons
+ * Used across all stages for consistent model naming
+ */
+export type SubscriptionTier = 'trial' | 'free' | 'basic' | 'standard' | 'premium';
+
+export const TIER_MODEL_NAMES: Record<SubscriptionTier, { ru: string; en: string }> = {
+  trial: { ru: 'Пробная модель', en: 'Trial Model' },
+  free: { ru: 'Бесплатная модель', en: 'Free Model' },
+  basic: { ru: 'Базовая модель', en: 'Basic Model' },
+  standard: { ru: 'Стандартная модель', en: 'Standard Model' },
+  premium: { ru: 'Премиум модель', en: 'Premium Model' },
+};
+
+/**
+ * Get tier-based model name for display
+ */
+export function getTierModelName(tier: string | undefined, locale: 'ru' | 'en'): string {
+  const validTier = (tier as SubscriptionTier) || 'standard';
+  return TIER_MODEL_NAMES[validTier]?.[locale] || TIER_MODEL_NAMES.standard[locale];
+}
+
+/**
  * Priority Configuration for Document Classification
  * - CORE: Exactly 1 per course (enforced by database constraint)
  * - IMPORTANT: Up to 30% of documents

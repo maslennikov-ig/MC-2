@@ -20,6 +20,7 @@ import {
 } from 'lucide-react';
 import { GRAPH_TRANSLATIONS } from '@/lib/generation-graph/translations';
 import { formatDuration } from '@/lib/generation-graph/format-utils';
+import { getTierModelName } from '@/lib/generation-graph/constants';
 import type {
   Stage3ProcessTabProps,
   ClassificationPhase,
@@ -323,7 +324,7 @@ function getDefaultTelemetry(): TelemetryData {
     processingTimeMs: 0,
     totalTokens: 0,
     documentsProcessed: 0,
-    model: 'gpt-4o',
+    tier: 'standard',
   };
 }
 
@@ -424,7 +425,7 @@ export const Stage3ProcessTab = memo<Stage3ProcessTabProps>(function Stage3Proce
               <TelemetryItem
                 icon={Cpu}
                 label={t.modelUsed?.[locale] ?? 'Model'}
-                value={telemetry.model || 'gpt-4o'}
+                value={getTierModelName(telemetry.tier, locale)}
                 colorClass="text-amber-500"
               />
             </div>
