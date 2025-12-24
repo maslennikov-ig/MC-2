@@ -362,12 +362,7 @@ export interface PhaseData {
   outputData?: Record<string, unknown>;
 
   /** Processing metrics for this phase */
-  processMetrics?: {
-    model: string;
-    tokens: number;
-    duration: number;
-    cost: number;
-  };
+  processMetrics?: ProcessMetrics;
 
   /** Actual retry attempts within THIS phase (only if retry_attempt > 0) */
   attempts?: TraceAttempt[];

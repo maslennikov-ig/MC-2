@@ -10,6 +10,7 @@
 import { getSupabaseAdmin } from '@/shared/supabase/admin';
 import { QuotaExceededError } from '@/server/errors/typed-errors';
 import type { Database } from '@megacampus/shared-types';
+import { DEFAULT_STORAGE_QUOTAS } from '@megacampus/shared-types';
 import {
   shouldBypassTierRestrictions,
   SUPERADMIN_LIMITS,
@@ -70,14 +71,13 @@ export interface QuotaInfo {
 
 /**
  * Tier-based storage quotas in bytes
+ * Re-exported from shared-types for Single Source of Truth
+ *
+ * @deprecated Use DEFAULT_STORAGE_QUOTAS from @megacampus/shared-types instead.
+ * This alias is kept for backward compatibility with existing tests.
+ * @see DEFAULT_STORAGE_QUOTAS in @megacampus/shared-types
  */
-export const TIER_QUOTAS: Record<Database['public']['Enums']['tier'], number> = {
-  trial: 1073741824, // 1 GB
-  free: 10485760, // 10 MB
-  basic: 104857600, // 100 MB
-  standard: 1073741824, // 1 GB
-  premium: 10737418240, // 10 GB
-} as const;
+export const TIER_QUOTAS: Record<Database['public']['Enums']['tier'], number> = DEFAULT_STORAGE_QUOTAS;
 
 // ============================================================================
 // UTILITY FUNCTIONS

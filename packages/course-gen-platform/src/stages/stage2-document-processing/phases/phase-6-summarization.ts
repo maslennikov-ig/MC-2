@@ -28,6 +28,7 @@
 
 import { getSupabaseAdmin } from '../../../shared/supabase/admin';
 import { tokenEstimator } from '../../../shared/llm/token-estimator';
+import { llmClient } from '../../../shared/llm/client';
 import { hierarchicalChunking, type HierarchicalChunkingResult } from '../../../shared/summarization/hierarchical-chunking';
 import {
   validateSummaryQuality,
@@ -62,6 +63,127 @@ const DEFAULT_SUMMARIZATION_CONFIG = {
 } as const;
 
 /**
+ * Title generation prompts by language
+ */
+const TITLE_GENERATION_PROMPTS: Record<string, string> = {
+  rus: `Ты эксперт по анализу документов. На основе предоставленного текста сгенерируй краткое и информативное название документа.
+
+Требования к названию:
+- 5-10 слов максимум
+- Отражает основную тему/содержание
+- Профессиональный стиль
+- Без кавычек и специальных символов
+- На русском языке
+
+Верни ТОЛЬКО название, без пояснений.`,
+
+  eng: `You are a document analysis expert. Based on the provided text, generate a concise and informative document title.
+
+Title requirements:
+- 5-10 words maximum
+- Reflects the main topic/content
+- Professional style
+- No quotes or special characters
+- In English
+
+Return ONLY the title, no explanations.`,
+};
+
+/**
+ * Default model for lightweight title generation
+ * Uses fast, cheap model since title extraction is simple
+ */
+const TITLE_GENERATION_MODEL = 'google/gemini-2.0-flash-001';
+
+/**
+ * Generate a meaningful document title from summary or full text
+ *
+ * @param text - Summary or document text to analyze
+ * @param language - Language code ('rus' or 'eng')
+ * @param model - Optional model override
+ * @returns Generated title or fallback from first line
+ */
+async function generateDocumentTitle(
+  text: string,
+  language: string,
+  model: string = TITLE_GENERATION_MODEL
+): Promise<string> {
+  // Use first 2000 chars for title generation (enough context, minimal tokens)
+  const textForTitle = text.slice(0, 2000);
+
+  // Language-specific prompt
+  const langKey = language === 'rus' || language === 'ru' ? 'rus' : 'eng';
+  const systemPrompt = TITLE_GENERATION_PROMPTS[langKey];
+
+  try {
+    const response = await llmClient.generateCompletion(textForTitle, {
+      model,
+      systemPrompt,
+      maxTokens: 50, // Title should be very short
+      temperature: 0.3, // Low temperature for consistency
+    });
+
+    const generatedTitle = response.content.trim()
+      // Remove any quotes that might wrap the title
+      .replace(/^["'«»]|["'«»]$/g, '')
+      // Remove any "Title:" prefix the model might add
+      .replace(/^(Title|Название|Заголовок):\s*/i, '')
+      .trim();
+
+    if (generatedTitle && generatedTitle.length >= 3 && generatedTitle.length <= 200) {
+      logger.debug({
+        textLength: textForTitle.length,
+        generatedTitle,
+        language: langKey,
+      }, '[Phase 6] Document title generated');
+      return generatedTitle;
+    }
+
+    // Fallback: extract from first line if generation failed
+    return extractTitleFromText(text, language);
+  } catch (error) {
+    logger.warn({
+      error: error instanceof Error ? error.message : String(error),
+      language: langKey,
+    }, '[Phase 6] Title generation failed, using fallback');
+
+    return extractTitleFromText(text, language);
+  }
+}
+
+/**
+ * Fallback title extraction from text
+ * Uses first meaningful line or sentence
+ */
+function extractTitleFromText(text: string, language: string): string {
+  // Split into lines and find first non-empty, non-header line
+  const lines = text.split('\n')
+    .map(line => line.trim())
+    .filter(line => {
+      if (!line) return false;
+      // Skip markdown headers but keep their content
+      if (line.startsWith('#')) {
+        return line.replace(/^#+\s*/, '').length > 3;
+      }
+      return line.length > 3;
+    });
+
+  if (lines.length === 0) {
+    return language === 'rus' ? 'Документ без названия' : 'Untitled Document';
+  }
+
+  // Get first meaningful line, strip markdown
+  let title = lines[0].replace(/^#+\s*/, '').trim();
+
+  // Truncate if too long
+  if (title.length > 100) {
+    title = title.slice(0, 97) + '...';
+  }
+
+  return title;
+}
+
+/**
  * Result from Phase 6 summarization
  */
 export interface Phase6Result {
@@ -71,6 +193,8 @@ export interface Phase6Result {
   fileId: string;
   /** Generated summary (or full text if bypassed) */
   summary: string;
+  /** AI-generated document title based on content analysis */
+  generatedTitle: string;
   /** Summary token count */
   summaryTokens: number;
   /** Original document token count */
@@ -207,11 +331,17 @@ export async function executePhase6Summarization(
       threshold: DEFAULT_NO_SUMMARY_THRESHOLD,
     }, '[Phase 6] Small document detected, bypassing summarization');
 
+    options?.onProgress?.(85, 'Generating document title');
+
+    // Generate title even for small documents
+    const generatedTitle = await generateDocumentTitle(extractedText, language);
+
     options?.onProgress?.(90, 'Storing full text');
 
     const result = await storeFullText(
       fileId,
       extractedText,
+      generatedTitle,
       estimatedTokens,
       language,
       Date.now() - startTime
@@ -367,11 +497,17 @@ async function executeSummarizationWithRetry(
 
       // If quality passed, store and return
       if (qualityCheck.quality_check_passed) {
+        options?.onProgress?.(progressBase + 12, 'Generating document title');
+
+        // Generate title from summary (uses less tokens than full text)
+        const generatedTitle = await generateDocumentTitle(chunkingResult.summary, language);
+
         options?.onProgress?.(progressBase + 15, 'Storing summary');
 
         const result = await storeSummary(
           fileId,
           chunkingResult.summary,
+          generatedTitle,
           originalTokens,
           chunkingResult.metadata.final_token_count,
           language,
@@ -386,6 +522,7 @@ async function executeSummarizationWithRetry(
 
         logger.info({
           fileId,
+          generatedTitle,
           qualityScore: qualityCheck.quality_score,
           attempts: currentAttempt + 1,
         }, '[Phase 6] Summary stored successfully');
@@ -401,12 +538,17 @@ async function executeSummarizationWithRetry(
           attempts: currentAttempt + 1,
         }, '[Phase 6] Max retries reached, using best-effort summary');
 
+        // Generate title even for best-effort summary
+        options?.onProgress?.(progressBase + 12, 'Generating document title');
+        const generatedTitle = await generateDocumentTitle(chunkingResult.summary, language);
+
         // Store best-effort summary
         options?.onProgress?.(progressBase + 15, 'Storing best-effort summary');
 
         return await storeSummary(
           fileId,
           chunkingResult.summary,
+          generatedTitle,
           originalTokens,
           chunkingResult.metadata.final_token_count,
           language,
@@ -444,11 +586,15 @@ async function executeSummarizationWithRetry(
           attempts: currentAttempt + 1,
         }, '[Phase 6] All attempts failed, falling back to full text');
 
+        options?.onProgress?.(85, 'Generating document title');
+        const generatedTitle = await generateDocumentTitle(extractedText, language);
+
         options?.onProgress?.(90, 'Storing full text (fallback)');
 
         return await storeFullText(
           fileId,
           extractedText,
+          generatedTitle,
           originalTokens,
           language,
           Date.now() - startTime
@@ -462,9 +608,11 @@ async function executeSummarizationWithRetry(
 
   // Should never reach here, but fallback to full text
   logger.error({ fileId }, '[Phase 6] Unexpected retry loop exit, falling back to full text');
+  const fallbackTitle = await generateDocumentTitle(extractedText, language);
   return await storeFullText(
     fileId,
     extractedText,
+    fallbackTitle,
     originalTokens,
     language,
     Date.now() - startTime
@@ -519,6 +667,7 @@ function applyEscalation(config: SummarizationConfig, retryAttempt: number): voi
 async function storeSummary(
   fileId: string,
   summary: string,
+  generatedTitle: string,
   originalTokens: number,
   summaryTokens: number,
   language: string,
@@ -553,6 +702,7 @@ async function storeSummary(
     .from('file_catalog')
     .update({
       processed_content: summary,
+      generated_title: generatedTitle,
       processing_method: 'hierarchical',
       summary_metadata: metadata,
       updated_at: new Date().toISOString(),
@@ -566,6 +716,7 @@ async function storeSummary(
 
   logger.info({
     fileId,
+    generatedTitle,
     summaryLength: summary.length,
     compressionRatio: compressionRatio.toFixed(2),
   }, '[Phase 6] Summary stored in database');
@@ -574,6 +725,7 @@ async function storeSummary(
     success: true,
     fileId,
     summary,
+    generatedTitle,
     summaryTokens,
     originalTokens,
     language,
@@ -597,6 +749,7 @@ async function storeSummary(
 async function storeFullText(
   fileId: string,
   fullText: string,
+  generatedTitle: string,
   estimatedTokens: number,
   language: string,
   processingTimeMs: number
@@ -621,6 +774,7 @@ async function storeFullText(
     .from('file_catalog')
     .update({
       processed_content: fullText,
+      generated_title: generatedTitle,
       processing_method: 'full_text',
       summary_metadata: metadata,
       updated_at: new Date().toISOString(),
@@ -634,6 +788,7 @@ async function storeFullText(
 
   logger.info({
     fileId,
+    generatedTitle,
     textLength: fullText.length,
     estimatedTokens,
   }, '[Phase 6] Full text stored (bypass)');
@@ -642,6 +797,7 @@ async function storeFullText(
     success: true,
     fileId,
     summary: fullText,
+    generatedTitle,
     summaryTokens: estimatedTokens,
     originalTokens: estimatedTokens,
     language,
@@ -664,6 +820,7 @@ function buildEmptyResult(fileId: string): Phase6Result {
     success: false,
     fileId,
     summary: '',
+    generatedTitle: '',
     summaryTokens: 0,
     originalTokens: 0,
     language: 'unknown',

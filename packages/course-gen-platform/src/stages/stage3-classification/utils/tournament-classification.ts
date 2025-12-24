@@ -32,6 +32,10 @@ import { createModelConfigService } from '../../../shared/llm/model-config-servi
 export interface DocumentForClassification {
   id: string;
   filename: string;
+  /** AI-generated meaningful title from Phase 6 summarization */
+  generated_title?: string | null;
+  /** User-provided original filename at upload */
+  original_name?: string | null;
   mime_type: string;
   file_size: number;
   summary: string;
@@ -90,6 +94,9 @@ const GroupDocumentClassificationSchema = z.object({
 const GroupClassificationResponseSchema = z.object({
   classifications: z.array(GroupDocumentClassificationSchema).min(1),
 });
+
+/** Single classification item from LLM response */
+type GroupDocumentClassification = z.infer<typeof GroupDocumentClassificationSchema>;
 
 // ============================================================================
 // Helper Functions - Model Configuration
@@ -336,14 +343,15 @@ async function executeSingleStageClassification(
   );
 
   const response = await structuredModel.invoke([systemMsg, humanMsg]);
+  const typedClassifications = response.classifications as GroupDocumentClassification[];
 
-  return {
-    classifications: response.classifications.map(c => ({
-      id: c.id,
-      priority: c.priority,
-      rationale: c.rationale,
-    })),
-  };
+  const classifications: TournamentClassificationResult['classifications'] = typedClassifications.map(c => ({
+    id: c.id as string,
+    priority: c.priority as 'CORE' | 'IMPORTANT' | 'SUPPLEMENTARY',
+    rationale: c.rationale as string,
+  }));
+
+  return { classifications };
 }
 
 /**
@@ -372,13 +380,16 @@ async function classifyDocumentGroup(
   );
 
   const response = await structuredModel.invoke([systemMsg, humanMsg]);
+  const typedClassifications = response.classifications as GroupDocumentClassification[];
 
-  return response.classifications.map(c => ({
-    id: c.id,
-    priority: c.priority,
+  const results: GroupClassificationResult[] = typedClassifications.map(c => ({
+    id: c.id as string,
+    priority: c.priority as 'CORE' | 'IMPORTANT' | 'SUPPLEMENTARY',
     rationale: `[Group ${groupIndex + 1}] ${c.rationale}`,
-    groupRank: c.rank,
+    groupRank: c.rank as number,
   }));
+
+  return results;
 }
 
 /**
@@ -411,16 +422,21 @@ Each classification: id (UUID), priority (CORE/IMPORTANT/SUPPLEMENTARY), rationa
 
 Be decisive and comparative. Don't mark everything as important - truly distinguish essential versus supplementary.`);
 
+  // Use generated_title when available for meaningful document identification
   const documentDescriptions = documents
     .map(
-      (doc, index) => `
+      (doc, index) => {
+        const hasGeneratedTitle = !!doc.generated_title;
+        return `
 [Document ${index + 1}]
 ID: ${doc.id}
-Filename: ${doc.filename}
+${hasGeneratedTitle ? `Title: ${doc.generated_title}` : ''}
+Filename: ${doc.original_name || doc.filename}
 File Type: ${doc.mime_type}
 Summary (${doc.summaryTokens} tokens):
 ${doc.summary.substring(0, 2000)}${doc.summary.length > 2000 ? '...[truncated]' : ''}
----`
+---`;
+      }
     )
     .join('\n');
 

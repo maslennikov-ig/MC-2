@@ -627,6 +627,8 @@ export type Database = {
           file_size: number
           file_type: string
           filename: string
+          /** AI-generated document title based on content analysis (Phase 6) */
+          generated_title: string | null
           hash: string
           id: string
           markdown_content: string | null
@@ -652,6 +654,7 @@ export type Database = {
           file_size: number
           file_type: string
           filename: string
+          generated_title?: string | null
           hash: string
           id?: string
           markdown_content?: string | null
@@ -677,6 +680,7 @@ export type Database = {
           file_size?: number
           file_type?: string
           filename?: string
+          generated_title?: string | null
           hash?: string
           id?: string
           markdown_content?: string | null

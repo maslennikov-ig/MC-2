@@ -1,6 +1,6 @@
 'use client';
 
-import React, { memo, useMemo } from 'react';
+import React, { memo, useMemo, useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -22,31 +22,59 @@ import {
 } from 'lucide-react';
 import { GRAPH_TRANSLATIONS } from '@/lib/generation-graph/translations';
 import { formatFileSize, HEAVY_PAYLOAD_THRESHOLD_BYTES } from '@/lib/generation-graph/format-utils';
-import type { Stage2InputTabProps, Stage2InputData, TierFeatures } from './types';
-import { getTierFeatures } from './types';
+import { useGenerationStore } from '@/stores/useGenerationStore';
+import { getSupabaseClient } from '@/lib/supabase/browser-client';
+import type { Stage2InputTabProps, Stage2InputData, TierFeatures, TierKey } from './types';
+import { getTierFeatures, parseTierFeaturesFromDB } from './types';
+
+// ============================================================================
+// FILE CATALOG INPUT DATA
+// ============================================================================
+
+interface FileCatalogInputData {
+  filename: string;
+  originalName: string | null;
+  mimeType: string | null;
+  fileSize: number;
+  organizationId: string | null;
+  tier: TierKey | null;
+  /** Tier features from tier_settings.features JSONB */
+  tierFeatures: Record<string, unknown> | null;
+}
 
 // ============================================================================
 // TYPE GUARDS
 // ============================================================================
 
 /** Valid tier values for Stage2InputData */
-const VALID_TIERS = ['basic', 'standard', 'premium'] as const;
+const VALID_TIERS: readonly TierKey[] = ['trial', 'free', 'basic', 'standard', 'premium'] as const;
 
 /**
  * Runtime type guard for Stage2InputData
- * Validates all required fields with proper type checking
+ * Validates all required fields and optional fields with proper type checking
  */
 function isStage2InputData(data: unknown): data is Stage2InputData {
   if (!data || typeof data !== 'object') return false;
   const d = data as Record<string, unknown>;
 
-  return (
+  // Required fields validation
+  const hasRequiredFields =
     typeof d.fileId === 'string' &&
     typeof d.tier === 'string' &&
-    VALID_TIERS.includes(d.tier as (typeof VALID_TIERS)[number]) &&
+    VALID_TIERS.includes(d.tier as TierKey) &&
     typeof d.originalFilename === 'string' &&
-    typeof d.mimeType === 'string'
-  );
+    typeof d.mimeType === 'string';
+
+  if (!hasRequiredFields) return false;
+
+  // Optional fields validation (if present, must be correct type)
+  const validOptionals =
+    (d.fileSize === undefined || typeof d.fileSize === 'number') &&
+    (d.pageCount === undefined || typeof d.pageCount === 'number') &&
+    (d.organizationId === undefined || typeof d.organizationId === 'string') &&
+    (d.filePath === undefined || typeof d.filePath === 'string');
+
+  return validOptionals;
 }
 
 // ============================================================================
@@ -59,6 +87,30 @@ function isStage2InputData(data: unknown): data is Stage2InputData {
 function isHeavyPayload(bytes: number | undefined): boolean {
   if (!bytes || !Number.isFinite(bytes)) return false;
   return bytes > HEAVY_PAYLOAD_THRESHOLD_BYTES;
+}
+
+/**
+ * Detect MIME type from filename extension
+ */
+function detectMimeType(filename: string): string {
+  const ext = filename.split('.').pop()?.toLowerCase();
+  switch (ext) {
+    case 'pdf':
+      return 'application/pdf';
+    case 'doc':
+      return 'application/msword';
+    case 'docx':
+      return 'application/vnd.openxmlformats-officedocument.wordprocessingml.document';
+    case 'txt':
+      return 'text/plain';
+    case 'md':
+      return 'text/markdown';
+    case 'ppt':
+    case 'pptx':
+      return 'application/vnd.ms-powerpoint';
+    default:
+      return 'application/octet-stream';
+  }
 }
 
 /**
@@ -84,7 +136,11 @@ function getFileIcon(mimeType: string): React.ReactNode {
 // TIER COLORS
 // ============================================================================
 
-const TIER_COLORS: Record<Stage2InputData['tier'], string> = {
+const TIER_COLORS: Record<TierKey, string> = {
+  trial:
+    'bg-purple-100 text-purple-600 border-purple-200 dark:bg-purple-900/30 dark:text-purple-400 dark:border-purple-800',
+  free:
+    'bg-gray-100 text-gray-600 border-gray-200 dark:bg-gray-800 dark:text-gray-400 dark:border-gray-700',
   basic:
     'bg-slate-100 text-slate-600 border-slate-200 dark:bg-slate-800 dark:text-slate-400 dark:border-slate-700',
   standard:
@@ -215,35 +271,202 @@ function TierFeaturesList({ features, locale }: TierFeaturesListProps) {
 // ============================================================================
 
 export const Stage2InputTab = memo<Stage2InputTabProps>(function Stage2InputTab({
+  documentId,
   inputData,
   locale = 'ru',
 }) {
   const t = GRAPH_TRANSLATIONS.stage2;
 
-  // Parse inputData safely with runtime type guard
-  const data = useMemo(() => {
-    return isStage2InputData(inputData) ? inputData : undefined;
-  }, [inputData]);
+  // State for file_catalog data from Supabase
+  const [fileCatalogData, setFileCatalogData] = useState<FileCatalogInputData | null>(null);
+  const [fetchError, setFetchError] = useState<string | null>(null);
 
-  // Compute tier features
+  // Get document data from Zustand store
+  const documentFromStore = useGenerationStore(state =>
+    documentId ? state.documents.get(documentId) : undefined
+  );
+
+  // Fetch file_catalog data when documentId is available
+  useEffect(() => {
+    if (!documentId) return;
+
+    const fetchFileCatalogData = async () => {
+      try {
+        setFetchError(null); // Reset error state on new fetch
+        const supabase = getSupabaseClient();
+        // Join with organizations to get real tier
+        const { data: row, error } = await supabase
+          .from('file_catalog')
+          .select(`
+            filename,
+            original_name,
+            mime_type,
+            file_size,
+            organization_id,
+            organizations!file_catalog_organization_id_fkey(tier)
+          `)
+          .eq('id', documentId)
+          .single();
+
+        if (error) {
+          const errorMsg = locale === 'ru'
+            ? 'Не удалось загрузить данные файла'
+            : 'Failed to load file details';
+          console.error('[Stage2InputTab] Error fetching file_catalog:', error);
+          setFetchError(errorMsg);
+          return;
+        }
+
+        if (row) {
+          // Extract tier from joined organizations table
+          const orgData = row.organizations as { tier: string } | null;
+          // Fail-safe: default to 'free' tier (most restrictive) if tier unknown
+          const tier = (orgData?.tier || 'free') as TierKey;
+
+          // Fetch tier_settings.features for document processing capabilities
+          let tierFeatures: Record<string, unknown> | null = null;
+          const { data: tierSettingsRow, error: tierError } = await supabase
+            .from('tier_settings')
+            .select('features')
+            .eq('tier_key', tier)
+            .single();
+
+          if (tierError) {
+            console.warn('[Stage2InputTab] Failed to fetch tier features, using defaults:', tierError);
+            // Continue with null tierFeatures - will fallback to DEFAULT_TIER_FEATURES
+          } else if (tierSettingsRow) {
+            tierFeatures = tierSettingsRow.features as Record<string, unknown>;
+          }
+
+          setFileCatalogData({
+            filename: row.filename || '',
+            originalName: row.original_name,
+            mimeType: row.mime_type,
+            fileSize: row.file_size || 0,
+            organizationId: row.organization_id,
+            tier: tier,
+            tierFeatures: tierFeatures,
+          });
+        }
+      } catch (err) {
+        const errorMsg = locale === 'ru'
+          ? 'Ошибка загрузки данных'
+          : 'Failed to fetch file catalog data';
+        console.error('[Stage2InputTab]', errorMsg, err);
+        setFetchError(errorMsg);
+      }
+    };
+
+    fetchFileCatalogData();
+  }, [documentId, locale]);
+
+  // Parse inputData safely with runtime type guard OR build from file_catalog/Zustand store
+  const data = useMemo((): Stage2InputData | undefined => {
+    // First priority: valid inputData from trace
+    if (isStage2InputData(inputData)) {
+      return inputData;
+    }
+
+    // Second priority: Build from file_catalog data (Supabase) - MOST ACCURATE
+    if (fileCatalogData) {
+      const displayName = fileCatalogData.originalName || fileCatalogData.filename;
+      return {
+        fileId: documentId || '',
+        originalFilename: displayName,
+        mimeType: fileCatalogData.mimeType || detectMimeType(displayName),
+        // Use real tier from organization, fallback to 'free' (most restrictive)
+        tier: fileCatalogData.tier || 'free',
+        fileSize: fileCatalogData.fileSize,
+        pageCount: undefined, // Not stored in file_catalog
+        organizationId: fileCatalogData.organizationId || undefined,
+      };
+    }
+
+    // Third priority: Build from Zustand store document data
+    if (documentFromStore) {
+      return {
+        fileId: documentFromStore.id,
+        originalFilename: documentFromStore.name,
+        mimeType: detectMimeType(documentFromStore.name),
+        tier: 'free' as const, // Fail-safe: most restrictive tier
+        fileSize: undefined,
+        pageCount: undefined,
+        organizationId: undefined,
+      };
+    }
+
+    // Fourth priority: Try to extract from raw inputData object
+    if (inputData && typeof inputData === 'object') {
+      const raw = inputData as Record<string, unknown>;
+      const fileId = (raw.fileId ?? raw.file_id ?? raw.documentId ?? raw.document_id ?? '') as string;
+      const filename = (raw.originalFilename ?? raw.filename ?? raw.file_name ?? raw.name ?? '') as string;
+      const mimeType = (raw.mimeType ?? raw.mime_type ?? raw.file_type ?? detectMimeType(filename)) as string;
+      const tier = (raw.tier ?? 'free') as TierKey; // Fail-safe: most restrictive tier
+
+      if (fileId && filename) {
+        return {
+          fileId,
+          originalFilename: filename,
+          mimeType,
+          tier: VALID_TIERS.includes(tier) ? tier : 'free',
+          fileSize: typeof raw.fileSize === 'number' ? raw.fileSize :
+                    typeof raw.file_size === 'number' ? raw.file_size : undefined,
+          pageCount: typeof raw.pageCount === 'number' ? raw.pageCount :
+                     typeof raw.page_count === 'number' ? raw.page_count : undefined,
+          organizationId: typeof raw.organizationId === 'string' ? raw.organizationId :
+                          typeof raw.organization_id === 'string' ? raw.organization_id : undefined,
+        };
+      }
+    }
+
+    return undefined;
+  }, [inputData, documentFromStore, fileCatalogData, documentId]);
+
+  // Compute tier features - prioritize DB data, fallback to defaults
   const tierFeatures = useMemo(() => {
-    if (!data?.tier) return getTierFeatures('basic');
-    return getTierFeatures(data.tier);
-  }, [data?.tier]);
+    const tier = data?.tier || 'free'; // Fail-safe: most restrictive tier
+
+    // If we have features from DB (tier_settings.features), use them
+    if (fileCatalogData?.tierFeatures) {
+      return parseTierFeaturesFromDB(fileCatalogData.tierFeatures, tier);
+    }
+
+    // Fallback to hardcoded defaults
+    return getTierFeatures(tier);
+  }, [data?.tier, fileCatalogData?.tierFeatures]);
 
   // Get tier label
   const tierLabel = useMemo(() => {
-    if (!data?.tier) return t?.tierBasic?.[locale] || 'Basic';
+    if (!data?.tier) return t?.tierStandard?.[locale] || 'Standard';
     switch (data.tier) {
       case 'premium':
         return t?.tierPremium?.[locale] || 'Premium';
       case 'standard':
         return t?.tierStandard?.[locale] || 'Standard';
+      case 'trial':
+        return locale === 'ru' ? 'Пробный' : 'Trial';
+      case 'free':
+        return locale === 'ru' ? 'Бесплатный' : 'Free';
       case 'basic':
       default:
         return t?.tierBasic?.[locale] || 'Basic';
     }
   }, [data?.tier, locale, t]);
+
+  // Error state
+  if (fetchError) {
+    return (
+      <div className="p-4 text-center">
+        <p className="text-destructive mb-2">{fetchError}</p>
+        <button
+          onClick={() => window.location.reload()}
+          className="text-sm text-muted-foreground hover:text-foreground underline"
+        >
+          {locale === 'ru' ? 'Обновить страницу' : 'Refresh page'}
+        </button>
+      </div>
+    );
+  }
 
   // Empty state
   if (!data) {

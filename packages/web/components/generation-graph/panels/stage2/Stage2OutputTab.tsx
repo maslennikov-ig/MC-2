@@ -28,8 +28,27 @@ import {
 } from 'lucide-react';
 import { GRAPH_TRANSLATIONS } from '@/lib/generation-graph/translations';
 import { formatNumber, MARKDOWN_TRUNCATE_LIMIT } from '@/lib/generation-graph/format-utils';
+import { useGenerationStore } from '@/stores/useGenerationStore';
+import { getSupabaseClient } from '@/lib/supabase/browser-client';
 import { MetricCard } from '../shared/MetricCard';
 import type { Stage2OutputTabProps, Stage2OutputData, DocumentStats } from './types';
+
+// ============================================================================
+// FILE CATALOG DATA TYPE
+// ============================================================================
+
+interface FileCatalogData {
+  vectorStatus: 'pending' | 'indexing' | 'indexed' | 'failed';
+  chunkCount: number;
+  markdownLength: number;
+  markdownContent: string | null;
+  summaryMetadata: {
+    quality_score?: number;
+    summary_tokens?: number;
+    processing_method?: string;
+    processing_time_ms?: number;
+  } | null;
+}
 
 // ============================================================================
 // TYPE GUARDS
@@ -476,17 +495,196 @@ const EmptyState = memo<EmptyStateProps>(function EmptyState({ t }) {
  * - Quality Health: Processing quality score with progress bar
  * - Vector Status: Indexing status badge
  * - Markdown Inspector: Dialog to view raw processed markdown
+ *
+ * Data sources (priority order):
+ * 1. Valid outputData prop (if has required shape)
+ * 2. Zustand store document status (for vectorStatus)
+ * 3. Raw outputData with flexible field extraction
  */
 export const Stage2OutputTab = memo<Stage2OutputTabProps>(function Stage2OutputTab({
   outputData,
   courseId: _courseId, // Available for future use
-  documentId: _documentId, // Available for future use
+  documentId,
   locale = 'ru',
 }) {
+  // State for file_catalog data from Supabase
+  const [fileCatalogData, setFileCatalogData] = useState<FileCatalogData | null>(null);
+
+  // Get document status from Zustand store - SINGLE SOURCE OF TRUTH
+  const documentFromStore = useGenerationStore(state =>
+    documentId ? state.documents.get(documentId) : undefined
+  );
+
+  // Fetch file_catalog data when documentId is available
+  useEffect(() => {
+    if (!documentId) return;
+
+    const fetchFileCatalogData = async () => {
+      try {
+        const supabase = getSupabaseClient();
+        const { data: row, error } = await supabase
+          .from('file_catalog')
+          .select('vector_status, chunk_count, markdown_content, summary_metadata')
+          .eq('id', documentId)
+          .single();
+
+        if (error) {
+          console.error('[Stage2OutputTab] Error fetching file_catalog:', error);
+          return;
+        }
+
+        if (row) {
+          setFileCatalogData({
+            vectorStatus: (row.vector_status as FileCatalogData['vectorStatus']) || 'pending',
+            chunkCount: row.chunk_count || 0,
+            markdownLength: row.markdown_content?.length || 0,
+            markdownContent: row.markdown_content,
+            summaryMetadata: row.summary_metadata as FileCatalogData['summaryMetadata'],
+          });
+        }
+      } catch (err) {
+        console.error('[Stage2OutputTab] Failed to fetch file_catalog:', err);
+      }
+    };
+
+    fetchFileCatalogData();
+  }, [documentId]);
+
   // Type guard and data extraction with runtime validation
-  const data = useMemo(() => {
-    return isStage2OutputData(outputData) ? outputData : undefined;
-  }, [outputData]);
+  const data = useMemo((): Stage2OutputData | undefined => {
+    // First priority: valid outputData with required shape
+    if (isStage2OutputData(outputData)) {
+      return outputData;
+    }
+
+    // Second priority: Build from file_catalog data (Supabase)
+    if (fileCatalogData) {
+      const meta = fileCatalogData.summaryMetadata;
+      return {
+        vectorStatus: fileCatalogData.vectorStatus,
+        markdownContent: fileCatalogData.markdownContent || undefined,
+        summarization: meta ? {
+          success: true,
+          method: (meta.processing_method as 'full_text' | 'hierarchical') || 'full_text',
+          summaryText: undefined, // Summary text is stored separately, not in summary_metadata
+          summaryTokens: meta.summary_tokens || 0,
+          qualityScore: meta.quality_score || 0,
+        } : undefined,
+        stats: {
+          pages: 0, // Not stored in file_catalog, would need parsed_content
+          images: 0,
+          tables: 0,
+          sections: 0,
+          markdownLength: fileCatalogData.markdownLength,
+          chunksCreated: fileCatalogData.chunkCount,
+          tokensEmbedded: fileCatalogData.summaryMetadata?.summary_tokens || 0,
+          processingTimeMs: fileCatalogData.summaryMetadata?.processing_time_ms || 0,
+        },
+      };
+    }
+
+    // Third priority: Build from Zustand store + raw outputData
+    const raw = outputData && typeof outputData === 'object'
+      ? outputData as Record<string, unknown>
+      : {};
+
+    // Map document status to vector status
+    const mapStatusToVectorStatus = (): Stage2OutputData['vectorStatus'] => {
+      if (documentFromStore?.status === 'completed') return 'indexed';
+      if (documentFromStore?.status === 'error') return 'failed';
+      if (documentFromStore?.status === 'active') return 'indexing';
+      // Try from raw data
+      const rawVectorStatus = raw.vectorStatus ?? raw.vector_status;
+      if (typeof rawVectorStatus === 'string' &&
+          ['pending', 'indexing', 'indexed', 'failed'].includes(rawVectorStatus)) {
+        return rawVectorStatus as Stage2OutputData['vectorStatus'];
+      }
+      return 'pending';
+    };
+
+    // Try to extract summarization data
+    const extractSummarization = () => {
+      const summary = raw.summarization ?? raw.summary;
+      if (summary && typeof summary === 'object') {
+        const s = summary as Record<string, unknown>;
+        return {
+          success: s.success !== false,
+          method: (s.method as 'full_text' | 'hierarchical') || 'full_text',
+          summaryText: typeof s.summaryText === 'string' ? s.summaryText :
+                       typeof s.summary_text === 'string' ? s.summary_text :
+                       typeof s.text === 'string' ? s.text : undefined,
+          summaryTokens: typeof s.summaryTokens === 'number' ? s.summaryTokens : 0,
+          qualityScore: typeof s.qualityScore === 'number' ? s.qualityScore :
+                        typeof s.quality_score === 'number' ? s.quality_score : 0,
+        };
+      }
+      // Try direct summary text
+      if (typeof raw.summaryText === 'string' || typeof raw.summary_text === 'string') {
+        return {
+          success: true,
+          method: 'full_text' as const,
+          summaryText: (raw.summaryText ?? raw.summary_text) as string,
+          summaryTokens: 0,
+          qualityScore: 0.75, // Default to 75% if not specified
+        };
+      }
+      return undefined;
+    };
+
+    // Try to extract stats
+    const extractStats = (): DocumentStats | undefined => {
+      const stats = raw.stats ?? raw.statistics;
+      if (stats && typeof stats === 'object') {
+        const st = stats as Record<string, unknown>;
+        return {
+          pages: typeof st.pages === 'number' ? st.pages : 0,
+          images: typeof st.images === 'number' ? st.images : 0,
+          tables: typeof st.tables === 'number' ? st.tables : 0,
+          sections: typeof st.sections === 'number' ? st.sections : 0,
+          markdownLength: typeof st.markdownLength === 'number' ? st.markdownLength :
+                          typeof st.markdown_length === 'number' ? st.markdown_length : 0,
+          chunksCreated: typeof st.chunksCreated === 'number' ? st.chunksCreated :
+                         typeof st.chunks_created === 'number' ? st.chunks_created :
+                         typeof st.chunks === 'number' ? st.chunks : 0,
+          tokensEmbedded: typeof st.tokensEmbedded === 'number' ? st.tokensEmbedded :
+                          typeof st.tokens_embedded === 'number' ? st.tokens_embedded :
+                          typeof st.tokens === 'number' ? st.tokens : 0,
+          processingTimeMs: typeof st.processingTimeMs === 'number' ? st.processingTimeMs :
+                            typeof st.processing_time_ms === 'number' ? st.processing_time_ms : 0,
+        };
+      }
+      return undefined;
+    };
+
+    // Build output data from available sources
+    const vectorStatus = mapStatusToVectorStatus();
+    const summarization = extractSummarization();
+    const stats = extractStats();
+    const markdownContent = typeof raw.markdownContent === 'string' ? raw.markdownContent :
+                            typeof raw.markdown_content === 'string' ? raw.markdown_content : undefined;
+
+    // If we have document from store and status is completed, build output data
+    if (documentFromStore?.status === 'completed' || vectorStatus === 'indexed') {
+      return {
+        vectorStatus,
+        markdownContent,
+        summarization,
+        stats,
+      };
+    }
+
+    // If we have any meaningful data, return it
+    if (vectorStatus !== 'pending' || summarization || stats || markdownContent) {
+      return {
+        vectorStatus,
+        markdownContent,
+        summarization,
+        stats,
+      };
+    }
+
+    return undefined;
+  }, [outputData, documentFromStore, fileCatalogData]);
 
   // Translation helper
   const t = useCallback(

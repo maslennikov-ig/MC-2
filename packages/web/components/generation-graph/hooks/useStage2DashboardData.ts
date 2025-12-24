@@ -6,6 +6,7 @@ import { logger } from '@/lib/client-logger';
 import { useDebouncedCallback } from '@/lib/hooks/use-debounce';
 import type { Database } from '@/types/database.generated';
 import { toast } from 'sonner';
+import { useGenerationStore } from '@/stores/useGenerationStore';
 
 // =============================================================================
 // Type Definitions for Stage 2 Dashboard
@@ -61,6 +62,10 @@ export interface DocumentMatrixRow {
   documentId: string;
   /** Original filename */
   filename: string;
+  /** AI-generated title from Phase 6 summarization */
+  generatedTitle?: string | null;
+  /** User-provided original filename at upload */
+  originalName?: string | null;
   /** Overall document processing status */
   status: DocumentStatus;
   /** Document priority level */
@@ -290,7 +295,16 @@ export function useStage2DashboardData({
 
   // Track current fetch to avoid race conditions
   const fetchIdRef = useRef(0);
-  const supabase = getSupabaseClient();
+
+  // IMPORTANT: Get supabase client once and store in ref to prevent
+  // subscription re-creation on every render (causing rate limit errors)
+  const supabaseRef = useRef(getSupabaseClient());
+  const supabase = supabaseRef.current;
+
+  // Get document progress/status functions from Zustand store - SINGLE SOURCE OF TRUTH
+  // This ensures consistency with Stage2Group and DocumentNode components
+  const getDocumentProgressFromStore = useGenerationStore(state => state.getDocumentProgress);
+  const getDocumentStatusFromStore = useGenerationStore(state => state.getDocumentStatus);
 
   // Skip hook if disabled or missing courseId
   const shouldFetch = enabled && !!courseId;
@@ -325,7 +339,7 @@ export function useStage2DashboardData({
       // Step 1: Get all files for this course from file_catalog
       const { data: filesData, error: filesError } = await supabase
         .from('file_catalog')
-        .select('id, filename, file_size, priority, vector_status, chunk_count, error_message, created_at')
+        .select('id, filename, generated_title, original_name, file_size, priority, vector_status, chunk_count, error_message, created_at')
         .eq('course_id', courseId)
         .order('created_at', { ascending: true })
         .abortSignal(abortController.signal);
@@ -451,25 +465,41 @@ export function useStage2DashboardData({
           });
         }
 
-        // Determine overall document status
-        let docStatus: DocumentStatus;
-        const completedStages = steps.filter(s => s.status === 'completed').length;
+        // Get status and progress from Zustand store - SINGLE SOURCE OF TRUTH
+        // This ensures consistency with Stage2Group and DocumentNode components
+        const storeProgress = getDocumentProgressFromStore(file.id);
+        const storeStatus = getDocumentStatusFromStore(file.id);
 
-        // Use file_catalog.vector_status as fallback
-        if (file.vector_status === 'indexed') {
-          docStatus = 'completed';
-        } else if (file.vector_status === 'failed' || file.error_message) {
-          docStatus = 'error';
-          errorMessage = errorMessage || file.error_message || undefined;
-        } else if (file.vector_status === 'indexing' || steps.length > 0) {
-          docStatus = getDocumentStatus(steps);
+        // Use Zustand store data if available, otherwise fall back to local calculation
+        let docStatus: DocumentStatus;
+        let completedStages: number;
+
+        if (storeStatus !== 'pending' || storeProgress.completed > 0) {
+          // Zustand store has data - use it as source of truth
+          docStatus = storeStatus as DocumentStatus;
+          completedStages = storeProgress.completed;
         } else {
-          docStatus = 'pending';
+          // Fallback to local calculation (for cases when store hasn't loaded yet)
+          completedStages = steps.filter(s => s.status === 'completed').length;
+
+          // Use file_catalog.vector_status as additional fallback
+          if (file.vector_status === 'indexed') {
+            docStatus = 'completed';
+          } else if (file.vector_status === 'failed' || file.error_message) {
+            docStatus = 'error';
+            errorMessage = errorMessage || file.error_message || undefined;
+          } else if (file.vector_status === 'indexing' || steps.length > 0) {
+            docStatus = getDocumentStatus(steps);
+          } else {
+            docStatus = 'pending';
+          }
         }
 
         documentRows.push({
           documentId: file.id,
           filename: file.filename,
+          generatedTitle: (file as { generated_title?: string | null }).generated_title ?? null,
+          originalName: (file as { original_name?: string | null }).original_name ?? null,
           status: docStatus,
           priority: file.priority as DocumentPriority | undefined,
           completedStages,
@@ -552,10 +582,14 @@ export function useStage2DashboardData({
         setIsLoading(false);
       }
     }
-  }, [shouldFetch, courseId, supabase]);
+  }, [shouldFetch, courseId, supabase, getDocumentProgressFromStore, getDocumentStatusFromStore]);
 
   // Create debounced version for realtime refetches
   const debouncedFetchDocumentData = useDebouncedCallback(fetchDocumentData, 500);
+
+  // Store fetch function in ref to avoid re-subscriptions when function reference changes
+  const fetchRef = useRef(debouncedFetchDocumentData);
+  fetchRef.current = debouncedFetchDocumentData;
 
   // Fetch on mount and when dependencies change
   useEffect(() => {
@@ -563,6 +597,8 @@ export function useStage2DashboardData({
   }, [fetchDocumentData]);
 
   // Set up realtime subscription
+  // IMPORTANT: Only depend on courseId and enableRealtime to prevent re-subscriptions
+  // Use fetchRef.current to access the latest fetch function without dependency
   useEffect(() => {
     if (!enableRealtime || !courseId) return;
 
@@ -573,9 +609,10 @@ export function useStage2DashboardData({
     });
 
     // Wrapper to safely refetch data only if component is still mounted
+    // Uses ref to always call latest version of fetch function
     const safeRefetch = () => {
       if (isMounted) {
-        debouncedFetchDocumentData();
+        fetchRef.current();
       }
     };
 
@@ -600,24 +637,32 @@ export function useStage2DashboardData({
           safeRefetch();
         }
       )
-      .subscribe((status) => {
+      .subscribe((status, err) => {
         if (status === 'SUBSCRIBED') {
           logger.debug('[useStage2DashboardData] File catalog realtime subscription active');
         } else if (status === 'CHANNEL_ERROR') {
-          logger.error('[useStage2DashboardData] File catalog realtime subscription error');
-          if (isMounted) {
-            toast.error('Ошибка подключения к серверу');
-          }
+          // Log full error for debugging - common causes:
+          // 1. Table not in supabase_realtime publication
+          // 2. RLS policies blocking access
+          // 3. Missing SELECT permissions
+          // 4. Rate limiting (too many subscriptions)
+          const errorMessage = err?.message || (typeof err === 'object' ? JSON.stringify(err) : String(err)) || 'Unknown error';
+          logger.error('[useStage2DashboardData] File catalog realtime subscription error', {
+            error: errorMessage,
+            errorRaw: err,
+            courseId,
+          });
+          // Don't show toast for expected errors (e.g., table not in publication, rate limits)
+          // This is a configuration issue, not a runtime error
         } else if (status === 'TIMED_OUT') {
           logger.warn('[useStage2DashboardData] File catalog realtime subscription timed out');
           if (isMounted) {
             toast.error('Время ожидания соединения истекло');
           }
         } else if (status === 'CLOSED') {
-          logger.warn('[useStage2DashboardData] File catalog realtime connection closed');
-          if (isMounted) {
-            toast.error('Соединение с сервером потеряно. Данные могут быть устаревшими.');
-          }
+          // CLOSED is normal on component unmount - only log for debugging
+          // No toast here as it would show false errors during navigation
+          logger.debug('[useStage2DashboardData] File catalog realtime connection closed');
         }
       });
 
@@ -648,24 +693,30 @@ export function useStage2DashboardData({
           }
         }
       )
-      .subscribe((status) => {
+      .subscribe((status, err) => {
         if (status === 'SUBSCRIBED') {
           logger.debug('[useStage2DashboardData] Trace realtime subscription active');
         } else if (status === 'CHANNEL_ERROR') {
-          logger.error('[useStage2DashboardData] Trace realtime subscription error');
-          if (isMounted) {
-            toast.error('Ошибка подключения к серверу');
-          }
+          // Log full error for debugging - common causes:
+          // 1. Table not in supabase_realtime publication
+          // 2. RLS policies blocking access
+          // 3. Missing SELECT permissions
+          // 4. Rate limiting (too many subscriptions)
+          const errorMessage = err?.message || (typeof err === 'object' ? JSON.stringify(err) : String(err)) || 'Unknown error';
+          logger.error('[useStage2DashboardData] Trace realtime subscription error', {
+            error: errorMessage,
+            errorRaw: err,
+            courseId,
+          });
+          // Don't show toast for expected errors (e.g., table not in publication, rate limits)
         } else if (status === 'TIMED_OUT') {
           logger.warn('[useStage2DashboardData] Trace realtime subscription timed out');
           if (isMounted) {
             toast.error('Время ожидания соединения истекло');
           }
         } else if (status === 'CLOSED') {
-          logger.warn('[useStage2DashboardData] Trace realtime connection closed');
-          if (isMounted) {
-            toast.error('Соединение с сервером потеряно. Данные могут быть устаревшими.');
-          }
+          // CLOSED is normal on component unmount - only log for debugging
+          logger.debug('[useStage2DashboardData] Trace realtime connection closed');
         }
       });
 
@@ -675,7 +726,10 @@ export function useStage2DashboardData({
       fileCatalogChannel.unsubscribe();
       traceChannel.unsubscribe();
     };
-  }, [enableRealtime, courseId, debouncedFetchDocumentData, supabase]);
+    // IMPORTANT: Only depend on courseId and enableRealtime
+    // supabase is stored in ref (stable), fetchRef is used for fetch function
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enableRealtime, courseId]);
 
   // Refetch function for manual refresh
   const refetch = useCallback(() => {

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { memo, useCallback, useEffect, useRef } from 'react';
+import React, { memo, useCallback, useEffect, useRef, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
@@ -22,6 +22,7 @@ import {
 } from 'lucide-react';
 import { GRAPH_TRANSLATIONS } from '@/lib/generation-graph/translations';
 import { formatDuration } from '@/lib/generation-graph/format-utils';
+import { useGenerationStore } from '@/stores/useGenerationStore';
 import type {
   Stage2ProcessTabProps,
   ProcessingPhase,
@@ -95,6 +96,41 @@ const PHASE_ORDER: ProcessingPhaseId[] = [
   'qdrant',
   'summarization',
 ];
+
+/**
+ * Map Zustand store stage names/phases to ProcessingPhaseId
+ * Zustand uses: init, start, processing, chunking, embedding, indexing, summarization, complete, finish
+ * ProcessTab uses: docling, markdown, images, chunking, embedding, qdrant, summarization
+ */
+const ZUSTAND_PHASE_TO_PROCESSING_PHASE: Record<string, ProcessingPhaseId> = {
+  // Phase 1: Digitization (Docling)
+  'init': 'docling',
+  'start': 'docling',
+  'docling': 'docling',
+  // Phase 2: Cleanup (Markdown)
+  'processing': 'markdown',
+  'markdown': 'markdown',
+  'cleanup': 'markdown',
+  // Phase 3: Visual Analysis (Images)
+  'images': 'images',
+  'visual': 'images',
+  'ocr': 'images',
+  // Phase 4: Segmentation (Chunking)
+  'chunking': 'chunking',
+  'segmentation': 'chunking',
+  // Phase 5: AI Encoding (Embedding)
+  'embedding': 'embedding',
+  'vectorization': 'embedding',
+  // Phase 6: Knowledge Save (Qdrant)
+  'indexing': 'qdrant',
+  'qdrant': 'qdrant',
+  'index': 'qdrant',
+  // Phase 7: Insight Generation (Summarization)
+  'summarization': 'summarization',
+  'summary': 'summarization',
+  'complete': 'summarization',
+  'finish': 'summarization',
+};
 
 /**
  * Generates default phases (all pending) when not provided
@@ -395,8 +431,14 @@ const TerminalFooter = memo<TerminalFooterProps>(function TerminalFooter({ logs,
  *
  * Visualizes the 7-phase document processing pipeline with a vertical layout.
  * Shows phase status, progress, metrics, and a terminal footer with live logs.
+ *
+ * Data sources (priority order):
+ * 1. providedPhases prop (if explicitly passed)
+ * 2. Zustand store document stages (via documentId)
+ * 3. Default pending phases (fallback)
  */
 export const Stage2ProcessTab = memo<Stage2ProcessTabProps>(function Stage2ProcessTab({
+  documentId,
   phases: providedPhases,
   terminalLogs = [],
   status = 'pending',
@@ -405,8 +447,125 @@ export const Stage2ProcessTab = memo<Stage2ProcessTabProps>(function Stage2Proce
 }) {
   const t = GRAPH_TRANSLATIONS.stage2;
 
-  // Generate default phases if not provided
-  const phases = providedPhases || generateDefaultPhases(locale);
+  // Get document stages from Zustand store - SINGLE SOURCE OF TRUTH
+  const documentStages = useGenerationStore(state =>
+    documentId ? state.getDocumentStages(documentId) : []
+  );
+  const documentStatus = useGenerationStore(state =>
+    documentId ? state.getDocumentStatus(documentId) : 'pending'
+  );
+
+  // Transform Zustand stages to ProcessingPhase format
+  const phasesFromStore = useMemo((): ProcessingPhase[] => {
+    if (!documentStages || documentStages.length === 0) {
+      return [];
+    }
+
+    // Create a map of completed phases from Zustand stages
+    const phaseStatusMap = new Map<ProcessingPhaseId, {
+      status: ProcessingPhaseStatus;
+      durationMs?: number;
+      metrics?: Record<string, number | string>;
+    }>();
+
+    for (const stage of documentStages) {
+      // Extract phase name from stageName or stageId
+      const phaseName = stage.stageId?.split('_').pop()?.toLowerCase() || '';
+      const mappedPhaseId = ZUSTAND_PHASE_TO_PROCESSING_PHASE[phaseName];
+
+      if (mappedPhaseId) {
+        // Map Zustand status to ProcessingPhaseStatus
+        let phaseStatus: ProcessingPhaseStatus = 'pending';
+        if (stage.status === 'completed') phaseStatus = 'completed';
+        else if (stage.status === 'active') phaseStatus = 'active';
+        else if (stage.status === 'error') phaseStatus = 'error';
+        else if (stage.status === 'skipped') phaseStatus = 'skipped';
+
+        // Only update if this stage has a more advanced status
+        const existing = phaseStatusMap.get(mappedPhaseId);
+        const statusPriority = { error: 4, active: 3, completed: 2, skipped: 1, pending: 0 };
+        if (!existing || statusPriority[phaseStatus] > statusPriority[existing.status]) {
+          phaseStatusMap.set(mappedPhaseId, {
+            status: phaseStatus,
+            durationMs: stage.attempts?.[0]?.processMetrics?.duration,
+            metrics: stage.outputData ? { items: Object.keys(stage.outputData).length } : undefined,
+          });
+        }
+      }
+    }
+
+    // Generate phases with status from store
+    const phaseNameMap: Record<ProcessingPhaseId, { name: string; desc: string }> = {
+      docling: {
+        name: t?.phaseDocling?.[locale] ?? 'Оцифровка',
+        desc: t?.phaseDoclingDesc?.[locale] ?? 'Умное чтение структуры документа',
+      },
+      markdown: {
+        name: t?.phaseMarkdown?.[locale] ?? 'Очистка',
+        desc: t?.phaseMarkdownDesc?.[locale] ?? 'Форматирование и очистка текста',
+      },
+      images: {
+        name: t?.phaseImages?.[locale] ?? 'Анализ медиа',
+        desc: t?.phaseImagesDesc?.[locale] ?? 'Распознавание изображений и таблиц',
+      },
+      chunking: {
+        name: t?.phaseChunking?.[locale] ?? 'Сегментация',
+        desc: t?.phaseChunkingDesc?.[locale] ?? 'Разбиение на смысловые блоки',
+      },
+      embedding: {
+        name: t?.phaseEmbedding?.[locale] ?? 'Векторизация',
+        desc: t?.phaseEmbeddingDesc?.[locale] ?? 'Создание семантических отпечатков',
+      },
+      qdrant: {
+        name: t?.phaseQdrant?.[locale] ?? 'Индексация',
+        desc: t?.phaseQdrantDesc?.[locale] ?? 'Сохранение в базу знаний',
+      },
+      summarization: {
+        name: t?.phaseSummarization?.[locale] ?? 'Синтез',
+        desc: t?.phaseSummarizationDesc?.[locale] ?? 'Создание краткого резюме',
+      },
+    };
+
+    // Determine which phases should be marked as completed based on overall document status
+    const isDocumentCompleted = documentStatus === 'completed';
+
+    return PHASE_ORDER.map((phaseId) => {
+      const storeData = phaseStatusMap.get(phaseId);
+
+      // If document is completed but phase wasn't explicitly tracked, mark as completed
+      let phaseStatus: ProcessingPhaseStatus = storeData?.status || 'pending';
+      if (isDocumentCompleted && phaseStatus === 'pending') {
+        // Images phase might be skipped if no images in document
+        phaseStatus = phaseId === 'images' ? 'skipped' : 'completed';
+      }
+
+      return {
+        id: phaseId,
+        name: phaseNameMap[phaseId].name,
+        description: phaseNameMap[phaseId].desc,
+        status: phaseStatus,
+        durationMs: storeData?.durationMs,
+        metrics: storeData?.metrics,
+      };
+    });
+  }, [documentStages, documentStatus, locale, t]);
+
+  // Determine which phases to use: provided > store > default
+  const phases = providedPhases || (phasesFromStore.length > 0 ? phasesFromStore : generateDefaultPhases(locale));
+
+  // Calculate effective status from phases
+  const effectiveStatus = useMemo(() => {
+    if (status !== 'pending') return status;
+    if (documentStatus !== 'pending') return documentStatus as 'active' | 'completed' | 'error';
+    return 'pending';
+  }, [status, documentStatus]);
+
+  // Calculate total progress from phases
+  const effectiveProgress = useMemo(() => {
+    if (totalProgress !== undefined) return totalProgress;
+    const completedCount = phases.filter(p => p.status === 'completed' || p.status === 'skipped').length;
+    return Math.round((completedCount / phases.length) * 100);
+  }, [totalProgress, phases]);
 
   // Safety check for terminalLogs in case null is passed instead of undefined
   const safeLogs = Array.isArray(terminalLogs) ? terminalLogs : [];
@@ -424,17 +583,24 @@ export const Stage2ProcessTab = memo<Stage2ProcessTabProps>(function Stage2Proce
             {t?.pipelineDesc?.[locale] ?? 'Transforming document into knowledge'}
           </p>
 
-          {/* Total progress bar */}
-          {totalProgress !== undefined && status === 'active' && (
+          {/* Total progress bar - show for active and completed states */}
+          {(effectiveStatus === 'active' || effectiveStatus === 'completed') && (
             <div className="mt-3">
               <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
-                <span>{t?.statusActive?.[locale] ?? 'Processing'}</span>
-                <span className="font-mono">{totalProgress}%</span>
+                <span>
+                  {effectiveStatus === 'completed'
+                    ? (t?.statusCompleted?.[locale] ?? 'Завершено')
+                    : (t?.statusActive?.[locale] ?? 'Обработка')}
+                </span>
+                <span className="font-mono">{effectiveProgress}%</span>
               </div>
               <div className="h-2 w-full bg-muted rounded-full overflow-hidden">
                 <div
-                  className="h-full bg-primary rounded-full transition-all duration-500"
-                  style={{ width: `${Math.min(100, totalProgress)}%` }}
+                  className={cn(
+                    'h-full rounded-full transition-all duration-500',
+                    effectiveStatus === 'completed' ? 'bg-green-500' : 'bg-primary'
+                  )}
+                  style={{ width: `${Math.min(100, effectiveProgress)}%` }}
                 />
               </div>
             </div>

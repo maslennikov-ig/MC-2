@@ -95,6 +95,10 @@ type ComparativeClassificationResponse = z.infer<
 interface FileMetadata {
   id: string;
   filename: string;
+  /** AI-generated meaningful title from Phase 6 summarization */
+  generated_title: string | null;
+  /** User-provided original filename at upload */
+  original_name: string | null;
   mime_type: string;
   file_size: number;
   content_preview: string;
@@ -225,9 +229,12 @@ export async function executeDocumentClassificationComparative(
       );
 
       // Convert FileMetadata to DocumentForClassification
+      // Include generated_title and original_name for meaningful document references
       const documents: DocumentForClassification[] = fileMetadataList.map(f => ({
         id: f.id,
         filename: f.filename,
+        generated_title: f.generated_title,
+        original_name: f.original_name,
         mime_type: f.mime_type,
         file_size: f.file_size,
         summary: f.content_preview,
@@ -461,6 +468,8 @@ export async function executeDocumentClassification(
  *
  * NEW: Uses processed_content (summary) instead of markdown_content
  * Falls back to markdown_content if processed_content is not available
+ *
+ * Also fetches generated_title and original_name for meaningful document references
  */
 async function fetchFileMetadata(
   supabase: ReturnType<typeof getSupabaseAdmin>,
@@ -468,7 +477,7 @@ async function fetchFileMetadata(
 ): Promise<FileMetadata[]> {
   const { data, error } = await supabase
     .from('file_catalog')
-    .select('id, filename, mime_type, file_size, processed_content, markdown_content, summary_metadata')
+    .select('id, filename, generated_title, original_name, mime_type, file_size, processed_content, markdown_content, summary_metadata')
     .in('id', fileIds);
 
   if (error) {
@@ -492,6 +501,7 @@ async function fetchFileMetadata(
     logger.debug({
       fileId: file.id,
       hasProcessedContent: !!file.processed_content,
+      hasGeneratedTitle: !!file.generated_title,
       summaryTokens,
       contentLength: content.length,
     }, 'Loaded file for classification');
@@ -499,6 +509,8 @@ async function fetchFileMetadata(
     return {
       id: file.id,
       filename: file.filename,
+      generated_title: file.generated_title ?? null,
+      original_name: file.original_name ?? null,
       mime_type: file.mime_type,
       file_size: file.file_size,
       content_preview: content, // Full summary, not truncated
@@ -622,17 +634,22 @@ async function buildComparativeClassificationPrompt(
   const promptService = createPromptService();
 
   // Build document list with previews
+  // Use generated_title when available for meaningful document identification
   const documentDescriptions = fileMetadataList
     .map(
-      (file, index) => `
+      (file, index) => {
+        const hasGeneratedTitle = !!file.generated_title;
+        return `
 [Document ${index + 1}]
 ID: ${file.id}
-Filename: ${file.filename}
+${hasGeneratedTitle ? `Title: ${file.generated_title}` : ''}
+Filename: ${file.original_name || file.filename}
 File Type: ${file.mime_type}
 File Size: ${formatFileSize(file.file_size)}
 Content Preview (first 1500 chars):
 ${file.content_preview.substring(0, 1500)}${file.content_preview.length > 1500 ? '...[truncated]' : ''}
----`
+---`;
+      }
     )
     .join('\n');
 

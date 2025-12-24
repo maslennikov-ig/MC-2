@@ -1,7 +1,6 @@
 'use client';
 
 import React, { useMemo, memo } from 'react';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Accordion,
   AccordionContent,
@@ -435,9 +434,8 @@ export const Stage2ActivityTab = memo<Stage2ActivityTabProps>(
     }
 
     return (
-      <ScrollArea className="h-[400px]">
-        <div className="p-4">
-          <Accordion type="multiple" className="space-y-2">
+      <div className="p-4">
+        <Accordion type="multiple" className="space-y-2">
             {phaseGroups.map((group) => {
               const PhaseIcon = PHASE_ICONS[group.phaseId];
               const hasGroupEvents = group.eventCount > 0;
@@ -579,9 +577,8 @@ export const Stage2ActivityTab = memo<Stage2ActivityTabProps>(
                 </AccordionItem>
               );
             })}
-          </Accordion>
-        </div>
-      </ScrollArea>
+        </Accordion>
+      </div>
     );
   }
 );

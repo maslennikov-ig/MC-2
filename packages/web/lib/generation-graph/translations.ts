@@ -7,6 +7,7 @@ export const GRAPH_TRANSLATIONS: GraphTranslations & {
   restart?: Record<string, { ru: string; en: string }>;
   stage1?: Record<string, { ru: string; en: string }>;
   stage2?: Record<string, { ru: string; en: string }>;
+  stage3?: Record<string, { ru: string; en: string }>;
   stageDescriptions?: Record<string, { ru: string; en: string }>;
 } = {
   stages: {
@@ -475,9 +476,10 @@ export const GRAPH_TRANSLATIONS: GraphTranslations & {
     tableAction: { ru: 'Действие', en: 'Action' },
 
     // Priority labels
-    priorityCore: { ru: 'Основной', en: 'Core' },
+    // @deprecated Use PRIORITY_CONFIG from '@/lib/generation-graph/priority-config' instead (SSOT)
+    priorityCore: { ru: 'Ключевой', en: 'Core' },
     priorityImportant: { ru: 'Важный', en: 'Important' },
-    prioritySupplementary: { ru: 'Доп.', en: 'Supplementary' },
+    prioritySupplementary: { ru: 'Дополнительный', en: 'Supplementary' },
 
     // Status labels
     statusAwaiting: { ru: 'Ожидает', en: 'Awaiting' },
@@ -531,5 +533,103 @@ export const GRAPH_TRANSLATIONS: GraphTranslations & {
     statusReady: { ru: 'Готово', en: 'Ready' },
     statusProcessing: { ru: 'Обработка', en: 'Processing' },
     unknownError: { ru: 'Неизвестная ошибка', en: 'Unknown error' },
+  },
+  stage3: {
+    // Tab names
+    inputTab: { ru: 'Контекст', en: 'Context' },
+    processTab: { ru: 'Оценка', en: 'Evaluation' },
+    outputTab: { ru: 'Иерархия', en: 'Hierarchy' },
+    activityTab: { ru: 'Протокол', en: 'Protocol' },
+
+    // Input Tab - Course Context
+    courseContext: { ru: 'Критерии курса', en: 'Course Criteria' },
+    courseContextDesc: { ru: 'Цель и направление определяют приоритеты', en: 'Goal and direction determine priorities' },
+    candidates: { ru: 'Кандидаты на оценку', en: 'Candidates' },
+    candidatesCount: { ru: 'документов', en: 'documents' },
+    strategyEngine: { ru: 'Режим оценки', en: 'Evaluation Mode' },
+    tokenBudget: { ru: 'Бюджет токенов', en: 'Token Budget' },
+    strategySinglePass: { ru: 'Единый проход', en: 'Single Pass' },
+    strategySinglePassDesc: { ru: 'Все документы оцениваются за один вызов', en: 'All documents evaluated in one call' },
+    strategyTournament: { ru: 'Турнирный режим', en: 'Tournament Mode' },
+    strategyTournamentDesc: { ru: 'Документы сравниваются попарно', en: 'Documents compared pairwise' },
+    summaryPreview: { ru: 'Резюме', en: 'Summary' },
+    heavyDocument: { ru: 'Большой документ', en: 'Heavy Document' },
+    sortedByTokens: { ru: 'Сортировка по весу (токенам)', en: 'Sorted by weight (tokens)' },
+
+    // Process Tab - Execution Audit
+    executionAudit: { ru: 'Аудит выполнения', en: 'Execution Audit' },
+    executionAuditDesc: { ru: 'Протокол работы системы классификации', en: 'Classification system execution log' },
+    phaseContextLoading: { ru: 'Загрузка контекста', en: 'Context Loading' },
+    phaseContextLoadingDesc: { ru: 'Загрузка темы и целей курса', en: 'Loading course topic and objectives' },
+    phaseStrategySelection: { ru: 'Выбор стратегии', en: 'Strategy Selection' },
+    phaseStrategySelectionDesc: { ru: 'Определение режима классификации', en: 'Determining classification mode' },
+    phaseComparativeAnalysis: { ru: 'Сравнительный анализ', en: 'Comparative Analysis' },
+    phaseComparativeAnalysisDesc: { ru: 'Оценка релевантности документов', en: 'Evaluating document relevance' },
+    phaseRationaleGeneration: { ru: 'Генерация обоснований', en: 'Rationale Generation' },
+    phaseRationaleGenerationDesc: { ru: 'Объяснение решений ИИ', en: 'Explaining AI decisions' },
+    phaseHierarchyFinalization: { ru: 'Финализация иерархии', en: 'Hierarchy Finalization' },
+    phaseHierarchyFinalizationDesc: { ru: 'Применение правила единственного CORE', en: 'Enforcing single CORE rule' },
+    telemetry: { ru: 'Телеметрия', en: 'Telemetry' },
+    processingTime: { ru: 'Время', en: 'Time' },
+    tokenLoad: { ru: 'Токены', en: 'Tokens' },
+    filesProcessed: { ru: 'Файлы', en: 'Files' },
+    modelUsed: { ru: 'Модель', en: 'Model' },
+
+    // Output Tab - Hierarchy Dashboard
+    hierarchyDashboard: { ru: 'Иерархия документов', en: 'Document Hierarchy' },
+    priorityDistribution: { ru: 'Распределение', en: 'Distribution' },
+    rank: { ru: 'Ранг', en: 'Rank' },
+    score: { ru: 'Оценка', en: 'Score' },
+    rationale: { ru: 'Обоснование', en: 'Rationale' },
+    showRationale: { ru: 'Показать обоснование', en: 'Show rationale' },
+    hideRationale: { ru: 'Скрыть', en: 'Hide' },
+    coreDocument: { ru: 'Ключевой', en: 'Core' },
+    coreDocumentDesc: { ru: 'Самый важный документ курса (только 1)', en: 'Most important course document (only 1)' },
+    importantDocument: { ru: 'Важный', en: 'Important' },
+    importantDocumentDesc: { ru: 'Основные материалы курса (до 30%)', en: 'Key course materials (up to 30%)' },
+    supplementaryDocument: { ru: 'Дополнительный', en: 'Supplementary' },
+    supplementaryDocumentDesc: { ru: 'Вспомогательные материалы', en: 'Supporting materials' },
+    validationError: { ru: 'Выберите ровно 1 ключевой документ', en: 'Select exactly 1 CORE document' },
+    approveStructure: { ru: 'Подтвердить структуру', en: 'Approve Structure' },
+    changeCoreWarning: { ru: 'Сделать этот документ ключевым?', en: 'Make this document CORE?' },
+    changeCoreDesc: { ru: 'Текущий ключевой документ будет понижен до "Важный"', en: 'Current CORE document will be demoted to IMPORTANT' },
+
+    // Activity Tab - Decision Protocol
+    decisionProtocol: { ru: 'Протокол решений', en: 'Decision Protocol' },
+    phaseSetup: { ru: 'Подготовка', en: 'Setup' },
+    phaseJudgment: { ru: 'Оценка ИИ', en: 'AI Judgment' },
+    phaseOverrides: { ru: 'Изменения пользователя', en: 'User Overrides' },
+    aiClassified: { ru: 'ИИ классифицировал', en: 'AI classified' },
+    documentsClassified: { ru: 'документов', en: 'documents' },
+    selectedAsCore: { ru: 'Выбран как ключевой', en: 'Selected as CORE' },
+    promotedToImportant: { ru: 'Повышен до важного', en: 'Promoted to IMPORTANT' },
+    demotedToSupplementary: { ru: 'Понижен до дополнительного', en: 'Demoted to SUPPLEMENTARY' },
+    userChangedPriority: { ru: 'Пользователь изменил приоритет', en: 'User changed priority' },
+    structureApproved: { ru: 'Структура утверждена', en: 'Structure approved' },
+    contextLoaded: { ru: 'Контекст курса загружен', en: 'Course context loaded' },
+    strategySelected: { ru: 'Выбрана стратегия', en: 'Strategy selected' },
+    classificationComplete: { ru: 'Классификация завершена', en: 'Classification complete' },
+
+    // Empty states
+    emptyInput: { ru: 'Ожидание документов из Этапа 2...', en: 'Waiting for Stage 2 documents...' },
+    emptyProcess: { ru: 'Классификация ещё не начата', en: 'Classification not started yet' },
+    emptyOutput: { ru: 'Результаты классификации появятся здесь', en: 'Classification results will appear here' },
+    emptyActivity: { ru: 'Решения ещё не записаны', en: 'No decisions recorded yet' },
+
+    // Error states
+    errorClassification: { ru: 'Ошибка классификации', en: 'Classification Error' },
+    errorTokenLimit: { ru: 'Превышен лимит токенов', en: 'Token Limit Exceeded' },
+    noDocumentsToClassify: { ru: 'Нет документов для классификации', en: 'No documents to classify' },
+
+    // Output Tab - Hierarchy Distribution (missing from code review)
+    hierarchyDistribution: { ru: 'Распределение документов', en: 'Document Hierarchy' },
+    priorityTable: { ru: 'Приоритеты документов', en: 'Document Priorities' },
+
+    // Activity Tab - Event messages (missing from code review)
+    noEventsInPhase: { ru: 'Нет событий в этой фазе', en: 'No events in this phase' },
+    eventContextLoaded: { ru: 'Контекст курса загружен', en: 'Course context loaded' },
+    eventStrategySelected: { ru: 'Стратегия классификации: единый проход', en: 'Classification strategy: single pass' },
+    eventClassificationComplete: { ru: 'Документы классифицированы', en: 'Documents classified' },
+    eventRationalesGenerated: { ru: 'Обоснования сгенерированы для всех документов', en: 'Rationales generated for all documents' },
   },
 };

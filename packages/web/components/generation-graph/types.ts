@@ -82,3 +82,69 @@ export type RFGraphEdge = Edge<GraphEdgeData>;
  * Currently just GraphEdge, but defined as separate type for future extensibility.
  */
 export type AppEdge = RFGraphEdge;
+
+// =============================================================================
+// TYPE GUARDS
+// =============================================================================
+
+/** Union type of all possible node data */
+export type AppNodeData =
+  | StageNodeData
+  | MergeNodeData
+  | EndNodeData
+  | DocumentNodeData
+  | LessonNodeData
+  | ModuleNodeData
+  | Stage2GroupNodeData;
+
+/**
+ * Type guard to check if node data is from a document node.
+ * DocumentNodeData has `documentId` and `stageNumber: 2`.
+ */
+export function isDocumentNodeData(data: AppNodeData | undefined): data is DocumentNodeData {
+  if (!data) return false;
+  return (
+    'documentId' in data &&
+    typeof (data as DocumentNodeData).documentId === 'string' &&
+    'stageNumber' in data &&
+    (data as DocumentNodeData).stageNumber === 2
+  );
+}
+
+/**
+ * Type guard to check if node data is from a stage node with phases.
+ * StageNodeData has optional `phases` array for stages 4 and 5.
+ */
+export function isStageNodeDataWithPhases(
+  data: AppNodeData | undefined
+): data is StageNodeData & { phases: NonNullable<StageNodeData['phases']> } {
+  if (!data) return false;
+  return (
+    'stageNumber' in data &&
+    'phases' in data &&
+    Array.isArray((data as StageNodeData).phases) &&
+    (data as StageNodeData).phases!.length > 0
+  );
+}
+
+/**
+ * Safely extract documentId from node data.
+ * Returns undefined if data is not DocumentNodeData.
+ */
+export function getDocumentId(data: AppNodeData | undefined): string | undefined {
+  if (isDocumentNodeData(data)) {
+    return data.documentId;
+  }
+  return undefined;
+}
+
+/**
+ * Safely extract phases from stage node data.
+ * Returns empty array if data has no phases.
+ */
+export function getStagePhases(data: AppNodeData | undefined): StageNodeData['phases'] {
+  if (data && 'phases' in data && Array.isArray((data as StageNodeData).phases)) {
+    return (data as StageNodeData).phases;
+  }
+  return [];
+}

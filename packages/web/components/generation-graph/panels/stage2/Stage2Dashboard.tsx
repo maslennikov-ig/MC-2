@@ -6,6 +6,14 @@ import { cn } from '@/lib/utils';
 import { useNodeSelection } from '../../hooks/useNodeSelection';
 import { useTranslation } from '@/lib/generation-graph/useTranslation';
 import {
+  PRIORITY_CONFIG,
+  isValidPriority,
+} from '@/lib/generation-graph/priority-config';
+import {
+  getDocumentDisplayName,
+  truncateDisplayName,
+} from '@/lib/generation-graph/document-display-name';
+import {
   Loader2,
   AlertCircle,
   FileStack,
@@ -43,6 +51,10 @@ export interface DocumentMatrixRow {
   documentId: string;
   /** Original filename */
   filename: string;
+  /** AI-generated title from Phase 6 summarization */
+  generatedTitle?: string | null;
+  /** User-provided original filename at upload */
+  originalName?: string | null;
   /** Processing status */
   status: 'pending' | 'active' | 'completed' | 'error';
   /** Document priority for processing order */
@@ -162,53 +174,29 @@ function getRowClassName(status: DocumentMatrixRow['status']): string {
 }
 
 /**
- * Get priority badge color
+ * Get priority badge using SSOT config
  */
-function getPriorityBadge(priority: DocumentMatrixRow['priority'], t: (key: string) => string) {
+function getPriorityBadge(
+  priority: DocumentMatrixRow['priority'],
+  locale: 'ru' | 'en' = 'ru'
+) {
   if (!priority) return null;
 
-  // Type guard to ensure priority is valid
-  const validPriorities = ['CORE', 'IMPORTANT', 'SUPPLEMENTARY'] as const;
-  if (!validPriorities.includes(priority as any)) {
+  // Use SSOT for validation and config
+  if (!isValidPriority(priority)) {
     console.warn(`[Stage2Dashboard] Invalid priority value: ${priority}`);
     return null;
   }
 
-  const variants: Record<
-    NonNullable<DocumentMatrixRow['priority']>,
-    { bg: string; text: string; border: string }
-  > = {
-    CORE: {
-      bg: 'bg-indigo-100 dark:bg-indigo-900/40',
-      text: 'text-indigo-700 dark:text-indigo-300',
-      border: 'border-indigo-300 dark:border-indigo-700',
-    },
-    IMPORTANT: {
-      bg: 'bg-amber-100 dark:bg-amber-900/40',
-      text: 'text-amber-700 dark:text-amber-300',
-      border: 'border-amber-300 dark:border-amber-700',
-    },
-    SUPPLEMENTARY: {
-      bg: 'bg-slate-100 dark:bg-slate-800/40',
-      text: 'text-slate-600 dark:text-slate-400',
-      border: 'border-slate-300 dark:border-slate-600',
-    },
-  };
-
-  const labels: Record<NonNullable<DocumentMatrixRow['priority']>, string> = {
-    CORE: t('stage2.priorityCore'),
-    IMPORTANT: t('stage2.priorityImportant'),
-    SUPPLEMENTARY: t('stage2.prioritySupplementary'),
-  };
-
-  const variant = variants[priority];
+  const config = PRIORITY_CONFIG[priority];
+  const style = config.style;
 
   return (
     <Badge
       variant="outline"
-      className={cn('text-xs', variant.bg, variant.text, variant.border)}
+      className={cn('text-xs', style.bg, style.text, style.border)}
     >
-      {labels[priority]}
+      {config.label[locale]}
     </Badge>
   );
 }
@@ -442,7 +430,7 @@ function DocumentMatrix({
   className,
   isLoading,
 }: DocumentMatrixProps) {
-  const { t } = useTranslation();
+  const { t, locale } = useTranslation();
 
   // Loading skeleton state
   if (isLoading) {
@@ -535,7 +523,7 @@ function DocumentMatrix({
               }}
               tabIndex={0}
               role="button"
-              aria-label={`${t('stage2.openDocument')} ${doc.filename}`}
+              aria-label={`${t('stage2.openDocument')} ${getDocumentDisplayName(doc)}`}
               className={cn(
                 'cursor-pointer transition-colors',
                 getRowClassName(doc.status),
@@ -544,21 +532,38 @@ function DocumentMatrix({
               )}
             >
               <TableCell className="font-medium">
-                <div className="flex items-center gap-2">
-                  {doc.status === 'error' && (
-                    <AlertCircle className="h-4 w-4 text-red-500 flex-shrink-0" />
-                  )}
-                  <span className="truncate max-w-xs" title={doc.filename}>
-                    {doc.filename}
-                  </span>
-                </div>
-                {doc.errorMessage && (
-                  <p className="text-xs text-red-500 mt-1 truncate" title={doc.errorMessage}>
-                    {doc.errorMessage}
-                  </p>
-                )}
+                {(() => {
+                  const displayName = getDocumentDisplayName(doc);
+                  const showOriginal = doc.generatedTitle && (doc.originalName || doc.filename) && doc.generatedTitle !== (doc.originalName || doc.filename);
+                  const originalFilename = doc.originalName || doc.filename;
+                  return (
+                    <div className="flex flex-col gap-0.5">
+                      <div className="flex items-center gap-2">
+                        {doc.status === 'error' && (
+                          <AlertCircle className="h-4 w-4 text-red-500 flex-shrink-0" />
+                        )}
+                        <span className="truncate max-w-xs" title={displayName}>
+                          {truncateDisplayName(displayName, 60)}
+                        </span>
+                      </div>
+                      {showOriginal && (
+                        <span
+                          className="text-xs text-slate-400 dark:text-slate-500 truncate max-w-xs ml-6"
+                          title={originalFilename}
+                        >
+                          ({truncateDisplayName(originalFilename, 40)})
+                        </span>
+                      )}
+                      {doc.errorMessage && (
+                        <p className="text-xs text-red-500 mt-1 truncate ml-6" title={doc.errorMessage}>
+                          {doc.errorMessage}
+                        </p>
+                      )}
+                    </div>
+                  );
+                })()}
               </TableCell>
-              <TableCell>{getPriorityBadge(doc.priority, t)}</TableCell>
+              <TableCell>{getPriorityBadge(doc.priority, locale)}</TableCell>
               <TableCell className="text-center">
                 <div className="flex items-center justify-center gap-2">
                   <span className="font-mono text-sm">

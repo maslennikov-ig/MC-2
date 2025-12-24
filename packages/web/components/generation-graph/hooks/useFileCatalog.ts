@@ -9,6 +9,8 @@ import { createClient } from '@/lib/supabase/client';
 interface FileCatalogEntry {
   id: string;
   filename: string;
+  /** AI-generated title from Phase 6 summarization */
+  generated_title: string | null;
   original_name: string | null;
 }
 
@@ -51,7 +53,7 @@ export function useFileCatalog(courseId: string) {
         const supabase = createClient();
         const { data, error: fetchError } = await supabase
           .from('file_catalog')
-          .select('id, filename, original_name')
+          .select('id, filename, generated_title, original_name')
           .eq('course_id', courseId);
 
         if (fetchError) {
@@ -59,10 +61,10 @@ export function useFileCatalog(courseId: string) {
         }
 
         // Build filename map
+        // Priority: generated_title > original_name > filename
         const map = new Map<string, string>();
         (data as FileCatalogEntry[] || []).forEach((file) => {
-          // Prefer original_name if available, otherwise use filename
-          const displayName = file.original_name || file.filename;
+          const displayName = file.generated_title || file.original_name || file.filename;
           if (displayName) {
             map.set(file.id, displayName);
           }

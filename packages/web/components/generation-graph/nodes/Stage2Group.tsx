@@ -18,6 +18,7 @@ import {
 } from '../components/shared';
 import { useTranslation } from '@/lib/generation-graph/useTranslation';
 import { useGenerationStore } from '@/stores/useGenerationStore';
+import { NodeStatus } from '@megacampus/shared-types';
 
 // Minimal Node for very low zoom (<0.3)
 const MinimalStage2Node = ({ id, data }: { id: string; data: RFStage2GroupNode['data'] }) => {
@@ -103,35 +104,42 @@ const Stage2Group = ({ id, data, selected }: NodeProps<RFStage2GroupNode>) => {
   // Subscribe to realtime status updates - MUST be called before any conditional returns (Rules of Hooks)
   const statusEntry = useNodeStatus(id);
 
-  // Get documents from Zustand store to calculate accurate completed count
-  // This is the single source of truth for document status (same as DocumentNode uses)
-  const documents = useGenerationStore(state => state.getDocuments());
+  // Get documents from Zustand store - SINGLE SOURCE OF TRUTH
+  // This ensures Stage2Group shows the same data as child DocumentNode components
+  // Both use useGenerationStore for document status, preventing sync issues
+  const documentsMap = useGenerationStore(state => state.documents);
 
-  // Calculate completed documents from Zustand store (matches DocumentNode status logic)
-  const { completedDocs, failedDocs, activeDocs } = useMemo(() => {
-    let completed = 0;
-    let failed = 0;
-    let active = 0;
-    documents.forEach(doc => {
-      if (doc.status === 'completed') completed++;
-      else if (doc.status === 'error') failed++;
-      else if (doc.status === 'active') active++;
-    });
-    return { completedDocs: completed, failedDocs: failed, activeDocs: active };
-  }, [documents]);
+  // Calculate document counts from Zustand store (memoized)
+  const { totalDocs, completedDocs, failedDocs, groupStatus } = useMemo(() => {
+    const docs = Array.from(documentsMap.values());
+    const total = docs.length || data.totalDocuments || 0;
+    const completed = docs.filter(d => d.status === 'completed').length;
+    const failed = docs.filter(d => d.status === 'error').length;
+    const active = docs.filter(d => d.status === 'active').length;
 
-  // Determine group status based on document statuses from Zustand
-  const totalDocs = data.totalDocuments || documents.length;
-  const dynamicStatus = useMemo(() => {
-    if (failedDocs > 0) return 'error';
-    if (activeDocs > 0) return 'active';
-    if (totalDocs > 0 && completedDocs === totalDocs) return 'completed';
-    if (completedDocs > 0) return 'active';
-    return 'pending';
-  }, [completedDocs, failedDocs, activeDocs, totalDocs]);
+    // Calculate group status from documents
+    let status: NodeStatus = 'pending';
+    if (failed > 0) {
+      status = 'error';
+    } else if (active > 0) {
+      status = 'active';
+    } else if (total > 0 && completed === total) {
+      status = 'completed';
+    } else if (completed > 0) {
+      status = 'active';
+    }
 
-  // Use dynamic status if documents exist in Zustand, otherwise fallback to data.status
-  const currentStatus = documents.length > 0 ? dynamicStatus : (statusEntry?.status || data.status || 'pending');
+    return {
+      totalDocs: total,
+      completedDocs: completed,
+      failedDocs: failed,
+      groupStatus: status
+    };
+  }, [documentsMap, data.totalDocuments]);
+
+  // Priority: Zustand calculated status > statusEntry > data.status (fallback)
+  // Zustand store is the single source of truth for document processing status
+  const currentStatus = groupStatus !== 'pending' ? groupStatus : (statusEntry?.status || data.status || 'pending');
 
   // Extract error information safely
   const errorMessage = statusEntry?.errorMessage ||
@@ -142,18 +150,15 @@ const Stage2Group = ({ id, data, selected }: NodeProps<RFStage2GroupNode>) => {
   const hasErrors = currentStatus === 'error';
   const retryCount = data.retryCount || 0;
 
-  // Count failed documents for error tooltip (from Zustand if available)
-  const errorCount = documents.length > 0 ? failedDocs : (data.failedDocuments || 0);
-
-  // Use dynamic count from Zustand if available, otherwise fallback to data
-  const effectiveCompletedDocs = documents.length > 0 ? completedDocs : data.completedDocuments;
+  // Count failed documents for error tooltip
+  const errorCount = failedDocs;
 
   // Semantic Zoom - switch to smaller representations at lower zoom levels
   if (zoom < 0.3) {
     return <MinimalStage2Node id={id} data={data} />;
   }
   if (zoom < 0.5) {
-    return <MediumStage2Node id={id} data={data} selected={selected} completedDocs={effectiveCompletedDocs} />;
+    return <MediumStage2Node id={id} data={data} selected={selected} completedDocs={completedDocs} />;
   }
 
   // Handle click with double-click detection
@@ -199,7 +204,7 @@ const Stage2Group = ({ id, data, selected }: NodeProps<RFStage2GroupNode>) => {
 
   // Calculate progress percentage using dynamic count
   const progressPercent = totalDocs > 0
-    ? Math.round((effectiveCompletedDocs / totalDocs) * 100)
+    ? Math.round((completedDocs / totalDocs) * 100)
     : 0;
 
   return (
@@ -216,7 +221,7 @@ const Stage2Group = ({ id, data, selected }: NodeProps<RFStage2GroupNode>) => {
           `}
           data-testid={`node-stage2group-${id}`}
           data-node-status={currentStatus}
-          aria-label={`${t('stage2.groupTitle')}: ${effectiveCompletedDocs} из ${totalDocs} ${t('stage2.documentsCount')} обработано, статус: ${currentStatus}`}
+          aria-label={`${t('stage2.groupTitle')}: ${completedDocs} из ${totalDocs} ${t('stage2.documentsCount')} обработано, статус: ${currentStatus}`}
           role="group"
           tabIndex={0}
         >
@@ -274,7 +279,7 @@ const Stage2Group = ({ id, data, selected }: NodeProps<RFStage2GroupNode>) => {
               </span>
               <div className="flex items-center gap-2 mt-1">
                 <span className="text-xs text-slate-600 dark:text-slate-400">
-                  {effectiveCompletedDocs}/{totalDocs} {t('stage2.documentsCount')}
+                  {completedDocs}/{totalDocs} {t('stage2.documentsCount')}
                 </span>
                 <StatusBadge
                   status={currentStatus}
@@ -305,7 +310,7 @@ const Stage2Group = ({ id, data, selected }: NodeProps<RFStage2GroupNode>) => {
           {(currentStatus === 'active' || currentStatus === 'completed' || currentStatus === 'error') && (
             <div className="border-t border-black/5 dark:border-white/10 px-2.5 py-1.5 text-[10px] text-slate-500 dark:text-slate-400 bg-slate-50/50 dark:bg-slate-900/30">
               <div className="flex justify-between items-center">
-                <span>{effectiveCompletedDocs} / {totalDocs} {t('stage2.documentsCount')}</span>
+                <span>{completedDocs} / {totalDocs} {t('stage2.documentsCount')}</span>
                 {currentStatus === 'completed' ? (
                   <span className="text-green-600 dark:text-green-400 font-medium">{t('stage2.statusReady')}</span>
                 ) : currentStatus === 'active' ? (
@@ -348,7 +353,7 @@ const Stage2Group = ({ id, data, selected }: NodeProps<RFStage2GroupNode>) => {
           `}
           data-testid={`node-stage2group-expanded-${id}`}
           data-node-status={currentStatus}
-          aria-label={`${t('stage2.documentProcessingExpanded')}: ${effectiveCompletedDocs} из ${totalDocs}`}
+          aria-label={`${t('stage2.documentProcessingExpanded')}: ${completedDocs} из ${totalDocs}`}
         >
           {/* Header (70px) - single click: collapse, double click: open details */}
           <div
@@ -393,7 +398,7 @@ const Stage2Group = ({ id, data, selected }: NodeProps<RFStage2GroupNode>) => {
                 : 'text-indigo-600 dark:text-indigo-400 bg-indigo-100 dark:bg-indigo-900/30'
               }
             `}>
-              {effectiveCompletedDocs}/{totalDocs}
+              {completedDocs}/{totalDocs}
             </span>
 
             {hasErrors && (

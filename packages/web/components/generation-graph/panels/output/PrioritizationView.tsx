@@ -21,8 +21,6 @@ import { Badge } from '@/components/ui/badge';
 import { Skeleton } from '@/components/ui/skeleton';
 import {
   Key,
-  Star,
-  FileIcon,
   Loader2,
   FileText,
   Rocket,
@@ -43,12 +41,23 @@ import { createClient } from '@/lib/supabase/client';
 import { updateDocumentPriority } from '@/app/actions/courses';
 import { approveStage } from '@/app/actions/admin-generation';
 import { toast } from 'sonner';
+import {
+  type DocumentPriority,
+  PRIORITY_CONFIG as SSOT_PRIORITY_CONFIG,
+} from '@/lib/generation-graph/priority-config';
+import {
+  getDocumentDisplayName,
+  truncateDisplayName,
+} from '@/lib/generation-graph/document-display-name';
 
-export type DocumentPriority = 'CORE' | 'IMPORTANT' | 'SUPPLEMENTARY';
+// Re-export type for external usage
+export type { DocumentPriority };
 
 interface DocumentWithPriority {
   id: string;
   filename: string;
+  /** AI-generated title from Phase 6 summarization */
+  generatedTitle: string | null;
   originalName: string | null;
   priority: DocumentPriority;
   fileSize?: number;
@@ -63,11 +72,23 @@ interface PrioritizationViewProps {
   onApproved?: () => void;
 }
 
-const PRIORITY_CONFIG: Record<DocumentPriority, { label: string; icon: typeof Key; color: string; bgColor: string }> = {
-  CORE: { label: 'Ключевой', icon: Key, color: 'text-amber-600 dark:text-amber-400', bgColor: 'bg-amber-100 dark:bg-amber-900/30' },
-  IMPORTANT: { label: 'Важный', icon: Star, color: 'text-blue-600 dark:text-blue-400', bgColor: 'bg-blue-100 dark:bg-blue-900/30' },
-  SUPPLEMENTARY: { label: 'Дополнительный', icon: FileIcon, color: 'text-gray-600 dark:text-gray-400', bgColor: 'bg-gray-100 dark:bg-gray-800/50' },
-};
+/**
+ * Local priority config adapted from SSOT for component-specific styling.
+ * Labels come from Single Source of Truth (priority-config.ts).
+ */
+const PRIORITY_CONFIG = Object.fromEntries(
+  (Object.entries(SSOT_PRIORITY_CONFIG) as [DocumentPriority, typeof SSOT_PRIORITY_CONFIG[DocumentPriority]][]).map(
+    ([key, config]) => [
+      key,
+      {
+        label: config.label.ru,
+        icon: config.icon,
+        color: config.style.text,
+        bgColor: config.style.bg,
+      },
+    ]
+  )
+) as Record<DocumentPriority, { label: string; icon: typeof SSOT_PRIORITY_CONFIG.CORE.icon; color: string; bgColor: string }>;
 
 function formatFileSize(bytes?: number): string {
   if (!bytes) return '-';
@@ -107,7 +128,7 @@ export function PrioritizationView({
 
         const { data, error } = await supabase
           .from('file_catalog')
-          .select('id, filename, original_name, file_size, mime_type, priority')
+          .select('id, filename, generated_title, original_name, file_size, mime_type, priority')
           .eq('course_id', courseId)
           .order('created_at', { ascending: true });
 
@@ -120,6 +141,7 @@ export function PrioritizationView({
         const docs: DocumentWithPriority[] = (data || []).map((file) => ({
           id: file.id,
           filename: file.filename,
+          generatedTitle: (file as { generated_title?: string | null }).generated_title ?? null,
           originalName: file.original_name,
           priority: (file.priority as DocumentPriority) || 'SUPPLEMENTARY',
           fileSize: file.file_size || undefined,
@@ -164,8 +186,21 @@ export function PrioritizationView({
 
         // Show informative toast
         if (newPriority === 'CORE' && currentCoreDoc) {
+          const newDoc = documents.find(d => d.id === docId);
+          const newDocName = newDoc
+            ? getDocumentDisplayName({
+                generated_title: newDoc.generatedTitle,
+                original_name: newDoc.originalName,
+                filename: newDoc.filename,
+              })
+            : 'Документ';
+          const coreDocName = getDocumentDisplayName({
+            generated_title: currentCoreDoc.generatedTitle,
+            original_name: currentCoreDoc.originalName,
+            filename: currentCoreDoc.filename,
+          });
           toast.success(
-            `"${documents.find(d => d.id === docId)?.originalName || 'Документ'}" теперь ключевой. "${currentCoreDoc.originalName || currentCoreDoc.filename}" изменен на "Важный".`,
+            `"${truncateDisplayName(newDocName, 30)}" теперь ключевой. "${truncateDisplayName(coreDocName, 30)}" изменен на "Важный".`,
             { duration: 5000 }
           );
         } else {
@@ -194,12 +229,23 @@ export function PrioritizationView({
       const newDoc = documents.find(d => d.id === docId);
 
       if (currentCoreDoc && newDoc) {
+        // Use getDocumentDisplayName for meaningful names
+        const newDocDisplayName = getDocumentDisplayName({
+          generated_title: newDoc.generatedTitle,
+          original_name: newDoc.originalName,
+          filename: newDoc.filename,
+        });
+        const currentCoreDisplayName = getDocumentDisplayName({
+          generated_title: currentCoreDoc.generatedTitle,
+          original_name: currentCoreDoc.originalName,
+          filename: currentCoreDoc.filename,
+        });
         // Show confirmation dialog
         setCoreConfirmDialog({
           isOpen: true,
           newDocId: docId,
-          newDocName: newDoc.originalName || newDoc.filename,
-          currentCoreDocName: currentCoreDoc.originalName || currentCoreDoc.filename,
+          newDocName: newDocDisplayName,
+          currentCoreDocName: currentCoreDisplayName,
         });
         return;
       }
@@ -298,26 +344,45 @@ export function PrioritizationView({
                   className={isCore ? 'bg-amber-50/50 dark:bg-amber-950/20 border-l-2 border-l-amber-500' : ''}
                 >
                   <TableCell>
-                    <div className="flex items-center gap-3">
-                      <div className={`p-2 rounded-lg ${isCore ? 'bg-amber-100 dark:bg-amber-900/30' : 'bg-muted'}`}>
-                        {isCore ? (
-                          <Key className="w-4 h-4 text-amber-600 dark:text-amber-400" />
-                        ) : (
-                          <FileText className="w-4 h-4 text-muted-foreground" />
-                        )}
-                      </div>
-                      <div>
-                        <p
-                          className="font-medium truncate max-w-[300px]"
-                          title={doc.originalName || doc.filename}
-                        >
-                          {doc.originalName || doc.filename}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {doc.mimeType || 'Файл'}
-                        </p>
-                      </div>
-                    </div>
+                    {(() => {
+                      const displayName = getDocumentDisplayName({
+                        generated_title: doc.generatedTitle,
+                        original_name: doc.originalName,
+                        filename: doc.filename,
+                      });
+                      const originalFilename = doc.originalName || doc.filename;
+                      const showOriginal = doc.generatedTitle && doc.generatedTitle !== originalFilename;
+                      return (
+                        <div className="flex items-center gap-3">
+                          <div className={`p-2 rounded-lg ${isCore ? 'bg-amber-100 dark:bg-amber-900/30' : 'bg-muted'}`}>
+                            {isCore ? (
+                              <Key className="w-4 h-4 text-amber-600 dark:text-amber-400" />
+                            ) : (
+                              <FileText className="w-4 h-4 text-muted-foreground" />
+                            )}
+                          </div>
+                          <div className="flex flex-col gap-0.5 min-w-0">
+                            <p
+                              className="font-medium truncate max-w-[300px]"
+                              title={displayName}
+                            >
+                              {truncateDisplayName(displayName, 50)}
+                            </p>
+                            {showOriginal && (
+                              <p
+                                className="text-xs text-muted-foreground/70 truncate max-w-[280px]"
+                                title={originalFilename}
+                              >
+                                ({truncateDisplayName(originalFilename, 40)})
+                              </p>
+                            )}
+                            <p className="text-xs text-muted-foreground">
+                              {doc.mimeType || 'Файл'}
+                            </p>
+                          </div>
+                        </div>
+                      );
+                    })()}
                   </TableCell>
                   <TableCell className="text-center text-muted-foreground">
                     {formatFileSize(doc.fileSize)}

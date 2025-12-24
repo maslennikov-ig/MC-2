@@ -11,7 +11,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useNodeSelection } from '../hooks/useNodeSelection';
 import { useTranslation } from '@/lib/generation-graph/useTranslation';
 import { useUserRole } from '../hooks/useUserRole';
-import { AppNode } from '../types';
+import { AppNode, getDocumentId, getStagePhases, AppNodeData } from '../types';
 import { AttemptSelector } from './AttemptSelector';
 import { PhaseSelector } from './PhaseSelector';
 import { ApprovalControls } from '../controls/ApprovalControls';
@@ -23,6 +23,8 @@ import { ActivityTab } from './ActivityTab';
 import { Stage1InputTab, Stage1ProcessTab, Stage1OutputTab, Stage1ActivityTab } from './stage1';
 // Stage 2 "Document Processing" UI components
 import { Stage2InputTab, Stage2ProcessTab, Stage2OutputTab, Stage2ActivityTab, Stage2Dashboard } from './stage2';
+// Stage 3 "Document Classification" UI components
+import { Stage3InputTab, Stage3ProcessTab, Stage3OutputTab, Stage3ActivityTab } from './stage3';
 import { useStage2DashboardData } from '../hooks/useStage2DashboardData';
 import { RefinementChat } from './RefinementChat';
 import { useRefinement } from '../hooks/useRefinement';
@@ -80,7 +82,7 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
 
   // Detect if this node has phases (stages 4, 5)
   const hasPhases = data?.stageNumber && (data.stageNumber === 4 || data.stageNumber === 5);
-  const phases = (data as any)?.phases || [];
+  const phases = getStagePhases(data as AppNodeData | undefined) || [];
 
   // Get realtime status from context (more reliable than node data)
   const realtimeStatus = useNodeStatus(selectedNodeId || '');
@@ -104,6 +106,11 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
   const isDocumentNode = selectedNode?.type === 'document';
   // Stage 2 "Document Processing" UI: Detect if this is the Stage 2 container node
   const isStage2Group = selectedNode?.type === 'stage2group';
+
+  // Safely extract documentId for Stage 2 document nodes
+  const documentId = useMemo(() => {
+    return getDocumentId(data as AppNodeData | undefined);
+  }, [data]);
 
   // Stage 6 "Glass Factory" UI: Detect if this is a Stage 6 module or lesson
   const isStage6Module = isModuleNode;
@@ -589,7 +596,15 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
                   {data?.stageNumber === 1 ? (
                     <Stage1InputTab inputData={displayData?.inputData} />
                   ) : isDocumentNode ? (
-                    <Stage2InputTab inputData={displayData?.inputData} />
+                    <Stage2InputTab
+                      documentId={documentId}
+                      inputData={displayData?.inputData}
+                    />
+                  ) : data?.stageNumber === 3 ? (
+                    <Stage3InputTab
+                      courseId={courseInfo.id}
+                      inputData={displayData?.inputData}
+                    />
                   ) : (
                     <InputTab inputData={displayData?.inputData} />
                   )}
@@ -603,10 +618,13 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
                     />
                   ) : isDocumentNode ? (
                     <Stage2ProcessTab
-                      phases={(data as any)?.phases}
-                      terminalLogs={(data as any)?.terminalLogs}
+                      documentId={documentId}
                       status={displayData?.status as 'pending' | 'active' | 'completed' | 'error' | undefined}
-                      totalProgress={(data as any)?.progress}
+                    />
+                  ) : data?.stageNumber === 3 ? (
+                    <Stage3ProcessTab
+                      courseId={courseInfo.id}
+                      status={displayData?.status as 'pending' | 'active' | 'completed' | 'error' | undefined}
                     />
                   ) : (
                     <ProcessTab
@@ -631,7 +649,14 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
                     <Stage2OutputTab
                       outputData={displayData?.outputData}
                       courseId={courseInfo.id}
-                      documentId={(data as any)?.documentId}
+                      documentId={documentId}
+                    />
+                  ) : data?.stageNumber === 3 ? (
+                    <Stage3OutputTab
+                      courseId={courseInfo.id}
+                      outputData={displayData?.outputData}
+                      isEditable={canEdit}
+                      onApprove={deselectNode}
                     />
                   ) : (
                     <OutputTab
@@ -660,7 +685,12 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
                     <Stage2ActivityTab
                       nodeId={selectedNodeId}
                       courseId={courseInfo.id}
-                      documentId={(data as any)?.documentId}
+                      documentId={documentId}
+                    />
+                  ) : data?.stageNumber === 3 ? (
+                    <Stage3ActivityTab
+                      nodeId={selectedNodeId}
+                      courseId={courseInfo.id}
                     />
                   ) : (
                     <ActivityTab nodeId={selectedNodeId} />

@@ -10,6 +10,11 @@
 // ============================================================================
 
 /**
+ * Valid tier keys matching database tier enum
+ */
+export type TierKey = 'trial' | 'free' | 'basic' | 'standard' | 'premium';
+
+/**
  * Stage 2 input data structure
  * Contains document metadata and processing configuration
  */
@@ -27,7 +32,7 @@ export interface Stage2InputData {
   /** Organization ID for tier lookup */
   organizationId?: string;
   /** Subscription tier determines available features */
-  tier: 'basic' | 'standard' | 'premium';
+  tier: TierKey;
   /** Number of pages (if document) */
   pageCount?: number;
 }
@@ -47,31 +52,118 @@ export interface TierFeatures {
 }
 
 /**
- * Get tier features based on subscription level.
+ * Default tier features (fallback when DB unavailable).
+ *
+ * ⚠️ IMPORTANT: These defaults must match the values seeded in:
+ *    - Migration: 20251221120000_create_tier_settings.sql
+ *    - Migration: add_document_processing_features_to_tier_settings (Supabase MCP)
+ *
+ * When updating tier features in the database via /admin/pricing,
+ * consider updating these defaults accordingly for consistency.
+ *
  * Uses Record type to ensure exhaustiveness checking at compile time.
  */
-export function getTierFeatures(tier: Stage2InputData['tier']): TierFeatures {
-  const tierMap: Record<Stage2InputData['tier'], TierFeatures> = {
-    basic: {
-      doclingConversion: false,
-      ocrExtraction: false,
-      visualAnalysis: false,
-      enhancedVisuals: false,
-    },
-    standard: {
-      doclingConversion: true,
-      ocrExtraction: true,
-      visualAnalysis: true,
-      enhancedVisuals: false,
-    },
-    premium: {
-      doclingConversion: true,
-      ocrExtraction: true,
-      visualAnalysis: true,
-      enhancedVisuals: true,
-    },
+export const DEFAULT_TIER_FEATURES: Record<TierKey, TierFeatures> = {
+  trial: {
+    doclingConversion: true,
+    ocrExtraction: true,
+    visualAnalysis: true,
+    enhancedVisuals: false,
+  },
+  free: {
+    doclingConversion: false,
+    ocrExtraction: false,
+    visualAnalysis: false,
+    enhancedVisuals: false,
+  },
+  basic: {
+    doclingConversion: false,
+    ocrExtraction: false,
+    visualAnalysis: false,
+    enhancedVisuals: false,
+  },
+  standard: {
+    doclingConversion: true,
+    ocrExtraction: true,
+    visualAnalysis: true,
+    enhancedVisuals: false,
+  },
+  premium: {
+    doclingConversion: true,
+    ocrExtraction: true,
+    visualAnalysis: true,
+    enhancedVisuals: true,
+  },
+};
+
+/**
+ * Get default tier features based on subscription level.
+ * For DB-driven features, use parseTierFeaturesFromDB instead.
+ */
+export function getTierFeatures(tier: TierKey): TierFeatures {
+  return DEFAULT_TIER_FEATURES[tier] ?? DEFAULT_TIER_FEATURES.basic;
+}
+
+/**
+ * Parse tier features from database JSONB features column.
+ * Extracts document processing features with type-safe fallback to defaults.
+ *
+ * This function is defensive against:
+ * - Null/undefined features
+ * - Missing fields (falls back to tier defaults)
+ * - Invalid types (falls back to tier defaults with console warning)
+ *
+ * @param features - JSONB features object from tier_settings.features column
+ * @param tier - Tier key used for fallback defaults if features are missing/invalid
+ * @returns Typed TierFeatures object with all required boolean fields
+ *
+ * @example
+ * ```typescript
+ * const dbFeatures = { doclingConversion: true, ocrExtraction: false };
+ * const parsed = parseTierFeaturesFromDB(dbFeatures, 'standard');
+ * // Returns: { doclingConversion: true, ocrExtraction: false, visualAnalysis: true, enhancedVisuals: false }
+ * ```
+ *
+ * @example
+ * ```typescript
+ * // Missing features - falls back to tier defaults
+ * const parsed = parseTierFeaturesFromDB(null, 'premium');
+ * // Returns: DEFAULT_TIER_FEATURES.premium
+ * ```
+ */
+export function parseTierFeaturesFromDB(
+  features: Record<string, unknown> | null | undefined,
+  tier: TierKey
+): TierFeatures {
+  const defaults = DEFAULT_TIER_FEATURES[tier] ?? DEFAULT_TIER_FEATURES.basic;
+
+  if (!features || typeof features !== 'object') {
+    return defaults;
+  }
+
+  // Helper to validate and warn on invalid types
+  const getBooleanField = (
+    key: keyof TierFeatures,
+    value: unknown,
+    defaultValue: boolean
+  ): boolean => {
+    if (typeof value === 'boolean') {
+      return value;
+    }
+    if (value !== undefined) {
+      console.warn(
+        `[parseTierFeaturesFromDB] Invalid type for "${key}": expected boolean, got ${typeof value}. Using default: ${defaultValue}`
+      );
+    }
+    return defaultValue;
   };
-  return tierMap[tier] ?? tierMap.basic;
+
+  return {
+    doclingConversion: getBooleanField('doclingConversion', features.doclingConversion, defaults.doclingConversion),
+    ocrExtraction: getBooleanField('ocrExtraction', features.ocrExtraction, defaults.ocrExtraction),
+    visualAnalysis: getBooleanField('visualAnalysis', features.visualAnalysis, defaults.visualAnalysis),
+    enhancedVisuals: getBooleanField('enhancedVisuals', features.enhancedVisuals, defaults.enhancedVisuals),
+  };
 }
 
 // ============================================================================
@@ -228,14 +320,18 @@ export interface ActivityEvent {
 // ============================================================================
 
 export interface Stage2InputTabProps {
-  /** Input data from trace */
+  /** Document ID to fetch data from Zustand store */
+  documentId?: string;
+  /** Input data from trace (fallback if documentId not provided) */
   inputData?: Stage2InputData | unknown;
   /** Locale for translations */
   locale?: 'ru' | 'en';
 }
 
 export interface Stage2ProcessTabProps {
-  /** Processing phases with status */
+  /** Document ID to fetch phases from Zustand store */
+  documentId?: string;
+  /** Processing phases with status (override, will use Zustand if not provided) */
   phases?: ProcessingPhase[];
   /** Terminal log entries for live console */
   terminalLogs?: TerminalLogEntry[];

@@ -667,7 +667,7 @@ const stage6Prompts: HardcodedPrompt[] = [
     promptKey: 'stage6_planner',
     promptName: 'Stage 6 - Planner: Lesson Outline Generation',
     promptDescription:
-      'Generates detailed lesson outline from specification. Uses Context-First XML strategy with lesson context, learning objectives, and RAG context.',
+      'Generates detailed lesson outline from specification. Uses Context-First XML strategy with lesson context, learning objectives, RAG context, and visual planning.',
     promptTemplate: `<lesson_context>
   <metadata>
     <lesson_id>{{lessonId}}</lesson_id>
@@ -694,8 +694,15 @@ const stage6Prompts: HardcodedPrompt[] = [
 {{sections}}
   </sections>
 
+  <reference_material>
   {{ragContext}}
+  </reference_material>
 </lesson_context>
+
+<visual_capabilities>
+Available: Mermaid (flowchart, sequence, mindmap, timeline), Math (LaTeX), Callouts (NOTE/TIP/WARNING/DANGER/INFO), Rich Code (filename, line highlight), Tables.
+Plan WHERE to use these for maximum visual impact.
+</visual_capabilities>
 
 {{#userRefinementPrompt}}
 <user_refinement_instructions>
@@ -718,11 +725,13 @@ Create a detailed lesson outline based on the specification above. The outline m
 
 2. **Main Sections**: For each section listed above, create:
    - 3-5 key points to cover
-   - Suggested examples or illustrations
-   - Include at least 1 practical example in format:
-     📌 **Example: [Situation Name]**
-     [Specific situation with details, numbers or names (2-4 sentences)]
-     Example types: case study | specific numbers/data | analogy | application scenario | success/failure story
+   - **Visual Plan**: Suggest 1-2 visual elements per section:
+     - [DIAGRAM]: flowchart/sequence/mindmap — describe what it shows
+     - [TABLE]: comparison/data — describe columns
+     - [CALLOUT]: tip/warning/note — describe key message
+     - [CODE]: filename and purpose
+   - Practical example placeholder:
+     > **Example: [Name]** — [Brief scenario description]
    - Transition to next section
 
 3. **Conclusion**: Plan a summary that:
@@ -825,7 +834,7 @@ Format as markdown outline. Target total reading time: {{durationMinutes}} minut
     promptKey: 'stage6_expander',
     promptName: 'Stage 6 - Expander: Section Content Expansion',
     promptDescription:
-      'Expands a single section from outline into full content. Uses content archetype, depth guidance, and RAG context.',
+      'Expands a single section from outline into full content. Uses content archetype, depth guidance, RAG context, and visual toolkit for engaging content.',
     promptTemplate: `<lesson_context>
   <metadata>
     <lesson_title>{{lessonTitle}}</lesson_title>
@@ -850,13 +859,54 @@ Format as markdown outline. Target total reading time: {{durationMinutes}} minut
 {{lessonOutline}}
   </lesson_outline>
 
+  <reference_material>
   {{ragContext}}
+  </reference_material>
 </lesson_context>
+
+<visual_toolkit>
+**VISUAL ELEMENTS** — Use actively to create engaging, professional content:
+
+1. **Mermaid Diagrams** — For processes, flows, relationships:
+   \`\`\`mermaid
+   flowchart TD
+     A[Input] --> B{Decision}
+     B -->|Yes| C[Result]
+     B -->|No| D[Alternative]
+   \`\`\`
+   Types: flowchart TD/LR, sequenceDiagram, mindmap, pie, timeline
+
+2. **Math Formulas** (LaTeX):
+   - Inline: \`$E=mc^2$\` within text
+   - Block: \`$$\\sum_{i=1}^{n} x_i$$\` centered on own line
+   - Use \\boxed{} for key formulas: \`$$\\boxed{F = ma}$$\`
+
+3. **Callouts** — For tips, warnings, key insights:
+   > [!TIP]
+   > Best practice or recommendation
+
+   > [!WARNING]
+   > Important caution
+
+   > [!NOTE]
+   > Key concept to remember
+
+   Types: NOTE, TIP, WARNING, DANGER, INFO
+
+4. **Rich Code Blocks**:
+   \`\`\`typescript filename="example.ts" {2,4-6}
+   // Line highlighting draws attention
+   \`\`\`
+
+5. **Tables** — For comparisons, structured data
+
+*Syntax keywords (mermaid, filename, [!TIP]) stay in English regardless of output language.*
+</visual_toolkit>
 
 <output_language>
 MANDATORY: Write ALL content in {{outputLanguage}}.
 Every word, header, example, and explanation must be in {{outputLanguage}}.
-DO NOT mix languages.
+DO NOT mix languages (except code/syntax keywords).
 </output_language>
 
 <task>
@@ -864,19 +914,28 @@ Write the full content for the "{{sectionTitle}}" section. Requirements:
 
 1. **Cover All Key Points**: Address each point from the specification
 2. **Match Depth**: {{depthGuidance}}
-3. **Content Style** ({{contentArchetype}}): Follow archetype-specific guidelines
-   - code_tutorial: Include code examples with explanations
-   - concept_explainer: Focus on clear explanations with analogies
-   - case_study: Use narrative style with real-world scenarios
-   - legal_warning: Be precise, formal, and authoritative
-4. **REQUIRED: Practical Example** - Include at least 1 example in format:
-   📌 **Example: [Situation Name]**
-   [Specific situation with details, numbers or names (2-4 sentences)]
-   Example types: case study | specific numbers/data | real-world analogy | application scenario | success/failure story
-5. **Include Keywords**: Naturally incorporate: {{requiredKeywords}}
-6. **Avoid Terms**: Do not use: {{prohibitedTerms}}
-7. **Tone**: Maintain {{tone}} tone
-8. **Audience**: Write for {{targetAudience}} level
+
+3. **Content & Visual Style** ({{contentArchetype}}):
+   - *code_tutorial*: Step-by-step with Rich Code blocks (filename REQUIRED). Use flowchart for architecture overview.
+   - *concept_explainer*: Clear analogies. USE Mermaid for processes/relationships, Math for formulas, [!TIP] for insights.
+   - *case_study*: Narrative with Tables for comparisons, [!INFO] for key takeaways, timeline diagrams if applicable.
+   - *legal_warning*: Precise, authoritative. USE [!WARNING]/[!DANGER] for critical points. Minimal decorative visuals.
+
+4. **REQUIRED: Visual Enhancement** — Each section SHOULD include at least one:
+   - Diagram (flowchart, sequence, or mindmap) for processes/flows
+   - Table for comparisons or structured data
+   - Callout for key insight or warning
+   - Code block with filename for technical content
+
+5. **REQUIRED: Practical Example** — Use callout format:
+   > [!INFO]
+   > **Example: [Situation Name]**
+   > [Specific situation with concrete details, numbers, or names (2-4 sentences)]
+
+6. **Include Keywords**: Naturally incorporate: {{requiredKeywords}}
+7. **Avoid Terms**: Do not use: {{prohibitedTerms}}
+8. **Tone**: Maintain {{tone}} tone
+9. **Audience**: Write for {{targetAudience}} level
 
 Output as markdown. Do NOT include the section title as a header.
 </task>`,
@@ -959,7 +1018,7 @@ Output as markdown. Do NOT include the section title as a header.
     promptKey: 'stage6_assembler',
     promptName: 'Stage 6 - Assembler: Content Assembly',
     promptDescription:
-      'Assembles expanded sections into cohesive lesson with introduction, transitions, exercises, and conclusion.',
+      'Assembles expanded sections into cohesive lesson with introduction, transitions, exercises, and conclusion. Preserves all visual elements.',
     promptTemplate: `<lesson_context>
   <metadata>
     <title>{{lessonTitle}}</title>
@@ -988,7 +1047,7 @@ Output as markdown. Do NOT include the section title as a header.
 <output_language>
 MANDATORY: Write ALL content in {{outputLanguage}}.
 Every word, header, example, and explanation must be in {{outputLanguage}}.
-DO NOT mix languages.
+DO NOT mix languages (except code/syntax keywords).
 </output_language>
 
 <task>
@@ -1002,6 +1061,12 @@ Assemble a complete lesson from the expanded sections above. You must:
 2. **Assemble Sections**:
    - Include each expanded section with its title as a heading
    - Add smooth transitions between sections
+   - **CRITICAL — Preserve All Visual Elements**:
+     - DO NOT modify \`\`\`mermaid blocks
+     - DO NOT modify $$...$$ math formulas
+     - DO NOT modify > [!NOTE/TIP/WARNING] callouts
+     - DO NOT modify \`\`\`lang filename="..." code blocks
+     - Keep ALL special markdown syntax exactly as written
    - Maintain consistent tone throughout
 
 3. **Create Exercises**: Follow the structure templates provided
