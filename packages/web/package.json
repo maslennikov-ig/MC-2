@@ -1,6 +1,6 @@
 {
   "name": "@megacampus/web",
-  "version": "0.26.22",
+  "version": "0.26.24",
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",
