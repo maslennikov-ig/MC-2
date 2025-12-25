@@ -9,21 +9,17 @@ import { MicroStepperState } from '@megacampus/shared-types';
 // Example 1: All pending (lesson not started)
 const pendingState: MicroStepperState = {
   nodes: [
-    { node: 'planner', status: 'pending' },
-    { node: 'expander', status: 'pending' },
-    { node: 'assembler', status: 'pending' },
-    { node: 'smoother', status: 'pending' },
+    { node: 'generator', status: 'pending' },
+    { node: 'selfReviewer', status: 'pending' },
     { node: 'judge', status: 'pending' },
   ],
 };
 
-// Example 2: Active processing (expander is running)
+// Example 2: Active processing (generator is running)
 const activeState: MicroStepperState = {
   nodes: [
-    { node: 'planner', status: 'completed' },
-    { node: 'expander', status: 'active' },
-    { node: 'assembler', status: 'pending' },
-    { node: 'smoother', status: 'pending' },
+    { node: 'generator', status: 'active' },
+    { node: 'selfReviewer', status: 'pending' },
     { node: 'judge', status: 'pending' },
   ],
 };
@@ -31,21 +27,17 @@ const activeState: MicroStepperState = {
 // Example 3: In refinement loop (judge requesting improvements)
 const loopState: MicroStepperState = {
   nodes: [
-    { node: 'planner', status: 'completed' },
-    { node: 'expander', status: 'completed' },
-    { node: 'assembler', status: 'completed' },
-    { node: 'smoother', status: 'completed' },
+    { node: 'generator', status: 'completed' },
+    { node: 'selfReviewer', status: 'completed' },
     { node: 'judge', status: 'loop' },
   ],
 };
 
-// Example 4: Error state (assembler failed)
+// Example 4: Error state (selfReviewer failed)
 const errorState: MicroStepperState = {
   nodes: [
-    { node: 'planner', status: 'completed' },
-    { node: 'expander', status: 'completed' },
-    { node: 'assembler', status: 'error' },
-    { node: 'smoother', status: 'pending' },
+    { node: 'generator', status: 'completed' },
+    { node: 'selfReviewer', status: 'error' },
     { node: 'judge', status: 'pending' },
   ],
 };
@@ -53,10 +45,8 @@ const errorState: MicroStepperState = {
 // Example 5: Completed successfully
 const completedState: MicroStepperState = {
   nodes: [
-    { node: 'planner', status: 'completed' },
-    { node: 'expander', status: 'completed' },
-    { node: 'assembler', status: 'completed' },
-    { node: 'smoother', status: 'completed' },
+    { node: 'generator', status: 'completed' },
+    { node: 'selfReviewer', status: 'completed' },
     { node: 'judge', status: 'completed' },
   ],
 };
@@ -142,22 +132,22 @@ export function MicroStepperExamples() {
           </thead>
           <tbody>
             <tr>
-              <td className="border border-slate-200 dark:border-slate-700 px-4 py-2">Урок 1</td>
-              <td className="border border-slate-200 dark:border-slate-700 px-4 py-2">Завершено</td>
+              <td className="border border-slate-200 dark:border-slate-700 px-4 py-2">Lesson 1</td>
+              <td className="border border-slate-200 dark:border-slate-700 px-4 py-2">Completed</td>
               <td className="border border-slate-200 dark:border-slate-700 px-4 py-2">
                 <MicroStepper state={completedState} size="sm" />
               </td>
             </tr>
             <tr>
-              <td className="border border-slate-200 dark:border-slate-700 px-4 py-2">Урок 2</td>
-              <td className="border border-slate-200 dark:border-slate-700 px-4 py-2">Выполняется</td>
+              <td className="border border-slate-200 dark:border-slate-700 px-4 py-2">Lesson 2</td>
+              <td className="border border-slate-200 dark:border-slate-700 px-4 py-2">Processing</td>
               <td className="border border-slate-200 dark:border-slate-700 px-4 py-2">
                 <MicroStepper state={activeState} size="sm" />
               </td>
             </tr>
             <tr>
-              <td className="border border-slate-200 dark:border-slate-700 px-4 py-2">Урок 3</td>
-              <td className="border border-slate-200 dark:border-slate-700 px-4 py-2">Ошибка</td>
+              <td className="border border-slate-200 dark:border-slate-700 px-4 py-2">Lesson 3</td>
+              <td className="border border-slate-200 dark:border-slate-700 px-4 py-2">Error</td>
               <td className="border border-slate-200 dark:border-slate-700 px-4 py-2">
                 <MicroStepper state={errorState} size="sm" />
               </td>

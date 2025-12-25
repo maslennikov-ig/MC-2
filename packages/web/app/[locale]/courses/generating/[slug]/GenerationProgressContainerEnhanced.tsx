@@ -18,14 +18,10 @@ import { Alert, AlertDescription } from '@/components/ui/alert';
 // import { approveStage, cancelGeneration, startGeneration } from '@/app/actions/admin-generation';
 import { GraphViewWrapper } from '@/components/generation-graph';
 
-// Celestial Design Imports
-import {
-  CelestialHeader,
-  SpaceBackground,
-  // MissionControlBanner - DISABLED: Now rendered inside GraphView
-  // StageResultsDrawer - DISABLED: Replaced by NodeDetailsDrawer in GraphView
-} from '@/components/generation-celestial';
-import StatsGrid from '@/components/generation/StatsGrid';
+// Celestial Design Imports - SpaceBackground REMOVED: GraphView takes full screen now
+// MissionControlBanner - DISABLED: Now rendered inside GraphView
+// StageResultsDrawer - DISABLED: Replaced by NodeDetailsDrawer in GraphView
+// GenerationProgressBar - REMOVED: Integrated into GraphHeader for unified UI
 import type { Stage1CourseData } from '@/components/generation-graph';
 
 /** Default fallback when lessons count is unknown (before Stage 4 analysis completes) */
@@ -182,7 +178,7 @@ export default function GenerationProgressContainerEnhanced({
   courseTitle,
   onComplete,
   onError,
-  showDebugInfo = false,
+  showDebugInfo: _showDebugInfo = false,
   autoRedirect = true,
   redirectDelay = 3000,
   userRole: _userRole = null,
@@ -666,106 +662,52 @@ export default function GenerationProgressContainerEnhanced({
   };
 
   return (
-      <SpaceBackground>
-        <div className="container mx-auto px-4 sm:px-6 lg:px-8 max-w-[95%] py-8">
-          {/* Toast notifications */}
-          <AnimatePresence>
-            {state.toast && (
-              <motion.div
-                initial={{ opacity: 0, y: -20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -20 }}
-                className="fixed top-4 right-4 z-50"
+      <div className="h-screen w-full relative">
+        {/* Toast notifications */}
+        <AnimatePresence>
+          {state.toast && (
+            <motion.div
+              initial={{ opacity: 0, y: -20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -20 }}
+              className="fixed top-4 right-4 z-[100]"
+            >
+              <Alert
+                variant={state.toast.type === 'error' ? 'destructive' : 'default'}
+                className={`
+                  ${state.toast.type === 'success' ? 'border-green-500 bg-green-50 dark:bg-green-950/30' : ''}
+                  ${state.toast.type === 'warning' ? 'border-yellow-500 bg-yellow-50 dark:bg-yellow-950/30' : ''}
+                  ${state.toast.type === 'info' ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/30' : ''}
+                  shadow-lg
+                `}
               >
-                <Alert
-                  variant={state.toast.type === 'error' ? 'destructive' : 'default'}
-                  className={`
-                    ${state.toast.type === 'success' ? 'border-green-500 bg-green-50 dark:bg-green-950/30' : ''}
-                    ${state.toast.type === 'warning' ? 'border-yellow-500 bg-yellow-50 dark:bg-yellow-950/30' : ''}
-                    ${state.toast.type === 'info' ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/30' : ''}
-                    shadow-lg
-                  `}
+                <AlertDescription className="pr-8">
+                  {state.toast.message}
+                </AlertDescription>
+                <button
+                  onClick={() => dispatch({ type: 'CLEAR_TOAST' })}
+                  className="absolute top-2 right-2 text-gray-400 hover:text-gray-600"
                 >
-                  <AlertDescription className="pr-8">
-                    {state.toast.message}
-                  </AlertDescription>
-                  <button
-                    onClick={() => dispatch({ type: 'CLEAR_TOAST' })}
-                    className="absolute top-2 right-2 text-gray-400 hover:text-gray-600"
-                  >
-                    ×
-                  </button>
-                </Alert>
-              </motion.div>
-            )}
-          </AnimatePresence>
+                  ×
+                </button>
+              </Alert>
+            </motion.div>
+          )}
+        </AnimatePresence>
 
-          <motion.div
-            initial={{ y: -20, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ duration: 0.5, ease: 'easeOut' }}
-          >
-            <CelestialHeader
-              courseTitle={courseTitle}
-              overallProgress={state.progress.percentage}
-              isConnected={state.isConnected}
-              currentStage={state.progress.current_stage || null}
-            />
-          </motion.div>
-
-          {/* Stage Approval Banner - DISABLED: Now rendered inside GraphView for proper selectNode integration */}
-          {/* {awaitingStage !== null && (
-            <MissionControlBanner
-              courseId={courseId}
-              awaitingStage={awaitingStage}
-              onApprove={handleApproveStage}
-              onCancel={handleCancelGeneration}
-              onViewResults={() => setDetailsStageId('stage_' + awaitingStage)}
-              isProcessing={isProcessingApproval}
-              isDark={isDark}
-            />
-          )} */}
-
-          <motion.div
-            className="mt-8 space-y-6"
-            initial={{ y: 20, opacity: 0 }}
-            animate={{ y: 0, opacity: 1 }}
-            transition={{ duration: 0.5, delay: 0.1, ease: 'easeOut' }}
-          >
-            {/* Stats Grid */}
-            <StatsGrid 
-              progress={state.progress}
-              status={state.status}
-            />
-
-            {/* Celestial Journey - REPLACED by GraphView */}
-            <div className="h-[700px] w-full border rounded-xl overflow-hidden shadow-xl bg-slate-50 relative z-0">
-              <GraphViewWrapper courseId={courseId} courseTitle={courseTitle} hasDocuments={state.progress?.has_documents} failedAtStage={failedAtStage} progressPercentage={state.progress?.percentage} generationCode={generationCode} stage1CourseData={stage1CourseData} />
-            </div>
-
-            {showDebugInfo && (
-              <div className="mt-4 p-4 bg-gray-100 dark:bg-gray-800 rounded-lg max-w-4xl mx-auto">
-                <h3 className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">
-                  Debug Info
-                </h3>
-                <pre className="text-xs text-gray-500 dark:text-gray-500 overflow-auto">
-                  {JSON.stringify({
-                    courseId,
-                    status: state.status,
-                    progress: state.progress.percentage,
-                    isConnected: state.isConnected,
-                    retryAttempts: state.retryAttempts,
-                    activeTab: state.activeTab,
-                    activityCount: state.activityLog.length,
-                    stepRetries: Array.from(state.stepRetryCount.entries()),
-                  }, null, 2)}
-                </pre>
-              </div>
-            )}
-
-          </motion.div>
-        </div>
-
+        {/* GraphView - Full screen */}
+        <GraphViewWrapper
+          courseId={courseId}
+          courseTitle={courseTitle}
+          hasDocuments={state.progress?.has_documents}
+          failedAtStage={failedAtStage}
+          progressPercentage={state.progress?.percentage}
+          generationCode={generationCode}
+          stage1CourseData={stage1CourseData}
+          generationProgress={state.progress}
+          generationStatus={state.status}
+          isRealtimeConnected={state.isConnected}
+        />
 
         {/* Success Overlay Animation */}
         <AnimatePresence>
@@ -774,7 +716,7 @@ export default function GenerationProgressContainerEnhanced({
               initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.8 }}
-              className="fixed inset-0 flex items-center justify-center pointer-events-none z-50"
+              className="fixed inset-0 flex items-center justify-center pointer-events-none z-[100]"
             >
               <motion.div
                 initial={{ scale: 0 }}
@@ -812,16 +754,6 @@ export default function GenerationProgressContainerEnhanced({
             </motion.div>
           )}
         </AnimatePresence>
-
-        {/* StageResultsDrawer DISABLED: Replaced by NodeDetailsDrawer in GraphView for consistency */}
-        {/* <StageResultsDrawer
-          isOpen={!!detailsStageId}
-          onClose={() => setDetailsStageId(null)}
-          courseId={courseId}
-          stageNumber={detailsStageId && detailsStageId.startsWith('stage_') ? parseInt(detailsStageId.replace('stage_', ''), 10) : null}
-          activityLog={state.activityLog}
-        /> */}
-
-      </SpaceBackground>
+      </div>
   );
 }

@@ -2,6 +2,7 @@
 
 import dynamic from 'next/dynamic';
 import { GraphSkeleton } from './GraphSkeleton';
+import type { GenerationProgress, CourseStatus } from '@/types/course-generation';
 
 // Dynamic import MUST be inside a Client Component for ssr: false to work
 // This prevents React Flow from being included in server bundle
@@ -51,6 +52,20 @@ export interface GraphViewWrapperProps {
    * instead of waiting for traces from generation.
    */
   stage1CourseData?: Stage1CourseData;
+  /**
+   * Full generation progress data for header stats display.
+   * Contains started_at, modules_total, lessons_total, lessons_completed, etc.
+   */
+  generationProgress?: GenerationProgress;
+  /**
+   * Current generation status for header stats display.
+   */
+  generationStatus?: CourseStatus;
+  /**
+   * Whether realtime connection is active.
+   * Used for connection indicator in header.
+   */
+  isRealtimeConnected?: boolean;
 }
 
 /**
@@ -67,8 +82,32 @@ export interface GraphViewWrapperProps {
  *   return <GraphViewWrapper courseId="123" courseTitle="My Course" />;
  * }
  */
-export function GraphViewWrapper({ courseId, courseTitle, hasDocuments, failedAtStage, progressPercentage, generationCode, stage1CourseData }: GraphViewWrapperProps) {
-  return <GraphViewDynamic courseId={courseId} courseTitle={courseTitle} hasDocuments={hasDocuments} failedAtStage={failedAtStage} progressPercentage={progressPercentage} generationCode={generationCode} stage1CourseData={stage1CourseData} />;
+export function GraphViewWrapper({
+  courseId,
+  courseTitle,
+  hasDocuments,
+  failedAtStage,
+  progressPercentage,
+  generationCode,
+  stage1CourseData,
+  generationProgress,
+  generationStatus,
+  isRealtimeConnected
+}: GraphViewWrapperProps) {
+  return (
+    <GraphViewDynamic
+      courseId={courseId}
+      courseTitle={courseTitle}
+      hasDocuments={hasDocuments}
+      failedAtStage={failedAtStage}
+      progressPercentage={progressPercentage}
+      generationCode={generationCode}
+      stage1CourseData={stage1CourseData}
+      generationProgress={generationProgress}
+      generationStatus={generationStatus}
+      isRealtimeConnected={isRealtimeConnected}
+    />
+  );
 }
 
 // Default export for dynamic import compatibility

@@ -6,13 +6,14 @@ import { cn } from '@/lib/utils';
 import type { MermaidDiagramProps } from '../types';
 
 /**
- * Lazy-loaded MermaidIframe component
+ * Lazy-loaded MermaidDirect component
  *
+ * Uses mermaid.render() API directly for more reliable rendering.
  * Loaded dynamically to avoid server-side rendering issues with Mermaid
  * and to reduce initial bundle size for pages that don't use diagrams.
  */
-const MermaidIframe = dynamic(
-  () => import('./MermaidIframe').then((mod) => ({ default: mod.MermaidIframe })),
+const MermaidDirect = dynamic(
+  () => import('./MermaidDirect').then((mod) => ({ default: mod.MermaidDirect })),
   {
     ssr: false, // Mermaid requires client-side execution
     loading: () => <MermaidSkeleton />,
@@ -119,7 +120,7 @@ export function MermaidDiagram({ chart, className, ariaLabel }: MermaidDiagramPr
   return (
     <MermaidErrorBoundary chart={chart}>
       <div className={cn('mermaid-wrapper my-6', className)}>
-        <MermaidIframe chart={chart} className={className} ariaLabel={ariaLabel} />
+        <MermaidDirect chart={chart} className={className} ariaLabel={ariaLabel} />
       </div>
     </MermaidErrorBoundary>
   );

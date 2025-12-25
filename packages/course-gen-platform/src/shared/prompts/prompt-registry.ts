@@ -709,6 +709,11 @@ const stage6Prompts: HardcodedPrompt[] = [
    \`\`\`
    Types: flowchart TD/LR, sequenceDiagram, mindmap, pie, timeline
 
+   CRITICAL MERMAID RULES:
+   - NEVER use escaped quotes inside node labels: BAD: A[Text \\"quote\\" here]
+   - Keep node labels simple and quote-free: GOOD: A[Простой текст]
+   - For special characters use entity codes: A[Text #quot;quote#quot; here]
+
 2. **Math Formulas** (LaTeX):
    - Inline: \`$E=mc^2$\` within text
    - Block: \`$$\\sum_{i=1}^{n} x_i$$\` centered on own line
@@ -1057,6 +1062,11 @@ Format as markdown outline. Target total reading time: {{durationMinutes}} minut
      B -->|No| D[Alternative]
    \`\`\`
    Types: flowchart TD/LR, sequenceDiagram, mindmap, pie, timeline
+
+   CRITICAL MERMAID RULES:
+   - NEVER use escaped quotes inside node labels: BAD: A[Text \\"quote\\" here]
+   - Keep node labels simple and quote-free: GOOD: A[Простой текст]
+   - For special characters use entity codes: A[Text #quot;quote#quot; here]
 
 2. **Math Formulas** (LaTeX):
    - Inline: \`$E=mc^2$\` within text

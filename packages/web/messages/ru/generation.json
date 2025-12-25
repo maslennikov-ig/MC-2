@@ -243,5 +243,32 @@
     "view": "Просмотр",
     "confirming": "Подтверждение...",
     "awaitingStatus": "Ожидание"
+  },
+  "stats": {
+    "documents": "Документы",
+    "documentsShort": "Док",
+    "documentsTooltip": "Загруженные документы",
+    "modules": "Модули",
+    "modulesShort": "мод",
+    "modulesTooltip": "Количество модулей в курсе",
+    "lessons": "Уроки",
+    "lessonsTooltip": "Прогресс генерации уроков",
+    "time": "Время",
+    "timeTooltip": "Время генерации",
+    "steps": "Шаги",
+    "stepsTooltip": "Этап генерации",
+    "processing": "Обработка",
+    "none": "Нет",
+    "analyzing": "Анализ...",
+    "completed": "Готово",
+    "inProgress": "В процессе",
+    "allCompleted": "Все выполнено",
+    "step": "Шаг {number}",
+    "hasDocuments": "Документы загружены",
+    "noDocuments": "Документы не загружены"
+  },
+  "header": {
+    "missionProgress": "Прогресс миссии",
+    "noConnection": "Нет связи"
   }
 }

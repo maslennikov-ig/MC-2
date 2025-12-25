@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState, useCallback, useMemo } from 'react';
+import React, { useState, useCallback, useMemo, useEffect } from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
 import { cn } from '@/lib/utils';
 import {
@@ -67,6 +67,8 @@ interface LessonInspectorProps {
   isMaximized?: boolean;
   onToggleMaximize?: () => void;
   className?: string;
+  /** User subscription tier for model display. Defaults to 'standard'. */
+  tier?: 'trial' | 'free' | 'basic' | 'standard' | 'premium';
 }
 
 /**
@@ -91,6 +93,7 @@ export function LessonInspector({
   isMaximized,
   onToggleMaximize,
   className,
+  tier = 'standard',
 }: LessonInspectorProps) {
   // Modal state for viewing node output
   const [outputModal, setOutputModal] = useState<{
@@ -118,6 +121,25 @@ export function LessonInspector({
     setOutputModal({ isOpen: true, node, output });
   }, []);
 
+  // Keyboard shortcut: Cmd+C / Ctrl+C to copy when modal is open
+  useEffect(() => {
+    if (!outputModal.isOpen) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if ((e.metaKey || e.ctrlKey) && e.key === 'c') {
+        // Don't override if user has selected text
+        const selection = window.getSelection();
+        if (selection && selection.toString().length > 0) return;
+
+        e.preventDefault();
+        handleCopy();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [outputModal.isOpen, handleCopy]);
+
   // Get node label for modal title
   const getNodeLabel = useCallback((node: string): string => {
     const labels = STAGE6_NODE_LABELS[node as keyof typeof STAGE6_NODE_LABELS];
@@ -126,18 +148,39 @@ export function LessonInspector({
 
   /**
    * Extract quality score (0-100) from judge result
+   * Supports cascade evaluation: heuristic → single_judge → clev_voting
    * @param judgeResult - Judge verdict with voting results
    * @returns Quality score as integer 0-100
    */
   const extractQualityScore = useCallback((judgeResult: JudgeVerdictDisplay | null): number => {
-    // Guard: No judge result or no voting result
-    if (!judgeResult?.votingResult) return 0;
+    if (!judgeResult) return 0;
 
-    // finalScore could be 0 (valid score), so use nullish coalescing
-    const score = judgeResult.votingResult.finalScore ?? 0;
+    let score: number | undefined;
 
-    // Convert to 0-100 scale: if already 0-100 keep as is, if 0-1 multiply by 100
-    return score > 1 ? Math.round(score) : Math.round(score * 100);
+    // Check cascade stage to determine score source
+    switch (judgeResult.cascadeStage) {
+      case 'heuristic':
+        // Heuristics passed = 100%, otherwise 0%
+        score = judgeResult.heuristicsPassed ? 100 : 0;
+        break;
+
+      case 'single_judge':
+        // Score from single judge (0-1 scale)
+        score = judgeResult.singleJudgeResult?.score;
+        break;
+
+      case 'clev_voting':
+      default:
+        // Score from CLEV voting
+        score = judgeResult.votingResult?.finalScore;
+        break;
+    }
+
+    // Guard: No score found
+    if (score === undefined || score === null) return 0;
+
+    // Convert to 0-100 scale: if 0-1 multiply by 100, if already 0-100 keep as is
+    return score <= 1 ? Math.round(score * 100) : Math.round(score);
   }, []);
 
   /**
@@ -282,9 +325,8 @@ export function LessonInspector({
       judgeResult={data.judgeResult}
       stats={{
         tokens: data.totalTokensUsed,
-        costUsd: data.totalCostUsd,
         durationMs: data.totalDurationMs,
-        modelTier: 'standard', // TODO: Extract from user subscription or course settings
+        modelTier: data.tier || tier,
         quality: extractQualityScore(data.judgeResult),
         tokensBreakdown: extractTokensBreakdown(data.pipelineNodes),
       }}

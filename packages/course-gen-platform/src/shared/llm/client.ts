@@ -260,15 +260,34 @@ export class LLMClient {
         }
 
         const usage = completion.usage;
-        if (!usage) {
-          throw new Error('No usage data in completion response');
+
+        // Extract token counts from API response
+        let inputTokens = usage?.prompt_tokens || 0;
+        let outputTokens = usage?.completion_tokens || 0;
+        let totalTokens = usage?.total_tokens || 0;
+
+        // Fallback: estimate tokens if model didn't report usage (common with free models)
+        if (totalTokens === 0) {
+          // Estimate using ~4 chars per token (conservative for mixed content)
+          const inputLength = systemPrompt.length + prompt.length;
+          const outputLength = choice.message.content.length;
+          inputTokens = Math.ceil(inputLength / 4);
+          outputTokens = Math.ceil(outputLength / 4);
+          totalTokens = inputTokens + outputTokens;
+
+          logger.debug({
+            model,
+            estimatedInputTokens: inputTokens,
+            estimatedOutputTokens: outputTokens,
+            estimatedTotalTokens: totalTokens,
+          }, 'Token usage estimated from content length (model did not report usage)');
         }
 
         const response: LLMResponse = {
           content: choice.message.content,
-          inputTokens: usage.prompt_tokens || 0,
-          outputTokens: usage.completion_tokens || 0,
-          totalTokens: usage.total_tokens || 0,
+          inputTokens,
+          outputTokens,
+          totalTokens,
           model: completion.model || model,
           finishReason: choice.finish_reason || 'unknown',
           requestId: (completion as any)._request_id,

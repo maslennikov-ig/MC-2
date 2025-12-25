@@ -161,35 +161,51 @@ app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 /**
  * Request Logging Middleware
  *
- * Logs all incoming requests with:
+ * Logs all requests with single aggregated entry containing:
  * - HTTP method and URL
- * - Request timestamp
  * - Response status code
  * - Request duration in milliseconds
+ *
+ * Design: Single log entry per request (not two) to reduce log noise.
+ * Use LOG_LEVEL=trace to see polling and request start events.
  */
+
+// Polling endpoints to log at trace level (reduce noise in dev)
+const POLLING_ENDPOINTS = [
+  'jobs.getStatus',
+  'jobs.getBatchStatus',
+  'generation.getProgress',
+  'health',
+];
+
 app.use((req: Request, res: Response, next: NextFunction) => {
   const startTime = Date.now();
   const { method, url } = req;
 
-  // Log request start
-  logger.info({
+  // Log request start only at trace level (reduces noise in dev)
+  logger.trace({
     method,
     url,
     userAgent: req.get('user-agent'),
     ip: req.ip,
-  }, 'Incoming request');
+  }, 'Request started');
 
-  // Capture response finish to log duration
+  // Log single aggregated entry on response finish
   res.on('finish', () => {
     const duration = Date.now() - startTime;
     const { statusCode } = res;
 
-    logger.info({
+    // Check if this is a polling endpoint (log at trace level)
+    const isPolling = POLLING_ENDPOINTS.some(ep => url.includes(ep));
+
+    // Use warn for errors, trace for polling, info for normal requests
+    const logLevel = statusCode >= 400 ? 'warn' : isPolling ? 'trace' : 'info';
+    logger[logLevel]({
       method,
       url,
       statusCode,
       duration,
-    }, 'Request completed');
+    }, `${method} ${url.split('?')[0]} ${statusCode} (${duration}ms)`);
   });
 
   next();

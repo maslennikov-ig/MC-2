@@ -50,10 +50,10 @@ export const DEFAULT_JOB_TIMEOUT_MS = 300_000;
  * - ModelConfigService is unavailable
  */
 export const MODEL_FALLBACK = {
-  /** Primary models by language (FALLBACK ONLY) */
+  /** Primary models by language (FALLBACK ONLY - used when DB unavailable) */
   primary: {
-    ru: 'qwen/qwen3-235b-a22b-2507',
-    en: 'deepseek/deepseek-v3.1-terminus',
+    ru: 'xiaomi/mimo-v2-flash:free',
+    en: 'xiaomi/mimo-v2-flash:free',
   },
   /** Fallback model for all languages */
   fallback: 'moonshotai/kimi-k2-0905',

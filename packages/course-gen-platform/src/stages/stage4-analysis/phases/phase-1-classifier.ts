@@ -2,14 +2,14 @@
  * Phase 1: Basic Classification Service
  *
  * Performs course categorization, contextual language generation, and topic analysis.
- * Uses 20B model for efficient classification with English-only output.
+ * Uses database-configured model for efficient classification with English-only output.
  *
  * Core Tasks:
  * 1. Course Category Detection (6 categories with confidence scoring)
  * 2. Contextual Language Generation (category-adapted motivational templates)
  * 3. Topic Analysis (complexity, target audience, key concepts extraction)
  *
- * Model: Always 20B (simple classification task, cost-effective)
+ * Model: Configured via database (llm_model_config table)
  * Output Language: Always English (regardless of input language)
  * Quality: Semantic similarity validation with 0.75 threshold
  *
@@ -161,9 +161,9 @@ export async function runPhase1Classification(input: Phase1Input): Promise<Phase
   const courseId = input.course_id;
   const startTime = Date.now();
 
-  // Get base model (20B)
+  // Get model from database config
   const model = await getModelForPhase('stage_4_classification');
-  const modelId = model.model || 'openai/gpt-oss-20b';
+  const modelId = model.model || 'unknown';
 
   // Build prompt
   const [systemMsg, humanMsg] = buildClassificationPrompt(input);

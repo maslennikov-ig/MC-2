@@ -16,7 +16,7 @@ import { Coins, Clock, Gauge, RefreshCw, Download } from 'lucide-react';
  * Stage6ControlTowerProps - Props for the Control Tower header component
  *
  * Compact 80px sticky header bar that replaces 4 large metric cards.
- * Displays module title, progress, tokens, quality, time, and actions.
+ * Displays module title, progress, tokens/cost, quality, time, and actions.
  *
  * Design Philosophy: "Editorial IDE" with Blue/Cyan theme
  */
@@ -27,8 +27,8 @@ export interface Stage6ControlTowerProps {
   moduleId: string;
   /** Aggregated statistics */
   stats: {
-    /** Total tokens consumed (formatted as "1.2M tokens") */
-    totalTokens: number;
+    /** Total tokens consumed (formatted as "1.2M tokens"). Optional */
+    totalTokens?: number;
     /** Average quality score 0-100 (NOT decimal, show as "92%") */
     avgQuality: number;
     /** Status breakdown */
@@ -120,7 +120,7 @@ function formatDuration(ms: number): string {
 export const Stage6ControlTower = memo<Stage6ControlTowerProps>(function Stage6ControlTower({
   moduleTitle,
   stats,
-  modelTier = 'medium',
+  modelTier = 'standard',
   locale = 'ru',
   onRegenerateAll,
   onExportAll,
@@ -150,25 +150,24 @@ export const Stage6ControlTower = memo<Stage6ControlTowerProps>(function Stage6C
           <h2 className="text-lg font-semibold text-foreground">{moduleTitle}</h2>
 
           {/* Actions */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1.5">
             <Button
               variant="outline"
-              size="sm"
+              size="compact"
               onClick={onRegenerateAll}
               disabled={hasActiveLessons}
-              className="gap-2"
             >
-              <RefreshCw className="h-4 w-4" />
+              <RefreshCw size={14} />
               {t?.controlTower?.regenerateAll?.[locale] ?? 'Regenerate All'}
             </Button>
             <Button
               variant="default"
-              size="sm"
+              size="compact"
               onClick={onExportAll}
               disabled={hasActiveLessons}
-              className="gap-2 bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
+              className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
             >
-              <Download className="h-4 w-4" />
+              <Download size={14} />
               {t?.controlTower?.exportAll?.[locale] ?? 'Export'}
             </Button>
           </div>
@@ -224,7 +223,9 @@ export const Stage6ControlTower = memo<Stage6ControlTowerProps>(function Stage6C
               </span>
             </div>
             <div className="text-lg font-mono font-semibold text-foreground">
-              {formatTokensCompact(stats.totalTokens)}
+              {stats.totalTokens !== undefined
+                ? formatTokensCompact(stats.totalTokens)
+                : '-'}
             </div>
             <div className="text-xs text-muted-foreground">{tierName}</div>
           </div>

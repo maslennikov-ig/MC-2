@@ -137,11 +137,11 @@ async function executePhaseWithRetry<T>(
  *
  * Workflow:
  * 1. Phase 0: Pre-flight validation (Stage 3 barrier check)
- * 2. Phase 1: Basic classification (20B model)
- * 3. Phase 2: Scope analysis (20B model, minimum 10 lessons validation)
- * 4. Phase 3: Deep expert analysis (120B model - ALWAYS)
- * 5. Phase 4: Document synthesis (Adaptive: 20B/120B based on document count)
- * 6. Phase 6: RAG planning (20B model, only if documents exist)
+ * 2. Phase 1: Basic classification (model from database)
+ * 3. Phase 2: Scope analysis (model from database, minimum 10 lessons validation)
+ * 4. Phase 3: Deep expert analysis (model from database)
+ * 5. Phase 4: Document synthesis (model from database)
+ * 6. Phase 6: RAG planning (model from database, only if documents exist)
  * 7. Phase 5: Final assembly (no LLM, pure data combination)
  *
  * Error Handling (FR-013):

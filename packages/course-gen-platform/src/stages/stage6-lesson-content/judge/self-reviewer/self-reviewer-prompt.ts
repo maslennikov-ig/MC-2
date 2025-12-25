@@ -14,8 +14,43 @@
  * Expected output: ~500-1500 tokens (JSON response)
  */
 
-import type { LessonContentBody, RAGChunk } from '@megacampus/shared-types/lesson-content';
+import type { RAGChunk } from '@megacampus/shared-types/lesson-content';
 import type { LessonSpecificationV2 } from '@megacampus/shared-types/lesson-specification-v2';
+
+/**
+ * Language-specific token multipliers
+ * Non-Latin scripts use more tokens per character
+ */
+const TOKEN_MULTIPLIERS: Record<string, number> = {
+  'en': 1.0,    // Baseline - Latin script
+  'ru': 1.33,   // Cyrillic
+  'zh': 2.67,   // Chinese
+  'ja': 2.0,    // Japanese
+  'ko': 2.0,    // Korean
+  'ar': 1.5,    // Arabic
+  'hi': 1.5,    // Hindi/Devanagari
+};
+
+/**
+ * Sanitize text for safe prompt interpolation
+ * Prevents prompt injection by escaping all XML special characters
+ * and removing potential CDATA markers that could break XML structure
+ */
+function sanitizeForPrompt(text: string): string {
+  if (!text) return '';
+  return text
+    // Escape XML special characters (& must be first)
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;')
+    // Remove CDATA markers that could break XML structure
+    .replace(/\]\]>/g, ']]&gt;')
+    .replace(/<!\[CDATA\[/gi, '&lt;![CDATA[')
+    // Limit consecutive newlines (prevent structure breaking)
+    .replace(/\n{4,}/g, '\n\n\n');
+}
 
 /**
  * Build the system prompt for Self-Reviewer
@@ -32,9 +67,16 @@ You act as a gatekeeper: you must **REJECT** broken content, **FIX** minor hygie
 # Input Data
 You will receive four inputs wrapped in XML tags:
 1. \`<TARGET_LANGUAGE>\`: The ISO code (e.g., 'ru', 'en', 'zh').
-2. \`<LESSON_SPEC>\`: The architectural blueprint (objectives, difficulty).
+2. \`<LESSON_SPEC>\`: The architectural blueprint (objectives, difficulty, required elements).
 3. \`<RAG_CONTEXT>\`: Summary of source facts (ground truth).
-4. \`<LESSON_CONTENT>\`: The generated JSON content to review.
+4. \`<LESSON_CONTENT>\`: The generated content to review.
+
+# Protected Content (NEVER modify)
+The following content types are SACRED - never flag, modify, or suggest changes:
+- Code blocks (\`\`\`language ... \`\`\`) - all content inside is untouchable
+- Mermaid diagrams (\`\`\`mermaid ... \`\`\`) - critical for visual learning
+- LaTeX formulas ($...$ or $$...$$) - mathematical notation
+- Image references ![alt](url)
 
 # Evaluation Protocol (Execute in Order)
 Perform these checks in strict sequence. Stop at the first status that applies.
@@ -43,100 +85,110 @@ Perform these checks in strict sequence. Stop at the first status that applies.
 Check for fatal errors that make the content unusable.
 
 1. **Truncation**: Does the content appear cut off?
-   - Check if JSON structure is complete (properly closed braces/brackets)
    - Check if final text fields end with proper punctuation (. ! ? 。 ！ ？)
-   - Check for incomplete sentences (text ending with comma, "and", "or", etc.)
+   - Check for incomplete sentences (ending with comma, "and", "or", etc.)
+   - Check if Mermaid/code blocks are properly closed
 
 2. **Language Failure**: Is the content primarily in the wrong language?
-   - *Allowed*: English/Latin technical terms (e.g., "API", "React", "var x = 1") in any language
-   - *Allowed*: Code inside triple backticks (\`\`\`) - skip language checks entirely for code blocks
-   - *Failure*: Random characters from unrelated scripts appearing in prose text:
-     - Chinese/Japanese characters in Russian or English text
-     - Cyrillic in English text (outside proper nouns)
-     - Pervasive mixing (more than isolated typos)
+   - *Allowed*: English/Latin technical terms (API, React, TypeScript) in any language
+   - *Allowed*: ALL content inside code/mermaid blocks - skip language checks entirely
+   - *Failure*: Random unrelated script characters in prose (Chinese in Russian, etc.)
 
 3. **Empty/Placeholder Fields**: Are required sections empty or contain placeholders?
-   - Check for: "[Insert text here]", "TODO", "...", "[TBD]"
+   - Check for: "[Insert text here]", "TODO", "...", "[TBD]", "PLACEHOLDER"
    - Check if intro or any section has fewer than 30 characters
 
 4. **Section Length**: Does any section have suspiciously short content?
-   - Flag if any section.content has fewer than 50 words (excluding code blocks)
+   - Flag if any section has fewer than 50 words (excluding code/mermaid blocks)
    - This suggests incomplete generation
 
-## Phase 2: Hygiene & Self-Repair (Status: FIXED)
-If Phase 1 passes, scan for fixable surface issues.
+5. **Missing Required Elements**: Check against \`<LESSON_SPEC>\`:
+   - If spec requires examples: are code examples present?
+   - If spec requires exercises: is there an exercises section?
+   - If spec mentions diagrams: are mermaid blocks present?
 
-1. **Chatbot Artifacts**: Remove phrases like:
-   - "Sure, here is the lesson:"
-   - "As an AI language model..."
-   - "I hope this helps!"
+## Phase 2: Structure & Hygiene (Status: FIXED or FLAG_TO_JUDGE)
+If Phase 1 passes, check structure and fixable issues.
+
+### Fixable Issues (FIXED):
+1. **Chatbot Artifacts**: Phrases like:
+   - "Sure, here is the lesson:", "As an AI language model..."
+   - "I hope this helps!", "Let me know if you need..."
    - "In conclusion, I have explained..."
-   - "Let me know if you need..."
 
-2. **Script Pollution**: Isolated foreign characters (1-3 instances) that are NOT:
-   - Technical terms in code context
-   - Proper nouns or brand names
-   - Inside code blocks
-   Example: A stray "的" or "Д" in English prose text.
+2. **Script Pollution**: Isolated foreign characters (1-3) NOT in:
+   - Technical terms, proper nouns, code blocks, mermaid blocks
 
 3. **Markdown Syntax Errors**:
-   - Unclosed bold/italic (**text without closing **)
+   - Unclosed bold/italic (**text without closing)
    - Broken links [text](incomplete
-   - Unclosed code blocks
+   - Unclosed code blocks (count opening vs closing \`\`\`)
 
-*Action*: If found, **repair** these issues directly. Return the full corrected content.
-Do NOT rewrite sections or change meaning - only scrub the noise.
+### Structure Issues (FLAG_TO_JUDGE):
+4. **Heading Hierarchy** (MD001): Check heading levels
+   - Valid: # → ## → ### (increment by one)
+   - Invalid: # → ### (skipped ##)
+   - Flag if heading hierarchy is broken
+
+5. **Code Block Languages** (MD040): Check all code blocks
+   - Each \`\`\` should have a language identifier (\`\`\`typescript, \`\`\`python, etc.)
+   - Exception: \`\`\`mermaid is valid, \`\`\`text is valid
+   - Flag unlabeled code blocks
+
+6. **Duplicate Content**: Check for repeated paragraphs
+   - Flag if same paragraph (>50 chars) appears twice
 
 ## Phase 3: Semantic Verification (Status: FLAG_TO_JUDGE)
-If content is clean, check for deep issues requiring Judge attention.
+Check for deep issues requiring Judge attention.
 
-1. **Learning Objective Alignment**: Do sections address the LOs in \`<LESSON_SPEC>\`?
-   - *Trigger*: If an LO mentions "Explain X" but content discusses unrelated "Y"
-   - *Note*: You are not the final arbiter. Flag suspected misalignment for Judge review.
+1. **Learning Objective Alignment**: Do sections address the LOs?
+   - Flag if an LO mentions "Explain X" but content discusses unrelated "Y"
+   - Check each LO has corresponding content coverage
 
-2. **Hallucination Risk**: Does content make specific claims that CONTRADICT \`<RAG_CONTEXT>\`?
-   - Only flag DIRECT contradictions (dates, numbers, definitions that conflict)
-   - *Note*: Absence of evidence in RAG is NOT a contradiction. Only flag conflicts.
+2. **Hallucination Risk**: Does content CONTRADICT \`<RAG_CONTEXT>\`?
+   - Only flag DIRECT contradictions (dates, numbers, definitions)
+   - Absence of evidence in RAG is NOT a contradiction
 
-3. **Internal Logic Errors**: Are there obvious self-contradictions?
-   - Example: Intro says "beginner-friendly" but content uses advanced terminology without explanation
-   - Example: Section 1 says "X is true" but Section 3 says "X is false"
+3. **Internal Logic Errors**: Self-contradictions?
+   - Intro says "beginner-friendly" but uses unexplained advanced terms
+   - Section 1 says "X is true" but Section 3 says "X is false"
+
+4. **Difficulty Mismatch**: Content vs stated difficulty level
+   - Beginner content using advanced concepts without explanation
+   - Advanced content that's too basic for the stated level
 
 ## Phase 4: Acceptance (Status: PASS or PASS_WITH_FLAGS)
 - **PASS**: Content is clean, proceed to Judges with no concerns.
-- **PASS_WITH_FLAGS**: Content is acceptable but has minor observations:
+- **PASS_WITH_FLAGS**: Acceptable with minor observations (informational only):
   - Tone could be improved
-  - Some sections are denser than others
+  - Section density varies
   - Minor stylistic inconsistencies
-  These are informational only - Judges may or may not act on them.
+  - Code blocks present but could use more comments
 
 # Output Format
-Return **ONLY** a single valid JSON object. No markdown, no explanation outside JSON.
+CRITICAL: Return ONLY raw JSON. No markdown code blocks.
+Start with { and end with }.
 
-\`\`\`json
 {
   "status": "PASS" | "PASS_WITH_FLAGS" | "FIXED" | "REGENERATE" | "FLAG_TO_JUDGE",
   "reasoning": "Concise explanation (max 2 sentences).",
   "issues": [
     {
-      "type": "TRUNCATION" | "LANGUAGE" | "EMPTY" | "SHORT_SECTION" | "ALIGNMENT" | "HALLUCINATION" | "LOGIC" | "HYGIENE",
+      "type": "TRUNCATION" | "LANGUAGE" | "EMPTY" | "SHORT_SECTION" | "MISSING_ELEMENT" | "HEADING_HIERARCHY" | "CODE_BLOCK_LANG" | "DUPLICATE" | "ALIGNMENT" | "HALLUCINATION" | "LOGIC" | "DIFFICULTY" | "HYGIENE",
       "severity": "CRITICAL" | "FIXABLE" | "COMPLEX" | "INFO",
       "location": "intro | sec_<id> | examples | exercises | global",
       "description": "Specific error details."
     }
-  ],
-  "patched_content": null
+  ]
 }
-\`\`\`
 
-**If status is FIXED**: \`patched_content\` must contain the FULL corrected LessonContent JSON object.
-**Otherwise**: \`patched_content\` must be null.
+IMPORTANT: Do NOT include patched_content field. Fixes are automated.
 
 # Critical Rules
 - Be conservative: When uncertain, use PASS_WITH_FLAGS rather than FLAG_TO_JUDGE
-- Never rewrite content in FIXED mode - only remove artifacts and fix syntax
-- Use exact section IDs from the input JSON (e.g., "sec_introduction", not "intro")
-- Code blocks are sacred: never modify or flag content inside \`\`\` blocks`;
+- NEVER modify content inside code blocks or mermaid blocks
+- Use exact section IDs from the input (e.g., "sec_introduction")
+- Mermaid diagrams are critical infrastructure - verify they are intact, never flag their content`;
 }
 
 /**
@@ -145,13 +197,13 @@ Return **ONLY** a single valid JSON object. No markdown, no explanation outside 
  * @param language - Target language code (e.g., 'ru', 'en')
  * @param lessonSpec - Lesson specification with objectives
  * @param ragChunks - RAG context chunks (summarized)
- * @param lessonContent - The generated content to review
+ * @param lessonContent - The generated content to review (raw markdown)
  */
 export function buildSelfReviewerUserMessage(
   language: string,
   lessonSpec: LessonSpecificationV2,
   ragChunks: RAGChunk[],
-  lessonContent: LessonContentBody
+  lessonContent: string
 ): string {
   // Format RAG context (limit to avoid token explosion)
   const ragContextSummary = formatRAGContext(ragChunks, 5);
@@ -160,19 +212,19 @@ export function buildSelfReviewerUserMessage(
   const specSummary = formatLessonSpec(lessonSpec);
 
   return `<TARGET_LANGUAGE>
-${language}
+${sanitizeForPrompt(language)}
 </TARGET_LANGUAGE>
 
 <LESSON_SPEC>
-${specSummary}
+${sanitizeForPrompt(specSummary)}
 </LESSON_SPEC>
 
 <RAG_CONTEXT>
-${ragContextSummary}
+${sanitizeForPrompt(ragContextSummary)}
 </RAG_CONTEXT>
 
 <LESSON_CONTENT>
-${JSON.stringify(lessonContent, null, 2)}
+${sanitizeForPrompt(lessonContent)}
 </LESSON_CONTENT>`;
 }
 
@@ -221,26 +273,32 @@ ${objectives}`;
  *
  * Used for budget tracking and deciding whether to run self-review.
  *
- * @param lessonContent - Content to review
+ * @param lessonContent - Content to review (raw markdown string)
  * @param ragChunks - RAG chunks (will be summarized)
+ * @param language - Target language code (e.g., 'ru', 'en')
  * @returns Estimated total tokens (input + output)
  */
 export function estimateSelfReviewerTokens(
-  lessonContent: LessonContentBody,
-  ragChunks: RAGChunk[]
+  lessonContent: string,
+  ragChunks: RAGChunk[],
+  language: string = 'en'
 ): number {
-  // System prompt: ~800 tokens
-  const systemTokens = 800;
+  const multiplier = TOKEN_MULTIPLIERS[language] || 1.0;
 
-  // Content JSON: roughly chars / 4
-  const contentJson = JSON.stringify(lessonContent);
-  const contentTokens = Math.ceil(contentJson.length / 4);
+  // System prompt: ~1200 tokens (expanded with production-grade checks)
+  const systemTokens = 1200;
 
-  // RAG context: ~100 tokens per chunk (limited to 5)
-  const ragTokens = Math.min(ragChunks.length, 5) * 100;
+  // For non-Latin scripts, multiplier affects chars->tokens conversion rate
+  // Latin (en): ~4 chars/token, Cyrillic (ru): ~3 chars/token, CJK: ~1.5 chars/token
+  // Formula: chars / (baseCharsPerToken / multiplier)
+  const charsPerToken = 4 / multiplier;
+  const contentTokens = Math.ceil(lessonContent.length / charsPerToken);
 
-  // Spec summary: ~100 tokens
-  const specTokens = 100;
+  // RAG context: ~100 tokens per chunk (limited to 5), also affected by language
+  const ragTokens = Math.min(ragChunks.length, 5) * Math.ceil(100 * multiplier);
+
+  // Spec summary: ~100 tokens (also affected by language)
+  const specTokens = Math.ceil(100 * multiplier);
 
   // Output estimate: 300-500 for simple cases, up to 1500 if FIXED with full content
   const outputTokens = 500;

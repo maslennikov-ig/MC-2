@@ -35,7 +35,7 @@
 | Phase 7: US4 Presentation | T052-T055 | NOT STARTED |
 | Phase 8: US5 Manage | T056-T077 | NOT STARTED |
 | Phase 9: US6 Batch | T078-T082 | NOT STARTED |
-| Phase 10: Polish | T083-T092 | NOT STARTED |
+| Phase 10: Polish | T083-T095 | NOT STARTED |
 
 **Next**: Start with Phase 1 (T001-T008) - Database migration and shared types.
 
@@ -182,6 +182,7 @@ Instructors need to see at a glance which lessons have enrichments and their cur
 - What happens when multiple enrichments of the same type are added? System queues them and generates in order
 - How are partial failures handled in batch operations? Each item is tracked independently; succeeded items remain, failed items can be retried
 - What happens if the user deletes a lesson that has enrichments in progress? Generation should be cancelled and pending work discarded
+- What happens when lesson content changes (via self-fix/section regeneration) after enrichments were created? System shows "content changed" indicator on affected enrichments, suggesting regeneration
 
 ## Requirements *(mandatory)*
 
@@ -202,6 +203,7 @@ Instructors need to see at a glance which lessons have enrichments and their cur
 - **FR-013**: System MUST persist all enrichment data and files for later access
 - **FR-014**: System MUST support cancellation of in-progress enrichment generation
 - **FR-015**: System MUST show "Document" enrichment type as disabled with "Coming Soon" indicator (placeholder for future file upload)
+- **FR-016**: System SHOULD detect when lesson content changes after enrichment generation and display a visual indicator suggesting regeneration
 
 ### Key Entities
 

@@ -36,6 +36,7 @@ import type { RAGChunk } from '@megacampus/shared-types/lesson-content';
 import type { LessonGraphStateType, LessonGraphStateUpdate } from '../state';
 import { createPromptService } from '@/shared/prompts/prompt-service';
 import { formatRAGContextXML, filterChunksForSection } from '@/shared/prompts';
+import { sanitizeMermaidBlocks } from '../utils/mermaid-sanitizer';
 
 // ============================================================================
 // CONSTANTS (reused from expander.ts)
@@ -104,6 +105,25 @@ function formatKeyPointsList(keyPoints: string[]): string {
 }
 
 /**
+ * Estimate tokens from text based on language
+ *
+ * Uses language-specific character-to-token ratios:
+ * - English: 4.0 chars/token
+ * - Russian: 3.2 chars/token (Cyrillic is denser)
+ *
+ * @param text - Text to estimate tokens for
+ * @param language - ISO language code ('en', 'ru')
+ * @returns Estimated token count
+ */
+function estimateTokensFromText(text: string, language: string): number {
+  const multiplier = getTokenMultiplier(language);
+  // Base: 4 chars per token for English, adjusted by language multiplier
+  // Russian multiplier is ~1.3, so: 4 / 1.3 ≈ 3.1 chars/token
+  const charsPerToken = 4 / multiplier;
+  return Math.ceil(text.length / charsPerToken);
+}
+
+/**
  * Parse token usage from ChatOpenAI response metadata
  *
  * Extracts total_tokens from OpenRouter/OpenAI response metadata.
@@ -134,6 +154,39 @@ function extractTokenUsage(response: Awaited<ReturnType<ChatOpenAI['invoke']>>):
     }
   }
   return { tokens: 0, hasMeta: false };
+}
+
+/**
+ * Extract token usage with fallback estimation
+ *
+ * First tries to get actual token count from model response metadata.
+ * If not available (free models often don't report), estimates based on
+ * prompt + response length using language-specific char/token ratios.
+ *
+ * @param response - ChatOpenAI invoke response
+ * @param prompt - Original prompt sent to model
+ * @param language - ISO language code for estimation
+ * @returns Token count (actual or estimated)
+ */
+function extractTokenUsageWithFallback(
+  response: Awaited<ReturnType<ChatOpenAI['invoke']>>,
+  prompt: string,
+  language: string
+): { tokens: number; isEstimated: boolean } {
+  const result = extractTokenUsage(response);
+
+  if (result.hasMeta) {
+    return { tokens: result.tokens, isEstimated: false };
+  }
+
+  // Fallback: estimate from prompt + response content
+  const responseContent = typeof response.content === 'string'
+    ? response.content
+    : JSON.stringify(response.content);
+
+  const estimatedTokens = estimateTokensFromText(prompt + responseContent, language);
+
+  return { tokens: estimatedTokens, isEstimated: true };
 }
 
 /**
@@ -301,11 +354,11 @@ Write in markdown format. Do NOT include a header - just the introduction paragr
       ? response.content
       : JSON.stringify(response.content);
 
-  const tokenResult = extractTokenUsage(response);
-  if (!tokenResult.hasMeta) {
-    logger.warn(
-      { phase: 'introduction' },
-      'Token metadata missing in LLM response - usage tracking may be inaccurate'
+  const tokenResult = extractTokenUsageWithFallback(response, prompt, language);
+  if (tokenResult.isEstimated) {
+    logger.debug(
+      { phase: 'introduction', estimatedTokens: tokenResult.tokens },
+      'Token usage estimated from content length (model did not report usage)'
     );
   }
 
@@ -376,11 +429,11 @@ Write in markdown format. Do NOT include a header - just the summary paragraphs.
       ? response.content
       : JSON.stringify(response.content);
 
-  const tokenResult = extractTokenUsage(response);
-  if (!tokenResult.hasMeta) {
-    logger.warn(
-      { phase: 'summary' },
-      'Token metadata missing in LLM response - usage tracking may be inaccurate'
+  const tokenResult = extractTokenUsageWithFallback(response, prompt, language);
+  if (tokenResult.isEstimated) {
+    logger.debug(
+      { phase: 'summary', estimatedTokens: tokenResult.tokens },
+      'Token usage estimated from content length (model did not report usage)'
     );
   }
 
@@ -396,8 +449,10 @@ Write in markdown format. Do NOT include a header - just the summary paragraphs.
 
 /**
  * Generate a single section with context window
+ *
+ * Exported for use by section-regenerator for partial content fixes.
  */
-async function generateSection(
+export async function generateSection(
   section: SectionSpecV2,
   lessonSpec: LessonSpecificationV2,
   ragChunks: RAGChunk[],
@@ -506,11 +561,11 @@ async function generateSection(
       ? response.content
       : JSON.stringify(response.content);
 
-  const tokenResult = extractTokenUsage(response);
-  if (!tokenResult.hasMeta) {
-    logger.warn(
-      { phase: 'section', sectionTitle: section.title },
-      'Token metadata missing in LLM response - usage tracking may be inaccurate'
+  const tokenResult = extractTokenUsageWithFallback(response, prompt, language);
+  if (tokenResult.isEstimated) {
+    logger.debug(
+      { phase: 'section', sectionTitle: section.title, estimatedTokens: tokenResult.tokens },
+      'Token usage estimated from content length (model did not report usage)'
     );
   }
 
@@ -649,10 +704,37 @@ export async function generatorNode(
       totalTokens += sectionResult.tokensUsed;
       sectionTitles.push(section.title);
 
+      // Sanitize Mermaid blocks to fix escaped quotes
+      // Defensive: if sanitizer fails, use original content to avoid blocking generation
+      let finalContent = sectionResult.content;
+      try {
+        const sanitizeResult = sanitizeMermaidBlocks(sectionResult.content);
+        if (sanitizeResult.modified) {
+          logger.debug(
+            {
+              sectionTitle: section.title,
+              fixes: sanitizeResult.fixes,
+              blocksProcessed: sanitizeResult.blocksProcessed,
+            },
+            'Mermaid syntax sanitized in section'
+          );
+        }
+        finalContent = sanitizeResult.content;
+      } catch (error) {
+        logger.warn(
+          {
+            sectionTitle: section.title,
+            error: error instanceof Error ? error.message : String(error),
+          },
+          'Mermaid sanitizer failed, using unsanitized content'
+        );
+        // Keep original content - self-reviewer will catch issues later
+      }
+
       // Add section to content
       contentParts.push(`## ${section.title}`);
       contentParts.push('');
-      contentParts.push(sectionResult.content);
+      contentParts.push(finalContent);
       contentParts.push('');
 
       // Update accumulated content for next section's context

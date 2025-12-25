@@ -31,8 +31,8 @@ import type {
 export type LessonGraphNode =
   | 'generator'
   | 'selfReviewer'
-  | 'judge'
-  | 'complete';
+  | 'sectionRegenerator'
+  | 'judge';
 
 /**
  * Cost record for a single node execution
@@ -184,6 +184,19 @@ export const LessonGraphState = Annotation.Root({
    * - FLAG_TO_JUDGE: Semantic issues flagged for Judge attention
    */
   selfReviewResult: Annotation<SelfReviewResult | null>({
+    reducer: (x, y) => y ?? x,
+    default: () => null,
+  }),
+
+  /**
+   * Section regeneration result
+   * Populated when specific sections are regenerated instead of full content
+   */
+  sectionRegenerationResult: Annotation<{
+    sectionsRegenerated: string[];
+    tokensUsed: number;
+    durationMs: number;
+  } | null>({
     reducer: (x, y) => y ?? x,
     default: () => null,
   }),

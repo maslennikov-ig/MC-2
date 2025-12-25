@@ -13,10 +13,10 @@
  * Linear workflow with no conditional edges or branching.
  * Each phase updates state immutably and transitions to next phase.
  *
- * RT-001 Model Routing Integration:
- * - Phase 2: qwen3-max (critical) + OSS 120B (non-critical)
- * - Phase 3: OSS 120B (primary) + qwen3-max (escalation) + Gemini (overflow)
- * - Phase 4: Jina-v3 embeddings (95%) + OSS 120B LLM-as-judge (5%)
+ * Model Routing:
+ * - All models are configured via database (llm_model_config table)
+ * - Phase-specific models selected by ModelConfigService
+ * - Fallback to hardcoded defaults only if database unavailable
  *
  * RT-004 Retry Logic:
  * - Tracks retry counts per phase in state.retryCount
@@ -285,10 +285,10 @@ export class GenerationOrchestrator {
    * 3. Validate final state for errors
    * 4. Assemble GenerationResult from finalState
    *
-   * RT-001 Model Routing:
-   * - Metadata: qwen3-max (critical) + OSS 120B (non-critical)
-   * - Sections: OSS 120B (primary) + qwen3-max (escalation)
-   * - Validation: Jina-v3 embeddings (95%) + OSS 120B LLM-as-judge (5%)
+   * Model Routing:
+   * - All models configured via database (llm_model_config table)
+   * - Phase-specific models selected by ModelConfigService
+   * - Fallback to hardcoded defaults only if database unavailable
    *
    * RT-004 Retry Logic:
    * - Implemented in GenerationPhases methods

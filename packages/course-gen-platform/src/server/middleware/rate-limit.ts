@@ -307,7 +307,8 @@ export function createRateLimiter(options: RateLimiterOptions = {}) {
       // Set expiration for automatic cleanup (window size + buffer)
       await redis.expire(redisKey, window + 10);
 
-      logger.debug({
+      // Use trace level to reduce dev log noise (only visible with LOG_LEVEL=trace)
+      logger.trace({
         path,
         identifier,
         currentRequests: currentCount + 1,

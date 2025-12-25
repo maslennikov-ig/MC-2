@@ -2,8 +2,7 @@
  * Stage 4 Analysis - Phase 4: Document Synthesis Service
  *
  * Synthesizes document summaries and analysis outputs into clear generation instructions
- * for Stage 5 (Course Structure Generation). Uses adaptive model selection based on
- * document count (<3 docs → 20B, ≥3 docs → 120B).
+ * for Stage 5 (Course Structure Generation). Model configured via database (llm_model_config table).
  *
  * @module phase-4-synthesis
  */
@@ -73,9 +72,9 @@ interface RawPhase4Output {
  * 1. scope_instructions (100-800 chars) - Clear instructions for Stage 5 Generation
  * 2. content_strategy - How to approach course creation
  *
- * Model selection is adaptive:
- * - <3 documents → 20B model (simple synthesis)
- * - ≥3 documents → 120B model (complex multi-source synthesis)
+ * Model selection:
+ * - Configured via database (llm_model_config table)
+ * - Supports tier-based selection for different document counts
  *
  * @param input - Phase 4 input data
  * @returns Phase4Output with scope_instructions, content_strategy, and metadata
@@ -106,13 +105,11 @@ export async function runPhase4Synthesis(
     0
   ) || 0;
 
-  // Adaptive model selection based on document count
-  // <3 docs → simple synthesis (20B)
-  // ≥3 docs → complex synthesis (120B)
+  // Model selection from database based on phase and tier
   // Language is passed to service which handles 'any' fallback for unknown languages
   const phaseName = documentCount < 3 ? 'stage_4_synthesis' : 'stage_4_expert';
   const model = await getModelForPhase(phaseName, input.course_id, totalTokens, input.language);
-  const modelId = model.model || (documentCount < 3 ? 'openai/gpt-oss-20b' : 'openai/gpt-oss-120b'); // Get modelId from ChatOpenAI instance
+  const modelId = model.model || 'unknown';
 
   // Build synthesis prompt
   const prompt = buildPhase4Prompt(input, documentCount);

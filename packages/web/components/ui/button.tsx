@@ -5,7 +5,7 @@ import { cva, type VariantProps } from "class-variance-authority"
 import { cn } from "@/lib/utils"
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap text-sm font-medium disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg:not([class*='size-'])]:icon-md shrink-0 [&_svg]:shrink-0 btn-interactive focus-ring gpu-accelerated",
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap font-medium disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none shrink-0 [&_svg]:shrink-0 btn-interactive focus-ring gpu-accelerated",
   {
     variants: {
       variant: {
@@ -21,10 +21,21 @@ const buttonVariants = cva(
         link: "text-primary underline-offset-4 hover:underline rounded-none",
       },
       size: {
-        default: "h-10 px-4 py-2 md:h-10 min-h-[44px] md:min-h-[40px]",
-        sm: "h-9 px-3 min-h-[44px] md:min-h-[36px] rounded-md",
-        lg: "h-11 px-8 min-h-[44px] rounded-xl",
-        icon: "h-10 w-10 min-h-[44px] min-w-[44px] md:min-h-[40px] md:min-w-[40px] rounded-lg",
+        // Compact sizes - NO min-height (for dense UIs like toolbars)
+        xs: "h-6 min-h-0 px-2 text-[10px] gap-1 rounded-md [&_svg]:w-3 [&_svg]:h-3",
+        compact: "h-10 min-h-0 px-4 text-sm gap-2 rounded-lg [&_svg]:w-4 [&_svg]:h-4",
+
+        // Touch-friendly sizes - WITH min-height for accessibility
+        sm: "h-8 px-3 text-xs gap-2 min-h-[44px] md:min-h-[32px] rounded-md [&_svg]:w-3.5 [&_svg]:h-3.5",
+        default: "h-10 px-4 text-sm gap-2 min-h-[44px] md:min-h-[40px] rounded-lg [&_svg]:w-4 [&_svg]:h-4",
+        lg: "h-11 px-6 text-base gap-2 min-h-[44px] rounded-xl [&_svg]:w-5 [&_svg]:h-5",
+
+        // Icon sizes - compact
+        "icon-xs": "h-5 w-5 min-h-0 min-w-0 rounded-md [&_svg]:w-2.5 [&_svg]:h-2.5",
+        "icon-sm": "h-7 w-7 min-h-0 min-w-0 rounded-md [&_svg]:w-3.5 [&_svg]:h-3.5",
+        // Icon sizes - touch-friendly
+        icon: "h-10 w-10 min-h-[44px] min-w-[44px] md:min-h-[40px] md:min-w-[40px] rounded-lg [&_svg]:w-4 [&_svg]:h-4",
+        "icon-lg": "h-11 w-11 min-h-[44px] min-w-[44px] rounded-xl [&_svg]:w-5 [&_svg]:h-5",
       },
     },
     defaultVariants: {

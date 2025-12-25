@@ -48,7 +48,7 @@ AnalysisResult -> courses.analysis_result
 
 ### Phase 1: Classifier
 **File:** `phases/phase-1-classifier.ts`
-**Model:** OSS 20B (fast, cost-effective)
+**Model:** Configured via database (llm_model_config table)
 
 **Purpose:** Categorize course and generate contextual language elements.
 
@@ -68,7 +68,7 @@ AnalysisResult -> courses.analysis_result
 
 ### Phase 2: Scope
 **File:** `phases/phase-2-scope.ts`
-**Model:** OSS 20B
+**Model:** Configured via database (llm_model_config table)
 
 **Purpose:** Define course structure and content distribution.
 
@@ -93,7 +93,7 @@ AnalysisResult -> courses.analysis_result
 
 ### Phase 3: Expert
 **File:** `phases/phase-3-expert.ts`
-**Model:** OSS 120B (complex pedagogical reasoning)
+**Model:** Configured via database (llm_model_config table)
 
 **Purpose:** Generate pedagogical strategy and identify knowledge gaps.
 
@@ -112,7 +112,7 @@ AnalysisResult -> courses.analysis_result
 
 ### Phase 4: Synthesis
 **File:** `phases/phase-4-synthesis.ts`
-**Model:** Adaptive (20B for <3 docs, 120B for 3+ docs)
+**Model:** Configured via database (supports tier-based selection)
 
 **Purpose:** Synthesize all analysis into generation instructions.
 
@@ -156,7 +156,7 @@ AnalysisResult -> courses.analysis_result
 
 ### Phase 6: RAG Planning
 **File:** `phases/phase-6-rag-planning.ts`
-**Model:** OSS 20B
+**Model:** Configured via database (llm_model_config table)
 **Condition:** Only runs if documents exist
 
 **Purpose:** Pre-map documents to sections for efficient RAG in Stage 5.
@@ -248,7 +248,7 @@ interface AnalysisResult {
 ## Dependencies
 
 ### External Services
-- **OpenRouter API:** LLM completion (gpt-oss-20b, gpt-oss-120b)
+- **OpenRouter API:** LLM completion (models configured via database)
 - **Jina Embeddings:** Semantic validation (optional, Phase 6)
 
 ### Internal Modules
@@ -271,7 +271,7 @@ When LLM output fails JSON parsing or schema validation:
 1. **Layer 1: Auto-Repair** - Regex-based JSON fixes (no LLM)
 2. **Layer 2: Critique-Revise** - LLM critiques and fixes output
 3. **Layer 3: Partial Regeneration** - Regenerate failed fields only
-4. **Layer 4: Model Escalation** - Upgrade to 120B model
+4. **Layer 4: Model Escalation** - Upgrade to higher-tier model
 5. **Layer 5: Emergency** - Hardcoded sensible defaults
 
 **Stage 4 Special:** `allowWarningFallback: true` for advisory fields
@@ -292,24 +292,17 @@ When LLM output fails JSON parsing or schema validation:
 # OpenRouter API
 OPENROUTER_API_KEY=sk-or-...
 
-# Model Selection
-ANALYSIS_MODEL_LIGHT=openai/gpt-oss-20b
-ANALYSIS_MODEL_HEAVY=openai/gpt-oss-120b
-
 # Quality Settings
 ANALYSIS_QUALITY_THRESHOLD=0.75
 ```
 
-### Phase Model Mapping
+### Model Configuration
 
-| Phase | Default Model | Condition |
-|-------|--------------|-----------|
-| Phase 1 | gpt-oss-20b | Always |
-| Phase 2 | gpt-oss-20b | Always |
-| Phase 3 | gpt-oss-120b | Complex reasoning |
-| Phase 4 | gpt-oss-20b | <3 docs |
-| Phase 4 | gpt-oss-120b | 3+ docs |
-| Phase 6 | gpt-oss-20b | Documents exist |
+All models are configured via database (`llm_model_config` table).
+Admin panel allows per-phase model selection with fallback hierarchy:
+1. Phase-specific config
+2. Global default config
+3. Hardcoded emergency fallback
 
 ---
 
@@ -384,13 +377,6 @@ Tracks phase execution metrics:
 ---
 
 ## Cost Tracking
-
-### Model Pricing (per 1M tokens)
-
-| Model | Input | Output |
-|-------|-------|--------|
-| gpt-oss-20b | $0.03 | $0.14 |
-| gpt-oss-120b | $0.04 | $0.18 |
 
 ### Average Analysis Costs
 

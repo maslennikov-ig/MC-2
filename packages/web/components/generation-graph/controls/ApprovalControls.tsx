@@ -114,6 +114,7 @@ export const ApprovalControls = ({
     return (
       <div className={cn('flex items-center gap-3', className)}>
         <Button
+          size="compact"
           onClick={handleApprove}
           disabled={isProcessing || isRestarting}
           className={cn(
@@ -126,16 +127,14 @@ export const ApprovalControls = ({
             'dark:hover:from-purple-500 dark:hover:to-indigo-600',
             'dark:shadow-purple-500/40',
             // Disabled state
-            'disabled:opacity-50 disabled:cursor-not-allowed',
-            // Sizing
-            'h-10 px-6'
+            'disabled:opacity-50 disabled:cursor-not-allowed'
           )}
           data-testid="approval-approve-btn"
         >
           {isProcessing && action === 'approve' ? (
-            <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            <Loader2 size={14} className="mr-1.5 animate-spin" />
           ) : (
-            <Rocket className="w-4 h-4 mr-2" />
+            <Rocket size={14} className="mr-1.5" />
           )}
           {approveText || t('actions.approveAndContinue') || 'Подтвердить и продолжить'}
         </Button>
@@ -156,12 +155,12 @@ export const ApprovalControls = ({
           >
             {isRegenerating ? (
               <>
-                <Loader2 className="w-3 h-3 animate-spin" />
+                <Loader2 size={14} className="animate-spin" />
                 {t('actions.regenerating') || 'Перегенерация...'}
               </>
             ) : (
               <>
-                <RotateCcw className="w-3 h-3" />
+                <RotateCcw size={14} />
                 {t('actions.regenerate') || 'Перегенерировать'}
               </>
             )}
@@ -176,7 +175,7 @@ export const ApprovalControls = ({
     <div className={cn('flex gap-2', className)}>
       <Button
         variant="outline"
-        size="sm"
+        size="compact"
         onClick={handleApprove}
         disabled={isProcessing || isRestarting}
         className={cn(
@@ -188,9 +187,9 @@ export const ApprovalControls = ({
         data-testid="approval-approve-btn"
       >
         {isProcessing && action === 'approve' ? (
-          <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+          <Loader2 size={14} className="mr-1 animate-spin" />
         ) : (
-          <Check className="w-4 h-4 mr-1" />
+          <Check size={14} className="mr-1" />
         )}
         {t('actions.approve')}
       </Button>
@@ -198,7 +197,7 @@ export const ApprovalControls = ({
       {showRegenerate && (
         <Button
           variant="outline"
-          size="sm"
+          size="compact"
           onClick={handleRegenerate}
           disabled={isProcessing || isRestarting}
           className={cn(
@@ -210,9 +209,9 @@ export const ApprovalControls = ({
           data-testid="approval-regenerate-btn"
         >
           {isRegenerating ? (
-            <Loader2 className="w-4 h-4 mr-1 animate-spin" />
+            <Loader2 size={14} className="mr-1 animate-spin" />
           ) : (
-            <RotateCcw className="w-4 h-4 mr-1" />
+            <RotateCcw size={14} className="mr-1" />
           )}
           {t('actions.regenerate') || 'Перегенерировать'}
         </Button>

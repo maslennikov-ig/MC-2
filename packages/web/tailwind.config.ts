@@ -99,7 +99,7 @@ const config: Config = {
         mono: ['var(--font-mono)', 'SFMono-Regular', 'Menlo', 'Monaco', 'Consolas', 'Liberation Mono', 'monospace'],
       },
 
-      // Consistent spacing system (8px base)
+      // Consistent spacing system (4px base via --spacing CSS variable)
       spacing: {
         '0': '0',
         'px': '1px',

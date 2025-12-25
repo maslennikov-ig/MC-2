@@ -3,6 +3,7 @@ import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '
 import { TraceViewer } from '@/components/generation-monitoring/trace-viewer';
 import { GenerationTimeline } from '@/components/generation-monitoring/generation-timeline';
 import { useGenerationRealtime } from '@/components/generation-monitoring/realtime-provider';
+import { useFullscreenContext } from '../contexts/FullscreenContext';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { X } from 'lucide-react';
@@ -14,6 +15,7 @@ interface AdminPanelProps {
 
 export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
   const { traces } = useGenerationRealtime();
+  const { portalContainerRef } = useFullscreenContext();
   const [stageFilter, setStageFilter] = useState<string>('all');
   const [statusFilter, setStatusFilter] = useState<string>('all');
 
@@ -27,7 +29,12 @@ export const AdminPanel: React.FC<AdminPanelProps> = ({ isOpen, onClose }) => {
 
   return (
     <Sheet open={isOpen} onOpenChange={(open) => !open && onClose()}>
-      <SheetContent side="left" className="w-[90vw] sm:max-w-[1000px] p-0 flex flex-col bg-white dark:bg-slate-900" data-testid="admin-panel">
+      <SheetContent
+        side="left"
+        className="w-[90vw] sm:max-w-[1000px] p-0 flex flex-col bg-white dark:bg-slate-900"
+        container={portalContainerRef.current}
+        data-testid="admin-panel"
+      >
         <SheetHeader className="p-6 border-b border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-800">
           <div className="flex justify-between items-center pr-8">
               <div>

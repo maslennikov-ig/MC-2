@@ -44,6 +44,7 @@ import { cn } from '@/lib/utils';
 import { getPresetConfig } from './presets';
 import { ResponsiveTable } from './components/ResponsiveTable';
 import { Link } from './components/Link';
+import { MermaidDiagram } from './components/MermaidDiagram';
 import type { PresetName, FeatureFlags } from './types';
 import type { Components } from 'react-markdown';
 
@@ -110,6 +111,63 @@ function extractLanguage(className?: string): string | undefined {
   if (!className) return undefined;
   const match = className.match(/language-(\w+)/);
   return match ? match[1] : undefined;
+}
+
+/**
+ * Mermaid diagram type keywords that appear at the start of diagrams
+ */
+const MERMAID_KEYWORDS = [
+  'flowchart',
+  'graph',
+  'sequenceDiagram',
+  'classDiagram',
+  'stateDiagram',
+  'erDiagram',
+  'journey',
+  'gantt',
+  'pie',
+  'quadrantChart',
+  'requirementDiagram',
+  'gitGraph',
+  'mindmap',
+  'timeline',
+  'sankey',
+  'xychart',
+  'block-beta',
+];
+
+/**
+ * Detects if content is likely a Mermaid diagram by checking for diagram type keywords
+ * Used as fallback when code block doesn't have explicit ```mermaid language tag
+ */
+function isMermaidContent(content: string): boolean {
+  const trimmed = content.trim();
+  return MERMAID_KEYWORDS.some((keyword) =>
+    trimmed.startsWith(keyword) || trimmed.startsWith(`${keyword} `) || trimmed.startsWith(`${keyword}\n`)
+  );
+}
+
+/**
+ * Extract text content from React children (handles strings, arrays, and nested elements)
+ * Used to get code block content regardless of how react-markdown structures the children
+ */
+function extractTextFromChildren(children: React.ReactNode): string {
+  if (typeof children === 'string') {
+    return children;
+  }
+  if (typeof children === 'number') {
+    return String(children);
+  }
+  if (Array.isArray(children)) {
+    return children.map(extractTextFromChildren).join('');
+  }
+  if (React.isValidElement(children)) {
+    const props = children.props as { children?: React.ReactNode };
+    if (props.children) {
+      return extractTextFromChildren(props.children);
+    }
+  }
+  return '';
 }
 
 /**
@@ -188,7 +246,8 @@ export function MarkdownRendererFull({
   // Build rehype plugins array based on config
   const rehypePlugins: React.ComponentProps<typeof Markdown>['rehypePlugins'] = [];
   if (config.math) {
-    rehypePlugins.push(rehypeKatex);
+    // Configure KaTeX to ignore Unicode text warnings (e.g., Cyrillic characters in math mode)
+    rehypePlugins.push([rehypeKatex, { strict: 'ignore' }]);
   }
 
   // Build custom components based on config
@@ -214,20 +273,36 @@ export function MarkdownRendererFull({
 
     // Custom code block with syntax highlighting classes and copy button
     pre: ({ children }) => {
-      // Extract code content for copy button
-      const codeElement = React.Children.toArray(children).find(
-        (child): child is React.ReactElement<{ children?: string; className?: string }> =>
-          React.isValidElement(child) && child.type === 'code'
+      // Extract code element from children (try multiple detection methods)
+      const childArray = React.Children.toArray(children);
+      const codeElement = childArray.find(
+        (child): child is React.ReactElement<{ children?: React.ReactNode; className?: string }> => {
+          if (!React.isValidElement(child)) return false;
+          // Check for 'code' element type (string or symbol)
+          const type = child.type;
+          if (type === 'code') return true;
+          if (typeof type === 'string' && type.toLowerCase() === 'code') return true;
+          // Check displayName for component functions
+          if (typeof type === 'function' && (type as { displayName?: string }).displayName === 'code') return true;
+          return false;
+        }
       );
 
       const codeProps = codeElement?.props;
-      const codeString =
-        codeProps && typeof codeProps.children === 'string'
-          ? codeProps.children
-          : '';
+      // Use robust text extraction that handles strings, arrays, and nested elements
+      // Fallback to extracting from all children if no code element found
+      const codeString = codeProps?.children
+        ? extractTextFromChildren(codeProps.children)
+        : extractTextFromChildren(children);
 
       const codeClassName = codeProps?.className;
       const language = extractLanguage(codeClassName);
+
+      // Handle Mermaid diagrams when feature is enabled
+      // Check explicit language tag OR detect by content pattern (fallback for LLM-generated content)
+      if (config.mermaid && (language === 'mermaid' || (!language && isMermaidContent(codeString)))) {
+        return <MermaidDiagram chart={codeString.trim()} />;
+      }
 
       return (
         <figure className="code-block group not-prose my-6" data-language={language}>

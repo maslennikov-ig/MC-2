@@ -236,6 +236,49 @@ FIX_TEMPLATE_STRATEGIES = {
 
 ---
 
+## Mermaid Fix Pipeline (3-Layer Defense)
+
+**Добавлено в v0.26.x**
+
+LLM часто генерируют некорректный синтаксис Mermaid, особенно escaped quotes (`\"`) которые ломают рендеринг.
+Система реализует 3-уровневую защиту:
+
+### Layer 1: Prevention (Prompt Instructions)
+
+Файл: `src/shared/prompts/prompt-registry.ts`
+
+Инструкции в промпте явно запрещают использование escaped quotes в Mermaid диаграммах.
+
+### Layer 2: Auto-Fix (Sanitizer)
+
+Файл: `src/stages/stage6-lesson-content/utils/mermaid-sanitizer.ts`
+
+Автоматически удаляет `\"` из Mermaid блоков после генерации:
+
+```typescript
+import { sanitizeMermaidBlocks } from './utils/mermaid-sanitizer';
+
+const result = sanitizeMermaidBlocks(content);
+// result.content - очищенный контент
+// result.modified - были ли изменения
+// result.fixes - детали примененных исправлений
+```
+
+### Layer 3: Detection (Heuristic Filter)
+
+Файл: `judge/heuristic-filter.ts` (функция `checkMermaidSyntax()`)
+
+Обнаруживает оставшиеся проблемы Mermaid и направляет их:
+- **CRITICAL severity** → запускает `REGENERATE` (дешевая модель)
+- НЕ отправляется в Judge (дорогие модели)
+
+### Ключевое архитектурное решение
+
+Проблемы Mermaid имеют `severity: CRITICAL` что запускает `REGENERATE`, а НЕ `FLAG_TO_JUDGE`.
+Это позволяет избежать дорогих вызовов Judge для легко исправимых синтаксических ошибок.
+
+---
+
 ## Дополнительные компоненты
 
 ### Entropy-based Hallucination Detection
@@ -265,7 +308,19 @@ ENTROPY_THRESHOLDS = {
 - Минимальная длина контента
 - Наличие всех обязательных секций
 - Базовая структурная валидация
-- Отсеивает 15-20% явно некачественного контента
+- **Mermaid синтаксис** (escaped quotes, unclosed brackets)
+- Языковая консистентность (Unicode script detection)
+- Обнаружение truncation (неполные предложения)
+- Отсеивает 30-50% явно некачественного контента
+
+**Маршрутизация по severity:**
+
+| Severity | Action | Описание |
+|----------|--------|----------|
+| `CRITICAL` (Mermaid, truncation) | `REGENERATE` | Дешевая модель для регенерации |
+| `COMPLEX` (factual, major) | `FLAG_TO_JUDGE` | Полная оценка Judge |
+| `FIXABLE` (clarity, tone) | `SURGICAL_EDIT` | Patcher применяет точечное исправление |
+| `INFO` (minor observations) | Pass through | Без действий |
 
 ### Prompt Cache
 
@@ -300,24 +355,89 @@ ENTROPY_THRESHOLDS = {
 
 ---
 
+## Targeted Refinement (Best-Effort Fallback)
+
+**Добавлено в v0.26.x**
+
+Система targeted refinement применяет хирургические исправления к конкретным секциям вместо полной регенерации.
+
+### Конфигурация
+
+```typescript
+REFINEMENT_CONFIG = {
+  limits: {
+    maxIterations: 3,      // Максимум итераций уточнения
+    maxTokens: 15000,      // Бюджет токенов
+    timeoutMs: 300000,     // 5 минут таймаут
+  },
+  quality: {
+    regressionTolerance: 0.05,    // 5% допуск на регрессию
+    sectionLockAfterEdits: 2,     // Блокировка секции после 2 правок
+    convergenceThreshold: 0.02,   // 2% порог улучшения
+  },
+}
+```
+
+### Best-Effort Fallback
+
+Когда достигнут максимум итераций без достижения порога:
+- Возвращает итерацию с **НАИВЫСШИМ score** (не оригинал)
+- Включает `improvementHints` извлеченные из нерешенных issues
+- Устанавливает `qualityStatus`: 'good' | 'acceptable' | 'below_standard'
+
+### Модель Patcher
+
+Patcher использует БЕСПЛАТНУЮ модель: `xiaomi/mimo-v2-flash:free`
+Это минимизирует стоимость уточнений при сохранении качества.
+
+### Блокировка секций
+
+После 2 правок секция блокируется для предотвращения осцилляции.
+Это предотвращает бесконечные циклы исправлений.
+
+---
+
 ## Файловая структура
 
 ```
-packages/course-gen-platform/src/stages/stage6-lesson-content/judge/
-├── clev-voter.ts           # CLEV voting orchestration, model selection
-├── cascade-evaluator.ts    # Cascade evaluation (heuristics → single → CLEV)
-├── decision-engine.ts      # Score-based decision tree
-├── refinement-loop.ts      # Iterative refinement orchestration
-├── fix-templates.ts        # Fix template generation per criterion
-├── entropy-detector.ts     # Hallucination detection via logprob entropy
-├── factual-verifier.ts     # RAG-based factual verification
-├── heuristic-filter.ts     # Pre-LLM structural validation
-├── review-queue.ts         # Human review queue service
-└── prompt-cache.ts         # Prompt caching for optimization
+packages/course-gen-platform/src/stages/stage6-lesson-content/
+├── utils/
+│   └── mermaid-sanitizer.ts     # Layer 2: Auto-fix Mermaid syntax
+├── judge/
+│   ├── clev-voter.ts            # CLEV voting orchestration, model selection
+│   ├── cascade-evaluator.ts     # Cascade evaluation (heuristics → single → CLEV)
+│   ├── decision-engine.ts       # Score-based decision tree
+│   ├── heuristic-filter.ts      # Pre-LLM validation + Mermaid check (Layer 3)
+│   ├── entropy-detector.ts      # Hallucination detection via logprob entropy
+│   ├── factual-verifier.ts      # RAG-based factual verification
+│   ├── review-queue.ts          # Human review queue service
+│   ├── prompt-cache.ts          # Prompt caching for optimization
+│   ├── self-reviewer/           # Self-review node
+│   │   └── self-reviewer-prompt.ts
+│   ├── patcher/                 # Targeted refinement: surgical edits
+│   │   ├── index.ts
+│   │   └── patcher-prompt.ts
+│   ├── section-expander/        # Targeted refinement: section regeneration
+│   │   ├── index.ts
+│   │   └── expander-prompt.ts
+│   ├── verifier/                # Delta Judge verification
+│   │   ├── delta-judge.ts
+│   │   └── quality-lock.ts
+│   ├── arbiter/                 # Judge consensus consolidation
+│   │   ├── consolidate-verdicts.ts
+│   │   ├── conflict-resolver.ts
+│   │   └── krippendorff.ts
+│   ├── router/                  # Fix action routing
+│   │   └── route-task.ts
+│   └── targeted-refinement/     # Main refinement orchestration
+│       ├── index.ts
+│       ├── orchestrator.ts
+│       ├── iteration-controller.ts
+│       └── best-effort-selector.ts
 
 packages/shared-types/src/
-├── judge-rubric.ts         # OSCQR rubric types and weights
-└── judge-types.ts          # JudgeVerdict, JudgeIssue, etc.
+├── judge-rubric.ts              # OSCQR rubric types and weights
+└── judge-types.ts               # JudgeVerdict, JudgeIssue, refinement types
 ```
 
 ---
@@ -330,4 +450,17 @@ packages/shared-types/src/
 
 ---
 
-**Последнее обновление**: 2025-11-22
+## Тестовое покрытие
+
+Stage 6 имеет обширное тестовое покрытие:
+
+| Тест | Кол-во | Описание |
+|------|--------|----------|
+| `mermaid-sanitizer.test.ts` | 20 | Unit тесты Mermaid sanitizer |
+| `mermaid-fix-pipeline.e2e.test.ts` | 27 | E2E pipeline с реальными данными БД |
+| `targeted-refinement-cycle.e2e.test.ts` | 23 | Полный цикл targeted refinement E2E |
+| Всего Stage 6 | 262+ | Все проходят |
+
+---
+
+**Последнее обновление**: 2025-12-25

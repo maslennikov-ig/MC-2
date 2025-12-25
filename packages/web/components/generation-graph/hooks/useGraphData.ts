@@ -150,6 +150,48 @@ export function useGraphData(options: UseGraphDataOptions = {}) {
   }, []);
 
   /**
+   * Initialize Stage 2 documents from database (file_catalog + generation_trace).
+   * Called on page load to populate documentSteps before realtime traces arrive.
+   */
+  const initializeDocumentsFromDb = useCallback((
+    documents: Array<{
+      id: string;
+      name: string;
+      status: NodeStatus;
+      priority?: 'CORE' | 'IMPORTANT' | 'SUPPLEMENTARY';
+    }>
+  ) => {
+    if (documents.length === 0) return;
+
+    setDocumentSteps(prevDocs => {
+      // Only initialize if empty
+      if (prevDocs.size > 0) return prevDocs;
+
+      const nextDocs = new Map<string, DocumentWithSteps>();
+
+      documents.forEach(doc => {
+        // Create a basic document entry with a single "complete" step
+        // This allows the graph to render document nodes
+        nextDocs.set(doc.id, {
+          id: doc.id,
+          name: doc.name,
+          priority: doc.priority,
+          steps: [{
+            id: `${doc.id}_complete`,
+            stepName: doc.status === 'completed' ? 'Обработан' : 'Обработка',
+            status: doc.status,
+            traceId: '',
+            timestamp: Date.now(),
+            attempts: [],
+          }],
+        });
+      });
+
+      return nextDocs;
+    });
+  }, []);
+
+  /**
    * Update lesson statuses from completed lesson IDs.
    */
   const updateLessonStatuses = useCallback((completedLessonLabels: string[]) => {
@@ -362,6 +404,7 @@ export function useGraphData(options: UseGraphDataOptions = {}) {
     onEdgesChange,
     processTraces,
     initializeFromCourseStructure,
+    initializeDocumentsFromDb,
     updateLessonStatuses,
     setNodes,
     setEdges,

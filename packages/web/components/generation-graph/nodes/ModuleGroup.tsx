@@ -1,5 +1,5 @@
-import React, { memo, useRef } from 'react';
-import { Handle, Position, NodeProps, useReactFlow, useViewport } from '@xyflow/react';
+import React, { memo, useRef, useEffect } from 'react';
+import { Handle, Position, NodeProps, useReactFlow, useViewport, useUpdateNodeInternals } from '@xyflow/react';
 import { RFModuleNode } from '../types';
 import { ChevronDown, ChevronRight, Layers, Play, RefreshCw, Loader2, Check } from 'lucide-react';
 import { motion } from 'framer-motion';
@@ -91,10 +91,24 @@ const ModuleGroup = ({ id, data, selected }: NodeProps<RFModuleNode>) => {
   const { setNodes } = useReactFlow();
   const { zoom } = useViewport();
   const { selectNode } = useNodeSelection();
+  const updateNodeInternals = useUpdateNodeInternals();
 
   // Double-click detection via timing (React Flow captures onDoubleClick)
   const lastClickTime = useRef(0);
   const DOUBLE_CLICK_THRESHOLD = 300; // ms
+
+  // Track zoom mode for semantic zoom - notify React Flow when node dimensions change
+  // This ensures edges are recalculated when crossing zoom thresholds
+  const prevZoomModeRef = useRef<'minimal' | 'medium' | 'full'>('full');
+  const currentZoomMode = zoom < 0.3 ? 'minimal' : zoom < 0.5 ? 'medium' : 'full';
+
+  useEffect(() => {
+    if (prevZoomModeRef.current !== currentZoomMode) {
+      prevZoomModeRef.current = currentZoomMode;
+      // Notify React Flow to recalculate node dimensions and edge positions
+      updateNodeInternals(id);
+    }
+  }, [currentZoomMode, id, updateNodeInternals]);
 
   // Subscribe to realtime status updates - MUST be called before any conditional returns (Rules of Hooks)
   const statusEntry = useNodeStatus(id);

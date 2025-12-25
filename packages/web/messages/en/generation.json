@@ -243,5 +243,32 @@
     "view": "View",
     "confirming": "Confirming...",
     "awaitingStatus": "Awaiting"
+  },
+  "stats": {
+    "documents": "Documents",
+    "documentsShort": "Doc",
+    "documentsTooltip": "Uploaded documents",
+    "modules": "Modules",
+    "modulesShort": "mod",
+    "modulesTooltip": "Number of modules in course",
+    "lessons": "Lessons",
+    "lessonsTooltip": "Lesson generation progress",
+    "time": "Time",
+    "timeTooltip": "Generation time",
+    "steps": "Steps",
+    "stepsTooltip": "Generation stage",
+    "processing": "Processing",
+    "none": "None",
+    "analyzing": "Analyzing...",
+    "completed": "Complete",
+    "inProgress": "In Progress",
+    "allCompleted": "All Complete",
+    "step": "Step {number}",
+    "hasDocuments": "Documents uploaded",
+    "noDocuments": "No documents uploaded"
+  },
+  "header": {
+    "missionProgress": "Mission Progress",
+    "noConnection": "No Connection"
   }
 }

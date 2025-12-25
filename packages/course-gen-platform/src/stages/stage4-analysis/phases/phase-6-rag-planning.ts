@@ -2,7 +2,7 @@
  * Phase 6: RAG Planning Service
  *
  * Generates document-to-section relevance mapping for RAG-based lesson generation.
- * Uses 20B model (lightweight mapping task) with English-only output.
+ * Uses database-configured model (lightweight mapping task) with English-only output.
  *
  * Core Tasks:
  * 1. Map documents to relevant sections (primary_documents per section)
@@ -15,7 +15,7 @@
  * - Generation (Stage 5) uses mapping to skip Planning LLM entirely
  * - Only queries relevant documents per section (targeted RAG)
  *
- * Model: OSS 20B (simple mapping task, cost-effective)
+ * Model: Configured via database (llm_model_config table)
  * Output Language: Always English (regardless of input language)
  * Quality: Semantic similarity validation with 0.75 threshold
  *
@@ -390,15 +390,15 @@ export async function runPhase6RagPlanning(input: Phase6Input): Promise<Phase6Ou
     };
   }
 
-  const maxRetries = 2; // 2 attempts with 20B, then escalate to 120B
+  const maxRetries = 2; // 2 attempts, then escalate to emergency model
   let retryCount = 0;
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
-      // Get appropriate model (20B for first attempts, escalate if needed)
+      // Get appropriate model from database (escalate to emergency if needed)
       const phaseName = attempt < maxRetries ? 'stage_6_rag_planning' : 'emergency';
       const model = await getModelForPhase(phaseName);
-      const modelId = model.model || 'openai/gpt-oss-20b';
+      const modelId = model.model || 'unknown';
 
       // Track execution with observability
       const result = await trackPhaseExecution(

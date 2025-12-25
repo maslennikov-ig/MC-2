@@ -1,12 +1,11 @@
-import React, { memo, useRef, useMemo } from 'react';
-import { Handle, Position, NodeProps, useReactFlow, useViewport } from '@xyflow/react';
+import React, { memo, useRef, useMemo, useEffect } from 'react';
+import { Handle, Position, NodeProps, useReactFlow, useViewport, useUpdateNodeInternals } from '@xyflow/react';
 import { RFStage2GroupNode } from '../types';
 import { ChevronDown, ChevronRight, FileStack } from 'lucide-react';
 import { motion } from 'framer-motion';
 import {
   getNodeStatusStyles,
-  getStatusColor,
-  getStatusBorderClass
+  getStatusColor
 } from '../hooks/useNodeStatusStyles';
 import { useNodeStatus } from '../hooks/useNodeStatus';
 import { useNodeSelection } from '../hooks/useNodeSelection';
@@ -96,10 +95,24 @@ const Stage2Group = ({ id, data, selected }: NodeProps<RFStage2GroupNode>) => {
   const { setNodes } = useReactFlow();
   const { zoom } = useViewport();
   const { selectNode } = useNodeSelection();
+  const updateNodeInternals = useUpdateNodeInternals();
 
   // Double-click detection via timing (React Flow captures onDoubleClick)
   const lastClickTime = useRef(0);
   const DOUBLE_CLICK_THRESHOLD = 300; // ms
+
+  // Track zoom mode for semantic zoom - notify React Flow when node dimensions change
+  // This ensures edges are recalculated when crossing zoom thresholds
+  const prevZoomModeRef = useRef<'minimal' | 'medium' | 'full'>('full');
+  const currentZoomMode = zoom < 0.3 ? 'minimal' : zoom < 0.5 ? 'medium' : 'full';
+
+  useEffect(() => {
+    if (prevZoomModeRef.current !== currentZoomMode) {
+      prevZoomModeRef.current = currentZoomMode;
+      // Notify React Flow to recalculate node dimensions and edge positions
+      updateNodeInternals(id);
+    }
+  }, [currentZoomMode, id, updateNodeInternals]);
 
   // Subscribe to realtime status updates - MUST be called before any conditional returns (Rules of Hooks)
   const statusEntry = useNodeStatus(id);
@@ -215,8 +228,19 @@ const Stage2Group = ({ id, data, selected }: NodeProps<RFStage2GroupNode>) => {
           animate={{ opacity: 1, scale: 1 }}
           transition={{ duration: 0.3 }}
           className={`
-            relative w-[300px] min-h-[90px] rounded-md border transition-all duration-300
-            ${getStatusBorderClass(currentStatus)}
+            relative w-[300px] min-h-[90px] rounded-md border-2 transition-all duration-300
+            ${currentStatus === 'active'
+              ? 'border-blue-400 dark:border-blue-500 bg-blue-50/50 dark:bg-blue-900/20 shadow-[0_0_10px_rgba(59,130,246,0.3)] animate-pulse'
+              : currentStatus === 'completed'
+              ? 'border-emerald-400 dark:border-emerald-500 bg-emerald-50/50 dark:bg-emerald-900/20'
+              : currentStatus === 'error'
+              ? 'border-red-400 dark:border-red-500 bg-red-50/50 dark:bg-red-900/20'
+              : currentStatus === 'awaiting'
+              ? 'border-yellow-400 dark:border-yellow-500 bg-yellow-50/50 dark:bg-yellow-900/20'
+              : currentStatus === 'skipped'
+              ? 'border-slate-300 dark:border-slate-600 bg-slate-100/50 dark:bg-slate-800/50 opacity-60'
+              : 'border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 opacity-70'
+            }
             ${selected ? 'ring-2 ring-offset-2 ring-blue-400' : ''}
           `}
           data-testid={`node-stage2group-${id}`}

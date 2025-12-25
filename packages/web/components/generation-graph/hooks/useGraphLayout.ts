@@ -169,14 +169,30 @@ export function useGraphLayout() {
     });
 
     // Position child nodes RELATIVE to their parents (0,0 = parent's top-left)
-    childrenByParent.forEach((children) => {
+    childrenByParent.forEach((children, parentId) => {
+      // Find parent node to determine type
+      const parent = layoutedNodes.find(n => n.id === parentId);
+      const isStage2Group = parent?.type === 'stage2group';
+
+      // Use appropriate config based on parent type
+      const config = isStage2Group ? {
+        headerHeight: STAGE2_LAYOUT_CONFIG.CONTAINER_HEADER_HEIGHT,
+        itemHeight: STAGE2_LAYOUT_CONFIG.DOCUMENT_HEIGHT,
+        itemGap: STAGE2_LAYOUT_CONFIG.DOCUMENT_GAP,
+        padding: STAGE2_LAYOUT_CONFIG.CONTAINER_PADDING,
+      } : {
+        headerHeight: LAYOUT_CONFIG.MODULE_HEADER_HEIGHT,
+        itemHeight: LAYOUT_CONFIG.LESSON_HEIGHT,
+        itemGap: LAYOUT_CONFIG.LESSON_GAP,
+        padding: LAYOUT_CONFIG.MODULE_PADDING,
+      };
+
       children.forEach((child, index) => {
         layoutedNodes.push({
           ...child,
           position: {
-            x: LAYOUT_CONFIG.MODULE_PADDING,
-            y: LAYOUT_CONFIG.MODULE_HEADER_HEIGHT +
-               (index * (LAYOUT_CONFIG.LESSON_HEIGHT + LAYOUT_CONFIG.LESSON_GAP)),
+            x: config.padding,
+            y: config.headerHeight + (index * (config.itemHeight + config.itemGap)),
           },
         });
       });
@@ -340,16 +356,37 @@ export function useGraphLayout() {
       return getNodeDimensions(node);
     };
 
-    // 1. Create ELK nodes (top-level only) with priority for ordering
+    // 1. Create ELK nodes (top-level only) with layout options per node type
     topLevelNodes.forEach((node, index) => {
+      // Determine per-node layout options for optimal alignment
+      let nodeLayoutOptions: Record<string, string> | undefined;
+
+      if (node.type === 'stage' || node.type === 'stage2group') {
+        // Stage nodes: high priority to stay centered in the main flow
+        // Use alignment CENTER to keep the main pipeline horizontal
+        nodeLayoutOptions = {
+          'elk.alignment': 'CENTER',
+          'elk.layered.priority': '2000', // Highest priority for main pipeline
+        };
+      } else if (node.type === 'module') {
+        // Modules: stack vertically, will be aligned in post-processing
+        nodeLayoutOptions = {
+          'elk.alignment': 'TOP', // Align from top for consistent vertical stacking
+          'elk.layered.priority': String(1000 - index), // Preserve module order
+        };
+      } else if (node.type === 'merge' || node.type === 'end') {
+        // Merge/End nodes: center alignment to match main flow
+        nodeLayoutOptions = {
+          'elk.alignment': 'CENTER',
+          'elk.layered.priority': '1500',
+        };
+      }
+
       const elkNode: ElkNode = {
         id: node.id,
         ...getModuleDimensions(node),
         children: [], // Children will be positioned in Phase 2
-        // Set priority based on order in sorted array (higher = placed first/top)
-        layoutOptions: node.type === 'module' ? {
-          'elk.layered.priority': String(1000 - index), // Higher priority = higher position
-        } : undefined,
+        layoutOptions: nodeLayoutOptions,
       };
       elkNodesMap.set(node.id, elkNode);
     });
@@ -379,22 +416,46 @@ export function useGraphLayout() {
       layoutOptions: {
         'elk.algorithm': 'layered',
         'elk.direction': 'RIGHT',
-        // Spacing between layers (horizontal) and nodes (vertical)
-        'elk.layered.spacing.nodeNodeBetweenLayers': '120',
-        'elk.spacing.nodeNode': '40',
-        // CRITICAL: Preserve model order from children array
-        'elk.layered.considerModelOrder.strategy': 'NODES_AND_EDGES',
-        // Use LINEAR_SEGMENTS for better vertical ordering based on priority
-        'elk.layered.nodePlacement.strategy': 'LINEAR_SEGMENTS',
-        // Center alignment for nodes within each layer
-        'elk.contentAlignment': 'V_CENTER',
-        // Minimize edge crossings while respecting model order
+
+        // === SPACING ===
+        // Horizontal spacing between layers (stages)
+        'elk.layered.spacing.nodeNodeBetweenLayers': '100',
+        // Vertical spacing between nodes in same layer (modules)
+        'elk.spacing.nodeNode': '30',
+        // Edge spacing for cleaner routing
+        'elk.layered.spacing.edgeNodeBetweenLayers': '30',
+        'elk.layered.spacing.edgeEdgeBetweenLayers': '20',
+
+        // === NODE PLACEMENT (Critical for alignment!) ===
+        // BRANDES_KOEPF produces cleaner, more balanced layouts
+        'elk.layered.nodePlacement.strategy': 'BRANDES_KOEPF',
+        // Improve edge straightness - keeps main pipeline horizontal
+        'elk.layered.nodePlacement.bk.edgeStraightening': 'IMPROVE_STRAIGHTNESS',
+        // Favor straight edges over balanced placement
+        'elk.layered.nodePlacement.favorStraightEdges': 'true',
+
+        // === LAYER ASSIGNMENT ===
+        // Network simplex produces better layer assignments
+        'elk.layered.layering.strategy': 'NETWORK_SIMPLEX',
+
+        // === CROSSING MINIMIZATION ===
         'elk.layered.crossingMinimization.strategy': 'LAYER_SWEEP',
-        'elk.layered.crossingMinimization.semiInteractive': 'true',
-        // Port constraints help with edge routing
-        'elk.portConstraints': 'FIXED_ORDER',
-        // Edge routing for smooth curves
+        // Respect model order for consistent layout
+        'elk.layered.considerModelOrder.strategy': 'NODES_AND_EDGES',
+
+        // === ALIGNMENT ===
+        // Center nodes vertically within each layer
+        'elk.alignment': 'CENTER',
+        'elk.contentAlignment': 'V_CENTER H_CENTER',
+
+        // === EDGE ROUTING ===
         'elk.edgeRouting': 'SPLINES',
+        // Better spline routing
+        'elk.layered.edgeRouting.splines.mode': 'CONSERVATIVE',
+
+        // === COMPACTION ===
+        // Reduce wasted space
+        'elk.layered.compaction.postCompaction.strategy': 'EDGE_LENGTH',
       },
     };
   }, [getNodeDimensions]);
@@ -432,7 +493,7 @@ export function useGraphLayout() {
     }
 
     // Map ELK results back to AppNodes (top-level only)
-    const layoutedTopLevel = topLevelNodes.map(node => {
+    const layoutedTopLevelRaw = topLevelNodes.map(node => {
       const findNode = (g: ElkGraph | ElkNode): ElkNode | null => {
         if (g.id === node.id) return g as ElkNode;
         if ('children' in g && g.children) {
@@ -456,9 +517,138 @@ export function useGraphLayout() {
       return node;
     });
 
-    // Lessons already have correct positions from buildGraph
-    // Just merge: parents first (required by React Flow), then lessons
-    return [...layoutedTopLevel, ...lessonNodes];
+    // POST-PROCESSING PHASE 1: Align stage nodes horizontally (same Y center)
+    // This ensures the main pipeline (Stages 1-6) forms a straight horizontal line
+    const stageNodes = layoutedTopLevelRaw.filter(n => n.type === 'stage' || n.type === 'stage2group');
+    const otherNodes = layoutedTopLevelRaw.filter(n => n.type !== 'stage' && n.type !== 'stage2group');
+
+    let alignedStages = stageNodes;
+    if (stageNodes.length > 1) {
+      // Calculate the center Y of each stage node (position.y + height/2)
+      const stageCenters = stageNodes.map(s => {
+        const height = (s.style?.height as number) || DEFAULT_NODE_HEIGHT;
+        return s.position.y + height / 2;
+      });
+
+      // Find the median center Y for alignment (more robust than average)
+      const sortedCenters = [...stageCenters].sort((a, b) => a - b);
+      const medianCenterY = sortedCenters[Math.floor(sortedCenters.length / 2)];
+
+      // Align all stages so their centers are at the median Y
+      alignedStages = stageNodes.map(stage => {
+        const height = (stage.style?.height as number) || DEFAULT_NODE_HEIGHT;
+        const newY = medianCenterY - height / 2;
+        return {
+          ...stage,
+          position: { ...stage.position, y: newY },
+        };
+      });
+    }
+
+    // Merge aligned stages with other nodes
+    const afterStageAlignment = [...alignedStages, ...otherNodes];
+
+    // POST-PROCESSING PHASE 2: Align all modules to the same X coordinate
+    // This ensures modules form a clean vertical column instead of a fan pattern
+    const moduleNodes = afterStageAlignment.filter(n => n.type === 'module');
+    const nonModuleNodes = afterStageAlignment.filter(n => n.type !== 'module');
+
+    let layoutedTopLevel = afterStageAlignment;
+
+    if (moduleNodes.length > 1) {
+      // Find the maximum X among modules (rightmost position)
+      const maxModuleX = Math.max(...moduleNodes.map(m => m.position.x));
+
+      // Align all modules to the same X coordinate
+      // Also redistribute Y positions evenly for consistent spacing
+      const sortedModules = [...moduleNodes].sort((a, b) => a.position.y - b.position.y);
+      const moduleSpacing = 20; // Vertical gap between modules
+      const firstModuleY = sortedModules[0]?.position.y ?? 0;
+
+      const alignedModules = sortedModules.map((module, index) => {
+        // Calculate cumulative height for proper spacing
+        const prevModulesHeight = sortedModules
+          .slice(0, index)
+          .reduce((sum, m) => {
+            const height = (m.style?.height as number) || LAYOUT_CONFIG.MODULE_COLLAPSED_HEIGHT;
+            return sum + height + moduleSpacing;
+          }, 0);
+
+        return {
+          ...module,
+          position: {
+            x: maxModuleX, // Align to rightmost module X
+            y: firstModuleY + prevModulesHeight, // Stack with consistent spacing
+          },
+        };
+      });
+
+      layoutedTopLevel = [...nonModuleNodes, ...alignedModules];
+    }
+
+    // PHASE 2 (MICRO): Recalculate child positions relative to their parents
+    // This is critical for auto-arrange button to work correctly
+    // Group children by parent
+    const childrenByParent = new Map<string, AppNode[]>();
+    lessonNodes.forEach(child => {
+      if (!child.parentId) return;
+      if (!childrenByParent.has(child.parentId)) {
+        childrenByParent.set(child.parentId, []);
+      }
+      childrenByParent.get(child.parentId)!.push(child);
+    });
+
+    // Position child nodes relative to their parents
+    const layoutedChildren: AppNode[] = [];
+    childrenByParent.forEach((children, parentId) => {
+      const parent = layoutedTopLevel.find(n => n.id === parentId);
+      if (!parent) {
+        // Parent not found, keep children as-is
+        layoutedChildren.push(...children);
+        return;
+      }
+
+      // Determine layout config based on parent type
+      const isStage2Group = parent.type === 'stage2group';
+      const config = isStage2Group ? {
+        headerHeight: STAGE2_LAYOUT_CONFIG.CONTAINER_HEADER_HEIGHT,
+        itemHeight: STAGE2_LAYOUT_CONFIG.DOCUMENT_HEIGHT,
+        itemGap: STAGE2_LAYOUT_CONFIG.DOCUMENT_GAP,
+        padding: STAGE2_LAYOUT_CONFIG.CONTAINER_PADDING,
+      } : {
+        headerHeight: LAYOUT_CONFIG.MODULE_HEADER_HEIGHT,
+        itemHeight: LAYOUT_CONFIG.LESSON_HEIGHT,
+        itemGap: LAYOUT_CONFIG.LESSON_GAP,
+        padding: LAYOUT_CONFIG.MODULE_PADDING,
+      };
+
+      // Sort children by their order (lessonOrder for lessons, index in array for documents)
+      const sortedChildren = [...children].sort((a, b) => {
+        const aOrder = (a.data as Record<string, unknown>)?.lessonOrder as number | undefined;
+        const bOrder = (b.data as Record<string, unknown>)?.lessonOrder as number | undefined;
+        if (aOrder !== undefined && bOrder !== undefined) {
+          return aOrder - bOrder;
+        }
+        // Fallback: extract numbers from ID for ordering
+        const aNum = parseInt(a.id.match(/\d+$/)?.[0] || '0');
+        const bNum = parseInt(b.id.match(/\d+$/)?.[0] || '0');
+        return aNum - bNum;
+      });
+
+      // Calculate positions relative to parent (0,0 = parent's top-left corner)
+      sortedChildren.forEach((child, index) => {
+        layoutedChildren.push({
+          ...child,
+          position: {
+            x: config.padding,
+            y: config.headerHeight + (index * (config.itemHeight + config.itemGap)),
+          },
+        });
+      });
+    });
+
+    // Merge: parents first (required by React Flow), then children
+    return [...layoutedTopLevel, ...layoutedChildren];
   }, [toElkGraph, calculateLayout, applyFallbackLayout]);
 
   /**

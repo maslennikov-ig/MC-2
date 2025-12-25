@@ -2,7 +2,6 @@
 
 import * as React from 'react';
 import { useState, useEffect, useMemo } from 'react';
-import { encode } from 'html-entities';
 import { cn } from '@/lib/utils';
 import type { MermaidDiagramProps } from '../types';
 
@@ -12,17 +11,18 @@ import type { MermaidDiagramProps } from '../types';
 const MERMAID_CDN = 'https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs';
 
 /**
- * Escapes HTML special characters to prevent XSS attacks
+ * Minimal HTML escaping for Mermaid content
  *
- * Uses the battle-tested html-entities library for comprehensive HTML entity encoding.
- * This is critical for security since we're injecting user-provided
- * Mermaid syntax into an iframe's srcdoc attribute.
+ * Only escapes angle brackets (< >) which could break HTML structure.
+ * Quotes and ampersands are preserved for Mermaid syntax compatibility.
+ * The iframe is sandboxed without allow-same-origin, so XSS risks are mitigated.
  *
  * @param str - The string to escape
  * @returns The escaped string safe for HTML insertion
  */
 function escapeHtml(str: string): string {
-  return encode(str, { mode: 'nonAscii', level: 'html5' });
+  // Only escape angle brackets - quotes are needed for Mermaid subgraph labels etc.
+  return str.replace(/</g, '&lt;').replace(/>/g, '&gt;');
 }
 
 /**

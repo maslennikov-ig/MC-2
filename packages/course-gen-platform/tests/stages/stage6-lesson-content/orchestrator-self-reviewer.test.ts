@@ -4,6 +4,7 @@
  *
  * Tests the conditional edge routing from selfReviewer node to either:
  * - 'judge': Content passed or needs judge attention (PASS, PASS_WITH_FLAGS, FIXED, FLAG_TO_JUDGE)
+ * - 'sectionRegenerator': Specific sections need regeneration (sectionsToRegenerate populated)
  * - 'generator': Content needs regeneration (REGENERATE status)
  *
  * This tests the shouldProceedToJudge routing function from orchestrator.ts
@@ -11,6 +12,7 @@
  *
  * Test coverage:
  * - REGENERATE → planner routing
+ * - sectionsToRegenerate → sectionRegenerator routing
  * - PASS → judge routing
  * - PASS_WITH_FLAGS → judge routing
  * - FIXED → judge routing (if implemented)
@@ -131,6 +133,8 @@ function createMockState(overrides: Partial<LessonGraphStateType> = {}): LessonG
     generatedContent: 'Test content',
     sectionProgress: 0,
     selfReviewResult: null,
+    sectionRegenerationResult: null,
+    progressSummary: null,
     lessonContent: null,
     currentNode: 'selfReviewer',
     errors: [],
@@ -268,6 +272,97 @@ describe('Self-Reviewer Orchestrator Routing', () => {
       const result = shouldProceedToJudge(state);
 
       expect(result).toBe('generator');
+    });
+  });
+
+  describe('shouldProceedToJudge - Section Regeneration', () => {
+    it('should route to sectionRegenerator when sectionsToRegenerate is populated', () => {
+      const state = createMockState({
+        selfReviewResult: createMockSelfReviewResult('PASS_WITH_FLAGS', {
+          heuristicsPassed: true,
+          sectionsToRegenerate: ['introduction', 'section_2'],
+          issues: [
+            {
+              type: 'TRUNCATION',
+              severity: 'INFO',
+              description: 'Section introduction needs regeneration',
+              location: 'introduction',
+            },
+            {
+              type: 'TRUNCATION',
+              severity: 'INFO',
+              description: 'Section section_2 needs regeneration',
+              location: 'section_2',
+            },
+          ],
+          reasoning: 'Specific sections need regeneration',
+        }),
+      });
+
+      const result = shouldProceedToJudge(state);
+
+      expect(result).toBe('sectionRegenerator');
+    });
+
+    it('should route to sectionRegenerator with single section', () => {
+      const state = createMockState({
+        selfReviewResult: createMockSelfReviewResult('PASS_WITH_FLAGS', {
+          heuristicsPassed: true,
+          sectionsToRegenerate: ['conclusion'],
+          issues: [
+            {
+              type: 'TRUNCATION',
+              severity: 'INFO',
+              description: 'Conclusion section is incomplete',
+              location: 'conclusion',
+            },
+          ],
+          reasoning: 'Conclusion section needs regeneration',
+        }),
+      });
+
+      const result = shouldProceedToJudge(state);
+
+      expect(result).toBe('sectionRegenerator');
+    });
+
+    it('should route to judge when sectionsToRegenerate is empty array', () => {
+      const state = createMockState({
+        selfReviewResult: createMockSelfReviewResult('PASS', {
+          heuristicsPassed: true,
+          sectionsToRegenerate: [],
+          issues: [],
+          reasoning: 'Content passed all checks',
+        }),
+      });
+
+      const result = shouldProceedToJudge(state);
+
+      expect(result).toBe('judge');
+    });
+
+    it('should prioritize REGENERATE over sectionsToRegenerate', () => {
+      // If status is REGENERATE, full regeneration takes priority
+      const state = createMockState({
+        selfReviewResult: createMockSelfReviewResult('REGENERATE', {
+          heuristicsPassed: false,
+          sectionsToRegenerate: ['section_1'], // This should be ignored
+          issues: [
+            {
+              type: 'EMPTY',
+              severity: 'CRITICAL',
+              description: 'No content available',
+              location: 'global',
+            },
+          ],
+          reasoning: 'Fatal errors require full regeneration',
+        }),
+        retryCount: 0,
+      });
+
+      const result = shouldProceedToJudge(state);
+
+      expect(result).toBe('generator'); // Should route to generator, not sectionRegenerator
     });
   });
 

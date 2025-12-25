@@ -132,7 +132,7 @@ export async function executeExpansion(
     const llmClient = new LLMClient();
     const modelService = createModelConfigService();
 
-    let modelId = 'openai/gpt-oss-120b';
+    let modelId = 'unknown'; // Will be set from database config
     let temperature = 0.7;
 
     try {

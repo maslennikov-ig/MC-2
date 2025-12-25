@@ -43,7 +43,6 @@ interface Stage6InspectorContentProps {
   // Stats for StatsStrip
   stats: {
     tokens: number;
-    costUsd?: number;
     durationMs: number;
     /** Subscription tier: 'trial' | 'free' | 'basic' | 'standard' | 'premium' */
     modelTier: string;
@@ -231,7 +230,7 @@ export const Stage6InspectorContent = memo(function Stage6InspectorContent({
             </div>
           )}
         >
-          <MarkdownRendererFull content={rawMarkdown || ''} preset="preview" />
+          <MarkdownRendererFull content={rawMarkdown || ''} preset="preview" features={{ mermaid: true }} />
         </ErrorBoundary>
       );
     }
@@ -344,7 +343,6 @@ export const Stage6InspectorContent = memo(function Stage6InspectorContent({
         {/* StatsStrip (sticky header) */}
         <Stage6StatsStrip
           tokens={stats.tokens}
-          costUsd={stats.costUsd}
           durationMs={stats.durationMs}
           modelTier={stats.modelTier}
           quality={stats.quality}

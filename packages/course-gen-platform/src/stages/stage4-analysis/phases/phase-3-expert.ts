@@ -1,7 +1,7 @@
 /**
  * Stage 4 Analysis - Phase 3: Deep Expert Analysis
  *
- * Critical quality phase using 120B model (ALWAYS, no compromise).
+ * Critical quality phase using database-configured model.
  * Designs pedagogical strategy, identifies expansion areas, and detects research flags.
  *
  * Key responsibilities:
@@ -9,7 +9,7 @@
  * - Expansion areas identification (if information_completeness < 80%)
  * - Research flag detection (CONSERVATIVE - minimize false positives)
  *
- * Model: ALWAYS 120B (openai/gpt-oss-120b)
+ * Model: Configured via database (llm_model_config table)
  * Temperature: 0.5 (more conservative for expert analysis)
  * Max tokens: 8000
  *
@@ -107,7 +107,7 @@ function buildPhase3Prompt(input: Phase3Input): string {
   const outputLanguage = language === 'en' ? 'English' : language === 'ru' ? 'Russian' : language;
 
   // Build document context with token-aware truncation
-  // Target: ~25K tokens total for documents (120B model has larger context but still limited)
+  // Target: ~25K tokens total for documents (model context is limited)
   // With 3 docs: ~8K tokens per document
   const documentCount = document_summaries?.length || 0;
   const tokensPerDocument = documentCount > 0 ? Math.floor(25000 / documentCount) : 0;
@@ -238,7 +238,7 @@ export async function runPhase3Expert(input: Phase3Input): Promise<Phase3Output>
     : 0;
 
   const model = await getModelForPhase('stage_4_expert', course_id, estimatedTokenCount, language);
-  const modelId = model.model || 'openai/gpt-oss-120b'; // Get modelId from ChatOpenAI instance
+  const modelId = model.model || 'unknown';
   const prompt = buildPhase3Prompt(input);
   const mainPhaseStartTime = Date.now();
   const mainPhaseOutput = await trackPhaseExecution(

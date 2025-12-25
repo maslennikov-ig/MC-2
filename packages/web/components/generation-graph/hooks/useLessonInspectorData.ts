@@ -39,16 +39,9 @@ export interface UseLessonInspectorDataReturn {
 /**
  * Patterns for extracting node names from step_name
  * Backend sends: generator_start, generator_complete, generator_error, etc.
- *
- * BACKWARD COMPATIBILITY: Old logs may contain planner, expander, assembler, smoother phases.
- * These are mapped to 'generator' for display in the new 3-node pipeline.
  */
 const NODE_PATTERNS: { pattern: RegExp; node: Stage6NodeName }[] = [
   { pattern: /^generator/i, node: 'generator' },
-  { pattern: /^planner/i, node: 'generator' }, // Legacy mapping
-  { pattern: /^expander/i, node: 'generator' }, // Legacy mapping
-  { pattern: /^assembler/i, node: 'generator' }, // Legacy mapping
-  { pattern: /^smoother/i, node: 'generator' }, // Legacy mapping
   { pattern: /^selfReviewer/i, node: 'selfReviewer' },
   { pattern: /^judge/i, node: 'judge' },
 ];
@@ -56,16 +49,9 @@ const NODE_PATTERNS: { pattern: RegExp; node: Stage6NodeName }[] = [
 /**
  * Map phase field to Stage6NodeName
  * Backend records: phase: 'generator', 'selfReviewer', 'judge', 'init', 'complete'
- *
- * BACKWARD COMPATIBILITY: Old logs may contain planner, expander, assembler, smoother phases.
- * These are mapped to 'generator' for display in the new 3-node pipeline.
  */
 const PHASE_TO_NODE_MAP: Record<string, Stage6NodeName> = {
   'generator': 'generator',
-  'planner': 'generator', // Legacy
-  'expander': 'generator', // Legacy
-  'assembler': 'generator', // Legacy
-  'smoother': 'generator', // Legacy
   'selfreviewer': 'selfReviewer',
   'judge': 'judge',
 };
@@ -182,7 +168,6 @@ function buildPipelineState(traces: GenerationTraceRow[]): {
       nodeMap.set(nodeName, {
         node: nodeName,
         status,
-        progress: nodeName === 'expander' ? calculateExpanderProgress(trace) : undefined,
         startedAt: new Date(trace.created_at),
         completedAt: status === 'completed' ? new Date(trace.created_at) : undefined,
         tokensUsed: trace.tokens_used || 0,
@@ -252,38 +237,6 @@ function buildPipelineState(traces: GenerationTraceRow[]): {
     totalDurationMs,
     retryCount,
   };
-}
-
-/**
- * Calculate expander progress from trace output
- */
-function calculateExpanderProgress(trace: GenerationTraceRow): number | undefined {
-  if (!trace.output_data || typeof trace.output_data !== 'object') {
-    return undefined;
-  }
-
-  const output = trace.output_data as Record<string, unknown>;
-  const completedSections = output.completedSections as number | undefined;
-  const totalSections = output.totalSections as number | undefined;
-
-  if (completedSections !== undefined && totalSections && totalSections > 0) {
-    return Math.round((completedSections / totalSections) * 100);
-  }
-
-  // Fallback: check for successRate field
-  const successRate = output.successRate as number | undefined;
-  if (successRate !== undefined) {
-    return successRate; // Already a percentage
-  }
-
-  // Second fallback: check for expandedCount / totalCount
-  const expandedCount = output.expandedCount as number | undefined;
-  const totalCount = output.totalCount as number | undefined;
-  if (expandedCount !== undefined && totalCount && totalCount > 0) {
-    return Math.round((expandedCount / totalCount) * 100);
-  }
-
-  return undefined;
 }
 
 /**
@@ -505,6 +458,35 @@ function parseJudgeResult(
   const highlightedSections =
     (judgeOutput.highlighted_sections as Array<Record<string, unknown>>) ?? [];
 
+  // Parse single judge result for cascade stage visibility
+  const singleJudgeData = judgeOutput.singleJudge as Record<string, unknown> | undefined;
+  const singleJudgeResult = singleJudgeData ? {
+    model: (singleJudgeData.model as string) || 'unknown',
+    score: (singleJudgeData.score as number) || 0,
+    confidence: (singleJudgeData.confidence as 'high' | 'medium' | 'low') || 'medium',
+    criteriaScores: singleJudgeData.criteriaScores as Record<string, number> | undefined,
+    issues: singleJudgeData.issues as Array<{
+      criterion: string;
+      severity: string;
+      location?: string;
+      description: string;
+      suggestedFix?: string;
+    }> | undefined,
+    strengths: singleJudgeData.strengths as string[] | undefined,
+    recommendation: (singleJudgeData.recommendation as string) || 'ACCEPT',
+  } : undefined;
+
+  // Parse heuristics result for cascade stage visibility
+  const heuristicsResult = heuristicsData ? {
+    passed: (heuristicsData.passed as boolean) ?? true,
+    wordCount: heuristicsData.wordCount as number | undefined,
+    fleschKincaid: heuristicsData.fleschKincaid as number | undefined,
+    fleschKincaidSkipped: heuristicsData.fleschKincaidSkipped as boolean | undefined,
+    examplesCount: heuristicsData.examplesCount as number | undefined,
+    exercisesCount: heuristicsData.exercisesCount as number | undefined,
+    failureReasons: (heuristicsData.failureReasons as string[]) || [],
+  } : undefined;
+
   return {
     votingResult,
     heuristicsPassed,
@@ -515,6 +497,10 @@ function parseJudgeResult(
       issue: (section.issue as string) || '',
       severity: (section.severity as 'low' | 'medium' | 'high') || 'medium',
     })),
+    // Cascade evaluation fields for correct score extraction
+    cascadeStage: cascadeStage as 'heuristic' | 'single_judge' | 'clev_voting' | undefined,
+    singleJudgeResult,
+    heuristicsResult,
   };
 }
 
@@ -751,6 +737,17 @@ export function useLessonInspectorData({
   // Debounce timer ref for realtime updates
   const debounceTimerRef = useRef<NodeJS.Timeout | null>(null);
 
+  // Stable refs to prevent re-renders on session/auth changes
+  // Session object reference changes on every token refresh, but we only need to check existence
+  const sessionRef = useRef(session);
+  const authLoadingRef = useRef(authLoading);
+  const isAuthenticatedRef = useRef(!!session && !authLoading);
+
+  // Update refs synchronously (no effect, no re-render trigger)
+  sessionRef.current = session;
+  authLoadingRef.current = authLoading;
+  isAuthenticatedRef.current = !!session && !authLoading;
+
   /**
    * Fetch lesson data from database
    *
@@ -768,7 +765,8 @@ export function useLessonInspectorData({
     const moduleId = moduleNumber ? `module_${moduleNumber}` : null;
 
     // Skip if disabled or missing required data
-    if (!enabled || !lessonId || !moduleId || !moduleNumber || !lessonNumber || authLoading || !session || !courseId) {
+    // Use refs to avoid recreating callback on session changes
+    if (!enabled || !lessonId || !moduleId || !moduleNumber || !lessonNumber || !isAuthenticatedRef.current || !courseId) {
       setIsLoading(false);
       return;
     }
@@ -784,6 +782,19 @@ export function useLessonInspectorData({
         moduleNumber,
         lessonNumber,
       });
+
+      // Step 0: Get organization tier for model naming
+      let tier: 'trial' | 'free' | 'basic' | 'standard' | 'premium' = 'standard';
+      const { data: orgData } = await supabase
+        .from('courses')
+        .select('organization_id, organizations!inner(tier)')
+        .eq('id', courseId)
+        .single();
+
+      if (orgData) {
+        const org = orgData.organizations as { tier?: string } | null;
+        tier = (org?.tier as typeof tier) || 'standard';
+      }
 
       // Step 1: Get section UUID
       const { data: sectionData, error: sectionError } = await supabase
@@ -978,6 +989,7 @@ export function useLessonInspectorData({
         canRegenerate: status === 'error' || status === 'completed',
         canApprove: status === 'completed' && judgeResult !== null,
         canEdit: status === 'completed',
+        tier,
       };
 
       setData(inspectorData);
@@ -1008,7 +1020,8 @@ export function useLessonInspectorData({
         setIsLoading(false);
       }
     }
-  }, [enabled, lessonId, courseId, supabase, authLoading, session]);
+  // Note: session/authLoading removed from deps - we use refs to avoid re-creating on token refresh
+  }, [enabled, lessonId, courseId, supabase]);
 
   /**
    * Debounced fetch for realtime updates
@@ -1027,17 +1040,23 @@ export function useLessonInspectorData({
     }, 500); // 500ms debounce
   }, [fetchLessonData]);
 
-  // Initial fetch
+  // Initial fetch - trigger once when authenticated
+  // Uses a stable boolean to avoid re-triggering on session object changes
+  const isAuthenticated = !!session && !authLoading;
   useEffect(() => {
-    if (!authLoading && session) {
+    if (isAuthenticated) {
       fetchLessonData();
     }
-  }, [fetchLessonData, authLoading, session]);
+  }, [fetchLessonData, isAuthenticated]);
+
+  // Store debouncedFetch in a ref to avoid re-subscribing on every callback recreation
+  const debouncedFetchRef = useRef(debouncedFetch);
+  debouncedFetchRef.current = debouncedFetch;
 
   // Realtime subscription for live updates (uses UUID, not label)
   useEffect(() => {
     // Wait for lesson UUID to be resolved from initial fetch
-    if (!lessonUuidForRealtime || authLoading || !session) return;
+    if (!lessonUuidForRealtime || !isAuthenticated) return;
 
     logger.debug('Setting up realtime subscription for lesson', { lessonId, lessonUuidForRealtime });
 
@@ -1060,7 +1079,7 @@ export function useLessonInspectorData({
         },
         () => {
           logger.debug('New trace received for lesson', { lessonId, lessonUuidForRealtime });
-          debouncedFetch(); // Debounced refetch to batch rapid updates
+          debouncedFetchRef.current(); // Use ref to get latest callback
         }
       )
       .on(
@@ -1073,7 +1092,7 @@ export function useLessonInspectorData({
         },
         () => {
           logger.debug('Lesson content updated', { lessonId, lessonUuidForRealtime });
-          debouncedFetch(); // Debounced refetch to batch rapid updates
+          debouncedFetchRef.current(); // Use ref to get latest callback
         }
       )
       .subscribe((status) => {
@@ -1095,7 +1114,8 @@ export function useLessonInspectorData({
         channelRef.current = null;
       }
     };
-  }, [lessonId, lessonUuidForRealtime, supabase, authLoading, session, debouncedFetch]);
+  // Note: debouncedFetch removed from deps - we use ref to avoid re-subscribing
+  }, [lessonId, lessonUuidForRealtime, supabase, isAuthenticated]);
 
   // Manual refetch function
   const refetch = useCallback(() => {

@@ -1,5 +1,8 @@
 # Stage 6 "Glass Factory" UI/UX Redesign - Final Specification
 
+> **Last Updated:** 2025-01-XX (synced with implementation)
+> **Status:** ✅ 80% Implemented
+
 ## Overview
 
 Stage 6 "Glass Factory" is the lesson content generation stage. Unlike Stages 4-5 which have linear pipelines, Stage 6 operates on **multiple entities**: modules and lessons.
@@ -13,6 +16,20 @@ Transition from a web-page layout to an Integrated Development Environment (IDE)
 
 **Color Scheme:** Blue/Cyan (`blue-500` / `cyan-400` dark mode)
 **Metaphor:** Glass Factory producing refined educational content from raw materials
+
+---
+
+## Pipeline Architecture (UPDATED)
+
+> **IMPORTANT:** The pipeline was refactored from 6 nodes to 3 nodes.
+
+| Original Spec | Current Implementation |
+|---------------|------------------------|
+| Planner → Expander → Assembler → Smoother → SelfReviewer → Judge | **Generator → SelfReviewer → Judge** |
+| 6 pipeline nodes | **3 pipeline nodes** |
+| 6 segments in SegmentedPillTrack | **3 segments** |
+
+**Rationale:** The Generator node consolidates the original planner/expander/assembler/smoother into a single generation step, simplifying the UI while maintaining the critical SelfReviewer and Judge quality gates.
 
 ---
 
@@ -85,14 +102,19 @@ const label = t?.moduleProgress?.[locale] ?? 'Module Progress';
 
 ### Decision 2: Segmented Pill Track (Dashboard Mini-Map)
 
-**Verdict:** 6 icons on a card is too dense ("fruit salad" effect). Simple progress bar is too vague.
+**Verdict:** Simple progress bar is too vague. Segmented track shows pipeline topology.
 
-**Implementation:** **Segmented Bar** - 6 connected pills with 1px gaps.
+**Implementation:** **Segmented Bar** - 3 connected pills with 1px gaps (updated from 6).
 
 ```
 [ Lesson 1.2: Introduction to React  ]
-[ ■ ■ ■ ■ ▣ □ ]  ← Step 5 Active (SelfReviewer)
+[ ■ ▣ □ ]  ← Step 2 Active (SelfReviewer)
 ```
+
+**Pipeline Order:**
+1. **Generator** - Content generation
+2. **SelfReviewer** - Auto-correction
+3. **Judge** - Quality assessment
 
 **Visual States:**
 | State | Color | Description |
@@ -103,7 +125,7 @@ const label = t?.moduleProgress?.[locale] ?? 'Module Progress';
 | SelfReview Fixed | Purple | Auto-fixed (visual distinction) |
 | Failed | Red | Error |
 
-**Tooltip on hover:** `"Step 5/6: Self-Reviewer (Fixing...)"`
+**Tooltip on hover:** `"Step 2/3: Self-Reviewer (Fixing...)"`
 
 ---
 
@@ -169,11 +191,13 @@ Replaces 4 large cards with a single sticky, compact bar.
 
 ### Lesson Cards with Segmented Track
 
+> **Status:** 🔴 `Stage6LessonCard` NOT implemented - uses legacy lesson panels.
+
 ```
 ┌───────────────────────────────────────────────────────────┐
 │ Lesson 1.2: Introduction to React                    [→]  │
 │ ┌─────────────────────────────────────────────────────┐   │
-│ │ [ ■ ■ ■ ■ ▣ □ ]  Step 5/6: Self-Reviewer           │   │
+│ │ [ ■ ▣ □ ]  Step 2/3: Self-Reviewer                 │   │
 │ └─────────────────────────────────────────────────────┘   │
 │ 45k Tokens  │  92% Quality  │  Theory                     │
 └───────────────────────────────────────────────────────────┘
@@ -183,42 +207,59 @@ Replaces 4 large cards with a single sticky, compact bar.
 
 ## Lesson Inspector Redesign
 
-### Selected Layout: Split Pane (Option B)
+### Selected Layout: Single Panel with Tabs (Simplified)
 
-**Justification:** Educational content requires vertical reading space. IDE layout separates *context* (where am I?) from *content* (what is the result?).
+> **UPDATED:** Implementation uses single-panel layout instead of split-pane.
+> The left sidebar with PipelineStepper is NOT implemented.
+
+**Current Implementation:**
 
 ```
 ┌─────────────────────────────────────────────────────────────────────────┐
-│ Header: ← Back │ Lesson 3.2: React Hooks API              [Max] [Close] │
-├────────────────────────┬────────────────────────────────────────────────┤
+│ [Preview] [Quality] [Blueprint] [Trace]    [Approve] [Edit] [Regenerate]│
+├─────────────────────────────────────────────────────────────────────────┤
+│ 💎 14.5k T  │  ⏱️ 42s  │  ⚡ Premium  │  🛡️ 92% Quality               │ ← Stats Strip
+├─────────────────────────────────────────────────────────────────────────┤
+│                                                                         │
+│   # Introduction to React Hooks                                         │
+│                                                                         │
+│   React Hooks are functions that let you use state and lifecycle        │
+│   features in functional components...                                  │
+│                                                                         │
+│   (Scrollable Content Area)                                             │
+│                                                                         │
+└─────────────────────────────────────────────────────────────────────────┘
+```
+
+**Original Plan (Deferred):**
+
+```
+┌────────────────────────┬────────────────────────────────────────────────┐
 │   LEFT SIDEBAR         │              RIGHT PANEL                       │
 │   (Fixed 280px)        │                                                │
-│                        │ ┌──────────────────────────────────────────┐   │
-│ ┌──────────────────┐   │ │ [Preview] [Quality] [Blueprint] [Trace] │   │
-│ │ Pipeline Stepper │   │ ├──────────────────────────────────────────┤   │
-│ │ ✓ Planner   2s   │   │ │ 💎 14.5k T │ ⏱️ 42s │ ⚡ Prem │ 92% ✓  │   │
-│ │ ✓ Expander 15s   │   │ ├──────────────────────────────────────────┤   │
-│ │ ✓ Assembler 8s   │   │ │                                          │   │
-│ │ ✓ Smoother  5s   │   │ │   # Introduction to React Hooks          │   │
-│ │ ● SelfReview 3s  │   │ │                                          │   │
-│ │ ○ Judge          │   │ │   React Hooks are functions that let     │   │
-│ └──────────────────┘   │ │   you use state and lifecycle features   │   │
-│                        │ │   in functional components...            │   │
+│ ┌──────────────────┐   │ ┌──────────────────────────────────────────┐   │
+│ │ Pipeline Stepper │   │ │ [Preview] [Quality] [Blueprint] [Trace] │   │
+│ │ ✓ Generator  20s │   │ ├──────────────────────────────────────────┤   │
+│ │ ● SelfReview 3s  │   │ │ Stats Strip                              │   │
+│ │ ○ Judge          │   │ ├──────────────────────────────────────────┤   │
+│ └──────────────────┘   │ │ Content...                               │   │
 │ ┌──────────────────┐   │ │                                          │   │
-│ │ [Approve Lesson] │   │ │   (Scrollable Content)                   │   │
-│ │ [↻ Regenerate]   │   │ │                                          │   │
-│ └──────────────────┘   │ └──────────────────────────────────────────┘   │
+│ │ [Approve Lesson] │   │ │                                          │   │
+│ │ [↻ Regenerate]   │   │ └──────────────────────────────────────────┘   │
+│ └──────────────────┘   │                                                │
 └────────────────────────┴────────────────────────────────────────────────┘
 ```
 
 ### Tab Contents
 
-| Tab | Purpose | Content |
-|-----|---------|---------|
-| **Preview** | The Content (default) | Rendered Markdown, clean reading |
-| **Quality** | The Validation | Two-Gate Waterfall (SelfReview + Judge) |
-| **Blueprint** | The Specs | Learning Objectives, Prerequisites, Target Audience |
-| **Trace** | The Logs | Node-by-node input/output, Activity log |
+| Tab | Purpose | Implementation Status |
+|-----|---------|----------------------|
+| **Preview** | Rendered Markdown content (default) | ✅ Inline in `Stage6InspectorContent` |
+| **Quality** | Two-Gate Waterfall (SelfReview + Judge) | ✅ `Stage6QualityTab` component |
+| **Blueprint** | Learning Objectives, Prerequisites | ✅ `Stage6BlueprintTab` component |
+| **Trace** | Node-by-node logs, Activity | ✅ Inline in `Stage6InspectorContent` |
+
+> **Note:** Preview and Trace tabs are rendered inline in `Stage6InspectorContent.tsx` rather than as separate components. Quality and Blueprint have dedicated components.
 
 ---
 
@@ -362,41 +403,55 @@ interface Stage6BlueprintTabProps {
 
 ## File Structure
 
+### Current Implementation
+
 ```
 packages/web/components/generation-graph/panels/stage6/
 ├── index.ts                          # Re-exports
-├── types.ts                          # Stage 6 specific types
 │
 ├── dashboard/
-│   ├── Stage6ModuleDashboard.tsx     # Main dashboard view
-│   ├── Stage6ControlTower.tsx        # Compact header with metrics
-│   ├── Stage6LessonCard.tsx          # Lesson card with segmented track
-│   └── SegmentedPillTrack.tsx        # 6-segment pipeline visualization
+│   ├── Stage6ControlTower.tsx        ✅ Compact header with metrics
+│   └── SegmentedPillTrack.tsx        ✅ 3-segment pipeline visualization
 │
 ├── inspector/
-│   ├── Stage6LessonInspector.tsx     # Main inspector layout
-│   ├── Stage6InspectorSidebar.tsx    # Left panel with pipeline + actions
-│   ├── Stage6StatsStrip.tsx          # Persistent metrics header
+│   ├── Stage6InspectorContent.tsx    ✅ Main layout with inline Preview/Trace
+│   ├── Stage6StatsStrip.tsx          ✅ Persistent metrics header
 │   │
 │   ├── tabs/
-│   │   ├── Stage6PreviewTab.tsx      # Rendered content
-│   │   ├── Stage6QualityTab.tsx      # Two-Gate Waterfall
-│   │   ├── Stage6BlueprintTab.tsx    # Learning objectives, prerequisites
-│   │   └── Stage6TraceTab.tsx        # Node details + activity log
+│   │   ├── Stage6QualityTab.tsx      ✅ Two-Gate Waterfall
+│   │   └── Stage6BlueprintTab.tsx    ✅ Learning objectives, prerequisites
 │   │
 │   └── quality/
-│       ├── SelfReviewGate.tsx        # Gate 1 visualization
-│       ├── JudgeScorecard.tsx        # Gate 2 visualization
-│       └── DiffViewer.tsx            # Before/after comparison
+│       └── DiffViewer.tsx            ✅ Before/after comparison
+```
+
+### Not Implemented (Deferred)
+
+```
+├── dashboard/
+│   ├── Stage6ModuleDashboard.tsx     🔴 Dashboard wrapper
+│   └── Stage6LessonCard.tsx          🔴 Lesson card with segmented track
+│
+├── inspector/
+│   ├── Stage6InspectorSidebar.tsx    🔴 Left panel with pipeline
+│   ├── tabs/
+│   │   ├── Stage6PreviewTab.tsx      🔴 (inline in InspectorContent)
+│   │   └── Stage6TraceTab.tsx        🔴 (inline in InspectorContent)
+│   └── quality/
+│       ├── SelfReviewGate.tsx        🔴 (inline in QualityTab)
+│       └── JudgeScorecard.tsx        🔴 (inline in QualityTab)
 │
 └── shared/
-    ├── PipelineStepper.tsx           # Vertical node stepper
-    └── LessonTypeIcon.tsx            # Theory/Quiz/Practice icons
+    ├── PipelineStepper.tsx           🔴 Vertical node stepper
+    └── LessonTypeIcon.tsx            🔴 Theory/Quiz/Practice icons
 ```
 
 ---
 
 ## Translation Keys
+
+> **Note:** Current implementation uses inline translations in components.
+> TODO: Migrate to `GRAPH_TRANSLATIONS.stage6` for consistency with Stage 4/5.
 
 ```typescript
 // lib/generation-graph/translations.ts
@@ -434,12 +489,9 @@ stage6: {
     tier: { ru: 'Модель', en: 'Model' },
   },
 
-  // Pipeline Nodes
+  // Pipeline Nodes (UPDATED: 3 nodes instead of 6)
   nodes: {
-    planner: { ru: 'Планировщик', en: 'Planner' },
-    expander: { ru: 'Расширитель', en: 'Expander' },
-    assembler: { ru: 'Сборщик', en: 'Assembler' },
-    smoother: { ru: 'Шлифовщик', en: 'Smoother' },
+    generator: { ru: 'Генератор', en: 'Generator' },
     selfReviewer: { ru: 'Самопроверка', en: 'Self-Review' },
     judge: { ru: 'Арбитр', en: 'Judge' },
   },
@@ -507,27 +559,33 @@ stage6: {
 
 ## Implementation Phases
 
-### Phase 1: Dashboard Cleanup
-1. Implement `Stage6ControlTower` (compact header)
-2. Migrate metrics to Tokens/Percentage
-3. Add tier-based model naming
-4. Add status breakdown
+### Phase 1: Dashboard Cleanup ✅ COMPLETE
+1. ✅ Implement `Stage6ControlTower` (compact header)
+2. ✅ Migrate metrics to Tokens/Percentage
+3. ✅ Add tier-based model naming
+4. ✅ Add status breakdown
 
-### Phase 2: Inspector Shell
-1. Build Split-Pane layout with `ResizablePanel`
-2. Move tabs to TOP of right panel
-3. Implement `Stage6StatsStrip` (persistent metrics)
-4. Update tab structure: Preview, Quality, Blueprint, Trace
+### Phase 2: Inspector Shell ✅ COMPLETE
+1. ⚠️ Build Split-Pane layout with `ResizablePanel` → **Simplified to single panel**
+2. ✅ Move tabs to TOP of right panel
+3. ✅ Implement `Stage6StatsStrip` (persistent metrics)
+4. ✅ Update tab structure: Preview, Quality, Blueprint, Trace
 
-### Phase 3: Pipeline Visualization
-1. Add SelfReviewer node to `PipelineStepper`
-2. Build `SegmentedPillTrack` for lesson cards
-3. Connect node states to UI
+### Phase 3: Pipeline Visualization ✅ COMPLETE
+1. ✅ Build `SegmentedPillTrack` for lesson cards (3 nodes)
+2. ✅ Connect node states to UI
+3. 🔴 `PipelineStepper` in sidebar → **Deferred**
 
-### Phase 4: Quality & SelfReview
-1. Implement Two-Gate Waterfall in `Stage6QualityTab`
-2. Build `DiffViewer` for FIXED state
-3. Connect SelfReviewer results
+### Phase 4: Quality & SelfReview ✅ COMPLETE
+1. ✅ Implement Two-Gate Waterfall in `Stage6QualityTab`
+2. ✅ Build `DiffViewer` for FIXED state
+3. ✅ Connect SelfReviewer results
+
+### Remaining Work (Optional Enhancements)
+1. 🔴 `Stage6LessonCard` component with segmented track
+2. 🔴 `Stage6ModuleDashboard` wrapper component
+3. 🔴 Left sidebar with `PipelineStepper`
+4. 🔴 Migrate inline translations to `GRAPH_TRANSLATIONS.stage6`
 
 ---
 

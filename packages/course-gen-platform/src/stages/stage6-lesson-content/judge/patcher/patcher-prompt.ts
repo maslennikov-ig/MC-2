@@ -83,13 +83,14 @@ ${scopeInstruction}
 ${markdownGuidance}
 
 ## OUTPUT REQUIREMENTS
-1. Return ONLY the corrected section content
-2. Preserve all text that doesn't need fixing
-3. Maintain coherent transitions with adjacent sections
-4. Keep the same approximate length (within 10%)
-5. Do NOT add commentary or explanations
+CRITICAL: You must return the COMPLETE section content with corrections applied.
+1. Return the ENTIRE section - not just the corrected part
+2. Apply the fix to the specific area, keep everything else unchanged
+3. The output length must be similar to the original (within ±10%)
+4. Maintain coherent transitions with adjacent sections
+5. Do NOT add any commentary, explanations, or extra text
 
-CORRECTED CONTENT:`;
+COMPLETE CORRECTED SECTION:`;
 }
 
 /**
@@ -113,5 +114,11 @@ Guidelines:
 - Do not introduce new content beyond the fix
 - Preserve any examples, exercises, or key points
 - Match the original writing style
-- For markdown issues: maintain proper heading hierarchy, add code block languages, ensure accessibility (alt text)`;
+- For markdown issues: maintain proper heading hierarchy, add code block languages, ensure accessibility (alt text)
+
+PROTECTED CONTENT (NEVER modify):
+- Mermaid diagrams (\`\`\`mermaid ... \`\`\`) - copy them exactly as-is
+- Code blocks (\`\`\`language ... \`\`\`) - preserve all code unchanged
+- LaTeX formulas ($...$ or $$...$$) - keep mathematical notation intact
+- Image references ![alt](url) - preserve image links exactly`;
 }

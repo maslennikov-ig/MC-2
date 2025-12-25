@@ -277,6 +277,11 @@ export function createOpenRouterModel(
     apiKey: apiKey,
     temperature,
     maxTokens,
+    // Request token usage from OpenRouter (some providers don't return it by default)
+    // See: https://openrouter.ai/docs/api-reference/parameters
+    modelKwargs: {
+      usage: { include: true },
+    },
   });
 }
 
@@ -316,6 +321,11 @@ export async function createOpenRouterModelAsync(
     apiKey: apiKey,
     temperature,
     maxTokens,
+    // Request token usage from OpenRouter (some providers don't return it by default)
+    // See: https://openrouter.ai/docs/api-reference/parameters
+    modelKwargs: {
+      usage: { include: true },
+    },
   });
 }
 

@@ -4,7 +4,7 @@ import React from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
 import { cn } from '@/lib/utils';
 import { ModuleDashboardData } from '@megacampus/shared-types';
-import { ModuleDashboardHeader } from './ModuleDashboardHeader';
+import { Stage6ControlTower } from '../stage6/dashboard/Stage6ControlTower';
 import { LessonMatrix } from './LessonMatrix';
 import { ModuleDashboardFooter } from './ModuleDashboardFooter';
 import { useNodeSelection } from '../../hooks/useNodeSelection';
@@ -128,11 +128,44 @@ export function ModuleDashboard({
     logger.debug(`Lesson action: ${action}`, { lessonId, action });
   };
 
+  // Map ModuleDashboardData.aggregates to Stage6ControlTower stats format
+  const controlTowerStats = {
+    totalTokens: undefined, // Not available yet - TODO: aggregate from lessons
+    avgQuality: (data.aggregates.avgQualityScore ?? 0) * 100, // Convert 0-1 to 0-100
+    statusCounts: {
+      completed: data.aggregates.completedLessons,
+      active: data.aggregates.activeLessons,
+      pending: data.aggregates.pendingLessons,
+      failed: data.aggregates.errorLessons,
+    },
+    totalDurationMs: data.aggregates.totalDurationMs,
+    estimatedRemainingMs: data.aggregates.estimatedTimeRemainingMs ?? undefined,
+  };
+
+  // Handlers for Control Tower actions
+  const handleRegenerateAll = () => {
+    // TODO: Implement via tRPC mutation
+    logger.debug('Regenerate all lessons requested', { moduleId: data.moduleId });
+    onRegenerateFailed?.();
+  };
+
+  const handleExportAll = () => {
+    onExportAll?.();
+  };
+
   return (
     <ErrorBoundary FallbackComponent={DashboardErrorFallback}>
       <div className={cn('flex flex-col h-full', className)}>
-        {/* Header with vital signs */}
-        <ModuleDashboardHeader data={data} className="flex-shrink-0" />
+        {/* Header with vital signs - using Stage6ControlTower */}
+        <Stage6ControlTower
+          moduleTitle={`${data.title}`}
+          moduleId={data.moduleId}
+          stats={controlTowerStats}
+          modelTier="standard" // TODO: Get from course settings or user subscription
+          locale="ru"
+          onRegenerateAll={handleRegenerateAll}
+          onExportAll={handleExportAll}
+        />
 
         {/* Lesson matrix - scrollable */}
         <div className="flex-1 overflow-y-auto min-h-0 p-4">

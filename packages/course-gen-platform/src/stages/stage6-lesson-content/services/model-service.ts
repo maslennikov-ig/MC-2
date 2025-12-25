@@ -62,22 +62,23 @@ export async function getStage6ModelConfig(
   }
 
   try {
-    const config = await modelConfigService.getModelForStage(6, normalizedLang, 0);
+    // Use phase-based config - Stage 6 has multiple phases, not a single stage config
+    const phaseConfig = await modelConfigService.getModelForPhase('stage_6_section_expander');
 
     logger.info(
       {
         lessonId: lessonSpec.lesson_id,
         language,
-        primary: config.primary,
-        fallback: config.fallback,
-        source: config.source,
+        primary: phaseConfig.modelId,
+        fallback: phaseConfig.fallbackModelId,
+        source: phaseConfig.source,
       },
       'Retrieved Stage 6 model config'
     );
 
     return {
-      primary: config.primary,
-      fallback: config.fallback,
+      primary: phaseConfig.modelId,
+      fallback: phaseConfig.fallbackModelId ?? MODEL_FALLBACK.fallback,
     };
   } catch (error) {
     logger.warn(

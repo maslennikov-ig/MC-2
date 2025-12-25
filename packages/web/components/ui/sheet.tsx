@@ -144,20 +144,26 @@ const getMotionVariants = (side: "top" | "bottom" | "left" | "right") => {
 
 interface SheetContentProps
   extends React.ComponentPropsWithoutRef<typeof SheetPrimitive.Content>,
-    VariantProps<typeof sheetVariants> {}
+    VariantProps<typeof sheetVariants> {
+  /** Hide the built-in close button (use when providing custom close button) */
+  hideCloseButton?: boolean
+  /** Container element to portal into (for fullscreen support) */
+  container?: HTMLElement | null
+}
 
 const SheetContent = React.forwardRef<
   React.ElementRef<typeof SheetPrimitive.Content>,
   SheetContentProps
->(({ side = "right", className, children, ...props }, ref) => {
+>(({ side = "right", className, children, hideCloseButton = false, container, ...props }, ref) => {
   const actualSide = side || "right"
   const motionVariants = getMotionVariants(actualSide)
 
   return (
-    <SheetPortal>
+    <SheetPortal container={container}>
       <SheetOverlay />
       <SheetPrimitive.Content
         ref={ref}
+        aria-describedby={undefined}
         className={cn(sheetVariants({ side: actualSide }), className)}
         asChild
         {...props}
@@ -168,10 +174,12 @@ const SheetContent = React.forwardRef<
           exit="exit"
           variants={motionVariants as any}
         >
-          <SheetPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-secondary">
-            <X className="h-4 w-4" />
-            <span className="sr-only">Close</span>
-          </SheetPrimitive.Close>
+          {!hideCloseButton && (
+            <SheetPrimitive.Close className="absolute right-4 top-4 rounded-sm opacity-70 ring-offset-background transition-opacity hover:opacity-100 focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:pointer-events-none data-[state=open]:bg-secondary">
+              <X className="h-4 w-4" />
+              <span className="sr-only">Close</span>
+            </SheetPrimitive.Close>
+          )}
           {children}
         </motion.div>
       </SheetPrimitive.Content>

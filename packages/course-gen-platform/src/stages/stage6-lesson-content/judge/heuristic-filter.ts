@@ -26,6 +26,7 @@ import {
   validateMarkdownStructure,
   applyMarkdownAutoFixes,
 } from './markdown-structure-filter';
+import { MERMAID_BLOCK_REGEX } from '../utils/mermaid-sanitizer';
 
 // ============================================================================
 // TYPES
@@ -924,6 +925,135 @@ export function checkContentTruncation(content: string): FilterCheckResult & {
       severity: issues.length > 2 ? 'critical' : 'major',
     };
     result.suggestion = `Content appears truncated: ${issues.join('; ')}. Ensure all content is complete and properly terminated.`;
+  }
+
+  return result;
+}
+
+// ============================================================================
+// MERMAID SYNTAX CHECK (Self-Review Pre-filter)
+// ============================================================================
+
+// Note: MERMAID_BLOCK_REGEX imported from ../utils/mermaid-sanitizer (DRY)
+
+/**
+ * Check Mermaid diagrams for syntax issues
+ *
+ * Detects common Mermaid syntax problems:
+ * - Escaped quotes `\"` that break rendering
+ * - Unclosed brackets [] or braces {}
+ * - Invalid arrow syntax (-> should be -->)
+ *
+ * IMPORTANT: This runs AFTER the sanitizer, so it catches edge cases
+ * that slipped through automated fixing.
+ *
+ * @param content - Lesson content (markdown string)
+ * @returns Filter check result with Mermaid issues
+ */
+export function checkMermaidSyntax(content: string): FilterCheckResult & {
+  mermaidIssues: string[];
+  affectedDiagrams: number;
+  totalDiagrams: number;
+} {
+  const issues: string[] = [];
+  let affectedDiagrams = 0;
+  let totalDiagrams = 0;
+
+  // Extract all Mermaid blocks
+  const mermaidBlocks: string[] = [];
+  content.replace(MERMAID_BLOCK_REGEX, (_, mermaidContent: string) => {
+    mermaidBlocks.push(mermaidContent);
+    return '';
+  });
+
+  totalDiagrams = mermaidBlocks.length;
+
+  // No Mermaid blocks - return perfect score
+  if (totalDiagrams === 0) {
+    return {
+      passed: true,
+      actual: 'no mermaid diagrams',
+      scoreContribution: 1.0,
+      mermaidIssues: [],
+      affectedDiagrams: 0,
+      totalDiagrams: 0,
+    };
+  }
+
+  for (let i = 0; i < mermaidBlocks.length; i++) {
+    const block = mermaidBlocks[i];
+    let hasIssues = false;
+
+    // Check for escaped quotes (primary issue)
+    if (/\\"/.test(block)) {
+      issues.push(`Diagram ${i + 1}: Contains escaped quotes (\\") that break rendering`);
+      hasIssues = true;
+    }
+
+    // Check for unclosed brackets
+    const openBrackets = (block.match(/\[/g) || []).length;
+    const closeBrackets = (block.match(/\]/g) || []).length;
+    if (openBrackets !== closeBrackets) {
+      issues.push(`Diagram ${i + 1}: Unclosed brackets (${openBrackets} open, ${closeBrackets} close)`);
+      hasIssues = true;
+    }
+
+    // Check for unclosed braces
+    const openBraces = (block.match(/\{/g) || []).length;
+    const closeBraces = (block.match(/\}/g) || []).length;
+    if (openBraces !== closeBraces) {
+      issues.push(`Diagram ${i + 1}: Unclosed braces (${openBraces} open, ${closeBraces} close)`);
+      hasIssues = true;
+    }
+
+    // Check for invalid arrow syntax (-> without proper format)
+    // Valid: -->, -.->  Invalid: -> (naked arrow)
+    // Pattern: not preceded by - or . and followed by space or letter
+    if (/(?<![-.])->(?![->])/.test(block)) {
+      issues.push(`Diagram ${i + 1}: Invalid arrow syntax (use --> instead of ->)`);
+      hasIssues = true;
+    }
+
+    if (hasIssues) {
+      affectedDiagrams++;
+    }
+  }
+
+  const passed = issues.length === 0;
+  // Score: 1.0 if clean, reduces by 0.25 per issue (max 4 issues = 0)
+  const scoreContribution = Math.max(0, 1 - issues.length * 0.25);
+
+  const result: FilterCheckResult & {
+    mermaidIssues: string[];
+    affectedDiagrams: number;
+    totalDiagrams: number;
+  } = {
+    passed,
+    actual: issues.length === 0 ? 'all diagrams valid' : `${issues.length} issues`,
+    scoreContribution,
+    mermaidIssues: issues,
+    affectedDiagrams,
+    totalDiagrams,
+  };
+
+  if (!passed) {
+    // Severity: 'major' for rendering-breaking issues
+    result.failure = {
+      filter: 'mermaidSyntax',
+      expected: 'Valid Mermaid syntax',
+      actual: `${issues.length} syntax issues in ${affectedDiagrams}/${totalDiagrams} diagrams`,
+      severity: 'major',
+    };
+    result.suggestion = `Mermaid syntax issues detected: ${issues.slice(0, 3).join('; ')}${issues.length > 3 ? ` (+${issues.length - 3} more)` : ''}. Fix escaped quotes and ensure proper bracket matching.`;
+  }
+
+  if (issues.length > 0) {
+    logger.debug({
+      msg: 'Mermaid syntax check found issues',
+      totalDiagrams,
+      affectedDiagrams,
+      issues,
+    });
   }
 
   return result;

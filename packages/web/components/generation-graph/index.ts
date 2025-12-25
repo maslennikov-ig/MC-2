@@ -1,6 +1,6 @@
 export { GraphView } from './GraphView';
 export { GraphHeader } from './GraphHeader';
-export { StatsBar } from './StatsBar';
+// StatsBar removed - functionality integrated into GraphHeader
 // MobileProgressList removed - maintaining two view modes adds complexity
 export { GenerationGraphErrorBoundary } from './GenerationGraphErrorBoundary';
 export { GraphSkeleton } from './GraphSkeleton';

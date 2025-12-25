@@ -24,13 +24,13 @@ export const QuickActions: React.FC<QuickActionsProps> = ({ onSelect, disabled }
         <Button
           key={action.label}
           variant="outline"
-          size="sm"
-          className="rounded-full text-xs h-8 px-3 flex-shrink-0 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border-blue-200 dark:border-blue-800 hover:bg-gradient-to-r hover:from-blue-100 hover:to-indigo-100 dark:hover:from-blue-900/30 dark:hover:to-indigo-900/30 hover:border-blue-300 dark:hover:border-blue-700 transition-all duration-200 shadow-sm hover:shadow-md"
+          size="compact"
+          className="rounded-full flex-shrink-0 bg-gradient-to-r from-blue-50 to-indigo-50 dark:from-blue-900/20 dark:to-indigo-900/20 border-blue-200 dark:border-blue-800 hover:bg-gradient-to-r hover:from-blue-100 hover:to-indigo-100 dark:hover:from-blue-900/30 dark:hover:to-indigo-900/30 hover:border-blue-300 dark:hover:border-blue-700 transition-all duration-200 shadow-sm hover:shadow-md"
           onClick={() => onSelect(action.text)}
           disabled={disabled}
           type="button"
         >
-          <action.icon className="w-3.5 h-3.5 mr-1.5 text-blue-600 dark:text-blue-400" />
+          <action.icon size={14} className="mr-1 text-blue-600 dark:text-blue-400" />
           <span className="font-medium">{action.label}</span>
         </Button>
       ))}

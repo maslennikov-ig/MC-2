@@ -2,7 +2,7 @@
 
 import React, { useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronDown, RefreshCw, CheckCircle2, Circle, AlertCircle, Loader2, FileText, Layers, Puzzle, Sparkles, Scale, ThumbsUp, ThumbsDown, AlertTriangle } from 'lucide-react';
+import { ChevronDown, RefreshCw, CheckCircle2, Circle, AlertCircle, Loader2, Sparkles, Scale, ThumbsUp, ThumbsDown, AlertTriangle } from 'lucide-react';
 import * as Accordion from '@radix-ui/react-accordion';
 import { cn } from '@/lib/utils';
 import {
@@ -48,15 +48,6 @@ export interface VerticalPipelineStepperProps {
   className?: string;
 }
 
-// =============================================================================
-// Constants
-// =============================================================================
-
-/** Stagger each bar by 15% for visual wave effect in parallel progress bars */
-const PARALLEL_BAR_STAGGER_INTERVAL = 15;
-
-/** Offset to create cascading animation in parallel progress bars */
-const PARALLEL_BAR_STAGGER_OFFSET = 30;
 
 // =============================================================================
 // Helper Functions
@@ -67,13 +58,6 @@ const PARALLEL_BAR_STAGGER_OFFSET = 30;
  */
 function formatTokens(tokens: number): string {
   return tokens.toLocaleString('ru-RU');
-}
-
-/**
- * Format cost in USD
- */
-function formatCost(costUsd: number): string {
-  return `$${costUsd.toFixed(4)}`;
 }
 
 /**
@@ -134,30 +118,9 @@ function getStatusIcon(status: Stage6NodeStatus, isActive: boolean): React.React
 // =============================================================================
 
 /**
- * Output data types for each pipeline stage
+ * Output data types for pipeline stages (3-node pipeline)
  */
-interface PlannerOutput {
-  outlineLength?: number;
-  sectionsPlanned?: number;
-  planningStrategy?: string;
-}
-
-interface ExpanderOutput {
-  expandedCount?: number;
-  totalCount?: number;
-  successRate?: number;
-  completedSections?: number;
-  totalSections?: number;
-}
-
-interface AssemblerOutput {
-  contentLength?: number;
-  sectionsAssembled?: number;
-  exercisesIncluded?: number;
-  wordCount?: number;
-}
-
-interface SmootherOutput {
+interface GeneratorOutput {
   smoothedLength?: number;
   wordCount?: number;
   sectionsCount?: number;
@@ -237,116 +200,9 @@ function formatNumber(num: number): string {
 }
 
 /**
- * Render human-readable output for Planner stage
+ * Render human-readable output for Generator stage
  */
-function PlannerOutputDisplay({ output }: { output: PlannerOutput }) {
-  return (
-    <div className="space-y-2">
-      <div className="flex items-center gap-2 text-slate-700 dark:text-slate-300">
-        <FileText className="w-4 h-4 text-purple-500" />
-        <span className="text-sm font-medium">Результат планирования</span>
-      </div>
-      <div className="grid grid-cols-2 gap-2 text-xs">
-        {output.outlineLength !== undefined && (
-          <div className="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-2">
-            <div className="text-purple-600 dark:text-purple-400 font-medium">Размер плана</div>
-            <div className="text-slate-900 dark:text-slate-100 font-mono">{formatNumber(output.outlineLength)} символов</div>
-          </div>
-        )}
-        {output.sectionsPlanned !== undefined && (
-          <div className="bg-purple-50 dark:bg-purple-900/20 rounded-lg p-2">
-            <div className="text-purple-600 dark:text-purple-400 font-medium">Секций запланировано</div>
-            <div className="text-slate-900 dark:text-slate-100 font-mono">{output.sectionsPlanned}</div>
-          </div>
-        )}
-      </div>
-      {output.planningStrategy && (
-        <div className="text-xs text-slate-600 dark:text-slate-400 mt-1">
-          Стратегия: {output.planningStrategy}
-        </div>
-      )}
-    </div>
-  );
-}
-
-/**
- * Render human-readable output for Expander stage
- */
-function ExpanderOutputDisplay({ output }: { output: ExpanderOutput }) {
-  const progress = output.totalCount && output.expandedCount
-    ? Math.round((output.expandedCount / output.totalCount) * 100)
-    : output.successRate;
-
-  return (
-    <div className="space-y-2">
-      <div className="flex items-center gap-2 text-slate-700 dark:text-slate-300">
-        <Layers className="w-4 h-4 text-blue-500" />
-        <span className="text-sm font-medium">Наполнение секций</span>
-      </div>
-      {(output.expandedCount !== undefined && output.totalCount !== undefined) && (
-        <div className="space-y-1">
-          <div className="flex justify-between text-xs">
-            <span className="text-slate-600 dark:text-slate-400">Обработано секций</span>
-            <span className="font-mono text-blue-600 dark:text-blue-400">{output.expandedCount} из {output.totalCount}</span>
-          </div>
-          <Progress value={progress} className="h-2" />
-        </div>
-      )}
-      {output.successRate !== undefined && (
-        <div className="flex items-center gap-2 text-xs">
-          <CheckCircle2 className="w-3 h-3 text-emerald-500" />
-          <span className="text-slate-600 dark:text-slate-400">Успешность:</span>
-          <span className="font-mono text-emerald-600 dark:text-emerald-400">{output.successRate}%</span>
-        </div>
-      )}
-    </div>
-  );
-}
-
-/**
- * Render human-readable output for Assembler stage
- */
-function AssemblerOutputDisplay({ output }: { output: AssemblerOutput }) {
-  return (
-    <div className="space-y-2">
-      <div className="flex items-center gap-2 text-slate-700 dark:text-slate-300">
-        <Puzzle className="w-4 h-4 text-amber-500" />
-        <span className="text-sm font-medium">Сборка контента</span>
-      </div>
-      <div className="grid grid-cols-2 gap-2 text-xs">
-        {output.sectionsAssembled !== undefined && (
-          <div className="bg-amber-50 dark:bg-amber-900/20 rounded-lg p-2">
-            <div className="text-amber-600 dark:text-amber-400 font-medium">Секций собрано</div>
-            <div className="text-slate-900 dark:text-slate-100 font-mono">{output.sectionsAssembled}</div>
-          </div>
-        )}
-        {output.exercisesIncluded !== undefined && (
-          <div className="bg-amber-50 dark:bg-amber-900/20 rounded-lg p-2">
-            <div className="text-amber-600 dark:text-amber-400 font-medium">Упражнений</div>
-            <div className="text-slate-900 dark:text-slate-100 font-mono">{output.exercisesIncluded}</div>
-          </div>
-        )}
-        {output.contentLength !== undefined && (
-          <div className="bg-amber-50 dark:bg-amber-900/20 rounded-lg p-2">
-            <div className="text-amber-600 dark:text-amber-400 font-medium">Размер контента</div>
-            <div className="text-slate-900 dark:text-slate-100 font-mono">{formatNumber(output.contentLength)} сим.</div>
-          </div>
-        )}
-        {output.wordCount !== undefined && (
-          <div className="bg-amber-50 dark:bg-amber-900/20 rounded-lg p-2">
-            <div className="text-amber-600 dark:text-amber-400 font-medium">Слов</div>
-            <div className="text-slate-900 dark:text-slate-100 font-mono">{formatNumber(output.wordCount)}</div>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-/**
- * Render human-readable output for Smoother stage
- */
-function SmootherOutputDisplay({ output }: { output: SmootherOutput }) {
+function GeneratorOutputDisplay({ output }: { output: GeneratorOutput }) {
   return (
     <div className="space-y-2">
       <div className="flex items-center gap-2 text-slate-700 dark:text-slate-300">
@@ -872,17 +728,15 @@ function SelfReviewerOutputDisplay({ output }: { output: SelfReviewerOutput }) {
 
 /**
  * Check if we have a specialized display for this node type
- * New 3-node pipeline: generator, selfReviewer, judge
- * Legacy nodes are included for backward compatibility with old trace data
+ * 3-node pipeline: generator, selfReviewer, judge
  */
 function hasSpecializedDisplay(node: Stage6NodeName): boolean {
-  return ['generator', 'selfReviewer', 'judge', 'planner', 'expander', 'assembler', 'smoother'].includes(node);
+  return ['generator', 'selfReviewer', 'judge'].includes(node);
 }
 
 /**
  * Render human-readable output based on node type
- * New 3-node pipeline: generator, selfReviewer, judge
- * Legacy nodes are kept for backward compatibility with old trace data
+ * 3-node pipeline: generator, selfReviewer, judge
  */
 function NodeOutputDisplay({ node, output }: { node: Stage6NodeName; output: unknown }) {
   if (!output || typeof output !== 'object') {
@@ -890,22 +744,10 @@ function NodeOutputDisplay({ node, output }: { node: Stage6NodeName; output: unk
   }
 
   switch (node) {
-    // New generator node (combines planner + expander + assembler + smoother)
     case 'generator':
-      // Generator output is similar to smoother output (final content)
-      return <SmootherOutputDisplay output={output as SmootherOutput} />;
-    // New selfReviewer node (heuristic pre-checks)
+      return <GeneratorOutputDisplay output={output as GeneratorOutput} />;
     case 'selfReviewer':
       return <SelfReviewerOutputDisplay output={output as SelfReviewerOutput} />;
-    // Legacy nodes for backward compatibility with old logs
-    case 'planner':
-      return <PlannerOutputDisplay output={output as PlannerOutput} />;
-    case 'expander':
-      return <ExpanderOutputDisplay output={output as ExpanderOutput} />;
-    case 'assembler':
-      return <AssemblerOutputDisplay output={output as AssemblerOutput} />;
-    case 'smoother':
-      return <SmootherOutputDisplay output={output as SmootherOutput} />;
     case 'judge':
       return <JudgeOutputDisplay output={output as JudgeOutput} />;
     default:
@@ -957,42 +799,6 @@ function NodeOutputDisplayWithFallback({ node, output }: { node: Stage6NodeName;
   );
 }
 
-/**
- * Render parallel progress bars for expander node
- */
-function ParallelExpanderBars({ progress = 0 }: { progress?: number }) {
-  const bars = 5; // Representing 5 sections processing in parallel
-  const barProgress = Math.min(100, progress);
-
-  return (
-    <div className="space-y-1 mt-2">
-      {Array.from({ length: bars }).map((_, idx) => {
-        // Calculate staggered progress for parallel visualization
-        const stagger = (idx * PARALLEL_BAR_STAGGER_INTERVAL) % 100;
-        const adjustedProgress = Math.max(0, Math.min(100, barProgress + stagger - PARALLEL_BAR_STAGGER_OFFSET));
-
-        return (
-          <div key={idx} className="flex items-center gap-2">
-            <div className="w-full h-1.5 bg-slate-200 dark:bg-slate-700 rounded-full overflow-hidden">
-              <motion.div
-                className="h-full bg-gradient-to-r from-blue-500 to-cyan-400"
-                initial={{ width: '0%' }}
-                animate={{ width: `${adjustedProgress}%` }}
-                transition={{ duration: 0.5, ease: 'easeOut' }}
-              />
-            </div>
-            <span className="text-xs text-slate-500 dark:text-slate-400 min-w-[3ch]">
-              {Math.round(adjustedProgress)}%
-            </span>
-          </div>
-        );
-      })}
-      <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
-        Секция {Math.ceil((barProgress / 100) * bars)} из {bars}...
-      </p>
-    </div>
-  );
-}
 
 // =============================================================================
 // Pipeline Node Card Component
@@ -1009,9 +815,9 @@ function PipelineNodeCard({ node, isActive, onRetry, onViewOutput }: PipelineNod
   const [isExpanded, setIsExpanded] = useState(false);
   const labels = STAGE6_NODE_LABELS[node.node];
   // Use explicit boolean check to avoid rendering 0
+  // Note: costUsd is NOT required - some models (free/trial) may not report cost
   const hasMetrics = node.status === 'completed' &&
     node.tokensUsed !== undefined &&
-    node.costUsd !== undefined &&
     node.durationMs !== undefined;
   const hasOutput = node.output != null;
   const canExpand = hasOutput || (node.status === 'error' && node.errorMessage);
@@ -1102,16 +908,10 @@ function PipelineNodeCard({ node, isActive, onRetry, onViewOutput }: PipelineNod
             <div className="flex items-center gap-3 mt-2 text-xs text-slate-500 dark:text-slate-400">
               <span className="font-mono">{formatTokens(node.tokensUsed!)} tok</span>
               <span className="text-slate-300 dark:text-slate-600">•</span>
-              <span className="font-mono">{formatCost(node.costUsd!)}</span>
-              <span className="text-slate-300 dark:text-slate-600">•</span>
               <span className="font-mono">{formatDuration(node.durationMs!)}</span>
             </div>
           ) : null}
 
-          {/* Parallel Progress Bars (for expander node) */}
-          {node.node === 'expander' && isActive && (
-            <ParallelExpanderBars progress={node.progress} />
-          )}
 
           {/* Retry Indicator (for loop/retry attempts) */}
           {node.retryAttempt != null && node.retryAttempt > 0 ? (
@@ -1231,13 +1031,12 @@ function ConnectingLine({ isActive }: { isActive: boolean }) {
 /**
  * VerticalPipelineStepper Component
  *
- * Displays the 5-node Stage 6 pipeline vertically with detailed state for each node:
- * - planner → expander → assembler → smoother → judge
+ * Displays the 3-node Stage 6 pipeline vertically with detailed state for each node:
+ * - generator -> selfReviewer -> judge
  *
  * Features:
  * - Status icons (completed/active/pending/error)
  * - Metrics display (tokens, cost, duration)
- * - Parallel progress bars for expander node
  * - Expandable output view
  * - Retry button for error nodes
  * - Loop/retry attempt indicators

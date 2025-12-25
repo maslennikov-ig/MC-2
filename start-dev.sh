@@ -37,6 +37,25 @@ cleanup_old_logs() {
 }
 cleanup_old_logs
 
+# =============================================================================
+# CLI OPTIONS
+# =============================================================================
+VERBOSE=false
+while [[ "$#" -gt 0 ]]; do
+    case $1 in
+        --verbose|-v) VERBOSE=true; shift ;;
+        *) shift ;;
+    esac
+done
+
+# Set log level based on verbosity
+if [ "$VERBOSE" = true ]; then
+    export LOG_LEVEL="trace"
+    echo -e "${YELLOW}🔍 Verbose mode: LOG_LEVEL=trace (showing all logs)${NC}"
+else
+    export LOG_LEVEL="info"
+fi
+
 echo -e "${BLUE}🚀 Starting MegaCampusAI Development Environment...${NC}"
 echo -e "${BLUE}📝 Logs: $LOGS_DIR${NC}"
 
@@ -120,13 +139,15 @@ log_service() {
 
 # 2. Start Backend (tRPC API server) on port 3456
 # Using non-standard port to avoid conflicts with common services
+# JSON logs to file, pino-pretty for terminal readability
 echo -e "\n${BLUE}⚙️  Starting Backend (course-gen-platform) on port 3456...${NC}"
-(PORT=3456 pnpm --filter course-gen-platform dev 2>&1 | tee >(ansifilter > "$BACKEND_LOG") | sed "s/^/[backend] /" | log_service backend "$BACKEND_LOG") &
+(PORT=3456 pnpm --filter course-gen-platform dev 2>&1 | tee "$BACKEND_LOG" | npx pino-pretty --colorize --translateTime 'HH:MM:ss' --ignore pid,hostname,service,environment,version | sed "s/^/[backend] /" | log_service backend "$BACKEND_LOG") &
 BACKEND_PID=$!
 
 # 3. Start BullMQ Worker (job processor)
+# JSON logs to file, pino-pretty for terminal readability
 echo -e "\n${BLUE}👷 Starting BullMQ Worker...${NC}"
-(pnpm --filter course-gen-platform dev:worker 2>&1 | tee >(ansifilter > "$WORKER_LOG") | sed "s/^/[worker] /" | log_service worker "$WORKER_LOG") &
+(pnpm --filter course-gen-platform dev:worker 2>&1 | tee "$WORKER_LOG" | npx pino-pretty --colorize --translateTime 'HH:MM:ss' --ignore pid,hostname,service,environment,version | sed "s/^/[worker] /" | log_service worker "$WORKER_LOG") &
 WORKER_PID=$!
 
 # 4. Start Frontend (using webpack mode for ElkJS/React Flow compatibility)
@@ -169,6 +190,9 @@ echo -e ""
 echo -e "${YELLOW}💡 View logs in real-time:${NC}"
 echo -e "   tail -f $LOGS_DIR/combined-latest.log"
 echo -e "   tail -f $LOGS_DIR/backend-latest.log"
+echo -e ""
+echo -e "${YELLOW}💡 Options:${NC}"
+echo -e "   ./start-dev.sh --verbose  # Show all logs (trace level)"
 echo -e ""
 echo -e "${YELLOW}Press Ctrl+C to stop all services.${NC}\n"
 

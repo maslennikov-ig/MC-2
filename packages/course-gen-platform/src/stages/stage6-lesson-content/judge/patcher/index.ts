@@ -65,7 +65,7 @@ async function defaultLLMCall(
   const llmClient = new LLMClient();
   const modelService = createModelConfigService();
 
-  let modelId = 'openai/gpt-oss-120b'; // Fallback
+  let modelId = 'unknown'; // Will be set from database config
   try {
     const config = await modelService.getModelForPhase('stage_6_patcher');
     modelId = config.modelId;

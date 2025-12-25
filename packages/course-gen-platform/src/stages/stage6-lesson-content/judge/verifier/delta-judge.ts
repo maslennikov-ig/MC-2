@@ -141,7 +141,7 @@ export async function verifyPatch(input: DeltaJudgeInput): Promise<DeltaJudgeOut
 
   try {
     // Get model configuration
-    let modelId = 'openai/gpt-oss-20b';
+    let modelId = 'unknown'; // Will be set from database config
     let temperature = 0.0;
     let maxTokens = 512;
 

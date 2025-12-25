@@ -32,6 +32,7 @@ import { GRAPH_STAGE_CONFIG, NODE_STYLES, ACTIVE_STATUSES } from '@/lib/generati
 import { GRAPH_TRANSLATIONS } from '@/lib/generation-graph/translations';
 import { useGenerationRealtime } from '@/components/generation-monitoring/realtime-provider';
 import { RealtimeStatusData, NodeStatusEntry } from '@megacampus/shared-types';
+import { GenerationProgress, CourseStatus } from '@/types/course-generation';
 import { mapStatusToNodeStatus, getStageFromStatus, isAwaitingApproval, calculateProgress } from '@/lib/generation-graph/utils';
 import { GraphControls } from './controls/GraphControls';
 import { GraphMinimap } from './controls/GraphMinimap';
@@ -56,7 +57,7 @@ import { useSessionRecovery } from './hooks/useSessionRecovery';
 import { useKeyboardNavigation } from './hooks/useKeyboardNavigation';
 // ViewToggle removed - maintaining two view modes adds complexity without significant benefit
 import { useUserRole } from './hooks/useUserRole';
-import { useFileCatalog } from './hooks/useFileCatalog';
+import { useDocumentsWithStatus } from './hooks/useDocumentsWithStatus';
 import { createClient } from '@/lib/supabase/client';
 import { useLocale } from 'next-intl';
 import { setTranslationLocale } from './hooks/use-graph-data/utils/step-translations';
@@ -116,6 +117,26 @@ export interface GraphViewProps {
     inputData: Record<string, unknown>;
     outputData: Record<string, unknown>;
   };
+  /**
+   * User subscription tier for model display.
+   * Determines which model name is shown (e.g., "Premium Model" for 'premium').
+   * @default 'standard'
+   */
+  tier?: 'trial' | 'free' | 'basic' | 'standard' | 'premium';
+  /**
+   * Full generation progress data for header stats display.
+   * Contains started_at, modules_total, lessons_total, lessons_completed, etc.
+   */
+  generationProgress?: GenerationProgress;
+  /**
+   * Current generation status for header stats display.
+   */
+  generationStatus?: CourseStatus;
+  /**
+   * Whether realtime connection is active.
+   * Used for connection indicator in header.
+   */
+  isRealtimeConnected?: boolean;
 }
 
 /**
@@ -156,7 +177,7 @@ function GraphInteractions({ setIsPanning }: GraphInteractionsProps) {
  *
  * @param props - Component props
  */
-function GraphViewInner({ courseId, courseTitle, hasDocuments = true, failedAtStage, progressPercentage, generationCode, stage1CourseData }: GraphViewProps) {
+function GraphViewInner({ courseId, courseTitle, hasDocuments = true, failedAtStage, progressPercentage, generationCode, stage1CourseData, tier = 'standard', generationProgress, generationStatus, isRealtimeConnected }: GraphViewProps) {
   const { isTablet } = useBreakpoint(768);
   const nodesInitialized = useNodesInitialized();
   const { fitView, getNodes, setCenter } = useReactFlow();
@@ -273,12 +294,13 @@ function GraphViewInner({ courseId, courseTitle, hasDocuments = true, failedAtSt
   const [isInteracting, setIsInteracting] = useState(false);
 
   // File catalog for document filename lookup (T014: Fix UUID display)
-  const { getFilename, filenameMap, isLoading: isCatalogLoading } = useFileCatalog(courseId);
-  const initializeDocuments = useGenerationStore(state => state.initializeDocuments);
+  // Also loads document statuses for Stage 2 graph initialization
+  const { documents: documentsWithStatus, getFilename, isLoading: isCatalogLoading } = useDocumentsWithStatus(courseId);
+  const initializeDocumentsWithStatus = useGenerationStore(state => state.initializeDocumentsWithStatus);
   const areAllDocumentsComplete = useGenerationStore(state => state.areAllDocumentsComplete);
 
   // Graph State
-  const { nodes, edges, onNodesChange, onEdgesChange, processTraces, initializeFromCourseStructure, setNodes, nodePositionsRef } = useGraphData({ getFilename, hasDocuments, stage1CourseData });
+  const { nodes, edges, onNodesChange, onEdgesChange, processTraces, initializeFromCourseStructure, initializeDocumentsFromDb, setNodes, nodePositionsRef } = useGraphData({ getFilename, hasDocuments, stage1CourseData });
   const { layoutNodes, layoutError: _layoutError } = useGraphLayout();
   // Layout generation counter to prevent stale layout results (Fix #6: Race condition)
   const layoutGenerationRef = useRef(0);
@@ -381,18 +403,24 @@ function GraphViewInner({ courseId, courseTitle, hasDocuments = true, failedAtSt
     }
   }, [pipelineStatus, courseId, initializeFromCourseStructure]);
 
-  // Initialize documents from file catalog (prevents premature stage completion)
-  const documentsInitialized = useRef(false);
+  // Initialize Stage 2 documents from database with proper statuses
+  // This ensures documents appear in the graph on page load (before realtime traces arrive)
+  // and have correct completion status for Stage2Group display
+  // Note: We check store state instead of using ref because Zustand store can reset on HMR
+  const storeDocumentsCount = useGenerationStore(state => state.documents.size);
   useEffect(() => {
-    if (documentsInitialized.current || isCatalogLoading || !hasDocuments) return;
-    if (filenameMap.size === 0) return;
+    if (isCatalogLoading || !hasDocuments) return;
+    if (documentsWithStatus.length === 0) return;
 
-    documentsInitialized.current = true;
+    // Only initialize if store is empty (handles HMR reset)
+    if (storeDocumentsCount > 0) return;
 
-    // Convert Map to array format for store
-    const files = Array.from(filenameMap.entries()).map(([id, name]) => ({ id, name }));
-    initializeDocuments(files);
-  }, [filenameMap, isCatalogLoading, hasDocuments, initializeDocuments]);
+    // Initialize Zustand store with proper statuses (for Stage2Group counters)
+    initializeDocumentsWithStatus(documentsWithStatus);
+
+    // Initialize useGraphData documentSteps (for graph node creation)
+    initializeDocumentsFromDb(documentsWithStatus);
+  }, [documentsWithStatus, isCatalogLoading, hasDocuments, storeDocumentsCount, initializeDocumentsWithStatus, initializeDocumentsFromDb]);
 
   // Track module and stage2group collapse states for relayout trigger
   const collapseSignature = useMemo(() =>
@@ -625,9 +653,10 @@ function GraphViewInner({ courseId, courseTitle, hasDocuments = true, failedAtSt
         documentCount: 0,
         moduleCount: 0,
         lessonCount: 0,
+        tier,
       },
     }),
-    [courseId, courseTitle]
+    [courseId, courseTitle, tier]
   );
 
   // Mobile view - show simplified graph (no separate list view)
@@ -714,6 +743,9 @@ function GraphViewInner({ courseId, courseTitle, hasDocuments = true, failedAtSt
              isFullscreen={isFullscreen}
              onToggleFullscreen={toggleFullscreen}
              generationCode={generationCode}
+             generationProgress={generationProgress}
+             generationStatus={generationStatus}
+             isConnected={isRealtimeConnected ?? isConnected}
           />
           <div className="relative flex-1 w-full overflow-hidden">
             {/* Degradation Mode Indicator */}

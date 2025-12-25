@@ -771,51 +771,62 @@ class ModelConfigServiceImpl {
   ): Promise<ModelConfigResult | null> {
     const supabase = getSupabaseAdmin();
 
-    // Use .select() to get all columns - Supabase types work better with '*'
-    const { data, error } = await supabase
-      .from('llm_model_config')
-      .select()
-      .eq('config_type', 'global')
-      .eq('stage_number', stageNumber)
-      .eq('language', language)
-      .eq('context_tier', tier)
-      .eq('is_active', true)
-      .maybeSingle();
+    // Cascading language lookup: specific language -> 'any' fallback
+    // This allows defining language-specific models while using 'any' as universal fallback
+    const languagesToTry: Array<'ru' | 'en' | 'any'> = [language, 'any'];
 
-    if (error) {
-      logger.warn({ stageNumber, language, tier, error }, 'Error fetching stage config from DB');
-      return null;
+    for (const langToTry of languagesToTry) {
+      const { data, error } = await supabase
+        .from('llm_model_config')
+        .select()
+        .eq('config_type', 'global')
+        .eq('stage_number', stageNumber)
+        .eq('language', langToTry)
+        .eq('context_tier', tier)
+        .eq('is_active', true)
+        .maybeSingle();
+
+      if (error) {
+        logger.warn({ stageNumber, language: langToTry, tier, error }, 'Error fetching stage config from DB');
+        continue; // Try next language variant
+      }
+
+      if (data) {
+        if (langToTry === 'any') {
+          logger.debug(
+            { stageNumber, requestedLanguage: language, foundLanguage: 'any', tier },
+            'Using universal (any) language config as fallback'
+          );
+        }
+        // Found a config - process it below
+        const config = data as LLMModelConfigRow;
+
+        // Validate required fields - fail fast on incomplete data
+        if (!config.fallback_model_id) {
+          const errorMsg = `Incomplete stage config in database: missing fallback_model_id for stage ${stageNumber}, language "${langToTry}", tier "${tier}"`;
+          logger.error({ stageNumber, language: langToTry, tier, modelId: config.model_id }, errorMsg);
+          throw new Error(errorMsg);
+        }
+
+        if (!config.max_context_tokens) {
+          const errorMsg = `Incomplete stage config in database: missing max_context_tokens for stage ${stageNumber}, language "${langToTry}", tier "${tier}"`;
+          logger.error({ stageNumber, language: langToTry, tier, modelId: config.model_id }, errorMsg);
+          throw new Error(errorMsg);
+        }
+
+        return {
+          primary: config.model_id,
+          fallback: config.fallback_model_id,
+          maxContext: config.max_context_tokens,
+          cacheReadEnabled: config.cache_read_enabled || false,
+          tier,
+          source: 'database',
+        };
+      }
     }
 
-    if (!data) {
-      return null;
-    }
-
-    // Type assertion to help TypeScript recognize the full schema
-    const config = data as LLMModelConfigRow;
-
-    // Validate required fields - fail fast on incomplete data
-    // This enforces data quality at the database level
-    if (!config.fallback_model_id) {
-      const errorMsg = `Incomplete stage config in database: missing fallback_model_id for stage ${stageNumber}, language "${language}", tier "${tier}"`;
-      logger.error({ stageNumber, language, tier, modelId: config.model_id }, errorMsg);
-      throw new Error(errorMsg);
-    }
-
-    if (!config.max_context_tokens) {
-      const errorMsg = `Incomplete stage config in database: missing max_context_tokens for stage ${stageNumber}, language "${language}", tier "${tier}"`;
-      logger.error({ stageNumber, language, tier, modelId: config.model_id }, errorMsg);
-      throw new Error(errorMsg);
-    }
-
-    return {
-      primary: config.model_id,
-      fallback: config.fallback_model_id,
-      maxContext: config.max_context_tokens,
-      cacheReadEnabled: config.cache_read_enabled || false,
-      tier,
-      source: 'database',
-    };
+    // No config found for any language variant
+    return null;
   }
 
   private async fetchPhaseConfigFromDb(

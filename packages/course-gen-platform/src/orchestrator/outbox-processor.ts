@@ -101,13 +101,14 @@ export class OutboxProcessor {
             this.pollInterval * this.backoffMultiplier,
             this.maxPollInterval
           );
-          logger.debug(
+          // Use trace level to reduce dev log noise (only visible with LOG_LEVEL=trace)
+          logger.trace(
             { nextPollInterval: this.pollInterval },
             'No jobs processed, increasing poll interval'
           );
         } else {
           this.pollInterval = this.minPollInterval;
-          logger.debug(
+          logger.trace(
             { jobsProcessed: processed },
             'Jobs processed, reset to min poll interval'
           );

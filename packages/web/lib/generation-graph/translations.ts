@@ -876,6 +876,7 @@ export const GRAPH_TRANSLATIONS: GraphTranslations & {
     controlTower: {
       title: { ru: 'Модуль', en: 'Module' },
       tokensUsed: { ru: 'Токены', en: 'Tokens' },
+      costUsed: { ru: 'Стоимость', en: 'Cost' },
       avgQuality: { ru: 'Качество', en: 'Quality' },
       quality: { ru: 'Качество', en: 'Quality' },
       time: { ru: 'Время', en: 'Time' },

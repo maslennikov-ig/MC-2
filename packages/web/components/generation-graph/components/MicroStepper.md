@@ -1,16 +1,14 @@
 # MicroStepper Component
 
-A compact 5-dot pipeline status indicator for Stage 6 lesson generation UI.
+A compact 3-dot pipeline status indicator for Stage 6 lesson generation UI.
 
 ## Overview
 
-The MicroStepper displays a horizontal row of 5 dots, each representing one node in the Stage 6 pipeline:
+The MicroStepper displays a horizontal row of 3 dots, each representing one node in the Stage 6 pipeline:
 
-1. **Planner** (Планировщик) - Creates lesson structure
-2. **Expander** (Наполнение) - Generates content for sections
-3. **Assembler** (Сборщик) - Combines sections into cohesive lesson
-4. **Smoother** (Редактор) - Applies stylistic refinement
-5. **Judge** (Оценка качества) - Evaluates quality using CLEV voting
+1. **Generator** - Generates full lesson content (intro + sections + summary)
+2. **SelfReviewer** - Pre-judge validation (Fail-Fast architecture)
+3. **Judge** - Evaluates quality using CLEV voting and targeted refinement
 
 ## Features
 
@@ -27,13 +25,11 @@ The MicroStepper displays a horizontal row of 5 dots, each representing one node
 import { MicroStepper } from '@/components/generation-graph/components/MicroStepper';
 import { MicroStepperState } from '@megacampus/shared-types';
 
-// Example: Lesson with expander actively processing
+// Example: Lesson with generator actively processing
 const state: MicroStepperState = {
   nodes: [
-    { node: 'planner', status: 'completed' },
-    { node: 'expander', status: 'active' },
-    { node: 'assembler', status: 'pending' },
-    { node: 'smoother', status: 'pending' },
+    { node: 'generator', status: 'active' },
+    { node: 'selfReviewer', status: 'pending' },
     { node: 'judge', status: 'pending' },
   ]
 };
@@ -49,7 +45,7 @@ const state: MicroStepperState = {
 
 | Prop | Type | Default | Description |
 |------|------|---------|-------------|
-| `state` | `MicroStepperState` | Required | Pipeline state with 5 nodes and their statuses |
+| `state` | `MicroStepperState` | Required | Pipeline state with 3 nodes and their statuses |
 | `size` | `'sm' \| 'md'` | `'sm'` | Dot size: 'sm' (8px) for tables, 'md' (12px) for larger displays |
 | `showTooltip` | `boolean` | `true` | Whether to show tooltips on hover |
 | `className` | `string` | `undefined` | Additional CSS classes |
@@ -67,13 +63,13 @@ const state: MicroStepperState = {
 ## Animation Details
 
 ### Active Status
-- **Pulse Animation**: Scale from 1 → 1.2 → 1, opacity from 1 → 0.7 → 1
+- **Pulse Animation**: Scale from 1 -> 1.2 -> 1, opacity from 1 -> 0.7 -> 1
 - **Duration**: 1.5s infinite loop
 - **Easing**: easeInOut
 
 ### Loop Status
 - **Rotating Icon**: RotateCw icon (from lucide-react)
-- **Rotation**: 360° continuous rotation
+- **Rotation**: 360 deg continuous rotation
 - **Duration**: 2s infinite loop
 - **Easing**: linear
 
@@ -92,7 +88,7 @@ See `MicroStepper.example.tsx` for comprehensive examples including:
 <table>
   <tbody>
     <tr>
-      <td>Урок 1</td>
+      <td>Lesson 1</td>
       <td>
         <MicroStepper state={lesson.pipelineState} size="sm" />
       </td>
@@ -120,7 +116,7 @@ See `MicroStepper.example.tsx` for comprehensive examples including:
 ## Accessibility
 
 - Uses semantic `role="status"` attribute
-- ARIA label: "Статус пайплайна"
+- ARIA label: "Status pipeline"
 - Tooltips provide additional context for screen readers
 - Color is not the only indicator (icons for loop state)
 - Keyboard accessible via tooltip focus
@@ -128,7 +124,7 @@ See `MicroStepper.example.tsx` for comprehensive examples including:
 ## Type Safety
 
 All types are imported from `@megacampus/shared-types`:
-- `Stage6NodeName`: 'planner' | 'expander' | 'assembler' | 'smoother' | 'judge'
+- `Stage6NodeName`: 'generator' | 'selfReviewer' | 'judge'
 - `Stage6NodeStatus`: 'pending' | 'active' | 'completed' | 'error' | 'loop'
 - `MicroStepperState`: Interface with nodes array
 - `STAGE6_NODE_LABELS`: Russian labels constant
@@ -136,7 +132,7 @@ All types are imported from `@megacampus/shared-types`:
 ## Dark Mode
 
 Full dark mode support using Tailwind's `dark:` prefix:
-- Pending dots: slate-300 → slate-600
+- Pending dots: slate-300 -> slate-600
 - All other statuses use same colors in both modes (sufficient contrast)
 - Tooltip background automatically adapts via shadcn/ui theme
 
@@ -150,12 +146,10 @@ Full dark mode support using Tailwind's `dark:` prefix:
 ## Related Components
 
 - **VerticalPipelineStepper**: Larger vertical version for Lesson Inspector
-- **ParallelExpanderBars**: Detailed progress bars for expander node
 - **ModuleDashboard**: Parent component that displays lesson matrix
 
 ## Future Enhancements
 
-- [ ] Add progress percentage for expander node (0-100%)
 - [ ] Configurable animation speeds
 - [ ] Custom color themes
 - [ ] Click handlers for navigation to Lesson Inspector

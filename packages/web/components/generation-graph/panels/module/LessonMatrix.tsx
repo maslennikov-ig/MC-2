@@ -53,15 +53,6 @@ interface LessonMatrixProps {
 }
 
 /**
- * Format cost as USD currency
- */
-function formatCost(cost: number): string {
-  if (cost === 0) return '$0.00';
-  if (cost < 0.01) return `$${cost.toFixed(4)}`;
-  return `$${cost.toFixed(2)}`;
-}
-
-/**
  * Format quality score as 0.XX or "—"
  */
 function formatQuality(score: number | null): string {
@@ -163,7 +154,6 @@ function ActionButton({
  * Calculate summary statistics
  */
 function calculateSummary(lessons: LessonMatrixRow[]) {
-  const totalCost = lessons.reduce((sum, lesson) => sum + lesson.costUsd, 0);
   const completedLessons = lessons.filter((l) => l.qualityScore !== null);
   const avgQuality =
     completedLessons.length > 0
@@ -172,7 +162,6 @@ function calculateSummary(lessons: LessonMatrixRow[]) {
 
   return {
     totalLessons: lessons.length,
-    totalCost,
     avgQuality,
   };
 }
@@ -189,7 +178,6 @@ export function LessonMatrix({ lessons, onLessonClick, onLessonAction, className
             <TableHead>Название</TableHead>
             <TableHead className="w-40">Pipeline</TableHead>
             <TableHead className="w-24 text-center">Качество</TableHead>
-            <TableHead className="w-24 text-right">Стоим.</TableHead>
             <TableHead className="w-20 text-center">Действие</TableHead>
           </TableRow>
         </TableHeader>
@@ -221,9 +209,6 @@ export function LessonMatrix({ lessons, onLessonClick, onLessonAction, className
               <TableCell className="text-center font-mono">
                 {formatQuality(lesson.qualityScore)}
               </TableCell>
-              <TableCell className="text-right font-mono text-sm">
-                {formatCost(lesson.costUsd)}
-              </TableCell>
               <TableCell className="text-center">
                 <ActionButton
                   lesson={lesson}
@@ -235,11 +220,9 @@ export function LessonMatrix({ lessons, onLessonClick, onLessonAction, className
         </TableBody>
         <TableFooter>
           <TableRow className="hover:bg-transparent">
-            <TableCell colSpan={6} className="text-center">
+            <TableCell colSpan={5} className="text-center">
               <div className="flex items-center justify-center gap-6 text-sm font-medium text-slate-600 dark:text-slate-400">
                 <span>Всего: {summary.totalLessons} уроков</span>
-                <span className="text-slate-400 dark:text-slate-600">•</span>
-                <span>{formatCost(summary.totalCost)}</span>
                 {summary.avgQuality !== null && (
                   <>
                     <span className="text-slate-400 dark:text-slate-600">•</span>

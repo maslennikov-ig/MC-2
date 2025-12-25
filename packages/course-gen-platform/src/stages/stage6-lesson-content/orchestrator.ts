@@ -2,7 +2,7 @@
  * Stage 6 LangGraph Orchestrator
  * @module stages/stage6-lesson-content/orchestrator
  *
- * Wires together the LangGraph nodes (generator -> selfReviewer -> judge)
+ * Wires together the LangGraph nodes (generator -> selfReviewer -> sectionRegenerator/judge)
  * using StateGraph for lesson content generation pipeline.
  *
  * Pipeline flow:
@@ -10,6 +10,7 @@
  *                             |              |
  *                             |              +-> generator (if regenerate needed)
  *                             +-> generator (if REGENERATE status)
+ *                             +-> sectionRegenerator (if sectionsToRegenerate) -> judge
  *
  * The generator node:
  * - Generates complete lesson content in one pass using serial section-by-section generation
@@ -19,7 +20,12 @@
  * The selfReviewer node:
  * - Performs pre-judge validation (Fail-Fast architecture)
  * - Detects fatal errors before expensive judge evaluation
- * - Routes to generator for regeneration or judge for final evaluation
+ * - Routes to generator for full regeneration, sectionRegenerator for section-level fixes, or judge for evaluation
+ *
+ * The sectionRegenerator node:
+ * - Regenerates specific sections identified by selfReviewer (instead of full content)
+ * - Merges regenerated sections back into existing content
+ * - Routes to judge for evaluation after regeneration
  *
  * The judge node:
  * - Evaluates content quality using cascade evaluation (heuristics -> single judge -> CLEV)
@@ -34,7 +40,7 @@
  */
 
 import { StateGraph, START, END } from '@langchain/langgraph';
-import { LessonGraphState, type LessonGraphStateType, type LessonGraphStateUpdate } from './state';
+import { LessonGraphState, type LessonGraphStateType, type LessonGraphStateUpdate, type LessonGraphNode } from './state';
 import { generatorNode } from './nodes/generator';
 import { selfReviewerNode } from './nodes/self-reviewer-node';
 import type { LessonSpecificationV2 } from '@megacampus/shared-types/lesson-specification-v2';
@@ -68,6 +74,7 @@ import { logger } from '@/shared/logger';
 import { logTrace } from '@/shared/trace-logger';
 import { HANDLER_CONFIG } from './config';
 import { parseMarkdownContent } from './utils/markdown-parser';
+import { regenerateSections } from './utils/section-regenerator';
 
 // ============================================================================
 // PUBLIC INTERFACES
@@ -1022,7 +1029,9 @@ async function judgeNode(state: LessonGraphStateType): Promise<LessonGraphStateU
 
           if (operationMode === 'full-auto' && noWorkDone && originalScoreIsGood) {
             // Arbiter rejected all issues but CLEV score was good - accept the original content
-            finalContent = state.lessonContent;
+            // FIX: Use buildLessonContent instead of state.lessonContent which may be null
+            // state.lessonContent is only set when content is ACCEPTED, not during the evaluation flow
+            finalContent = buildLessonContent(state, contentBody, verdict.overallScore);
             finalScore = verdict.overallScore;
             finalRecommendation = 'ACCEPT_WITH_MINOR_REVISION';
 
@@ -1198,6 +1207,134 @@ async function judgeNode(state: LessonGraphStateType): Promise<LessonGraphStateU
   }
 }
 
+/**
+ * Section Regenerator Node - Regenerates specific sections identified by self-reviewer
+ *
+ * Called when selfReviewResult.sectionsToRegenerate is populated.
+ * Regenerates only the problematic sections and merges them back into the content.
+ *
+ * @param state - Current LangGraph state after selfReviewer node
+ * @returns Updated state with regenerated content
+ */
+async function sectionRegeneratorNode(state: LessonGraphStateType): Promise<LessonGraphStateUpdate> {
+  const startTime = Date.now();
+  const sectionsToRegenerate = state.selfReviewResult?.sectionsToRegenerate || [];
+
+  logger.info({
+    lessonId: state.lessonSpec.lesson_id,
+    currentNode: 'sectionRegenerator',
+    sectionsToRegenerate,
+    sectionCount: sectionsToRegenerate.length,
+  }, 'Section regenerator: Starting section-level regeneration');
+
+  // Log trace at start
+  await logTrace({
+    courseId: state.courseId,
+    lessonId: state.lessonUuid || undefined,
+    stage: 'stage_6',
+    phase: 'section_regenerator',
+    stepName: 'section_regen_start',
+    inputData: {
+      lessonLabel: state.lessonSpec.lesson_id,
+      sectionsToRegenerate,
+    },
+    durationMs: 0,
+  });
+
+  try {
+    // Regenerate sections
+    const result = await regenerateSections({
+      markdown: state.generatedContent || '',
+      sectionIds: sectionsToRegenerate,
+      lessonSpec: state.lessonSpec,
+      ragChunks: state.ragChunks,
+      language: state.language,
+      modelOverride: state.modelOverride,
+    });
+
+    const durationMs = Date.now() - startTime;
+
+    // Log trace at completion
+    await logTrace({
+      courseId: state.courseId,
+      lessonId: state.lessonUuid || undefined,
+      stage: 'stage_6',
+      phase: 'section_regenerator',
+      stepName: 'section_regen_complete',
+      inputData: {
+        lessonLabel: state.lessonSpec.lesson_id,
+      },
+      outputData: {
+        success: result.success,
+        regeneratedSections: result.regeneratedSections,
+        failedSections: result.failedSections,
+        tokensUsed: result.tokensUsed,
+      },
+      tokensUsed: result.tokensUsed,
+      durationMs,
+    });
+
+    if (!result.success) {
+      logger.warn({
+        lessonId: state.lessonSpec.lesson_id,
+        failedSections: result.failedSections,
+        errorMessage: result.errorMessage,
+      }, 'Section regenerator: Some sections failed, proceeding with partial result');
+    }
+
+    logger.info({
+      lessonId: state.lessonSpec.lesson_id,
+      regeneratedSections: result.regeneratedSections,
+      tokensUsed: result.tokensUsed,
+      durationMs,
+    }, 'Section regenerator: Completed');
+
+    return {
+      currentNode: 'sectionRegenerator' as LessonGraphNode,
+      generatedContent: result.content,
+      tokensUsed: result.tokensUsed,
+      durationMs,
+      sectionRegenerationResult: {
+        sectionsRegenerated: result.regeneratedSections,
+        tokensUsed: result.tokensUsed,
+        durationMs,
+      },
+    };
+  } catch (error) {
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const durationMs = Date.now() - startTime;
+
+    logger.error({
+      lessonId: state.lessonSpec.lesson_id,
+      error: errorMessage,
+      durationMs,
+    }, 'Section regenerator: Failed with exception');
+
+    // Log trace on error
+    await logTrace({
+      courseId: state.courseId,
+      lessonId: state.lessonUuid || undefined,
+      stage: 'stage_6',
+      phase: 'section_regenerator',
+      stepName: 'section_regen_error',
+      inputData: {
+        lessonLabel: state.lessonSpec.lesson_id,
+      },
+      errorData: {
+        error: errorMessage,
+      },
+      durationMs,
+    });
+
+    // On error, proceed to judge with original content
+    return {
+      currentNode: 'sectionRegenerator' as LessonGraphNode,
+      errors: [`Section regeneration failed: ${errorMessage}`],
+      durationMs,
+    };
+  }
+}
+
 // ============================================================================
 // CONDITIONAL EDGE ROUTING
 // ============================================================================
@@ -1270,10 +1407,12 @@ function shouldRetryAfterJudge(state: LessonGraphStateType): string {
  *
  * Determines next step based on self-review evaluation:
  * - 'judge': Content passed or needs judge attention (PASS, PASS_WITH_FLAGS, FIXED, FLAG_TO_JUDGE)
+ * - 'sectionRegenerator': Specific sections need regeneration (sectionsToRegenerate populated)
  * - 'generator': Content needs regeneration (REGENERATE status)
+ * - '__end__': Max retries exceeded
  *
  * @param state - Current graph state after selfReviewer evaluation
- * @returns Next node name: 'judge' or 'generator'
+ * @returns Next node name: 'judge', 'sectionRegenerator', 'generator', or '__end__'
  */
 function shouldProceedToJudge(state: LessonGraphStateType): string {
   const selfReviewResult = state.selfReviewResult;
@@ -1311,6 +1450,19 @@ function shouldProceedToJudge(state: LessonGraphStateType): string {
     return 'generator';
   }
 
+  // NEW: Check if specific sections need regeneration (not full regenerate)
+  const sectionsToRegenerate = selfReviewResult.sectionsToRegenerate;
+  if (sectionsToRegenerate && sectionsToRegenerate.length > 0) {
+    logger.info({
+      lessonId: state.lessonSpec.lesson_id,
+      status,
+      sectionsToRegenerate,
+      sectionCount: sectionsToRegenerate.length,
+    }, 'SelfReviewer routing: Section-level regeneration needed - routing to sectionRegenerator');
+
+    return 'sectionRegenerator';
+  }
+
   // PASS, PASS_WITH_FLAGS, FIXED, FLAG_TO_JUDGE: Proceed to judge
   logger.debug({
     lessonId: state.lessonSpec.lesson_id,
@@ -1332,6 +1484,7 @@ function shouldProceedToJudge(state: LessonGraphStateType): string {
  * Builds the lesson generation pipeline with:
  * - generator: Generate complete lesson content in one pass (serial section-by-section)
  * - selfReviewer: Pre-judge validation (Fail-Fast architecture)
+ * - sectionRegenerator: Regenerate specific sections identified by selfReviewer
  * - judge: Validate quality and handle refinement/regeneration
  *
  * Pipeline flow:
@@ -1339,6 +1492,7 @@ function shouldProceedToJudge(state: LessonGraphStateType): string {
  *                        |              |
  *                        |              +-> generator (if regenerate needed)
  *                        +-> generator (if REGENERATE status)
+ *                        +-> sectionRegenerator (if sectionsToRegenerate) -> judge
  *
  * @returns Compiled StateGraph ready for invocation
  */
@@ -1347,16 +1501,20 @@ function createStage6Graph() {
     // Add nodes
     .addNode('generator', generatorNode)
     .addNode('selfReviewer', selfReviewerNode)
+    .addNode('sectionRegenerator', sectionRegeneratorNode)
     .addNode('judge', judgeNode)
     // Define edges
     .addEdge(START, 'generator')
     .addEdge('generator', 'selfReviewer')
-    // Conditional edge from selfReviewer: proceed to judge or regenerate
+    // Conditional edge from selfReviewer: proceed to judge, sectionRegenerator, or regenerate
     .addConditionalEdges('selfReviewer', shouldProceedToJudge, {
       judge: 'judge',
       generator: 'generator',
+      sectionRegenerator: 'sectionRegenerator',
       __end__: END,
     })
+    // After section regeneration, proceed to judge
+    .addEdge('sectionRegenerator', 'judge')
     // Conditional edge from judge: either end or retry
     .addConditionalEdges('judge', shouldRetryAfterJudge, {
       generator: 'generator',

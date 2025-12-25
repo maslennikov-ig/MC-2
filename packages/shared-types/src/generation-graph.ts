@@ -629,6 +629,8 @@ export interface StaticGraphData {
     documentCount: number;
     moduleCount: number;
     lessonCount: number;
+    /** Subscription tier for model selection */
+    tier?: 'trial' | 'free' | 'basic' | 'standard' | 'premium';
   };
 }
 

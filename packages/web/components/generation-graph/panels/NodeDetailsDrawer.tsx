@@ -33,13 +33,14 @@ import { useStage2DashboardData } from '../hooks/useStage2DashboardData';
 import { RefinementChat } from './RefinementChat';
 import { useRefinement } from '../hooks/useRefinement';
 import { useStaticGraph } from '../contexts/StaticGraphContext';
+import { useFullscreenContext } from '../contexts/FullscreenContext';
 import { useGenerationRealtime } from '@/components/generation-monitoring/realtime-provider';
 import { useLessonContent } from '../hooks/useLessonContent';
 import { useNodeStatus } from '../hooks/useNodeStatus';
 import { TraceAttempt } from '@megacampus/shared-types';
 import { isAwaitingApproval as getAwaitingStageNumber } from '@/lib/generation-graph/utils';
 import { toast } from 'sonner';
-import { approveLesson } from '@/app/actions/lesson-actions';
+import { approveLesson, retryLessonGeneration } from '@/app/actions/lesson-actions';
 // Stage 6 "Glass Factory" UI components
 import { ModuleDashboard } from './module/ModuleDashboard';
 import { LessonInspector } from './lesson/LessonInspector';
@@ -65,6 +66,7 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
   const { t } = useTranslation();
   const { getNode } = useReactFlow();
   const { courseInfo } = useStaticGraph();
+  const { portalContainerRef } = useFullscreenContext();
   const { isAdmin } = useUserRole();
   const params = useParams();
   const courseSlug = params?.slug as string | undefined;
@@ -76,6 +78,7 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
   const [isLessonMaximized, setIsLessonMaximized] = useState(false);
   const [showRestartDialog, setShowRestartDialog] = useState(false);
   const [isApproving, setIsApproving] = useState(false);
+  const [isRetrying, setIsRetrying] = useState(false);
 
   const toggleExpand = useCallback(() => {
     setIsExpanded(prev => !prev);
@@ -173,13 +176,51 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
     deselectNode();
   }, [data?.stageNumber, courseInfo.id, deselectNode]);
 
-  const handleRegenerateLesson = useCallback(() => {
+  const handleRegenerateLesson = useCallback(async () => {
     if (!lessonInfoForInspector) return;
 
-    // Use existing retry mechanism - TODO: wire up properly with lessonSpec
-    toast.info('Функция регенерации будет добавлена позже');
-    // TODO: Fetch lesson spec and call regenerateLesson action
-  }, [lessonInfoForInspector]);
+    setIsRetrying(true);
+    try {
+      const result = await retryLessonGeneration(
+        courseInfo.id,
+        lessonInfoForInspector.lessonId,
+        8 // High priority for user-initiated retries
+      );
+      if (result.success) {
+        toast.success('Урок поставлен в очередь на перегенерацию');
+      } else {
+        toast.error('Не удалось запустить перегенерацию');
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Ошибка перегенерации');
+    } finally {
+      setIsRetrying(false);
+    }
+  }, [lessonInfoForInspector, courseInfo.id]);
+
+  // Handler for retry node button in pipeline stepper
+  // Regardless of which node failed, we regenerate the entire lesson
+  const handleRetryNode = useCallback(async (_nodeName: string) => {
+    if (!lessonInfoForInspector) return;
+
+    setIsRetrying(true);
+    try {
+      const result = await retryLessonGeneration(
+        courseInfo.id,
+        lessonInfoForInspector.lessonId,
+        9 // Higher priority for error retries
+      );
+      if (result.success) {
+        toast.success('Урок поставлен в очередь на повторную генерацию');
+      } else {
+        toast.error('Не удалось запустить повторную генерацию');
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Ошибка повторной генерации');
+    } finally {
+      setIsRetrying(false);
+    }
+  }, [lessonInfoForInspector, courseInfo.id]);
 
   const lessonIdForFetch = useMemo(() => {
     if (!isLessonNode || !selectedNodeId) return null;
@@ -415,6 +456,10 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
           // Remove padding for lesson nodes - LessonInspectorLayout handles its own padding
           isStage6Lesson && 'p-0'
         )}
+        // Hide built-in close button for lesson nodes - LessonInspectorLayout provides its own
+        hideCloseButton={isStage6Lesson}
+        // Portal into fullscreen container when in fullscreen mode (fixes z-index issue)
+        container={portalContainerRef.current}
         data-testid="node-details-drawer"
       >
         {/* Accessibility: Hidden title for lesson nodes (screen readers only) */}
@@ -521,11 +566,13 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
               onApprove={handleApproveLesson}
               onEdit={handleEditLesson}
               onRegenerate={handleRegenerateLesson}
-              onRetryNode={(_node) => {/* TODO: Implement retry node */}}
+              onRetryNode={handleRetryNode}
               isMaximized={isLessonMaximized}
               onToggleMaximize={() => setIsLessonMaximized(!isLessonMaximized)}
               className="h-full"
               isApproving={isApproving}
+              isRegenerating={isRetrying}
+              tier={courseInfo.tier}
             />
           ) : realtimeStatus?.status === 'skipped' || data?.status === 'skipped' ? (
             /* Skipped Stage - show informative message */

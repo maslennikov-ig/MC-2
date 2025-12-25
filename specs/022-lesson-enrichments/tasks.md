@@ -43,7 +43,7 @@
 - [ ] T004 [P] Create enrichment Zod schemas in `packages/shared-types/src/lesson-enrichment.ts` (includes isDraftPhase, isAwaitingAction helpers)
 - [ ] T005 [P] Create enrichment content type interfaces in `packages/shared-types/src/enrichment-content.ts`
 - [ ] T006 [P] Create Type Registry for extensibility in `packages/shared-types/src/enrichment-type-registry.ts` (EnrichmentTypeDefinition, EnrichmentTypeRegistry class)
-- [ ] T007 Update BullMQ job types with EnrichmentJobDataSchema in `packages/shared-types/src/bullmq-jobs.ts`
+- [ ] T007 Update BullMQ job types with EnrichmentJobDataSchema in `packages/shared-types/src/bullmq-jobs.ts` (depends on T004 for EnrichmentType)
 - [ ] T008 Export new types from `packages/shared-types/src/index.ts`
 
 ---
@@ -261,6 +261,9 @@
 - [ ] T090 Add Document enrichment type as disabled with "Coming Soon" tooltip in EnrichmentAddPopover and NodeToolbar
 - [ ] T091 Implement error grouping in Asset Dock (single indicator for multiple failures)
 - [ ] T092 Run quickstart.md validation and verify all flows work end-to-end
+- [ ] T093 Test edge cases: short content warning, navigation during generation, multiple same-type enrichments, batch partial failures, delete lesson with in-progress enrichments
+- [ ] T094 Performance validation: verify graph with 50+ lessons and enrichments renders at 60fps (pan/zoom), ELK layout stability
+- [ ] T095 Implement content-change detection: show "stale" indicator on enrichments when lesson content updated after generation (FR-016)
 
 ---
 
@@ -362,9 +365,9 @@ Task: T062 [P] document handler placeholder
 | US4 Presentation | T052-T055 | 4 | - |
 | US5 Manage (Inspector) | T056-T077 | 22 | T071-T074 |
 | US6 Batch | T078-T082 | 5 | - |
-| Polish | T083-T092 | 10 | T083-T086 |
+| Polish | T083-T095 | 13 | T083-T086 |
 
-**Total Tasks**: 92
+**Total Tasks**: 95
 **MVP Tasks** (US7 + US2): T001-T032, T033-T041, T046-T048 = 49 tasks
 **Full Inspector MVP** (US7 + US2 + US5): + T056-T077 = 71 tasks
 **Suggested MVP**: Complete through Phase 5 (Quiz) for first functional demo, then add Phase 8 (Inspector) for full UX
@@ -415,3 +418,6 @@ Task: T062 [P] document handler placeholder
 | 11.1-11.2 i18n | ✅ | T040, T041, T083 |
 | 12.1-12.3 Theme Support | ✅ | T084 |
 | 14 Acceptance Criteria | ✅ | T092 (validation) |
+| Edge Cases (spec.md:144-148) | ✅ | T093 |
+| Performance SC-006 | ✅ | T094 |
+| Content-change detection FR-016 | ✅ | T095 |

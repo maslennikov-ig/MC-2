@@ -2,7 +2,7 @@
  * Phase 2: Scope Analysis Service
  *
  * Estimates course scope and generates detailed structure recommendations.
- * Uses 20B model (mathematical/logical task) with English-only output.
+ * Uses database-configured model (mathematical/logical task) with English-only output.
  *
  * Key responsibilities:
  * - Estimate total content hours (0.5-200h)
@@ -29,7 +29,7 @@ import { preprocessObject } from '@/shared/validation/preprocessing';
  * Main Phase 2 execution function: Scope Analysis
  *
  * Analyzes course topic and Phase 1 output to estimate scope and structure.
- * Uses 20B model for cost efficiency (scope estimation is mathematical).
+ * Uses database-configured model (scope estimation is mathematical).
  *
  * @param input - Phase 2 input data (validated)
  * @returns Validated Phase 2 output with scope recommendations
@@ -50,9 +50,9 @@ export async function runPhase2Scope(input: Phase2Input): Promise<Phase2Output> 
   // Validate input
   const validatedInput = Phase2InputSchema.parse(input);
 
-  // Get 20B model for Phase 2 (cost-effective for scope estimation)
+  // Get model for Phase 2 from database config
   const model = await getModelForPhase('stage_4_scope', validatedInput.course_id);
-  const modelId = model.model || 'openai/gpt-oss-20b';
+  const modelId = model.model || 'unknown';
 
   // Build prompt
   const prompt = buildPhase2Prompt(validatedInput);

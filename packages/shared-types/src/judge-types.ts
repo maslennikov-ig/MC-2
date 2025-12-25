@@ -1515,6 +1515,12 @@ export const SelfReviewResultSchema = z.object({
    * Null for all other statuses.
    */
   patchedContent: z.any().nullable().default(null),
+  /**
+   * Section IDs that need regeneration (e.g., ['introduction', 'section_2']).
+   * Populated when specific sections have fixable issues.
+   * Used for section-level regeneration instead of full content replacement.
+   */
+  sectionsToRegenerate: z.array(z.string()).optional(),
   /** Tokens used for self-review LLM call */
   tokensUsed: z.number().int().min(0).default(0),
   /** Duration of self-review in milliseconds */

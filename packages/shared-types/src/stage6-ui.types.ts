@@ -25,11 +25,8 @@ import type { JudgeRecommendation, SelfReviewResult } from './judge-types';
  * 1. generator: Generates full lesson content (intro + sections + summary) in one pass
  * 2. selfReviewer: Pre-judge validation (Fail-Fast architecture)
  * 3. judge: Evaluates quality using CLEV voting and targeted refinement
- *
- * BACKWARD COMPATIBILITY: Legacy node names (planner, expander, assembler, smoother) are
- * included for parsing trace logs from old generations. These map to 'generator' in the UI.
  */
-export type Stage6NodeName = 'generator' | 'selfReviewer' | 'judge' | 'planner' | 'expander' | 'assembler' | 'smoother';
+export type Stage6NodeName = 'generator' | 'selfReviewer' | 'judge';
 
 /**
  * Stage6NodeStatus - Current status of a pipeline node
@@ -471,6 +468,10 @@ export interface LessonInspectorData {
   canApprove: boolean;
   /** Whether manual editing action is available */
   canEdit: boolean;
+
+  // Organization context
+  /** User subscription tier for model display */
+  tier?: 'trial' | 'free' | 'basic' | 'standard' | 'premium';
 }
 
 // =============================================================================
@@ -481,18 +482,11 @@ export interface LessonInspectorData {
  * STAGE6_NODE_LABELS - Russian labels for pipeline nodes
  *
  * Provides localized labels and descriptions for UI display.
- * Includes both new 3-node pipeline and legacy nodes for backward compatibility.
  */
 export const STAGE6_NODE_LABELS: Record<Stage6NodeName, { ru: string; description: string }> = {
-  // New 3-node pipeline
   generator: { ru: 'Генератор', description: 'Генерация полного контента урока' },
   selfReviewer: { ru: 'Самопроверка', description: 'Предварительная проверка качества' },
   judge: { ru: 'Оценка качества', description: 'Проверка критериев и доработка' },
-  // Legacy nodes for backward compatibility with old trace logs
-  planner: { ru: 'Планировщик', description: 'Создание структуры урока' },
-  expander: { ru: 'Наполнение', description: 'Генерация контента (параллельно)' },
-  assembler: { ru: 'Сборщик', description: 'Объединение разделов' },
-  smoother: { ru: 'Редактор', description: 'Стилистическая правка' },
 } as const;
 
 /**

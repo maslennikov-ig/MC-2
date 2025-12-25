@@ -15,6 +15,7 @@ import {
 import { cn } from '@/lib/utils';
 import { useEffect, useState } from 'react';
 import { STAGE_CONFIG } from '../generation-celestial/utils';
+import { useTranslations } from 'next-intl';
 
 interface StatsGridProps {
   progress: GenerationProgress;
@@ -42,34 +43,34 @@ function StatCard({ icon, label, value, subValue, color = 'blue', isLoading, dis
 
   return (
     <motion.div
-      whileHover={{ scale: 1.02, y: -4 }}
+      whileHover={{ scale: 1.01, y: -2 }}
       transition={{ type: 'spring', stiffness: 300 }}
     >
       <Card className={cn(
-        'overflow-hidden border rounded-xl backdrop-blur-sm transition-shadow duration-300',
+        'overflow-hidden border rounded-lg backdrop-blur-sm transition-shadow duration-300',
         colorClasses[color as keyof typeof colorClasses]
       )}>
-        <CardContent className="p-4">
-          <div className="flex items-start justify-between">
-            <div className="flex-1">
-              <p className="text-xs font-medium uppercase tracking-wider opacity-70">
+        <CardContent className="p-2">
+          <div className="flex items-start justify-between gap-1">
+            <div className="flex-1 min-w-0">
+              <p className="text-[10px] font-medium uppercase tracking-wider opacity-70 truncate">
                 {label}
               </p>
-              <div className="mt-2 flex items-baseline">
+              <div className="mt-1 flex items-baseline">
                 {isLoading ? (
                   <motion.div
                     animate={{ rotate: 360 }}
                     transition={{ duration: 1, repeat: Infinity, ease: 'linear' }}
                   >
-                    <Loader2 className="w-5 h-5 opacity-70" />
+                    <Loader2 className="w-4 h-4 opacity-70" />
                   </motion.div>
                 ) : disableAnimation ? (
                   <>
-                    <p className="text-2xl font-bold tabular-nums">
+                    <p className="text-base font-bold tabular-nums">
                       {value}
                     </p>
                     {subValue && (
-                      <p className="ml-2 text-sm opacity-60">
+                      <p className="ml-1 text-[10px] opacity-60 truncate">
                         {subValue}
                       </p>
                     )}
@@ -77,7 +78,7 @@ function StatCard({ icon, label, value, subValue, color = 'blue', isLoading, dis
                 ) : (
                   <>
                     <motion.p
-                      className="text-2xl font-bold"
+                      className="text-base font-bold"
                       initial={{ scale: 0 }}
                       animate={{ scale: 1 }}
                       transition={{ type: 'spring', stiffness: 200 }}
@@ -87,7 +88,7 @@ function StatCard({ icon, label, value, subValue, color = 'blue', isLoading, dis
                     </motion.p>
                     {subValue && (
                       <motion.p
-                        className="ml-2 text-sm opacity-60"
+                        className="ml-1 text-[10px] opacity-60 truncate"
                         initial={{ opacity: 0 }}
                         animate={{ opacity: 1 }}
                         transition={{ delay: 0.1 }}
@@ -100,7 +101,7 @@ function StatCard({ icon, label, value, subValue, color = 'blue', isLoading, dis
               </div>
             </div>
             <motion.div
-              className="p-2 rounded-lg bg-white/5"
+              className="p-1 rounded bg-white/5 flex-shrink-0"
               whileHover={{ rotate: 15 }}
               transition={{ type: 'spring', stiffness: 300 }}
             >
@@ -114,6 +115,7 @@ function StatCard({ icon, label, value, subValue, color = 'blue', isLoading, dis
 }
 
 export default function StatsGrid({ progress, status }: StatsGridProps) {
+  const t = useTranslations('generation.stats');
   const [elapsed, setElapsed] = useState('0s');
 
   useEffect(() => {
@@ -176,16 +178,16 @@ export default function StatsGrid({ progress, status }: StatsGridProps) {
 
   return (
     <motion.div
-      className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4 mb-8"
+      className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-2 mb-4"
       variants={containerVariants}
       initial="hidden"
       animate="visible"
     >
       <motion.div variants={itemVariants}>
         <StatCard
-          icon={<FileText className="w-5 h-5" />}
-          label="Документы"
-          value={progress.has_documents ? 'Обработка' : 'Нет'}
+          icon={<FileText className="w-4 h-4" />}
+          label={t('documents')}
+          value={progress.has_documents ? t('processing') : t('none')}
           subValue={progress.document_size ? `${(progress.document_size / 1000).toFixed(1)}KB` : undefined}
           color="blue"
           isLoading={progress.has_documents && status === 'processing_documents'}
@@ -194,19 +196,19 @@ export default function StatsGrid({ progress, status }: StatsGridProps) {
 
       <motion.div variants={itemVariants}>
         <StatCard
-          icon={<Layers className="w-5 h-5" />}
-          label="Модули"
+          icon={<Layers className="w-4 h-4" />}
+          label={t('modules')}
           // Use actual modules_total from analysis_result if available, otherwise show placeholder
           value={showStructureStats ? (progress.modules_total ?? '—') : '—'}
-          subValue={status === 'generating_structure' || (status.includes && status.includes('stage_4_analyzing')) ? 'Анализ...' : undefined}
+          subValue={status === 'generating_structure' || (status.includes && status.includes('stage_4_analyzing')) ? t('analyzing') : undefined}
           color="purple"
         />
       </motion.div>
 
       <motion.div variants={itemVariants}>
         <StatCard
-          icon={<BookOpen className="w-5 h-5" />}
-          label="Уроки"
+          icon={<BookOpen className="w-4 h-4" />}
+          label={t('lessons')}
           value={showStructureStats ? `${progress.lessons_completed}/${progress.lessons_total}` : '—'}
           subValue={showStructureStats && progress.lessons_total > 0 ? `${Math.round((progress.lessons_completed / progress.lessons_total) * 100)}%` : undefined}
           color="purple"
@@ -215,10 +217,10 @@ export default function StatsGrid({ progress, status }: StatsGridProps) {
 
       <motion.div variants={itemVariants}>
         <StatCard
-          icon={<Clock className="w-5 h-5" />}
-          label="Время"
+          icon={<Clock className="w-4 h-4" />}
+          label={t('time')}
           value={elapsed}
-          subValue={status === 'completed' ? 'Готово' : 'В процессе'}
+          subValue={status === 'completed' ? t('completed') : t('inProgress')}
           color="orange"
           disableAnimation={true}
         />
@@ -226,10 +228,10 @@ export default function StatsGrid({ progress, status }: StatsGridProps) {
 
       <motion.div variants={itemVariants}>
         <StatCard
-          icon={status === 'completed' ? <CheckCircle2 className="w-5 h-5" /> : <Zap className="w-5 h-5" />}
-          label="Шаги"
+          icon={status === 'completed' ? <CheckCircle2 className="w-4 h-4" /> : <Zap className="w-4 h-4" />}
+          label={t('steps')}
           value={`${displayStep}/${totalSteps}`}
-          subValue={status === 'completed' ? 'Все выполнено' : `Шаг ${displayStep}`}
+          subValue={status === 'completed' ? t('allCompleted') : t('step', { number: displayStep })}
           color="green"
         />
       </motion.div>

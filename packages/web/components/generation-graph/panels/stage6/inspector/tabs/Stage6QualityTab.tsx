@@ -7,6 +7,12 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
 import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import {
   ShieldCheck,
   Wrench,
   AlertTriangle,
@@ -16,6 +22,7 @@ import {
   Eye,
   XCircle,
 } from 'lucide-react';
+import { DiffViewer } from '../quality/DiffViewer';
 import type {
   SelfReviewResult,
   JudgeVerdictDisplay,
@@ -602,9 +609,10 @@ export const Stage6QualityTab = memo(function Stage6QualityTab({
 
   const handleViewDiff = () => {
     setShowDiffModal(true);
-    // TODO: Implement diff viewer modal
-    console.log('View Diff:', { originalContent, fixedContent });
   };
+
+  // Check if we have both contents for diff view
+  const hasDiffContent = originalContent && fixedContent;
 
   return (
     <div className="space-y-4 p-6">
@@ -621,28 +629,34 @@ export const Stage6QualityTab = memo(function Stage6QualityTab({
       {/* Gate 2: Judge */}
       <JudgeGate result={judgeResult} isDisabled={isGate2Disabled} locale={locale} />
 
-      {/* TODO: Implement DiffViewer modal */}
-      {showDiffModal && (
-        <div
-          key="diff-modal"
-          role="dialog"
-          aria-modal="true"
-          aria-labelledby="diff-modal-title"
-          className="fixed inset-0 z-50 bg-black/50 flex items-center justify-center"
-        >
-          <div className="bg-white dark:bg-slate-900 rounded-lg p-6 max-w-4xl w-full max-h-[80vh] overflow-auto">
-            <h3 id="diff-modal-title" className="text-lg font-semibold mb-4">
-              {locale === 'ru' ? 'Сравнение изменений' : 'Diff Viewer'}
-            </h3>
-            <p className="text-sm text-slate-600 dark:text-slate-400 mb-4">
-              {locale === 'ru' ? 'Модуль просмотра изменений будет реализован позже' : 'Diff viewer will be implemented later'}
-            </p>
-            <Button onClick={() => setShowDiffModal(false)}>
-              {locale === 'ru' ? 'Закрыть' : 'Close'}
-            </Button>
+      {/* DiffViewer Modal - uses Dialog for built-in Escape key support */}
+      <Dialog open={showDiffModal} onOpenChange={setShowDiffModal}>
+        <DialogContent className="max-w-4xl max-h-[85vh] overflow-hidden flex flex-col">
+          <DialogHeader>
+            <DialogTitle>
+              {locale === 'ru' ? 'Сравнение изменений' : 'Changes Comparison'}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="flex-1 overflow-auto">
+            {hasDiffContent ? (
+              <DiffViewer
+                originalContent={originalContent}
+                fixedContent={fixedContent}
+                changes={selfReviewResult?.issues}
+                locale={locale}
+              />
+            ) : (
+              <div className="p-8 text-center text-slate-500 dark:text-slate-400">
+                <p>
+                  {locale === 'ru'
+                    ? 'Нет данных для сравнения. Контент не был изменён.'
+                    : 'No comparison data available. Content was not modified.'}
+                </p>
+              </div>
+            )}
           </div>
-        </div>
-      )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 });

@@ -110,8 +110,9 @@ export default function Logo({
       height={h}
       priority
       quality={90}
+      style={{ width: 'auto', height: 'auto' }}
       className={cn(
-        "object-contain w-auto h-auto",
+        "object-contain",
         variant === "icon" && "rounded-lg",
         effectiveForceTheme === "light" ? "hidden" : "hidden dark:block",
         effectiveForceTheme === "dark" && "block"
@@ -127,8 +128,9 @@ export default function Logo({
       height={h}
       priority
       quality={90}
+      style={{ width: 'auto', height: 'auto' }}
       className={cn(
-        "object-contain w-auto h-auto",
+        "object-contain",
         variant === "icon" && "rounded-lg",
         effectiveForceTheme === "dark" ? "hidden" : "block dark:hidden",
         effectiveForceTheme === "light" && "block"

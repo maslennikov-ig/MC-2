@@ -62,13 +62,13 @@ GenerationMetadata -> courses.generation_metadata
 
 ### Phase 2: Generate Metadata
 **File:** `utils/metadata-generator.ts`
-**Model:** Hybrid routing (qwen3-max + OSS 120B)
+**Model:** Configured via database (llm_model_config table)
 
 **Purpose:** Generate course-level metadata.
 
-**RT-001 Hybrid Routing:**
-- **Critical fields (qwen3-max):** learning_outcomes, pedagogical_strategy, prerequisites
-- **Non-critical fields (OSS 120B):** course_description, course_tags, estimated_duration
+**Model Selection:**
+- Models configured via admin panel
+- Supports tier-based routing for different field types
 
 **Output:**
 - `course_title`: Course name
@@ -85,14 +85,14 @@ GenerationMetadata -> courses.generation_metadata
 
 ### Phase 3: Generate Sections
 **File:** `utils/section-batch-generator.ts`
-**Model:** Tiered routing (OSS 120B primary)
+**Model:** Configured via database (supports tiered routing)
 
 **Purpose:** Generate all course sections with lessons.
 
-**RT-001 Tiered Routing:**
-- **Tier 1 (70-75%):** OSS 120B - Standard sections
-- **Tier 2 (20-25%):** qwen3-max - Complex/critical sections (escalation)
-- **Tier 3 (5%):** Gemini 2.5 Flash - Overflow (context >108K tokens)
+**Model Selection:**
+- Primary model from database config
+- Escalation model for complex sections
+- Emergency model for overflow contexts
 
 **Parallel Processing (SC-003):**
 - Batch size: 4 sections concurrent
@@ -121,7 +121,7 @@ GenerationMetadata -> courses.generation_metadata
 
 ### Phase 4: Validate Quality
 **File:** `phases/generation-phases.ts`
-**Model:** Jina-v3 embeddings (95%) + OSS 120B LLM-as-judge (5%)
+**Model:** Jina-v3 embeddings (primary) + LLM-as-judge from database (edge cases)
 
 **Purpose:** Validate generated content quality.
 
@@ -271,7 +271,7 @@ interface GenerationMetadata {
 ## Dependencies
 
 ### External Services
-- **OpenRouter API:** LLM completion (qwen3-max, OSS 120B, Gemini 2.5 Flash)
+- **OpenRouter API:** LLM completion (models configured via database)
 - **Jina Embeddings:** Quality validation (semantic similarity)
 - **Qdrant:** Optional RAG context (vector similarity search)
 
@@ -322,10 +322,6 @@ On failure:
 # OpenRouter API
 OPENROUTER_API_KEY=sk-or-...
 
-# Model Selection
-GENERATION_MODEL_PRIMARY=openai/gpt-oss-120b
-GENERATION_MODEL_ESCALATION=alibaba/qwen3-max
-
 # Quality Settings
 QUALITY_THRESHOLD=0.75
 MIN_LESSONS=10
@@ -335,16 +331,13 @@ PARALLEL_BATCH_SIZE=4
 BATCH_DELAY_MS=2000
 ```
 
-### Model Routing Configuration
+### Model Configuration
 
-| Component | Model | Cost (1M tokens) |
-|-----------|-------|------------------|
-| Metadata (critical) | qwen3-max | $0.10 |
-| Metadata (non-critical) | OSS 120B | $0.04 |
-| Sections (primary) | OSS 120B | $0.04 |
-| Sections (escalation) | qwen3-max | $0.10 |
-| Sections (overflow) | Gemini 2.5 Flash | $0.10 |
-| Validation | Jina-v3 | $0.02 |
+All models are configured via database (`llm_model_config` table).
+Admin panel allows per-phase model selection with fallback hierarchy:
+1. Phase-specific config
+2. Global default config
+3. Hardcoded emergency fallback
 
 ---
 

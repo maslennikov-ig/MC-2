@@ -147,6 +147,7 @@ interface GenerationState {
   // Initialization
   setCourseId: (id: string, hasDocuments?: boolean) => void;
   initializeDocuments: (files: Array<{id: string, name: string}>) => void;
+  initializeDocumentsWithStatus: (docs: Array<{id: string, name: string, status: NodeStatus, priority?: 'CORE' | 'IMPORTANT' | 'SUPPLEMENTARY'}>) => void;
   reset: () => void;
 
   // Trace processing
@@ -324,6 +325,45 @@ export const useGenerationStore = create<GenerationState>()(
       });
     },
 
+    initializeDocumentsWithStatus: (docs) => {
+      set((state) => {
+        docs.forEach((doc) => {
+          const existing = state.documents.get(doc.id);
+
+          // Skip if document already has a non-pending status (from traces)
+          if (existing && existing.status !== 'pending') {
+            return;
+          }
+
+          // For completed documents, set completedSteps to max (6 = finish step)
+          const completedSteps = doc.status === 'completed'
+            ? TOTAL_DOCUMENT_STEPS - 1
+            : doc.status === 'active'
+              ? 0
+              : -1;
+
+          state.documents.set(doc.id, {
+            id: doc.id,
+            name: doc.name,
+            status: doc.status,
+            priority: doc.priority,
+            completedSteps,
+            totalSteps: TOTAL_DOCUMENT_STEPS,
+            currentPhase: doc.status === 'completed' ? 'finish' : '',
+            stages: doc.status === 'completed' ? [{
+              stageId: `${doc.id}_finish`,
+              stageName: 'Завершено',
+              stageNumber: TOTAL_DOCUMENT_STEPS,
+              status: 'completed',
+              attempts: []
+            }] : []
+          });
+        });
+
+        logger.devLog('[GenerationStore] Initialized documents with status:', docs.length);
+      });
+    },
+
     reset: () => {
       set((state) => {
         logger.devLog('[GenerationStore] Resetting all state');
@@ -427,16 +467,20 @@ export const useGenerationStore = create<GenerationState>()(
                 existing.name = docName;
               }
             } else {
-              state.documents.set(docId, {
+              // Create new document entry
+              const newDoc = {
                 id: docId,
                 name: docName || `Документ ${docId.substring(0, 8)}...`,
-                status: stepStatus === 'error' ? 'error' : 'active',
+                status: 'active' as NodeStatus,
                 completedSteps: stepIndex,
                 totalSteps: TOTAL_DOCUMENT_STEPS,
                 currentPhase: phase,
                 priority: trace.input_data?.priority as 'CORE' | 'IMPORTANT' | 'SUPPLEMENTARY' | undefined,
                 stages: [newStage]
-              });
+              };
+              // Calculate proper status based on stages
+              newDoc.status = calculateDocumentStatus(newDoc.stages, newDoc.completedSteps);
+              state.documents.set(docId, newDoc);
             }
 
             // Update Stage 2 overall status
@@ -604,16 +648,20 @@ export const useGenerationStore = create<GenerationState>()(
                   existing.name = docName;
                 }
               } else {
-                state.documents.set(docId, {
+                // Create new document entry
+                const newDoc = {
                   id: docId,
                   name: docName || `Документ ${docId.substring(0, 8)}...`,
-                  status: stepStatus === 'error' ? 'error' : 'active',
+                  status: 'active' as NodeStatus,
                   completedSteps: stepIndex,
                   totalSteps: TOTAL_DOCUMENT_STEPS,
                   currentPhase: phase,
                   priority: trace.input_data?.priority as 'CORE' | 'IMPORTANT' | 'SUPPLEMENTARY' | undefined,
                   stages: [newStage]
-                });
+                };
+                // Calculate proper status based on stages
+                newDoc.status = calculateDocumentStatus(newDoc.stages, newDoc.completedSteps);
+                state.documents.set(docId, newDoc);
               }
               break;
             }

@@ -153,7 +153,18 @@ Guidelines:
 - Use the reference materials to ensure factual accuracy
 - Include practical examples to illustrate concepts
 - Write at an appropriate level for the target audience
-- Ensure smooth flow from previous content to next content`;
+- Ensure smooth flow from previous content to next content
+
+PROTECTED CONTENT (preserve from original if present):
+- Mermaid diagrams (\`\`\`mermaid ... \`\`\`) - copy them exactly as-is
+- Code blocks (\`\`\`language ... \`\`\`) - preserve working code examples
+- LaTeX formulas ($...$ or $$...$$) - keep mathematical notation intact
+- Image references ![alt](url) - preserve image links exactly
+
+When regenerating a section that contains these elements:
+1. Keep Mermaid diagrams in their original position unless explicitly flagged
+2. Preserve code blocks unless the issue specifically mentions code problems
+3. Integrate protected content smoothly into the new narrative`;
 }
 
 /**

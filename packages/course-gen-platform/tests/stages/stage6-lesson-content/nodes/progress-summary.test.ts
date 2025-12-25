@@ -53,6 +53,54 @@ vi.mock('@/shared/trace-logger', () => ({
   logTrace: vi.fn().mockResolvedValue(undefined),
 }));
 
+// Hoisted mock for LLM client (must be hoisted for proper module mocking)
+const { mockGenerateCompletion, MockLLMClient } = vi.hoisted(() => {
+  const mockFn = vi.fn();
+  return {
+    mockGenerateCompletion: mockFn,
+    MockLLMClient: class {
+      generateCompletion = mockFn;
+    },
+  };
+});
+
+// Set default mock implementation
+mockGenerateCompletion.mockResolvedValue({
+  content: JSON.stringify({
+    status: 'PASS',
+    reasoning: 'Content passed semantic review',
+    issues: [],
+    patched_content: null,
+  }),
+  inputTokens: 200,
+  outputTokens: 300,
+  totalTokens: 500,
+  model: 'anthropic/claude-3-haiku',
+  finishReason: 'stop',
+});
+
+vi.mock('@/shared/llm', () => ({
+  LLMClient: MockLLMClient,
+}));
+
+// Mock model config service
+vi.mock('@/shared/llm/model-config-service', () => ({
+  createModelConfigService: vi.fn().mockReturnValue({
+    getModelForPhase: vi.fn().mockResolvedValue({
+      modelId: 'anthropic/claude-3-haiku',
+      fallbackModelId: 'anthropic/claude-3-haiku',
+      temperature: 0.7,
+      maxTokens: 4096,
+      maxContextTokens: 200000,
+      qualityThreshold: null,
+      maxRetries: 3,
+      timeoutMs: null,
+      tier: 'standard',
+      source: 'database',
+    }),
+  }),
+}));
+
 // ============================================================================
 // TEST FIXTURES
 // ============================================================================

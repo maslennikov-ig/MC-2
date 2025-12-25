@@ -1,15 +1,17 @@
 /**
- * Tests for selfReviewerNode - Pre-judge validation with Fail-Fast heuristics
+ * Tests for selfReviewerNode - Pre-judge validation with two-phase Fail-Fast architecture
  * @module stages/stage6-lesson-content/nodes/self-reviewer-node.test
  *
  * Tests the self-review node that implements two-phase validation:
  * 1. FREE heuristic pre-checks (language consistency, content truncation)
- * 2. LLM-based semantic review (TODO: future implementation)
+ * 2. LLM-based semantic review with self-fix capability
  *
  * Test coverage:
- * - PASS cases: Clean content passing all heuristics
+ * - PASS cases: Clean content passing all checks (heuristics + LLM)
  * - PASS_WITH_FLAGS cases: Minor issues noted but not blocking
  * - REGENERATE cases: Critical failures (language mixing, truncation, missing content)
+ * - FIXED cases: LLM returns patchedContent with auto-corrections
+ * - LLM error handling: Retry logic, timeout fallback to heuristics
  * - Result metadata: Duration, token usage, heuristic details
  * - Edge cases: Different languages, code blocks, empty content
  */
@@ -18,6 +20,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest';
 import { selfReviewerNode } from '../../../../src/stages/stage6-lesson-content/nodes/self-reviewer-node.js';
 import type { LessonGraphStateType } from '../../../../src/stages/stage6-lesson-content/state.js';
 import type { LessonSpecificationV2 } from '@megacampus/shared-types/lesson-specification-v2';
+import { LLMClient } from '@/shared/llm';
 
 // ============================================================================
 // MOCKS
@@ -37,6 +40,59 @@ vi.mock('@/shared/logger', () => ({
     debug: vi.fn(),
     error: vi.fn(),
   },
+}));
+
+// Mock trace logger
+vi.mock('@/shared/trace-logger', () => ({
+  logTrace: vi.fn().mockResolvedValue(undefined),
+}));
+
+// Hoisted mock for LLM client
+const { mockGenerateCompletion, MockLLMClient } = vi.hoisted(() => {
+  const mockFn = vi.fn();
+  return {
+    mockGenerateCompletion: mockFn,
+    MockLLMClient: class {
+      generateCompletion = mockFn;
+    },
+  };
+});
+
+// Set default mock implementation
+mockGenerateCompletion.mockResolvedValue({
+  content: JSON.stringify({
+    status: 'PASS',
+    reasoning: 'Content passed semantic review',
+    issues: [],
+    patched_content: null,
+  }),
+  inputTokens: 200,
+  outputTokens: 300,
+  totalTokens: 500,
+  model: 'anthropic/claude-3-haiku',
+  finishReason: 'stop',
+});
+
+vi.mock('@/shared/llm', () => ({
+  LLMClient: MockLLMClient,
+}));
+
+// Mock model config service
+vi.mock('@/shared/llm/model-config-service', () => ({
+  createModelConfigService: vi.fn().mockReturnValue({
+    getModelForPhase: vi.fn().mockResolvedValue({
+      modelId: 'anthropic/claude-3-haiku',
+      fallbackModelId: 'anthropic/claude-3-haiku',
+      temperature: 0.7,
+      maxTokens: 4096,
+      maxContextTokens: 200000,
+      qualityThreshold: null,
+      maxRetries: 3,
+      timeoutMs: null,
+      tier: 'standard',
+      source: 'database',
+    }),
+  }),
 }));
 
 // ============================================================================
@@ -159,7 +215,8 @@ TypeScript является типизированным расширением 
     expect(result.selfReviewResult!.status).toBe('PASS');
     expect(result.selfReviewResult!.heuristicsPassed).toBe(true);
     expect(result.selfReviewResult!.issues).toHaveLength(0);
-    expect(result.selfReviewResult!.reasoning).toContain('passed all heuristic pre-checks');
+    // LLM review is now always performed, reasoning comes from LLM
+    expect(result.selfReviewResult!.reasoning).toContain('passed');
   });
 
   it('should return PASS for clean English content with proper structure', async () => {
@@ -226,7 +283,8 @@ interface User {
     const result = await selfReviewerNode(state);
 
     expect(result.selfReviewResult!.durationMs).toBeGreaterThanOrEqual(0);
-    expect(result.selfReviewResult!.tokensUsed).toBe(0); // No LLM in MVP
+    // LLM review now always runs, so tokensUsed should be positive
+    expect(result.selfReviewResult!.tokensUsed).toBeGreaterThan(0);
     expect(result.selfReviewResult!.heuristicDetails).toBeDefined();
     expect(result.selfReviewResult!.heuristicDetails!.languageCheck).toBeDefined();
     expect(result.selfReviewResult!.heuristicDetails!.truncationCheck).toBeDefined();
@@ -399,15 +457,18 @@ describe('selfReviewerNode - REGENERATE cases', () => {
   });
 
   it('should detect content ending with incomplete patterns as truncation issue', async () => {
+    // Mock LLM to fail so we fall back to heuristic-only results
+    mockGenerateCompletion.mockRejectedValueOnce(new Error('LLM unavailable'));
+
     const state = createMockState({
       language: 'ru',
-      // Very short (<200) + ends with "и" (and) + no punctuation = 3 truncation issues (CRITICAL)
+      // Very short (<200) + no punctuation = 2 truncation issues (INFO severity)
       generatedContent: 'и',
     });
 
     const result = await selfReviewerNode(state);
 
-    // Should have truncation issues detected (may be PASS_WITH_FLAGS if only 1-2 issues)
+    // With LLM fallback, should return PASS_WITH_FLAGS for minor issues
     expect(['REGENERATE', 'PASS_WITH_FLAGS']).toContain(result.selfReviewResult!.status);
 
     // Should have at least one truncation issue
@@ -428,15 +489,18 @@ describe('selfReviewerNode - REGENERATE cases', () => {
   });
 
   it('should detect very short content (<200 chars) as having truncation issues', async () => {
+    // Mock LLM to fail so we fall back to heuristic-only results
+    mockGenerateCompletion.mockRejectedValueOnce(new Error('LLM unavailable'));
+
     const state = createMockState({
       language: 'ru',
-      // Very short (<200 chars) + no punctuation + ends abruptly
+      // Very short (<200 chars) + no punctuation = 2 truncation issues (INFO severity)
       generatedContent: 'x',
     });
 
     const result = await selfReviewerNode(state);
 
-    // Should detect truncation (may be PASS_WITH_FLAGS or REGENERATE depending on issue count)
+    // With LLM fallback, should return PASS_WITH_FLAGS for minor issues
     expect(['REGENERATE', 'PASS_WITH_FLAGS']).toContain(result.selfReviewResult!.status);
 
     // Should have at least one truncation issue detected
@@ -486,13 +550,13 @@ describe('selfReviewerNode - Heuristic details', () => {
     expect(result.selfReviewResult!.heuristicDetails!.truncationCheck.issues).toBeInstanceOf(Array);
   });
 
-  it('should report zero tokens for heuristic-only checks (MVP)', async () => {
+  it('should report LLM token usage for semantic review', async () => {
     const state = createMockState();
 
     const result = await selfReviewerNode(state);
 
-    // No LLM call in MVP, only heuristics
-    expect(result.selfReviewResult!.tokensUsed).toBe(0);
+    // LLM review is always performed now (not MVP anymore)
+    expect(result.selfReviewResult!.tokensUsed).toBeGreaterThan(0);
   });
 
   it('should set heuristicsPassed=true for PASS and PASS_WITH_FLAGS', async () => {
@@ -754,3 +818,423 @@ describe('selfReviewerNode - Issue aggregation', () => {
     expect(result.selfReviewResult!.patchedContent).toBeNull();
   });
 });
+
+// ============================================================================
+// LLM ERROR HANDLING TESTS
+// ============================================================================
+
+describe('selfReviewerNode - LLM Error Handling', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // Reset to default success mock (will be overridden in individual tests)
+    mockGenerateCompletion.mockResolvedValue({
+      content: JSON.stringify({
+        status: 'PASS',
+        reasoning: 'Content passed semantic review',
+        issues: [],
+        patched_content: null,
+      }),
+      inputTokens: 200,
+      outputTokens: 300,
+      totalTokens: 500,
+      model: 'anthropic/claude-3-haiku',
+      finishReason: 'stop',
+    });
+  });
+
+  it('should fallback to heuristics on LLM timeout (after all retries fail)', async () => {
+    // Mock LLM to timeout on ALL retry attempts (3 attempts)
+    mockGenerateCompletion
+      .mockRejectedValueOnce(new Error('Request timeout'))
+      .mockRejectedValueOnce(new Error('Request timeout'))
+      .mockRejectedValueOnce(new Error('Request timeout'));
+
+    // Use default state which has proper long Russian content that passes heuristics
+    const state = createMockState({
+      language: 'ru',
+    });
+
+    const result = await selfReviewerNode(state);
+
+    // Should return heuristic-only result, not throw
+    expect(result.selfReviewResult).toBeDefined();
+    expect(['PASS', 'PASS_WITH_FLAGS', 'REGENERATE']).toContain(result.selfReviewResult!.status);
+    expect(result.selfReviewResult!.tokensUsed).toBe(0); // No LLM tokens
+    expect(result.selfReviewResult!.reasoning).toContain('LLM review');
+  });
+
+  it('should fallback to heuristics on LLM network error (after all retries fail)', async () => {
+    // Reject all 3 retry attempts
+    mockGenerateCompletion
+      .mockRejectedValueOnce(new Error('Network error: ECONNRESET'))
+      .mockRejectedValueOnce(new Error('Network error: ECONNRESET'))
+      .mockRejectedValueOnce(new Error('Network error: ECONNRESET'));
+
+    const state = createMockState({ language: 'ru' });
+    const result = await selfReviewerNode(state);
+
+    expect(result.selfReviewResult).toBeDefined();
+    expect(['PASS', 'PASS_WITH_FLAGS', 'REGENERATE']).toContain(result.selfReviewResult!.status);
+    expect(result.selfReviewResult!.tokensUsed).toBe(0);
+  });
+
+  it('should fallback to heuristics on LLM rate limit error (after all retries fail)', async () => {
+    // Reject all 3 retry attempts
+    mockGenerateCompletion
+      .mockRejectedValueOnce(new Error('Rate limit exceeded'))
+      .mockRejectedValueOnce(new Error('Rate limit exceeded'))
+      .mockRejectedValueOnce(new Error('Rate limit exceeded'));
+
+    const state = createMockState({ language: 'ru' });
+    const result = await selfReviewerNode(state);
+
+    expect(result.selfReviewResult).toBeDefined();
+    expect(['PASS', 'PASS_WITH_FLAGS', 'REGENERATE']).toContain(result.selfReviewResult!.status);
+    expect(result.selfReviewResult!.tokensUsed).toBe(0);
+  });
+
+  it('should fallback to heuristics on LLM 503 Service Unavailable (after all retries fail)', async () => {
+    // Reject all 3 retry attempts
+    mockGenerateCompletion
+      .mockRejectedValueOnce(new Error('503 Service Unavailable'))
+      .mockRejectedValueOnce(new Error('503 Service Unavailable'))
+      .mockRejectedValueOnce(new Error('503 Service Unavailable'));
+
+    const state = createMockState({ language: 'ru' });
+    const result = await selfReviewerNode(state);
+
+    expect(result.selfReviewResult).toBeDefined();
+    expect(['PASS', 'PASS_WITH_FLAGS', 'REGENERATE']).toContain(result.selfReviewResult!.status);
+    expect(result.selfReviewResult!.tokensUsed).toBe(0);
+  });
+
+  it('should recover on retry when first attempt fails but second succeeds', async () => {
+    // First attempt fails, second succeeds
+    mockGenerateCompletion
+      .mockRejectedValueOnce(new Error('Network timeout'))
+      .mockResolvedValueOnce({
+        content: JSON.stringify({
+          status: 'PASS',
+          reasoning: 'Content passed after retry',
+          issues: [],
+          patched_content: null,
+        }),
+        inputTokens: 200,
+        outputTokens: 300,
+        totalTokens: 500,
+        model: 'anthropic/claude-3-haiku',
+        finishReason: 'stop',
+      });
+
+    const state = createMockState({ language: 'ru' });
+    const result = await selfReviewerNode(state);
+
+    expect(result.selfReviewResult).toBeDefined();
+    expect(result.selfReviewResult!.status).toBe('PASS');
+    expect(result.selfReviewResult!.tokensUsed).toBe(500); // LLM tokens used
+  });
+});
+
+describe('selfReviewerNode - LLM Response Parsing', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // Reset to default success mock (will be overridden in individual tests)
+    mockGenerateCompletion.mockResolvedValue({
+      content: JSON.stringify({
+        status: 'PASS',
+        reasoning: 'Content passed semantic review',
+        issues: [],
+        patched_content: null,
+      }),
+      inputTokens: 200,
+      outputTokens: 300,
+      totalTokens: 500,
+      model: 'anthropic/claude-3-haiku',
+      finishReason: 'stop',
+    });
+  });
+
+  it('should fallback to heuristics on invalid JSON response', async () => {
+    mockGenerateCompletion.mockResolvedValueOnce({
+      content: 'This is not valid JSON { broken',
+      inputTokens: 200,
+      outputTokens: 300,
+      totalTokens: 500,
+      model: 'anthropic/claude-3-haiku',
+      finishReason: 'stop',
+    });
+
+    const state = createMockState({
+      generatedContent: createValidMarkdownContent(), // Must pass heuristics to reach LLM review path
+      language: 'ru',
+    });
+    const result = await selfReviewerNode(state);
+
+    // Should not crash, should fallback
+    expect(result.selfReviewResult).toBeDefined();
+    expect(['PASS', 'PASS_WITH_FLAGS', 'REGENERATE']).toContain(result.selfReviewResult!.status);
+    expect(result.selfReviewResult!.reasoning).toContain('invalid response format');
+    expect(result.selfReviewResult!.tokensUsed).toBe(500); // Tokens consumed but parsing failed
+  });
+
+  it('should fallback to heuristics on missing required fields', async () => {
+    mockGenerateCompletion.mockResolvedValueOnce({
+      content: JSON.stringify({
+        // Missing status, reasoning, issues
+        patched_content: null,
+      }),
+      inputTokens: 200,
+      outputTokens: 300,
+      totalTokens: 500,
+      model: 'anthropic/claude-3-haiku',
+      finishReason: 'stop',
+    });
+
+    const state = createMockState({
+      generatedContent: createValidMarkdownContent(), // Must pass heuristics to reach LLM review path
+      language: 'ru',
+    });
+    const result = await selfReviewerNode(state);
+
+    expect(result.selfReviewResult).toBeDefined();
+    expect(['PASS', 'PASS_WITH_FLAGS', 'REGENERATE']).toContain(result.selfReviewResult!.status);
+    expect(result.selfReviewResult!.reasoning).toContain('invalid response format');
+  });
+
+  it('should extract JSON from markdown code block in LLM response', async () => {
+    mockGenerateCompletion.mockResolvedValueOnce({
+      content: '```json\n' + JSON.stringify({
+        status: 'PASS',
+        reasoning: 'Content passed semantic review',
+        issues: [],
+        patched_content: null,
+      }) + '\n```',
+      inputTokens: 200,
+      outputTokens: 300,
+      totalTokens: 500,
+      model: 'anthropic/claude-3-haiku',
+      finishReason: 'stop',
+    });
+
+    const state = createMockState({
+      generatedContent: createValidMarkdownContent(), // Must pass heuristics to reach LLM review path
+      language: 'ru',
+    });
+    const result = await selfReviewerNode(state);
+
+    expect(result.selfReviewResult).toBeDefined();
+    expect(result.selfReviewResult!.status).toBe('PASS');
+    expect(result.selfReviewResult!.reasoning).toBe('Content passed semantic review');
+    expect(result.selfReviewResult!.tokensUsed).toBe(500);
+  });
+});
+
+describe('selfReviewerNode - patchedContent Validation', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // Reset mock to default success response
+    mockGenerateCompletion.mockResolvedValue({
+      content: JSON.stringify({
+        status: 'PASS',
+        reasoning: 'Content passed semantic review',
+        issues: [],
+        patched_content: null,
+      }),
+      inputTokens: 200,
+      outputTokens: 300,
+      totalTokens: 500,
+      model: 'anthropic/claude-3-haiku',
+      finishReason: 'stop',
+    });
+  });
+
+  it('should accept valid patchedContent and update state', async () => {
+    // validPatch must conform to LessonContentBodySchema
+    const validPatch = {
+      intro: 'Это вводная часть урока с исправленным содержимым. Достаточно длинный текст для прохождения валидации минимальной длины intro.',
+      sections: [{
+        title: 'Первый раздел',
+        content: 'Исправленное содержимое раздела с достаточным количеством слов для прохождения проверки. Этот текст должен быть достаточно длинным.',
+      }],
+      examples: [],
+      exercises: [],
+    };
+
+    mockGenerateCompletion.mockResolvedValueOnce({
+      content: JSON.stringify({
+        status: 'FIXED',
+        reasoning: 'Fixed hygiene issues with proper Russian grammar',
+        issues: [{
+          type: 'HYGIENE',
+          severity: 'FIXABLE',
+          location: 'intro',
+          description: 'Fixed grammar issues in introduction',
+        }],
+        patched_content: validPatch,
+      }),
+      inputTokens: 200,
+      outputTokens: 300,
+      totalTokens: 500,
+      model: 'anthropic/claude-3-haiku',
+      finishReason: 'stop',
+    });
+
+    const state = createMockState({
+      generatedContent: createValidMarkdownContent(), // Must pass heuristics to reach LLM review path
+      language: 'ru',
+    });
+    const result = await selfReviewerNode(state);
+
+    expect(result.selfReviewResult!.status).toBe('FIXED');
+    expect(result.selfReviewResult!.patchedContent).toEqual(validPatch);
+    expect(result.generatedContent).toBeDefined();
+    expect(result.generatedContent).toContain('Исправленное содержимое');
+  });
+
+  it('should handle FLAG_TO_JUDGE status without patched content', async () => {
+    mockGenerateCompletion.mockResolvedValueOnce({
+      content: JSON.stringify({
+        status: 'FLAG_TO_JUDGE',
+        reasoning: 'Potential factual inaccuracies detected, requires expert review',
+        issues: [{
+          type: 'HALLUCINATION',
+          severity: 'CRITICAL',
+          location: 'section_1',
+          description: 'Claim requires verification against RAG context',
+        }],
+        patched_content: null,
+      }),
+      inputTokens: 200,
+      outputTokens: 300,
+      totalTokens: 500,
+      model: 'anthropic/claude-3-haiku',
+      finishReason: 'stop',
+    });
+
+    const state = createMockState({
+      generatedContent: createValidMarkdownContent(), // Must pass heuristics to reach LLM review path
+      language: 'ru',
+    });
+    const result = await selfReviewerNode(state);
+
+    expect(result.selfReviewResult!.status).toBe('FLAG_TO_JUDGE');
+    expect(result.selfReviewResult!.patchedContent).toBeNull();
+    expect(result.generatedContent).toBeUndefined(); // No patched content, so no update
+    // Combined heuristic + LLM issues
+    const hallucinations = result.selfReviewResult!.issues.filter(i => i.type === 'HALLUCINATION');
+    expect(hallucinations.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('should handle PASS_WITH_FLAGS from LLM with minor issues', async () => {
+    mockGenerateCompletion.mockResolvedValueOnce({
+      content: JSON.stringify({
+        status: 'PASS_WITH_FLAGS',
+        reasoning: 'Content passed with minor observations about tone consistency',
+        issues: [{
+          type: 'HYGIENE',
+          severity: 'INFO',
+          location: 'section_2',
+          description: 'Tone slightly inconsistent with metadata.tone',
+        }],
+        patched_content: null,
+      }),
+      inputTokens: 200,
+      outputTokens: 300,
+      totalTokens: 500,
+      model: 'anthropic/claude-3-haiku',
+      finishReason: 'stop',
+    });
+
+    const state = createMockState({
+      generatedContent: createValidMarkdownContent(), // Must pass heuristics to reach LLM review path
+      language: 'ru',
+    });
+    const result = await selfReviewerNode(state);
+
+    expect(result.selfReviewResult!.status).toBe('PASS_WITH_FLAGS');
+    expect(result.selfReviewResult!.patchedContent).toBeNull();
+    // May have heuristic issues + LLM issues
+    const hygieneIssues = result.selfReviewResult!.issues.filter(i => i.type === 'HYGIENE');
+    expect(hygieneIssues.length).toBeGreaterThanOrEqual(1);
+  });
+});
+
+describe('selfReviewerNode - Content Parsing Edge Cases', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // Reset mock to default success response
+    mockGenerateCompletion.mockResolvedValue({
+      content: JSON.stringify({
+        status: 'PASS',
+        reasoning: 'Content passed semantic review',
+        issues: [],
+        patched_content: null,
+      }),
+      inputTokens: 200,
+      outputTokens: 300,
+      totalTokens: 500,
+      model: 'anthropic/claude-3-haiku',
+      finishReason: 'stop',
+    });
+  });
+
+  // NOTE: Removed test "should skip LLM review when generatedContent cannot be parsed as JSON"
+  // LLM review now works directly with Markdown content, no JSON parsing needed
+
+  it('should handle markdown content in generatedContent (edge case)', async () => {
+    // NOTE: This test demonstrates an edge case where content is wrapped in markdown.
+    // In practice, heuristics run on the RAW string (including ```json markers),
+    // which can trigger truncation failures. This is expected behavior.
+    const validContent = {
+      intro: 'Это вводная часть урока с достаточным количеством текста для прохождения всех проверок качества. Введение должно быть информативным и полезным для студентов. Мы рассмотрим основные концепции и подготовим основу для дальнейшего изучения материала.',
+      sections: [
+        {
+          section_id: 'sec_1',
+          section_title: 'Первый раздел',
+          content: 'Содержимое первого раздела достаточной длины для прохождения валидации. Текст должен быть информативным и полезным, содержать примеры и пояснения. Мы подробно разберем каждую концепцию и предоставим практические рекомендации.',
+        },
+        {
+          section_id: 'sec_2',
+          section_title: 'Второй раздел',
+          content: 'Содержимое второго раздела с дополнительной информацией и примерами. Каждый раздел строится на предыдущем материале и расширяет понимание темы. Студенты смогут применить полученные знания на практике.',
+        },
+      ],
+      summary: 'Заключение урока с достаточной информацией и подведением итогов. Мы рассмотрели все ключевые концепции и готовы применить их на практике. Использование полученных знаний поможет в дальнейшей работе.',
+    };
+
+    const state = createMockState({
+      generatedContent: '```json\n' + JSON.stringify(validContent, null, 2) + '\n```',
+      language: 'ru',
+    });
+
+    const result = await selfReviewerNode(state);
+
+    // Markdown-wrapped content may fail heuristics (truncation checks on raw string)
+    // This is expected - production generators don't wrap JSON in markdown
+    expect(result.selfReviewResult).toBeDefined();
+    // Status can be PASS (if long enough) or REGENERATE (if truncation detected)
+    expect(['PASS', 'REGENERATE', 'PASS_WITH_FLAGS']).toContain(result.selfReviewResult!.status);
+  });
+});
+
+// ============================================================================
+// HELPER FUNCTIONS FOR LLM TESTS
+// ============================================================================
+
+/**
+ * Create valid Markdown content for testing LLM review path
+ * Must pass heuristic checks (language consistency, truncation) first
+ */
+function createValidMarkdownContent(): string {
+  return `## Введение в TypeScript
+
+TypeScript является типизированным расширением JavaScript. Он добавляет статическую типизацию к языку, что помогает выявлять ошибки на этапе разработки. Это достаточно длинный текст для прохождения всех проверок качества.
+
+## Основные концепции
+
+В этом разделе мы рассмотрим ключевые концепции TypeScript, включая типы данных, интерфейсы и классы. Каждая из этих концепций играет важную роль в создании надежных приложений. Материал изложен последовательно и понятно.
+
+## Заключение
+
+Мы изучили основы TypeScript и готовы применять их на практике. Использование типизации поможет создавать более качественные приложения.`.trim();
+}

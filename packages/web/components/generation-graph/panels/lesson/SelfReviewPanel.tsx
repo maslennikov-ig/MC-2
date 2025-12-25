@@ -158,6 +158,22 @@ export function SelfReviewPanel({ result, className }: SelfReviewPanelProps) {
         </div>
       )}
 
+      {/* Sections to regenerate (if any) */}
+      {result.sectionsToRegenerate && result.sectionsToRegenerate.length > 0 && (
+        <div className="mb-3 p-2 rounded bg-blue-50 dark:bg-blue-900/20 border border-blue-200 dark:border-blue-700">
+          <h4 className="text-xs font-medium text-blue-600 dark:text-blue-400 mb-1">
+            Секции для перегенерации ({result.sectionsToRegenerate.length})
+          </h4>
+          <div className="flex flex-wrap gap-1">
+            {result.sectionsToRegenerate.map((sectionId) => (
+              <Badge key={sectionId} variant="outline" className="text-xs text-blue-600 dark:text-blue-400 border-blue-300 dark:border-blue-600">
+                {sectionId}
+              </Badge>
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Heuristic details (if available) */}
       {result.heuristicDetails && (
         <div className="mb-3 p-2 rounded bg-slate-50 dark:bg-slate-800 text-xs">
