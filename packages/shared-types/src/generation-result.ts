@@ -498,7 +498,6 @@ export const SupportedLanguageSchema = z.enum([
   'id',  // Indonesian (Bahasa Indonesia)
   'ms',  // Malay (Bahasa Melayu)
   'hi',  // Hindi (हिन्दी)
-  'bn',  // Bengali (বাংলা)
   'pl'   // Polish (Polski)
 ]);
 

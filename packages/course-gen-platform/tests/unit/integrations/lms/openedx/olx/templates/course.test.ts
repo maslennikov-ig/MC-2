@@ -228,10 +228,10 @@ describe('generateCourseXml - OLX course.xml template', () => {
       expect(result).toContain('language="ru"');
     });
 
-    it('should support all 19 platform languages', () => {
+    it('should support all 18 platform languages', () => {
       const languages = [
         'en', 'ru', 'zh', 'ar', 'ja', 'ko', 'hi', 'vi', 'es', 'fr',
-        'de', 'pt', 'it', 'tr', 'th', 'id', 'ms', 'bn', 'pl',
+        'de', 'pt', 'it', 'tr', 'th', 'id', 'ms', 'pl',
       ];
 
       languages.forEach((lang) => {

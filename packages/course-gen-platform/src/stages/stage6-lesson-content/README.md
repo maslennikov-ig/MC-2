@@ -91,12 +91,12 @@ courses.language → lesson-content.ts router → LessonContentJobData
    CRITICAL: Write ALL content in {LanguageName}. Every word must be in {LanguageName}.
    ```
 
-### Supported Languages (19 total)
+### Supported Languages (18 total)
 
 - **European**: Russian, English, Spanish, French, German, Italian, Polish
 - **East Asian**: Chinese, Japanese, Korean
 - **Southeast Asian**: Vietnamese, Thai, Indonesian, Malay
-- **South Asian**: Hindi, Bengali
+- **South Asian**: Hindi
 - **Middle Eastern**: Arabic, Turkish
 - **Other**: Portuguese
 

@@ -3,13 +3,13 @@
  * @module integrations/lms/openedx/utils/transliterate
  *
  * Converts Unicode characters (Cyrillic, Arabic, CJK, etc.) to ASCII equivalents.
- * Supports all 19 platform languages via the any-ascii library.
+ * Supports all 18 platform languages via the any-ascii library.
  *
  * Supported Languages:
  * - Russian (ru), English (en), Chinese (zh), Spanish (es), French (fr),
  *   German (de), Japanese (ja), Korean (ko), Arabic (ar), Portuguese (pt),
  *   Italian (it), Turkish (tr), Vietnamese (vi), Thai (th), Indonesian (id),
- *   Malay (ms), Hindi (hi), Bengali (bn), Polish (pl)
+ *   Malay (ms), Hindi (hi), Polish (pl)
  */
 
 import anyAscii from 'any-ascii';

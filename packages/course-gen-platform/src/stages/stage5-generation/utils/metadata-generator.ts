@@ -349,7 +349,7 @@ export class MetadataGenerator {
       'French': 'fr', 'German': 'de', 'Japanese': 'ja', 'Korean': 'ko',
       'Arabic': 'ar', 'Portuguese': 'pt', 'Italian': 'it', 'Turkish': 'tr',
       'Vietnamese': 'vi', 'Thai': 'th', 'Indonesian': 'id', 'Malay': 'ms',
-      'Hindi': 'hi', 'Bengali': 'bn', 'Polish': 'pl',
+      'Hindi': 'hi', 'Polish': 'pl',
     };
 
     // Priority 1: Explicit frontend parameter

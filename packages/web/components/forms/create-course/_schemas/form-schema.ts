@@ -11,8 +11,8 @@ export const formSchema = z.object({
     "inspirational", "interactive", "analytical"
   ]).optional(),
   language: z.enum([
-    "ru", "en", "zh", "es", "fr", "de", "ja", "ko", "ar", "pt", "it", 
-    "tr", "vi", "th", "id", "ms", "hi", "bn", "pl"
+    "ru", "en", "zh", "es", "fr", "de", "ja", "ko", "ar", "pt", "it",
+    "tr", "vi", "th", "id", "ms", "hi", "pl"
   ]).optional(),
   targetAudience: z.string().optional(),
   estimatedLessons: z.number().min(10).max(100).optional().or(z.nan().transform(() => undefined)),

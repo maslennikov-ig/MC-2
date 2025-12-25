@@ -109,7 +109,6 @@ export function BasicInfoSection({ onBlur }: BasicInfoSectionProps) {
             <option value="id" className="bg-white dark:bg-gray-800 text-slate-900 dark:text-white">🇮🇩 Bahasa Indonesia</option>
             <option value="ms" className="bg-white dark:bg-gray-800 text-slate-900 dark:text-white">🇲🇾 Bahasa Melayu</option>
             <option value="hi" className="bg-white dark:bg-gray-800 text-slate-900 dark:text-white">🇮🇳 हिन्दी (Hindi)</option>
-            <option value="bn" className="bg-white dark:bg-gray-800 text-slate-900 dark:text-white">🇧🇩 বাংলা (Bengali)</option>
             <option value="pl" className="bg-white dark:bg-gray-800 text-slate-900 dark:text-white">🇵🇱 Polski</option>
           </select>
         </div>

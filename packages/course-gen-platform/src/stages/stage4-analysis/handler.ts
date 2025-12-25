@@ -331,7 +331,7 @@ class Stage4AnalysisHandler {
       'French': 'fr', 'German': 'de', 'Japanese': 'ja', 'Korean': 'ko',
       'Arabic': 'ar', 'Portuguese': 'pt', 'Italian': 'it', 'Turkish': 'tr',
       'Vietnamese': 'vi', 'Thai': 'th', 'Indonesian': 'id', 'Malay': 'ms',
-      'Hindi': 'hi', 'Bengali': 'bn', 'Polish': 'pl',
+      'Hindi': 'hi', 'Polish': 'pl',
     };
     const rawLang = courseForInput.language || 'ru';
     // If it's already a 2-char code, use it; otherwise convert from name

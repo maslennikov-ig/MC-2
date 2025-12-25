@@ -181,15 +181,6 @@ export const BLOOMS_TAXONOMY_MULTILINGUAL: Record<string, BloomsWhitelist> = {
     create: ['डिज़ाइन करें', 'विकसित करें', 'निर्माण करें', 'सूत्रबद्ध करें'],
   },
 
-  bn: { // Bengali
-    remember: ['তালিকাভুক্ত করুন', 'নাম দিন', 'চিহ্নিত করুন', 'মনে রাখুন', 'সংজ্ঞায়িত করুন'],
-    understand: ['ব্যাখ্যা করুন', 'সংক্ষিপ্ত করুন', 'ব্যাখ্যা করুন', 'বর্ণনা করুন'],
-    apply: ['প্রদর্শন করুন', 'বাস্তবায়ন করুন', 'চালান', 'ব্যবহার করুন'],
-    analyze: ['তুলনা করুন', 'বিপরীতে রাখুন', 'পার্থক্য করুন', 'পরীক্ষা করুন'],
-    evaluate: ['মূল্যায়ন করুন', 'ন্যায্যতা দিন', 'সমালোচনা করুন', 'রক্ষা করুন'],
-    create: ['ডিজাইন করুন', 'বিকাশ করুন', 'নির্মাণ করুন', 'প্রণয়ন করুন'],
-  },
-
   pl: { // Polish
     remember: ['wymień', 'nazwij', 'zidentyfikuj', 'przypomnij', 'zdefiniuj'],
     understand: ['wyjaśnij', 'podsumuj', 'zinterpretuj', 'opisz'],

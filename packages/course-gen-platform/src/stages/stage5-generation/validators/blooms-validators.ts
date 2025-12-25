@@ -77,7 +77,7 @@ const SNOWBALL_LANGUAGES: Record<string, string> = {
 };
 
 // CJK languages (no stemming, use normalization)
-const CJK_LANGUAGES = ['zh', 'ja', 'ko', 'th', 'vi', 'id', 'ms', 'bn', 'pl'];
+const CJK_LANGUAGES = ['zh', 'ja', 'ko', 'th', 'vi', 'id', 'ms', 'pl'];
 
 // Stemmer cache for performance
 interface StemmerCache {

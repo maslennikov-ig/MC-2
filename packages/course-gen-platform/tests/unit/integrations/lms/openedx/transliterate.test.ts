@@ -184,16 +184,6 @@ describe('transliterate - Unicode to ASCII conversion', () => {
       expect(result).toBe('Pengenalan pengaturcaraan');
     });
 
-    it('should transliterate Bengali (bn) to ASCII', () => {
-      const input = 'প্রোগ্রামিং পরিচিতি';
-      const result = transliterate(input);
-
-      // Verify result is ASCII-only
-      expect(result).toMatch(/^[\x00-\x7F]+$/);
-      // Verify non-empty result
-      expect(result.length).toBeGreaterThan(0);
-    });
-
     it('should transliterate Polish (pl) with special characters to ASCII', () => {
       const input = 'Wprowadzenie do programowania';
       const result = transliterate(input);

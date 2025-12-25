@@ -13,19 +13,19 @@ import { z } from 'zod';
 // ============================================================================
 
 /**
- * Language enum schema - all supported languages
+ * Language enum schema - all supported languages (18 languages)
  *
  * Languages supported:
  * - ru: Russian, en: English, zh: Chinese, es: Spanish
  * - fr: French, de: German, ja: Japanese, ko: Korean
  * - ar: Arabic, pt: Portuguese, it: Italian, tr: Turkish
  * - vi: Vietnamese, th: Thai, id: Indonesian, ms: Malay
- * - hi: Hindi, bn: Bengali, pl: Polish
+ * - hi: Hindi, pl: Polish
  */
 export const languageSchema = z.enum([
   'ru', 'en', 'zh', 'es', 'fr', 'de', 'ja', 'ko',
   'ar', 'pt', 'it', 'tr', 'vi', 'th', 'id', 'ms',
-  'hi', 'bn', 'pl'
+  'hi', 'pl'
 ]);
 
 /** Inferred Language type from schema */
@@ -56,7 +56,6 @@ export const LANGUAGE_NAMES: Record<Language, string> = {
   id: 'Indonesian',
   ms: 'Malay',
   hi: 'Hindi',
-  bn: 'Bengali',
   pl: 'Polish',
 };
 
