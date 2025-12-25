@@ -117,17 +117,32 @@ packages/
         │   │   ├── LessonNode.tsx    # Updated with AssetDock
         │   │   └── AssetDock.tsx     # New component
         │   ├── components/
-        │   │   └── EnrichmentNodeToolbar.tsx  # React Flow NodeToolbar
+        │   │   └── EnrichmentNodeToolbar.tsx  # React Flow NodeToolbar (deep-links)
+        │   ├── stores/
+        │   │   └── enrichment-inspector-store.ts  # Zustand store for Inspector state
         │   ├── hooks/
         │   │   ├── useEnrichmentData.ts       # Fetch + realtime
         │   │   └── useEnrichmentSelection.ts  # Selection sync
         │   └── panels/
-        │       └── stage7/                    # Inspector panel components
-        │           ├── EnrichmentInspectorPanel.tsx
-        │           ├── EnrichmentList.tsx
-        │           ├── EnrichmentListItem.tsx
-        │           ├── EnrichmentStatusBadge.tsx
-        │           ├── EnrichmentAddMenu.tsx
+        │       └── stage7/                    # Inspector panel with Stack Navigator
+        │           ├── EnrichmentInspectorPanel.tsx   # Main panel (view router)
+        │           ├── views/
+        │           │   ├── RootView.tsx              # List + fallback add button
+        │           │   ├── CreateView.tsx            # Configuration form
+        │           │   ├── DetailView.tsx            # Preview/edit specific enrichment
+        │           │   └── EmptyStateCards.tsx       # Discovery cards for first enrichment
+        │           ├── components/
+        │           │   ├── EnrichmentList.tsx
+        │           │   ├── EnrichmentListItem.tsx
+        │           │   ├── EnrichmentStatusBadge.tsx
+        │           │   ├── EnrichmentAddPopover.tsx  # Popover menu for fallback add
+        │           │   ├── GenerationProgress.tsx    # Progress display during generation
+        │           │   └── DiscardChangesDialog.tsx  # Confirm dirty state discard
+        │           ├── forms/
+        │           │   ├── QuizCreateForm.tsx
+        │           │   ├── AudioCreateForm.tsx
+        │           │   ├── VideoCreateForm.tsx
+        │           │   └── PresentationCreateForm.tsx
         │           └── previews/
         │               ├── QuizPreview.tsx
         │               ├── VideoPreview.tsx
@@ -209,7 +224,14 @@ Create `research.md` with:
 
 Create:
 - `enrichment_type` enum (video, audio, presentation, quiz, document)
-- `enrichment_status` enum (pending, generating, completed, failed, cancelled)
+- `enrichment_status` enum with two-stage support:
+  - `pending` - Queued for generation
+  - `draft_generating` - Phase 1: Generating draft/script (two-stage)
+  - `draft_ready` - Phase 1 complete: Awaiting user review (two-stage)
+  - `generating` - Phase 2: Final content (or single-stage)
+  - `completed` - Successfully generated
+  - `failed` - Generation failed
+  - `cancelled` - User cancelled
 - `lesson_enrichments` table with JSONB content column
 - RLS policies for admin/instructor access
 - Indexes on lesson_id, status, type
@@ -221,7 +243,9 @@ Create:
 **File**: `packages/shared-types/src/lesson-enrichment.ts`
 
 Create:
-- `EnrichmentType` and `EnrichmentStatus` Zod schemas
+- `EnrichmentType` and `EnrichmentStatus` Zod schemas (with two-stage statuses)
+- `isDraftPhase(status)` - Helper to check if in draft phase
+- `isAwaitingAction(status)` - Helper to check if user action needed
 - `LessonEnrichment` interface
 - `EnrichmentMetadata` interface
 - `EnrichmentSummary` interface (for React Flow node data)
@@ -236,6 +260,13 @@ Create:
 - `QuizEnrichmentContent` interface
 - `DocumentEnrichmentContent` interface (placeholder)
 - `EnrichmentContent` union type
+
+**File**: `packages/shared-types/src/enrichment-type-registry.ts`
+
+Create Type Registry for extensibility:
+- `EnrichmentTypeDefinition` interface (type, icon, label, generationFlow, contentSchema, settingsSchema, components, features)
+- `EnrichmentTypeRegistry` class (register, get, getAll, getEnabled)
+- `enrichmentRegistry` singleton export
 
 ### 1.3 BullMQ Job Types
 
@@ -292,13 +323,31 @@ Implement:
 - Route to type-specific handler based on enrichment_type
 - `handlers: Record<EnrichmentType, EnrichmentHandler>`
 
-### 2.5 Type Handlers (Stubs)
+### 2.5 Type Handlers (Two-Stage & Single-Stage)
 
-Create placeholder handlers for each type:
-- `video-handler.ts` - Returns mock video script
-- `audio-handler.ts` - Returns mock TTS text
-- `presentation-handler.ts` - Returns mock slide JSON
+Create handlers for each type with appropriate generation flow:
+
+**Two-Stage Types (Video, Presentation):**
+- `video-handler.ts` - Phase 1: Generate script → Phase 2: Call video API
+- `presentation-handler.ts` - Phase 1: Generate slide structure → Phase 2: Render HTML
+
+**Single-Stage Types (Audio, Quiz):**
+- `audio-handler.ts` - Direct TTS API call (low cost, fast)
 - `quiz-handler.ts` - Full implementation (first enrichment type)
+
+**Handler Interface:**
+```typescript
+interface EnrichmentHandler {
+  generationFlow: 'single-stage' | 'two-stage';
+
+  // For single-stage types
+  generate?(job: EnrichmentJobData): Promise<EnrichmentContent>;
+
+  // For two-stage types
+  generateDraft?(job: EnrichmentJobData): Promise<DraftContent>;
+  generateFinal?(job: EnrichmentJobData, approvedDraft: DraftContent): Promise<EnrichmentContent>;
+}
+```
 
 ### 2.6 Database Service
 
@@ -362,6 +411,9 @@ Implement procedures:
 - `getByLesson` - List enrichments for lesson
 - `getSummaryByCourse` - Aggregated summary for graph nodes
 - `regenerate` - Retry failed enrichment
+- `regenerateDraft` - Regenerate Phase 1 draft only (two-stage)
+- `updateDraft` - Save user edits to draft content (two-stage)
+- `approveDraft` - Approve draft and start Phase 2 (two-stage)
 - `delete` - Remove enrichment + asset
 - `reorder` - Update order_index values
 - `cancel` - Cancel in-progress generation
@@ -416,16 +468,75 @@ Implement:
 - Buttons for each enrichment type
 - Document button disabled with "Coming Soon" tooltip
 
-### 4.4 Inspector Panel
+### 4.4 Inspector Panel (Stack Navigator Pattern)
 
-**Files in**: `packages/web/components/generation-graph/panels/stage7/`
+**Architecture**: The Inspector Panel functions as a **Stack Navigator** with three internal views, implementing the **Contextual Deep-Link Pattern** from DeepThink analysis.
+
+**Main File**: `packages/web/components/generation-graph/panels/stage7/EnrichmentInspectorPanel.tsx`
+
+```tsx
+// View router component
+export const EnrichmentInspectorPanel = () => {
+  const { view, activeCreateType, activeEnrichmentId } = useEnrichmentInspectorStore();
+
+  return (
+    <SheetContent>
+      {view === 'ROOT' && <RootView />}
+      {view === 'CREATE' && <CreateView type={activeCreateType} />}
+      {view === 'DETAIL' && <DetailView enrichmentId={activeEnrichmentId} />}
+    </SheetContent>
+  );
+};
+```
+
+**Views in**: `packages/web/components/generation-graph/panels/stage7/views/`
+
+| View | Purpose | Entry Points |
+|------|---------|--------------|
+| `RootView.tsx` | List enrichments + fallback add button | Node body click, Back from CREATE/DETAIL |
+| `CreateView.tsx` | Configuration form for new enrichment | NodeToolbar button, [+ Add Enrichment] |
+| `DetailView.tsx` | Preview/edit specific enrichment | Asset Dock icon click (count=1), Generation complete |
+| `EmptyStateCards.tsx` | Discovery cards when no enrichments | RootView when enrichments.length === 0 |
+
+**DETAIL View Modes (Two-Stage Support):**
+```typescript
+// DetailView automatically adapts based on status
+switch (enrichment.status) {
+  case 'draft_generating':
+    return <DraftGeneratingState />; // Progress spinner for Phase 1
+  case 'draft_ready':
+    return <DraftReviewMode />;      // Editable preview + [Approve & Generate]
+  case 'generating':
+    return <GeneratingState />;       // Progress for Phase 2 (or single-stage)
+  case 'completed':
+    return <FinalPreviewMode />;      // Final content preview
+  case 'failed':
+    return <ErrorState />;            // Error + [Retry] button
+}
+```
+
+**Components in**: `packages/web/components/generation-graph/panels/stage7/components/`
 
 Create:
-- `EnrichmentInspectorPanel.tsx` - Main sidebar panel
 - `EnrichmentList.tsx` - Sortable list with @dnd-kit
-- `EnrichmentListItem.tsx` - Individual enrichment row
-- `EnrichmentStatusBadge.tsx` - Status indicator
-- `EnrichmentAddMenu.tsx` - Bottom add button menu
+- `EnrichmentListItem.tsx` - Individual enrichment row (click → DETAIL view)
+- `EnrichmentStatusBadge.tsx` - Status indicator (✓, ●, ✗)
+- `EnrichmentAddPopover.tsx` - Popover/Bottom Sheet for fallback add
+- `GenerationProgress.tsx` - Progress display during generation (terminal style)
+- `DiscardChangesDialog.tsx` - Confirm dialog for dirty form state
+
+**Forms in**: `packages/web/components/generation-graph/panels/stage7/forms/`
+
+Create type-specific configuration forms with smart defaults:
+- `QuizCreateForm.tsx` - Question count, difficulty, types
+- `AudioCreateForm.tsx` - Voice selection, speed
+- `VideoCreateForm.tsx` - Voice, avatar, resolution
+- `PresentationCreateForm.tsx` - Slide count, theme
+
+**Navigation Rules (Safe Harbor):**
+- "Back" always returns to ROOT view, never closes panel
+- Dirty form state → show DiscardChangesDialog before navigation
+- Pristine form → allow immediate navigation without confirm
 
 ### 4.5 Preview Components
 
@@ -501,7 +612,42 @@ Implement error grouping to prevent "Christmas Tree" visual clutter:
 
 ## Phase 5: Frontend - State & Integration
 
-### 5.1 Enrichment Data Hook
+### 5.1 Inspector Store (Zustand)
+
+**File**: `packages/web/components/generation-graph/stores/enrichment-inspector-store.ts`
+
+Implement Zustand store for Inspector Panel state management:
+
+```typescript
+type InspectorView = 'ROOT' | 'CREATE' | 'DETAIL';
+
+interface EnrichmentInspectorState {
+  isOpen: boolean;
+  nodeId: string | null;
+  nodeType: 'lesson' | 'module' | null;
+  view: InspectorView;
+  activeCreateType: EnrichmentType | null;
+  createFormDirty: boolean;
+  activeEnrichmentId: string | null;
+  scrollToType: EnrichmentType | null;  // For count-based routing
+
+  // Actions
+  openRoot: (nodeId: string) => void;
+  openCreate: (nodeId: string, type: EnrichmentType) => void;
+  openDetail: (nodeId: string, enrichmentId: string) => void;
+  goBack: () => void;
+  close: () => void;
+  setFormDirty: (dirty: boolean) => void;
+  setScrollToType: (type: EnrichmentType | null) => void;
+}
+```
+
+**Key behaviors:**
+- `openCreate()` - Called by NodeToolbar buttons (deep-link pattern)
+- `goBack()` - Safe Harbor: always goes to ROOT, never closes panel
+- `createFormDirty` - Tracks unsaved changes for discard confirmation
+
+### 5.2 Enrichment Data Hook
 
 **File**: `packages/web/components/generation-graph/hooks/useEnrichmentData.ts`
 
@@ -509,23 +655,39 @@ Implement:
 - tRPC query for getSummaryByCourse
 - Supabase realtime subscription
 - Update node data on status changes
+- Count-based routing logic for Asset Dock clicks
 
-### 5.2 Selection Sync Hook
+### 5.3 Selection Sync Hook
 
 **File**: `packages/web/components/generation-graph/hooks/useEnrichmentSelection.ts`
 
 Implement:
 - React Flow `useOnSelectionChange` integration
-- Open/close inspector panel on lesson selection
+- Node body click → `openRoot(nodeId)`
+- NodeToolbar button click → `openCreate(nodeId, type)` (deep-link)
+- Asset Dock icon click → Count-based routing:
+  - count === 1 → `openDetail(nodeId, enrichmentId)`
+  - count > 1 → `openRoot(nodeId)` + `setScrollToType(type)`
 
-### 5.3 Optimistic UI Updates
+### 5.4 Post-Generation Flow Hook
+
+**File**: `packages/web/components/generation-graph/hooks/useGenerationStatus.ts`
+
+Implement optimistic handoff behavior:
+- Watch for status changes on generating enrichments
+- When status changes to 'completed' → transition from progress to preview in DETAIL view
+- When generation starts → Asset Dock icon starts pulsing blue
+- Handle return paths (specific icon click vs generic node click)
+
+### 5.5 Optimistic UI Updates
 
 Implement in tRPC mutation hooks:
 - Optimistic add (ghost icon)
 - Rollback on error
 - Cache invalidation on settle
+- CREATE → DETAIL transition on generate click
 
-### 5.4 ELK Layout Update
+### 5.6 ELK Layout Update
 
 Update ELK configuration:
 - Increase node height from 50 to 64

@@ -21,11 +21,11 @@ import { logger } from '../../../../shared/logger';
  * | Condition | Action | Executor |
  * |-----------|--------|----------|
  * | severity=minor AND localizable | SURGICAL_EDIT | patcher |
- * | severity=major AND single section | REGENERATE_SECTION | section-expander |
- * | severity=critical AND structural | FULL_REGENERATE | planner |
- * | multiple criteria in section | REGENERATE_SECTION | section-expander |
+ * | severity=major AND single section | REGENERATE_SECTION | generator |
+ * | severity=critical AND structural | FULL_REGENERATE | generator |
+ * | multiple criteria in section | REGENERATE_SECTION | generator |
  * | tone/grammar/clarity issue | SURGICAL_EDIT | patcher |
- * | factual error | REGENERATE_SECTION | section-expander |
+ * | factual error | REGENERATE_SECTION | generator |
  *
  * @param task - SectionRefinementTask to route
  * @param config - RoutingConfig with budget and preferences
@@ -62,19 +62,20 @@ export function routeTask(
   );
 
   let action: FixAction;
-  let executor: 'patcher' | 'section-expander' | 'planner';
+  let executor: 'patcher' | 'generator';
   let estimatedTokens: number;
   let reason: string;
 
   if (hasCriticalStructural) {
     action = 'FULL_REGENERATE';
-    executor = 'planner';
+    executor = 'generator';
     estimatedTokens = REFINEMENT_CONFIG.tokenCosts.fullRegenerate.max;
     reason = 'Critical structural issue requires full regeneration';
   } else if (hasFactualError || multipleIssues) {
     action = 'REGENERATE_SECTION';
-    executor = 'section-expander';
-    estimatedTokens = REFINEMENT_CONFIG.tokenCosts.sectionExpander.max;
+    executor = 'generator'; // Generator handles section regeneration now
+    estimatedTokens = REFINEMENT_CONFIG.tokenCosts.sectionExpander?.max ??
+                     REFINEMENT_CONFIG.tokenCosts.fullRegenerate.max;
     reason = hasFactualError
       ? 'Factual error requires section regeneration with RAG'
       : 'Multiple issues in section - regeneration more efficient';
@@ -86,10 +87,11 @@ export function routeTask(
   } else {
     // Default to surgical edit if within budget
     action = config.preferSurgical ? 'SURGICAL_EDIT' : 'REGENERATE_SECTION';
-    executor = config.preferSurgical ? 'patcher' : 'section-expander';
+    executor = config.preferSurgical ? 'patcher' : 'generator';
     estimatedTokens = config.preferSurgical
       ? REFINEMENT_CONFIG.tokenCosts.patcher.max
-      : REFINEMENT_CONFIG.tokenCosts.sectionExpander.max;
+      : REFINEMENT_CONFIG.tokenCosts.sectionExpander?.max ??
+        REFINEMENT_CONFIG.tokenCosts.fullRegenerate.max;
     reason = 'Default routing based on configuration preference';
   }
 

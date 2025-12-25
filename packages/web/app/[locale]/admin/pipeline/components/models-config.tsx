@@ -74,6 +74,20 @@ import {
 import type { ModelConfigWithVersion } from '@megacampus/shared-types';
 
 /**
+ * Phases that use dynamic token calculation
+ * These phases calculate maxTokens at runtime based on content length and language
+ */
+const DYNAMIC_TOKEN_PHASES = [
+  'stage_6_refinement',
+  'stage_6_section_expander',
+  'stage_6_patcher',
+] as const;
+
+function usesDynamicTokens(phaseName: string): boolean {
+  return DYNAMIC_TOKEN_PHASES.includes(phaseName as typeof DYNAMIC_TOKEN_PHASES[number]);
+}
+
+/**
  * Display model configurations in a data table
  */
 export function ModelsConfig() {
@@ -262,9 +276,33 @@ export function ModelsConfig() {
     {
       accessorKey: 'maxTokens',
       header: 'Max Tokens',
-      cell: ({ row }) => (
-        <div className="text-sm">{row.original.maxTokens.toLocaleString()}</div>
-      ),
+      cell: ({ row }) => {
+        if (usesDynamicTokens(row.original.phaseName)) {
+          return (
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Badge
+                  variant="outline"
+                  className="bg-emerald-500/10 border-emerald-500/30 text-emerald-400 cursor-help"
+                >
+                  Dynamic
+                </Badge>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="max-w-[280px] text-xs">
+                <p>Calculated automatically based on:</p>
+                <ul className="list-disc ml-4 mt-1">
+                  <li>Content length</li>
+                  <li>Language (RU needs 33% more tokens)</li>
+                  <li>Lesson duration</li>
+                </ul>
+              </TooltipContent>
+            </Tooltip>
+          );
+        }
+        return (
+          <div className="text-sm">{row.original.maxTokens.toLocaleString()}</div>
+        );
+      },
     },
     {
       accessorKey: 'version',

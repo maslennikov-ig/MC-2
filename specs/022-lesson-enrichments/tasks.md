@@ -40,10 +40,11 @@
 - [ ] T001 Create database migration for Stage 7 enrichments in `packages/course-gen-platform/supabase/migrations/20251224_stage7_enrichments.sql` (includes enums, table, indexes, RLS, triggers, REPLICA IDENTITY FULL)
 - [ ] T002 Create Supabase Storage bucket `course-enrichments` with RLS policies via Supabase Dashboard or migration
 - [ ] T003 Regenerate Supabase TypeScript types via MCP and update `packages/shared-types/src/database.types.ts`
-- [ ] T004 [P] Create enrichment Zod schemas in `packages/shared-types/src/lesson-enrichment.ts`
+- [ ] T004 [P] Create enrichment Zod schemas in `packages/shared-types/src/lesson-enrichment.ts` (includes isDraftPhase, isAwaitingAction helpers)
 - [ ] T005 [P] Create enrichment content type interfaces in `packages/shared-types/src/enrichment-content.ts`
-- [ ] T006 Update BullMQ job types with EnrichmentJobDataSchema in `packages/shared-types/src/bullmq-jobs.ts`
-- [ ] T007 Export new types from `packages/shared-types/src/index.ts`
+- [ ] T006 [P] Create Type Registry for extensibility in `packages/shared-types/src/enrichment-type-registry.ts` (EnrichmentTypeDefinition, EnrichmentTypeRegistry class)
+- [ ] T007 Update BullMQ job types with EnrichmentJobDataSchema in `packages/shared-types/src/bullmq-jobs.ts`
+- [ ] T008 Export new types from `packages/shared-types/src/index.ts`
 
 ---
 
@@ -53,27 +54,30 @@
 
 **CRITICAL**: No user story work can begin until this phase is complete
 
-- [ ] T008 Create Stage 7 config in `packages/course-gen-platform/src/stages/stage7-enrichments/config/index.ts`
-- [ ] T009 Create Stage 7 job types in `packages/course-gen-platform/src/stages/stage7-enrichments/types/index.ts`
-- [ ] T010 [P] Create database service in `packages/course-gen-platform/src/stages/stage7-enrichments/services/database-service.ts`
-- [ ] T011 [P] Create storage service for asset upload + signed URLs in `packages/course-gen-platform/src/stages/stage7-enrichments/services/storage-service.ts`
-- [ ] T012 Create retry strategy with model fallback in `packages/course-gen-platform/src/stages/stage7-enrichments/retry-strategy.ts`
-- [ ] T013 Create enrichment router (type-to-handler dispatch) in `packages/course-gen-platform/src/stages/stage7-enrichments/services/enrichment-router.ts`
-- [ ] T014 Create job processor (main job handler with progress tracking) in `packages/course-gen-platform/src/stages/stage7-enrichments/services/job-processor.ts`
-- [ ] T015 Create Stage 7 worker factory in `packages/course-gen-platform/src/stages/stage7-enrichments/factory.ts`
-- [ ] T016 Create QueueEvents for global monitoring in `packages/course-gen-platform/src/queues/enrichment-events.ts`
-- [ ] T017 Create tRPC enrichment schemas in `packages/course-gen-platform/src/server/routers/enrichment/schemas.ts`
-- [ ] T018 [P] Create tRPC create procedure in `packages/course-gen-platform/src/server/routers/enrichment/procedures/create.ts`
-- [ ] T019 [P] Create tRPC getByLesson procedure in `packages/course-gen-platform/src/server/routers/enrichment/procedures/get-by-lesson.ts`
-- [ ] T020 [P] Create tRPC getSummaryByCourse procedure in `packages/course-gen-platform/src/server/routers/enrichment/procedures/get-summary.ts`
-- [ ] T021 [P] Create tRPC regenerate procedure in `packages/course-gen-platform/src/server/routers/enrichment/procedures/regenerate.ts`
-- [ ] T022 [P] Create tRPC delete procedure in `packages/course-gen-platform/src/server/routers/enrichment/procedures/delete.ts`
-- [ ] T023 [P] Create tRPC reorder procedure in `packages/course-gen-platform/src/server/routers/enrichment/procedures/reorder.ts`
-- [ ] T024 [P] Create tRPC cancel procedure in `packages/course-gen-platform/src/server/routers/enrichment/procedures/cancel.ts`
-- [ ] T025 [P] Create tRPC getPlaybackUrl procedure in `packages/course-gen-platform/src/server/routers/enrichment/procedures/get-playback-url.ts`
-- [ ] T026 Create tRPC createBatch procedure in `packages/course-gen-platform/src/server/routers/enrichment/procedures/create-batch.ts`
-- [ ] T027 Create enrichment router index in `packages/course-gen-platform/src/server/routers/enrichment/router.ts`
-- [ ] T028 Register enrichment router in main app router `packages/course-gen-platform/src/server/routers/index.ts`
+- [ ] T009 Create Stage 7 config in `packages/course-gen-platform/src/stages/stage7-enrichments/config/index.ts`
+- [ ] T010 Create Stage 7 job types in `packages/course-gen-platform/src/stages/stage7-enrichments/types/index.ts`
+- [ ] T011 [P] Create database service in `packages/course-gen-platform/src/stages/stage7-enrichments/services/database-service.ts`
+- [ ] T012 [P] Create storage service for asset upload + signed URLs in `packages/course-gen-platform/src/stages/stage7-enrichments/services/storage-service.ts`
+- [ ] T013 Create retry strategy with model fallback in `packages/course-gen-platform/src/stages/stage7-enrichments/retry-strategy.ts`
+- [ ] T014 Create enrichment router (type-to-handler dispatch, supports two-stage flow) in `packages/course-gen-platform/src/stages/stage7-enrichments/services/enrichment-router.ts`
+- [ ] T015 Create job processor (main job handler with progress tracking, draft/final phases) in `packages/course-gen-platform/src/stages/stage7-enrichments/services/job-processor.ts`
+- [ ] T016 Create Stage 7 worker factory in `packages/course-gen-platform/src/stages/stage7-enrichments/factory.ts`
+- [ ] T017 Create QueueEvents for global monitoring in `packages/course-gen-platform/src/queues/enrichment-events.ts`
+- [ ] T018 Create tRPC enrichment schemas in `packages/course-gen-platform/src/server/routers/enrichment/schemas.ts`
+- [ ] T019 [P] Create tRPC create procedure in `packages/course-gen-platform/src/server/routers/enrichment/procedures/create.ts`
+- [ ] T020 [P] Create tRPC getByLesson procedure in `packages/course-gen-platform/src/server/routers/enrichment/procedures/get-by-lesson.ts`
+- [ ] T021 [P] Create tRPC getSummaryByCourse procedure in `packages/course-gen-platform/src/server/routers/enrichment/procedures/get-summary.ts`
+- [ ] T022 [P] Create tRPC regenerate procedure in `packages/course-gen-platform/src/server/routers/enrichment/procedures/regenerate.ts`
+- [ ] T023 [P] Create tRPC delete procedure in `packages/course-gen-platform/src/server/routers/enrichment/procedures/delete.ts`
+- [ ] T024 [P] Create tRPC reorder procedure in `packages/course-gen-platform/src/server/routers/enrichment/procedures/reorder.ts`
+- [ ] T025 [P] Create tRPC cancel procedure in `packages/course-gen-platform/src/server/routers/enrichment/procedures/cancel.ts`
+- [ ] T026 [P] Create tRPC getPlaybackUrl procedure in `packages/course-gen-platform/src/server/routers/enrichment/procedures/get-playback-url.ts`
+- [ ] T027 [P] Create tRPC regenerateDraft procedure (two-stage) in `packages/course-gen-platform/src/server/routers/enrichment/procedures/regenerate-draft.ts`
+- [ ] T028 [P] Create tRPC updateDraft procedure (two-stage) in `packages/course-gen-platform/src/server/routers/enrichment/procedures/update-draft.ts`
+- [ ] T029 [P] Create tRPC approveDraft procedure (two-stage) in `packages/course-gen-platform/src/server/routers/enrichment/procedures/approve-draft.ts`
+- [ ] T030 Create tRPC createBatch procedure in `packages/course-gen-platform/src/server/routers/enrichment/procedures/create-batch.ts`
+- [ ] T031 Create enrichment router index in `packages/course-gen-platform/src/server/routers/enrichment/router.ts`
+- [ ] T032 Register enrichment router in main app router `packages/course-gen-platform/src/server/routers/index.ts`
 
 **Checkpoint**: Foundation ready - user story implementation can now begin in parallel
 
@@ -89,15 +93,15 @@
 
 ### Implementation for User Story 7
 
-- [ ] T029 [US7] Update LessonNodeData type to include enrichmentsSummary, hasEnrichmentErrors, enrichmentsGenerating in `packages/web/components/generation-graph/types.ts`
-- [ ] T030 [US7] Create AssetDock component with semantic zoom logic (dot→count→icons) in `packages/web/components/generation-graph/nodes/AssetDock.tsx`
-- [ ] T031 [US7] Update LessonNode to include AssetDock (height 50px→64px) in `packages/web/components/generation-graph/nodes/LessonNode.tsx`
-- [ ] T032 [US7] Create enrichment status badge component in `packages/web/components/generation-graph/panels/stage7/EnrichmentStatusBadge.tsx`
-- [ ] T033 [US7] Create enrichment type icons map in `packages/web/lib/generation-graph/translations.ts`
-- [ ] T034 [US7] Create useEnrichmentData hook (tRPC + Supabase realtime subscription) in `packages/web/components/generation-graph/hooks/useEnrichmentData.ts`
-- [ ] T035 [US7] Update ELK layout config for 64px node height in `packages/web/lib/generation-graph/constants.ts`
-- [ ] T036 [P] [US7] Create enrichment translations in `packages/web/messages/ru/enrichments.json`
-- [ ] T037 [P] [US7] Create enrichment translations in `packages/web/messages/en/enrichments.json`
+- [ ] T033 [US7] Update LessonNodeData type to include enrichmentsSummary, hasEnrichmentErrors, enrichmentsGenerating in `packages/web/components/generation-graph/types.ts`
+- [ ] T034 [US7] Create AssetDock component with semantic zoom logic (dot→count→icons) in `packages/web/components/generation-graph/nodes/AssetDock.tsx`
+- [ ] T035 [US7] Update LessonNode to include AssetDock (height 50px→64px) in `packages/web/components/generation-graph/nodes/LessonNode.tsx`
+- [ ] T036 [US7] Create enrichment status badge component in `packages/web/components/generation-graph/panels/stage7/EnrichmentStatusBadge.tsx`
+- [ ] T037 [US7] Create enrichment type icons map in `packages/web/lib/generation-graph/translations.ts`
+- [ ] T038 [US7] Create useEnrichmentData hook (tRPC + Supabase realtime subscription) in `packages/web/components/generation-graph/hooks/useEnrichmentData.ts`
+- [ ] T039 [US7] Update ELK layout config for 64px node height in `packages/web/lib/generation-graph/constants.ts`
+- [ ] T040 [P] [US7] Create enrichment translations in `packages/web/messages/ru/enrichments.json`
+- [ ] T041 [P] [US7] Create enrichment translations in `packages/web/messages/en/enrichments.json`
 
 **Checkpoint**: Asset Dock visible on lesson nodes with status indicators
 
@@ -109,13 +113,16 @@
 
 **Independent Test**: Add a video enrichment to a single lesson, verify the video script is generated and displayed in the inspector panel.
 
+**Flow**: Two-stage (draft script → user review → final video generation)
+
 ### Implementation for User Story 1
 
-- [ ] T038 [US1] Create video prompt template in `packages/course-gen-platform/src/stages/stage7-enrichments/prompts/video-prompt.ts`
-- [ ] T039 [US1] Create video handler (stub returning script) in `packages/course-gen-platform/src/stages/stage7-enrichments/handlers/video-handler.ts`
-- [ ] T040 [US1] Create VideoPreview component in `packages/web/components/generation-graph/panels/stage7/previews/VideoPreview.tsx`
+- [ ] T042 [US1] Create video prompt template in `packages/course-gen-platform/src/stages/stage7-enrichments/prompts/video-prompt.ts`
+- [ ] T043 [US1] Create video handler (two-stage: generateDraft → generateFinal) in `packages/course-gen-platform/src/stages/stage7-enrichments/handlers/video-handler.ts`
+- [ ] T044 [US1] Create VideoPreview component in `packages/web/components/generation-graph/panels/stage7/previews/VideoPreview.tsx`
+- [ ] T045 [US1] Create VideoDraftEditor component for script review/edit in `packages/web/components/generation-graph/panels/stage7/editors/VideoDraftEditor.tsx`
 
-**Checkpoint**: Video enrichments can be added and preview shows script content
+**Checkpoint**: Video enrichments can be added, draft reviewed/edited, and preview shows script content
 
 ---
 
@@ -125,11 +132,13 @@
 
 **Independent Test**: Add a quiz to a lesson, verify questions are generated based on lesson content, preview shows questions/answers/explanations.
 
+**Flow**: Single-stage (direct generation)
+
 ### Implementation for User Story 2
 
-- [ ] T041 [US2] Create quiz prompt template with Bloom's taxonomy in `packages/course-gen-platform/src/stages/stage7-enrichments/prompts/quiz-prompt.ts`
-- [ ] T042 [US2] Create quiz handler (full implementation) in `packages/course-gen-platform/src/stages/stage7-enrichments/handlers/quiz-handler.ts`
-- [ ] T043 [US2] Create QuizPreview component in `packages/web/components/generation-graph/panels/stage7/previews/QuizPreview.tsx`
+- [ ] T046 [US2] Create quiz prompt template with Bloom's taxonomy in `packages/course-gen-platform/src/stages/stage7-enrichments/prompts/quiz-prompt.ts`
+- [ ] T047 [US2] Create quiz handler (full implementation) in `packages/course-gen-platform/src/stages/stage7-enrichments/handlers/quiz-handler.ts`
+- [ ] T048 [US2] Create QuizPreview component in `packages/web/components/generation-graph/panels/stage7/previews/QuizPreview.tsx`
 
 **Checkpoint**: Quiz enrichments can be added with generated questions, preview is fully functional
 
@@ -141,11 +150,13 @@
 
 **Independent Test**: Generate audio for a lesson, verify audio plays back in the preview.
 
+**Flow**: Single-stage (direct TTS generation)
+
 ### Implementation for User Story 3
 
-- [ ] T044 [US3] Create audio prompt template (TTS optimization) in `packages/course-gen-platform/src/stages/stage7-enrichments/prompts/audio-prompt.ts`
-- [ ] T045 [US3] Create audio handler (OpenAI TTS integration) in `packages/course-gen-platform/src/stages/stage7-enrichments/handlers/audio-handler.ts`
-- [ ] T046 [US3] Create AudioPreview component (HTML5 audio player) in `packages/web/components/generation-graph/panels/stage7/previews/AudioPreview.tsx`
+- [ ] T049 [US3] Create audio prompt template (TTS optimization) in `packages/course-gen-platform/src/stages/stage7-enrichments/prompts/audio-prompt.ts`
+- [ ] T050 [US3] Create audio handler (OpenAI TTS integration) in `packages/course-gen-platform/src/stages/stage7-enrichments/handlers/audio-handler.ts`
+- [ ] T051 [US3] Create AudioPreview component (HTML5 audio player) in `packages/web/components/generation-graph/panels/stage7/previews/AudioPreview.tsx`
 
 **Checkpoint**: Audio enrichments can be added and played back in preview
 
@@ -157,13 +168,16 @@
 
 **Independent Test**: Generate a presentation for a lesson, view the slides in carousel preview.
 
+**Flow**: Two-stage (draft slide structure → user review → final HTML render)
+
 ### Implementation for User Story 4
 
-- [ ] T047 [US4] Create presentation prompt template (6x6 rule) in `packages/course-gen-platform/src/stages/stage7-enrichments/prompts/presentation-prompt.ts`
-- [ ] T048 [US4] Create presentation handler in `packages/course-gen-platform/src/stages/stage7-enrichments/handlers/presentation-handler.ts`
-- [ ] T049 [US4] Create PresentationPreview component (slide carousel) in `packages/web/components/generation-graph/panels/stage7/previews/PresentationPreview.tsx`
+- [ ] T052 [US4] Create presentation prompt template (6x6 rule) in `packages/course-gen-platform/src/stages/stage7-enrichments/prompts/presentation-prompt.ts`
+- [ ] T053 [US4] Create presentation handler (two-stage: generateDraft → generateFinal) in `packages/course-gen-platform/src/stages/stage7-enrichments/handlers/presentation-handler.ts`
+- [ ] T054 [US4] Create PresentationPreview component (slide carousel) in `packages/web/components/generation-graph/panels/stage7/previews/PresentationPreview.tsx`
+- [ ] T055 [US4] Create PresentationDraftEditor component for slide structure review in `packages/web/components/generation-graph/panels/stage7/editors/PresentationDraftEditor.tsx`
 
-**Checkpoint**: Presentation enrichments can be added and slides viewed in carousel
+**Checkpoint**: Presentation enrichments can be added, draft reviewed, and slides viewed in carousel
 
 ---
 
@@ -173,17 +187,43 @@
 
 **Independent Test**: Add multiple enrichments to a lesson, reorder them, delete one, verify changes persist.
 
+**Architecture**: Implements **Contextual Deep-Link Pattern** with Inspector Panel as Stack Navigator (ROOT → CREATE → DETAIL views)
+
 ### Implementation for User Story 5
 
-- [ ] T050 [US5] Create EnrichmentInspectorPanel in `packages/web/components/generation-graph/panels/stage7/EnrichmentInspectorPanel.tsx`
-- [ ] T051 [US5] Create EnrichmentList (sortable with @dnd-kit) in `packages/web/components/generation-graph/panels/stage7/EnrichmentList.tsx`
-- [ ] T052 [US5] Create EnrichmentListItem with progress display in `packages/web/components/generation-graph/panels/stage7/EnrichmentListItem.tsx`
-- [ ] T053 [US5] Create EnrichmentAddMenu in `packages/web/components/generation-graph/panels/stage7/EnrichmentAddMenu.tsx`
-- [ ] T054 [US5] Create useEnrichmentSelection hook (React Flow useOnSelectionChange) in `packages/web/components/generation-graph/hooks/useEnrichmentSelection.ts`
-- [ ] T055 [US5] Create EnrichmentNodeToolbar (React Flow NodeToolbar) in `packages/web/components/generation-graph/components/EnrichmentNodeToolbar.tsx`
-- [ ] T056 [US5] Integrate inspector panel with node selection in graph view
+#### Zustand Store & Hooks
+- [ ] T056 [US5] Create enrichment inspector Zustand store in `packages/web/components/generation-graph/stores/enrichment-inspector-store.ts` (InspectorView type, openRoot/openCreate/openDetail/goBack actions)
+- [ ] T057 [US5] Create useEnrichmentSelection hook (count-based routing logic) in `packages/web/components/generation-graph/hooks/useEnrichmentSelection.ts`
+- [ ] T058 [US5] Create useGenerationStatus hook (optimistic handoff behavior) in `packages/web/components/generation-graph/hooks/useGenerationStatus.ts`
+- [ ] T059 [US5] Create useDraftReview hook (two-stage flow: edit/approve draft) in `packages/web/components/generation-graph/hooks/useDraftReview.ts`
 
-**Checkpoint**: Full inspector panel functional with list management and reordering
+#### Inspector Panel Views (Stack Navigator)
+- [ ] T060 [US5] Create EnrichmentInspectorPanel (view router) in `packages/web/components/generation-graph/panels/stage7/EnrichmentInspectorPanel.tsx`
+- [ ] T061 [US5] Create RootView (list + fallback add button) in `packages/web/components/generation-graph/panels/stage7/views/RootView.tsx`
+- [ ] T062 [US5] Create CreateView (configuration form router) in `packages/web/components/generation-graph/panels/stage7/views/CreateView.tsx`
+- [ ] T063 [US5] Create DetailView (preview/edit with progress mode, supports two-stage) in `packages/web/components/generation-graph/panels/stage7/views/DetailView.tsx`
+- [ ] T064 [US5] Create EmptyStateCards (discovery cards for first enrichment) in `packages/web/components/generation-graph/panels/stage7/views/EmptyStateCards.tsx`
+
+#### Inspector Components
+- [ ] T065 [US5] Create EnrichmentList (sortable with @dnd-kit) in `packages/web/components/generation-graph/panels/stage7/components/EnrichmentList.tsx`
+- [ ] T066 [US5] Create EnrichmentListItem (click → DETAIL view) in `packages/web/components/generation-graph/panels/stage7/components/EnrichmentListItem.tsx`
+- [ ] T067 [US5] Create EnrichmentAddPopover (fallback add, popover/bottom sheet) in `packages/web/components/generation-graph/panels/stage7/components/EnrichmentAddPopover.tsx`
+- [ ] T068 [US5] Create GenerationProgress (terminal-style progress display) in `packages/web/components/generation-graph/panels/stage7/components/GenerationProgress.tsx`
+- [ ] T069 [US5] Create DiscardChangesDialog (dirty form state confirm) in `packages/web/components/generation-graph/panels/stage7/components/DiscardChangesDialog.tsx`
+- [ ] T070 [US5] Create DraftReviewActions (Approve/Regenerate/Edit buttons) in `packages/web/components/generation-graph/panels/stage7/components/DraftReviewActions.tsx`
+
+#### Configuration Forms (Smart Defaults)
+- [ ] T071 [P] [US5] Create QuizCreateForm in `packages/web/components/generation-graph/panels/stage7/forms/QuizCreateForm.tsx`
+- [ ] T072 [P] [US5] Create AudioCreateForm in `packages/web/components/generation-graph/panels/stage7/forms/AudioCreateForm.tsx`
+- [ ] T073 [P] [US5] Create VideoCreateForm in `packages/web/components/generation-graph/panels/stage7/forms/VideoCreateForm.tsx`
+- [ ] T074 [P] [US5] Create PresentationCreateForm in `packages/web/components/generation-graph/panels/stage7/forms/PresentationCreateForm.tsx`
+
+#### Deep-Link Integration
+- [ ] T075 [US5] Create EnrichmentNodeToolbar (deep-link triggers) in `packages/web/components/generation-graph/components/EnrichmentNodeToolbar.tsx`
+- [ ] T076 [US5] Update AssetDock click handler with count-based routing in `packages/web/components/generation-graph/nodes/AssetDock.tsx`
+- [ ] T077 [US5] Integrate inspector panel with node selection in graph view (node body → ROOT, toolbar → CREATE)
+
+**Checkpoint**: Full inspector panel functional with Stack Navigator pattern, list management, reordering, two-stage draft review, and deep-link triggers
 
 ---
 
@@ -191,15 +231,19 @@
 
 **Goal**: Instructors generate the same enrichment type for multiple lessons at once
 
-**Independent Test**: Select multiple lessons, generate audio for all, verify all affected lessons show progress indicators.
+**Independent Test**: Select ModuleGroup, generate audio for all lessons, verify all affected lessons show progress indicators.
+
+**Architecture**: Batch operations via **Module Inspector** (separate from Lesson Inspector)
 
 ### Implementation for User Story 6
 
-- [ ] T057 [US6] Add batch selection UI to module context menu in `packages/web/components/generation-graph/components/ModuleContextMenu.tsx`
-- [ ] T058 [US6] Create batch generation progress component in `packages/web/components/generation-graph/panels/stage7/BatchGenerationProgress.tsx`
-- [ ] T059 [US6] Add batch generation status tracking in useEnrichmentData hook
+- [ ] T078 [US6] Create ModuleInspectorPanel with batch enrichments section in `packages/web/components/generation-graph/panels/module/ModuleInspectorPanel.tsx`
+- [ ] T079 [US6] Create BatchEnrichmentButtons component in `packages/web/components/generation-graph/panels/module/BatchEnrichmentButtons.tsx`
+- [ ] T080 [US6] Create BatchConfirmDialog (cost preview) in `packages/web/components/generation-graph/panels/module/BatchConfirmDialog.tsx`
+- [ ] T081 [US6] Add batch generation status tracking in useEnrichmentData hook
+- [ ] T082 [US6] Update ModuleGroup selection to open Module Inspector (not Lesson Inspector)
 
-**Checkpoint**: Batch generation works for multiple lessons with individual progress tracking
+**Checkpoint**: Batch generation works via Module Inspector with cost preview and individual progress tracking
 
 ---
 
@@ -207,15 +251,16 @@
 
 **Purpose**: Improvements that affect multiple user stories
 
-- [ ] T060 [P] Add i18n for backend Stage 7 messages in `packages/course-gen-platform/src/shared/i18n/messages.ts`
-- [ ] T061 [P] Create enrichment theme tokens (light/dark) in `packages/web/components/generation-graph/styles/enrichment-tokens.ts`
-- [ ] T062 [P] Create document handler placeholder in `packages/course-gen-platform/src/stages/stage7-enrichments/handlers/document-handler.ts`
-- [ ] T063 Implement mobile adaptation (inspector as bottom sheet) in EnrichmentInspectorPanel
-- [ ] T064 Add accessibility: ARIA labels (ariaLabelConfig), keyboard navigation (nodesFocusable), focus trap, aria-live in inspector
-- [ ] T065 Implement optimistic UI updates for create/delete mutations with rollback on error
-- [ ] T066 Add Document enrichment type as disabled with "Coming Soon" tooltip in EnrichmentAddMenu and NodeToolbar
-- [ ] T067 Implement error grouping in Asset Dock (single indicator for multiple failures)
-- [ ] T068 Run quickstart.md validation and verify all flows work end-to-end
+- [ ] T083 [P] Add i18n for backend Stage 7 messages in `packages/course-gen-platform/src/shared/i18n/messages.ts`
+- [ ] T084 [P] Create enrichment theme tokens (light/dark) in `packages/web/components/generation-graph/styles/enrichment-tokens.ts`
+- [ ] T085 [P] Create document handler placeholder in `packages/course-gen-platform/src/stages/stage7-enrichments/handlers/document-handler.ts`
+- [ ] T086 [P] Register all enrichment types in Type Registry in `packages/web/lib/enrichments/type-registrations.ts`
+- [ ] T087 Implement mobile adaptation (inspector as bottom sheet) in EnrichmentInspectorPanel
+- [ ] T088 Add accessibility: ARIA labels (ariaLabelConfig), keyboard navigation (nodesFocusable), focus trap, aria-live in inspector
+- [ ] T089 Implement optimistic UI updates for create/delete mutations with rollback on error
+- [ ] T090 Add Document enrichment type as disabled with "Coming Soon" tooltip in EnrichmentAddPopover and NodeToolbar
+- [ ] T091 Implement error grouping in Asset Dock (single indicator for multiple failures)
+- [ ] T092 Run quickstart.md validation and verify all flows work end-to-end
 
 ---
 
@@ -308,46 +353,65 @@ Task: T062 [P] document handler placeholder
 
 | Phase | Tasks | Count | Parallel |
 |-------|-------|-------|----------|
-| Setup | T001-T007 | 7 | T004, T005 |
-| Foundational | T008-T028 | 21 | T010-T011, T018-T025 |
-| US7 View Status | T029-T037 | 9 | T036, T037 |
-| US1 Video | T038-T040 | 3 | - |
-| US2 Quiz | T041-T043 | 3 | - |
-| US3 Audio | T044-T046 | 3 | - |
-| US4 Presentation | T047-T049 | 3 | - |
-| US5 Manage | T050-T056 | 7 | - |
-| US6 Batch | T057-T059 | 3 | - |
-| Polish | T060-T068 | 9 | T060-T062 |
+| Setup | T001-T008 | 8 | T004-T006 |
+| Foundational | T009-T032 | 24 | T011-T012, T019-T029 |
+| US7 View Status | T033-T041 | 9 | T040, T041 |
+| US1 Video | T042-T045 | 4 | - |
+| US2 Quiz | T046-T048 | 3 | - |
+| US3 Audio | T049-T051 | 3 | - |
+| US4 Presentation | T052-T055 | 4 | - |
+| US5 Manage (Inspector) | T056-T077 | 22 | T071-T074 |
+| US6 Batch | T078-T082 | 5 | - |
+| Polish | T083-T092 | 10 | T083-T086 |
 
-**Total Tasks**: 68
-**MVP Tasks** (US7 + US2): T001-T028, T029-T037, T041-T043 = 43 tasks
-**Suggested MVP**: Complete through Phase 5 (Quiz) for first functional demo
+**Total Tasks**: 92
+**MVP Tasks** (US7 + US2): T001-T032, T033-T041, T046-T048 = 49 tasks
+**Full Inspector MVP** (US7 + US2 + US5): + T056-T077 = 71 tasks
+**Suggested MVP**: Complete through Phase 5 (Quiz) for first functional demo, then add Phase 8 (Inspector) for full UX
+
+**New in this version**:
+- Type Registry pattern (T006, T086)
+- Two-stage flow support (T027-T029, T059, T070)
+- Draft editors for Video/Presentation (T045, T055)
 
 ## ТЗ Coverage Checklist
 
 | ТЗ Section | Status | Tasks |
 |------------|--------|-------|
-| 3.1 Database Schema | ✅ | T001 (enums, table, indexes, RLS, triggers, REPLICA IDENTITY) |
+| 3.1 Database Schema | ✅ | T001 (enums with two-stage statuses, table, indexes, RLS, triggers) |
 | 3.2 Content JSONB | ✅ | T005 |
-| 3.3 TypeScript Types | ✅ | T004, T006, T007 |
-| 3.4 React Flow State | ✅ | T029 |
-| 4.1-4.5 Three-Layer UI | ✅ | T030 (Asset Dock), T055 (NodeToolbar), T050 (Inspector) |
-| 4.6 Batch Operations | ✅ | T057-T059 |
-| 5.1-5.3 Pipeline | ✅ | T008-T015 |
-| 5.4 QueueEvents | ✅ | T016 |
-| 5.5 Progress Tracking | ✅ | T014 (in job-processor) |
-| 5.6 Retry Strategy | ✅ | T012 |
-| 6.1-6.4 Agent Prompts | ✅ | T038, T041, T044, T047 |
-| 6.5 Adding New Type | ✅ | T062 (document-handler placeholder) |
-| 7.1 tRPC Router | ✅ | T017-T028 |
-| 7.2 Supabase Realtime | ✅ | T034 |
-| 7.3 React Flow Integration | ✅ | T034 |
-| 7.4 Selection Sync | ✅ | T054 |
-| 8.1-8.4 Accessibility | ✅ | T064 |
-| 9.1 Optimistic UI | ✅ | T065 |
-| 9.2-9.3 Error Display | ✅ | T032, T067 |
-| 9.4 Progress Display | ✅ | T052 |
-| 10.1-10.4 Storage | ✅ | T002, T011, T025 |
-| 11.1-11.2 i18n | ✅ | T036, T037, T060 |
-| 12.1-12.3 Theme Support | ✅ | T061 |
-| 14 Acceptance Criteria | ✅ | T068 (validation) |
+| 3.3 TypeScript Types | ✅ | T004, T007, T008 |
+| 3.4 React Flow State | ✅ | T033 |
+| 3.5 Inspector State (Zustand) | ✅ | T056 (enrichment-inspector-store.ts) |
+| 3.6 Two-Stage Generation Flow | ✅ | T014-T015, T027-T029, T043, T053, T059, T070 |
+| 3.7 Type Registry Pattern | ✅ | T006, T086 |
+| 4.1 Contextual Deep-Link Pattern | ✅ | T056, T075 (store + NodeToolbar deep-links) |
+| 4.2-4.3 LessonNode + Asset Dock | ✅ | T034, T035, T076 (Asset Dock with count-based routing) |
+| 4.4 NodeToolbar | ✅ | T075 (EnrichmentNodeToolbar) |
+| 4.5 Inspector Panel Views | ✅ | T060-T064 (ROOT, CREATE, DETAIL, EmptyStateCards) |
+| 4.6 Post-Generation Flow | ✅ | T058, T068 (useGenerationStatus, GenerationProgress) |
+| 4.7 Count-Based Routing | ✅ | T057, T076 (useEnrichmentSelection, AssetDock) |
+| 4.8 Empty State Cards | ✅ | T064 (EmptyStateCards) |
+| 4.9 Safe Harbor Navigation | ✅ | T056, T069 (goBack action, DiscardChangesDialog) |
+| 4.10 Batch Operations | ✅ | T078-T082 (Module Inspector) |
+| 5.1-5.3 Pipeline | ✅ | T009-T016 |
+| 5.4 QueueEvents | ✅ | T017 |
+| 5.5 Progress Tracking | ✅ | T015, T068 (job-processor, GenerationProgress) |
+| 5.6 Retry Strategy | ✅ | T013 |
+| 6.1-6.4 Agent Prompts | ✅ | T042, T046, T049, T052 |
+| 6.5 Adding New Type | ✅ | T085 (document-handler placeholder), T006 (Type Registry) |
+| 7.1 tRPC Router | ✅ | T018-T032 (includes two-stage: regenerateDraft, updateDraft, approveDraft) |
+| 7.2 Supabase Realtime | ✅ | T038 |
+| 7.3 React Flow Integration | ✅ | T038 |
+| 7.4 Selection Sync | ✅ | T057 (useEnrichmentSelection) |
+| 8.1-8.4 Accessibility | ✅ | T088 |
+| 9.1 Optimistic UI | ✅ | T089 |
+| 9.2-9.3 Error Display | ✅ | T036, T091 |
+| 9.4 Progress Display | ✅ | T058, T068 |
+| Create Forms (Smart Defaults) | ✅ | T071-T074 |
+| Fallback Add Button | ✅ | T067 (EnrichmentAddPopover) |
+| Draft Editors (Two-Stage) | ✅ | T045, T055, T070 |
+| 10.1-10.4 Storage | ✅ | T002, T012, T026 |
+| 11.1-11.2 i18n | ✅ | T040, T041, T083 |
+| 12.1-12.3 Theme Support | ✅ | T084 |
+| 14 Acceptance Criteria | ✅ | T092 (validation) |

@@ -87,13 +87,15 @@ CREATE TYPE enrichment_type AS ENUM (
     'document'
 );
 
--- Enrichment generation status
+-- Enrichment generation status (supports two-stage flow)
 CREATE TYPE enrichment_status AS ENUM (
-    'pending',      -- Queued for generation
-    'generating',   -- AI processing in progress
-    'completed',    -- Successfully generated
-    'failed',       -- Generation failed
-    'cancelled'     -- User cancelled
+    'pending',           -- Queued for generation
+    'draft_generating',  -- Phase 1: Generating draft/script
+    'draft_ready',       -- Phase 1 complete: Awaiting user review
+    'generating',        -- Phase 2: Generating final content (or single-stage)
+    'completed',         -- Successfully generated
+    'failed',            -- Generation failed
+    'cancelled'          -- User cancelled
 );
 
 -- Main enrichments table
@@ -273,13 +275,23 @@ export type EnrichmentType = z.infer<typeof enrichmentTypeSchema>;
 
 export const enrichmentStatusSchema = z.enum([
   'pending',
-  'generating',
+  'draft_generating',  // Two-stage: Phase 1 in progress
+  'draft_ready',       // Two-stage: Awaiting user review
+  'generating',        // Final generation (or single-stage)
   'completed',
   'failed',
   'cancelled'
 ]);
 
 export type EnrichmentStatus = z.infer<typeof enrichmentStatusSchema>;
+
+/** Helper to check if status is in draft phase (two-stage flow) */
+export const isDraftPhase = (status: EnrichmentStatus): boolean =>
+  status === 'draft_generating' || status === 'draft_ready';
+
+/** Helper to check if enrichment is actionable by user */
+export const isAwaitingAction = (status: EnrichmentStatus): boolean =>
+  status === 'draft_ready' || status === 'failed';
 
 export interface LessonEnrichment {
   id: string;
@@ -349,42 +361,322 @@ export interface LessonNodeData {
 }
 ```
 
+### 3.5 Inspector Panel State Management
+
+```typescript
+// packages/web/components/generation-graph/stores/enrichment-inspector-store.ts
+
+import { create } from 'zustand';
+
+/** Inspector view types (Stack Navigator pattern) */
+type InspectorView = 'ROOT' | 'CREATE' | 'DETAIL';
+
+interface EnrichmentInspectorState {
+  // Panel state
+  isOpen: boolean;
+  nodeId: string | null;           // Selected lesson node ID
+  nodeType: 'lesson' | 'module' | null;
+
+  // View stack
+  view: InspectorView;
+
+  // CREATE view state
+  activeCreateType: EnrichmentType | null;
+  createFormDirty: boolean;        // For "discard unsaved?" warning
+
+  // DETAIL view state
+  activeEnrichmentId: string | null;
+
+  // Actions
+  openRoot: (nodeId: string) => void;
+  openCreate: (nodeId: string, type: EnrichmentType) => void;
+  openDetail: (nodeId: string, enrichmentId: string) => void;
+  goBack: () => void;
+  close: () => void;
+  setFormDirty: (dirty: boolean) => void;
+}
+
+export const useEnrichmentInspectorStore = create<EnrichmentInspectorState>((set, get) => ({
+  isOpen: false,
+  nodeId: null,
+  nodeType: null,
+  view: 'ROOT',
+  activeCreateType: null,
+  createFormDirty: false,
+  activeEnrichmentId: null,
+
+  openRoot: (nodeId) => set({
+    isOpen: true,
+    nodeId,
+    nodeType: 'lesson',
+    view: 'ROOT',
+    activeCreateType: null,
+    activeEnrichmentId: null,
+  }),
+
+  openCreate: (nodeId, type) => set({
+    isOpen: true,
+    nodeId,
+    nodeType: 'lesson',
+    view: 'CREATE',
+    activeCreateType: type,
+    createFormDirty: false,
+    activeEnrichmentId: null,
+  }),
+
+  openDetail: (nodeId, enrichmentId) => set({
+    isOpen: true,
+    nodeId,
+    nodeType: 'lesson',
+    view: 'DETAIL',
+    activeEnrichmentId: enrichmentId,
+    activeCreateType: null,
+  }),
+
+  goBack: () => {
+    const { view, createFormDirty } = get();
+    // Safe Harbor: always go to ROOT, never close
+    if (view === 'CREATE' && createFormDirty) {
+      // Caller should show confirm dialog first
+      return;
+    }
+    set({ view: 'ROOT', activeCreateType: null, activeEnrichmentId: null });
+  },
+
+  close: () => set({
+    isOpen: false,
+    nodeId: null,
+    nodeType: null,
+    view: 'ROOT',
+    activeCreateType: null,
+    activeEnrichmentId: null,
+    createFormDirty: false,
+  }),
+
+  setFormDirty: (dirty) => set({ createFormDirty: dirty }),
+}));
+```
+
+**Usage in NodeToolbar (Deep-Link):**
+
+```tsx
+// When user clicks [+ Quiz] in NodeToolbar
+const { openCreate } = useEnrichmentInspectorStore();
+
+const handleAddQuiz = () => {
+  openCreate(selectedNodeId, 'quiz');  // Opens Inspector directly in CREATE view
+};
+```
+
+**Usage in Asset Dock (Count-Based Routing):**
+
+```tsx
+const handleIconClick = (type: EnrichmentType) => {
+  const count = enrichments.filter(e => e.enrichment_type === type).length;
+
+  if (count === 1) {
+    // Single item: go directly to DETAIL
+    const enrichment = enrichments.find(e => e.enrichment_type === type);
+    openDetail(nodeId, enrichment.id);
+  } else {
+    // Multiple: go to ROOT with scroll hint
+    openRoot(nodeId);
+    // Scroll to section handled by ROOT view component
+  }
+};
+```
+
+### 3.6 Two-Stage Generation Flow
+
+Some enrichment types (Video, Presentation) use a **two-stage generation flow** to give users control before expensive operations:
+
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│  SINGLE-STAGE FLOW (Audio, Quiz)                                    │
+│  ────────────────────────────────────────────────────────────────── │
+│  pending → generating → completed                                   │
+│                                                                     │
+│  - Fast, inexpensive generation                                     │
+│  - Direct to final content                                          │
+│  - Regenerate if unsatisfied                                        │
+└─────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────┐
+│  TWO-STAGE FLOW (Video, Presentation)                               │
+│  ────────────────────────────────────────────────────────────────── │
+│  pending → draft_generating → draft_ready → generating → completed  │
+│                                    │                                │
+│                              [User Review]                          │
+│                              Edit / Approve                         │
+│                                                                     │
+│  Phase 1: Generate script/structure (cheap LLM call)                │
+│  User Review: View, edit, approve or regenerate draft               │
+│  Phase 2: Generate final content (expensive: TTS, video API)        │
+└─────────────────────────────────────────────────────────────────────┘
+```
+
+**DETAIL View for Two-Stage Flow:**
+
+```
+┌──────────────────────────────────────────────────────────────┐
+│  < Back                                           [🗑] [⟳]    │
+│                                                              │
+│  📹 Video Script                          STATUS: draft_ready │
+│  ────────────────────────────────────────────────────────────│
+│                                                              │
+│  [ SCRIPT PREVIEW ]                                          │
+│  ┌────────────────────────────────────────────────────────┐ │
+│  │  INTRO (15 sec)                                        │ │
+│  │  Welcome to this lesson on Variables...                │ │
+│  │                                                        │ │
+│  │  SECTION 1: What is a Variable? (60 sec)               │ │
+│  │  A variable is a named storage location...             │ │
+│  │  [Edit]                                                │ │
+│  │                                                        │ │
+│  │  SECTION 2: Variable Types (45 sec)                    │ │
+│  │  There are several types of variables...               │ │
+│  │  [Edit]                                                │ │
+│  └────────────────────────────────────────────────────────┘ │
+│                                                              │
+│  Estimated Duration: 2:30  •  Cost: ~$0.85                   │
+│                                                              │
+│  [ Regenerate Script ]    [ ✨ Approve & Generate Video ]    │
+└──────────────────────────────────────────────────────────────┘
+```
+
+**Type Configuration:**
+
+| Type | Flow | Phase 1 Output | Phase 2 Action | Cost Control |
+|------|------|----------------|----------------|--------------|
+| `video` | two-stage | Script + visual cues | Video API call | High ($0.50+/min) |
+| `presentation` | two-stage | Slide structure | Render HTML | Medium (time) |
+| `audio` | single | — | TTS API call | Low ($0.015/1K) |
+| `quiz` | single | — | LLM generation | Low (tokens) |
+
+### 3.7 Type Registry Pattern (Extensibility)
+
+The enrichment system uses a **Type Registry** pattern for easy extensibility:
+
+```typescript
+// packages/shared-types/src/enrichment-type-registry.ts
+
+export interface EnrichmentTypeDefinition<
+  TContent = unknown,
+  TSettings = unknown
+> {
+  // Identity
+  type: string;
+  version: number;
+
+  // Display
+  icon: string;                          // Lucide icon name
+  label: { en: string; ru: string };
+  description: { en: string; ru: string };
+
+  // Behavior
+  generationFlow: 'single-stage' | 'two-stage';
+  estimatedDuration: (wordCount: number) => number;
+  estimatedCost: (wordCount: number) => number;
+
+  // Schemas
+  contentSchema: z.ZodType<TContent>;
+  settingsSchema: z.ZodType<TSettings>;
+
+  // UI Components (lazy-loaded)
+  components: {
+    CreateForm: () => Promise<React.ComponentType>;
+    DetailView: () => Promise<React.ComponentType>;
+    DraftEditor?: () => Promise<React.ComponentType>; // For two-stage
+  };
+
+  // Feature flags
+  features: {
+    canEdit: boolean;
+    canRegenerate: boolean;
+    canExport: boolean;
+    requiresAsset: boolean;
+    supportsPreview: boolean;
+  };
+}
+
+// Registry singleton
+class EnrichmentTypeRegistry {
+  private types = new Map<string, EnrichmentTypeDefinition>();
+
+  register(definition: EnrichmentTypeDefinition): void {
+    this.types.set(definition.type, definition);
+  }
+
+  get(type: string): EnrichmentTypeDefinition | undefined {
+    return this.types.get(type);
+  }
+
+  getAll(): EnrichmentTypeDefinition[] {
+    return Array.from(this.types.values());
+  }
+}
+
+export const enrichmentRegistry = new EnrichmentTypeRegistry();
+```
+
+**Adding a New Type (Checklist):**
+
+1. **Database**: `ALTER TYPE enrichment_type ADD VALUE 'flashcards'`
+2. **Schemas**: Define content/settings in `shared-types`
+3. **Register**: Call `enrichmentRegistry.register({...})`
+4. **UI Components**: Create form, detail view, (draft editor if two-stage)
+5. **Worker Handler**: Implement generation logic
+6. **Tests**: Add test coverage
+
+**No changes needed to:**
+- Inspector Panel (uses registry)
+- Asset Dock (uses registry icons)
+- BullMQ router (dispatches by type)
+- Database schema (JSONB is flexible)
+
 ---
 
 ## 4. UI/UX Specification
 
-### 4.1 Three-Layer System
+### 4.1 Contextual Deep-Link Pattern (Core Architecture)
+
+Based on DeepThink analysis, we use the **Contextual Deep-Link Pattern** where NodeToolbar buttons act as shortcuts (deep links) into the Inspector Panel's internal views.
 
 ```
 ┌─────────────────────────────────────────────────────────────────────┐
-│  LAYER 1: Badge Indicators (Always Visible on LessonNode)          │
+│  LAYER 1: Asset Dock (Always Visible on LessonNode)                │
 │  ─────────────────────────────────────────────────────────────────  │
-│  - Compact icons in "Asset Dock" (bottom 24px of node)             │
-│  - Status colors: gray=pending, blue=generating, green=done, red=error │
-│  - Semantic zoom: dot → icons → labels                              │
+│  - Compact icons in bottom 14px strip of node (64px total height)  │
+│  - Status colors: gray=empty, blue=generating, green=done, red=error │
+│  - Click icon → opens Inspector in DETAIL view                     │
+│  - Semantic zoom: dot → count badge → individual icons             │
 └─────────────────────────────────────────────────────────────────────┘
                               │
-                              ▼ click "+"
+                              ▼ click [+ Type] button
 ┌─────────────────────────────────────────────────────────────────────┐
-│  LAYER 2: Plus Button + NodeToolbar (On Selection)                  │
+│  LAYER 2: NodeToolbar (Deep-Link Triggers)                         │
 │  ─────────────────────────────────────────────────────────────────  │
 │  - React Flow <NodeToolbar> appears ABOVE selected node            │
 │  - Buttons: [+Video] [+Audio] [+Slides] [+Quiz] [+Doc*]            │
+│  - Click → Opens Inspector directly in CREATE view (deep link)     │
 │  - *Doc button disabled with "Coming Soon" tooltip                 │
-│  - Optimistic UI: ghost icon appears immediately                   │
 └─────────────────────────────────────────────────────────────────────┘
                               │
-                              ▼ click badge/icon
+                              ▼ Inspector Panel
 ┌─────────────────────────────────────────────────────────────────────┐
-│  LAYER 3: Inspector Panel (Right Sidebar)                          │
+│  LAYER 3: Inspector Panel (Stack Navigator with 3 Views)           │
 │  ─────────────────────────────────────────────────────────────────  │
-│  - Lesson title + metadata header                                  │
-│  - Scrollable enrichment list with drag-reorder                    │
-│  - Per-enrichment: icon, title, status, [Edit] [Regenerate] [Delete] │
-│  - [+ Add Enrichment] button at bottom                             │
-│  - Mobile: converts to bottom sheet                                │
+│  VIEW: ROOT (default) - Enrichment list with management            │
+│  VIEW: CREATE - Configuration form for new enrichment              │
+│  VIEW: DETAIL - Preview/edit for specific enrichment               │
+│  Mobile: converts to bottom sheet                                  │
 └─────────────────────────────────────────────────────────────────────┘
 ```
+
+**Navigation Rules (Golden Rule):**
+- **Generic click (node body)** → Opens Inspector in ROOT view
+- **Specific click (Asset Dock icon)** → Opens Inspector in DETAIL view
+- **Add click (NodeToolbar button)** → Opens Inspector in CREATE view
 
 ### 4.2 LessonNode Redesign
 
@@ -430,31 +722,31 @@ Icon States:
 - 🟢 Green: All enrichments completed
 - ⚪ Gray: No enrichments
 
-### 4.4 NodeToolbar (Add Enrichment)
+### 4.4 NodeToolbar (Deep-Link Triggers)
 
 ```tsx
-// Appears on node selection
+// Appears on node selection - buttons are DEEP LINKS to Inspector CREATE view
 <NodeToolbar isVisible={selected} position={Position.Top}>
   <div className="flex gap-2 p-2 bg-white dark:bg-slate-800 rounded-lg shadow-lg">
     <ToolbarButton
       icon={<Video />}
       label={t('enrichments.addVideo')}
-      onClick={() => addEnrichment('video')}
+      onClick={() => openInspector({ view: 'CREATE', type: 'video' })}
     />
     <ToolbarButton
       icon={<Mic />}
       label={t('enrichments.addAudio')}
-      onClick={() => addEnrichment('audio')}
+      onClick={() => openInspector({ view: 'CREATE', type: 'audio' })}
     />
     <ToolbarButton
       icon={<Presentation />}
       label={t('enrichments.addSlides')}
-      onClick={() => addEnrichment('presentation')}
+      onClick={() => openInspector({ view: 'CREATE', type: 'presentation' })}
     />
     <ToolbarButton
       icon={<HelpCircle />}
       label={t('enrichments.addQuiz')}
-      onClick={() => addEnrichment('quiz')}
+      onClick={() => openInspector({ view: 'CREATE', type: 'quiz' })}
     />
     <ToolbarButton
       icon={<FileText />}
@@ -466,52 +758,223 @@ Icon States:
 </NodeToolbar>
 ```
 
-### 4.5 Inspector Panel
+### 4.5 Inspector Panel Views (Stack Navigator)
+
+The Inspector Panel functions as a **Stack Navigator** with three internal routes:
+
+#### 4.5.1 ROOT View (Enrichment List)
+
+Default view when clicking lesson node body.
 
 ```
 ┌─────────────────────────────────────┐
+│  < Back                    [✕]      │
 │  📖 Introduction to Variables       │  ← Lesson title
 │  Module 1 • 15 min                  │
 ├─────────────────────────────────────┤
 │  ENRICHMENTS (3)                    │
 │  ─────────────────────────────────  │
 │                                     │
-│  ⠿ 📹 Welcome Video         ✓      │  ← Completed
+│  ⠿ 📹 Welcome Video         ✓      │  ← Click → DETAIL view
 │      Duration: 2:34                 │
-│      [Preview] [Regenerate] [🗑]    │
 │                                     │
-│  ⠿ 🎙️ Audio Narration      ●      │  ← Generating
+│  ⠿ 🎙️ Audio Narration      ●      │  ← Generating (pulsing)
 │      Progress: 45%                  │
-│      [Cancel]                       │
 │                                     │
 │  ⠿ ❓ Comprehension Quiz    ✗      │  ← Failed
 │      Error: Rate limit exceeded     │
-│      [Retry] [🗑]                   │
 │                                     │
 ├─────────────────────────────────────┤
-│  [+ Add Enrichment]                 │
+│  [+ Add Enrichment]                 │  ← Opens Popover menu
 └─────────────────────────────────────┘
 
 Legend:
-⠿ = drag handle for reordering
+⠿ = drag handle for reordering (@dnd-kit)
 ✓ = completed (green)
 ● = in progress (blue, animated)
 ✗ = failed (red)
 ```
 
-### 4.6 Batch Operations
+**Fallback [+ Add Enrichment] Button:**
+- Desktop: Opens **Popover Menu** anchored to button
+- Mobile: Opens **Bottom Sheet** with type selector
+- Menu items mirror NodeToolbar (Icons + Labels)
+- Selecting type → transitions to CREATE view
 
-**Module-Level Actions:**
-1. Select ModuleGroup header
-2. Click "Batch Actions" in toolbar
-3. Choose enrichment type: "Generate Audio for all 12 lessons"
-4. All child lessons show pulsing audio icons
+#### 4.5.2 CREATE View (Configuration Form)
 
-**Multi-Select Mode:**
-1. Enter selection mode (checkbox icon in toolbar)
-2. Check desired lessons (or "Select All in Module")
-3. Click batch action button
-4. Choose enrichment type to generate for all selected
+Opened via NodeToolbar deep-link or [+ Add Enrichment] button.
+
+```
+┌──────────────────────────────────────────────────┐
+│  < Back to Lesson 1.05                           │
+│                                                  │
+│  ❓ New Quiz Enrichment                          │
+│  ──────────────────────────────────────────────  │
+│                                                  │
+│  AI will generate comprehension questions        │
+│  based on this lesson's content (1,200 words).   │
+│                                                  │
+│  [ CONFIGURATION ]                               │
+│  Question Count:   [ - ]  5  [ + ]               │
+│  Difficulty:       [ Easy | Medium | Hard ]      │
+│  Question Types:   [✓] Multi-Choice  [✓] T/F     │
+│                                                  │
+│                                                  │
+│  [ Cancel ]          [ ✨ Generate (1 Credit) ]  │
+└──────────────────────────────────────────────────┘
+```
+
+**Smart Defaults:** Form pre-filled with sensible defaults. User can generate immediately or customize.
+
+#### 4.5.3 DETAIL View (Preview/Edit)
+
+Opened via Asset Dock icon click or after generation completes.
+
+```
+┌──────────────────────────────────────────────────┐
+│  < Back to Lesson                    [🗑] [⟳]    │
+│                                                  │
+│  ❓ Comprehension Quiz                           │
+│  Status: ✓ Completed • 5 questions              │
+│  ──────────────────────────────────────────────  │
+│                                                  │
+│  [ PREVIEW ]                                     │
+│  ┌────────────────────────────────────────────┐ │
+│  │  Q1: What is a variable in programming?    │ │
+│  │  ○ A) A fixed value that never changes     │ │
+│  │  ● B) A named storage location for data    │ │
+│  │  ○ C) A type of loop structure             │ │
+│  │  ○ D) A function parameter                 │ │
+│  │  ✓ Correct! Explanation: Variables are... │ │
+│  └────────────────────────────────────────────┘ │
+│                                                  │
+│  [ Edit Questions ]    [ Regenerate ]            │
+└──────────────────────────────────────────────────┘
+```
+
+### 4.6 Post-Generation Flow (Optimistic Handoff)
+
+When user clicks "Generate":
+
+**Scenario A: User stays on panel**
+1. Click [Generate] → View transitions from CREATE to DETAIL
+2. DETAIL shows "Building..." progress state (terminal log style)
+3. When complete → content appears with live update (no reload)
+
+**Scenario B: User leaves (closes panel or navigates)**
+1. Click [Generate] → Asset Dock icon starts pulsing blue
+2. User can work elsewhere while generation runs
+3. Return paths:
+   - Click pulsing icon → Opens DETAIL view (progress or result)
+   - Click lesson node body → Opens ROOT view (list with status badge)
+
+```
+State Machine:
+
+CREATE ──[Generate]──► DETAIL (progress mode)
+                           │
+                           ▼ (generation complete)
+                       DETAIL (preview mode)
+```
+
+### 4.7 Count-Based Smart Routing
+
+When clicking Asset Dock icon with multiple enrichments of same type:
+
+| Count | Behavior |
+|-------|----------|
+| 0 | N/A (no icon shown) |
+| 1 | Opens DETAIL view directly (optimizes 90% case) |
+| >1 | Opens ROOT view, auto-scrolls to section, flashes group |
+
+**Visual indicator:**
+- Single item: Standard icon `[❓]`
+- Multiple items: Icon with badge `[❓ 2]`
+
+### 4.8 Empty State (Discovery Cards)
+
+When lesson has zero enrichments, ROOT view shows educational onboarding:
+
+```
+┌─────────────────────────────────────┐
+│  📖 Introduction to Variables       │
+│  Module 1 • 15 min                  │
+├─────────────────────────────────────┤
+│                                     │
+│  Recommended Enrichments            │
+│                                     │
+│  ┌──────────────┐  ┌──────────────┐ │
+│  │ 📹 Video     │  │ ❓ Quiz      │ │
+│  │ AI Avatar    │  │ Check know-  │ │
+│  │ lecture.     │  │ ledge.       │ │
+│  │ [Add Video]  │  │ [Add Quiz]   │ │
+│  └──────────────┘  └──────────────┘ │
+│                                     │
+│  ┌──────────────┐  ┌──────────────┐ │
+│  │ 🎙️ Audio     │  │ 📊 Slides    │ │
+│  │ Listen to    │  │ Key points   │ │
+│  │ lesson.      │  │ summary.     │ │
+│  │ [Add Audio]  │  │ [Add Slides] │ │
+│  └──────────────┘  └──────────────┘ │
+│                                     │
+└─────────────────────────────────────┘
+```
+
+- Cards explain what each type does
+- Click card → transitions to CREATE view (same as NodeToolbar)
+- After first enrichment added → standard list view takes over
+
+### 4.9 Cancel/Back Navigation (Safe Harbor)
+
+**Rule:** "Back" always returns to ROOT view, never closes panel.
+
+| Scenario | Action | Result |
+|----------|--------|--------|
+| Deep-link → CREATE → Cancel | Click Cancel/Back | Go to ROOT (not close panel) |
+| ROOT → [+ Add] → CREATE | Click Cancel | Return to ROOT |
+| Dirty state in CREATE | Click icon in Asset Dock | Show confirm: "Discard unsaved?" |
+| Pristine CREATE form | Click icon in Asset Dock | Switch immediately (no confirm) |
+
+**Why:** User selected the lesson. Closing panel feels like a crash. ROOT view re-orients them.
+
+### 4.10 Batch Operations (Module Inspector)
+
+Batch operations are handled via **Module Inspector** (not Lesson Inspector).
+
+**Interaction Flow:**
+1. User clicks **ModuleGroup** header/background
+2. Inspector opens showing **"Module Details"** view
+3. **"Batch Enrichments"** section available with type buttons
+4. Click [Generate Quizzes for All 12 Lessons]
+5. Confirmation with cost preview
+6. All child LessonNodes update Asset Docks to "generating" (pulsing blue)
+
+```
+┌─────────────────────────────────────┐
+│  📁 Module 1: Fundamentals          │
+│  12 lessons • 45 min total          │
+├─────────────────────────────────────┤
+│                                     │
+│  BATCH ENRICHMENTS                  │
+│  ─────────────────────────────────  │
+│                                     │
+│  [📹 Video for All]  0/12 lessons   │
+│  [🎙️ Audio for All]  0/12 lessons   │
+│  [❓ Quiz for All]   0/12 lessons   │
+│  [📊 Slides for All] 0/12 lessons   │
+│                                     │
+│  ─────────────────────────────────  │
+│  LESSON STATUS                      │
+│  ✓ 1.01 Variables       [📹🎙️]     │
+│  ✓ 1.02 Data Types      [📹]       │
+│  ○ 1.03 Operators       -          │
+│  ...                               │
+│                                     │
+└─────────────────────────────────────┘
+```
+
+**Why Module Inspector:** Keeps Lesson Inspector focused and simple. Provides safe, dedicated space for bulk operations.
 
 ---
 

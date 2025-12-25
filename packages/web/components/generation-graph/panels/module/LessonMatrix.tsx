@@ -1,6 +1,6 @@
 'use client';
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { LessonMatrixRow } from '@megacampus/shared-types';
 import {
   Table,
@@ -12,7 +12,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { MicroStepper } from '../../components/MicroStepper';
+import { SegmentedPillTrack } from '../stage6/dashboard/SegmentedPillTrack';
 import { Eye, Play, Pause, RotateCw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -178,7 +178,7 @@ function calculateSummary(lessons: LessonMatrixRow[]) {
 }
 
 export function LessonMatrix({ lessons, onLessonClick, onLessonAction, className }: LessonMatrixProps) {
-  const summary = calculateSummary(lessons);
+  const summary = useMemo(() => calculateSummary(lessons), [lessons]);
 
   return (
     <div className={cn('rounded-lg border border-slate-200 dark:border-slate-700', className)}>
@@ -213,7 +213,10 @@ export function LessonMatrix({ lessons, onLessonClick, onLessonAction, className
                 </div>
               </TableCell>
               <TableCell>
-                <MicroStepper state={lesson.pipelineState} size="sm" />
+                <SegmentedPillTrack
+                  pipelineState={lesson.pipelineState}
+                  className="h-2"
+                />
               </TableCell>
               <TableCell className="text-center font-mono">
                 {formatQuality(lesson.qualityScore)}

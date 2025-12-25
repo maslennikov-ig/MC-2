@@ -166,6 +166,7 @@ export async function executeTargetedRefinement(
             iterationHistory: convertToIterationHistory(state.contentHistory),
             lessonSpec,
             strengths: arbiterOutput.acceptedIssues.length === 0 ? ['Content meets quality standards'] : [],
+            language, // Pass language for token budget calculation
           }))
         );
 

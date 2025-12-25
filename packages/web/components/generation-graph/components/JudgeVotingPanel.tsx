@@ -46,7 +46,7 @@ function getVerdictIcon(verdict: JudgeVerdictType) {
   switch (verdict) {
     case 'ACCEPT':
       return Check;
-    case 'TARGETED_FIX':
+    case 'ACCEPT_WITH_MINOR_REVISION':
     case 'ITERATIVE_REFINEMENT':
       return AlertTriangle;
     case 'REGENERATE':
@@ -68,9 +68,28 @@ function getScoreColor(score: number): string {
 
 /**
  * Get verdict badge color class
+ *
+ * Handles unknown verdicts gracefully (e.g., ACCEPT_WITH_MINOR_REVISION from LLM)
  */
 function getVerdictBadgeColor(verdict: JudgeVerdictType): string {
   const labelConfig = JUDGE_VERDICT_LABELS[verdict];
+
+  // Fallback for unknown verdicts (LLM may return non-standard values like ACCEPT_WITH_MINOR_REVISION)
+  if (!labelConfig) {
+    // Map known LLM variations to appropriate colors
+    const verdictStr = String(verdict).toUpperCase();
+    if (verdictStr.includes('ACCEPT')) {
+      return 'bg-emerald-100 text-emerald-700 dark:bg-emerald-900/30 dark:text-emerald-400';
+    }
+    if (verdictStr.includes('FIX') || verdictStr.includes('REVISION')) {
+      return 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400';
+    }
+    if (verdictStr.includes('REGENERATE')) {
+      return 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-400';
+    }
+    return 'bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400';
+  }
+
   const color = labelConfig.color;
 
   switch (color) {
@@ -129,7 +148,7 @@ interface JudgeCardProps {
 function JudgeCard({ vote, isTieBreaker = false, expanded = false, onToggle }: JudgeCardProps) {
   const VerdictIcon = getVerdictIcon(vote.verdict);
   const scoreColor = getScoreColor(vote.score);
-  const verdictLabel = JUDGE_VERDICT_LABELS[vote.verdict].ru;
+  const verdictLabel = JUDGE_VERDICT_LABELS[vote.verdict]?.ru ?? String(vote.verdict).replace(/_/g, ' ');
   const verdictBadgeColor = getVerdictBadgeColor(vote.verdict);
 
   return (
@@ -277,9 +296,10 @@ export function JudgeVotingPanel({
   const { votes, consensusMethod, finalVerdict, finalScore, tieBreakerId } = votingResult;
 
   const finalScoreColor = getScoreColor(finalScore);
-  const finalVerdictLabel = JUDGE_VERDICT_LABELS[finalVerdict].ru;
-  const finalVerdictBadgeColor = getVerdictBadgeColor(finalVerdict);
-  const consensusLabel = CONSENSUS_METHOD_LABELS[consensusMethod];
+  // Guard against undefined finalVerdict (can happen during cascade evaluation when single judge was used)
+  const finalVerdictLabel = finalVerdict ? JUDGE_VERDICT_LABELS[finalVerdict]?.ru ?? 'Неизвестно' : 'Неизвестно';
+  const finalVerdictBadgeColor = finalVerdict ? getVerdictBadgeColor(finalVerdict) : 'bg-gray-100 text-gray-700 dark:bg-gray-900/30 dark:text-gray-400';
+  const consensusLabel = consensusMethod ? CONSENSUS_METHOD_LABELS[consensusMethod] ?? 'Неизвестно' : 'Неизвестно';
 
   const toggleJudgeExpansion = (judgeId: string) => {
     setExpandedJudgeIds((prev) => {

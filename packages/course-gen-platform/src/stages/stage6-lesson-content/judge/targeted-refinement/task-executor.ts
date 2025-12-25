@@ -280,6 +280,9 @@ export async function executePatcherTask(
         endQuote: undefined,
         scope: 'section' as const,
       },
+      // Pass lesson duration and language for accurate token budget calculation
+      lessonDurationMinutes: iterationContext.lessonSpec?.estimated_duration_minutes,
+      language: iterationContext.language,
     };
 
     // Execute patch

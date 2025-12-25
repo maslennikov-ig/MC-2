@@ -79,4 +79,6 @@ export interface IterationContext {
   iterationHistory?: IterationHistoryEntry[];
   lessonSpec?: LessonSpecificationV2;
   strengths?: string[];
+  /** Content language for token budget calculation (ISO 639-1 code: 'ru', 'en', 'zh') */
+  language?: string;
 }

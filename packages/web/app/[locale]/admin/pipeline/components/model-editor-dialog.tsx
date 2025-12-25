@@ -39,6 +39,24 @@ import { ModelSelector } from './model-selector';
 import { updateModelConfig } from '@/app/actions/pipeline-admin';
 import type { ModelConfigWithVersion } from '@megacampus/shared-types';
 
+/**
+ * Phases that use dynamic token calculation
+ * These phases calculate maxTokens at runtime based on content length and language
+ * The maxTokens field should be hidden/disabled in the UI for these phases
+ */
+const DYNAMIC_TOKEN_PHASES = [
+  'stage_6_refinement',      // smoother: uses calculateRequiredTokens
+  'stage_6_section_expander', // expander: uses dynamic calc
+  'stage_6_patcher',          // patcher: uses calculateMaxTokensForPatch
+] as const;
+
+/**
+ * Check if a phase uses dynamic token calculation
+ */
+function usesDynamicTokens(phaseName: string): boolean {
+  return DYNAMIC_TOKEN_PHASES.includes(phaseName as typeof DYNAMIC_TOKEN_PHASES[number]);
+}
+
 // Form validation schema
 const formSchema = z.object({
   modelId: z.string().min(1, 'Model is required'),
@@ -242,23 +260,42 @@ export function ModelEditorDialog({
             )}
           </div>
 
-          {/* Max tokens input */}
+          {/* Max tokens input - hidden for dynamic phases */}
           <div className="space-y-2">
             <Label htmlFor="maxTokens" className="text-gray-900 dark:text-gray-100 font-medium">Maximum Output Tokens</Label>
-            <Input
-              id="maxTokens"
-              type="number"
-              {...register('maxTokens', { valueAsNumber: true })}
-              min={1}
-              max={128000}
-              placeholder="e.g., 4096"
-              className="bg-gray-100 dark:bg-slate-900 border-gray-200 dark:border-slate-700 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500"
-            />
-            <p className="text-xs text-gray-500 dark:text-gray-500">
-              Limits the length of model-generated responses (1-128,000)
-            </p>
-            {errors.maxTokens && (
-              <p className="text-sm text-red-400">{errors.maxTokens.message}</p>
+            {usesDynamicTokens(config.phaseName) ? (
+              <div className="rounded-lg border border-emerald-500/30 bg-emerald-50 dark:bg-emerald-950/30 p-3">
+                <div className="flex items-center gap-2">
+                  <span className="inline-flex items-center rounded-md bg-emerald-100 dark:bg-emerald-900/50 px-2 py-1 text-xs font-semibold text-emerald-700 dark:text-emerald-400">
+                    Dynamic
+                  </span>
+                  <span className="text-sm text-emerald-700 dark:text-emerald-300">
+                    Calculated automatically
+                  </span>
+                </div>
+                <p className="text-xs text-emerald-600 dark:text-emerald-400 mt-2">
+                  Token limit is calculated at runtime based on content length, language, and lesson duration.
+                  This ensures sufficient capacity without manual configuration.
+                </p>
+              </div>
+            ) : (
+              <>
+                <Input
+                  id="maxTokens"
+                  type="number"
+                  {...register('maxTokens', { valueAsNumber: true })}
+                  min={1}
+                  max={128000}
+                  placeholder="e.g., 4096"
+                  className="bg-gray-100 dark:bg-slate-900 border-gray-200 dark:border-slate-700 text-gray-900 dark:text-gray-100 placeholder:text-gray-400 dark:placeholder:text-gray-500"
+                />
+                <p className="text-xs text-gray-500 dark:text-gray-500">
+                  Limits the length of model-generated responses (1-128,000)
+                </p>
+                {errors.maxTokens && (
+                  <p className="text-sm text-red-400">{errors.maxTokens.message}</p>
+                )}
+              </>
             )}
           </div>
 

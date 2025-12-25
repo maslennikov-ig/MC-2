@@ -308,14 +308,20 @@ export function checkWordCount(
   const words = content.match(/\b[a-zA-Z]+\b/g) || [];
   const wordCount = words.length;
 
-  const passed = wordCount >= config.min && wordCount <= config.max;
+  // IMPORTANT: Only content BELOW min is a blocking failure
+  // Content exceeding max is just a warning (non-blocking)
+  const passedMin = wordCount >= config.min;
+  const passedMax = wordCount <= config.max;
+  const passed = passedMin; // Only min check determines pass/fail
 
   // Calculate score contribution (1.0 if in range, scaled otherwise)
   let scoreContribution = 1.0;
   if (wordCount < config.min) {
     scoreContribution = wordCount / config.min;
   } else if (wordCount > config.max) {
-    scoreContribution = Math.max(0, 1 - (wordCount - config.max) / config.max);
+    // Exceeding max: reduce score slightly but not critically
+    // 150% of max = 0.9 score, 200% of max = 0.8 score, etc.
+    scoreContribution = Math.max(0.7, 1 - (wordCount - config.max) / (config.max * 2));
   }
 
   const result: FilterCheckResult = {
@@ -324,17 +330,19 @@ export function checkWordCount(
     scoreContribution,
   };
 
-  if (!passed) {
+  // Only add failure if BELOW minimum (requires regeneration)
+  if (!passedMin) {
     result.failure = {
       filter: 'wordCount',
       expected: { min: config.min, max: config.max },
       actual: wordCount,
-      severity: wordCount < config.min * 0.5 || wordCount > config.max * 1.5 ? 'critical' : 'major',
+      // Severity based on how far below minimum
+      severity: wordCount < config.min * 0.5 ? 'critical' : 'major',
     };
-    result.suggestion =
-      wordCount < config.min
-        ? `Content is too short (${wordCount} words). Add more detail, examples, or expand explanations to reach at least ${config.min} words.`
-        : `Content is too long (${wordCount} words). Consider splitting into multiple lessons or reducing redundancy to stay under ${config.max} words.`;
+    result.suggestion = `Content is too short (${wordCount} words). Add more detail, examples, or expand explanations to reach at least ${config.min} words.`;
+  } else if (!passedMax) {
+    // Exceeding max: just a suggestion, not a failure
+    result.suggestion = `Content exceeds recommended length (${wordCount} words vs max ${config.max}). Consider condensing if possible, but this is not blocking.`;
   }
 
   return result;
@@ -676,6 +684,246 @@ export function checkLearningObjectiveCoverage(
       severity,
     };
     result.suggestion = `Low learning objective coverage (${coveredCount}/${objectives.length} objectives). Review the spec and ensure content addresses each learning objective with relevant terms.`;
+  }
+
+  return result;
+}
+
+// ============================================================================
+// LANGUAGE CONSISTENCY CHECK (Self-Review Pre-filter)
+// ============================================================================
+
+/**
+ * Unicode ranges for script detection
+ */
+const UNICODE_SCRIPTS = {
+  /** Cyrillic script range (Russian, Ukrainian, etc.) */
+  CYRILLIC: /[\u0400-\u04FF]/g,
+  /** CJK Unified Ideographs (Chinese, Japanese Kanji, Korean Hanja) */
+  CJK: /[\u4E00-\u9FFF\u3400-\u4DBF]/g,
+  /** Basic Latin letters */
+  LATIN: /[a-zA-Z]/g,
+  /** Arabic script */
+  ARABIC: /[\u0600-\u06FF]/g,
+  /** Devanagari (Hindi, Sanskrit) */
+  DEVANAGARI: /[\u0900-\u097F]/g,
+} as const;
+
+/**
+ * Language to unexpected (foreign) scripts mapping
+ * These scripts should NEVER appear in content of given language
+ */
+const LANGUAGE_UNEXPECTED_SCRIPTS: Record<string, (keyof typeof UNICODE_SCRIPTS)[]> = {
+  ru: ['CJK', 'ARABIC', 'DEVANAGARI'],  // Chinese in Russian is always wrong
+  en: ['CJK', 'CYRILLIC', 'ARABIC', 'DEVANAGARI'],  // Non-Latin in English
+  zh: ['CYRILLIC', 'ARABIC', 'DEVANAGARI'],  // Non-CJK in Chinese
+};
+
+/**
+ * Extract text content from markdown, excluding code blocks
+ * Code blocks can legitimately contain any characters
+ */
+function extractProseText(content: string): string {
+  // Remove code blocks (``` ... ```)
+  const withoutCodeBlocks = content.replace(/```[\s\S]*?```/g, '');
+  // Remove inline code (`...`)
+  const withoutInlineCode = withoutCodeBlocks.replace(/`[^`]+`/g, '');
+  return withoutInlineCode;
+}
+
+/**
+ * Check language consistency using Unicode script detection
+ *
+ * Detects unexpected script mixing:
+ * - Chinese characters in Russian text
+ * - Cyrillic in English text
+ * - etc.
+ *
+ * IMPORTANT: Code blocks are EXCLUDED from checks (technical terms are valid)
+ *
+ * @param content - Lesson content (markdown string)
+ * @param expectedLanguage - Expected language code (ru, en, zh, etc.)
+ * @returns Filter check result with foreign character details
+ */
+export function checkLanguageConsistency(
+  content: string,
+  expectedLanguage: string
+): FilterCheckResult & {
+  foreignCharacters: number;
+  foreignSamples: string[];
+  scriptsFound: string[];
+} {
+  // Extract prose text (exclude code blocks)
+  const proseText = extractProseText(content);
+
+  // Get unexpected scripts for this language
+  const unexpectedScriptKeys = LANGUAGE_UNEXPECTED_SCRIPTS[expectedLanguage] || [];
+
+  let totalForeignCount = 0;
+  const allSamples: string[] = [];
+  const scriptsFound: string[] = [];
+
+  for (const scriptKey of unexpectedScriptKeys) {
+    const pattern = UNICODE_SCRIPTS[scriptKey];
+    const matches = proseText.match(pattern) || [];
+
+    if (matches.length > 0) {
+      totalForeignCount += matches.length;
+      scriptsFound.push(scriptKey);
+      // Collect unique samples (up to 3 per script)
+      const uniqueSamples = [...new Set(matches)].slice(0, 3);
+      allSamples.push(...uniqueSamples);
+    }
+  }
+
+  /** Threshold for minor language issues (>5 chars = failed check) */
+  const MINOR_LANGUAGE_THRESHOLD = 5;
+  /** Divisor for language score contribution calculation */
+  const LANGUAGE_SCORE_DIVISOR = 20;
+
+  // Threshold: more than 5 foreign characters is a failure
+  // 1-5 characters might be typos or edge cases
+  const passed = totalForeignCount <= MINOR_LANGUAGE_THRESHOLD;
+
+  // Score contribution: 1.0 if clean, reduces based on foreign count
+  const scoreContribution = totalForeignCount === 0
+    ? 1.0
+    : Math.max(0, 1 - totalForeignCount / LANGUAGE_SCORE_DIVISOR);
+
+  const result: FilterCheckResult & {
+    foreignCharacters: number;
+    foreignSamples: string[];
+    scriptsFound: string[];
+  } = {
+    passed,
+    actual: totalForeignCount,
+    scoreContribution,
+    foreignCharacters: totalForeignCount,
+    foreignSamples: allSamples.slice(0, 5),
+    scriptsFound,
+  };
+
+  if (!passed) {
+    result.failure = {
+      filter: 'languageConsistency',
+      expected: `No unexpected ${scriptsFound.join('/')} characters`,
+      actual: `${totalForeignCount} foreign characters found`,
+      severity: totalForeignCount > 20 ? 'critical' : 'major',
+    };
+    result.suggestion = `Content contains ${totalForeignCount} unexpected characters from ${scriptsFound.join(', ')} script(s). Examples: "${allSamples.slice(0, 3).join('", "')}". Remove or replace these characters.`;
+  }
+
+  if (totalForeignCount > 0) {
+    logger.debug({
+      msg: 'Language consistency check found foreign characters',
+      expectedLanguage,
+      foreignCharacters: totalForeignCount,
+      scriptsFound,
+      samples: allSamples.slice(0, 5),
+    });
+  }
+
+  return result;
+}
+
+// ============================================================================
+// CONTENT TRUNCATION CHECK (Self-Review Pre-filter)
+// ============================================================================
+
+/**
+ * Check if content appears truncated or incomplete
+ *
+ * Signs of truncation:
+ * - Last section doesn't end with proper punctuation (. ! ? 。 ！ ？)
+ * - Unmatched code blocks (odd number of ```)
+ * - Incomplete sentences (ends with comma, "and", "or", etc.)
+ * - Suspiciously short last section
+ *
+ * @param content - Lesson content (markdown string)
+ * @returns Filter check result with truncation issues
+ */
+export function checkContentTruncation(content: string): FilterCheckResult & {
+  truncationIssues: string[];
+  lastCharacter: string;
+  hasMatchedCodeBlocks: boolean;
+} {
+  const issues: string[] = [];
+
+  // Check 1: Proper ending punctuation
+  const trimmedContent = content.trim();
+
+  // Get last meaningful character (skip closing markdown like **)
+  let lastMeaningfulIndex = trimmedContent.length - 1;
+  while (lastMeaningfulIndex > 0 && /[*_`#\s]/.test(trimmedContent[lastMeaningfulIndex])) {
+    lastMeaningfulIndex--;
+  }
+  const lastMeaningfulChar = trimmedContent[lastMeaningfulIndex];
+
+  const validEndingPunctuation = /[.!?。！？:]/;
+  if (!validEndingPunctuation.test(lastMeaningfulChar)) {
+    issues.push(`Content does not end with proper punctuation (last char: "${lastMeaningfulChar}")`);
+  }
+
+  // Check 2: Matched code blocks
+  const codeBlockCount = (content.match(/```/g) || []).length;
+  const hasMatchedCodeBlocks = codeBlockCount % 2 === 0;
+  if (!hasMatchedCodeBlocks) {
+    issues.push(`Unmatched code blocks detected (${codeBlockCount} markers found, expected even number)`);
+  }
+
+  // Check 3: Incomplete sentence patterns at the end
+  const lastSentence = trimmedContent.slice(-100);
+  const incompletePatterns = [
+    /,\s*$/,           // Ends with comma
+    /\band\s*$/i,      // Ends with "and"
+    /\bor\s*$/i,       // Ends with "or"
+    /\bthe\s*$/i,      // Ends with "the"
+    /\ba\s*$/i,        // Ends with "a"
+    /\bto\s*$/i,       // Ends with "to"
+    /\bof\s*$/i,       // Ends with "of"
+    /\bи\s*$/i,        // Russian "and"
+    /\bили\s*$/i,      // Russian "or"
+    /\bчто\s*$/i,      // Russian "that"
+  ];
+
+  for (const pattern of incompletePatterns) {
+    if (pattern.test(lastSentence)) {
+      issues.push('Content appears to end mid-sentence');
+      break;
+    }
+  }
+
+  // Check 4: Very short content (less than 200 characters suggests truncation)
+  if (trimmedContent.length < 200) {
+    issues.push(`Content suspiciously short (${trimmedContent.length} characters)`);
+  }
+
+  const passed = issues.length === 0;
+
+  // Score: 1.0 if clean, reduces based on number of issues
+  const scoreContribution = Math.max(0, 1 - issues.length * 0.25);
+
+  const result: FilterCheckResult & {
+    truncationIssues: string[];
+    lastCharacter: string;
+    hasMatchedCodeBlocks: boolean;
+  } = {
+    passed,
+    actual: issues.length === 0 ? 'no truncation detected' : `${issues.length} issues`,
+    scoreContribution,
+    truncationIssues: issues,
+    lastCharacter: lastMeaningfulChar,
+    hasMatchedCodeBlocks,
+  };
+
+  if (!passed) {
+    result.failure = {
+      filter: 'contentTruncation',
+      expected: 'Complete, properly terminated content',
+      actual: `${issues.length} truncation issues`,
+      severity: issues.length > 2 ? 'critical' : 'major',
+    };
+    result.suggestion = `Content appears truncated: ${issues.join('; ')}. Ensure all content is complete and properly terminated.`;
   }
 
   return result;

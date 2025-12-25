@@ -38,25 +38,35 @@ export interface UseLessonInspectorDataReturn {
 
 /**
  * Patterns for extracting node names from step_name
- * Backend sends: planner_start, planner_complete, planner_error, etc.
+ * Backend sends: generator_start, generator_complete, generator_error, etc.
+ *
+ * BACKWARD COMPATIBILITY: Old logs may contain planner, expander, assembler, smoother phases.
+ * These are mapped to 'generator' for display in the new 3-node pipeline.
  */
 const NODE_PATTERNS: { pattern: RegExp; node: Stage6NodeName }[] = [
-  { pattern: /^planner/i, node: 'planner' },
-  { pattern: /^expander/i, node: 'expander' },
-  { pattern: /^assembler/i, node: 'assembler' },
-  { pattern: /^smoother/i, node: 'smoother' },
+  { pattern: /^generator/i, node: 'generator' },
+  { pattern: /^planner/i, node: 'generator' }, // Legacy mapping
+  { pattern: /^expander/i, node: 'generator' }, // Legacy mapping
+  { pattern: /^assembler/i, node: 'generator' }, // Legacy mapping
+  { pattern: /^smoother/i, node: 'generator' }, // Legacy mapping
+  { pattern: /^selfReviewer/i, node: 'selfReviewer' },
   { pattern: /^judge/i, node: 'judge' },
 ];
 
 /**
  * Map phase field to Stage6NodeName
- * Backend records: phase: 'planner', 'expander', 'assembler', 'smoother', 'judge', 'init', 'complete'
+ * Backend records: phase: 'generator', 'selfReviewer', 'judge', 'init', 'complete'
+ *
+ * BACKWARD COMPATIBILITY: Old logs may contain planner, expander, assembler, smoother phases.
+ * These are mapped to 'generator' for display in the new 3-node pipeline.
  */
 const PHASE_TO_NODE_MAP: Record<string, Stage6NodeName> = {
-  'planner': 'planner',
-  'expander': 'expander',
-  'assembler': 'assembler',
-  'smoother': 'smoother',
+  'generator': 'generator',
+  'planner': 'generator', // Legacy
+  'expander': 'generator', // Legacy
+  'assembler': 'generator', // Legacy
+  'smoother': 'generator', // Legacy
+  'selfreviewer': 'selfReviewer',
   'judge': 'judge',
 };
 
@@ -228,8 +238,8 @@ function buildPipelineState(traces: GenerationTraceRow[]): {
     }
   }
 
-  // Convert map to array in pipeline order
-  const pipelineOrder: Stage6NodeName[] = ['planner', 'expander', 'assembler', 'smoother', 'judge'];
+  // Convert map to array in pipeline order (new 3-node pipeline)
+  const pipelineOrder: Stage6NodeName[] = ['generator', 'selfReviewer', 'judge'];
   const pipelineNodes = pipelineOrder
     .map((node) => nodeMap.get(node))
     .filter((node): node is PipelineNodeState => node !== undefined);
@@ -649,7 +659,7 @@ function parseVotingResult(
  */
 function determineVerdict(score: number): JudgeVerdictType {
   if (score >= 0.9) return 'ACCEPT';
-  if (score >= 0.75) return 'TARGETED_FIX';
+  if (score >= 0.75) return 'ACCEPT_WITH_MINOR_REVISION';
   if (score >= 0.6) return 'ITERATIVE_REFINEMENT';
   if (score >= 0.4) return 'REGENERATE';
   return 'ESCALATE_TO_HUMAN';

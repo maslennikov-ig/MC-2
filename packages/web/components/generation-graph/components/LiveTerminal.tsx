@@ -31,13 +31,19 @@ const LOG_LEVEL_COLORS: Record<LessonLogEntry['level'], string> = {
   error: 'text-red-500',
 };
 
-/** Color classes for node tags */
+/** Color classes for node tags
+ * New 3-node pipeline: generator, selfReviewer, judge
+ * Legacy nodes are kept for backward compatibility with old trace logs
+ */
 const NODE_TAG_COLORS: Record<Stage6NodeName | 'system', string> = {
+  generator: 'text-indigo-400',
+  selfReviewer: 'text-teal-400',
+  judge: 'text-orange-400',
+  // Legacy nodes for backward compatibility with old logs
   planner: 'text-purple-400',
   expander: 'text-blue-400',
   assembler: 'text-cyan-400',
   smoother: 'text-green-400',
-  judge: 'text-orange-400',
   system: 'text-slate-500',
 };
 

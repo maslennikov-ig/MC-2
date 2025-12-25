@@ -93,7 +93,6 @@ const phaseConfig: Record<
     icon: Layers,
     colorClass: 'text-orange-600 dark:text-orange-400',
     bgClass: 'bg-orange-100 dark:bg-orange-900/30',
-    isHighlight: true,
   },
   validate_quality: {
     icon: CheckCircle,
@@ -362,6 +361,15 @@ function getDefaultTelemetry(): Stage5TelemetryData {
 }
 
 /**
+ * Type guard to check if outputData is a CourseStructure
+ */
+function isCourseStructure(data: unknown): data is { sections: Array<{ lessons: unknown[] }> } {
+  if (!data || typeof data !== 'object') return false;
+  const d = data as Record<string, unknown>;
+  return typeof d.course_title === 'string' && Array.isArray(d.sections);
+}
+
+/**
  * Stage5ProcessTab Component
  *
  * Displays a "Forge Pipeline" showing the 5-phase structure generation process
@@ -373,16 +381,35 @@ export const Stage5ProcessTab = memo<Stage5ProcessTabProps>(function Stage5Proce
   telemetry: providedTelemetry,
   status = 'completed',
   locale = 'ru',
+  outputData,
+  processingTimeMs,
+  totalTokens,
 }) {
   const t = GRAPH_TRANSLATIONS.stage5!;
 
   // Generate default phases if not provided
   const phases = providedPhases || generateDefaultPhases(status, locale);
 
-  // Merge telemetry
+  // Calculate sections and lessons count from outputData
+  let sectionsCount: number | undefined;
+  let lessonsCount: number | undefined;
+  if (isCourseStructure(outputData)) {
+    sectionsCount = outputData.sections.length;
+    lessonsCount = outputData.sections.reduce(
+      (sum, section) => sum + (section.lessons?.length ?? 0),
+      0
+    );
+  }
+
+  // Merge telemetry with real data from props
   const telemetry: Stage5TelemetryData = {
     ...getDefaultTelemetry(),
     ...providedTelemetry,
+    // Override with real values if available
+    ...(processingTimeMs !== undefined && { processingTimeMs }),
+    ...(totalTokens !== undefined && { totalTokens }),
+    ...(sectionsCount !== undefined && { sectionsCount }),
+    ...(lessonsCount !== undefined && { lessonsCount }),
   };
 
   // Check if we have any data to display

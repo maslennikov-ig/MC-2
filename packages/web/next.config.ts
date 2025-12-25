@@ -2,13 +2,23 @@ import type { NextConfig } from "next";
 import webpack from 'webpack';
 import createNextIntlPlugin from 'next-intl/plugin';
 
+// Read version from package.json for cache invalidation
+const packageJson = require('./package.json');
+const APP_VERSION = packageJson.version;
+
 const withPWA = require('next-pwa')({
   dest: 'public',
   register: true,
   skipWaiting: true,
   disable: process.env.NODE_ENV === 'development',
   reloadOnOnline: true,
-  buildExcludes: [/app-build-manifest\.json$/],
+  // CRITICAL: Clean up outdated caches on deploy to prevent 502 errors
+  cleanupOutdatedCaches: true,
+  // Use build ID as cache namespace for proper versioning
+  cacheId: 'megacampus-v1',
+  buildExcludes: [/app-build-manifest\.json$/, /\.map$/],
+  // Don't precache _next/static - let runtime caching handle with NetworkFirst
+  publicExcludes: ['!_next/static/**/*'],
   runtimeCaching: [
     {
       urlPattern: /^https:\/\/fonts\.(?:gstatic)\.com\/.*/i,
@@ -88,36 +98,54 @@ const withPWA = require('next-pwa')({
       }
     },
     {
+      // Next.js chunks - use NetworkFirst to always get fresh on deploy
+      urlPattern: /\/_next\/static\/chunks\/.*/i,
+      handler: 'NetworkFirst',
+      options: {
+        cacheName: 'next-js-chunks',
+        expiration: {
+          maxEntries: 64,
+          maxAgeSeconds: 7 * 24 * 60 * 60 // 1 week
+        },
+        networkTimeoutSeconds: 5
+      }
+    },
+    {
+      // Other JS files (third-party, etc.)
       urlPattern: /\.(?:js)$/i,
-      handler: 'StaleWhileRevalidate',
+      handler: 'NetworkFirst',
       options: {
         cacheName: 'static-js-assets',
         expiration: {
           maxEntries: 32,
           maxAgeSeconds: 24 * 60 * 60 // 1 day
-        }
+        },
+        networkTimeoutSeconds: 5
       }
     },
     {
       urlPattern: /\.(?:css|less)$/i,
-      handler: 'StaleWhileRevalidate',
+      handler: 'NetworkFirst',
       options: {
         cacheName: 'static-style-assets',
         expiration: {
           maxEntries: 32,
           maxAgeSeconds: 24 * 60 * 60 // 1 day
-        }
+        },
+        networkTimeoutSeconds: 5
       }
     },
     {
+      // Next.js data - contains build ID, must use NetworkFirst
       urlPattern: /\/_next\/data\/.+\/.+\.json$/i,
-      handler: 'StaleWhileRevalidate',
+      handler: 'NetworkFirst',
       options: {
         cacheName: 'next-data',
         expiration: {
           maxEntries: 32,
-          maxAgeSeconds: 24 * 60 * 60 // 1 day
-        }
+          maxAgeSeconds: 60 * 60 // 1 hour only
+        },
+        networkTimeoutSeconds: 5
       }
     },
     {
@@ -172,6 +200,10 @@ const withPWA = require('next-pwa')({
 const nextConfig: NextConfig = {
   output: 'standalone',
   reactStrictMode: true,
+  // Expose app version to client for cache invalidation
+  env: {
+    NEXT_PUBLIC_APP_VERSION: APP_VERSION,
+  },
   // typedRoutes disabled - incompatible with [locale] dynamic segment in next-intl
   // Routes like "/" are not recognized with dynamic locale prefix
   typedRoutes: false,

@@ -2,32 +2,50 @@
  * Stage 6 LangGraph Orchestrator
  * @module stages/stage6-lesson-content/orchestrator
  *
- * Wires together the LangGraph nodes (planner -> expander -> assembler -> smoother -> judge)
+ * Wires together the LangGraph nodes (generator -> selfReviewer -> judge)
  * using StateGraph for lesson content generation pipeline.
  *
  * Pipeline flow:
- * __start__ -> planner -> expander -> assembler -> smoother -> judge -> __end__
- *                                                                |
- *                                                                +-> planner (if regenerate needed)
+ * __start__ -> generator -> selfReviewer -> judge -> __end__
+ *                             |              |
+ *                             |              +-> generator (if regenerate needed)
+ *                             +-> generator (if REGENERATE status)
+ *
+ * The generator node:
+ * - Generates complete lesson content in one pass using serial section-by-section generation
+ * - Replaces the previous planner -> expander -> assembler -> smoother pipeline
+ * - Uses context window for natural transitions between sections
+ *
+ * The selfReviewer node:
+ * - Performs pre-judge validation (Fail-Fast architecture)
+ * - Detects fatal errors before expensive judge evaluation
+ * - Routes to generator for regeneration or judge for final evaluation
  *
  * The judge node:
  * - Evaluates content quality using cascade evaluation (heuristics -> single judge -> CLEV)
  * - Makes decisions: ACCEPT, TARGETED_FIX, ITERATIVE_REFINEMENT, REGENERATE, ESCALATE_TO_HUMAN
  * - Executes refinement loop for fixable issues
- * - Routes back to planner for complete regeneration if needed
+ * - Routes back to generator for complete regeneration if needed
  *
  * Reference:
  * - LangGraph.js StateGraph API
- * - specs/010-stages-456-pipeline/data-model.md
+ * - specs/022-lesson-enrichments/stage-7-lesson-enrichments.md
  * - docs/research/010-stage6-generation-strategy/
  */
 
 import { StateGraph, START, END } from '@langchain/langgraph';
 import { LessonGraphState, type LessonGraphStateType, type LessonGraphStateUpdate } from './state';
-import { plannerNode, expanderNode, assemblerNode, smootherNode } from './nodes';
+import { generatorNode } from './nodes/generator';
+import { selfReviewerNode } from './nodes/self-reviewer-node';
 import type { LessonSpecificationV2 } from '@megacampus/shared-types/lesson-specification-v2';
 import type { LessonContent, LessonContentBody, RAGChunk } from '@megacampus/shared-types/lesson-content';
-import type { JudgeRecommendation, JudgeVerdict } from '@megacampus/shared-types/judge-types';
+import type {
+  JudgeRecommendation,
+  JudgeVerdict,
+  ProgressSummary,
+  NodeAttemptSummary,
+  SummaryItem,
+} from '@megacampus/shared-types/judge-types';
 import {
   executeCascadeEvaluation,
   type CascadeEvaluationInput,
@@ -49,6 +67,7 @@ import type { ArbiterInput } from '@megacampus/shared-types/judge-types';
 import { logger } from '@/shared/logger';
 import { logTrace } from '@/shared/trace-logger';
 import { HANDLER_CONFIG } from './config';
+import { parseMarkdownContent } from './utils/markdown-parser';
 
 // ============================================================================
 // PUBLIC INTERFACES
@@ -109,42 +128,80 @@ export interface Stage6Output {
 
 /**
  * Extract LessonContentBody from state
- * Uses the structured lessonContent.content from smoother node
+ * Uses the structured lessonContent.content from generator node
  */
 function extractContentBody(state: LessonGraphStateType): LessonContentBody | null {
-  // Primary path: use lessonContent.content from smoother node
+  // Primary path: use lessonContent.content from generator node
   if (state.lessonContent?.content) {
     return state.lessonContent.content;
   }
 
-  // Fallback: if lessonContent not available but smoothedContent exists
+  // Fallback: if lessonContent not available but generatedContent exists
   // This can happen in edge cases or tests
-  if (!state.smoothedContent) {
+  if (!state.generatedContent) {
     return null;
   }
 
   try {
-    // If smoothedContent is already parsed, use it directly
-    if (typeof state.smoothedContent === 'object') {
-      return state.smoothedContent as unknown as LessonContentBody;
+    // If generatedContent is already parsed, validate structure before casting
+    if (
+      typeof state.generatedContent === 'object' &&
+      state.generatedContent !== null &&
+      !Array.isArray(state.generatedContent) &&
+      'intro' in state.generatedContent &&
+      'sections' in state.generatedContent
+    ) {
+      return state.generatedContent as LessonContentBody;
     }
 
     // Try to parse JSON from string (for backward compatibility)
-    const parsed = JSON.parse(state.smoothedContent);
+    const parsed = JSON.parse(state.generatedContent);
     return parsed as LessonContentBody;
   } catch {
     // Try to extract JSON from markdown code blocks
-    const jsonMatch = state.smoothedContent.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+    const jsonMatch = state.generatedContent.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
     if (jsonMatch) {
       try {
         return JSON.parse(jsonMatch[1]) as LessonContentBody;
       } catch {
-        logger.warn('Failed to parse JSON from code block in smoothedContent');
+        logger.debug('Failed to parse JSON from code block, trying markdown parser');
       }
     }
 
-    logger.warn('Failed to parse smoothedContent as JSON, and lessonContent not available');
-    return null;
+    // NEW: Parse markdown content using the markdown parser
+    // This is the primary path for the new generator node which outputs markdown
+    const parsedMarkdown = parseMarkdownContent(state.generatedContent);
+
+    if (parsedMarkdown.sections.length === 0) {
+      logger.warn({
+        title: parsedMarkdown.title,
+        wordCount: parsedMarkdown.wordCount,
+        headingCount: parsedMarkdown.headingStructure.length,
+      }, 'Markdown parsed but no sections extracted');
+      return null;
+    }
+
+    // Convert ParsedMarkdown to LessonContentBody
+    const contentBody: LessonContentBody = {
+      intro: parsedMarkdown.introduction || parsedMarkdown.summary || '',
+      sections: parsedMarkdown.sections,
+      examples: [], // Markdown doesn't have structured examples
+      exercises: parsedMarkdown.exercises.map((exerciseText) => ({
+        question: exerciseText,
+        solution: 'См. содержание урока для получения рекомендаций.',
+        hints: [],
+      })),
+    };
+
+    logger.info({
+      title: parsedMarkdown.title,
+      sectionsCount: contentBody.sections.length,
+      exercisesCount: contentBody.exercises.length,
+      introLength: contentBody.intro.length,
+      wordCount: parsedMarkdown.wordCount,
+    }, 'Successfully parsed markdown to LessonContentBody');
+
+    return contentBody;
   }
 }
 
@@ -417,6 +474,221 @@ function buildEnrichedJudgeOutput(
 }
 
 /**
+ * Build localized progress summary for judge node UI display
+ *
+ * Generates user-friendly messages about what happened during judge evaluation.
+ * Messages are localized based on the course language.
+ *
+ * @param recommendation - Final judge recommendation
+ * @param cascadeResult - Result from cascade evaluation
+ * @param decision - Decision made by decision engine
+ * @param language - Target language ('ru' or 'en')
+ * @param durationMs - Duration in milliseconds
+ * @param tokensUsed - Tokens used in evaluation
+ * @param attempt - Current attempt number
+ * @param existingProgress - Existing progress summary to append to
+ * @returns Updated progress summary
+ */
+function buildJudgeProgressSummary(
+  recommendation: JudgeRecommendation,
+  cascadeResult: CascadeResult | null,
+  decisionAction: DecisionAction | null,
+  language: string,
+  durationMs: number,
+  tokensUsed: number,
+  attempt: number,
+  existingProgress: ProgressSummary | null
+): ProgressSummary {
+  const isRussian = language === 'ru';
+
+  // Early return for null cascadeResult - return minimal progress summary
+  if (!cascadeResult) {
+    const existingAttempts = existingProgress?.attempts || [];
+    return {
+      status: recommendation === 'REGENERATE' ? 'failed' : 'completed',
+      currentPhase: isRussian ? 'Оценка качества' : 'Quality evaluation',
+      language,
+      attempts: [...existingAttempts, {
+        node: 'judge',
+        attempt,
+        status: recommendation === 'REGENERATE' ? 'failed' : 'completed',
+        resultLabel: recommendation,
+        issuesFound: [],
+        actionsPerformed: [],
+        outcome: isRussian ? 'Нет данных каскадной оценки' : 'No cascade evaluation data',
+        durationMs,
+        tokensUsed,
+      }],
+      outcome: isRussian ? 'Оценка завершена' : 'Evaluation completed',
+    };
+  }
+
+  // Build issues found list
+  const issuesFound: SummaryItem[] = [];
+
+  // Add heuristic failures if any
+  if (cascadeResult.heuristicResults && !cascadeResult.heuristicResults.passed) {
+    for (const reason of cascadeResult.heuristicResults.failureReasons) {
+      issuesFound.push({
+        text: reason,
+        severity: 'warning',
+      });
+    }
+  }
+
+  // Add verdict issues if any
+  const verdict = cascadeResult?.singleJudgeVerdict || cascadeResult?.clevResult?.verdicts?.[0];
+  if (verdict?.issues) {
+    const criticalCount = verdict.issues.filter(i => i.severity === 'critical').length;
+    const majorCount = verdict.issues.filter(i => i.severity === 'major').length;
+
+    if (criticalCount > 0) {
+      issuesFound.push({
+        text: isRussian
+          ? `Найдено ${criticalCount} критических проблем`
+          : `Found ${criticalCount} critical issues`,
+        severity: 'error',
+      });
+    }
+    if (majorCount > 0) {
+      issuesFound.push({
+        text: isRussian
+          ? `Найдено ${majorCount} значительных проблем`
+          : `Found ${majorCount} major issues`,
+        severity: 'warning',
+      });
+    }
+  }
+
+  // Build actions performed list
+  const actionsPerformed: SummaryItem[] = [];
+
+  // Describe cascade stages
+  if (cascadeResult) {
+    actionsPerformed.push({
+      text: isRussian
+        ? `Эвристическая проверка: ${cascadeResult.heuristicResults?.passed ? 'пройдена' : 'обнаружены проблемы'}`
+        : `Heuristic check: ${cascadeResult.heuristicResults?.passed ? 'passed' : 'issues found'}`,
+      severity: 'info',
+    });
+
+    if (cascadeResult.stage === 'single_judge') {
+      actionsPerformed.push({
+        text: isRussian
+          ? `Оценка судьи: ${cascadeResult.singleJudgeVerdict?.confidence} уверенность`
+          : `Judge evaluation: ${cascadeResult.singleJudgeVerdict?.confidence} confidence`,
+        severity: 'info',
+      });
+    } else if (cascadeResult.stage === 'clev_voting') {
+      const voteCount = cascadeResult.clevResult?.verdicts?.length ?? 0;
+      actionsPerformed.push({
+        text: isRussian
+          ? `CLEV голосование: ${voteCount} судей`
+          : `CLEV voting: ${voteCount} judges`,
+        severity: 'info',
+      });
+    }
+  }
+
+  // Add action description
+  if (decisionAction) {
+    const actionLabels: Record<DecisionAction, { ru: string; en: string }> = {
+      [DecisionAction.ACCEPT]: {
+        ru: 'Контент принят',
+        en: 'Content accepted',
+      },
+      [DecisionAction.TARGETED_FIX]: {
+        ru: 'Выполнены точечные исправления',
+        en: 'Targeted fixes applied',
+      },
+      [DecisionAction.ITERATIVE_REFINEMENT]: {
+        ru: 'Выполнено итеративное улучшение',
+        en: 'Iterative refinement applied',
+      },
+      [DecisionAction.REGENERATE]: {
+        ru: 'Требуется полная регенерация',
+        en: 'Full regeneration required',
+      },
+      [DecisionAction.ESCALATE_TO_HUMAN]: {
+        ru: 'Требуется проверка человеком',
+        en: 'Human review required',
+      },
+    };
+
+    actionsPerformed.push({
+      text: isRussian ? actionLabels[decisionAction].ru : actionLabels[decisionAction].en,
+      severity: decisionAction === DecisionAction.ACCEPT ? 'info' : 'warning',
+    });
+  }
+
+  // Build outcome message
+  let outcome: string;
+  const score = cascadeResult?.finalScore ?? 0;
+  const scorePercent = Math.round(score * 100);
+
+  switch (recommendation) {
+    case 'ACCEPT':
+      outcome = isRussian
+        ? `✓ Контент принят (оценка: ${scorePercent}%)`
+        : `✓ Content accepted (score: ${scorePercent}%)`;
+      break;
+    case 'ACCEPT_WITH_MINOR_REVISION':
+      outcome = isRussian
+        ? `✓ Контент принят с исправлениями (оценка: ${scorePercent}%)`
+        : `✓ Content accepted with revisions (score: ${scorePercent}%)`;
+      break;
+    case 'ITERATIVE_REFINEMENT':
+      outcome = isRussian
+        ? `→ Выполнено итеративное улучшение`
+        : `→ Iterative refinement completed`;
+      break;
+    case 'REGENERATE':
+      outcome = isRussian
+        ? `→ Требуется полная регенерация контента`
+        : `→ Full content regeneration required`;
+      break;
+    case 'ESCALATE_TO_HUMAN':
+      outcome = isRussian
+        ? `→ Передано на проверку человеку`
+        : `→ Escalated to human review`;
+      break;
+    default:
+      outcome = isRussian
+        ? `→ Оценка завершена`
+        : `→ Evaluation completed`;
+  }
+
+  // Determine status
+  const isFailure = recommendation === 'REGENERATE';
+  const isCompleted = recommendation === 'ACCEPT' || recommendation === 'ACCEPT_WITH_MINOR_REVISION';
+
+  // Create attempt summary
+  const attemptSummary: NodeAttemptSummary = {
+    node: 'judge',
+    attempt,
+    status: isFailure ? 'failed' : isCompleted ? 'completed' : 'fixing',
+    resultLabel: recommendation,
+    issuesFound,
+    actionsPerformed,
+    outcome,
+    startedAt: new Date(),
+    durationMs,
+    tokensUsed,
+  };
+
+  // Merge with existing progress or create new
+  const existingAttempts = existingProgress?.attempts || [];
+
+  return {
+    status: isFailure ? 'failed' : isCompleted ? 'completed' : 'fixing',
+    currentPhase: isRussian ? 'Оценка качества' : 'Quality evaluation',
+    language,
+    attempts: [...existingAttempts, attemptSummary],
+    outcome: isCompleted || isFailure ? outcome : undefined,
+  };
+}
+
+/**
  * Judge node - Evaluates content quality and handles refinement/regeneration decisions
  *
  * Implements the cascade evaluation pattern:
@@ -425,7 +697,7 @@ function buildEnrichedJudgeOutput(
  * 3. Execute refinement loop if needed (TARGETED_FIX or ITERATIVE_REFINEMENT)
  * 4. Return final state with verdict and recommendations
  *
- * @param state - Current LangGraph state after smoother node
+ * @param state - Current LangGraph state after selfReviewer node
  * @returns Updated state with judge verdict and final content
  */
 async function judgeNode(state: LessonGraphStateType): Promise<LessonGraphStateUpdate> {
@@ -434,7 +706,7 @@ async function judgeNode(state: LessonGraphStateType): Promise<LessonGraphStateU
   logger.info({
     lessonId: state.lessonSpec.lesson_id,
     currentNode: 'judge',
-    hasSmoothedContent: Boolean(state.smoothedContent),
+    hasGeneratedContent: Boolean(state.generatedContent),
     refinementIterationCount: state.refinementIterationCount,
   }, 'Judge node: Starting content evaluation');
 
@@ -449,7 +721,7 @@ async function judgeNode(state: LessonGraphStateType): Promise<LessonGraphStateU
       lessonLabel: state.lessonSpec.lesson_id,
       lessonTitle: state.lessonSpec.title,
       moduleNumber: state.lessonSpec.lesson_id.split('.')[0],
-      hasSmoothedContent: Boolean(state.smoothedContent),
+      hasGeneratedContent: Boolean(state.generatedContent),
       refinementIterationCount: state.refinementIterationCount,
     },
     durationMs: 0,
@@ -463,11 +735,23 @@ async function judgeNode(state: LessonGraphStateType): Promise<LessonGraphStateU
       lessonId: state.lessonSpec.lesson_id,
     }, 'Judge node: No valid content body to evaluate');
 
+    const noContentProgress = buildJudgeProgressSummary(
+      'REGENERATE',
+      null,
+      null,
+      state.language,
+      Date.now() - startTime,
+      0,
+      (state.retryCount || 0) + 1,
+      state.progressSummary
+    );
+
     return {
       currentNode: 'judge',
       errors: ['Judge node: No valid content body to evaluate'],
       needsRegeneration: true,
       judgeRecommendation: 'REGENERATE' as JudgeRecommendation,
+      progressSummary: noContentProgress,
     };
   }
 
@@ -594,6 +878,17 @@ async function judgeNode(state: LessonGraphStateType): Promise<LessonGraphStateU
         durationMs,
       });
 
+      const syntheticProgress = buildJudgeProgressSummary(
+        recommendation,
+        cascadeResult,
+        null,
+        state.language,
+        durationMs,
+        cascadeResult.totalTokensUsed,
+        (state.retryCount || 0) + 1,
+        state.progressSummary
+      );
+
       return {
         currentNode: 'judge',
         qualityScore: cascadeResult.finalScore,
@@ -606,6 +901,7 @@ async function judgeNode(state: LessonGraphStateType): Promise<LessonGraphStateU
         retryCount: needsRegeneration ? state.retryCount + 1 : state.retryCount,
         tokensUsed: cascadeResult.totalTokensUsed,
         durationMs,
+        progressSummary: syntheticProgress,
       };
     }
 
@@ -794,7 +1090,22 @@ async function judgeNode(state: LessonGraphStateType): Promise<LessonGraphStateU
       needsHumanReview,
     );
 
-    // Log trace at completion
+    // Check if targeted refinement was used
+    const usedTargetedRefinement = decision.action === DecisionAction.TARGETED_FIX || decision.action === DecisionAction.ITERATIVE_REFINEMENT;
+
+    // Build progress summary for UI
+    const completionProgress = buildJudgeProgressSummary(
+      finalRecommendation,
+      cascadeResult,
+      decision.action,
+      state.language,
+      durationMs,
+      totalTokensUsed,
+      (state.retryCount || 0) + 1,
+      state.progressSummary
+    );
+
+    // Log trace at completion (with progressSummary for UI)
     await logTrace({
       courseId: state.courseId,
       lessonId: state.lessonUuid || undefined,
@@ -809,13 +1120,11 @@ async function judgeNode(state: LessonGraphStateType): Promise<LessonGraphStateU
       outputData: {
         ...enrichedOutput,
         hasLessonContent: finalContent !== null,
+        progressSummary: completionProgress,
       },
       tokensUsed: totalTokensUsed,
       durationMs,
     });
-
-    // Check if targeted refinement was used
-    const usedTargetedRefinement = decision.action === DecisionAction.TARGETED_FIX || decision.action === DecisionAction.ITERATIVE_REFINEMENT;
 
     return {
       currentNode: 'judge',
@@ -831,6 +1140,7 @@ async function judgeNode(state: LessonGraphStateType): Promise<LessonGraphStateU
       retryCount: needsRegeneration ? state.retryCount + 1 : state.retryCount,
       tokensUsed: totalTokensUsed,
       durationMs,
+      progressSummary: completionProgress,
       // Targeted refinement state updates (only if used)
       ...(usedTargetedRefinement && {
         arbiterOutput,
@@ -866,12 +1176,24 @@ async function judgeNode(state: LessonGraphStateType): Promise<LessonGraphStateU
       durationMs,
     });
 
+    const errorProgress = buildJudgeProgressSummary(
+      'REGENERATE',
+      null,
+      null,
+      state.language,
+      durationMs,
+      0,
+      (state.retryCount || 0) + 1,
+      state.progressSummary
+    );
+
     return {
       currentNode: 'judge',
       errors: [`Judge node error: ${errorMessage}`],
       needsRegeneration: true,
       judgeRecommendation: 'REGENERATE' as JudgeRecommendation,
       durationMs,
+      progressSummary: errorProgress,
     };
   }
 }
@@ -885,7 +1207,7 @@ async function judgeNode(state: LessonGraphStateType): Promise<LessonGraphStateU
  *
  * Determines next step based on judge evaluation:
  * - 'end': Content passed or needs human review (end the graph)
- * - 'planner': Content needs regeneration (restart pipeline)
+ * - 'generator': Content needs regeneration (restart pipeline)
  *
  * @param state - Current graph state after judge evaluation
  * @returns Next node name or END
@@ -899,8 +1221,8 @@ function shouldRetryAfterJudge(state: LessonGraphStateType): string {
       lessonId: state.lessonSpec.lesson_id,
       retryCount: state.retryCount,
       maxRetries,
-    }, 'Judge routing: Routing to planner for regeneration');
-    return 'planner';
+    }, 'Judge routing: Routing to generator for regeneration');
+    return 'generator';
   }
 
   // Priority 2: Max retries exceeded - log error and end
@@ -940,6 +1262,67 @@ function shouldRetryAfterJudge(state: LessonGraphStateType): string {
 }
 
 // ============================================================================
+// SELF-REVIEWER ROUTING
+// ============================================================================
+
+/**
+ * Routing function for selfReviewer node conditional edges
+ *
+ * Determines next step based on self-review evaluation:
+ * - 'judge': Content passed or needs judge attention (PASS, PASS_WITH_FLAGS, FIXED, FLAG_TO_JUDGE)
+ * - 'generator': Content needs regeneration (REGENERATE status)
+ *
+ * @param state - Current graph state after selfReviewer evaluation
+ * @returns Next node name: 'judge' or 'generator'
+ */
+function shouldProceedToJudge(state: LessonGraphStateType): string {
+  const selfReviewResult = state.selfReviewResult;
+
+  // If no self-review result, proceed to judge (backward compatibility)
+  if (!selfReviewResult) {
+    logger.warn({
+      lessonId: state.lessonSpec?.lesson_id ?? 'unknown',
+    }, 'SelfReviewer routing: No selfReviewResult, proceeding to judge');
+    return 'judge';
+  }
+
+  const status = selfReviewResult.status;
+
+  // REGENERATE status: Fatal errors detected, skip judge and restart pipeline
+  if (status === 'REGENERATE') {
+    logger.info({
+      lessonId: state.lessonSpec.lesson_id,
+      status,
+      reasoning: selfReviewResult.reasoning,
+      issueCount: selfReviewResult.issues.length,
+    }, 'SelfReviewer routing: REGENERATE status - routing to generator');
+
+    // Check retry limit
+    const maxRetries = HANDLER_CONFIG.MAX_REGENERATION_RETRIES;
+    if (state.retryCount >= maxRetries) {
+      logger.error({
+        lessonId: state.lessonSpec.lesson_id,
+        retryCount: state.retryCount,
+        maxRetries,
+      }, 'SelfReviewer routing: Max retries exceeded - ending graph');
+      return '__end__';
+    }
+
+    return 'generator';
+  }
+
+  // PASS, PASS_WITH_FLAGS, FIXED, FLAG_TO_JUDGE: Proceed to judge
+  logger.debug({
+    lessonId: state.lessonSpec.lesson_id,
+    status,
+    heuristicsPassed: selfReviewResult.heuristicsPassed,
+    issueCount: selfReviewResult.issues.length,
+  }, 'SelfReviewer routing: Proceeding to judge');
+
+  return 'judge';
+}
+
+// ============================================================================
 // GRAPH CREATION
 // ============================================================================
 
@@ -947,36 +1330,36 @@ function shouldRetryAfterJudge(state: LessonGraphStateType): string {
  * Create the Stage 6 StateGraph workflow
  *
  * Builds the lesson generation pipeline with:
- * - planner: Generate structured outline
- * - expander: Expand sections with RAG context
- * - assembler: Combine sections into coherent content
- * - smoother: Refine transitions and polish prose
+ * - generator: Generate complete lesson content in one pass (serial section-by-section)
+ * - selfReviewer: Pre-judge validation (Fail-Fast architecture)
  * - judge: Validate quality and handle refinement/regeneration
  *
  * Pipeline flow:
- * START -> planner -> expander -> assembler -> smoother -> judge -> END
- *                                                             |
- *                                                             +-> planner (if regenerate needed)
+ * START -> generator -> selfReviewer -> judge -> END
+ *                        |              |
+ *                        |              +-> generator (if regenerate needed)
+ *                        +-> generator (if REGENERATE status)
  *
  * @returns Compiled StateGraph ready for invocation
  */
 function createStage6Graph() {
   const builder = new StateGraph(LessonGraphState)
     // Add nodes
-    .addNode('planner', plannerNode)
-    .addNode('expander', expanderNode)
-    .addNode('assembler', assemblerNode)
-    .addNode('smoother', smootherNode)
+    .addNode('generator', generatorNode)
+    .addNode('selfReviewer', selfReviewerNode)
     .addNode('judge', judgeNode)
     // Define edges
-    .addEdge(START, 'planner')
-    .addEdge('planner', 'expander')
-    .addEdge('expander', 'assembler')
-    .addEdge('assembler', 'smoother')
-    .addEdge('smoother', 'judge')
+    .addEdge(START, 'generator')
+    .addEdge('generator', 'selfReviewer')
+    // Conditional edge from selfReviewer: proceed to judge or regenerate
+    .addConditionalEdges('selfReviewer', shouldProceedToJudge, {
+      judge: 'judge',
+      generator: 'generator',
+      __end__: END,
+    })
     // Conditional edge from judge: either end or retry
     .addConditionalEdges('judge', shouldRetryAfterJudge, {
-      planner: 'planner',
+      generator: 'generator',
       __end__: END,
     });
 
@@ -1065,7 +1448,7 @@ export async function executeStage6(input: Stage6Input): Promise<Stage6Output> {
       ragContextId: input.ragContextId ?? null,
       userRefinementPrompt: input.userRefinementPrompt ?? null,
       modelOverride: validatedModelOverride,
-      currentNode: 'planner',
+      currentNode: 'generator',
       errors: [],
       retryCount: 0,
     };
@@ -1219,6 +1602,12 @@ export async function executeStage6Batch(
  * Allows unit tests to create isolated graph instances
  */
 export { createStage6Graph };
+
+/**
+ * Export routing functions for testing
+ * Allows unit tests to verify conditional edge logic
+ */
+export { shouldProceedToJudge, shouldRetryAfterJudge };
 
 /**
  * Reset the singleton graph (for testing only)

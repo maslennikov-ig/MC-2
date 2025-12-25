@@ -52,6 +52,7 @@ import type {
   SectionExpanderInput,
   SectionExpanderOutput,
 } from '@megacampus/shared-types';
+import { calculateRequiredTokens } from '@megacampus/shared-types';
 import {
   buildExpanderPrompt,
   buildExpanderSystemPrompt,
@@ -127,24 +128,41 @@ export async function executeExpansion(
   const startTime = Date.now();
 
   try {
-    // Get model configuration from database
+    // Get model configuration from database (model and temperature only)
     const llmClient = new LLMClient();
     const modelService = createModelConfigService();
 
     let modelId = 'openai/gpt-oss-120b';
     let temperature = 0.7;
-    let maxTokens = 2000;
 
     try {
       const config = await modelService.getModelForPhase('stage_6_section_expander');
       modelId = config.modelId;
       temperature = config.temperature;
-      maxTokens = config.maxTokens;
       logger.info({ modelId, source: config.source }, 'Section-Expander using model from config');
     } catch (error) {
       logger.warn({ error: error instanceof Error ? error.message : String(error) },
         'Failed to get expander model config, using fallback');
     }
+
+    // Calculate maxTokens dynamically based on content length and language
+    // Section regeneration needs enough tokens for the target word count
+    const language = input.language || 'en';
+    const targetChars = (input.targetWordCount || 400) * 6; // ~6 chars per word avg
+    const contentChars = Math.max(input.originalContent.length, targetChars);
+
+    const maxTokens = calculateRequiredTokens({
+      language,
+      contentLengthChars: contentChars,
+    });
+
+    logger.debug({
+      sectionId: input.sectionId,
+      language,
+      originalLength: input.originalContent.length,
+      targetWordCount: input.targetWordCount,
+      calculatedMaxTokens: maxTokens,
+    }, 'Section-Expander using dynamic token calculation');
 
     // Build prompts
     const prompt = buildExpanderPrompt(input);
@@ -171,19 +189,29 @@ export async function executeExpansion(
     // Calculate word count for validation
     const wordCount = countWords(regeneratedContent);
 
-    // Validate word count against target (±10% tolerance)
+    // Validate word count against target
+    // IMPORTANT: Only BELOW minimum requires action
+    // Exceeding maximum is acceptable (just a warning)
     const targetWordCount = validateTargetWordCount(input.targetWordCount);
     const tolerance = 0.10;
     const minWords = Math.floor(targetWordCount * (1 - tolerance));
     const maxWords = Math.ceil(targetWordCount * (1 + tolerance));
 
-    // Log warning if word count is significantly off target
-    if (wordCount < minWords || wordCount > maxWords) {
+    // Log warning if word count is below minimum - this may require re-expansion
+    if (wordCount < minWords) {
       logger.warn({
         sectionId: input.sectionId,
         wordCount,
-        targetRange: { min: minWords, max: maxWords },
-      }, 'Section-Expander: Word count outside target range');
+        minRequired: minWords,
+        targetWordCount,
+      }, 'Section-Expander: Word count below minimum - may need re-expansion');
+    } else if (wordCount > maxWords) {
+      // Exceeding max is OK - just log as info
+      logger.info({
+        sectionId: input.sectionId,
+        wordCount,
+        maxRecommended: maxWords,
+      }, 'Section-Expander: Word count exceeds target (acceptable)');
     }
 
     return {
@@ -330,21 +358,19 @@ export function validateExpansionResult(
   }
 
   // Check word count if target provided
+  // IMPORTANT: Only BELOW minimum is an issue requiring action
+  // Exceeding maximum is acceptable
   if (targetWordCount) {
     const validated = validateTargetWordCount(targetWordCount);
     const tolerance = 0.10;
     const minWords = Math.floor(validated * (1 - tolerance));
-    const maxWords = Math.ceil(validated * (1 + tolerance));
 
     if (result.wordCount < minWords) {
       issues.push(
-        `Word count ${result.wordCount} below target range ${minWords}-${maxWords}`
-      );
-    } else if (result.wordCount > maxWords) {
-      issues.push(
-        `Word count ${result.wordCount} above target range ${minWords}-${maxWords}`
+        `Word count ${result.wordCount} below minimum ${minWords} - may need re-expansion`
       );
     }
+    // NOTE: Exceeding maximum is NOT an issue - content can be longer than target
   }
 
   return {

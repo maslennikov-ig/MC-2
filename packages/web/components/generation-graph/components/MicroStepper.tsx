@@ -17,10 +17,10 @@ import {
 import { cn } from '@/lib/utils';
 
 /**
- * MicroStepper - Compact 5-dot pipeline status indicator for Stage 6
+ * MicroStepper - Compact 6-dot pipeline status indicator for Stage 6
  *
- * Displays a horizontal row of 5 dots representing the pipeline nodes:
- * planner → expander → assembler → smoother → judge
+ * Displays a horizontal row of 6 dots representing the pipeline nodes:
+ * planner → expander → assembler → smoother → selfReviewer → judge
  *
  * Each dot shows the current status with color coding and animations:
  * - pending: Gray (not started)

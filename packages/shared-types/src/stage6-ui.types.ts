@@ -4,7 +4,7 @@
  *
  * Type definitions for the Stage 6 lesson generation pipeline UI.
  * Provides types for:
- * - Pipeline node state tracking (5 nodes: planner → expander → assembler → smoother → judge)
+ * - Pipeline node state tracking (3 nodes: generator → selfReviewer → judge)
  * - CLEV voting visualization (multi-judge consensus)
  * - Module dashboard (lesson matrix with aggregated metrics)
  * - Lesson inspector (detailed pipeline view with logs and content preview)
@@ -12,21 +12,24 @@
  * Based on: Stage 6 "Glass Factory" UI design (Module Dashboard + Lesson Inspector)
  */
 
+import type { JudgeRecommendation, SelfReviewResult } from './judge-types';
+
 // =============================================================================
 // Pipeline Node Types
 // =============================================================================
 
 /**
- * Stage6NodeName - The 5 pipeline nodes in Stage 6 lesson generation
+ * Stage6NodeName - The 3 pipeline nodes in Stage 6 lesson generation
  *
  * Pipeline flow:
- * 1. planner: Creates lesson structure (outline, sections, objectives)
- * 2. expander: Generates content for each section (parallel processing)
- * 3. assembler: Combines sections into cohesive lesson
- * 4. smoother: Applies stylistic refinement and formatting
- * 5. judge: Evaluates quality using CLEV voting
+ * 1. generator: Generates full lesson content (intro + sections + summary) in one pass
+ * 2. selfReviewer: Pre-judge validation (Fail-Fast architecture)
+ * 3. judge: Evaluates quality using CLEV voting and targeted refinement
+ *
+ * BACKWARD COMPATIBILITY: Legacy node names (planner, expander, assembler, smoother) are
+ * included for parsing trace logs from old generations. These map to 'generator' in the UI.
  */
-export type Stage6NodeName = 'planner' | 'expander' | 'assembler' | 'smoother' | 'judge';
+export type Stage6NodeName = 'generator' | 'selfReviewer' | 'judge' | 'planner' | 'expander' | 'assembler' | 'smoother';
 
 /**
  * Stage6NodeStatus - Current status of a pipeline node
@@ -77,15 +80,17 @@ export interface PipelineNodeState {
 /**
  * JudgeVerdictType - Verdict from a single judge evaluation
  *
+ * Unified with JudgeRecommendation from judge-types for consistency.
+ *
  * Based on research: docs/research/010-stage6-generation-strategy/
  * Decision thresholds:
  * - ACCEPT: score >= 0.90 (auto-accept, excellent quality)
- * - TARGETED_FIX: score 0.75-0.90 with localized issues
+ * - ACCEPT_WITH_MINOR_REVISION: score 0.75-0.90 with localized issues (targeted fix)
  * - ITERATIVE_REFINEMENT: score 0.60-0.75 (max 2 iterations)
  * - REGENERATE: score < 0.60 (fundamental issues, regenerate with feedback)
  * - ESCALATE_TO_HUMAN: persistent issues or low confidence
  */
-export type JudgeVerdictType = 'ACCEPT' | 'TARGETED_FIX' | 'ITERATIVE_REFINEMENT' | 'REGENERATE' | 'ESCALATE_TO_HUMAN';
+export type JudgeVerdictType = JudgeRecommendation;
 
 /**
  * IndividualJudgeVote - A single judge's evaluation vote
@@ -438,6 +443,8 @@ export interface LessonInspectorData {
   rawMarkdown: string | null;
 
   // Quality
+  /** Self-review result from pre-judge validation (null if not reviewed yet) */
+  selfReviewResult?: SelfReviewResult | null;
   /** Judge evaluation result with CLEV voting (null if not judged yet) */
   judgeResult: JudgeVerdictDisplay | null;
 
@@ -474,13 +481,18 @@ export interface LessonInspectorData {
  * STAGE6_NODE_LABELS - Russian labels for pipeline nodes
  *
  * Provides localized labels and descriptions for UI display.
+ * Includes both new 3-node pipeline and legacy nodes for backward compatibility.
  */
 export const STAGE6_NODE_LABELS: Record<Stage6NodeName, { ru: string; description: string }> = {
+  // New 3-node pipeline
+  generator: { ru: 'Генератор', description: 'Генерация полного контента урока' },
+  selfReviewer: { ru: 'Самопроверка', description: 'Предварительная проверка качества' },
+  judge: { ru: 'Оценка качества', description: 'Проверка критериев и доработка' },
+  // Legacy nodes for backward compatibility with old trace logs
   planner: { ru: 'Планировщик', description: 'Создание структуры урока' },
   expander: { ru: 'Наполнение', description: 'Генерация контента (параллельно)' },
   assembler: { ru: 'Сборщик', description: 'Объединение разделов' },
   smoother: { ru: 'Редактор', description: 'Стилистическая правка' },
-  judge: { ru: 'Оценка качества', description: 'Проверка критериев' },
 } as const;
 
 /**
@@ -490,7 +502,7 @@ export const STAGE6_NODE_LABELS: Record<Stage6NodeName, { ru: string; descriptio
  */
 export const JUDGE_VERDICT_LABELS: Record<JudgeVerdictType, { ru: string; color: string }> = {
   ACCEPT: { ru: 'Принять', color: 'emerald' },
-  TARGETED_FIX: { ru: 'Точечное исправление', color: 'yellow' },
+  ACCEPT_WITH_MINOR_REVISION: { ru: 'Точечное исправление', color: 'yellow' },
   ITERATIVE_REFINEMENT: { ru: 'Итеративная доработка', color: 'orange' },
   REGENERATE: { ru: 'Переделать', color: 'red' },
   ESCALATE_TO_HUMAN: { ru: 'Ручная проверка', color: 'purple' },

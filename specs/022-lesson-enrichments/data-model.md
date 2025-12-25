@@ -51,7 +51,7 @@
 ### 2.1 Enums
 
 ```sql
--- Enrichment types
+-- Enrichment types (extensible via future ALTER TYPE ADD VALUE)
 CREATE TYPE enrichment_type AS ENUM (
     'video',
     'audio',
@@ -60,13 +60,15 @@ CREATE TYPE enrichment_type AS ENUM (
     'document'
 );
 
--- Enrichment generation status
+-- Enrichment generation status (supports two-stage flow)
 CREATE TYPE enrichment_status AS ENUM (
-    'pending',      -- Queued for generation
-    'generating',   -- AI processing in progress
-    'completed',    -- Successfully generated
-    'failed',       -- Generation failed
-    'cancelled'     -- User cancelled
+    'pending',           -- Queued for generation
+    'draft_generating',  -- Phase 1: Generating draft/script
+    'draft_ready',       -- Phase 1 complete: Awaiting user review
+    'generating',        -- Phase 2: Generating final content (or single-stage)
+    'completed',         -- Successfully generated
+    'failed',            -- Generation failed
+    'cancelled'          -- User cancelled
 );
 ```
 
@@ -377,13 +379,23 @@ export type EnrichmentType = z.infer<typeof enrichmentTypeSchema>;
 
 export const enrichmentStatusSchema = z.enum([
   'pending',
-  'generating',
+  'draft_generating',  // Two-stage: Phase 1 in progress
+  'draft_ready',       // Two-stage: Awaiting user review
+  'generating',        // Final generation (or single-stage)
   'completed',
   'failed',
   'cancelled'
 ]);
 
 export type EnrichmentStatus = z.infer<typeof enrichmentStatusSchema>;
+
+/** Helper to check if status is in draft phase (two-stage flow) */
+export const isDraftPhase = (status: EnrichmentStatus): boolean =>
+  status === 'draft_generating' || status === 'draft_ready';
+
+/** Helper to check if enrichment is actionable by user */
+export const isAwaitingAction = (status: EnrichmentStatus): boolean =>
+  status === 'draft_ready' || status === 'failed';
 
 export interface LessonEnrichment {
   id: string;
@@ -477,6 +489,8 @@ export type EnrichmentJobData = z.infer<typeof EnrichmentJobDataSchema>;
 
 ### 6.2 State Transitions
 
+#### Single-Stage Flow (Audio, Quiz)
+
 ```
 pending ──┬──► generating ──┬──► completed
           │                 │
@@ -485,12 +499,38 @@ pending ──┬──► generating ──┬──► completed
           └──► cancelled
 ```
 
+#### Two-Stage Flow (Video, Presentation)
+
+```
+pending ──► draft_generating ──┬──► draft_ready ──┬──► generating ──┬──► completed
+                               │                  │                 │
+                               │                  │                 └──► failed
+                               │                  │
+                               │                  └──► pending (regenerate draft)
+                               │
+                               └──► failed ──► pending (retry)
+```
+
+**Two-Stage Flow Explained:**
+1. **Phase 1 (Draft)**: `pending` → `draft_generating` → `draft_ready`
+   - AI generates script/structure (cheap LLM call)
+   - User reviews and optionally edits the draft
+2. **Phase 2 (Final)**: `draft_ready` → `generating` → `completed`
+   - User approves draft, triggers expensive generation (TTS, video API)
+   - Final content is produced and stored
+
 Valid transitions:
-- `pending` → `generating` (job started)
+- `pending` → `generating` (single-stage start)
+- `pending` → `draft_generating` (two-stage start)
+- `draft_generating` → `draft_ready` (draft complete)
+- `draft_generating` → `failed` (draft generation error)
+- `draft_ready` → `generating` (user approved draft)
+- `draft_ready` → `pending` (user wants new draft)
 - `generating` → `completed` (success)
 - `generating` → `failed` (error)
 - `failed` → `pending` (regenerate action)
 - `pending` → `cancelled` (user cancel)
+- `draft_generating` → `cancelled` (user cancel)
 - `generating` → `cancelled` (user cancel)
 
 ---
@@ -560,6 +600,180 @@ Migration includes:
 4. RLS policies
 5. Triggers
 6. Realtime configuration
+
+---
+
+## 9. Type Registry Pattern (Extensibility)
+
+The enrichment system is designed as a **Type Constructor** — a pluggable architecture where new enrichment types can be added with minimal code changes.
+
+### 9.1 Type Definition Interface
+
+```typescript
+// packages/shared-types/src/enrichment-type-registry.ts
+
+import { z } from 'zod';
+
+/**
+ * Each enrichment type must implement this interface.
+ * This is the "contract" for adding new types.
+ */
+export interface EnrichmentTypeDefinition<
+  TContent extends Record<string, unknown> = Record<string, unknown>,
+  TSettings extends Record<string, unknown> = Record<string, unknown>
+> {
+  // Identity
+  type: string;                          // Unique type key (e.g., 'video', 'flashcards')
+  version: number;                       // Schema version for migrations
+
+  // Display
+  icon: string;                          // Lucide icon name (e.g., 'Video', 'FileQuestion')
+  label: { en: string; ru: string };     // Localized display name
+  description: { en: string; ru: string }; // Localized description
+
+  // Behavior
+  generationFlow: 'single-stage' | 'two-stage';
+  estimatedDuration: (lessonWordCount: number) => number; // seconds
+  estimatedCost: (lessonWordCount: number) => number;     // USD
+
+  // Schemas
+  contentSchema: z.ZodType<TContent>;    // Zod schema for content JSONB
+  settingsSchema: z.ZodType<TSettings>;  // Zod schema for generation settings
+
+  // UI Components (lazy-loaded)
+  components: {
+    CreateForm: () => Promise<React.ComponentType<CreateFormProps<TSettings>>>;
+    DetailView: () => Promise<React.ComponentType<DetailViewProps<TContent>>>;
+    DraftEditor?: () => Promise<React.ComponentType<DraftEditorProps<TContent>>>; // For two-stage
+  };
+
+  // Feature flags
+  features: {
+    canEdit: boolean;           // Can user edit after generation?
+    canRegenerate: boolean;     // Can regenerate from scratch?
+    canExport: boolean;         // Has export/download capability?
+    requiresAsset: boolean;     // Needs file storage (audio/video)?
+    supportsPreview: boolean;   // Has in-app preview?
+  };
+}
+```
+
+### 9.2 Type Registry
+
+```typescript
+// packages/shared-types/src/enrichment-type-registry.ts
+
+class EnrichmentTypeRegistry {
+  private types = new Map<string, EnrichmentTypeDefinition>();
+
+  register<T extends EnrichmentTypeDefinition>(definition: T): void {
+    if (this.types.has(definition.type)) {
+      throw new Error(`Enrichment type "${definition.type}" already registered`);
+    }
+    this.types.set(definition.type, definition);
+  }
+
+  get(type: string): EnrichmentTypeDefinition | undefined {
+    return this.types.get(type);
+  }
+
+  getAll(): EnrichmentTypeDefinition[] {
+    return Array.from(this.types.values());
+  }
+
+  getEnabled(): EnrichmentTypeDefinition[] {
+    // Filter by feature flags, user permissions, etc.
+    return this.getAll().filter(t => !t.type.startsWith('_'));
+  }
+}
+
+export const enrichmentRegistry = new EnrichmentTypeRegistry();
+```
+
+### 9.3 Example: Registering Video Type
+
+```typescript
+// packages/web/lib/enrichments/types/video.ts
+
+import { enrichmentRegistry } from '@megacampus/shared-types';
+import { videoContentSchema, videoSettingsSchema } from './video-schemas';
+
+enrichmentRegistry.register({
+  type: 'video',
+  version: 1,
+
+  icon: 'Video',
+  label: { en: 'Video', ru: 'Видео' },
+  description: {
+    en: 'AI-generated video presentation of lesson content',
+    ru: 'Видеопрезентация контента урока, сгенерированная ИИ'
+  },
+
+  generationFlow: 'two-stage',
+  estimatedDuration: (words) => Math.ceil(words / 150) * 60, // ~150 words/min
+  estimatedCost: (words) => (words / 1000) * 0.50,           // $0.50/1K words
+
+  contentSchema: videoContentSchema,
+  settingsSchema: videoSettingsSchema,
+
+  components: {
+    CreateForm: () => import('./VideoCreateForm').then(m => m.VideoCreateForm),
+    DetailView: () => import('./VideoDetailView').then(m => m.VideoDetailView),
+    DraftEditor: () => import('./VideoDraftEditor').then(m => m.VideoDraftEditor),
+  },
+
+  features: {
+    canEdit: false,        // Can't edit generated video
+    canRegenerate: true,
+    canExport: true,       // Download MP4
+    requiresAsset: true,   // Stores in Supabase Storage
+    supportsPreview: true,
+  },
+});
+```
+
+### 9.4 Adding a New Type (Checklist)
+
+To add a new enrichment type (e.g., `flashcards`):
+
+1. **Database**: Add to enum (migration):
+   ```sql
+   ALTER TYPE enrichment_type ADD VALUE 'flashcards';
+   ```
+
+2. **Shared Types**: Define content/settings schemas in `packages/shared-types/src/enrichments/flashcards.ts`
+
+3. **Register Type**: Create `packages/web/lib/enrichments/types/flashcards.ts` with `enrichmentRegistry.register(...)`
+
+4. **UI Components**: Create in `packages/web/components/enrichments/flashcards/`:
+   - `FlashcardsCreateForm.tsx`
+   - `FlashcardsDetailView.tsx`
+   - `FlashcardsDraftEditor.tsx` (if two-stage)
+
+5. **Worker Handler**: Add `packages/course-gen-platform/src/workers/enrichments/flashcards-handler.ts`
+
+6. **Tests**: Add test cases for new type
+
+**No changes needed to**:
+- Inspector Panel logic (uses registry)
+- Asset Dock (uses registry icons)
+- BullMQ router (dispatches by type)
+- Database schema (JSONB is flexible)
+
+### 9.5 Type Configuration Matrix
+
+| Type | Flow | Asset | Preview | Edit | Export |
+|------|------|-------|---------|------|--------|
+| `video` | two-stage | ✅ MP4 | ✅ | ❌ | ✅ |
+| `audio` | single | ✅ MP3 | ✅ | ❌ | ✅ |
+| `presentation` | two-stage | ❌ | ✅ | ✅ | ✅ HTML |
+| `quiz` | single | ❌ | ✅ | ✅ | ✅ QTI |
+| `document` | — | ✅ | ✅ | ❌ | ✅ |
+| `flashcards` | single | ❌ | ✅ | ✅ | ✅ Anki |
+| `summary` | single | ❌ | ✅ | ✅ | ✅ MD |
+| `mindmap` | single | ❌ | ✅ | ❌ | ✅ SVG |
+
+*Types below the line are future examples showing extensibility.*
 
 ---
 

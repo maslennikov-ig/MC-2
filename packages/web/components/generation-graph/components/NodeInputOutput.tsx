@@ -32,8 +32,11 @@ import { cn } from '@/lib/utils';
  */
 
 interface NodeInputOutputProps {
-  /** Node type for display */
-  nodeType: 'planner' | 'expander' | 'assembler' | 'smoother' | 'judge';
+  /** Node type for display
+   * New 3-node pipeline: generator, selfReviewer, judge
+   * Legacy nodes kept for backward compatibility
+   */
+  nodeType: 'generator' | 'selfReviewer' | 'judge' | 'planner' | 'expander' | 'assembler' | 'smoother';
   /** Input data summary */
   input?: {
     /** Primary input description */
@@ -65,20 +68,32 @@ interface NodeInputOutputProps {
   defaultCollapsed?: boolean;
 }
 
+/**
+ * Node type labels - new 3-node pipeline with legacy support
+ */
 const NODE_TYPE_LABELS: Record<string, string> = {
+  generator: 'Генератор',
+  selfReviewer: 'Самопроверка',
+  judge: 'Судья',
+  // Legacy nodes for backward compatibility
   planner: 'Планировщик',
   expander: 'Экспандер',
   assembler: 'Сборщик',
   smoother: 'Сглаживатель',
-  judge: 'Судья',
 };
 
+/**
+ * Node type colors - new 3-node pipeline with legacy support
+ */
 const NODE_TYPE_COLORS: Record<string, string> = {
+  generator: 'text-indigo-600 dark:text-indigo-400',
+  selfReviewer: 'text-teal-600 dark:text-teal-400',
+  judge: 'text-red-600 dark:text-red-400',
+  // Legacy nodes for backward compatibility
   planner: 'text-blue-600 dark:text-blue-400',
   expander: 'text-purple-600 dark:text-purple-400',
   assembler: 'text-green-600 dark:text-green-400',
   smoother: 'text-yellow-600 dark:text-yellow-400',
-  judge: 'text-red-600 dark:text-red-400',
 };
 
 function formatNumber(num: number): string {

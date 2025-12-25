@@ -318,4 +318,246 @@ function EnrichmentList({ enrichments, onReorder }) {
 
 ---
 
+## 10. UX Architecture: DeepThink Analysis (2025-12-24)
+
+### Problem Statement
+
+Initial spec defined a three-layer system (Asset Dock → NodeToolbar → Inspector Panel) but left a critical UX gap: **Where does the user configure enrichment options before generation?**
+
+User mental model (from n8n): "I click a node, a panel opens with full description and configuration options."
+
+### DeepThink Analysis Process
+
+Two rounds of DeepThink analysis were conducted:
+1. **Round 1**: Evaluated 5 options (Modal, Inspector immediate, Hover+Modal, Separate nodes, Inline in Inspector)
+2. **Round 2**: Clarified edge cases (post-generation flow, multiple enrichments, batch operations, navigation)
+
+### Decision: Contextual Deep-Link Pattern
+
+**Core Concept**: NodeToolbar buttons act as **shortcuts (deep links)** into the Inspector Panel's internal views.
+
+```
+NodeToolbar [+ Quiz] click
+        ↓
+Inspector Panel opens directly in CREATE view (skips ROOT)
+        ↓
+User sees configuration form with description + smart defaults
+        ↓
+Click [Generate] → Panel transitions to DETAIL view (progress → result)
+```
+
+### Inspector Panel Architecture (Stack Navigator)
+
+Three internal views with navigation rules:
+
+| View | Purpose | Entry Points |
+|------|---------|--------------|
+| **ROOT** | List enrichments + fallback add button | Node body click, Back from other views |
+| **CREATE** | Configuration form for new enrichment | NodeToolbar button, [+ Add Enrichment] popover |
+| **DETAIL** | Preview/edit specific enrichment | Asset Dock icon click (count=1), Generation complete |
+
+### Key UX Decisions
+
+#### 1. Post-Generation Flow: "Optimistic Handoff"
+- Click [Generate] → Panel immediately transitions CREATE → DETAIL
+- DETAIL shows progress state ("Building...") with terminal-style log
+- When complete → content appears with live update (no page reload)
+- User can close panel and return later (Asset Dock shows pulsing icon)
+
+#### 2. Multiple Same-Type Enrichments: "Count-Based Smart Routing"
+- **Count = 1**: Asset Dock icon click → DETAIL view directly
+- **Count > 1**: Asset Dock icon click → ROOT view with auto-scroll to section
+- Visual: Single item `[❓]`, Multiple items `[❓ 2]` (badge)
+
+#### 3. Fallback Add Button: Popover Menu
+- Desktop: Popover anchored to [+ Add Enrichment] button
+- Mobile: Bottom Sheet
+- Menu mirrors NodeToolbar (Icons + Labels)
+
+#### 4. Batch Operations: Module Inspector
+- Click ModuleGroup → Opens **Module Details** Inspector (not Lesson Inspector)
+- "Batch Enrichments" section with type buttons
+- Example: [Generate Quizzes for All 12 Lessons]
+- **Why**: Keeps Lesson Inspector focused; safe space for bulk operations
+
+#### 5. Cancel/Back Navigation: "Safe Harbor"
+- **Rule**: "Back" always returns to ROOT view, never closes panel
+- Dirty form state → Show "Discard unsaved changes?" dialog
+- Pristine form → Switch immediately without confirm
+- **Why**: Closing panel feels like crash; ROOT view re-orients user
+
+#### 6. Empty State: "Discovery Cards"
+- When lesson has 0 enrichments, ROOT view shows educational cards
+- Each card explains enrichment type + [Add] button
+- After first enrichment added → standard list view takes over
+- **Why**: Transforms "dead end" into onboarding; improves discoverability
+
+### Navigation Rules Summary (Golden Rule)
+
+| User Action | Result |
+|-------------|--------|
+| Click lesson node body | Inspector opens in ROOT view |
+| Click NodeToolbar [+ Type] | Inspector opens in CREATE view (deep-link) |
+| Click Asset Dock icon (count=1) | Inspector opens in DETAIL view |
+| Click Asset Dock icon (count>1) | Inspector opens in ROOT view + scroll |
+| Click [+ Add Enrichment] | Popover menu → CREATE view |
+| Click item in ROOT list | Transition to DETAIL view |
+| Click Back in CREATE/DETAIL | Transition to ROOT view (Safe Harbor) |
+
+### Why This Pattern Works
+
+1. **Matches n8n Mental Model**: Side panel is the "properties engine"
+2. **Solves Mobile Constraint**: No hover-dependent interactions
+3. **Prevents Graph Explosion**: Enrichments as metadata, not separate nodes
+4. **Smart Defaults**: Users can generate immediately or customize
+5. **Keeps Module Inspector for Batch**: Clean separation of concerns
+
+### Files Documenting DeepThink Analysis
+
+- `docs/DeepThink/enrichment-add-flow-ux-analysis.md` - Initial analysis prompt
+- `docs/DeepThink/enrichment-add-flow-followup.md` - Follow-up clarifications
+
+---
+
+## 11. Two-Stage Generation Flow Decision (2025-12-24)
+
+### Problem Statement
+
+Some enrichment types involve expensive operations (video generation at $0.50+/min, complex rendering). Users need to review and approve content before these costs are incurred.
+
+### Decision: Two-Stage Flow for Video and Presentation
+
+**Single-Stage Types**: Audio, Quiz
+- Fast, inexpensive generation
+- Immediate final output
+- Regenerate if unsatisfied
+
+**Two-Stage Types**: Video, Presentation
+- **Phase 1 (Draft)**: Generate script/structure via LLM (cheap)
+- **User Review**: View, edit, approve or regenerate draft
+- **Phase 2 (Final)**: Generate final content (expensive)
+
+### Status Enum Extension
+
+```sql
+CREATE TYPE enrichment_status AS ENUM (
+    'pending',           -- Queued for generation
+    'draft_generating',  -- Phase 1: Generating draft/script
+    'draft_ready',       -- Phase 1 complete: Awaiting user review
+    'generating',        -- Phase 2: Final content (or single-stage)
+    'completed',         -- Successfully generated
+    'failed',            -- Generation failed
+    'cancelled'          -- User cancelled
+);
+```
+
+### Handler Interface
+
+```typescript
+interface EnrichmentHandler {
+  generationFlow: 'single-stage' | 'two-stage';
+
+  // For single-stage types
+  generate?(job: EnrichmentJobData): Promise<EnrichmentContent>;
+
+  // For two-stage types
+  generateDraft?(job: EnrichmentJobData): Promise<DraftContent>;
+  generateFinal?(job: EnrichmentJobData, approvedDraft: DraftContent): Promise<EnrichmentContent>;
+}
+```
+
+### DETAIL View Modes
+
+```typescript
+switch (enrichment.status) {
+  case 'draft_generating': return <DraftGeneratingState />;
+  case 'draft_ready':      return <DraftReviewMode />;      // Edit + [Approve & Generate]
+  case 'generating':       return <GeneratingState />;
+  case 'completed':        return <FinalPreviewMode />;
+  case 'failed':           return <ErrorState />;
+}
+```
+
+### tRPC Procedures Added
+
+- `regenerateDraft` - Regenerate Phase 1 draft only
+- `updateDraft` - Save user edits to draft content
+- `approveDraft` - Approve draft and start Phase 2
+
+### Benefits
+
+1. **Cost Control**: Users see estimated cost before expensive generation
+2. **Quality Control**: Users can fix issues before final render
+3. **Transparency**: Users understand exactly what will be generated
+4. **Professional Workflow**: Matches real video/presentation production
+
+---
+
+## 12. Type Registry Pattern Decision (2025-12-24)
+
+### Problem Statement
+
+The enrichment system needs to support adding new enrichment types (flashcards, summaries, mindmaps, etc.) with minimal code changes and no modifications to core components.
+
+### Decision: Pluggable Type Registry
+
+Create a **Type Constructor** pattern where each enrichment type is self-describing and the system dynamically adapts.
+
+### Core Interface
+
+```typescript
+interface EnrichmentTypeDefinition {
+  type: string;                              // Unique type key
+  version: number;                           // Schema version
+  icon: string;                              // Lucide icon name
+  label: { en: string; ru: string };
+  description: { en: string; ru: string };
+  generationFlow: 'single-stage' | 'two-stage';
+  contentSchema: ZodSchema;
+  settingsSchema: ZodSchema;
+  components: {
+    CreateForm: () => Promise<Component>;
+    DetailView: () => Promise<Component>;
+    DraftEditor?: () => Promise<Component>;  // For two-stage
+  };
+  features: {
+    canEdit: boolean;
+    canRegenerate: boolean;
+    canExport: boolean;
+    requiresAsset: boolean;
+    supportsPreview: boolean;
+  };
+}
+```
+
+### Adding New Type Checklist
+
+1. Database: `ALTER TYPE enrichment_type ADD VALUE 'flashcards'`
+2. Schemas: Define content/settings in `shared-types`
+3. Register: Call `enrichmentRegistry.register({...})`
+4. UI Components: Create form, detail view, (draft editor if two-stage)
+5. Worker Handler: Implement generation logic
+
+**No changes needed to**:
+- Inspector Panel (reads from registry)
+- Asset Dock (uses registry icons)
+- BullMQ router (dispatches by type)
+- Database schema (JSONB is flexible)
+
+### Type Configuration Matrix
+
+| Type | Flow | Asset | Preview | Edit | Export |
+|------|------|-------|---------|------|--------|
+| video | two-stage | ✅ MP4 | ✅ | ❌ | ✅ |
+| audio | single | ✅ MP3 | ✅ | ❌ | ✅ |
+| presentation | two-stage | ❌ | ✅ | ✅ | ✅ HTML |
+| quiz | single | ❌ | ✅ | ✅ | ✅ QTI |
+| flashcards* | single | ❌ | ✅ | ✅ | ✅ Anki |
+| summary* | single | ❌ | ✅ | ✅ | ✅ MD |
+| mindmap* | single | ❌ | ✅ | ❌ | ✅ SVG |
+
+*Future types showing extensibility pattern*
+
+---
+
 *Research complete. Ready for Phase 1 implementation.*

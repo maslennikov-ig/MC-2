@@ -98,17 +98,85 @@ async function defaultLLMCall(
  * @param llmCall - Optional LLM call function for dependency injection (defaults to defaultLLMCall)
  * @returns PatcherOutput with patched content and metrics
  */
+import { getTokenMultiplier, getCharsPerToken } from '@megacampus/shared-types';
+
+/**
+ * Minimum ratio of patched content length to original content length
+ * If patch results in content shorter than this ratio, it's considered truncated
+ * 0.7 = patched content must be at least 70% of original length
+ */
+const MIN_CONTENT_LENGTH_RATIO = 0.7;
+
+/**
+ * Base token budget per minute of lesson duration (for English)
+ * Based on ~150 words/minute, ~1.3 tokens/word = ~200 tokens/minute
+ * We use 250 tokens/minute as generous buffer
+ */
+const BASE_TOKENS_PER_MINUTE = 250;
+
+/**
+ * Calculate max tokens based on lesson duration and language
+ *
+ * Language multipliers (relative to English):
+ * - en/es/fr/de: 1.0x
+ * - ru: 1.33x (Cyrillic)
+ * - zh: 2.67x (CJK - most expensive)
+ * - ja/ko/th: 2.0x
+ * - ar/hi/bn: 1.6x
+ *
+ * @param lessonDurationMinutes - Lesson duration in minutes (3-45)
+ * @param contentLength - Original content length in characters (fallback estimation)
+ * @param language - Content language code (e.g., 'ru', 'en', 'zh')
+ * @returns Calculated maxTokens for LLM call
+ */
+function calculateMaxTokensForPatch(
+  lessonDurationMinutes: number | undefined,
+  contentLength: number,
+  language: string = 'en'
+): number {
+  // Get language multiplier (1.0 for English, higher for other languages)
+  const languageMultiplier = getTokenMultiplier(language);
+
+  // If lesson duration is provided, use it for accurate calculation
+  if (lessonDurationMinutes) {
+    // Base: tokens per minute × duration × 1.5 buffer × language multiplier
+    const durationBasedTokens = Math.ceil(
+      lessonDurationMinutes * BASE_TOKENS_PER_MINUTE * 1.5 * languageMultiplier
+    );
+    // Clamp to reasonable range:
+    // - Min: 1500 (short English lessons)
+    // - Max: 45000 (all our models support 50K+ output)
+    return Math.max(1500, Math.min(45000, durationBasedTokens));
+  }
+
+  // Fallback: estimate from content length if duration not provided
+  const charsPerToken = getCharsPerToken(language);
+  const estimatedTokens = Math.ceil(contentLength / charsPerToken);
+  return Math.max(1500, Math.min(16000, estimatedTokens * 1.5));
+}
+
 export async function executePatch(
   input: PatcherInput,
   llmCall: LLMCallFn = defaultLLMCall
 ): Promise<PatcherOutput> {
   const startTime = Date.now();
 
+  // Calculate dynamic maxTokens based on lesson duration, language, and content length
+  const maxTokens = calculateMaxTokensForPatch(
+    input.lessonDurationMinutes,
+    input.originalContent.length,
+    input.language
+  );
+
   logger.info({
     sectionId: input.sectionId,
     sectionTitle: input.sectionTitle,
     originalLength: input.originalContent.length,
     scope: input.contextWindow.scope,
+    lessonDurationMinutes: input.lessonDurationMinutes || 'not provided',
+    language: input.language || 'en (default)',
+    languageMultiplier: getTokenMultiplier(input.language || 'en'),
+    maxTokens,
   }, 'Executing Patcher: surgical edit');
 
   try {
@@ -116,11 +184,33 @@ export async function executePatch(
     const systemPrompt = buildPatcherSystemPrompt();
 
     const response = await llmCall(prompt, systemPrompt, {
-      maxTokens: 1000,
+      maxTokens,
       temperature: 0.1,
     });
     const patchedContent = response.content.trim();
     const tokensUsed = response.tokensUsed;
+
+    // IMPORTANT: Validate that content was not truncated
+    // If patched content is significantly shorter than original, reject the patch
+    const lengthRatio = patchedContent.length / input.originalContent.length;
+    if (lengthRatio < MIN_CONTENT_LENGTH_RATIO) {
+      logger.error({
+        sectionId: input.sectionId,
+        originalLength: input.originalContent.length,
+        patchedLength: patchedContent.length,
+        lengthRatio: lengthRatio.toFixed(2),
+        minRatio: MIN_CONTENT_LENGTH_RATIO,
+      }, 'Patcher: REJECTED - content was truncated, returning original');
+
+      return {
+        patchedContent: input.originalContent, // Return original - patch was corrupted
+        success: false,
+        diffSummary: `Patch rejected: content truncated to ${(lengthRatio * 100).toFixed(0)}% of original`,
+        tokensUsed,
+        durationMs: Date.now() - startTime,
+        errorMessage: 'Patch resulted in truncated content - LLM output was incomplete',
+      };
+    }
 
     // Calculate diff summary
     const diffSummary = generateDiffSummary(input.originalContent, patchedContent);
@@ -134,6 +224,7 @@ export async function executePatch(
       diffSummary,
       patchedLength: patchedContent.length,
       lengthDelta: patchedContent.length - input.originalContent.length,
+      lengthRatio: lengthRatio.toFixed(2),
     }, 'Patcher: surgical edit complete');
 
     return {

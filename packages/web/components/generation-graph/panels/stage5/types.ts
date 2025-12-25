@@ -7,6 +7,15 @@
  * Color scheme: Orange/Amber (energy, creativity, transformation)
  */
 
+import type {
+  CourseStructure,
+  Section,
+  Lesson,
+} from '@megacampus/shared-types';
+
+// Re-export for convenience
+export type { CourseStructure, Section, Lesson };
+
 // ============================================================================
 // INPUT DATA
 // ============================================================================
@@ -78,50 +87,6 @@ export interface Stage5TelemetryData {
 }
 
 // ============================================================================
-// OUTPUT DATA
-// ============================================================================
-
-export interface Stage5OutputData {
-  courseStructure: {
-    courseTitle: string;
-    courseDescription: string;
-    learningOutcomes: string[];
-    prerequisites: string[];
-    difficultyLevel: string;
-    estimatedDurationHours: number;
-    courseTags: string[];
-    sections: Stage5Section[];
-  };
-  generationMetadata?: {
-    modelsUsed: string[];
-    totalTokens: number;
-    costUsd: number;
-    qualityScores: {
-      metadataSimilarity: number;
-      sectionsSimilarity: number[];
-      overall: number;
-    };
-  };
-}
-
-export interface Stage5Section {
-  sectionId: string;
-  sectionTitle: string;
-  sectionDescription: string;
-  learningObjectives: string[];
-  lessons: Stage5Lesson[];
-}
-
-export interface Stage5Lesson {
-  lessonId: string;
-  lessonTitle: string;
-  lessonDescription: string;
-  lessonType: 'theory' | 'practice' | 'quiz' | 'project';
-  estimatedDurationMinutes: number;
-  keyTopics: string[];
-}
-
-// ============================================================================
 // ACTIVITY TAB
 // ============================================================================
 
@@ -160,10 +125,20 @@ export interface Stage5ProcessTabProps {
   telemetry?: Stage5TelemetryData;
   status?: 'pending' | 'active' | 'completed' | 'error';
   locale?: 'ru' | 'en';
+  /** Output data for calculating telemetry (sectionsCount, lessonsCount) */
+  outputData?: CourseStructure | unknown;
+  /** Processing time from trace for telemetry */
+  processingTimeMs?: number;
+  /** Total tokens from trace for telemetry */
+  totalTokens?: number;
 }
 
 export interface Stage5OutputTabProps {
-  outputData?: Stage5OutputData | unknown;
+  /**
+   * Output data - can be CourseStructure directly (real data)
+   * or unknown for validation
+   */
+  outputData?: CourseStructure | unknown;
   courseId?: string;
   editable?: boolean;
   locale?: 'ru' | 'en';
@@ -197,7 +172,7 @@ export interface BatchProgressProps {
 }
 
 export interface StructureTreeProps {
-  sections: Stage5Section[];
+  sections: Section[];
   expandedSections?: string[];
   onToggleSection?: (sectionId: string) => void;
   locale?: 'ru' | 'en';

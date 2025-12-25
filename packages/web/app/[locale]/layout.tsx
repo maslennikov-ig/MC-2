@@ -9,6 +9,7 @@ import { ErrorBoundary } from "@/components/common/error-boundary";
 import { Toaster } from "@/components/ui/sonner";
 import { Providers } from "./providers";
 import { BackToTop } from "@/components/ui/back-to-top";
+import { ServiceWorkerManager } from "@/components/pwa/ServiceWorkerManager";
 import "../globals.css";
 // KaTeX CSS for math formula rendering
 import "katex/dist/katex.min.css";
@@ -162,6 +163,7 @@ export default async function LocaleLayout({ children, params }: Props) {
               {children}
               <BackToTop threshold={300} />
               <Toaster />
+              <ServiceWorkerManager />
             </ErrorBoundary>
           </Providers>
         </NextIntlClientProvider>

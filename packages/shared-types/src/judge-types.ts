@@ -371,7 +371,7 @@ export const RouterDecisionSchema = z.object({
   /** Chosen fix action */
   action: z.enum(['SURGICAL_EDIT', 'REGENERATE_SECTION', 'FULL_REGENERATE']),
   /** Agent to execute the fix */
-  executor: z.enum(['patcher', 'section-expander', 'planner']),
+  executor: z.enum(['patcher', 'generator']),
   /** Estimated token cost */
   estimatedTokens: z.number().int().min(0),
   /** Routing reasoning */
@@ -419,6 +419,23 @@ export const PatcherInputSchema = z.object({
     endQuote: z.string().optional(),
     scope: z.enum(['paragraph', 'section', 'global']),
   }),
+  /**
+   * Lesson duration in minutes (3-45) for token budget calculation.
+   * Longer lessons require more tokens for patching.
+   * If not provided, will be estimated from content length.
+   */
+  lessonDurationMinutes: z.number().int().min(3).max(45).optional(),
+
+  /**
+   * Content language for token budget calculation.
+   * Different languages have different tokenization ratios:
+   * - en/es/fr/de: ~1.0x (baseline)
+   * - ru: ~1.33x (Cyrillic needs more tokens)
+   * - zh: ~2.67x (CJK needs significantly more tokens)
+   * - ja/ko/th: ~2.0x
+   * - ar/hi/bn: ~1.6x
+   */
+  language: z.string().optional(),
 });
 
 /** PatcherInput type */
@@ -1397,3 +1414,242 @@ export function determineRecommendation(
 
   return 'REGENERATE';
 }
+
+// ============================================================================
+// SELF-REVIEWER TYPES (Pre-Judge Validation)
+// ============================================================================
+
+/**
+ * SelfReviewStatus - Result status from Self-Reviewer node
+ *
+ * Fail-Fast architecture with 4-phase evaluation:
+ * - PASS: Content is clean, proceed to Judges
+ * - PASS_WITH_FLAGS: Content acceptable with minor observations
+ * - FIXED: Self-repairable hygiene issues were fixed, patched_content provided
+ * - REGENERATE: Fatal errors (truncation, language failure), skip Judges
+ * - FLAG_TO_JUDGE: Semantic issues requiring Judge attention
+ */
+export const SelfReviewStatusSchema = z.enum([
+  'PASS',
+  'PASS_WITH_FLAGS',
+  'FIXED',
+  'REGENERATE',
+  'FLAG_TO_JUDGE',
+]);
+
+/** SelfReviewStatus type */
+export type SelfReviewStatus = z.infer<typeof SelfReviewStatusSchema>;
+
+/**
+ * SelfReviewIssueType - Types of issues detected by Self-Reviewer
+ *
+ * Phase 1 (Integrity/Critical): TRUNCATION, LANGUAGE, EMPTY, SHORT_SECTION
+ * Phase 2 (Hygiene): HYGIENE
+ * Phase 3 (Semantic): ALIGNMENT, HALLUCINATION, LOGIC
+ */
+export const SelfReviewIssueTypeSchema = z.enum([
+  'TRUNCATION',     // Content appears cut off (Phase 1)
+  'LANGUAGE',       // Wrong language / script pollution (Phase 1)
+  'EMPTY',          // Empty or placeholder fields (Phase 1)
+  'SHORT_SECTION',  // Section has < 50 words (Phase 1)
+  'HYGIENE',        // Chatbot artifacts, markdown errors (Phase 2)
+  'ALIGNMENT',      // Learning objective mismatch (Phase 3)
+  'HALLUCINATION',  // Contradicts RAG context (Phase 3)
+  'LOGIC',          // Internal contradictions (Phase 3)
+]);
+
+/** SelfReviewIssueType type */
+export type SelfReviewIssueType = z.infer<typeof SelfReviewIssueTypeSchema>;
+
+/**
+ * SelfReviewSeverity - Severity levels for Self-Review issues
+ *
+ * - CRITICAL: Must regenerate (Phase 1 failures)
+ * - FIXABLE: Self-repairable (Phase 2 hygiene)
+ * - COMPLEX: Requires Judge evaluation (Phase 3)
+ * - INFO: Informational only (Phase 4)
+ */
+export const SelfReviewSeveritySchema = z.enum([
+  'CRITICAL',  // Must regenerate
+  'FIXABLE',   // Can be auto-fixed
+  'COMPLEX',   // Needs Judge
+  'INFO',      // Informational
+]);
+
+/** SelfReviewSeverity type */
+export type SelfReviewSeverity = z.infer<typeof SelfReviewSeveritySchema>;
+
+/**
+ * SelfReviewIssue - Individual issue from Self-Reviewer
+ */
+export const SelfReviewIssueSchema = z.object({
+  /** Type of issue */
+  type: SelfReviewIssueTypeSchema,
+  /** Severity level */
+  severity: SelfReviewSeveritySchema,
+  /** Location in content (section ID or "global") */
+  location: z.string().min(1),
+  /** Description of the issue */
+  description: z.string().min(1),
+});
+
+/** SelfReviewIssue type */
+export type SelfReviewIssue = z.infer<typeof SelfReviewIssueSchema>;
+
+/**
+ * SelfReviewResult - Complete result from Self-Reviewer node
+ *
+ * Part of Fail-Fast architecture to reduce Judge token costs by 30-50%
+ * by filtering obviously broken content before expensive evaluation.
+ */
+export const SelfReviewResultSchema = z.object({
+  /** Final status from evaluation */
+  status: SelfReviewStatusSchema,
+  /** Concise reasoning (max 2 sentences) */
+  reasoning: z.string(),
+  /** List of issues found */
+  issues: z.array(SelfReviewIssueSchema).default([]),
+  /**
+   * Full patched content if status is FIXED.
+   * Contains the complete LessonContentBody JSON.
+   * Null for all other statuses.
+   */
+  patchedContent: z.any().nullable().default(null),
+  /** Tokens used for self-review LLM call */
+  tokensUsed: z.number().int().min(0).default(0),
+  /** Duration of self-review in milliseconds */
+  durationMs: z.number().int().min(0).default(0),
+  /** Whether heuristic pre-checks passed */
+  heuristicsPassed: z.boolean().default(true),
+  /** Details from heuristic checks (language, truncation) */
+  heuristicDetails: z.object({
+    languageCheck: z.object({
+      passed: z.boolean(),
+      foreignCharacters: z.number().default(0),
+      scriptsFound: z.array(z.string()).default([]),
+    }).optional(),
+    truncationCheck: z.object({
+      passed: z.boolean(),
+      issues: z.array(z.string()).default([]),
+    }).optional(),
+  }).optional(),
+});
+
+/** SelfReviewResult type */
+export type SelfReviewResult = z.infer<typeof SelfReviewResultSchema>;
+
+/**
+ * SelfReviewerConfig - Configuration for Self-Reviewer node
+ */
+export const SelfReviewerConfigSchema = z.object({
+  /** Enable heuristic pre-checks (FREE, no LLM) */
+  enableHeuristicChecks: z.boolean().default(true),
+  /** Enable LLM-based semantic review */
+  enableLLMReview: z.boolean().default(true),
+  /** Skip self-review if content is short */
+  minContentLengthForReview: z.number().int().min(0).default(100),
+  /** Model to use for self-review (should be fast/cheap) */
+  model: z.string().optional(),
+  /** Temperature for self-review (low for consistency) */
+  temperature: z.number().min(0).max(1).default(0.1),
+});
+
+/** SelfReviewerConfig type */
+export type SelfReviewerConfig = z.infer<typeof SelfReviewerConfigSchema>;
+
+/**
+ * Validate a SelfReviewResult
+ * @param result - Raw result data to validate
+ * @returns Validation result with parsed data or errors
+ */
+export function validateSelfReviewResult(result: unknown) {
+  return SelfReviewResultSchema.safeParse(result);
+}
+
+// ============================================================================
+// PROGRESS SUMMARY TYPES (User-Friendly Messages)
+// ============================================================================
+
+/**
+ * SummaryItemSeverity - Severity level for progress summary items
+ */
+export const SummaryItemSeveritySchema = z.enum(['info', 'warning', 'error']);
+export type SummaryItemSeverity = z.infer<typeof SummaryItemSeveritySchema>;
+
+/**
+ * SummaryItem - A single item in the progress summary
+ *
+ * Used to display user-friendly messages about issues found or fixes applied.
+ */
+export const SummaryItemSchema = z.object({
+  /** Brief description (1-2 sentences) */
+  text: z.string(),
+  /** Severity level */
+  severity: SummaryItemSeveritySchema,
+});
+
+export type SummaryItem = z.infer<typeof SummaryItemSchema>;
+
+/**
+ * ProgressSummaryStatus - Overall status of the generation progress
+ */
+export const ProgressSummaryStatusSchema = z.enum([
+  'generating',
+  'reviewing',
+  'fixing',
+  'completed',
+  'failed',
+]);
+export type ProgressSummaryStatus = z.infer<typeof ProgressSummaryStatusSchema>;
+
+/**
+ * NodeAttemptSummary - Summary for a single node execution attempt
+ *
+ * Captures user-friendly information about what happened during
+ * a single execution of a pipeline node (generator, selfReviewer, judge).
+ */
+export const NodeAttemptSummarySchema = z.object({
+  /** Node name (generator, selfReviewer, judge) */
+  node: z.string(),
+  /** Attempt number (1-based) */
+  attempt: z.number().int().min(1),
+  /** Status of this attempt */
+  status: ProgressSummaryStatusSchema,
+  /** Result label (e.g., "PASS", "PASS_WITH_FLAGS", "ACCEPT") */
+  resultLabel: z.string().optional(),
+  /** Issues found during this attempt */
+  issuesFound: z.array(SummaryItemSchema).default([]),
+  /** Actions performed during this attempt */
+  actionsPerformed: z.array(SummaryItemSchema).default([]),
+  /** Outcome message (where it was routed next) */
+  outcome: z.string().optional(),
+  /** Timestamp when this attempt started */
+  startedAt: z.coerce.date().optional(),
+  /** Duration in milliseconds */
+  durationMs: z.number().int().min(0).optional(),
+  /** Tokens used */
+  tokensUsed: z.number().int().min(0).optional(),
+});
+
+export type NodeAttemptSummary = z.infer<typeof NodeAttemptSummarySchema>;
+
+/**
+ * ProgressSummary - Aggregated progress summary for lesson generation
+ *
+ * Contains all attempt summaries grouped by node, providing a complete
+ * picture of what happened during generation.
+ */
+export const ProgressSummarySchema = z.object({
+  /** Current overall status */
+  status: ProgressSummaryStatusSchema,
+  /** Current phase description (localized) */
+  currentPhase: z.string(),
+  /** Language code used for messages (e.g., 'ru', 'en') */
+  language: z.string().default('en'),
+  /** All attempt summaries, grouped by node */
+  attempts: z.array(NodeAttemptSummarySchema).default([]),
+  /** Final outcome message */
+  outcome: z.string().optional(),
+});
+
+export type ProgressSummary = z.infer<typeof ProgressSummarySchema>;

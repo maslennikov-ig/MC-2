@@ -14,19 +14,23 @@ import {
 } from 'lucide-react';
 import { GRAPH_TRANSLATIONS } from '@/lib/generation-graph/translations';
 import { StructureTree } from './components/StructureTree';
-import type { Stage5OutputTabProps, Stage5OutputData } from './types';
+import type { Stage5OutputTabProps, CourseStructure } from './types';
 
 // ============================================================================
 // TYPE GUARDS
 // ============================================================================
 
 /**
- * Type guard to validate Stage5OutputData
+ * Type guard to validate CourseStructure from real database data
+ * Real data uses snake_case fields directly (not wrapped in courseStructure)
  */
-function isStage5OutputData(data: unknown): data is Stage5OutputData {
+function isCourseStructure(data: unknown): data is CourseStructure {
   if (!data || typeof data !== 'object') return false;
   const d = data as Record<string, unknown>;
-  return d.courseStructure !== undefined && typeof d.courseStructure === 'object';
+  return (
+    typeof d.course_title === 'string' &&
+    Array.isArray(d.sections)
+  );
 }
 
 // ============================================================================
@@ -74,9 +78,9 @@ export const Stage5OutputTab = memo<Stage5OutputTabProps>(function Stage5OutputT
   // Expanded sections state for StructureTree
   const [expandedSections, setExpandedSections] = useState<string[]>([]);
 
-  // Parse output data
-  const parsedData = useMemo((): Stage5OutputData | null => {
-    if (isStage5OutputData(outputData)) {
+  // Parse output data - real data IS the CourseStructure directly
+  const parsedData = useMemo((): CourseStructure | null => {
+    if (isCourseStructure(outputData)) {
       return outputData;
     }
     return null;
@@ -92,7 +96,7 @@ export const Stage5OutputTab = memo<Stage5OutputTabProps>(function Stage5OutputT
   }, []);
 
   // Empty state - no data yet
-  if (!parsedData || !parsedData.courseStructure) {
+  if (!parsedData) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center">
         <GitBranch className="h-12 w-12 text-muted-foreground/50 mb-4" />
@@ -103,23 +107,24 @@ export const Stage5OutputTab = memo<Stage5OutputTabProps>(function Stage5OutputT
     );
   }
 
+  // Extract fields using snake_case (real data format)
   const {
-    courseTitle,
-    courseDescription,
-    learningOutcomes,
+    course_title,
+    course_description,
+    learning_outcomes,
     prerequisites,
-    difficultyLevel,
-    estimatedDurationHours,
-    courseTags,
+    difficulty_level,
+    estimated_duration_hours,
+    course_tags,
     sections,
-  } = parsedData.courseStructure;
+  } = parsedData;
 
   // Get difficulty badge color
-  const difficultyColor = DIFFICULTY_COLORS[difficultyLevel.toLowerCase()] || DIFFICULTY_COLORS.intermediate;
+  const difficultyColor = DIFFICULTY_COLORS[difficulty_level?.toLowerCase() ?? 'intermediate'] || DIFFICULTY_COLORS.intermediate;
 
   // Translate difficulty level (stage5 section uses simple keys: beginner, intermediate, advanced)
-  const difficultyLower = difficultyLevel.toLowerCase() as 'beginner' | 'intermediate' | 'advanced';
-  const difficultyLabel = t?.[difficultyLower]?.[locale] ?? difficultyLevel;
+  const difficultyLower = (difficulty_level?.toLowerCase() ?? 'intermediate') as 'beginner' | 'intermediate' | 'advanced';
+  const difficultyLabel = t?.[difficultyLower]?.[locale] ?? difficulty_level;
 
   return (
     <div className="space-y-4 p-1">
@@ -133,29 +138,29 @@ export const Stage5OutputTab = memo<Stage5OutputTabProps>(function Stage5OutputT
       >
         <CardHeader className="pb-3">
           <CardTitle className="text-lg font-semibold text-foreground">
-            {courseTitle}
+            {course_title}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Course Description */}
-          {courseDescription && (
+          {course_description && (
             <p className="text-sm text-muted-foreground leading-relaxed">
-              {courseDescription}
+              {course_description}
             </p>
           )}
 
-          {/* Learning Outcomes */}
-          {learningOutcomes && learningOutcomes.length > 0 && (
+          {/* Learning Outcomes - real data has objects with 'text' field */}
+          {learning_outcomes && learning_outcomes.length > 0 && (
             <div>
               <h4 className="text-sm font-semibold mb-2 flex items-center gap-2">
                 <CheckCircle2 className="h-4 w-4 text-green-500" />
                 {t?.learningOutcomes?.[locale] ?? 'Learning Outcomes'}
               </h4>
               <ul className="space-y-1.5">
-                {learningOutcomes.map((outcome, idx) => (
+                {learning_outcomes.map((outcome, idx) => (
                   <li key={idx} className="flex items-start gap-2 text-sm text-muted-foreground">
                     <CheckCircle2 className="h-3.5 w-3.5 text-green-500 mt-0.5 flex-shrink-0" />
-                    <span>{outcome}</span>
+                    <span>{typeof outcome === 'string' ? outcome : outcome.text}</span>
                   </li>
                 ))}
               </ul>
@@ -203,16 +208,16 @@ export const Stage5OutputTab = memo<Stage5OutputTabProps>(function Stage5OutputT
             <div className="flex items-center gap-2">
               <Clock className="h-3.5 w-3.5 text-muted-foreground" />
               <span className="text-sm font-medium">
-                {estimatedDurationHours}{t?.hoursShort?.[locale] ?? 'h'}
+                {estimated_duration_hours}{t?.hoursShort?.[locale] ?? 'h'}
               </span>
             </div>
 
             {/* Tags */}
-            {courseTags && courseTags.length > 0 && (
+            {course_tags && course_tags.length > 0 && (
               <div className="flex items-center gap-2">
                 <Tag className="h-3.5 w-3.5 text-muted-foreground" />
                 <div className="flex flex-wrap gap-1.5">
-                  {courseTags.slice(0, 3).map((tag, idx) => (
+                  {course_tags.slice(0, 3).map((tag, idx) => (
                     <Badge
                       key={idx}
                       variant="secondary"
@@ -221,9 +226,9 @@ export const Stage5OutputTab = memo<Stage5OutputTabProps>(function Stage5OutputT
                       {tag}
                     </Badge>
                   ))}
-                  {courseTags.length > 3 && (
+                  {course_tags.length > 3 && (
                     <span className="text-xs text-muted-foreground">
-                      +{courseTags.length - 3}
+                      +{course_tags.length - 3}
                     </span>
                   )}
                 </div>

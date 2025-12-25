@@ -102,12 +102,10 @@ function extractPipelineState(
 ): MicroStepperState {
   const lessonStatus = mapLessonStatus(status);
 
-  // Default pipeline: all nodes pending
+  // Default pipeline: all nodes pending (3-node pipeline: generator → selfReviewer → judge)
   const nodes: Array<{ node: Stage6NodeName; status: Stage6NodeStatus }> = [
-    { node: 'planner', status: 'pending' },
-    { node: 'expander', status: 'pending' },
-    { node: 'assembler', status: 'pending' },
-    { node: 'smoother', status: 'pending' },
+    { node: 'generator', status: 'pending' },
+    { node: 'selfReviewer', status: 'pending' },
     { node: 'judge', status: 'pending' },
   ];
 

@@ -524,13 +524,13 @@ function mapPhaseGroupFromTrace(trace: GenerationTrace): ActivityPhaseGroup {
 
 /**
  * Extract relevant details from trace for display
+ * Note: model_used is intentionally excluded to hide concrete model names from users.
+ * Users should only see tier-based naming (e.g., "Premium Model") which is shown elsewhere.
  */
 function extractDetailsFromTrace(trace: GenerationTrace): Record<string, unknown> | undefined {
   const details: Record<string, unknown> = {};
 
-  if (trace.model_used) {
-    details.model = trace.model_used;
-  }
+  // Skip model_used to hide concrete model names from users
   if (trace.tokens_used) {
     details.tokens = trace.tokens_used;
   }

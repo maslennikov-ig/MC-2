@@ -1,18 +1,19 @@
 'use client';
 
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useMemo } from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
 import { cn } from '@/lib/utils';
 import {
   LessonInspectorData,
   LessonInspectorDataRefinementExtension,
   STAGE6_NODE_LABELS,
+  JudgeVerdictDisplay,
+  PipelineNodeState,
+  Stage6NodeName,
 } from '@megacampus/shared-types';
 import { LessonInspectorLayout } from './LessonInspectorLayout';
 import { PipelinePanel } from './PipelinePanel';
-import { ContentPreviewPanel } from './ContentPreviewPanel';
-import { JudgeVotingPanel } from '../../components/JudgeVotingPanel';
-import { RefinementPlanPanel } from './RefinementPlanPanel';
+import { Stage6InspectorContent } from '../stage6/inspector/Stage6InspectorContent';
 import { Loader2, AlertCircle, Copy, Check } from 'lucide-react';
 import {
   Dialog,
@@ -39,12 +40,9 @@ function InspectorErrorFallback({ error, resetErrorBoundary }: {
       <p className="text-sm text-slate-600 dark:text-slate-400 mb-4 max-w-sm">
         {error.message}
       </p>
-      <button
-        onClick={resetErrorBoundary}
-        className="px-4 py-2 bg-blue-500 hover:bg-blue-600 text-white rounded-md text-sm"
-      >
+      <Button onClick={resetErrorBoundary} variant="default" size="sm">
         Попробовать снова
-      </button>
+      </Button>
     </div>
   );
 }
@@ -126,6 +124,73 @@ export function LessonInspector({
     return labels?.ru || node;
   }, []);
 
+  /**
+   * Extract quality score (0-100) from judge result
+   * @param judgeResult - Judge verdict with voting results
+   * @returns Quality score as integer 0-100
+   */
+  const extractQualityScore = useCallback((judgeResult: JudgeVerdictDisplay | null): number => {
+    // Guard: No judge result or no voting result
+    if (!judgeResult?.votingResult) return 0;
+
+    // finalScore could be 0 (valid score), so use nullish coalescing
+    const score = judgeResult.votingResult.finalScore ?? 0;
+
+    // Convert to 0-100 scale: if already 0-100 keep as is, if 0-1 multiply by 100
+    return score > 1 ? Math.round(score) : Math.round(score * 100);
+  }, []);
+
+  /**
+   * Extract tokens breakdown per node from pipeline nodes
+   */
+  const extractTokensBreakdown = useCallback(
+    (pipelineNodes: PipelineNodeState[]): Record<Stage6NodeName, number> | undefined => {
+      const breakdown: Partial<Record<Stage6NodeName, number>> = {};
+      let hasTokens = false;
+
+      for (const node of pipelineNodes) {
+        if (node.tokensUsed && node.tokensUsed > 0) {
+          breakdown[node.node as Stage6NodeName] = node.tokensUsed;
+          hasTokens = true;
+        }
+      }
+
+      return hasTokens ? (breakdown as Record<Stage6NodeName, number>) : undefined;
+    },
+    []
+  );
+
+  /**
+   * Build metadata object from lesson data
+   */
+  const buildMetadata = useMemo(() => {
+    if (!data) return null;
+    return {
+      lessonId: data.lessonId,
+      moduleId: data.moduleId,
+      lessonNumber: data.lessonNumber,
+      title: data.title,
+      totalTokens: data.totalTokensUsed,
+      totalCost: data.totalCostUsd,
+      totalDuration: data.totalDurationMs,
+      retryCount: data.retryCount,
+      refinementIterations: data.refinementIterations,
+    };
+  }, [data]);
+
+  /**
+   * Transform logs to required format
+   */
+  const transformedLogs = useMemo(() => {
+    if (!data?.logs) return [];
+    return data.logs.map((log) => ({
+      level: log.level,
+      message: log.message,
+      timestamp: typeof log.timestamp === 'string' ? log.timestamp : log.timestamp.toISOString(),
+      details: log.details,
+    }));
+  }, [data?.logs]);
+
   // Loading state
   if (isLoading) {
     return (
@@ -206,51 +271,33 @@ export function LessonInspector({
     />
   );
 
-  // Right panel: Content + Judge + Refinement
+  // Right panel: Stage6InspectorContent (Editorial IDE layout)
   const rightPanel = (
-    <div className="flex flex-col h-full">
-      {/* Judge voting panel (if available) */}
-      {data.judgeResult && (
-        <div className="flex-shrink-0 p-4 border-b border-slate-200 dark:border-slate-700">
-          <JudgeVotingPanel result={data.judgeResult} />
-        </div>
-      )}
-
-      {/* Refinement panel (if refinement occurred) */}
-      {data.refinementPlan && (
-        <div className="flex-shrink-0 p-4 border-b border-slate-200 dark:border-slate-700">
-          <RefinementPlanPanel
-            plan={data.refinementPlan}
-            bestEffortResult={data.bestEffortResult}
-            defaultExpanded={data.isRefining}
-          />
-        </div>
-      )}
-
-      {/* Content preview */}
-      <ContentPreviewPanel
-        content={data.content}
-        rawMarkdown={data.rawMarkdown}
-        metadata={{
-          lessonId: data.lessonId,
-          moduleId: data.moduleId,
-          totalTokens: data.totalTokensUsed,
-          totalCost: data.totalCostUsd,
-          totalDuration: data.totalDurationMs,
-          retryCount: data.retryCount,
-          refinementIterations: data.refinementIterations,
-        }}
-        judgeResult={data.judgeResult}
-        status={data.status}
-        errorMessage={getErrorMessage()}
-        onApprove={onApprove || (() => {})}
-        onEdit={onEdit || (() => {})}
-        onRegenerate={onRegenerate || (() => {})}
-        isApproving={isApproving}
-        isRegenerating={isRegenerating}
-        className="flex-1 min-h-0"
-      />
-    </div>
+    <Stage6InspectorContent
+      content={data.content}
+      rawMarkdown={data.rawMarkdown}
+      metadata={buildMetadata}
+      logs={transformedLogs}
+      selfReviewResult={data.selfReviewResult ?? null}
+      judgeResult={data.judgeResult}
+      stats={{
+        tokens: data.totalTokensUsed,
+        costUsd: data.totalCostUsd,
+        durationMs: data.totalDurationMs,
+        modelTier: 'standard', // TODO: Extract from user subscription or course settings
+        quality: extractQualityScore(data.judgeResult),
+        tokensBreakdown: extractTokensBreakdown(data.pipelineNodes),
+      }}
+      status={data.status}
+      errorMessage={getErrorMessage()}
+      onApprove={onApprove || (() => {})}
+      onEdit={onEdit || (() => {})}
+      onRegenerate={onRegenerate || (() => {})}
+      isApproving={isApproving}
+      isRegenerating={isRegenerating}
+      locale="ru"
+      className="h-full"
+    />
   );
 
   return (

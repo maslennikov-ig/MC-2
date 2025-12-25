@@ -57,7 +57,14 @@ export * from './lms';
 export * from './context-reserve-settings';
 
 // Token Estimation Utilities
-export { estimateTokenCount, getCharsPerToken } from './token-estimation';
+export {
+  estimateTokenCount,
+  getCharsPerToken,
+  getTokenMultiplier,
+  calculateRequiredTokens,
+  CHARS_PER_TOKEN_BY_LANGUAGE,
+  TOKEN_MULTIPLIER_BY_LANGUAGE,
+} from './token-estimation';
 
 // Tier Settings Types
 export * from './tier-settings';

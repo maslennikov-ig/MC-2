@@ -1,5 +1,5 @@
 /**
- * Hardcoded Prompt Registry - 18 Prompts from Stage 3-6
+ * Hardcoded Prompt Registry - 19 Prompts from Stage 3-6
  *
  * Central registry of all hardcoded prompts extracted from stage files.
  * Provides fallback when prompts are not available in the database.
@@ -10,7 +10,7 @@
  * - Stage 3: 2 classification prompts (comparative, independent)
  * - Stage 4: 4 analysis phases (classification, scope, expert, synthesis)
  * - Stage 5: 2 metadata/sections prompts (metadata, sections)
- * - Stage 6: 5 lesson content prompts (planner, expander, assembler, smoother, judge)
+ * - Stage 6: 6 lesson content prompts (serial_generator, planner, expander, assembler, smoother, judge)
  *
  * Structure:
  * - promptKey: Unique identifier (e.g., "stage4_phase1_classification")
@@ -664,10 +664,192 @@ Generate sections with:
 const stage6Prompts: HardcodedPrompt[] = [
   {
     stage: 'stage_6',
-    promptKey: 'stage6_planner',
-    promptName: 'Stage 6 - Planner: Lesson Outline Generation',
+    promptKey: 'stage6_serial_generator',
+    promptName: 'Stage 6 - Serial Generator: Section-by-Section Content',
     promptDescription:
-      'Generates detailed lesson outline from specification. Uses Context-First XML strategy with lesson context, learning objectives, RAG context, and visual planning.',
+      'Generates section content sequentially with context window from previous sections. Enables natural transitions without separate Smoother node.',
+    promptTemplate: `<lesson_context>
+  <metadata>
+    <lesson_title>{{lessonTitle}}</lesson_title>
+    <target_audience>{{targetAudience}}</target_audience>
+    <tone>{{tone}}</tone>
+    <difficulty>{{difficulty}}</difficulty>
+  </metadata>
+
+  <section_spec>
+    <title>{{sectionTitle}}</title>
+    <content_archetype>{{contentArchetype}}</content_archetype>
+    <depth>{{depth}}</depth>
+    <depth_guidance>{{depthGuidance}}</depth_guidance>
+    <key_points>
+{{keyPoints}}
+    </key_points>
+    <required_keywords>{{requiredKeywords}}</required_keywords>
+    <prohibited_terms>{{prohibitedTerms}}</prohibited_terms>
+  </section_spec>
+
+  <reference_material>
+  {{ragContext}}
+  </reference_material>
+
+  <previous_context>
+{{previousContext}}
+  </previous_context>
+</lesson_context>
+
+<visual_toolkit>
+**VISUAL ELEMENTS** — Use actively to create engaging, professional content:
+
+1. **Mermaid Diagrams** — For processes, flows, relationships:
+   \`\`\`mermaid
+   flowchart TD
+     A[Input] --> B{Decision}
+     B -->|Yes| C[Result]
+     B -->|No| D[Alternative]
+   \`\`\`
+   Types: flowchart TD/LR, sequenceDiagram, mindmap, pie, timeline
+
+2. **Math Formulas** (LaTeX):
+   - Inline: \`$E=mc^2$\` within text
+   - Block: \`$$\\sum_{i=1}^{n} x_i$$\` centered on own line
+   - Use \\boxed{} for key formulas: \`$$\\boxed{F = ma}$$\`
+
+3. **Callouts** — For tips, warnings, key insights:
+   > [!TIP]
+   > Best practice or recommendation
+
+   > [!WARNING]
+   > Important caution
+
+   > [!NOTE]
+   > Key concept to remember
+
+   Types: NOTE, TIP, WARNING, DANGER, INFO
+
+4. **Rich Code Blocks**:
+   \`\`\`typescript filename="example.ts" {2,4-6}
+   // Line highlighting draws attention
+   \`\`\`
+
+5. **Tables** — For comparisons, structured data
+
+*Syntax keywords (mermaid, filename, [!TIP]) stay in English regardless of output language.*
+</visual_toolkit>
+
+<output_language>
+MANDATORY: Write ALL content in {{outputLanguage}}.
+Every word, header, example, and explanation must be in {{outputLanguage}}.
+DO NOT mix languages (except code/syntax keywords).
+</output_language>
+
+<task>
+Write the content for section "{{sectionTitle}}".
+
+CRITICAL INSTRUCTIONS:
+1. DO NOT repeat the lesson title or introduction
+2. Create a SMOOTH TRANSITION from the previous context
+3. Use the reference material to inform your content
+4. Apply depth guidance: {{depthGuidance}}
+5. Match the {{tone}} tone for {{targetAudience}} audience
+
+Content Requirements:
+- Cover all key points from the specification
+- Naturally incorporate keywords: {{requiredKeywords}}
+- Avoid prohibited terms: {{prohibitedTerms}}
+- Match content archetype: {{contentArchetype}}
+
+Visual Enhancement (REQUIRED):
+- Include at least ONE visual element (diagram, table, callout, or code block)
+- Use visuals that enhance understanding, not decoration
+
+Practical Examples:
+- Include concrete examples using callout format:
+  > [!INFO]
+  > **Example: [Situation Name]**
+  > [Specific details, 2-4 sentences]
+
+Output markdown content for this section only (no header needed).
+</task>`,
+    variables: [
+      {
+        name: 'lessonTitle',
+        description: 'Lesson title',
+        required: true,
+      },
+      {
+        name: 'targetAudience',
+        description: 'Target audience',
+        required: true,
+      },
+      {
+        name: 'tone',
+        description: 'Content tone',
+        required: true,
+      },
+      {
+        name: 'difficulty',
+        description: 'Difficulty level',
+        required: true,
+      },
+      {
+        name: 'sectionTitle',
+        description: 'Section title to generate',
+        required: true,
+      },
+      {
+        name: 'contentArchetype',
+        description: 'Content archetype',
+        required: true,
+      },
+      {
+        name: 'depth',
+        description: 'Content depth (summary, detailed_analysis, comprehensive)',
+        required: true,
+      },
+      {
+        name: 'depthGuidance',
+        description: 'Human-readable depth guidance',
+        required: true,
+      },
+      {
+        name: 'keyPoints',
+        description: 'Formatted key points list',
+        required: true,
+      },
+      {
+        name: 'requiredKeywords',
+        description: 'Comma-separated required keywords',
+        required: false,
+      },
+      {
+        name: 'prohibitedTerms',
+        description: 'Comma-separated prohibited terms',
+        required: false,
+      },
+      {
+        name: 'ragContext',
+        description: 'XML-formatted RAG context',
+        required: false,
+      },
+      {
+        name: 'previousContext',
+        description: 'Last ~5000 chars of generated content for transition context',
+        required: true,
+      },
+      {
+        name: 'outputLanguage',
+        description: 'Target language for all output content (e.g., "English", "Russian")',
+        required: true,
+        example: 'English',
+      },
+    ],
+  },
+  {
+    stage: 'stage_6',
+    promptKey: 'stage6_planner',
+    promptName: 'Stage 6 - Planner: Lesson Outline Generation [DEPRECATED]',
+    promptDescription:
+      '[DEPRECATED - Stage 6 refactored from 6-node to 3-node pipeline] Generates detailed lesson outline from specification. Uses Context-First XML strategy with lesson context, learning objectives, RAG context, and visual planning.',
     promptTemplate: `<lesson_context>
   <metadata>
     <lesson_id>{{lessonId}}</lesson_id>
@@ -832,9 +1014,9 @@ Format as markdown outline. Target total reading time: {{durationMinutes}} minut
   {
     stage: 'stage_6',
     promptKey: 'stage6_expander',
-    promptName: 'Stage 6 - Expander: Section Content Expansion',
+    promptName: 'Stage 6 - Expander: Section Content Expansion [DEPRECATED]',
     promptDescription:
-      'Expands a single section from outline into full content. Uses content archetype, depth guidance, RAG context, and visual toolkit for engaging content.',
+      '[DEPRECATED - Stage 6 refactored from 6-node to 3-node pipeline] Expands a single section from outline into full content. Uses content archetype, depth guidance, RAG context, and visual toolkit for engaging content.',
     promptTemplate: `<lesson_context>
   <metadata>
     <lesson_title>{{lessonTitle}}</lesson_title>
@@ -1016,9 +1198,9 @@ Output as markdown. Do NOT include the section title as a header.
   {
     stage: 'stage_6',
     promptKey: 'stage6_assembler',
-    promptName: 'Stage 6 - Assembler: Content Assembly',
+    promptName: 'Stage 6 - Assembler: Content Assembly [DEPRECATED]',
     promptDescription:
-      'Assembles expanded sections into cohesive lesson with introduction, transitions, exercises, and conclusion. Preserves all visual elements.',
+      '[DEPRECATED - Stage 6 refactored from 6-node to 3-node pipeline] Assembles expanded sections into cohesive lesson with introduction, transitions, exercises, and conclusion. Preserves all visual elements.',
     promptTemplate: `<lesson_context>
   <metadata>
     <title>{{lessonTitle}}</title>
@@ -1145,9 +1327,9 @@ Output as complete markdown lesson.
   {
     stage: 'stage_6',
     promptKey: 'stage6_smoother',
-    promptName: 'Stage 6 - Smoother: Transition Refinement',
+    promptName: 'Stage 6 - Smoother: Transition Refinement [DEPRECATED]',
     promptDescription:
-      'Polishes assembled content with improved transitions, consistent tone, and refined prose. Does NOT change structure or technical content.',
+      '[DEPRECATED - Stage 6 refactored from 6-node to 3-node pipeline] Polishes assembled content with improved transitions, consistent tone, and refined prose. Does NOT change structure or technical content.',
     promptTemplate: `<lesson_context>
   <metadata>
     <title>{{lessonTitle}}</title>

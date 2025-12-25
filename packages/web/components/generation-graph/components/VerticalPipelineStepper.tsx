@@ -11,9 +11,25 @@ import {
   STAGE6_NODE_LABELS,
   Stage6NodeStatus
 } from '@megacampus/shared-types';
+import type { ProgressSummary } from '@megacampus/shared-types/judge-types';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import { ProgressSummaryDisplay } from './ProgressSummaryDisplay';
+import { ErrorBoundary } from 'react-error-boundary';
+
+// =============================================================================
+// Error Boundary Fallback
+// =============================================================================
+
+function NodeOutputErrorFallback({ error }: { error: Error }) {
+  return (
+    <div className="text-xs text-red-500 dark:text-red-400 p-2 rounded bg-red-50 dark:bg-red-900/20">
+      <span className="font-medium">Ошибка отображения:</span>{' '}
+      <span className="text-slate-600 dark:text-slate-400">{error.message}</span>
+    </div>
+  );
+}
 
 // =============================================================================
 // Props & Types
@@ -66,6 +82,24 @@ function formatCost(costUsd: number): string {
 function formatDuration(durationMs: number): string {
   const seconds = (durationMs / 1000).toFixed(1);
   return `${seconds}с`;
+}
+
+/** Labels for judge criteria scores (Russian) */
+const CRITERION_LABELS: Record<string, string> = {
+  coherence: 'Связность',
+  accuracy: 'Точность',
+  completeness: 'Полнота',
+  readability: 'Читаемость',
+};
+
+/**
+ * Format criterion score as percentage with label
+ * Returns null if value is undefined
+ */
+function formatCriterionScore(key: string, value: number | undefined): React.ReactNode {
+  if (value === undefined) return null;
+  const label = CRITERION_LABELS[key] || key;
+  return <span key={key}>{label}: {Math.round(value * 100)}%</span>;
 }
 
 /**
@@ -134,7 +168,7 @@ interface JudgeVote {
   judgeId?: string;
   modelId?: string;
   modelDisplayName?: string;
-  verdict?: 'accept' | 'reject' | 'revise' | 'ACCEPT' | 'REJECT' | 'TARGETED_FIX' | 'ITERATIVE_REFINEMENT' | 'REGENERATE' | 'ESCALATE_TO_HUMAN';
+  verdict?: 'accept' | 'reject' | 'revise' | 'ACCEPT' | 'REJECT' | 'ACCEPT_WITH_MINOR_REVISION' | 'ITERATIVE_REFINEMENT' | 'REGENERATE' | 'ESCALATE_TO_HUMAN';
   score?: number;
   confidence?: number;
   reasoning?: string;
@@ -358,7 +392,7 @@ function getVerdictLabel(verdict?: string): string {
     ACCEPT: 'Принято',
     REJECT: 'Отклонено',
     REVISE: 'Требует правок',
-    TARGETED_FIX: 'Требует правок',
+    ACCEPT_WITH_MINOR_REVISION: 'Точечное исправление',
     ITERATIVE_REFINEMENT: 'Итеративная доработка',
     REGENERATE: 'Переделать',
     ESCALATE_TO_HUMAN: 'Ручная проверка',
@@ -377,7 +411,7 @@ function getVerdictColorClass(verdict?: string): string {
     ACCEPT: 'text-emerald-600 dark:text-emerald-400',
     REJECT: 'text-red-600 dark:text-red-400',
     REVISE: 'text-amber-600 dark:text-amber-400',
-    TARGETED_FIX: 'text-amber-600 dark:text-amber-400',
+    ACCEPT_WITH_MINOR_REVISION: 'text-yellow-600 dark:text-yellow-400',
     ITERATIVE_REFINEMENT: 'text-orange-600 dark:text-orange-400',
     REGENERATE: 'text-red-600 dark:text-red-400',
     ESCALATE_TO_HUMAN: 'text-purple-600 dark:text-purple-400',
@@ -612,21 +646,13 @@ function JudgeOutputDisplay({ output, isLoading = false }: JudgeOutputDisplayPro
                   ) : null}
                 </div>
 
-                {/* Criteria breakdown */}
+                {/* Criteria breakdown - using helper for DRY */}
                 {vote.criteria ? (
                   <div className="mt-1 grid grid-cols-2 gap-1 text-xs text-slate-500 dark:text-slate-400">
-                    {vote.criteria.coherence !== undefined ? (
-                      <span>Связность: {Math.round(vote.criteria.coherence * 100)}%</span>
-                    ) : null}
-                    {vote.criteria.accuracy !== undefined ? (
-                      <span>Точность: {Math.round(vote.criteria.accuracy * 100)}%</span>
-                    ) : null}
-                    {vote.criteria.completeness !== undefined ? (
-                      <span>Полнота: {Math.round(vote.criteria.completeness * 100)}%</span>
-                    ) : null}
-                    {vote.criteria.readability !== undefined ? (
-                      <span>Читаемость: {Math.round(vote.criteria.readability * 100)}%</span>
-                    ) : null}
+                    {formatCriterionScore('coherence', vote.criteria.coherence)}
+                    {formatCriterionScore('accuracy', vote.criteria.accuracy)}
+                    {formatCriterionScore('completeness', vote.criteria.completeness)}
+                    {formatCriterionScore('readability', vote.criteria.readability)}
                   </div>
                 ) : null}
 
@@ -709,14 +735,154 @@ function JudgeOutputDisplay({ output, isLoading = false }: JudgeOutputDisplayPro
 }
 
 /**
+ * SelfReviewer output structure
+ */
+interface SelfReviewerOutput {
+  status?: string;
+  issuesCount?: number;
+  criticalIssuesCount?: number;
+  heuristicsPassed?: boolean;
+  heuristicDetails?: {
+    languageCheck?: {
+      passed: boolean;
+      foreignCharCount?: number;
+      threshold?: number;
+    };
+    truncationCheck?: {
+      passed: boolean;
+      hasEndMarker?: boolean;
+      unexpectedEnd?: boolean;
+    };
+  };
+  progressSummary?: unknown;
+}
+
+/**
+ * Render human-readable output for SelfReviewer stage
+ */
+function SelfReviewerOutputDisplay({ output }: { output: SelfReviewerOutput }) {
+  const statusLabel = output.status === 'PASS'
+    ? 'Пройдено'
+    : output.status === 'PASS_WITH_FLAGS'
+      ? 'Пройдено с замечаниями'
+      : output.status === 'REGENERATE'
+        ? 'Требует перегенерации'
+        : output.status || 'Неизвестно';
+
+  const statusColor = output.status === 'PASS'
+    ? 'text-emerald-600 dark:text-emerald-400'
+    : output.status === 'PASS_WITH_FLAGS'
+      ? 'text-amber-600 dark:text-amber-400'
+      : output.status === 'REGENERATE'
+        ? 'text-red-600 dark:text-red-400'
+        : 'text-slate-600 dark:text-slate-400';
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-2 text-slate-700 dark:text-slate-300">
+        <CheckCircle2 className="w-4 h-4 text-cyan-500" />
+        <span className="text-sm font-medium">Самопроверка</span>
+      </div>
+
+      {/* Status */}
+      <div className="flex items-center gap-2 text-xs">
+        <span className="text-slate-600 dark:text-slate-400">Статус:</span>
+        <span className={cn('font-semibold', statusColor)}>{statusLabel}</span>
+      </div>
+
+      {/* Issue counts */}
+      {(output.issuesCount !== undefined || output.criticalIssuesCount !== undefined) && (
+        <div className="grid grid-cols-2 gap-2 text-xs">
+          {output.issuesCount !== undefined && (
+            <div className="bg-slate-50 dark:bg-slate-800/50 rounded-lg p-2">
+              <div className="text-slate-600 dark:text-slate-400 font-medium">Всего проблем</div>
+              <div className="text-slate-900 dark:text-slate-100 font-mono">{output.issuesCount}</div>
+            </div>
+          )}
+          {output.criticalIssuesCount !== undefined && (
+            <div className={cn(
+              'rounded-lg p-2',
+              output.criticalIssuesCount > 0
+                ? 'bg-red-50 dark:bg-red-900/20'
+                : 'bg-emerald-50 dark:bg-emerald-900/20'
+            )}>
+              <div className={cn(
+                'font-medium',
+                output.criticalIssuesCount > 0
+                  ? 'text-red-600 dark:text-red-400'
+                  : 'text-emerald-600 dark:text-emerald-400'
+              )}>
+                Критических
+              </div>
+              <div className="text-slate-900 dark:text-slate-100 font-mono">
+                {output.criticalIssuesCount}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Heuristic details */}
+      {output.heuristicDetails && (
+        <div className="space-y-1 text-xs">
+          {output.heuristicDetails.languageCheck && (
+            <div className="flex items-center gap-2">
+              {output.heuristicDetails.languageCheck.passed ? (
+                <CheckCircle2 className="w-3 h-3 text-emerald-500" />
+              ) : (
+                <AlertCircle className="w-3 h-3 text-amber-500" />
+              )}
+              <span className="text-slate-600 dark:text-slate-400">
+                Проверка языка: {output.heuristicDetails.languageCheck.passed ? 'OK' : 'Замечания'}
+              </span>
+            </div>
+          )}
+          {output.heuristicDetails.truncationCheck && (
+            <div className="flex items-center gap-2">
+              {output.heuristicDetails.truncationCheck.passed ? (
+                <CheckCircle2 className="w-3 h-3 text-emerald-500" />
+              ) : (
+                <AlertCircle className="w-3 h-3 text-red-500" />
+              )}
+              <span className="text-slate-600 dark:text-slate-400">
+                Проверка целостности: {output.heuristicDetails.truncationCheck.passed ? 'OK' : 'Обрезан'}
+              </span>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Heuristics passed badge */}
+      {output.heuristicsPassed !== undefined && (
+        <Badge
+          variant="outline"
+          className={cn(
+            'text-xs',
+            output.heuristicsPassed
+              ? 'border-emerald-400 text-emerald-600 dark:text-emerald-400'
+              : 'border-red-400 text-red-600 dark:text-red-400'
+          )}
+        >
+          {output.heuristicsPassed ? 'Эвристики пройдены' : 'Эвристики не пройдены'}
+        </Badge>
+      )}
+    </div>
+  );
+}
+
+/**
  * Check if we have a specialized display for this node type
+ * New 3-node pipeline: generator, selfReviewer, judge
+ * Legacy nodes are included for backward compatibility with old trace data
  */
 function hasSpecializedDisplay(node: Stage6NodeName): boolean {
-  return ['planner', 'expander', 'assembler', 'smoother', 'judge'].includes(node);
+  return ['generator', 'selfReviewer', 'judge', 'planner', 'expander', 'assembler', 'smoother'].includes(node);
 }
 
 /**
  * Render human-readable output based on node type
+ * New 3-node pipeline: generator, selfReviewer, judge
+ * Legacy nodes are kept for backward compatibility with old trace data
  */
 function NodeOutputDisplay({ node, output }: { node: Stage6NodeName; output: unknown }) {
   if (!output || typeof output !== 'object') {
@@ -724,6 +890,14 @@ function NodeOutputDisplay({ node, output }: { node: Stage6NodeName; output: unk
   }
 
   switch (node) {
+    // New generator node (combines planner + expander + assembler + smoother)
+    case 'generator':
+      // Generator output is similar to smoother output (final content)
+      return <SmootherOutputDisplay output={output as SmootherOutput} />;
+    // New selfReviewer node (heuristic pre-checks)
+    case 'selfReviewer':
+      return <SelfReviewerOutputDisplay output={output as SelfReviewerOutput} />;
+    // Legacy nodes for backward compatibility with old logs
     case 'planner':
       return <PlannerOutputDisplay output={output as PlannerOutput} />;
     case 'expander':
@@ -752,16 +926,34 @@ function NodeOutputDisplayWithFallback({ node, output }: { node: Stage6NodeName;
     );
   }
 
+  // Extract progressSummary if present
+  const outputObj = output as Record<string, unknown>;
+  const progressSummary = outputObj?.progressSummary as ProgressSummary | undefined;
+
   // If we have a specialized display for this node, use it
   if (hasSpecializedDisplay(node) && typeof output === 'object') {
-    return <NodeOutputDisplay node={node} output={output} />;
+    return (
+      <div className="space-y-4">
+        {/* Show progress summary first if available */}
+        {progressSummary && (
+          <ProgressSummaryDisplay progressSummary={progressSummary} />
+        )}
+        {/* Then show specialized output display */}
+        <NodeOutputDisplay node={node} output={output} />
+      </div>
+    );
   }
 
-  // Fallback: show raw JSON for unknown node types
+  // Fallback: show progress summary + raw JSON for unknown node types
   return (
-    <pre className="text-xs text-slate-700 dark:text-slate-300 overflow-x-auto max-h-48 overflow-y-auto">
-      {JSON.stringify(output, null, 2)}
-    </pre>
+    <div className="space-y-4">
+      {progressSummary && (
+        <ProgressSummaryDisplay progressSummary={progressSummary} />
+      )}
+      <pre className="text-xs text-slate-700 dark:text-slate-300 overflow-x-auto max-h-48 overflow-y-auto">
+        {JSON.stringify(output, null, 2)}
+      </pre>
+    </div>
   );
 }
 
@@ -960,8 +1152,10 @@ function PipelineNodeCard({ node, isActive, onRetry, onViewOutput }: PipelineNod
                 </Accordion.Header>
                 <Accordion.Content className="overflow-hidden data-[state=open]:animate-accordion-down data-[state=closed]:animate-accordion-up">
                   <div className="mt-2 p-3 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-slate-200 dark:border-slate-700">
-                    {/* Human-readable output display or fallback JSON */}
-                    <NodeOutputDisplayWithFallback node={node.node} output={node.output} />
+                    {/* Human-readable output display with error boundary */}
+                    <ErrorBoundary FallbackComponent={NodeOutputErrorFallback}>
+                      <NodeOutputDisplayWithFallback node={node.node} output={node.output} />
+                    </ErrorBoundary>
 
                     {/* View full output button */}
                     {onViewOutput ? (
@@ -1057,8 +1251,8 @@ export function VerticalPipelineStepper({
   onViewOutput,
   className,
 }: VerticalPipelineStepperProps) {
-  // Sort nodes in pipeline order
-  const nodeOrder: Stage6NodeName[] = ['planner', 'expander', 'assembler', 'smoother', 'judge'];
+  // Sort nodes in pipeline order (new 3-node pipeline)
+  const nodeOrder: Stage6NodeName[] = ['generator', 'selfReviewer', 'judge'];
   const sortedNodes = nodeOrder.map(nodeName =>
     nodes.find(n => n.node === nodeName) || {
       node: nodeName,

@@ -96,11 +96,13 @@ export const LessonInspectorLayout: React.FC<LessonInspectorLayoutProps> = ({
         direction="horizontal"
         className="flex-1 min-h-0"
       >
-        {/* Left Panel: Pipeline (35%) */}
+        {/* Left Panel: Pipeline (collapsible, default 30%) */}
         <ResizablePanel
-          defaultSize={35}
-          minSize={25}
+          defaultSize={30}
+          minSize={15}
           maxSize={50}
+          collapsible={true}
+          collapsedSize={0}
           className="bg-slate-50 dark:bg-slate-800/50"
         >
           <div className="h-full overflow-y-auto" data-testid="pipeline-panel">
@@ -110,10 +112,10 @@ export const LessonInspectorLayout: React.FC<LessonInspectorLayoutProps> = ({
 
         <ResizableHandle withHandle />
 
-        {/* Right Panel: Content Preview (65%) */}
+        {/* Right Panel: Content Preview (70%, expands when left collapsed) */}
         <ResizablePanel
-          defaultSize={65}
-          minSize={30}
+          defaultSize={70}
+          minSize={50}
           className="bg-white dark:bg-slate-900"
         >
           <div className="h-full overflow-hidden" data-testid="content-panel">

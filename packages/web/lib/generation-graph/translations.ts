@@ -10,6 +10,7 @@ export const GRAPH_TRANSLATIONS: GraphTranslations & {
   stage3?: Record<string, { ru: string; en: string }>;
   stage4?: Record<string, { ru: string; en: string }>;
   stage5?: Record<string, { ru: string; en: string }>;
+  stage6?: Record<string, Record<string, { ru: string; en: string }>>;
   stageDescriptions?: Record<string, { ru: string; en: string }>;
 } = {
   stages: {
@@ -777,11 +778,9 @@ export const GRAPH_TRANSLATIONS: GraphTranslations & {
     courseLanguage: { ru: 'Язык', en: 'Language' },
     userInstructions: { ru: 'Инструкции', en: 'Instructions' },
 
-    // Generation params
-    generationParams: { ru: 'Параметры генерации', en: 'Generation Parameters' },
-    batchSize: { ru: 'Размер батча', en: 'Batch Size' },
-    qualityThreshold: { ru: 'Порог качества', en: 'Quality Threshold' },
-    minLessons: { ru: 'Мин. уроков', en: 'Min Lessons' },
+    // Model info
+    modelInfo: { ru: 'Модель', en: 'Model' },
+    modelTier: { ru: 'AI Модель', en: 'AI Model' },
 
     // === PROCESS TAB ===
     forgePipeline: { ru: 'Конвейер сборки', en: 'Assembly Pipeline' },
@@ -871,5 +870,105 @@ export const GRAPH_TRANSLATIONS: GraphTranslations & {
     // Error states
     errorGeneration: { ru: 'Ошибка генерации', en: 'Generation Error' },
     retryGeneration: { ru: 'Повторить генерацию', en: 'Retry Generation' },
+  },
+  stage6: {
+    // === CONTROL TOWER ===
+    controlTower: {
+      title: { ru: 'Модуль', en: 'Module' },
+      tokensUsed: { ru: 'Токены', en: 'Tokens' },
+      avgQuality: { ru: 'Качество', en: 'Quality' },
+      quality: { ru: 'Качество', en: 'Quality' },
+      time: { ru: 'Время', en: 'Time' },
+      timeElapsed: { ru: 'Время', en: 'Time' },
+      ready: { ru: 'готово', en: 'ready' },
+      lessonsReady: { ru: 'Готово', en: 'Ready' },
+      remaining: { ru: 'осталось', en: 'left' },
+      improvement: { ru: '+3%', en: '+3%' },
+      regenerateAll: { ru: 'Перегенерировать всё', en: 'Regenerate All' },
+      exportAll: { ru: 'Экспорт', en: 'Export' },
+    },
+
+    // === LESSON CARD ===
+    lessonCard: {
+      stepProgress: { ru: 'Шаг', en: 'Step' },
+      tokens: { ru: 'Т', en: 'T' },
+    },
+
+    // === INSPECTOR TABS ===
+    tabs: {
+      preview: { ru: 'Просмотр', en: 'Preview' },
+      quality: { ru: 'Качество', en: 'Quality' },
+      blueprint: { ru: 'Спецификация', en: 'Blueprint' },
+      trace: { ru: 'Трейс', en: 'Trace' },
+    },
+
+    // === STATS STRIP ===
+    statsStrip: {
+      tokens: { ru: 'Токены', en: 'Tokens' },
+      time: { ru: 'Время', en: 'Time' },
+      quality: { ru: 'Качество', en: 'Quality' },
+      tier: { ru: 'Модель', en: 'Model' },
+    },
+
+    // === PIPELINE NODES ===
+    // New 3-node pipeline: generator, selfReviewer, judge
+    // Legacy nodes kept for backward compatibility with old logs
+    nodes: {
+      generator: { ru: 'Генератор', en: 'Generator' },
+      selfReviewer: { ru: 'Самопроверка', en: 'Self-Review' },
+      judge: { ru: 'Арбитр', en: 'Judge' },
+      // Legacy nodes for backward compatibility
+      planner: { ru: 'Планировщик', en: 'Planner' },
+      expander: { ru: 'Расширитель', en: 'Expander' },
+      assembler: { ru: 'Сборщик', en: 'Assembler' },
+      smoother: { ru: 'Шлифовщик', en: 'Smoother' },
+    },
+
+    // === QUALITY TAB - GATE 1 (SELF-REVIEW) ===
+    selfReview: {
+      gateTitle: { ru: 'Автокоррекция', en: 'Auto-Correction' },
+      passed: { ru: 'Проверка пройдена', en: 'Review Passed' },
+      noIssues: { ru: 'Проблем не найдено', en: 'No issues found' },
+      fixed: { ru: 'Исправлено автоматически', en: 'Auto-Fixed' },
+      issuesFixed: { ru: 'исправлено', en: 'issues corrected' },
+      viewDiff: { ru: 'Показать изменения', en: 'View Changes' },
+      flagged: { ru: 'Требует внимания', en: 'Needs Review' },
+      regenerate: { ru: 'Требуется перегенерация', en: 'Regeneration Required' },
+    },
+
+    // === QUALITY TAB - GATE 2 (JUDGE) ===
+    judge: {
+      gateTitle: { ru: 'Финальная оценка', en: 'Final Assessment' },
+      depth: { ru: 'Глубина', en: 'Depth' },
+      clarity: { ru: 'Ясность', en: 'Clarity' },
+      style: { ru: 'Стиль', en: 'Style' },
+      critique: { ru: 'Комментарий', en: 'Critique' },
+    },
+
+    // === BLUEPRINT TAB ===
+    blueprint: {
+      learningObjectives: { ru: 'Цели обучения', en: 'Learning Objectives' },
+      prerequisites: { ru: 'Пререквизиты', en: 'Prerequisites' },
+      targetAudience: { ru: 'Целевая аудитория', en: 'Target Audience' },
+      estimatedDuration: { ru: 'Длительность', en: 'Duration' },
+      lessonType: { ru: 'Тип урока', en: 'Lesson Type' },
+    },
+
+    // === ACTIONS ===
+    actions: {
+      approve: { ru: 'Одобрить', en: 'Approve' },
+      approving: { ru: 'Одобрение...', en: 'Approving...' },
+      regenerate: { ru: 'Пересоздать', en: 'Regenerate' },
+      regenerating: { ru: 'Пересоздание...', en: 'Regenerating...' },
+      edit: { ru: 'Редактировать', en: 'Edit' },
+    },
+
+    // === STATUS ===
+    status: {
+      completed: { ru: 'готово', en: 'completed' },
+      active: { ru: 'в работе', en: 'active' },
+      pending: { ru: 'ожидает', en: 'pending' },
+      failed: { ru: 'ошибка', en: 'failed' },
+    },
   },
 };

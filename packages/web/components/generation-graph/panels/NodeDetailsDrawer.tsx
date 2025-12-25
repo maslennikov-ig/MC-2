@@ -650,6 +650,9 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
                     <Stage5ProcessTab
                       courseId={courseInfo.id}
                       status={displayData?.status as 'pending' | 'active' | 'completed' | 'error' | undefined}
+                      outputData={displayData?.outputData}
+                      processingTimeMs={displayData?.duration}
+                      totalTokens={displayData?.tokens}
                     />
                   ) : (
                     <ProcessTab

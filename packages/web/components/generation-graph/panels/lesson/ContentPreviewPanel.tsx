@@ -269,13 +269,13 @@ export function ContentPreviewPanel({
                   className={cn(
                     'text-xs',
                     judgeResult.votingResult.finalVerdict === 'ACCEPT' && 'bg-emerald-50 dark:bg-emerald-900/20 text-emerald-700 dark:text-emerald-300 border-emerald-300 dark:border-emerald-700',
-                    judgeResult.votingResult.finalVerdict === 'TARGETED_FIX' && 'bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-300 border-yellow-300 dark:border-yellow-700',
+                    judgeResult.votingResult.finalVerdict === 'ACCEPT_WITH_MINOR_REVISION' && 'bg-yellow-50 dark:bg-yellow-900/20 text-yellow-700 dark:text-yellow-300 border-yellow-300 dark:border-yellow-700',
                     judgeResult.votingResult.finalVerdict === 'ITERATIVE_REFINEMENT' && 'bg-orange-50 dark:bg-orange-900/20 text-orange-700 dark:text-orange-300 border-orange-300 dark:border-orange-700',
                     judgeResult.votingResult.finalVerdict === 'REGENERATE' && 'bg-red-50 dark:bg-red-900/20 text-red-700 dark:text-red-300 border-red-300 dark:border-red-700',
                     judgeResult.votingResult.finalVerdict === 'ESCALATE_TO_HUMAN' && 'bg-purple-50 dark:bg-purple-900/20 text-purple-700 dark:text-purple-300 border-purple-300 dark:border-purple-700'
                   )}
                 >
-                  {JUDGE_VERDICT_LABELS[judgeResult.votingResult.finalVerdict].ru}
+                  {JUDGE_VERDICT_LABELS[judgeResult.votingResult.finalVerdict]?.ru ?? String(judgeResult.votingResult.finalVerdict).replace(/_/g, ' ')}
                   {' '}
                   ({Math.round(judgeResult.votingResult.finalScore * 100)}%)
                 </Badge>

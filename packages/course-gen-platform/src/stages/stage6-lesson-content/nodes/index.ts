@@ -4,8 +4,8 @@
  *
  * Exports all LangGraph nodes for the lesson content generation pipeline.
  *
- * Pipeline flow:
- * Planner -> Expander -> Assembler -> Smoother -> (Judge)
+ * Pipeline flow (simplified):
+ * Generator -> SelfReviewer -> (Judge)
  *
  * Each node:
  * - Takes LessonGraphStateType as input
@@ -14,10 +14,12 @@
  * - Adds errors to state.errors on failure
  */
 
-export { plannerNode } from './planner';
-export { expanderNode } from './expander';
-export { assemblerNode } from './assembler';
-export { smootherNode } from './smoother';
+// Active nodes
+export { generatorNode } from './generator';
+export { selfReviewerNode } from './self-reviewer-node';
+
+// Note: Deprecated nodes (planner, expander, assembler, smoother) have been removed.
+// See specs/023-stage6-architecture-simplification/ for migration details.
 
 /**
  * Node function type for LangGraph integration

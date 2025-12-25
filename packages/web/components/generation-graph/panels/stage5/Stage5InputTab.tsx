@@ -7,7 +7,6 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   FileText,
   Cpu,
-  Coins,
   Users,
   Palette,
   BookOpen,
@@ -110,24 +109,32 @@ export const Stage5InputTab = memo<Stage5InputTabProps>(function Stage5InputTab(
         }
 
         if (courseData) {
-          // Parse analysis_result from Stage 4
+          // Parse analysis_result from Stage 4 (uses snake_case from AnalysisResult type)
           let parsedAnalysisResult: Stage5InputData['analysisResult'] | null = null;
           if (courseData.analysis_result && typeof courseData.analysis_result === 'object') {
             const ar = courseData.analysis_result as Record<string, unknown>;
+            // Real paths from AnalysisResult type (shared-types)
             const courseCategory = ar.course_category as Record<string, unknown> | undefined;
-            const scopeRec = ar.scope_recommendation as Record<string, unknown> | undefined;
-            const pedagogyRec = ar.pedagogical_recommendation as Record<string, unknown> | undefined;
+            const recommendedStructure = ar.recommended_structure as Record<string, unknown> | undefined;
+            const pedagogicalStrategy = ar.pedagogical_strategy as Record<string, unknown> | undefined;
             const topicAnalysis = ar.topic_analysis as Record<string, unknown> | undefined;
 
+            // Get total_lessons from recommended_structure
+            const totalLessons = (recommendedStructure?.total_lessons as number) || 10;
+            const totalSections = (recommendedStructure?.total_sections as number) || 1;
+
             parsedAnalysisResult = {
-              courseCategory: (courseCategory?.category as string) || 'Unknown',
+              // Use 'primary' not 'category' - real AnalysisResult structure
+              courseCategory: (courseCategory?.primary as string) || 'professional',
               confidence: (courseCategory?.confidence as number) || 0,
-              totalLessons: (scopeRec?.total_lessons as number) || 10,
+              totalLessons,
               lessonsRange: {
-                min: (scopeRec?.lessons_min as number) || 5,
-                max: (scopeRec?.lessons_max as number) || 15,
+                // Calculate approximate min/max based on sections
+                min: Math.max(10, totalLessons - totalSections * 2),
+                max: totalLessons + totalSections * 2,
               },
-              teachingStyle: (pedagogyRec?.teaching_style as string) || 'mixed',
+              // Use 'pedagogical_strategy.teaching_style' - real path
+              teachingStyle: (pedagogicalStrategy?.teaching_style as string) || 'mixed',
               topicAnalysis: topicAnalysis
                 ? {
                     complexity: (topicAnalysis.complexity as string) || 'intermediate',
@@ -314,65 +321,27 @@ export const Stage5InputTab = memo<Stage5InputTabProps>(function Stage5InputTab(
       </Card>
 
       {/* ============================================================
-          Card C: Generation Parameters (40% = 2/5 columns)
+          Card C: Model Information (40% = 2/5 columns)
           ============================================================ */}
       <Card className="col-span-2">
         <CardHeader className="pb-3">
           <CardTitle className="text-sm font-medium text-muted-foreground">
-            {t?.generationParams?.[locale] || 'Generation Parameters'}
+            {t?.modelInfo?.[locale] || 'Model'}
           </CardTitle>
         </CardHeader>
-        <CardContent className="space-y-4">
-          {/* Batch Size */}
+        <CardContent>
+          {/* Model (tier-based naming) */}
           <div className="flex items-center justify-between p-3 rounded-lg bg-orange-50/50 dark:bg-orange-950/20">
             <div className="flex items-center gap-2">
               <Cpu className="h-4 w-4 text-orange-500" aria-hidden="true" />
-              <span className="text-sm">{t?.batchSize?.[locale] || 'Batch Size'}</span>
+              <span className="text-sm">{t?.modelTier?.[locale] || 'AI Model'}</span>
             </div>
             <Badge
               variant="outline"
               className="font-mono bg-orange-100 text-orange-700 border-orange-300 dark:bg-orange-900/40 dark:text-orange-400 dark:border-orange-700"
             >
-              {generationParams?.batchSize || 4}
+              {getTierModelName(generationParams?.tier, locale)}
             </Badge>
-          </div>
-
-          {/* Quality Threshold */}
-          <div className="flex items-center justify-between p-3 rounded-lg bg-amber-50/50 dark:bg-amber-950/20">
-            <div className="flex items-center gap-2">
-              <Coins className="h-4 w-4 text-amber-500" aria-hidden="true" />
-              <span className="text-sm">{t?.qualityThreshold?.[locale] || 'Quality Threshold'}</span>
-            </div>
-            <Badge
-              variant="outline"
-              className="font-mono bg-amber-100 text-amber-700 border-amber-300 dark:bg-amber-900/40 dark:text-amber-400 dark:border-amber-700"
-            >
-              {generationParams?.qualityThreshold ? Math.round(generationParams.qualityThreshold * 100) : 70}%
-            </Badge>
-          </div>
-
-          {/* Min Lessons */}
-          <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
-            <div className="flex items-center gap-2">
-              <BookOpen className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-              <span className="text-sm">{t?.minLessons?.[locale] || 'Min Lessons'}</span>
-            </div>
-            <Badge variant="secondary" className="text-xs">
-              {generationParams?.minLessons || 10}
-            </Badge>
-          </div>
-
-          {/* Model (tier-based naming) */}
-          <div className="pt-4 border-t border-border/50">
-            <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
-              <div className="flex items-center gap-2">
-                <Cpu className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-                <span className="text-sm">{GRAPH_TRANSLATIONS.stage4?.modelUsed?.[locale] || 'Model'}</span>
-              </div>
-              <Badge variant="secondary" className="text-xs">
-                {getTierModelName(generationParams?.tier, locale)}
-              </Badge>
-            </div>
           </div>
         </CardContent>
       </Card>
