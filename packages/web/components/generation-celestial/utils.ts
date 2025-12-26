@@ -2,6 +2,7 @@ import { GenerationProgress } from '@/types/course-generation';
 
 // Re-defining GenerationTrace here to avoid importing from a component file
 // Ideally this should be moved to a shared types file
+// Note: input_data/output_data are optional for skeleton traces (lazy loading pattern)
 export type GenerationTrace = {
   id: string;
   course_id: string;
@@ -10,9 +11,9 @@ export type GenerationTrace = {
   phase: string;
   step_name: string;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  input_data: any;
+  input_data?: any;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  output_data: any;
+  output_data?: any;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   error_data?: any;
   model_used?: string;

@@ -330,6 +330,7 @@ export function updatePhasesMap(
         phaseName,
         status: phaseStatus,
         timestamp: new Date(latestTrace.created_at),
+        traceId: latestTrace.id, // Store trace ID for lazy loading
         inputData: latestTrace.input_data || undefined,
         outputData: latestTrace.output_data || undefined,
         processMetrics: {

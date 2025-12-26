@@ -803,6 +803,10 @@ function GraphViewInner({ courseId, courseTitle, hasDocuments = true, failedAtSt
                   logger.devLog('[GraphView] onNodeDoubleClick', { nodeId: node.id, nodeType: node.type });
                   selectNode(node.id);
                 }}
+                onPaneClick={() => {
+                  // Close node details panel when clicking on empty canvas area
+                  deselectNode();
+                }}
                 onMoveStart={() => setIsInteracting(true)}
                 onMoveEnd={() => setIsInteracting(false)}
                 aria-label="Course generation pipeline graph"

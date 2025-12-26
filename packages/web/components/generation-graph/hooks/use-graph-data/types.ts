@@ -13,6 +13,8 @@ export interface PhaseData {
   status: NodeStatus;
   /** Phase start timestamp */
   timestamp: Date;
+  /** Original trace ID for lazy loading full data */
+  traceId: string;
   /** Input data for this phase */
   inputData?: Record<string, unknown>;
   /** Output data from this phase */

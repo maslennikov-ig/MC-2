@@ -13,7 +13,34 @@ const log = (...args: unknown[]): void => {
   if (isDev) console.log('[RealtimeProvider]', ...args);
 };
 
-// Define types locally for now as per plan
+// Lightweight trace for graph rendering (no heavy JSONB)
+// Uses idx_trace_skeleton for Index-Only Scan
+export type SkeletonTrace = {
+  id: string;
+  course_id: string;
+  lesson_id?: string;
+  stage: 'stage_1' | 'stage_2' | 'stage_3' | 'stage_4' | 'stage_5' | 'stage_6';
+  phase: string;
+  step_name: string;
+  duration_ms?: number;
+  tokens_used?: number;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  error_data?: any; // Keep for error detection
+  created_at: string;
+  retry_attempt?: number;
+  // Heavy fields NOT included: input_data, output_data, prompt_text, completion_text
+};
+
+// Critical trace with output_data (for Stage 4/5 complete phases)
+export type CriticalTrace = {
+  id: string;
+  stage: string;
+  phase: string;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  output_data: any;
+};
+
+// Full trace (for on-demand loading)
 export type GenerationTrace = {
   id: string;
   course_id: string;
@@ -22,9 +49,9 @@ export type GenerationTrace = {
   phase: string;
   step_name: string;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  input_data: any;
+  input_data?: any;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  output_data: any;
+  output_data?: any;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   error_data?: any;
   model_used?: string;
@@ -48,6 +75,8 @@ type GenerationRealtimeContextType = {
   selectedTraceId: string | null;
   setSelectedTraceId: (id: string | null) => void;
   refetch: () => Promise<void>;
+  /** Lazy load full trace data (input_data, output_data, etc.) for a specific trace */
+  fetchTraceDetails: (traceId: string) => Promise<GenerationTrace | null>;
 };
 
 const GenerationRealtimeContext = createContext<GenerationRealtimeContextType | undefined>(undefined);
@@ -75,7 +104,8 @@ export function GenerationRealtimeProvider({
     }
   }, [courseId]);
 
-  // Reusable fetch function
+  // Reusable fetch function - uses skeleton + critical data pattern
+  // This fetches ALL traces with lightweight columns, plus Stage 4/5 output_data
   const fetchTraces = useCallback(async () => {
     if (!courseId) return;
 
@@ -92,36 +122,74 @@ export function GenerationRealtimeProvider({
 
     log(' Fetching traces for courseId:', courseId, 'user:', session.user.id);
 
-    // Use returns<T[]>() to explicitly request array response
-    // This overrides any global Accept header that might request single object
-    // Limit increased from 100 to 500 to ensure Stage 4/5 complete phases
-    // are fetched even for courses with many Stage 6 lesson traces
-    const { data, error } = await supabase
-      .from('generation_trace')
-      .select('*')
-      .eq('course_id', courseId)
-      .order('created_at', { ascending: false })
-      .limit(500)
-      .returns<GenerationTrace[]>();
+    // Execute both queries in parallel for 2x faster load (~100ms vs ~200ms)
+    // Uses idx_trace_skeleton for skeleton query (Index-Only Scan)
+    // Uses idx_trace_critical_phases for critical query (partial index)
+    const skeletonColumns = 'id,course_id,lesson_id,stage,phase,step_name,duration_ms,tokens_used,error_data,created_at,retry_attempt';
 
-    if (error) {
-      console.error('[RealtimeProvider] Failed to fetch traces:', error);
+    const [skeletonResult, criticalResult] = await Promise.all([
+      // Query 1: Skeleton traces (ALL rows, lightweight columns only, ~100KB for 2000 rows)
+      supabase
+        .from('generation_trace')
+        .select(skeletonColumns)
+        .eq('course_id', courseId)
+        .order('created_at', { ascending: false })
+        .returns<SkeletonTrace[]>(),
+      // Query 2: Critical data (Stage 4/5 complete phases, ~2 rows, ~50KB)
+      supabase
+        .from('generation_trace')
+        .select('id, stage, phase, output_data')
+        .eq('course_id', courseId)
+        .in('stage', ['stage_4', 'stage_5'])
+        .eq('phase', 'complete')
+        .returns<CriticalTrace[]>(),
+    ]);
+
+    const { data: skeletonData, error: skeletonError } = skeletonResult;
+    const { data: criticalData, error: criticalError } = criticalResult;
+
+    if (skeletonError) {
+      console.error('[RealtimeProvider] Failed to fetch skeleton traces:', skeletonError);
       console.error('[RealtimeProvider] Error details:', {
-        message: error.message,
-        code: error.code,
-        details: error.details,
-        hint: error.hint,
+        message: skeletonError.message,
+        code: skeletonError.code,
+        details: skeletonError.details,
+        hint: skeletonError.hint,
       });
       return;
     }
 
-    log(' Fetched traces:', data?.length || 0, 'items');
+    if (criticalError) {
+      console.error('[RealtimeProvider] Failed to fetch critical traces:', criticalError);
+      // Continue with skeleton data even if critical fails
+    }
 
-    if (data && data.length > 0) {
-      setTraces(data);
+    log(' Fetched skeleton traces:', skeletonData?.length || 0, 'items');
+    log(' Fetched critical traces:', criticalData?.length || 0, 'items');
+
+    // Merge critical output_data into skeleton traces
+    const criticalMap = new Map(
+      (criticalData || []).map(t => [t.id, t.output_data])
+    );
+
+    const mergedTraces: GenerationTrace[] = (skeletonData || []).map(skeleton => ({
+      ...skeleton,
+      input_data: undefined,  // Will be lazy-loaded on demand
+      output_data: criticalMap.get(skeleton.id) || undefined,
+      model_used: undefined,
+      prompt_text: undefined,
+      completion_text: undefined,
+      cost_usd: undefined,
+      temperature: undefined,
+      was_cached: undefined,
+      quality_score: undefined,
+    }));
+
+    if (mergedTraces.length > 0) {
+      setTraces(mergedTraces);
       // Load historical traces into generation store (for page refresh)
-      useGenerationStore.getState().loadFromTraces(data);
-      log(' First trace:', data[0]);
+      useGenerationStore.getState().loadFromTraces(mergedTraces);
+      log(' First trace:', mergedTraces[0]);
     } else {
       setTraces([]);
       log(' No traces found for this course');
@@ -164,6 +232,8 @@ export function GenerationRealtimeProvider({
         },
         (payload) => {
           log(' Received new trace:', payload.new);
+          // New traces from realtime arrive with FULL data (not skeleton)
+          // Skeleton pattern only applies to historical bulk load
           const newTrace = payload.new as GenerationTrace;
           setTraces((prev) => [newTrace, ...prev]);
 
@@ -224,8 +294,76 @@ export function GenerationRealtimeProvider({
     };
   }, [courseId, supabase, isLoading, session]);
 
+  // Lazy load full trace data for a specific trace (on-demand when user clicks node)
+  const fetchTraceDetails = useCallback(async (traceId: string): Promise<GenerationTrace | null> => {
+    if (!traceId) return null;
+
+    // Check if trace is already fully loaded (deduplication)
+    const existing = traces.find(t => t.id === traceId);
+    if (existing?.input_data !== undefined && existing?.output_data !== undefined) {
+      log(' Trace details already loaded:', traceId);
+      return existing;
+    }
+
+    log(' Fetching trace details for:', traceId);
+
+    const { data, error } = await supabase
+      .from('generation_trace')
+      .select('*')
+      .eq('id', traceId)
+      .single();
+
+    if (error) {
+      console.error('[RealtimeProvider] Failed to fetch trace details:', error);
+      return null;
+    }
+
+    if (!data) return null;
+
+    // Convert Supabase null values to undefined for our type
+    const trace: GenerationTrace = {
+      id: data.id,
+      course_id: data.course_id,
+      lesson_id: data.lesson_id ?? undefined,
+      stage: data.stage as GenerationTrace['stage'],
+      phase: data.phase,
+      step_name: data.step_name,
+      input_data: data.input_data ?? undefined,
+      output_data: data.output_data ?? undefined,
+      error_data: data.error_data ?? undefined,
+      model_used: data.model_used ?? undefined,
+      prompt_text: data.prompt_text ?? undefined,
+      completion_text: data.completion_text ?? undefined,
+      tokens_used: data.tokens_used ?? undefined,
+      cost_usd: data.cost_usd ?? undefined,
+      temperature: data.temperature ?? undefined,
+      duration_ms: data.duration_ms ?? undefined,
+      retry_attempt: data.retry_attempt ?? undefined,
+      was_cached: data.was_cached ?? undefined,
+      quality_score: data.quality_score ?? undefined,
+      created_at: data.created_at,
+    };
+
+    // Update the trace in state with full data
+    setTraces(prev => prev.map(t =>
+      t.id === traceId ? { ...t, ...trace } : t
+    ));
+    log(' Trace details loaded:', traceId);
+
+    return trace;
+  }, [supabase, traces]);
+
   return (
-    <GenerationRealtimeContext.Provider value={{ traces, status, isConnected, courseId, selectedTraceId, setSelectedTraceId, refetch: fetchTraces }}>
+    <GenerationRealtimeContext.Provider value={{
+      traces,
+      status,
+      isConnected,
+      courseId,
+      selectedTraceId,
+      setSelectedTraceId,
+      refetch: fetchTraces,
+      fetchTraceDetails,
+    }}>
       {children}
     </GenerationRealtimeContext.Provider>
   );

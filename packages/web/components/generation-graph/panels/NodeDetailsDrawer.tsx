@@ -59,6 +59,8 @@ interface DisplayData {
   attempts?: TraceAttempt[];
   attemptNumber?: number;
   retryCount?: number;
+  /** Trace ID for lazy loading full data */
+  traceId?: string;
 }
 
 export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
@@ -93,7 +95,7 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
 
   // Get realtime status from context (more reliable than node data)
   const realtimeStatus = useNodeStatus(selectedNodeId || '');
-  const { status: generationStatus } = useGenerationRealtime();
+  const { status: generationStatus, fetchTraceDetails } = useGenerationRealtime();
 
   // Check if THIS stage is awaiting approval based on course generation_status
   // generationStatus contains the raw generation_status like 'stage_5_awaiting_approval'
@@ -340,7 +342,8 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
                   status: phase.status,
                   attempts: phase.attempts || [],
                   attemptNumber: 1,
-                  retryCount: phase.attempts?.filter((a: TraceAttempt) => a.status === 'failed').length || 0
+                  retryCount: phase.attempts?.filter((a: TraceAttempt) => a.status === 'failed').length || 0,
+                  traceId: phase.traceId, // For lazy loading full trace data
               };
           }
       }
@@ -396,6 +399,38 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
 
       return data;
   }, [data, selectedAttemptNum, hasPhases, selectedPhaseId, phases, isLessonNode, lessonContentData]);
+
+  // Lazy load full trace details when drawer opens and outputData is missing
+  // This is needed for skeleton traces that don't have output_data pre-loaded
+  useEffect(() => {
+    let cancelled = false;
+
+    const loadTraceDetails = async () => {
+      if (!selectedNodeId || !displayData) return;
+
+      // Check if we need to load output_data for completed phases
+      // Stage 4/5 complete phases should already have output_data from critical query
+      // Other phases may need lazy loading
+      const needsOutputData =
+        displayData.outputData === undefined &&
+        displayData.status === 'completed' &&
+        displayData.traceId;
+
+      if (needsOutputData && displayData.traceId) {
+        await fetchTraceDetails(displayData.traceId);
+
+        // Prevent stale updates if user rapidly switched nodes
+        if (cancelled) return;
+      }
+    };
+
+    loadTraceDetails();
+
+    // Cleanup: mark as cancelled if node changes before fetch completes
+    return () => {
+      cancelled = true;
+    };
+  }, [selectedNodeId, displayData?.traceId, displayData?.outputData, displayData?.status, fetchTraceDetails]);
 
   // Construct chat history - only show REAL user refinement messages
   // DO NOT show LLM prompts (prompt_text) which were incorrectly set as refinementMessage
@@ -460,6 +495,9 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
         hideCloseButton={isStage6Lesson}
         // Portal into fullscreen container when in fullscreen mode (fixes z-index issue)
         container={portalContainerRef.current}
+        // Prevent closing on clicks outside (e.g., hint panel buttons)
+        // Panel closes via: 1) onPaneClick on canvas 2) close button
+        onInteractOutside={(e) => e.preventDefault()}
         data-testid="node-details-drawer"
       >
         {/* Accessibility: Hidden title for lesson nodes (screen readers only) */}
