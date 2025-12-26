@@ -370,8 +370,16 @@ function GraphViewInner({ courseId, courseTitle, hasDocuments = true, failedAtSt
   // Re-fetch course structure when Stage 5 becomes complete
   // This ensures lesson nodes appear immediately after Stage 5 approval
   const prevPipelineStatus = useRef<string | null>(null);
+  const isInitialMount = useRef(true);
   useEffect(() => {
-    // Only trigger on transition TO stage_5_complete
+    // Skip the initial mount - first useEffect already handles initial load with completedLabels
+    if (isInitialMount.current) {
+      isInitialMount.current = false;
+      prevPipelineStatus.current = pipelineStatus ?? null;
+      return;
+    }
+
+    // Only trigger on actual transition TO stage_5_complete (not initial load)
     const wasNotComplete = prevPipelineStatus.current !== 'stage_5_complete';
     const isNowComplete = pipelineStatus === 'stage_5_complete';
     prevPipelineStatus.current = pipelineStatus ?? null;
@@ -380,22 +388,42 @@ function GraphViewInner({ courseId, courseTitle, hasDocuments = true, failedAtSt
       // Reset the initialization flag to allow re-fetch
       courseStructureInitialized.current = false;
 
-      // Fetch fresh course structure
+      // Fetch fresh course structure WITH completed lessons
       const fetchCourseStructure = async () => {
         const supabase = createClient();
-        const { data, error } = await supabase
-          .from('courses')
-          .select('course_structure')
-          .eq('id', courseId)
-          .single();
 
-        if (error) {
-          console.error('[GraphView] Failed to fetch course structure after Stage 5:', error);
+        // Fetch course structure and completed lessons in parallel
+        const [courseResult, lessonsResult] = await Promise.all([
+          supabase
+            .from('courses')
+            .select('course_structure')
+            .eq('id', courseId)
+            .single(),
+          supabase
+            .from('generation_trace')
+            .select('input_data')
+            .eq('course_id', courseId)
+            .eq('stage', 'stage_6')
+            .eq('step_name', 'finish')
+            .not('input_data->lessonLabel', 'is', null)
+        ]);
+
+        if (courseResult.error) {
+          console.error('[GraphView] Failed to fetch course structure after Stage 5:', courseResult.error);
           return;
         }
 
-        if (data?.course_structure) {
-          initializeFromCourseStructure(data.course_structure as CourseStructure, []);
+        if (courseResult.data?.course_structure) {
+          // Extract unique lessonLabels from completed traces
+          const completedLabels = lessonsResult.data && lessonsResult.data.length > 0
+            ? [...new Set(
+                lessonsResult.data
+                  .map(t => (t.input_data as Record<string, unknown>)?.lessonLabel as string)
+                  .filter(Boolean)
+              )]
+            : [];
+
+          initializeFromCourseStructure(courseResult.data.course_structure as CourseStructure, completedLabels);
           courseStructureInitialized.current = true;
         }
       };
