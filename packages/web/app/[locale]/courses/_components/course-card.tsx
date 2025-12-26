@@ -166,9 +166,13 @@ export function CourseCard({
   const lessonsCount = course.total_lessons_count || course.actual_lessons_count || 0
   const sectionsCount = course.total_sections_count || course.actual_sections_count || 0
   const estimatedLessons = course.estimated_lessons || 15
-  const progress = estimatedLessons > 0 
-    ? Math.min(100, Math.round((lessonsCount / estimatedLessons) * 100))
-    : 0
+  // Use generation_progress.percentage when available (real progress),
+  // otherwise fallback to lesson-based calculation
+  const progress = course.generation_progress?.percentage !== undefined
+    ? Math.round(course.generation_progress.percentage)
+    : estimatedLessons > 0
+      ? Math.min(100, Math.round((lessonsCount / estimatedLessons) * 100))
+      : 0
   
   // Use estimated_completion_minutes if available, otherwise calculate
   const duration = course.estimated_completion_minutes 
@@ -602,7 +606,7 @@ export function CourseCard({
         </CardContent>
         
         {/* Main action button - positioned between content and footer */}
-        <div className="px-6 pb-3 flex-shrink-0">
+        <div className="px-6 pt-4 pb-3 flex-shrink-0">
           <Button
             size="sm"
             variant="default"
