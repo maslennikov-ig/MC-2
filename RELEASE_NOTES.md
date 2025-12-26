@@ -1,11 +1,15 @@
-# Release Notes - v0.26.27
+# Release Notes - v0.26.28
 
 _Released on 2025-12-26_
 
 ## ✨ New Features
 
-- **Skills**: Add 3 new skills (SKILL.md, ...)
+- **AI Agents**: Add lead-research-assistant agent
+
+## 🐛 Bug Fixes
+
+- **graph**: Fix completed lessons showing as pending on initial load
 
 ---
 
-_This release was automatically generated from 1 commits._
+_This release was automatically generated from 2 commits._

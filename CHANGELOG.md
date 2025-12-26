@@ -30,6 +30,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.26.28] - 2025-12-26
+
+### Added
+- **agents**: add lead-research-assistant agent (0898b23)
+
+### Fixed
+- **graph**: fix completed lessons showing as pending on initial load (819c91f)
+
 ## [0.26.27] - 2025-12-26
 
 ### Added
