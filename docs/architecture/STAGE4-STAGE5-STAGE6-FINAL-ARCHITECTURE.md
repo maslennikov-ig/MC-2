@@ -1040,6 +1040,49 @@ interface LessonContent {
 
 ---
 
+## Stage 6 Quality Improvements (V2.2)
+
+### Targeted Refinement System
+
+Replaces full regeneration with surgical fixes for specific content issues.
+
+**Key Components**:
+- **Severity Routing**: CRITICAL -> REGENERATE, MAJOR -> FLAG_TO_JUDGE, MINOR -> SURGICAL_EDIT
+- **CLEV Voting**: 2 judges + conditional 3rd for verification consensus
+- **Section Locking**: Max 2 edits per section prevents infinite loops
+- **Best-Effort Fallback**: Returns highest-scoring iteration when max iterations reached
+
+**Cost Reduction**: 60-70% (patches ~300 tokens vs regeneration ~3000 tokens)
+
+See [ADR-002: Targeted Refinement System](../ADR-002-TARGETED-REFINEMENT-SYSTEM.md) for details.
+
+### Mermaid Fix Pipeline
+
+3-layer defense architecture against Mermaid diagram syntax issues:
+
+```
+Layer 1: Prevention (Prompt Instructions)
+    |
+    v
+Layer 2: Auto-Fix (mermaid-sanitizer.ts)
+    |
+    v
+Layer 3: Detection (heuristic-filter.ts) --> CRITICAL --> REGENERATE
+```
+
+**Key Decision**: Mermaid issues are CRITICAL severity (triggers self-regeneration, not expensive Judge review).
+
+**Problem Solved**: LLMs generate escaped quotes (`\"`) inside Mermaid node labels, breaking client-side rendering.
+
+**Solution**:
+1. **Prevention**: Prompt instructions reduce escaped quote generation
+2. **Auto-Fix**: Sanitizer removes `\"` automatically after generation
+3. **Detection**: Heuristic filter catches edge cases, triggers regeneration
+
+See [ADR-003: Mermaid Fix Pipeline](../ADR-003-MERMAID-FIX-PIPELINE.md) for details.
+
+---
+
 ## RAG Strategy (Two-Level)
 
 ### Level 1: Section-Level RAG (Stage 5 - Generation)

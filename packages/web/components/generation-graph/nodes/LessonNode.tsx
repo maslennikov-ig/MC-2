@@ -7,6 +7,7 @@ import { RefreshCw, Play, Loader2, Check } from 'lucide-react';
 import { useOptionalPartialGenerationContext } from '../contexts/PartialGenerationContext';
 import { NodeErrorTooltip, RetryBadge, NodeProgressBar } from '../components/shared';
 import { getStatusColor, getStatusBorderClass, getNodeStatusStyles } from '../hooks/useNodeStatusStyles';
+import { logger } from '@/lib/client-logger';
 
 // Minimal Node for very low zoom (<0.3)
 const MinimalLessonNode = ({ id, data, onDoubleClick }: { id: string; data: RFLessonNode['data']; onDoubleClick: () => void }) => {
@@ -90,13 +91,13 @@ const LessonNode = (props: NodeProps<RFLessonNode>) => {
   // Semantic Zoom - switch to smaller representations at lower zoom levels
   if (zoom < 0.3) {
     return <MinimalLessonNode id={id} data={data} onDoubleClick={() => {
-      console.log('[MinimalLessonNode] Double-click', { id, zoom });
+      logger.devLog('[MinimalLessonNode] Double-click', { id, zoom });
       selectNode(id);
     }} />;
   }
   if (zoom < 0.5) {
     return <MediumLessonNode id={id} data={data} selected={selected} onDoubleClick={() => {
-      console.log('[MediumLessonNode] Double-click', { id, zoom });
+      logger.devLog('[MediumLessonNode] Double-click', { id, zoom });
       selectNode(id);
     }} />;
   }

@@ -1,8 +1,8 @@
 # Stage 6 Targeted Refinement System - Technical Specification
 
-> **Status:** Draft v1.2
+> **Status:** Implemented
 > **Created:** 2024-12-10
-> **Updated:** 2024-12-10
+> **Updated:** 2025-12-25 (Implementation Notes Added)
 > **Sources:** Deep Think (o3), Deep Research (Gemini), Codebase Analysis, Admin UI Compatibility Review
 
 ## Executive Summary
@@ -1415,3 +1415,79 @@ The following features were considered but deferred to avoid overengineering:
 | Semantic caching | Phase 2 optimization after core system works |
 | Autocorrelation oscillation | Simple section locking after 2 edits is sufficient |
 | Lite-Smoother component | Patcher handles transitions via context anchors |
+
+---
+
+## Appendix D: Implementation Notes (Added 2025-12-25)
+
+### Mermaid Fix Pipeline (3-Layer Defense)
+
+LLMs frequently generate invalid Mermaid syntax, especially escaped quotes (`\"`) that break rendering.
+The implementation adds a 3-layer defense that integrates with the targeted refinement system:
+
+| Layer | Component | File Location | Description |
+|-------|-----------|---------------|-------------|
+| 1 | Prevention | `src/shared/prompts/prompt-registry.ts` | Prompt instructions to avoid escaped quotes |
+| 2 | Auto-fix | `src/stages/stage6-lesson-content/utils/mermaid-sanitizer.ts` | Automatically removes `\"` from Mermaid blocks |
+| 3 | Detection | `src/stages/stage6-lesson-content/judge/heuristic-filter.ts` | Detects remaining issues, routes to REGENERATE |
+
+**Key Design Decision**: Mermaid issues have `severity: CRITICAL` which triggers `REGENERATE`, NOT `FLAG_TO_JUDGE`.
+This avoids expensive Judge calls for easily fixable syntax issues.
+
+### Severity Routing Implementation
+
+The self-reviewer node (`nodes/self-reviewer-node.ts`) routes issues based on severity:
+
+| Severity | Issue Types | Action | Description |
+|----------|-------------|--------|-------------|
+| `CRITICAL` | Mermaid syntax, truncation, empty sections | `REGENERATE` | Cheap model self-regeneration |
+| `COMPLEX` | Factual errors, major structural issues | `FLAG_TO_JUDGE` | Full Judge evaluation |
+| `FIXABLE` | Clarity, tone, minor grammar | `SURGICAL_EDIT` | Patcher applies targeted fix |
+| `INFO` | Minor observations, suggestions | Pass through | No action needed |
+
+### Best-Effort Fallback Implementation
+
+The `best-effort-selector.ts` module implements the fallback logic:
+
+```typescript
+// Key function: selectBestIteration()
+// Selects iteration with HIGHEST score (not original)
+// Returns with improvementHints extracted from unresolved issues
+```
+
+Quality status thresholds:
+- >= 0.85: 'good'
+- >= 0.75: 'acceptable'
+- < 0.75: 'below_standard'
+
+### Patcher Model Selection
+
+Patcher uses FREE model: `xiaomi/mimo-v2-flash:free`
+Configured in: `src/stages/stage6-lesson-content/config/index.ts`
+
+### Test Coverage
+
+| Test Suite | Tests | Description |
+|------------|-------|-------------|
+| `mermaid-sanitizer.test.ts` | 20 | Unit tests for Mermaid sanitizer |
+| `mermaid-fix-pipeline.e2e.test.ts` | 27 | E2E pipeline with real DB data |
+| `targeted-refinement-cycle.e2e.test.ts` | 23 | Full refinement cycle E2E |
+| Total Stage 6 | 262+ | All passing |
+
+### Files Created/Modified
+
+**New Files:**
+- `src/stages/stage6-lesson-content/utils/mermaid-sanitizer.ts` - Layer 2 auto-fix
+- `src/stages/stage6-lesson-content/utils/markdown-section-parser.ts` - Section parsing utilities
+- `src/stages/stage6-lesson-content/utils/section-regenerator.ts` - Section regeneration logic
+- `tests/stages/stage6-lesson-content/utils/mermaid-sanitizer.test.ts` - Unit tests
+- `tests/stages/stage6-lesson-content/mermaid-fix-pipeline.e2e.test.ts` - E2E tests
+- `tests/stages/stage6-lesson-content/targeted-refinement-cycle.e2e.test.ts` - Full cycle E2E
+
+**Modified Files:**
+- `judge/heuristic-filter.ts` - Added `checkMermaidSyntax()` function
+- `nodes/generator.ts` - Integrated mermaid sanitizer after generation
+- `nodes/self-reviewer-node.ts` - CRITICAL severity for Mermaid issues
+- `src/shared/prompts/prompt-registry.ts` - Mermaid instructions in prompt
+- `judge/targeted-refinement/orchestrator.ts` - Main refinement orchestration
+- `judge/targeted-refinement/best-effort-selector.ts` - Best iteration selection

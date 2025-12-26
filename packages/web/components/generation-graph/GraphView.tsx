@@ -48,6 +48,7 @@ import { toast } from 'sonner';
 // MobileProgressList removed - maintaining two view modes adds complexity
 import { useBreakpoint } from './hooks/useBreakpoint';
 import { useTheme } from 'next-themes';
+import { logger } from '@/lib/client-logger';
 import { useFallbackPolling } from './hooks/useFallbackPolling';
 import { useViewportPreservation } from './hooks/useViewportPreservation';
 import { useGracefulDegradation } from './hooks/useGracefulDegradation';
@@ -771,7 +772,7 @@ function GraphViewInner({ courseId, courseTitle, hasDocuments = true, failedAtSt
                 fitView
                 defaultViewport={{ x: 0, y: 0, zoom: 1 }}
                 onNodeDoubleClick={(_, node) => {
-                  console.log('[GraphView] onNodeDoubleClick', { nodeId: node.id, nodeType: node.type });
+                  logger.devLog('[GraphView] onNodeDoubleClick', { nodeId: node.id, nodeType: node.type });
                   selectNode(node.id);
                 }}
                 onMoveStart={() => setIsInteracting(true)}

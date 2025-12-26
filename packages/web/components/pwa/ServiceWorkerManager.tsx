@@ -2,6 +2,7 @@
 
 import { useEffect, useCallback, useRef } from 'react';
 import { toast } from 'sonner';
+import { logger } from '@/lib/client-logger';
 
 /**
  * Build version from package.json, exposed via next.config.ts
@@ -35,7 +36,7 @@ export function ServiceWorkerManager() {
         const cacheNames = await caches.keys();
         await Promise.all(
           cacheNames.map(async (cacheName) => {
-            console.log(`[SW Manager] Deleting cache: ${cacheName}`);
+            logger.devLog(`[SW Manager] Deleting cache: ${cacheName}`);
             return caches.delete(cacheName);
           })
         );
@@ -46,16 +47,16 @@ export function ServiceWorkerManager() {
         const registrations = await navigator.serviceWorker.getRegistrations();
         await Promise.all(
           registrations.map(async (registration) => {
-            console.log(`[SW Manager] Unregistering SW: ${registration.scope}`);
+            logger.devLog(`[SW Manager] Unregistering SW: ${registration.scope}`);
             return registration.unregister();
           })
         );
       }
 
-      console.log('[SW Manager] All caches cleared successfully');
+      logger.devLog('[SW Manager] All caches cleared successfully');
       return true;
     } catch (error) {
-      console.error('[SW Manager] Error clearing caches:', error);
+      logger.error('[SW Manager] Error clearing caches:', error);
       return false;
     }
   }, []);
@@ -64,7 +65,7 @@ export function ServiceWorkerManager() {
    * Handle version mismatch - clear caches and reload
    */
   const handleVersionMismatch = useCallback(async (oldVersion: string) => {
-    console.log(`[SW Manager] Version mismatch detected: ${oldVersion} -> ${APP_VERSION}`);
+    logger.info(`[SW Manager] Version mismatch detected: ${oldVersion} -> ${APP_VERSION}`);
 
     const cleared = await clearAllCaches();
 
@@ -96,7 +97,7 @@ export function ServiceWorkerManager() {
     if (!savedVersion) {
       // First visit - just save version
       localStorage.setItem(VERSION_STORAGE_KEY, APP_VERSION);
-      console.log(`[SW Manager] First visit, saved version: ${APP_VERSION}`);
+      logger.devLog(`[SW Manager] First visit, saved version: ${APP_VERSION}`);
       return;
     }
 
@@ -104,7 +105,7 @@ export function ServiceWorkerManager() {
       // Version changed - clear caches
       handleVersionMismatch(savedVersion);
     } else {
-      console.log(`[SW Manager] Version unchanged: ${APP_VERSION}`);
+      logger.devLog(`[SW Manager] Version unchanged: ${APP_VERSION}`);
     }
   }, [handleVersionMismatch]);
 
@@ -115,7 +116,7 @@ export function ServiceWorkerManager() {
     if (updatePending.current) return;
     updatePending.current = true;
 
-    console.log('[SW Manager] New service worker available');
+    logger.info('[SW Manager] New service worker available');
 
     // Show toast with reload option
     toast.info('A new version is available', {
@@ -170,7 +171,7 @@ export function ServiceWorkerManager() {
     // Listen for messages from SW
     navigator.serviceWorker.addEventListener('message', (event) => {
       if (event.data?.type === 'CACHE_UPDATED') {
-        console.log('[SW Manager] Cache updated:', event.data.payload);
+        logger.devLog('[SW Manager] Cache updated:', event.data.payload);
       }
     });
   }, [handleSWUpdate]);
@@ -190,7 +191,7 @@ export function ServiceWorkerManager() {
         message.includes('failed to fetch') ||
         filename.includes('_next/static')
       ) {
-        console.error('[SW Manager] Detected stale cache error, clearing...');
+        logger.error('[SW Manager] Detected stale cache error, clearing...');
         clearAllCaches().then(() => {
           localStorage.setItem(VERSION_STORAGE_KEY, APP_VERSION);
           window.location.reload();

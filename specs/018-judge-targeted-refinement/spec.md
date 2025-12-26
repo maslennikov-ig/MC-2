@@ -2,7 +2,8 @@
 
 **Feature Branch**: `018-judge-targeted-refinement`
 **Created**: 2025-12-11
-**Status**: Draft
+**Last Updated**: 2025-12-25
+**Status**: Implemented
 **Input**: Technical specification from `/home/me/code/megacampus2/docs/specs/features/stage6-targeted-refinement-spec.md`
 
 ## Problem Statement
@@ -265,3 +266,65 @@ Users see real-time progress of the refinement process, including which sections
 ### Session 2025-12-11
 
 - Q: Откуда генерируются `improvementHints` для best-effort результата? → A: Из `unresolvedIssues` - автоматически извлекаем `fixInstructions`
+
+---
+
+## Implementation Notes (Added 2025-12-25)
+
+### Mermaid Fix Pipeline (3-Layer Defense)
+
+LLMs frequently generate invalid Mermaid syntax, especially escaped quotes (`\"`) that break rendering.
+The implementation adds a 3-layer defense:
+
+| Layer | Component | File Location | Description |
+|-------|-----------|---------------|-------------|
+| 1 | Prevention | `src/shared/prompts/prompt-registry.ts` | Prompt instructions to avoid escaped quotes |
+| 2 | Auto-fix | `utils/mermaid-sanitizer.ts` | Automatically removes `\"` from Mermaid blocks |
+| 3 | Detection | `judge/heuristic-filter.ts` (`checkMermaidSyntax()`) | Detects remaining issues, routes to REGENERATE |
+
+**Key Design Decision**: Mermaid issues have `severity: CRITICAL` which triggers `REGENERATE`, NOT `FLAG_TO_JUDGE`.
+This avoids expensive Judge calls for easily fixable syntax issues.
+
+### Severity Routing Table
+
+| Severity | Issue Types | Action | Description |
+|----------|-------------|--------|-------------|
+| `CRITICAL` | Mermaid syntax, truncation, empty sections | `REGENERATE` | Cheap model self-regeneration |
+| `COMPLEX` | Factual errors, major structural issues | `FLAG_TO_JUDGE` | Full Judge evaluation |
+| `FIXABLE` | Clarity, tone, minor grammar | `SURGICAL_EDIT` | Patcher applies targeted fix |
+| `INFO` | Minor observations, suggestions | Pass through | No action needed |
+
+### Best-Effort Fallback Implementation
+
+When max iterations reached (default: 3) without meeting quality threshold:
+- System selects iteration with **HIGHEST score** (not original content)
+- `improvementHints` are extracted from `fixInstructions` of unresolved issues
+- `qualityStatus` set to 'good' | 'acceptable' | 'below_standard'
+
+### Patcher Model Selection
+
+Patcher uses FREE model: `xiaomi/mimo-v2-flash:free`
+This minimizes refinement costs while maintaining acceptable quality.
+
+### Test Coverage
+
+| Test Suite | Tests | Description |
+|------------|-------|-------------|
+| `mermaid-sanitizer.test.ts` | 20 | Unit tests for Mermaid sanitizer |
+| `mermaid-fix-pipeline.e2e.test.ts` | 27 | E2E pipeline with real DB data |
+| `targeted-refinement-cycle.e2e.test.ts` | 23 | Full refinement cycle E2E |
+| Total Stage 6 | 262+ | All passing |
+
+### Files Created/Modified
+
+**New Files:**
+- `src/stages/stage6-lesson-content/utils/mermaid-sanitizer.ts` - Layer 2 auto-fix
+- `tests/stages/stage6-lesson-content/utils/mermaid-sanitizer.test.ts` - Unit tests
+- `tests/stages/stage6-lesson-content/mermaid-fix-pipeline.e2e.test.ts` - E2E tests
+- `tests/stages/stage6-lesson-content/targeted-refinement-cycle.e2e.test.ts` - Full cycle E2E
+
+**Modified Files:**
+- `judge/heuristic-filter.ts` - Added `checkMermaidSyntax()` (Layer 3)
+- `nodes/generator.ts` - Integrated mermaid sanitizer after generation
+- `nodes/self-reviewer-node.ts` - CRITICAL severity for Mermaid issues
+- `src/shared/prompts/prompt-registry.ts` - Mermaid instructions in prompt (Layer 1)
