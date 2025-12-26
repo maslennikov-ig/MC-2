@@ -94,12 +94,14 @@ export function GenerationRealtimeProvider({
 
     // Use returns<T[]>() to explicitly request array response
     // This overrides any global Accept header that might request single object
+    // Limit increased from 100 to 500 to ensure Stage 4/5 complete phases
+    // are fetched even for courses with many Stage 6 lesson traces
     const { data, error } = await supabase
       .from('generation_trace')
       .select('*')
       .eq('course_id', courseId)
       .order('created_at', { ascending: false })
-      .limit(100)
+      .limit(500)
       .returns<GenerationTrace[]>();
 
     if (error) {

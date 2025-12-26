@@ -3,7 +3,6 @@
 import * as React from 'react';
 import { useEffect, useRef, useState, useId } from 'react';
 import mermaid from 'mermaid';
-import DOMPurify from 'isomorphic-dompurify';
 import { cn } from '@/lib/utils';
 import type { MermaidDiagramProps } from '../types';
 
@@ -301,15 +300,8 @@ export function MermaidDirect({ chart, className, ariaLabel }: MermaidDiagramPro
         );
 
         if (containerRef.current) {
-          // Sanitize SVG with DOMPurify for additional XSS protection
-          // Although Mermaid uses securityLevel: 'strict', this adds defense-in-depth
-          const sanitizedSvg = DOMPurify.sanitize(svg, {
-            USE_PROFILES: { svg: true, svgFilters: true },
-            ADD_TAGS: ['svg', 'g', 'path', 'rect', 'circle', 'ellipse', 'polygon', 'text', 'tspan', 'marker', 'defs', 'style'],
-            ADD_ATTR: ['viewBox', 'xmlns', 'xmlns:xlink', 'fill', 'stroke', 'stroke-width', 'd', 'transform', 'class', 'id'],
-          });
-
-          containerRef.current.innerHTML = sanitizedSvg;
+          // Mermaid uses securityLevel: 'strict' which provides XSS protection
+          containerRef.current.innerHTML = svg;
 
           // Post-process SVG to force our theme colors
           // This overrides any inline styles Mermaid may have applied

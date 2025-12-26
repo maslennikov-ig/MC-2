@@ -67,6 +67,22 @@ export const PHASE_NAMES: Record<string, Record<string, PhaseInfo>> = {
         en: 'Assembling final analysis result',
       },
     },
+    complete: {
+      ru: 'Результат',
+      en: 'Result',
+      description: {
+        ru: 'Итоговый результат анализа',
+        en: 'Final analysis result',
+      },
+    },
+    init: {
+      ru: 'Инициализация',
+      en: 'Initialization',
+      description: {
+        ru: 'Подготовка к анализу',
+        en: 'Preparing for analysis',
+      },
+    },
   },
   stage_5: {
     validate_input: {
@@ -107,6 +123,22 @@ export const PHASE_NAMES: Record<string, Record<string, PhaseInfo>> = {
       description: {
         ru: 'Проверка минимального количества уроков',
         en: 'Checking minimum lessons requirement',
+      },
+    },
+    complete: {
+      ru: 'Результат',
+      en: 'Result',
+      description: {
+        ru: 'Итоговая структура курса',
+        en: 'Final course structure',
+      },
+    },
+    init: {
+      ru: 'Инициализация',
+      en: 'Initialization',
+      description: {
+        ru: 'Подготовка к генерации структуры',
+        en: 'Preparing for structure generation',
       },
     },
   },

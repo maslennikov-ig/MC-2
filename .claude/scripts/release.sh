@@ -273,15 +273,10 @@ run_preflight_checks() {
         # Get detailed file list for commit body
         FILE_LIST=$(git diff --cached --name-status | sed 's/^/  /')
 
-        # Detect commit type based on changed files
-        local commit_type="chore"
-        local commit_scope=""
-        local commit_desc="update project files"
-
         # Get file changes with status (A=added, M=modified, D=deleted)
         local file_status=$(git diff --cached --name-status)
 
-        # Count different types of changes
+        # Count ALL types of changes (added, modified, deleted)
         local new_agents=$(echo "$file_status" | grep "^A.*\.claude/agents/.*\.md$" | wc -l)
         local new_skills=$(echo "$file_status" | grep "^A.*\.claude/skills/.*/SKILL\.md$" | wc -l)
         local new_commands=$(echo "$file_status" | grep "^A.*\.claude/commands/.*\.md$" | wc -l)
@@ -291,90 +286,69 @@ run_preflight_checks() {
         local modified_commands=$(echo "$file_status" | grep "^M.*\.claude/commands/.*\.md$" | wc -l)
         local modified_docs=$(echo "$file_status" | grep "\.md$" | grep -v "\.claude/" | wc -l)
         local modified_mcp=$(echo "$file_status" | grep "mcp/.*\.json$" | wc -l)
+        local deleted_skills=$(echo "$file_status" | grep "^D.*\.claude/skills/.*/SKILL\.md$" | wc -l)
+        local deleted_templates=$(echo "$file_status" | grep "^D.*\.claude/templates/.*\.md$" | wc -l)
+        local deleted_other=$(echo "$file_status" | grep "^D" | grep -v "\.claude/skills/" | grep -v "\.claude/templates/" | wc -l)
 
-        # Priority-based commit type detection (most specific first)
+        # Build change summary array
+        local changes=()
 
-        # 1. New agents (highest priority for features)
-        if [ "$new_agents" -gt 0 ]; then
+        # Features (new stuff)
+        [ "$new_agents" -gt 0 ] && changes+=("add ${new_agents} agent(s)")
+        [ "$new_skills" -gt 0 ] && changes+=("add ${new_skills} skill(s)")
+        [ "$new_commands" -gt 0 ] && changes+=("add ${new_commands} command(s)")
+
+        # Updates
+        [ "$modified_scripts" -gt 0 ] && changes+=("update scripts")
+        [ "$modified_agents" -gt 0 ] && changes+=("update ${modified_agents} agent(s)")
+        [ "$modified_skills" -gt 0 ] && changes+=("update ${modified_skills} skill(s)")
+        [ "$modified_commands" -gt 0 ] && changes+=("update ${modified_commands} command(s)")
+        [ "$modified_mcp" -gt 0 ] && changes+=("update MCP configs")
+        [ "$modified_docs" -gt 0 ] && changes+=("update docs")
+
+        # Deletions
+        [ "$deleted_skills" -gt 0 ] && changes+=("remove ${deleted_skills} skill(s)")
+        [ "$deleted_templates" -gt 0 ] && changes+=("remove templates")
+        [ "$deleted_other" -gt 0 ] && changes+=("cleanup ${deleted_other} file(s)")
+
+        # Determine commit type based on what changed
+        local commit_type="chore"
+        local has_feat=false
+
+        if [ "$new_agents" -gt 0 ] || [ "$new_skills" -gt 0 ] || [ "$new_commands" -gt 0 ]; then
             commit_type="feat"
-            commit_scope="agents"
-            local agent_file=$(echo "$file_status" | grep "^A.*\.claude/agents/.*\.md$" | safe_first | awk '{print $2}')
-            local agent_name=$(basename "$agent_file" .md)
-            if [ "$new_agents" -eq 1 ]; then
-                commit_desc="add ${agent_name} agent"
-            else
-                commit_desc="add ${new_agents} new agents (${agent_name}, ...)"
-            fi
-
-        # 2. New skills
-        elif [ "$new_skills" -gt 0 ]; then
-            commit_type="feat"
-            commit_scope="skills"
-            local skill_file=$(echo "$file_status" | grep "^A.*\.claude/skills/.*/SKILL\.md$" | safe_first | awk '{print $2}')
-            local skill_name=$(echo "$skill_file" | cut -d'/' -f4)
-            if [ "$new_skills" -eq 1 ]; then
-                commit_desc="add ${skill_name} skill"
-            else
-                commit_desc="add ${new_skills} new skills (${skill_name}, ...)"
-            fi
-
-        # 3. New commands
-        elif [ "$new_commands" -gt 0 ]; then
-            commit_type="feat"
-            commit_scope="commands"
-            local cmd_file=$(echo "$file_status" | grep "^A.*\.claude/commands/.*\.md$" | safe_first | awk '{print $2}')
-            local cmd_name=$(basename "$cmd_file" .md)
-            if [ "$new_commands" -eq 1 ]; then
-                commit_desc="add ${cmd_name} command"
-            else
-                commit_desc="add ${new_commands} new commands"
-            fi
-
-        # 4. Modified skills (features)
-        elif [ "$modified_skills" -gt 0 ]; then
-            commit_type="feat"
-            commit_scope="skills"
-            commit_desc="update skill implementations"
-
-        # 5. Modified commands (features)
-        elif [ "$modified_commands" -gt 0 ]; then
-            commit_type="feat"
-            commit_scope="commands"
-            commit_desc="update slash commands"
-
-        # 6. Modified scripts (chore)
-        elif [ "$modified_scripts" -gt 0 ]; then
+            has_feat=true
+        elif [ "$modified_scripts" -gt 0 ] && [ "$modified_scripts" -eq "$TOTAL_COUNT" ]; then
             commit_type="chore"
-            commit_scope="scripts"
-            commit_desc="update automation scripts"
-
-        # 7. Modified agents (chore)
-        elif [ "$modified_agents" -gt 0 ]; then
-            commit_type="chore"
-            commit_scope="agents"
-            commit_desc="update agent configurations"
-
-        # 8. Modified MCP configs (chore)
-        elif [ "$modified_mcp" -gt 0 ]; then
-            commit_type="chore"
-            commit_scope="mcp"
-            commit_desc="update MCP server configurations"
-
-        # 9. Documentation changes
-        elif [ "$modified_docs" -gt 0 ]; then
+        elif [ "$modified_docs" -gt 0 ] && [ "$modified_docs" -eq "$TOTAL_COUNT" ]; then
             commit_type="docs"
-            commit_desc="update documentation"
         fi
 
-        # Generate commit message with detected type
-        if [ -n "$commit_scope" ]; then
-            COMMIT_MSG="${commit_type}(${commit_scope}): ${commit_desc}"
+        # Build commit message summary
+        local commit_desc=""
+        local change_count=${#changes[@]}
+
+        if [ "$change_count" -eq 0 ]; then
+            commit_desc="update project files"
+        elif [ "$change_count" -eq 1 ]; then
+            commit_desc="${changes[0]}"
+        elif [ "$change_count" -eq 2 ]; then
+            commit_desc="${changes[0]}, ${changes[1]}"
         else
-            COMMIT_MSG="${commit_type}: ${commit_desc}"
+            # Multiple changes - create summary
+            commit_desc="${changes[0]}, ${changes[1]}, +$((change_count - 2)) more"
         fi
 
-        COMMIT_MSG="${COMMIT_MSG}
+        # Build detailed body with all changes
+        local changes_body=""
+        for change in "${changes[@]}"; do
+            changes_body="${changes_body}- ${change}\n"
+        done
 
+        COMMIT_MSG="${commit_type}: ${commit_desc}
+
+Changes in this commit:
+$(echo -e "$changes_body")
 Auto-committed ${TOTAL_COUNT} file(s) before creating release.
 
 Files changed:
@@ -391,7 +365,7 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
         }
 
         log_success "Changes committed (${TOTAL_COUNT} files)"
-        log_info "Commit type: ${commit_type}${commit_scope:+(${commit_scope})}: ${commit_desc}"
+        log_info "Commit: ${commit_type}: ${commit_desc}"
     fi
 
     # Check if remote is configured
@@ -767,12 +741,12 @@ format_user_facing_line() {
 }
 
 # Generate user-facing release notes (marketing format)
-generate_user_facing_notes() {
+generate_user_facing_notes_entry() {
     local version="$1"
     local date="$2"
 
     cat << EOF
-# Release Notes - v${version}
+## v${version}
 
 _Released on ${date}_
 
@@ -780,7 +754,7 @@ EOF
 
     # New Features (from feat commits)
     if [ ${#FEATURES[@]} -gt 0 ]; then
-        echo "## ✨ New Features"
+        echo "### ✨ New Features"
         echo ""
         for commit in "${FEATURES[@]}"; do
             format_user_facing_line "$commit"
@@ -790,7 +764,7 @@ EOF
 
     # Improvements (from refactor + perf)
     if [ ${#REFACTORS[@]} -gt 0 ] || [ ${#PERF[@]} -gt 0 ]; then
-        echo "## 🔧 Improvements"
+        echo "### 🔧 Improvements"
         echo ""
         for commit in "${PERF[@]}"; do
             format_user_facing_line "$commit"
@@ -803,7 +777,7 @@ EOF
 
     # Security (from security commits)
     if [ ${#SECURITY_FIXES[@]} -gt 0 ]; then
-        echo "## 🔒 Security"
+        echo "### 🔒 Security"
         echo ""
         for commit in "${SECURITY_FIXES[@]}"; do
             format_user_facing_line "$commit"
@@ -813,7 +787,7 @@ EOF
 
     # Bug Fixes
     if [ ${#FIXES[@]} -gt 0 ]; then
-        echo "## 🐛 Bug Fixes"
+        echo "### 🐛 Bug Fixes"
         echo ""
         for commit in "${FIXES[@]}"; do
             format_user_facing_line "$commit"
@@ -823,7 +797,7 @@ EOF
 
     # Breaking Changes (important for users!)
     if [ ${#BREAKING_CHANGES[@]} -gt 0 ]; then
-        echo "## ⚠️ Breaking Changes"
+        echo "### ⚠️ Breaking Changes"
         echo ""
         for commit in "${BREAKING_CHANGES[@]}"; do
             format_user_facing_line "$commit"
@@ -833,7 +807,7 @@ EOF
 
     # Deprecations
     if [ ${#DEPRECATIONS[@]} -gt 0 ]; then
-        echo "## 📦 Deprecated"
+        echo "### 📦 Deprecated"
         echo ""
         for commit in "${DEPRECATIONS[@]}"; do
             format_user_facing_line "$commit"
@@ -979,10 +953,67 @@ update_release_notes() {
     # Track for rollback
     MODIFIED_FILES+=("$release_notes_file")
 
-    # Generate user-facing notes (overwrites the file)
-    generate_user_facing_notes "$version" "$date" > "$release_notes_file"
+    # Generate new entry
+    local new_entry=$(generate_user_facing_notes_entry "$version" "$date")
 
-    log_success "RELEASE_NOTES.md generated"
+    # Read existing release notes and prepend new entry
+    if [ -f "$release_notes_file" ]; then
+        local existing_content=$(<"$release_notes_file")
+
+        # Check if file has header "# Release Notes"
+        if echo "$existing_content" | grep -q "^# Release Notes"; then
+            # Find the first ## section (first release) to insert before it
+            local first_release_line=$(echo "$existing_content" | grep -n "^## v" | safe_first | cut -d: -f1)
+
+            if [ -n "$first_release_line" ] && [ "$first_release_line" -gt 0 ]; then
+                # Insert new entry before the first release
+                {
+                    echo "$existing_content" | safe_head "$((first_release_line - 1))"
+                    echo "$new_entry"
+                    echo ""
+                    echo "$existing_content" | tail -n +"$first_release_line"
+                } > "$release_notes_file"
+            else
+                # No releases yet, append after header
+                {
+                    echo "$existing_content" | safe_head 4
+                    echo ""
+                    echo "$new_entry"
+                } > "$release_notes_file"
+            fi
+        else
+            # Old format or missing header - recreate with new structure
+            {
+                cat << EOF
+# Release Notes
+
+User-facing release notes for all versions.
+
+EOF
+                echo "$new_entry"
+                echo ""
+                # Keep old content after separator
+                echo "---"
+                echo ""
+                echo "## Previous Releases"
+                echo ""
+                echo "$existing_content"
+            } > "$release_notes_file"
+        fi
+    else
+        # Create new RELEASE_NOTES.md with header
+        {
+            cat << EOF
+# Release Notes
+
+User-facing release notes for all versions.
+
+EOF
+            echo "$new_entry"
+        } > "$release_notes_file"
+    fi
+
+    log_success "RELEASE_NOTES.md updated"
     echo ""
 }
 
@@ -1033,7 +1064,7 @@ $(generate_changelog_entry "$NEW_VERSION" "$DATE")──────────
 
 📣 RELEASE_NOTES.md (User-Facing):
 ───────────────────────────────────────────────────────────
-$(generate_user_facing_notes "$NEW_VERSION" "$DATE")───────────────────────────────────────────────────────────
+$(generate_user_facing_notes_entry "$NEW_VERSION" "$DATE")───────────────────────────────────────────────────────────
 
 💬 Git Commit Message:
 ───────────────────────────────────────────────────────────
