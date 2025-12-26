@@ -2,9 +2,10 @@
 
 _Released on 2025-12-26_
 
-## ✨ New Features
 
-- **Commands**: Update slash commands
+## v0.26.30
+
+_Released on 2025-12-26_
 
 ---
 
