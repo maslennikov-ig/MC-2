@@ -1,15 +1,11 @@
-# Release Notes - v0.26.28
+# Release Notes - v0.26.29
 
 _Released on 2025-12-26_
 
 ## ✨ New Features
 
-- **AI Agents**: Add lead-research-assistant agent
-
-## 🐛 Bug Fixes
-
-- **graph**: Fix completed lessons showing as pending on initial load
+- **Commands**: Update slash commands
 
 ---
 
-_This release was automatically generated from 2 commits._
+_This release was automatically generated from 1 commits._

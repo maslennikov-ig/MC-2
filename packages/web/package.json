@@ -1,6 +1,6 @@
 {
   "name": "@megacampus/web",
-  "version": "0.26.28",
+  "version": "0.26.29",
   "private": true,
   "type": "module",
   "scripts": {

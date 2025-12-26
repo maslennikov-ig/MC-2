@@ -30,6 +30,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.26.29] - 2025-12-26
+
+### Added
+- **commands**: update slash commands (135c4cf)
+
 ## [0.26.28] - 2025-12-26
 
 ### Added
