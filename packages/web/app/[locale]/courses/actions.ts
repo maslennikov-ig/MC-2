@@ -4,6 +4,7 @@ import { getUserClient, getAdminClient } from '@/lib/supabase/client-factory'
 import { getCurrentUser } from '@/lib/auth-helpers'
 import { revalidatePath } from 'next/cache'
 import type { CourseStructureData } from '@/types/database'
+import type { GenerationProgress } from '@/types/course-generation'
 import { logger } from '@/lib/logger'
 import { PostgrestError } from '@supabase/supabase-js'
 import { generateSlug } from '@/lib/utils/slug'
@@ -91,6 +92,7 @@ export async function getCourses({
       course_structure,
       status,
       generation_status,
+      generation_progress,
       language,
       difficulty,
       style,
@@ -238,6 +240,7 @@ export async function getCourses({
       course_structure: course.course_structure as Record<string, unknown> | null,
       status: (course.status || 'draft') as 'draft' | 'published' | 'archived',
       generation_status: course.generation_status as 'pending' | 'initializing' | 'processing_documents' | 'analyzing_task' | 'generating_structure' | 'generating_content' | 'finalizing' | 'completed' | 'failed' | 'cancelled' | null,
+      generation_progress: course.generation_progress as GenerationProgress | null,
       language: course.language || 'en',
       difficulty: course.difficulty || 'intermediate',
       style: course.style || 'academic',

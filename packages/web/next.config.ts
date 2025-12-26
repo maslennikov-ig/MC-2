@@ -6,7 +6,7 @@ import createNextIntlPlugin from 'next-intl/plugin';
 const packageJson = require('./package.json');
 const APP_VERSION = packageJson.version;
 
-const withPWA = require('next-pwa')({
+const withPWA = require('@ducanh2912/next-pwa').default({
   dest: 'public',
   register: true,
   skipWaiting: true,
@@ -200,6 +200,16 @@ const withPWA = require('next-pwa')({
 const nextConfig: NextConfig = {
   output: 'standalone',
   reactStrictMode: true,
+  // Exclude pino from bundling to fix worker thread errors during build
+  // Pino uses thread-stream which requires native worker files
+  // Also exclude shared-logger which imports pino as workspace dependency
+  serverExternalPackages: [
+    'pino',
+    'pino-pretty',
+    'thread-stream',
+    '@megacampus/shared-logger',
+    '@axiomhq/pino',
+  ],
   // Expose app version to client for cache invalidation
   env: {
     NEXT_PUBLIC_APP_VERSION: APP_VERSION,
@@ -258,6 +268,20 @@ const nextConfig: NextConfig = {
   // These warnings occur because Supabase uses Node.js APIs like process.versions
   // but they don't affect functionality in Edge Runtime
   webpack: (config, { isServer }) => {
+    // === Pino worker thread fix ===
+    // Pino uses thread-stream with worker threads that don't work when bundled.
+    // Force pino and related packages to be loaded as external modules on server.
+    if (isServer) {
+      const externals = config.externals || [];
+      config.externals = [
+        ...externals,
+        'pino',
+        'pino-pretty',
+        'thread-stream',
+        '@megacampus/shared-logger',
+      ];
+    }
+
     // === ElkJS Web Worker suppression ===
     // ElkJS optionally requires 'web-worker' for Node.js environments.
     // In browser (Next.js client), this is unnecessary and causes build errors.

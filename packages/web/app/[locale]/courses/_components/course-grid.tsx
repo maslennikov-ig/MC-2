@@ -88,8 +88,8 @@ export function CourseGrid({
   
   return (
     <div>
-      {/* Course grid - responsive with more columns on wider screens */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-5 mb-8 auto-rows-fr">
+      {/* Course grid - responsive with fewer columns for wider cards */}
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-6 mb-8 auto-rows-fr">
         <AnimatePresence mode="popLayout">
           {displayedCourses.map((course, index) => (
             <motion.div

@@ -2,6 +2,7 @@
   "name": "@megacampus/web",
   "version": "0.26.28",
   "private": true,
+  "type": "module",
   "scripts": {
     "dev": "next dev --turbopack",
     "dev:pretty": "next dev --turbopack | pnpm exec pino-pretty",
@@ -34,6 +35,7 @@
   },
   "dependencies": {
     "@codemirror/lang-xml": "^6.1.0",
+    "@ducanh2912/next-pwa": "^10.2.9",
     "@emotion/is-prop-valid": "^1.4.0",
     "@googleapis/drive": "^18.0.0",
     "@hookform/resolvers": "^3.10.0",
@@ -88,7 +90,6 @@
     "next": "15.5.9",
     "next-intl": "^4.6.0",
     "next-mdx-remote": "^5",
-    "next-pwa": "^5.6.0",
     "next-themes": "^0.4.6",
     "react": "19.2.3",
     "react-diff-viewer-continued": "^3.4.0",
