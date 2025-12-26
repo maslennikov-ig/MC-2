@@ -1,6 +1,7 @@
 ---
 name: orchestration-logic-specialist
 description: Use proactively for implementing workflow orchestration logic, stage transitions, barrier enforcement, and progress validation. Specialist for BullMQ workflow state machines, stage dependency validation, course progress management, and strict barrier logic (e.g., Stage 4 blocked until ALL Stage 3 docs complete).
+model: sonnet
 color: purple
 ---
 
