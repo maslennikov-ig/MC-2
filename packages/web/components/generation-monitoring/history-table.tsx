@@ -321,7 +321,7 @@ export function HistoryTable() {
               className="h-8 w-8 text-gray-500 hover:text-purple-500 dark:hover:text-cyan-400"
               onClick={(e) => {
                 e.stopPropagation();
-                router.push(`/courses/generating/${row.original.slug}`);
+                router.push(`/courses/generating/${row.original.slug}?workflow=true`);
               }}
               title={t('actions.openWorkflow')}
             >
@@ -522,7 +522,7 @@ export function HistoryTable() {
                   <tr
                     key={row.id}
                     className="cursor-pointer transition-colors even:bg-gray-50 dark:even:bg-slate-900/50 hover:bg-gray-100 dark:hover:bg-slate-800"
-                    onClick={() => router.push(`/courses/generating/${row.original.slug}`)}
+                    onClick={() => router.push(`/courses/generating/${row.original.slug}?workflow=true`)}
                   >
                     {row.getVisibleCells().map((cell) => (
                       <td key={cell.id} className="p-4 align-middle">

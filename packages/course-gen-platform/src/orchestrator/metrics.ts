@@ -61,6 +61,25 @@ export interface WorkerFallbackMetrics {
 }
 
 /**
+ * Model fallback metrics (LLM escalation tracking)
+ * Tracks when primary model fails and fallback model is used
+ */
+export interface ModelFallbackMetrics {
+  /** Total model fallback activations */
+  total: number;
+  /** Successful completions after fallback */
+  successes: number;
+  /** Failed completions after fallback */
+  failures: number;
+  /** Fallback activations by reason */
+  byReason: Map<string, number>; // 'cjk' | 'timeout' | 'rate_limit' | 'error'
+  /** Fallback activations by stage */
+  byStage: Map<string, number>; // 'stage6' | etc.
+  /** Recent fallback timestamps */
+  timestamps: Date[];
+}
+
+/**
  * Percentile calculation result
  */
 export interface PercentileStats {
@@ -109,6 +128,16 @@ class MetricsStore {
     layer3Successes: 0,
     layer2Failures: 0,
     layer3Failures: 0,
+    timestamps: [],
+  };
+
+  // Model fallback metrics (LLM escalation)
+  private modelFallbackMetrics: ModelFallbackMetrics = {
+    total: 0,
+    successes: 0,
+    failures: 0,
+    byReason: new Map(),
+    byStage: new Map(),
     timestamps: [],
   };
 
@@ -466,6 +495,78 @@ class MetricsStore {
   }
 
   /**
+   * Record model fallback activation (LLM escalation)
+   *
+   * Called when primary model fails and fallback model is used.
+   *
+   * @param {string} reason - Reason for fallback ('cjk' | 'timeout' | 'rate_limit' | 'error')
+   * @param {string} stage - Stage where fallback occurred ('stage6')
+   */
+  recordModelFallback(reason: string, stage: string): void {
+    this.modelFallbackMetrics.total++;
+
+    // Track by reason
+    const reasonCount = this.modelFallbackMetrics.byReason.get(reason) || 0;
+    this.modelFallbackMetrics.byReason.set(reason, reasonCount + 1);
+
+    // Track by stage
+    const stageCount = this.modelFallbackMetrics.byStage.get(stage) || 0;
+    this.modelFallbackMetrics.byStage.set(stage, stageCount + 1);
+
+    // Track timestamp
+    this.modelFallbackMetrics.timestamps.push(new Date());
+    if (this.modelFallbackMetrics.timestamps.length > this.MAX_HISTORY) {
+      this.modelFallbackMetrics.timestamps.shift();
+    }
+  }
+
+  /**
+   * Record model fallback outcome
+   *
+   * @param {boolean} success - Whether fallback model succeeded
+   */
+  recordModelFallbackOutcome(success: boolean): void {
+    if (success) {
+      this.modelFallbackMetrics.successes++;
+    } else {
+      this.modelFallbackMetrics.failures++;
+    }
+  }
+
+  /**
+   * Get model fallback metrics
+   *
+   * @returns {object} Model fallback metrics with calculated rates
+   */
+  getModelFallbackMetrics(): ModelFallbackMetrics & {
+    successRate: number;
+    recentActivations: number;
+    topReasons: Array<{ reason: string; count: number }>;
+  } {
+    const successRate = this.modelFallbackMetrics.total > 0
+      ? (this.modelFallbackMetrics.successes / this.modelFallbackMetrics.total) * 100
+      : 100;
+
+    // Count activations in last 5 minutes
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+    const recentActivations = this.modelFallbackMetrics.timestamps.filter(
+      timestamp => timestamp > fiveMinutesAgo
+    ).length;
+
+    // Get top reasons sorted by count
+    const topReasons = Array.from(this.modelFallbackMetrics.byReason.entries())
+      .map(([reason, count]) => ({ reason, count }))
+      .sort((a, b) => b.count - a.count);
+
+    return {
+      ...this.modelFallbackMetrics,
+      successRate,
+      recentActivations,
+      topReasons,
+    };
+  }
+
+  /**
    * Reset all metrics (useful for testing)
    */
   reset(): void {
@@ -495,6 +596,14 @@ class MetricsStore {
       layer3Successes: 0,
       layer2Failures: 0,
       layer3Failures: 0,
+      timestamps: [],
+    };
+    this.modelFallbackMetrics = {
+      total: 0,
+      successes: 0,
+      failures: 0,
+      byReason: new Map(),
+      byStage: new Map(),
       timestamps: [],
     };
   }

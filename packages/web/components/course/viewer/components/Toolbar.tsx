@@ -1,17 +1,25 @@
 import React from "react"
+import Link from "next/link"
 import { Button } from "@/components/ui/button"
-import { 
-  ChevronLeft, 
-  ChevronRight, 
-  Maximize2, 
-  Minimize2, 
+import {
+  ChevronLeft,
+  ChevronRight,
+  Maximize2,
+  Minimize2,
   PanelLeft,
   GraduationCap,
   Clock,
   Trophy,
-  BarChart3
+  BarChart3,
+  GitBranch
 } from "lucide-react"
 import ThemeToggle from "@/components/common/theme-toggle"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import { Section, Lesson, Course } from "@/types/database"
 
 interface ToolbarProps {
@@ -76,13 +84,32 @@ export function Toolbar({
           </div>
           
           <div className="flex items-center gap-2">
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    asChild
+                    variant="ghost"
+                    size="sm"
+                    className="text-gray-600 dark:text-white/70 hover:text-blue-600 dark:hover:text-blue-400"
+                  >
+                    <Link href={`/courses/generating/${course.slug || course.id}?workflow=true`}>
+                      <GitBranch className="w-4 h-4" />
+                      <span className="hidden lg:inline ml-2">Конструктор</span>
+                    </Link>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Конструктор курса</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+
             <Button
               onClick={onToggleFocusMode}
               variant="ghost"
               size="sm"
               className={`${
-                focusMode 
-                  ? 'text-purple-600 dark:text-purple-400 bg-purple-100 dark:bg-purple-900/30' 
+                focusMode
+                  ? 'text-purple-600 dark:text-purple-400 bg-purple-100 dark:bg-purple-900/30'
                   : 'text-gray-600 dark:text-white/70 hover:text-gray-800 dark:hover:text-white'
               }`}
               title="Режим чтения (F11 или Ctrl+K)"
@@ -90,7 +117,7 @@ export function Toolbar({
               {focusMode ? <Minimize2 className="w-4 h-4" /> : <Maximize2 className="w-4 h-4" />}
               <span className="hidden lg:inline ml-2">Режим чтения</span>
             </Button>
-            
+
             {!focusMode && <ThemeToggle />}
             
             <Button

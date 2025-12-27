@@ -22,6 +22,7 @@ import { startWorker } from './worker';
 import logger from '../shared/logger';
 import { validateEnvironment } from '../shared/config/env-validator';
 import { initializeModelConfigBunker, getModelConfigBunker } from '../shared/llm/model-config-bunker';
+import { TIMEOUTS } from '../shared/constants/timeouts';
 
 // Validate environment
 validateEnvironment();
@@ -126,16 +127,55 @@ process.on('SIGTERM', () => {
 });
 
 /**
+ * Wrapper for executing async function with timeout
+ */
+async function withTimeout<T>(
+  promise: Promise<T>,
+  timeoutMs: number,
+  errorMessage: string
+): Promise<T> {
+  return Promise.race([
+    promise,
+    new Promise<T>((_, reject) =>
+      setTimeout(() => reject(new Error(errorMessage)), timeoutMs)
+    ),
+  ]);
+}
+
+/**
  * Start the worker
  */
 async function main() {
   try {
     logger.info('Starting BullMQ worker...');
 
+    // Run pre-flight checks BEFORE accepting any jobs
+    // This ensures uploads directory is mounted and accessible
+    logger.info('Running pre-flight checks...');
+    const { runPreFlightChecks } = await import('./worker-readiness');
+    const preFlightResults = await withTimeout(
+      runPreFlightChecks(true),
+      TIMEOUTS.PRE_FLIGHT_TOTAL,
+      `Pre-flight checks timed out after ${TIMEOUTS.PRE_FLIGHT_TOTAL / 1000} seconds`
+    );
+
+    const failedChecks = preFlightResults.filter((r) => !r.passed);
+    if (failedChecks.length > 0) {
+      logger.error(
+        { failedChecks: failedChecks.map((c) => c.name) },
+        'Pre-flight checks failed, aborting worker startup'
+      );
+      process.exit(1);
+    }
+
     // Initialize ModelConfigBunker BEFORE accepting jobs
     // This loads configs from disk/Redis/DB with graceful fallbacks
     logger.info('Initializing ModelConfigBunker...');
-    const bunker = await initializeModelConfigBunker();
+    const bunker = await withTimeout(
+      initializeModelConfigBunker(),
+      TIMEOUTS.BUNKER_INIT,
+      `ModelConfigBunker initialization timed out after ${TIMEOUTS.BUNKER_INIT / 1000} seconds`
+    );
     const health = bunker.getHealth();
     logger.info({
       configCount: health.configCount,

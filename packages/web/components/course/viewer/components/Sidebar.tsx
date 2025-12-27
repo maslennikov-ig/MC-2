@@ -1,19 +1,26 @@
 import React from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { 
-  ChevronRight, 
-  BookOpen, 
-  Clock, 
+import {
+  ChevronRight,
+  BookOpen,
+  Clock,
   ArrowLeft,
   CheckCircle2,
   Layers,
   PanelLeftClose,
   X,
-  Home
+  Home,
+  GitBranch
 } from "lucide-react"
 import Link from "next/link"
 import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip"
 import LessonProgressCard from "@/components/common/lesson-progress-card"
 import { Course, Section, Lesson } from "@/types/database"
 
@@ -58,32 +65,51 @@ export function Sidebar({
     <div className="h-full overflow-y-auto">
       <div className="p-6 border-b border-gray-200/60 dark:border-gray-800">
         <div className="flex items-center justify-between mb-4">
-          <Link 
+          <Link
             href={isMobile ? "/courses" : "/courses"}
             className="inline-flex items-center gap-2 text-gray-600 dark:text-white/70 hover:text-purple-600 dark:hover:text-white transition-colors group"
           >
             {isMobile ? <Home className="w-4 h-4" /> : <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />}
             <span className="text-sm">{isMobile ? "К каталогу" : "К каталогу"}</span>
           </Link>
-          {!isMobile && (
-            <Button
-              onClick={() => onToggleSidebar(false)}
-              variant="ghost"
-              size="icon"
-              className="h-8 w-8 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
-              title="Скрыть боковую панель"
-            >
-              <PanelLeftClose className="w-4 h-4" />
-            </Button>
-          )}
-          {isMobile && (
-            <button
-              onClick={() => onToggleMobileSidebar(false)}
-              className="p-2 text-gray-700 dark:text-white/70 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
-            >
-              <X className="w-6 h-6" />
-            </button>
-          )}
+          <div className="flex items-center gap-1">
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button
+                    asChild
+                    variant="ghost"
+                    size="icon"
+                    className="h-8 w-8 text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400"
+                  >
+                    <Link href={`/courses/generating/${course.slug || course.id}?workflow=true`}>
+                      <GitBranch className="w-4 h-4" />
+                    </Link>
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>Конструктор курса</TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
+            {!isMobile && (
+              <Button
+                onClick={() => onToggleSidebar(false)}
+                variant="ghost"
+                size="icon"
+                className="h-8 w-8 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
+                title="Скрыть боковую панель"
+              >
+                <PanelLeftClose className="w-4 h-4" />
+              </Button>
+            )}
+            {isMobile && (
+              <button
+                onClick={() => onToggleMobileSidebar(false)}
+                className="p-2 text-gray-700 dark:text-white/70 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+              >
+                <X className="w-6 h-6" />
+              </button>
+            )}
+          </div>
         </div>
         <h2 className="text-2xl font-bold text-gray-800 dark:text-white/90 mb-3">
           {course.title}

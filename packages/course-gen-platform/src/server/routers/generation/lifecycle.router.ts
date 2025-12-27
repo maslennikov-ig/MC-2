@@ -27,6 +27,7 @@ import { InitializeFSMCommandHandler } from '../../../shared/fsm/fsm-initializat
 import { deleteVectorsForDocument } from '../../../shared/qdrant/lifecycle';
 import { generateGenerationCode } from '../../../shared/utils/generation-code';
 import { cleanupCourseResources } from '../../../shared/cleanup';
+import { workerReadiness } from '../../../orchestrator/worker-readiness';
 import * as path from 'path';
 
 // Type aliases for Database tables
@@ -188,6 +189,33 @@ export const lifecycleRouter = router({
           throw new TRPCError({
             code: 'TOO_MANY_REQUESTS',
             message: errorMessage,
+          });
+        }
+
+        // T016: Check worker readiness before accepting new jobs
+        // This prevents race conditions where files are uploaded but not yet
+        // accessible through Docker volume mount
+        const readinessStatus = workerReadiness.getStatus();
+        if (!readinessStatus.ready) {
+          const failedChecks = readinessStatus.checks
+            .filter(c => !c.passed)
+            .map(c => c.name);
+
+          logger.warn({
+            requestId,
+            userId,
+            courseId,
+            readinessStatus,
+            failedChecks,
+          }, 'Worker not ready - rejecting generation request');
+
+          throw new TRPCError({
+            code: 'SERVICE_UNAVAILABLE',
+            message: `Worker is not ready to process jobs. ${
+              failedChecks.length > 0
+                ? `Failed checks: ${failedChecks.join(', ')}.`
+                : 'Pre-flight checks pending.'
+            } Please try again in a few moments.`,
           });
         }
 

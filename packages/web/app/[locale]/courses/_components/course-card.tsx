@@ -23,7 +23,8 @@ import {
   AlertCircle,
   Zap,
   Settings,
-  ClipboardList
+  ClipboardList,
+  GitBranch
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { deleteCourse, toggleFavorite, togglePublishStatus } from '../actions'
@@ -202,7 +203,12 @@ export function CourseCard({
   const handleView = () => {
     router.push(`/courses/${slug}`)
   }
-  
+
+  const handleWorkflow = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    router.push(`/courses/generating/${slug}?workflow=true`)
+  }
+
 
   const handleToggleFavorite = async (e: React.MouseEvent) => {
     e.stopPropagation()
@@ -265,7 +271,8 @@ export function CourseCard({
 
   if (viewMode === 'list') {
     return (
-      <Card 
+      <TooltipProvider>
+      <Card
         className={cn(
           "group relative overflow-hidden transition-smooth",
           "elevation-2 hover-lift",
@@ -335,6 +342,21 @@ export function CourseCard({
                   isAdmin={user?.role === 'admin' || user?.role === 'superadmin'}
                   className="h-8 w-8"
                 />
+                {user && (user.id === course.user_id || user.role === 'admin' || user.role === 'superadmin') && (
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-8 w-8 text-gray-400 hover:text-blue-400 transition-colors"
+                        onClick={handleWorkflow}
+                      >
+                        <GitBranch className="h-4 w-4" />
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent>Конструктор курса</TooltipContent>
+                  </Tooltip>
+                )}
                 {canDelete && (
                   <Button
                     variant="ghost"
@@ -387,12 +409,13 @@ export function CourseCard({
           </div>
         </div>
       </Card>
+      </TooltipProvider>
     )
   }
-  
+
   return (
     <TooltipProvider>
-      <Card 
+      <Card
         className={cn(
           "group relative overflow-hidden transition-smooth",
           "elevation-3 hover-scale card-interactive",
@@ -664,6 +687,15 @@ export function CourseCard({
                   onClick={handleTogglePublish}
                   disabled={isUpdatingPublish}
                   className="h-7 w-7 text-gray-400 hover:text-purple-400"
+                />
+              )}
+
+              {user && (user.id === course.user_id || user.role === 'admin' || user.role === 'superadmin') && (
+                <ActionButtonWithTooltip
+                  icon={<GitBranch className="h-3.5 w-3.5" />}
+                  label="Конструктор курса"
+                  onClick={handleWorkflow}
+                  className="h-7 w-7 text-gray-400 hover:text-blue-400"
                 />
               )}
 

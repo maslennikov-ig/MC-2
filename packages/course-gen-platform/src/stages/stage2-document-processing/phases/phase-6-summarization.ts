@@ -303,8 +303,23 @@ export async function executePhase6Summarization(
     return buildEmptyResult(fileId);
   }
 
-  // Step 2: Detect language (simple heuristic - can be improved)
-  const language = detectLanguage(extractedText);
+  // Step 2: Detect document language for summarization (content-based)
+  const documentLanguage = detectLanguage(extractedText);
+
+  // Step 2.1: Get course target language for title generation
+  // Title should be in course language, not document language
+  const courseLanguage = await getCourseLanguage(supabase, courseId);
+  const titleLanguage = courseLanguage || documentLanguage;
+
+  logger.debug({
+    fileId,
+    documentLanguage,
+    courseLanguage,
+    titleLanguage,
+  }, '[Phase 6] Language detection complete');
+
+  // Use document language for processing, course language for titles
+  const language = documentLanguage;
 
   logger.info({
     fileId,
@@ -333,8 +348,8 @@ export async function executePhase6Summarization(
 
     options?.onProgress?.(85, 'Generating document title');
 
-    // Generate title even for small documents
-    const generatedTitle = await generateDocumentTitle(extractedText, language);
+    // Generate title even for small documents (use course language for titles)
+    const generatedTitle = await generateDocumentTitle(extractedText, titleLanguage);
 
     options?.onProgress?.(90, 'Storing full text');
 
@@ -376,6 +391,7 @@ export async function executePhase6Summarization(
     fileId,
     extractedText,
     language,
+    titleLanguage,
     fileData.filename || 'Unknown document',
     estimatedTokens,
     config,
@@ -390,11 +406,14 @@ export async function executePhase6Summarization(
 
 /**
  * Execute summarization with quality validation and retry logic
+ *
+ * @param titleLanguage - Language for title generation (course language, not document language)
  */
 async function executeSummarizationWithRetry(
   fileId: string,
   extractedText: string,
   language: string,
+  titleLanguage: string,
   topic: string,
   originalTokens: number,
   config: SummarizationConfig,
@@ -500,7 +519,8 @@ async function executeSummarizationWithRetry(
         options?.onProgress?.(progressBase + 12, 'Generating document title');
 
         // Generate title from summary (uses less tokens than full text)
-        const generatedTitle = await generateDocumentTitle(chunkingResult.summary, language);
+        // Use course language for title, not document language
+        const generatedTitle = await generateDocumentTitle(chunkingResult.summary, titleLanguage);
 
         options?.onProgress?.(progressBase + 15, 'Storing summary');
 
@@ -538,9 +558,9 @@ async function executeSummarizationWithRetry(
           attempts: currentAttempt + 1,
         }, '[Phase 6] Max retries reached, using best-effort summary');
 
-        // Generate title even for best-effort summary
+        // Generate title even for best-effort summary (use course language)
         options?.onProgress?.(progressBase + 12, 'Generating document title');
-        const generatedTitle = await generateDocumentTitle(chunkingResult.summary, language);
+        const generatedTitle = await generateDocumentTitle(chunkingResult.summary, titleLanguage);
 
         // Store best-effort summary
         options?.onProgress?.(progressBase + 15, 'Storing best-effort summary');
@@ -587,7 +607,7 @@ async function executeSummarizationWithRetry(
         }, '[Phase 6] All attempts failed, falling back to full text');
 
         options?.onProgress?.(85, 'Generating document title');
-        const generatedTitle = await generateDocumentTitle(extractedText, language);
+        const generatedTitle = await generateDocumentTitle(extractedText, titleLanguage);
 
         options?.onProgress?.(90, 'Storing full text (fallback)');
 
@@ -608,7 +628,7 @@ async function executeSummarizationWithRetry(
 
   // Should never reach here, but fallback to full text
   logger.error({ fileId }, '[Phase 6] Unexpected retry loop exit, falling back to full text');
-  const fallbackTitle = await generateDocumentTitle(extractedText, language);
+  const fallbackTitle = await generateDocumentTitle(extractedText, titleLanguage);
   return await storeFullText(
     fileId,
     extractedText,
@@ -848,6 +868,58 @@ function detectLanguage(text: string): 'ru' | 'en' {
   const hasCyrillic = cyrillicPattern.test(text.slice(0, 1000)); // Check first 1000 chars
 
   return hasCyrillic ? 'ru' : 'en';
+}
+
+/**
+ * Get course target language from database
+ *
+ * Used to generate document titles in the course's language,
+ * not the document's detected language.
+ *
+ * @param supabase - Supabase admin client
+ * @param courseId - Course UUID
+ * @returns Language code ('ru' or 'en') or null if not found
+ */
+async function getCourseLanguage(
+  supabase: ReturnType<typeof getSupabaseAdmin>,
+  courseId: string
+): Promise<'ru' | 'en' | null> {
+  try {
+    const { data, error } = await supabase
+      .from('courses')
+      .select('language')
+      .eq('id', courseId)
+      .single();
+
+    if (error || !data?.language) {
+      logger.warn({
+        courseId,
+        error: error?.message,
+      }, '[Phase 6] Failed to get course language, will use document language');
+      return null;
+    }
+
+    // Normalize language code to ISO 639-1
+    const lang = data.language.toLowerCase();
+    if (lang === 'ru' || lang === 'rus' || lang === 'russian') {
+      return 'ru';
+    }
+    if (lang === 'en' || lang === 'eng' || lang === 'english') {
+      return 'en';
+    }
+
+    logger.warn({
+      courseId,
+      language: data.language,
+    }, '[Phase 6] Unknown course language, will use document language');
+    return null;
+  } catch (error) {
+    logger.warn({
+      courseId,
+      error: error instanceof Error ? error.message : String(error),
+    }, '[Phase 6] Exception getting course language');
+    return null;
+  }
 }
 
 /**

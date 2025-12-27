@@ -15,12 +15,29 @@
  */
 
 import { Job } from 'bullmq';
+import { access, constants } from 'fs/promises';
 import { JobType, DocumentProcessingJobData } from '@megacampus/shared-types';
 import { BaseJobHandler, JobResult } from '../../orchestrator/handlers/base-handler';
 import { DocumentProcessingOrchestrator } from './orchestrator';
 import { getSupabaseAdmin } from '../../shared/supabase/admin';
 import { logger } from '../../shared/logger/index.js';
 import { logPermanentFailure } from '../../shared/logger';
+
+/**
+ * Configuration for ENOENT retry logic
+ * Handles race conditions where files may not be immediately available
+ * after Docker volume mount or container restart
+ */
+const FILE_ACCESS_RETRY_CONFIG = {
+  /** Maximum number of retry attempts for file not found errors */
+  maxRetries: 5,
+  /** Initial delay between retries in milliseconds */
+  initialDelayMs: 2000,
+  /** Maximum delay between retries in milliseconds */
+  maxDelayMs: 15000,
+  /** Backoff multiplier for exponential backoff */
+  backoffMultiplier: 1.5,
+} as const;
 
 /**
  * Document processing job handler
@@ -58,6 +75,9 @@ export class DocumentProcessingHandler extends BaseJobHandler<DocumentProcessing
     // Layer 3: Worker validation and fallback initialization
     await this.ensureFsmInitialized(jobData, job);
 
+    // Pre-check: Wait for file to be accessible (handles volume mount race conditions)
+    await this.waitForFileAccess(filePath, job);
+
     try {
       // Delegate to orchestrator for multi-phase processing
       const processingResult = await this.orchestrator.execute(jobData, job);
@@ -72,6 +92,15 @@ export class DocumentProcessingHandler extends BaseJobHandler<DocumentProcessing
         },
       };
     } catch (error) {
+      // Check if this is a file not found error that should be retried
+      if (this.isFileNotFoundError(error)) {
+        this.log(job, 'warn', 'File not found during processing, may retry', {
+          fileId,
+          filePath,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+
       this.log(job, 'error', 'Document processing failed', { error, fileId });
 
       // Update vector_status to 'failed'
@@ -90,6 +119,115 @@ export class DocumentProcessingHandler extends BaseJobHandler<DocumentProcessing
         error: error instanceof Error ? error.message : String(error),
       };
     }
+  }
+
+  /**
+   * Wait for file to be accessible with exponential backoff
+   *
+   * Handles race conditions where Docker volume mount may not be
+   * immediately ready after container restart.
+   *
+   * @param filePath - Path to the file to check
+   * @param job - BullMQ job for logging
+   * @throws Error if file is not accessible after all retries
+   */
+  private async waitForFileAccess(
+    filePath: string,
+    job: Job<DocumentProcessingJobData>
+  ): Promise<void> {
+    let attempt = 0;
+    let lastError: Error | null = null;
+
+    while (attempt < FILE_ACCESS_RETRY_CONFIG.maxRetries) {
+      try {
+        await access(filePath, constants.R_OK);
+        if (attempt > 0) {
+          this.log(job, 'info', 'File became accessible after retry', {
+            filePath,
+            attempts: attempt + 1,
+          });
+        }
+        return; // File is accessible
+      } catch (error) {
+        attempt++;
+        lastError = error as Error;
+
+        if (attempt >= FILE_ACCESS_RETRY_CONFIG.maxRetries) {
+          break; // Max retries reached
+        }
+
+        // Calculate delay based on attempt number using exponential backoff formula:
+        // baseDelay * multiplier^(attempt-1)
+        const delay = Math.min(
+          FILE_ACCESS_RETRY_CONFIG.initialDelayMs *
+            Math.pow(FILE_ACCESS_RETRY_CONFIG.backoffMultiplier, attempt - 1),
+          FILE_ACCESS_RETRY_CONFIG.maxDelayMs
+        );
+
+        this.log(job, 'warn', 'File not accessible, waiting for volume mount', {
+          filePath,
+          attempt,
+          maxRetries: FILE_ACCESS_RETRY_CONFIG.maxRetries,
+          nextRetryMs: delay,
+          error: lastError.message,
+        });
+
+        // Wait with exponential backoff
+        await this.sleep(delay);
+      }
+    }
+
+    // All retries exhausted
+    this.log(job, 'error', 'File not accessible after all retries', {
+      filePath,
+      attempts: attempt,
+      error: lastError?.message,
+    });
+
+    throw new Error(
+      `File not accessible after ${attempt} retries: ${filePath}. ` +
+      `Error: ${lastError?.message}. ` +
+      `This may indicate a Docker volume mount issue.`
+    );
+  }
+
+  /**
+   * Type guard for NodeJS.ErrnoException
+   */
+  private isErrnoException(error: unknown): error is NodeJS.ErrnoException {
+    return (
+      error instanceof Error &&
+      'code' in error &&
+      typeof (error as { code?: unknown }).code === 'string'
+    );
+  }
+
+  /**
+   * Check if an error is a file not found error (ENOENT)
+   */
+  private isFileNotFoundError(error: unknown): boolean {
+    // First check errno code (most reliable)
+    if (this.isErrnoException(error) && error.code === 'ENOENT') {
+      return true;
+    }
+
+    // Fallback to message matching for non-standard errors
+    if (error instanceof Error) {
+      const message = error.message.toLowerCase();
+      return (
+        message.includes('enoent') ||
+        message.includes('no such file or directory')
+      );
+    }
+
+    return false;
+  }
+
+  /**
+   * Sleep helper
+   */
+  private sleep(ms: number): Promise<void> {
+    return new Promise((resolve) => setTimeout(resolve, ms));
   }
 
   /**

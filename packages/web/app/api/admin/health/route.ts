@@ -227,10 +227,17 @@ async function checkDoclingMcp(): Promise<ServiceStatus> {
     // Use tools/list - standard MCP method that should always be available
     const mcpRequest = { jsonrpc: '2.0', method: 'tools/list', id: 1 }
 
+    // MCP SDK requires Accept header with both application/json and text/event-stream
+    // Without this header, the server returns HTTP 406 Not Acceptable
+    const mcpHeaders = {
+      'Content-Type': 'application/json',
+      'Accept': 'application/json, text/event-stream',
+    }
+
     try {
       response = await fetchWithTimeout(internalUrl, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: mcpHeaders,
         body: JSON.stringify(mcpRequest),
       })
     } catch {
@@ -238,20 +245,25 @@ async function checkDoclingMcp(): Promise<ServiceStatus> {
       usedUrl = fallbackUrl
       response = await fetchWithTimeout(fallbackUrl, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: mcpHeaders,
         body: JSON.stringify(mcpRequest),
       })
     }
 
     const responseTime = Date.now() - startTime
 
-    // Check if we got a valid JSON-RPC response
-    if (response.ok) {
-      try {
-        const data = await response.json()
-        // Valid JSON-RPC response has either result or error
-        if (data.jsonrpc === '2.0' && (data.result !== undefined || data.error !== undefined)) {
-          // Even if method returns error, service is responding correctly
+    // Try to parse JSON response regardless of HTTP status
+    // MCP servers may return HTTP 400 with valid JSON-RPC error for session-related issues
+    try {
+      const data = await response.json()
+
+      // Valid JSON-RPC response has either result or error
+      if (data.jsonrpc === '2.0' && (data.result !== undefined || data.error !== undefined)) {
+        // Check if it's a session-related error (expected for stateless health check)
+        const isSessionError = data.error?.message?.toLowerCase().includes('session')
+
+        if (data.result !== undefined || isSessionError) {
+          // Service is healthy: either returned tools or requires session (expected behavior)
           const toolCount = data.result?.tools?.length
           return {
             name: 'Docling MCP',
@@ -259,12 +271,25 @@ async function checkDoclingMcp(): Promise<ServiceStatus> {
             responseTime,
             message: toolCount !== undefined
               ? `${toolCount} tool(s) available`
-              : `Service responding at ${usedUrl.includes('docling-mcp:8000') ? 'internal' : 'external'} URL`,
+              : isSessionError
+                ? 'MCP protocol responding (session required)'
+                : `Service responding at ${usedUrl.includes('docling-mcp:8000') ? 'internal' : 'external'} URL`,
             lastCheck,
           }
         }
-      } catch {
-        // JSON parse failed but HTTP was OK - service is partially working
+
+        // Other JSON-RPC errors indicate the service is working but may have issues
+        return {
+          name: 'Docling MCP',
+          status: 'healthy',
+          responseTime,
+          message: `MCP responding: ${data.error?.message || 'OK'}`,
+          lastCheck,
+        }
+      }
+    } catch {
+      // JSON parse failed - check HTTP status
+      if (response.ok) {
         return {
           name: 'Docling MCP',
           status: 'degraded',
@@ -285,6 +310,84 @@ async function checkDoclingMcp(): Promise<ServiceStatus> {
   } catch (error) {
     return {
       name: 'Docling MCP',
+      status: 'error',
+      responseTime: Date.now() - startTime,
+      message: error instanceof Error ? error.message : 'Connection failed',
+      lastCheck,
+    }
+  }
+}
+
+/**
+ * Check Worker Readiness
+ * Verifies that the BullMQ worker is ready to process jobs
+ * (uploads directory accessible, pre-flight checks passed)
+ */
+async function checkWorkerReadiness(): Promise<ServiceStatus> {
+  const startTime = Date.now()
+  const lastCheck = new Date().toISOString()
+
+  const internalUrl = 'http://api:4000/readiness'
+  const publicUrl = `${ENV.COURSEGEN_BACKEND_URL}/readiness`
+
+  try {
+    let response: Response | null = null
+
+    try {
+      response = await fetchWithTimeout(internalUrl)
+    } catch {
+      response = await fetchWithTimeout(publicUrl)
+    }
+
+    const responseTime = Date.now() - startTime
+
+    if (response.ok) {
+      const data = await response.json()
+
+      if (data.data?.ready === true) {
+        return {
+          name: 'Worker',
+          status: 'healthy',
+          responseTime,
+          message: 'Worker ready, uploads accessible',
+          lastCheck,
+        }
+      }
+
+      // Worker not ready yet
+      const failedChecks = data.data?.checks?.filter((c: { passed: boolean }) => !c.passed) || []
+      return {
+        name: 'Worker',
+        status: 'degraded',
+        responseTime,
+        message: failedChecks.length > 0
+          ? `Pre-flight checks failed: ${failedChecks.map((c: { name: string }) => c.name).join(', ')}`
+          : 'Worker not ready',
+        lastCheck,
+      }
+    }
+
+    // 503 means worker is not ready
+    if (response.status === 503) {
+      return {
+        name: 'Worker',
+        status: 'degraded',
+        responseTime,
+        message: 'Worker not ready (pre-flight checks pending)',
+        lastCheck,
+      }
+    }
+
+    return {
+      name: 'Worker',
+      status: 'error',
+      responseTime,
+      message: `HTTP ${response.status}: ${response.statusText}`,
+      lastCheck,
+    }
+  } catch (error) {
+    return {
+      name: 'Worker',
       status: 'error',
       responseTime: Date.now() - startTime,
       message: error instanceof Error ? error.message : 'Connection failed',
@@ -416,12 +519,14 @@ export async function GET(request: NextRequest): Promise<NextResponse<HealthResp
       redisStatus,
       doclingStatus,
       qdrantStatus,
+      workerStatus,
     ] = await Promise.allSettled([
       checkSupabase(),
       checkApiServer(),
       checkRedis(),
       checkDoclingMcp(),
       checkQdrant(),
+      checkWorkerReadiness(),
     ])
 
     // Extract results, handling rejected promises
@@ -441,6 +546,9 @@ export async function GET(request: NextRequest): Promise<NextResponse<HealthResp
       qdrantStatus.status === 'fulfilled'
         ? qdrantStatus.value
         : { name: 'Qdrant', status: 'error' as const, responseTime: 0, message: 'Check failed', lastCheck: new Date().toISOString() },
+      workerStatus.status === 'fulfilled'
+        ? workerStatus.value
+        : { name: 'Worker', status: 'error' as const, responseTime: 0, message: 'Check failed', lastCheck: new Date().toISOString() },
     ]
 
     // Determine overall status

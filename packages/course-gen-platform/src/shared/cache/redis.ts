@@ -9,6 +9,7 @@ import logger from '../logger';
 let redisClient: Redis | null = null;
 let isConnected = false; // Module-level connection state (shared across all RedisCache instances)
 let connectionPromise: Promise<void> | null = null; // Module-level connection promise
+let isClosing = false; // Guard against concurrent close calls
 
 export function getRedisClient(): Redis {
   if (!redisClient) {
@@ -68,6 +69,36 @@ export function getRedisClient(): Redis {
  */
 export function isRedisConnected(): boolean {
   return redisClient !== null && redisClient.status === 'ready';
+}
+
+/**
+ * Close the Redis client connection (idempotent)
+ *
+ * Should be called during test teardown or application shutdown
+ * to prevent file handle leaks. Safe to call multiple times.
+ */
+export async function closeRedisClient(): Promise<void> {
+  // Already closed or closing - safe to call multiple times
+  if (!redisClient || isClosing) {
+    return;
+  }
+
+  isClosing = true;
+  const client = redisClient;
+
+  try {
+    await client.quit();
+    logger.info('Redis client closed successfully');
+  } catch (error) {
+    // Force disconnect if quit fails
+    client.disconnect();
+    logger.warn({ error }, 'Redis quit failed, forced disconnect');
+  } finally {
+    redisClient = null;
+    isConnected = false;
+    connectionPromise = null;
+    isClosing = false;
+  }
 }
 
 /**

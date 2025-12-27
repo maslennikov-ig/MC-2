@@ -29,7 +29,8 @@ export default function CreateCourseForm() {
     uploadSingleFile,
     toggleFormat,
     authModal,
-    formats
+    formats,
+    workerReadiness,
   } = useCreateCourseForm()
 
   // Show loading state while checking permissions
@@ -100,7 +101,12 @@ export default function CreateCourseForm() {
 
           <AdvancedSettingsSection />
 
-          <SubmitSection isSubmitting={isSubmitting} />
+          <SubmitSection
+            isSubmitting={isSubmitting}
+            workerReady={workerReadiness.ready}
+            workerLoading={workerReadiness.loading}
+            workerError={workerReadiness.error}
+          />
 
         </form>
       </FormProvider>

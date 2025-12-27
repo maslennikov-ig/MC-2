@@ -30,6 +30,7 @@
 
 import { logger } from '@/shared/logger';
 import { logTrace } from '@/shared/trace-logger';
+import { metricsStore } from '@/orchestrator/metrics';
 import type {
   LessonGraphStateType,
   LessonGraphStateUpdate,
@@ -111,13 +112,18 @@ interface SelfReviewerLLMResponse {
 
 /**
  * Unicode ranges for foreign script detection (matching heuristic-filter.ts)
+ *
+ * IMPORTANT: Do NOT use /g flag here!
+ * RegExp.test() with /g flag retains lastIndex between calls, causing
+ * intermittent failures when checking multiple sections. Without /g,
+ * test() always starts from index 0.
  */
 const FOREIGN_SCRIPT_PATTERNS: Record<string, RegExp> = {
-  CJK: /[\u4E00-\u9FFF\u3400-\u4DBF]/g,
-  ARABIC: /[\u0600-\u06FF]/g,
-  DEVANAGARI: /[\u0900-\u097F]/g,
-  THAI: /[\u0E00-\u0E7F]/g,
-  HEBREW: /[\u0590-\u05FF]/g,
+  CJK: /[\u4E00-\u9FFF\u3400-\u4DBF]/,
+  ARABIC: /[\u0600-\u06FF]/,
+  DEVANAGARI: /[\u0900-\u097F]/,
+  THAI: /[\u0E00-\u0E7F]/,
+  HEBREW: /[\u0590-\u05FF]/,
 };
 
 /**
@@ -1105,13 +1111,14 @@ export async function selfReviewerNode(
     // - 11+ chars: REGENERATE (critical issue, skip LLM, full regeneration)
 
     // Language failures: More than 10 foreign characters triggers regeneration
-    // Strategy:
-    // 1st attempt (retryCount=0): Partial section regeneration with primary model
-    // 2nd+ attempt (retryCount>0): Full regeneration with fallback model (non-Chinese)
+    // Strategy (based on MODEL_FALLBACK.maxPrimaryAttempts = 2):
+    // - retryCount=0: 1st attempt - Partial section regeneration with primary model
+    // - retryCount=1: 2nd attempt - Still use primary model (partial/full regeneration)
+    // - retryCount>=2: 3rd+ attempt - Switch to fallback model (non-Chinese)
     // This prevents Chinese model (mimo) from inserting CJK repeatedly
     if (!languageCheck.passed && languageCheck.foreignCharacters > SELF_REVIEW_CONFIG.criticalLanguageThreshold) {
       const currentRetryCount = state.retryCount ?? 0;
-      const isRetryWithPersistentCJK = currentRetryCount > 0;
+      const isRetryWithPersistentCJK = currentRetryCount >= MODEL_FALLBACK.maxPrimaryAttempts;
 
       // Find which specific sections contain foreign characters
       const affectedSections = findSectionsWithForeignCharacters(
@@ -1129,6 +1136,9 @@ export async function selfReviewerNode(
           location: 'global',
           description: `Persistent CJK issue after ${currentRetryCount} retry(ies). Switching to fallback model (${MODEL_FALLBACK.fallback}) for full regeneration.`,
         });
+
+        // Record model fallback metric for monitoring
+        metricsStore.recordModelFallback('cjk', 'stage6');
 
         nodeLogger.warn({
           msg: 'Persistent CJK issue - switching to fallback model for full regeneration',

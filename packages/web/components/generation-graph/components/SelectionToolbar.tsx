@@ -194,6 +194,7 @@ export function SelectionToolbar({ courseId }: SelectionToolbarProps) {
             onDragEnd={handleDragEnd}
             style={{ x, opacity }}
             className="w-full max-w-3xl pointer-events-auto touch-pan-y"
+            title="Смахните влево, чтобы свернуть"
           >
             <div className={`backdrop-blur-md rounded-lg shadow-lg overflow-hidden ${
               isDark
@@ -203,13 +204,19 @@ export function SelectionToolbar({ courseId }: SelectionToolbarProps) {
 
               {/* Header with both buttons visible */}
               <div className="px-3 py-1.5 flex items-center justify-between gap-2">
-                {/* Left: Icon + Title + Expand toggle */}
+                {/* Left: Drag grip + Icon + Title + Expand toggle */}
                 <div
                   className={`flex items-center gap-2 overflow-hidden cursor-pointer transition-colors rounded px-1.5 py-0.5 -mx-1.5 ${
                     isDark ? 'hover:bg-white/5' : 'hover:bg-slate-50'
                   }`}
                   onClick={() => setIsExpanded(!isExpanded)}
                 >
+                  {/* Drag grip indicator */}
+                  <div className="flex flex-col gap-0.5 mr-1">
+                    <div className={`w-0.5 h-0.5 rounded-full ${isDark ? 'bg-gray-500' : 'bg-gray-300'}`} />
+                    <div className={`w-0.5 h-0.5 rounded-full ${isDark ? 'bg-gray-500' : 'bg-gray-300'}`} />
+                    <div className={`w-0.5 h-0.5 rounded-full ${isDark ? 'bg-gray-500' : 'bg-gray-300'}`} />
+                  </div>
                   <div className={`p-1 rounded-full border shrink-0 ${
                     isDark
                       ? 'bg-purple-500/10 border-purple-500/30 text-purple-400'

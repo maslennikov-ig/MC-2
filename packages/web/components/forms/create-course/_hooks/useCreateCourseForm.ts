@@ -14,6 +14,7 @@ import { formSchema, type FormData } from "../_schemas/form-schema"
 import { useFileUpload } from "./useFileUpload"
 import { useAutoSave } from "./useAutoSave"
 import { useSubmitCourse } from "./useSubmitCourse"
+import { useWorkerReadiness } from "./useWorkerReadiness"
 
 export function useCreateCourseForm() {
   const [mounted, setMounted] = useState(false)
@@ -73,6 +74,13 @@ export function useCreateCourseForm() {
   } = useFileUpload()
 
   const { handleFormChange } = useAutoSave(sessionId, getValues)
+
+  // Worker readiness check - poll every 10s until ready
+  const workerReadiness = useWorkerReadiness({
+    enabled: mounted && canCreate === true,
+    pollInterval: 10000,
+    pollWhenReady: false, // Stop polling once ready
+  })
 
   const { onSubmit, isSubmitting, authModal, router } = useSubmitCourse({
     sessionId,
@@ -262,13 +270,17 @@ export function useCreateCourseForm() {
   }, [getValues, setValue])
 
   useEffect(() => {
-    const validationTimeouts = [...validationTimeoutsRef.current]
-    const autoSubmitTimeout = autoSubmitTimeoutRef.current
-
+    // Cleanup function called at unmount
     return () => {
-      validationTimeouts.forEach(clearTimeout)
+      // Clear all validation timeouts (from current ref, not a copy)
+      validationTimeoutsRef.current.forEach(clearTimeout)
       validationTimeoutsRef.current = []
-      if (autoSubmitTimeout) clearTimeout(autoSubmitTimeout)
+
+      // Clear autoSubmit timeout
+      if (autoSubmitTimeoutRef.current) {
+        clearTimeout(autoSubmitTimeoutRef.current)
+        autoSubmitTimeoutRef.current = null
+      }
     }
   }, [])
 
@@ -301,6 +313,7 @@ export function useCreateCourseForm() {
     toggleFormat,
     authModal,
     router,
-    formats
+    formats,
+    workerReadiness,
   }
 }

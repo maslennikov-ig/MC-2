@@ -528,6 +528,11 @@ export const Stage2ProcessTab = memo<Stage2ProcessTabProps>(function Stage2Proce
 
     // Determine which phases should be marked as completed based on overall document status
     const isDocumentCompleted = documentStatus === 'completed';
+    const isDocumentError = documentStatus === 'error';
+    // Check docling phase status (images/markdown are processed within docling)
+    const doclingStatus = phaseStatusMap.get('docling')?.status;
+    const isDoclingCompleted = doclingStatus === 'completed' || isDocumentCompleted;
+    const isDoclingError = doclingStatus === 'error';
 
     return PHASE_ORDER.map((phaseId) => {
       const storeData = phaseStatusMap.get(phaseId);
@@ -535,8 +540,23 @@ export const Stage2ProcessTab = memo<Stage2ProcessTabProps>(function Stage2Proce
       // If document is completed but phase wasn't explicitly tracked, mark as completed
       let phaseStatus: ProcessingPhaseStatus = storeData?.status || 'pending';
       if (isDocumentCompleted && phaseStatus === 'pending') {
-        // Images phase might be skipped if no images in document
-        phaseStatus = phaseId === 'images' ? 'skipped' : 'completed';
+        // All phases are completed when document processing finishes
+        // Images and markdown phases are processed within the Docling conversion phase
+        phaseStatus = 'completed';
+      } else if (isDocumentError && phaseStatus === 'pending') {
+        // If document errored, mark untracked phases as error too
+        phaseStatus = 'error';
+      } else if (phaseStatus === 'pending' && isDoclingCompleted) {
+        // Images and markdown phases complete together with Docling
+        // They are sub-phases of Docling conversion, not separate steps
+        if (phaseId === 'images' || phaseId === 'markdown') {
+          phaseStatus = 'completed';
+        }
+      } else if (phaseStatus === 'pending' && isDoclingError) {
+        // If Docling errored, mark its sub-phases as error too
+        if (phaseId === 'images' || phaseId === 'markdown') {
+          phaseStatus = 'error';
+        }
       }
 
       return {

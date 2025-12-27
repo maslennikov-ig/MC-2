@@ -17,10 +17,15 @@ interface PageProps {
     locale: Locale;
     slug: string;
   }>;
+  searchParams: Promise<{ [key: string]: string | string[] | undefined }>;
 }
 
-export default async function CourseGeneratingPage({ params }: PageProps) {
+export default async function CourseGeneratingPage({ params, searchParams }: PageProps) {
   const { locale, slug } = await params;
+  const resolvedSearchParams = await searchParams;
+
+  // Allow viewing workflow for completed courses with ?workflow=true
+  const forceWorkflowView = resolvedSearchParams.workflow === 'true';
   setRequestLocale(locale); // Enable static rendering
   const supabase = await createClient();
 
@@ -53,13 +58,15 @@ export default async function CourseGeneratingPage({ params }: PageProps) {
   }
 
   // If course generation is already completed, redirect to the course page
-  if (course.generation_status === 'completed') {
+  // Unless ?workflow=true is passed to force workflow view
+  if (course.generation_status === 'completed' && !forceWorkflowView) {
     redirect(`/courses/${course.slug}`);
   }
 
   // If course generation has been cancelled, redirect to course page
   // Note: 'failed' status stays on this page to show error and allow restart
-  if (course.generation_status === 'cancelled') {
+  // Unless ?workflow=true is passed to force workflow view
+  if (course.generation_status === 'cancelled' && !forceWorkflowView) {
     redirect(`/courses/${course.slug}`);
   }
 
@@ -175,7 +182,7 @@ export default async function CourseGeneratingPage({ params }: PageProps) {
             initialProgress={generationProgress}
             initialStatus={generationStatus}
             courseTitle={course.title || 'Untitled Course'}
-            autoRedirect={true}
+            autoRedirect={!forceWorkflowView}
             redirectDelay={3000}
             userRole={userRole}
             failedAtStage={course.failed_at_stage}

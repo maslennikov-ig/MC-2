@@ -1,5 +1,5 @@
 import { NextRequest } from 'next/server'
-import { apiError, apiSuccess } from '@/lib/api-response'
+import { jsonError, jsonSuccess, ERROR_CODES } from '@/lib/api-response'
 import { logger } from '@/lib/logger'
 import { checkRateLimit, getRateLimitIdentifier } from '@/lib/rate-limit'
 
@@ -34,7 +34,8 @@ export async function POST(request: NextRequest) {
     });
 
     if (!rateLimitResult.success) {
-      const response = apiError(
+      const response = jsonError(
+        ERROR_CODES.VALIDATION_ERROR,
         'Too many idea submissions. Please wait a few minutes before submitting another idea.',
         429,
         { retryAfter: rateLimitResult.retryAfter }
@@ -52,7 +53,7 @@ export async function POST(request: NextRequest) {
     // Check if Telegram is properly configured
     if (!TELEGRAM_BOT_TOKEN || !TELEGRAM_CHAT_ID || !TELEGRAM_API_URL) {
       logger.error('Telegram integration not configured: Missing environment variables')
-      return apiError('Service temporarily unavailable. Please try again later.', 503)
+      return jsonError(ERROR_CODES.SERVICE_UNAVAILABLE, 'Service temporarily unavailable. Please try again later.', 503)
     }
 
     // Parse request body
@@ -60,7 +61,7 @@ export async function POST(request: NextRequest) {
     
     // Validate required fields
     if (!body.idea || body.idea.trim().length === 0) {
-      return apiError('Idea text is required', 400)
+      return jsonError(ERROR_CODES.VALIDATION_ERROR, 'Idea text is required', 400)
     }
 
     // Format message for Telegram
@@ -100,9 +101,9 @@ export async function POST(request: NextRequest) {
     if (!telegramResponse.ok) {
       const error = await telegramResponse.json()
       logger.error('Telegram API error:', error)
-      
+
       // Don't expose Telegram errors to the client
-      return apiError('Failed to send message. Please try again later.', 500)
+      return jsonError(ERROR_CODES.INTERNAL_ERROR, 'Failed to send message. Please try again later.', 500)
     }
 
     const result = await telegramResponse.json()
@@ -114,7 +115,7 @@ export async function POST(request: NextRequest) {
       hasContact: !!body.contact
     })
 
-    const response = apiSuccess({
+    const response = jsonSuccess({
       message: 'Idea submitted successfully',
       timestamp,
       messageId: result.result?.message_id
@@ -129,9 +130,9 @@ export async function POST(request: NextRequest) {
 
   } catch (error) {
     logger.error('Error sending to Telegram:', error)
-    
+
     // Generic error response
-    return apiError('An error occurred while processing your request', 500)
+    return jsonError(ERROR_CODES.INTERNAL_ERROR, 'An error occurred while processing your request', 500)
   }
 }
 
