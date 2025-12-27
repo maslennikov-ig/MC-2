@@ -11,9 +11,10 @@
 # - Safe rollback with file backups (no data loss on errors)
 # - Rollback support for failed releases
 #
-# Usage: ./release.sh [patch|minor|major] [--yes]
+# Usage: ./release.sh [patch|minor|major] [--yes] [--message "commit message"]
 #        Leave empty for auto-detection from conventional commits
 #        --yes: Skip confirmation prompt (for automation)
+#        --message, -m: Custom commit message for auto-committing uncommitted changes
 #
 # Supported conventional commit types:
 #   security:   → Security section (patch version)
@@ -42,6 +43,7 @@ readonly NC='\033[0m' # No Color
 # State tracking for rollback
 CREATED_COMMIT=""
 CREATED_TAG=""
+CUSTOM_COMMIT_MSG=""  # Custom message for auto-commit (set via --message flag)
 declare -a MODIFIED_FILES=()
 declare -a BACKUP_FILES=()  # Track backup files for safe rollback
 
@@ -345,7 +347,21 @@ run_preflight_checks() {
             changes_body="${changes_body}- ${change}\n"
         done
 
-        COMMIT_MSG="${commit_type}: ${commit_desc}
+        # Use custom message if provided, otherwise auto-generate
+        if [ -n "${CUSTOM_COMMIT_MSG:-}" ]; then
+            COMMIT_MSG="${CUSTOM_COMMIT_MSG}
+
+Auto-committed ${TOTAL_COUNT} file(s) before creating release.
+
+Files changed:
+${FILE_LIST}
+
+🤖 Generated with [Claude Code](https://claude.com/claude-code)
+
+Co-Authored-By: Claude <noreply@anthropic.com>"
+            log_info "Using custom commit message: ${CUSTOM_COMMIT_MSG}"
+        else
+            COMMIT_MSG="${commit_type}: ${commit_desc}
 
 Changes in this commit:
 $(echo -e "$changes_body")
@@ -357,6 +373,7 @@ ${FILE_LIST}
 🤖 Generated with [Claude Code](https://claude.com/claude-code)
 
 Co-Authored-By: Claude <noreply@anthropic.com>"
+        fi
 
         # Create commit
         git commit -m "$COMMIT_MSG" >/dev/null 2>&1 || {
@@ -1202,22 +1219,38 @@ main() {
     # Parse arguments
     local bump_arg=""
     local auto_confirm="false"
+    local custom_commit_msg=""
 
-    for arg in "$@"; do
-        case "$arg" in
+    while [[ $# -gt 0 ]]; do
+        case "$1" in
             --yes|-y)
                 auto_confirm="true"
+                shift
+                ;;
+            --message|-m)
+                if [[ -n "${2:-}" && ! "$2" =~ ^- ]]; then
+                    custom_commit_msg="$2"
+                    shift 2
+                else
+                    log_error "--message requires an argument"
+                    echo "Usage: $0 [patch|minor|major] [--yes] [--message \"commit message\"]"
+                    exit 1
+                fi
                 ;;
             patch|minor|major)
-                bump_arg="$arg"
+                bump_arg="$1"
+                shift
                 ;;
             *)
-                log_error "Unknown argument: $arg"
-                echo "Usage: $0 [patch|minor|major] [--yes]"
+                log_error "Unknown argument: $1"
+                echo "Usage: $0 [patch|minor|major] [--yes] [--message \"commit message\"]"
                 exit 1
                 ;;
         esac
     done
+
+    # Export custom_commit_msg for use in run_preflight_checks
+    CUSTOM_COMMIT_MSG="$custom_commit_msg"
 
     # Run workflow
     run_preflight_checks
