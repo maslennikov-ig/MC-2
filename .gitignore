@@ -29,6 +29,8 @@ Thumbs.db
 .idea/
 *.log
 logs/
+# Unignore admin logs page (it's a Next.js route, not log files)
+!**/app/**/admin/logs/
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
