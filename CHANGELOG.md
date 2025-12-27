@@ -35,6 +35,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.26.32] - 2025-12-27
+
+### Other
+- cleanup 1 file(s) (bd1711b)
+
 ## [0.26.31] - 2025-12-26
 
 ### Other
