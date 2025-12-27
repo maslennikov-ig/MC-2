@@ -3,6 +3,18 @@
 _Released on 2025-12-26_
 
 
+## v0.26.33
+
+_Released on 2025-12-27_
+
+### 🐛 Bug Fixes
+
+- **gitignore**: Unignore admin/logs page route
+
+---
+
+_This release was automatically generated from 2 commits._
+
 ## v0.26.32
 
 _Released on 2025-12-27_

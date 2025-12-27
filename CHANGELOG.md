@@ -35,6 +35,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.26.33] - 2025-12-27
+
+### Fixed
+- **gitignore**: unignore admin/logs page route (b105489)
+
+### Other
+- update docs (5e9ac1c)
+
 ## [0.26.32] - 2025-12-27
 
 ### Other
