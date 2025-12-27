@@ -35,6 +35,7 @@ const SheetOverlay = React.forwardRef<
     <SheetPrimitive.Overlay asChild>
       <motion.div
         ref={ref}
+        data-sheet-overlay=""
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         exit={{ opacity: 0 }}

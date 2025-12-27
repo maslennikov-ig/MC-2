@@ -47,6 +47,7 @@ import {
   checkContentTruncation,
   checkMermaidSyntax,
 } from '../judge/heuristic-filter';
+import { MODEL_FALLBACK } from '../config';
 import { locationToSectionId } from '../utils/markdown-section-parser';
 import { LLMClient } from '@/shared/llm';
 import { createModelConfigService } from '@/shared/llm/model-config-service';
@@ -102,6 +103,114 @@ interface SelfReviewerLLMResponse {
     description: string;
   }>;
   patched_content?: LessonContentBody | null;
+}
+
+// ============================================================================
+// FOREIGN CHARACTER SECTION DETECTION
+// ============================================================================
+
+/**
+ * Unicode ranges for foreign script detection (matching heuristic-filter.ts)
+ */
+const FOREIGN_SCRIPT_PATTERNS: Record<string, RegExp> = {
+  CJK: /[\u4E00-\u9FFF\u3400-\u4DBF]/g,
+  ARABIC: /[\u0600-\u06FF]/g,
+  DEVANAGARI: /[\u0900-\u097F]/g,
+  THAI: /[\u0E00-\u0E7F]/g,
+  HEBREW: /[\u0590-\u05FF]/g,
+};
+
+/**
+ * Find sections containing foreign script characters
+ *
+ * Parses markdown into sections and checks each for unexpected characters.
+ * Returns section IDs (introduction, section_1, section_2, summary) for partial regeneration.
+ *
+ * @param content - Full markdown content
+ * @param scriptsToFind - Scripts to look for (e.g., ['CJK', 'ARABIC'])
+ * @returns Array of affected section IDs
+ */
+function findSectionsWithForeignCharacters(
+  content: string,
+  scriptsToFind: string[]
+): string[] {
+  const affectedSections: string[] = [];
+
+  // Split content by ## headers (markdown section boundaries)
+  const sectionRegex = /^##\s+(.+)$/gm;
+  const sections: Array<{ title: string; content: string; startIndex: number }> = [];
+
+  let match: RegExpExecArray | null;
+  let sectionNumber = 0;
+
+  // Extract introduction (content before first ## header)
+  const firstHeaderMatch = content.match(/^##\s+/m);
+  if (firstHeaderMatch && firstHeaderMatch.index !== undefined && firstHeaderMatch.index > 0) {
+    sections.push({
+      title: 'Introduction',
+      content: content.slice(0, firstHeaderMatch.index),
+      startIndex: 0,
+    });
+  }
+
+  // Extract sections
+  const matches: Array<{ title: string; index: number }> = [];
+  while ((match = sectionRegex.exec(content)) !== null) {
+    matches.push({ title: match[1], index: match.index });
+  }
+
+  for (let i = 0; i < matches.length; i++) {
+    const start = matches[i].index;
+    const end = i < matches.length - 1 ? matches[i + 1].index : content.length;
+    sections.push({
+      title: matches[i].title,
+      content: content.slice(start, end),
+      startIndex: start,
+    });
+  }
+
+  // Check each section for foreign characters
+  for (const section of sections) {
+    // Remove code blocks before checking (foreign chars in code are OK)
+    const proseContent = section.content.replace(/```[\s\S]*?```/g, '').replace(/`[^`]+`/g, '');
+
+    let hasForeignChars = false;
+    for (const scriptKey of scriptsToFind) {
+      const pattern = FOREIGN_SCRIPT_PATTERNS[scriptKey];
+      if (pattern && pattern.test(proseContent)) {
+        hasForeignChars = true;
+        break;
+      }
+    }
+
+    if (hasForeignChars) {
+      // Map section title to section ID
+      const lowerTitle = section.title.toLowerCase();
+
+      if (lowerTitle.includes('введение') || lowerTitle.includes('introduction')) {
+        affectedSections.push('introduction');
+      } else if (lowerTitle.includes('итог') || lowerTitle.includes('заключение') ||
+                 lowerTitle.includes('summary') || lowerTitle.includes('conclusion')) {
+        affectedSections.push('summary');
+      } else {
+        // For numbered sections, extract section number
+        sectionNumber++;
+        affectedSections.push(`section_${sectionNumber}`);
+      }
+    } else {
+      // Still increment section number for non-intro/summary sections
+      const lowerTitle = section.title.toLowerCase();
+      if (!lowerTitle.includes('введение') && !lowerTitle.includes('introduction') &&
+          !lowerTitle.includes('итог') && !lowerTitle.includes('заключение') &&
+          !lowerTitle.includes('summary') && !lowerTitle.includes('conclusion') &&
+          section.title !== 'Introduction') {
+        sectionNumber++;
+      }
+    }
+  }
+
+  // Deduplicate
+  return [...new Set(affectedSections)];
 }
 
 /**
@@ -995,21 +1104,126 @@ export async function selfReviewerNode(
     // - 6-10 chars: PASS_WITH_FLAGS (minor issue, proceed to LLM review)
     // - 11+ chars: REGENERATE (critical issue, skip LLM, full regeneration)
 
-    // Language failures: More than 10 foreign characters is critical
+    // Language failures: More than 10 foreign characters triggers regeneration
+    // Strategy:
+    // 1st attempt (retryCount=0): Partial section regeneration with primary model
+    // 2nd+ attempt (retryCount>0): Full regeneration with fallback model (non-Chinese)
+    // This prevents Chinese model (mimo) from inserting CJK repeatedly
     if (!languageCheck.passed && languageCheck.foreignCharacters > SELF_REVIEW_CONFIG.criticalLanguageThreshold) {
-      issues.push({
-        type: 'LANGUAGE',
-        severity: 'CRITICAL',
-        location: 'global',
-        description: `Found ${languageCheck.foreignCharacters} foreign characters from ${languageCheck.scriptsFound.join(', ')} scripts. Expected language: ${language}`,
-      });
+      const currentRetryCount = state.retryCount ?? 0;
+      const isRetryWithPersistentCJK = currentRetryCount > 0;
 
-      nodeLogger.warn({
-        msg: 'Critical language consistency failure',
-        foreignCharacters: languageCheck.foreignCharacters,
-        scriptsFound: languageCheck.scriptsFound,
-        samples: languageCheck.foreignSamples,
-      });
+      // Find which specific sections contain foreign characters
+      const affectedSections = findSectionsWithForeignCharacters(
+        generatedContent,
+        languageCheck.scriptsFound
+      );
+
+      // Check if we need model fallback (CJK persists after partial regeneration)
+      if (isRetryWithPersistentCJK) {
+        // Switch to fallback model (non-Chinese) for full regeneration
+        // This prevents the Chinese model from inserting CJK characters again
+        issues.push({
+          type: 'LANGUAGE',
+          severity: 'CRITICAL',
+          location: 'global',
+          description: `Persistent CJK issue after ${currentRetryCount} retry(ies). Switching to fallback model (${MODEL_FALLBACK.fallback}) for full regeneration.`,
+        });
+
+        nodeLogger.warn({
+          msg: 'Persistent CJK issue - switching to fallback model for full regeneration',
+          foreignCharacters: languageCheck.foreignCharacters,
+          scriptsFound: languageCheck.scriptsFound,
+          samples: languageCheck.foreignSamples,
+          affectedSections,
+          retryCount: currentRetryCount,
+          fallbackModel: MODEL_FALLBACK.fallback,
+        });
+
+        // Return early with modelOverride set to fallback
+        // This will be picked up by the generator node
+        const heuristicDetails = buildHeuristicDetails(languageCheck, truncationCheck, mermaidCheck);
+        const durationMs = Date.now() - startTime;
+
+        const result: SelfReviewResult = {
+          status: 'REGENERATE',
+          reasoning: `Persistent foreign characters (${languageCheck.scriptsFound.join(', ')}) after ${currentRetryCount} retry(ies). Switching to fallback model for regeneration.`,
+          issues,
+          patchedContent: null,
+          tokensUsed: HEURISTIC_TOKENS_USED,
+          durationMs,
+          heuristicsPassed: false,
+          heuristicDetails,
+        };
+
+        const fallbackProgress = buildSelfReviewProgressSummary(
+          'REGENERATE',
+          issues,
+          language,
+          heuristicDetails,
+          false,
+          false,
+          durationMs,
+          currentRetryCount + 1,
+          state.progressSummary
+        );
+
+        return {
+          currentNode: 'selfReviewer',
+          selfReviewResult: result,
+          progressSummary: fallbackProgress,
+          modelOverride: MODEL_FALLBACK.fallback, // Switch to non-Chinese model
+          retryCount: currentRetryCount + 1,
+        };
+      }
+
+      // First attempt: Try partial regeneration with primary model
+      const totalSections = state.lessonSpec?.sections?.length ?? 0;
+      const introAndSummary = 2; // intro + summary
+      const estimatedTotalSections = totalSections + introAndSummary;
+      const isPartialPossible = affectedSections.length > 0 &&
+                                affectedSections.length < estimatedTotalSections * 0.5;
+
+      if (isPartialPossible) {
+        // COMPLEX severity: Triggers partial section regeneration
+        // Push one issue per section so extractSectionsToRegenerate() can map each
+        for (const sectionId of affectedSections) {
+          issues.push({
+            type: 'LANGUAGE',
+            severity: 'COMPLEX',
+            location: sectionId,
+            description: `Foreign characters from ${languageCheck.scriptsFound.join(', ')} scripts found in ${sectionId}. Expected language: ${language}. Targeting for partial regeneration.`,
+          });
+        }
+
+        nodeLogger.warn({
+          msg: 'Foreign character issue - targeting sections for partial regeneration',
+          foreignCharacters: languageCheck.foreignCharacters,
+          scriptsFound: languageCheck.scriptsFound,
+          samples: languageCheck.foreignSamples,
+          affectedSections,
+          totalSections: estimatedTotalSections,
+          partialRegeneration: true,
+        });
+      } else {
+        // CRITICAL severity: Triggers full regeneration (too many sections affected)
+        issues.push({
+          type: 'LANGUAGE',
+          severity: 'CRITICAL',
+          location: 'global',
+          description: `Found ${languageCheck.foreignCharacters} foreign characters from ${languageCheck.scriptsFound.join(', ')} scripts affecting ${affectedSections.length} sections. Expected language: ${language}. Full regeneration required.`,
+        });
+
+        nodeLogger.warn({
+          msg: 'Critical language consistency failure - full regeneration required',
+          foreignCharacters: languageCheck.foreignCharacters,
+          scriptsFound: languageCheck.scriptsFound,
+          samples: languageCheck.foreignSamples,
+          affectedSections,
+          totalSections: estimatedTotalSections,
+          partialRegeneration: false,
+        });
+      }
     }
 
     // Truncation failures: More than 2 truncation issues is critical

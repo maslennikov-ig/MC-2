@@ -5,6 +5,7 @@ import { motion, AnimatePresence, useMotionValue, useTransform, PanInfo } from '
 import { Play, X, CheckSquare, Rocket, ChevronUp, ChevronDown, Sparkles, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useOptionalPartialGenerationContext } from '../contexts/PartialGenerationContext';
+import { useNodeSelection } from '../hooks/useNodeSelection';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
 import type { CourseStructure } from '@megacampus/shared-types';
@@ -23,6 +24,7 @@ interface SelectionToolbarProps {
  */
 export function SelectionToolbar({ courseId }: SelectionToolbarProps) {
   const contextValue = useOptionalPartialGenerationContext();
+  const { selectedNodeId } = useNodeSelection();
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
@@ -40,6 +42,15 @@ export function SelectionToolbar({ courseId }: SelectionToolbarProps) {
       setIsMinimized(true);
     }
   }, []);
+
+  // Auto-minimize when side panel (NodeDetailsDrawer) opens
+  // Stays minimized until user manually expands
+  useEffect(() => {
+    if (selectedNodeId) {
+      setIsMinimized(true);
+      localStorage.setItem(STORAGE_KEY, 'true');
+    }
+  }, [selectedNodeId]);
 
   // Save minimized state to localStorage
   const toggleMinimized = useCallback((minimized: boolean) => {

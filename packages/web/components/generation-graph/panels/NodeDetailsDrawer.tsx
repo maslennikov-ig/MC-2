@@ -495,9 +495,18 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
         hideCloseButton={isStage6Lesson}
         // Portal into fullscreen container when in fullscreen mode (fixes z-index issue)
         container={portalContainerRef.current}
-        // Prevent closing on clicks outside (e.g., hint panel buttons)
-        // Panel closes via: 1) onPaneClick on canvas 2) close button
-        onInteractOutside={(e) => e.preventDefault()}
+        // Smart outside click handling:
+        // - Allow overlay clicks (dark backdrop) to close the drawer
+        // - Prevent closing on clicks on other elements (graph buttons, hint panels)
+        onInteractOutside={(e) => {
+          const target = e.target as HTMLElement;
+          // Allow clicks on the overlay backdrop to close the drawer
+          if (target.hasAttribute('data-sheet-overlay')) {
+            return; // Allow default close behavior
+          }
+          // Prevent closing on clicks on other elements
+          e.preventDefault();
+        }}
         data-testid="node-details-drawer"
       >
         {/* Accessibility: Hidden title for lesson nodes (screen readers only) */}

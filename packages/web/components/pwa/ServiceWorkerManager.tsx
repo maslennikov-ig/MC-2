@@ -204,6 +204,59 @@ export function ServiceWorkerManager() {
   }, [clearAllCaches]);
 
   /**
+   * Intercept fetch responses to detect 502/503 errors
+   * This handles cases where server returns error for missing chunks after deploy
+   */
+  useEffect(() => {
+    // Only intercept if we're in browser with service worker
+    if (typeof window === 'undefined' || !('serviceWorker' in navigator)) return;
+
+    const originalFetch = window.fetch;
+    let isClearing = false;
+
+    window.fetch = async (...args) => {
+      try {
+        const response = await originalFetch(...args);
+
+        // Detect 502/503 errors on static assets (likely stale cache after deploy)
+        if ((response.status === 502 || response.status === 503) && !isClearing) {
+          const input = args[0];
+          const url = typeof input === 'string'
+            ? input
+            : input instanceof Request
+              ? input.url
+              : input instanceof URL
+                ? input.href
+                : '';
+
+          // Only act on Next.js static assets and page requests
+          if (url.includes('/_next/') || url.includes('.js') || url.includes('.css')) {
+            isClearing = true;
+            logger.error(`[SW Manager] Detected ${response.status} on ${url}, clearing caches...`);
+
+            await clearAllCaches();
+            localStorage.setItem(VERSION_STORAGE_KEY, APP_VERSION);
+
+            // Show toast and reload
+            toast.info('Updating to new version...', { duration: 1500 });
+            setTimeout(() => window.location.reload(), 500);
+          }
+        }
+
+        return response;
+      } catch (error) {
+        // Re-throw the original error
+        throw error;
+      }
+    };
+
+    // Cleanup: restore original fetch on unmount
+    return () => {
+      window.fetch = originalFetch;
+    };
+  }, [clearAllCaches]);
+
+  /**
    * Initialize on mount
    */
   useEffect(() => {

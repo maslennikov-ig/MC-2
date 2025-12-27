@@ -28,6 +28,9 @@ const withPWA = require('@ducanh2912/next-pwa').default({
         expiration: {
           maxEntries: 4,
           maxAgeSeconds: 365 * 24 * 60 * 60 // 1 year
+        },
+        cacheableResponse: {
+          statuses: [0, 200] // Only cache successful responses
         }
       }
     },
@@ -39,6 +42,9 @@ const withPWA = require('@ducanh2912/next-pwa').default({
         expiration: {
           maxEntries: 4,
           maxAgeSeconds: 7 * 24 * 60 * 60 // 1 week
+        },
+        cacheableResponse: {
+          statuses: [0, 200]
         }
       }
     },
@@ -50,6 +56,9 @@ const withPWA = require('@ducanh2912/next-pwa').default({
         expiration: {
           maxEntries: 4,
           maxAgeSeconds: 7 * 24 * 60 * 60 // 1 week
+        },
+        cacheableResponse: {
+          statuses: [0, 200]
         }
       }
     },
@@ -61,6 +70,9 @@ const withPWA = require('@ducanh2912/next-pwa').default({
         expiration: {
           maxEntries: 64,
           maxAgeSeconds: 24 * 60 * 60 // 1 day
+        },
+        cacheableResponse: {
+          statuses: [0, 200]
         }
       }
     },
@@ -72,6 +84,9 @@ const withPWA = require('@ducanh2912/next-pwa').default({
         expiration: {
           maxEntries: 64,
           maxAgeSeconds: 24 * 60 * 60 // 1 day
+        },
+        cacheableResponse: {
+          statuses: [0, 200]
         }
       }
     },
@@ -83,6 +98,9 @@ const withPWA = require('@ducanh2912/next-pwa').default({
         expiration: {
           maxEntries: 32,
           maxAgeSeconds: 24 * 60 * 60 // 1 day
+        },
+        cacheableResponse: {
+          statuses: [0, 200]
         }
       }
     },
@@ -94,6 +112,9 @@ const withPWA = require('@ducanh2912/next-pwa').default({
         expiration: {
           maxEntries: 32,
           maxAgeSeconds: 24 * 60 * 60 // 1 day
+        },
+        cacheableResponse: {
+          statuses: [0, 200]
         }
       }
     },
@@ -107,7 +128,10 @@ const withPWA = require('@ducanh2912/next-pwa').default({
           maxEntries: 64,
           maxAgeSeconds: 7 * 24 * 60 * 60 // 1 week
         },
-        networkTimeoutSeconds: 5
+        networkTimeoutSeconds: 5,
+        cacheableResponse: {
+          statuses: [0, 200] // Critical: reject 502/404 to prevent stale cache after deploy
+        }
       }
     },
     {
@@ -120,7 +144,10 @@ const withPWA = require('@ducanh2912/next-pwa').default({
           maxEntries: 32,
           maxAgeSeconds: 24 * 60 * 60 // 1 day
         },
-        networkTimeoutSeconds: 5
+        networkTimeoutSeconds: 5,
+        cacheableResponse: {
+          statuses: [0, 200]
+        }
       }
     },
     {
@@ -132,7 +159,10 @@ const withPWA = require('@ducanh2912/next-pwa').default({
           maxEntries: 32,
           maxAgeSeconds: 24 * 60 * 60 // 1 day
         },
-        networkTimeoutSeconds: 5
+        networkTimeoutSeconds: 5,
+        cacheableResponse: {
+          statuses: [0, 200]
+        }
       }
     },
     {
@@ -145,7 +175,10 @@ const withPWA = require('@ducanh2912/next-pwa').default({
           maxEntries: 32,
           maxAgeSeconds: 60 * 60 // 1 hour only
         },
-        networkTimeoutSeconds: 5
+        networkTimeoutSeconds: 5,
+        cacheableResponse: {
+          statuses: [0, 200] // Critical: reject 502/404 after deploy
+        }
       }
     },
     {
@@ -156,6 +189,9 @@ const withPWA = require('@ducanh2912/next-pwa').default({
         expiration: {
           maxEntries: 32,
           maxAgeSeconds: 24 * 60 * 60 // 1 day
+        },
+        cacheableResponse: {
+          statuses: [0, 200]
         }
       }
     },
@@ -175,7 +211,10 @@ const withPWA = require('@ducanh2912/next-pwa').default({
           maxEntries: 32,
           maxAgeSeconds: 24 * 60 * 60 // 1 day
         },
-        networkTimeoutSeconds: 10
+        networkTimeoutSeconds: 10,
+        cacheableResponse: {
+          statuses: [0, 200] // Critical: reject 502/404 after deploy
+        }
       }
     },
     {
@@ -190,7 +229,10 @@ const withPWA = require('@ducanh2912/next-pwa').default({
           maxEntries: 32,
           maxAgeSeconds: 60 * 60 // 1 hour
         },
-        networkTimeoutSeconds: 10
+        networkTimeoutSeconds: 10,
+        cacheableResponse: {
+          statuses: [0, 200]
+        }
       }
     }
   ]
