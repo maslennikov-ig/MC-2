@@ -12,6 +12,7 @@
 
 import React from 'react';
 import { useViewport } from '@xyflow/react';
+import { useTranslations } from 'next-intl';
 import type { EnrichmentSummaryForNode } from '@megacampus/shared-types';
 import {
   ENRICHMENT_TYPE_CONFIG,
@@ -41,9 +42,10 @@ export const AssetDock: React.FC<AssetDockProps> = ({
   count = 0,
 }) => {
   const { zoom } = useViewport();
+  const t = useTranslations('enrichments');
 
   // Empty state - return null if no enrichments
-  if (!enrichments || enrichments.length === 0) {
+  if (enrichments.length === 0) {
     return null;
   }
 
@@ -73,6 +75,9 @@ export const AssetDock: React.FC<AssetDockProps> = ({
     return 'bg-slate-100 dark:bg-slate-900/30 text-slate-700 dark:text-slate-300 border-slate-300 dark:border-slate-700';
   };
 
+  // Localized enrichment count tooltip
+  const enrichmentCountText = t('assetDock.enrichmentCount', { count });
+
   // Dot Mode: zoom < 0.4
   if (zoom < 0.4) {
     return (
@@ -83,7 +88,9 @@ export const AssetDock: React.FC<AssetDockProps> = ({
             ${getDotColor()}
             ${isGenerating ? 'animate-pulse' : ''}
           `}
-          title={`${count} enrichment(s)`}
+          title={enrichmentCountText}
+          role="img"
+          aria-label={enrichmentCountText}
         />
       </div>
     );
@@ -99,7 +106,9 @@ export const AssetDock: React.FC<AssetDockProps> = ({
             ${getBadgeColor()}
             ${isGenerating ? 'animate-pulse' : ''}
           `}
-          title={`${count} enrichment(s)`}
+          title={enrichmentCountText}
+          role="img"
+          aria-label={enrichmentCountText}
         >
           {count}
         </div>
@@ -131,22 +140,22 @@ export const AssetDock: React.FC<AssetDockProps> = ({
           return config.color;
         };
 
-        // Get human-readable type name for tooltip
-        const getTypeName = (): string => {
-          const typeNames: Record<EnrichmentType, string> = {
-            video: 'Видео',
-            audio: 'Аудио',
-            presentation: 'Презентация',
-            quiz: 'Тест',
-            document: 'Документ',
-          };
-          return typeNames[enrichment.type as EnrichmentType];
-        };
-
-        const tooltipText = `${getTypeName()}${statusConfig.animate ? ' (генерация)' : ''}${statusConfig.isError ? ' (ошибка)' : ''}`;
+        // Build localized tooltip with type name and status suffix
+        const typeName = t(`types.${enrichment.type}`);
+        const statusSuffix = statusConfig.animate
+          ? ` (${t('assetDock.generating')})`
+          : statusConfig.isError
+            ? ` (${t('assetDock.error')})`
+            : '';
+        const tooltipText = `${typeName}${statusSuffix}`;
 
         return (
-          <div key={enrichment.type} title={tooltipText}>
+          <div
+            key={enrichment.type}
+            title={tooltipText}
+            role="img"
+            aria-label={tooltipText}
+          >
             <Icon
               className={`
                 w-3.5 h-3.5 transition-all duration-300

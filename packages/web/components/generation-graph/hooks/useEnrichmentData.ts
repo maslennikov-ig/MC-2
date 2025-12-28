@@ -162,6 +162,10 @@ export function useEnrichmentData(
     fetchRef.current = fetchEnrichments;
   }, [fetchEnrichments]);
 
+  // Debounce timeout ref for batching rapid realtime updates
+  const debounceTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const REFETCH_DEBOUNCE_MS = 300;
+
   // Initial fetch
   useEffect(() => {
     fetchEnrichments();
@@ -181,11 +185,17 @@ export function useEnrichmentData(
       courseId,
     });
 
-    // Safe refetch wrapper
-    const safeRefetch = () => {
-      if (isMounted) {
-        fetchRef.current();
+    // Safe debounced refetch wrapper - batches rapid realtime updates
+    const debouncedRefetch = () => {
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
       }
+
+      debounceTimeoutRef.current = setTimeout(() => {
+        if (isMounted) {
+          fetchRef.current();
+        }
+      }, REFETCH_DEBOUNCE_MS);
     };
 
     // Subscribe to lesson_enrichments changes for this course
@@ -208,8 +218,8 @@ export function useEnrichmentData(
             status: (payload.new as Partial<LessonEnrichmentsRow>)?.status,
           });
 
-          // Refetch to get updated data
-          safeRefetch();
+          // Refetch to get updated data (debounced to batch rapid updates)
+          debouncedRefetch();
         }
       )
       .subscribe((status, err) => {
@@ -251,6 +261,11 @@ export function useEnrichmentData(
 
     return () => {
       isMounted = false;
+      // Clear any pending debounced refetch
+      if (debounceTimeoutRef.current) {
+        clearTimeout(debounceTimeoutRef.current);
+        debounceTimeoutRef.current = null;
+      }
       logger.debug('[useEnrichmentData] Unsubscribing from realtime channel', {
         courseId,
       });

@@ -1,59 +1,16 @@
 import { AppNode, AppEdge } from '../../../types';
 import { GRAPH_STAGE_CONFIG } from '@/lib/generation-graph/constants';
+import {
+  STAGE6_LAYOUT_CONFIG,
+  STAGE2_LAYOUT_CONFIG,
+} from '@/lib/generation-graph/layout-constants';
 import { NodeStatus, TraceAttempt } from '@megacampus/shared-types';
 import { ParallelItem, DocumentWithSteps, PhaseData, Stage1CourseData } from '../types';
 import { calculateDocumentStatus } from './graph-transformers';
 import { GenerationTrace } from '@/components/generation-celestial/utils';
 
-/**
- * Layout constants for Stage 6 modules and lessons.
- * Used to calculate parent node heights based on child count.
- *
- * @remarks
- * These values MUST match useGraphLayout.ts LAYOUT_CONFIG for consistent rendering.
- * Modules use larger dimensions since they contain lesson content with more detail.
- */
-const LAYOUT_CONFIG = {
-  /** Width of module container node */
-  MODULE_WIDTH: 300,
-  /** Height when module is collapsed (shows title only) */
-  MODULE_COLLAPSED_HEIGHT: 90,
-  /** Height of module header area (title + expand button) */
-  MODULE_HEADER_HEIGHT: 60,
-  /** Height of each lesson node inside module (64px to accommodate AssetDock) */
-  LESSON_HEIGHT: 64,
-  /** Vertical gap between lesson nodes */
-  LESSON_GAP: 10,
-  /** Internal padding inside module container */
-  MODULE_PADDING: 15,
-} as const;
-
-/**
- * Layout constants for Stage 2 document processing container.
- * Used to calculate group node height based on document count.
- *
- * @remarks
- * These values MUST match useGraphLayout.ts STAGE2_LAYOUT_CONFIG for consistent rendering.
- * Stage 2 uses slightly different dimensions than Stage 6:
- * - Wider container (320 vs 300) for longer filenames
- * - Taller collapsed state (100 vs 90) for document count display
- * - Smaller document nodes (55 vs 50) since documents show less detail
- * - Tighter spacing (8 vs 10 gap, 12 vs 15 padding) for compact display
- */
-const STAGE2_LAYOUT_CONFIG = {
-  /** Width of stage2group container node */
-  GROUP_WIDTH: 320,
-  /** Height when container is collapsed (shows summary only) */
-  GROUP_COLLAPSED_HEIGHT: 100,
-  /** Height of container header area (title + progress) */
-  GROUP_HEADER_HEIGHT: 70,
-  /** Height of each document node inside container */
-  DOCUMENT_HEIGHT: 55,
-  /** Vertical gap between document nodes */
-  DOCUMENT_GAP: 8,
-  /** Internal padding inside container */
-  GROUP_PADDING: 12,
-} as const;
+// Alias for backward compatibility within this file
+const LAYOUT_CONFIG = STAGE6_LAYOUT_CONFIG;
 
 interface BuildGraphParams {
   parallelItems: Map<number, ParallelItem[]>;
