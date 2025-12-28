@@ -158,7 +158,8 @@
 
 ### Implementation for User Story 1
 
-- [ ] T042 [US1] Create video prompt template in `packages/course-gen-platform/src/stages/stage7-enrichments/prompts/video-prompt.ts`
+- [X] T042 [US1] Create video prompt template in `packages/course-gen-platform/src/stages/stage7-enrichments/prompts/video-prompt.ts`
+  → Artifacts: [video-prompt.ts](packages/course-gen-platform/src/stages/stage7-enrichments/prompts/video-prompt.ts)
 - [ ] T043 [US1] Create video handler (two-stage: generateDraft → generateFinal) in `packages/course-gen-platform/src/stages/stage7-enrichments/handlers/video-handler.ts`
 - [ ] T044 [US1] Create VideoPreview component in `packages/web/components/generation-graph/panels/stage7/previews/VideoPreview.tsx`
 - [ ] T045 [US1] Create VideoDraftEditor component for script review/edit in `packages/web/components/generation-graph/panels/stage7/editors/VideoDraftEditor.tsx`
