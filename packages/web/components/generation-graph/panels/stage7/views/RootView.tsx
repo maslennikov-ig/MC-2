@@ -11,8 +11,9 @@
 
 import React from 'react';
 import { useLocale } from 'next-intl';
-import { Layers, Plus, Video, HelpCircle, Volume2, Presentation } from 'lucide-react';
+import { Layers, Plus, Video, HelpCircle, Volume2, Presentation, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   useEnrichmentInspectorStore,
@@ -157,6 +158,54 @@ function DiscoveryCard({
 }
 
 /**
+ * LoadingState Component
+ *
+ * Skeleton loading state while enrichments are being fetched
+ */
+function LoadingState() {
+  return (
+    <div className="p-4 space-y-3">
+      {[1, 2, 3].map((i) => (
+        <div key={i} className="flex items-center gap-3 p-3 rounded-lg border">
+          <Skeleton className="w-8 h-8 rounded" />
+          <div className="flex-1 space-y-2">
+            <Skeleton className="h-4 w-24" />
+          </div>
+          <Skeleton className="h-5 w-16 rounded-full" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
+/**
+ * ErrorState Component
+ *
+ * Shown when enrichments fail to load
+ */
+function ErrorState({
+  onRetry,
+}: {
+  onRetry: () => void;
+}) {
+  const locale = useLocale();
+  const t = locale === 'ru'
+    ? { title: 'Не удалось загрузить', description: 'Произошла ошибка при загрузке обогащений', retry: 'Повторить' }
+    : { title: 'Failed to load', description: 'An error occurred while loading enrichments', retry: 'Retry' };
+
+  return (
+    <div className="flex flex-col items-center justify-center h-full p-8 text-center">
+      <AlertCircle className="w-12 h-12 text-red-500 mb-4" />
+      <h3 className="text-lg font-medium text-red-700 dark:text-red-400 mb-2">{t.title}</h3>
+      <p className="text-sm text-muted-foreground mb-4">{t.description}</p>
+      <Button onClick={onRetry} variant="outline">
+        {t.retry}
+      </Button>
+    </div>
+  );
+}
+
+/**
  * EmptyState Component
  *
  * Shown when lesson has no enrichments yet
@@ -216,10 +265,32 @@ function EmptyState({ onAddClick }: { onAddClick: (type: CreateEnrichmentType) =
 }
 
 /**
+ * Data state for enrichment list
+ */
+type DataState =
+  | { status: 'loading' }
+  | { status: 'error'; error: string }
+  | { status: 'success'; data: EnrichmentListItemData[] };
+
+/**
+ * Mock data hook - will be replaced with tRPC query
+ */
+function useEnrichmentList(_lessonId: string): DataState {
+  // TODO: Replace with actual tRPC query:
+  // const { data, isLoading, error } = trpc.enrichment.list.useQuery({ lessonId });
+  //
+  // For now, return empty success state to show empty state UI
+  return { status: 'success', data: [] };
+}
+
+/**
  * RootView
  *
- * Main view for enrichment list. Shows empty state with discovery cards
- * when no enrichments exist, otherwise shows list with add button.
+ * Main view for enrichment list. Shows:
+ * - Loading state with skeletons while fetching
+ * - Error state with retry button on failure
+ * - Empty state with discovery cards when no enrichments
+ * - List with add button when enrichments exist
  *
  * @example
  * ```tsx
@@ -229,41 +300,63 @@ function EmptyState({ onAddClick }: { onAddClick: (type: CreateEnrichmentType) =
 export function RootView({ lessonId, className }: RootViewProps) {
   const { openCreate, openDetail } = useEnrichmentInspectorStore();
 
-  // TODO: Connect to useEnrichmentData hook when available
-  // For now, use empty array to show empty state
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const enrichments: EnrichmentListItemData[] = [];
+  const dataState = useEnrichmentList(lessonId);
 
-  // Suppress unused variable warning - lessonId will be used when connecting to data hook
-  void lessonId;
+  // Render based on data state
+  const renderContent = () => {
+    switch (dataState.status) {
+      case 'loading':
+        return <LoadingState />;
 
-  const isEmpty = enrichments.length === 0;
+      case 'error':
+        return (
+          <ErrorState
+            onRetry={() => {
+              // TODO: Trigger refetch when connected to tRPC
+              console.log('Retry loading enrichments');
+            }}
+          />
+        );
+
+      case 'success': {
+        const enrichments = dataState.data;
+        const isEmpty = enrichments.length === 0;
+
+        if (isEmpty) {
+          return <EmptyState onAddClick={(type) => openCreate(type)} />;
+        }
+
+        return (
+          <>
+            {/* Enrichment list */}
+            <ScrollArea className="flex-1">
+              <div className="p-4 space-y-2">
+                {enrichments.map((enrichment) => (
+                  <EnrichmentListItem
+                    key={enrichment.id}
+                    enrichment={enrichment}
+                    onClick={() => openDetail(enrichment.id)}
+                  />
+                ))}
+              </div>
+            </ScrollArea>
+
+            {/* Add button */}
+            <div className="border-t p-4">
+              <EnrichmentAddPopover onSelect={(type) => openCreate(type)} />
+            </div>
+          </>
+        );
+      }
+
+      default:
+        return null;
+    }
+  };
 
   return (
     <div className={cn('flex flex-col h-full', className)}>
-      {isEmpty ? (
-        <EmptyState onAddClick={(type) => openCreate(type)} />
-      ) : (
-        <>
-          {/* Enrichment list */}
-          <ScrollArea className="flex-1">
-            <div className="p-4 space-y-2">
-              {enrichments.map((enrichment) => (
-                <EnrichmentListItem
-                  key={enrichment.id}
-                  enrichment={enrichment}
-                  onClick={() => openDetail(enrichment.id)}
-                />
-              ))}
-            </div>
-          </ScrollArea>
-
-          {/* Add button */}
-          <div className="border-t p-4">
-            <EnrichmentAddPopover onSelect={(type) => openCreate(type)} />
-          </div>
-        </>
-      )}
+      {renderContent()}
     </div>
   );
 }

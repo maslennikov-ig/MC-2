@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { useLocale } from 'next-intl';
-import { Loader2 } from 'lucide-react';
+import { Loader2, AlertCircle, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Label } from '@/components/ui/label';
 import { Slider } from '@/components/ui/slider';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { useEnrichmentInspectorStore } from '../../../stores/enrichment-inspector-store';
 import { cn } from '@/lib/utils';
 
@@ -330,14 +331,30 @@ function PresentationCreateForm({ onSubmit, onCancel, onDirtyChange, isSubmittin
   );
 }
 
+/**
+ * Sanitize error message for display
+ */
+function getErrorMessage(error: unknown, locale: string): string {
+  if (error instanceof Error) {
+    // Truncate long error messages
+    const msg = error.message.replace(/<[^>]*>/g, '');
+    return msg.length > 150 ? msg.slice(0, 150) + '...' : msg;
+  }
+  return locale === 'ru' ? 'Произошла ошибка при создании' : 'An error occurred while creating';
+}
+
 // Main CreateView Component
 export function CreateView({ type, lessonId, className }: CreateViewProps) {
+  const locale = useLocale();
   const { goBack, setDirty } = useEnrichmentInspectorStore();
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Handle form submission
   const handleSubmit = async (settings: Record<string, unknown>) => {
     setIsSubmitting(true);
+    setError(null); // Clear previous errors
+
     try {
       // TODO: Call tRPC mutation to create enrichment
       // await trpc.enrichment.create.mutate({ lessonId, type, settings });
@@ -345,8 +362,9 @@ export function CreateView({ type, lessonId, className }: CreateViewProps) {
 
       // Return to root view on success
       goBack();
-    } catch (error) {
-      console.error('Failed to create enrichment:', error);
+    } catch (err) {
+      console.error('Failed to create enrichment:', err);
+      setError(getErrorMessage(err, locale));
     } finally {
       setIsSubmitting(false);
     }
@@ -357,6 +375,9 @@ export function CreateView({ type, lessonId, className }: CreateViewProps) {
     // TODO: Show discard dialog if dirty
     goBack();
   };
+
+  // Dismiss error alert
+  const dismissError = () => setError(null);
 
   // Render form based on type
   const renderForm = () => {
@@ -404,7 +425,26 @@ export function CreateView({ type, lessonId, className }: CreateViewProps) {
 
   return (
     <ScrollArea className={cn('flex-1 h-full', className)}>
-      <div className="p-4">
+      <div className="p-4 space-y-4">
+        {/* Error Alert */}
+        {error && (
+          <Alert variant="destructive">
+            <AlertCircle className="h-4 w-4" />
+            <AlertTitle>
+              {locale === 'ru' ? 'Ошибка' : 'Error'}
+            </AlertTitle>
+            <AlertDescription className="flex items-start justify-between gap-2">
+              <span>{error}</span>
+              <button
+                onClick={dismissError}
+                className="shrink-0 text-destructive-foreground/70 hover:text-destructive-foreground"
+              >
+                <X className="h-4 w-4" />
+              </button>
+            </AlertDescription>
+          </Alert>
+        )}
+
         {renderForm()}
       </div>
     </ScrollArea>

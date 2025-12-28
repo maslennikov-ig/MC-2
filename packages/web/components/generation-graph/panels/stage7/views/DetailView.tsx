@@ -2,10 +2,11 @@ import React from 'react';
 import { useLocale } from 'next-intl';
 import { Loader2, AlertCircle, RotateCcw, Check, Trash2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { QuizPreview } from '../QuizPreview';
-import { AudioPreview } from '../AudioPreview';
-import { VideoScriptPanel } from '../VideoScriptPanel';
-import { PresentationPreview } from '../PresentationPreview';
+import { QuizPreview, type QuizPreviewProps } from '../QuizPreview';
+import { AudioPreview, type AudioPreviewProps } from '../AudioPreview';
+import { VideoScriptPanel, type VideoScriptPanelProps } from '../VideoScriptPanel';
+import { PresentationPreview, type PresentationPreviewProps } from '../PresentationPreview';
+import { type EnrichmentStatus } from '@/lib/generation-graph/enrichment-config';
 import { cn } from '@/lib/utils';
 
 export interface DetailViewProps {
@@ -13,16 +14,44 @@ export interface DetailViewProps {
   className?: string;
 }
 
-interface EnrichmentData {
+// Type aliases for each preview component's enrichment prop
+type QuizEnrichment = QuizPreviewProps['enrichment'];
+type VideoEnrichment = VideoScriptPanelProps['enrichment'];
+type AudioEnrichment = AudioPreviewProps['enrichment'];
+type PresentationEnrichment = PresentationPreviewProps['enrichment'];
+
+// Discriminated union for type-safe enrichment handling
+interface EnrichmentBase {
   id: string;
-  type: 'quiz' | 'video' | 'audio' | 'presentation';
-  status: 'pending' | 'draft_generating' | 'draft_ready' | 'generating' | 'completed' | 'failed';
-  content: unknown | null;
-  draft_content: unknown | null;
+  status: EnrichmentStatus;
   metadata: Record<string, unknown> | null;
   error_message: string | null;
   asset_url: string | null;
+  draft_content: unknown | null;
 }
+
+interface QuizEnrichmentData extends EnrichmentBase {
+  type: 'quiz';
+  content: QuizEnrichment['content'];
+}
+
+interface VideoEnrichmentData extends EnrichmentBase {
+  type: 'video';
+  content: VideoEnrichment['content'];
+}
+
+interface AudioEnrichmentData extends EnrichmentBase {
+  type: 'audio';
+  content: AudioEnrichment['content'];
+}
+
+interface PresentationEnrichmentData extends EnrichmentBase {
+  type: 'presentation';
+  content: PresentationEnrichment['content'];
+}
+
+// Discriminated union type
+type EnrichmentData = QuizEnrichmentData | VideoEnrichmentData | AudioEnrichmentData | PresentationEnrichmentData;
 
 function useMockEnrichment(id: string): EnrichmentData | null {
   // Return mock completed quiz for demo
@@ -63,6 +92,25 @@ function useMockEnrichment(id: string): EnrichmentData | null {
   };
 }
 
+/**
+ * Sanitize error message for display.
+ * - Truncates to reasonable length for UI
+ * - Strips any HTML tags (though React escapes strings anyway)
+ * - Provides user-friendly fallback
+ */
+function sanitizeErrorMessage(message: string | null | undefined, locale: string, maxLength = 150): string {
+  if (!message) {
+    return locale === 'ru' ? 'Произошла ошибка' : 'An error occurred';
+  }
+  // Strip any potential HTML tags
+  const stripped = message.replace(/<[^>]*>/g, '');
+  // Truncate long messages
+  if (stripped.length > maxLength) {
+    return stripped.slice(0, maxLength) + '...';
+  }
+  return stripped;
+}
+
 function ErrorState({
   error,
   onRetry,
@@ -77,8 +125,8 @@ function ErrorState({
       <h3 className="text-lg font-medium text-red-700 dark:text-red-400 mb-2">
         {locale === 'ru' ? 'Ошибка генерации' : 'Generation Error'}
       </h3>
-      <p className="text-sm text-muted-foreground mb-4">
-        {error || (locale === 'ru' ? 'Неизвестная ошибка' : 'Unknown error')}
+      <p className="text-sm text-muted-foreground mb-4 max-w-md">
+        {sanitizeErrorMessage(error, locale)}
       </p>
       <Button onClick={onRetry}>
         <RotateCcw className="w-4 h-4 mr-2" />
@@ -121,20 +169,45 @@ function ActionBar({ enrichment }: { enrichment: EnrichmentData }) {
   );
 }
 
+/**
+ * Helper functions to extract preview props from enrichment data
+ * These ensure type-safe narrowing from discriminated union
+ */
+function toQuizPreviewProps(e: QuizEnrichmentData): QuizEnrichment {
+  return { id: e.id, status: e.status, content: e.content, metadata: e.metadata, error_message: e.error_message };
+}
+
+function toVideoPreviewProps(e: VideoEnrichmentData): VideoEnrichment {
+  return { id: e.id, status: e.status, content: e.content, metadata: e.metadata, error_message: e.error_message };
+}
+
+function toAudioPreviewProps(e: AudioEnrichmentData): AudioEnrichment {
+  return { id: e.id, status: e.status, content: e.content, metadata: e.metadata, error_message: e.error_message };
+}
+
+function toPresentationPreviewProps(e: PresentationEnrichmentData): PresentationEnrichment {
+  return { id: e.id, status: e.status, content: e.content, draft_content: e.draft_content, metadata: e.metadata, error_message: e.error_message };
+}
+
+/**
+ * Renders the appropriate preview component based on enrichment type.
+ * Uses discriminated union pattern for type-safe rendering.
+ */
 function renderPreview(enrichment: EnrichmentData) {
-  // Type assertions needed because EnrichmentData.content is unknown
-  // Preview components expect specific content types
   switch (enrichment.type) {
     case 'quiz':
-      return <QuizPreview enrichment={enrichment as never} />;
+      return <QuizPreview enrichment={toQuizPreviewProps(enrichment)} />;
     case 'video':
-      return <VideoScriptPanel enrichment={enrichment as never} />;
+      return <VideoScriptPanel enrichment={toVideoPreviewProps(enrichment)} />;
     case 'audio':
-      return <AudioPreview enrichment={enrichment as never} />;
+      return <AudioPreview enrichment={toAudioPreviewProps(enrichment)} />;
     case 'presentation':
-      return <PresentationPreview enrichment={enrichment as never} />;
-    default:
-      return <div>Unknown type</div>;
+      return <PresentationPreview enrichment={toPresentationPreviewProps(enrichment)} />;
+    default: {
+      // Exhaustive check - should never reach here
+      const _exhaustive: never = enrichment;
+      return <div>Unknown type: {(_exhaustive as EnrichmentData).type}</div>;
+    }
   }
 }
 

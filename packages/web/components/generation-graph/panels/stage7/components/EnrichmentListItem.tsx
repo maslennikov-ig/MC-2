@@ -56,6 +56,25 @@ function getStatusText(status: EnrichmentStatus, locale: string): string {
 }
 
 /**
+ * Sanitize error message for display.
+ * - Truncates to reasonable length for UI
+ * - Strips any HTML tags (though React escapes strings anyway)
+ * - Provides user-friendly fallback
+ */
+function sanitizeErrorMessage(message: string | null | undefined, locale: string, maxLength = 80): string {
+  if (!message) {
+    return locale === 'ru' ? 'Произошла ошибка' : 'An error occurred';
+  }
+  // Strip any potential HTML tags
+  const stripped = message.replace(/<[^>]*>/g, '');
+  // Truncate long messages
+  if (stripped.length > maxLength) {
+    return stripped.slice(0, maxLength) + '...';
+  }
+  return stripped;
+}
+
+/**
  * Individual enrichment list item with drag handle and status indicator
  *
  * Supports @dnd-kit sortable for drag-and-drop reordering.
@@ -122,8 +141,8 @@ export function EnrichmentListItem({ item, isDragging, onClick }: EnrichmentList
       <div className="flex-1 min-w-0">
         <div className="font-medium truncate">{typeName}</div>
         <div className="text-xs text-muted-foreground truncate">
-          {item.status === 'failed' && item.error_message
-            ? item.error_message
+          {item.status === 'failed'
+            ? sanitizeErrorMessage(item.error_message, locale)
             : statusText}
         </div>
       </div>

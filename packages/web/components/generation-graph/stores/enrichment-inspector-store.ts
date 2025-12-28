@@ -167,6 +167,11 @@ export const useEnrichmentInspectorStore = create<EnrichmentInspectorState>((set
 
 /**
  * Selector hooks for convenient access to specific state
+ *
+ * Note: These hooks return primitive values (strings, booleans, null),
+ * which Zustand handles efficiently by default using referential equality.
+ * For selectors that return objects/arrays, use:
+ * `import { useShallow } from 'zustand/react/shallow'`
  */
 
 /**

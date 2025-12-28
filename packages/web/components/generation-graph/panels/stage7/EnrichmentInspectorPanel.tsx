@@ -30,6 +30,7 @@ import {
   type CreateEnrichmentType,
 } from '../../stores/enrichment-inspector-store';
 import { RootView } from './views/RootView';
+import { EnrichmentInspectorErrorBoundary } from './EnrichmentInspectorErrorBoundary';
 
 /**
  * Props for EnrichmentInspectorPanel
@@ -154,12 +155,13 @@ export function EnrichmentInspectorPanel({
   const selectedEnrichmentId = useSelectedEnrichmentId();
   const createType = useCreateEnrichmentType();
   const canGoBack = useCanGoBack();
-  const { openRoot, goBack } = useEnrichmentInspectorStore();
+  const goBack = useEnrichmentInspectorStore((s) => s.goBack);
 
   // Initialize on lessonId change
+  // Using getState() to avoid putting openRoot in deps (causes infinite loop)
   useEffect(() => {
-    openRoot(lessonId);
-  }, [lessonId, openRoot]);
+    useEnrichmentInspectorStore.getState().openRoot(lessonId);
+  }, [lessonId]);
 
   // Render view based on current state
   const renderView = () => {
@@ -180,20 +182,22 @@ export function EnrichmentInspectorPanel({
   };
 
   return (
-    <div className={cn('flex flex-col h-full bg-background', className)}>
-      {/* Header with back button */}
-      <InspectorHeader
-        view={currentView}
-        createType={createType}
-        canGoBack={canGoBack}
-        onBack={goBack}
-      />
+    <EnrichmentInspectorErrorBoundary>
+      <div className={cn('flex flex-col h-full bg-background', className)}>
+        {/* Header with back button */}
+        <InspectorHeader
+          view={currentView}
+          createType={createType}
+          canGoBack={canGoBack}
+          onBack={goBack}
+        />
 
-      {/* View content */}
-      <div className="flex-1 overflow-hidden">
-        {renderView()}
+        {/* View content */}
+        <div className="flex-1 overflow-hidden">
+          {renderView()}
+        </div>
       </div>
-    </div>
+    </EnrichmentInspectorErrorBoundary>
   );
 }
 

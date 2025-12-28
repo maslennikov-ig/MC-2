@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useMemo } from 'react';
+import { useState, useCallback } from 'react';
 
 /**
  * Draft review mode
@@ -82,19 +82,17 @@ export function useDraftReview(originalContent: unknown | null): DraftReviewStat
     setEditedContent(originalContent);
   }, [originalContent]);
 
-  return useMemo(
-    () => ({
-      mode,
-      isEditing,
-      hasEdits,
-      editedContent,
-      startEditing,
-      cancelEditing,
-      updateContent,
-      resetContent,
-    }),
-    [mode, isEditing, hasEdits, editedContent, startEditing, cancelEditing, updateContent, resetContent]
-  );
+  // Callbacks are already memoized with useCallback - no need for outer useMemo
+  return {
+    mode,
+    isEditing,
+    hasEdits,
+    editedContent,
+    startEditing,
+    cancelEditing,
+    updateContent,
+    resetContent,
+  };
 }
 
 /**
@@ -122,17 +120,15 @@ export function useDraftApprovalStatus() {
     setApprovalError(null);
   }, []);
 
-  return useMemo(
-    () => ({
-      isApproving,
-      approvalError,
-      startApproval,
-      completeApproval,
-      failApproval,
-      clearError,
-    }),
-    [isApproving, approvalError, startApproval, completeApproval, failApproval, clearError]
-  );
+  // Callbacks are already memoized with useCallback - no need for outer useMemo
+  return {
+    isApproving,
+    approvalError,
+    startApproval,
+    completeApproval,
+    failApproval,
+    clearError,
+  };
 }
 
 /**
@@ -142,13 +138,15 @@ export function useDraftReviewWithApproval(originalContent: unknown | null) {
   const review = useDraftReview(originalContent);
   const approval = useDraftApprovalStatus();
 
-  return useMemo(
-    () => ({
-      ...review,
-      ...approval,
-      // Helper to get content to submit (edited or original)
-      getContentToSubmit: () => (review.hasEdits ? review.editedContent : originalContent),
-    }),
-    [review, approval, originalContent]
+  // Helper needs useCallback to be stable
+  const getContentToSubmit = useCallback(
+    () => (review.hasEdits ? review.editedContent : originalContent),
+    [review.hasEdits, review.editedContent, originalContent]
   );
+
+  return {
+    ...review,
+    ...approval,
+    getContentToSubmit,
+  };
 }
