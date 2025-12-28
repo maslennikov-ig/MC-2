@@ -3,6 +3,18 @@
 _Released on 2025-12-26_
 
 
+## v0.26.36
+
+_Released on 2025-12-28_
+
+### ✨ New Features
+
+- Add 4 skill(s), add 1 command(s), +4 more
+
+---
+
+_This release was automatically generated from 1 commits._
+
 ## v0.26.35
 
 _Released on 2025-12-28_

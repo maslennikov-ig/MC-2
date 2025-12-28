@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.26.36] - 2025-12-28
+
+### Added
+- add 4 skill(s), add 1 command(s), +4 more (2372fca)
+
 ## [0.26.30] - 2025-12-26
 
 ### Other
