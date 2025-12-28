@@ -20,8 +20,8 @@ const LAYOUT_CONFIG = {
   MODULE_COLLAPSED_HEIGHT: 90,
   /** Height of module header area (title + expand button) */
   MODULE_HEADER_HEIGHT: 60,
-  /** Height of each lesson node inside module */
-  LESSON_HEIGHT: 50,
+  /** Height of each lesson node inside module (64px to accommodate AssetDock) */
+  LESSON_HEIGHT: 64,
   /** Vertical gap between lesson nodes */
   LESSON_GAP: 10,
   /** Internal padding inside module container */

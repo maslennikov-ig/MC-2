@@ -8,6 +8,7 @@ import { useOptionalPartialGenerationContext } from '../contexts/PartialGenerati
 import { NodeErrorTooltip, RetryBadge, NodeProgressBar } from '../components/shared';
 import { getStatusColor, getStatusBorderClass, getNodeStatusStyles } from '../hooks/useNodeStatusStyles';
 import { logger } from '@/lib/client-logger';
+import { AssetDock } from './AssetDock';
 
 // Minimal Node for very low zoom (<0.3)
 const MinimalLessonNode = ({ id, data, onDoubleClick }: { id: string; data: RFLessonNode['data']; onDoubleClick: () => void }) => {
@@ -32,6 +33,7 @@ const MinimalLessonNode = ({ id, data, onDoubleClick }: { id: string; data: RFLe
 const MediumLessonNode = ({ id, data, selected, onDoubleClick }: { id: string; data: RFLessonNode['data']; selected?: boolean; onDoubleClick: () => void }) => {
   const statusEntry = useNodeStatus(id);
   const currentStatus = statusEntry?.status || data.status;
+  const hasEnrichments = (data.enrichmentCount ?? 0) > 0;
 
   return (
     <div
@@ -47,6 +49,16 @@ const MediumLessonNode = ({ id, data, selected, onDoubleClick }: { id: string; d
       <span className="text-[9px] font-medium text-slate-700 dark:text-slate-300 truncate">
         {data.title}
       </span>
+      {/* Small dot indicator if enrichments exist */}
+      {hasEnrichments && (
+        <div
+          className={`
+            absolute top-1 right-1 w-1.5 h-1.5 rounded-full
+            ${data.hasEnrichmentErrors ? 'bg-red-500' : data.enrichmentsGenerating ? 'bg-blue-500 animate-pulse' : 'bg-green-500'}
+          `}
+          title={`${data.enrichmentCount} enrichment(s)`}
+        />
+      )}
     </div>
   );
 };
@@ -163,8 +175,8 @@ const LessonNode = (props: NodeProps<RFLessonNode>) => {
   return (
     <div
       className={`
-        relative w-full h-[50px] rounded border border-slate-200 dark:border-slate-700
-        transition-all duration-300 flex items-center cursor-pointer
+        relative w-full h-[64px] rounded border border-slate-200 dark:border-slate-700
+        transition-all duration-300 flex flex-col cursor-pointer
         ${getStatusBorderClass(currentStatus)}
         ${selected ? 'ring-2 ring-offset-2 ring-blue-400' : ''}
       `}
@@ -181,76 +193,89 @@ const LessonNode = (props: NodeProps<RFLessonNode>) => {
         <NodeErrorTooltip message={errorMessage} />
       )}
 
-      {/* Left Number Zone (36px) */}
-      <div className="w-[36px] flex-shrink-0 flex items-center justify-center">
-        <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
-          {lessonNumber}
-        </span>
+      {/* Main content row (50px) */}
+      <div className="flex items-center h-[50px]">
+        {/* Left Number Zone (36px) */}
+        <div className="w-[36px] flex-shrink-0 flex items-center justify-center">
+          <span className="text-xs font-semibold text-slate-500 dark:text-slate-400">
+            {lessonNumber}
+          </span>
+        </div>
+
+        {/* Content Zone (flex-1, two lines) */}
+        <div className="flex-1 flex flex-col justify-center min-w-0 pr-2">
+          {/* Line 1: Title */}
+          <div className="text-sm font-medium text-slate-900 dark:text-slate-100 truncate" title={data.title}>
+            {data.title}
+          </div>
+
+          {/* Line 2: Meta info */}
+          <div className="text-[10px] text-slate-500 dark:text-slate-400">
+            {getMetaText()}
+          </div>
+        </div>
+
+        {/* Right Action Zone */}
+        {contextValue && (
+          <div className="w-[32px] flex-shrink-0 flex items-center justify-center">
+            {isSelectionMode ? (
+              // Checkbox in selection mode
+              <button
+                onClick={() => toggleLesson(getLessonIdForApi())}
+                className={`
+                  w-4 h-4 rounded border-2 flex items-center justify-center transition-colors
+                  ${selectedLessons.has(getLessonIdForApi())
+                    ? 'bg-blue-500 border-blue-500 text-white'
+                    : 'border-slate-300 dark:border-slate-600 hover:border-blue-300'
+                  }
+                `}
+                title="Выбрать урок"
+              >
+                {selectedLessons.has(getLessonIdForApi()) && <Check size={10} />}
+              </button>
+            ) : currentStatus !== 'active' ? (
+              // Generate button (not in active status)
+              <button
+                onClick={() => {
+                  if (generateLesson) {
+                    generateLesson(getLessonIdForApi());
+                  }
+                }}
+                disabled={isLessonGenerating(getLessonIdForApi())}
+                className={`
+                  p-1 rounded transition-colors
+                  ${currentStatus === 'completed' || currentStatus === 'error'
+                    ? 'text-orange-600 hover:bg-orange-100 dark:text-orange-400 dark:hover:bg-orange-900/30'
+                    : 'text-emerald-600 hover:bg-emerald-100 dark:text-emerald-400 dark:hover:bg-emerald-900/30'
+                  }
+                  ${isLessonGenerating(getLessonIdForApi()) ? 'opacity-50 cursor-not-allowed' : ''}
+                `}
+                title={currentStatus === 'completed' ? 'Перегенерировать урок' : 'Сгенерировать урок'}
+              >
+                {isLessonGenerating(getLessonIdForApi()) ? (
+                  <Loader2 size={14} className="animate-spin" />
+                ) : currentStatus === 'completed' || currentStatus === 'error' ? (
+                  <RefreshCw size={14} />
+                ) : (
+                  <Play size={14} />
+                )}
+              </button>
+            ) : null}
+          </div>
+        )}
       </div>
 
-      {/* Content Zone (flex-1, two lines) */}
-      <div className="flex-1 flex flex-col justify-center min-w-0 pr-2">
-        {/* Line 1: Title */}
-        <div className="text-sm font-medium text-slate-900 dark:text-slate-100 truncate" title={data.title}>
-          {data.title}
-        </div>
-
-        {/* Line 2: Meta info */}
-        <div className="text-[10px] text-slate-500 dark:text-slate-400">
-          {getMetaText()}
-        </div>
+      {/* Asset Dock row (14px) */}
+      <div className="h-[14px] px-1">
+        <AssetDock
+          enrichments={data.enrichmentsSummary}
+          hasErrors={data.hasEnrichmentErrors}
+          isGenerating={data.enrichmentsGenerating}
+          count={data.enrichmentCount}
+        />
       </div>
 
-      {/* Right Action Zone */}
-      {contextValue && (
-        <div className="w-[32px] flex-shrink-0 flex items-center justify-center">
-          {isSelectionMode ? (
-            // Checkbox in selection mode
-            <button
-              onClick={() => toggleLesson(getLessonIdForApi())}
-              className={`
-                w-4 h-4 rounded border-2 flex items-center justify-center transition-colors
-                ${selectedLessons.has(getLessonIdForApi())
-                  ? 'bg-blue-500 border-blue-500 text-white'
-                  : 'border-slate-300 dark:border-slate-600 hover:border-blue-300'
-                }
-              `}
-              title="Выбрать урок"
-            >
-              {selectedLessons.has(getLessonIdForApi()) && <Check size={10} />}
-            </button>
-          ) : currentStatus !== 'active' ? (
-            // Generate button (not in active status)
-            <button
-              onClick={() => {
-                if (generateLesson) {
-                  generateLesson(getLessonIdForApi());
-                }
-              }}
-              disabled={isLessonGenerating(getLessonIdForApi())}
-              className={`
-                p-1 rounded transition-colors
-                ${currentStatus === 'completed' || currentStatus === 'error'
-                  ? 'text-orange-600 hover:bg-orange-100 dark:text-orange-400 dark:hover:bg-orange-900/30'
-                  : 'text-emerald-600 hover:bg-emerald-100 dark:text-emerald-400 dark:hover:bg-emerald-900/30'
-                }
-                ${isLessonGenerating(getLessonIdForApi()) ? 'opacity-50 cursor-not-allowed' : ''}
-              `}
-              title={currentStatus === 'completed' ? 'Перегенерировать урок' : 'Сгенерировать урок'}
-            >
-              {isLessonGenerating(getLessonIdForApi()) ? (
-                <Loader2 size={14} className="animate-spin" />
-              ) : currentStatus === 'completed' || currentStatus === 'error' ? (
-                <RefreshCw size={14} />
-              ) : (
-                <Play size={14} />
-              )}
-            </button>
-          ) : null}
-        </div>
-      )}
-
-      {/* Progress Bar (active only) */}
+      {/* Progress Bar (active only) - absolute positioned at bottom */}
       {currentStatus === 'active' && data.progress !== undefined && (
         <div className="absolute bottom-0 left-0 w-full">
           <NodeProgressBar

@@ -12,6 +12,12 @@ export const GRAPH_TRANSLATIONS: GraphTranslations & {
   stage5?: Record<string, { ru: string; en: string }>;
   stage6?: Record<string, Record<string, { ru: string; en: string }>>;
   stageDescriptions?: Record<string, { ru: string; en: string }>;
+  enrichments?: {
+    types: Record<string, { ru: string; en: string }>;
+    status: Record<string, { ru: string; en: string }>;
+    actions: Record<string, { ru: string; en: string }>;
+    assetDock: Record<string, { ru: string; en: string }>;
+  };
 } = {
   stages: {
     stage_1: { ru: 'Инициализация курса', en: 'Course Initialization' },
@@ -871,6 +877,39 @@ export const GRAPH_TRANSLATIONS: GraphTranslations & {
     errorGeneration: { ru: 'Ошибка генерации', en: 'Generation Error' },
     retryGeneration: { ru: 'Повторить генерацию', en: 'Retry Generation' },
   },
+  // === STAGE 7: ENRICHMENTS ===
+  enrichments: {
+    types: {
+      video: { ru: 'Видео', en: 'Video' },
+      audio: { ru: 'Аудио', en: 'Audio' },
+      presentation: { ru: 'Презентация', en: 'Presentation' },
+      quiz: { ru: 'Тест', en: 'Quiz' },
+      document: { ru: 'Документ', en: 'Document' },
+    },
+    status: {
+      pending: { ru: 'В очереди', en: 'Pending' },
+      draft_generating: { ru: 'Черновик...', en: 'Draft...' },
+      draft_ready: { ru: 'Черновик готов', en: 'Draft Ready' },
+      generating: { ru: 'Генерация...', en: 'Generating...' },
+      completed: { ru: 'Готово', en: 'Completed' },
+      failed: { ru: 'Ошибка', en: 'Failed' },
+      cancelled: { ru: 'Отменено', en: 'Cancelled' },
+    },
+    actions: {
+      add: { ru: 'Добавить', en: 'Add' },
+      delete: { ru: 'Удалить', en: 'Delete' },
+      regenerate: { ru: 'Перегенерировать', en: 'Regenerate' },
+      approve: { ru: 'Одобрить', en: 'Approve' },
+      preview: { ru: 'Просмотр', en: 'Preview' },
+    },
+    assetDock: {
+      title: { ru: 'Дополнения', en: 'Enrichments' },
+      empty: { ru: 'Нет дополнений', en: 'No enrichments' },
+      generating: { ru: 'генерируется', en: 'generating' },
+      error: { ru: 'с ошибкой', en: 'with error' },
+    },
+  },
+
   stage6: {
     // === CONTROL TOWER ===
     controlTower: {

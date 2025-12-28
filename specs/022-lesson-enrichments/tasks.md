@@ -125,15 +125,24 @@
 
 ### Implementation for User Story 7
 
-- [ ] T033 [US7] Update LessonNodeData type to include enrichmentsSummary, hasEnrichmentErrors, enrichmentsGenerating in `packages/web/components/generation-graph/types.ts`
-- [ ] T034 [US7] Create AssetDock component with semantic zoom logic (dot→count→icons) in `packages/web/components/generation-graph/nodes/AssetDock.tsx`
-- [ ] T035 [US7] Update LessonNode to include AssetDock (height 50px→64px) in `packages/web/components/generation-graph/nodes/LessonNode.tsx`
-- [ ] T036 [US7] Create enrichment status badge component in `packages/web/components/generation-graph/panels/stage7/EnrichmentStatusBadge.tsx`
-- [ ] T037 [US7] Create enrichment type icons map in `packages/web/lib/generation-graph/translations.ts`
-- [ ] T038 [US7] Create useEnrichmentData hook (tRPC + Supabase realtime subscription) in `packages/web/components/generation-graph/hooks/useEnrichmentData.ts`
-- [ ] T039 [US7] Update ELK layout config for 64px node height in `packages/web/lib/generation-graph/constants.ts`
-- [ ] T040 [P] [US7] Create enrichment translations in `packages/web/messages/ru/enrichments.json`
-- [ ] T041 [P] [US7] Create enrichment translations in `packages/web/messages/en/enrichments.json`
+- [X] T033 [US7] Update LessonNodeData type to include enrichmentsSummary, hasEnrichmentErrors, enrichmentsGenerating in `packages/shared-types/src/generation-graph.ts`
+  → Artifacts: [generation-graph.ts](packages/shared-types/src/generation-graph.ts)
+- [X] T034 [US7] Create AssetDock component with semantic zoom logic (dot→count→icons) in `packages/web/components/generation-graph/nodes/AssetDock.tsx`
+  → Artifacts: [AssetDock.tsx](packages/web/components/generation-graph/nodes/AssetDock.tsx)
+- [X] T035 [US7] Update LessonNode to include AssetDock (height 50px→64px) in `packages/web/components/generation-graph/nodes/LessonNode.tsx`
+  → Artifacts: [LessonNode.tsx](packages/web/components/generation-graph/nodes/LessonNode.tsx)
+- [X] T036 [US7] Create enrichment status badge component in `packages/web/components/generation-graph/panels/stage7/EnrichmentStatusBadge.tsx`
+  → Artifacts: [EnrichmentStatusBadge.tsx](packages/web/components/generation-graph/panels/stage7/EnrichmentStatusBadge.tsx)
+- [X] T037 [US7] Create enrichment type icons map in `packages/web/lib/generation-graph/enrichment-config.ts`
+  → Artifacts: [enrichment-config.ts](packages/web/lib/generation-graph/enrichment-config.ts), [translations.ts](packages/web/lib/generation-graph/translations.ts)
+- [X] T038 [US7] Create useEnrichmentData hook (Supabase query + realtime subscription) in `packages/web/components/generation-graph/hooks/useEnrichmentData.ts`
+  → Artifacts: [useEnrichmentData.ts](packages/web/components/generation-graph/hooks/useEnrichmentData.ts)
+- [X] T039 [US7] Update ELK layout config for 64px node height in layout hooks
+  → Artifacts: [useGraphLayout.ts](packages/web/components/generation-graph/hooks/useGraphLayout.ts), [graph-builders.ts](packages/web/components/generation-graph/hooks/use-graph-data/utils/graph-builders.ts)
+- [X] T040 [P] [US7] Create enrichment translations in `packages/web/messages/ru/enrichments.json`
+  → Artifacts: [enrichments.json](packages/web/messages/ru/enrichments.json)
+- [X] T041 [P] [US7] Create enrichment translations in `packages/web/messages/en/enrichments.json`
+  → Artifacts: [enrichments.json](packages/web/messages/en/enrichments.json)
 
 **Checkpoint**: Asset Dock visible on lesson nodes with status indicators
 

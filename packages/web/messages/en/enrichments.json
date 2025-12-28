@@ -1,0 +1,104 @@
+{
+  "types": {
+    "video": "Video",
+    "audio": "Audio",
+    "presentation": "Presentation",
+    "quiz": "Quiz",
+    "document": "Document"
+  },
+  "typeDescriptions": {
+    "video": "AI-generated video lecture based on lesson content",
+    "audio": "Text-to-speech narration for convenient listening",
+    "presentation": "Slide presentation for visual accompaniment",
+    "quiz": "Comprehension quiz to reinforce learning",
+    "document": "Additional document for download"
+  },
+  "status": {
+    "pending": "Pending",
+    "draft_generating": "Generating Draft",
+    "draft_ready": "Draft Ready",
+    "generating": "Generating",
+    "completed": "Completed",
+    "failed": "Failed",
+    "cancelled": "Cancelled"
+  },
+  "actions": {
+    "add": "Add",
+    "delete": "Delete",
+    "regenerate": "Regenerate",
+    "cancel": "Cancel",
+    "preview": "Preview",
+    "download": "Download",
+    "approve": "Approve",
+    "edit": "Edit",
+    "reorder": "Reorder"
+  },
+  "assetDock": {
+    "title": "Lesson Enrichments",
+    "empty": "No enrichments",
+    "addFirst": "Add your first enrichment"
+  },
+  "inspector": {
+    "title": "Lesson Enrichments",
+    "noEnrichments": "This lesson has no enrichments yet",
+    "addEnrichment": "Add Enrichment",
+    "generating": "Generating...",
+    "progress": "Progress",
+    "error": "An error occurred",
+    "retry": "Try Again",
+    "back": "Back",
+    "settings": "Settings"
+  },
+  "twoStage": {
+    "draftReady": "Draft ready for review",
+    "reviewDraft": "Review and edit the draft before final generation",
+    "approveAndGenerate": "Approve & Generate",
+    "regenerateDraft": "Regenerate Draft",
+    "editDraft": "Edit Draft"
+  },
+  "batch": {
+    "title": "Batch Generation",
+    "generateForAll": "Generate for all lessons",
+    "confirmTitle": "Confirm Batch Generation",
+    "confirmDescription": "This will create {count} \"{type}\" enrichments",
+    "inProgress": "Generating for {completed} of {total} lessons"
+  },
+  "errors": {
+    "generationFailed": "Failed to generate enrichment",
+    "deleteFailed": "Failed to delete enrichment",
+    "loadFailed": "Failed to load enrichments",
+    "noContent": "Lesson content is empty"
+  },
+  "forms": {
+    "quiz": {
+      "title": "Quiz Settings",
+      "questionCount": "Number of Questions",
+      "difficulty": "Difficulty",
+      "difficultyEasy": "Easy",
+      "difficultyMedium": "Medium",
+      "difficultyHard": "Hard",
+      "includeExplanations": "Include Explanations"
+    },
+    "audio": {
+      "title": "Audio Settings",
+      "voice": "Voice",
+      "speed": "Speed",
+      "speedSlow": "Slow",
+      "speedNormal": "Normal",
+      "speedFast": "Fast"
+    },
+    "video": {
+      "title": "Video Settings",
+      "voice": "Voice",
+      "avatar": "Avatar",
+      "resolution": "Resolution"
+    },
+    "presentation": {
+      "title": "Presentation Settings",
+      "theme": "Theme",
+      "slideCount": "Number of Slides",
+      "includeNotes": "Include Speaker Notes"
+    }
+  },
+  "comingSoon": "Coming Soon"
+}

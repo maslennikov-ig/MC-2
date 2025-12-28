@@ -175,6 +175,17 @@ export interface DocumentNode extends GraphNode {
 }
 
 /**
+ * Enrichment summary for React Flow node display
+ * Lightweight representation for Asset Dock visualization
+ */
+export interface EnrichmentSummaryForNode {
+  type: 'video' | 'audio' | 'presentation' | 'quiz' | 'document';
+  status: 'pending' | 'draft_generating' | 'draft_ready' | 'generating' | 'completed' | 'failed' | 'cancelled';
+  count: number;
+  hasError: boolean;
+}
+
+/**
  * Lesson node (parallel generation in Stage 6)
  */
 export interface LessonNode extends GraphNode {
@@ -192,6 +203,32 @@ export interface LessonNode extends GraphNode {
 
   /** Parent module ID */
   moduleId: string;
+
+  // === Stage 7: Enrichment Summary Fields ===
+
+  /**
+   * Summary of enrichments attached to this lesson
+   * Maps enrichment type to its status summary
+   * Used for Asset Dock visualization in React Flow
+   */
+  enrichmentsSummary?: EnrichmentSummaryForNode[];
+
+  /**
+   * Whether any enrichment has an error
+   * Used for quick error indicator on node
+   */
+  hasEnrichmentErrors?: boolean;
+
+  /**
+   * Whether any enrichment is currently generating
+   * Used for animation indicator on node
+   */
+  enrichmentsGenerating?: boolean;
+
+  /**
+   * Total count of enrichments for this lesson
+   */
+  enrichmentCount?: number;
 }
 
 /**
