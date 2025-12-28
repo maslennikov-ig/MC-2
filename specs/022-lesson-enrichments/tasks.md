@@ -207,9 +207,17 @@ const model = (settings.model as string) || FALLBACK_MODEL;
 
 ### Implementation for User Story 2
 
-- [ ] T046 [US2] Create quiz prompt template with Bloom's taxonomy in `packages/course-gen-platform/src/stages/stage7-enrichments/prompts/quiz-prompt.ts`
-- [ ] T047 [US2] Create quiz handler (full implementation) in `packages/course-gen-platform/src/stages/stage7-enrichments/handlers/quiz-handler.ts`
-- [ ] T048 [US2] Create QuizPreview component in `packages/web/components/generation-graph/panels/stage7/previews/QuizPreview.tsx`
+- [X] T046 [US2] Create quiz prompt template with Bloom's taxonomy in `packages/course-gen-platform/src/stages/stage7-enrichments/prompts/quiz-prompt.ts`
+  → Artifacts: [quiz-prompt.ts](packages/course-gen-platform/src/stages/stage7-enrichments/prompts/quiz-prompt.ts)
+- [X] T047 [US2] Create quiz handler (single-stage implementation) in `packages/course-gen-platform/src/stages/stage7-enrichments/handlers/quiz-handler.ts`
+  - Uses quizOutputSchema for validation, Bloom's taxonomy question distribution
+  - Follows model configuration pattern (FALLBACK_MODEL = DEFAULT_MODEL_ID)
+  → Artifacts: [quiz-handler.ts](packages/course-gen-platform/src/stages/stage7-enrichments/handlers/quiz-handler.ts), [enrichment-router.ts](packages/course-gen-platform/src/stages/stage7-enrichments/services/enrichment-router.ts)
+- [X] T048 [US2] Create QuizPreview component in `packages/web/components/generation-graph/panels/stage7/QuizPreview.tsx`
+  - Read-only preview with question accordion, Bloom level/difficulty badges
+  - Bloom's coverage visualization chart
+  - Reuses: EnrichmentStatusBadge, Badge, Accordion, JsonViewer
+  → Artifacts: [QuizPreview.tsx](packages/web/components/generation-graph/panels/stage7/QuizPreview.tsx)
 
 **Checkpoint**: Quiz enrichments can be added with generated questions, preview is fully functional
 

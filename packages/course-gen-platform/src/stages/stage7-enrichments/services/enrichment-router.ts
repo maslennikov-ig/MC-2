@@ -13,6 +13,7 @@ import type {
   DraftResult,
   GenerateResult,
 } from '../types';
+import { quizHandler, videoHandler } from '../handlers';
 
 /**
  * Enrichment handler interface
@@ -45,86 +46,7 @@ export interface EnrichmentHandler {
   ) => Promise<GenerateResult>;
 }
 
-/**
- * Quiz enrichment handler (stub)
- *
- * Generates quiz questions based on lesson content.
- * Single-stage flow: generates complete quiz in one pass.
- */
-const quizHandler: EnrichmentHandler = {
-  generationFlow: 'single-stage',
-
-  async generate(input: EnrichmentHandlerInput): Promise<GenerateResult> {
-    const { enrichmentContext } = input;
-
-    logger.info(
-      {
-        enrichmentId: enrichmentContext.enrichment.id,
-        lessonId: enrichmentContext.lesson.id,
-      },
-      'Quiz handler: generating quiz (stub)'
-    );
-
-    // TODO: Implement actual quiz generation using LLM
-    // For now, return placeholder content
-    const startTime = Date.now();
-
-    // Stub: Generate placeholder quiz content
-    const content = {
-      type: 'quiz' as const,
-      quiz_title: `Quiz for ${enrichmentContext.lesson.title}`,
-      instructions: 'Answer all questions to the best of your ability.',
-      questions: [
-        {
-          id: 'q1',
-          type: 'multiple_choice' as const,
-          bloom_level: 'remember' as const,
-          difficulty: 'easy' as const,
-          question: 'This is a placeholder question about the lesson content.',
-          options: [
-            { id: 'a', text: 'Option A' },
-            { id: 'b', text: 'Option B' },
-            { id: 'c', text: 'Option C' },
-            { id: 'd', text: 'Option D' },
-          ],
-          correct_answer: 'a',
-          explanation: 'This is the explanation for the correct answer.',
-          points: 10,
-        },
-      ],
-      passing_score: 70,
-      shuffle_questions: true,
-      shuffle_options: true,
-      metadata: {
-        total_points: 10,
-        estimated_minutes: 5,
-        bloom_coverage: {
-          remember: 1,
-          understand: 0,
-          apply: 0,
-          analyze: 0,
-        },
-      },
-    };
-
-    const durationMs = Date.now() - startTime;
-
-    return {
-      content,
-      metadata: {
-        generated_at: new Date().toISOString(),
-        generation_duration_ms: durationMs,
-        input_tokens: 0,
-        output_tokens: 0,
-        total_tokens: 0,
-        estimated_cost_usd: 0,
-        model_used: 'stub',
-        quality_score: 1.0,
-        retry_attempts: 0,
-      },
-    };
-  },
-};
+// Quiz handler imported from handlers/quiz-handler.ts
 
 /**
  * Audio enrichment handler (stub)
@@ -298,94 +220,7 @@ const presentationHandler: EnrichmentHandler = {
   },
 };
 
-/**
- * Video enrichment handler (stub)
- *
- * Generates video script for future video generation.
- * Two-stage flow: script draft -> review -> final generation.
- */
-const videoHandler: EnrichmentHandler = {
-  generationFlow: 'two-stage',
-
-  async generateDraft(input: EnrichmentHandlerInput): Promise<DraftResult> {
-    const { enrichmentContext } = input;
-
-    logger.info(
-      {
-        enrichmentId: enrichmentContext.enrichment.id,
-        lessonId: enrichmentContext.lesson.id,
-      },
-      'Video handler: generating script draft (stub)'
-    );
-
-    const startTime = Date.now();
-
-    // Stub: Generate placeholder script
-    const draftContent = {
-      script: `Welcome to the lesson on ${enrichmentContext.lesson.title}. In this video, we will cover...`,
-      estimatedDuration: 120,
-    };
-
-    const durationMs = Date.now() - startTime;
-
-    return {
-      draftContent,
-      metadata: {
-        durationMs,
-        tokensUsed: 0,
-        modelUsed: 'stub',
-      },
-    };
-  },
-
-  async generate(input: EnrichmentHandlerInput): Promise<GenerateResult> {
-    const { enrichmentContext } = input;
-
-    logger.info(
-      {
-        enrichmentId: enrichmentContext.enrichment.id,
-        lessonId: enrichmentContext.lesson.id,
-      },
-      'Video handler: generating video content (stub)'
-    );
-
-    const startTime = Date.now();
-
-    // Stub: Generate placeholder video content metadata
-    const content = {
-      type: 'video' as const,
-      script: `Video script for ${enrichmentContext.lesson.title}`,
-      avatar_id: undefined,
-      slides_sync_points: [],
-      estimated_duration_seconds: 120,
-    };
-
-    const durationMs = Date.now() - startTime;
-
-    return {
-      content,
-      metadata: {
-        generated_at: new Date().toISOString(),
-        generation_duration_ms: durationMs,
-        estimated_cost_usd: 0,
-        model_used: 'stub',
-        quality_score: 1.0,
-        retry_attempts: 0,
-      },
-    };
-  },
-
-  async generateFinal(
-    input: EnrichmentHandlerInput,
-    draft: DraftResult
-  ): Promise<GenerateResult> {
-    logger.debug(
-      { draft: draft.draftContent },
-      'Generating final video from draft'
-    );
-    return this.generate(input);
-  },
-};
+// Video handler imported from handlers/video-handler.ts
 
 /**
  * Document enrichment handler (stub)
