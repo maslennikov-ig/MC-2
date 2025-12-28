@@ -4,7 +4,15 @@
     "audio": "Audio",
     "presentation": "Presentation",
     "quiz": "Quiz",
-    "document": "Document"
+    "document": "Document",
+    "podcast": "Podcast",
+    "mindmap": "Mindmap",
+    "case_study": "Case Study",
+    "flashcards": "Flashcards",
+    "project": "Project",
+    "discussion": "Discussion",
+    "reading": "Reading",
+    "exercise": "Exercise"
   },
   "typeDescriptions": {
     "video": "AI-generated video lecture based on lesson content",
@@ -51,7 +59,16 @@
     "error": "An error occurred",
     "retry": "Try Again",
     "back": "Back",
-    "settings": "Settings"
+    "settings": "Settings",
+    "views": {
+      "root": "Enrichments",
+      "create": "Create",
+      "detail": "Details"
+    },
+    "createPrefix": "Create",
+    "dragToReorder": "Drag to reorder",
+    "empty": "No enrichments",
+    "emptyDescription": "Add video, quiz, audio, or presentation to this lesson"
   },
   "twoStage": {
     "draftReady": "Draft ready for review",
@@ -74,6 +91,10 @@
     "noContent": "Lesson content is empty"
   },
   "forms": {
+    "common": {
+      "cancel": "Cancel",
+      "create": "Create"
+    },
     "quiz": {
       "title": "Quiz Settings",
       "questionCount": "Number of Questions",
@@ -81,7 +102,8 @@
       "difficultyEasy": "Easy",
       "difficultyMedium": "Medium",
       "difficultyHard": "Hard",
-      "includeExplanations": "Include Explanations"
+      "includeExplanations": "Include Explanations",
+      "balanced": "Balanced"
     },
     "audio": {
       "title": "Audio Settings",
@@ -89,19 +111,27 @@
       "speed": "Speed",
       "speedSlow": "Slow",
       "speedNormal": "Normal",
-      "speedFast": "Fast"
+      "speedFast": "Fast",
+      "format": "Format"
     },
     "video": {
       "title": "Video Settings",
       "voice": "Voice",
       "avatar": "Avatar",
-      "resolution": "Resolution"
+      "resolution": "Resolution",
+      "speed": "Speed",
+      "format": "Format"
     },
     "presentation": {
       "title": "Presentation Settings",
       "theme": "Theme",
       "slideCount": "Number of Slides",
-      "includeNotes": "Include Speaker Notes"
+      "includeNotes": "Include Speaker Notes",
+      "themeLight": "Light",
+      "themeDark": "Dark",
+      "themeColorful": "Colorful",
+      "maxSlides": "Maximum Slides",
+      "includeSpeakerNotes": "Include Speaker Notes"
     }
   },
   "comingSoon": "Coming Soon"

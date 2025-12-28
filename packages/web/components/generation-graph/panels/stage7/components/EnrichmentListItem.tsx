@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { useLocale } from 'next-intl';
+import { useLocale, useTranslations } from 'next-intl';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { GripVertical, AlertCircle, Loader2, CheckCircle2 } from 'lucide-react';
@@ -42,18 +42,7 @@ function StatusIndicator({ status }: { status: EnrichmentStatus }) {
   }
 }
 
-function getStatusText(status: EnrichmentStatus, locale: string): string {
-  const texts: Record<EnrichmentStatus, { en: string; ru: string }> = {
-    pending: { en: 'Pending', ru: 'Ожидание' },
-    draft_generating: { en: 'Generating draft...', ru: 'Генерация черновика...' },
-    draft_ready: { en: 'Draft ready', ru: 'Черновик готов' },
-    generating: { en: 'Generating...', ru: 'Генерация...' },
-    completed: { en: 'Completed', ru: 'Завершено' },
-    failed: { en: 'Failed', ru: 'Ошибка' },
-    cancelled: { en: 'Cancelled', ru: 'Отменено' },
-  };
-  return locale === 'ru' ? texts[status].ru : texts[status].en;
-}
+// Status text helper removed - now using translations directly via useTranslations
 
 /**
  * Sanitize error message for display.
@@ -61,9 +50,9 @@ function getStatusText(status: EnrichmentStatus, locale: string): string {
  * - Strips any HTML tags (though React escapes strings anyway)
  * - Provides user-friendly fallback
  */
-function sanitizeErrorMessage(message: string | null | undefined, locale: string, maxLength = 80): string {
+function sanitizeErrorMessage(message: string | null | undefined, fallback: string, maxLength = 80): string {
   if (!message) {
-    return locale === 'ru' ? 'Произошла ошибка' : 'An error occurred';
+    return fallback;
   }
   // Strip any potential HTML tags
   const stripped = message.replace(/<[^>]*>/g, '');
@@ -91,6 +80,7 @@ function sanitizeErrorMessage(message: string | null | undefined, locale: string
  */
 export function EnrichmentListItem({ item, isDragging, onClick }: EnrichmentListItemProps) {
   const locale = useLocale();
+  const t = useTranslations('enrichments');
   const config = ENRICHMENT_TYPE_CONFIG[item.type];
 
   const {
@@ -108,7 +98,7 @@ export function EnrichmentListItem({ item, isDragging, onClick }: EnrichmentList
   };
 
   const typeName = locale === 'ru' ? config.labelRu : config.label;
-  const statusText = getStatusText(item.status, locale);
+  const statusText = t(`status.${item.status}`);
 
   return (
     <div
@@ -128,6 +118,7 @@ export function EnrichmentListItem({ item, isDragging, onClick }: EnrichmentList
         {...attributes}
         {...listeners}
         onClick={(e) => e.stopPropagation()}
+        aria-label={t('inspector.dragToReorder')}
       >
         <GripVertical className="w-4 h-4" />
       </button>
@@ -142,7 +133,7 @@ export function EnrichmentListItem({ item, isDragging, onClick }: EnrichmentList
         <div className="font-medium truncate">{typeName}</div>
         <div className="text-xs text-muted-foreground truncate">
           {item.status === 'failed'
-            ? sanitizeErrorMessage(item.error_message, locale)
+            ? sanitizeErrorMessage(item.error_message, t('inspector.error'))
             : statusText}
         </div>
       </div>

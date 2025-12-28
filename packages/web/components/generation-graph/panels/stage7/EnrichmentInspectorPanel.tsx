@@ -15,9 +15,9 @@
 
 'use client';
 
-import React, { useEffect } from 'react';
-import { useLocale } from 'next-intl';
-import { ChevronLeft } from 'lucide-react';
+import React, { useEffect, Suspense, lazy } from 'react';
+import { useTranslations } from 'next-intl';
+import { ChevronLeft, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import {
@@ -31,6 +31,33 @@ import {
 } from '../../stores/enrichment-inspector-store';
 import { RootView } from './views/RootView';
 import { EnrichmentInspectorErrorBoundary } from './EnrichmentInspectorErrorBoundary';
+import type { CreateViewProps } from './views/CreateView';
+
+// Lazy load heavy views to reduce initial bundle
+const CreateViewLazy = lazy(() => import('./views/CreateView').then(m => ({ default: m.CreateView })));
+const DetailViewLazy = lazy(() => import('./views/DetailView').then(m => ({ default: m.DetailView })));
+
+/**
+ * CreateView supported types - subset of CreateEnrichmentType
+ * Maps store types to CreateView types where applicable
+ */
+type SupportedCreateType = CreateViewProps['type'];
+const SUPPORTED_CREATE_TYPES = new Set<string>(['quiz', 'video']);
+
+/**
+ * Map CreateEnrichmentType to CreateView type if supported
+ * Returns null for unsupported types
+ */
+function mapToCreateViewType(type: CreateEnrichmentType): SupportedCreateType | null {
+  if (SUPPORTED_CREATE_TYPES.has(type)) {
+    return type as SupportedCreateType;
+  }
+  // Map podcast to audio (same form)
+  if (type === 'podcast') {
+    return 'audio';
+  }
+  return null;
+}
 
 /**
  * Props for EnrichmentInspectorPanel
@@ -58,34 +85,12 @@ function InspectorHeader({
   canGoBack: boolean;
   onBack: () => void;
 }) {
-  const locale = useLocale();
-
-  // View titles (ru/en)
-  const titles: Record<InspectorView, { ru: string; en: string }> = {
-    root: { ru: 'Обогащения', en: 'Enrichments' },
-    create: { ru: 'Создание', en: 'Create' },
-    detail: { ru: 'Детали', en: 'Details' },
-  };
-
-  // Create type labels (ru/en)
-  const createTypeLabels: Record<CreateEnrichmentType, { ru: string; en: string }> = {
-    video: { ru: 'видео', en: 'video' },
-    podcast: { ru: 'подкаст', en: 'podcast' },
-    mindmap: { ru: 'майндмэп', en: 'mindmap' },
-    case_study: { ru: 'кейс', en: 'case study' },
-    quiz: { ru: 'тест', en: 'quiz' },
-    flashcards: { ru: 'карточки', en: 'flashcards' },
-    project: { ru: 'проект', en: 'project' },
-    discussion: { ru: 'обсуждение', en: 'discussion' },
-    reading: { ru: 'чтение', en: 'reading' },
-    exercise: { ru: 'упражнение', en: 'exercise' },
-  };
+  const t = useTranslations('enrichments');
 
   // Build title based on view
-  let title = titles[view][locale as 'ru' | 'en'];
+  let title = t(`inspector.views.${view}`);
   if (view === 'create' && createType) {
-    const typeLabel = createTypeLabels[createType][locale as 'ru' | 'en'];
-    title = locale === 'ru' ? `Создание: ${typeLabel}` : `Create ${typeLabel}`;
+    title = `${t('inspector.createPrefix')} ${t(`types.${createType}`)}`;
   }
 
   return (
@@ -102,35 +107,24 @@ function InspectorHeader({
   );
 }
 
-
 /**
- * CreateView Stub Component
- *
- * Placeholder for enrichment creation form
+ * Loading spinner for lazy-loaded views
  */
-function CreateView({
-  type,
-  lessonId,
-}: {
-  type: CreateEnrichmentType;
-  lessonId: string;
-}) {
+function ViewLoadingSpinner() {
   return (
-    <div className="flex items-center justify-center h-full p-4 text-muted-foreground text-sm">
-      Create {type} for lessonId: {lessonId}
+    <div className="flex items-center justify-center h-full">
+      <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
     </div>
   );
 }
 
 /**
- * DetailView Stub Component
- *
- * Placeholder for enrichment detail view
+ * Placeholder for unsupported create types (forms not yet implemented)
  */
-function DetailView({ enrichmentId }: { enrichmentId: string }) {
+function UnsupportedCreateTypePlaceholder({ type }: { type: string }) {
   return (
     <div className="flex items-center justify-center h-full p-4 text-muted-foreground text-sm">
-      Details for enrichmentId: {enrichmentId}
+      Form for &quot;{type}&quot; coming soon
     </div>
   );
 }
@@ -168,13 +162,24 @@ export function EnrichmentInspectorPanel({
     switch (currentView) {
       case 'root':
         return <RootView lessonId={lessonId} />;
-      case 'create':
-        return createType ? (
-          <CreateView type={createType} lessonId={lessonId} />
-        ) : null;
+      case 'create': {
+        if (!createType) return null;
+        const mappedType = mapToCreateViewType(createType);
+        if (mappedType) {
+          return (
+            <Suspense fallback={<ViewLoadingSpinner />}>
+              <CreateViewLazy type={mappedType} lessonId={lessonId} />
+            </Suspense>
+          );
+        }
+        // Fallback for unsupported types
+        return <UnsupportedCreateTypePlaceholder type={createType} />;
+      }
       case 'detail':
         return selectedEnrichmentId ? (
-          <DetailView enrichmentId={selectedEnrichmentId} />
+          <Suspense fallback={<ViewLoadingSpinner />}>
+            <DetailViewLazy enrichmentId={selectedEnrichmentId} />
+          </Suspense>
         ) : null;
       default:
         return null;

@@ -1,6 +1,7 @@
 'use client';
 
 import { create } from 'zustand';
+import { immer } from 'zustand/middleware/immer';
 
 /**
  * Inspector view types for stack navigation
@@ -114,56 +115,57 @@ interface EnrichmentInspectorState {
  * goBack();
  * ```
  */
-export const useEnrichmentInspectorStore = create<EnrichmentInspectorState>((set) => ({
-  lessonId: null,
-  history: [],
-  current: null,
-  dirty: false,
+export const useEnrichmentInspectorStore = create<EnrichmentInspectorState>()(
+  immer((set) => ({
+    lessonId: null,
+    history: [],
+    current: null,
+    dirty: false,
 
-  openRoot: (lessonId) =>
-    set(() => ({
-      lessonId,
-      history: [],
-      current: { view: 'root' },
-      dirty: false,
-    })),
+    openRoot: (lessonId) =>
+      set((state) => {
+        state.lessonId = lessonId;
+        state.history = [];
+        state.current = { view: 'root' };
+        state.dirty = false;
+      }),
 
-  openCreate: (type) =>
-    set((state) => ({
-      history: state.current ? [...state.history, state.current] : state.history,
-      current: { view: 'create', createType: type },
-      dirty: false,
-    })),
+    openCreate: (type) =>
+      set((state) => {
+        if (state.current) {
+          state.history.push(state.current);
+        }
+        state.current = { view: 'create', createType: type };
+        state.dirty = false;
+      }),
 
-  openDetail: (enrichmentId) =>
-    set((state) => ({
-      history: state.current ? [...state.history, state.current] : state.history,
-      current: { view: 'detail', enrichmentId },
-    })),
+    openDetail: (enrichmentId) =>
+      set((state) => {
+        if (state.current) {
+          state.history.push(state.current);
+        }
+        state.current = { view: 'detail', enrichmentId };
+      }),
 
-  goBack: () =>
-    set((state) => {
-      if (state.history.length === 0) return state;
+    goBack: () =>
+      set((state) => {
+        if (state.history.length === 0) return;
 
-      const newHistory = [...state.history];
-      const previous = newHistory.pop()!;
+        const previous = state.history.pop()!;
+        state.current = previous;
+      }),
 
-      return {
-        history: newHistory,
-        current: previous,
-      };
-    }),
+    reset: () =>
+      set((state) => {
+        state.lessonId = null;
+        state.history = [];
+        state.current = null;
+        state.dirty = false;
+      }),
 
-  reset: () =>
-    set(() => ({
-      lessonId: null,
-      history: [],
-      current: null,
-      dirty: false,
-    })),
-
-  setDirty: (dirty) => set({ dirty }),
-}));
+    setDirty: (dirty) => set((state) => { state.dirty = dirty; }),
+  }))
+);
 
 /**
  * Selector hooks for convenient access to specific state

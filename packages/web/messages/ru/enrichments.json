@@ -4,7 +4,15 @@
     "audio": "Аудио",
     "presentation": "Презентация",
     "quiz": "Тест",
-    "document": "Документ"
+    "document": "Документ",
+    "podcast": "Подкаст",
+    "mindmap": "Майндмэп",
+    "case_study": "Кейс",
+    "flashcards": "Карточки",
+    "project": "Проект",
+    "discussion": "Обсуждение",
+    "reading": "Чтение",
+    "exercise": "Упражнение"
   },
   "typeDescriptions": {
     "video": "AI-сгенерированная видео-лекция на основе материала урока",
@@ -51,7 +59,16 @@
     "error": "Произошла ошибка",
     "retry": "Попробовать снова",
     "back": "Назад",
-    "settings": "Настройки"
+    "settings": "Настройки",
+    "views": {
+      "root": "Обогащения",
+      "create": "Создание",
+      "detail": "Детали"
+    },
+    "createPrefix": "Создание:",
+    "dragToReorder": "Перетащите для сортировки",
+    "empty": "Нет обогащений",
+    "emptyDescription": "Добавьте видео, тест, аудио или презентацию к уроку"
   },
   "twoStage": {
     "draftReady": "Черновик готов к проверке",
@@ -74,6 +91,10 @@
     "noContent": "Контент урока пуст"
   },
   "forms": {
+    "common": {
+      "cancel": "Отмена",
+      "create": "Создать"
+    },
     "quiz": {
       "title": "Настройки теста",
       "questionCount": "Количество вопросов",
@@ -81,7 +102,8 @@
       "difficultyEasy": "Легкий",
       "difficultyMedium": "Средний",
       "difficultyHard": "Сложный",
-      "includeExplanations": "Включить объяснения"
+      "includeExplanations": "Включить объяснения",
+      "balanced": "Сбалансированный"
     },
     "audio": {
       "title": "Настройки аудио",
@@ -89,19 +111,27 @@
       "speed": "Скорость",
       "speedSlow": "Медленно",
       "speedNormal": "Нормально",
-      "speedFast": "Быстро"
+      "speedFast": "Быстро",
+      "format": "Формат"
     },
     "video": {
       "title": "Настройки видео",
       "voice": "Голос",
       "avatar": "Аватар",
-      "resolution": "Разрешение"
+      "resolution": "Разрешение",
+      "speed": "Скорость",
+      "format": "Формат"
     },
     "presentation": {
       "title": "Настройки презентации",
       "theme": "Тема",
       "slideCount": "Количество слайдов",
-      "includeNotes": "Включить заметки докладчика"
+      "includeNotes": "Включить заметки докладчика",
+      "themeLight": "Светлая",
+      "themeDark": "Тёмная",
+      "themeColorful": "Красочная",
+      "maxSlides": "Максимум слайдов",
+      "includeSpeakerNotes": "Заметки докладчика"
     }
   },
   "comingSoon": "Скоро"

@@ -10,7 +10,7 @@
 'use client';
 
 import React from 'react';
-import { useLocale } from 'next-intl';
+import { useTranslations } from 'next-intl';
 import { Layers, Plus, Video, HelpCircle, Volume2, Presentation, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -75,18 +75,7 @@ function EnrichmentListItem({
   enrichment: EnrichmentListItemData;
   onClick: () => void;
 }) {
-  const locale = useLocale();
-
-  // Type labels
-  const typeLabels: Record<EnrichmentType, { ru: string; en: string }> = {
-    video: { ru: 'Видео', en: 'Video' },
-    audio: { ru: 'Аудио', en: 'Audio' },
-    presentation: { ru: 'Презентация', en: 'Presentation' },
-    quiz: { ru: 'Тест', en: 'Quiz' },
-    document: { ru: 'Документ', en: 'Document' },
-  };
-
-  const label = typeLabels[enrichment.type][locale as 'ru' | 'en'];
+  const t = useTranslations('enrichments');
 
   return (
     <button
@@ -99,7 +88,7 @@ function EnrichmentListItem({
     >
       <EnrichmentTypeIcon type={enrichment.type} />
       <div className="flex-1 text-left">
-        <span className="font-medium text-sm">{label}</span>
+        <span className="font-medium text-sm">{t(`types.${enrichment.type}`)}</span>
       </div>
       <EnrichmentStatusBadge status={enrichment.status} size="sm" />
     </button>
@@ -116,13 +105,12 @@ function EnrichmentAddPopover({
 }: {
   onSelect: (type: CreateEnrichmentType) => void;
 }) {
-  const locale = useLocale();
-  const label = locale === 'ru' ? 'Добавить обогащение' : 'Add Enrichment';
+  const t = useTranslations('enrichments');
 
   return (
     <Button onClick={() => onSelect('quiz')} className="w-full">
       <Plus className="w-4 h-4 mr-2" />
-      {label}
+      {t('inspector.addEnrichment')}
     </Button>
   );
 }
@@ -188,18 +176,15 @@ function ErrorState({
 }: {
   onRetry: () => void;
 }) {
-  const locale = useLocale();
-  const t = locale === 'ru'
-    ? { title: 'Не удалось загрузить', description: 'Произошла ошибка при загрузке обогащений', retry: 'Повторить' }
-    : { title: 'Failed to load', description: 'An error occurred while loading enrichments', retry: 'Retry' };
+  const t = useTranslations('enrichments');
 
   return (
     <div className="flex flex-col items-center justify-center h-full p-8 text-center">
       <AlertCircle className="w-12 h-12 text-red-500 mb-4" />
-      <h3 className="text-lg font-medium text-red-700 dark:text-red-400 mb-2">{t.title}</h3>
-      <p className="text-sm text-muted-foreground mb-4">{t.description}</p>
+      <h3 className="text-lg font-medium text-red-700 dark:text-red-400 mb-2">{t('errors.loadFailed')}</h3>
+      <p className="text-sm text-muted-foreground mb-4">{t('inspector.error')}</p>
       <Button onClick={onRetry} variant="outline">
-        {t.retry}
+        {t('inspector.retry')}
       </Button>
     </div>
   );
@@ -211,52 +196,34 @@ function ErrorState({
  * Shown when lesson has no enrichments yet
  */
 function EmptyState({ onAddClick }: { onAddClick: (type: CreateEnrichmentType) => void }) {
-  const locale = useLocale();
-  const t =
-    locale === 'ru'
-      ? {
-          title: 'Нет обогащений',
-          description: 'Добавьте видео, тест, аудио или презентацию к уроку',
-        }
-      : {
-          title: 'No enrichments',
-          description: 'Add video, quiz, audio, or presentation to this lesson',
-        };
-
-  // Type labels for discovery cards
-  const typeLabels: Record<string, { ru: string; en: string }> = {
-    video: { ru: 'Видео', en: 'Video' },
-    quiz: { ru: 'Тест', en: 'Quiz' },
-    audio: { ru: 'Аудио', en: 'Audio' },
-    presentation: { ru: 'Презентация', en: 'Presentation' },
-  };
+  const t = useTranslations('enrichments');
 
   return (
     <div className="flex flex-col items-center justify-center h-full p-8 text-center">
       <Layers className="w-12 h-12 text-muted-foreground mb-4" />
-      <h3 className="text-lg font-medium mb-2">{t.title}</h3>
-      <p className="text-sm text-muted-foreground mb-6">{t.description}</p>
+      <h3 className="text-lg font-medium mb-2">{t('inspector.empty')}</h3>
+      <p className="text-sm text-muted-foreground mb-6">{t('inspector.emptyDescription')}</p>
 
       {/* Discovery cards */}
       <div className="grid grid-cols-2 gap-3 w-full max-w-sm">
         <DiscoveryCard
           icon={Video}
-          title={typeLabels.video[locale as 'ru' | 'en']}
+          title={t('types.video')}
           onClick={() => onAddClick('video')}
         />
         <DiscoveryCard
           icon={HelpCircle}
-          title={typeLabels.quiz[locale as 'ru' | 'en']}
+          title={t('types.quiz')}
           onClick={() => onAddClick('quiz')}
         />
         <DiscoveryCard
           icon={Volume2}
-          title={typeLabels.audio[locale as 'ru' | 'en']}
+          title={t('types.audio')}
           onClick={() => onAddClick('podcast')}
         />
         <DiscoveryCard
           icon={Presentation}
-          title={typeLabels.presentation[locale as 'ru' | 'en']}
+          title={t('types.presentation')}
           onClick={() => onAddClick('reading')}
         />
       </div>

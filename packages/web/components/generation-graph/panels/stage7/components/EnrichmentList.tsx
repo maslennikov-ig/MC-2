@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useState } from 'react';
-import { useLocale } from 'next-intl';
+import { useTranslations } from 'next-intl';
 import {
   DndContext,
   closestCenter,
@@ -20,6 +20,13 @@ import {
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { EnrichmentListItem, EnrichmentListItemData } from './EnrichmentListItem';
+
+/**
+ * Minimum drag distance in pixels before activation.
+ * Prevents accidental drags when user is just clicking.
+ * 8px is optimal for touch and mouse (@dnd-kit recommendation)
+ */
+const DRAG_ACTIVATION_DISTANCE_PX = 8;
 
 export interface EnrichmentListProps {
   items: EnrichmentListItemData[];
@@ -44,13 +51,13 @@ export interface EnrichmentListProps {
  * ```
  */
 export function EnrichmentList({ items, onItemClick, onReorder, className }: EnrichmentListProps) {
-  const locale = useLocale();
+  const t = useTranslations('enrichments');
   const [activeId, setActiveId] = useState<string | null>(null);
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
       activationConstraint: {
-        distance: 8, // Require 8px of movement before starting drag
+        distance: DRAG_ACTIVATION_DISTANCE_PX,
       },
     }),
     useSensor(KeyboardSensor, {
@@ -73,12 +80,10 @@ export function EnrichmentList({ items, onItemClick, onReorder, className }: Enr
     }
   };
 
-  const emptyMessage = locale === 'ru' ? 'Нет обогащений' : 'No enrichments';
-
   if (items.length === 0) {
     return (
       <div className={cn('flex items-center justify-center h-32 text-muted-foreground', className)}>
-        {emptyMessage}
+        {t('inspector.empty')}
       </div>
     );
   }
