@@ -160,9 +160,12 @@
 
 - [X] T042 [US1] Create video prompt template in `packages/course-gen-platform/src/stages/stage7-enrichments/prompts/video-prompt.ts`
   → Artifacts: [video-prompt.ts](packages/course-gen-platform/src/stages/stage7-enrichments/prompts/video-prompt.ts)
-- [ ] T043 [US1] Create video handler (two-stage: generateDraft → generateFinal) in `packages/course-gen-platform/src/stages/stage7-enrichments/handlers/video-handler.ts`
-- [ ] T044 [US1] Create VideoPreview component in `packages/web/components/generation-graph/panels/stage7/previews/VideoPreview.tsx`
-- [ ] T045 [US1] Create VideoDraftEditor component for script review/edit in `packages/web/components/generation-graph/panels/stage7/editors/VideoDraftEditor.tsx`
+- [X] T043 [US1] Create video handler (two-stage: generateDraft → generateFinal) in `packages/course-gen-platform/src/stages/stage7-enrichments/handlers/video-handler.ts`
+  → Artifacts: [video-handler.ts](packages/course-gen-platform/src/stages/stage7-enrichments/handlers/video-handler.ts), [index.ts](packages/course-gen-platform/src/stages/stage7-enrichments/handlers/index.ts)
+- [ ] T044+T045 [US1] Create unified VideoScriptPanel component (replaces separate VideoPreview + VideoDraftEditor) in `packages/web/components/generation-graph/panels/stage7/VideoScriptPanel.tsx`
+  - **Architecture Decision**: Single component with mode switching (draft_ready → edit mode, completed → preview mode)
+  - Reuses: EnrichmentStatusBadge, MarkdownRendererFull, JsonViewer, Accordion, UI primitives
+  - Handles: script display/editing, metadata view, approve/regenerate actions
 
 **Checkpoint**: Video enrichments can be added, draft reviewed/edited, and preview shows script content
 
