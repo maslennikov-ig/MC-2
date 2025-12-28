@@ -13,7 +13,7 @@ import type {
   DraftResult,
   GenerateResult,
 } from '../types';
-import { quizHandler, videoHandler, audioHandler } from '../handlers';
+import { quizHandler, videoHandler, audioHandler, presentationHandler } from '../handlers';
 
 /**
  * Enrichment handler interface
@@ -46,130 +46,7 @@ export interface EnrichmentHandler {
   ) => Promise<GenerateResult>;
 }
 
-// Quiz handler imported from handlers/quiz-handler.ts
-// Audio handler imported from handlers/audio-handler.ts
-
-/**
- * Presentation enrichment handler (stub)
- *
- * Generates presentation slides from lesson content.
- * Two-stage flow: draft (outline) -> review -> final (full slides).
- */
-const presentationHandler: EnrichmentHandler = {
-  generationFlow: 'two-stage',
-
-  async generateDraft(input: EnrichmentHandlerInput): Promise<DraftResult> {
-    const { enrichmentContext } = input;
-
-    logger.info(
-      {
-        enrichmentId: enrichmentContext.enrichment.id,
-        lessonId: enrichmentContext.lesson.id,
-      },
-      'Presentation handler: generating draft (stub)'
-    );
-
-    const startTime = Date.now();
-
-    // Stub: Generate placeholder outline
-    const draftContent = {
-      outline: [
-        { title: 'Introduction', keyPoints: ['Welcome', 'Overview'] },
-        { title: 'Main Content', keyPoints: ['Key concept 1', 'Key concept 2'] },
-        { title: 'Summary', keyPoints: ['Recap', 'Next steps'] },
-      ],
-    };
-
-    const durationMs = Date.now() - startTime;
-
-    return {
-      draftContent,
-      metadata: {
-        durationMs,
-        tokensUsed: 0,
-        modelUsed: 'stub',
-      },
-    };
-  },
-
-  async generate(input: EnrichmentHandlerInput): Promise<GenerateResult> {
-    const { enrichmentContext } = input;
-
-    logger.info(
-      {
-        enrichmentId: enrichmentContext.enrichment.id,
-        lessonId: enrichmentContext.lesson.id,
-      },
-      'Presentation handler: generating slides (stub)'
-    );
-
-    const startTime = Date.now();
-
-    // Stub: Generate placeholder slides
-    const content = {
-      type: 'presentation' as const,
-      theme: 'default' as const,
-      slides: [
-        {
-          index: 0,
-          title: enrichmentContext.lesson.title,
-          content: '# Introduction\n\nWelcome to this lesson.',
-          layout: 'title' as const,
-          speaker_notes: 'Introduce the topic',
-        },
-        {
-          index: 1,
-          title: 'Key Concepts',
-          content: '## Main Points\n\n- Point 1\n- Point 2\n- Point 3',
-          layout: 'content' as const,
-          speaker_notes: 'Explain the key concepts',
-        },
-        {
-          index: 2,
-          title: 'Summary',
-          content: '## Takeaways\n\nKey learning outcomes.',
-          layout: 'content' as const,
-          speaker_notes: 'Summarize and conclude',
-        },
-      ],
-      total_slides: 3,
-    };
-
-    const durationMs = Date.now() - startTime;
-
-    return {
-      content,
-      metadata: {
-        generated_at: new Date().toISOString(),
-        generation_duration_ms: durationMs,
-        input_tokens: 0,
-        output_tokens: 0,
-        total_tokens: 0,
-        estimated_cost_usd: 0,
-        model_used: 'stub',
-        quality_score: 1.0,
-        retry_attempts: 0,
-      },
-    };
-  },
-
-  async generateFinal(
-    input: EnrichmentHandlerInput,
-    draft: DraftResult
-  ): Promise<GenerateResult> {
-    // Use draft to generate final content
-    logger.debug(
-      { draft: draft.draftContent },
-      'Generating final presentation from draft'
-    );
-
-    // For now, just call generate() - in real implementation,
-    // this would use the approved draft outline
-    return this.generate(input);
-  },
-};
-
-// Video handler imported from handlers/video-handler.ts
+// Quiz, audio, presentation, and video handlers imported from handlers/
 
 /**
  * Document enrichment handler (stub)

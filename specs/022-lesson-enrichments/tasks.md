@@ -261,10 +261,22 @@ const model = (settings.model as string) || FALLBACK_MODEL;
 
 ### Implementation for User Story 4
 
-- [ ] T052 [US4] Create presentation prompt template (6x6 rule) in `packages/course-gen-platform/src/stages/stage7-enrichments/prompts/presentation-prompt.ts`
-- [ ] T053 [US4] Create presentation handler (two-stage: generateDraft → generateFinal) in `packages/course-gen-platform/src/stages/stage7-enrichments/handlers/presentation-handler.ts`
-- [ ] T054 [US4] Create PresentationPreview component (slide carousel) in `packages/web/components/generation-graph/panels/stage7/previews/PresentationPreview.tsx`
-- [ ] T055 [US4] Create PresentationDraftEditor component for slide structure review in `packages/web/components/generation-graph/panels/stage7/editors/PresentationDraftEditor.tsx`
+- [X] T052 [US4] Create presentation prompt template (6x6 rule) in `packages/course-gen-platform/src/stages/stage7-enrichments/prompts/presentation-prompt.ts`
+  - Two-stage prompts: buildPresentationDraftSystemPrompt, buildPresentationFinalSystemPrompt
+  - Zod schemas: presentationDraftSchema, presentationOutputSchema
+  → Artifacts: [presentation-prompt.ts](packages/course-gen-platform/src/stages/stage7-enrichments/prompts/presentation-prompt.ts)
+- [X] T053 [US4] Create presentation handler (two-stage: generateDraft → generateFinal) in `packages/course-gen-platform/src/stages/stage7-enrichments/handlers/presentation-handler.ts`
+  - Follows video-handler pattern for two-stage flow
+  - Supports settings.model → DEFAULT_MODEL_ID fallback
+  → Artifacts: [presentation-handler.ts](packages/course-gen-platform/src/stages/stage7-enrichments/handlers/presentation-handler.ts), [enrichment-router.ts](packages/course-gen-platform/src/stages/stage7-enrichments/services/enrichment-router.ts)
+- [X] T054 [US4] Create PresentationPreview component (slide carousel) in `packages/web/components/generation-graph/panels/stage7/PresentationPreview.tsx`
+  - Carousel with thumbnail strip, keyboard navigation
+  - Theme-aware styling (default/dark/academic)
+  - Speaker notes and visual suggestions display
+  → Artifacts: [PresentationPreview.tsx](packages/web/components/generation-graph/panels/stage7/PresentationPreview.tsx)
+- [X] T055 [US4] **MERGED**: Draft editor functionality integrated into PresentationPreview component
+  - PresentationPreview handles draft_ready status with onApproveDraft callback
+  - Separate component not needed - follows VideoScriptPanel pattern
 
 **Checkpoint**: Presentation enrichments can be added, draft reviewed, and slides viewed in carousel
 
