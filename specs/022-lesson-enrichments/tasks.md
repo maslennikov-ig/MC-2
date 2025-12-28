@@ -293,31 +293,47 @@ const model = (settings.model as string) || FALLBACK_MODEL;
 ### Implementation for User Story 5
 
 #### Zustand Store & Hooks
-- [ ] T056 [US5] Create enrichment inspector Zustand store in `packages/web/components/generation-graph/stores/enrichment-inspector-store.ts` (InspectorView type, openRoot/openCreate/openDetail/goBack actions)
-- [ ] T057 [US5] Create useEnrichmentSelection hook (count-based routing logic) in `packages/web/components/generation-graph/hooks/useEnrichmentSelection.ts`
-- [ ] T058 [US5] Create useGenerationStatus hook (optimistic handoff behavior) in `packages/web/components/generation-graph/hooks/useGenerationStatus.ts`
-- [ ] T059 [US5] Create useDraftReview hook (two-stage flow: edit/approve draft) in `packages/web/components/generation-graph/hooks/useDraftReview.ts`
+- [X] T056 [US5] Create enrichment inspector Zustand store in `packages/web/components/generation-graph/stores/enrichment-inspector-store.ts` (InspectorView type, openRoot/openCreate/openDetail/goBack actions)
+  → Artifacts: [enrichment-inspector-store.ts](packages/web/components/generation-graph/stores/enrichment-inspector-store.ts)
+- [X] T057 [US5] Create useEnrichmentSelection hook (count-based routing logic) in `packages/web/components/generation-graph/hooks/useEnrichmentSelection.ts`
+  → Artifacts: [useEnrichmentSelection.ts](packages/web/components/generation-graph/hooks/useEnrichmentSelection.ts)
+- [X] T058 [US5] Create useGenerationStatus hook (optimistic handoff behavior) in `packages/web/components/generation-graph/hooks/useGenerationStatus.ts`
+  → Artifacts: [useGenerationStatus.ts](packages/web/components/generation-graph/hooks/useGenerationStatus.ts)
+- [X] T059 [US5] Create useDraftReview hook (two-stage flow: edit/approve draft) in `packages/web/components/generation-graph/hooks/useDraftReview.ts`
+  → Artifacts: [useDraftReview.ts](packages/web/components/generation-graph/hooks/useDraftReview.ts)
 
 #### Inspector Panel Views (Stack Navigator)
-- [ ] T060 [US5] Create EnrichmentInspectorPanel (view router) in `packages/web/components/generation-graph/panels/stage7/EnrichmentInspectorPanel.tsx`
-- [ ] T061 [US5] Create RootView (list + fallback add button) in `packages/web/components/generation-graph/panels/stage7/views/RootView.tsx`
-- [ ] T062 [US5] Create CreateView (configuration form router) in `packages/web/components/generation-graph/panels/stage7/views/CreateView.tsx`
-- [ ] T063 [US5] Create DetailView (preview/edit with progress mode, supports two-stage) in `packages/web/components/generation-graph/panels/stage7/views/DetailView.tsx`
-- [ ] T064 [US5] Create EmptyStateCards (discovery cards for first enrichment) in `packages/web/components/generation-graph/panels/stage7/views/EmptyStateCards.tsx`
+- [X] T060 [US5] Create EnrichmentInspectorPanel (view router) in `packages/web/components/generation-graph/panels/stage7/EnrichmentInspectorPanel.tsx`
+  → Artifacts: [EnrichmentInspectorPanel.tsx](packages/web/components/generation-graph/panels/stage7/EnrichmentInspectorPanel.tsx)
+- [X] T061 [US5] Create RootView (list + fallback add button) in `packages/web/components/generation-graph/panels/stage7/views/RootView.tsx`
+  → Artifacts: [RootView.tsx](packages/web/components/generation-graph/panels/stage7/views/RootView.tsx)
+- [X] T062 [US5] Create CreateView (configuration form router) in `packages/web/components/generation-graph/panels/stage7/views/CreateView.tsx`
+  - Includes inline forms: QuizCreateForm, VideoCreateForm, AudioCreateForm, PresentationCreateForm
+  → Artifacts: [CreateView.tsx](packages/web/components/generation-graph/panels/stage7/views/CreateView.tsx)
+- [X] T063 [US5] Create DetailView (preview/edit with progress mode, supports two-stage) in `packages/web/components/generation-graph/panels/stage7/views/DetailView.tsx`
+  → Artifacts: [DetailView.tsx](packages/web/components/generation-graph/panels/stage7/views/DetailView.tsx)
+- [X] T064 [US5] Create EmptyStateCards (discovery cards for first enrichment) in `packages/web/components/generation-graph/panels/stage7/views/EmptyStateCards.tsx`
+  → Artifacts: [EmptyStateCards.tsx](packages/web/components/generation-graph/panels/stage7/views/EmptyStateCards.tsx)
 
 #### Inspector Components
-- [ ] T065 [US5] Create EnrichmentList (sortable with @dnd-kit) in `packages/web/components/generation-graph/panels/stage7/components/EnrichmentList.tsx`
-- [ ] T066 [US5] Create EnrichmentListItem (click → DETAIL view) in `packages/web/components/generation-graph/panels/stage7/components/EnrichmentListItem.tsx`
-- [ ] T067 [US5] Create EnrichmentAddPopover (fallback add, popover/bottom sheet) in `packages/web/components/generation-graph/panels/stage7/components/EnrichmentAddPopover.tsx`
-- [ ] T068 [US5] Create GenerationProgress (terminal-style progress display) in `packages/web/components/generation-graph/panels/stage7/components/GenerationProgress.tsx`
-- [ ] T069 [US5] Create DiscardChangesDialog (dirty form state confirm) in `packages/web/components/generation-graph/panels/stage7/components/DiscardChangesDialog.tsx`
-- [ ] T070 [US5] Create DraftReviewActions (Approve/Regenerate/Edit buttons) in `packages/web/components/generation-graph/panels/stage7/components/DraftReviewActions.tsx`
+- [X] T065 [US5] Create EnrichmentList (sortable with @dnd-kit) in `packages/web/components/generation-graph/panels/stage7/components/EnrichmentList.tsx`
+  → Artifacts: [EnrichmentList.tsx](packages/web/components/generation-graph/panels/stage7/components/EnrichmentList.tsx)
+- [X] T066 [US5] Create EnrichmentListItem (click → DETAIL view) in `packages/web/components/generation-graph/panels/stage7/components/EnrichmentListItem.tsx`
+  → Artifacts: [EnrichmentListItem.tsx](packages/web/components/generation-graph/panels/stage7/components/EnrichmentListItem.tsx)
+- [X] T067 [US5] Create EnrichmentAddPopover (fallback add, popover/bottom sheet) in `packages/web/components/generation-graph/panels/stage7/components/EnrichmentAddPopover.tsx`
+  → Artifacts: [EnrichmentAddPopover.tsx](packages/web/components/generation-graph/panels/stage7/components/EnrichmentAddPopover.tsx)
+- [X] T068 [US5] Create GenerationProgress (terminal-style progress display) in `packages/web/components/generation-graph/panels/stage7/components/GenerationProgress.tsx`
+  → Artifacts: [GenerationProgress.tsx](packages/web/components/generation-graph/panels/stage7/components/GenerationProgress.tsx)
+- [X] T069 [US5] Create DiscardChangesDialog (dirty form state confirm) in `packages/web/components/generation-graph/panels/stage7/components/DiscardChangesDialog.tsx`
+  → Artifacts: [DiscardChangesDialog.tsx](packages/web/components/generation-graph/panels/stage7/components/DiscardChangesDialog.tsx)
+- [X] T070 [US5] Create DraftReviewActions (Approve/Regenerate/Edit buttons) in `packages/web/components/generation-graph/panels/stage7/components/DraftReviewActions.tsx`
+  → Artifacts: [DraftReviewActions.tsx](packages/web/components/generation-graph/panels/stage7/components/DraftReviewActions.tsx)
 
 #### Configuration Forms (Smart Defaults)
-- [ ] T071 [P] [US5] Create QuizCreateForm in `packages/web/components/generation-graph/panels/stage7/forms/QuizCreateForm.tsx`
-- [ ] T072 [P] [US5] Create AudioCreateForm in `packages/web/components/generation-graph/panels/stage7/forms/AudioCreateForm.tsx`
-- [ ] T073 [P] [US5] Create VideoCreateForm in `packages/web/components/generation-graph/panels/stage7/forms/VideoCreateForm.tsx`
-- [ ] T074 [P] [US5] Create PresentationCreateForm in `packages/web/components/generation-graph/panels/stage7/forms/PresentationCreateForm.tsx`
+- [X] T071-T074 [P] [US5] **MERGED**: Create forms inline in CreateView.tsx
+  - QuizCreateForm, VideoCreateForm, AudioCreateForm, PresentationCreateForm
+  - All forms integrated into CreateView with shared FormProps interface
+  → Note: Separate form files not needed - forms are small and specific to CreateView
 
 #### Deep-Link Integration
 - [ ] T075 [US5] Create EnrichmentNodeToolbar (deep-link triggers) in `packages/web/components/generation-graph/components/EnrichmentNodeToolbar.tsx`

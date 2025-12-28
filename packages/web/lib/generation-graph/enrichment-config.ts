@@ -39,8 +39,16 @@ export interface EnrichmentTypeConfig {
   icon: LucideIcon;
   /** Tailwind color class for the icon */
   color: string;
+  /** Tailwind color class (alias for compatibility) */
+  colorClass: string;
   /** Tailwind background color class */
   bgColor: string;
+  /** Tailwind background class (alias for compatibility) */
+  bgClass: string;
+  /** Display label in English */
+  label: string;
+  /** Display label in Russian */
+  labelRu: string;
   /** Whether this type uses two-stage generation (draft → final) */
   twoStage: boolean;
   /** Sort order for display */
@@ -54,35 +62,55 @@ export const ENRICHMENT_TYPE_CONFIG: Record<EnrichmentType, EnrichmentTypeConfig
   video: {
     icon: Video,
     color: 'text-red-500 dark:text-red-400',
+    colorClass: 'text-red-500 dark:text-red-400',
     bgColor: 'bg-red-100 dark:bg-red-900/30',
+    bgClass: 'bg-red-100 dark:bg-red-900/30',
+    label: 'Video',
+    labelRu: 'Видео',
     twoStage: true,
     order: 1,
   },
   audio: {
     icon: Headphones,
     color: 'text-purple-500 dark:text-purple-400',
+    colorClass: 'text-purple-500 dark:text-purple-400',
     bgColor: 'bg-purple-100 dark:bg-purple-900/30',
+    bgClass: 'bg-purple-100 dark:bg-purple-900/30',
+    label: 'Audio',
+    labelRu: 'Аудио',
     twoStage: false,
     order: 2,
   },
   presentation: {
     icon: Presentation,
     color: 'text-orange-500 dark:text-orange-400',
+    colorClass: 'text-orange-500 dark:text-orange-400',
     bgColor: 'bg-orange-100 dark:bg-orange-900/30',
+    bgClass: 'bg-orange-100 dark:bg-orange-900/30',
+    label: 'Presentation',
+    labelRu: 'Презентация',
     twoStage: true,
     order: 3,
   },
   quiz: {
     icon: HelpCircle,
     color: 'text-green-500 dark:text-green-400',
+    colorClass: 'text-green-500 dark:text-green-400',
     bgColor: 'bg-green-100 dark:bg-green-900/30',
+    bgClass: 'bg-green-100 dark:bg-green-900/30',
+    label: 'Quiz',
+    labelRu: 'Тест',
     twoStage: false,
     order: 4,
   },
   document: {
     icon: FileText,
     color: 'text-blue-500 dark:text-blue-400',
+    colorClass: 'text-blue-500 dark:text-blue-400',
     bgColor: 'bg-blue-100 dark:bg-blue-900/30',
+    bgClass: 'bg-blue-100 dark:bg-blue-900/30',
+    label: 'Document',
+    labelRu: 'Документ',
     twoStage: false,
     order: 5,
   },
