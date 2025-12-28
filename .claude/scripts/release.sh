@@ -279,6 +279,7 @@ run_preflight_checks() {
         local file_status=$(git diff --cached --name-status)
 
         # Count ALL types of changes (added, modified, deleted)
+        # Claude/project tooling
         local new_agents=$(echo "$file_status" | grep "^A.*\.claude/agents/.*\.md$" | wc -l)
         local new_skills=$(echo "$file_status" | grep "^A.*\.claude/skills/.*/SKILL\.md$" | wc -l)
         local new_commands=$(echo "$file_status" | grep "^A.*\.claude/commands/.*\.md$" | wc -l)
@@ -292,10 +293,32 @@ run_preflight_checks() {
         local deleted_templates=$(echo "$file_status" | grep "^D.*\.claude/templates/.*\.md$" | wc -l)
         local deleted_other=$(echo "$file_status" | grep "^D" | grep -v "\.claude/skills/" | grep -v "\.claude/templates/" | wc -l)
 
+        # Source code changes (TypeScript, JavaScript, Python, etc.)
+        local new_source=$(echo "$file_status" | grep "^A" | grep -E "\.(ts|tsx|js|jsx|py|go|rs)$" | grep -v "\.test\." | grep -v "\.spec\." | wc -l)
+        local modified_source=$(echo "$file_status" | grep "^M" | grep -E "\.(ts|tsx|js|jsx|py|go|rs)$" | grep -v "\.test\." | grep -v "\.spec\." | wc -l)
+        local new_tests=$(echo "$file_status" | grep "^A" | grep -E "\.(test|spec)\.(ts|tsx|js|jsx)$" | wc -l)
+        local modified_tests=$(echo "$file_status" | grep "^M" | grep -E "\.(test|spec)\.(ts|tsx|js|jsx)$" | wc -l)
+
+        # Try to detect scope from file paths (packages/xxx/, src/xxx/, lib/xxx/, app/xxx/)
+        local detected_scope=""
+        local scope_candidates=$(echo "$file_status" | grep -E "^[AM]" | grep -E "\.(ts|tsx|js|jsx)$" | \
+            sed -E 's/^[AM]\s+//' | \
+            sed -E 's|^packages/([^/]+)/.*|\1|; s|^src/([^/]+)/.*|\1|; s|^lib/([^/]+)/.*|\1|; s|^app/([^/]+)/.*|\1|' | \
+            sort | uniq -c | sort -rn | head -1 | awk '{print $2}')
+        if [ -n "$scope_candidates" ] && [ "$scope_candidates" != "." ]; then
+            detected_scope="$scope_candidates"
+        fi
+
         # Build change summary array
         local changes=()
 
-        # Features (new stuff)
+        # Source code features (new files = new functionality)
+        [ "$new_source" -gt 0 ] && changes+=("add ${new_source} source file(s)")
+        [ "$modified_source" -gt 0 ] && changes+=("update ${modified_source} source file(s)")
+        [ "$new_tests" -gt 0 ] && changes+=("add ${new_tests} test(s)")
+        [ "$modified_tests" -gt 0 ] && changes+=("update ${modified_tests} test(s)")
+
+        # Claude tooling
         [ "$new_agents" -gt 0 ] && changes+=("add ${new_agents} agent(s)")
         [ "$new_skills" -gt 0 ] && changes+=("add ${new_skills} skill(s)")
         [ "$new_commands" -gt 0 ] && changes+=("add ${new_commands} command(s)")
@@ -313,15 +336,28 @@ run_preflight_checks() {
         [ "$deleted_templates" -gt 0 ] && changes+=("remove templates")
         [ "$deleted_other" -gt 0 ] && changes+=("cleanup ${deleted_other} file(s)")
 
-        # Determine commit type based on what changed
+        # Determine commit type based on what changed (prioritize source code)
         local commit_type="chore"
         local has_feat=false
 
-        if [ "$new_agents" -gt 0 ] || [ "$new_skills" -gt 0 ] || [ "$new_commands" -gt 0 ]; then
+        # New source files = feature
+        if [ "$new_source" -gt 0 ]; then
             commit_type="feat"
             has_feat=true
+        # Modified source files = fix (improvements/bug fixes)
+        elif [ "$modified_source" -gt 0 ]; then
+            commit_type="fix"
+        # New agents/skills/commands = feature
+        elif [ "$new_agents" -gt 0 ] || [ "$new_skills" -gt 0 ] || [ "$new_commands" -gt 0 ]; then
+            commit_type="feat"
+            has_feat=true
+        # New tests only = test
+        elif [ "$new_tests" -gt 0 ] || [ "$modified_tests" -gt 0 ]; then
+            commit_type="test"
+        # Only scripts modified = chore
         elif [ "$modified_scripts" -gt 0 ] && [ "$modified_scripts" -eq "$TOTAL_COUNT" ]; then
             commit_type="chore"
+        # Only docs modified = docs
         elif [ "$modified_docs" -gt 0 ] && [ "$modified_docs" -eq "$TOTAL_COUNT" ]; then
             commit_type="docs"
         fi
@@ -347,6 +383,12 @@ run_preflight_checks() {
             changes_body="${changes_body}- ${change}\n"
         done
 
+        # Build commit prefix with optional scope
+        local commit_prefix="${commit_type}"
+        if [ -n "$detected_scope" ]; then
+            commit_prefix="${commit_type}(${detected_scope})"
+        fi
+
         # Use custom message if provided, otherwise auto-generate
         if [ -n "${CUSTOM_COMMIT_MSG:-}" ]; then
             COMMIT_MSG="${CUSTOM_COMMIT_MSG}
@@ -361,7 +403,7 @@ ${FILE_LIST}
 Co-Authored-By: Claude <noreply@anthropic.com>"
             log_info "Using custom commit message: ${CUSTOM_COMMIT_MSG}"
         else
-            COMMIT_MSG="${commit_type}: ${commit_desc}
+            COMMIT_MSG="${commit_prefix}: ${commit_desc}
 
 Changes in this commit:
 $(echo -e "$changes_body")
@@ -382,7 +424,7 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
         }
 
         log_success "Changes committed (${TOTAL_COUNT} files)"
-        log_info "Commit: ${commit_type}: ${commit_desc}"
+        log_info "Commit: ${commit_prefix}: ${commit_desc}"
     fi
 
     # Check if remote is configured

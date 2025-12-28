@@ -12,13 +12,34 @@ const withPWA = require('@ducanh2912/next-pwa').default({
   skipWaiting: true,
   disable: process.env.NODE_ENV === 'development',
   reloadOnOnline: true,
+  // Use custom worker with async helpers for workbox compatibility
+  customWorkerSrc: 'worker',
+  // CRITICAL: Disable start URL caching - it has async functions that fail in SW context
+  cacheStartUrl: false,
   // CRITICAL: Clean up outdated caches on deploy to prevent 502 errors
   cleanupOutdatedCaches: true,
-  // Use build ID as cache namespace for proper versioning
-  cacheId: 'megacampus-v1',
+  // Use version in cacheId for proper cache invalidation on each deploy
+  cacheId: `megacampus-${APP_VERSION}`,
+  // CRITICAL FIX: Do NOT extend default runtimeCaching - it uses CacheFirst for JS which causes 502
+  extendDefaultRuntimeCaching: false,
+  // Exclude ALL _next/static from precaching - these files change every build
+  // and precaching them causes 502 when old files are requested after deploy
   buildExcludes: [/app-build-manifest\.json$/, /\.map$/],
-  // Don't precache _next/static - let runtime caching handle with NetworkFirst
-  publicExcludes: ['!_next/static/**/*'],
+  // Exclude _next from public precache
+  publicExcludes: ['!_next/**/*'],
+  // CRITICAL: Use workboxOptions to configure proper SW generation
+  workboxOptions: {
+    // Exclude all Next.js static chunks from precache manifest
+    // These files change every build and precaching them causes stale cache issues
+    exclude: [
+      /\/_next\/static\/chunks\/.*/,
+      /\/_next\/static\/css\/.*/,
+      /\.js$/,
+      /\.css$/,
+    ],
+    // Override default runtimeCaching completely - we define our own below
+    runtimeCaching: [],
+  },
   runtimeCaching: [
     {
       urlPattern: /^https:\/\/fonts\.(?:gstatic)\.com\/.*/i,

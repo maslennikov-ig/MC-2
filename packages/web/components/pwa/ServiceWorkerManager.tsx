@@ -10,6 +10,33 @@ import { logger } from '@/lib/client-logger';
  */
 const APP_VERSION = process.env.NEXT_PUBLIC_APP_VERSION || 'dev';
 const VERSION_STORAGE_KEY = 'megacampus-app-version';
+const CACHE_PREFIX = 'megacampus-';
+
+/**
+ * Immediately clear outdated caches on page load (before React hydration)
+ * This helps prevent 502 errors by cleaning stale caches early
+ */
+if (typeof window !== 'undefined' && 'caches' in window) {
+  // Clear caches that don't match current version
+  const expectedCachePrefix = `${CACHE_PREFIX}${APP_VERSION}`;
+
+  caches.keys().then((cacheNames) => {
+    cacheNames.forEach((cacheName) => {
+      // Delete caches from old versions (they start with megacampus- but not current version)
+      if (cacheName.startsWith(CACHE_PREFIX) && !cacheName.startsWith(expectedCachePrefix)) {
+        console.log(`[SW Manager] Deleting outdated cache: ${cacheName}`);
+        caches.delete(cacheName);
+      }
+      // Also delete workbox precache caches that might have stale content
+      if (cacheName.includes('workbox-precache') || cacheName.includes('next-static')) {
+        console.log(`[SW Manager] Deleting precache: ${cacheName}`);
+        caches.delete(cacheName);
+      }
+    });
+  }).catch(() => {
+    // Ignore errors during early cleanup
+  });
+}
 
 /**
  * ServiceWorkerManager - Handles PWA lifecycle and cache management
