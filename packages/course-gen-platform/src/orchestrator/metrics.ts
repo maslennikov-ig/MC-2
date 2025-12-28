@@ -80,6 +80,38 @@ export interface ModelFallbackMetrics {
 }
 
 /**
+ * Enrichment type for metrics tracking
+ */
+export type EnrichmentMetricType = 'video' | 'audio' | 'presentation' | 'quiz' | 'document';
+
+/**
+ * Enrichment operation metrics (Stage 7)
+ * Tracks enrichment generation performance by type
+ */
+export interface EnrichmentMetrics {
+  /** Total enrichment operations started */
+  total: number;
+  /** Successfully completed enrichments */
+  successes: number;
+  /** Failed enrichments */
+  failures: number;
+  /** Enrichments in draft phase (two-stage types) */
+  draftsCreated: number;
+  /** Drafts approved for final generation */
+  draftsApproved: number;
+  /** Operations by enrichment type */
+  byType: Map<EnrichmentMetricType, { total: number; success: number; failed: number }>;
+  /** Operation durations in milliseconds */
+  durations: number[];
+  /** Token usage for LLM-based enrichments */
+  tokensUsed: number;
+  /** Cost in USD for LLM-based enrichments */
+  costUsd: number;
+  /** Recent operation timestamps */
+  timestamps: Date[];
+}
+
+/**
  * Percentile calculation result
  */
 export interface PercentileStats {
@@ -138,6 +170,20 @@ class MetricsStore {
     failures: 0,
     byReason: new Map(),
     byStage: new Map(),
+    timestamps: [],
+  };
+
+  // Enrichment metrics (Stage 7)
+  private enrichmentMetrics: EnrichmentMetrics = {
+    total: 0,
+    successes: 0,
+    failures: 0,
+    draftsCreated: 0,
+    draftsApproved: 0,
+    byType: new Map(),
+    durations: [],
+    tokensUsed: 0,
+    costUsd: 0,
     timestamps: [],
   };
 
@@ -566,6 +612,141 @@ class MetricsStore {
     };
   }
 
+  // ============================================
+  // Enrichment Metrics (Stage 7)
+  // ============================================
+
+  /**
+   * Ensure enrichment type metrics exist
+   */
+  private ensureEnrichmentTypeMetrics(type: EnrichmentMetricType): { total: number; success: number; failed: number } {
+    if (!this.enrichmentMetrics.byType.has(type)) {
+      this.enrichmentMetrics.byType.set(type, { total: 0, success: 0, failed: 0 });
+    }
+    return this.enrichmentMetrics.byType.get(type)!;
+  }
+
+  /**
+   * Record enrichment operation start
+   *
+   * @param {EnrichmentMetricType} type - Type of enrichment
+   */
+  recordEnrichmentStart(type: EnrichmentMetricType): void {
+    this.enrichmentMetrics.total++;
+    const typeMetrics = this.ensureEnrichmentTypeMetrics(type);
+    typeMetrics.total++;
+
+    this.enrichmentMetrics.timestamps.push(new Date());
+    if (this.enrichmentMetrics.timestamps.length > this.MAX_HISTORY) {
+      this.enrichmentMetrics.timestamps.shift();
+    }
+  }
+
+  /**
+   * Record enrichment success
+   *
+   * @param {EnrichmentMetricType} type - Type of enrichment
+   * @param {number} durationMs - Duration in milliseconds
+   * @param {object} usage - Optional token and cost usage
+   */
+  recordEnrichmentSuccess(
+    type: EnrichmentMetricType,
+    durationMs: number,
+    usage?: { tokensUsed?: number; costUsd?: number }
+  ): void {
+    this.enrichmentMetrics.successes++;
+    const typeMetrics = this.ensureEnrichmentTypeMetrics(type);
+    typeMetrics.success++;
+
+    this.enrichmentMetrics.durations.push(durationMs);
+    if (this.enrichmentMetrics.durations.length > this.MAX_DURATIONS) {
+      this.enrichmentMetrics.durations.shift();
+    }
+
+    if (usage?.tokensUsed) {
+      this.enrichmentMetrics.tokensUsed += usage.tokensUsed;
+    }
+    if (usage?.costUsd) {
+      this.enrichmentMetrics.costUsd += usage.costUsd;
+    }
+  }
+
+  /**
+   * Record enrichment failure
+   *
+   * @param {EnrichmentMetricType} type - Type of enrichment
+   * @param {number} durationMs - Duration in milliseconds
+   */
+  recordEnrichmentFailure(type: EnrichmentMetricType, durationMs: number): void {
+    this.enrichmentMetrics.failures++;
+    const typeMetrics = this.ensureEnrichmentTypeMetrics(type);
+    typeMetrics.failed++;
+
+    this.enrichmentMetrics.durations.push(durationMs);
+    if (this.enrichmentMetrics.durations.length > this.MAX_DURATIONS) {
+      this.enrichmentMetrics.durations.shift();
+    }
+  }
+
+  /**
+   * Record draft creation (two-stage enrichments)
+   */
+  recordDraftCreated(): void {
+    this.enrichmentMetrics.draftsCreated++;
+  }
+
+  /**
+   * Record draft approval (two-stage enrichments)
+   */
+  recordDraftApproved(): void {
+    this.enrichmentMetrics.draftsApproved++;
+  }
+
+  /**
+   * Get enrichment metrics with calculated statistics
+   *
+   * @returns {object} Enrichment metrics with rates and averages
+   */
+  getEnrichmentMetrics(): EnrichmentMetrics & {
+    successRate: number;
+    avgDurationMs: number;
+    recentOperations: number;
+    byTypeStats: Array<{ type: EnrichmentMetricType; total: number; success: number; failed: number; successRate: number }>;
+  } {
+    const successRate = this.enrichmentMetrics.total > 0
+      ? (this.enrichmentMetrics.successes / this.enrichmentMetrics.total) * 100
+      : 100;
+
+    const avgDurationMs = this.enrichmentMetrics.durations.length > 0
+      ? this.enrichmentMetrics.durations.reduce((sum, d) => sum + d, 0) / this.enrichmentMetrics.durations.length
+      : 0;
+
+    // Count operations in last 5 minutes
+    const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+    const recentOperations = this.enrichmentMetrics.timestamps.filter(
+      timestamp => timestamp > fiveMinutesAgo
+    ).length;
+
+    // Get stats by type
+    const byTypeStats = Array.from(this.enrichmentMetrics.byType.entries())
+      .map(([type, stats]) => ({
+        type,
+        total: stats.total,
+        success: stats.success,
+        failed: stats.failed,
+        successRate: stats.total > 0 ? (stats.success / stats.total) * 100 : 100,
+      }))
+      .sort((a, b) => b.total - a.total);
+
+    return {
+      ...this.enrichmentMetrics,
+      successRate,
+      avgDurationMs,
+      recentOperations,
+      byTypeStats,
+    };
+  }
+
   /**
    * Reset all metrics (useful for testing)
    */
@@ -606,6 +787,18 @@ class MetricsStore {
       byStage: new Map(),
       timestamps: [],
     };
+    this.enrichmentMetrics = {
+      total: 0,
+      successes: 0,
+      failures: 0,
+      draftsCreated: 0,
+      draftsApproved: 0,
+      byType: new Map(),
+      durations: [],
+      tokensUsed: 0,
+      costUsd: 0,
+      timestamps: [],
+    };
   }
 }
 
@@ -621,6 +814,22 @@ export const metricsStore = new MetricsStore();
  */
 export function exportMetrics(): Record<string, unknown> {
   return metricsStore.getAllMetrics();
+}
+
+/**
+ * Export all metrics including specialized metrics for monitoring systems
+ *
+ * @returns {Record<string, unknown>} Complete metrics data
+ */
+export function exportAllMetrics(): Record<string, unknown> {
+  return {
+    jobTypes: metricsStore.getAllMetrics(),
+    fsm: metricsStore.getFSMMetrics(),
+    outbox: metricsStore.getOutboxMetrics(),
+    fallback: metricsStore.getFallbackMetrics(),
+    modelFallback: metricsStore.getModelFallbackMetrics(),
+    enrichment: metricsStore.getEnrichmentMetrics(),
+  };
 }
 
 export default metricsStore;

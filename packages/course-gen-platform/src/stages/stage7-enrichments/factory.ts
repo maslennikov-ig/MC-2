@@ -9,9 +9,16 @@
 import { Worker, Queue } from 'bullmq';
 import { getRedisClient } from '@/shared/cache/redis';
 import { logger } from '@/shared/logger';
+import { retryWithBackoff } from '@/shared/utils/retry';
 import { STAGE7_CONFIG } from './config';
 import type { Stage7JobInput, Stage7JobResult, Stage7ProgressUpdate } from './types';
 import { processStage7Job } from './services/job-processor';
+
+/** Retry configuration for job queue operations */
+const QUEUE_RETRY_CONFIG = {
+  maxRetries: 3,
+  delays: [100, 500, 1000], // exponential backoff
+} as const;
 
 /**
  * Create and configure the Stage 7 BullMQ worker
@@ -193,12 +200,15 @@ export async function gracefulShutdown(
 }
 
 /**
- * Add a job to the Stage 7 queue
+ * Add a job to the Stage 7 queue with retry logic
+ *
+ * Uses exponential backoff retry for transient Redis/BullMQ errors.
  *
  * @param queue - Queue instance
  * @param input - Job input data
  * @param options - Optional job options
  * @returns Added job
+ * @throws Error if job cannot be added after all retries
  */
 export async function addEnrichmentJob(
   queue: Queue<Stage7JobInput, Stage7JobResult>,
@@ -210,12 +220,33 @@ export async function addEnrichmentJob(
   }
 ) {
   const jobName = `${input.enrichmentType}-${input.enrichmentId}`;
+  const jobId = options?.jobId || `enrich-${input.enrichmentId}-${Date.now()}`;
 
-  const job = await queue.add(jobName, input, {
-    priority: options?.priority,
-    delay: options?.delay,
-    jobId: options?.jobId || `enrich-${input.enrichmentId}-${Date.now()}`,
-  });
+  const job = await retryWithBackoff(
+    async () => {
+      return await queue.add(jobName, input, {
+        priority: options?.priority,
+        delay: options?.delay,
+        jobId,
+      });
+    },
+    {
+      maxRetries: QUEUE_RETRY_CONFIG.maxRetries,
+      delays: [...QUEUE_RETRY_CONFIG.delays],
+      onRetry: (attempt, error) => {
+        logger.warn(
+          {
+            enrichmentId: input.enrichmentId,
+            enrichmentType: input.enrichmentType,
+            attempt,
+            error: error.message,
+            jobId,
+          },
+          'Retrying enrichment job queue add'
+        );
+      },
+    }
+  );
 
   logger.debug(
     {

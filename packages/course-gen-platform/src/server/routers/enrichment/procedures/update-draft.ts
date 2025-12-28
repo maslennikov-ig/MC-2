@@ -95,6 +95,20 @@ export const updateDraft = protectedProcedure
         });
       }
 
+      // Step 3.5: Validate draft content structure
+      if (!draftContent || typeof draftContent !== 'object') {
+        logger.error({
+          requestId,
+          enrichmentId,
+          draftContent,
+        }, 'Invalid draft content structure');
+
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Draft content must be a valid object',
+        });
+      }
+
       // Step 4: Update the content field with new draft
       const supabase = getSupabaseAdmin();
 

@@ -104,6 +104,21 @@ export const approveDraft = protectedProcedure
         });
       }
 
+      // Step 3.5: Validate that draft content exists
+      const draftContent = (enrichment.content as Record<string, unknown> | null)?.draft;
+      if (!draftContent) {
+        logger.error({
+          requestId,
+          enrichmentId,
+          content: enrichment.content,
+        }, 'Draft content missing for approval');
+
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Draft content is missing. Please regenerate the draft.',
+        });
+      }
+
       // Step 4: Update enrichment status to 'generating'
       const supabase = getSupabaseAdmin();
       const { error: updateError } = await supabase

@@ -6,6 +6,11 @@
  * Fetches enrichment summaries for a course and subscribes to
  * Supabase Realtime for live status updates.
  *
+ * Features:
+ * - Initial data fetch with error handling
+ * - Supabase Realtime subscription with exponential backoff retry
+ * - Debounced refetch to batch rapid updates
+ *
  * @module components/generation-graph/hooks/useEnrichmentData
  */
 
@@ -16,6 +21,16 @@ import type { EnrichmentSummaryForNode } from '@megacampus/shared-types';
 import type { Database } from '@/types/database.generated';
 
 type LessonEnrichmentsRow = Database['public']['Tables']['lesson_enrichments']['Row'];
+
+/** Realtime retry configuration */
+const REALTIME_RETRY_CONFIG = {
+  /** Maximum retry attempts before giving up */
+  maxRetries: 5,
+  /** Base delay in milliseconds (doubles each retry) */
+  baseDelay: 1000,
+  /** Maximum delay in milliseconds */
+  maxDelay: 30000,
+} as const;
 
 /**
  * Return type for useEnrichmentData hook
@@ -171,7 +186,12 @@ export function useEnrichmentData(
     fetchEnrichments();
   }, [fetchEnrichments]);
 
-  // Supabase Realtime subscription
+  // Retry state refs for Realtime subscription
+  const retryCountRef = useRef(0);
+  const retryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const channelRef = useRef<ReturnType<typeof supabaseRef.current.channel> | null>(null);
+
+  // Supabase Realtime subscription with exponential backoff retry
   useEffect(() => {
     if (!courseId || !enabled) {
       setIsConnected(false);
@@ -198,66 +218,116 @@ export function useEnrichmentData(
       }, REFETCH_DEBOUNCE_MS);
     };
 
-    // Subscribe to lesson_enrichments changes for this course
-    const channel = supabase
-      .channel(`enrichments:${courseId}`)
-      .on(
-        'postgres_changes',
-        {
-          event: '*', // INSERT, UPDATE, DELETE
-          schema: 'public',
-          table: 'lesson_enrichments',
-          filter: `course_id=eq.${courseId}`,
-        },
-        (payload) => {
-          logger.debug('[useEnrichmentData] Enrichment change received', {
-            event: payload.eventType,
-            enrichmentId: (payload.new as Partial<LessonEnrichmentsRow>)?.id ||
-              (payload.old as Partial<LessonEnrichmentsRow>)?.id,
-            lessonId: (payload.new as Partial<LessonEnrichmentsRow>)?.lesson_id,
-            status: (payload.new as Partial<LessonEnrichmentsRow>)?.status,
-          });
+    /**
+     * Calculate exponential backoff delay
+     */
+    const getRetryDelay = (attempt: number): number => {
+      const delay = Math.min(
+        REALTIME_RETRY_CONFIG.baseDelay * Math.pow(2, attempt),
+        REALTIME_RETRY_CONFIG.maxDelay
+      );
+      // Add jitter (±10%) to prevent thundering herd
+      const jitter = delay * 0.1 * (Math.random() * 2 - 1);
+      return Math.round(delay + jitter);
+    };
 
-          // Refetch to get updated data (debounced to batch rapid updates)
-          debouncedRefetch();
-        }
-      )
-      .subscribe((status, err) => {
-        if (status === 'SUBSCRIBED') {
-          logger.debug('[useEnrichmentData] Realtime subscription active', {
-            courseId,
-          });
-          if (isMounted) {
-            setIsConnected(true);
+    /**
+     * Create and subscribe to channel with retry logic
+     */
+    const createSubscription = () => {
+      // Clean up previous channel if exists
+      if (channelRef.current) {
+        channelRef.current.unsubscribe();
+      }
+
+      const channel = supabase
+        .channel(`enrichments:${courseId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*', // INSERT, UPDATE, DELETE
+            schema: 'public',
+            table: 'lesson_enrichments',
+            filter: `course_id=eq.${courseId}`,
+          },
+          (payload) => {
+            logger.debug('[useEnrichmentData] Enrichment change received', {
+              event: payload.eventType,
+              enrichmentId: (payload.new as Partial<LessonEnrichmentsRow>)?.id ||
+                (payload.old as Partial<LessonEnrichmentsRow>)?.id,
+              lessonId: (payload.new as Partial<LessonEnrichmentsRow>)?.lesson_id,
+              status: (payload.new as Partial<LessonEnrichmentsRow>)?.status,
+            });
+
+            // Refetch to get updated data (debounced to batch rapid updates)
+            debouncedRefetch();
           }
-        } else if (status === 'CHANNEL_ERROR') {
-          const errorMessage = err?.message ||
-            (typeof err === 'object' ? JSON.stringify(err) : String(err)) ||
-            'Unknown error';
-          logger.error('[useEnrichmentData] Realtime subscription error', {
-            error: errorMessage,
-            errorRaw: err,
-            courseId,
-          });
-          if (isMounted) {
-            setIsConnected(false);
+        )
+        .subscribe((status, err) => {
+          if (status === 'SUBSCRIBED') {
+            logger.debug('[useEnrichmentData] Realtime subscription active', {
+              courseId,
+              retryCount: retryCountRef.current,
+            });
+            if (isMounted) {
+              setIsConnected(true);
+              retryCountRef.current = 0; // Reset retry count on success
+            }
+          } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+            const errorMessage = err?.message ||
+              (typeof err === 'object' ? JSON.stringify(err) : String(err)) ||
+              'Unknown error';
+            const logLevel = status === 'CHANNEL_ERROR' ? 'error' : 'warn';
+
+            logger[logLevel]('[useEnrichmentData] Realtime subscription failed', {
+              status,
+              error: errorMessage,
+              courseId,
+              retryCount: retryCountRef.current,
+            });
+
+            if (isMounted) {
+              setIsConnected(false);
+
+              // Attempt retry with exponential backoff
+              if (retryCountRef.current < REALTIME_RETRY_CONFIG.maxRetries) {
+                const delay = getRetryDelay(retryCountRef.current);
+                retryCountRef.current++;
+
+                logger.info('[useEnrichmentData] Scheduling retry', {
+                  courseId,
+                  attempt: retryCountRef.current,
+                  maxRetries: REALTIME_RETRY_CONFIG.maxRetries,
+                  delayMs: delay,
+                });
+
+                retryTimeoutRef.current = setTimeout(() => {
+                  if (isMounted) {
+                    createSubscription();
+                  }
+                }, delay);
+              } else {
+                logger.error('[useEnrichmentData] Max retries reached, giving up', {
+                  courseId,
+                  maxRetries: REALTIME_RETRY_CONFIG.maxRetries,
+                });
+              }
+            }
+          } else if (status === 'CLOSED') {
+            logger.debug('[useEnrichmentData] Realtime connection closed', {
+              courseId,
+            });
+            if (isMounted) {
+              setIsConnected(false);
+            }
           }
-        } else if (status === 'TIMED_OUT') {
-          logger.warn('[useEnrichmentData] Realtime subscription timed out', {
-            courseId,
-          });
-          if (isMounted) {
-            setIsConnected(false);
-          }
-        } else if (status === 'CLOSED') {
-          logger.debug('[useEnrichmentData] Realtime connection closed', {
-            courseId,
-          });
-          if (isMounted) {
-            setIsConnected(false);
-          }
-        }
-      });
+        });
+
+      channelRef.current = channel;
+    };
+
+    // Start subscription
+    createSubscription();
 
     return () => {
       isMounted = false;
@@ -266,10 +336,21 @@ export function useEnrichmentData(
         clearTimeout(debounceTimeoutRef.current);
         debounceTimeoutRef.current = null;
       }
+      // Clear any pending retry
+      if (retryTimeoutRef.current) {
+        clearTimeout(retryTimeoutRef.current);
+        retryTimeoutRef.current = null;
+      }
+      // Reset retry count
+      retryCountRef.current = 0;
+
       logger.debug('[useEnrichmentData] Unsubscribing from realtime channel', {
         courseId,
       });
-      channel.unsubscribe();
+      if (channelRef.current) {
+        channelRef.current.unsubscribe();
+        channelRef.current = null;
+      }
     };
   }, [courseId, enabled]);
 
