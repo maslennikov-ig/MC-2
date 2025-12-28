@@ -162,10 +162,11 @@
   → Artifacts: [video-prompt.ts](packages/course-gen-platform/src/stages/stage7-enrichments/prompts/video-prompt.ts)
 - [X] T043 [US1] Create video handler (two-stage: generateDraft → generateFinal) in `packages/course-gen-platform/src/stages/stage7-enrichments/handlers/video-handler.ts`
   → Artifacts: [video-handler.ts](packages/course-gen-platform/src/stages/stage7-enrichments/handlers/video-handler.ts), [index.ts](packages/course-gen-platform/src/stages/stage7-enrichments/handlers/index.ts)
-- [ ] T044+T045 [US1] Create unified VideoScriptPanel component (replaces separate VideoPreview + VideoDraftEditor) in `packages/web/components/generation-graph/panels/stage7/VideoScriptPanel.tsx`
+- [X] T044+T045 [US1] Create unified VideoScriptPanel component (replaces separate VideoPreview + VideoDraftEditor) in `packages/web/components/generation-graph/panels/stage7/VideoScriptPanel.tsx`
   - **Architecture Decision**: Single component with mode switching (draft_ready → edit mode, completed → preview mode)
   - Reuses: EnrichmentStatusBadge, MarkdownRendererFull, JsonViewer, Accordion, UI primitives
   - Handles: script display/editing, metadata view, approve/regenerate actions
+  → Artifacts: [VideoScriptPanel.tsx](packages/web/components/generation-graph/panels/stage7/VideoScriptPanel.tsx)
 
 **Checkpoint**: Video enrichments can be added, draft reviewed/edited, and preview shows script content
 
