@@ -1,6 +1,3 @@
-/* eslint-disable @typescript-eslint/no-redundant-type-constituents */
-/* eslint-disable max-lines */
-
 export type Json =
   | string
   | number
@@ -630,7 +627,6 @@ export type Database = {
           file_size: number
           file_type: string
           filename: string
-          /** AI-generated document title based on content analysis (Phase 6) */
           generated_title: string | null
           hash: string
           id: string
@@ -1223,6 +1219,85 @@ export type Database = {
             columns: ["parent_content_id"]
             isOneToOne: false
             referencedRelation: "lesson_contents"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      lesson_enrichments: {
+        Row: {
+          asset_id: string | null
+          content: Json | null
+          course_id: string
+          created_at: string | null
+          enrichment_type: Database["public"]["Enums"]["enrichment_type"]
+          error_details: Json | null
+          error_message: string | null
+          generated_at: string | null
+          generation_attempt: number | null
+          id: string
+          lesson_id: string
+          metadata: Json | null
+          order_index: number
+          status: Database["public"]["Enums"]["enrichment_status"]
+          title: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          asset_id?: string | null
+          content?: Json | null
+          course_id: string
+          created_at?: string | null
+          enrichment_type: Database["public"]["Enums"]["enrichment_type"]
+          error_details?: Json | null
+          error_message?: string | null
+          generated_at?: string | null
+          generation_attempt?: number | null
+          id?: string
+          lesson_id: string
+          metadata?: Json | null
+          order_index?: number
+          status?: Database["public"]["Enums"]["enrichment_status"]
+          title?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          asset_id?: string | null
+          content?: Json | null
+          course_id?: string
+          created_at?: string | null
+          enrichment_type?: Database["public"]["Enums"]["enrichment_type"]
+          error_details?: Json | null
+          error_message?: string | null
+          generated_at?: string | null
+          generation_attempt?: number | null
+          id?: string
+          lesson_id?: string
+          metadata?: Json | null
+          order_index?: number
+          status?: Database["public"]["Enums"]["enrichment_status"]
+          title?: string | null
+          updated_at?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lesson_enrichments_asset_id_fkey"
+            columns: ["asset_id"]
+            isOneToOne: false
+            referencedRelation: "assets"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lesson_enrichments_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lesson_enrichments_lesson_id_fkey"
+            columns: ["lesson_id"]
+            isOneToOne: false
+            referencedRelation: "lessons"
             referencedColumns: ["id"]
           },
         ]
@@ -2506,6 +2581,15 @@ export type Database = {
         | "supplementary"
         | "reference"
         | "regulatory"
+      enrichment_status:
+        | "pending"
+        | "draft_generating"
+        | "draft_ready"
+        | "generating"
+        | "completed"
+        | "failed"
+        | "cancelled"
+      enrichment_type: "video" | "audio" | "presentation" | "quiz" | "document"
       enrollment_status: "active" | "completed" | "dropped" | "expired"
       generation_stage: "stage4" | "stage5" | "stage6"
       generation_status:
@@ -2700,6 +2784,16 @@ export const Constants = {
         "reference",
         "regulatory",
       ],
+      enrichment_status: [
+        "pending",
+        "draft_generating",
+        "draft_ready",
+        "generating",
+        "completed",
+        "failed",
+        "cancelled",
+      ],
+      enrichment_type: ["video", "audio", "presentation", "quiz", "document"],
       enrollment_status: ["active", "completed", "dropped", "expired"],
       generation_stage: ["stage4", "stage5", "stage6"],
       generation_status: [

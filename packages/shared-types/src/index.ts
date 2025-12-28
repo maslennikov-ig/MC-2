@@ -68,3 +68,8 @@ export {
 
 // Tier Settings Types
 export * from './tier-settings';
+
+// Stage 7 Enrichments Types
+export * from './enrichment-content';
+export * from './lesson-enrichment';
+export * from './enrichment-settings';

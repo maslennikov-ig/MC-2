@@ -46,6 +46,9 @@ export enum JobType {
   // Lesson content generation (Stage 6+)
   LESSON_CONTENT = 'lesson_content',
 
+  // Enrichment generation (Stage 7+)
+  ENRICHMENT_GENERATION = 'enrichment_generation',
+
   // Finalization (Stage 5+)
   FINALIZATION = 'finalization',
 }
@@ -279,6 +282,38 @@ export const LessonContentJobDataSchema = BaseJobDataSchema.extend({
 export type LessonContentJobData = z.infer<typeof LessonContentJobDataSchema>;
 
 // ============================================================================
+// Enrichment Generation Job Schema (Stage 7+)
+// ============================================================================
+
+/**
+ * Enrichment generation job - Stage 7 pipeline
+ *
+ * Generates enrichments (audio, video, quiz, presentation, document) for lessons.
+ *
+ * For full type definitions of enrichment types and settings, see:
+ * - enrichment-content.ts (EnrichmentContent schemas)
+ * - enrichment-settings.ts (Settings schemas)
+ * - lesson-enrichment.ts (LessonEnrichment schema)
+ */
+export const EnrichmentGenerationJobDataSchema = BaseJobDataSchema.extend({
+  jobType: z.literal(JobType.ENRICHMENT_GENERATION),
+  /** Enrichment record UUID */
+  enrichmentId: z.string().uuid(),
+  /** Enrichment type (determines handler routing) */
+  enrichmentType: z.enum(['video', 'audio', 'presentation', 'quiz', 'document']),
+  /** Parent lesson UUID */
+  lessonId: z.string().uuid(),
+  /** Type-specific generation settings (validated by handler using canonical schemas) */
+  settings: z.record(z.unknown()).optional(),
+  /** Optional lesson content for context */
+  lessonContent: z.string().optional(),
+  /** Optional model override for fallback retry */
+  modelOverride: z.string().optional(),
+});
+
+export type EnrichmentGenerationJobData = z.infer<typeof EnrichmentGenerationJobDataSchema>;
+
+// ============================================================================
 // Union Type for All Jobs
 // ============================================================================
 
@@ -295,6 +330,7 @@ export type JobData =
   | StructureGenerationJobData
   | TextGenerationJobData
   | LessonContentJobData
+  | EnrichmentGenerationJobData
   | FinalizationJobData;
 
 /**
@@ -310,6 +346,7 @@ export const JobDataSchema = z.discriminatedUnion('jobType', [
   StructureGenerationJobDataSchema,
   TextGenerationJobDataSchema,
   LessonContentJobDataSchema,
+  EnrichmentGenerationJobDataSchema,
   FinalizationJobDataSchema,
 ]);
 
@@ -426,6 +463,14 @@ export const DEFAULT_JOB_OPTIONS: Record<JobType, JobOptions> = {
     removeOnComplete: 1000,
     removeOnFail: false,
     priority: 5, // Medium priority for lesson generation
+  },
+  [JobType.ENRICHMENT_GENERATION]: {
+    attempts: 3,
+    backoff: { type: 'exponential', delay: 2000 },
+    timeout: 300000, // 5 minutes (allows for TTS/LLM generation)
+    removeOnComplete: 100,
+    removeOnFail: false,
+    priority: 5, // Medium priority
   },
   [JobType.FINALIZATION]: {
     attempts: 3,
