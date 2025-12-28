@@ -118,6 +118,23 @@
  * - `lms.course.status` - Get course publish status (authenticated users)
  * - `lms.course.delete` - Delete course from LMS (soft delete) (authenticated users)
  *
+ * ### enrichment
+ * Lesson enrichment operations (Stage 7) for audio, video, quiz, and presentation generation.
+ *
+ * Procedures:
+ * - `enrichment.create` - Create a single enrichment for a lesson (authenticated users)
+ * - `enrichment.createBatch` - Create enrichments for multiple lessons (authenticated users)
+ * - `enrichment.getByLesson` - Get all enrichments for a lesson (authenticated users)
+ * - `enrichment.getSummaryByCourse` - Get lightweight summary for React Flow nodes (authenticated users)
+ * - `enrichment.regenerate` - Regenerate a failed enrichment (authenticated users)
+ * - `enrichment.delete` - Delete an enrichment and its asset (authenticated users)
+ * - `enrichment.reorder` - Reorder enrichments within a lesson (authenticated users)
+ * - `enrichment.cancel` - Cancel an in-progress enrichment (authenticated users)
+ * - `enrichment.getPlaybackUrl` - Get signed URL for media playback (authenticated users)
+ * - `enrichment.regenerateDraft` - Regenerate draft for two-stage enrichments (authenticated users)
+ * - `enrichment.updateDraft` - Update draft content before final generation (authenticated users)
+ * - `enrichment.approveDraft` - Approve draft and trigger final generation (authenticated users)
+ *
  * ## Usage Example
  *
  * ```typescript
@@ -152,6 +169,7 @@
  * @see {@link courseRouter} - Document classification and budget allocation (T016, T017)
  * @see {@link lessonContentRouter} - Lesson content generation (T054)
  * @see {@link locksRouter} - Generation lock management (FR-037, FR-038)
+ * @see {@link enrichmentRouter} - Lesson enrichment operations (T018-T032)
  */
 
 import { router } from './trpc';
@@ -169,6 +187,7 @@ import { locksRouter } from './routers/locks';
 import { pipelineAdminRouter } from './routers/pipeline-admin';
 import { documentProcessingRouter } from './routers/document-processing';
 import { lmsRouter } from './routers/lms';
+import { enrichmentRouter } from './routers/enrichment';
 
 /**
  * Main application router combining all feature routers
@@ -261,6 +280,12 @@ export const appRouter = router({
    * @see {@link lmsRouter}
    */
   lms: lmsRouter,
+
+  /**
+   * Lesson enrichment operations (Stage 7)
+   * @see {@link enrichmentRouter}
+   */
+  enrichment: enrichmentRouter,
 });
 
 /**
