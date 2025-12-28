@@ -148,6 +148,31 @@
 
 ---
 
+## ⚠️ CRITICAL: Model Configuration Pattern for All Handlers
+
+**All enrichment handlers MUST follow this pattern (same as lesson generation in Stage 6):**
+
+1. **NO HARDCODED MODELS** - Never use `'openai/gpt-4o-mini'` or similar directly
+2. **Model Priority Chain**:
+   - `settings.model` (from enrichment settings in DB) → first priority
+   - `llm_model_config` table lookup by phase (e.g., `stage_7_quiz`) → second priority
+   - `DEFAULT_MODEL_ID` from `@megacampus/shared-types` → last resort fallback
+3. **DEFAULT_MODEL_ID** = `'xiaomi/mimo-v2-flash:free'` (Xiaomi MiMo V2 Flash)
+4. **Admin configurable** - Models must be changeable via admin panel without code changes
+
+**Example pattern:**
+```typescript
+import { DEFAULT_MODEL_ID } from '@megacampus/shared-types';
+
+const FALLBACK_MODEL = DEFAULT_MODEL_ID;
+
+// In handler:
+const model = (settings.model as string) || FALLBACK_MODEL;
+// TODO: Add llm_model_config lookup for stage_7_<type> phase
+```
+
+---
+
 ## Phase 4: User Story 1 - Add Video to Lesson (Priority: P1)
 
 **Goal**: Course creators enhance lessons with AI-generated video presentations

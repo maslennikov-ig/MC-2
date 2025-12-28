@@ -19,6 +19,7 @@ import type {
   GenerateResult,
 } from '../types';
 import type { VideoEnrichmentContent, EnrichmentMetadata } from '@megacampus/shared-types';
+import { DEFAULT_MODEL_ID } from '@megacampus/shared-types';
 import {
   buildVideoScriptSystemPrompt,
   buildVideoScriptUserMessage,
@@ -33,9 +34,15 @@ import {
 
 /**
  * Default model for video script generation
- * Uses GPT-4o-mini for cost-effective JSON generation
+ *
+ * NOTE: Model is configurable via enrichment settings or llm_model_config table.
+ * This constant is LAST RESORT fallback when no model specified.
+ * Primary model comes from: settings.model → llm_model_config → DEFAULT_MODEL_ID
+ *
+ * @see llm_model_config table for admin-configurable models
+ * @see DEFAULT_MODEL_ID from shared-types (Xiaomi MiMo V2 Flash)
  */
-const DEFAULT_MODEL = 'openai/gpt-4o-mini';
+const FALLBACK_MODEL = DEFAULT_MODEL_ID;
 
 /**
  * Maximum tokens for script generation response
@@ -174,8 +181,10 @@ async function generateDraft(input: EnrichmentHandlerInput): Promise<DraftResult
     settings: videoSettings,
   });
 
-  // Get model from settings or use default
-  const model = (settings.model as string) || DEFAULT_MODEL;
+  // Get model from settings or use fallback
+  // Priority: settings.model → FALLBACK_MODEL (DEFAULT_MODEL_ID)
+  // TODO: Add support for llm_model_config table lookup (stage_7_video phase)
+  const model = (settings.model as string) || FALLBACK_MODEL;
 
   try {
     // Generate script via LLM
