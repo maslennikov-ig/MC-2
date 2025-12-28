@@ -35,6 +35,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.26.35] - 2025-12-28
+
+### Fixed
+- **web**: add emergency SW cleanup for stuck users with stale cache (6bce501)
+
 ## [0.26.34] - 2025-12-28
 
 ### Added

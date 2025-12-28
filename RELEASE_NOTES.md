@@ -3,6 +3,18 @@
 _Released on 2025-12-26_
 
 
+## v0.26.35
+
+_Released on 2025-12-28_
+
+### 🐛 Bug Fixes
+
+- **web**: Add emergency SW cleanup for stuck users with stale cache
+
+---
+
+_This release was automatically generated from 1 commits._
+
 ## v0.26.34
 
 _Released on 2025-12-28_
