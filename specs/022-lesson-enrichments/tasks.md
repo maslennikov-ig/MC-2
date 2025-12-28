@@ -233,9 +233,19 @@ const model = (settings.model as string) || FALLBACK_MODEL;
 
 ### Implementation for User Story 3
 
-- [ ] T049 [US3] Create audio prompt template (TTS optimization) in `packages/course-gen-platform/src/stages/stage7-enrichments/prompts/audio-prompt.ts`
-- [ ] T050 [US3] Create audio handler (OpenAI TTS integration) in `packages/course-gen-platform/src/stages/stage7-enrichments/handlers/audio-handler.ts`
-- [ ] T051 [US3] Create AudioPreview component (HTML5 audio player) in `packages/web/components/generation-graph/panels/stage7/previews/AudioPreview.tsx`
+- [X] T049 [US3] Create audio TTS preprocessing module in `packages/course-gen-platform/src/stages/stage7-enrichments/prompts/audio-prompt.ts`
+  - Markdown to TTS-friendly text conversion, chunking for 4096 char limit
+  - Language-aware transitions (en/ru), code block descriptions, list conversion
+  → Artifacts: [audio-prompt.ts](packages/course-gen-platform/src/stages/stage7-enrichments/prompts/audio-prompt.ts)
+- [X] T050 [US3] Create audio handler (OpenAI TTS integration) in `packages/course-gen-platform/src/stages/stage7-enrichments/handlers/audio-handler.ts`
+  - Uses OpenAI TTS API directly (NOT OpenRouter), handles chunking and concatenation
+  - Uploads audio to Supabase Storage, calculates TTS cost
+  → Artifacts: [audio-handler.ts](packages/course-gen-platform/src/stages/stage7-enrichments/handlers/audio-handler.ts), [enrichment-router.ts](packages/course-gen-platform/src/stages/stage7-enrichments/services/enrichment-router.ts)
+- [X] T051 [US3] Create AudioPreview component (custom audio player) in `packages/web/components/generation-graph/panels/stage7/AudioPreview.tsx`
+  - Custom HTML5 audio player with waveform visualization
+  - Three tabs: Player, Script, Metadata
+  - Reuses: EnrichmentStatusBadge, JsonViewer
+  → Artifacts: [AudioPreview.tsx](packages/web/components/generation-graph/panels/stage7/AudioPreview.tsx)
 
 **Checkpoint**: Audio enrichments can be added and played back in preview
 

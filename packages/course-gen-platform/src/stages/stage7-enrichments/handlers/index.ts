@@ -9,8 +9,8 @@
 
 export { videoHandler } from './video-handler';
 export { quizHandler } from './quiz-handler';
+export { audioHandler } from './audio-handler';
 
 // Future handlers to be added:
-// export { audioHandler } from './audio-handler';
 // export { presentationHandler } from './presentation-handler';
 // export { documentHandler } from './document-handler';

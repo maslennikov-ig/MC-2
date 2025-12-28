@@ -13,7 +13,7 @@ import type {
   DraftResult,
   GenerateResult,
 } from '../types';
-import { quizHandler, videoHandler } from '../handlers';
+import { quizHandler, videoHandler, audioHandler } from '../handlers';
 
 /**
  * Enrichment handler interface
@@ -47,58 +47,7 @@ export interface EnrichmentHandler {
 }
 
 // Quiz handler imported from handlers/quiz-handler.ts
-
-/**
- * Audio enrichment handler (stub)
- *
- * Generates audio narration using OpenAI TTS.
- * Single-stage flow: generates complete audio in one pass.
- */
-const audioHandler: EnrichmentHandler = {
-  generationFlow: 'single-stage',
-
-  async generate(input: EnrichmentHandlerInput): Promise<GenerateResult> {
-    const { enrichmentContext } = input;
-
-    logger.info(
-      {
-        enrichmentId: enrichmentContext.enrichment.id,
-        lessonId: enrichmentContext.lesson.id,
-      },
-      'Audio handler: generating audio (stub)'
-    );
-
-    // TODO: Implement actual audio generation using OpenAI TTS
-    const startTime = Date.now();
-
-    // Stub: Return placeholder content (no actual audio buffer)
-    const content = {
-      type: 'audio' as const,
-      voice_id: 'nova',
-      script: enrichmentContext.lesson.content || 'Placeholder script for audio narration.',
-      duration_seconds: 60,
-      format: 'mp3' as const,
-    };
-
-    const durationMs = Date.now() - startTime;
-
-    return {
-      content,
-      // In real implementation, assetBuffer would contain the MP3 data
-      // assetBuffer: Buffer.from([]),
-      // assetMimeType: 'audio/mpeg',
-      // assetExtension: 'mp3',
-      metadata: {
-        generated_at: new Date().toISOString(),
-        generation_duration_ms: durationMs,
-        estimated_cost_usd: 0,
-        model_used: 'tts-1-hd',
-        quality_score: 1.0,
-        retry_attempts: 0,
-      },
-    };
-  },
-};
+// Audio handler imported from handlers/audio-handler.ts
 
 /**
  * Presentation enrichment handler (stub)
