@@ -40,6 +40,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.26.37] - 2025-12-28
+
+### Fixed
+- **pwa**: remove JS/CSS from SW cache to prevent 502 after deploy (9d8c6c7)
+
 ## [0.26.35] - 2025-12-28
 
 ### Fixed

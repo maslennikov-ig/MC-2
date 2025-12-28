@@ -3,6 +3,18 @@
 _Released on 2025-12-26_
 
 
+## v0.26.37
+
+_Released on 2025-12-28_
+
+### 🐛 Bug Fixes
+
+- **pwa**: Remove JS/CSS from SW cache to prevent 502 after deploy
+
+---
+
+_This release was automatically generated from 1 commits._
+
 ## v0.26.36
 
 _Released on 2025-12-28_
