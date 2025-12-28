@@ -3,6 +3,7 @@ import { Manrope, JetBrains_Mono } from "next/font/google";
 import { NextIntlClientProvider, hasLocale } from 'next-intl';
 import { getMessages, getTranslations, setRequestLocale } from 'next-intl/server';
 import { notFound } from 'next/navigation';
+import Script from 'next/script';
 import { routing } from '@/src/i18n/routing';
 import { Locale } from '@/src/i18n/config';
 import { ErrorBoundary } from "@/components/common/error-boundary";
@@ -153,7 +154,64 @@ export default async function LocaleLayout({ children, params }: Props) {
 
   return (
     <html lang={locale} suppressHydrationWarning>
-      <head />
+      <head>
+        {/*
+          CRITICAL: Emergency SW cleanup script
+          This runs BEFORE any JS bundles load to fix stuck users with stale cache.
+          If user has old SW with cached 502 responses, this will clear it.
+        */}
+        <Script
+          id="sw-emergency-cleanup"
+          strategy="beforeInteractive"
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                try {
+                  if (!('serviceWorker' in navigator) || !('caches' in window)) return;
+
+                  var APP_VERSION = '${process.env.NEXT_PUBLIC_APP_VERSION || 'dev'}';
+                  var VERSION_KEY = 'megacampus-sw-version';
+                  var RECOVERY_KEY = 'sw-needs-recovery';
+
+                  var savedVersion = localStorage.getItem(VERSION_KEY);
+                  var needsRecovery = sessionStorage.getItem(RECOVERY_KEY);
+
+                  // Clear caches if: 1) version changed, or 2) recovery flag set
+                  if ((savedVersion && savedVersion !== APP_VERSION) || needsRecovery) {
+                    console.log('[SW] Version change or recovery: clearing caches');
+
+                    caches.keys().then(function(names) {
+                      names.forEach(function(name) { caches.delete(name); });
+                    });
+
+                    navigator.serviceWorker.getRegistrations().then(function(regs) {
+                      regs.forEach(function(reg) { reg.unregister(); });
+                    });
+
+                    localStorage.setItem(VERSION_KEY, APP_VERSION);
+                    sessionStorage.removeItem(RECOVERY_KEY);
+
+                    if (needsRecovery) {
+                      setTimeout(function() { location.reload(); }, 100);
+                    }
+                  } else if (!savedVersion) {
+                    localStorage.setItem(VERSION_KEY, APP_VERSION);
+                  }
+
+                  // Detect chunk loading failures and trigger recovery on next load
+                  window.addEventListener('error', function(e) {
+                    var msg = (e.message || '').toLowerCase();
+                    if (msg.includes('loading chunk') || msg.includes('failed to fetch')) {
+                      sessionStorage.setItem(RECOVERY_KEY, '1');
+                      location.reload();
+                    }
+                  });
+                } catch(e) {}
+              })();
+            `,
+          }}
+        />
+      </head>
       <body
         className={`${manrope.variable} ${jetbrainsMono.variable} font-sans antialiased`}
       >
