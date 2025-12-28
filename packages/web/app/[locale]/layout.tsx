@@ -198,12 +198,34 @@ export default async function LocaleLayout({ children, params }: Props) {
                     localStorage.setItem(VERSION_KEY, APP_VERSION);
                   }
 
-                  // Detect chunk loading failures and trigger recovery on next load
+                  // Detect chunk loading failures and trigger recovery
+                  // With cooldown to prevent infinite reload loops
+                  var RETRY_COUNT_KEY = 'sw-retry-count';
+                  var RETRY_TIME_KEY = 'sw-retry-time';
+                  var MAX_RETRIES = 3;
+                  var COOLDOWN_MS = 60000; // 1 minute
+
                   window.addEventListener('error', function(e) {
                     var msg = (e.message || '').toLowerCase();
-                    if (msg.includes('loading chunk') || msg.includes('failed to fetch')) {
-                      sessionStorage.setItem(RECOVERY_KEY, '1');
-                      location.reload();
+                    if (msg.includes('loading chunk') || msg.includes('failed to fetch') || msg.includes('chunkloaderror')) {
+                      var now = Date.now();
+                      var lastRetry = parseInt(sessionStorage.getItem(RETRY_TIME_KEY) || '0');
+                      var retryCount = parseInt(sessionStorage.getItem(RETRY_COUNT_KEY) || '0');
+
+                      // Reset counter if cooldown has passed
+                      if (now - lastRetry > COOLDOWN_MS) {
+                        retryCount = 0;
+                      }
+
+                      if (retryCount < MAX_RETRIES) {
+                        console.log('[SW] ChunkLoadError detected, attempt ' + (retryCount + 1) + '/' + MAX_RETRIES);
+                        sessionStorage.setItem(RETRY_COUNT_KEY, String(retryCount + 1));
+                        sessionStorage.setItem(RETRY_TIME_KEY, String(now));
+                        sessionStorage.setItem(RECOVERY_KEY, '1');
+                        location.reload();
+                      } else {
+                        console.error('[SW] Max retries reached. Please clear site data manually.');
+                      }
                     }
                   });
                 } catch(e) {}

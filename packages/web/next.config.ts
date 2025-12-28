@@ -9,39 +9,35 @@ const APP_VERSION = packageJson.version;
 const withPWA = require('@ducanh2912/next-pwa').default({
   dest: 'public',
   register: true,
-  skipWaiting: true,
+  // CRITICAL: skipWaiting: false prevents SW from taking control mid-session
+  // This dramatically reduces risk of chunk loading failures after deployment
+  // See: https://developer.chrome.com/docs/workbox/modules/workbox-core/#skip-waiting-and-clients-claim
+  skipWaiting: false,
   disable: process.env.NODE_ENV === 'development',
   reloadOnOnline: true,
-  // Use custom worker with async helpers for workbox compatibility
+  // Custom worker with async helpers for workbox compatibility
   customWorkerSrc: 'worker',
-  // CRITICAL: Disable start URL caching - it has async functions that fail in SW context
+  // CRITICAL: Disable start URL caching completely
   cacheStartUrl: false,
-  // CRITICAL: Clean up outdated caches on deploy to prevent 502 errors
+  // Clean up outdated caches on deploy
   cleanupOutdatedCaches: true,
-  // Use version in cacheId for proper cache invalidation on each deploy
+  // Version in cacheId for cache invalidation
   cacheId: `megacampus-${APP_VERSION}`,
-  // CRITICAL FIX: Do NOT extend default runtimeCaching - it uses CacheFirst for JS which causes 502
+  // Do NOT use default runtimeCaching (uses CacheFirst for JS = 502 after deploy)
   extendDefaultRuntimeCaching: false,
-  // Exclude ALL _next/static from precaching - these files change every build
-  // and precaching them causes 502 when old files are requested after deploy
+  // Exclude _next from precache - files change every build
   buildExcludes: [/app-build-manifest\.json$/, /\.map$/],
-  // Exclude _next from public precache
   publicExcludes: ['!_next/**/*'],
-  // CRITICAL: Use workboxOptions to configure proper SW generation
+  // CRITICAL: All caching config must be inside workboxOptions to truly override defaults
   workboxOptions: {
-    // Exclude all Next.js static chunks from precache manifest
-    // These files change every build and precaching them causes stale cache issues
-    exclude: [
-      /\/_next\/static\/chunks\/.*/,
-      /\/_next\/static\/css\/.*/,
-      /\.js$/,
-      /\.css$/,
-    ],
-    // Override default runtimeCaching completely - we define our own below
-    runtimeCaching: [],
-  },
-  runtimeCaching: [
+    // Exclude JS/CSS/JSON from precache manifest
+    exclude: [/\.js$/, /\.css$/, /\.json$/],
+    // MINIMAL runtime caching - ONLY fonts, images, and media
+    // NO JS/CSS/JSON - these change on every deploy and cause 502 errors when cached
+    // The SW will NOT intercept any code-related requests
+    runtimeCaching: [
     {
+      // Google Fonts webfonts (woff2 files) - safe to cache long-term
       urlPattern: /^https:\/\/fonts\.(?:gstatic)\.com\/.*/i,
       handler: 'CacheFirst',
       options: {
@@ -51,11 +47,12 @@ const withPWA = require('@ducanh2912/next-pwa').default({
           maxAgeSeconds: 365 * 24 * 60 * 60 // 1 year
         },
         cacheableResponse: {
-          statuses: [0, 200] // Only cache successful responses
+          statuses: [0, 200]
         }
       }
     },
     {
+      // Google Fonts CSS - use StaleWhileRevalidate for font CSS
       urlPattern: /^https:\/\/fonts\.(?:googleapis)\.com\/.*/i,
       handler: 'StaleWhileRevalidate',
       options: {
@@ -70,12 +67,28 @@ const withPWA = require('@ducanh2912/next-pwa').default({
       }
     },
     {
-      urlPattern: /\.(?:eot|otf|ttc|ttf|woff|woff2|font.css)$/i,
-      handler: 'StaleWhileRevalidate',
+      // Local font files (woff, woff2, etc.)
+      urlPattern: /\.(?:eot|otf|ttc|ttf|woff|woff2)$/i,
+      handler: 'CacheFirst',
       options: {
         cacheName: 'static-font-assets',
         expiration: {
-          maxEntries: 4,
+          maxEntries: 8,
+          maxAgeSeconds: 365 * 24 * 60 * 60 // 1 year
+        },
+        cacheableResponse: {
+          statuses: [0, 200]
+        }
+      }
+    },
+    {
+      // Images - safe to cache
+      urlPattern: /\.(?:jpg|jpeg|gif|png|svg|ico|webp|avif)$/i,
+      handler: 'StaleWhileRevalidate',
+      options: {
+        cacheName: 'static-image-assets',
+        expiration: {
+          maxEntries: 64,
           maxAgeSeconds: 7 * 24 * 60 * 60 // 1 week
         },
         cacheableResponse: {
@@ -84,27 +97,14 @@ const withPWA = require('@ducanh2912/next-pwa').default({
       }
     },
     {
-      urlPattern: /\.(?:jpg|jpeg|gif|png|svg|ico|webp)$/i,
-      handler: 'StaleWhileRevalidate',
-      options: {
-        cacheName: 'static-image-assets',
-        expiration: {
-          maxEntries: 64,
-          maxAgeSeconds: 24 * 60 * 60 // 1 day
-        },
-        cacheableResponse: {
-          statuses: [0, 200]
-        }
-      }
-    },
-    {
+      // Next.js optimized images
       urlPattern: /\/_next\/image\?url=.+$/i,
       handler: 'StaleWhileRevalidate',
       options: {
         cacheName: 'next-image',
         expiration: {
           maxEntries: 64,
-          maxAgeSeconds: 24 * 60 * 60 // 1 day
+          maxAgeSeconds: 7 * 24 * 60 * 60 // 1 week
         },
         cacheableResponse: {
           statuses: [0, 200]
@@ -112,13 +112,14 @@ const withPWA = require('@ducanh2912/next-pwa').default({
       }
     },
     {
-      urlPattern: /\.(?:mp3|wav|ogg)$/i,
+      // Audio files
+      urlPattern: /\.(?:mp3|wav|ogg|flac)$/i,
       handler: 'CacheFirst',
       options: {
         cacheName: 'static-audio-assets',
         expiration: {
           maxEntries: 32,
-          maxAgeSeconds: 24 * 60 * 60 // 1 day
+          maxAgeSeconds: 30 * 24 * 60 * 60 // 30 days
         },
         cacheableResponse: {
           statuses: [0, 200]
@@ -126,137 +127,24 @@ const withPWA = require('@ducanh2912/next-pwa').default({
       }
     },
     {
-      urlPattern: /\.(?:mp4|webm)$/i,
+      // Video files
+      urlPattern: /\.(?:mp4|webm|mov)$/i,
       handler: 'CacheFirst',
       options: {
         cacheName: 'static-video-assets',
         expiration: {
-          maxEntries: 32,
-          maxAgeSeconds: 24 * 60 * 60 // 1 day
+          maxEntries: 16,
+          maxAgeSeconds: 30 * 24 * 60 * 60 // 30 days
         },
-        cacheableResponse: {
-          statuses: [0, 200]
-        }
-      }
-    },
-    {
-      // Next.js chunks - use NetworkFirst to always get fresh on deploy
-      urlPattern: /\/_next\/static\/chunks\/.*/i,
-      handler: 'NetworkFirst',
-      options: {
-        cacheName: 'next-js-chunks',
-        expiration: {
-          maxEntries: 64,
-          maxAgeSeconds: 7 * 24 * 60 * 60 // 1 week
-        },
-        networkTimeoutSeconds: 5,
-        cacheableResponse: {
-          statuses: [0, 200] // Critical: reject 502/404 to prevent stale cache after deploy
-        }
-      }
-    },
-    {
-      // Other JS files (third-party, etc.)
-      urlPattern: /\.(?:js)$/i,
-      handler: 'NetworkFirst',
-      options: {
-        cacheName: 'static-js-assets',
-        expiration: {
-          maxEntries: 32,
-          maxAgeSeconds: 24 * 60 * 60 // 1 day
-        },
-        networkTimeoutSeconds: 5,
-        cacheableResponse: {
-          statuses: [0, 200]
-        }
-      }
-    },
-    {
-      urlPattern: /\.(?:css|less)$/i,
-      handler: 'NetworkFirst',
-      options: {
-        cacheName: 'static-style-assets',
-        expiration: {
-          maxEntries: 32,
-          maxAgeSeconds: 24 * 60 * 60 // 1 day
-        },
-        networkTimeoutSeconds: 5,
-        cacheableResponse: {
-          statuses: [0, 200]
-        }
-      }
-    },
-    {
-      // Next.js data - contains build ID, must use NetworkFirst
-      urlPattern: /\/_next\/data\/.+\/.+\.json$/i,
-      handler: 'NetworkFirst',
-      options: {
-        cacheName: 'next-data',
-        expiration: {
-          maxEntries: 32,
-          maxAgeSeconds: 60 * 60 // 1 hour only
-        },
-        networkTimeoutSeconds: 5,
-        cacheableResponse: {
-          statuses: [0, 200] // Critical: reject 502/404 after deploy
-        }
-      }
-    },
-    {
-      urlPattern: /\.(?:json|xml|csv)$/i,
-      handler: 'NetworkFirst',
-      options: {
-        cacheName: 'static-data-assets',
-        expiration: {
-          maxEntries: 32,
-          maxAgeSeconds: 24 * 60 * 60 // 1 day
-        },
-        cacheableResponse: {
-          statuses: [0, 200]
-        }
-      }
-    },
-    {
-      urlPattern: ({ url }: { url: URL }) => {
-        const isSameOrigin = self.origin === url.origin
-        if (!isSameOrigin) return false
-        const pathname = url.pathname
-        // Exclude /api/
-        if (pathname.startsWith('/api/')) return false
-        return true
-      },
-      handler: 'NetworkFirst',
-      options: {
-        cacheName: 'others',
-        expiration: {
-          maxEntries: 32,
-          maxAgeSeconds: 24 * 60 * 60 // 1 day
-        },
-        networkTimeoutSeconds: 10,
-        cacheableResponse: {
-          statuses: [0, 200] // Critical: reject 502/404 after deploy
-        }
-      }
-    },
-    {
-      urlPattern: ({ url }: { url: URL }) => {
-        const isSameOrigin = self.origin === url.origin
-        return !isSameOrigin
-      },
-      handler: 'NetworkFirst',
-      options: {
-        cacheName: 'cross-origin',
-        expiration: {
-          maxEntries: 32,
-          maxAgeSeconds: 60 * 60 // 1 hour
-        },
-        networkTimeoutSeconds: 10,
         cacheableResponse: {
           statuses: [0, 200]
         }
       }
     }
-  ]
+    // NO JS/CSS/JSON rules - let the browser handle these directly
+    // This prevents stale code from being served after deployments
+    ]
+  }
   // Removed fallbacks to avoid babel-loader requirement
 })
 
