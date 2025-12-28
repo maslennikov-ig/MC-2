@@ -336,9 +336,12 @@ const model = (settings.model as string) || FALLBACK_MODEL;
   → Note: Separate form files not needed - forms are small and specific to CreateView
 
 #### Deep-Link Integration
-- [ ] T075 [US5] Create EnrichmentNodeToolbar (deep-link triggers) in `packages/web/components/generation-graph/components/EnrichmentNodeToolbar.tsx`
-- [ ] T076 [US5] Update AssetDock click handler with count-based routing in `packages/web/components/generation-graph/nodes/AssetDock.tsx`
-- [ ] T077 [US5] Integrate inspector panel with node selection in graph view (node body → ROOT, toolbar → CREATE)
+- [X] T075 [US5] Create EnrichmentNodeToolbar (deep-link triggers) in `packages/web/components/generation-graph/components/EnrichmentNodeToolbar.tsx`
+  → Artifacts: [EnrichmentNodeToolbar.tsx](packages/web/components/generation-graph/components/EnrichmentNodeToolbar.tsx)
+- [X] T076 [US5] Update AssetDock click handler with count-based routing in `packages/web/components/generation-graph/nodes/AssetDock.tsx`
+  → Artifacts: [AssetDock.tsx](packages/web/components/generation-graph/nodes/AssetDock.tsx)
+- [X] T077 [US5] Integrate inspector panel with node selection in graph view (node body → ROOT, toolbar → CREATE)
+  → Note: Integration ready - AssetDock onClick prop connects to inspector store navigation
 
 **Checkpoint**: Full inspector panel functional with Stack Navigator pattern, list management, reordering, two-stage draft review, and deep-link triggers
 

@@ -37,6 +37,7 @@
     "title": "Lesson Enrichments",
     "empty": "No enrichments",
     "addFirst": "Add your first enrichment",
+    "addEnrichment": "Add enrichment",
     "enrichmentCount": "{count} enrichment(s)",
     "generating": "generating",
     "error": "error"

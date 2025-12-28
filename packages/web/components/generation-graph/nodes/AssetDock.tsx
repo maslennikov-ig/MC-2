@@ -30,6 +30,8 @@ export interface AssetDockProps {
   isGenerating?: boolean;
   /** Total enrichment count */
   count?: number;
+  /** Click handler - opens inspector with count-based routing */
+  onClick?: () => void;
 }
 
 /**
@@ -40,13 +42,34 @@ export const AssetDock: React.FC<AssetDockProps> = ({
   hasErrors = false,
   isGenerating = false,
   count = 0,
+  onClick,
 }) => {
   const { zoom } = useViewport();
   const t = useTranslations('enrichments');
 
-  // Empty state - return null if no enrichments
+  // Click wrapper for interactive dock
+  const handleClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onClick?.();
+  };
+
+  // Empty state - show add indicator when clicked
   if (enrichments.length === 0) {
-    return null;
+    if (!onClick) return null;
+
+    // Show subtle add indicator only at higher zoom
+    if (zoom < 0.6) return null;
+
+    return (
+      <button
+        onClick={handleClick}
+        className="flex items-center justify-center h-[14px] px-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors group"
+        title={t('assetDock.addEnrichment')}
+        aria-label={t('assetDock.addEnrichment')}
+      >
+        <span className="text-[10px] text-muted-foreground group-hover:text-primary">+</span>
+      </button>
+    );
   }
 
   // Determine overall state for dot/count modes
@@ -80,39 +103,51 @@ export const AssetDock: React.FC<AssetDockProps> = ({
 
   // Dot Mode: zoom < 0.4
   if (zoom < 0.4) {
-    return (
-      <div className="flex items-center justify-center h-[14px]">
-        <div
-          className={`
-            w-1.5 h-1.5 rounded-full transition-all duration-300
-            ${getDotColor()}
-            ${isGenerating ? 'animate-pulse' : ''}
-          `}
-          title={enrichmentCountText}
-          role="img"
-          aria-label={enrichmentCountText}
-        />
-      </div>
+    const content = (
+      <div
+        className={`
+          w-1.5 h-1.5 rounded-full transition-all duration-300
+          ${getDotColor()}
+          ${isGenerating ? 'animate-pulse' : ''}
+        `}
+        title={enrichmentCountText}
+        role="img"
+        aria-label={enrichmentCountText}
+      />
+    );
+
+    return onClick ? (
+      <button onClick={handleClick} className="flex items-center justify-center h-[14px]">
+        {content}
+      </button>
+    ) : (
+      <div className="flex items-center justify-center h-[14px]">{content}</div>
     );
   }
 
   // Count Mode: 0.4 ≤ zoom < 0.6
   if (zoom < 0.6) {
-    return (
-      <div className="flex items-center justify-center h-[14px]">
-        <div
-          className={`
-            px-1.5 py-0.5 rounded text-[10px] font-medium border transition-all duration-300
-            ${getBadgeColor()}
-            ${isGenerating ? 'animate-pulse' : ''}
-          `}
-          title={enrichmentCountText}
-          role="img"
-          aria-label={enrichmentCountText}
-        >
-          {count}
-        </div>
+    const content = (
+      <div
+        className={`
+          px-1.5 py-0.5 rounded text-[10px] font-medium border transition-all duration-300
+          ${getBadgeColor()}
+          ${isGenerating ? 'animate-pulse' : ''}
+        `}
+        title={enrichmentCountText}
+        role="img"
+        aria-label={enrichmentCountText}
+      >
+        {count}
       </div>
+    );
+
+    return onClick ? (
+      <button onClick={handleClick} className="flex items-center justify-center h-[14px]">
+        {content}
+      </button>
+    ) : (
+      <div className="flex items-center justify-center h-[14px]">{content}</div>
     );
   }
 
@@ -123,8 +158,8 @@ export const AssetDock: React.FC<AssetDockProps> = ({
     (a, b) => ENRICHMENT_TYPE_CONFIG[a.type as EnrichmentType].order - ENRICHMENT_TYPE_CONFIG[b.type as EnrichmentType].order
   );
 
-  return (
-    <div className="flex items-center gap-1 h-[14px] px-1">
+  const iconsContent = (
+    <>
       {sortedEnrichments.slice(0, 5).map((enrichment) => {
         const config = ENRICHMENT_TYPE_CONFIG[enrichment.type as EnrichmentType];
         const statusConfig = ENRICHMENT_STATUS_CONFIG[enrichment.status as EnrichmentStatus];
@@ -166,7 +201,18 @@ export const AssetDock: React.FC<AssetDockProps> = ({
           </div>
         );
       })}
-    </div>
+    </>
+  );
+
+  return onClick ? (
+    <button
+      onClick={handleClick}
+      className="flex items-center gap-1 h-[14px] px-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors"
+    >
+      {iconsContent}
+    </button>
+  ) : (
+    <div className="flex items-center gap-1 h-[14px] px-1">{iconsContent}</div>
   );
 };
 
