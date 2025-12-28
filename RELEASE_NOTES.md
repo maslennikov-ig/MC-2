@@ -3,6 +3,19 @@
 _Released on 2025-12-26_
 
 
+## v0.26.34
+
+_Released on 2025-12-28_
+
+### ✨ New Features
+
+- **web**: Add 1 source file(s), update 2 source file(s), +1 more
+- **scripts**: Add --message flag to release.sh for custom commit messages
+
+---
+
+_This release was automatically generated from 2 commits._
+
 ## v0.26.33
 
 _Released on 2025-12-27_

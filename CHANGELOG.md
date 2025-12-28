@@ -35,6 +35,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.26.34] - 2025-12-28
+
+### Added
+- **web**: add 1 source file(s), update 2 source file(s), +1 more (fd0b8b0)
+- **scripts**: add --message flag to release.sh for custom commit messages (24397ec)
+
 ## [0.26.33] - 2025-12-27
 
 ### Fixed
