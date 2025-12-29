@@ -1,7 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { useLocale } from 'next-intl';
+import { useTranslations } from 'next-intl';
 import { Loader2, Terminal, CheckCircle2, XCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
@@ -45,7 +45,7 @@ export function GenerationProgress({
   canCancel,
   className,
 }: GenerationProgressProps) {
-  const locale = useLocale();
+  const t = useTranslations('enrichments');
   const [dots, setDots] = useState('');
 
   // Animate dots for generating states
@@ -57,10 +57,10 @@ export function GenerationProgress({
       return () => clearInterval(interval);
     }
     setDots('');
-    return undefined;
+    return; // Explicit return to satisfy TypeScript
   }, [phase]);
 
-  const cancelLabel = locale === 'ru' ? 'Отменить' : 'Cancel';
+  const cancelLabel = t('actions.cancel');
 
   const isActive = phase === 'queued' || phase === 'generating' || phase === 'finalizing';
   const isComplete = phase === 'completed';
@@ -102,13 +102,13 @@ export function GenerationProgress({
       <div className="flex-1 overflow-auto bg-slate-950 p-4 font-mono text-sm">
         <div className="flex items-center gap-2 text-slate-400 mb-3">
           <Terminal className="w-4 h-4" />
-          <span>{locale === 'ru' ? 'Журнал генерации' : 'Generation Log'}</span>
+          <span>{t('generationLog.title')}</span>
         </div>
 
         <div className="space-y-1">
           {logs.length === 0 ? (
             <div className="text-slate-500">
-              {locale === 'ru' ? 'Ожидание вывода...' : 'Waiting for output...'}
+              {t('generationLog.waiting')}
             </div>
           ) : (
             logs.map((log, idx) => (

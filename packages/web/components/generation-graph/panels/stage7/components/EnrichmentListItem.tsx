@@ -1,7 +1,7 @@
 'use client';
 
 import React from 'react';
-import { useLocale, useTranslations } from 'next-intl';
+import { useTranslations } from 'next-intl';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { GripVertical, AlertCircle, Loader2, CheckCircle2 } from 'lucide-react';
@@ -79,7 +79,6 @@ function sanitizeErrorMessage(message: string | null | undefined, fallback: stri
  * ```
  */
 export function EnrichmentListItem({ item, isDragging, onClick }: EnrichmentListItemProps) {
-  const locale = useLocale();
   const t = useTranslations('enrichments');
   const config = ENRICHMENT_TYPE_CONFIG[item.type];
 
@@ -90,14 +89,21 @@ export function EnrichmentListItem({ item, isDragging, onClick }: EnrichmentList
     transform,
     transition,
     isDragging: isSortableDragging,
-  } = useSortable({ id: item.id });
+  } = useSortable({
+    id: item.id,
+    data: {
+      type: 'enrichment',
+      enrichmentType: item.type,
+      status: item.status,
+    },
+  });
 
   const style = {
     transform: CSS.Transform.toString(transform),
     transition,
   };
 
-  const typeName = locale === 'ru' ? config.labelRu : config.label;
+  const typeName = t(`types.${item.type}`);
   const statusText = t(`status.${item.status}`);
 
   return (

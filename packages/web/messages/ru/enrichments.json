@@ -134,5 +134,9 @@
       "includeSpeakerNotes": "Заметки докладчика"
     }
   },
-  "comingSoon": "Скоро"
+  "comingSoon": "Скоро",
+  "generationLog": {
+    "title": "Журнал генерации",
+    "waiting": "Ожидание вывода..."
+  }
 }

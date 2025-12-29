@@ -134,5 +134,9 @@
       "includeSpeakerNotes": "Include Speaker Notes"
     }
   },
-  "comingSoon": "Coming Soon"
+  "comingSoon": "Coming Soon",
+  "generationLog": {
+    "title": "Generation Log",
+    "waiting": "Waiting for output..."
+  }
 }
