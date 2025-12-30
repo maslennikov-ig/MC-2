@@ -40,6 +40,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.26.40] - 2025-12-30
+
+### Changed
+- **web**: remove empty UI blocks and add intro section styling (e342066)
+
+### Fixed
+- **web**: update 1 source file(s) (593c474)
+- **web**: improve mermaid text readability on light backgrounds in dark theme (610aa49)
+- **web**: load lesson content from lesson_contents table (03d0894)
+
 ## [0.26.39] - 2025-12-30
 
 ### Added

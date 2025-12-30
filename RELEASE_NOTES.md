@@ -3,6 +3,24 @@
 _Released on 2025-12-26_
 
 
+## v0.26.40
+
+_Released on 2025-12-30_
+
+### 🔧 Improvements
+
+- **web**: Remove empty UI blocks and add intro section styling
+
+### 🐛 Bug Fixes
+
+- **web**: Update 1 source file(s)
+- **web**: Improve mermaid text readability on light backgrounds in dark theme
+- **web**: Load lesson content from lesson_contents table
+
+---
+
+_This release was automatically generated from 4 commits._
+
 ## v0.26.39
 
 _Released on 2025-12-30_
