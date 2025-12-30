@@ -17,6 +17,10 @@ const DARK_COLORS = {
   textColor: '#e2e8f0',     // slate-200
   clusterBg: '#1e293b',     // slate-800
   clusterBorder: '#475569', // slate-600
+  startNodeBg: '#34d399',   // emerald-400 aligns with dark-mode success palette
+  startNodeBorder: '#10b981', // emerald-500 ensures contrast on slate backgrounds
+  endNodeBg: '#f87171',     // red-400 stands out while remaining readable in dark UI
+  endNodeBorder: '#fecaca', // red-200 border provides clear outline on dark bg
 };
 
 /**
@@ -30,6 +34,10 @@ const LIGHT_COLORS = {
   textColor: '#334155',     // slate-700
   clusterBg: '#f1f5f9',     // slate-100
   clusterBorder: '#cbd5e1', // slate-300
+  startNodeBg: '#059669',   // emerald-600 keeps consistency with accept states
+  startNodeBorder: '#047857', // emerald-700 for clear delineation
+  endNodeBg: '#dc2626',     // red-600 = critical/stop color in product palette
+  endNodeBorder: '#7f1d1d', // red-800 stroke maintains WCAG contrast
 };
 
 /**
@@ -190,6 +198,37 @@ function postProcessSvg(container: HTMLElement, isDark: boolean): void {
     element.style.fill = colors.lineColor;
   });
 
+  // State diagrams use dedicated start/end markers that need higher contrast.
+  container.querySelectorAll('.state-start').forEach((el) => {
+    const element = el as SVGElement;
+    const hasEndSibling = element.parentElement?.querySelector('.state-end');
+    if (hasEndSibling) {
+      element.setAttribute('fill', 'transparent');
+      element.style.fill = 'transparent';
+      element.setAttribute('stroke', colors.endNodeBorder);
+      element.style.stroke = colors.endNodeBorder;
+      element.setAttribute('stroke-width', '2');
+      element.style.strokeWidth = '2';
+    } else {
+      element.setAttribute('fill', colors.startNodeBg);
+      element.style.fill = colors.startNodeBg;
+      element.setAttribute('stroke', colors.startNodeBorder);
+      element.style.stroke = colors.startNodeBorder;
+      element.setAttribute('stroke-width', '2');
+      element.style.strokeWidth = '2';
+    }
+  });
+
+  container.querySelectorAll('.state-end').forEach((el) => {
+    const element = el as SVGElement;
+    element.setAttribute('fill', colors.endNodeBg);
+    element.style.fill = colors.endNodeBg;
+    element.setAttribute('stroke', colors.endNodeBorder);
+    element.style.stroke = colors.endNodeBorder;
+    element.setAttribute('stroke-width', '2');
+    element.style.strokeWidth = '2';
+  });
+
   // Replace light-colored backgrounds in dark mode
   // This catches colors like #90EE90 (lightgreen) that aren't in MERMAID_DEFAULT_COLORS
   if (isDark) {
@@ -241,14 +280,24 @@ const darkThemeVariables = {
   lineColor: DARK_COLORS.lineColor,
   arrowheadColor: DARK_COLORS.lineColor,
   textColor: DARK_COLORS.textColor,
+  transitionColor: DARK_COLORS.lineColor,
+  transitionLabelColor: DARK_COLORS.textColor,
   // Clusters/subgraphs
   clusterBkg: DARK_COLORS.clusterBg,
   clusterBorder: DARK_COLORS.clusterBorder,
+  compositeBackground: DARK_COLORS.clusterBg,
+  compositeTitleBackground: DARK_COLORS.clusterBg,
+  compositeBorder: DARK_COLORS.clusterBorder,
   // Labels
   edgeLabelBackground: DARK_COLORS.clusterBg,
   labelBoxBkgColor: DARK_COLORS.clusterBg,
   labelBoxBorderColor: DARK_COLORS.clusterBorder,
   labelTextColor: DARK_COLORS.textColor,
+  stateLabelColor: DARK_COLORS.nodeText,
+  stateBkg: DARK_COLORS.nodeBg,
+  stateBorder: DARK_COLORS.nodeBorder,
+  specialStateColor: DARK_COLORS.startNodeBg,
+  innerEndBackground: DARK_COLORS.endNodeBg,
   // Color scale for different node types (cScale0-11)
   // All set to same color for consistency
   cScale0: DARK_COLORS.nodeBg,
@@ -309,14 +358,24 @@ const lightThemeVariables = {
   lineColor: LIGHT_COLORS.lineColor,
   arrowheadColor: LIGHT_COLORS.lineColor,
   textColor: LIGHT_COLORS.textColor,
+  transitionColor: LIGHT_COLORS.lineColor,
+  transitionLabelColor: LIGHT_COLORS.textColor,
   // Clusters/subgraphs
   clusterBkg: LIGHT_COLORS.clusterBg,
   clusterBorder: LIGHT_COLORS.clusterBorder,
+  compositeBackground: LIGHT_COLORS.clusterBg,
+  compositeTitleBackground: LIGHT_COLORS.clusterBg,
+  compositeBorder: LIGHT_COLORS.clusterBorder,
   // Labels
   edgeLabelBackground: '#ffffff',
   labelBoxBkgColor: '#ffffff',
   labelBoxBorderColor: LIGHT_COLORS.clusterBorder,
   labelTextColor: LIGHT_COLORS.textColor,
+  stateLabelColor: LIGHT_COLORS.nodeText,
+  stateBkg: LIGHT_COLORS.nodeBg,
+  stateBorder: LIGHT_COLORS.nodeBorder,
+  specialStateColor: LIGHT_COLORS.startNodeBg,
+  innerEndBackground: LIGHT_COLORS.endNodeBg,
   // Color scale for different node types (cScale0-11)
   // All set to same color for consistency
   cScale0: LIGHT_COLORS.nodeBg,
