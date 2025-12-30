@@ -40,6 +40,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.26.41] - 2025-12-30
+
+### Fixed
+- **web**: update 1 source file(s), update docs (cfeff98)
+
 ## [0.26.40] - 2025-12-30
 
 ### Changed
