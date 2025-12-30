@@ -21,6 +21,7 @@ import { Database } from "@/types/database.generated"
 import { ActivitiesPanel } from "./ActivitiesPanel"
 import { StructurePanel } from "./StructurePanel"
 import { EnrichmentsPanel } from "./EnrichmentsPanel"
+import type { LessonContentRow } from "../types"
 
 type EnrichmentRow = Database['public']['Tables']['lesson_enrichments']['Row'];
 
@@ -32,6 +33,8 @@ interface LessonViewProps {
   enrichments?: EnrichmentRow[];
   /** Error message if enrichments failed to load */
   enrichmentsLoadError?: string;
+  /** Lesson content from lesson_contents table (Stage 6 generated content) */
+  lessonContent?: LessonContentRow;
   focusMode: boolean;
   currentIndex: number;
   totalLessonsOrdered: number;
@@ -62,6 +65,7 @@ export function LessonView({
   assets,
   enrichments,
   enrichmentsLoadError,
+  lessonContent,
   focusMode,
   currentIndex,
   totalLessonsOrdered,
@@ -163,10 +167,11 @@ export function LessonView({
           </AnimatePresence>
 
           <div className="prose prose-lg dark:prose-invert max-w-none prose-purple">
-            <LessonContent 
+            <LessonContent
               lesson={currentLesson}
               section={currentSection}
               assets={assets}
+              lessonContent={lessonContent}
             />
           </div>
           
@@ -260,6 +265,7 @@ export function LessonView({
           lesson={currentLesson}
           section={currentSection}
           assets={assets}
+          lessonContent={lessonContent}
           availableFormats={{
             video: currentLesson.video_asset?.url,
             audio: currentLesson.audio_asset?.url,

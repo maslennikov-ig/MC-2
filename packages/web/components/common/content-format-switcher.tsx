@@ -40,6 +40,9 @@ import { Badge } from "@/components/ui/badge"
 import { cn } from "@/lib/utils"
 import LessonContent from "@/components/common/lesson-content"
 import type { Lesson, Section, Asset } from "@/types/database"
+import type { Database } from "@/types/database.generated"
+
+type LessonContentRow = Database['public']['Tables']['lesson_contents']['Row']
 
 interface ContentFormat {
   type: 'text' | 'video' | 'audio' | 'presentation'
@@ -53,6 +56,8 @@ interface ContentFormatSwitcherProps {
   lesson: Lesson
   section: Section | undefined
   assets?: Asset[]
+  /** Lesson content from lesson_contents table (Stage 6 generated content) */
+  lessonContent?: LessonContentRow
   availableFormats?: {
     video?: string
     audio?: string
@@ -65,6 +70,7 @@ export default function ContentFormatSwitcher({
   lesson,
   section,
   assets,
+  lessonContent,
   availableFormats = {},
   onFormatChange
 }: ContentFormatSwitcherProps) {
@@ -177,7 +183,7 @@ export default function ContentFormatSwitcher({
 
   // Only show switcher if there are alternative formats
   if (availableFormatsCount <= 1) {
-    return <LessonContent lesson={lesson} section={section} assets={assets} />
+    return <LessonContent lesson={lesson} section={section} assets={assets} lessonContent={lessonContent} />
   }
 
   return (
@@ -246,7 +252,7 @@ export default function ContentFormatSwitcher({
           className="w-full"
         >
           {currentFormat === 'text' && (
-            <LessonContent lesson={lesson} section={section} assets={assets} />
+            <LessonContent lesson={lesson} section={section} assets={assets} lessonContent={lessonContent} />
           )}
 
           {currentFormat === 'video' && mockFormats.video && (

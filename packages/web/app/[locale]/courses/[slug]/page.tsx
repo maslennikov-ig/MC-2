@@ -25,6 +25,7 @@ type SectionRow = Database['public']['Tables']['sections']['Row']
 type LessonRow = Database['public']['Tables']['lessons']['Row']
 type AssetRow = Database['public']['Tables']['assets']['Row']
 type EnrichmentRow = Database['public']['Tables']['lesson_enrichments']['Row']
+type LessonContentRow = Database['public']['Tables']['lesson_contents']['Row']
 
 
 interface CoursePageProps {
@@ -155,6 +156,42 @@ export default async function CoursePage({ params }: CoursePageProps) {
     }
   }
 
+  // Fetch lesson contents from lesson_contents table (Stage 6 generated content)
+  // This is the actual lesson content that was generated, stored separately from lessons table
+  let lessonContents: LessonContentRow[] | null = null
+
+  if (lessons && lessons.length > 0) {
+    const lessonIds = lessons.map((l: LessonRow) => l.id)
+    const lessonContentsResult = await adminSupabase
+      .from('lesson_contents')
+      .select('*')
+      .in('lesson_id', lessonIds)
+      .eq('status', 'completed')
+      .order('created_at', { ascending: false }) as { data: LessonContentRow[] | null; error: PostgrestError | null }
+
+    lessonContents = lessonContentsResult.data
+
+    if (lessonContentsResult.error) {
+      logger.warn('Failed to load lesson contents', {
+        courseId: course.id,
+        slug,
+        error: lessonContentsResult.error.message,
+        code: lessonContentsResult.error.code
+      })
+    }
+  }
+
+  // Group lesson contents by lesson_id (take the latest completed one per lesson)
+  const lessonContentsByLessonId: Record<string, LessonContentRow> = {}
+  if (lessonContents) {
+    for (const lc of lessonContents) {
+      // Only keep the first (latest) content per lesson
+      if (!lessonContentsByLessonId[lc.lesson_id]) {
+        lessonContentsByLessonId[lc.lesson_id] = lc
+      }
+    }
+  }
+
   // Use shared utilities for data transformation
   const assetsByLessonId = groupAssetsByLessonId(assets)
   const enrichmentsByLessonId = groupEnrichmentsByLessonId(enrichments)
@@ -179,6 +216,7 @@ export default async function CoursePage({ params }: CoursePageProps) {
         assets={assetsByLessonId as Record<string, Asset[]>}
         enrichments={enrichmentsByLessonId}
         enrichmentsLoadError={enrichmentsError}
+        lessonContents={lessonContentsByLessonId}
       />
     </CourseErrorBoundary>
   )

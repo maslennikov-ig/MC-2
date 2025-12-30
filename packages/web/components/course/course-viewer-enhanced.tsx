@@ -14,7 +14,7 @@ import { FAB } from "./viewer/components/FAB"
 import { SharedCourseBanner } from "./viewer/components/SharedCourseBanner"
 import type { CourseViewerProps } from "./viewer/types"
 
-export default function CourseViewerEnhanced({ course, sections: rawSections, lessons: rawLessons, assets, enrichments, enrichmentsLoadError, readOnly = false }: CourseViewerProps) {
+export default function CourseViewerEnhanced({ course, sections: rawSections, lessons: rawLessons, assets, enrichments, enrichmentsLoadError, lessonContents, readOnly = false }: CourseViewerProps) {
   const {
     sections,
     lessons,
@@ -166,6 +166,7 @@ export default function CourseViewerEnhanced({ course, sections: rawSections, le
                 assets={currentLessonId ? assets?.[currentLessonId] : undefined}
                 enrichments={currentLessonId ? enrichments?.[currentLessonId] : undefined}
                 enrichmentsLoadError={enrichmentsLoadError}
+                lessonContent={currentLessonId ? lessonContents?.[currentLessonId] : undefined}
                 focusMode={focusMode}
                 currentIndex={currentIndex}
                 totalLessonsOrdered={allLessonsOrdered.length}

@@ -2,6 +2,7 @@ import type { Course, Section, Lesson, Asset, LessonActivity } from "@/types/dat
 import type { Database } from "@/types/database.generated";
 
 type EnrichmentRow = Database['public']['Tables']['lesson_enrichments']['Row'];
+export type LessonContentRow = Database['public']['Tables']['lesson_contents']['Row'];
 
 export interface CourseViewerProps {
   course: Course;
@@ -12,6 +13,8 @@ export interface CourseViewerProps {
   enrichments?: Record<string, EnrichmentRow[]>;
   /** Error message if enrichments failed to load */
   enrichmentsLoadError?: string;
+  /** Lesson contents from lesson_contents table, grouped by lesson_id */
+  lessonContents?: Record<string, LessonContentRow>;
   /** Read-only mode for shared/public course viewing (hides edit buttons, generation panel) */
   readOnly?: boolean;
 }

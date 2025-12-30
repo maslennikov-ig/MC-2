@@ -1,6 +1,6 @@
 "use client"
 
-import { useState, useEffect } from "react"
+import React, { useState, useEffect, useMemo } from "react"
 import { motion } from "framer-motion"
 import { Target, BookOpen, Activity, Clock, CheckCircle, Circle, PlayCircle, Film, X } from "lucide-react"
 import dynamic from "next/dynamic"
@@ -8,6 +8,9 @@ import dynamic from "next/dynamic"
 import { MarkdownRendererFull } from "@/components/markdown"
 import type { Lesson, Section, Asset, LessonActivity } from "@/types/database"
 import { parseLessonContent } from "@/lib/lesson-content-parser"
+import type { Database } from "@/types/database.generated"
+
+type LessonContentRow = Database['public']['Tables']['lesson_contents']['Row']
 
 // Type guard to check if activity is an object
 function isActivityObject(activity: string | LessonActivity): activity is LessonActivity {
@@ -32,9 +35,11 @@ interface LessonContentProps {
   lesson: Lesson
   section?: Section
   assets?: Asset[]
+  /** Lesson content from lesson_contents table (Stage 6 generated content) */
+  lessonContent?: LessonContentRow
 }
 
-export default function LessonContent({ lesson, section, assets }: LessonContentProps) {
+export default function LessonContent({ lesson, section, assets, lessonContent }: LessonContentProps) {
   const [completedTasks, setCompletedTasks] = useState<Set<number>>(new Set())
   const [videoMode, setVideoMode] = useState<'hidden' | 'normal' | 'floating'>('hidden')
   
@@ -120,9 +125,47 @@ export default function LessonContent({ lesson, section, assets }: LessonContent
     return assetUrl
   }
 
-  // Parse the lesson content from JSONB or legacy fields
-  // Note: structured content support can be added in a future phase
-  const { markdown: markdownContent, structured: _structured } = parseLessonContent(lesson)
+  // Parse the lesson content - prefer lessonContent from lesson_contents table
+  // Fallback to lesson.content or lesson.content_text for legacy support
+  const markdownContent = useMemo(() => {
+    // Priority 1: Use lessonContent from lesson_contents table (Stage 6)
+    if (lessonContent?.content) {
+      const contentData = lessonContent.content as Record<string, unknown>
+
+      // Structure: { status, content: { intro, sections: [{title, content}], exercises } }
+      const innerContent = contentData.content as Record<string, unknown> | undefined
+
+      if (innerContent) {
+        const parts: string[] = []
+
+        // Add intro
+        if (typeof innerContent.intro === 'string' && innerContent.intro.trim()) {
+          parts.push(innerContent.intro)
+        }
+
+        // Add sections
+        if (Array.isArray(innerContent.sections)) {
+          for (const section of innerContent.sections) {
+            if (section && typeof section === 'object') {
+              const sectionObj = section as { title?: string; content?: string }
+              if (sectionObj.title && sectionObj.content) {
+                // Section title is already in markdown with ## from LLM
+                parts.push(sectionObj.content)
+              }
+            }
+          }
+        }
+
+        if (parts.length > 0) {
+          return parts.join('\n\n')
+        }
+      }
+    }
+
+    // Priority 2: Fallback to legacy parsing from lesson table
+    const { markdown } = parseLessonContent(lesson)
+    return markdown
+  }, [lessonContent, lesson])
 
   const toggleTask = (index: number) => {
     const newCompleted = new Set(completedTasks)
