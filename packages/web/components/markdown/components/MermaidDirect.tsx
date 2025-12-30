@@ -165,6 +165,8 @@ function postProcessSvg(container: HTMLElement, isDark: boolean): void {
     const element = el as SVGElement;
     element.setAttribute('fill', colors.nodeBg);
     element.setAttribute('stroke', colors.nodeBorder);
+    element.style.fill = colors.nodeBg;
+    element.style.stroke = colors.nodeBorder;
   });
 
   // Force text colors
@@ -178,12 +180,14 @@ function postProcessSvg(container: HTMLElement, isDark: boolean): void {
   container.querySelectorAll('.edge-pattern-solid, .flowchart-link, path.path').forEach((el) => {
     const element = el as SVGElement;
     element.setAttribute('stroke', colors.lineColor);
+    element.style.stroke = colors.lineColor;
   });
 
   // Force arrowhead colors
   container.querySelectorAll('marker path').forEach((el) => {
     const element = el as SVGElement;
     element.setAttribute('fill', colors.lineColor);
+    element.style.fill = colors.lineColor;
   });
 
   // Replace light-colored backgrounds in dark mode
@@ -196,11 +200,13 @@ function postProcessSvg(container: HTMLElement, isDark: boolean): void {
       const fill = element.getAttribute('fill');
       if (fill && fill !== 'none' && isLightColor(fill)) {
         element.setAttribute('fill', colors.nodeBg);
+        element.style.fill = colors.nodeBg;
       }
 
       // Check style.fill property
       if (element.style?.fill && element.style.fill !== 'none' && isLightColor(element.style.fill)) {
         element.style.fill = colors.nodeBg;
+        element.setAttribute('fill', colors.nodeBg);
       }
     });
   }
