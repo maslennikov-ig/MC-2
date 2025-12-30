@@ -40,6 +40,66 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.26.39] - 2025-12-30
+
+### Added
+- **web**: add 48 source file(s), update 46 source file(s), +6 more (ed8d876)
+- **stage7**: add deep-link integration for enrichment inspector (55ca2c0)
+- **stage7**: add enrichment inspector panel with Stack Navigator pattern (fee3163)
+- **stage7**: implement presentation enrichment with two-stage flow (73d1bdc)
+- **stage7**: implement audio enrichment with OpenAI TTS (993e9ba)
+- **stage7**: implement quiz enrichment handler with Bloom's taxonomy (226140b)
+- **stage7**: add unified VideoScriptPanel for video enrichments (e6df67b)
+- **stage7**: add video handler with two-stage script generation (b0f1a7e)
+- **stage7**: add video script prompt template for enrichments (aa3b3a9)
+- **stage7**: add Asset Dock visual foundation for enrichments (bd31e13)
+- **stage7**: add tRPC enrichment router with 12 procedures (aa82ac4)
+- **stage7**: add BullMQ worker infrastructure for enrichments (1d48563)
+- **stage7**: add enrichment types, schemas, and database migration (cc492f9)
+- add 4 skill(s), add 1 command(s), +4 more (2372fca)
+- **web**: add 1 source file(s), update 2 source file(s), +1 more (fd0b8b0)
+- **scripts**: add --message flag to release.sh for custom commit messages (24397ec)
+- **commands**: update slash commands (135c4cf)
+- **agents**: add lead-research-assistant agent (0898b23)
+- **skills**: add 3 new skills (SKILL.md, ...) (2be4354)
+
+### Fixed
+- **stage7**: code review low priority improvements (1ad3d1a)
+- **stage7**: code review medium priority improvements (29fd163)
+- **stage7**: address code review issues for enrichment inspector (048f138)
+- **stage7**: use DEFAULT_MODEL_ID instead of hardcoded model (b312101)
+- **stage7**: production-grade improvements for enrichment pipeline (81b4eb4)
+- **stage7**: code review fixes for AssetDock and enrichment infrastructure (0e4dd96)
+- **pwa**: remove JS/CSS from SW cache to prevent 502 after deploy (9d8c6c7)
+- **web**: add emergency SW cleanup for stuck users with stale cache (6bce501)
+- **gitignore**: unignore admin/logs page route (b105489)
+- **graph**: fix completed lessons showing as pending on initial load (819c91f)
+
+### Other
+- **release**: v0.26.37 (c9700de)
+- **release**: v0.26.36 (80709a5)
+- **release**: v0.26.35 (900a87e)
+- **release**: v0.26.34 (1dac0ae)
+- **release**: v0.26.33 (ceacf61)
+- update docs (5e9ac1c)
+- **release**: v0.26.32 (87f10e9)
+- cleanup 1 file(s) (bd1711b)
+- **release**: v0.26.31 (8bac38d)
+- update project files (b28dca2)
+- **release**: v0.26.30 (8db394b)
+- update scripts (f3a19f5)
+- **release**: v0.26.29 (b6e73fc)
+- **release**: v0.26.28 (e68be84)
+- **release**: v0.26.27 (c242544)
+- **release**: v0.26.26 (415da21)
+- update documentation (d0a6e79)
+- **release**: v0.26.25 (3259506)
+- update documentation (4b7f511)
+- **release**: v0.26.24 (c28819f)
+- update documentation (114d4a1)
+- **release**: v0.26.22 (882e3df)
+- update documentation (1a81ada)
+
 ## [0.26.37] - 2025-12-28
 
 ### Fixed

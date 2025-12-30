@@ -3,6 +3,49 @@
 _Released on 2025-12-26_
 
 
+## v0.26.39
+
+_Released on 2025-12-30_
+
+### ✨ New Features
+
+- **web**: Add 48 source file(s), update 46 source file(s), +6 more
+- **stage7**: Add deep-link integration for enrichment inspector
+- **stage7**: Add enrichment inspector panel with Stack Navigator pattern
+- **stage7**: Implement presentation enrichment with two-stage flow
+- **stage7**: Implement audio enrichment with OpenAI TTS
+- **stage7**: Implement quiz enrichment handler with Bloom's taxonomy
+- **stage7**: Add unified VideoScriptPanel for video enrichments
+- **stage7**: Add video handler with two-stage script generation
+- **stage7**: Add video script prompt template for enrichments
+- **stage7**: Add Asset Dock visual foundation for enrichments
+- **stage7**: Add tRPC enrichment router with 12 procedures
+- **stage7**: Add BullMQ worker infrastructure for enrichments
+- **stage7**: Add enrichment types, schemas, and database migration
+- Add 4 skill(s), add 1 command(s), +4 more
+- **web**: Add 1 source file(s), update 2 source file(s), +1 more
+- **scripts**: Add --message flag to release.sh for custom commit messages
+- **Commands**: Update slash commands
+- **AI Agents**: Add lead-research-assistant agent
+- **Skills**: Add 3 new skills (SKILL.md, ...)
+
+### 🐛 Bug Fixes
+
+- **stage7**: Code review low priority improvements
+- **stage7**: Code review medium priority improvements
+- **stage7**: Address code review issues for enrichment inspector
+- **stage7**: Use DEFAULT_MODEL_ID instead of hardcoded model
+- **stage7**: Production-grade improvements for enrichment pipeline
+- **stage7**: Code review fixes for AssetDock and enrichment infrastructure
+- **pwa**: Remove JS/CSS from SW cache to prevent 502 after deploy
+- **web**: Add emergency SW cleanup for stuck users with stale cache
+- **gitignore**: Unignore admin/logs page route
+- **graph**: Fix completed lessons showing as pending on initial load
+
+---
+
+_This release was automatically generated from 52 commits._
+
 ## v0.26.37
 
 _Released on 2025-12-28_
