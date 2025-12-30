@@ -94,12 +94,12 @@ export function GenerationProgress({
 
         {/* Progress Bar */}
         {progress !== null && progress !== undefined && isActive && (
-          <Progress value={progress} className="mt-3 h-2" />
+          <Progress value={progress} className="mt-3 h-2" data-testid="progress-bar" />
         )}
       </div>
 
       {/* Terminal-style Log Output */}
-      <div className="flex-1 overflow-auto bg-slate-950 p-4 font-mono text-sm">
+      <div data-testid="generation-log" className="flex-1 overflow-auto bg-slate-950 p-4 font-mono text-sm">
         <div className="flex items-center gap-2 text-slate-400 mb-3">
           <Terminal className="w-4 h-4" />
           <span>{t('generationLog.title')}</span>

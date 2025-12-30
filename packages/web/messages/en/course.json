@@ -1,0 +1,17 @@
+{
+  "viewer": {
+    "showSidebar": "Show sidebar",
+    "section": "Section",
+    "lesson": "Lesson",
+    "constructor": "Constructor",
+    "constructorTooltip": "Course Constructor",
+    "focusMode": "Focus Mode",
+    "focusModeTooltip": "Focus Mode (F11 or Ctrl+K)",
+    "prev": "Back",
+    "next": "Next",
+    "lessonsCount": "Lessons",
+    "duration": "Duration",
+    "completed": "Completed",
+    "level": "Level"
+  }
+}

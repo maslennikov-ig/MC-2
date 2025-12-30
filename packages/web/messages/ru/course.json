@@ -1,0 +1,17 @@
+{
+  "viewer": {
+    "showSidebar": "Показать боковую панель",
+    "section": "Модуль",
+    "lesson": "Урок",
+    "constructor": "Конструктор",
+    "constructorTooltip": "Конструктор курса",
+    "focusMode": "Режим чтения",
+    "focusModeTooltip": "Режим чтения (F11 или Ctrl+K)",
+    "prev": "Назад",
+    "next": "Далее",
+    "lessonsCount": "Уроков",
+    "duration": "Длительность",
+    "completed": "Завершено",
+    "level": "Уровень"
+  }
+}

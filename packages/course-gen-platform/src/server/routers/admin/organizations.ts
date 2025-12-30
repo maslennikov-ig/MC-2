@@ -374,12 +374,21 @@ export const organizationsRouter = router({
       try {
         const supabase = getSupabaseAdmin();
 
+        // Generate slug from name
+        const baseSlug = input.name
+          .toLowerCase()
+          .replace(/[^a-z0-9]+/g, '-')
+          .replace(/^-|-$/g, '')
+          .slice(0, 50);
+        const slug = `${baseSlug}-${Date.now().toString(36)}`;
+
         // Create organization (DB will set default storage_quota_bytes based on tier)
         const { data: org, error: orgError } = await supabase
           .from('organizations')
           .insert({
             name: input.name,
             tier: input.tier,
+            slug,
           })
           .select()
           .single();

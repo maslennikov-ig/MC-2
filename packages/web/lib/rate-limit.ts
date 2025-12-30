@@ -54,7 +54,22 @@
 import { randomUUID } from 'crypto';
 import type { NextRequest } from 'next/server';
 import { getRedisClient } from './redis-client';
-import { logger } from './logger';
+
+// Middleware-compatible logger that doesn't depend on @megacampus/shared-logger
+// This is necessary because middleware runs in Edge runtime where Pino doesn't work
+const middlewareLogger = {
+  debug: (msg: string, data?: Record<string, unknown>) => {
+    if (process.env.NODE_ENV === 'development') {
+      console.debug(`[rate-limit] ${msg}`, data ?? '');
+    }
+  },
+  warn: (msg: string, data?: Record<string, unknown>) => {
+    console.warn(`[rate-limit] ${msg}`, data ?? '');
+  },
+  error: (msg: string, data?: Record<string, unknown>) => {
+    console.error(`[rate-limit] ${msg}`, data ?? '');
+  },
+};
 
 /**
  * Rate limit check result
@@ -209,7 +224,7 @@ export async function checkRateLimit(
 
   // Skip rate limiting in test environment
   if (process.env.NODE_ENV === 'test' || process.env.VITEST === 'true') {
-    logger.debug('Rate limiting disabled in test environment');
+    middlewareLogger.debug('Rate limiting disabled in test environment');
     return {
       success: true,
       remaining: requests,
@@ -266,7 +281,7 @@ export async function checkRateLimit(
       const oldestTimestamp = oldestEntries.length > 1 ? parseInt(oldestEntries[1]) : now;
       const retryAfter = Math.ceil((oldestTimestamp + windowMs - now) / 1000);
 
-      logger.warn('Rate limit exceeded', {
+      middlewareLogger.warn('Rate limit exceeded', {
         identifier,
         currentRequests: currentCount,
         limit: requests,
@@ -288,7 +303,7 @@ export async function checkRateLimit(
     // Set expiration for automatic cleanup (window size + buffer)
     await redis.expire(redisKey, window + 10);
 
-    logger.debug('Rate limit check passed', {
+    middlewareLogger.debug('Rate limit check passed', {
       identifier,
       currentRequests: currentCount + 1,
       limit: requests,
@@ -304,7 +319,7 @@ export async function checkRateLimit(
   } catch (error) {
     // For Redis errors, log and fail open (allow the request)
     // This prevents Redis failures from breaking the entire API
-    logger.error('Rate limit check failed (failing open)', {
+    middlewareLogger.error('Rate limit check failed (failing open)', {
       identifier,
       error: error instanceof Error ? error.message : String(error),
     });

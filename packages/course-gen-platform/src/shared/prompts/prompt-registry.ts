@@ -695,6 +695,8 @@ const stage6Prompts: HardcodedPrompt[] = [
   <previous_context>
 {{previousContext}}
   </previous_context>
+
+{{interLessonContext}}
 </lesson_context>
 
 <visual_toolkit>
@@ -756,6 +758,10 @@ CRITICAL INSTRUCTIONS:
 3. Use the reference material to inform your content
 4. Apply depth guidance: {{depthGuidance}}
 5. Match the {{tone}} tone for {{targetAudience}} audience
+6. INTER-LESSON AWARENESS (use inter_lesson_context as inspiration, not constraint):
+   - You MAY reference previous concepts to create flow, but don't force connections
+   - Terms in terms_already_defined can be used without re-explanation (reader knows them)
+   - The next lesson preview is FYI only — use creatively if it enhances your section
 
 Content Requirements:
 - Cover all key points from the specification
@@ -846,6 +852,11 @@ Output markdown content for this section only (no header needed).
         description: 'Target language for all output content (e.g., "English", "Russian")',
         required: true,
         example: 'English',
+      },
+      {
+        name: 'interLessonContext',
+        description: 'Inter-lesson context XML with previous/next lesson info and covered concepts (pre-rendered)',
+        required: false,
       },
     ],
   },

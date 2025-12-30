@@ -11,9 +11,10 @@ import { Sidebar } from "./viewer/components/Sidebar"
 import { Toolbar } from "./viewer/components/Toolbar"
 import { LessonView } from "./viewer/components/LessonView"
 import { FAB } from "./viewer/components/FAB"
+import { SharedCourseBanner } from "./viewer/components/SharedCourseBanner"
 import type { CourseViewerProps } from "./viewer/types"
 
-export default function CourseViewerEnhanced({ course, sections: rawSections, lessons: rawLessons, assets }: CourseViewerProps) {
+export default function CourseViewerEnhanced({ course, sections: rawSections, lessons: rawLessons, assets, enrichments, enrichmentsLoadError, readOnly = false }: CourseViewerProps) {
   const {
     sections,
     lessons,
@@ -99,9 +100,12 @@ export default function CourseViewerEnhanced({ course, sections: rawSections, le
       {!focusMode && (
         <div className="fixed inset-0 bg-gradient-to-br from-transparent via-purple-50/10 to-purple-100/20 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 pointer-events-none" />
       )}
-      
+
       {!focusMode && <Header />}
-      
+
+      {/* Shared Course Banner - shown when readOnly is true */}
+      {readOnly && !focusMode && <SharedCourseBanner />}
+
       <div className="relative z-10 min-h-screen flex">
         <Sidebar 
           course={course}
@@ -134,7 +138,7 @@ export default function CourseViewerEnhanced({ course, sections: rawSections, le
             mass: 0.5
           }}
         >
-          <Toolbar 
+          <Toolbar
             currentSection={currentSection}
             currentLesson={currentLesson}
             course={course}
@@ -146,6 +150,7 @@ export default function CourseViewerEnhanced({ course, sections: rawSections, le
             progressPercentage={progressPercentage}
             hasPrev={!!prevLesson}
             hasNext={!!nextLesson}
+            readOnly={readOnly}
             onToggleSidebar={() => setSidebarOpen(true)}
             onToggleMobileSidebar={() => setMobileSidebarOpen(true)}
             onToggleFocusMode={() => setFocusMode(!focusMode)}
@@ -155,10 +160,12 @@ export default function CourseViewerEnhanced({ course, sections: rawSections, le
 
           <div className="flex-1 overflow-y-auto">
             {currentLesson ? (
-              <LessonView 
+              <LessonView
                 currentLesson={currentLesson}
                 currentSection={currentSection}
                 assets={currentLessonId ? assets?.[currentLessonId] : undefined}
+                enrichments={currentLessonId ? enrichments?.[currentLessonId] : undefined}
+                enrichmentsLoadError={enrichmentsLoadError}
                 focusMode={focusMode}
                 currentIndex={currentIndex}
                 totalLessonsOrdered={allLessonsOrdered.length}
@@ -189,22 +196,24 @@ export default function CourseViewerEnhanced({ course, sections: rawSections, le
         </motion.div>
       </div>
 
-      {/* Floating Action Button for Generation - Desktop only */}
-      {!focusMode && currentLesson && !isMobile && (
+      {/* Floating Action Button for Generation - Desktop only, hidden in readOnly mode */}
+      {!readOnly && !focusMode && currentLesson && !isMobile && (
         <FAB showFab={showFab} onOpenPanel={() => setGenerationPanelOpen(true)} />
       )}
 
-      {/* Content Generation Panel */}
-      <ContentGenerationPanel
-        open={generationPanelOpen}
-        onClose={() => setGenerationPanelOpen(false)}
-        courseId={course.id}
-        courseTitle={course.title}
-        courseLanguage={(course.request_data?.language as string) || course.language || "ru"}
-        sections={sections}
-        lessons={lessons}
-        selectedLessons={currentLessonId ? [currentLessonId] : []}
-      />
+      {/* Content Generation Panel - hidden in readOnly mode */}
+      {!readOnly && (
+        <ContentGenerationPanel
+          open={generationPanelOpen}
+          onClose={() => setGenerationPanelOpen(false)}
+          courseId={course.id}
+          courseTitle={course.title}
+          courseLanguage={(course.request_data?.language as string) || course.language || "ru"}
+          sections={sections}
+          lessons={lessons}
+          selectedLessons={currentLessonId ? [currentLessonId] : []}
+        />
+      )}
     </div>
   )
 }

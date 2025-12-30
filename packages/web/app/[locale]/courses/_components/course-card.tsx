@@ -12,7 +12,6 @@ import {
   Globe,
   Loader2,
   Lock,
-  LockOpen,
   Clock,
   Users,
   Award,
@@ -24,10 +23,19 @@ import {
   Zap,
   Settings,
   ClipboardList,
-  GitBranch
+  GitBranch,
+  Building2,
+  ChevronDown
 } from 'lucide-react'
 import { toast } from 'sonner'
-import { deleteCourse, toggleFavorite, togglePublishStatus } from '../actions'
+import { deleteCourse, toggleFavorite, updateCourseVisibility } from '../actions'
+import type { CourseVisibility } from '@/types/database'
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu'
 import { cn } from '@/lib/utils'
 import type { Course } from '@/types/database'
 import { ShareButton } from '@/components/courses/share-button'
@@ -131,10 +139,33 @@ const difficultyConfig = {
     label: 'Эксперт',
     icon: <Award className="h-3 w-3" />
   },
-  mixed: { 
+  mixed: {
     color: 'bg-indigo-500/10 text-indigo-400 border-indigo-500/20',
     label: 'Смешанный',
     icon: <Award className="h-3 w-3" />
+  }
+}
+
+// Visibility configuration
+const visibilityConfig: Record<CourseVisibility, {
+  color: string
+  label: string
+  icon: React.ComponentType<{ className?: string }>
+}> = {
+  private: {
+    color: 'bg-gray-500/10 text-gray-400 border-gray-500/20',
+    label: 'Приватный',
+    icon: Lock
+  },
+  organization: {
+    color: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
+    label: 'Для организации',
+    icon: Building2
+  },
+  public: {
+    color: 'bg-green-500/10 text-green-400 border-green-500/20',
+    label: 'Публичный',
+    icon: Globe
   }
 }
 
@@ -159,8 +190,8 @@ export function CourseCard({
   const initialFavorited = propFavorited ?? course.isFavorited ?? false
   const [isFavorited, setIsFavorited] = useState(initialFavorited)
   const [isUpdatingFavorite, setIsUpdatingFavorite] = useState(false)
-  const [isPublished, setIsPublished] = useState(course.is_published || false)
-  const [isUpdatingPublish, setIsUpdatingPublish] = useState(false)
+  const [visibility, setVisibility] = useState<CourseVisibility>(course.visibility || 'private')
+  const [isUpdatingVisibility, setIsUpdatingVisibility] = useState(false)
   
   const slug = course.slug || course.id
   // Use total_lessons_count if available, otherwise fall back to actual_lessons_count
@@ -179,7 +210,9 @@ export function CourseCard({
   const duration = course.estimated_completion_minutes 
     ? Math.round(course.estimated_completion_minutes / 60)
     : Math.round((lessonsCount * 5) / 60)
-  const statusInfo = statusConfig[course.status as keyof typeof statusConfig] || statusConfig.draft
+  // Use generation_status for display if available, otherwise fall back to course.status
+  const displayStatus = course.generation_status || course.status
+  const statusInfo = statusConfig[displayStatus as keyof typeof statusConfig] || statusConfig.draft
   const difficultyInfo = difficultyConfig[course.difficulty as keyof typeof difficultyConfig]
   
   // Optimize date calculations with useMemo
@@ -242,31 +275,32 @@ export function CourseCard({
     }
   }
 
-  const handleTogglePublish = async () => {
+  const handleUpdateVisibility = async (newVisibility: CourseVisibility) => {
     if (!user) {
-      toast.error('Войдите, чтобы изменить статус публикации')
+      toast.error('Войдите, чтобы изменить видимость')
       return
     }
 
-    setIsUpdatingPublish(true)
+    if (newVisibility === visibility) return
+
+    setIsUpdatingVisibility(true)
 
     try {
-      const result = await togglePublishStatus(course.id)
+      const result = await updateCourseVisibility(course.id, newVisibility)
 
       if (result.success) {
-        setIsPublished(result.isPublished)
-        toast.success(
-          result.isPublished
-            ? 'Курс опубликован'
-            : 'Курс снят с публикации'
-        )
+        setVisibility(result.visibility as CourseVisibility)
+        toast.success('Видимость обновлена')
       }
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Не удалось изменить статус публикации')
+      toast.error(error instanceof Error ? error.message : 'Не удалось изменить видимость')
     } finally {
-      setIsUpdatingPublish(false)
+      setIsUpdatingVisibility(false)
     }
   }
+
+  // Get current visibility config
+  const currentVisibility = visibilityConfig[visibility]
 
 
   if (viewMode === 'list') {
@@ -673,21 +707,44 @@ export function CourseCard({
               />
 
               {user && (user.id === course.user_id || user.role === 'admin' || user.role === 'superadmin') && (
-                <ActionButtonWithTooltip
-                  icon={
-                    isUpdatingPublish ? (
-                      <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                    ) : isPublished ? (
-                      <LockOpen className="h-3.5 w-3.5" />
-                    ) : (
-                      <Lock className="h-3.5 w-3.5" />
-                    )
-                  }
-                  label={isPublished ? 'Снять с публикации' : 'Опубликовать курс'}
-                  onClick={handleTogglePublish}
-                  disabled={isUpdatingPublish}
-                  className="h-7 w-7 text-gray-400 hover:text-purple-400"
-                />
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      className={cn(
+                        "h-7 px-2 gap-1 text-xs font-normal",
+                        currentVisibility.color,
+                        "hover:opacity-80"
+                      )}
+                      disabled={isUpdatingVisibility}
+                      onClick={(e) => e.stopPropagation()}
+                    >
+                      {isUpdatingVisibility ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <currentVisibility.icon className="h-3 w-3" />
+                      )}
+                      <span className="hidden sm:inline">{currentVisibility.label}</span>
+                      <ChevronDown className="h-3 w-3" />
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" onClick={(e) => e.stopPropagation()}>
+                    {(Object.entries(visibilityConfig) as [CourseVisibility, typeof currentVisibility][]).map(([key, config]) => (
+                      <DropdownMenuItem
+                        key={key}
+                        onClick={() => handleUpdateVisibility(key)}
+                        className={cn(
+                          "gap-2 cursor-pointer",
+                          visibility === key && "bg-accent"
+                        )}
+                      >
+                        <config.icon className="h-4 w-4" />
+                        {config.label}
+                      </DropdownMenuItem>
+                    ))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
               )}
 
               {user && (user.id === course.user_id || user.role === 'admin' || user.role === 'superadmin') && (

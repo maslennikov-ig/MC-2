@@ -4,6 +4,9 @@ import type { Database } from '@megacampus/shared-types/database.types'
 // User role type - sourced from database enum
 export type UserRole = Database['public']['Enums']['role']
 
+// Course visibility type
+export type CourseVisibility = 'private' | 'organization' | 'public'
+
 export interface Course {
   id: string
   title: string
@@ -18,7 +21,8 @@ export interface Course {
   difficulty: string
   style: string
   user_id?: string | null
-  is_published?: boolean
+  visibility?: CourseVisibility  // Who can see this course: private, organization, public
+  is_published?: boolean  // @deprecated - use visibility instead
   share_token?: string | null
   total_lessons_count?: number | null
   total_sections_count?: number | null
@@ -243,3 +247,25 @@ export interface CourseStructureData {
     }>
   }>
 }
+
+// Re-export enrichment types from shared-types (Stage 7)
+export type {
+  EnrichmentType,
+  EnrichmentStatus,
+  LessonEnrichmentBase,
+  EnrichmentSummary,
+  EnrichmentWithPlaybackUrl,
+  CreateEnrichmentInput,
+} from '@megacampus/shared-types';
+
+export type {
+  EnrichmentContent,
+  QuizEnrichmentContent,
+  PresentationEnrichmentContent,
+  AudioEnrichmentContent,
+  VideoEnrichmentContent,
+  DocumentEnrichmentContent,
+  EnrichmentMetadata,
+  QuizQuestion,
+  PresentationSlide,
+} from '@megacampus/shared-types';

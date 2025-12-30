@@ -43,7 +43,7 @@ import { toast } from 'sonner';
 import { approveLesson, retryLessonGeneration } from '@/app/actions/lesson-actions';
 // Stage 6 "Glass Factory" UI components
 import { ModuleDashboard } from './module/ModuleDashboard';
-import { LessonInspector } from './lesson/LessonInspector';
+import { LessonPanelWithTabs } from './lesson/LessonPanelWithTabs';
 import { useModuleDashboardData } from '../hooks/useModuleDashboardData';
 import { useLessonInspectorData } from '../hooks/useLessonInspectorData';
 
@@ -603,8 +603,9 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
               className="h-full"
             />
           ) : isStage6Lesson ? (
-            /* Stage 6 "Glass Factory" UI: Lesson Inspector */
-            <LessonInspector
+            /* Lesson Panel with Content + Activities tabs */
+            <LessonPanelWithTabs
+              lessonId={lessonInfoForInspector?.lessonId ?? ''}
               data={lessonInspectorData}
               isLoading={isLoadingLessonInspector}
               error={lessonInspectorError}

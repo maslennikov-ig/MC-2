@@ -15,6 +15,8 @@ type AdminMessages = typeof import('../messages/ru/admin.json');
 type GenerationMessages = typeof import('../messages/ru/generation.json');
 type AuthMessages = typeof import('../messages/ru/auth.json');
 type EnrichmentsMessages = typeof import('../messages/ru/enrichments.json');
+type CourseMessages = typeof import('../messages/ru/course.json');
+type OrganizationsMessages = typeof import('../messages/ru/organizations.json');
 
 // Combined messages type matching the structure returned by request.ts
 type Messages = {
@@ -23,6 +25,8 @@ type Messages = {
   generation: GenerationMessages;
   auth: AuthMessages;
   enrichments: EnrichmentsMessages;
+  course: CourseMessages;
+  organizations: OrganizationsMessages;
 };
 
 declare global {

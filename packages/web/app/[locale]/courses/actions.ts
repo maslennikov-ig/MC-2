@@ -3,7 +3,7 @@
 import { getUserClient, getAdminClient } from '@/lib/supabase/client-factory'
 import { getCurrentUser } from '@/lib/auth-helpers'
 import { revalidatePath } from 'next/cache'
-import type { CourseStructureData } from '@/types/database'
+import type { CourseStructureData, CourseVisibility } from '@/types/database'
 import type { GenerationProgress } from '@/types/course-generation'
 import { logger } from '@/lib/logger'
 import { PostgrestError } from '@supabase/supabase-js'
@@ -98,6 +98,7 @@ export async function getCourses({
       style,
       user_id,
       is_published,
+      visibility,
       share_token,
       created_at,
       updated_at,
@@ -245,6 +246,7 @@ export async function getCourses({
       difficulty: course.difficulty || 'intermediate',
       style: course.style || 'academic',
       is_published: course.is_published || false,
+      visibility: course.visibility || 'private',
       created_at: course.created_at || new Date().toISOString(),
       updated_at: course.updated_at || new Date().toISOString(),
       learning_outcomes: learningOutcomes,
@@ -300,7 +302,7 @@ async function cleanupCourseResources(courseId: string): Promise<{
   try {
     const headers = await getBackendAuthHeaders()
 
-    const response = await fetch(`${TRPC_URL}/generation.lifecycle.cleanupCourse`, {
+    const response = await fetch(`${TRPC_URL}/generation.cleanupCourse`, {
       method: 'POST',
       headers,
       body: JSON.stringify({ courseId }),
@@ -556,6 +558,7 @@ export async function canUserAccessCourse(
 
 /**
  * Toggle publish status for a course
+ * @deprecated Use updateCourseVisibility instead for more granular control
  */
 export async function togglePublishStatus(courseId: string) {
   logger.info(`togglePublishStatus: Starting for courseId=${courseId}`)
@@ -572,7 +575,7 @@ export async function togglePublishStatus(courseId: string) {
     // First get current status
     const { data: course, error: fetchError } = await supabase
       .from('courses')
-      .select('is_published, user_id')
+      .select('is_published, visibility, user_id')
       .eq('id', courseId)
       .single()
 
@@ -594,11 +597,17 @@ export async function togglePublishStatus(courseId: string) {
       }
     }
 
-    // Toggle the status
-    const newStatus = !course.is_published
+    // Toggle visibility between private and public (maps to is_published behavior)
+    const currentVisibility = course.visibility || 'private'
+    const newVisibility: CourseVisibility = currentVisibility === 'public' ? 'private' : 'public'
+    const newIsPublished = newVisibility === 'public'
+
     const { error: updateError } = await supabase
       .from('courses')
-      .update({ is_published: newStatus })
+      .update({
+        visibility: newVisibility,
+        is_published: newIsPublished // Keep is_published in sync for backward compatibility
+      })
       .eq('id', courseId)
 
     if (updateError) {
@@ -606,10 +615,82 @@ export async function togglePublishStatus(courseId: string) {
       throw updateError
     }
 
-    logger.info(`togglePublishStatus: Successfully updated courseId=${courseId} to is_published=${newStatus}`)
-    return { success: true, isPublished: newStatus }
+    logger.info(`togglePublishStatus: Successfully updated courseId=${courseId} to visibility=${newVisibility}`)
+    return { success: true, isPublished: newIsPublished, visibility: newVisibility }
   } catch (error) {
     logger.error('togglePublishStatus: Error', error)
+    throw error
+  }
+}
+
+/**
+ * Update course visibility
+ * @param courseId - Course UUID
+ * @param visibility - New visibility: 'private' | 'organization' | 'public'
+ */
+export async function updateCourseVisibility(courseId: string, visibility: CourseVisibility) {
+  logger.info(`updateCourseVisibility: Starting for courseId=${courseId}, visibility=${visibility}`)
+
+  const supabase = await getUserClient()
+  const user = await getCurrentUser()
+
+  if (!user) {
+    logger.error('updateCourseVisibility: No authenticated user')
+    throw new Error('Unauthorized')
+  }
+
+  // Validate visibility value
+  const validVisibilities: CourseVisibility[] = ['private', 'organization', 'public']
+  if (!validVisibilities.includes(visibility)) {
+    throw new Error('Invalid visibility value')
+  }
+
+  try {
+    // First get current course to verify ownership
+    const { data: course, error: fetchError } = await supabase
+      .from('courses')
+      .select('user_id')
+      .eq('id', courseId)
+      .single()
+
+    if (fetchError || !course) {
+      logger.error('updateCourseVisibility: Course not found or access denied', fetchError)
+      throw new Error('Course not found or access denied')
+    }
+
+    // Check if user owns the course or is admin
+    if (course.user_id !== user.id) {
+      const { data: profile } = await supabase
+        .from('users')
+        .select('role')
+        .eq('id', user.id)
+        .single()
+
+      if (!profile || (profile.role !== 'admin' && profile.role !== 'superadmin')) {
+        throw new Error('Unauthorized to change visibility')
+      }
+    }
+
+    // Update visibility and keep is_published in sync for backward compatibility
+    const isPublished = visibility === 'public'
+    const { error: updateError } = await supabase
+      .from('courses')
+      .update({
+        visibility,
+        is_published: isPublished
+      })
+      .eq('id', courseId)
+
+    if (updateError) {
+      logger.error('updateCourseVisibility: Failed to update', updateError)
+      throw updateError
+    }
+
+    logger.info(`updateCourseVisibility: Successfully updated courseId=${courseId} to visibility=${visibility}`)
+    revalidatePath('/courses')
+    return { success: true, visibility }
+  } catch (error) {
+    logger.error('updateCourseVisibility: Error', error)
     throw error
   }
 }

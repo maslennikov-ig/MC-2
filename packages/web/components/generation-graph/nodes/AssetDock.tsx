@@ -36,6 +36,10 @@ export interface AssetDockProps {
 
 /**
  * AssetDock component - shows enrichment status on lesson nodes
+ *
+ * Note: This component is only rendered when enrichments exist.
+ * When no enrichments exist, the parent LessonNode hides this dock entirely
+ * and users can add enrichments via the hover toolbar (EnrichmentNodeToolbar).
  */
 export const AssetDock: React.FC<AssetDockProps> = ({
   enrichments = [],
@@ -53,23 +57,9 @@ export const AssetDock: React.FC<AssetDockProps> = ({
     onClick?.();
   };
 
-  // Empty state - show add indicator when clicked
+  // Guard: should not render with empty enrichments (parent handles this)
   if (enrichments.length === 0) {
-    if (!onClick) return null;
-
-    // Show subtle add indicator only at higher zoom
-    if (zoom < 0.6) return null;
-
-    return (
-      <button
-        onClick={handleClick}
-        className="flex items-center justify-center h-[14px] px-1 rounded hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors group"
-        title={t('assetDock.addEnrichment')}
-        aria-label={t('assetDock.addEnrichment')}
-      >
-        <span className="text-[10px] text-muted-foreground group-hover:text-primary">+</span>
-      </button>
-    );
+    return null;
   }
 
   // Determine overall state for dot/count modes

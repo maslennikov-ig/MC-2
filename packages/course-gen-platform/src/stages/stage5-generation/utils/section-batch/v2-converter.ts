@@ -1,10 +1,12 @@
-import type { Section, GenerationJobInput } from '@megacampus/shared-types';
+import type { Section, GenerationJobInput, Lesson } from '@megacampus/shared-types';
 import type {
   LessonSpecificationV2,
   BloomLevelV2,
   ExerciseTypeV2,
   ExerciseDifficultyV2,
   LessonRAGContextV2,
+  LessonContext,
+  AdjacentLessonContext,
 } from '@megacampus/shared-types/lesson-specification-v2';
 import logger from '@/shared/logger';
 import { inferSemanticScaffolding } from '../semantic-scaffolding';
@@ -74,12 +76,107 @@ function buildRAGContext(
 }
 
 /**
+ * Build inter-lesson context for a specific lesson
+ *
+ * Provides information about:
+ * - Previous lesson (if exists) with key concepts and summary
+ * - Next lesson (if exists) with title and preview
+ * - All concepts covered in previous lessons
+ * - Terms already defined in previous lessons
+ *
+ * @param sectionIndex - Current section index (0-based)
+ * @param lessonIndex - Current lesson index within section (0-based)
+ * @param allSections - All sections with their lessons
+ * @returns LessonContext or undefined if first lesson
+ */
+function buildLessonContext(
+  sectionIndex: number,
+  lessonIndex: number,
+  allSections: Section[]
+): LessonContext | undefined {
+  // Helper to get lesson ID
+  const getLessonId = (secIdx: number, lesIdx: number) => `${secIdx + 1}.${lesIdx + 1}`;
+
+  // Collect all lessons in order with their section indices
+  const allLessons: Array<{ lesson: Lesson; sectionIdx: number; lessonIdx: number }> = [];
+  allSections.forEach((section, sIdx) => {
+    (section.lessons || []).forEach((lesson, lIdx) => {
+      allLessons.push({ lesson, sectionIdx: sIdx, lessonIdx: lIdx });
+    });
+  });
+
+  // Find current lesson position in the flat list
+  const currentFlatIndex = allLessons.findIndex(
+    l => l.sectionIdx === sectionIndex && l.lessonIdx === lessonIndex
+  );
+
+  if (currentFlatIndex === -1) {
+    return undefined;
+  }
+
+  // Get previous lesson (if exists)
+  let previousLesson: AdjacentLessonContext | null = null;
+  if (currentFlatIndex > 0) {
+    const prev = allLessons[currentFlatIndex - 1];
+    previousLesson = {
+      lesson_id: getLessonId(prev.sectionIdx, prev.lessonIdx),
+      title: prev.lesson.lesson_title,
+      key_concepts: (prev.lesson.key_topics || []).slice(0, 5),
+      summary_preview: (prev.lesson.lesson_objectives || []).slice(0, 2).join('. ') || undefined,
+    };
+  }
+
+  // Get next lesson (if exists)
+  let nextLesson: Omit<AdjacentLessonContext, 'summary_preview'> | null = null;
+  if (currentFlatIndex < allLessons.length - 1) {
+    const next = allLessons[currentFlatIndex + 1];
+    nextLesson = {
+      lesson_id: getLessonId(next.sectionIdx, next.lessonIdx),
+      title: next.lesson.lesson_title,
+      key_concepts: (next.lesson.key_topics || []).slice(0, 3),
+    };
+  }
+
+  // Accumulate concepts from all previous lessons (max 20)
+  const conceptsAlreadyCovered: string[] = [];
+  for (let i = 0; i < currentFlatIndex && conceptsAlreadyCovered.length < 20; i++) {
+    const prevLesson = allLessons[i].lesson;
+    const topics = prevLesson.key_topics || [];
+    for (const topic of topics) {
+      if (!conceptsAlreadyCovered.includes(topic) && conceptsAlreadyCovered.length < 20) {
+        conceptsAlreadyCovered.push(topic);
+      }
+    }
+  }
+
+  // Extract terms from previous lesson only (for recency)
+  const termsAlreadyDefined: string[] = [];
+  if (currentFlatIndex > 0) {
+    const prev = allLessons[currentFlatIndex - 1].lesson;
+    termsAlreadyDefined.push(...(prev.key_topics || []).slice(0, 10));
+  }
+
+  // Only return context if there's something useful
+  if (!previousLesson && !nextLesson && conceptsAlreadyCovered.length === 0) {
+    return undefined;
+  }
+
+  return {
+    previous_lesson: previousLesson,
+    next_lesson: nextLesson,
+    concepts_already_covered: conceptsAlreadyCovered,
+    terms_already_defined: termsAlreadyDefined,
+  };
+}
+
+/**
  * Convert a Section to LessonSpecificationV2[] output
  */
 export function convertSectionToV2Specs(
   section: Section,
   sectionIndex: number,
-  input: GenerationJobInput
+  input: GenerationJobInput,
+  allSections?: Section[]
 ): LessonSpecificationV2[] {
   const analysisResult = input.analysis_result;
   const sectionBreakdown = analysisResult?.recommended_structure?.sections_breakdown?.[sectionIndex];
@@ -161,6 +258,14 @@ export function convertSectionToV2Specs(
       estimated_duration_minutes: lesson.estimated_duration_minutes || 15,
       difficulty_level: (lesson.difficulty_level || 'intermediate'),
     };
+
+    // Build inter-lesson context if allSections is provided
+    if (allSections) {
+      const lessonContext = buildLessonContext(sectionIndex, lessonIndex, allSections);
+      if (lessonContext) {
+        lessonSpec.lesson_context = lessonContext;
+      }
+    }
 
     return lessonSpec;
   });

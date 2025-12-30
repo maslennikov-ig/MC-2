@@ -1,13 +1,21 @@
-import React from 'react';
+'use client';
+
+import React, { useState, useCallback, useEffect } from 'react';
 import { useLocale } from 'next-intl';
-import { Loader2, AlertCircle, RotateCcw, Check, Trash2 } from 'lucide-react';
+import { Loader2, AlertCircle, RotateCcw, Check, Trash2, FileQuestion } from 'lucide-react';
+import { toast } from 'sonner';
+import { sanitizeErrorMessage } from '@/lib/utils/sanitize-error';
 import { Button } from '@/components/ui/button';
 import { QuizPreview, type QuizPreviewProps } from '../QuizPreview';
 import { AudioPreview, type AudioPreviewProps } from '../AudioPreview';
 import { VideoScriptPanel, type VideoScriptPanelProps } from '../VideoScriptPanel';
 import { PresentationPreview, type PresentationPreviewProps } from '../PresentationPreview';
+import { DeleteConfirmationDialog } from '../components/DeleteConfirmationDialog';
 import { type EnrichmentStatus } from '@/lib/generation-graph/enrichment-config';
 import { cn } from '@/lib/utils';
+import { useStaticGraph } from '../../../contexts/StaticGraphContext';
+import { useEnrichmentInspectorStore } from '../../../stores/enrichment-inspector-store';
+import { getEnrichment, deleteEnrichment } from '@/app/actions/enrichment-actions';
 
 export interface DetailViewProps {
   enrichmentId: string;
@@ -51,64 +59,139 @@ interface PresentationEnrichmentData extends EnrichmentBase {
 }
 
 // Discriminated union type
-type EnrichmentData = QuizEnrichmentData | VideoEnrichmentData | AudioEnrichmentData | PresentationEnrichmentData;
+type EnrichmentData =
+  | QuizEnrichmentData
+  | VideoEnrichmentData
+  | AudioEnrichmentData
+  | PresentationEnrichmentData;
 
-function useMockEnrichment(id: string): EnrichmentData | null {
-  // Return mock completed quiz for demo
-  return {
-    id,
-    type: 'quiz',
-    status: 'completed',
-    content: {
-      type: 'quiz',
-      quiz_title: 'Assessment: React Fundamentals',
-      instructions: 'Answer all questions. 70% to pass.',
-      questions: [
-        {
-          id: 'q1',
-          type: 'multiple_choice',
-          bloom_level: 'remember',
-          difficulty: 'easy',
-          question: 'What is React?',
-          options: [
-            { id: 'a', text: 'A JavaScript library' },
-            { id: 'b', text: 'A programming language' },
-            { id: 'c', text: 'A database' },
-          ],
-          correct_answer: 'a',
-          explanation: 'React is a JavaScript library for building UIs.',
-          points: 1,
-        },
-      ],
-      passing_score: 70,
-      shuffle_questions: true,
-      shuffle_options: true,
-      metadata: { total_points: 1, estimated_minutes: 5, bloom_coverage: { remember: 1 } },
-    },
-    draft_content: null,
-    metadata: { generated_at: new Date().toISOString(), generation_duration_ms: 1500 },
-    error_message: null,
-    asset_url: null,
-  };
-}
+// Data state for the enrichment detail
+type DataState =
+  | { status: 'loading' }
+  | { status: 'error'; error: string }
+  | { status: 'not_found' }
+  | { status: 'success'; data: EnrichmentData };
 
 /**
- * Sanitize error message for display.
- * - Truncates to reasonable length for UI
- * - Strips any HTML tags (though React escapes strings anyway)
- * - Provides user-friendly fallback
+ * Hook to fetch enrichment data from server action
  */
-function sanitizeErrorMessage(message: string | null | undefined, locale: string, maxLength = 150): string {
-  if (!message) {
-    return locale === 'ru' ? 'Произошла ошибка' : 'An error occurred';
-  }
-  // Strip any potential HTML tags
-  const stripped = message.replace(/<[^>]*>/g, '');
-  // Truncate long messages
-  if (stripped.length > maxLength) {
-    return stripped.slice(0, maxLength) + '...';
-  }
-  return stripped;
+function useEnrichmentDetail(enrichmentId: string): DataState & { refetch: () => void } {
+  const { courseInfo } = useStaticGraph();
+  const [state, setState] = useState<DataState>({ status: 'loading' });
+
+  const fetchEnrichment = useCallback(async () => {
+    if (!enrichmentId || !courseInfo?.id) {
+      setState({ status: 'not_found' });
+      return;
+    }
+
+    setState({ status: 'loading' });
+
+    try {
+      const result = await getEnrichment({
+        enrichmentId,
+        courseId: courseInfo.id,
+      });
+
+      if (!result.success || !result.enrichment) {
+        if (result.error === 'Enrichment not found') {
+          setState({ status: 'not_found' });
+        } else {
+          setState({ status: 'error', error: result.error || 'Failed to load enrichment' });
+        }
+        return;
+      }
+
+      // Map database types to component types
+      const enrichment = result.enrichment;
+      const baseData: EnrichmentBase = {
+        id: enrichment.id,
+        status: enrichment.status as EnrichmentStatus,
+        metadata: enrichment.metadata,
+        error_message: enrichment.error_message,
+        asset_url: enrichment.asset_url,
+        draft_content: enrichment.draft_content,
+      };
+
+      // Create discriminated union based on type
+      let enrichmentData: EnrichmentData;
+      switch (enrichment.enrichment_type) {
+        case 'quiz':
+          enrichmentData = {
+            ...baseData,
+            type: 'quiz',
+            content: enrichment.content as QuizEnrichment['content'],
+          };
+          break;
+        case 'video':
+          enrichmentData = {
+            ...baseData,
+            type: 'video',
+            content: enrichment.content as VideoEnrichment['content'],
+          };
+          break;
+        case 'audio':
+          enrichmentData = {
+            ...baseData,
+            type: 'audio',
+            content: enrichment.content as AudioEnrichment['content'],
+          };
+          break;
+        case 'presentation':
+          enrichmentData = {
+            ...baseData,
+            type: 'presentation',
+            content: enrichment.content as PresentationEnrichment['content'],
+          };
+          break;
+        case 'document':
+          // Document type not yet supported in preview, treat as not found
+          setState({ status: 'not_found' });
+          return;
+        default:
+          setState({ status: 'error', error: 'Unknown enrichment type' });
+          return;
+      }
+
+      setState({ status: 'success', data: enrichmentData });
+    } catch (err) {
+      setState({
+        status: 'error',
+        error: err instanceof Error ? err.message : 'Failed to load enrichment',
+      });
+    }
+  }, [enrichmentId, courseInfo?.id]);
+
+  useEffect(() => {
+    fetchEnrichment();
+  }, [fetchEnrichment]);
+
+  return { ...state, refetch: fetchEnrichment };
+}
+
+function LoadingState() {
+  return (
+    <div className="flex items-center justify-center h-full">
+      <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+    </div>
+  );
+}
+
+function NotFoundState() {
+  const locale = useLocale();
+  return (
+    <div className="flex flex-col items-center justify-center h-full p-8 text-center">
+      <FileQuestion className="w-12 h-12 text-muted-foreground mb-4" />
+      <h3 className="text-lg font-medium mb-2">
+        {locale === 'ru' ? 'Обогащение не найдено' : 'Enrichment Not Found'}
+      </h3>
+      <p className="text-sm text-muted-foreground">
+        {locale === 'ru'
+          ? 'Это обогащение могло быть удалено или перемещено.'
+          : 'This enrichment may have been deleted or moved.'}
+      </p>
+    </div>
+  );
 }
 
 function ErrorState({
@@ -126,7 +209,7 @@ function ErrorState({
         {locale === 'ru' ? 'Ошибка генерации' : 'Generation Error'}
       </h3>
       <p className="text-sm text-muted-foreground mb-4 max-w-md">
-        {sanitizeErrorMessage(error, locale)}
+        {sanitizeErrorMessage(error, { locale })}
       </p>
       <Button onClick={onRetry}>
         <RotateCcw className="w-4 h-4 mr-2" />
@@ -136,7 +219,14 @@ function ErrorState({
   );
 }
 
-function ActionBar({ enrichment }: { enrichment: EnrichmentData }) {
+interface ActionBarProps {
+  enrichment: EnrichmentData;
+  onDelete: () => void;
+  onRegenerate: () => void;
+  onApprove: () => void;
+}
+
+function ActionBar({ enrichment, onDelete, onRegenerate, onApprove }: ActionBarProps) {
   const locale = useLocale();
 
   // Different actions based on status
@@ -148,19 +238,24 @@ function ActionBar({ enrichment }: { enrichment: EnrichmentData }) {
     <div className="border-t p-4 bg-white dark:bg-slate-950">
       <div className="flex gap-2">
         {showApprove && (
-          <Button onClick={() => console.log('Approve draft')} className="flex-1">
+          <Button onClick={onApprove} className="flex-1">
             <Check className="w-4 h-4 mr-2" />
             {locale === 'ru' ? 'Одобрить' : 'Approve'}
           </Button>
         )}
         {showRegenerate && (
-          <Button variant="outline" onClick={() => console.log('Regenerate')}>
+          <Button variant="outline" onClick={onRegenerate}>
             <RotateCcw className="w-4 h-4 mr-2" />
             {locale === 'ru' ? 'Переделать' : 'Regenerate'}
           </Button>
         )}
         {showDelete && (
-          <Button variant="ghost" size="icon" onClick={() => console.log('Delete')}>
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={onDelete}
+            aria-label={locale === 'ru' ? 'Удалить' : 'Delete'}
+          >
             <Trash2 className="w-4 h-4 text-red-500" />
           </Button>
         )}
@@ -174,19 +269,44 @@ function ActionBar({ enrichment }: { enrichment: EnrichmentData }) {
  * These ensure type-safe narrowing from discriminated union
  */
 function toQuizPreviewProps(e: QuizEnrichmentData): QuizEnrichment {
-  return { id: e.id, status: e.status, content: e.content, metadata: e.metadata, error_message: e.error_message };
+  return {
+    id: e.id,
+    status: e.status,
+    content: e.content,
+    metadata: e.metadata,
+    error_message: e.error_message,
+  };
 }
 
 function toVideoPreviewProps(e: VideoEnrichmentData): VideoEnrichment {
-  return { id: e.id, status: e.status, content: e.content, metadata: e.metadata, error_message: e.error_message };
+  return {
+    id: e.id,
+    status: e.status,
+    content: e.content,
+    metadata: e.metadata,
+    error_message: e.error_message,
+  };
 }
 
 function toAudioPreviewProps(e: AudioEnrichmentData): AudioEnrichment {
-  return { id: e.id, status: e.status, content: e.content, metadata: e.metadata, error_message: e.error_message };
+  return {
+    id: e.id,
+    status: e.status,
+    content: e.content,
+    metadata: e.metadata,
+    error_message: e.error_message,
+  };
 }
 
 function toPresentationPreviewProps(e: PresentationEnrichmentData): PresentationEnrichment {
-  return { id: e.id, status: e.status, content: e.content, draft_content: e.draft_content, metadata: e.metadata, error_message: e.error_message };
+  return {
+    id: e.id,
+    status: e.status,
+    content: e.content,
+    draft_content: e.draft_content,
+    metadata: e.metadata,
+    error_message: e.error_message,
+  };
 }
 
 /**
@@ -212,40 +332,128 @@ function renderPreview(enrichment: EnrichmentData) {
 }
 
 export function DetailView({ enrichmentId, className }: DetailViewProps) {
+  const locale = useLocale();
+  const { courseInfo } = useStaticGraph();
+  const goBack = useEnrichmentInspectorStore((s) => s.goBack);
 
-  // For now, use mock data - will be connected to real data later
-  // TODO: Connect to useEnrichmentData or tRPC query
-  const enrichment = useMockEnrichment(enrichmentId);
+  // Delete confirmation state
+  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
-  // Loading state
-  if (!enrichment) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
-      </div>
-    );
-  }
+  // Fetch real enrichment data
+  const dataState = useEnrichmentDetail(enrichmentId);
 
-  // Error state
-  if (enrichment.status === 'failed') {
-    return (
-      <ErrorState
-        error={enrichment.error_message}
-        onRetry={() => console.log('Retry')} // TODO: Connect to regenerate mutation
-      />
-    );
-  }
+  // Handle delete confirmation
+  const handleDeleteClick = useCallback(() => {
+    setShowDeleteDialog(true);
+  }, []);
 
-  // Render preview based on type
+  const handleDeleteConfirm = useCallback(async () => {
+    if (!courseInfo?.id) {
+      toast.error(locale === 'ru' ? 'Курс не найден' : 'Course not found');
+      return;
+    }
+
+    setIsDeleting(true);
+
+    try {
+      const result = await deleteEnrichment({
+        enrichmentId,
+        courseId: courseInfo.id,
+      });
+
+      if (result.success) {
+        toast.success(locale === 'ru' ? 'Активность удалена' : 'Activity deleted');
+        setShowDeleteDialog(false);
+        goBack();
+      } else {
+        toast.error(
+          locale === 'ru'
+            ? `Не удалось удалить: ${result.error}`
+            : `Failed to delete: ${result.error}`
+        );
+      }
+    } catch {
+      toast.error(
+        locale === 'ru' ? 'Не удалось удалить активность' : 'Failed to delete activity'
+      );
+    } finally {
+      setIsDeleting(false);
+    }
+  }, [enrichmentId, courseInfo?.id, locale, goBack]);
+
+  const handleDeleteCancel = useCallback(() => {
+    setShowDeleteDialog(false);
+  }, []);
+
+  // Handle regenerate action (Coming soon)
+  const handleRegenerate = useCallback(() => {
+    toast.info(locale === 'ru' ? 'Скоро будет доступно' : 'Coming soon');
+  }, [locale]);
+
+  // Handle approve action (Coming soon)
+  const handleApprove = useCallback(() => {
+    toast.info(locale === 'ru' ? 'Скоро будет доступно' : 'Coming soon');
+  }, [locale]);
+
+  // Render based on data state
+  const renderContent = () => {
+    switch (dataState.status) {
+      case 'loading':
+        return <LoadingState />;
+
+      case 'not_found':
+        return <NotFoundState />;
+
+      case 'error':
+        return <ErrorState error={dataState.error} onRetry={dataState.refetch} />;
+
+      case 'success': {
+        const enrichment = dataState.data;
+
+        // Show error state for failed enrichments
+        if (enrichment.status === 'failed') {
+          return <ErrorState error={enrichment.error_message} onRetry={handleRegenerate} />;
+        }
+
+        // Render preview with action bar
+        return (
+          <>
+            {/* Preview component */}
+            <div data-testid="preview-content" className="flex-1 overflow-hidden">
+              {renderPreview(enrichment)}
+            </div>
+
+            {/* Action bar */}
+            <ActionBar
+              enrichment={enrichment}
+              onDelete={handleDeleteClick}
+              onRegenerate={handleRegenerate}
+              onApprove={handleApprove}
+            />
+          </>
+        );
+      }
+
+      default:
+        return null;
+    }
+  };
+
   return (
-    <div className={cn('flex flex-col h-full', className)}>
-      {/* Preview component */}
-      <div className="flex-1 overflow-hidden">
-        {renderPreview(enrichment)}
+    <>
+      <div data-testid="detail-view" className={cn('flex flex-col h-full', className)}>
+        {renderContent()}
       </div>
 
-      {/* Action bar */}
-      <ActionBar enrichment={enrichment} />
-    </div>
+      {/* Delete Confirmation Dialog */}
+      <DeleteConfirmationDialog
+        open={showDeleteDialog}
+        onOpenChange={setShowDeleteDialog}
+        onConfirm={handleDeleteConfirm}
+        onCancel={handleDeleteCancel}
+        isDeleting={isDeleting}
+      />
+    </>
   );
 }

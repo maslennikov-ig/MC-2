@@ -5,6 +5,13 @@ import { updateSession } from '@/lib/supabase/middleware';
 
 const handleI18nRouting = createMiddleware(routing);
 
+// Note: Redis-based rate limiting removed from middleware because ioredis
+// is a Node.js-only library that cannot run in Edge runtime.
+// Rate limiting for shared pages should be implemented at:
+// 1. API route level (Node.js runtime)
+// 2. CDN/WAF level (Cloudflare, Vercel)
+// 3. Using Edge-compatible Redis client (e.g., @upstash/redis)
+
 export async function middleware(request: NextRequest) {
   // Step 1: Handle i18n routing (locale detection, cookies)
   const response = handleI18nRouting(request);
@@ -30,8 +37,7 @@ export const config = {
      */
     '/((?!api|trpc|_next|_vercel|.*\\..*).*)',
   ],
-  // Allow dynamic code evaluation for Supabase libraries that use Node.js APIs
-  // This suppresses Edge Runtime warnings for code that won't actually run on Edge
+  // Allow dynamic code evaluation for Supabase libraries that use eval()
   unstable_allowDynamic: [
     '**/node_modules/@supabase/realtime-js/**',
     '**/node_modules/@supabase/supabase-js/**',

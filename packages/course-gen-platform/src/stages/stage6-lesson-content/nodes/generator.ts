@@ -190,6 +190,58 @@ function extractTokenUsageWithFallback(
 }
 
 /**
+ * Format inter-lesson context as XML string for prompt inclusion
+ *
+ * Converts the lesson_context object into an XML block that can be
+ * included in prompts. Returns empty string if no context available.
+ *
+ * @param lessonContext - Lesson context from LessonSpecificationV2
+ * @returns XML string or empty string
+ */
+function formatInterLessonContextXML(
+  lessonContext: LessonSpecificationV2['lesson_context']
+): string {
+  if (!lessonContext) {
+    return '';
+  }
+
+  const parts: string[] = ['<inter_lesson_context>'];
+
+  // Previous lesson
+  if (lessonContext.previous_lesson) {
+    parts.push('  <previous_lesson>');
+    parts.push(`    <title>${lessonContext.previous_lesson.title}</title>`);
+    parts.push(`    <key_concepts>${lessonContext.previous_lesson.key_concepts.join(', ')}</key_concepts>`);
+    if (lessonContext.previous_lesson.summary_preview) {
+      parts.push(`    <summary_preview>${lessonContext.previous_lesson.summary_preview}</summary_preview>`);
+    }
+    parts.push('  </previous_lesson>');
+  }
+
+  // Next lesson
+  if (lessonContext.next_lesson) {
+    parts.push('  <next_lesson>');
+    parts.push(`    <title>${lessonContext.next_lesson.title}</title>`);
+    parts.push(`    <preview_concepts>${lessonContext.next_lesson.key_concepts.join(', ')}</preview_concepts>`);
+    parts.push('  </next_lesson>');
+  }
+
+  // Concepts already covered
+  if (lessonContext.concepts_already_covered.length > 0) {
+    parts.push(`  <concepts_already_covered>${lessonContext.concepts_already_covered.join(', ')}</concepts_already_covered>`);
+  }
+
+  // Terms already defined
+  if (lessonContext.terms_already_defined.length > 0) {
+    parts.push(`  <terms_already_defined>${lessonContext.terms_already_defined.join(', ')}</terms_already_defined>`);
+  }
+
+  parts.push('</inter_lesson_context>');
+
+  return parts.join('\n');
+}
+
+/**
  * Extract last N characters from text for context window
  *
  * Used to provide previous content context to each section generation,
@@ -552,6 +604,8 @@ export async function generateSection(
     outputLanguage: getLanguageName(language),
     ragContext: ragContextXML,
     previousContext: previousContextValue,
+    // Inter-lesson context for coherence (optional, rendered as XML string)
+    interLessonContext: formatInterLessonContextXML(lessonSpec.lesson_context),
   });
 
   // Generate content

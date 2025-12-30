@@ -198,9 +198,9 @@ const ModuleGroup = ({ id, data, selected }: NodeProps<RFModuleNode>) => {
     <>
       {data.isCollapsed ? (
         <motion.div
-          initial={{ opacity: 0, scale: 0.8 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.3 }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.2 }}
           className={`
             relative w-[300px] min-h-[90px] rounded-md border transition-all duration-300
             ${getStatusBorderClass(currentStatus)}
@@ -384,9 +384,9 @@ const ModuleGroup = ({ id, data, selected }: NodeProps<RFModuleNode>) => {
         // Lessons are positioned by useGraphLayout Phase 2 starting at y=60px
         // CRITICAL: w-full h-full to fill React Flow wrapper (which has correct dimensions from layout)
         <motion.div
-          initial={{ opacity: 0, scale: 0.95 }}
-          animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.3 }}
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.2 }}
           className={`
             w-full h-full relative rounded-md border-2 transition-all duration-300
             ${currentStatus === 'active'

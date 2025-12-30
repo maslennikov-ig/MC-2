@@ -6,6 +6,7 @@ import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
 import { GripVertical, AlertCircle, Loader2, CheckCircle2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { sanitizeErrorMessage } from '@/lib/utils/sanitize-error';
 import type { EnrichmentStatus, EnrichmentType } from '@megacampus/shared-types';
 import { ENRICHMENT_TYPE_CONFIG } from '@/lib/generation-graph/enrichment-config';
 
@@ -43,25 +44,6 @@ function StatusIndicator({ status }: { status: EnrichmentStatus }) {
 }
 
 // Status text helper removed - now using translations directly via useTranslations
-
-/**
- * Sanitize error message for display.
- * - Truncates to reasonable length for UI
- * - Strips any HTML tags (though React escapes strings anyway)
- * - Provides user-friendly fallback
- */
-function sanitizeErrorMessage(message: string | null | undefined, fallback: string, maxLength = 80): string {
-  if (!message) {
-    return fallback;
-  }
-  // Strip any potential HTML tags
-  const stripped = message.replace(/<[^>]*>/g, '');
-  // Truncate long messages
-  if (stripped.length > maxLength) {
-    return stripped.slice(0, maxLength) + '...';
-  }
-  return stripped;
-}
 
 /**
  * Individual enrichment list item with drag handle and status indicator
@@ -110,6 +92,10 @@ export function EnrichmentListItem({ item, isDragging, onClick }: EnrichmentList
     <div
       ref={setNodeRef}
       style={style}
+      data-testid="enrichment-list-item"
+      data-enrichment-id={item.id}
+      data-enrichment-type={item.type}
+      data-enrichment-status={item.status}
       className={cn(
         'flex items-center gap-3 p-3 bg-white dark:bg-slate-900 border rounded-lg',
         'cursor-pointer hover:border-primary/50 hover:shadow-sm transition-all',
@@ -121,6 +107,7 @@ export function EnrichmentListItem({ item, isDragging, onClick }: EnrichmentList
       {/* Drag Handle */}
       <button
         className="p-1 cursor-grab active:cursor-grabbing text-muted-foreground hover:text-foreground touch-none"
+        data-testid="drag-handle"
         {...attributes}
         {...listeners}
         onClick={(e) => e.stopPropagation()}
@@ -139,7 +126,7 @@ export function EnrichmentListItem({ item, isDragging, onClick }: EnrichmentList
         <div className="font-medium truncate">{typeName}</div>
         <div className="text-xs text-muted-foreground truncate">
           {item.status === 'failed'
-            ? sanitizeErrorMessage(item.error_message, t('inspector.error'))
+            ? sanitizeErrorMessage(item.error_message, { fallback: t('inspector.error'), maxLength: 80 })
             : statusText}
         </div>
       </div>

@@ -1,5 +1,6 @@
-import React, { memo, useRef } from 'react';
+import React, { memo, useRef, useState } from 'react';
 import { NodeProps, useViewport } from '@xyflow/react';
+import { useShallow } from 'zustand/react/shallow';
 import { RFLessonNode } from '../types';
 import { useNodeStatus } from '../hooks/useNodeStatus';
 import { useNodeSelection } from '../hooks/useNodeSelection';
@@ -9,6 +10,8 @@ import { NodeErrorTooltip, RetryBadge, NodeProgressBar } from '../components/sha
 import { getStatusColor, getStatusBorderClass, getNodeStatusStyles } from '../hooks/useNodeStatusStyles';
 import { logger } from '@/lib/client-logger';
 import { AssetDock } from './AssetDock';
+import { EnrichmentNodeToolbar } from '../components/EnrichmentNodeToolbar';
+import { useEnrichmentInspectorStore, type CreateEnrichmentType } from '../stores/enrichment-inspector-store';
 
 // Minimal Node for very low zoom (<0.3)
 const MinimalLessonNode = ({ id, data, onDoubleClick }: { id: string; data: RFLessonNode['data']; onDoubleClick: () => void }) => {
@@ -67,6 +70,14 @@ const LessonNode = (props: NodeProps<RFLessonNode>) => {
   const { id, data, selected } = props;
   const { zoom } = useViewport();
   const { selectNode } = useNodeSelection();
+  const [showToolbar, setShowToolbar] = useState(false);
+  const { setPendingCreate, openCreate } = useEnrichmentInspectorStore(
+    useShallow((s) => ({
+      setPendingCreate: s.setPendingCreate,
+      openCreate: s.openCreate,
+    }))
+  );
+  const { selectedNodeId } = useNodeSelection();
 
   // Subscribe to realtime status updates - MUST be called before any conditional returns (Rules of Hooks)
   const statusEntry = useNodeStatus(id);
@@ -74,6 +85,19 @@ const LessonNode = (props: NodeProps<RFLessonNode>) => {
 
   // Partial generation context (optional - may not be in provider)
   const contextValue = useOptionalPartialGenerationContext();
+
+  // Quick add handler - opens create view in enrichment inspector
+  const handleQuickAdd = (type: CreateEnrichmentType) => {
+    if (selectedNodeId === id) {
+      // Node already selected - directly open create view
+      openCreate(type);
+    } else {
+      // Node not selected - set pending and select (openRoot will pick it up)
+      setPendingCreate(type);
+      selectNode(id);
+    }
+    setShowToolbar(false);
+  };
   const {
     generateLesson,
     isLessonGenerating = () => false,
@@ -128,27 +152,31 @@ const LessonNode = (props: NodeProps<RFLessonNode>) => {
       return numbers && numbers.length > 0 ? parseInt(numbers[numbers.length - 1]) : 1;
     })();
 
-  const getMetaText = () => {
-    if (currentStatus === 'active') {
-      const progressText = data.progress !== undefined ? `${data.progress}%` : '';
+  // Status text for Line 2 - consistent with DocumentNode style
+  const getStatusText = () => {
+    if (currentStatus === 'completed') {
       return (
-        <span className="text-blue-600 dark:text-blue-400">
-          Генерация {progressText}...
+        <span className="text-green-600 dark:text-green-400 font-medium">
+          Сгенерирован
         </span>
       );
     }
-    if (currentStatus === 'completed') {
-      const durationSec = data.duration ? `${Math.round(data.duration / 1000)}с` : '';
-      const tokensText = data.tokens ? `${data.tokens.toLocaleString('ru-RU')} tok` : '';
-      return `${durationSec}${durationSec && tokensText ? ' • ' : ''}${tokensText}`;
-    }
     if (currentStatus === 'error') {
-      return <span className="text-red-600 dark:text-red-400 truncate">{errorMessage}</span>;
+      return (
+        <span className="text-red-600 dark:text-red-400 font-medium">
+          Ошибка генерации
+        </span>
+      );
     }
-    if (currentStatus === 'pending') {
-      return <span className="text-slate-400 dark:text-slate-500">В очереди</span>;
+    if (currentStatus === 'active') {
+      const progressText = data.progress !== undefined ? ` ${data.progress}%` : '';
+      return (
+        <span className="text-blue-600 dark:text-blue-400">
+          Генерация{progressText}...
+        </span>
+      );
     }
-    return '';
+    return <span className="text-slate-400 dark:text-slate-500">В очереди</span>;
   };
 
   const handleClick = (e: React.MouseEvent) => {
@@ -172,11 +200,15 @@ const LessonNode = (props: NodeProps<RFLessonNode>) => {
     }
   };
 
+  // Show AssetDock only when there are enrichments
+  const hasEnrichments = (data.enrichmentCount ?? 0) > 0;
+
   return (
     <div
       className={`
-        relative w-full h-[64px] rounded border border-slate-200 dark:border-slate-700
-        transition-all duration-300 flex flex-col cursor-pointer
+        relative w-full rounded border border-slate-200 dark:border-slate-700
+        transition-all duration-300 flex flex-col cursor-pointer group
+        ${hasEnrichments ? 'h-[64px]' : 'h-[50px]'}
         ${getStatusBorderClass(currentStatus)}
         ${selected ? 'ring-2 ring-offset-2 ring-blue-400' : ''}
       `}
@@ -187,7 +219,22 @@ const LessonNode = (props: NodeProps<RFLessonNode>) => {
       tabIndex={0}
       onClick={handleClick}
       onKeyDown={handleKeyDown}
+      onMouseEnter={() => zoom >= 0.6 && setShowToolbar(true)}
+      onMouseLeave={() => setShowToolbar(false)}
     >
+      {/* Quick Add Toolbar - shows on hover at sufficient zoom */}
+      {showToolbar && zoom >= 0.6 && (
+        <div
+          className="absolute -top-12 left-1/2 -translate-x-1/2 z-50"
+          onClick={(e) => e.stopPropagation()}
+        >
+          <EnrichmentNodeToolbar
+            onCreateEnrichment={handleQuickAdd}
+            existingTypes={(data.enrichmentsSummary || []).map(e => e.type as CreateEnrichmentType)}
+            isCompact
+          />
+        </div>
+      )}
       {/* Error Tooltip */}
       {currentStatus === 'error' && (
         <NodeErrorTooltip message={errorMessage} />
@@ -209,9 +256,9 @@ const LessonNode = (props: NodeProps<RFLessonNode>) => {
             {data.title}
           </div>
 
-          {/* Line 2: Meta info */}
+          {/* Line 2: Status info (consistent with DocumentNode) */}
           <div className="text-[10px] text-slate-500 dark:text-slate-400">
-            {getMetaText()}
+            {getStatusText()}
           </div>
         </div>
 
@@ -265,15 +312,18 @@ const LessonNode = (props: NodeProps<RFLessonNode>) => {
         )}
       </div>
 
-      {/* Asset Dock row (14px) */}
-      <div className="h-[14px] px-1">
-        <AssetDock
-          enrichments={data.enrichmentsSummary}
-          hasErrors={data.hasEnrichmentErrors}
-          isGenerating={data.enrichmentsGenerating}
-          count={data.enrichmentCount}
-        />
-      </div>
+      {/* AssetDock row (14px) - only shown when enrichments exist */}
+      {hasEnrichments && (
+        <div className="h-[14px] px-2 flex items-center">
+          <AssetDock
+            enrichments={data.enrichmentsSummary}
+            hasErrors={data.hasEnrichmentErrors}
+            isGenerating={data.enrichmentsGenerating}
+            count={data.enrichmentCount}
+            onClick={() => selectNode(id)}
+          />
+        </div>
+      )}
 
       {/* Progress Bar (active only) - absolute positioned at bottom */}
       {currentStatus === 'active' && data.progress !== undefined && (

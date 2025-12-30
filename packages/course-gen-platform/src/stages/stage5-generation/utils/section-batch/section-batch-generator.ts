@@ -101,6 +101,13 @@ export class SectionBatchGenerator {
 
     const lessonSpecs: LessonSpecificationV2[] = [];
 
+    // NOTE: allSections should ideally contain ALL sections from the entire course
+    // for proper inter-lesson context. Currently we only have access to the current
+    // batch's sections. In the future, this should be called after all batches are
+    // generated and sections are collected (similar to generation-phases.ts line 550).
+    // For now, we pass undefined to maintain backward compatibility.
+    const allSections = undefined; // TODO: Pass all course sections when available
+
     for (let i = 0; i < sectionResult.sections.length; i++) {
       const section = sectionResult.sections[i];
       const sectionIndex = startSection + i;
@@ -108,7 +115,8 @@ export class SectionBatchGenerator {
       const specs = convertSectionToV2Specs(
         section,
         sectionIndex,
-        input
+        input,
+        allSections
       );
 
       lessonSpecs.push(...specs);

@@ -46,21 +46,23 @@ export async function GET(request: NextRequest) {
     const user = await authenticateRequest(request)
 
     // Build query based on auth status and filter
+    // Using visibility field: 'private' (owner only), 'organization' (same org), 'public' (all)
     let countFilter = ''
     let dataFilter = ''
-    
+
     if (onlyMine && user) {
       // Show only user's courses
       countFilter = `user_id.eq.${user.id}`
       dataFilter = `user_id.eq.${user.id}`
     } else if (!user) {
-      // Not authenticated - show only published courses
-      countFilter = 'is_published.eq.true'
-      dataFilter = 'is_published.eq.true'
+      // Not authenticated - show only public courses
+      countFilter = 'visibility.eq.public'
+      dataFilter = 'visibility.eq.public'
     } else {
-      // Authenticated - show user's courses + published courses
-      countFilter = `user_id.eq.${user.id},is_published.eq.true`
-      dataFilter = `user_id.eq.${user.id},is_published.eq.true`
+      // Authenticated - show user's courses + public courses
+      // Note: organization visibility is handled by RLS policy based on user's organization
+      countFilter = `user_id.eq.${user.id},visibility.eq.public`
+      dataFilter = `user_id.eq.${user.id},visibility.eq.public`
     }
 
     // Use appropriate client for user-based filtering

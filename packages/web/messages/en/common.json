@@ -20,6 +20,18 @@
   "import": "Import",
   "refresh": "Refresh",
   "na": "N/A",
+  "sharedCourse": {
+    "message": "You're viewing a shared course.",
+    "signInLink": "Sign in to save progress"
+  },
+  "visibility": {
+    "private": "Private",
+    "organization": "Organization",
+    "public": "Public",
+    "label": "Visibility",
+    "changeSuccess": "Visibility updated",
+    "changeError": "Failed to update visibility"
+  },
   "errors": {
     "notFound": {
       "title": "Page Not Found",

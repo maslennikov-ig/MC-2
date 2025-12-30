@@ -7,6 +7,7 @@ import dynamic from "next/dynamic"
 
 import { MarkdownRendererFull } from "@/components/markdown"
 import type { Lesson, Section, Asset, LessonActivity } from "@/types/database"
+import { parseLessonContent } from "@/lib/lesson-content-parser"
 
 // Type guard to check if activity is an object
 function isActivityObject(activity: string | LessonActivity): activity is LessonActivity {
@@ -119,8 +120,9 @@ export default function LessonContent({ lesson, section, assets }: LessonContent
     return assetUrl
   }
 
-  // Get the markdown content
-  const markdownContent = lesson.content_text || lesson.content || ''
+  // Parse the lesson content from JSONB or legacy fields
+  // Note: structured content support can be added in a future phase
+  const { markdown: markdownContent, structured: _structured } = parseLessonContent(lesson)
 
   const toggleTask = (index: number) => {
     const newCompleted = new Set(completedTasks)

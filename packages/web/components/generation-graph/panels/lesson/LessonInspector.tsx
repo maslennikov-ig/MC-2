@@ -69,6 +69,8 @@ interface LessonInspectorProps {
   className?: string;
   /** User subscription tier for model display. Defaults to 'standard'. */
   tier?: 'trial' | 'free' | 'basic' | 'standard' | 'premium';
+  /** Hide the header (when used inside a tabbed container that provides its own header) */
+  hideHeader?: boolean;
 }
 
 /**
@@ -94,6 +96,7 @@ export function LessonInspector({
   onToggleMaximize,
   className,
   tier = 'standard',
+  hideHeader = false,
 }: LessonInspectorProps) {
   // Modal state for viewing node output
   const [outputModal, setOutputModal] = useState<{
@@ -355,6 +358,7 @@ export function LessonInspector({
         isMaximized={isMaximized}
         onToggleMaximize={onToggleMaximize}
         className={className}
+        hideHeader={hideHeader}
       />
 
       {/* Output Modal */}

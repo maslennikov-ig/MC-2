@@ -44,19 +44,20 @@ async function handleGetCourse(
       `)
       .eq('slug', slug)
     
-    // If user is not authenticated, only show published courses
-    // If user is authenticated, show their courses OR published courses
+    // If user is not authenticated, only show public courses
+    // If user is authenticated, show their courses OR public courses
+    // Note: organization visibility is handled by RLS policy based on user's organization
     if (!user) {
-      query = query.eq('is_published', true)
+      query = query.eq('visibility', 'public')
     } else {
       // Use separate queries combined with OR for safety - avoid string concatenation
-      // First get published courses OR user's own courses using proper OR conditions
+      // First get public courses OR user's own courses using proper OR conditions
       // Note: Supabase .or() expects comma-separated conditions as string format
       // This is the expected Supabase syntax, but we validate user.id is a safe UUID
       if (typeof user.id !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(user.id)) {
         return NextResponse.json({ error: 'Invalid user ID format' }, { status: 400 })
       }
-      query = query.or(`user_id.eq.${user.id},is_published.eq.true`)
+      query = query.or(`user_id.eq.${user.id},visibility.eq.public`)
     }
     
     const { data: course, error } = await query.single() as { data: CourseWithSections | null, error: PostgrestError | null }

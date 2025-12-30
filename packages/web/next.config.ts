@@ -9,16 +9,14 @@ const APP_VERSION = packageJson.version;
 const withPWA = require('@ducanh2912/next-pwa').default({
   dest: 'public',
   register: true,
-  // CRITICAL: skipWaiting: false prevents SW from taking control mid-session
-  // This dramatically reduces risk of chunk loading failures after deployment
-  // See: https://developer.chrome.com/docs/workbox/modules/workbox-core/#skip-waiting-and-clients-claim
-  skipWaiting: false,
   disable: process.env.NODE_ENV === 'development',
   reloadOnOnline: true,
   // Custom worker with async helpers for workbox compatibility
   customWorkerSrc: 'worker',
   // CRITICAL: Disable start URL caching completely
+  // Both options required per @ducanh2912/next-pwa docs
   cacheStartUrl: false,
+  dynamicStartUrl: false,
   // Clean up outdated caches on deploy
   cleanupOutdatedCaches: true,
   // Version in cacheId for cache invalidation
@@ -29,7 +27,13 @@ const withPWA = require('@ducanh2912/next-pwa').default({
   buildExcludes: [/app-build-manifest\.json$/, /\.map$/],
   publicExcludes: ['!_next/**/*'],
   // CRITICAL: All caching config must be inside workboxOptions to truly override defaults
+  // Top-level skipWaiting is IGNORED - must be in workboxOptions!
   workboxOptions: {
+    // CRITICAL: skipWaiting and clientsClaim MUST be inside workboxOptions
+    // Top-level placement is silently ignored by Workbox
+    // See: https://github.com/nicolo-ribaudo/next-pwa/issues/issues
+    skipWaiting: false,  // Don't take control mid-session
+    clientsClaim: false, // Don't claim clients immediately
     // Exclude JS/CSS/JSON from precache manifest
     exclude: [/\.js$/, /\.css$/, /\.json$/],
     // MINIMAL runtime caching - ONLY fonts, images, and media

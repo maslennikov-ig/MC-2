@@ -20,6 +20,18 @@
   "import": "Импорт",
   "refresh": "Обновить",
   "na": "Н/Д",
+  "sharedCourse": {
+    "message": "Вы просматриваете общий курс.",
+    "signInLink": "Войдите, чтобы сохранить прогресс"
+  },
+  "visibility": {
+    "private": "Приватный",
+    "organization": "Для организации",
+    "public": "Публичный",
+    "label": "Видимость",
+    "changeSuccess": "Видимость обновлена",
+    "changeError": "Не удалось обновить видимость"
+  },
   "errors": {
     "notFound": {
       "title": "Страница не найдена",

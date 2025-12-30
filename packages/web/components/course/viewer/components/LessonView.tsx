@@ -1,14 +1,15 @@
 import React from "react"
 import { motion, AnimatePresence } from "framer-motion"
-import { 
-  ChevronLeft, 
-  ChevronRight, 
-  BookOpen, 
-  X, 
+import {
+  ChevronLeft,
+  ChevronRight,
+  BookOpen,
+  X,
   CheckCircle2,
   Circle,
   Activity,
-  Layers
+  Layers,
+  Film
 } from "lucide-react"
 import LessonContent from "@/components/common/lesson-content"
 import ContentFormatSwitcher from "@/components/common/content-format-switcher"
@@ -16,13 +17,21 @@ import { Button } from "@/components/ui/button"
 import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Section, Lesson, Asset } from "@/types/database"
+import { Database } from "@/types/database.generated"
 import { ActivitiesPanel } from "./ActivitiesPanel"
 import { StructurePanel } from "./StructurePanel"
+import { EnrichmentsPanel } from "./EnrichmentsPanel"
+
+type EnrichmentRow = Database['public']['Tables']['lesson_enrichments']['Row'];
 
 interface LessonViewProps {
   currentLesson: Lesson;
   currentSection?: Section;
   assets?: Asset[];
+  /** Enrichments for the current lesson (video, audio, quiz, presentation, document) */
+  enrichments?: EnrichmentRow[];
+  /** Error message if enrichments failed to load */
+  enrichmentsLoadError?: string;
   focusMode: boolean;
   currentIndex: number;
   totalLessonsOrdered: number;
@@ -51,6 +60,8 @@ export function LessonView({
   currentLesson,
   currentSection,
   assets,
+  enrichments,
+  enrichmentsLoadError,
   focusMode,
   currentIndex,
   totalLessonsOrdered,
@@ -222,12 +233,24 @@ export function LessonView({
             <Activity className="w-4 h-4 mr-2" />
             Задания
           </TabsTrigger>
-          <TabsTrigger 
-            value="structure" 
+          <TabsTrigger
+            value="structure"
             className="rounded-none border-b-2 border-transparent data-[state=active]:border-purple-600 dark:data-[state=active]:border-purple-500 data-[state=active]:bg-transparent px-6 py-3 text-gray-600 data-[state=active]:text-purple-700 dark:text-white/70 dark:data-[state=active]:text-purple-300"
           >
             <Layers className="w-4 h-4 mr-2" />
             Структура курса
+          </TabsTrigger>
+          <TabsTrigger
+            value="enrichments"
+            className="rounded-none border-b-2 border-transparent data-[state=active]:border-purple-600 dark:data-[state=active]:border-purple-500 data-[state=active]:bg-transparent px-6 py-3 text-gray-600 data-[state=active]:text-purple-700 dark:text-white/70 dark:data-[state=active]:text-purple-300"
+          >
+            <Film className="w-4 h-4 mr-2" />
+            Медиа
+            {enrichments && enrichments.length > 0 && (
+              <Badge variant="secondary" className="ml-2 h-5 px-1.5 text-xs">
+                {enrichments.length}
+              </Badge>
+            )}
           </TabsTrigger>
         </TabsList>
       </div>
@@ -255,7 +278,7 @@ export function LessonView({
       </TabsContent>
       
       <TabsContent value="structure" className="mt-0 p-6">
-        <StructurePanel 
+        <StructurePanel
           sections={sections}
           lessonsBySection={lessonsBySection}
           currentLessonId={currentLesson.id}
@@ -267,6 +290,10 @@ export function LessonView({
           progressPercentage={progressPercentage}
           onSelectLesson={onSelectLesson}
         />
+      </TabsContent>
+
+      <TabsContent value="enrichments" className="mt-0 p-6">
+        <EnrichmentsPanel enrichments={enrichments || []} enrichmentsLoadError={enrichmentsLoadError} />
       </TabsContent>
     </Tabs>
   );

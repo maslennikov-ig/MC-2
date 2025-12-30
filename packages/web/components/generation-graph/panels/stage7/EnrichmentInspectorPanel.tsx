@@ -31,6 +31,7 @@ import {
 } from '../../stores/enrichment-inspector-store';
 import { RootView } from './views/RootView';
 import { EnrichmentInspectorErrorBoundary } from './EnrichmentInspectorErrorBoundary';
+import { DiscardChangesDialog, useDiscardDialog } from './components/DiscardChangesDialog';
 import type { CreateViewProps } from './views/CreateView';
 
 // Lazy load heavy views to reduce initial bundle
@@ -42,19 +43,23 @@ const DetailViewLazy = lazy(() => import('./views/DetailView').then(m => ({ defa
  * Maps store types to CreateView types where applicable
  */
 type SupportedCreateType = CreateViewProps['type'];
-const SUPPORTED_CREATE_TYPES = new Set<string>(['quiz', 'video']);
+const SUPPORTED_CREATE_TYPES = new Set<string>(['quiz', 'video', 'audio', 'presentation']);
 
 /**
  * Map CreateEnrichmentType to CreateView type if supported
  * Returns null for unsupported types
  */
 function mapToCreateViewType(type: CreateEnrichmentType): SupportedCreateType | null {
+  // Direct mappings
   if (SUPPORTED_CREATE_TYPES.has(type)) {
     return type as SupportedCreateType;
   }
-  // Map podcast to audio (same form)
+  // Alias mappings for backward compatibility with store types
   if (type === 'podcast') {
     return 'audio';
+  }
+  if (type === 'mindmap') {
+    return 'presentation';
   }
   return null;
 }
@@ -94,13 +99,22 @@ function InspectorHeader({
   }
 
   return (
-    <div className="flex items-center gap-2 px-4 py-3 border-b border-border bg-background/50 backdrop-blur-sm">
+    <div
+      data-testid="inspector-header"
+      className="flex items-center gap-2 px-4 py-3 border-b border-border bg-background/50 backdrop-blur-sm"
+    >
       {canGoBack && (
-        <Button variant="ghost" size="icon-sm" onClick={onBack}>
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          onClick={onBack}
+          data-testid="back-button"
+          aria-label={t('inspector.back')}
+        >
           <ChevronLeft className="w-4 h-4" />
         </Button>
       )}
-      <h2 className="font-medium text-sm text-foreground">
+      <h2 data-testid="header-title" className="font-medium text-sm text-foreground">
         {title}
       </h2>
     </div>
@@ -150,6 +164,24 @@ export function EnrichmentInspectorPanel({
   const createType = useCreateEnrichmentType();
   const canGoBack = useCanGoBack();
   const goBack = useEnrichmentInspectorStore((s) => s.goBack);
+  const isDirty = useEnrichmentInspectorStore((s) => s.dirty);
+  const setDirty = useEnrichmentInspectorStore((s) => s.setDirty);
+
+  // Discard dialog for header back button (only active in create view)
+  const {
+    showDialog,
+    handleNavigation,
+    handleConfirm,
+    handleCancel,
+  } = useDiscardDialog(
+    currentView === 'create' && isDirty,
+    () => setDirty(false)
+  );
+
+  // Handle header back button with discard check
+  const handleBack = () => {
+    handleNavigation(goBack);
+  };
 
   // Initialize on lessonId change
   // Using getState() to avoid putting openRoot in deps (causes infinite loop)
@@ -188,13 +220,16 @@ export function EnrichmentInspectorPanel({
 
   return (
     <EnrichmentInspectorErrorBoundary>
-      <div className={cn('flex flex-col h-full bg-background', className)}>
+      <div
+        data-testid="enrichment-inspector-panel"
+        className={cn('flex flex-col h-full bg-background', className)}
+      >
         {/* Header with back button */}
         <InspectorHeader
           view={currentView}
           createType={createType}
           canGoBack={canGoBack}
-          onBack={goBack}
+          onBack={handleBack}
         />
 
         {/* View content */}
@@ -202,6 +237,17 @@ export function EnrichmentInspectorPanel({
           {renderView()}
         </div>
       </div>
+
+      {/* Discard Changes Confirmation Dialog (for header back button) */}
+      <DiscardChangesDialog
+        open={showDialog}
+        onOpenChange={(open) => !open && handleCancel()}
+        onConfirm={() => {
+          handleConfirm();
+          goBack();
+        }}
+        onCancel={handleCancel}
+      />
     </EnrichmentInspectorErrorBoundary>
   );
 }

@@ -10,13 +10,21 @@ export type InspectorView = 'root' | 'create' | 'detail';
 
 /**
  * Enrichment types that can be created
+ *
+ * Primary types: video, audio, presentation, quiz, document (match database enum)
+ * Aliases kept for backward compatibility: podcast (audio), mindmap (presentation), reading (document)
  */
 export type CreateEnrichmentType =
+  // Primary types (match database enum)
   | 'video'
+  | 'audio'
+  | 'presentation'
+  | 'quiz'
+  | 'document'
+  // Legacy aliases (kept for backward compatibility)
   | 'podcast'
   | 'mindmap'
   | 'case_study'
-  | 'quiz'
   | 'flashcards'
   | 'project'
   | 'discussion'
@@ -61,6 +69,12 @@ interface EnrichmentInspectorState {
   dirty: boolean;
 
   /**
+   * Pending create type for deep-link from node toolbar
+   * When set, openRoot will automatically navigate to create view
+   */
+  pendingCreateType: CreateEnrichmentType | null;
+
+  /**
    * Open root view for a lesson (clear history)
    * @param lessonId - Lesson ID to inspect
    */
@@ -93,6 +107,13 @@ interface EnrichmentInspectorState {
    * @param dirty - Whether form has unsaved changes
    */
   setDirty: (dirty: boolean) => void;
+
+  /**
+   * Set pending create type for deep-link navigation
+   * Used by node toolbar to pre-select enrichment type
+   * @param type - Type of enrichment to create, or null to clear
+   */
+  setPendingCreate: (type: CreateEnrichmentType | null) => void;
 }
 
 /**
@@ -121,13 +142,22 @@ export const useEnrichmentInspectorStore = create<EnrichmentInspectorState>()(
     history: [],
     current: null,
     dirty: false,
+    pendingCreateType: null,
 
     openRoot: (lessonId) =>
       set((state) => {
         state.lessonId = lessonId;
         state.history = [];
-        state.current = { view: 'root' };
         state.dirty = false;
+
+        // Check for pending create from node toolbar deep-link
+        if (state.pendingCreateType) {
+          // Navigate directly to create view with pending type
+          state.current = { view: 'create', createType: state.pendingCreateType };
+          state.pendingCreateType = null;
+        } else {
+          state.current = { view: 'root' };
+        }
       }),
 
     openCreate: (type) =>
@@ -161,9 +191,12 @@ export const useEnrichmentInspectorStore = create<EnrichmentInspectorState>()(
         state.history = [];
         state.current = null;
         state.dirty = false;
+        state.pendingCreateType = null;
       }),
 
     setDirty: (dirty) => set((state) => { state.dirty = dirty; }),
+
+    setPendingCreate: (type) => set((state) => { state.pendingCreateType = type; }),
   }))
 );
 

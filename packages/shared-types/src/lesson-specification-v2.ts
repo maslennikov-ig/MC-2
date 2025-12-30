@@ -328,6 +328,46 @@ export const ExerciseSpecV2Schema = z.object({
 });
 
 // ============================================================================
+// INTER-LESSON CONTEXT TYPES (Enhancement 1)
+// ============================================================================
+
+/**
+ * Context from an adjacent lesson (previous or next)
+ * Used to provide inter-lesson coherence in Stage 6 content generation
+ */
+export const AdjacentLessonContextSchema = z.object({
+  /** Lesson ID (e.g., "1.1", "2.3") */
+  lesson_id: z.string(),
+  /** Lesson title */
+  title: z.string(),
+  /** Key concepts covered in this lesson (max 5) */
+  key_concepts: z.array(z.string()).max(5),
+  /** Brief summary/preview of lesson content (for previous lesson only) */
+  summary_preview: z.string().optional(),
+});
+
+export type AdjacentLessonContext = z.infer<typeof AdjacentLessonContextSchema>;
+
+/**
+ * Inter-lesson context for content generation
+ * Provides information about surrounding lessons to improve coherence
+ *
+ * @see specs/future/stage6-enhancements-lesson-context-and-self-verification.md
+ */
+export const LessonContextSchema = z.object({
+  /** Previous lesson in the course sequence (null if first lesson) */
+  previous_lesson: AdjacentLessonContextSchema.nullable(),
+  /** Next lesson in the course sequence (null if last lesson) */
+  next_lesson: AdjacentLessonContextSchema.omit({ summary_preview: true }).nullable(),
+  /** Concepts already covered in previous lessons (accumulated) */
+  concepts_already_covered: z.array(z.string()),
+  /** Terms already defined in previous lessons */
+  terms_already_defined: z.array(z.string()),
+});
+
+export type LessonContext = z.infer<typeof LessonContextSchema>;
+
+// ============================================================================
 // Lesson RAG Context Schema
 // ============================================================================
 
@@ -441,6 +481,9 @@ export const LessonSpecificationV2Schema = z.object({
 
   /** RAG context specification for lesson content retrieval */
   rag_context: LessonRAGContextV2Schema,
+
+  /** Inter-lesson context for content coherence (optional, populated by Stage 5) */
+  lesson_context: LessonContextSchema.optional(),
 
   /**
    * Estimated lesson duration in minutes.

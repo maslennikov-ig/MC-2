@@ -5,7 +5,23 @@
  */
 
 import Redis from 'ioredis'
-import { logger } from './logger'
+
+// Middleware-compatible logger that doesn't depend on @megacampus/shared-logger
+// This is necessary because this file may be imported in middleware (via rate-limit.ts)
+// and middleware runs in Edge runtime where Pino doesn't work
+const redisLogger = {
+  info: (msg: string, data?: Record<string, unknown>) => {
+    if (process.env.NODE_ENV === 'development') {
+      console.info(`[redis] ${msg}`, data ?? '');
+    }
+  },
+  warn: (msg: string, data?: Record<string, unknown>) => {
+    console.warn(`[redis] ${msg}`, data ?? '');
+  },
+  error: (msg: string, data?: unknown) => {
+    console.error(`[redis] ${msg}`, data ?? '');
+  },
+};
 
 let redisClient: Redis | null = null
 
@@ -26,7 +42,7 @@ export function getRedisClient(): Redis {
       retryStrategy(times: number) {
         const delay = Math.min(times * 50, 2000)
         if (times > 10) {
-          logger.warn('Redis retry limit reached (10 attempts)')
+          redisLogger.warn('Redis retry limit reached (10 attempts)')
           return null
         }
         return delay
@@ -34,7 +50,7 @@ export function getRedisClient(): Redis {
       reconnectOnError(err: Error) {
         const targetErrors = ['READONLY', 'ECONNRESET', 'ETIMEDOUT']
         if (targetErrors.some(e => err.message.includes(e))) {
-          logger.warn('Redis reconnecting on error', { error: err.message })
+          redisLogger.warn('Redis reconnecting on error', { error: err.message })
           return true
         }
         return false
@@ -42,23 +58,23 @@ export function getRedisClient(): Redis {
     })
 
     redisClient.on('error', (err: Error) => {
-      logger.error('Redis connection error:', err)
+      redisLogger.error('Redis connection error:', err)
     })
 
     redisClient.on('connect', () => {
-      logger.info('Redis connected successfully')
+      redisLogger.info('Redis connected successfully')
     })
 
     redisClient.on('reconnecting', (delay: number) => {
-      logger.warn(`Redis reconnecting in ${delay}ms`)
+      redisLogger.warn(`Redis reconnecting in ${delay}ms`)
     })
 
     redisClient.on('end', () => {
-      logger.error('Redis connection ended, no more reconnections')
+      redisLogger.error('Redis connection ended, no more reconnections')
     })
 
     redisClient.on('close', () => {
-      logger.warn('Redis connection closed')
+      redisLogger.warn('Redis connection closed')
     })
   }
 
@@ -94,9 +110,9 @@ export class RedisCache {
       try {
         await this.client.connect()
         this.connected = true
-        logger.info('Redis connected successfully')
+        redisLogger.info('Redis connected successfully')
       } catch (error) {
-        logger.error('Redis connection failed, degrading gracefully', {
+        redisLogger.error('Redis connection failed, degrading gracefully', {
           error: error instanceof Error ? error.message : String(error),
         })
         // Graceful degradation - app continues without Redis
@@ -121,7 +137,7 @@ export class RedisCache {
       const value = await this.client.get(key)
       return value ? (JSON.parse(value) as T) : null
     } catch (error) {
-      logger.error('Redis GET error:', { key, error })
+      redisLogger.error('Redis GET error:', { key, error })
       return null
     }
   }
@@ -146,7 +162,7 @@ export class RedisCache {
       }
       return true
     } catch (error) {
-      logger.error('Redis SET error:', { key, error })
+      redisLogger.error('Redis SET error:', { key, error })
       return false
     }
   }
@@ -164,7 +180,7 @@ export class RedisCache {
       await this.client.del(key)
       return true
     } catch (error) {
-      logger.error('Redis DELETE error:', { key, error })
+      redisLogger.error('Redis DELETE error:', { key, error })
       return false
     }
   }
@@ -182,7 +198,7 @@ export class RedisCache {
       const result = await this.client.exists(key)
       return result === 1
     } catch (error) {
-      logger.error('Redis EXISTS error:', { key, error })
+      redisLogger.error('Redis EXISTS error:', { key, error })
       return false
     }
   }

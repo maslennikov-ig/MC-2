@@ -3,9 +3,16 @@ import { notFound } from 'next/navigation'
 import { setRequestLocale } from 'next-intl/server';
 import { Locale } from '@/src/i18n/config';
 import { getUserClient } from '@/lib/supabase/client-factory'
+import { logger } from '@/lib/logger'
 import CourseViewerEnhanced from '@/components/course/course-viewer-enhanced'
 import { CourseErrorBoundary } from '@/components/common/error-boundary'
-import type { Section, Lesson, Course, Asset } from '@/types/database'
+import {
+  groupAssetsByLessonId,
+  groupEnrichmentsByLessonId,
+  prepareSectionsForViewer,
+  prepareLessonsForViewer,
+} from '@/lib/course-data-utils'
+import type { Course, Asset } from '@/types/database'
 import { PostgrestError } from '@supabase/supabase-js'
 import { Database } from '@/types/database.generated'
 
@@ -17,6 +24,7 @@ export const fetchCache = 'force-no-store'
 type SectionRow = Database['public']['Tables']['sections']['Row']
 type LessonRow = Database['public']['Tables']['lessons']['Row']
 type AssetRow = Database['public']['Tables']['assets']['Row']
+type EnrichmentRow = Database['public']['Tables']['lesson_enrichments']['Row']
 
 
 interface CoursePageProps {
@@ -52,10 +60,9 @@ export default async function CoursePage({ params }: CoursePageProps) {
     .order('order_index') as { data: SectionRow[] | null; error: PostgrestError | null }
 
   if (sectionsError) {
-    const { logger } = await import('@/lib/logger')
-    logger.error('Failed to load course sections:', {
+    logger.error('Failed to load course sections', {
       courseId: course.id,
-      slug: slug,
+      slug,
       error: sectionsError.message,
       code: sectionsError.code
     })
@@ -77,11 +84,10 @@ export default async function CoursePage({ params }: CoursePageProps) {
     lessonsError = lessonsResult.error
 
     if (lessonsError) {
-      const { logger } = await import('@/lib/logger')
-      logger.error('Failed to load course lessons:', {
+      logger.error('Failed to load course lessons', {
         courseId: course.id,
-        slug: slug,
-        sectionIds: sectionIds,
+        slug,
+        sectionIds,
         error: lessonsError.message,
         code: lessonsError.code
       })
@@ -110,49 +116,50 @@ export default async function CoursePage({ params }: CoursePageProps) {
     if (assetsError) {
       // Log error for monitoring but continue with empty assets list
       // This ensures the course page still renders even if assets fail to load
-      const { logger } = await import('@/lib/logger')
-      logger.warn('Failed to load course assets:', {
+      logger.warn('Failed to load course assets', {
         courseId: course.id,
-        slug: slug,
-        lessonIds: lessonIds,
+        slug,
+        lessonIds,
         error: assetsError.message,
         code: assetsError.code
       })
     }
   }
-  
-  // Группируем assets по lesson_id
-  const assetsByLessonId = assets?.reduce((acc: Record<string, AssetRow[]>, asset: AssetRow) => {
-    if (asset.lesson_id && !acc[asset.lesson_id]) {
-      acc[asset.lesson_id] = []
-    }
-    if (asset.lesson_id) {
-      acc[asset.lesson_id].push(asset)
-    }
-    return acc
-  }, {} as Record<string, AssetRow[]>) || {}
-  
-  // Keep lessons as-is, the component will use the assets record
-  
-  // Подготовка данных для CourseViewerEnhanced
-  const sectionsWithLessons: Section[] = sections?.map((section: SectionRow) => ({
-    ...section,
-    section_number: String(section.order_index || ''),
-    order_number: section.order_index,
-    lessons: lessons?.filter((l: LessonRow) => l.section_id === section.id).map(lesson => ({
-      ...lesson,
-      lesson_number: String(lesson.order_index || ''),
-      course_id: course.id,
-      order_number: lesson.order_index
-    })) || []
-  } as Section)) || []
 
-  const lessonsForViewer: Lesson[] = lessons?.map((lesson: LessonRow) => ({
-    ...lesson,
-    lesson_number: String(lesson.order_index || ''),
-    course_id: course.id,
-    order_number: lesson.order_index
-  } as Lesson)) || []
+  // Fetch enrichments only if we have lessons to avoid empty .in() query
+  let enrichments: EnrichmentRow[] | null = null
+  let enrichmentsError: string | undefined
+
+  if (lessons && lessons.length > 0) {
+    const lessonIds = lessons.map((l: LessonRow) => l.id)
+    const enrichmentsResult = await adminSupabase
+      .from('lesson_enrichments')
+      .select('*')
+      .in('lesson_id', lessonIds)
+      .eq('status', 'completed')
+      .order('order_index') as { data: EnrichmentRow[] | null; error: PostgrestError | null }
+
+    enrichments = enrichmentsResult.data
+
+    if (enrichmentsResult.error) {
+      // Track error message for UI display
+      enrichmentsError = enrichmentsResult.error.message
+      // Log error for monitoring but continue with empty enrichments list
+      // This ensures the course page still renders even if enrichments fail to load
+      logger.warn('Failed to load lesson enrichments', {
+        courseId: course.id,
+        slug,
+        error: enrichmentsResult.error.message,
+        code: enrichmentsResult.error.code
+      })
+    }
+  }
+
+  // Use shared utilities for data transformation
+  const assetsByLessonId = groupAssetsByLessonId(assets)
+  const enrichmentsByLessonId = groupEnrichmentsByLessonId(enrichments)
+  const sectionsWithLessons = prepareSectionsForViewer(sections, lessons, course.id)
+  const lessonsForViewer = prepareLessonsForViewer(lessons, course.id)
 
   // If course is still generating, redirect to generation page
   const isGenerating = course.generation_status &&
@@ -165,11 +172,13 @@ export default async function CoursePage({ params }: CoursePageProps) {
 
   return (
     <CourseErrorBoundary>
-      <CourseViewerEnhanced 
+      <CourseViewerEnhanced
         course={course}
         sections={sectionsWithLessons}
         lessons={lessonsForViewer}
         assets={assetsByLessonId as Record<string, Asset[]>}
+        enrichments={enrichmentsByLessonId}
+        enrichmentsLoadError={enrichmentsError}
       />
     </CourseErrorBoundary>
   )

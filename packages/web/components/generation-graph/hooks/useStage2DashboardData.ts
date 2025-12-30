@@ -641,19 +641,27 @@ export function useStage2DashboardData({
         if (status === 'SUBSCRIBED') {
           logger.debug('[useStage2DashboardData] File catalog realtime subscription active');
         } else if (status === 'CHANNEL_ERROR') {
-          // Log full error for debugging - common causes:
+          // Log as warning (not error) - realtime subscription failures are often transient
+          // Common causes:
           // 1. Table not in supabase_realtime publication
-          // 2. RLS policies blocking access
+          // 2. RLS policies blocking access (complex policies with JOINs may not work)
           // 3. Missing SELECT permissions
           // 4. Rate limiting (too many subscriptions)
-          const errorMessage = err?.message || (typeof err === 'object' ? JSON.stringify(err) : String(err)) || 'Unknown error';
-          logger.error('[useStage2DashboardData] File catalog realtime subscription error', {
-            error: errorMessage,
-            errorRaw: err,
+          // 5. Network connectivity issues
+          const errorDetails = err ? {
+            message: err.message,
+            name: err.name,
+            code: (err as { code?: string }).code,
+            details: (err as { details?: string }).details,
+            hint: (err as { hint?: string }).hint,
+            // Fallback: try to stringify if no structured data
+            raw: (!err.message && !err.name) ? JSON.stringify(err) : undefined,
+          } : { message: 'Unknown error' };
+          logger.warn('[useStage2DashboardData] File catalog realtime subscription error (may be transient)', {
+            ...errorDetails,
             courseId,
           });
-          // Don't show toast for expected errors (e.g., table not in publication, rate limits)
-          // This is a configuration issue, not a runtime error
+          // Don't show toast - this is often transient and data still loads via polling
         } else if (status === 'TIMED_OUT') {
           logger.warn('[useStage2DashboardData] File catalog realtime subscription timed out');
           if (isMounted) {
@@ -697,18 +705,20 @@ export function useStage2DashboardData({
         if (status === 'SUBSCRIBED') {
           logger.debug('[useStage2DashboardData] Trace realtime subscription active');
         } else if (status === 'CHANNEL_ERROR') {
-          // Log full error for debugging - common causes:
-          // 1. Table not in supabase_realtime publication
-          // 2. RLS policies blocking access
-          // 3. Missing SELECT permissions
-          // 4. Rate limiting (too many subscriptions)
-          const errorMessage = err?.message || (typeof err === 'object' ? JSON.stringify(err) : String(err)) || 'Unknown error';
-          logger.error('[useStage2DashboardData] Trace realtime subscription error', {
-            error: errorMessage,
-            errorRaw: err,
+          // Log as warning (not error) - realtime subscription failures are often transient
+          const errorDetails = err ? {
+            message: err.message,
+            name: err.name,
+            code: (err as { code?: string }).code,
+            details: (err as { details?: string }).details,
+            hint: (err as { hint?: string }).hint,
+            raw: (!err.message && !err.name) ? JSON.stringify(err) : undefined,
+          } : { message: 'Unknown error' };
+          logger.warn('[useStage2DashboardData] Trace realtime subscription error (may be transient)', {
+            ...errorDetails,
             courseId,
           });
-          // Don't show toast for expected errors (e.g., table not in publication, rate limits)
+          // Don't show toast - this is often transient and data still loads via polling
         } else if (status === 'TIMED_OUT') {
           logger.warn('[useStage2DashboardData] Trace realtime subscription timed out');
           if (isMounted) {

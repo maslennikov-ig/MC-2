@@ -18,11 +18,10 @@ export function useViewportPreservation(): UseViewportPreservationReturn {
 
   const restoreViewport = useCallback(() => {
     if (savedViewport.current) {
-      requestAnimationFrame(() => {
-        if (savedViewport.current) {
-          setViewport(savedViewport.current, { duration: 0 });
-        }
-      });
+      // Restore immediately without requestAnimationFrame to prevent viewport jump
+      // The delay from requestAnimationFrame allows React Flow to adjust viewport
+      // between setNodes and restore, causing visible "scroll jump"
+      setViewport(savedViewport.current, { duration: 0 });
     }
   }, [setViewport]);
 

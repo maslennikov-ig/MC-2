@@ -1,9 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { authenticateRequest } from '@/lib/auth';
+import { randomBytes } from 'crypto';
 import { nanoid } from 'nanoid';
 import { logger } from '@/lib/logger';
 import type { Database } from '@/types/database.generated';
+
+/**
+ * Generate a cryptographically secure token using crypto.randomBytes
+ * More secure than nanoid as it uses explicit CSPRNG
+ * @param length - Length of the token (default 16)
+ * @returns URL-safe base64 token
+ */
+function generateSecureToken(length: number = 16): string {
+  return randomBytes(length)
+    .toString('base64url')
+    .slice(0, length);
+}
 
 type CourseUpdate = Database['public']['Tables']['courses']['Update'];
 
@@ -150,8 +163,8 @@ export async function POST(
       });
     }
 
-    // Generate new share token with prefix for better identification
-    const shareToken = `share_${nanoid(16)}`; // Prefixed, URL-safe token
+    // Generate new share token with cryptographically secure random bytes
+    const shareToken = `share_${generateSecureToken(16)}`; // Prefixed, URL-safe token
 
     // Update course with share token
     const { error: updateError } = await supabase

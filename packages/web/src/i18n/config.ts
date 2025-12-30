@@ -20,7 +20,7 @@ export const defaultLocale: Locale = 'ru';
  * 3. Create messages/en/{namespace}.json
  * 4. Update types/i18n.d.ts with the new type
  */
-export const namespaces = ['common', 'admin', 'generation', 'auth', 'enrichments'] as const;
+export const namespaces = ['common', 'admin', 'generation', 'auth', 'enrichments', 'course', 'organizations'] as const;
 export type Namespace = (typeof namespaces)[number];
 
 /**

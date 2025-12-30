@@ -182,6 +182,66 @@ export type Database = {
           },
         ]
       }
+      audit_log: {
+        Row: {
+          action: string
+          created_at: string
+          entity_id: string | null
+          entity_type: string
+          id: string
+          ip_address: string | null
+          new_values: Json | null
+          old_values: Json | null
+          organization_id: string | null
+          request_id: string | null
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          action: string
+          created_at?: string
+          entity_id?: string | null
+          entity_type: string
+          id?: string
+          ip_address?: string | null
+          new_values?: Json | null
+          old_values?: Json | null
+          organization_id?: string | null
+          request_id?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          action?: string
+          created_at?: string
+          entity_id?: string | null
+          entity_type?: string
+          id?: string
+          ip_address?: string | null
+          new_values?: Json | null
+          old_values?: Json | null
+          organization_id?: string | null
+          request_id?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "audit_log_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organization_deduplication_stats"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "audit_log_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       config_backups: {
         Row: {
           backup_data: Json
@@ -341,6 +401,7 @@ export type Database = {
           updated_at: string | null
           user_agent: string | null
           user_id: string
+          visibility: Database["public"]["Enums"]["course_visibility"]
           webhook_url: string | null
         }
         Insert: {
@@ -391,6 +452,7 @@ export type Database = {
           updated_at?: string | null
           user_agent?: string | null
           user_id: string
+          visibility?: Database["public"]["Enums"]["course_visibility"]
           webhook_url?: string | null
         }
         Update: {
@@ -441,6 +503,7 @@ export type Database = {
           updated_at?: string | null
           user_agent?: string | null
           user_id?: string
+          visibility?: Database["public"]["Enums"]["course_visibility"]
           webhook_url?: string | null
         }
         Relationships: [
@@ -1655,11 +1718,127 @@ export type Database = {
           },
         ]
       }
+      organization_invitations: {
+        Row: {
+          accepted_at: string | null
+          accepted_by: string | null
+          code: string | null
+          created_at: string
+          created_by: string
+          current_uses: number
+          email: string | null
+          expires_at: string
+          id: string
+          invitation_type: Database["public"]["Enums"]["invitation_type"]
+          max_uses: number | null
+          organization_id: string
+          role: Database["public"]["Enums"]["org_role"]
+          status: Database["public"]["Enums"]["invitation_status"]
+          token: string | null
+        }
+        Insert: {
+          accepted_at?: string | null
+          accepted_by?: string | null
+          code?: string | null
+          created_at?: string
+          created_by: string
+          current_uses?: number
+          email?: string | null
+          expires_at: string
+          id?: string
+          invitation_type: Database["public"]["Enums"]["invitation_type"]
+          max_uses?: number | null
+          organization_id: string
+          role?: Database["public"]["Enums"]["org_role"]
+          status?: Database["public"]["Enums"]["invitation_status"]
+          token?: string | null
+        }
+        Update: {
+          accepted_at?: string | null
+          accepted_by?: string | null
+          code?: string | null
+          created_at?: string
+          created_by?: string
+          current_uses?: number
+          email?: string | null
+          expires_at?: string
+          id?: string
+          invitation_type?: Database["public"]["Enums"]["invitation_type"]
+          max_uses?: number | null
+          organization_id?: string
+          role?: Database["public"]["Enums"]["org_role"]
+          status?: Database["public"]["Enums"]["invitation_status"]
+          token?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_invitations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organization_deduplication_stats"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "organization_invitations_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      organization_members: {
+        Row: {
+          id: string
+          invited_by: string | null
+          joined_at: string
+          organization_id: string
+          role: Database["public"]["Enums"]["org_role"]
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          invited_by?: string | null
+          joined_at?: string
+          organization_id: string
+          role?: Database["public"]["Enums"]["org_role"]
+          user_id: string
+        }
+        Update: {
+          id?: string
+          invited_by?: string | null
+          joined_at?: string
+          organization_id?: string
+          role?: Database["public"]["Enums"]["org_role"]
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "organization_members_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organization_deduplication_stats"
+            referencedColumns: ["organization_id"]
+          },
+          {
+            foreignKeyName: "organization_members_organization_id_fkey"
+            columns: ["organization_id"]
+            isOneToOne: false
+            referencedRelation: "organizations"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       organizations: {
         Row: {
           created_at: string | null
+          deleted_at: string | null
+          deleted_by: string | null
           id: string
+          member_count: number
           name: string
+          settings: Json | null
+          slug: string
           storage_quota_bytes: number
           storage_used_bytes: number
           tier: Database["public"]["Enums"]["tier"] | null
@@ -1667,8 +1846,13 @@ export type Database = {
         }
         Insert: {
           created_at?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
           id?: string
+          member_count?: number
           name: string
+          settings?: Json | null
+          slug: string
           storage_quota_bytes?: number
           storage_used_bytes?: number
           tier?: Database["public"]["Enums"]["tier"] | null
@@ -1676,8 +1860,13 @@ export type Database = {
         }
         Update: {
           created_at?: string | null
+          deleted_at?: string | null
+          deleted_by?: string | null
           id?: string
+          member_count?: number
           name?: string
+          settings?: Json | null
+          slug?: string
           storage_quota_bytes?: number
           storage_used_bytes?: number
           tier?: Database["public"]["Enums"]["tier"] | null
@@ -2295,6 +2484,10 @@ export type Database = {
       }
     }
     Functions: {
+      accept_invitation: {
+        Args: { p_invitation_id: string; p_user_id: string }
+        Returns: Json
+      }
       acquire_generation_lock: {
         Args: {
           p_course_id: string
@@ -2386,6 +2579,7 @@ export type Database = {
           success: boolean
         }[]
       }
+      expire_old_invitations: { Args: never; Returns: number }
       find_duplicate_file: {
         Args: { p_hash: string }
         Returns: {
@@ -2492,6 +2686,20 @@ export type Database = {
         Args: { p_lesson_id: string; p_user_id: string }
         Returns: boolean
       }
+      log_audit_event: {
+        Args: {
+          p_action: string
+          p_entity_id?: string
+          p_entity_type: string
+          p_ip_address?: string
+          p_new_values?: Json
+          p_old_values?: Json
+          p_organization_id: string
+          p_request_id?: string
+          p_user_agent?: string
+        }
+        Returns: string
+      }
       refund_tenant_tokens: {
         Args: {
           p_amount: number
@@ -2519,6 +2727,7 @@ export type Database = {
         Args: { p_course_id: string; p_stage_number: number; p_user_id: string }
         Returns: Json
       }
+      restore_organization: { Args: { org_id: string }; Returns: boolean }
       section_belongs_to_user_course: {
         Args: { p_section_id: string; p_user_id: string }
         Returns: boolean
@@ -2532,7 +2741,16 @@ export type Database = {
         }
         Returns: undefined
       }
+      soft_delete_organization: { Args: { org_id: string }; Returns: boolean }
       test_set_jwt: { Args: { user_id: string }; Returns: undefined }
+      transfer_organization_ownership: {
+        Args: {
+          p_current_owner_id: string
+          p_new_owner_id: string
+          p_org_id: string
+        }
+        Returns: Json
+      }
       update_api_key_last_used: {
         Args: { key_prefix_param: string }
         Returns: undefined
@@ -2576,6 +2794,7 @@ export type Database = {
     }
     Enums: {
       course_status: "draft" | "published" | "archived"
+      course_visibility: "private" | "organization" | "public"
       document_category:
         | "course_core"
         | "supplementary"
@@ -2614,6 +2833,8 @@ export type Database = {
         | "completed"
         | "failed"
         | "cancelled"
+      invitation_status: "pending" | "accepted" | "expired" | "revoked"
+      invitation_type: "email" | "link" | "code"
       job_status_enum:
         | "pending"
         | "waiting"
@@ -2639,6 +2860,7 @@ export type Database = {
         | "llm_phase_execution"
         | "json_repair_execution"
       metric_severity: "info" | "warn" | "error" | "fatal"
+      org_role: "owner" | "admin" | "instructor" | "student" | "manager"
       role: "admin" | "superadmin" | "instructor" | "student"
       stage_error_code:
         | "LOCK_ACQUISITION_FAILED"
@@ -2778,6 +3000,7 @@ export const Constants = {
   public: {
     Enums: {
       course_status: ["draft", "published", "archived"],
+      course_visibility: ["private", "organization", "public"],
       document_category: [
         "course_core",
         "supplementary",
@@ -2819,6 +3042,8 @@ export const Constants = {
         "failed",
         "cancelled",
       ],
+      invitation_status: ["pending", "accepted", "expired", "revoked"],
+      invitation_type: ["email", "link", "code"],
       job_status_enum: [
         "pending",
         "waiting",
@@ -2847,6 +3072,7 @@ export const Constants = {
         "json_repair_execution",
       ],
       metric_severity: ["info", "warn", "error", "fatal"],
+      org_role: ["owner", "admin", "instructor", "student", "manager"],
       role: ["admin", "superadmin", "instructor", "student"],
       stage_error_code: [
         "LOCK_ACQUISITION_FAILED",

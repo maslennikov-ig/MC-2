@@ -20,6 +20,8 @@ interface LessonInspectorLayoutProps {
   isMaximized?: boolean;
   onToggleMaximize?: () => void;
   className?: string;
+  /** Hide the header (when used inside tabbed container that provides its own header) */
+  hideHeader?: boolean;
 }
 
 export const LessonInspectorLayout: React.FC<LessonInspectorLayoutProps> = ({
@@ -33,13 +35,15 @@ export const LessonInspectorLayout: React.FC<LessonInspectorLayoutProps> = ({
   isMaximized = false,
   onToggleMaximize,
   className = '',
+  hideHeader = false,
 }) => {
   return (
     <div
       className={`flex flex-col h-full w-full bg-white dark:bg-slate-900 ${className}`}
       data-testid="lesson-inspector-layout"
     >
-      {/* Header */}
+      {/* Header - can be hidden when parent provides its own header */}
+      {!hideHeader && (
       <header className="flex items-center justify-between px-4 py-3 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 shadow-sm shrink-0">
         <div className="flex items-center gap-3">
           <Button
@@ -90,6 +94,7 @@ export const LessonInspectorLayout: React.FC<LessonInspectorLayoutProps> = ({
           </Button>
         </div>
       </header>
+      )}
 
       {/* Split View Container using ResizablePanel */}
       <ResizablePanelGroup

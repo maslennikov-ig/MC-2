@@ -156,9 +156,10 @@ export default async function LocaleLayout({ children, params }: Props) {
     <html lang={locale} suppressHydrationWarning>
       <head>
         {/*
-          CRITICAL: Emergency SW cleanup script
+          CRITICAL: Emergency SW cleanup script - v2.0
           This runs BEFORE any JS bundles load to fix stuck users with stale cache.
-          If user has old SW with cached 502 responses, this will clear it.
+          - On version change: immediately clears ALL caches and reloads
+          - On chunk load error: clears caches and retries (with loop protection)
         */}
         <Script
           id="sw-emergency-cleanup"
@@ -167,68 +168,102 @@ export default async function LocaleLayout({ children, params }: Props) {
             __html: `
               (function() {
                 try {
-                  if (!('serviceWorker' in navigator) || !('caches' in window)) return;
-
                   var APP_VERSION = '${process.env.NEXT_PUBLIC_APP_VERSION || 'dev'}';
-                  var VERSION_KEY = 'megacampus-sw-version';
-                  var RECOVERY_KEY = 'sw-needs-recovery';
+                  var VERSION_KEY = 'mc-app-version';
+                  var CLEARING_KEY = 'mc-clearing';
+                  var RETRY_KEY = 'mc-retry';
+
+                  // Skip if we're in the middle of clearing (prevents loop)
+                  if (sessionStorage.getItem(CLEARING_KEY)) {
+                    sessionStorage.removeItem(CLEARING_KEY);
+                    console.log('[CacheBuster] Cleared caches, continuing with fresh state');
+                    return;
+                  }
 
                   var savedVersion = localStorage.getItem(VERSION_KEY);
-                  var needsRecovery = sessionStorage.getItem(RECOVERY_KEY);
+                  var versionChanged = savedVersion && savedVersion !== APP_VERSION;
 
-                  // Clear caches if: 1) version changed, or 2) recovery flag set
-                  if ((savedVersion && savedVersion !== APP_VERSION) || needsRecovery) {
-                    console.log('[SW] Version change or recovery: clearing caches');
-
-                    caches.keys().then(function(names) {
-                      names.forEach(function(name) { caches.delete(name); });
-                    });
-
-                    navigator.serviceWorker.getRegistrations().then(function(regs) {
-                      regs.forEach(function(reg) { reg.unregister(); });
-                    });
-
+                  // CASE 1: Version changed - clear everything and reload
+                  if (versionChanged) {
+                    console.log('[CacheBuster] Version changed: ' + savedVersion + ' → ' + APP_VERSION);
                     localStorage.setItem(VERSION_KEY, APP_VERSION);
-                    sessionStorage.removeItem(RECOVERY_KEY);
+                    sessionStorage.setItem(CLEARING_KEY, '1');
 
-                    if (needsRecovery) {
+                    // Clear all caches
+                    if ('caches' in window) {
+                      caches.keys().then(function(keys) {
+                        return Promise.all(keys.map(function(k) { return caches.delete(k); }));
+                      }).then(function() {
+                        console.log('[CacheBuster] Caches cleared');
+                      });
+                    }
+
+                    // Unregister all service workers
+                    if ('serviceWorker' in navigator) {
+                      navigator.serviceWorker.getRegistrations().then(function(regs) {
+                        return Promise.all(regs.map(function(r) { return r.unregister(); }));
+                      }).then(function() {
+                        console.log('[CacheBuster] SWs unregistered, reloading...');
+                        setTimeout(function() { location.reload(); }, 100);
+                      });
+                    } else {
                       setTimeout(function() { location.reload(); }, 100);
                     }
-                  } else if (!savedVersion) {
+                    return; // Stop execution - page will reload
+                  }
+
+                  // CASE 2: First visit - just save version
+                  if (!savedVersion) {
                     localStorage.setItem(VERSION_KEY, APP_VERSION);
                   }
 
-                  // Detect chunk loading failures and trigger recovery
-                  // With cooldown to prevent infinite reload loops
-                  var RETRY_COUNT_KEY = 'sw-retry-count';
-                  var RETRY_TIME_KEY = 'sw-retry-time';
+                  // CASE 3: Error recovery for chunk loading failures
                   var MAX_RETRIES = 3;
-                  var COOLDOWN_MS = 60000; // 1 minute
+                  var COOLDOWN_MS = 60000;
 
                   window.addEventListener('error', function(e) {
                     var msg = (e.message || '').toLowerCase();
-                    if (msg.includes('loading chunk') || msg.includes('failed to fetch') || msg.includes('chunkloaderror')) {
-                      var now = Date.now();
-                      var lastRetry = parseInt(sessionStorage.getItem(RETRY_TIME_KEY) || '0');
-                      var retryCount = parseInt(sessionStorage.getItem(RETRY_COUNT_KEY) || '0');
+                    var isChunkError = msg.includes('loading chunk') ||
+                                       msg.includes('failed to fetch') ||
+                                       msg.includes('chunkloaderror') ||
+                                       msg.includes('dynamically imported module');
 
-                      // Reset counter if cooldown has passed
-                      if (now - lastRetry > COOLDOWN_MS) {
-                        retryCount = 0;
+                    if (!isChunkError) return;
+
+                    var now = Date.now();
+                    var retryData = JSON.parse(sessionStorage.getItem(RETRY_KEY) || '{"count":0,"time":0}');
+
+                    // Reset if cooldown passed
+                    if (now - retryData.time > COOLDOWN_MS) {
+                      retryData.count = 0;
+                    }
+
+                    if (retryData.count < MAX_RETRIES) {
+                      console.log('[CacheBuster] Chunk error, retry ' + (retryData.count + 1) + '/' + MAX_RETRIES);
+                      sessionStorage.setItem(RETRY_KEY, JSON.stringify({count: retryData.count + 1, time: now}));
+                      sessionStorage.setItem(CLEARING_KEY, '1');
+
+                      // Clear caches and reload
+                      if ('caches' in window) {
+                        caches.keys().then(function(keys) {
+                          return Promise.all(keys.map(function(k) { return caches.delete(k); }));
+                        });
+                      }
+                      if ('serviceWorker' in navigator) {
+                        navigator.serviceWorker.getRegistrations().then(function(regs) {
+                          regs.forEach(function(r) { r.unregister(); });
+                        });
                       }
 
-                      if (retryCount < MAX_RETRIES) {
-                        console.log('[SW] ChunkLoadError detected, attempt ' + (retryCount + 1) + '/' + MAX_RETRIES);
-                        sessionStorage.setItem(RETRY_COUNT_KEY, String(retryCount + 1));
-                        sessionStorage.setItem(RETRY_TIME_KEY, String(now));
-                        sessionStorage.setItem(RECOVERY_KEY, '1');
-                        location.reload();
-                      } else {
-                        console.error('[SW] Max retries reached. Please clear site data manually.');
-                      }
+                      setTimeout(function() { location.reload(); }, 150);
+                    } else {
+                      console.error('[CacheBuster] Max retries reached. Manual cache clear needed.');
                     }
                   });
-                } catch(e) {}
+
+                } catch(err) {
+                  console.error('[CacheBuster] Error:', err);
+                }
               })();
             `,
           }}
