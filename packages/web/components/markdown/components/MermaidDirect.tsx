@@ -44,6 +44,89 @@ const MERMAID_DEFAULT_COLORS = [
 ];
 
 /**
+ * Named CSS colors mapped to their HEX equivalents
+ * Only includes commonly used colors that might appear in Mermaid diagrams
+ */
+const NAMED_COLORS: Record<string, string> = {
+  lightgreen: '#90EE90',
+  lightyellow: '#FFFFE0',
+  lightblue: '#ADD8E6',
+  lightcoral: '#F08080',
+  lightcyan: '#E0FFFF',
+  lightgray: '#D3D3D3',
+  lightgrey: '#D3D3D3',
+  lightpink: '#FFB6C1',
+  lightsalmon: '#FFA07A',
+  lightseagreen: '#20B2AA',
+  lightskyblue: '#87CEFA',
+  lightslategray: '#778899',
+  lightslategrey: '#778899',
+  lightsteelblue: '#B0C4DE',
+  white: '#FFFFFF',
+  yellow: '#FFFF00',
+  lime: '#00FF00',
+  cyan: '#00FFFF',
+  magenta: '#FF00FF',
+};
+
+/**
+ * Parse color string to RGB values [0-255]
+ * Supports: HEX (#RGB, #RRGGBB), RGB(r,g,b), RGBA(r,g,b,a), named colors
+ */
+function parseColor(color: string): [number, number, number] | null {
+  const normalized = color.toLowerCase().trim();
+
+  // Named colors
+  if (NAMED_COLORS[normalized]) {
+    return parseColor(NAMED_COLORS[normalized]);
+  }
+
+  // HEX: #RGB or #RRGGBB
+  if (normalized.startsWith('#')) {
+    const hex = normalized.slice(1);
+    if (hex.length === 3) {
+      const r = parseInt(hex[0] + hex[0], 16);
+      const g = parseInt(hex[1] + hex[1], 16);
+      const b = parseInt(hex[2] + hex[2], 16);
+      return [r, g, b];
+    } else if (hex.length === 6) {
+      const r = parseInt(hex.slice(0, 2), 16);
+      const g = parseInt(hex.slice(2, 4), 16);
+      const b = parseInt(hex.slice(4, 6), 16);
+      return [r, g, b];
+    }
+  }
+
+  // RGB or RGBA: rgb(r, g, b) or rgba(r, g, b, a)
+  const rgbMatch = normalized.match(/rgba?\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
+  if (rgbMatch) {
+    return [parseInt(rgbMatch[1]), parseInt(rgbMatch[2]), parseInt(rgbMatch[3])];
+  }
+
+  return null;
+}
+
+/**
+ * Calculate relative luminance using simplified formula
+ * Returns true if color is "light" (luminance > 0.5)
+ *
+ * Uses simplified luminance formula:
+ * L = (0.299*R + 0.587*G + 0.114*B) / 255
+ *
+ * For full W3C WCAG 2.1 compliance, would need gamma correction:
+ * https://www.w3.org/TR/WCAG21/#dfn-relative-luminance
+ */
+function isLightColor(color: string): boolean {
+  const rgb = parseColor(color);
+  if (!rgb) return false;
+
+  const [r, g, b] = rgb;
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+
+  return luminance > 0.5;
+}
+
+/**
  * Post-process SVG to replace Mermaid's default colors with our theme colors
  */
 function postProcessSvg(container: HTMLElement, isDark: boolean): void {
@@ -102,6 +185,25 @@ function postProcessSvg(container: HTMLElement, isDark: boolean): void {
     const element = el as SVGElement;
     element.setAttribute('fill', colors.lineColor);
   });
+
+  // Replace light-colored backgrounds in dark mode
+  // This catches colors like #90EE90 (lightgreen) that aren't in MERMAID_DEFAULT_COLORS
+  if (isDark) {
+    container.querySelectorAll('*').forEach((el) => {
+      const element = el as SVGElement;
+
+      // Check fill attribute
+      const fill = element.getAttribute('fill');
+      if (fill && fill !== 'none' && isLightColor(fill)) {
+        element.setAttribute('fill', colors.nodeBg);
+      }
+
+      // Check style.fill property
+      if (element.style?.fill && element.style.fill !== 'none' && isLightColor(element.style.fill)) {
+        element.style.fill = colors.nodeBg;
+      }
+    });
+  }
 }
 
 /**
