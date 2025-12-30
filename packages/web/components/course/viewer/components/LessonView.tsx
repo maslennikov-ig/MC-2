@@ -7,7 +7,6 @@ import {
   X,
   CheckCircle2,
   Circle,
-  Activity,
   Layers,
   Film
 } from "lucide-react"
@@ -18,7 +17,6 @@ import { Badge } from "@/components/ui/badge"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { Section, Lesson, Asset } from "@/types/database"
 import { Database } from "@/types/database.generated"
-import { ActivitiesPanel } from "./ActivitiesPanel"
 import { StructurePanel } from "./StructurePanel"
 import { EnrichmentsPanel } from "./EnrichmentsPanel"
 import type { LessonContentRow } from "../types"
@@ -45,7 +43,6 @@ interface LessonViewProps {
   completedCount: number;
   remainingTime: string;
   progressPercentage: number;
-  completedActivities: Record<string, Set<number>>;
   swipeHandlers: {
     onTouchStart: (e: React.TouchEvent) => void;
     onTouchMove: (e: React.TouchEvent) => void;
@@ -55,7 +52,6 @@ interface LessonViewProps {
   onNext: () => void;
   onSelectLesson: (id: string) => void;
   onMarkComplete: (id: string) => void;
-  onToggleActivity: (lessonId: string, index: number, total: number) => void;
   onExitFocus: () => void;
 }
 
@@ -76,13 +72,11 @@ export function LessonView({
   completedCount,
   remainingTime,
   progressPercentage,
-  completedActivities,
   swipeHandlers,
   onPrev,
   onNext,
   onSelectLesson,
   onMarkComplete,
-  onToggleActivity,
   onExitFocus
 }: LessonViewProps) {
   if (focusMode) {
@@ -224,19 +218,12 @@ export function LessonView({
     <Tabs defaultValue="content" className="w-full">
       <div className="sticky top-0 bg-white dark:bg-gray-900/70 backdrop-blur-sm border-b border-gray-200/60 dark:border-gray-800 z-10">
         <TabsList className="w-full justify-start rounded-none bg-transparent h-auto p-0">
-          <TabsTrigger 
-            value="content" 
+          <TabsTrigger
+            value="content"
             className="rounded-none border-b-2 border-transparent data-[state=active]:border-purple-600 dark:data-[state=active]:border-purple-500 data-[state=active]:bg-transparent px-6 py-3 text-gray-600 data-[state=active]:text-purple-700 dark:text-white/70 dark:data-[state=active]:text-purple-300"
           >
             <BookOpen className="w-4 h-4 mr-2" />
             Содержание
-          </TabsTrigger>
-          <TabsTrigger 
-            value="activities" 
-            className="rounded-none border-b-2 border-transparent data-[state=active]:border-purple-600 dark:data-[state=active]:border-purple-500 data-[state=active]:bg-transparent px-6 py-3 text-gray-600 data-[state=active]:text-purple-700 dark:text-white/70 dark:data-[state=active]:text-purple-300"
-          >
-            <Activity className="w-4 h-4 mr-2" />
-            Задания
           </TabsTrigger>
           <TabsTrigger
             value="structure"
@@ -274,15 +261,7 @@ export function LessonView({
           onFormatChange={undefined}
         />
       </TabsContent>
-      
-      <TabsContent value="activities" className="mt-0 p-6">
-        <ActivitiesPanel 
-          lesson={currentLesson} 
-          completedActivities={completedActivities} 
-          onToggleActivity={onToggleActivity} 
-        />
-      </TabsContent>
-      
+
       <TabsContent value="structure" className="mt-0 p-6">
         <StructurePanel
           sections={sections}

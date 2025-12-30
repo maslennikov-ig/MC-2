@@ -33,7 +33,6 @@ export default function CourseViewerEnhanced({ course, sections: rawSections, le
     setMobileSidebarOpen,
     completedLessons,
     expandedSections,
-    completedActivities,
     generationPanelOpen,
     setGenerationPanelOpen,
     focusMode,
@@ -46,8 +45,7 @@ export default function CourseViewerEnhanced({ course, sections: rawSections, le
     totalMinutes,
     remainingMinutes,
     toggleSection,
-    markLessonComplete,
-    toggleActivity
+    markLessonComplete
   } = useViewerState(course, rawSections, rawLessons)
 
   // Swipe logic for mobile navigation
@@ -177,13 +175,11 @@ export default function CourseViewerEnhanced({ course, sections: rawSections, le
                 completedCount={completedCount}
                 remainingTime={formatTime(remainingMinutes)}
                 progressPercentage={progressPercentage}
-                completedActivities={completedActivities}
                 swipeHandlers={swipeHandlers}
                 onPrev={() => prevLesson && setCurrentLessonId(prevLesson.id)}
                 onNext={() => nextLesson && setCurrentLessonId(nextLesson.id)}
                 onSelectLesson={setCurrentLessonId}
                 onMarkComplete={markLessonComplete}
-                onToggleActivity={toggleActivity}
                 onExitFocus={() => setFocusMode(false)}
               />
             ) : (

@@ -9,7 +9,6 @@ export function useViewerState(course: Course, rawSections: Section[], rawLesson
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
   const [completedLessons, setCompletedLessons] = useState<Set<string>>(new Set())
   const [expandedSections, setExpandedSections] = useState<Set<string>>(new Set())
-  const [completedActivities, setCompletedActivities] = useState<Record<string, Set<number>>>({})
   const [generationPanelOpen, setGenerationPanelOpen] = useState(false)
   const [focusMode, setFocusMode] = useState(false)
   const [showFab, setShowFab] = useState(true)
@@ -55,30 +54,20 @@ export function useViewerState(course: Course, rawSections: Section[], rawLesson
     try {
       const savedProgress = localStorage.getItem(storageKey)
       if (savedProgress) {
-        const { completedLessons: saved, completedActivities: savedActivities } = JSON.parse(savedProgress)
+        const { completedLessons: saved } = JSON.parse(savedProgress)
         setCompletedLessons(new Set(saved))
-        const activitiesMap: Record<string, Set<number>> = {}
-        for (const [lessonId, activities] of Object.entries(savedActivities || {})) {
-          activitiesMap[lessonId] = new Set(activities as number[])
-        }
-        setCompletedActivities(activitiesMap)
       }
     } catch (e) {}
   }, [course.id])
 
   useEffect(() => {
     const storageKey = `course-progress-${course.id}`
-    const activitiesArray: Record<string, number[]> = {}
-    for (const [lessonId, activities] of Object.entries(completedActivities)) {
-      activitiesArray[lessonId] = Array.from(activities)
-    }
     const progressData = {
       completedLessons: Array.from(completedLessons),
-      completedActivities: activitiesArray,
       lastUpdated: new Date().toISOString()
     }
     localStorage.setItem(storageKey, JSON.stringify(progressData))
-  }, [course.id, completedLessons, completedActivities])
+  }, [course.id, completedLessons])
 
   // Initial lesson selection
   useEffect(() => {
@@ -140,29 +129,6 @@ export function useViewerState(course: Course, rawSections: Section[], rawLesson
     })
   }, [])
 
-  const toggleActivity = useCallback((lessonId: string, activityIndex: number, totalActivities: number) => {
-    setCompletedActivities(prev => {
-      const lessonActivities = prev[lessonId] || new Set()
-      const newActivities = new Set(lessonActivities)
-      if (newActivities.has(activityIndex)) newActivities.delete(activityIndex)
-      else newActivities.add(activityIndex)
-      
-      const next = { ...prev, [lessonId]: newActivities }
-      
-      if (newActivities.size === totalActivities && totalActivities > 0) {
-        setCompletedLessons(prevComp => {
-          if (!prevComp.has(lessonId)) {
-            const nextComp = new Set(prevComp)
-            nextComp.add(lessonId)
-            return nextComp
-          }
-          return prevComp
-        })
-      }
-      return next
-    })
-  }, [])
-
   return {
     sections,
     lessons,
@@ -181,7 +147,6 @@ export function useViewerState(course: Course, rawSections: Section[], rawLesson
     setMobileSidebarOpen,
     completedLessons,
     expandedSections,
-    completedActivities,
     generationPanelOpen,
     setGenerationPanelOpen,
     focusMode,
@@ -194,7 +159,6 @@ export function useViewerState(course: Course, rawSections: Section[], rawLesson
     totalMinutes,
     remainingMinutes,
     toggleSection,
-    markLessonComplete,
-    toggleActivity
+    markLessonComplete
   }
 }
