@@ -103,7 +103,7 @@ export function Toolbar({
                       size="sm"
                       className="text-gray-600 dark:text-white/70 hover:text-blue-600 dark:hover:text-blue-400"
                     >
-                      <Link href={`/courses/generating/${course.slug || course.id}?workflow=true`}>
+                      <Link href={`/courses/generating/${course.slug || course.id}?workflow=true`} target="_blank">
                         <GitBranch className="w-4 h-4" />
                         <span className="hidden lg:inline ml-2">{t("constructor")}</span>
                       </Link>

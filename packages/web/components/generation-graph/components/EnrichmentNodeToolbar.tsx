@@ -2,7 +2,7 @@
 
 import React from 'react';
 import { useLocale } from 'next-intl';
-import { Video, HelpCircle, Headphones, Presentation, FileText, Plus } from 'lucide-react';
+import { Video, HelpCircle, Headphones, Presentation, FileText, Plus, ImageIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
 import { cn } from '@/lib/utils';
@@ -29,6 +29,7 @@ interface ToolbarButton {
 }
 
 const TOOLBAR_BUTTONS: ToolbarButton[] = [
+  { type: 'cover', icon: <ImageIcon className="w-4 h-4" />, label: { en: 'Add Cover', ru: 'Добавить обложку' } },
   { type: 'quiz', icon: <HelpCircle className="w-4 h-4" />, label: { en: 'Add Quiz', ru: 'Добавить тест' } },
   { type: 'video', icon: <Video className="w-4 h-4" />, label: { en: 'Add Video', ru: 'Добавить видео' } },
   { type: 'audio', icon: <Headphones className="w-4 h-4" />, label: { en: 'Add Audio', ru: 'Добавить аудио' } },

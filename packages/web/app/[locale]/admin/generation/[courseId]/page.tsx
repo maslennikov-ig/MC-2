@@ -48,7 +48,7 @@ export default async function AdminGenerationPage({ params }: PageProps) {
             </p>
           </div>
           <Button asChild variant="outline" size="sm">
-            <Link href={`/courses/generating/${course.slug || course.id}?workflow=true`}>
+            <Link href={`/courses/generating/${course.slug || course.id}?workflow=true`} target="_blank">
               <GitBranch className="w-4 h-4 mr-2" />
               Конструктор курса
             </Link>

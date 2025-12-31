@@ -17,12 +17,13 @@ export interface EnrichmentAddPopoverProps {
 
 interface EnrichmentTypeOption {
   type: CreateEnrichmentType;
-  configKey: 'quiz' | 'video' | 'audio' | 'presentation' | 'document';
+  configKey: 'quiz' | 'video' | 'audio' | 'presentation' | 'document' | 'cover';
   disabled?: boolean;
   comingSoon?: boolean;
 }
 
 const ENRICHMENT_OPTIONS: EnrichmentTypeOption[] = [
+  { type: 'cover', configKey: 'cover' },
   { type: 'quiz', configKey: 'quiz' },
   { type: 'video', configKey: 'video' },
   { type: 'podcast', configKey: 'audio' },

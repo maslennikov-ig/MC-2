@@ -239,7 +239,7 @@ export function CourseCard({
 
   const handleWorkflow = (e: React.MouseEvent) => {
     e.stopPropagation()
-    router.push(`/courses/generating/${slug}?workflow=true`)
+    window.open(`/courses/generating/${slug}?workflow=true`, '_blank')
   }
 
 

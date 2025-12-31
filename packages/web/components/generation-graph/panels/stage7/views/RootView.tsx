@@ -13,7 +13,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslations } from 'next-intl';
-import { Layers, Video, HelpCircle, Volume2, Presentation, AlertCircle } from 'lucide-react';
+import { Layers, Video, HelpCircle, Volume2, Presentation, AlertCircle, ImageIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
@@ -59,6 +59,7 @@ function EnrichmentAddGrid({
     labelKey: string;
     colorClass: string;
   }> = [
+    { type: 'cover', icon: ImageIcon, labelKey: 'cover', colorClass: 'text-cyan-500' },
     { type: 'video', icon: Video, labelKey: 'video', colorClass: 'text-blue-500' },
     { type: 'quiz', icon: HelpCircle, labelKey: 'quiz', colorClass: 'text-purple-500' },
     { type: 'audio', icon: Volume2, labelKey: 'audio', colorClass: 'text-green-500' },
@@ -70,7 +71,7 @@ function EnrichmentAddGrid({
       <p className="text-xs text-muted-foreground mb-2 px-1">
         {t('inspector.addEnrichment')}
       </p>
-      <div className="grid grid-cols-4 gap-1.5">
+      <div className="grid grid-cols-5 gap-1.5">
         {enrichmentTypes.map(({ type, icon: Icon, labelKey, colorClass }) => (
           <button
             key={type}
@@ -189,6 +190,12 @@ function EmptyState({ onAddClick }: { onAddClick: (type: CreateEnrichmentType) =
 
       {/* Discovery cards */}
       <div data-testid="discovery-cards" className="grid grid-cols-2 gap-3 w-full max-w-sm">
+        <DiscoveryCard
+          icon={ImageIcon}
+          title={t('types.cover')}
+          onClick={() => onAddClick('cover')}
+          testId="discovery-card-cover"
+        />
         <DiscoveryCard
           icon={Video}
           title={t('types.video')}

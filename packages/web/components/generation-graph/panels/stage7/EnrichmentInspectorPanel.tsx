@@ -43,7 +43,7 @@ const DetailViewLazy = lazy(() => import('./views/DetailView').then(m => ({ defa
  * Maps store types to CreateView types where applicable
  */
 type SupportedCreateType = CreateViewProps['type'];
-const SUPPORTED_CREATE_TYPES = new Set<string>(['quiz', 'video', 'audio', 'presentation']);
+const SUPPORTED_CREATE_TYPES = new Set<string>(['quiz', 'video', 'audio', 'presentation', 'cover']);
 
 /**
  * Map CreateEnrichmentType to CreateView type if supported

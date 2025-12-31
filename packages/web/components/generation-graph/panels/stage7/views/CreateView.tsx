@@ -16,7 +16,7 @@ import { getErrorMessage } from '@/lib/utils/sanitize-error';
 import { DiscardChangesDialog, useDiscardDialog } from '../components/DiscardChangesDialog';
 
 export interface CreateViewProps {
-  type: 'quiz' | 'video' | 'audio' | 'presentation';
+  type: 'quiz' | 'video' | 'audio' | 'presentation' | 'cover';
   lessonId: string;
   className?: string;
 }
@@ -336,6 +336,36 @@ function PresentationCreateForm({ onSubmit, onCancel, onDirtyChange, isSubmittin
   );
 }
 
+// Cover Form Component - Simple form with no settings (auto-generated from lesson content)
+function CoverCreateForm({ onSubmit, onCancel, isSubmitting }: Omit<FormProps, 'onDirtyChange'>) {
+  const locale = useLocale();
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    onSubmit({}); // No settings needed - cover is auto-generated from lesson content
+  };
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-6">
+      <div className="text-sm text-muted-foreground">
+        {locale === 'ru'
+          ? 'Обложка будет автоматически сгенерирована на основе контента урока.'
+          : 'Cover image will be automatically generated based on lesson content.'}
+      </div>
+
+      <div className="flex gap-3 pt-4 border-t">
+        <Button type="button" variant="outline" onClick={onCancel} className="flex-1">
+          {locale === 'ru' ? 'Отмена' : 'Cancel'}
+        </Button>
+        <Button type="submit" disabled={isSubmitting} className="flex-1">
+          {isSubmitting && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+          {locale === 'ru' ? 'Создать' : 'Create'}
+        </Button>
+      </div>
+    </form>
+  );
+}
+
 // Main CreateView Component
 export function CreateView({ type, lessonId, className }: CreateViewProps) {
   const locale = useLocale();
@@ -364,11 +394,12 @@ export function CreateView({ type, lessonId, className }: CreateViewProps) {
 
     try {
       // Map form type to enrichmentType
-      const typeMap: Record<string, 'quiz' | 'video' | 'audio' | 'presentation' | 'document'> = {
+      const typeMap: Record<string, 'quiz' | 'video' | 'audio' | 'presentation' | 'document' | 'cover'> = {
         quiz: 'quiz',
         video: 'video',
         audio: 'audio',
         presentation: 'presentation',
+        cover: 'cover',
       };
 
       const result = await createEnrichment({
@@ -436,6 +467,14 @@ export function CreateView({ type, lessonId, className }: CreateViewProps) {
             onSubmit={handleSubmit}
             onCancel={handleCancel}
             onDirtyChange={setDirty}
+            isSubmitting={isSubmitting}
+          />
+        );
+      case 'cover':
+        return (
+          <CoverCreateForm
+            onSubmit={handleSubmit}
+            onCancel={handleCancel}
             isSubmitting={isSubmitting}
           />
         );

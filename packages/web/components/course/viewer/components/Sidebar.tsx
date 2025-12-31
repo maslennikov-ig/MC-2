@@ -82,7 +82,7 @@ export function Sidebar({
                     size="icon"
                     className="h-8 w-8 text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400"
                   >
-                    <Link href={`/courses/generating/${course.slug || course.id}?workflow=true`}>
+                    <Link href={`/courses/generating/${course.slug || course.id}?workflow=true`} target="_blank">
                       <GitBranch className="w-4 h-4" />
                     </Link>
                   </Button>
