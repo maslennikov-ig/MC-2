@@ -118,13 +118,49 @@ export async function generateImage(
 
     // Check for images array (OpenRouter format)
     // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const images = (message as any)?.images as string[] | undefined;
+    const messageAny = message as any;
+    const images = messageAny?.images as unknown[] | undefined;
+
+    // Log the actual response structure for debugging
+    logger.info({
+      hasImages: !!images,
+      imagesLength: images?.length,
+      imagesType: images ? typeof images[0] : 'none',
+      firstImagePreview: images && images[0]
+        ? (typeof images[0] === 'string'
+            ? images[0].substring(0, 100)
+            : JSON.stringify(images[0]).substring(0, 200))
+        : 'none',
+      messageContent: messageAny?.content?.substring?.(0, 100) || 'none',
+    }, 'Image generation response structure');
 
     if (!images || images.length === 0) {
       throw new Error('No image generated in response');
     }
 
-    const imageDataUrl = images[0];
+    const imageData = images[0];
+
+    // Handle different response formats
+    let imageDataUrl: string;
+
+    if (typeof imageData === 'string') {
+      imageDataUrl = imageData;
+    } else if (imageData && typeof imageData === 'object') {
+      // Some models return { url: string } or { b64_json: string }
+      const imgObj = imageData as { url?: string; b64_json?: string; data?: string };
+      if (imgObj.url) {
+        // If URL is provided, we need to fetch the image
+        throw new Error(`Image URL response not supported yet: ${imgObj.url}`);
+      } else if (imgObj.b64_json) {
+        imageDataUrl = `data:image/png;base64,${imgObj.b64_json}`;
+      } else if (imgObj.data) {
+        imageDataUrl = imgObj.data;
+      } else {
+        throw new Error(`Unknown image object format: ${JSON.stringify(imgObj).substring(0, 200)}`);
+      }
+    } else {
+      throw new Error(`Unexpected image data type: ${typeof imageData}`);
+    }
 
     // Parse data URL: data:image/png;base64,{base64_data}
     const dataUrlMatch = imageDataUrl.match(/^data:(image\/\w+);base64,(.+)$/);
