@@ -3,6 +3,24 @@
 _Released on 2025-12-26_
 
 
+## v0.26.44
+
+_Released on 2025-12-31_
+
+### ✨ New Features
+
+- **web**: Add 1 source file(s), update 2 source file(s)
+- **admin**: Add Stage 7 (Enrichments) to admin pipeline page
+- **enrichments**: Add cover option to all enrichment UI locations
+
+### 🔧 Improvements
+
+- **admin**: Apply code review improvements
+
+---
+
+_This release was automatically generated from 4 commits._
+
 ## v0.26.43
 
 _Released on 2025-12-31_

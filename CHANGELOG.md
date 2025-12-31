@@ -40,6 +40,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.26.44] - 2025-12-31
+
+### Added
+- **web**: add 1 source file(s), update 2 source file(s) (95c0121)
+- **admin**: add Stage 7 (Enrichments) to admin pipeline page (7be1400)
+- **enrichments**: add cover option to all enrichment UI locations (8930c9d)
+
+### Changed
+- **admin**: apply code review improvements (8ed8510)
+
 ## [0.26.43] - 2025-12-31
 
 ### Fixed
