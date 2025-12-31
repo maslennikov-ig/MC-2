@@ -3,6 +3,28 @@
 _Released on 2025-12-26_
 
 
+## v0.26.42
+
+_Released on 2025-12-31_
+
+### ✨ New Features
+
+- **.claude**: Add 19 source file(s), update docs
+- **enrichments**: Add cover image generation for lessons
+
+### 🔧 Improvements
+
+- **enrichments**: Apply code review improvements to cover feature
+
+### 🐛 Bug Fixes
+
+- **web**: Add APP_VERSION to container for proper logging
+- **web**: Disable PWA + add Kill Switch to fix 502 errors
+
+---
+
+_This release was automatically generated from 7 commits._
+
 ## v0.26.41
 
 _Released on 2025-12-30_

@@ -40,6 +40,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.26.42] - 2025-12-31
+
+### Added
+- **.claude**: add 19 source file(s), update docs (14e84c5)
+- **enrichments**: add cover image generation for lessons (fff0838)
+
+### Changed
+- **enrichments**: apply code review improvements to cover feature (8bea531)
+
+### Fixed
+- **web**: add APP_VERSION to container for proper logging (2ef0527)
+- **web**: disable PWA + add Kill Switch to fix 502 errors (404d3c5)
+
+### Other
+- add PWA disabled context and recovery plan (67ba69e)
+- **release**: v0.26.42 (8cfc89e)
+
 ## [0.26.41] - 2025-12-30
 
 ### Fixed
