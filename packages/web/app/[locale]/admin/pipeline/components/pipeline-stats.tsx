@@ -7,6 +7,7 @@ import { useEffect, useState } from 'react';
 import { getPipelineStats } from '@/app/actions/pipeline-admin';
 import type { PipelineStats as PipelineStatsType } from '@megacampus/shared-types';
 import { useTranslations } from 'next-intl';
+import { formatDuration } from '@/lib/utils/format';
 
 /**
  * PipelineStats Component
@@ -147,15 +148,4 @@ export function PipelineStats() {
       </Card>
     </div>
   );
-}
-
-/**
- * Format duration in milliseconds to human-readable string
- */
-function formatDuration(ms: number): string {
-  if (ms < 1000) return `${ms}ms`;
-  if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
-  const minutes = Math.floor(ms / 60000);
-  const seconds = Math.round((ms % 60000) / 1000);
-  return `${minutes}m ${seconds}s`;
 }

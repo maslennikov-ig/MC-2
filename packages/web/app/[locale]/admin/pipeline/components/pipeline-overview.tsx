@@ -9,6 +9,7 @@ import { getStagesInfo } from '@/app/actions/pipeline-admin';
 import type { PipelineStage, ModelConfigWithVersion } from '@megacampus/shared-types';
 import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils';
+import { formatDuration } from '@/lib/utils/format';
 import { StageDetailSheet } from './stage-detail-sheet';
 import { ModelEditorDialog } from './model-editor-dialog';
 import { PromptEditorDialog } from './prompt-editor-dialog';
@@ -291,15 +292,4 @@ export function PipelineOverview() {
       />
     </>
   );
-}
-
-/**
- * Format duration in milliseconds to human-readable string
- */
-function formatDuration(ms: number): string {
-  if (ms < 1000) return `${ms}ms`;
-  if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
-  const minutes = Math.floor(ms / 60000);
-  const seconds = Math.round((ms % 60000) / 1000);
-  return `${minutes}m ${seconds}s`;
 }

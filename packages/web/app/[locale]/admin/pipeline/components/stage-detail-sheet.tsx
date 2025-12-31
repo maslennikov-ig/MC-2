@@ -53,6 +53,7 @@ import {
   Presentation,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { formatDuration } from '@/lib/utils/format';
 import { listModelConfigs, listPromptTemplates, listJudgeConfigs, listContextReserveSettings } from '@/app/actions/pipeline-admin';
 import type { PipelineStage, ModelConfigWithVersion, JudgeConfigsByLanguage, JudgeConfig } from '@megacampus/shared-types';
 import { calculateContextThreshold, DEFAULT_CONTEXT_RESERVE, MAX_RESERVE_PERCENT } from '@megacampus/shared-types';
@@ -110,17 +111,6 @@ const ENRICHMENT_ACTIVITIES = [
 ] as const;
 
 /**
- * Format duration in milliseconds to human-readable string
- */
-function formatDuration(ms: number): string {
-  if (ms < 1000) return `${ms}ms`;
-  if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
-  const minutes = Math.floor(ms / 60000);
-  const seconds = Math.round((ms % 60000) / 1000);
-  return `${minutes}m ${seconds}s`;
-}
-
-/**
  * Map stage number to stage key for filtering
  */
 function getStageKey(stageNumber: number): string {
@@ -149,6 +139,17 @@ function getTierLabel(
   maxContext: number = 128000,
   reservePercent: number = DEFAULT_CONTEXT_RESERVE.any
 ): string {
+  // Validate maxContext - must be a positive finite number
+  if (!Number.isFinite(maxContext) || maxContext <= 0) {
+    if (process.env.NODE_ENV === 'development') {
+      console.warn(
+        '[getTierLabel] Invalid maxContext:',
+        { maxContext, action: 'using default 128000' }
+      );
+    }
+    maxContext = 128000;
+  }
+
   // Validate and clamp reservePercent
   if (reservePercent < 0 || reservePercent > MAX_RESERVE_PERCENT) {
     // Log warning with structured context

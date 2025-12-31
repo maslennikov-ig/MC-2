@@ -306,6 +306,8 @@ export const DEFAULT_MODEL_CONFIGS: Record<PhaseName, DefaultModelConfig> = {
     fallbackModelId: DEFAULT_FALLBACK_MODEL_ID,
   },
   // Stage 7: Enrichments (Activities)
+  // Cover uses image generation model (SeedDream 4.5) via OpenRouter's image endpoint.
+  // Fallback to text model for prompt generation if image model unavailable.
   stage_7_cover: {
     modelId: 'bytedance-seed/seedream-4.5',
     temperature: 0.7,
