@@ -180,7 +180,7 @@ services:
         max-size: "50m"
         max-file: "3"
 
-  # BullMQ Worker for background jobs
+  # BullMQ Worker for background jobs (course generation stages 1-6)
   worker:
     image: ghcr.io/maslennikov-ig/mc-2/api:latest
     container_name: megacampus-worker
@@ -219,6 +219,41 @@ services:
         limits:
           cpus: '2'
           memory: 2G
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "50m"
+        max-file: "3"
+
+  # Stage 7 Enrichment Worker (cover images, audio, video, quiz, presentation)
+  worker-stage7:
+    image: ghcr.io/maslennikov-ig/mc-2/api:latest
+    container_name: megacampus-worker-stage7
+    restart: unless-stopped
+    command: ["tsx", "dist/stages/stage7-enrichments/worker-entrypoint.js"]
+    healthcheck:
+      disable: true
+    env_file:
+      - .env.production
+    environment:
+      - NODE_ENV=production
+      - REDIS_URL=redis://redis:6379
+      # Storage bucket for enrichment assets
+      - ENRICHMENTS_STORAGE_BUCKET=course-enrichments
+    volumes:
+      - ./data/uploads:/app/uploads
+    networks:
+      - megacampus
+    depends_on:
+      redis:
+        condition: service_healthy
+      api:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
     logging:
       driver: "json-file"
       options:
