@@ -37,9 +37,9 @@ export default function Logo({
 
   // Standardized sizes for responsive design
   const sizePresets: Record<LogoSize, { width: number; height: number }> = {
-    sm: { width: 48, height: 16 },
-    md: { width: 60, height: 20 },
-    lg: { width: 72, height: 24 }
+    sm: { width: 40, height: 16 },
+    md: { width: 52, height: 20 },
+    lg: { width: 62, height: 24 }
   }
 
   // Determine dimensions: size prop > width/height props > variant defaults
@@ -77,8 +77,8 @@ export default function Logo({
     <span className={cn(
       "font-bold tracking-tight whitespace-nowrap",
       "transition-all duration-300",
-      variant === "full" ? "text-[22px]" : "text-[18px]",
-      textPosition === "bottom" ? "mt-2" : "ml-3",
+      variant === "full" ? "text-[21px]" : "text-[17px]",
+      textPosition === "bottom" ? "mt-2" : "ml-2",
       // Forced white text (e.g., dark background header)
       effectiveForceTheme === "dark"
         ? "text-white"
@@ -110,9 +110,8 @@ export default function Logo({
       height={h}
       priority
       quality={90}
-      style={{ width: 'auto', height: 'auto' }}
       className={cn(
-        "object-contain",
+        "h-auto",
         variant === "icon" && "rounded-lg",
         effectiveForceTheme === "light" ? "hidden" : "hidden dark:block",
         effectiveForceTheme === "dark" && "block"
@@ -128,9 +127,8 @@ export default function Logo({
       height={h}
       priority
       quality={90}
-      style={{ width: 'auto', height: 'auto' }}
       className={cn(
-        "object-contain",
+        "h-auto",
         variant === "icon" && "rounded-lg",
         effectiveForceTheme === "dark" ? "hidden" : "block dark:hidden",
         effectiveForceTheme === "light" && "block"
