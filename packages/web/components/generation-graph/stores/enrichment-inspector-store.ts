@@ -153,6 +153,8 @@ export const useEnrichmentInspectorStore = create<EnrichmentInspectorState>()(
 
         // Check for pending create from node toolbar deep-link
         if (state.pendingCreateType) {
+          // Push root to history so cancel/back button works
+          state.history = [{ view: 'root' }];
           // Navigate directly to create view with pending type
           state.current = { view: 'create', createType: state.pendingCreateType };
           state.pendingCreateType = null;

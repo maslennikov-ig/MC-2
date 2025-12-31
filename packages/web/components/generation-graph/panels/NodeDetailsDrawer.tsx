@@ -46,6 +46,7 @@ import { ModuleDashboard } from './module/ModuleDashboard';
 import { LessonPanelWithTabs } from './lesson/LessonPanelWithTabs';
 import { useModuleDashboardData } from '../hooks/useModuleDashboardData';
 import { useLessonInspectorData } from '../hooks/useLessonInspectorData';
+import { useEnrichmentInspectorStore } from '../stores/enrichment-inspector-store';
 
 interface DisplayData {
   label?: string;
@@ -81,6 +82,9 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
   const [showRestartDialog, setShowRestartDialog] = useState(false);
   const [isApproving, setIsApproving] = useState(false);
   const [isRetrying, setIsRetrying] = useState(false);
+
+  // Check if there's a pending enrichment create from toolbar
+  const pendingCreateType = useEnrichmentInspectorStore((state) => state.pendingCreateType);
 
   const toggleExpand = useCallback(() => {
     setIsExpanded(prev => !prev);
@@ -621,6 +625,7 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
               isApproving={isApproving}
               isRegenerating={isRetrying}
               tier={courseInfo.tier}
+              defaultTab={pendingCreateType ? 'enrichments' : 'content'}
             />
           ) : realtimeStatus?.status === 'skipped' || data?.status === 'skipped' ? (
             /* Skipped Stage - show informative message */
