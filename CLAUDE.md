@@ -201,6 +201,11 @@ Production server SSH available. See `.claude/local.md` for IP and details (giti
 - Config: `packages/web/src/i18n/config.ts` (Single Source of Truth)
 - Guide: `.claude/docs/i18n-guide.md` (full reference for translations)
 
+**Enrichments (Stage 7 Activities)**:
+- Guide: `.claude/docs/enrichment-guide.md` (checklist for adding new activity types)
+- Types: video, audio, presentation, quiz, document, cover
+- Add to: 6 UI locations + backend handler + DB migration + translations + admin pipeline
+
 ## Recent Changes
 - 013-n8n-graph-view: Added Immer for state management
 - 010-stages-456-pipeline: Added TypeScript 5.x (strict mode)

@@ -305,6 +305,43 @@ export const DEFAULT_MODEL_CONFIGS: Record<PhaseName, DefaultModelConfig> = {
     maxTokens: 512,
     fallbackModelId: DEFAULT_FALLBACK_MODEL_ID,
   },
+  // Stage 7: Enrichments (Activities)
+  stage_7_cover: {
+    modelId: 'bytedance-seed/seedream-4.5',
+    temperature: 0.7,
+    maxTokens: 1024,
+    fallbackModelId: DEFAULT_MODEL_ID,
+  },
+  stage_7_video: {
+    modelId: DEFAULT_MODEL_ID,
+    temperature: 0.7,
+    maxTokens: 8000,
+    fallbackModelId: DEFAULT_FALLBACK_MODEL_ID,
+  },
+  stage_7_audio: {
+    modelId: DEFAULT_MODEL_ID,
+    temperature: 0.7,
+    maxTokens: 8000,
+    fallbackModelId: DEFAULT_FALLBACK_MODEL_ID,
+  },
+  stage_7_quiz: {
+    modelId: DEFAULT_MODEL_ID,
+    temperature: 0.7,
+    maxTokens: 4096,
+    fallbackModelId: DEFAULT_FALLBACK_MODEL_ID,
+  },
+  stage_7_presentation: {
+    modelId: DEFAULT_MODEL_ID,
+    temperature: 0.7,
+    maxTokens: 8000,
+    fallbackModelId: DEFAULT_FALLBACK_MODEL_ID,
+  },
+  stage_7_document: {
+    modelId: DEFAULT_MODEL_ID,
+    temperature: 0.7,
+    maxTokens: 8000,
+    fallbackModelId: DEFAULT_FALLBACK_MODEL_ID,
+  },
   // Special phases
   emergency: {
     modelId: 'x-ai/grok-4-fast',

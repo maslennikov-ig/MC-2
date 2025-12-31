@@ -46,6 +46,11 @@ import {
   Zap,
   Shield,
   Database,
+  ImageIcon,
+  Video,
+  Headphones,
+  HelpCircle,
+  Presentation,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { listModelConfigs, listPromptTemplates, listJudgeConfigs, listContextReserveSettings } from '@/app/actions/pipeline-admin';
@@ -89,7 +94,20 @@ const stageColors: Record<number, { bg: string; text: string; border: string; gr
   4: { bg: 'bg-purple-500/10', text: 'text-purple-400', border: 'border-purple-500/30', gradient: 'from-purple-500 to-purple-600' },
   5: { bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/30', gradient: 'from-emerald-500 to-emerald-600' },
   6: { bg: 'bg-amber-500/10', text: 'text-amber-400', border: 'border-amber-500/30', gradient: 'from-amber-500 to-amber-600' },
+  7: { bg: 'bg-rose-500/10', text: 'text-rose-400', border: 'border-rose-500/30', gradient: 'from-rose-500 to-rose-600' },
 };
+
+/**
+ * Stage 7 Enrichment activity types with their configurations
+ */
+const ENRICHMENT_ACTIVITIES = [
+  { key: 'cover', icon: ImageIcon, label: 'Cover', labelRu: 'Обложка', color: 'text-cyan-500' },
+  { key: 'video', icon: Video, label: 'Video', labelRu: 'Видео', color: 'text-red-500' },
+  { key: 'audio', icon: Headphones, label: 'Audio', labelRu: 'Аудио', color: 'text-purple-500' },
+  { key: 'quiz', icon: HelpCircle, label: 'Quiz', labelRu: 'Тест', color: 'text-green-500' },
+  { key: 'presentation', icon: Presentation, label: 'Presentation', labelRu: 'Презентация', color: 'text-orange-500' },
+  { key: 'document', icon: FileText, label: 'Document', labelRu: 'Документ', color: 'text-blue-500' },
+] as const;
 
 /**
  * Format duration in milliseconds to human-readable string
@@ -197,6 +215,7 @@ export function StageDetailSheet({
   );
   const [isLoading, setIsLoading] = useState(false);
   const [activeTab, setActiveTab] = useState('overview');
+  const [activeEnrichmentTab, setActiveEnrichmentTab] = useState<string>('cover');
   const [judgeEditorOpen, setJudgeEditorOpen] = useState(false);
   const [selectedJudge, setSelectedJudge] = useState<JudgeConfig | null>(null);
 
@@ -475,6 +494,102 @@ export function StageDetailSheet({
                 </Card>
               ) : (
                 <>
+                  {/* Stage 7: Show Enrichment Activity Tabs first */}
+                  {stage.number === 7 && (
+                    <Card className="bg-gray-50 dark:bg-zinc-900/50 border-gray-200 dark:border-zinc-800">
+                      <CardHeader className="pb-3">
+                        <CardTitle className="text-sm font-medium text-gray-700 dark:text-zinc-300 flex items-center gap-2">
+                          <Sparkles className="h-4 w-4 text-rose-400" />
+                          Enrichment Activities Configuration
+                          <Badge
+                            variant="outline"
+                            className="bg-rose-500/10 text-rose-400 border-rose-500/30 text-xs"
+                          >
+                            Database
+                          </Badge>
+                        </CardTitle>
+                      </CardHeader>
+                      <CardContent className="space-y-4">
+                        <p className="text-xs text-gray-500 dark:text-zinc-500">
+                          Configure LLM models for each enrichment activity type. Each activity can have its own model and prompt settings.
+                        </p>
+
+                        {/* Activity Tabs */}
+                        <Tabs value={activeEnrichmentTab} onValueChange={setActiveEnrichmentTab}>
+                          <TabsList className="bg-gray-100 dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 w-full grid grid-cols-6 h-auto p-1">
+                            {ENRICHMENT_ACTIVITIES.map((activity) => {
+                              const ActivityIcon = activity.icon;
+                              const activityModels = models.filter(m => m.phaseName === `stage_7_${activity.key}`);
+                              return (
+                                <TabsTrigger
+                                  key={activity.key}
+                                  value={activity.key}
+                                  className="flex flex-col items-center gap-1 py-2 px-1 data-[state=active]:bg-gray-200 dark:data-[state=active]:bg-zinc-800"
+                                >
+                                  <ActivityIcon className={cn('h-4 w-4', activity.color)} />
+                                  <span className="text-xs">{activity.label}</span>
+                                  {activityModels.length > 0 && (
+                                    <Badge variant="secondary" className="h-4 px-1 text-xs">
+                                      {activityModels.length}
+                                    </Badge>
+                                  )}
+                                </TabsTrigger>
+                              );
+                            })}
+                          </TabsList>
+
+                          {ENRICHMENT_ACTIVITIES.map((activity) => {
+                            const activityModels = models.filter(m => m.phaseName === `stage_7_${activity.key}`);
+                            const ActivityIcon = activity.icon;
+
+                            return (
+                              <TabsContent key={activity.key} value={activity.key} className="mt-4">
+                                {activityModels.length === 0 ? (
+                                  <div className="text-center py-8 text-gray-500 dark:text-zinc-500">
+                                    <ActivityIcon className={cn('h-8 w-8 mx-auto mb-2', activity.color, 'opacity-50')} />
+                                    <p className="text-sm">No model configured for {activity.label}</p>
+                                    <p className="text-xs mt-1">Add a model for stage_7_{activity.key} phase</p>
+                                  </div>
+                                ) : (
+                                  <div className="space-y-3">
+                                    {activityModels.map((model) => (
+                                      <div
+                                        key={model.id}
+                                        onClick={() => onEditModel?.(model)}
+                                        className="flex items-center justify-between p-3 rounded-lg bg-white dark:bg-zinc-900 border border-gray-200 dark:border-zinc-800 cursor-pointer hover:border-gray-300 dark:hover:border-zinc-700 transition-colors"
+                                      >
+                                        <div className="flex items-center gap-3">
+                                          <ActivityIcon className={cn('h-5 w-5', activity.color)} />
+                                          <div>
+                                            <code className="text-sm text-purple-500 dark:text-cyan-400 font-mono">
+                                              {model.modelId.split('/').pop()}
+                                            </code>
+                                            <div className="flex items-center gap-2 mt-1 text-xs text-gray-500 dark:text-zinc-500">
+                                              <span className="flex items-center gap-1">
+                                                <Thermometer className="h-3 w-3" />
+                                                {model.temperature ?? 0.7}
+                                              </span>
+                                              <span>•</span>
+                                              <span className="flex items-center gap-1">
+                                                <Hash className="h-3 w-3" />
+                                                {model.maxTokens ?? 4096}
+                                              </span>
+                                            </div>
+                                          </div>
+                                        </div>
+                                        <ChevronRight className="h-4 w-4 text-gray-400 dark:text-zinc-600" />
+                                      </div>
+                                    ))}
+                                  </div>
+                                )}
+                              </TabsContent>
+                            );
+                          })}
+                        </Tabs>
+                      </CardContent>
+                    </Card>
+                  )}
+
                   {/* Stage 6: Show CLEV Judge Configurations first */}
                   {stage.number === 6 && judgeConfigs.length > 0 && (
                     <Card className="bg-gray-50 dark:bg-zinc-900/50 border-gray-200 dark:border-zinc-800">
@@ -622,10 +737,14 @@ export function StageDetailSheet({
                     All configurations are editable and stored in the database.
                   </p>
 
-                  {/* Group models by language and tier (exclude judge configs - they are shown above) */}
+                  {/* Group models by language and tier (exclude special configs shown above) */}
                   {(() => {
-                    // Filter out judge models - they are already shown in CLEV Judges section
-                    const nonJudgeModels = models.filter((m) => !m.judgeRole);
+                    // Filter out judge models (Stage 6) and enrichment activity models (Stage 7)
+                    const nonJudgeModels = models.filter((m) => {
+                      if (m.judgeRole) return false;
+                      if (stage.number === 7 && ENRICHMENT_ACTIVITIES.some(a => m.phaseName === `stage_7_${a.key}`)) return false;
+                      return true;
+                    });
                     const grouped = groupModelsByLanguageAndTier(nonJudgeModels);
                     const languages: Array<'any' | 'ru' | 'en'> = ['any', 'ru', 'en'];
                     const tiers: Array<'standard' | 'extended'> = ['standard', 'extended'];

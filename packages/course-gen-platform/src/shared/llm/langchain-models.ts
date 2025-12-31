@@ -217,6 +217,37 @@ const PHASE_FALLBACK_CONFIG: Record<
     temperature: 0.7,
     maxTokens: 15000,
   },
+  // Stage 7: Enrichments (Activities)
+  stage_7_cover: {
+    modelId: 'bytedance-seed/seedream-4.5', // Image generation for covers
+    temperature: 0.7,
+    maxTokens: 1024,
+  },
+  stage_7_video: {
+    modelId: DEFAULT_MODEL_ID,
+    temperature: 0.7,
+    maxTokens: 8000,
+  },
+  stage_7_audio: {
+    modelId: DEFAULT_MODEL_ID,
+    temperature: 0.7,
+    maxTokens: 8000,
+  },
+  stage_7_quiz: {
+    modelId: DEFAULT_MODEL_ID,
+    temperature: 0.7,
+    maxTokens: 4096,
+  },
+  stage_7_presentation: {
+    modelId: DEFAULT_MODEL_ID,
+    temperature: 0.7,
+    maxTokens: 8000,
+  },
+  stage_7_document: {
+    modelId: DEFAULT_MODEL_ID,
+    temperature: 0.7,
+    maxTokens: 8000,
+  },
   // Special phases (keep specific models)
   emergency: {
     modelId: 'x-ai/grok-4-fast',         // Large context (2M tokens)

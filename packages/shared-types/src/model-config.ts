@@ -52,6 +52,13 @@ export type PhaseName =
   | 'stage_6_patcher'
   | 'stage_6_section_expander'
   | 'stage_6_delta_judge'
+  // Stage 7: Enrichments (Activities)
+  | 'stage_7_cover'
+  | 'stage_7_video'
+  | 'stage_7_audio'
+  | 'stage_7_quiz'
+  | 'stage_7_presentation'
+  | 'stage_7_document'
   // Special
   | 'emergency'
   | 'quality_fallback';

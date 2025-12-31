@@ -42,6 +42,7 @@ const stageColors: Record<number, { bg: string; text: string; border: string; ho
   4: { bg: 'bg-purple-500/10', text: 'text-purple-400', border: 'border-purple-500/30', hover: 'hover:border-purple-500/60' },
   5: { bg: 'bg-emerald-500/10', text: 'text-emerald-400', border: 'border-emerald-500/30', hover: 'hover:border-emerald-500/60' },
   6: { bg: 'bg-amber-500/10', text: 'text-amber-400', border: 'border-amber-500/30', hover: 'hover:border-amber-500/60' },
+  7: { bg: 'bg-rose-500/10', text: 'text-rose-400', border: 'border-rose-500/30', hover: 'hover:border-rose-500/60' },
 };
 
 /**

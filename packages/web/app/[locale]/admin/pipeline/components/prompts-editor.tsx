@@ -4,7 +4,7 @@
  * Displays prompt templates grouped by pipeline stage with edit and history actions.
  *
  * Features:
- * - Accordion grouped by stage (stage_3, stage_4, stage_5, stage_6)
+ * - Accordion grouped by stage (stage_3, stage_4, stage_5, stage_6, stage_7)
  * - Display prompt metadata (name, key, version, variables)
  * - Edit button to open PromptEditorDialog
  * - History button to open PromptHistoryDialog
@@ -60,6 +60,7 @@ const STAGE_LABELS: Record<string, string> = {
   stage_4: 'Stage 4: Content Analysis',
   stage_5: 'Stage 5: Course Structure',
   stage_6: 'Stage 6: Lesson Generation',
+  stage_7: 'Stage 7: Enrichments',
 };
 
 /**
@@ -71,6 +72,7 @@ export function PromptsEditor() {
     stage_4: [],
     stage_5: [],
     stage_6: [],
+    stage_7: [],
   });
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -88,7 +90,7 @@ export function PromptsEditor() {
       setIsLoading(true);
       setError(null);
       const result = await listPromptTemplates();
-      setPrompts(result.result?.data || { stage_3: [], stage_4: [], stage_5: [], stage_6: [] });
+      setPrompts(result.result?.data || { stage_3: [], stage_4: [], stage_5: [], stage_6: [], stage_7: [] });
     } catch (err) {
       const errorMessage = err instanceof Error ? err.message : 'Failed to load prompts';
       setError(errorMessage);
@@ -155,7 +157,7 @@ export function PromptsEditor() {
         </p>
       </div>
 
-      <Accordion type="multiple" defaultValue={['stage_3', 'stage_4', 'stage_5', 'stage_6']}>
+      <Accordion type="multiple" defaultValue={['stage_3', 'stage_4', 'stage_5', 'stage_6', 'stage_7']}>
         {Object.entries(STAGE_LABELS).map(([stage, label]) => (
           <AccordionItem key={stage} value={stage}>
             <AccordionTrigger className="text-lg font-medium">
