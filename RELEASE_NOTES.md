@@ -3,6 +3,18 @@
 _Released on 2025-12-26_
 
 
+## v0.26.43
+
+_Released on 2025-12-31_
+
+### 🐛 Bug Fixes
+
+- **web**: Update 1 source file(s)
+
+---
+
+_This release was automatically generated from 1 commits._
+
 ## v0.26.42
 
 _Released on 2025-12-31_
