@@ -5,6 +5,7 @@
     "presentation": "Presentation",
     "quiz": "Quiz",
     "document": "Document",
+    "cover": "Cover",
     "podcast": "Podcast",
     "mindmap": "Mindmap",
     "case_study": "Case Study",
@@ -19,7 +20,8 @@
     "audio": "Text-to-speech narration for convenient listening",
     "presentation": "Slide presentation for visual accompaniment",
     "quiz": "Comprehension quiz to reinforce learning",
-    "document": "Additional document for download"
+    "document": "Additional document for download",
+    "cover": "AI-generated cover image for the lesson"
   },
   "status": {
     "pending": "Pending",
@@ -230,7 +232,8 @@
       "audio": "Audio",
       "presentation": "Presentation",
       "quiz": "Quiz",
-      "document": "Document"
+      "document": "Document",
+      "cover": "Cover"
     }
   }
 }

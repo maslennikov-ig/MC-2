@@ -11,13 +11,14 @@ import {
   Presentation,
   HelpCircle,
   FileText,
+  Image,
   type LucideIcon,
 } from 'lucide-react';
 
 /**
  * Enrichment type (matches database enum)
  */
-export type EnrichmentType = 'video' | 'audio' | 'presentation' | 'quiz' | 'document';
+export type EnrichmentType = 'video' | 'audio' | 'presentation' | 'quiz' | 'document' | 'cover';
 
 /**
  * Enrichment status (matches database enum)
@@ -113,6 +114,17 @@ export const ENRICHMENT_TYPE_CONFIG: Record<EnrichmentType, EnrichmentTypeConfig
     labelRu: 'Дополнительное чтение',
     twoStage: false,
     order: 5,
+  },
+  cover: {
+    icon: Image,
+    color: 'text-cyan-500 dark:text-cyan-400',
+    colorClass: 'text-cyan-500 dark:text-cyan-400',
+    bgColor: 'bg-cyan-100 dark:bg-cyan-900/30',
+    bgClass: 'bg-cyan-100 dark:bg-cyan-900/30',
+    label: 'Lesson Cover',
+    labelRu: 'Обложка урока',
+    twoStage: false,
+    order: 0,
   },
 };
 
@@ -224,6 +236,7 @@ export function isAwaitingActionStatus(status: EnrichmentStatus): boolean {
  * Ordered array of enrichment types for consistent display
  */
 export const ENRICHMENT_TYPES_ORDERED: EnrichmentType[] = [
+  'cover',
   'video',
   'audio',
   'presentation',

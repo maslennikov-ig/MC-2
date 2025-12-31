@@ -337,6 +337,48 @@ export type DocumentEnrichmentContent = z.infer<
 >;
 
 // ============================================================================
+// COVER ENRICHMENT CONTENT (Lesson Hero Image)
+// ============================================================================
+
+/**
+ * Cover enrichment content structure
+ *
+ * Stores generated lesson cover/hero image metadata and URL.
+ * Image generated via OpenRouter (bytedance-seed/seedream-4.5).
+ * Displayed as hero banner at the top of lesson content.
+ */
+export const coverEnrichmentContentSchema = z.object({
+  /** Content type discriminator */
+  type: z.literal('cover'),
+
+  /** Generated image URL (Supabase Storage public URL) */
+  image_url: z.string().url(),
+
+  /** Image width in pixels */
+  width: z.number().int().positive().default(1280),
+
+  /** Image height in pixels */
+  height: z.number().int().positive().default(720),
+
+  /** Aspect ratio string (e.g., "16:9") */
+  aspect_ratio: z.string().default('16:9'),
+
+  /** The prompt used for image generation (stored for regeneration/debugging) */
+  generation_prompt: z.string(),
+
+  /** Optional alt text for accessibility */
+  alt_text: z.string().optional(),
+
+  /** Image format */
+  format: z.enum(['png', 'jpeg', 'webp']).default('png'),
+
+  /** File size in bytes (optional) */
+  file_size_bytes: z.number().int().positive().optional(),
+});
+
+export type CoverEnrichmentContent = z.infer<typeof coverEnrichmentContentSchema>;
+
+// ============================================================================
 // DISCRIMINATED UNION OF ALL CONTENT TYPES
 // ============================================================================
 
@@ -352,6 +394,7 @@ export const enrichmentContentSchema = z.discriminatedUnion('type', [
   audioEnrichmentContentSchema,
   videoEnrichmentContentSchema,
   documentEnrichmentContentSchema,
+  coverEnrichmentContentSchema,
 ]);
 
 export type EnrichmentContent = z.infer<typeof enrichmentContentSchema>;

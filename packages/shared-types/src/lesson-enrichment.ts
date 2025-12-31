@@ -29,6 +29,7 @@ export const enrichmentTypeSchema = z.enum([
   'presentation',
   'quiz',
   'document',
+  'cover',
 ]);
 
 export type EnrichmentType = z.infer<typeof enrichmentTypeSchema>;
@@ -256,12 +257,12 @@ export function isEnrichmentSummary(value: unknown): value is EnrichmentSummary 
 }
 
 /**
- * Check if enrichment requires an asset file (audio/video)
+ * Check if enrichment requires an asset file (audio/video/cover)
  * @param type - Enrichment type
  * @returns True if type requires Supabase Storage asset
  */
 export function requiresAsset(type: EnrichmentType): boolean {
-  return type === 'audio' || type === 'video';
+  return type === 'audio' || type === 'video' || type === 'cover';
 }
 
 /**
@@ -289,6 +290,7 @@ export function getDefaultEnrichmentTitle(
     presentation: { en: 'Presentation Slides', ru: 'Презентация' },
     quiz: { en: 'Knowledge Check Quiz', ru: 'Проверочный тест' },
     document: { en: 'Downloadable Document', ru: 'Документ для скачивания' },
+    cover: { en: 'Lesson Cover', ru: 'Обложка урока' },
   };
 
   return titles[type][locale];

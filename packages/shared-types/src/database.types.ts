@@ -2808,7 +2808,7 @@ export type Database = {
         | "completed"
         | "failed"
         | "cancelled"
-      enrichment_type: "video" | "audio" | "presentation" | "quiz" | "document"
+      enrichment_type: "video" | "audio" | "presentation" | "quiz" | "document" | "cover"
       enrollment_status: "active" | "completed" | "dropped" | "expired"
       generation_stage: "stage4" | "stage5" | "stage6"
       generation_status:
@@ -3016,7 +3016,7 @@ export const Constants = {
         "failed",
         "cancelled",
       ],
-      enrichment_type: ["video", "audio", "presentation", "quiz", "document"],
+      enrichment_type: ["video", "audio", "presentation", "quiz", "document", "cover"],
       enrollment_status: ["active", "completed", "dropped", "expired"],
       generation_stage: ["stage4", "stage5", "stage6"],
       generation_status: [

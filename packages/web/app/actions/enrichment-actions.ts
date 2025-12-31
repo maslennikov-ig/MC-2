@@ -448,7 +448,7 @@ export interface GetEnrichmentResult {
   success: boolean;
   enrichment?: {
     id: string;
-    enrichment_type: 'video' | 'audio' | 'quiz' | 'presentation' | 'document';
+    enrichment_type: 'video' | 'audio' | 'quiz' | 'presentation' | 'document' | 'cover';
     status:
       | 'pending'
       | 'draft_generating'

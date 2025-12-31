@@ -166,6 +166,7 @@ export function LessonView({
               section={currentSection}
               assets={assets}
               lessonContent={lessonContent}
+              enrichments={enrichments}
             />
           </div>
           
@@ -253,6 +254,7 @@ export function LessonView({
           section={currentSection}
           assets={assets}
           lessonContent={lessonContent}
+          enrichments={enrichments}
           availableFormats={{
             video: currentLesson.video_asset?.url,
             audio: currentLesson.audio_asset?.url,

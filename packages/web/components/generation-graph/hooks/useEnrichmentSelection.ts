@@ -56,6 +56,7 @@ export function useEnrichmentSelection(
 
     // Count by type
     const countByType: Record<EnrichmentType, number> = {
+      cover: 0,
       quiz: 0,
       video: 0,
       audio: 0,

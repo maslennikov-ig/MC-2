@@ -58,6 +58,8 @@ interface ContentFormatSwitcherProps {
   assets?: Asset[]
   /** Lesson content from lesson_contents table (Stage 6 generated content) */
   lessonContent?: LessonContentRow
+  /** Enrichments for the current lesson (video, audio, quiz, presentation, document, cover) */
+  enrichments?: Array<{ enrichment_type: string; content: unknown; status: string }>
   availableFormats?: {
     video?: string
     audio?: string
@@ -71,6 +73,7 @@ export default function ContentFormatSwitcher({
   section,
   assets,
   lessonContent,
+  enrichments,
   availableFormats = {},
   onFormatChange
 }: ContentFormatSwitcherProps) {
@@ -183,7 +186,7 @@ export default function ContentFormatSwitcher({
 
   // Only show switcher if there are alternative formats
   if (availableFormatsCount <= 1) {
-    return <LessonContent lesson={lesson} section={section} assets={assets} lessonContent={lessonContent} />
+    return <LessonContent lesson={lesson} section={section} assets={assets} lessonContent={lessonContent} enrichments={enrichments} />
   }
 
   return (
@@ -252,7 +255,7 @@ export default function ContentFormatSwitcher({
           className="w-full"
         >
           {currentFormat === 'text' && (
-            <LessonContent lesson={lesson} section={section} assets={assets} lessonContent={lessonContent} />
+            <LessonContent lesson={lesson} section={section} assets={assets} lessonContent={lessonContent} enrichments={enrichments} />
           )}
 
           {currentFormat === 'video' && mockFormats.video && (

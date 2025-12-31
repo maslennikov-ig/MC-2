@@ -21,10 +21,7 @@ import {
   useEnrichmentInspectorStore,
   type CreateEnrichmentType,
 } from '../../../stores/enrichment-inspector-store';
-import {
-  type EnrichmentType,
-  type EnrichmentStatus,
-} from '@/lib/generation-graph/enrichment-config';
+import type { EnrichmentType, EnrichmentStatus } from '@megacampus/shared-types';
 import { cn } from '@/lib/utils';
 import { useSupabase } from '@/lib/supabase/browser-client';
 import { useStaticGraph } from '../../../contexts/StaticGraphContext';

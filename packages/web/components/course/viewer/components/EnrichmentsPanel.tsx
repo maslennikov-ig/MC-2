@@ -120,6 +120,9 @@ export function EnrichmentsPanel({ enrichments, enrichmentsLoadError }: Enrichme
   const t = useTranslations('enrichments')
   const [activeEnrichmentId, setActiveEnrichmentId] = useState<string | null>(null)
 
+  // Filter out cover type - it's displayed as hero banner in lesson content
+  const filteredEnrichments = enrichments.filter(e => (e.enrichment_type as string) !== 'cover')
+
   // Show error banner if there was a load error
   if (enrichmentsLoadError) {
     return (
@@ -134,7 +137,7 @@ export function EnrichmentsPanel({ enrichments, enrichmentsLoadError }: Enrichme
     )
   }
 
-  if (!enrichments || enrichments.length === 0) {
+  if (!filteredEnrichments || filteredEnrichments.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center">
         <FileText className="w-12 h-12 text-gray-300 dark:text-gray-600 mb-4" />
@@ -149,7 +152,7 @@ export function EnrichmentsPanel({ enrichments, enrichmentsLoadError }: Enrichme
   }
 
   // Group enrichments by type
-  const groupedEnrichments = enrichments.reduce((acc, e) => {
+  const groupedEnrichments = filteredEnrichments.reduce((acc, e) => {
     const type = e.enrichment_type as EnrichmentType
     if (!acc[type]) acc[type] = []
     acc[type].push(e)

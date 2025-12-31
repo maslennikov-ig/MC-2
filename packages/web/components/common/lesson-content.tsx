@@ -9,6 +9,8 @@ import { MarkdownRendererFull } from "@/components/markdown"
 import type { Lesson, Section, Asset } from "@/types/database"
 import { parseLessonContent } from "@/lib/lesson-content-parser"
 import type { Database } from "@/types/database.generated"
+import { LessonCoverHero } from "@/components/course/viewer/components/LessonCoverHero"
+import { EnrichmentErrorBoundary } from "@/components/course/viewer/enrichments/EnrichmentErrorBoundary"
 
 type LessonContentRow = Database['public']['Tables']['lesson_contents']['Row']
 
@@ -32,9 +34,11 @@ interface LessonContentProps {
   assets?: Asset[]
   /** Lesson content from lesson_contents table (Stage 6 generated content) */
   lessonContent?: LessonContentRow
+  /** Enrichments for the current lesson (video, audio, quiz, presentation, document, cover) */
+  enrichments?: Array<{ enrichment_type: string; content: unknown; status: string }>
 }
 
-export default function LessonContent({ lesson, section, assets, lessonContent }: LessonContentProps) {
+export default function LessonContent({ lesson, section, assets, lessonContent, enrichments }: LessonContentProps) {
   const [videoMode, setVideoMode] = useState<'hidden' | 'normal' | 'floating'>('hidden')
   
   // Assets are loaded from database
@@ -164,6 +168,20 @@ export default function LessonContent({ lesson, section, assets, lessonContent }
     }
   }, [lessonContent, lesson])
 
+  // Extract cover image URL from enrichments
+  const coverImageUrl = useMemo(() => {
+    if (!enrichments) return null
+
+    const coverEnrichment = enrichments.find(
+      (e) => e.enrichment_type === 'cover' && e.status === 'completed'
+    )
+
+    if (!coverEnrichment?.content) return null
+
+    const content = coverEnrichment.content as { type: string; image_url?: string }
+    return content.type === 'cover' ? content.image_url ?? null : null
+  }, [enrichments])
+
   return (
     <motion.div
       key={lesson.id}
@@ -172,6 +190,22 @@ export default function LessonContent({ lesson, section, assets, lessonContent }
       transition={{ duration: 0.5 }}
       className="max-w-7xl mx-auto px-6 py-8 lg:px-10 xl:max-w-[90rem]"
     >
+      {/* Cover Hero Image - Displayed at the top if exists */}
+      {coverImageUrl && (
+        <EnrichmentErrorBoundary
+          enrichmentType="Lesson Cover"
+          enrichmentId={lesson.id}
+        >
+          <div className="mb-6">
+            <LessonCoverHero
+              imageUrl={coverImageUrl}
+              lessonTitle={lesson.title}
+              showOverlay={false}
+            />
+          </div>
+        </EnrichmentErrorBoundary>
+      )}
+
       {/* Additional Materials Section - Only show when materials exist */}
       {hasAdditionalMaterials && (
         <div className="mb-8 p-6 bg-gradient-to-br from-purple-50/50 via-blue-50/30 to-indigo-50/50 dark:from-purple-900/20 dark:via-blue-900/10 dark:to-indigo-900/20 rounded-xl border border-purple-200 dark:border-purple-800/30 shadow-sm">

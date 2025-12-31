@@ -213,7 +213,7 @@ const nextConfig: NextConfig = {
       }
     ],
     loader: 'default',
-    loaderFile: undefined,
+    loaderFile: './lib/supabase-image-loader.ts',
     domains: [], // deprecated in favor of remotePatterns
     path: '/_next/image',
     unoptimized: false,

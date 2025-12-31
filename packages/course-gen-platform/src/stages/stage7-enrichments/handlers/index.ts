@@ -11,6 +11,7 @@ export { videoHandler } from './video-handler';
 export { quizHandler } from './quiz-handler';
 export { audioHandler } from './audio-handler';
 export { presentationHandler } from './presentation-handler';
+export { coverHandler } from './cover-handler';
 
 // Future handlers to be added:
 // export { documentHandler } from './document-handler';
