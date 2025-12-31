@@ -59,6 +59,10 @@ ENV NEXT_PUBLIC_SUPABASE_URL=${NEXT_PUBLIC_SUPABASE_URL}
 ENV NEXT_PUBLIC_SUPABASE_ANON_KEY=${NEXT_PUBLIC_SUPABASE_ANON_KEY}
 ENV SUPABASE_SERVICE_ROLE_KEY=${SUPABASE_SERVICE_ROLE_KEY}
 ENV SUPABASE_JWT_SECRET=${SUPABASE_JWT_SECRET}
+
+# Extract version from package.json and save to file for runner stage
+RUN node -p "require('./packages/web/package.json').version" > /tmp/app_version.txt
+
 # Build shared packages first (other packages depend on them)
 RUN pnpm --filter @megacampus/shared-types build
 RUN pnpm --filter @megacampus/shared-logger build
@@ -91,12 +95,21 @@ RUN adduser --system --uid 1001 nextjs
 # Public folder must be relative to server.js location (packages/web/)
 COPY --from=builder /app/packages/web/public ./packages/web/public
 
+# Copy version file for entrypoint script
+COPY --from=builder /tmp/app_version.txt /app/app_version.txt
+
 # Automatically leverage output traces to reduce image size
 # Next.js standalone output is in packages/web/.next for monorepo
 # Standalone contains: packages/web/server.js, packages/web/.next/, node_modules/
 COPY --from=builder --chown=nextjs:nodejs /app/packages/web/.next/standalone ./
 # Static files must be in packages/web/.next/static (relative to server.js location)
 COPY --from=builder --chown=nextjs:nodejs /app/packages/web/.next/static ./packages/web/.next/static
+
+# Create entrypoint script that sets APP_VERSION from the version file
+RUN echo '#!/bin/sh' > /app/entrypoint.sh && \
+    echo 'export APP_VERSION=$(cat /app/app_version.txt)' >> /app/entrypoint.sh && \
+    echo 'exec node packages/web/server.js' >> /app/entrypoint.sh && \
+    chmod +x /app/entrypoint.sh
 
 # Switch to nodejs user
 USER nextjs
@@ -107,5 +120,5 @@ EXPOSE 3000
 ENV PORT=3000
 ENV HOSTNAME="0.0.0.0"
 
-# Start the application (in monorepo, server.js is in packages/web/)
-CMD ["node", "packages/web/server.js"]
+# Start the application with entrypoint that sets APP_VERSION
+CMD ["/bin/sh", "/app/entrypoint.sh"]
