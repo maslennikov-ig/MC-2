@@ -9,7 +9,9 @@ const APP_VERSION = packageJson.version;
 const withPWA = require('@ducanh2912/next-pwa').default({
   dest: 'public',
   register: true,
-  disable: process.env.NODE_ENV === 'development',
+  // TEMPORARY: Disable PWA completely to diagnose 502 errors
+  // TODO: Re-enable after confirming SW was the issue
+  disable: true,
   reloadOnOnline: true,
   // Custom worker with async helpers for workbox compatibility
   customWorkerSrc: 'worker',

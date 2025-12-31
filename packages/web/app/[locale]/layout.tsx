@@ -156,113 +156,77 @@ export default async function LocaleLayout({ children, params }: Props) {
     <html lang={locale} suppressHydrationWarning>
       <head>
         {/*
-          CRITICAL: Emergency SW cleanup script - v2.0
-          This runs BEFORE any JS bundles load to fix stuck users with stale cache.
-          - On version change: immediately clears ALL caches and reloads
-          - On chunk load error: clears caches and retries (with loop protection)
+          CRITICAL: Kill Switch - v3.0 (TEMPORARY)
+          PWA is disabled. This script ALWAYS clears ALL caches and unregisters ALL SWs.
+          This ensures ALL users get clean state after deployment.
         */}
         <Script
-          id="sw-emergency-cleanup"
+          id="sw-kill-switch"
           strategy="beforeInteractive"
           dangerouslySetInnerHTML={{
             __html: `
               (function() {
                 try {
-                  var APP_VERSION = '${process.env.NEXT_PUBLIC_APP_VERSION || 'dev'}';
-                  var VERSION_KEY = 'mc-app-version';
-                  var CLEARING_KEY = 'mc-clearing';
-                  var RETRY_KEY = 'mc-retry';
+                  var CLEARED_KEY = 'mc-sw-killed';
 
-                  // Skip if we're in the middle of clearing (prevents loop)
-                  if (sessionStorage.getItem(CLEARING_KEY)) {
-                    sessionStorage.removeItem(CLEARING_KEY);
-                    console.log('[CacheBuster] Cleared caches, continuing with fresh state');
+                  // Only run once per session to avoid infinite loop
+                  if (sessionStorage.getItem(CLEARED_KEY)) {
+                    console.log('[KillSwitch] Already cleared this session');
                     return;
                   }
 
-                  var savedVersion = localStorage.getItem(VERSION_KEY);
-                  var versionChanged = savedVersion && savedVersion !== APP_VERSION;
+                  var hadSW = false;
+                  var hadCache = false;
 
-                  // CASE 1: Version changed - clear everything and reload
-                  if (versionChanged) {
-                    console.log('[CacheBuster] Version changed: ' + savedVersion + ' → ' + APP_VERSION);
-                    localStorage.setItem(VERSION_KEY, APP_VERSION);
-                    sessionStorage.setItem(CLEARING_KEY, '1');
-
-                    // Clear all caches
-                    if ('caches' in window) {
-                      caches.keys().then(function(keys) {
-                        return Promise.all(keys.map(function(k) { return caches.delete(k); }));
-                      }).then(function() {
-                        console.log('[CacheBuster] Caches cleared');
-                      });
-                    }
-
-                    // Unregister all service workers
-                    if ('serviceWorker' in navigator) {
-                      navigator.serviceWorker.getRegistrations().then(function(regs) {
+                  // Unregister ALL service workers
+                  if ('serviceWorker' in navigator) {
+                    navigator.serviceWorker.getRegistrations().then(function(regs) {
+                      if (regs.length > 0) {
+                        hadSW = true;
+                        console.log('[KillSwitch] Found ' + regs.length + ' SW(s), unregistering...');
                         return Promise.all(regs.map(function(r) { return r.unregister(); }));
-                      }).then(function() {
-                        console.log('[CacheBuster] SWs unregistered, reloading...');
+                      }
+                    }).then(function() {
+                      if (hadSW) {
+                        console.log('[KillSwitch] All SWs unregistered');
+                      }
+                    });
+                  }
+
+                  // Clear ALL caches
+                  if ('caches' in window) {
+                    caches.keys().then(function(keys) {
+                      if (keys.length > 0) {
+                        hadCache = true;
+                        console.log('[KillSwitch] Found ' + keys.length + ' cache(s), deleting...');
+                        return Promise.all(keys.map(function(k) { return caches.delete(k); }));
+                      }
+                    }).then(function() {
+                      if (hadCache) {
+                        console.log('[KillSwitch] All caches deleted');
+                      }
+
+                      // Mark as cleared and reload if we had SW or caches
+                      if (hadSW || hadCache) {
+                        sessionStorage.setItem(CLEARED_KEY, '1');
+                        console.log('[KillSwitch] Reloading with clean state...');
                         setTimeout(function() { location.reload(); }, 100);
-                      });
-                    } else {
-                      setTimeout(function() { location.reload(); }, 100);
-                    }
-                    return; // Stop execution - page will reload
+                      }
+                    });
                   }
 
-                  // CASE 2: First visit - just save version
-                  if (!savedVersion) {
-                    localStorage.setItem(VERSION_KEY, APP_VERSION);
-                  }
-
-                  // CASE 3: Error recovery for chunk loading failures
-                  var MAX_RETRIES = 3;
-                  var COOLDOWN_MS = 60000;
-
+                  // Also listen for chunk errors just in case
                   window.addEventListener('error', function(e) {
                     var msg = (e.message || '').toLowerCase();
-                    var isChunkError = msg.includes('loading chunk') ||
-                                       msg.includes('failed to fetch') ||
-                                       msg.includes('chunkloaderror') ||
-                                       msg.includes('dynamically imported module');
-
-                    if (!isChunkError) return;
-
-                    var now = Date.now();
-                    var retryData = JSON.parse(sessionStorage.getItem(RETRY_KEY) || '{"count":0,"time":0}');
-
-                    // Reset if cooldown passed
-                    if (now - retryData.time > COOLDOWN_MS) {
-                      retryData.count = 0;
-                    }
-
-                    if (retryData.count < MAX_RETRIES) {
-                      console.log('[CacheBuster] Chunk error, retry ' + (retryData.count + 1) + '/' + MAX_RETRIES);
-                      sessionStorage.setItem(RETRY_KEY, JSON.stringify({count: retryData.count + 1, time: now}));
-                      sessionStorage.setItem(CLEARING_KEY, '1');
-
-                      // Clear caches and reload
-                      if ('caches' in window) {
-                        caches.keys().then(function(keys) {
-                          return Promise.all(keys.map(function(k) { return caches.delete(k); }));
-                        });
-                      }
-                      if ('serviceWorker' in navigator) {
-                        navigator.serviceWorker.getRegistrations().then(function(regs) {
-                          regs.forEach(function(r) { r.unregister(); });
-                        });
-                      }
-
-                      setTimeout(function() { location.reload(); }, 150);
-                    } else {
-                      console.error('[CacheBuster] Max retries reached. Manual cache clear needed.');
+                    if (msg.includes('chunk') || msg.includes('failed to fetch')) {
+                      console.log('[KillSwitch] Chunk error detected, forcing reload');
+                      sessionStorage.setItem(CLEARED_KEY, '1');
+                      location.reload();
                     }
                   });
 
                 } catch(err) {
-                  console.error('[CacheBuster] Error:', err);
+                  console.error('[KillSwitch] Error:', err);
                 }
               })();
             `,
