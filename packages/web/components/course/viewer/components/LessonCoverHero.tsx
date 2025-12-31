@@ -6,20 +6,23 @@ import NextImage from "next/image"
 import { ImageIcon } from "lucide-react"
 import { cn } from "@/lib/utils"
 
+/**
+ * Props for the LessonCoverHero component
+ */
 interface LessonCoverHeroProps {
-  /** URL of the cover image (from Supabase Storage) */
+  /** URL of the cover image from Supabase Storage */
   imageUrl?: string | null
-  /** Lesson title for alt text and optional overlay */
+  /** Lesson title used for accessibility (aria-label) and optional overlay text */
   lessonTitle: string
-  /** Section/module title for optional overlay */
+  /** Section/module title displayed above lesson title in overlay */
   sectionTitle?: string
-  /** Show gradient overlay with title */
+  /** Whether to show gradient overlay with lesson and section titles */
   showOverlay?: boolean
-  /** Callback when image loads successfully */
+  /** Callback fired when image loads successfully */
   onImageLoad?: () => void
-  /** Callback when image fails to load */
+  /** Callback fired when image fails to load */
   onImageError?: () => void
-  /** Additional CSS classes */
+  /** Additional CSS classes for the container element */
   className?: string
 }
 
@@ -27,12 +30,37 @@ interface LessonCoverHeroProps {
  * LessonCoverHero - Hero banner component for lesson cover images
  *
  * Displays a 16:9 aspect ratio hero image at the top of lesson content.
+ *
  * Features:
  * - Responsive height (200px mobile, 250px tablet, 300px desktop)
- * - Fade-in animation with skeleton loader
- * - Optional gradient overlay with lesson title
+ * - Fade-in animation with skeleton loader during image load
+ * - GPU-optimized animations with willChange hints
+ * - Memory-safe state updates (prevents setState on unmounted)
  * - Dark/light theme support
  * - Priority loading for above-the-fold content
+ * - Optional gradient overlay with lesson/section titles
+ *
+ * @param props - Component props
+ * @param props.imageUrl - URL of the cover image from Supabase Storage
+ * @param props.lessonTitle - Lesson title for accessibility (aria-label) and optional overlay
+ * @param props.sectionTitle - Section/module title for optional overlay
+ * @param props.showOverlay - Whether to display gradient overlay with titles
+ * @param props.className - Additional CSS classes for container
+ * @param props.onImageLoad - Callback when image loads successfully
+ * @param props.onImageError - Callback when image fails to load
+ *
+ * @returns JSX element or null if no image URL or error occurred
+ *
+ * @example
+ * ```tsx
+ * <LessonCoverHero
+ *   imageUrl="https://supabase.co/storage/..."
+ *   lessonTitle="Introduction to React"
+ *   sectionTitle="Module 1: Basics"
+ *   showOverlay={true}
+ *   onImageLoad={() => console.log('loaded')}
+ * />
+ * ```
  */
 export function LessonCoverHero({
   imageUrl,
@@ -100,6 +128,10 @@ export function LessonCoverHero({
       </AnimatePresence>
 
       {/* Main image with fade-in animation */}
+      {/*
+        GPU optimization: willChange='opacity' during load hints browser to prepare,
+        then resets to 'auto' after animation to free GPU memory
+      */}
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: isLoaded ? 1 : 0 }}

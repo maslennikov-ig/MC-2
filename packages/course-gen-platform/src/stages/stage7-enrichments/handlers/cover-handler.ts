@@ -45,6 +45,15 @@ const PROMPT_TEMPERATURE = 0.7;
 /** Supabase Storage bucket for cover images */
 const STORAGE_BUCKET = process.env.ENRICHMENTS_STORAGE_BUCKET ?? 'course-enrichments';
 
+/**
+ * Retry configuration for upload operations
+ */
+const RETRY_CONFIG = {
+  MAX_ATTEMPTS: 3,
+  INITIAL_DELAY_MS: 1000,
+  BACKOFF_MULTIPLIER: 2,
+} as const;
+
 // ============================================================================
 // HELPER FUNCTIONS
 // ============================================================================
@@ -54,8 +63,8 @@ const STORAGE_BUCKET = process.env.ENRICHMENTS_STORAGE_BUCKET ?? 'course-enrichm
  */
 async function retryWithBackoff<T>(
   fn: () => Promise<T>,
-  maxAttempts: number = 3,
-  initialDelayMs: number = 1000
+  maxAttempts: number = RETRY_CONFIG.MAX_ATTEMPTS,
+  initialDelayMs: number = RETRY_CONFIG.INITIAL_DELAY_MS
 ): Promise<T> {
   let lastError: Error | null = null;
 
@@ -69,7 +78,7 @@ async function retryWithBackoff<T>(
         break;
       }
 
-      const delayMs = initialDelayMs * Math.pow(2, attempt - 1);
+      const delayMs = initialDelayMs * Math.pow(RETRY_CONFIG.BACKOFF_MULTIPLIER, attempt - 1);
       logger.warn(
         { attempt, delayMs, error: lastError.message },
         'Upload failed, retrying...'
@@ -79,6 +88,45 @@ async function retryWithBackoff<T>(
   }
 
   throw lastError;
+}
+
+/**
+ * Generate localized alt text for cover images
+ */
+function getLocalizedAltText(language: string, lessonTitle: string): string {
+  const safeTitle = lessonTitle.slice(0, 100); // Limit length
+  const templates: Record<string, string> = {
+    en: `Cover illustration for lesson: ${safeTitle}`,
+    ru: `Обложка урока: ${safeTitle}`,
+  };
+  return templates[language] ?? templates.en;
+}
+
+/**
+ * Patterns for prohibited content in image prompts
+ * Uses word boundaries to avoid false positives
+ */
+const PROHIBITED_PATTERNS = [
+  /\bnsfw\b/i,
+  /\bnude\b/i,
+  /\bnaked\b/i,
+  /\bexplicit\b/i,
+  /\bgore\b/i,
+  /\bviolence\b/i,
+  /\bviolent\b/i,
+  /\bblood\b/i,
+  /\bbloody\b/i,
+  /\bweapon\b/i,
+  /\bweapons\b/i,
+  /\bdeath\b/i,
+  /\bkill\b/i,
+] as const;
+
+/**
+ * Check if prompt contains prohibited content
+ */
+function containsProhibitedContent(prompt: string): boolean {
+  return PROHIBITED_PATTERNS.some(pattern => pattern.test(prompt));
 }
 
 /**
@@ -191,12 +239,10 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
       }
 
       // Check for prohibited content
-      const prohibitedKeywords = ['nsfw', 'nude', 'explicit', 'gore', 'violence', 'blood'];
-      const lowerPrompt = imagePrompt.toLowerCase();
-      if (prohibitedKeywords.some(keyword => lowerPrompt.includes(keyword))) {
+      if (containsProhibitedContent(imagePrompt)) {
         logger.warn(
           { enrichmentId: enrichment.id },
-          'Cover handler: prohibited content in prompt, using default'
+          'Cover handler: prohibited content detected in LLM-generated prompt, using default'
         );
         imagePrompt = getDefaultImagePrompt(lesson.title, course.title ?? 'Educational Content');
       }
@@ -282,7 +328,7 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
       height: imageResult.height,
       aspect_ratio: '16:9',
       generation_prompt: imagePrompt,
-      alt_text: 'Generated lesson cover illustration',
+      alt_text: getLocalizedAltText(course.language ?? 'en', lesson.title),
       format: extension as 'png' | 'jpeg' | 'webp',
       file_size_bytes: imageBuffer.length,
     };
