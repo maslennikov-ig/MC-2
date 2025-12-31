@@ -10,6 +10,7 @@ import { QuizPreview, type QuizPreviewProps } from '../QuizPreview';
 import { AudioPreview, type AudioPreviewProps } from '../AudioPreview';
 import { VideoScriptPanel, type VideoScriptPanelProps } from '../VideoScriptPanel';
 import { PresentationPreview, type PresentationPreviewProps } from '../PresentationPreview';
+import { CoverPreview, type CoverPreviewProps } from '../CoverPreview';
 import { DeleteConfirmationDialog } from '../components/DeleteConfirmationDialog';
 import { type EnrichmentStatus } from '@/lib/generation-graph/enrichment-config';
 import { cn } from '@/lib/utils';
@@ -27,6 +28,7 @@ type QuizEnrichment = QuizPreviewProps['enrichment'];
 type VideoEnrichment = VideoScriptPanelProps['enrichment'];
 type AudioEnrichment = AudioPreviewProps['enrichment'];
 type PresentationEnrichment = PresentationPreviewProps['enrichment'];
+type CoverEnrichment = CoverPreviewProps['enrichment'];
 
 // Discriminated union for type-safe enrichment handling
 interface EnrichmentBase {
@@ -58,12 +60,18 @@ interface PresentationEnrichmentData extends EnrichmentBase {
   content: PresentationEnrichment['content'];
 }
 
+interface CoverEnrichmentData extends EnrichmentBase {
+  type: 'cover';
+  content: CoverEnrichment['content'];
+}
+
 // Discriminated union type
 type EnrichmentData =
   | QuizEnrichmentData
   | VideoEnrichmentData
   | AudioEnrichmentData
-  | PresentationEnrichmentData;
+  | PresentationEnrichmentData
+  | CoverEnrichmentData;
 
 // Data state for the enrichment detail
 type DataState =
@@ -142,6 +150,13 @@ function useEnrichmentDetail(enrichmentId: string): DataState & { refetch: () =>
             ...baseData,
             type: 'presentation',
             content: enrichment.content as PresentationEnrichment['content'],
+          };
+          break;
+        case 'cover':
+          enrichmentData = {
+            ...baseData,
+            type: 'cover',
+            content: enrichment.content as CoverEnrichment['content'],
           };
           break;
         case 'document':
@@ -309,6 +324,16 @@ function toPresentationPreviewProps(e: PresentationEnrichmentData): Presentation
   };
 }
 
+function toCoverPreviewProps(e: CoverEnrichmentData): CoverEnrichment {
+  return {
+    id: e.id,
+    status: e.status,
+    content: e.content,
+    metadata: e.metadata,
+    error_message: e.error_message,
+  };
+}
+
 /**
  * Renders the appropriate preview component based on enrichment type.
  * Uses discriminated union pattern for type-safe rendering.
@@ -323,6 +348,8 @@ function renderPreview(enrichment: EnrichmentData) {
       return <AudioPreview enrichment={toAudioPreviewProps(enrichment)} />;
     case 'presentation':
       return <PresentationPreview enrichment={toPresentationPreviewProps(enrichment)} />;
+    case 'cover':
+      return <CoverPreview enrichment={toCoverPreviewProps(enrichment)} />;
     default: {
       // Exhaustive check - should never reach here
       const _exhaustive: never = enrichment;

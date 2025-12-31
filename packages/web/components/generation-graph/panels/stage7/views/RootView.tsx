@@ -12,11 +12,13 @@
 'use client';
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { useTranslations } from 'next-intl';
+import { useTranslations, useLocale } from 'next-intl';
 import { Layers, Video, HelpCircle, Volume2, Presentation, AlertCircle, ImageIcon } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
+import { DeleteConfirmationDialog } from '../components/DeleteConfirmationDialog';
+import { deleteEnrichment } from '@/app/actions/enrichment-actions';
 import {
   useEnrichmentInspectorStore,
   type CreateEnrichmentType,
@@ -28,6 +30,7 @@ import { useStaticGraph } from '../../../contexts/StaticGraphContext';
 import { EnrichmentList } from '../components/EnrichmentList';
 import { type EnrichmentListItemData } from '../components/EnrichmentListItem';
 import { reorderEnrichments } from '@/app/actions/enrichment-actions';
+// deleteEnrichment is imported above
 import { logger } from '@/lib/client-logger';
 
 /**
@@ -502,12 +505,17 @@ function useEnrichmentsByLesson(lessonId: string): DataState & { refetch: () => 
  */
 export function RootView({ lessonId, className }: RootViewProps) {
   const t = useTranslations('enrichments');
+  const locale = useLocale();
   const { openCreate, openDetail } = useEnrichmentInspectorStore();
   const { courseInfo } = useStaticGraph();
   const dataState = useEnrichmentsByLesson(lessonId);
 
   // Local state for optimistic reordering
   const [localEnrichments, setLocalEnrichments] = useState<EnrichmentListItemData[]>([]);
+
+  // Delete confirmation state
+  const [deleteTarget, setDeleteTarget] = useState<string | null>(null);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Sync local state with fetched data
   useEffect(() => {
@@ -552,6 +560,57 @@ export function RootView({ lessonId, className }: RootViewProps) {
     [localEnrichments, courseInfo?.id, lessonId, t]
   );
 
+  /**
+   * Handle delete button click - show confirmation dialog
+   */
+  const handleDeleteClick = useCallback((enrichmentId: string) => {
+    setDeleteTarget(enrichmentId);
+  }, []);
+
+  /**
+   * Handle delete confirmation
+   */
+  const handleDeleteConfirm = useCallback(async () => {
+    if (!deleteTarget || !courseInfo?.id) {
+      return;
+    }
+
+    setIsDeleting(true);
+
+    try {
+      const result = await deleteEnrichment({
+        enrichmentId: deleteTarget,
+        courseId: courseInfo.id,
+      });
+
+      if (result.success) {
+        toast.success(locale === 'ru' ? 'Активность удалена' : 'Activity deleted');
+        // Optimistically remove from local state
+        setLocalEnrichments((prev) => prev.filter((e) => e.id !== deleteTarget));
+        setDeleteTarget(null);
+      } else {
+        toast.error(
+          locale === 'ru'
+            ? `Не удалось удалить: ${result.error}`
+            : `Failed to delete: ${result.error}`
+        );
+      }
+    } catch {
+      toast.error(
+        locale === 'ru' ? 'Не удалось удалить активность' : 'Failed to delete activity'
+      );
+    } finally {
+      setIsDeleting(false);
+    }
+  }, [deleteTarget, courseInfo?.id, locale]);
+
+  /**
+   * Handle delete cancel
+   */
+  const handleDeleteCancel = useCallback(() => {
+    setDeleteTarget(null);
+  }, []);
+
   // Render based on data state
   const renderContent = () => {
     switch (dataState.status) {
@@ -576,6 +635,7 @@ export function RootView({ lessonId, className }: RootViewProps) {
                 items={localEnrichments}
                 onItemClick={openDetail}
                 onReorder={handleReorder}
+                onDelete={handleDeleteClick}
               />
             </div>
 
@@ -593,9 +653,20 @@ export function RootView({ lessonId, className }: RootViewProps) {
   };
 
   return (
-    <div className={cn('flex flex-col h-full', className)}>
-      {renderContent()}
-    </div>
+    <>
+      <div className={cn('flex flex-col h-full', className)}>
+        {renderContent()}
+      </div>
+
+      {/* Delete Confirmation Dialog */}
+      <DeleteConfirmationDialog
+        open={deleteTarget !== null}
+        onOpenChange={(open) => !open && handleDeleteCancel()}
+        onConfirm={handleDeleteConfirm}
+        onCancel={handleDeleteCancel}
+        isDeleting={isDeleting}
+      />
+    </>
   );
 }
 

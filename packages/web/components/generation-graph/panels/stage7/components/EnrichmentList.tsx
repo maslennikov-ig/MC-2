@@ -32,6 +32,7 @@ export interface EnrichmentListProps {
   items: EnrichmentListItemData[];
   onItemClick: (id: string) => void;
   onReorder?: (items: EnrichmentListItemData[]) => void;
+  onDelete?: (id: string) => void;
   className?: string;
 }
 
@@ -50,7 +51,7 @@ export interface EnrichmentListProps {
  * />
  * ```
  */
-export function EnrichmentList({ items, onItemClick, onReorder, className }: EnrichmentListProps) {
+export function EnrichmentList({ items, onItemClick, onReorder, onDelete, className }: EnrichmentListProps) {
   const t = useTranslations('enrichments');
   const [activeId, setActiveId] = useState<string | null>(null);
 
@@ -104,6 +105,7 @@ export function EnrichmentList({ items, onItemClick, onReorder, className }: Enr
                 item={item}
                 isDragging={activeId === item.id}
                 onClick={() => onItemClick(item.id)}
+                onDelete={onDelete ? () => onDelete(item.id) : undefined}
               />
             ))}
           </div>

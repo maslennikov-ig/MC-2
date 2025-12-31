@@ -4,11 +4,12 @@ import React from 'react';
 import { useTranslations } from 'next-intl';
 import { useSortable } from '@dnd-kit/sortable';
 import { CSS } from '@dnd-kit/utilities';
-import { GripVertical, AlertCircle, Loader2, CheckCircle2 } from 'lucide-react';
+import { GripVertical, AlertCircle, Loader2, CheckCircle2, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { sanitizeErrorMessage } from '@/lib/utils/sanitize-error';
 import type { EnrichmentStatus, EnrichmentType } from '@megacampus/shared-types';
 import { ENRICHMENT_TYPE_CONFIG } from '@/lib/generation-graph/enrichment-config';
+import { Button } from '@/components/ui/button';
 
 export interface EnrichmentListItemData {
   id: string;
@@ -22,6 +23,7 @@ export interface EnrichmentListItemProps {
   item: EnrichmentListItemData;
   isDragging?: boolean;
   onClick: () => void;
+  onDelete?: () => void;
 }
 
 function StatusIndicator({ status }: { status: EnrichmentStatus }) {
@@ -60,9 +62,14 @@ function StatusIndicator({ status }: { status: EnrichmentStatus }) {
  * />
  * ```
  */
-export function EnrichmentListItem({ item, isDragging, onClick }: EnrichmentListItemProps) {
+export function EnrichmentListItem({ item, isDragging, onClick, onDelete }: EnrichmentListItemProps) {
   const t = useTranslations('enrichments');
   const config = ENRICHMENT_TYPE_CONFIG[item.type];
+
+  const handleDelete = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onDelete?.();
+  };
 
   const {
     attributes,
@@ -97,7 +104,7 @@ export function EnrichmentListItem({ item, isDragging, onClick }: EnrichmentList
       data-enrichment-type={item.type}
       data-enrichment-status={item.status}
       className={cn(
-        'flex items-center gap-3 p-3 bg-white dark:bg-slate-900 border rounded-lg',
+        'group flex items-center gap-3 p-3 bg-white dark:bg-slate-900 border rounded-lg',
         'cursor-pointer hover:border-primary/50 hover:shadow-sm transition-all',
         (isDragging || isSortableDragging) && 'opacity-50 shadow-lg ring-2 ring-primary',
         item.status === 'failed' && 'border-red-200 dark:border-red-900'
@@ -133,6 +140,19 @@ export function EnrichmentListItem({ item, isDragging, onClick }: EnrichmentList
 
       {/* Status Indicator */}
       <StatusIndicator status={item.status} />
+
+      {/* Delete Button - visible on hover */}
+      {onDelete && (
+        <Button
+          variant="ghost"
+          size="icon-sm"
+          onClick={handleDelete}
+          className="opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground hover:text-red-500"
+          aria-label={t('inspector.delete')}
+        >
+          <Trash2 className="w-4 h-4" />
+        </Button>
+      )}
     </div>
   );
 }

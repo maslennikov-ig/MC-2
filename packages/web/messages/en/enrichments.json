@@ -76,6 +76,7 @@
     "empty": "No activities yet",
     "emptyDescription": "Add interactive content to make your lesson more engaging",
     "reorderFailed": "Failed to reorder activities",
+    "delete": "Delete",
     "deleteConfirmTitle": "Delete Activity?",
     "deleteConfirmDescription": "This action cannot be undone. The activity will be permanently deleted along with all associated data.",
     "deleteSuccess": "Activity deleted"
