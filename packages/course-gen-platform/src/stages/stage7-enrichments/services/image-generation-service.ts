@@ -146,11 +146,28 @@ export async function generateImage(
     if (typeof imageData === 'string') {
       imageDataUrl = imageData;
     } else if (imageData && typeof imageData === 'object') {
-      // Some models return { url: string } or { b64_json: string }
-      const imgObj = imageData as { url?: string; b64_json?: string; data?: string };
-      if (imgObj.url) {
-        // If URL is provided, we need to fetch the image
-        throw new Error(`Image URL response not supported yet: ${imgObj.url}`);
+      // OpenRouter can return various formats:
+      // 1. { type: "image_url", image_url: { url: "data:..." } } - chat completion format
+      // 2. { url: string } - direct URL
+      // 3. { b64_json: string } - base64 without data URL prefix
+      // 4. { data: string } - data URL
+      const imgObj = imageData as {
+        type?: string;
+        image_url?: { url?: string };
+        url?: string;
+        b64_json?: string;
+        data?: string;
+      };
+
+      if (imgObj.type === 'image_url' && imgObj.image_url?.url) {
+        // Chat completion format: { type: "image_url", image_url: { url: "data:..." } }
+        imageDataUrl = imgObj.image_url.url;
+      } else if (imgObj.url?.startsWith('data:')) {
+        // Direct data URL
+        imageDataUrl = imgObj.url;
+      } else if (imgObj.url) {
+        // External URL - not supported yet
+        throw new Error(`External image URL not supported yet: ${imgObj.url}`);
       } else if (imgObj.b64_json) {
         imageDataUrl = `data:image/png;base64,${imgObj.b64_json}`;
       } else if (imgObj.data) {
