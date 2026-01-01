@@ -1,5 +1,7 @@
+'use client';
+
 import { useState, useEffect, useCallback } from 'react'
-import { logger } from '../logger'
+import { logger } from '../client-logger'
 
 /**
  * Custom hook for managing localStorage with TypeScript support

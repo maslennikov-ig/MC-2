@@ -1,4 +1,4 @@
-import type { Metadata } from "next";
+import type { Metadata, Viewport } from "next";
 import { Manrope, JetBrains_Mono } from "next/font/google";
 import { NextIntlClientProvider, hasLocale } from 'next-intl';
 import { getMessages, getTranslations, setRequestLocale } from 'next-intl/server';
@@ -11,6 +11,7 @@ import { Toaster } from "@/components/ui/sonner";
 import { Providers } from "./providers";
 import { BackToTop } from "@/components/ui/back-to-top";
 import { ServiceWorkerManager } from "@/components/pwa/ServiceWorkerManager";
+import { InstallPrompt } from "@/components/pwa/InstallPrompt";
 import "../globals.css";
 // KaTeX CSS for math formula rendering
 import "katex/dist/katex.min.css";
@@ -23,6 +24,16 @@ import "@/components/markdown/styles/task-list.css";
 // Force dynamic rendering to ensure auth state is always fresh
 export const dynamic = 'force-dynamic';
 export const fetchCache = 'force-no-store';
+
+/**
+ * PWA viewport configuration with theme color
+ */
+export const viewport: Viewport = {
+  themeColor: '#667eea',
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+};
 
 /**
  * Generate static params for all supported locales.
@@ -61,7 +72,13 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const ogLocale = locale === 'ru' ? 'ru_RU' : 'en_US';
 
   return {
+    applicationName: 'MegaCampusAI',
     manifest: '/manifest.json',
+    appleWebApp: {
+      capable: true,
+      statusBarStyle: 'default',
+      title: 'MegaCampusAI',
+    },
     title: {
       default: t('metadata.title'),
       template: '%s | MegaCampusAI',
@@ -243,6 +260,7 @@ export default async function LocaleLayout({ children, params }: Props) {
               <BackToTop threshold={300} />
               <Toaster />
               <ServiceWorkerManager />
+              <InstallPrompt />
             </ErrorBoundary>
           </Providers>
         </NextIntlClientProvider>

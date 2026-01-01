@@ -86,6 +86,7 @@ export function CoverPreview({ enrichment, className }: CoverPreviewProps) {
             className="object-cover"
             sizes="(max-width: 768px) 100vw, 600px"
             priority
+            unoptimized
           />
         </div>
 

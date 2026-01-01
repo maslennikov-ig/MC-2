@@ -65,6 +65,32 @@ const withPWA = require('@ducanh2912/next-pwa').default({
 
 **Файл:** `packages/web/Dockerfile:63-64, 98-112, 124`
 
+### 4. Исправлены буферы nginx (ГЛАВНАЯ ПРИЧИНА 502!)
+
+**ВАЖНО:** При дальнейшем анализе выяснилось, что основная причина 502 была **НЕ в PWA**, а в недостаточном размере буферов nginx для обработки больших HTTP headers.
+
+Ошибка в логах nginx:
+```
+upstream sent too big header while reading response header from upstream
+```
+
+**Причина:** Next.js отправляет большие HTTP headers когда пользователь авторизован (cookies + auth tokens). Дефолтные буферы nginx (4k) слишком маленькие.
+
+**Решение:** Увеличены буферы в `/etc/nginx/sites-enabled/megacampus`:
+```nginx
+location / {
+    # Fix for "upstream sent too big header" 502 errors
+    proxy_buffer_size 128k;
+    proxy_buffers 4 256k;
+    proxy_busy_buffers_size 256k;
+    proxy_headers_hash_max_size 512;
+    proxy_headers_hash_bucket_size 128;
+    ...
+}
+```
+
+**Файл:** `nginx-megacampus.conf` (добавлен в репозиторий)
+
 ---
 
 ## Как включить PWA обратно
@@ -150,6 +176,16 @@ git push origin master
 
 ## TODO
 
-- [ ] Через 1-2 недели включить PWA обратно
+- [x] ~~Через 1-2 недели включить PWA обратно~~ → **Можно включить сейчас!**
+      Выяснилось что 502 был из-за nginx буферов, не PWA.
 - [ ] Убрать Kill Switch после стабилизации (опционально)
 - [ ] Рассмотреть NetworkFirst стратегию для HTML страниц
+
+---
+
+## Обновление 2026-01-01
+
+**502 ошибки были вызваны nginx, а не PWA!**
+
+Теперь когда nginx исправлен, PWA можно безопасно включить обратно.
+Конфигурация PWA (skipWaiting: false, exclude JS/CSS) была правильной.

@@ -120,6 +120,7 @@
     "streamdown": "^1.6.10",
     "tailwind-merge": "^3.4.0",
     "use-debounce": "^10.0.6",
+    "web-push": "^3.6.7",
     "zod": "^3.22.4",
     "zustand": "^5.0.9"
   },
@@ -135,6 +136,7 @@
     "@types/node": "^24.10.1",
     "@types/react": "^19.2.7",
     "@types/react-dom": "^19.2.3",
+    "@types/web-push": "^3.6.4",
     "@types/webpack": "^5.28.5",
     "@typescript-eslint/eslint-plugin": "^8.50.0",
     "@typescript-eslint/parser": "^8.50.0",

@@ -72,5 +72,39 @@
       "title": "Critical Error",
       "message": "A serious error occurred. Please try refreshing the page."
     }
+  },
+  "pwa": {
+    "title": "Install MegaCampusAI",
+    "description": "Get faster access and a better experience with our app.",
+    "install": "Install",
+    "later": "Maybe later",
+    "close": "Close",
+    "installFull": {
+      "title": "Install App",
+      "description": "Install MegaCampusAI for faster access and offline support",
+      "button": "Install",
+      "dismiss": "Not now",
+      "iosHint": "Tap the share button and select \"Add to Home Screen\""
+    },
+    "update": {
+      "title": "Update Available",
+      "description": "A new version of the app is available",
+      "button": "Update Now",
+      "dismiss": "Later"
+    },
+    "notifications": {
+      "title": "Push Notifications",
+      "enable": "Enable notifications",
+      "disable": "Disable notifications",
+      "description": "Get notified about course updates and new content",
+      "permissionDenied": "Notifications are blocked. Please enable them in your browser settings.",
+      "subscribed": "Notifications enabled",
+      "unsubscribed": "Notifications disabled",
+      "error": "Failed to update notification settings"
+    },
+    "offline": {
+      "message": "You are currently offline",
+      "reconnected": "Back online"
+    }
   }
 }

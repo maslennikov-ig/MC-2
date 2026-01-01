@@ -67,3 +67,131 @@ self._async_to_generator = _async_to_generator;
 self._ts_generator = _ts_generator;
 
 console.log('[SW] Custom worker initialized with async helpers');
+
+// ============================================================================
+// Push Notification Handlers
+// ============================================================================
+
+/**
+ * Handle incoming push notifications
+ * Displays a notification to the user with the data from the push message
+ */
+self.addEventListener('push', function(event) {
+  console.log('[SW] Push notification received');
+
+  // Default notification data
+  const defaultData = {
+    title: 'MegaCampusAI',
+    body: '',
+    icon: '/icons/icon-192x192.png',
+    badge: '/icons/icon-192x192.png',
+    url: '/',
+    tag: 'default',
+  };
+
+  // Parse push data
+  let data = defaultData;
+  try {
+    if (event.data) {
+      const parsed = event.data.json();
+      data = { ...defaultData, ...parsed };
+    }
+  } catch (error) {
+    console.error('[SW] Error parsing push data:', error);
+  }
+
+  const options = {
+    body: data.body || '',
+    icon: data.icon || '/icons/icon-192x192.png',
+    badge: data.badge || '/icons/icon-192x192.png',
+    data: { url: data.url || '/' },
+    vibrate: [100, 50, 100],
+    tag: data.tag || 'default',
+    renotify: true,
+    requireInteraction: false,
+  };
+
+  event.waitUntil(
+    self.registration.showNotification(data.title, options)
+  );
+});
+
+/**
+ * Handle notification click events
+ * Opens the associated URL or focuses an existing window
+ */
+self.addEventListener('notificationclick', function(event) {
+  console.log('[SW] Notification clicked');
+
+  event.notification.close();
+
+  const url = event.notification.data?.url || '/';
+
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(clientList) {
+      // Check if there's already a window with the target URL
+      for (var i = 0; i < clientList.length; i++) {
+        var client = clientList[i];
+        // Check if the client URL matches or is the same origin
+        if (client.url === url || client.url.includes(url)) {
+          if ('focus' in client) {
+            return client.focus();
+          }
+        }
+      }
+
+      // Check if there's any window we can navigate
+      for (var j = 0; j < clientList.length; j++) {
+        var existingClient = clientList[j];
+        if ('navigate' in existingClient && 'focus' in existingClient) {
+          return existingClient.navigate(url).then(function(c) {
+            return c.focus();
+          });
+        }
+      }
+
+      // Open a new window if no existing window found
+      if (clients.openWindow) {
+        return clients.openWindow(url);
+      }
+    })
+  );
+});
+
+/**
+ * Handle notification close events (for analytics if needed)
+ */
+self.addEventListener('notificationclose', function(event) {
+  console.log('[SW] Notification closed:', event.notification.tag);
+});
+
+/**
+ * Handle push subscription change events
+ * This can happen when the push service updates the subscription
+ */
+self.addEventListener('pushsubscriptionchange', function(event) {
+  console.log('[SW] Push subscription changed');
+
+  event.waitUntil(
+    self.registration.pushManager.subscribe({
+      userVisibleOnly: true,
+      // The public key should be available from the app
+      // For now, we'll let the app handle re-subscription
+    }).then(function(subscription) {
+      console.log('[SW] Resubscribed to push notifications');
+      // Notify the app about the new subscription
+      return clients.matchAll().then(function(clientList) {
+        clientList.forEach(function(client) {
+          client.postMessage({
+            type: 'PUSH_SUBSCRIPTION_CHANGED',
+            subscription: subscription.toJSON(),
+          });
+        });
+      });
+    }).catch(function(error) {
+      console.error('[SW] Failed to resubscribe:', error);
+    })
+  );
+});
+
+console.log('[SW] Push notification handlers registered');

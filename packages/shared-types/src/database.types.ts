@@ -1965,6 +1965,39 @@ export type Database = {
           },
         ]
       }
+      push_subscriptions: {
+        Row: {
+          created_at: string | null
+          endpoint: string
+          id: string
+          keys_auth: string
+          keys_p256dh: string
+          updated_at: string | null
+          user_agent: string | null
+          user_id: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          endpoint: string
+          id?: string
+          keys_auth: string
+          keys_p256dh: string
+          updated_at?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          endpoint?: string
+          id?: string
+          keys_auth?: string
+          keys_p256dh?: string
+          updated_at?: string | null
+          user_agent?: string | null
+          user_id?: string | null
+        }
+        Relationships: []
+      }
       rag_context_cache: {
         Row: {
           chunks: Json
@@ -2808,7 +2841,13 @@ export type Database = {
         | "completed"
         | "failed"
         | "cancelled"
-      enrichment_type: "video" | "audio" | "presentation" | "quiz" | "document" | "cover"
+      enrichment_type:
+        | "video"
+        | "audio"
+        | "presentation"
+        | "quiz"
+        | "document"
+        | "cover"
       enrollment_status: "active" | "completed" | "dropped" | "expired"
       generation_stage: "stage4" | "stage5" | "stage6"
       generation_status:
@@ -3016,7 +3055,14 @@ export const Constants = {
         "failed",
         "cancelled",
       ],
-      enrichment_type: ["video", "audio", "presentation", "quiz", "document", "cover"],
+      enrichment_type: [
+        "video",
+        "audio",
+        "presentation",
+        "quiz",
+        "document",
+        "cover",
+      ],
       enrollment_status: ["active", "completed", "dropped", "expired"],
       generation_stage: ["stage4", "stage5", "stage6"],
       generation_status: [
