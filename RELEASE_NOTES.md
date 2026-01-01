@@ -3,6 +3,27 @@
 _Released on 2025-12-26_
 
 
+## v0.26.45
+
+_Released on 2026-01-01_
+
+### ✨ New Features
+
+- **web**: Add 5 source file(s), update 19 source file(s)
+- **stage7**: Add cover preview and delete button for enrichments
+- **docker**: Add Stage 7 enrichment worker to production compose
+
+### 🐛 Bug Fixes
+
+- **stage7**: Use unoptimized images for cover preview
+- **nginx**: Increase proxy buffers to fix 502 errors
+- **stage7**: Handle OpenRouter chat completion image format
+- **stage7**: Handle different OpenRouter image response formats
+
+---
+
+_This release was automatically generated from 8 commits._
+
 ## v0.26.44
 
 _Released on 2025-12-31_

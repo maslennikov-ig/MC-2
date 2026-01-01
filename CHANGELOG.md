@@ -5,6 +5,22 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.26.45] - 2026-01-01
+
+### Added
+- **web**: add 5 source file(s), update 19 source file(s) (455a30b)
+- **stage7**: add cover preview and delete button for enrichments (764d0ec)
+- **docker**: add Stage 7 enrichment worker to production compose (5e2541a)
+
+### Fixed
+- **stage7**: use unoptimized images for cover preview (f86769a)
+- **nginx**: increase proxy buffers to fix 502 errors (e209173)
+- **stage7**: handle OpenRouter chat completion image format (df9779c)
+- **stage7**: handle different OpenRouter image response formats (89347a5)
+
+### Other
+- **release**: v0.26.45 (0fc6d7f)
+
 ## [0.26.36] - 2025-12-28
 
 ### Added
