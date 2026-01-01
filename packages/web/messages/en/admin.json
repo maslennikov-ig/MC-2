@@ -8,7 +8,8 @@
     "users": "Users",
     "pipeline": "Pipeline",
     "pricing": "Pricing",
-    "logs": "Logs"
+    "logs": "Logs",
+    "analytics": "Analytics"
   },
   "stats": {
     "overview": "Platform overview",
@@ -314,5 +315,23 @@
       "clearSelection": "Clear Selection"
     },
     "empty": "No logs found"
+  },
+  "analytics": {
+    "title": "PWA Analytics",
+    "description": "Track app installation and push notification metrics",
+    "refresh": "Refresh",
+    "retry": "Retry",
+    "totalEvents": "Total Events",
+    "last24h": "in last 24h",
+    "installConversion": "Install Conversion",
+    "installs": "installs",
+    "pushSubscriptions": "Net Push Subscriptions",
+    "installFunnel": "Install Funnel (Last 30 Days)",
+    "promptsShown": "Prompts Shown",
+    "installed": "Installed",
+    "dismissed": "Dismissed",
+    "pushNotifications": "Push Notifications (Last 30 Days)",
+    "subscribed": "Subscribed",
+    "unsubscribed": "Unsubscribed"
   }
 }

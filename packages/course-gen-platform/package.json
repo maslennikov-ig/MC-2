@@ -69,6 +69,7 @@
     "openai": "^6.13.0",
     "p-limit": "^7.2.0",
     "pino": "^9.6.0",
+    "sharp": "^0.34.5",
     "snowball-stemmers": "^0.6.0",
     "strip-ansi": "^7.1.2",
     "tiktoken": "^1.0.22",

@@ -98,9 +98,15 @@
       "disable": "Disable notifications",
       "description": "Get notified about course updates and new content",
       "permissionDenied": "Notifications are blocked. Please enable them in your browser settings.",
-      "subscribed": "Notifications enabled",
+      "permissionDeniedHelp": "Click the lock icon in your address bar to change notification permissions.",
+      "subscribed": "Notifications enabled successfully",
       "unsubscribed": "Notifications disabled",
-      "error": "Failed to update notification settings"
+      "subscribing": "Enabling notifications...",
+      "unsubscribing": "Disabling notifications...",
+      "error": "Failed to update notification settings",
+      "errorNetwork": "Network error. Please check your connection and try again.",
+      "errorNotSignedIn": "Please sign in to enable notifications",
+      "errorPartialUnsubscribe": "Unsubscribed locally, but server cleanup failed. You may still receive some notifications."
     },
     "offline": {
       "message": "You are currently offline",

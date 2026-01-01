@@ -303,7 +303,7 @@ export async function getNextOrderIndex(lessonId: string): Promise<number> {
  * @returns True if type uses draft -> final flow
  */
 export function isTwoStageType(enrichmentType: string): boolean {
-  return enrichmentType === 'video' || enrichmentType === 'presentation';
+  return enrichmentType === 'video' || enrichmentType === 'presentation' || enrichmentType === 'cover';
 }
 
 /**

@@ -16,7 +16,12 @@ import { type EnrichmentStatus } from '@/lib/generation-graph/enrichment-config'
 import { cn } from '@/lib/utils';
 import { useStaticGraph } from '../../../contexts/StaticGraphContext';
 import { useEnrichmentInspectorStore } from '../../../stores/enrichment-inspector-store';
-import { getEnrichment, deleteEnrichment } from '@/app/actions/enrichment-actions';
+import {
+  getEnrichment,
+  deleteEnrichment,
+  approveCoverDraft,
+} from '@/app/actions/enrichment-actions';
+import { type CoverDraftContent } from '../CoverPreview';
 
 export interface DetailViewProps {
   enrichmentId: string;
@@ -329,16 +334,26 @@ function toCoverPreviewProps(e: CoverEnrichmentData): CoverEnrichment {
     id: e.id,
     status: e.status,
     content: e.content,
+    draft_content: e.draft_content as CoverDraftContent | null,
     metadata: e.metadata,
     error_message: e.error_message,
   };
 }
 
 /**
+ * Cover preview props for passing handlers to CoverPreview
+ */
+interface CoverPreviewHandlers {
+  onSelectVariant?: (variantId: number) => void;
+  onApproveDraft?: () => void;
+  isApproving?: boolean;
+}
+
+/**
  * Renders the appropriate preview component based on enrichment type.
  * Uses discriminated union pattern for type-safe rendering.
  */
-function renderPreview(enrichment: EnrichmentData) {
+function renderPreview(enrichment: EnrichmentData, coverHandlers?: CoverPreviewHandlers) {
   switch (enrichment.type) {
     case 'quiz':
       return <QuizPreview enrichment={toQuizPreviewProps(enrichment)} />;
@@ -349,7 +364,14 @@ function renderPreview(enrichment: EnrichmentData) {
     case 'presentation':
       return <PresentationPreview enrichment={toPresentationPreviewProps(enrichment)} />;
     case 'cover':
-      return <CoverPreview enrichment={toCoverPreviewProps(enrichment)} />;
+      return (
+        <CoverPreview
+          enrichment={toCoverPreviewProps(enrichment)}
+          onSelectVariant={coverHandlers?.onSelectVariant}
+          onApproveDraft={coverHandlers?.onApproveDraft}
+          isApproving={coverHandlers?.isApproving}
+        />
+      );
     default: {
       // Exhaustive check - should never reach here
       const _exhaustive: never = enrichment;
@@ -366,6 +388,10 @@ export function DetailView({ enrichmentId, className }: DetailViewProps) {
   // Delete confirmation state
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // Cover draft approval state
+  const [selectedCoverVariant, setSelectedCoverVariant] = useState<number | null>(null);
+  const [isApprovingCover, setIsApprovingCover] = useState(false);
 
   // Fetch real enrichment data
   const dataState = useEnrichmentDetail(enrichmentId);
@@ -418,10 +444,59 @@ export function DetailView({ enrichmentId, className }: DetailViewProps) {
     toast.info(locale === 'ru' ? 'Скоро будет доступно' : 'Coming soon');
   }, [locale]);
 
-  // Handle approve action (Coming soon)
+  // Handle approve action (Coming soon for non-cover types)
   const handleApprove = useCallback(() => {
     toast.info(locale === 'ru' ? 'Скоро будет доступно' : 'Coming soon');
   }, [locale]);
+
+  // Handle cover variant selection
+  const handleCoverVariantSelect = useCallback((variantId: number) => {
+    setSelectedCoverVariant(variantId);
+  }, []);
+
+  // Handle cover draft approval
+  const handleCoverApprove = useCallback(async () => {
+    if (!courseInfo?.id || selectedCoverVariant === null) {
+      toast.error(
+        locale === 'ru' ? 'Выберите вариант обложки' : 'Please select a cover variant'
+      );
+      return;
+    }
+
+    setIsApprovingCover(true);
+
+    try {
+      const result = await approveCoverDraft({
+        enrichmentId,
+        courseId: courseInfo.id,
+        selectedVariantId: selectedCoverVariant,
+      });
+
+      if (result.success) {
+        toast.success(
+          locale === 'ru'
+            ? 'Генерация обложки запущена'
+            : 'Cover generation started'
+        );
+        // Refetch to show updated status
+        dataState.refetch();
+      } else {
+        toast.error(
+          locale === 'ru'
+            ? `Ошибка: ${result.error}`
+            : `Error: ${result.error}`
+        );
+      }
+    } catch {
+      toast.error(
+        locale === 'ru'
+          ? 'Не удалось запустить генерацию'
+          : 'Failed to start generation'
+      );
+    } finally {
+      setIsApprovingCover(false);
+    }
+  }, [enrichmentId, courseInfo?.id, selectedCoverVariant, locale, dataState]);
 
   // Render based on data state
   const renderContent = () => {
@@ -443,21 +518,37 @@ export function DetailView({ enrichmentId, className }: DetailViewProps) {
           return <ErrorState error={enrichment.error_message} onRetry={handleRegenerate} />;
         }
 
+        // Cover handlers for CoverPreview component
+        const coverHandlers: CoverPreviewHandlers =
+          enrichment.type === 'cover'
+            ? {
+                onSelectVariant: handleCoverVariantSelect,
+                onApproveDraft: handleCoverApprove,
+                isApproving: isApprovingCover,
+              }
+            : {};
+
+        // Hide action bar for cover draft_ready state (CoverPreview has its own action bar)
+        const hideCoverActionBar =
+          enrichment.type === 'cover' && enrichment.status === 'draft_ready';
+
         // Render preview with action bar
         return (
           <>
             {/* Preview component */}
             <div data-testid="preview-content" className="flex-1 overflow-hidden">
-              {renderPreview(enrichment)}
+              {renderPreview(enrichment, coverHandlers)}
             </div>
 
-            {/* Action bar */}
-            <ActionBar
-              enrichment={enrichment}
-              onDelete={handleDeleteClick}
-              onRegenerate={handleRegenerate}
-              onApprove={handleApprove}
-            />
+            {/* Action bar - hidden for cover draft state */}
+            {!hideCoverActionBar && (
+              <ActionBar
+                enrichment={enrichment}
+                onDelete={handleDeleteClick}
+                onRegenerate={handleRegenerate}
+                onApprove={handleApprove}
+              />
+            )}
           </>
         );
       }

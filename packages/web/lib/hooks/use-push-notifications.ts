@@ -1,7 +1,9 @@
 'use client';
 
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { logger } from '../client-logger';
+import { createClient } from '@/lib/supabase/client';
+import { usePWAAnalytics } from './use-pwa-analytics';
 
 /**
  * VAPID public key from environment
@@ -108,21 +110,31 @@ export function usePushNotifications(): UsePushNotificationsReturn {
   const [isSubscribed, setIsSubscribed] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const { trackEvent } = usePWAAnalytics();
+
+  // Ref to always have access to latest subscribe function (avoids stale closure)
+  const subscribeRef = useRef<() => Promise<boolean>>(undefined);
 
   // Initialize state on mount
   useEffect(() => {
-    const supported = checkPushSupport();
-    setIsSupported(supported);
-    setPermission(getPermission());
+    const initializeState = async () => {
+      const supported = checkPushSupport();
+      setIsSupported(supported);
+      setPermission(getPermission());
 
-    if (supported) {
-      // Check if already subscribed
-      checkExistingSubscription();
-    }
+      if (supported) {
+        // Check if already subscribed - await to avoid race condition
+        await checkExistingSubscription();
+      }
+    };
+
+    initializeState();
   }, []);
 
   /**
    * Check if there's an existing push subscription
+   * Updates isSubscribed state based on browser subscription status.
+   * @internal
    */
   const checkExistingSubscription = useCallback(async () => {
     try {
@@ -132,11 +144,33 @@ export function usePushNotifications(): UsePushNotificationsReturn {
     } catch (err) {
       logger.error('[Push] Error checking subscription:', err);
       setIsSubscribed(false);
+
+      // Provide specific error feedback
+      if (err instanceof Error) {
+        if (err.message.includes('insecure')) {
+          setError('Push notifications require HTTPS');
+        } else if (err.message.includes('permission')) {
+          setError('Notification permission was denied');
+        }
+      }
     }
   }, []);
 
   /**
    * Subscribe to push notifications
+   *
+   * Requests notification permission if needed, creates a push subscription,
+   * and registers it with the backend.
+   *
+   * @returns Promise<boolean> - true if subscription successful, false otherwise
+   * @throws Never throws - all errors are caught and set in error state
+   *
+   * @example
+   * ```tsx
+   * const { subscribe, error } = usePushNotifications();
+   * const success = await subscribe();
+   * if (!success) console.error(error);
+   * ```
    */
   const subscribe = useCallback(async (): Promise<boolean> => {
     if (!isSupported) {
@@ -153,6 +187,18 @@ export function usePushNotifications(): UsePushNotificationsReturn {
     setError(null);
 
     try {
+      // Check authentication before attempting subscription
+      const supabase = createClient();
+      const {
+        data: { user },
+        error: authError,
+      } = await supabase.auth.getUser();
+      if (authError || !user) {
+        setError('Please sign in to enable notifications');
+        setIsLoading(false);
+        return false;
+      }
+
       // Request notification permission if not granted
       if (Notification.permission === 'default') {
         const result = await Notification.requestPermission();
@@ -204,20 +250,33 @@ export function usePushNotifications(): UsePushNotificationsReturn {
       }
 
       setIsSubscribed(true);
+      trackEvent('push_subscribed');
       logger.devLog('[Push] Successfully subscribed to push notifications');
       return true;
     } catch (err) {
       const message = err instanceof Error ? err.message : 'Failed to subscribe';
       logger.error('[Push] Subscribe error:', err);
       setError(message);
+      trackEvent('push_error', { error: message, action: 'subscribe' });
       return false;
     } finally {
       setIsLoading(false);
     }
-  }, [isSupported]);
+  }, [isSupported, trackEvent]);
 
   /**
    * Unsubscribe from push notifications
+   *
+   * Removes the push subscription from the browser and notifies the backend.
+   * If backend cleanup fails, the user is warned but local unsubscribe is still successful.
+   *
+   * @returns Promise<boolean> - true if unsubscribe successful, false on error
+   *
+   * @example
+   * ```tsx
+   * const { unsubscribe } = usePushNotifications();
+   * await unsubscribe();
+   * ```
    */
   const unsubscribe = useCallback(async (): Promise<boolean> => {
     if (!isSupported) {
@@ -256,11 +315,15 @@ export function usePushNotifications(): UsePushNotificationsReturn {
       });
 
       if (!response.ok) {
-        // Log but don't fail - subscription is already removed locally
+        // Backend cleanup failed - warn user but don't fail completely
         logger.error('[Push] Failed to remove subscription from backend');
+        setError('Unsubscribed locally, but server cleanup failed. You may still receive some notifications.');
+        setIsSubscribed(false);
+        return true; // Still return true since local unsubscribe worked
       }
 
       setIsSubscribed(false);
+      trackEvent('push_unsubscribed');
       logger.devLog('[Push] Successfully unsubscribed from push notifications');
       return true;
     } catch (err) {
@@ -271,37 +334,82 @@ export function usePushNotifications(): UsePushNotificationsReturn {
     } finally {
       setIsLoading(false);
     }
-  }, [isSupported]);
+  }, [isSupported, trackEvent]);
 
-  // Listen for permission changes
+  // Keep subscribeRef updated with latest subscribe function
+  useEffect(() => {
+    subscribeRef.current = subscribe;
+  }, [subscribe]);
+
+  // Listen for permission changes using Permissions API with fallback
   useEffect(() => {
     if (!isSupported) return;
 
-    // Check permission periodically (there's no native event for this)
-    const interval = setInterval(() => {
-      const currentPermission = getPermission();
-      if (currentPermission !== permission) {
-        setPermission(currentPermission);
+    let permissionStatus: PermissionStatus | null = null;
+    let fallbackInterval: ReturnType<typeof setInterval> | null = null;
 
-        // If permission was revoked, update subscription state
-        if (currentPermission === 'denied') {
-          setIsSubscribed(false);
-        }
+    const handleChange = () => {
+      const newPermission = permissionStatus?.state as NotificationPermission;
+      setPermission(newPermission);
+      if (newPermission === 'denied') {
+        setIsSubscribed(false);
       }
-    }, 1000);
+    };
 
-    return () => clearInterval(interval);
+    // Try to use native Permissions API with change listener
+    if ('permissions' in navigator) {
+      navigator.permissions
+        .query({ name: 'notifications' })
+        .then((status) => {
+          permissionStatus = status;
+          setPermission(status.state as NotificationPermission);
+          status.addEventListener('change', handleChange);
+        })
+        .catch(() => {
+          // Fallback: Poll every 30 seconds instead of 1 second
+          fallbackInterval = setInterval(() => {
+            const currentPermission = getPermission();
+            if (currentPermission !== permission) {
+              setPermission(currentPermission);
+              if (currentPermission === 'denied') {
+                setIsSubscribed(false);
+              }
+            }
+          }, 30000);
+        });
+    } else {
+      // No Permissions API: Poll every 30 seconds
+      fallbackInterval = setInterval(() => {
+        const currentPermission = getPermission();
+        if (currentPermission !== permission) {
+          setPermission(currentPermission);
+          if (currentPermission === 'denied') {
+            setIsSubscribed(false);
+          }
+        }
+      }, 30000);
+    }
+
+    return () => {
+      if (permissionStatus) {
+        permissionStatus.removeEventListener('change', handleChange);
+      }
+      if (fallbackInterval) {
+        clearInterval(fallbackInterval);
+      }
+    };
   }, [isSupported, permission]);
 
   // Listen for subscription changes from service worker
+  // Uses subscribeRef to avoid stale closure issues
   useEffect(() => {
     if (!isSupported) return;
 
     const handleMessage = (event: MessageEvent) => {
       if (event.data?.type === 'PUSH_SUBSCRIPTION_CHANGED') {
-        // Re-sync subscription with backend
+        // Re-sync subscription with backend using ref to get latest function
         logger.devLog('[Push] Subscription changed, re-syncing...');
-        subscribe();
+        subscribeRef.current?.();
       }
     };
 
@@ -310,7 +418,7 @@ export function usePushNotifications(): UsePushNotificationsReturn {
     return () => {
       navigator.serviceWorker.removeEventListener('message', handleMessage);
     };
-  }, [isSupported, subscribe]);
+  }, [isSupported]); // Remove subscribe from deps - using ref instead
 
   return {
     isSupported,

@@ -558,14 +558,20 @@ export async function getEnrichment(
       status: enrichment.status,
     });
 
+    // For draft_ready status, content contains draft data
+    // Pass it as draft_content for the preview components
+    const isDraftReady = enrichment.status === 'draft_ready';
+    const draftContent = isDraftReady ? enrichment.content : null;
+    const finalContent = isDraftReady ? null : enrichment.content;
+
     return {
       success: true,
       enrichment: {
         id: enrichment.id,
         enrichment_type: enrichment.enrichment_type,
         status: enrichment.status,
-        content: enrichment.content,
-        draft_content: null, // Not stored separately, content is the source
+        content: finalContent,
+        draft_content: draftContent,
         metadata: enrichment.metadata as Record<string, unknown> | null,
         error_message: enrichment.error_message,
         asset_url: assetUrl,
@@ -578,6 +584,158 @@ export async function getEnrichment(
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Failed to get enrichment',
+    };
+  }
+}
+
+// ============================================================================
+// Approve Cover Draft
+// ============================================================================
+
+const approveCoverDraftSchema = z.object({
+  enrichmentId: z.string().uuid('Invalid enrichment ID'),
+  courseId: z.string().uuid('Invalid course ID'),
+  selectedVariantId: z.number().int().min(1).max(10),
+});
+
+export interface ApproveCoverDraftInput {
+  enrichmentId: string;
+  courseId: string;
+  selectedVariantId: number;
+}
+
+export interface ApproveCoverDraftResult {
+  success: boolean;
+  error?: string;
+}
+
+/**
+ * Approve a cover draft with the selected variant
+ *
+ * This triggers the final image generation phase for a cover enrichment.
+ * The selected variant's prompt will be used to generate the cover image.
+ *
+ * @param input - The approval input containing enrichmentId, courseId, and selectedVariantId
+ * @returns Success status and optional error message
+ */
+export async function approveCoverDraft(
+  input: ApproveCoverDraftInput
+): Promise<ApproveCoverDraftResult> {
+  try {
+    // Input validation
+    const validation = approveCoverDraftSchema.safeParse(input);
+    if (!validation.success) {
+      logger.error('[approveCoverDraft] Invalid input', {
+        errors: validation.error.flatten(),
+      });
+      return { success: false, error: 'Invalid input data' };
+    }
+
+    const currentUser = await getCurrentUser();
+    if (!currentUser) {
+      return { success: false, error: 'Not authenticated' };
+    }
+
+    const supabase = await getUserClient();
+
+    // Authorization: Verify user owns the course
+    const { data: course, error: courseError } = await supabase
+      .from('courses')
+      .select('user_id')
+      .eq('id', input.courseId)
+      .single();
+
+    if (courseError || !course) {
+      logger.error('[approveCoverDraft] Course not found', { courseId: input.courseId });
+      return { success: false, error: 'Course not found' };
+    }
+
+    if (course.user_id !== currentUser.id) {
+      logger.error('[approveCoverDraft] Unauthorized access attempt', {
+        userId: currentUser.id,
+        courseId: input.courseId,
+        courseOwner: course.user_id,
+      });
+      return { success: false, error: 'Unauthorized' };
+    }
+
+    // Verify enrichment exists and is in draft_ready status
+    const { data: enrichment, error: enrichmentError } = await supabase
+      .from('lesson_enrichments')
+      .select('id, status, enrichment_type, content')
+      .eq('id', input.enrichmentId)
+      .eq('course_id', input.courseId)
+      .single();
+
+    if (enrichmentError || !enrichment) {
+      logger.error('[approveCoverDraft] Enrichment not found', {
+        enrichmentId: input.enrichmentId,
+        error: enrichmentError?.message,
+      });
+      return { success: false, error: 'Enrichment not found' };
+    }
+
+    if (enrichment.enrichment_type !== 'cover') {
+      logger.error('[approveCoverDraft] Enrichment is not a cover type', {
+        enrichmentId: input.enrichmentId,
+        type: enrichment.enrichment_type,
+      });
+      return { success: false, error: 'Enrichment is not a cover type' };
+    }
+
+    if (enrichment.status !== 'draft_ready') {
+      logger.error('[approveCoverDraft] Enrichment is not in draft_ready status', {
+        enrichmentId: input.enrichmentId,
+        status: enrichment.status,
+      });
+      return { success: false, error: 'Enrichment is not ready for approval' };
+    }
+
+    // Call tRPC API to approve the cover draft
+    const headers = await getBackendAuthHeaders();
+    const response = await fetch(`${TRPC_URL}/enrichment.approveCoverDraft`, {
+      method: 'POST',
+      headers: {
+        ...headers,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        enrichmentId: input.enrichmentId,
+        selectedVariantId: input.selectedVariantId,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      logger.error('[approveCoverDraft] tRPC call failed', {
+        status: response.status,
+        error: errorText,
+      });
+      return { success: false, error: `Failed to approve cover draft: ${response.status}` };
+    }
+
+    const result = await response.json();
+
+    if (!result.result?.data?.success) {
+      return {
+        success: false,
+        error: result.result?.data?.error || 'Unknown error',
+      };
+    }
+
+    logger.info('[approveCoverDraft] Cover draft approved', {
+      enrichmentId: input.enrichmentId,
+      selectedVariantId: input.selectedVariantId,
+    });
+
+    return { success: true };
+  } catch (error) {
+    logger.error('[approveCoverDraft] Unexpected error', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to approve cover draft',
     };
   }
 }

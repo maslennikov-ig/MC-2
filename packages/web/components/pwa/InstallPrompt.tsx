@@ -1,11 +1,15 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useTranslations } from 'next-intl';
 import { X, Download, Smartphone } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useInstallPrompt } from '@/lib/hooks/use-install-prompt';
 import { cn } from '@/lib/utils';
+
+// Animation timing constants
+const INSTALL_PROMPT_DELAY_MS = 2000;
+const INSTALL_PROMPT_ANIMATION_MS = 300;
 
 /**
  * PWA Install Prompt Component
@@ -29,7 +33,7 @@ export function InstallPrompt() {
     if (canInstall) {
       const timer = setTimeout(() => {
         setIsVisible(true);
-      }, 2000); // Show after 2 seconds
+      }, INSTALL_PROMPT_DELAY_MS);
 
       return () => clearTimeout(timer);
     }
@@ -38,37 +42,45 @@ export function InstallPrompt() {
     return undefined;
   }, [canInstall]);
 
-  const handleInstall = async () => {
+  const handleClose = useCallback(() => {
+    setIsExiting(true);
+    // Wait for animation to complete before hiding
+    const timer = setTimeout(() => {
+      setIsVisible(false);
+      setIsExiting(false);
+    }, INSTALL_PROMPT_ANIMATION_MS);
+    return () => clearTimeout(timer);
+  }, []);
+
+  const handleInstall = useCallback(async () => {
     const accepted = await promptInstall();
     if (accepted) {
       handleClose();
     }
-  };
+  }, [promptInstall, handleClose]);
 
-  const handleDismiss = () => {
+  const handleDismiss = useCallback(() => {
     dismissPrompt();
     handleClose();
-  };
-
-  const handleClose = () => {
-    setIsExiting(true);
-    // Wait for animation to complete before hiding
-    setTimeout(() => {
-      setIsVisible(false);
-      setIsExiting(false);
-    }, 300);
-  };
+  }, [dismissPrompt, handleClose]);
 
   if (!isVisible) {
     return null;
   }
 
   return (
-    <div
-      role="dialog"
-      aria-labelledby="pwa-install-title"
-      aria-describedby="pwa-install-description"
-      className={cn(
+    <>
+      {/* Screen reader announcement */}
+      <div className="sr-only" role="status" aria-live="polite">
+        {!isExiting && 'Install app prompt is now available'}
+      </div>
+
+      <div
+        role="dialog"
+        aria-modal="false"
+        aria-labelledby="pwa-install-title"
+        aria-describedby="pwa-install-description"
+        className={cn(
         // Base styles
         'fixed z-50 mx-4 p-4',
         // Positioning - bottom on mobile, bottom-right on desktop
@@ -147,6 +159,7 @@ export function InstallPrompt() {
           {t('install')}
         </Button>
       </div>
-    </div>
+      </div>
+    </>
   );
 }

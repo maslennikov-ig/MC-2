@@ -1,6 +1,21 @@
 // Custom service worker code that runs before workbox
 // This file is automatically imported into the generated sw.js
 
+// ============================================================================
+// Async/Generator Polyfills for Workbox Compatibility
+// ============================================================================
+// IMPORTANT: These helpers are required by Workbox's generated code.
+// Workbox uses async/await internally but the transpiled output expects
+// these helper functions to be available in the global scope.
+//
+// DO NOT REMOVE unless:
+// 1. Upgrading to a newer Workbox version that doesn't need them
+// 2. Changing the build configuration to include native async support
+//
+// Source: Babel async-to-generator transform
+// Required for: Workbox cacheWillUpdate plugin and other async operations
+// ============================================================================
+
 // Define async generator helpers that workbox needs but doesn't include
 // These are required for the cacheWillUpdate plugin async functions
 function _async_to_generator(fn) {
@@ -69,42 +84,114 @@ self._ts_generator = _ts_generator;
 console.log('[SW] Custom worker initialized with async helpers');
 
 // ============================================================================
+// Type Definitions
+// ============================================================================
+
+/**
+ * @typedef {Object} NotificationPayload
+ * @property {string} title - Notification title
+ * @property {string} [body] - Notification body text
+ * @property {string} [icon] - URL to notification icon
+ * @property {string} [badge] - URL to notification badge
+ * @property {string} [url] - URL to open when clicked
+ * @property {string} [tag] - Notification tag for grouping
+ */
+
+/**
+ * @typedef {Object} NotificationData
+ * @property {string} url - URL to navigate to on click
+ * @property {boolean} [parseError] - Whether there was an error parsing the payload
+ */
+
+// ============================================================================
+// Security Utilities
+// ============================================================================
+
+/**
+ * Validate URL is safe to open
+ * Only allows relative URLs or URLs from approved origins
+ * @param {string} url - The URL to validate
+ * @returns {boolean} - Whether the URL is safe to open
+ */
+function isValidNotificationUrl(url) {
+  try {
+    // Allow relative URLs (start with /)
+    if (url.startsWith('/')) {
+      return true;
+    }
+
+    // Parse absolute URLs
+    var urlObj = new URL(url, self.location.origin);
+
+    // List of allowed origins
+    var allowedOrigins = [
+      'https://megacampus.ai',
+      'https://www.megacampus.ai',
+    ];
+
+    // In development, also allow localhost
+    if (self.location.hostname === 'localhost') {
+      allowedOrigins.push('http://localhost:3000');
+    }
+
+    return allowedOrigins.includes(urlObj.origin);
+  } catch (e) {
+    console.warn('[SW] Invalid URL format:', url);
+    return false;
+  }
+}
+
+// ============================================================================
 // Push Notification Handlers
 // ============================================================================
 
 /**
  * Handle incoming push notifications
  * Displays a notification to the user with the data from the push message
+ * @param {PushEvent} event - The push event
  */
 self.addEventListener('push', function(event) {
   console.log('[SW] Push notification received');
 
-  // Default notification data
-  const defaultData = {
+  var defaultData = {
     title: 'MegaCampusAI',
-    body: '',
+    body: 'You have a new notification',
     icon: '/icons/icon-192x192.png',
     badge: '/icons/icon-192x192.png',
     url: '/',
     tag: 'default',
   };
 
-  // Parse push data
-  let data = defaultData;
+  var data = defaultData;
+  var parseError = false;
+
   try {
     if (event.data) {
-      const parsed = event.data.json();
+      var parsed = event.data.json();
       data = { ...defaultData, ...parsed };
+
+      // Validate required fields
+      if (!data.title || typeof data.title !== 'string') {
+        throw new Error('Invalid notification title');
+      }
     }
   } catch (error) {
     console.error('[SW] Error parsing push data:', error);
+    parseError = true;
+    data = {
+      ...defaultData,
+      body: 'New notification (tap to view)',
+    };
   }
 
-  const options = {
-    body: data.body || '',
+  var options = {
+    body: data.body || 'You have a new notification',
     icon: data.icon || '/icons/icon-192x192.png',
     badge: data.badge || '/icons/icon-192x192.png',
-    data: { url: data.url || '/' },
+    data: {
+      url: data.url || '/',
+      parseError: parseError,
+    },
     vibrate: [100, 50, 100],
     tag: data.tag || 'default',
     renotify: true,
@@ -113,26 +200,40 @@ self.addEventListener('push', function(event) {
 
   event.waitUntil(
     self.registration.showNotification(data.title, options)
+      .catch(function(error) {
+        console.error('[SW] Failed to show notification:', error);
+        // Fallback: Try minimal notification
+        return self.registration.showNotification('MegaCampusAI', {
+          body: 'You have a new notification',
+          icon: '/icons/icon-192x192.png',
+        });
+      })
   );
 });
 
 /**
  * Handle notification click events
  * Opens the associated URL or focuses an existing window
+ * @param {NotificationEvent} event - The notification click event
  */
 self.addEventListener('notificationclick', function(event) {
   console.log('[SW] Notification clicked');
-
   event.notification.close();
 
-  const url = event.notification.data?.url || '/';
+  var rawUrl = event.notification.data?.url || '/';
+
+  // SECURITY: Validate URL before opening
+  var url = isValidNotificationUrl(rawUrl) ? rawUrl : '/';
+
+  if (url !== rawUrl) {
+    console.warn('[SW] Blocked unsafe notification URL:', rawUrl);
+  }
 
   event.waitUntil(
     clients.matchAll({ type: 'window', includeUncontrolled: true }).then(function(clientList) {
       // Check if there's already a window with the target URL
       for (var i = 0; i < clientList.length; i++) {
         var client = clientList[i];
-        // Check if the client URL matches or is the same origin
         if (client.url === url || client.url.includes(url)) {
           if ('focus' in client) {
             return client.focus();

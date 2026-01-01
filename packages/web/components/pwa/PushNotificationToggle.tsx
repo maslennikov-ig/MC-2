@@ -1,5 +1,6 @@
 'use client';
 
+import { useCallback } from 'react';
 import { Bell, BellOff, AlertCircle, Loader2 } from 'lucide-react';
 import { useTranslations } from 'next-intl';
 import { usePushNotifications } from '@/lib/hooks/use-push-notifications';
@@ -43,14 +44,14 @@ export function PushNotificationToggle({
     unsubscribe,
   } = usePushNotifications();
 
-  // Handle toggle change
-  const handleToggle = async (checked: boolean) => {
+  // Handle toggle change - memoized to prevent unnecessary re-renders
+  const handleToggle = useCallback(async (checked: boolean) => {
     if (checked) {
       await subscribe();
     } else {
       await unsubscribe();
     }
-  };
+  }, [subscribe, unsubscribe]);
 
   // Browser doesn't support push notifications
   if (!isSupported) {

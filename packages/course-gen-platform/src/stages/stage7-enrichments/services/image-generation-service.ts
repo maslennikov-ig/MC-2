@@ -7,6 +7,7 @@
  */
 
 import OpenAI from 'openai';
+import sharp from 'sharp';
 import { logger } from '@/shared/logger';
 import { getApiKey } from '@/shared/services/api-key-service';
 
@@ -250,4 +251,65 @@ export function getExtensionFromMimeType(mimeType: string): string {
     'image/webp': 'webp',
   };
   return extensions[mimeType] ?? 'png';
+}
+
+// ============================================================================
+// WEBP CONVERSION
+// ============================================================================
+
+export interface WebPConversionResult {
+  /** Converted image buffer in WebP format */
+  buffer: Buffer;
+  /** MIME type (always "image/webp") */
+  mimeType: 'image/webp';
+  /** File size in bytes */
+  sizeBytes: number;
+  /** Original size before conversion */
+  originalSizeBytes: number;
+  /** Compression ratio (0.0 - 1.0, lower is better) */
+  compressionRatio: number;
+}
+
+/**
+ * Convert image buffer to WebP format for smaller file sizes
+ *
+ * @param imageBuffer - Original image buffer (PNG/JPEG)
+ * @param quality - WebP quality (1-100, default 85)
+ * @returns Converted WebP buffer with metadata
+ */
+export async function convertToWebP(
+  imageBuffer: Buffer,
+  quality: number = 85
+): Promise<WebPConversionResult> {
+  const originalSizeBytes = imageBuffer.length;
+
+  logger.info(
+    { originalSizeBytes, quality },
+    'Starting WebP conversion'
+  );
+
+  const webpBuffer = await sharp(imageBuffer)
+    .webp({ quality, effort: 6 })
+    .toBuffer();
+
+  const sizeBytes = webpBuffer.length;
+  const compressionRatio = sizeBytes / originalSizeBytes;
+
+  logger.info(
+    {
+      originalSizeBytes,
+      sizeBytes,
+      compressionRatio: compressionRatio.toFixed(2),
+      savedBytes: originalSizeBytes - sizeBytes,
+    },
+    'WebP conversion completed'
+  );
+
+  return {
+    buffer: webpBuffer,
+    mimeType: 'image/webp',
+    sizeBytes,
+    originalSizeBytes,
+    compressionRatio,
+  };
 }

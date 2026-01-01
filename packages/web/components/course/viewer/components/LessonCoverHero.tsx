@@ -148,6 +148,7 @@ export function LessonCoverHero({
           onLoad={handleLoad}
           onError={handleError}
           priority // Hero image should load immediately
+          unoptimized // External Supabase Storage URLs, skip Next.js image optimization
         />
       </motion.div>
 

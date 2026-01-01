@@ -8,7 +8,8 @@
     "users": "Пользователи",
     "pipeline": "Пайплайн",
     "pricing": "Тарифы",
-    "logs": "Логи"
+    "logs": "Логи",
+    "analytics": "Аналитика"
   },
   "stats": {
     "overview": "Обзор платформы",
@@ -314,5 +315,23 @@
       "clearSelection": "Снять выделение"
     },
     "empty": "Логи не найдены"
+  },
+  "analytics": {
+    "title": "PWA Аналитика",
+    "description": "Отслеживание установок приложения и push-уведомлений",
+    "refresh": "Обновить",
+    "retry": "Повторить",
+    "totalEvents": "Всего событий",
+    "last24h": "за последние 24ч",
+    "installConversion": "Конверсия установок",
+    "installs": "установок",
+    "pushSubscriptions": "Push-подписки (нетто)",
+    "installFunnel": "Воронка установок (30 дней)",
+    "promptsShown": "Показано предложений",
+    "installed": "Установлено",
+    "dismissed": "Отклонено",
+    "pushNotifications": "Push-уведомления (30 дней)",
+    "subscribed": "Подписались",
+    "unsubscribed": "Отписались"
   }
 }

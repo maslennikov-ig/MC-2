@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
 import { logger } from '@/lib/logger';
+import { checkRateLimit, getRateLimitIdentifier } from '@/lib/rate-limit';
 
 /**
  * Schema for push subscription request body
@@ -15,12 +16,58 @@ const pushSubscriptionSchema = z.object({
 });
 
 /**
+ * Allowed origins for CSRF protection
+ */
+const getAllowedOrigins = (): string[] => {
+  const origins = [
+    'https://megacampus.ai',
+    'https://www.megacampus.ai',
+  ];
+  if (process.env.NODE_ENV === 'development') {
+    origins.push('http://localhost:3000');
+  }
+  return origins;
+};
+
+/**
  * POST /api/push/subscribe
  *
  * Saves a push notification subscription for the authenticated user
  */
 export async function POST(req: NextRequest) {
   try {
+    // Validate origin to prevent CSRF
+    const origin = req.headers.get('origin');
+    const allowedOrigins = getAllowedOrigins();
+
+    if (!origin || !allowedOrigins.includes(origin)) {
+      return NextResponse.json(
+        { error: 'Invalid origin' },
+        { status: 403 }
+      );
+    }
+
+    // Rate limit: 10 requests per hour per user/IP
+    const rateLimitId = getRateLimitIdentifier(req);
+    const rateLimit = await checkRateLimit(`push-subscribe:${rateLimitId}`, {
+      requests: 10,
+      window: 3600, // 1 hour
+    });
+
+    if (!rateLimit.success) {
+      return NextResponse.json(
+        { error: 'Too many requests. Please try again later.' },
+        {
+          status: 429,
+          headers: {
+            'Retry-After': String(rateLimit.retryAfter || 60),
+            'X-RateLimit-Remaining': String(rateLimit.remaining),
+            'X-RateLimit-Reset': String(rateLimit.reset),
+          },
+        }
+      );
+    }
+
     const supabase = await createClient();
 
     // Verify user is authenticated
@@ -53,6 +100,7 @@ export async function POST(req: NextRequest) {
     const userAgent = req.headers.get('user-agent') || null;
 
     // Upsert the subscription (update if exists, insert if new)
+    // Uses composite key (user_id, endpoint) to allow same endpoint for different users
     const { error: dbError } = await supabase
       .from('push_subscriptions')
       .upsert(
@@ -65,7 +113,7 @@ export async function POST(req: NextRequest) {
           updated_at: new Date().toISOString(),
         },
         {
-          onConflict: 'endpoint',
+          onConflict: 'user_id,endpoint',
           ignoreDuplicates: false,
         }
       );

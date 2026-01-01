@@ -40,6 +40,7 @@ import { getPlaybackUrl } from './procedures/get-playback-url';
 import { regenerateDraft } from './procedures/regenerate-draft';
 import { updateDraft } from './procedures/update-draft';
 import { approveDraft } from './procedures/approve-draft';
+import { approveCoverDraft } from './procedures/approve-cover-draft';
 import { createBatch } from './procedures/create-batch';
 
 /**
@@ -137,6 +138,12 @@ export const enrichmentRouter = router({
    * @see procedures/approve-draft.ts
    */
   approveDraft,
+
+  /**
+   * Approve cover draft with selected variant
+   * @see procedures/approve-cover-draft.ts
+   */
+  approveCoverDraft,
 });
 
 /**

@@ -239,9 +239,9 @@ export function LessonView({
           >
             <Film className="w-4 h-4 mr-2" />
             Медиа
-            {enrichments && enrichments.length > 0 && (
+            {enrichments && enrichments.filter(e => e.enrichment_type !== 'cover').length > 0 && (
               <Badge variant="secondary" className="ml-2 h-5 px-1.5 text-xs">
-                {enrichments.length}
+                {enrichments.filter(e => e.enrichment_type !== 'cover').length}
               </Badge>
             )}
           </TabsTrigger>

@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { logger } from '../client-logger';
+import { usePWAAnalytics } from './use-pwa-analytics';
 
 /**
  * BeforeInstallPromptEvent interface
@@ -28,11 +29,26 @@ function isIOSSafari(): boolean {
   if (typeof window === 'undefined') return false;
 
   const ua = window.navigator.userAgent;
-  const isIOS = /iPad|iPhone|iPod/.test(ua);
-  // @ts-expect-error - MSStream is IE-specific
-  const isNotAndroid = !window.MSStream;
 
-  return isIOS && isNotAndroid;
+  // Check for iOS devices (iPhone, iPad, iPod)
+  const isIOS = /iPad|iPhone|iPod/.test(ua);
+
+  // Check for iPad on iOS 13+ (reports as macOS but has touch)
+  const isIPadOS = navigator.maxTouchPoints > 1 && /Macintosh/.test(ua);
+
+  // Ensure it's actually Safari (not Chrome/Firefox on iOS)
+  const isSafari = /Safari/.test(ua) && !/Chrome|CriOS|FxiOS|EdgiOS/.test(ua);
+
+  return (isIOS || isIPadOS) && isSafari;
+}
+
+/**
+ * Check if the browser supports the install prompt
+ * This is more reliable than user agent sniffing
+ */
+function supportsInstallPrompt(): boolean {
+  if (typeof window === 'undefined') return false;
+  return 'BeforeInstallPromptEvent' in window || 'onbeforeinstallprompt' in window;
 }
 
 /**
@@ -98,6 +114,12 @@ export interface UseInstallPromptReturn {
 }
 
 /**
+ * Export helper function for feature detection
+ * Useful for conditional rendering or feature detection outside of this hook
+ */
+export { supportsInstallPrompt };
+
+/**
  * Hook to manage PWA install prompt
  *
  * Features:
@@ -120,6 +142,7 @@ export function useInstallPrompt(): UseInstallPromptReturn {
   const [isInstalled, setIsInstalled] = useState(true); // Default to true to prevent flash
   const [isiOS, setIsIOS] = useState(false);
   const [wasDismissed, setWasDismissed] = useState(true); // Default to true to prevent flash
+  const { trackEvent } = usePWAAnalytics();
 
   // Initialize state on mount
   useEffect(() => {
@@ -137,6 +160,7 @@ export function useInstallPrompt(): UseInstallPromptReturn {
       // Store the event for later use
       setDeferredPrompt(event as BeforeInstallPromptEvent);
       logger.devLog('[PWA] beforeinstallprompt captured');
+      trackEvent('install_prompt_shown');
     };
 
     const handleAppInstalled = () => {
@@ -152,7 +176,7 @@ export function useInstallPrompt(): UseInstallPromptReturn {
       window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
       window.removeEventListener('appinstalled', handleAppInstalled);
     };
-  }, []);
+  }, [trackEvent]);
 
   // Listen for display mode changes (in case app is installed while page is open)
   useEffect(() => {
@@ -204,16 +228,19 @@ export function useInstallPrompt(): UseInstallPromptReturn {
       setDeferredPrompt(null);
 
       if (outcome === 'accepted') {
+        trackEvent('install_accepted');
         setIsInstalled(true);
         return true;
       }
 
+      trackEvent('install_dismissed');
       return false;
     } catch (error) {
       logger.error('[PWA] Error showing install prompt:', error);
+      trackEvent('install_error', { error: error instanceof Error ? error.message : 'Unknown' });
       return false;
     }
-  }, [deferredPrompt]);
+  }, [deferredPrompt, trackEvent]);
 
   /**
    * Dismiss the prompt and don't show for 7 days

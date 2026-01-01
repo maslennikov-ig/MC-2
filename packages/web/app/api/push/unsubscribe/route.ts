@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server';
 import { z } from 'zod';
 import { createClient } from '@/lib/supabase/server';
 import { logger } from '@/lib/logger';
+import { checkRateLimit, getRateLimitIdentifier } from '@/lib/rate-limit';
 
 /**
  * Schema for unsubscribe request body
@@ -11,12 +12,58 @@ const unsubscribeSchema = z.object({
 });
 
 /**
+ * Allowed origins for CSRF protection
+ */
+const getAllowedOrigins = (): string[] => {
+  const origins = [
+    'https://megacampus.ai',
+    'https://www.megacampus.ai',
+  ];
+  if (process.env.NODE_ENV === 'development') {
+    origins.push('http://localhost:3000');
+  }
+  return origins;
+};
+
+/**
  * DELETE /api/push/unsubscribe
  *
  * Removes a push notification subscription for the authenticated user
  */
 export async function DELETE(req: NextRequest) {
   try {
+    // Validate origin to prevent CSRF
+    const origin = req.headers.get('origin');
+    const allowedOrigins = getAllowedOrigins();
+
+    if (!origin || !allowedOrigins.includes(origin)) {
+      return NextResponse.json(
+        { error: 'Invalid origin' },
+        { status: 403 }
+      );
+    }
+
+    // Rate limit: 10 requests per hour per user/IP
+    const rateLimitId = getRateLimitIdentifier(req);
+    const rateLimit = await checkRateLimit(`push-unsubscribe:${rateLimitId}`, {
+      requests: 10,
+      window: 3600, // 1 hour
+    });
+
+    if (!rateLimit.success) {
+      return NextResponse.json(
+        { error: 'Too many requests. Please try again later.' },
+        {
+          status: 429,
+          headers: {
+            'Retry-After': String(rateLimit.retryAfter || 60),
+            'X-RateLimit-Remaining': String(rateLimit.remaining),
+            'X-RateLimit-Reset': String(rateLimit.reset),
+          },
+        }
+      );
+    }
+
     const supabase = await createClient();
 
     // Verify user is authenticated
