@@ -183,12 +183,19 @@ jobs:
           scp -i ~/.ssh/deploy_key \
             docker-compose.production.yml \
             nginx-docling-proxy.conf \
+            nginx-megacampus.conf \
             ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }}:${{ env.DEPLOY_PATH }}/
 
           scp -i ~/.ssh/deploy_key \
             scripts/deploy.sh \
             scripts/rollback.sh \
             ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }}:${{ env.DEPLOY_PATH }}/scripts/
+
+      - name: Update nginx config
+        run: |
+          ssh -i ~/.ssh/deploy_key \
+            ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} \
+            "sudo cp ${{ env.DEPLOY_PATH }}/nginx-megacampus.conf /etc/nginx/sites-enabled/megacampus && sudo nginx -t && sudo systemctl reload nginx"
 
       - name: Create .env.production from secrets
         run: |
