@@ -3,6 +3,18 @@
 _Released on 2025-12-26_
 
 
+## v0.26.47
+
+_Released on 2026-01-03_
+
+### 🐛 Bug Fixes
+
+- **stage7**: Fix two-stage cover flow and delete extension mapping
+
+---
+
+_This release was automatically generated from 1 commits._
+
 ## v0.26.46
 
 _Released on 2026-01-03_
