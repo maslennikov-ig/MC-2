@@ -379,6 +379,60 @@ export const coverEnrichmentContentSchema = z.object({
 export type CoverEnrichmentContent = z.infer<typeof coverEnrichmentContentSchema>;
 
 // ============================================================================
+// CARD ENRICHMENT CONTENT (Visual Card Images)
+// ============================================================================
+
+/**
+ * Card enrichment content structure
+ *
+ * Stores generated visual card image metadata and URL.
+ * Images generated at 1024x1024 resolution using course style.
+ * Used for shareable visual cards, social media, or lesson highlights.
+ */
+export const cardEnrichmentContentSchema = z.object({
+  /** Content type discriminator */
+  type: z.literal('card'),
+
+  /** Generated image URL (Supabase Storage public URL) */
+  imageUrl: z.string().url(),
+
+  /** Optional thumbnail URL for preview */
+  thumbnailUrl: z.string().url().optional(),
+
+  /** Alt text for accessibility */
+  altText: z.string(),
+
+  /** Image dimensions */
+  dimensions: z.object({
+    /** Image width in pixels */
+    width: z.number().int().positive().default(1024),
+
+    /** Image height in pixels */
+    height: z.number().int().positive().default(1024),
+  }),
+
+  /** Visual style reference (matches course style) */
+  visualStyle: z.object({
+    /** Color scheme used */
+    colorScheme: z.string(),
+
+    /** Aesthetic style applied */
+    aesthetic: z.string(),
+  }).optional(),
+
+  /** The prompt used for image generation (stored for regeneration/debugging) */
+  generation_prompt: z.string().optional(),
+
+  /** Image format */
+  format: z.enum(['png', 'jpeg', 'webp']).default('png'),
+
+  /** File size in bytes (optional) */
+  file_size_bytes: z.number().int().positive().optional(),
+});
+
+export type CardEnrichmentContent = z.infer<typeof cardEnrichmentContentSchema>;
+
+// ============================================================================
 // DISCRIMINATED UNION OF ALL CONTENT TYPES
 // ============================================================================
 
@@ -395,6 +449,7 @@ export const enrichmentContentSchema = z.discriminatedUnion('type', [
   videoEnrichmentContentSchema,
   documentEnrichmentContentSchema,
   coverEnrichmentContentSchema,
+  cardEnrichmentContentSchema,
 ]);
 
 export type EnrichmentContent = z.infer<typeof enrichmentContentSchema>;

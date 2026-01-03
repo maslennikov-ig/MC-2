@@ -1,20 +1,30 @@
 import React, { memo } from 'react';
 import { Handle, Position, NodeProps } from '@xyflow/react';
 import { RFEndNode } from '../types';
-import { Trophy, Sparkles, CheckCircle2, ExternalLink, Layers, BookOpen } from 'lucide-react';
+import { Trophy, Sparkles, CheckCircle2, ExternalLink, Layers, BookOpen, AlertCircle } from 'lucide-react';
 import { useNodeStatus } from '../hooks/useNodeStatus';
 import { useStaticGraph } from '../contexts/StaticGraphContext';
+import { useTranslation } from '@/lib/generation-graph/useTranslation';
+import { getModuleWord, getLessonWord } from '@/lib/generation-graph/utils/pluralization';
 import { motion } from 'framer-motion';
 import { Link } from '@/src/i18n/navigation';
+import { useParams } from 'next/navigation';
 
 const EndNode = ({ id, data, selected }: NodeProps<RFEndNode>) => {
   const statusEntry = useNodeStatus(id);
   const currentStatus = statusEntry?.status || data.status || 'pending';
   const isCompleted = currentStatus === 'completed';
 
-  // Get course info from context for navigation and stats
+  // Get course info from context for stats
   const { courseInfo } = useStaticGraph();
-  const { id: courseId, moduleCount, lessonCount } = courseInfo;
+  const { moduleCount, lessonCount } = courseInfo;
+
+  // Get courseSlug from URL params for navigation
+  const params = useParams();
+  const courseSlug = params?.slug as string | undefined;
+
+  // Translations
+  const { t } = useTranslation();
 
   return (
     <motion.div
@@ -70,7 +80,7 @@ const EndNode = ({ id, data, selected }: NodeProps<RFEndNode>) => {
               : 'text-slate-400 dark:text-slate-500'
             }
           `}>
-            Финиш
+            {t('endNode.finish')}
           </span>
           <span className={`
             text-sm font-bold
@@ -79,7 +89,7 @@ const EndNode = ({ id, data, selected }: NodeProps<RFEndNode>) => {
               : 'text-slate-500 dark:text-slate-400'
             }
           `}>
-            {isCompleted ? 'Курс готов!' : 'Ожидание...'}
+            {isCompleted ? t('endNode.courseReady') : t('endNode.waiting')}
           </span>
         </div>
         {isCompleted && (
@@ -92,33 +102,41 @@ const EndNode = ({ id, data, selected }: NodeProps<RFEndNode>) => {
         <div className="border-t border-emerald-200 dark:border-emerald-700/50 px-3 py-2.5 bg-emerald-50/50 dark:bg-emerald-900/20 rounded-b-md space-y-2">
           {/* Course Stats */}
           {(moduleCount > 0 || lessonCount > 0) && (
-            <div className="flex items-center gap-3 text-[11px] text-emerald-600 dark:text-emerald-400">
+            <div className="flex items-center gap-3 text-[11px] text-emerald-600 dark:text-emerald-400" role="status">
               {moduleCount > 0 && (
                 <span className="flex items-center gap-1">
                   <Layers size={12} />
-                  {moduleCount} модул{moduleCount === 1 ? 'ь' : moduleCount < 5 ? 'я' : 'ей'}
+                  {moduleCount} {getModuleWord(moduleCount, t, 'common')}
                 </span>
               )}
               {lessonCount > 0 && (
                 <span className="flex items-center gap-1">
                   <BookOpen size={12} />
-                  {lessonCount} урок{lessonCount === 1 ? '' : lessonCount < 5 ? 'а' : 'ов'}
+                  {lessonCount} {getLessonWord(lessonCount, t, 'common')}
                 </span>
               )}
             </div>
           )}
 
           {/* Open Course Button */}
-          <Link
-            href={`/courses/${courseId}`}
-            className="flex items-center justify-center gap-1.5 w-full px-3 py-1.5 rounded-md text-xs font-semibold
-              bg-emerald-500 hover:bg-emerald-600 text-white transition-colors
-              dark:bg-emerald-600 dark:hover:bg-emerald-500"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <span>Открыть курс</span>
-            <ExternalLink size={12} />
-          </Link>
+          {courseSlug ? (
+            <Link
+              href={`/courses/${courseSlug}`}
+              className="nopan nodrag flex items-center justify-center gap-1.5 w-full px-3 py-1.5 rounded-md text-xs font-semibold
+                bg-emerald-500 hover:bg-emerald-600 text-white transition-colors
+                dark:bg-emerald-600 dark:hover:bg-emerald-500"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <span>{t('endNode.openCourse')}</span>
+              <ExternalLink size={12} />
+            </Link>
+          ) : (
+            /* Fallback when courseSlug is not available */
+            <div className="flex items-center justify-center gap-1.5 w-full px-3 py-1.5 text-xs text-emerald-600 dark:text-emerald-400">
+              <AlertCircle size={12} />
+              <span>{t('endNode.loadingLink')}</span>
+            </div>
+          )}
         </div>
       )}
 
@@ -126,7 +144,7 @@ const EndNode = ({ id, data, selected }: NodeProps<RFEndNode>) => {
       {!isCompleted && (
         <div className="border-t border-slate-200 dark:border-slate-700 px-3 py-2 bg-slate-50/50 dark:bg-slate-800/50 rounded-b-md">
           <span className="text-[10px] text-slate-400 dark:text-slate-500">
-            Ожидание завершения генерации...
+            {t('endNode.waitingForGeneration')}
           </span>
         </div>
       )}

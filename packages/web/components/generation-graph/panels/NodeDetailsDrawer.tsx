@@ -47,6 +47,8 @@ import { LessonPanelWithTabs } from './lesson/LessonPanelWithTabs';
 import { useModuleDashboardData } from '../hooks/useModuleDashboardData';
 import { useLessonInspectorData } from '../hooks/useLessonInspectorData';
 import { useEnrichmentInspectorStore } from '../stores/enrichment-inspector-store';
+// End Node completion panel
+import { EndNodePanel } from './EndNodePanel';
 
 interface DisplayData {
   label?: string;
@@ -119,6 +121,8 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
   const isDocumentNode = selectedNode?.type === 'document';
   // Stage 2 "Document Processing" UI: Detect if this is the Stage 2 container node
   const isStage2Group = selectedNode?.type === 'stage2group';
+  // End Node: Detect if this is the final "finish" node
+  const isEndNode = selectedNode?.type === 'end';
 
   // Safely extract documentId for Stage 2 document nodes
   const documentId = useMemo(() => {
@@ -626,6 +630,18 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
               isRegenerating={isRetrying}
               tier={courseInfo.tier}
               defaultTab={pendingCreateType ? 'enrichments' : 'content'}
+            />
+          ) : isEndNode ? (
+            /* End Node - Course Completion Panel */
+            <EndNodePanel
+              courseSlug={courseSlug}
+              courseTitle={courseInfo.title}
+              moduleCount={courseInfo.moduleCount}
+              lessonCount={courseInfo.lessonCount}
+              isCompleted={
+                realtimeStatus?.status === 'completed' ||
+                generationStatus === 'completed'
+              }
             />
           ) : realtimeStatus?.status === 'skipped' || data?.status === 'skipped' ? (
             /* Skipped Stage - show informative message */

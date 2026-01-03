@@ -15,8 +15,22 @@ import { getApiKey } from '@/shared/services/api-key-service';
 // CONFIGURATION
 // ============================================================================
 
+/** Default model for cover images (16:9) - Gemini supports aspect ratio control */
 const DEFAULT_IMAGE_MODEL = 'google/gemini-2.5-flash-image-preview';
-const COST_PER_IMAGE_USD = 0.038;
+
+/** Model for card images (1:1) - GPT-5 Mini always generates square 1024x1024 */
+export const CARD_IMAGE_MODEL = 'openai/gpt-5-image-mini';
+
+/** Cost per image by model (USD) */
+const MODEL_COSTS: Record<string, number> = {
+  'google/gemini-2.5-flash-image-preview': 0.038,
+  'openai/gpt-5-image-mini': 0.007,
+  'openai/gpt-5-image': 0.04,
+};
+
+/** Default cost if model not in lookup */
+const DEFAULT_COST_USD = 0.04;
+
 const DEFAULT_ASPECT_RATIO = '16:9';
 const DEFAULT_IMAGE_SIZE = '1K'; // 1344x768 for 16:9 - optimal for web covers
 const API_TIMEOUT_MS = 60000; // 1 minute for image generation
@@ -28,11 +42,32 @@ const API_TIMEOUT_MS = 60000; // 1 minute for image generation
 const DEFAULT_NEGATIVE_PROMPT = 'Do not include any watermarks, logos, or signatures.';
 
 /**
- * Get actual pixel dimensions from image size preset
- * Gemini supports: 1K, 2K, 4K with various aspect ratios
- * 16:9 dimensions: 1K=1344x768, 2K=2688x1536, 4K=5765x3072
+ * Check if model supports image_config parameters (aspect_ratio, image_size)
+ * Only Gemini models support these through OpenRouter
  */
-function getImageDimensions(imageSize: '1K' | '2K' | '4K', aspectRatio: string): { width: number; height: number } {
+function supportsImageConfig(model: string): boolean {
+  return model.startsWith('google/');
+}
+
+/**
+ * Get actual pixel dimensions based on model and settings
+ *
+ * Gemini supports: 1K, 2K, 4K with various aspect ratios
+ * GPT-5 Mini: Always 1024x1024 (square only)
+ *
+ * 16:9 dimensions: 1K=1344x768, 2K=2688x1536, 4K=5765x3072
+ * 1:1 dimensions: 1K=1024x1024, 2K=2048x2048, 4K=4096x4096
+ */
+function getImageDimensions(
+  model: string,
+  imageSize: '1K' | '2K' | '4K',
+  aspectRatio: string
+): { width: number; height: number } {
+  // GPT-5 Mini always generates 1024x1024 square images
+  if (model.includes('gpt-5-image-mini')) {
+    return { width: 1024, height: 1024 };
+  }
+
   // For 16:9 aspect ratio (most common for covers)
   if (aspectRatio === '16:9') {
     if (imageSize === '4K') return { width: 5765, height: 3072 };
@@ -143,7 +178,9 @@ export async function generateImage(
       timeout: API_TIMEOUT_MS,
     });
 
-    const response = await client.chat.completions.create({
+    // Build request options - only include image_config for models that support it
+    // GPT models ignore image_config and always generate 1024x1024
+    const requestOptions: Record<string, unknown> = {
       model,
       messages: [
         {
@@ -151,14 +188,19 @@ export async function generateImage(
           content: fullPrompt,
         },
       ],
-      // @ts-expect-error - OpenRouter extensions not in OpenAI types
       modalities: ['text', 'image'],
-      // OpenRouter image_config for aspect ratio and resolution control
-      image_config: {
+    };
+
+    // Only add image_config for Gemini models (OpenRouter limitation)
+    if (supportsImageConfig(model)) {
+      requestOptions.image_config = {
         aspect_ratio: aspectRatio,
         image_size: imageSize,
-      },
-    }, {
+      };
+    }
+
+    // @ts-expect-error - OpenRouter extensions not in OpenAI types
+    const response = await client.chat.completions.create(requestOptions, {
       signal: abortController.signal,
     });
 
@@ -243,8 +285,11 @@ export async function generateImage(
     const mimeType = dataUrlMatch[1];
     const base64Data = dataUrlMatch[2];
 
-    // Get actual dimensions based on image_size preset
-    const actualDimensions = getImageDimensions(imageSize, aspectRatio);
+    // Get actual dimensions based on model and settings
+    const actualDimensions = getImageDimensions(model, imageSize, aspectRatio);
+
+    // Get model-specific cost
+    const costUsd = MODEL_COSTS[model] ?? DEFAULT_COST_USD;
 
     logger.info(
       {
@@ -256,6 +301,7 @@ export async function generateImage(
         imageSize,
         actualWidth: actualDimensions.width,
         actualHeight: actualDimensions.height,
+        costUsd,
       },
       'Image generation completed'
     );
@@ -265,7 +311,7 @@ export async function generateImage(
       mimeType,
       width: actualDimensions.width,
       height: actualDimensions.height,
-      costUsd: COST_PER_IMAGE_USD,
+      costUsd,
       modelUsed: model,
     };
   } catch (error) {
@@ -292,6 +338,40 @@ export async function generateImage(
 
     throw error;
   }
+}
+
+/**
+ * Generate a card image (1:1 square) using GPT-5 Image Mini
+ *
+ * Convenience wrapper for card generation with optimal settings.
+ * GPT-5 Mini is cost-effective ($0.007) and always generates 1024x1024 squares.
+ *
+ * @param prompt - Card image prompt
+ * @returns Generated card image data
+ */
+export async function generateCardImage(prompt: string): Promise<ImageGenerationResult> {
+  return generateImage(prompt, {
+    model: CARD_IMAGE_MODEL,
+    aspectRatio: '1:1',
+    imageSize: '1K',
+  });
+}
+
+/**
+ * Generate a cover image (16:9) using Gemini
+ *
+ * Convenience wrapper for cover generation with optimal settings.
+ * Gemini produces high-quality 16:9 covers at 1344x768.
+ *
+ * @param prompt - Cover image prompt
+ * @returns Generated cover image data
+ */
+export async function generateCoverImage(prompt: string): Promise<ImageGenerationResult> {
+  return generateImage(prompt, {
+    model: DEFAULT_IMAGE_MODEL,
+    aspectRatio: '16:9',
+    imageSize: '1K',
+  });
 }
 
 /**

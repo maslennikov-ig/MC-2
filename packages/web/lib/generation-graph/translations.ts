@@ -18,7 +18,19 @@ export const GRAPH_TRANSLATIONS: GraphTranslations & {
     actions: Record<string, { ru: string; en: string }>;
     assetDock: Record<string, { ru: string; en: string }>;
   };
+  endNode?: Record<string, { ru: string; en: string }>;
+  selectionToolbar?: Record<string, { ru: string; en: string }>;
+  common?: Record<string, { ru: string; en: string }>;
 } = {
+  // === COMMON TRANSLATIONS (shared across components) ===
+  common: {
+    moduleWord: { ru: 'модуль', en: 'module' },
+    modulesWord: { ru: 'модуля', en: 'modules' },
+    modulesManyWord: { ru: 'модулей', en: 'modules' },
+    lessonWord: { ru: 'урок', en: 'lesson' },
+    lessonsWord: { ru: 'урока', en: 'lessons' },
+    lessonsManyWord: { ru: 'уроков', en: 'lessons' },
+  },
   stages: {
     stage_1: { ru: 'Инициализация курса', en: 'Course Initialization' },
     stage_2: { ru: 'Обработка документов', en: 'Document Processing' },
@@ -908,6 +920,56 @@ export const GRAPH_TRANSLATIONS: GraphTranslations & {
       generating: { ru: 'генерируется', en: 'generating' },
       error: { ru: 'с ошибкой', en: 'with error' },
     },
+  },
+
+  // === END NODE ===
+  endNode: {
+    finish: { ru: 'Финиш', en: 'Finish' },
+    courseReady: { ru: 'Курс готов!', en: 'Course Ready!' },
+    waiting: { ru: 'Ожидание...', en: 'Waiting...' },
+    waitingForGeneration: { ru: 'Ожидание завершения генерации...', en: 'Waiting for generation to complete...' },
+    openCourse: { ru: 'Открыть курс', en: 'Open Course' },
+    moduleWord: { ru: 'модуль', en: 'module' },
+    modulesWord: { ru: 'модуля', en: 'modules' },
+    modulesManyWord: { ru: 'модулей', en: 'modules' },
+    lessonWord: { ru: 'урок', en: 'lesson' },
+    lessonsWord: { ru: 'урока', en: 'lessons' },
+    lessonsManyWord: { ru: 'уроков', en: 'lessons' },
+    // Drawer panel translations
+    drawerTitle: { ru: 'Завершение курса', en: 'Course Completion' },
+    drawerDescription: { ru: 'Статус генерации и ссылка на готовый курс', en: 'Generation status and link to completed course' },
+    completionStatus: { ru: 'Статус завершения', en: 'Completion Status' },
+    generationComplete: { ru: 'Генерация завершена', en: 'Generation Complete' },
+    generationPending: { ru: 'Генерация в процессе', en: 'Generation in Progress' },
+    courseStats: { ru: 'Статистика курса', en: 'Course Statistics' },
+    modules: { ru: 'Модулей', en: 'Modules' },
+    lessons: { ru: 'Уроков', en: 'Lessons' },
+    viewCourse: { ru: 'Перейти к курсу', en: 'View Course' },
+    congratulations: { ru: 'Поздравляем! Ваш курс успешно создан.', en: 'Congratulations! Your course has been successfully created.' },
+    pendingMessage: { ru: 'Пожалуйста, дождитесь завершения генерации всех уроков.', en: 'Please wait for all lessons to finish generating.' },
+    loadingLink: { ru: 'Загрузка...', en: 'Loading...' },
+  },
+
+  // === SELECTION TOOLBAR ===
+  selectionToolbar: {
+    stageTitle: { ru: 'Этап 6: Генерация', en: 'Stage 6: Generation' },
+    completedTitle: { ru: 'Курс завершён', en: 'Course Completed' },
+    generateAll: { ru: 'Запустить', en: 'Start' },
+    select: { ru: 'Выбрать', en: 'Select' },
+    cancel: { ru: 'Отмена', en: 'Cancel' },
+    lesson: { ru: 'урок', en: 'lesson' },
+    lessons2_4: { ru: 'урока', en: 'lessons' },
+    lessonsMany: { ru: 'уроков', en: 'lessons' },
+    openCourse: { ru: 'Открыть курс', en: 'Open Course' },
+    expandPanel: { ru: 'Развернуть панель генерации', en: 'Expand generation panel' },
+    collapsePanel: { ru: 'Свернуть панель', en: 'Collapse panel' },
+    swipeToCollapse: { ru: 'Смахните влево, чтобы свернуть', en: 'Swipe left to collapse' },
+    howToGenerate: { ru: 'Выберите способ генерации:', en: 'Choose generation method:' },
+    generateAllDesc: { ru: 'все уроки', en: 'all lessons' },
+    selectDesc: { ru: 'отдельные уроки', en: 'individual lessons' },
+    moduleWord: { ru: 'модуль', en: 'module' },
+    modulesWord: { ru: 'модуля', en: 'modules' },
+    modulesManyWord: { ru: 'модулей', en: 'modules' },
   },
 
   stage6: {

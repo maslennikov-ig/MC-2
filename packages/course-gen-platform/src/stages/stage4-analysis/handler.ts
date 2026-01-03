@@ -23,6 +23,7 @@ import logger from '../../shared/logger';
 import { getSupabaseAdmin } from '../../shared/supabase/admin';
 import { runAnalysisOrchestration } from './orchestrator';
 import { generationLockService } from '@/shared/locks';
+import { generateVisualStyle } from './utils/visual-style-generator';
 
 /**
  * Error details for STRUCTURE_ANALYSIS jobs
@@ -468,7 +469,38 @@ class Stage4AnalysisHandler {
       const analysisResult: AnalysisResult = await runAnalysisOrchestration(orchestratorJob);
 
       // =================================================================
-      // STEP 2: Store Result in Database
+      // STEP 2: Generate Visual Style for Card Imagery
+      // =================================================================
+      // Generate consistent visual style for course cards and lesson cards
+      // This is stored separately from analysis_result for easy extraction
+      let visualStyle = null;
+      try {
+        jobLogger.info('Generating visual style for course imagery');
+
+        visualStyle = await generateVisualStyle({
+          courseTitle: analysisInput.topic,
+          courseTopic: analysisResult.topic_analysis.determined_topic || analysisInput.topic,
+          language: analysisInput.language,
+          category: analysisResult.course_category.primary,
+        });
+
+        jobLogger.info(
+          {
+            colorScheme: visualStyle.colorScheme.slice(0, 50),
+            aesthetic: visualStyle.aesthetic.slice(0, 50),
+          },
+          'Visual style generated successfully'
+        );
+      } catch (visualStyleError) {
+        // Non-blocking - log and continue without visual_style
+        jobLogger.warn(
+          { error: visualStyleError instanceof Error ? visualStyleError.message : String(visualStyleError) },
+          'Visual style generation failed - cards will use default styling'
+        );
+      }
+
+      // =================================================================
+      // STEP 3: Store Result in Database
       // =================================================================
       jobLogger.info(
         {
@@ -476,6 +508,7 @@ class Stage4AnalysisHandler {
           total_sections: analysisResult.recommended_structure.total_sections,
           category: analysisResult.course_category.primary,
           research_flags_count: analysisResult.research_flags.length,
+          hasVisualStyle: !!visualStyle,
         },
         'Analysis completed - storing result in database'
       );
@@ -484,6 +517,7 @@ class Stage4AnalysisHandler {
         .from('courses')
         .update({
           analysis_result: analysisResult as any, // Cast to any for Supabase JSONB compatibility
+          visual_style: visualStyle as any, // Visual style for card generation (JSONB)
           generation_status: 'stage_4_awaiting_approval' as const, // Stage Gates: Wait for approval before Stage 5
           // Denormalize counts for fast access in UI and queries
           total_lessons_count: analysisResult.recommended_structure.total_lessons,

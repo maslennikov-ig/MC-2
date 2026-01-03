@@ -13,7 +13,7 @@ import { getBackendAuthHeaders, TRPC_URL } from '@/lib/auth';
 const createEnrichmentSchema = z.object({
   lessonId: z.string().regex(/^\d+\.\d+$/, 'Invalid lesson ID format (expected: "1.2")'),
   courseId: z.string().uuid('Invalid course ID'),
-  enrichmentType: z.enum(['video', 'audio', 'quiz', 'presentation', 'document', 'cover']),
+  enrichmentType: z.enum(['video', 'audio', 'quiz', 'presentation', 'document', 'cover', 'card']),
   settings: z.record(z.unknown()).optional(),
 });
 
@@ -26,7 +26,7 @@ const reorderEnrichmentsSchema = z.object({
 export interface CreateEnrichmentInput {
   lessonId: string; // In format "1.2" (module.lesson label)
   courseId: string;
-  enrichmentType: 'video' | 'audio' | 'quiz' | 'presentation' | 'document' | 'cover';
+  enrichmentType: 'video' | 'audio' | 'quiz' | 'presentation' | 'document' | 'cover' | 'card';
   settings?: Record<string, unknown>;
 }
 
@@ -448,7 +448,7 @@ export interface GetEnrichmentResult {
   success: boolean;
   enrichment?: {
     id: string;
-    enrichment_type: 'video' | 'audio' | 'quiz' | 'presentation' | 'document' | 'cover';
+    enrichment_type: 'video' | 'audio' | 'quiz' | 'presentation' | 'document' | 'cover' | 'card';
     status:
       | 'pending'
       | 'draft_generating'

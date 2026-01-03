@@ -402,6 +402,7 @@ export type Database = {
           user_agent: string | null
           user_id: string
           visibility: Database["public"]["Enums"]["course_visibility"]
+          visual_style: Json | null
           webhook_url: string | null
         }
         Insert: {
@@ -453,6 +454,7 @@ export type Database = {
           user_agent?: string | null
           user_id: string
           visibility?: Database["public"]["Enums"]["course_visibility"]
+          visual_style?: Json | null
           webhook_url?: string | null
         }
         Update: {
@@ -504,6 +506,7 @@ export type Database = {
           user_agent?: string | null
           user_id?: string
           visibility?: Database["public"]["Enums"]["course_visibility"]
+          visual_style?: Json | null
           webhook_url?: string | null
         }
         Relationships: [
@@ -2593,6 +2596,7 @@ export type Database = {
       cleanup_expired_generation_locks: { Args: never; Returns: number }
       cleanup_expired_idempotency_keys: { Args: never; Returns: undefined }
       cleanup_old_outbox_entries: { Args: never; Returns: undefined }
+      cleanup_stale_push_subscriptions: { Args: never; Returns: number }
       course_belongs_to_org: {
         Args: { p_course_id: string; p_org_id: string }
         Returns: boolean
@@ -2875,6 +2879,7 @@ export type Database = {
         | "quiz"
         | "document"
         | "cover"
+        | "card"
       enrollment_status: "active" | "completed" | "dropped" | "expired"
       generation_stage: "stage4" | "stage5" | "stage6"
       generation_status:
@@ -3089,6 +3094,7 @@ export const Constants = {
         "quiz",
         "document",
         "cover",
+        "card",
       ],
       enrollment_status: ["active", "completed", "dropped", "expired"],
       generation_stage: ["stage4", "stage5", "stage6"],

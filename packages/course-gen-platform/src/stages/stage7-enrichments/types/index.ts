@@ -159,6 +159,12 @@ export interface EnrichmentWithContext {
     id: string;
     title: string;
     language: string;
+    /** Course description for context */
+    course_description?: string | null;
+    /** Visual style for consistent imagery */
+    visual_style?: Record<string, unknown> | null;
+    /** Legacy settings (may contain visual_style) */
+    settings?: Record<string, unknown> | null;
   };
 }
 

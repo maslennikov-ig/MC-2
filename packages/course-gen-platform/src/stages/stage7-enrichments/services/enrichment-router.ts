@@ -13,7 +13,7 @@ import type {
   DraftResult,
   GenerateResult,
 } from '../types';
-import { quizHandler, videoHandler, audioHandler, presentationHandler, coverHandler } from '../handlers';
+import { quizHandler, videoHandler, audioHandler, presentationHandler, coverHandler, cardHandler } from '../handlers';
 
 /**
  * Enrichment handler interface
@@ -104,6 +104,7 @@ const handlers: Record<EnrichmentType, EnrichmentHandler> = {
   video: videoHandler,
   document: documentHandler,
   cover: coverHandler,
+  card: cardHandler,
 };
 
 /**

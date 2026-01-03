@@ -12,7 +12,7 @@ import type { TierKey } from './file-upload-constants';
  * Activity type for limit configuration
  * Matches the enrichment types in the database enum
  */
-export type ActivityType = 'video' | 'audio' | 'presentation' | 'quiz' | 'document';
+export type ActivityType = 'video' | 'audio' | 'presentation' | 'quiz' | 'document' | 'card';
 
 /**
  * Activity limits configuration for a tier
@@ -37,23 +37,23 @@ export interface ActivityLimits {
 export const ACTIVITY_LIMITS_BY_TIER: Record<TierKey, ActivityLimits> = {
   trial: {
     maxPerLesson: 10,
-    maxPerType: { video: 2, audio: 2, quiz: 5, presentation: 2, document: 2 },
+    maxPerType: { video: 2, audio: 2, quiz: 5, presentation: 2, document: 2, card: 3 },
   },
   free: {
     maxPerLesson: 3,
-    maxPerType: { video: 1, audio: 1, quiz: 2, presentation: 1, document: 1 },
+    maxPerType: { video: 1, audio: 1, quiz: 2, presentation: 1, document: 1, card: 2 },
   },
   basic: {
     maxPerLesson: 6,
-    maxPerType: { video: 1, audio: 2, quiz: 3, presentation: 2, document: 2 },
+    maxPerType: { video: 1, audio: 2, quiz: 3, presentation: 2, document: 2, card: 3 },
   },
   standard: {
     maxPerLesson: 10,
-    maxPerType: { video: 2, audio: 2, quiz: 5, presentation: 2, document: 2 },
+    maxPerType: { video: 2, audio: 2, quiz: 5, presentation: 2, document: 2, card: 3 },
   },
   premium: {
     maxPerLesson: 20,
-    maxPerType: { video: 5, audio: 5, quiz: 10, presentation: 5, document: 5 },
+    maxPerType: { video: 5, audio: 5, quiz: 10, presentation: 5, document: 5, card: 10 },
   },
 };
 
@@ -125,6 +125,7 @@ export function getRemainingCapacity(
     presentation: Math.max(0, limits.maxPerType.presentation - (currentCounts.presentation || 0)),
     quiz: Math.max(0, limits.maxPerType.quiz - (currentCounts.quiz || 0)),
     document: Math.max(0, limits.maxPerType.document - (currentCounts.document || 0)),
+    card: Math.max(0, limits.maxPerType.card - (currentCounts.card || 0)),
   };
 
   return {

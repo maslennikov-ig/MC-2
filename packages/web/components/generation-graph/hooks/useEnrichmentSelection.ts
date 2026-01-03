@@ -26,7 +26,7 @@ export interface EnrichmentSelectionState {
 /**
  * All available enrichment types
  */
-const ALL_ENRICHMENT_TYPES: EnrichmentType[] = ['quiz', 'video', 'audio', 'presentation', 'document'];
+const ALL_ENRICHMENT_TYPES: EnrichmentType[] = ['quiz', 'video', 'audio', 'presentation', 'document', 'cover', 'card'];
 
 /**
  * Hook for count-based routing logic in the enrichment inspector
@@ -62,6 +62,7 @@ export function useEnrichmentSelection(
       audio: 0,
       presentation: 0,
       document: 0,
+      card: 0,
     };
 
     for (const enrichment of items) {

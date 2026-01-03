@@ -6,6 +6,7 @@
     "quiz": "Quiz",
     "document": "Document",
     "cover": "Cover",
+    "card": "Visual Card",
     "podcast": "Podcast",
     "mindmap": "Mindmap",
     "case_study": "Case Study",
@@ -21,7 +22,8 @@
     "presentation": "Slide presentation for visual accompaniment",
     "quiz": "Comprehension quiz to reinforce learning",
     "document": "Additional document for download",
-    "cover": "AI-generated cover image for the lesson"
+    "cover": "AI-generated cover image for the lesson",
+    "card": "AI-generated visual card for lesson content"
   },
   "status": {
     "pending": "Pending",
@@ -234,7 +236,8 @@
       "presentation": "Presentation",
       "quiz": "Quiz",
       "document": "Document",
-      "cover": "Cover"
+      "cover": "Cover",
+      "card": "Visual Card"
     }
   }
 }

@@ -54,9 +54,10 @@ export async function getEnrichment(
     }
 
     // Get the course (using course_id from enrichment, which is denormalized)
+    // Include visual_style for card/cover image generation and course_description for context
     const { data: course, error: courseError } = await supabaseAdmin
       .from('courses')
-      .select('id, title, language')
+      .select('id, title, language, course_description, visual_style, settings')
       .eq('id', enrichment.course_id)
       .single();
 
@@ -103,6 +104,9 @@ export async function getEnrichment(
         id: course.id,
         title: course.title,
         language: course.language ?? 'en',
+        course_description: course.course_description ?? null,
+        visual_style: course.visual_style as Record<string, unknown> | null,
+        settings: course.settings as Record<string, unknown> | null,
       },
     };
   } catch (error) {

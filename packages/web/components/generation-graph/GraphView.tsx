@@ -61,6 +61,7 @@ import { useUserRole } from './hooks/useUserRole';
 import { useDocumentsWithStatus } from './hooks/useDocumentsWithStatus';
 import { createClient } from '@/lib/supabase/client';
 import { useLocale } from 'next-intl';
+import { useParams } from 'next/navigation';
 import { setTranslationLocale } from './hooks/use-graph-data/utils/step-translations';
 import type { CourseStructure } from '@megacampus/shared-types';
 import { PartialGenerationProvider } from './contexts/PartialGenerationContext';
@@ -183,6 +184,10 @@ function GraphViewInner({ courseId, courseTitle, hasDocuments = true, failedAtSt
   const nodesInitialized = useNodesInitialized();
   const { fitView, getNodes, setCenter } = useReactFlow();
   const initialFitDone = useRef(false);
+
+  // Get courseSlug from URL params for navigation
+  const params = useParams();
+  const courseSlug = params?.slug as string | undefined;
 
   // Sync locale for step name translations
   const locale = useLocale();
@@ -920,7 +925,15 @@ function GraphViewInner({ courseId, courseTitle, hasDocuments = true, failedAtSt
             {isAdmin && <AdminPanel isOpen={isAdminPanelOpen} onClose={() => setIsAdminPanelOpen(false)} />}
 
             {/* Selection toolbar for Stage 6 partial generation - show when lessons exist AND Stage 5 is approved */}
-            {nodes.some(n => n.type === 'lesson') && awaitingStage !== 5 && <SelectionToolbar courseId={courseId} />}
+            {nodes.some(n => n.type === 'lesson') && awaitingStage !== 5 && (
+              <SelectionToolbar
+                courseId={courseId}
+                isCompleted={pipelineStatus === 'completed'}
+                courseSlug={courseSlug}
+                moduleCount={staticData.courseInfo.moduleCount}
+                lessonCount={staticData.courseInfo.lessonCount}
+              />
+            )}
           </div>
         </div>
         </FullscreenProvider>

@@ -18,7 +18,7 @@ import {
 /**
  * Enrichment type (matches database enum)
  */
-export type EnrichmentType = 'video' | 'audio' | 'presentation' | 'quiz' | 'document' | 'cover';
+export type EnrichmentType = 'video' | 'audio' | 'presentation' | 'quiz' | 'document' | 'cover' | 'card';
 
 /**
  * Enrichment status (matches database enum)
@@ -125,6 +125,17 @@ export const ENRICHMENT_TYPE_CONFIG: Record<EnrichmentType, EnrichmentTypeConfig
     labelRu: 'Обложка урока',
     twoStage: false,
     order: 0,
+  },
+  card: {
+    icon: Image,
+    color: 'text-indigo-500 dark:text-indigo-400',
+    colorClass: 'text-indigo-500 dark:text-indigo-400',
+    bgColor: 'bg-indigo-100 dark:bg-indigo-900/30',
+    bgClass: 'bg-indigo-100 dark:bg-indigo-900/30',
+    label: 'Visual Card',
+    labelRu: 'Визуальная карточка',
+    twoStage: false,
+    order: 6,
   },
 };
 
@@ -242,4 +253,5 @@ export const ENRICHMENT_TYPES_ORDERED: EnrichmentType[] = [
   'presentation',
   'quiz',
   'document',
+  'card',
 ];
