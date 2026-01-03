@@ -1,6 +1,6 @@
 {
   "name": "@megacampus/trpc-client-sdk",
-  "version": "0.26.45",
+  "version": "0.26.46",
   "description": "Official TypeScript client SDK for MegaCampusAI tRPC API with full type safety, authentication, and error handling",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
