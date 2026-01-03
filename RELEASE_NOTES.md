@@ -3,6 +3,23 @@
 _Released on 2025-12-26_
 
 
+## v0.26.48
+
+_Released on 2026-01-03_
+
+### ✨ New Features
+
+- **stage7**: Add card enrichment handler for 1:1 course/lesson thumbnails
+- **stage7**: Switch image generation from Seedream 4.5 to Gemini 2.5 Flash
+
+### 🐛 Bug Fixes
+
+- **stage7**: Allow text in generated images
+
+---
+
+_This release was automatically generated from 3 commits._
+
 ## v0.26.47
 
 _Released on 2026-01-03_

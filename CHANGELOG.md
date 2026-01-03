@@ -66,6 +66,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.26.48] - 2026-01-03
+
+### Added
+- **stage7**: add card enrichment handler for 1:1 course/lesson thumbnails (56e3fb0)
+- **stage7**: switch image generation from Seedream 4.5 to Gemini 2.5 Flash (f86736a)
+
+### Fixed
+- **stage7**: allow text in generated images (12f76e8)
+
 ## [0.26.44] - 2025-12-31
 
 ### Added
