@@ -2,6 +2,7 @@ import React, { memo, useRef, useMemo, useEffect } from 'react';
 import { Handle, Position, NodeProps, useReactFlow, useViewport, useUpdateNodeInternals } from '@xyflow/react';
 import { RFStage2GroupNode } from '../types';
 import { ChevronDown, ChevronRight, FileStack } from 'lucide-react';
+import { useViewportPreservation } from '../hooks/useViewportPreservation';
 import { motion } from 'framer-motion';
 import {
   getNodeStatusStyles,
@@ -96,6 +97,7 @@ const Stage2Group = ({ id, data, selected }: NodeProps<RFStage2GroupNode>) => {
   const { zoom } = useViewport();
   const { selectNode } = useNodeSelection();
   const updateNodeInternals = useUpdateNodeInternals();
+  const { preserveViewport } = useViewportPreservation();
 
   // Double-click detection via timing (React Flow captures onDoubleClick)
   const lastClickTime = useRef(0);
@@ -193,6 +195,10 @@ const Stage2Group = ({ id, data, selected }: NodeProps<RFStage2GroupNode>) => {
 
       const newCollapsed = !data.isCollapsed;
 
+      // CRITICAL: Preserve viewport BEFORE setNodes to prevent scroll jump
+      // This captures the current viewport state before React Flow processes node changes
+      preserveViewport();
+
       // Update stage2group collapse state and child visibility
       // This triggers nodes change -> GraphView useEffect -> layoutNodes
       // Two-Phase Layout will recalculate group dimensions and document positions
@@ -273,9 +279,10 @@ const Stage2Group = ({ id, data, selected }: NodeProps<RFStage2GroupNode>) => {
           />
 
           {/* Clickable header area for expand/collapse (single click) or open details (double click) */}
+          {/* nopan nodrag: prevent React Flow from panning/dragging when clicking header */}
           <div
             onClick={handleHeaderClick}
-            className="flex items-center gap-3 p-3 cursor-pointer hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors"
+            className="nopan nodrag flex items-center gap-3 p-3 cursor-pointer hover:bg-slate-50/50 dark:hover:bg-slate-800/30 transition-colors"
             data-testid={`expand-stage2group-${id}`}
             role="button"
             aria-expanded="false"
@@ -324,9 +331,10 @@ const Stage2Group = ({ id, data, selected }: NodeProps<RFStage2GroupNode>) => {
             </div>
 
             {/* Chevron on the right - indicates expandable */}
+            {/* nopan nodrag: prevent React Flow from intercepting click */}
             <ChevronRight
               size={20}
-              className="text-slate-400 dark:text-slate-500 flex-shrink-0 transition-transform duration-200"
+              className="nopan nodrag text-slate-400 dark:text-slate-500 flex-shrink-0 transition-transform duration-200"
             />
           </div>
 
@@ -380,9 +388,10 @@ const Stage2Group = ({ id, data, selected }: NodeProps<RFStage2GroupNode>) => {
           aria-label={`${t('stage2.documentProcessingExpanded')}: ${completedDocs} из ${totalDocs}`}
         >
           {/* Header (70px) - single click: collapse, double click: open details */}
+          {/* nopan nodrag: prevent React Flow from panning/dragging when clicking header */}
           <div
             onClick={handleHeaderClick}
-            className="h-[70px] px-3 flex items-center gap-3 border-b border-indigo-200/50 dark:border-indigo-700/30 relative overflow-hidden cursor-pointer hover:bg-indigo-50/30 dark:hover:bg-indigo-900/20 transition-colors"
+            className="nopan nodrag h-[70px] px-3 flex items-center gap-3 border-b border-indigo-200/50 dark:border-indigo-700/30 relative overflow-hidden cursor-pointer hover:bg-indigo-50/30 dark:hover:bg-indigo-900/20 transition-colors"
             data-testid={`collapse-stage2group-${id}`}
             role="button"
             aria-expanded="true"
@@ -433,9 +442,10 @@ const Stage2Group = ({ id, data, selected }: NodeProps<RFStage2GroupNode>) => {
             )}
 
             {/* Chevron pointing down when expanded - on the right */}
+            {/* nopan nodrag: prevent React Flow from intercepting click */}
             <ChevronDown
               size={20}
-              className="text-slate-400 dark:text-slate-500 flex-shrink-0 relative z-10 transition-transform duration-200"
+              className="nopan nodrag text-slate-400 dark:text-slate-500 flex-shrink-0 relative z-10 transition-transform duration-200"
             />
           </div>
 

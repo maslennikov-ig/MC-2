@@ -18,7 +18,7 @@ import { getApiKey } from '@/shared/services/api-key-service';
 const DEFAULT_IMAGE_MODEL = 'bytedance-seed/seedream-4.5';
 const COST_PER_IMAGE_USD = 0.04;
 const DEFAULT_ASPECT_RATIO = '16:9';
-const DEFAULT_IMAGE_SIZE = '4K'; // Seedream 4.5 supports 4K at same cost
+const DEFAULT_IMAGE_SIZE = '2K'; // 2048x1152 - optimal for hero banners
 const API_TIMEOUT_MS = 60000; // 1 minute for image generation
 
 /**

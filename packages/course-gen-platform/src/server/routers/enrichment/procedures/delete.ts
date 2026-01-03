@@ -63,11 +63,20 @@ export const deleteEnrichment = protectedProcedure
         requestId
       );
 
-      // Step 2: Delete asset from storage if exists
-      if (enrichment.asset_id) {
+      // Step 2: Delete asset from storage
+      // Some enrichments use asset_id, others (like cover) store files directly
+      const extensionMap: Record<string, string> = {
+        audio: 'mp3',
+        video: 'mp4',
+        cover: 'webp',
+        presentation: 'pptx',
+        document: 'pdf',
+      };
+      const extension = extensionMap[enrichment.enrichment_type];
+
+      // Try to delete storage file if we know the extension
+      if (extension) {
         try {
-          // Determine file extension based on enrichment type
-          const extension = enrichment.enrichment_type === 'audio' ? 'mp3' : 'mp4';
           const assetPath = buildAssetPath(
             enrichment.course_id,
             enrichment.lesson_id,
@@ -84,10 +93,11 @@ export const deleteEnrichment = protectedProcedure
           }, 'Enrichment asset deleted from storage');
         } catch (storageError) {
           // Log but don't fail - continue with database deletion
+          // File may not exist (e.g., enrichment failed before upload)
           logger.warn({
             requestId,
             enrichmentId,
-            assetId: enrichment.asset_id,
+            enrichmentType: enrichment.enrichment_type,
             error: storageError instanceof Error ? storageError.message : String(storageError),
           }, 'Failed to delete enrichment asset from storage (continuing with db delete)');
         }

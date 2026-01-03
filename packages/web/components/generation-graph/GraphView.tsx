@@ -537,10 +537,9 @@ function GraphViewInner({ courseId, courseTitle, hasDocuments = true, failedAtSt
 
       // Only layout if structure changes, collapse state changes, or initial load
       if (nodesRef.current.length > 0 && (structureChanged || isInitialLoad || collapseChanged)) {
-          // Preserve viewport when collapse state changes (avoid scroll jump)
-          if (collapseChanged && !isInitialLoad) {
-              preserveViewport();
-          }
+          // Note: preserveViewport() is now called BEFORE setNodes() in ModuleGroup/Stage2Group
+          // to capture viewport state before any React Flow processing occurs.
+          // This prevents the race condition where viewport would shift between setNodes and this useEffect.
 
           // Increment generation to track this layout request
           const currentGeneration = ++layoutGenerationRef.current;
@@ -553,7 +552,7 @@ function GraphViewInner({ courseId, courseTitle, hasDocuments = true, failedAtSt
       return () => {
         debouncedLayout.cancel();
       };
-  }, [layoutTrigger, edges, preserveViewport, debouncedLayout]);
+  }, [layoutTrigger, edges, debouncedLayout]);
   
   // Selection
   const { selectNode, deselectNode, selectedNodeId } = useNodeSelection();
@@ -643,6 +642,13 @@ function GraphViewInner({ courseId, courseTitle, hasDocuments = true, failedAtSt
       });
     }
 
+    // Set End node status based on pipeline completion
+    // End node should be 'completed' only when entire pipeline is completed
+    nodeStatuses.set('end', {
+      status: pipelineStatus === 'completed' ? 'completed' : 'pending',
+      lastUpdated: new Date(),
+    });
+
     let mappedStatus: 'idle' | 'running' | 'completed' | 'failed' | 'paused' = 'idle';
     if (pipelineStatus && ACTIVE_STATUSES.includes(pipelineStatus)) {
       mappedStatus = 'running';
@@ -670,22 +676,29 @@ function GraphViewInner({ courseId, courseTitle, hasDocuments = true, failedAtSt
     };
   }, [pipelineStatus, isConnected, hasDocuments, failedAtStage, nodes, progressPercentage]);
 
-  // Static Data
+  // Static Data (includes dynamic counts for EndNode display)
   const staticData = useMemo(
-    () => ({
-      stageConfig: GRAPH_STAGE_CONFIG,
-      translations: GRAPH_TRANSLATIONS,
-      nodeStyles: NODE_STYLES,
-      courseInfo: {
-        id: courseId,
-        title: courseTitle || 'Course Generation',
-        documentCount: 0,
-        moduleCount: 0,
-        lessonCount: 0,
-        tier,
-      },
-    }),
-    [courseId, courseTitle, tier]
+    () => {
+      // Count modules and lessons from nodes for EndNode display
+      const moduleCount = nodes.filter(n => n.type === 'module').length;
+      const lessonCount = nodes.filter(n => n.type === 'lesson').length;
+      const documentCount = nodes.filter(n => n.type === 'document').length;
+
+      return {
+        stageConfig: GRAPH_STAGE_CONFIG,
+        translations: GRAPH_TRANSLATIONS,
+        nodeStyles: NODE_STYLES,
+        courseInfo: {
+          id: courseId,
+          title: courseTitle || 'Course Generation',
+          documentCount,
+          moduleCount,
+          lessonCount,
+          tier,
+        },
+      };
+    },
+    [courseId, courseTitle, tier, nodes]
   );
 
   // Mobile view - show simplified graph (no separate list view)

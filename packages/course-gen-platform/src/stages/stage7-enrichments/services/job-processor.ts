@@ -174,7 +174,7 @@ export async function processStage7Job(
 
     // Execute generation based on flow type
     if (isTwoStage && isDraftPhase && handler.generateDraft) {
-      // Two-stage: Generate draft
+      // Two-stage: Generate draft (Phase 1)
       jobLogger.info('Generating draft for two-stage enrichment');
 
       const draftResult = await handler.generateDraft(handlerInput);
@@ -213,7 +213,95 @@ export async function processStage7Job(
       };
     }
 
-    // Single-stage or final generation
+    // Two-stage: Final generation (Phase 2) - use generateFinal with approved draft
+    if (isTwoStage && !isDraftPhase && handler.generateFinal) {
+      jobLogger.info('Generating final content from approved draft');
+
+      // Get draft content from enrichment (it has selected_variant set by approval)
+      const draftContent = enrichmentContext.enrichment.content;
+
+      if (!draftContent) {
+        throw new Error('Draft content missing for final generation. Please regenerate the draft.');
+      }
+
+      // Build draft result structure expected by generateFinal
+      const draftResult = {
+        draftContent,
+        metadata: {
+          durationMs: 0, // Already counted in draft phase
+          tokensUsed: (enrichmentContext.enrichment.metadata as Record<string, unknown>)?.total_tokens as number ?? 0,
+          modelUsed: (enrichmentContext.enrichment.metadata as Record<string, unknown>)?.model_used as string ?? 'unknown',
+        },
+      };
+
+      const result = await handler.generateFinal(handlerInput, draftResult);
+
+      await updateJobProgress(job, {
+        phase: 'validating',
+        progress: 70,
+        message: 'Validating generated content',
+      });
+
+      // Handle asset upload for cover images
+      if (result.assetBuffer && result.assetMimeType && result.assetExtension) {
+        await updateJobProgress(job, {
+          phase: 'uploading',
+          progress: 85,
+          message: 'Uploading asset to storage',
+        });
+
+        const assetPath = await uploadEnrichmentAsset(
+          courseId,
+          lessonId,
+          enrichmentId,
+          result.assetBuffer,
+          result.assetMimeType,
+          result.assetExtension
+        );
+
+        await linkEnrichmentAsset(enrichmentId, assetPath);
+
+        jobLogger.info({ assetPath }, 'Asset uploaded and linked');
+      }
+
+      // Save content and mark as completed
+      await saveEnrichmentContent(enrichmentId, result.content, result.metadata);
+
+      await updateJobProgress(job, {
+        phase: 'complete',
+        progress: 100,
+        message: 'Enrichment generation completed',
+      });
+
+      const durationMs = Date.now() - startTime;
+
+      jobLogger.info(
+        {
+          success: true,
+          durationMs,
+          tokensUsed: result.metadata.total_tokens,
+          modelUsed: result.metadata.model_used,
+          qualityScore: result.metadata.quality_score,
+        },
+        'Stage 7 two-stage final generation completed'
+      );
+
+      return {
+        enrichmentId,
+        success: true,
+        status: 'completed',
+        content: result.content,
+        metrics: {
+          durationMs,
+          tokensUsed: result.metadata.total_tokens,
+          costUsd: result.metadata.estimated_cost_usd,
+          modelUsed: result.metadata.model_used,
+          qualityScore: result.metadata.quality_score,
+        },
+      };
+    }
+
+    // Single-stage generation (fallback for non-two-stage types)
     jobLogger.info('Generating final enrichment content');
 
     const result = await handler.generate(handlerInput);

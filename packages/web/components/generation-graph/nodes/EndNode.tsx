@@ -1,14 +1,20 @@
 import React, { memo } from 'react';
 import { Handle, Position, NodeProps } from '@xyflow/react';
 import { RFEndNode } from '../types';
-import { Trophy, Sparkles, CheckCircle2 } from 'lucide-react';
+import { Trophy, Sparkles, CheckCircle2, ExternalLink, Layers, BookOpen } from 'lucide-react';
 import { useNodeStatus } from '../hooks/useNodeStatus';
+import { useStaticGraph } from '../contexts/StaticGraphContext';
 import { motion } from 'framer-motion';
+import { Link } from '@/src/i18n/navigation';
 
 const EndNode = ({ id, data, selected }: NodeProps<RFEndNode>) => {
   const statusEntry = useNodeStatus(id);
   const currentStatus = statusEntry?.status || data.status || 'pending';
   const isCompleted = currentStatus === 'completed';
+
+  // Get course info from context for navigation and stats
+  const { courseInfo } = useStaticGraph();
+  const { id: courseId, moduleCount, lessonCount } = courseInfo;
 
   return (
     <motion.div
@@ -16,7 +22,7 @@ const EndNode = ({ id, data, selected }: NodeProps<RFEndNode>) => {
       animate={{ opacity: 1, scale: 1 }}
       transition={{ duration: 0.3 }}
       className={`
-        relative min-w-[160px] rounded-lg border-2 transition-all duration-300
+        nopan nodrag relative min-w-[180px] rounded-lg border-2 transition-all duration-300
         ${isCompleted
           ? 'bg-gradient-to-br from-emerald-50 to-green-100 border-emerald-400 dark:from-emerald-900/30 dark:to-green-900/30 dark:border-emerald-600 shadow-lg shadow-emerald-500/20'
           : 'bg-slate-50 border-slate-200 dark:bg-slate-800 dark:border-slate-600'
@@ -81,11 +87,46 @@ const EndNode = ({ id, data, selected }: NodeProps<RFEndNode>) => {
         )}
       </div>
 
-      {/* Footer for completed state */}
+      {/* Stats and CTA for completed state */}
       {isCompleted && (
-        <div className="border-t border-emerald-200 dark:border-emerald-700/50 px-3 py-2 bg-emerald-50/50 dark:bg-emerald-900/20 rounded-b-md">
-          <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">
-            ✓ Генерация завершена успешно
+        <div className="border-t border-emerald-200 dark:border-emerald-700/50 px-3 py-2.5 bg-emerald-50/50 dark:bg-emerald-900/20 rounded-b-md space-y-2">
+          {/* Course Stats */}
+          {(moduleCount > 0 || lessonCount > 0) && (
+            <div className="flex items-center gap-3 text-[11px] text-emerald-600 dark:text-emerald-400">
+              {moduleCount > 0 && (
+                <span className="flex items-center gap-1">
+                  <Layers size={12} />
+                  {moduleCount} модул{moduleCount === 1 ? 'ь' : moduleCount < 5 ? 'я' : 'ей'}
+                </span>
+              )}
+              {lessonCount > 0 && (
+                <span className="flex items-center gap-1">
+                  <BookOpen size={12} />
+                  {lessonCount} урок{lessonCount === 1 ? '' : lessonCount < 5 ? 'а' : 'ов'}
+                </span>
+              )}
+            </div>
+          )}
+
+          {/* Open Course Button */}
+          <Link
+            href={`/courses/${courseId}`}
+            className="flex items-center justify-center gap-1.5 w-full px-3 py-1.5 rounded-md text-xs font-semibold
+              bg-emerald-500 hover:bg-emerald-600 text-white transition-colors
+              dark:bg-emerald-600 dark:hover:bg-emerald-500"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <span>Открыть курс</span>
+            <ExternalLink size={12} />
+          </Link>
+        </div>
+      )}
+
+      {/* Pending state footer */}
+      {!isCompleted && (
+        <div className="border-t border-slate-200 dark:border-slate-700 px-3 py-2 bg-slate-50/50 dark:bg-slate-800/50 rounded-b-md">
+          <span className="text-[10px] text-slate-400 dark:text-slate-500">
+            Ожидание завершения генерации...
           </span>
         </div>
       )}
