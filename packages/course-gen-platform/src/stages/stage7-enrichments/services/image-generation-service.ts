@@ -17,9 +17,38 @@ import { getApiKey } from '@/shared/services/api-key-service';
 
 const DEFAULT_IMAGE_MODEL = 'bytedance-seed/seedream-4.5';
 const COST_PER_IMAGE_USD = 0.04;
-const DEFAULT_WIDTH = 1280;
-const DEFAULT_HEIGHT = 720;
+const DEFAULT_ASPECT_RATIO = '16:9';
+const DEFAULT_IMAGE_SIZE = '4K'; // Seedream 4.5 supports 4K at same cost
 const API_TIMEOUT_MS = 60000; // 1 minute for image generation
+
+/**
+ * Negative prompt to avoid text, watermarks, and artifacts in generated images.
+ * Used to strengthen "no text" instructions.
+ */
+const DEFAULT_NEGATIVE_PROMPT = 'text, letters, words, numbers, typography, watermark, logo, signature, title, label, caption, subtitle, handwriting, characters, alphabet, digits, inscriptions, writings, printed text, written text, fonts, typeface';
+
+/**
+ * Get actual pixel dimensions from image size preset
+ * Seedream 4.5 supports: 2K (2048x1152 for 16:9) and 4K (3840x2160 for 16:9)
+ */
+function getImageDimensions(imageSize: '2K' | '4K', aspectRatio: string): { width: number; height: number } {
+  // For 16:9 aspect ratio (most common for covers)
+  if (aspectRatio === '16:9') {
+    return imageSize === '4K'
+      ? { width: 3840, height: 2160 }
+      : { width: 2048, height: 1152 };
+  }
+  // For other aspect ratios, use approximations
+  if (aspectRatio === '1:1') {
+    return imageSize === '4K'
+      ? { width: 2160, height: 2160 }
+      : { width: 1024, height: 1024 };
+  }
+  // Default fallback
+  return imageSize === '4K'
+    ? { width: 3840, height: 2160 }
+    : { width: 2048, height: 1152 };
+}
 
 // ============================================================================
 // TYPES
@@ -28,10 +57,14 @@ const API_TIMEOUT_MS = 60000; // 1 minute for image generation
 export interface ImageGenerationOptions {
   /** Model to use (default: bytedance-seed/seedream-4.5) */
   model?: string;
-  /** Image width (default: 1280) */
-  width?: number;
-  /** Image height (default: 720) */
-  height?: number;
+  /** Aspect ratio for image generation (default: '16:9') */
+  aspectRatio?: string;
+  /** Image size/resolution: '2K' or '4K' (default: '4K') */
+  imageSize?: '2K' | '4K';
+  /** Negative prompt to avoid unwanted elements (default: text-related terms) */
+  negativePrompt?: string;
+  /** Whether to skip negative prompt (default: false) */
+  skipNegativePrompt?: boolean;
 }
 
 export interface ImageGenerationResult {
@@ -65,10 +98,23 @@ export async function generateImage(
   options: ImageGenerationOptions = {}
 ): Promise<ImageGenerationResult> {
   const model = options.model ?? DEFAULT_IMAGE_MODEL;
-  const width = options.width ?? DEFAULT_WIDTH;
-  const height = options.height ?? DEFAULT_HEIGHT;
+  const aspectRatio = options.aspectRatio ?? DEFAULT_ASPECT_RATIO;
+  const imageSize = options.imageSize ?? DEFAULT_IMAGE_SIZE;
+  const negativePrompt = options.negativePrompt ?? DEFAULT_NEGATIVE_PROMPT;
+  const skipNegativePrompt = options.skipNegativePrompt ?? false;
 
-  logger.info({ model, promptLength: prompt.length }, 'Starting image generation');
+  // Append negative prompt to strengthen text avoidance
+  const fullPrompt = skipNegativePrompt
+    ? prompt
+    : `${prompt}\n\nNegative: ${negativePrompt}`;
+
+  logger.info({
+    model,
+    promptLength: prompt.length,
+    aspectRatio,
+    imageSize,
+    hasNegativePrompt: !skipNegativePrompt,
+  }, 'Starting image generation');
 
   const apiKey = await getApiKey('openrouter');
 
@@ -100,11 +146,16 @@ export async function generateImage(
       messages: [
         {
           role: 'user',
-          content: prompt,
+          content: fullPrompt,
         },
       ],
-      // @ts-expect-error - OpenRouter extension not in OpenAI types
+      // @ts-expect-error - OpenRouter extensions not in OpenAI types
       modalities: ['text', 'image'],
+      // OpenRouter image_config for aspect ratio and resolution control
+      image_config: {
+        aspect_ratio: aspectRatio,
+        image_size: imageSize,
+      },
     }, {
       signal: abortController.signal,
     });
@@ -190,12 +241,19 @@ export async function generateImage(
     const mimeType = dataUrlMatch[1];
     const base64Data = dataUrlMatch[2];
 
+    // Get actual dimensions based on image_size preset
+    const actualDimensions = getImageDimensions(imageSize, aspectRatio);
+
     logger.info(
       {
         model,
         durationMs,
         mimeType,
         base64Length: base64Data.length,
+        aspectRatio,
+        imageSize,
+        actualWidth: actualDimensions.width,
+        actualHeight: actualDimensions.height,
       },
       'Image generation completed'
     );
@@ -203,8 +261,8 @@ export async function generateImage(
     return {
       base64Data,
       mimeType,
-      width,
-      height,
+      width: actualDimensions.width,
+      height: actualDimensions.height,
       costUsd: COST_PER_IMAGE_USD,
       modelUsed: model,
     };
