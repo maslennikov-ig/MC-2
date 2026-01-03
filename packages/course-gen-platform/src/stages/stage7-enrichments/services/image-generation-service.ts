@@ -15,39 +15,40 @@ import { getApiKey } from '@/shared/services/api-key-service';
 // CONFIGURATION
 // ============================================================================
 
-const DEFAULT_IMAGE_MODEL = 'bytedance-seed/seedream-4.5';
-const COST_PER_IMAGE_USD = 0.04;
+const DEFAULT_IMAGE_MODEL = 'google/gemini-2.5-flash-image-preview';
+const COST_PER_IMAGE_USD = 0.038;
 const DEFAULT_ASPECT_RATIO = '16:9';
-const DEFAULT_IMAGE_SIZE = '2K'; // 2048x1152 - optimal for hero banners
+const DEFAULT_IMAGE_SIZE = '1K'; // 1344x768 for 16:9 - optimal for web covers
 const API_TIMEOUT_MS = 60000; // 1 minute for image generation
 
 /**
  * Negative prompt to avoid text, watermarks, and artifacts in generated images.
- * Used to strengthen "no text" instructions.
+ * Appended to prompts to strengthen "no text" instructions.
  */
-const DEFAULT_NEGATIVE_PROMPT = 'text, letters, words, numbers, typography, watermark, logo, signature, title, label, caption, subtitle, handwriting, characters, alphabet, digits, inscriptions, writings, printed text, written text, fonts, typeface';
+const DEFAULT_NEGATIVE_PROMPT = 'Do not include any text, letters, words, numbers, typography, watermarks, logos, signatures, titles, labels, captions, or written content of any kind.';
 
 /**
  * Get actual pixel dimensions from image size preset
- * Seedream 4.5 supports: 2K (2048x1152 for 16:9) and 4K (3840x2160 for 16:9)
+ * Gemini supports: 1K, 2K, 4K with various aspect ratios
+ * 16:9 dimensions: 1K=1344x768, 2K=2688x1536, 4K=5765x3072
  */
-function getImageDimensions(imageSize: '2K' | '4K', aspectRatio: string): { width: number; height: number } {
+function getImageDimensions(imageSize: '1K' | '2K' | '4K', aspectRatio: string): { width: number; height: number } {
   // For 16:9 aspect ratio (most common for covers)
   if (aspectRatio === '16:9') {
-    return imageSize === '4K'
-      ? { width: 3840, height: 2160 }
-      : { width: 2048, height: 1152 };
+    if (imageSize === '4K') return { width: 5765, height: 3072 };
+    if (imageSize === '2K') return { width: 2688, height: 1536 };
+    return { width: 1344, height: 768 }; // 1K default
   }
-  // For other aspect ratios, use approximations
+  // For 1:1 aspect ratio
   if (aspectRatio === '1:1') {
-    return imageSize === '4K'
-      ? { width: 2160, height: 2160 }
-      : { width: 1024, height: 1024 };
+    if (imageSize === '4K') return { width: 4096, height: 4096 };
+    if (imageSize === '2K') return { width: 2048, height: 2048 };
+    return { width: 1024, height: 1024 }; // 1K default
   }
-  // Default fallback
-  return imageSize === '4K'
-    ? { width: 3840, height: 2160 }
-    : { width: 2048, height: 1152 };
+  // Default fallback to 16:9
+  if (imageSize === '4K') return { width: 5765, height: 3072 };
+  if (imageSize === '2K') return { width: 2688, height: 1536 };
+  return { width: 1344, height: 768 };
 }
 
 // ============================================================================
@@ -55,12 +56,12 @@ function getImageDimensions(imageSize: '2K' | '4K', aspectRatio: string): { widt
 // ============================================================================
 
 export interface ImageGenerationOptions {
-  /** Model to use (default: bytedance-seed/seedream-4.5) */
+  /** Model to use (default: google/gemini-2.5-flash-image-preview) */
   model?: string;
   /** Aspect ratio for image generation (default: '16:9') */
   aspectRatio?: string;
-  /** Image size/resolution: '2K' or '4K' (default: '4K') */
-  imageSize?: '2K' | '4K';
+  /** Image size/resolution: '1K', '2K' or '4K' (default: '1K') */
+  imageSize?: '1K' | '2K' | '4K';
   /** Negative prompt to avoid unwanted elements (default: text-related terms) */
   negativePrompt?: string;
   /** Whether to skip negative prompt (default: false) */
@@ -104,9 +105,10 @@ export async function generateImage(
   const skipNegativePrompt = options.skipNegativePrompt ?? false;
 
   // Append negative prompt to strengthen text avoidance
+  // Gemini works best with natural language instructions
   const fullPrompt = skipNegativePrompt
     ? prompt
-    : `${prompt}\n\nNegative: ${negativePrompt}`;
+    : `${prompt}\n\n${negativePrompt}`;
 
   logger.info({
     model,
