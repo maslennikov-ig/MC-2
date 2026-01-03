@@ -22,10 +22,10 @@ const DEFAULT_IMAGE_SIZE = '1K'; // 1344x768 for 16:9 - optimal for web covers
 const API_TIMEOUT_MS = 60000; // 1 minute for image generation
 
 /**
- * Negative prompt to avoid text, watermarks, and artifacts in generated images.
- * Appended to prompts to strengthen "no text" instructions.
+ * Negative prompt to avoid unwanted artifacts in generated images.
+ * Gemini renders text well, so we only exclude watermarks/logos.
  */
-const DEFAULT_NEGATIVE_PROMPT = 'Do not include any text, letters, words, numbers, typography, watermarks, logos, signatures, titles, labels, captions, or written content of any kind.';
+const DEFAULT_NEGATIVE_PROMPT = 'Do not include any watermarks, logos, or signatures.';
 
 /**
  * Get actual pixel dimensions from image size preset
