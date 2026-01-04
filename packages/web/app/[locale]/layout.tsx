@@ -4,7 +4,6 @@ import { Manrope, JetBrains_Mono } from "next/font/google";
 import { NextIntlClientProvider, hasLocale } from 'next-intl';
 import { getMessages, getTranslations, setRequestLocale } from 'next-intl/server';
 import { notFound } from 'next/navigation';
-import Script from 'next/script';
 import { routing } from '@/src/i18n/routing';
 import { Locale } from '@/src/i18n/config';
 import { ErrorBoundary } from "@/components/common/error-boundary";
@@ -248,83 +247,6 @@ export default async function LocaleLayout({ children, params }: Props) {
                 65% { transform: rotate(85deg); }
                 75% { transform: rotate(87.5deg); }
               }
-            `,
-          }}
-        />
-        {/*
-          CRITICAL: Kill Switch - v3.0 (TEMPORARY)
-          PWA is disabled. This script ALWAYS clears ALL caches and unregisters ALL SWs.
-          This ensures ALL users get clean state after deployment.
-        */}
-        <Script
-          id="sw-kill-switch"
-          strategy="beforeInteractive"
-          dangerouslySetInnerHTML={{
-            __html: `
-              (function() {
-                try {
-                  var CLEARED_KEY = 'mc-sw-killed';
-
-                  // Only run once per session to avoid infinite loop
-                  if (sessionStorage.getItem(CLEARED_KEY)) {
-                    console.log('[KillSwitch] Already cleared this session');
-                    return;
-                  }
-
-                  var hadSW = false;
-                  var hadCache = false;
-
-                  // Unregister ALL service workers
-                  if ('serviceWorker' in navigator) {
-                    navigator.serviceWorker.getRegistrations().then(function(regs) {
-                      if (regs.length > 0) {
-                        hadSW = true;
-                        console.log('[KillSwitch] Found ' + regs.length + ' SW(s), unregistering...');
-                        return Promise.all(regs.map(function(r) { return r.unregister(); }));
-                      }
-                    }).then(function() {
-                      if (hadSW) {
-                        console.log('[KillSwitch] All SWs unregistered');
-                      }
-                    });
-                  }
-
-                  // Clear ALL caches
-                  if ('caches' in window) {
-                    caches.keys().then(function(keys) {
-                      if (keys.length > 0) {
-                        hadCache = true;
-                        console.log('[KillSwitch] Found ' + keys.length + ' cache(s), deleting...');
-                        return Promise.all(keys.map(function(k) { return caches.delete(k); }));
-                      }
-                    }).then(function() {
-                      if (hadCache) {
-                        console.log('[KillSwitch] All caches deleted');
-                      }
-
-                      // Mark as cleared and reload if we had SW or caches
-                      if (hadSW || hadCache) {
-                        sessionStorage.setItem(CLEARED_KEY, '1');
-                        console.log('[KillSwitch] Reloading with clean state...');
-                        setTimeout(function() { location.reload(); }, 100);
-                      }
-                    });
-                  }
-
-                  // Also listen for chunk errors just in case
-                  window.addEventListener('error', function(e) {
-                    var msg = (e.message || '').toLowerCase();
-                    if (msg.includes('chunk') || msg.includes('failed to fetch')) {
-                      console.log('[KillSwitch] Chunk error detected, forcing reload');
-                      sessionStorage.setItem(CLEARED_KEY, '1');
-                      location.reload();
-                    }
-                  });
-
-                } catch(err) {
-                  console.error('[KillSwitch] Error:', err);
-                }
-              })();
             `,
           }}
         />
