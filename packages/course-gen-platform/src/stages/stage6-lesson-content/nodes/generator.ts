@@ -83,6 +83,53 @@ const CONTEXT_WINDOW_CHARS = 5000;
  */
 const VALID_DEPTHS: readonly SectionDepthV2[] = ['summary', 'detailed_analysis', 'comprehensive'];
 
+/**
+ * Dynamic context window calculation constants
+ * @see calculateDynamicContextWindow
+ */
+const DYNAMIC_CONTEXT_BASE_CHARS = 3000;      // Base for 15-min lesson
+const DYNAMIC_CONTEXT_CHARS_PER_MINUTE = 150; // Extra chars per minute over 15
+const DYNAMIC_CONTEXT_MAX_CHARS = 8000;       // Maximum cap
+const DYNAMIC_CONTEXT_MIN_DURATION = 5;       // Minimum lesson duration (minutes)
+
+/**
+ * Calculate dynamic context window based on lesson duration and language
+ *
+ * Formula: (BASE_CHARS + extraMinutes × CHARS_PER_MINUTE) × languageMultiplier
+ * Capped at MAX_CHARS to prevent excessive context.
+ *
+ * Rationale:
+ * - Longer lessons need more context for coherence across sections
+ * - Language multiplier accounts for token density (e.g., Russian needs more chars)
+ * - Cap prevents context from growing unbounded
+ *
+ * @param durationMinutes - Estimated lesson duration in minutes (minimum 5, defaults to 15)
+ * @param language - ISO language code ('en', 'ru', etc.)
+ * @returns Dynamic context window size in characters
+ *
+ * @example
+ * // 15-min English lesson: 3000 chars
+ * calculateDynamicContextWindow(15, 'en') // 3000
+ *
+ * // 30-min English lesson: 3000 + (15 × 150) = 5250 chars
+ * calculateDynamicContextWindow(30, 'en') // 5250
+ *
+ * // 60-min Russian lesson: (3000 + 45 × 150) × 1.3 = 12675 → capped to 8000
+ * calculateDynamicContextWindow(60, 'ru') // 8000
+ */
+export function calculateDynamicContextWindow(
+  durationMinutes: number,
+  language: string
+): number {
+  // Input validation: ensure duration is at least MIN_DURATION
+  const validDuration = Math.max(DYNAMIC_CONTEXT_MIN_DURATION, durationMinutes || 15);
+  const extraMinutes = validDuration > 15 ? validDuration - 15 : 0;
+  const languageMultiplier = getTokenMultiplier(language);
+
+  const calculated = (DYNAMIC_CONTEXT_BASE_CHARS + extraMinutes * DYNAMIC_CONTEXT_CHARS_PER_MINUTE) * languageMultiplier;
+  return Math.min(DYNAMIC_CONTEXT_MAX_CHARS, Math.ceil(calculated));
+}
+
 // ============================================================================
 // HELPER FUNCTIONS
 // ============================================================================
@@ -583,11 +630,36 @@ export async function generateSection(
       ? prohibitedTermsArr.join(', ')
       : 'None specified';
 
+  // Calculate dynamic context window based on lesson duration and language
+  const durationMinutes = lessonSpec.estimated_duration_minutes || 15;
+  const dynamicWindowSize = calculateDynamicContextWindow(durationMinutes, language);
+
+  logger.debug(
+    {
+      sectionTitle: section.title,
+      lessonId: lessonSpec.lesson_id,
+      durationMinutes,
+      language,
+      languageMultiplier: getTokenMultiplier(language),
+      dynamicWindowSize,
+      previousContextLength: previousContext.length,
+    },
+    'Calculated dynamic context window for section'
+  );
+
   // Handle empty previousContext gracefully for first section
-  const contextWindow = extractContextWindow(previousContext);
+  const contextWindow = extractContextWindow(previousContext, dynamicWindowSize);
   const previousContextValue = contextWindow.trim()
     ? contextWindow
     : '<!-- First section: no previous context available -->';
+
+  // Log if inter-lesson context is not available
+  if (!lessonSpec.lesson_context) {
+    logger.debug(
+      { lessonId: lessonSpec.lesson_id, sectionTitle: section.title },
+      'No inter-lesson context available (first lesson or context not generated)'
+    );
+  }
 
   const prompt = await promptService.renderPrompt('stage6_serial_generator', {
     lessonTitle: lessonSpec.title,

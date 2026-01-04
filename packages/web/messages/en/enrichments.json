@@ -22,8 +22,8 @@
     "presentation": "Slide presentation for visual accompaniment",
     "quiz": "Comprehension quiz to reinforce learning",
     "document": "Additional document for download",
-    "cover": "Premium 16:9 hero banner for lesson page (optional)",
-    "card": "AI-generated 1:1 thumbnail for catalog and navigation"
+    "cover": "Premium 16:9 hero banner for lesson page header (manual generation)",
+    "card": "AI-generated 1:1 thumbnail for course catalog and navigation (automatic)"
   },
   "status": {
     "pending": "Pending",

@@ -758,10 +758,13 @@ CRITICAL INSTRUCTIONS:
 3. Use the reference material to inform your content
 4. Apply depth guidance: {{depthGuidance}}
 5. Match the {{tone}} tone for {{targetAudience}} audience
-6. INTER-LESSON AWARENESS (use inter_lesson_context as inspiration, not constraint):
-   - You MAY reference previous concepts to create flow, but don't force connections
-   - Terms in terms_already_defined can be used without re-explanation (reader knows them)
-   - The next lesson preview is FYI only — use creatively if it enhances your section
+6. INTER-LESSON CONTINUITY (from inter_lesson_context if provided):
+   - Reference previous lesson naturally: "As we explored in [previous_lesson.title]..." or "Building on [concept]..."
+   - Do NOT re-explain terms from terms_already_defined — the reader already knows them
+   - In conclusion sections, tease next lesson: "In the next lesson, we will explore [next_lesson.title]..."
+   Example:
+   ✓ GOOD: "Building on the React hooks concept from the previous lesson, let's explore..."
+   ✗ BAD: "React hooks allow you to use state in functional components..." (re-explaining known term)
 
 Content Requirements:
 - Cover all key points from the specification
@@ -844,7 +847,7 @@ Output markdown content for this section only (no header needed).
       },
       {
         name: 'previousContext',
-        description: 'Last ~5000 chars of generated content for transition context',
+        description: 'Previous section content (3000-8000 chars, dynamic based on lesson duration/language) for transition smoothing',
         required: true,
       },
       {

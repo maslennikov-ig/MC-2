@@ -37,13 +37,19 @@ import {
 
 /** Supabase Storage bucket for card images */
 const STORAGE_BUCKET = process.env.ENRICHMENTS_STORAGE_BUCKET ?? 'course-enrichments';
+if (!process.env.ENRICHMENTS_STORAGE_BUCKET) {
+  logger.warn('ENRICHMENTS_STORAGE_BUCKET not set, using default: course-enrichments');
+}
 
 /**
- * Retry configuration for upload operations
+ * Retry configuration for card generation operations
+ *
+ * Used for upload retries with exponential backoff
  */
 const RETRY_CONFIG = {
   MAX_ATTEMPTS: 3,
   INITIAL_DELAY_MS: 1000,
+  MAX_DELAY_MS: 10000,
   BACKOFF_MULTIPLIER: 2,
 } as const;
 
@@ -63,6 +69,12 @@ const DEFAULT_VISUAL_STYLE = {
 
 /**
  * Retry a function with exponential backoff
+ *
+ * @param fn - Async function to retry
+ * @param maxAttempts - Maximum number of attempts (default: 3)
+ * @param initialDelayMs - Initial delay in milliseconds (default: 1000)
+ * @returns Result of the function
+ * @throws Last error if all retries fail
  */
 async function retryWithBackoff<T>(
   fn: () => Promise<T>,
@@ -94,7 +106,12 @@ async function retryWithBackoff<T>(
 }
 
 /**
- * Generate localized alt text for card images
+ * Get localized alt text for card images
+ *
+ * @param language - Language code (e.g., 'ru', 'en')
+ * @param isCourseCard - Whether this is a course card or lesson card
+ * @param title - Course or lesson title
+ * @returns Localized alt text string
  */
 function getLocalizedAltText(language: string, title: string, isLesson: boolean): string {
   const safeTitle = title.slice(0, 100);
@@ -113,7 +130,13 @@ function getLocalizedAltText(language: string, title: string, isLesson: boolean)
 }
 
 /**
- * Extract visual style from course settings
+ * Extract visual style from course data
+ *
+ * Retrieves the visual style from course.visual_style column,
+ * falling back to course.settings.visual_style for legacy courses.
+ *
+ * @param course - Course data with visual_style and settings
+ * @returns Visual style object or null if not found
  */
 function getVisualStyle(course: { visual_style?: unknown; settings?: unknown }): {
   colorScheme: string;
@@ -154,7 +177,13 @@ function getVisualStyle(course: { visual_style?: unknown; settings?: unknown }):
 }
 
 /**
- * Extract learning objectives from lesson content
+ * Extract learning objectives from lesson specification
+ *
+ * Parses the lesson content or specification to find learning objectives
+ * for use in card image generation prompts.
+ *
+ * @param lesson - Lesson data with content and specification
+ * @returns Array of learning objective strings (max 3)
  */
 function extractLessonObjectives(lessonContent: string | null): string[] {
   if (!lessonContent) {
@@ -206,16 +235,23 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
   let imageCostUsd = 0;
 
   // Determine if this is a course card or lesson card
-  // Course cards have a special marker in settings, title, or no lesson content
+  // Use explicit markers as source of truth, remove overly broad conditions
   const isCourseCard =
-    !lesson.content ||
-    lesson.id === 'course-level' ||
-    enrichment.settings?.isCourseCard === true ||
-    enrichment.title === 'course-card';
+    enrichment.title === 'course-card' ||
+    enrichment.settings?.isCourseCard === true;
+
+  // Log warning if using fallback detection
+  if (!isCourseCard && (!lesson.content || lesson.id === 'course-level')) {
+    logger.warn(
+      { enrichmentId: enrichment.id, lessonId: lesson.id, hasContent: !!lesson.content },
+      'Card enrichment detected as course card via fallback (legacy detection)'
+    );
+  }
 
   logger.info(
     {
       enrichmentId: enrichment.id,
+      courseId: course.id,
       lessonId: lesson.id,
       lessonTitle: lesson.title,
       isCourseCard,
@@ -281,8 +317,11 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
     logger.info(
       {
         enrichmentId: enrichment.id,
+        courseId: course.id,
+        lessonId: lesson.id,
         promptLength: imagePrompt.length,
         isCourseCard,
+        visualStyleSource: course.visual_style ? 'visual_style' : (course.settings?.visual_style ? 'settings' : 'default'),
       },
       'Card handler: prompt built'
     );
@@ -294,6 +333,8 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
     logger.info(
       {
         enrichmentId: enrichment.id,
+        courseId: course.id,
+        lessonId: lesson.id,
         mimeType: imageResult.mimeType,
         dimensions: `${imageResult.width}x${imageResult.height}`,
         costUsd: imageCostUsd,
@@ -345,6 +386,8 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
     logger.info(
       {
         enrichmentId: enrichment.id,
+        courseId: course.id,
+        lessonId: lesson.id,
         storagePath,
         imageUrl,
       },
@@ -390,9 +433,12 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
     logger.info(
       {
         enrichmentId: enrichment.id,
+        courseId: course.id,
+        lessonId: lesson.id,
         durationMs,
         costUsd: imageCostUsd,
         cardType: isCourseCard ? 'course' : 'lesson',
+        visualStyleSource: course.visual_style ? 'visual_style' : (course.settings?.visual_style ? 'settings' : 'default'),
       },
       'Card handler: card generation complete'
     );
@@ -405,6 +451,7 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
     logger.error(
       {
         enrichmentId: enrichment.id,
+        courseId: course.id,
         lessonId: lesson.id,
         durationMs,
         error: errorMessage,

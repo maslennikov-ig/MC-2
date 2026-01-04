@@ -2,8 +2,9 @@
  * Factual Verifier for Stage 6 Lesson Content Generation
  * @module stages/stage6-lesson-content/judge/factual-verifier
  *
- * Implements entropy-based conditional RAG verification for factual accuracy.
- * Uses entropy detection to identify uncertain spans, then verifies only those with RAG.
+ * Implements RAG-based factual verification with optional entropy prioritization.
+ * RAG verification runs unconditionally when chunks are available.
+ * Entropy scores (when provided) are used to prioritize claims for verification.
  *
  * Research findings:
  * - Factual accuracy without RAG: 30-40% detection rate
@@ -19,7 +20,7 @@
 
 import type { RAGChunk } from '@megacampus/shared-types/lesson-content';
 import type { EntropyAnalysisResult } from './entropy-detector';
-import { shouldTriggerRAGVerification, extractFlaggedSentences } from './entropy-detector';
+import { extractFlaggedSentences, shouldTriggerRAGVerification } from './entropy-detector';
 import { logger } from '@/shared/logger';
 
 // ============================================================================
@@ -38,6 +39,8 @@ export interface FactualVerificationConfig {
   minConfidence: number;
   /** If true, verify all claims; if false, only verify high-entropy claims (default: false) */
   strictMode: boolean;
+  /** If true, always verify regardless of entropy (default: true for backward compatibility) */
+  alwaysVerify: boolean;
 }
 
 /**
@@ -97,6 +100,7 @@ export const DEFAULT_FACTUAL_VERIFICATION_CONFIG: FactualVerificationConfig = {
   ragChunkLimit: 10,
   minConfidence: 0.7,
   strictMode: false,
+  alwaysVerify: true, // Always verify when RAG available (cost optimization disabled)
 };
 
 /**
@@ -562,7 +566,9 @@ export function calculateAccuracyScore(claims: VerificationClaim[]): number {
  *
  * @param content - Text content to verify
  * @param ragChunks - RAG context for verification
- * @param entropyResult - Optional entropy analysis for prioritization
+ * @param entropyResult - Optional entropy analysis. Used ONLY for claim prioritization
+ *   in extractVerifiableClaims(), NOT for gating verification. RAG verification runs
+ *   unconditionally when ragChunks are available.
  * @param config - Verification configuration
  * @returns Complete factual verification result
  */
@@ -586,19 +592,16 @@ export function executeFactualVerification(
     strictMode: fullConfig.strictMode,
   });
 
-  // Check if RAG verification is recommended based on entropy
-  const ragRecommended = entropyResult
-    ? shouldTriggerRAGVerification(entropyResult)
-    : true; // Default to verification if no entropy data
+  const hasRagContext = ragChunks.length > 0;
 
-  if (!ragRecommended && !fullConfig.strictMode) {
+  if (!hasRagContext) {
     logger.info({
-      msg: 'RAG verification not recommended by entropy analysis, returning high-confidence result',
+      msg: 'RAG verification skipped: no reference chunks available',
     });
 
     return {
       claims: [],
-      overallAccuracyScore: entropyResult?.confidenceScore ?? 0.9,
+      overallAccuracyScore: 0.8,
       contradictedClaims: 0,
       unverifiedClaims: 0,
       verifiedClaims: 0,
@@ -607,6 +610,37 @@ export function executeFactualVerification(
       flaggedSentences: [],
     };
   }
+
+  // Check if we should skip based on entropy (when alwaysVerify is false)
+  if (!fullConfig.alwaysVerify && entropyResult) {
+    if (!shouldTriggerRAGVerification(entropyResult)) {
+      logger.info({
+        msg: 'RAG verification skipped: entropy confidence high',
+        confidenceScore: entropyResult.confidenceScore,
+      });
+
+      return {
+        claims: [],
+        overallAccuracyScore: entropyResult.confidenceScore ?? 0.9,
+        contradictedClaims: 0,
+        unverifiedClaims: 0,
+        verifiedClaims: 0,
+        noEvidenceClaims: 0,
+        requiresHumanReview: false,
+        flaggedSentences: [],
+      };
+    }
+  }
+
+  // Proceed with verification
+  logger.info({
+    msg: fullConfig.alwaysVerify
+      ? 'Performing unconditional RAG-based factual verification'
+      : 'Performing entropy-triggered RAG verification',
+    ragChunksCount: ragChunks.length,
+    entropyDataAvailable: !!entropyResult,
+    alwaysVerify: fullConfig.alwaysVerify,
+  });
 
   // Extract claims
   const extractedClaims = extractVerifiableClaims(content, entropyResult, fullConfig);
