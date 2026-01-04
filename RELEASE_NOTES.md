@@ -3,6 +3,18 @@
 _Released on 2025-12-26_
 
 
+## v0.26.60
+
+_Released on 2026-01-04_
+
+### 🐛 Bug Fixes
+
+- **web**: Prevent hydration error by not removing initial-loader from DOM
+
+---
+
+_This release was automatically generated from 1 commits._
+
 ## v0.26.59
 
 _Released on 2026-01-04_
