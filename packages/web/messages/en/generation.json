@@ -224,8 +224,8 @@
     "stage0": {
       "compact": "Start",
       "full": "Start Generation",
-      "description": "Everything is ready for course generation. Click the start button to begin the process.",
-      "hint": "Ready to start"
+      "description": "Course is created and ready for generation. Documents uploaded, settings configured. Click «Start Generation» to begin creating the course.",
+      "hint": "✓ Preparation complete — click «Start»"
     },
     "stage5": {
       "compact": "Review",

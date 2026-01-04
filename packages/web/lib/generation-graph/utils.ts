@@ -188,6 +188,10 @@ export function mapStatusToNodeStatus(
 
   if (awaitingStage === stageNumber) return 'awaiting';
 
+  // Stage 0 awaiting (pre-launch): Stage 1 should show as 'completed' (preparation done)
+  // This indicates "ready to launch" - user needs to click Start button
+  if (awaitingStage === 0 && stageNumber === 1) return 'completed';
+
   if (overallStatus === 'completed') return 'completed';
 
   if (!currentStage) return 'pending';
