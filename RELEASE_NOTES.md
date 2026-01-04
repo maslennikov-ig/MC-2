@@ -3,6 +3,18 @@
 _Released on 2025-12-26_
 
 
+## v0.26.49
+
+_Released on 2026-01-04_
+
+### ✨ New Features
+
+- **course-gen-platform**: Add 5 source file(s), update 7 source file(s)
+
+---
+
+_This release was automatically generated from 1 commits._
+
 ## v0.26.48
 
 _Released on 2026-01-03_
