@@ -3,6 +3,24 @@
 _Released on 2025-12-26_
 
 
+## v0.26.52
+
+_Released on 2026-01-04_
+
+### ✨ New Features
+
+- **web**: Add 24 source file(s), update 4 source file(s)
+
+### 🐛 Bug Fixes
+
+- **API**: Use Redis-based readiness check for cross-process sync
+- **generation-ui**: Show Stage 1 as completed when awaiting launch
+- **worker-readiness**: Add Redis sync for cross-process readiness status
+
+---
+
+_This release was automatically generated from 4 commits._
+
 ## v0.26.51
 
 _Released on 2026-01-04_
