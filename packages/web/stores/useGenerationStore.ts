@@ -157,6 +157,9 @@ interface GenerationState {
   // Stage 6 structure
   setModuleStructure: (modules: ModuleStructure[]) => void;
 
+  // Optimistic updates (for immediate UI feedback before backend response)
+  setStageStatusOptimistic: (stageId: StageId, status: NodeStatus) => void;
+
   // ========== SELECTORS ==========
 
   // Stage selectors
@@ -568,8 +571,11 @@ export const useGenerationStore = create<GenerationState>()(
       logger.devLog('[GenerationStore] Loading', sorted.length, 'traces');
 
       set((state) => {
-        // Reset parallel items but keep stages
-        state.documents = new Map();
+        // IMPORTANT: Do NOT reset documents here!
+        // Skeleton traces don't contain input_data, so extractDocumentId returns null
+        // and documents cannot be rebuilt from skeleton traces.
+        // Documents are initialized separately via initializeDocumentsWithStatus from DB.
+        // Previously there was: state.documents = new Map() which caused the 7/7 → 0/7 bug.
 
         for (const trace of sorted) {
           const attempt = traceToAttempt(trace, 1);
@@ -748,6 +754,19 @@ export const useGenerationStore = create<GenerationState>()(
         });
 
         logger.devLog('[GenerationStore] Set module structure:', state.modules.size, 'modules,', state.lessons.size, 'lessons');
+      });
+    },
+
+    setStageStatusOptimistic: (stageId, status) => {
+      set((state) => {
+        const stage = state.stages.get(stageId);
+        if (stage) {
+          stage.status = status;
+          if (status === 'active' && !stage.startedAt) {
+            stage.startedAt = new Date();
+          }
+          logger.devLog('[GenerationStore] Optimistic status update:', stageId, '->', status);
+        }
       });
     },
 

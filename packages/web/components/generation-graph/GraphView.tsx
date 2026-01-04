@@ -304,6 +304,7 @@ function GraphViewInner({ courseId, courseTitle, hasDocuments = true, failedAtSt
   const { documents: documentsWithStatus, getFilename, isLoading: isCatalogLoading } = useDocumentsWithStatus(courseId);
   const initializeDocumentsWithStatus = useGenerationStore(state => state.initializeDocumentsWithStatus);
   const areAllDocumentsComplete = useGenerationStore(state => state.areAllDocumentsComplete);
+  const setStageStatusOptimistic = useGenerationStore(state => state.setStageStatusOptimistic);
 
   // Graph State
   const { nodes, edges, onNodesChange, onEdgesChange, processTraces, initializeFromCourseStructure, initializeDocumentsFromDb, setNodes, nodePositionsRef } = useGraphData({ getFilename, hasDocuments, stage1CourseData });
@@ -859,10 +860,15 @@ function GraphViewInner({ courseId, courseTitle, hasDocuments = true, failedAtSt
                   // Stage 0: Start generation
                   if (awaitingStage === 0) {
                     setIsProcessingBanner(true);
+                    // Optimistic update: immediately show Stage 1 as active
+                    // This provides instant visual feedback before backend responds
+                    setStageStatusOptimistic('stage_1', 'active');
                     try {
                       await startGeneration(courseId);
                       toast.success('Генерация запущена!');
                     } catch (error) {
+                      // Rollback optimistic update on error
+                      setStageStatusOptimistic('stage_1', 'pending');
                       toast.error('Не удалось запустить генерацию', {
                         description: error instanceof Error ? error.message : 'Неизвестная ошибка'
                       });

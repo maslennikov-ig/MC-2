@@ -12,6 +12,7 @@ import { motion } from 'framer-motion';
 import { useTranslation } from '@/lib/generation-graph/useTranslation';
 import { RestartConfirmDialog } from '../controls/RestartConfirmDialog';
 import { useOptionalPartialGenerationContext } from '../contexts/PartialGenerationContext';
+import { useGenerationStore } from '@/stores/useGenerationStore';
 import {
   NodeErrorTooltip,
   NodeErrorPanel,
@@ -45,6 +46,10 @@ const StageNode = (props: NodeProps<RFStageNode>) => {
   // Get partial generation context for Stage 6 active state detection (optional - may not be in provider)
   const partialGenContext = useOptionalPartialGenerationContext();
 
+  // Get optimistic status from Zustand store (for immediate UI feedback)
+  const stageId = `stage_${data.stageNumber}` as 'stage_1' | 'stage_2' | 'stage_3' | 'stage_4' | 'stage_5' | 'stage_6';
+  const zustandStatus = useGenerationStore(state => state.getStageStatus(stageId));
+
   // Semantic Zoom - thresholds adjusted for better initial visibility
   if (zoom < 0.3) {
       return <MinimalNode {...props} />;
@@ -54,11 +59,14 @@ const StageNode = (props: NodeProps<RFStageNode>) => {
   }
 
   // Subscribe to realtime status updates
+  // Priority: Zustand 'active' status (optimistic) > Realtime > data.status (fallback)
+  // This ensures optimistic updates show immediately before Realtime confirms
   const realtimeStatus = statusEntry?.status || data.status;
+  const baseStatus = zustandStatus === 'active' ? 'active' : realtimeStatus;
 
   // For Stage 6: show as 'active' if any lesson is currently generating
   const isStage6Generating = data.stageNumber === 6 && partialGenContext?.isGenerating;
-  const currentStatus = isStage6Generating ? 'active' : realtimeStatus;
+  const currentStatus = isStage6Generating ? 'active' : baseStatus;
   // Extract error message safely
   const errorMessage = statusEntry?.errorMessage ||
                        (data.errorData?.message as string) ||
