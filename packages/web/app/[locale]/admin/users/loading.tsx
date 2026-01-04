@@ -1,0 +1,5 @@
+import { FullPageLoader } from "@/components/ui/full-page-loader";
+
+export default function UsersLoading() {
+  return <FullPageLoader text="Loading users..." />;
+}

@@ -1,4 +1,5 @@
 import type { Metadata, Viewport } from "next";
+import { Suspense } from "react";
 import { Manrope, JetBrains_Mono } from "next/font/google";
 import { NextIntlClientProvider, hasLocale } from 'next-intl';
 import { getMessages, getTranslations, setRequestLocale } from 'next-intl/server';
@@ -7,6 +8,8 @@ import Script from 'next/script';
 import { routing } from '@/src/i18n/routing';
 import { Locale } from '@/src/i18n/config';
 import { ErrorBoundary } from "@/components/common/error-boundary";
+import { InitialLoaderHide } from "@/components/common/initial-loader-hide";
+import { PageTransitionLoader } from "@/components/common/page-transition-loader";
 import { Toaster } from "@/components/ui/sonner";
 import { Providers } from "./providers";
 import { BackToTop } from "@/components/ui/back-to-top";
@@ -173,6 +176,82 @@ export default async function LocaleLayout({ children, params }: Props) {
     <html lang={locale} suppressHydrationWarning>
       <head>
         {/*
+          CRITICAL: Initial page loader - renders BEFORE React hydration.
+          This prevents white screen flash on slow connections.
+          Theme is read from localStorage to match app theme.
+        */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                try {
+                  var theme = localStorage.getItem('theme');
+                  var isDark = theme === 'dark' ||
+                    (theme !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+                  document.documentElement.setAttribute('data-loader-theme', isDark ? 'dark' : 'light');
+                } catch(e) {}
+              })();
+            `,
+          }}
+        />
+        <style
+          dangerouslySetInnerHTML={{
+            __html: `
+              #initial-loader {
+                position: fixed;
+                inset: 0;
+                z-index: 99999;
+                display: flex;
+                align-items: center;
+                justify-content: center;
+                background: hsl(0 0% 100%);
+                transition: opacity 0.3s ease-out;
+              }
+              html[data-loader-theme="dark"] #initial-loader {
+                background: hsl(222 47% 11%);
+              }
+              #initial-loader.hidden {
+                opacity: 0;
+                pointer-events: none;
+              }
+              .il-container {
+                position: relative;
+                width: 100%;
+                transform: rotate(-35deg);
+              }
+              .il-box {
+                position: relative;
+                left: -100px;
+                display: flex;
+                justify-content: center;
+                align-items: center;
+                width: calc(100% + 400px);
+                -webkit-box-reflect: below 1px linear-gradient(transparent, rgba(0,0,0,0.3));
+                animation: il-surface 1.5s ease-in-out infinite;
+              }
+              @keyframes il-surface {
+                0% { transform: translateX(0); }
+                100% { transform: translateX(-200px); }
+              }
+              .il-cube {
+                position: relative;
+                width: 200px;
+                height: 200px;
+                background: rgb(139 92 246);
+                box-shadow: 0 0 5px rgba(139,92,246,1), 0 0 25px rgba(139,92,246,1), 0 0 50px rgba(139,92,246,1), 0 0 150px rgba(139,92,246,1);
+                transform-origin: bottom right;
+                animation: il-rotate 1.5s ease-in-out infinite;
+              }
+              @keyframes il-rotate {
+                0% { transform: rotate(0deg); }
+                60%,70%,80%,100% { transform: rotate(90deg); }
+                65% { transform: rotate(85deg); }
+                75% { transform: rotate(87.5deg); }
+              }
+            `,
+          }}
+        />
+        {/*
           CRITICAL: Kill Switch - v3.0 (TEMPORARY)
           PWA is disabled. This script ALWAYS clears ALL caches and unregisters ALL SWs.
           This ensures ALL users get clean state after deployment.
@@ -253,9 +332,21 @@ export default async function LocaleLayout({ children, params }: Props) {
       <body
         className={`${manrope.variable} ${jetbrainsMono.variable} font-sans antialiased`}
       >
+        {/* Initial loader - FIRST element, renders before React */}
+        <div id="initial-loader" aria-label="Loading">
+          <div className="il-container">
+            <div className="il-box">
+              <div className="il-cube" />
+            </div>
+          </div>
+        </div>
         <NextIntlClientProvider locale={locale} messages={messages}>
           <Providers>
+            <InitialLoaderHide />
             <ErrorBoundary>
+              <Suspense fallback={null}>
+                <PageTransitionLoader />
+              </Suspense>
               {children}
               <BackToTop threshold={300} />
               <Toaster />
