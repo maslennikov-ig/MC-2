@@ -250,6 +250,46 @@ export default async function LocaleLayout({ children, params }: Props) {
             `,
           }}
         />
+        {/* Cache invalidation on version change - prevents stale bundle errors */}
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              (function() {
+                try {
+                  var APP_VERSION = '${process.env.NEXT_PUBLIC_APP_VERSION || 'dev'}';
+                  var STORAGE_KEY = 'mc-app-version';
+                  var storedVersion = localStorage.getItem(STORAGE_KEY);
+
+                  if (storedVersion && storedVersion !== APP_VERSION) {
+                    console.log('[CacheInvalidator] Version changed: ' + storedVersion + ' -> ' + APP_VERSION);
+
+                    // Clear all caches
+                    if ('caches' in window) {
+                      caches.keys().then(function(keys) {
+                        if (keys.length > 0) {
+                          console.log('[CacheInvalidator] Clearing ' + keys.length + ' cache(s)');
+                          return Promise.all(keys.map(function(k) { return caches.delete(k); }));
+                        }
+                      }).then(function() {
+                        localStorage.setItem(STORAGE_KEY, APP_VERSION);
+                        console.log('[CacheInvalidator] Reloading with fresh bundles...');
+                        location.reload();
+                      });
+                    } else {
+                      localStorage.setItem(STORAGE_KEY, APP_VERSION);
+                      location.reload();
+                    }
+                  } else if (!storedVersion) {
+                    // First visit - just store version
+                    localStorage.setItem(STORAGE_KEY, APP_VERSION);
+                  }
+                } catch(e) {
+                  console.error('[CacheInvalidator] Error:', e);
+                }
+              })();
+            `,
+          }}
+        />
       </head>
       <body
         className={`${manrope.variable} ${jetbrainsMono.variable} font-sans antialiased`}
