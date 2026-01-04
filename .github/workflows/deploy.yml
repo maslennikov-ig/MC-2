@@ -115,9 +115,10 @@ jobs:
           push: true
           tags: ${{ steps.meta-web.outputs.tags }}
           labels: ${{ steps.meta-web.outputs.labels }}
-          # Disable cache for web to ensure NEXT_PUBLIC_* vars are baked fresh
-          # These vars are inlined at build time and cache doesn't track ARG changes
-          no-cache: true
+          # Enable cache for dependencies layer (node_modules)
+          # Next.js app layer still rebuilds due to source changes
+          cache-from: type=gha,scope=web
+          cache-to: type=gha,mode=max,scope=web
           build-args: |
             NODE_VERSION=20
             BUILD_DATE=${{ github.event.head_commit.timestamp }}
