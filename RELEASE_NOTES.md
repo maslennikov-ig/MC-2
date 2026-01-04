@@ -3,6 +3,22 @@
 _Released on 2025-12-26_
 
 
+## v0.26.61
+
+_Released on 2026-01-04_
+
+### 🔧 Improvements
+
+- **CI/CD**: Enable Docker layer cache for web build
+
+### 🐛 Bug Fixes
+
+- **web**: Update 3 source file(s)
+
+---
+
+_This release was automatically generated from 2 commits._
+
 ## v0.26.60
 
 _Released on 2026-01-04_

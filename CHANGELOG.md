@@ -111,6 +111,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.26.61] - 2026-01-04
+
+### Changed
+- **ci**: enable Docker layer cache for web build (b69c5e8)
+
+### Fixed
+- **web**: update 3 source file(s) (ed91e87)
+
 ## [0.26.58] - 2026-01-04
 
 ### Fixed
