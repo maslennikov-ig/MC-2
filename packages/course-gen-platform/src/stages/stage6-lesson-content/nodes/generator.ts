@@ -36,7 +36,7 @@ import type { RAGChunk } from '@megacampus/shared-types/lesson-content';
 import type { LessonGraphStateType, LessonGraphStateUpdate } from '../state';
 import { createPromptService } from '@/shared/prompts/prompt-service';
 import { formatRAGContextXML, filterChunksForSection } from '@/shared/prompts';
-import { sanitizeMermaidBlocks } from '../utils/mermaid-sanitizer';
+import { runMermaidFixPipeline } from '../utils/mermaid-fix-pipeline';
 
 // ============================================================================
 // CONSTANTS (reused from expander.ts)
@@ -758,29 +758,57 @@ export async function generatorNode(
       totalTokens += sectionResult.tokensUsed;
       sectionTitles.push(section.title);
 
-      // Sanitize Mermaid blocks to fix escaped quotes
-      // Defensive: if sanitizer fails, use original content to avoid blocking generation
+      // =========================================================================
+      // MERMAID FIX PIPELINE
+      // =========================================================================
+      // Run 5-stage cascading fix pipeline:
+      // 1. Regex Sanitization - Fast fixes for common LLM issues (escaped quotes, arrows)
+      // 2. Validation - Official mermaid.parse() syntax check
+      // 3. LLM Fix - Use cheap LLM to fix complex issues (max 5 per lesson)
+      // 4. Re-validation - Verify LLM fix worked
+      // 5. Fallback - Replace with HTML comment for manual review
+      //
+      // DEFENSIVE STRATEGY:
+      // - Pipeline errors should NOT block lesson generation
+      // - If pipeline crashes, use original content (self-reviewer will catch issues)
+      // - Trade-off: Some broken diagrams might slip through, but lessons still generate
+      // - Rationale: Better to have a lesson with broken diagram than no lesson at all
+      //
+      // ERROR SCENARIOS:
+      // 1. Pipeline throws → catch, log, use original content ✓
+      // 2. Pipeline returns invalid result → use anyway (self-reviewer validates)
+      // 3. JSDOM OOM → crash acceptable (indicates systemic issue requiring restart)
+      //
+      // MONITORING:
+      // - Check logs for 'Mermaid pipeline: All fixes failed' warnings
+      // - High fallback rate indicates prompt improvement needed
+      // - LLM token usage tracked via getLLMFixerMetrics()
+      //
+      // FUTURE IMPROVEMENTS:
+      // - Add circuit breaker for repeated pipeline failures
+      // - Add retry logic with exponential backoff
+      // - Consider pre-generation diagram syntax validation
+      // =========================================================================
       let finalContent = sectionResult.content;
       try {
-        const sanitizeResult = sanitizeMermaidBlocks(sectionResult.content);
-        if (sanitizeResult.modified) {
+        const pipelineResult = await runMermaidFixPipeline(sectionResult.content);
+        if (pipelineResult.modified) {
           logger.debug(
             {
               sectionTitle: section.title,
-              fixes: sanitizeResult.fixes,
-              blocksProcessed: sanitizeResult.blocksProcessed,
+              metrics: pipelineResult.metrics,
             },
-            'Mermaid syntax sanitized in section'
+            'Mermaid fix pipeline applied to section'
           );
         }
-        finalContent = sanitizeResult.content;
+        finalContent = pipelineResult.content;
       } catch (error) {
         logger.warn(
           {
             sectionTitle: section.title,
             error: error instanceof Error ? error.message : String(error),
           },
-          'Mermaid sanitizer failed, using unsanitized content'
+          'Mermaid fix pipeline failed, using original content'
         );
         // Keep original content - self-reviewer will catch issues later
       }

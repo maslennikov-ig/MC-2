@@ -957,9 +957,10 @@ export const GRAPH_TRANSLATIONS: GraphTranslations & {
     generateAll: { ru: 'Запустить', en: 'Start' },
     select: { ru: 'Выбрать', en: 'Select' },
     cancel: { ru: 'Отмена', en: 'Cancel' },
-    lesson: { ru: 'урок', en: 'lesson' },
-    lessons2_4: { ru: 'урока', en: 'lessons' },
-    lessonsMany: { ru: 'уроков', en: 'lessons' },
+    // Standardized plural keys (same pattern as endNode and common)
+    lessonWord: { ru: 'урок', en: 'lesson' },
+    lessonsWord: { ru: 'урока', en: 'lessons' },
+    lessonsManyWord: { ru: 'уроков', en: 'lessons' },
     openCourse: { ru: 'Открыть курс', en: 'Open Course' },
     expandPanel: { ru: 'Развернуть панель генерации', en: 'Expand generation panel' },
     collapsePanel: { ru: 'Свернуть панель', en: 'Collapse panel' },

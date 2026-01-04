@@ -1,4 +1,4 @@
-import React, { memo } from 'react';
+import React, { memo, useMemo } from 'react';
 import { Handle, Position, NodeProps } from '@xyflow/react';
 import { RFEndNode } from '../types';
 import { Trophy, Sparkles, CheckCircle2, ExternalLink, Layers, BookOpen, AlertCircle } from 'lucide-react';
@@ -10,6 +10,28 @@ import { motion } from 'framer-motion';
 import { Link } from '@/src/i18n/navigation';
 import { useParams } from 'next/navigation';
 
+/**
+ * End Node component for React Flow graph.
+ *
+ * Represents the final node in the course generation pipeline.
+ * Shows completion status with:
+ * - Trophy icon when completed, checkmark when pending
+ * - Course statistics (modules and lessons with Russian pluralization)
+ * - "Open Course" button linking to `/courses/{slug}`
+ *
+ * Features:
+ * - Real-time status updates via useNodeStatus hook
+ * - Animated entrance via framer-motion
+ * - Full dark/light theme support
+ * - Accessible with role="status" for screen readers
+ * - Fallback UI when courseSlug is unavailable
+ *
+ * @example
+ * ```tsx
+ * // Used automatically by React Flow
+ * const nodeTypes = { end: EndNode };
+ * ```
+ */
 const EndNode = ({ id, data, selected }: NodeProps<RFEndNode>) => {
   const statusEntry = useNodeStatus(id);
   const currentStatus = statusEntry?.status || data.status || 'pending';
@@ -25,6 +47,16 @@ const EndNode = ({ id, data, selected }: NodeProps<RFEndNode>) => {
 
   // Translations
   const { t } = useTranslation();
+
+  // Memoized plural forms for Russian language support
+  const moduleLabel = useMemo(
+    () => getModuleWord(moduleCount, t, 'common'),
+    [moduleCount, t]
+  );
+  const lessonLabel = useMemo(
+    () => getLessonWord(lessonCount, t, 'common'),
+    [lessonCount, t]
+  );
 
   return (
     <motion.div
@@ -106,13 +138,13 @@ const EndNode = ({ id, data, selected }: NodeProps<RFEndNode>) => {
               {moduleCount > 0 && (
                 <span className="flex items-center gap-1">
                   <Layers size={12} />
-                  {moduleCount} {getModuleWord(moduleCount, t, 'common')}
+                  {moduleCount} {moduleLabel}
                 </span>
               )}
               {lessonCount > 0 && (
                 <span className="flex items-center gap-1">
                   <BookOpen size={12} />
-                  {lessonCount} {getLessonWord(lessonCount, t, 'common')}
+                  {lessonCount} {lessonLabel}
                 </span>
               )}
             </div>

@@ -98,9 +98,9 @@ export function getLessonWord(
       many: 'endNode.lessonsManyWord',
     },
     selectionToolbar: {
-      one: 'selectionToolbar.lesson',
-      few: 'selectionToolbar.lessons2_4',
-      many: 'selectionToolbar.lessonsMany',
+      one: 'selectionToolbar.lessonWord',
+      few: 'selectionToolbar.lessonsWord',
+      many: 'selectionToolbar.lessonsManyWord',
     },
   };
 

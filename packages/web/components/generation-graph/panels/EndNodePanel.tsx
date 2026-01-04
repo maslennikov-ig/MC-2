@@ -1,23 +1,51 @@
 'use client';
 
-import React from 'react';
-import { Trophy, Layers, BookOpen, ExternalLink, Clock, CheckCircle2, Sparkles } from 'lucide-react';
+import React, { useMemo } from 'react';
+import { Trophy, Layers, BookOpen, ExternalLink, Clock, CheckCircle2, Sparkles, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Link } from '@/src/i18n/navigation';
 import { useTranslation } from '@/lib/generation-graph/useTranslation';
+import { getModuleWord, getLessonWord } from '@/lib/generation-graph/utils/pluralization';
 import { cn } from '@/lib/utils';
 
+/**
+ * Props for the EndNodePanel component.
+ */
 interface EndNodePanelProps {
+  /** Course URL slug for navigation (optional, shows fallback if missing) */
   courseSlug?: string;
+  /** Display title of the course */
   courseTitle: string;
+  /** Total number of modules in the course */
   moduleCount: number;
+  /** Total number of lessons in the course */
   lessonCount: number;
+  /** Whether all course generation is complete */
   isCompleted: boolean;
 }
 
 /**
  * Panel content for End Node in NodeDetailsDrawer.
- * Shows course completion status and statistics.
+ *
+ * Displays course completion status with:
+ * - Hero section with completion/pending state
+ * - Course title
+ * - Stats cards (modules and lessons count with proper Russian pluralization)
+ * - Congratulatory or pending message
+ * - CTA button to view course (with fallback when courseSlug is missing)
+ *
+ * Supports both light and dark themes.
+ *
+ * @example
+ * ```tsx
+ * <EndNodePanel
+ *   courseSlug="my-course"
+ *   courseTitle="Introduction to TypeScript"
+ *   moduleCount={5}
+ *   lessonCount={25}
+ *   isCompleted={true}
+ * />
+ * ```
  */
 export function EndNodePanel({
   courseSlug,
@@ -27,6 +55,16 @@ export function EndNodePanel({
   isCompleted,
 }: EndNodePanelProps) {
   const { t } = useTranslation();
+
+  // Memoized plural forms for Russian language support
+  const moduleLabel = useMemo(
+    () => getModuleWord(moduleCount, t, 'common'),
+    [moduleCount, t]
+  );
+  const lessonLabel = useMemo(
+    () => getLessonWord(lessonCount, t, 'common'),
+    [lessonCount, t]
+  );
 
   return (
     <div className="flex flex-col h-full">
@@ -94,7 +132,7 @@ export function EndNodePanel({
                 : 'text-slate-500 dark:text-slate-400'
             )} />
             <span className="text-sm text-slate-600 dark:text-slate-400">
-              {t('endNode.modules')}
+              {moduleLabel}
             </span>
           </div>
           <p className={cn(
@@ -120,7 +158,7 @@ export function EndNodePanel({
                 : 'text-slate-500 dark:text-slate-400'
             )} />
             <span className="text-sm text-slate-600 dark:text-slate-400">
-              {t('endNode.lessons')}
+              {lessonLabel}
             </span>
           </div>
           <p className={cn(
@@ -161,17 +199,24 @@ export function EndNodePanel({
       </div>
 
       {/* CTA Button */}
-      {isCompleted && courseSlug && (
+      {isCompleted && (
         <div className="mt-auto">
-          <Link href={`/courses/${courseSlug}`}>
-            <Button
-              className="w-full bg-emerald-500 hover:bg-emerald-600 text-white dark:bg-emerald-600 dark:hover:bg-emerald-500"
-              size="lg"
-            >
-              <span>{t('endNode.viewCourse')}</span>
-              <ExternalLink size={16} className="ml-2" />
-            </Button>
-          </Link>
+          {courseSlug ? (
+            <Link href={`/courses/${courseSlug}`}>
+              <Button
+                className="w-full bg-emerald-500 hover:bg-emerald-600 text-white dark:bg-emerald-600 dark:hover:bg-emerald-500"
+                size="lg"
+              >
+                <span>{t('endNode.viewCourse')}</span>
+                <ExternalLink size={16} className="ml-2" />
+              </Button>
+            </Link>
+          ) : (
+            <div className="flex items-center justify-center gap-2 p-3 rounded-lg bg-amber-50 dark:bg-amber-900/20 text-amber-600 dark:text-amber-400 text-sm">
+              <AlertCircle size={16} />
+              <span>{t('endNode.loadingLink')}</span>
+            </div>
+          )}
         </div>
       )}
     </div>

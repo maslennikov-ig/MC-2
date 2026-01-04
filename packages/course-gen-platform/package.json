@@ -65,6 +65,7 @@
     "jsonrepair": "^3.13.1",
     "krippendorff": "^0.1.0",
     "markdownlint": "^0.40.0",
+    "mermaid": "11",
     "nanoid": "^5.1.6",
     "openai": "^6.13.0",
     "p-limit": "^7.2.0",

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useCallback, useState, useEffect } from 'react';
+import React, { useCallback, useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence, useMotionValue, useTransform, PanInfo } from 'framer-motion';
 import { Play, X, CheckSquare, Rocket, ChevronUp, ChevronDown, Sparkles, ChevronLeft, ChevronRight, Trophy, ExternalLink, Layers, BookOpen } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -16,19 +16,53 @@ import { getModuleWord, getLessonWord } from '@/lib/generation-graph/utils/plura
 
 const STORAGE_KEY = 'stage6-toolbar-minimized';
 
+/**
+ * Props for the SelectionToolbar component.
+ */
 interface SelectionToolbarProps {
+  /** Course UUID for generation actions */
   courseId?: string;
+  /** Whether all course generation is complete (shows celebration banner) */
   isCompleted?: boolean;
+  /** Course URL slug for navigation to completed course */
   courseSlug?: string;
+  /** Total number of modules (displayed in completion stats) */
   moduleCount?: number;
+  /** Total number of lessons (displayed in completion stats) */
   lessonCount?: number;
 }
 
 /**
- * Stage 6 Control Banner - consistent with MissionControlBanner design.
- * Shows after Stage 5 is complete and lesson nodes are visible.
- * Provides "Generate All" and "Select Lessons" actions.
- * Shows celebration banner when course generation is completed.
+ * Stage 6 Control Banner for lesson generation workflow.
+ *
+ * Two visual states:
+ * 1. **Generation Mode** (isCompleted=false):
+ *    - "Generate All" button to start all lessons
+ *    - "Select" button to choose specific lessons
+ *    - Swipe gesture to minimize
+ *
+ * 2. **Celebration Mode** (isCompleted=true):
+ *    - Green gradient celebration banner
+ *    - Trophy icon with sparkles
+ *    - Course stats (modules/lessons with Russian pluralization)
+ *    - "Open Course" button linking to course page
+ *
+ * Features:
+ * - Persists minimized state to localStorage
+ * - Swipe-to-minimize gesture support
+ * - Full dark/light theme support
+ * - Accessible with proper ARIA labels
+ *
+ * @example
+ * ```tsx
+ * <SelectionToolbar
+ *   courseId="123e4567-e89b-12d3-a456-426614174000"
+ *   isCompleted={true}
+ *   courseSlug="my-course"
+ *   moduleCount={5}
+ *   lessonCount={25}
+ * />
+ * ```
  */
 export function SelectionToolbar({
   courseId,
@@ -45,6 +79,16 @@ export function SelectionToolbar({
   const { resolvedTheme } = useTheme();
   const isDark = resolvedTheme === 'dark';
   const { t } = useTranslation();
+
+  // Memoized plural forms for Russian language support
+  const moduleLabel = useMemo(
+    () => getModuleWord(moduleCount, t, 'common'),
+    [moduleCount, t]
+  );
+  const lessonLabel = useMemo(
+    () => getLessonWord(lessonCount, t, 'common'),
+    [lessonCount, t]
+  );
 
   // Swipe tracking
   const x = useMotionValue(0);
@@ -239,13 +283,13 @@ export function SelectionToolbar({
                         {moduleCount > 0 && (
                           <span className="flex items-center gap-1">
                             <Layers size={12} />
-                            {moduleCount} {getModuleWord(moduleCount, t, 'common')}
+                            {moduleCount} {moduleLabel}
                           </span>
                         )}
                         {lessonCount > 0 && (
                           <span className="flex items-center gap-1">
                             <BookOpen size={12} />
-                            {lessonCount} {getLessonWord(lessonCount, t, 'common')}
+                            {lessonCount} {lessonLabel}
                           </span>
                         )}
                       </div>
