@@ -101,6 +101,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.26.58] - 2026-01-04
+
+### Fixed
+- **web**: revert enableSystem to fix hydration errors (2ae6b19)
+
 ## [0.26.54] - 2026-01-04
 
 ### Fixed
