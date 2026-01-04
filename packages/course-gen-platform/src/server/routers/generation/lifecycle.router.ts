@@ -27,7 +27,7 @@ import { InitializeFSMCommandHandler } from '../../../shared/fsm/fsm-initializat
 import { deleteVectorsForDocument } from '../../../shared/qdrant/lifecycle';
 import { generateGenerationCode } from '../../../shared/utils/generation-code';
 import { cleanupCourseResources } from '../../../shared/cleanup';
-import { workerReadiness } from '../../../orchestrator/worker-readiness';
+import { workerReadiness, getReadinessFromRedis } from '../../../orchestrator/worker-readiness';
 import * as path from 'path';
 
 // Type aliases for Database tables
@@ -195,7 +195,10 @@ export const lifecycleRouter = router({
         // T016: Check worker readiness before accepting new jobs
         // This prevents race conditions where files are uploaded but not yet
         // accessible through Docker volume mount
-        const readinessStatus = workerReadiness.getStatus();
+        // Use Redis-based readiness check for cross-process synchronization
+        // (worker and API run in separate Docker containers)
+        const redisReadiness = await getReadinessFromRedis();
+        const readinessStatus = redisReadiness || workerReadiness.getStatus();
         if (!readinessStatus.ready) {
           const failedChecks = readinessStatus.checks
             .filter(c => !c.passed)
