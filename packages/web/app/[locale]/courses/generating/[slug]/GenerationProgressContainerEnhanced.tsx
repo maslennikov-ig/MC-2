@@ -605,6 +605,35 @@ export default function GenerationProgressContainerEnhanced({
     };
   }, [courseId, supabase, handleProgressUpdate, startPolling, stopPolling]);
 
+  // Refetch state when tab becomes visible (handles browser throttling WebSocket)
+  useEffect(() => {
+    if (!supabase) return;
+
+    const handleVisibilityChange = async () => {
+      if (document.visibilityState === 'visible') {
+        // Tab became visible - refetch current state to ensure UI is up-to-date
+        try {
+          const { data, error } = await supabase
+            .from('courses')
+            .select('*')
+            .eq('id', courseId)
+            .single();
+
+          if (!error && data) {
+            handleProgressUpdate(data);
+          }
+        } catch {
+          // Silently fail - polling will handle it
+        }
+      }
+    };
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [courseId, supabase, handleProgressUpdate]);
 
   // Track confetti interval
   const confettiInterval = useRef<NodeJS.Timeout | null>(null);
