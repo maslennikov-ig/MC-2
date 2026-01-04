@@ -34,6 +34,7 @@ import { sanitizeCourseStructure } from './utils/sanitize';
 import { qdrantClient } from '@/shared/qdrant/client';
 import { generationLockService } from '@/shared/locks';
 import { logTrace } from '../../shared/trace-logger';
+import { triggerCourseCard } from '../stage7-enrichments/services/auto-card-trigger';
 
 /**
  * Model fallback configuration for Stage 5
@@ -640,6 +641,20 @@ class Stage5GenerationHandler {
         },
         'Stage 5 generation job completed successfully'
       );
+
+      // =================================================================
+      // STEP 5.5: Auto-trigger Course Card Generation (non-blocking)
+      // =================================================================
+      triggerCourseCard({
+        courseId: course_id,
+        userId: user_id,
+        organizationId: organization_id,
+      }).catch((err) => {
+        jobLogger.warn(
+          { courseId: course_id, error: err instanceof Error ? err.message : String(err) },
+          'Non-blocking: Failed to trigger course card generation'
+        );
+      });
 
       // =================================================================
       // STEP 6: Return Success Result

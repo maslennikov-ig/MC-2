@@ -206,8 +206,12 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
   let imageCostUsd = 0;
 
   // Determine if this is a course card or lesson card
-  // Course cards have a special "course_card" marker or no lesson content
-  const isCourseCard = !lesson.content || lesson.id === 'course-level';
+  // Course cards have a special marker in settings, title, or no lesson content
+  const isCourseCard =
+    !lesson.content ||
+    lesson.id === 'course-level' ||
+    enrichment.settings?.isCourseCard === true ||
+    enrichment.title === 'course-card';
 
   logger.info(
     {

@@ -5,7 +5,7 @@
     "presentation": "Presentation",
     "quiz": "Quiz",
     "document": "Document",
-    "cover": "Cover",
+    "cover": "Hero Image",
     "card": "Visual Card",
     "podcast": "Podcast",
     "mindmap": "Mindmap",
@@ -22,8 +22,8 @@
     "presentation": "Slide presentation for visual accompaniment",
     "quiz": "Comprehension quiz to reinforce learning",
     "document": "Additional document for download",
-    "cover": "AI-generated cover image for the lesson",
-    "card": "AI-generated visual card for lesson content"
+    "cover": "Premium 16:9 hero banner for lesson page (optional)",
+    "card": "AI-generated 1:1 thumbnail for catalog and navigation"
   },
   "status": {
     "pending": "Pending",
@@ -236,7 +236,7 @@
       "presentation": "Presentation",
       "quiz": "Quiz",
       "document": "Document",
-      "cover": "Cover",
+      "cover": "Hero Image",
       "card": "Visual Card"
     }
   }

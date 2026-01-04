@@ -16,6 +16,7 @@ import { MODEL_FALLBACK } from '../config';
 import { getStage6ModelConfig } from './model-service';
 import { handlePartialSuccess, markForReview, saveLessonContent } from './database-service';
 import { extractContentMarkdown } from './content-utils';
+import { triggerLessonCard } from '../../stage7-enrichments/services/auto-card-trigger';
 
 function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -372,6 +373,16 @@ export async function processStage6Job(
 
     if (result.success && result.lessonContent) {
       await saveLessonContent(courseId, lessonSpec.lesson_id, result, sanityResult);
+
+      // Auto-trigger lesson card generation (non-blocking)
+      if (lessonUuid) {
+        triggerLessonCard({ courseId, lessonId: lessonUuid }).catch((err) => {
+          jobLogger.warn(
+            { lessonId: lessonUuid, error: err instanceof Error ? err.message : String(err) },
+            'Non-blocking: Failed to trigger lesson card generation'
+          );
+        });
+      }
     }
 
     jobLogger.info(
