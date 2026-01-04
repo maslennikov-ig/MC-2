@@ -17,7 +17,7 @@ import rateLimit from 'express-rate-limit';
 import { getQueue } from './queue';
 import { exportMetrics } from './metrics';
 import logger from '../shared/logger';
-import { workerReadiness, getUploadsPath } from './worker-readiness';
+import { workerReadiness, getUploadsPath, getReadinessFromRedis } from './worker-readiness';
 import { ERROR_MESSAGES } from '../shared/constants/messages';
 
 /**
@@ -221,12 +221,24 @@ export function createMetricsRouter(): Router {
    * - Uploads directory accessible
    * - All required services initialized
    *
+   * Uses Redis for cross-process synchronization:
+   * - Worker saves readiness status to Redis after pre-flight checks
+   * - API server reads status from Redis (separate process)
+   * - Falls back to local singleton if Redis unavailable
+   *
    * Use this endpoint to determine if the "Start Generation" button
    * should be enabled in the UI.
    */
-  router.get('/readiness', readinessLimiter, (_req, res) => {
+  router.get('/readiness', readinessLimiter, asyncHandler(async (_req, res) => {
     try {
-      const status = workerReadiness.getStatus();
+      // Try to get status from Redis first (cross-process sync)
+      // This is the primary source for worker readiness in production
+      const redisStatus = await getReadinessFromRedis();
+
+      // Use Redis status if available, otherwise fall back to local singleton
+      // Local singleton will only have data if this is the worker process itself
+      const status = redisStatus || workerReadiness.getStatus();
+      const source = redisStatus ? 'redis' : 'local';
 
       // Determine HTTP status code
       const httpStatus = status.ready ? 200 : 503;
@@ -235,6 +247,7 @@ export function createMetricsRouter(): Router {
         endpoint: '/readiness',
         ready: status.ready,
         checksCount: status.checks.length,
+        source,
       }, 'Readiness check completed');
 
       res.status(httpStatus).json({
@@ -246,6 +259,7 @@ export function createMetricsRouter(): Router {
           startedAt: status.startedAt?.toISOString() || null,
           readyAt: status.readyAt?.toISOString() || null,
           lastCheckAt: status.lastCheckAt.toISOString(),
+          source, // Include source for debugging
         },
         timestamp: new Date().toISOString(),
       });
@@ -257,7 +271,7 @@ export function createMetricsRouter(): Router {
         timestamp: new Date().toISOString(),
       });
     }
-  });
+  }));
 
   // Add centralized error handler - must be last
   router.use(errorHandler);

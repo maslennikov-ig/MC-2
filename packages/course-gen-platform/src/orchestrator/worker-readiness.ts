@@ -11,6 +11,19 @@ import { access, constants, stat, statfs } from 'fs/promises';
 import path from 'path';
 import logger from '../shared/logger';
 import { CHECK_NAMES, WORKER_MESSAGES } from '../shared/constants/messages';
+import { cache } from '../shared/cache/redis';
+
+/**
+ * Redis key for worker readiness status
+ * Used for cross-process synchronization between worker and API server
+ */
+const REDIS_READINESS_KEY = 'worker:readiness:status';
+
+/**
+ * TTL for readiness status in Redis (seconds)
+ * Status expires after 5 minutes to detect worker crashes
+ */
+const REDIS_READINESS_TTL = 300;
 
 /**
  * Pre-flight check result
@@ -155,6 +168,108 @@ class WorkerReadinessState {
  * Singleton instance
  */
 export const workerReadiness = new WorkerReadinessState();
+
+/**
+ * Redis-stored readiness status (for cross-process sync)
+ */
+interface RedisReadinessStatus {
+  ready: boolean;
+  checks: PreFlightCheckResult[];
+  startedAt: string | null;
+  readyAt: string | null;
+  lastCheckAt: string;
+  workerId: string;
+}
+
+/**
+ * Get unique worker ID for this process
+ */
+function getWorkerId(): string {
+  return `worker-${process.pid}-${Date.now()}`;
+}
+
+/**
+ * Save readiness status to Redis for cross-process synchronization
+ *
+ * Called by worker process after pre-flight checks complete.
+ * API server reads this status via getReadinessFromRedis().
+ */
+export async function saveReadinessToRedis(
+  status: WorkerReadinessStatus
+): Promise<boolean> {
+  try {
+    const redisStatus: RedisReadinessStatus = {
+      ready: status.ready,
+      checks: status.checks,
+      startedAt: status.startedAt?.toISOString() || null,
+      readyAt: status.readyAt?.toISOString() || null,
+      lastCheckAt: status.lastCheckAt.toISOString(),
+      workerId: getWorkerId(),
+    };
+
+    const success = await cache.set(REDIS_READINESS_KEY, redisStatus, {
+      ttl: REDIS_READINESS_TTL,
+    });
+
+    if (success) {
+      logger.info(
+        { ready: status.ready, checksCount: status.checks.length },
+        'Saved readiness status to Redis'
+      );
+    } else {
+      logger.warn('Failed to save readiness status to Redis');
+    }
+
+    return success;
+  } catch (error) {
+    logger.error(
+      { error: (error as Error).message },
+      'Error saving readiness to Redis'
+    );
+    return false;
+  }
+}
+
+/**
+ * Get readiness status from Redis
+ *
+ * Used by API server to check worker readiness across processes.
+ * Returns null if no status in Redis (worker not started or status expired).
+ */
+export async function getReadinessFromRedis(): Promise<WorkerReadinessStatus | null> {
+  try {
+    const redisStatus = await cache.get<RedisReadinessStatus>(REDIS_READINESS_KEY);
+
+    if (!redisStatus) {
+      return null;
+    }
+
+    return {
+      ready: redisStatus.ready,
+      checks: redisStatus.checks,
+      startedAt: redisStatus.startedAt ? new Date(redisStatus.startedAt) : null,
+      readyAt: redisStatus.readyAt ? new Date(redisStatus.readyAt) : null,
+      lastCheckAt: new Date(redisStatus.lastCheckAt),
+    };
+  } catch (error) {
+    logger.error(
+      { error: (error as Error).message },
+      'Error reading readiness from Redis'
+    );
+    return null;
+  }
+}
+
+/**
+ * Refresh readiness TTL in Redis (heartbeat)
+ *
+ * Called periodically by worker to indicate it's still alive.
+ * If TTL expires, API server assumes worker is down.
+ */
+export async function refreshReadinessHeartbeat(): Promise<boolean> {
+  const status = workerReadiness.getStatus();
+  return saveReadinessToRedis(status);
+}
 
 /**
  * Sleep helper
@@ -415,6 +530,10 @@ export async function runPreFlightChecks(
         WORKER_MESSAGES.PRE_FLIGHT_FAILED
       );
     }
+
+    // Save status to Redis for cross-process synchronization
+    // This allows API server to read worker readiness status
+    await saveReadinessToRedis(workerReadiness.getStatus());
 
     return results;
   } finally {

@@ -23,6 +23,7 @@ import logger from '../shared/logger';
 import { validateEnvironment } from '../shared/config/env-validator';
 import { initializeModelConfigBunker, getModelConfigBunker } from '../shared/llm/model-config-bunker';
 import { TIMEOUTS } from '../shared/constants/timeouts';
+import { refreshReadinessHeartbeat } from './worker-readiness';
 
 // Validate environment
 validateEnvironment();
@@ -57,6 +58,14 @@ const DEBUG_LOG_EVERY_N_CHECKS = 15;
 let peakHeapUsed = 0;
 let memoryMonitorInterval: NodeJS.Timeout | null = null;
 let memoryCheckCount = 0;
+
+/**
+ * Readiness heartbeat interval (in ms)
+ * Refreshes Redis TTL every 60 seconds to indicate worker is alive
+ * TTL is 5 minutes, so we have ~4 missed heartbeats before expiry
+ */
+const READINESS_HEARTBEAT_INTERVAL_MS = 60000;
+let readinessHeartbeatInterval: NodeJS.Timeout | null = null;
 
 /**
  * Start memory monitoring with threshold-based alerts
@@ -105,12 +114,49 @@ function stopMemoryMonitoring(): void {
   }
 }
 
+/**
+ * Start readiness heartbeat
+ *
+ * Periodically refreshes the readiness status TTL in Redis.
+ * This allows API server to detect if worker crashes (TTL expires).
+ */
+function startReadinessHeartbeat(): void {
+  if (readinessHeartbeatInterval) return;
+
+  readinessHeartbeatInterval = setInterval(async () => {
+    try {
+      const success = await refreshReadinessHeartbeat();
+      if (!success) {
+        logger.warn('Failed to refresh readiness heartbeat');
+      }
+    } catch (error) {
+      logger.error({ error }, 'Error in readiness heartbeat');
+    }
+  }, READINESS_HEARTBEAT_INTERVAL_MS);
+
+  logger.info({
+    intervalMs: READINESS_HEARTBEAT_INTERVAL_MS,
+  }, 'Readiness heartbeat started');
+}
+
+/**
+ * Stop readiness heartbeat
+ */
+function stopReadinessHeartbeat(): void {
+  if (readinessHeartbeatInterval) {
+    clearInterval(readinessHeartbeatInterval);
+    readinessHeartbeatInterval = null;
+    logger.info('Readiness heartbeat stopped');
+  }
+}
+
 // Start monitoring immediately
 startMemoryMonitoring();
 
 // Cleanup on exit
 process.on('SIGINT', () => {
   stopMemoryMonitoring();
+  stopReadinessHeartbeat();
   // Shutdown bunker (stops background sync timer)
   const bunker = getModelConfigBunker();
   if (bunker.isInitialized()) {
@@ -119,6 +165,7 @@ process.on('SIGINT', () => {
 });
 process.on('SIGTERM', () => {
   stopMemoryMonitoring();
+  stopReadinessHeartbeat();
   // Shutdown bunker (stops background sync timer)
   const bunker = getModelConfigBunker();
   if (bunker.isInitialized()) {
@@ -190,6 +237,10 @@ async function main() {
     const concurrency = parseInt(process.env.WORKER_CONCURRENCY || '5', 10);
 
     await startWorker(concurrency);
+
+    // Start readiness heartbeat to keep Redis TTL fresh
+    // This allows API server to detect if worker crashes
+    startReadinessHeartbeat();
 
     logger.info({
       concurrency,
