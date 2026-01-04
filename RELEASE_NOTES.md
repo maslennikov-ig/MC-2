@@ -3,6 +3,18 @@
 _Released on 2025-12-26_
 
 
+## v0.26.57
+
+_Released on 2026-01-04_
+
+### 🐛 Bug Fixes
+
+- **nginx**: Add no-cache headers to prevent stale HTML errors
+
+---
+
+_This release was automatically generated from 1 commits._
+
 ## v0.26.56
 
 _Released on 2026-01-04_
