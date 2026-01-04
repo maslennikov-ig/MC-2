@@ -20,11 +20,11 @@ export function AppThemeProvider({ children, ...props }: AppThemeProviderProps) 
   return (
     <NextThemesProvider
       attribute="class"
-      defaultTheme="system"
-      enableSystem={true}
+      defaultTheme="light"
+      enableSystem={false}
       disableTransitionOnChange={false}
       storageKey="theme"
-      themes={['light', 'dark', 'system']}
+      themes={['light', 'dark']}
       {...props}
     >
       {children}
