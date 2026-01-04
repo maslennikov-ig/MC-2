@@ -609,8 +609,10 @@ export default function GenerationProgressContainerEnhanced({
   useEffect(() => {
     if (!supabase) return;
 
+    let isMounted = true;
+
     const handleVisibilityChange = async () => {
-      if (document.visibilityState === 'visible') {
+      if (document.visibilityState === 'visible' && isMounted) {
         // Tab became visible - refetch current state to ensure UI is up-to-date
         try {
           const { data, error } = await supabase
@@ -619,7 +621,8 @@ export default function GenerationProgressContainerEnhanced({
             .eq('id', courseId)
             .single();
 
-          if (!error && data) {
+          // Check isMounted again after async operation
+          if (!error && data && isMounted) {
             handleProgressUpdate(data);
           }
         } catch {
@@ -631,6 +634,7 @@ export default function GenerationProgressContainerEnhanced({
     document.addEventListener('visibilitychange', handleVisibilityChange);
 
     return () => {
+      isMounted = false;
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [courseId, supabase, handleProgressUpdate]);
