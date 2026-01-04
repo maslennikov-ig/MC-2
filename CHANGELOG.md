@@ -86,6 +86,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.26.54] - 2026-01-04
+
+### Fixed
+- **web**: update 1 source file(s) (3994dee)
+
 ## [0.26.50] - 2026-01-04
 
 ### Added
