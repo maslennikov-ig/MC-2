@@ -20,7 +20,7 @@ import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { z } from 'zod';
 import { toast } from 'sonner';
-import { useTheme } from 'next-themes';
+import { useThemeSync } from '@/lib/hooks/use-theme-sync';
 import CodeMirror, { ReactCodeMirrorRef } from '@uiw/react-codemirror';
 import { xml } from '@codemirror/lang-xml';
 import { tokyoNight } from '@uiw/codemirror-theme-tokyo-night';
@@ -108,7 +108,7 @@ export function PromptEditorDialog({
   prompt,
   onSaved,
 }: PromptEditorDialogProps) {
-  const { resolvedTheme } = useTheme();
+  const { resolvedTheme, mounted } = useThemeSync();
   const [templateContent, setTemplateContent] = useState('');
   const [xmlError, setXmlError] = useState<string | null>(null);
   const [activeTab, setActiveTab] = useState<string>('editor');
@@ -407,7 +407,7 @@ export function PromptEditorDialog({
                   ref={editorRef}
                   value={templateContent}
                   height="400px"
-                  theme={resolvedTheme === 'dark' ? tokyoNight : undefined}
+                  theme={mounted && resolvedTheme === 'dark' ? tokyoNight : undefined}
                   extensions={[xml()]}
                   onChange={handleTemplateChange}
                   className="text-sm"

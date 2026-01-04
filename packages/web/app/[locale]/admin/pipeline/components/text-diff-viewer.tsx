@@ -16,7 +16,7 @@
 'use client';
 
 import ReactDiffViewer, { DiffMethod } from 'react-diff-viewer-continued';
-import { useTheme } from 'next-themes';
+import { useThemeSync } from '@/lib/hooks/use-theme-sync';
 
 interface TextDiffViewerProps {
   oldValue: string;
@@ -45,9 +45,9 @@ export function TextDiffViewer({
   newTitle = 'Current Version',
   splitView = true,
 }: TextDiffViewerProps) {
-  const { theme, systemTheme } = useTheme();
-  const resolvedTheme = theme === 'system' ? systemTheme : theme;
-  const isDark = resolvedTheme === 'dark';
+  const { resolvedTheme, mounted } = useThemeSync();
+  // Use light theme as default when not mounted to prevent hydration mismatch
+  const isDark = mounted && resolvedTheme === 'dark';
 
   return (
     <div className="rounded-lg border bg-background overflow-hidden">

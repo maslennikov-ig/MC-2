@@ -47,7 +47,7 @@ import { startGeneration, cancelGeneration, approveStage } from '@/app/actions/a
 import { toast } from 'sonner';
 // MobileProgressList removed - maintaining two view modes adds complexity
 import { useBreakpoint } from './hooks/useBreakpoint';
-import { useTheme } from 'next-themes';
+import { useThemeSync } from '@/lib/hooks/use-theme-sync';
 import { logger } from '@/lib/client-logger';
 import { useFallbackPolling } from './hooks/useFallbackPolling';
 import { useViewportPreservation } from './hooks/useViewportPreservation';
@@ -238,8 +238,8 @@ function GraphViewInner({ courseId, courseTitle, hasDocuments = true, failedAtSt
   const [isPanning, setIsPanning] = useState(true);
 
   // Theme support
-  const { theme } = useTheme();
-  const isDark = theme === 'dark';
+  const { resolvedTheme, mounted } = useThemeSync();
+  const isDark = mounted && resolvedTheme === 'dark';
 
   // Tablet optimizations (FIX-021)
   const flowProps = isTablet ? {

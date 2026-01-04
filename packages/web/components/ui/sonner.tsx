@@ -1,16 +1,18 @@
 "use client"
 
-import { useTheme } from "next-themes"
+import { useThemeSync } from "@/lib/hooks/use-theme-sync"
 import { Toaster as Sonner } from "sonner"
 
 type ToasterProps = React.ComponentProps<typeof Sonner>
 
 export function Toaster({ ...props }: ToasterProps) {
-  const { resolvedTheme } = useTheme()
+  // Use useThemeSync for hydration-safe theme access
+  const { resolvedTheme, mounted } = useThemeSync()
 
   return (
     <Sonner
-      theme={resolvedTheme === 'dark' ? 'dark' : 'light'}
+      // Use 'light' as default before mounting to match server render
+      theme={mounted && resolvedTheme === 'dark' ? 'dark' : 'light'}
       position="bottom-right"
       expand={false}
       richColors

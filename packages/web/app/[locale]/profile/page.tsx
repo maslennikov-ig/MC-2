@@ -6,7 +6,7 @@ import Image from 'next/image'
 import { Link, useRouter } from '@/src/i18n/navigation'
 import { useSupabase } from '@/lib/supabase/browser-client'
 import { toast } from 'sonner'
-import { useTheme } from 'next-themes'
+import { useThemeSync } from '@/lib/hooks/use-theme-sync'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { Card } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -120,7 +120,7 @@ const profileTabs = [
 export default function ProfilePage() {
   const router = useRouter()
   const { supabase, session, isLoading: sessionLoading } = useSupabase()
-  const { theme, setTheme } = useTheme()
+  const { theme, setTheme, mounted } = useThemeSync()
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [preferences, setPreferences] = useState<UserPrefs | null>(null)
   const [isLoading, setIsLoading] = useState(true)
@@ -131,14 +131,8 @@ export default function ProfilePage() {
   const [touchStartX, setTouchStartX] = useState(0)
   const [touchEndX, setTouchEndX] = useState(0)
   const [showKeyboardHints, setShowKeyboardHints] = useState(false)
-  const [mounted, setMounted] = useState(false)
   const [hasUnsavedChanges, setHasUnsavedChanges] = useState(false)
   const mainContentRef = useRef<HTMLDivElement>(null)
-
-  // Set mounted state
-  useEffect(() => {
-    setMounted(true)
-  }, [])
 
   // Check authentication and handle navigation guard
   useEffect(() => {

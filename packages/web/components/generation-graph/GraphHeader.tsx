@@ -28,7 +28,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import Link from 'next/link';
-import { useTheme } from 'next-themes';
+import { useThemeSync } from '@/lib/hooks/use-theme-sync';
 import { toast } from 'sonner';
 import { useTranslations } from 'next-intl';
 import { cn } from '@/lib/utils';
@@ -125,7 +125,7 @@ export const GraphHeader = ({
     generationStatus,
     isConnected = true
 }: GraphHeaderProps) => {
-    const { setTheme } = useTheme();
+    const { setTheme } = useThemeSync();
     const t = useTranslations('generation');
     const [copied, setCopied] = useState(false);
     const [isExpanded, setIsExpanded] = useState(() => {

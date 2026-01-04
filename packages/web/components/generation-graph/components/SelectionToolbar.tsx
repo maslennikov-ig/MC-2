@@ -9,7 +9,7 @@ import { useNodeSelection } from '../hooks/useNodeSelection';
 import { createClient } from '@/lib/supabase/client';
 import { toast } from 'sonner';
 import type { CourseStructure } from '@megacampus/shared-types';
-import { useTheme } from 'next-themes';
+import { useThemeSync } from '@/lib/hooks/use-theme-sync';
 import { Link } from '@/src/i18n/navigation';
 import { useTranslation } from '@/lib/generation-graph/useTranslation';
 import { getModuleWord, getLessonWord } from '@/lib/generation-graph/utils/pluralization';
@@ -76,8 +76,8 @@ export function SelectionToolbar({
   const [isGeneratingAll, setIsGeneratingAll] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
   const [isMinimized, setIsMinimized] = useState(false);
-  const { resolvedTheme } = useTheme();
-  const isDark = resolvedTheme === 'dark';
+  const { resolvedTheme, mounted } = useThemeSync();
+  const isDark = mounted && resolvedTheme === 'dark';
   const { t } = useTranslation();
 
   // Memoized plural forms for Russian language support
