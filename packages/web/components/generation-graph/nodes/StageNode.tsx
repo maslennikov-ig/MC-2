@@ -59,10 +59,14 @@ const StageNode = (props: NodeProps<RFStageNode>) => {
   }
 
   // Subscribe to realtime status updates
-  // Priority: Zustand 'active' status (optimistic) > Realtime > data.status (fallback)
-  // This ensures optimistic updates show immediately before Realtime confirms
+  // Priority logic for optimistic updates:
+  // - If Realtime shows 'pending' but Zustand shows 'active' → show 'active' (optimistic)
+  // - If Realtime shows 'completed'/'active'/etc → use Realtime (backend has confirmed)
+  // This ensures optimistic updates show immediately, but don't override backend confirmations
   const realtimeStatus = statusEntry?.status || data.status;
-  const baseStatus = zustandStatus === 'active' ? 'active' : realtimeStatus;
+  const baseStatus = (zustandStatus === 'active' && realtimeStatus === 'pending')
+    ? 'active'
+    : realtimeStatus;
 
   // For Stage 6: show as 'active' if any lesson is currently generating
   const isStage6Generating = data.stageNumber === 6 && partialGenContext?.isGenerating;
