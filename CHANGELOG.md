@@ -5,6 +5,12 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.26.66] - 2026-01-05
+
+### Fixed
+- **course-gen-platform**: update 7 source file(s), cleanup 2 file(s) (0e43ce6)
+- **ci**: use pnpm store cache instead of artifacts, fix rollback --pull flag (bcd99ac)
+
 ## [0.26.65] - 2026-01-05
 
 ### Other

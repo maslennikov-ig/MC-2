@@ -3,6 +3,19 @@
 _Released on 2025-12-26_
 
 
+## v0.26.66
+
+_Released on 2026-01-05_
+
+### 🐛 Bug Fixes
+
+- **course-gen-platform**: Update 7 source file(s), cleanup 2 file(s)
+- **CI/CD**: Use pnpm store cache instead of artifacts, fix rollback --pull flag
+
+---
+
+_This release was automatically generated from 2 commits._
+
 ## v0.26.65
 
 _Released on 2026-01-05_
