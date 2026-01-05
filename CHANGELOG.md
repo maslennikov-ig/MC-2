@@ -116,6 +116,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.26.64] - 2026-01-05
+
+### Fixed
+- **shared-types**: update 5 source file(s), update docs (7b391f7)
+
+### Other
+- add Mermaid LLM Fixer upgrade investigation (9fff859)
+
 ## [0.26.63] - 2026-01-05
 
 ### Fixed

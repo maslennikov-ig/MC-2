@@ -3,6 +3,18 @@
 _Released on 2025-12-26_
 
 
+## v0.26.64
+
+_Released on 2026-01-05_
+
+### 🐛 Bug Fixes
+
+- **shared-types**: Update 5 source file(s), update docs
+
+---
+
+_This release was automatically generated from 2 commits._
+
 ## v0.26.63
 
 _Released on 2026-01-05_
