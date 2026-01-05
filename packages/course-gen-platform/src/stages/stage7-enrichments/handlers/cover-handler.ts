@@ -13,24 +13,37 @@ import { z } from 'zod';
 import { logger } from '@/shared/logger';
 import { llmClient } from '@/shared/llm/client';
 import { getSupabaseAdmin } from '@/shared/supabase/admin';
+import { createPromptService } from '@/shared/prompts/prompt-service';
 import { DEFAULT_MODEL_ID } from '@megacampus/shared-types';
 import type { CoverEnrichmentContent, EnrichmentMetadata } from '@megacampus/shared-types';
 import type { EnrichmentHandler } from '../services/enrichment-router';
 import type { EnrichmentHandlerInput, GenerateResult, DraftResult } from '../types';
 import {
-  buildCoverPromptSystemPrompt,
-  buildCoverPromptUserMessage,
-  buildCoverPromptVariantsSystemPrompt,
-  buildCoverPromptVariantsUserMessage,
-  getDefaultImagePrompt,
-  type CoverPromptParams,
-  type CoverPromptVariant,
-} from '../prompts/cover-prompt';
-import {
   generateImage,
   base64ToBuffer,
   convertToWebP,
 } from '../services/image-generation-service';
+
+// ============================================================================
+// TYPES
+// ============================================================================
+
+interface CoverPromptParams {
+  lessonTitle: string;
+  keywords: string[];
+  courseSubject: string;
+  language: 'en' | 'ru';
+  styleHint?: string;
+}
+
+/**
+ * Single cover prompt variant
+ */
+export interface CoverPromptVariant {
+  id: number;
+  prompt_en: string;
+  description_localized: string;
+}
 
 // ============================================================================
 // CONFIGURATION
@@ -197,6 +210,137 @@ function extractKeywords(lessonContent: string | null): string[] {
   return [];
 }
 
+/**
+ * Default system prompt for cover generation (inline fallback)
+ */
+function getDefaultCoverSystemPrompt(): string {
+  return `# Role
+You are an expert prompt engineer specializing in AI image generation for educational content.
+Your task is to create optimized prompts for generating lesson cover images (hero banners).
+
+# Output Requirements
+Generate a single, detailed image prompt that will produce:
+- A visually striking hero banner suitable for educational content
+- Professional, clean aesthetic appropriate for online learning
+- Abstract or symbolic representation of the lesson topic
+- Modern, high-quality digital art style
+
+# CRITICAL: No Text Requirement
+IMPORTANT: The image MUST NOT contain ANY text, words, letters, numbers, characters, typography, writing, or inscriptions in ANY language.
+Always include in your prompt: "absolutely no text, no letters, no words, no numbers, no writing, no typography, no inscriptions, text-free image"
+Also avoid: logos, watermarks, signatures, labels, captions, titles, and human faces.
+
+# Style Guidelines
+- Use rich, vibrant colors that convey the subject matter
+- Create depth and visual interest through composition
+- Avoid literal depictions - prefer abstract/conceptual representations
+- Ensure the image works well as a wide banner (16:9 aspect ratio)
+- Consider how a title might be overlaid (leave visual breathing room)
+- Use clean geometric shapes, gradients, and modern design elements
+
+# Format
+Return ONLY the image prompt text (1-3 sentences, 50-100 words).
+Do not include any explanation, preamble, or commentary - just the prompt itself.
+ALWAYS end your prompt with: ", absolutely no text, no letters, no words, no typography, text-free image"`;
+}
+
+/**
+ * Default fallback prompt if LLM/DB fails to generate one
+ */
+function getDefaultImagePrompt(lessonTitle: string, courseSubject: string): string {
+  return `A stunning abstract visualization representing "${lessonTitle}" in the context of ${courseSubject}. Modern digital art style with flowing gradients in professional blue and purple tones. Clean geometric shapes creating depth and movement. Ultra-wide 16:9 format, suitable as an educational hero banner. Clean professional aesthetic, absolutely no text, no letters, no words, no numbers, no writing, no typography, no inscriptions, text-free image.`;
+}
+
+/**
+ * System prompt for generating 3 cover prompt variants (draft phase)
+ */
+function getVariantsSystemPrompt(language: 'en' | 'ru'): string {
+  const descriptionLanguage = language === 'ru' ? 'Russian' : 'English';
+  const descriptionExample = language === 'ru'
+    ? 'Абстрактная визуализация с геометрическими формами'
+    : 'Abstract visualization with geometric shapes';
+
+  return `# Role
+You are an expert prompt engineer specializing in AI image generation for educational content.
+Your task is to create 3 different image prompt variants for a lesson cover image (hero banner).
+
+# Output Requirements
+Generate exactly 3 distinct image prompts, each with a unique visual approach:
+1. **Abstract/Conceptual**: Focus on abstract shapes, gradients, and symbolic representation
+2. **Illustrative**: Use metaphorical imagery and visual storytelling
+3. **Minimalist/Modern**: Clean, simple design with bold colors and minimal elements
+
+Each prompt should produce:
+- A visually striking hero banner suitable for educational content
+- Professional, clean aesthetic appropriate for online learning
+- Different visual style from other variants
+- Modern, high-quality digital art style
+
+# CRITICAL: No Text Requirement
+IMPORTANT: All images MUST NOT contain ANY text, words, letters, numbers, characters, typography, writing, or inscriptions in ANY language.
+Every prompt MUST end with: ", absolutely no text, no letters, no words, no numbers, no writing, no typography, no inscriptions, text-free image"
+Also avoid: logos, watermarks, signatures, labels, captions, titles, and human faces.
+
+# Style Guidelines
+- Use rich, vibrant colors that convey the subject matter
+- Create depth and visual interest through composition
+- Avoid literal depictions - prefer abstract/conceptual representations
+- Ensure the image works well as a wide banner (16:9 aspect ratio)
+- Consider how a title might be overlaid (leave visual breathing room)
+- Each variant should have a distinctly different mood and visual approach
+
+# Format
+Return ONLY valid JSON. No markdown code blocks.
+Start with { and end with }.
+
+{
+  "variants": [
+    {
+      "id": 1,
+      "prompt_en": "First image prompt here (50-100 words), absolutely no text, no letters, no words, no typography, text-free image",
+      "description_localized": "${descriptionExample}"
+    },
+    {
+      "id": 2,
+      "prompt_en": "Second image prompt here (50-100 words), absolutely no text, no letters, no words, no typography, text-free image",
+      "description_localized": "${descriptionExample}"
+    },
+    {
+      "id": 3,
+      "prompt_en": "Third image prompt here (50-100 words), absolutely no text, no letters, no words, no typography, text-free image",
+      "description_localized": "${descriptionExample}"
+    }
+  ]
+}
+
+# Critical Rules
+- Generate EXACTLY 3 variants
+- Each prompt must be unique with different visual approach
+- All prompts in English (prompt_en)
+- All descriptions in ${descriptionLanguage} (description_localized)
+- Each prompt must end with the no-text requirement
+- Each description should be 5-15 words explaining the visual style
+- Return ONLY raw JSON (no markdown code blocks)`;
+}
+
+/**
+ * User message for generating 3 cover prompt variants (draft phase)
+ */
+function getVariantsUserMessage(params: CoverPromptParams): string {
+  const { lessonTitle, keywords, courseSubject, language, styleHint } = params;
+  const keywordsStr = keywords.length > 0 ? keywords.join(', ') : 'general concepts';
+
+  return `Generate 3 different image prompt variants for a lesson cover with the following context:
+
+Lesson Title: ${lessonTitle}
+Course Subject: ${courseSubject}
+Key Topics: ${keywordsStr}
+Language Context: ${language === 'ru' ? 'Russian educational content' : 'English educational content'}
+${styleHint ? `Style Preference: ${styleHint}` : ''}
+
+Create 3 distinct prompts for 16:9 hero banner images, each with a unique visual approach.`;
+}
+
 // ============================================================================
 // DRAFT GENERATION (Phase 1)
 // ============================================================================
@@ -239,9 +383,14 @@ async function generateDraft(input: EnrichmentHandlerInput): Promise<DraftResult
       language: (course.language as 'en' | 'ru') || 'en',
     };
 
-    // Build prompts for variant generation
-    const systemPrompt = buildCoverPromptVariantsSystemPrompt(promptParams.language);
-    const userMessage = buildCoverPromptVariantsUserMessage(promptParams);
+    // Build prompts for variant generation (inline helpers)
+    // TODO: Migrate to DB prompts (stage7_cover_variants_system, stage7_cover_variants_user)
+    // Currently uses inline helpers because:
+    // 1. Variant generation is experimental and changes frequently
+    // 2. Language-specific prompt logic (ru vs en) requires dynamic interpolation
+    // 3. Draft phase is internal workflow, not exposed to end users
+    const systemPrompt = getVariantsSystemPrompt(promptParams.language);
+    const userMessage = getVariantsUserMessage(promptParams);
 
     // Generate 3 variants via LLM
     const llmResponse = await llmClient.generateCompletion(
@@ -411,22 +560,41 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
   );
 
   try {
-    // Phase 1: Generate image prompt using LLM
+    // Phase 1: Generate image prompt using LLM with DB prompts
     const keywords = extractKeywords(lesson.content);
+    const promptService = createPromptService();
 
-    const promptParams: CoverPromptParams = {
-      lessonTitle: lesson.title,
-      keywords,
-      courseSubject: course.title ?? 'Educational Content',
-      language: (course.language as 'en' | 'ru') || 'en',
-    };
+    const language = (course.language as 'en' | 'ru') || 'en';
+    const languageContext = language === 'ru' ? 'Russian educational content' : 'English educational content';
 
     let imagePrompt: string;
 
-    try {
-      const systemPrompt = buildCoverPromptSystemPrompt();
-      const userMessage = buildCoverPromptUserMessage(promptParams);
+    // Step 1: Load prompts from database (with fallback)
+    let systemPrompt: string;
+    let userMessage: string;
 
+    try {
+      const systemPromptResult = await promptService.getPrompt('stage7_cover_system');
+      systemPrompt = systemPromptResult?.promptTemplate ?? getDefaultCoverSystemPrompt();
+
+      userMessage = await promptService.renderPrompt('stage7_cover_user', {
+        lessonTitle: lesson.title,
+        courseSubject: course.title ?? 'Educational Content',
+        keywords: keywords.length > 0 ? keywords.join(', ') : 'general concepts',
+        languageContext,
+        styleHint: '', // Optional, leave empty
+      });
+    } catch (dbError) {
+      logger.warn(
+        { enrichmentId: enrichment.id, error: dbError instanceof Error ? dbError.message : 'Unknown error' },
+        'Cover handler: DB prompt lookup failed, using hardcoded fallback'
+      );
+      systemPrompt = getDefaultCoverSystemPrompt();
+      userMessage = `Generate an image prompt for a lesson cover:\nLesson: ${lesson.title}\nCourse: ${course.title ?? 'Educational Content'}\nTopics: ${keywords.join(', ') || 'general concepts'}`;
+    }
+
+    // Step 2: Call LLM (separate error handling)
+    try {
       const llmResponse = await llmClient.generateCompletion(
         userMessage,
         {
@@ -476,16 +644,14 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
         },
         'Cover handler: image prompt generated'
       );
-    } catch (error) {
-      // Fallback to default prompt if LLM fails
+    } catch (llmError) {
       logger.warn(
         {
           enrichmentId: enrichment.id,
-          error: error instanceof Error ? error.message : 'Unknown error',
+          error: llmError instanceof Error ? llmError.message : 'Unknown error',
         },
-        'Cover handler: LLM failed, using default prompt'
+        'Cover handler: LLM generation failed, using default prompt'
       );
-
       imagePrompt = getDefaultImagePrompt(lesson.title, course.title ?? 'Educational Content');
     }
 

@@ -49,7 +49,7 @@ const stageColors: Record<number, { bg: string; text: string; border: string; ho
 /**
  * PipelineOverview Component
  *
- * Displays horizontal flow of 6 pipeline stages with:
+ * Displays horizontal flow of 7 pipeline stages with:
  * - Stage number and name
  * - Description
  * - Status badge (always active)
@@ -128,7 +128,7 @@ export function PipelineOverview() {
   if (isLoading) {
     return (
       <div className="flex gap-4 overflow-x-auto pb-4">
-        {Array.from({ length: 6 }).map((_, i) => (
+        {Array.from({ length: 7 }).map((_, i) => (
           <Card key={i} className="min-w-[280px] flex-shrink-0">
             <CardHeader>
               <Skeleton className="h-6 w-32" />

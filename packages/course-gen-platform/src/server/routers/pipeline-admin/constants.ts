@@ -13,7 +13,7 @@ import { DEFAULT_MODEL_ID, DEFAULT_FALLBACK_MODEL_ID, MODEL_DEFAULTS } from '@me
 // =============================================================================
 
 /**
- * Static definitions for the 6 pipeline stages
+ * Static definitions for the 7 pipeline stages
  * These are hardcoded because they represent the core architecture of the system
  */
 export const PIPELINE_STAGES = [
@@ -78,6 +78,26 @@ export const PIPELINE_STAGES = [
       'stage_6_assembler',
       'stage_6_smoother',
       'stage_6_judge',
+    ],
+  },
+  {
+    number: 7,
+    name: 'Enrichments',
+    description: 'Generate multimedia enrichments: covers, cards, videos, audio, quizzes, presentations',
+    handlerPath: 'stages/stage7-enrichment',
+    linkedPhases: [
+      'stage_7_cover',
+      'stage_7_card',
+      'stage_7_video',
+      'stage_7_audio',
+      'stage_7_quiz',
+      'stage_7_presentation',
+    ] as PhaseName[],
+    linkedPrompts: [
+      'stage7_card_course',
+      'stage7_card_lesson',
+      'stage7_cover_system',
+      'stage7_cover_user',
     ],
   },
 ] as const;

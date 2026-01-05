@@ -13,7 +13,7 @@ import { z } from 'zod';
 // Prompt Stages
 // =============================================================================
 
-export const promptStageSchema = z.enum(['stage_3', 'stage_4', 'stage_5', 'stage_6']);
+export const promptStageSchema = z.enum(['stage_3', 'stage_4', 'stage_5', 'stage_6', 'stage_7']);
 
 export type PromptStage = z.infer<typeof promptStageSchema>;
 

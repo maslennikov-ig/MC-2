@@ -11,6 +11,8 @@
 | UI Config | `packages/web/lib/generation-graph/enrichment-config.ts` |
 | Translations | `packages/web/messages/{en,ru}/enrichments.json` |
 | Handler | `packages/course-gen-platform/src/stages/stage7-enrichments/handlers/` |
+| Prompt Service | `packages/course-gen-platform/src/shared/prompts/prompt-service.ts` |
+| Prompt Registry | `packages/course-gen-platform/src/shared/prompts/prompt-registry.ts` |
 | DB Migration | `packages/course-gen-platform/supabase/migrations/` |
 | Phase Names | `packages/shared-types/src/model-config.ts` |
 | Admin Pipeline | `packages/web/app/[locale]/admin/pipeline/components/stage-detail-sheet.tsx` |
@@ -37,9 +39,13 @@
 
 - [ ] **Create handler**: `handlers/new-type-handler.ts`
   - Implement `EnrichmentHandler` interface
+  - Use `createPromptService()` for DB-driven prompts (see Section 8)
   - Handle generation logic
 
-- [ ] **Create prompt** (if LLM-based): `prompts/new-type-prompt.ts`
+- [ ] **Add prompt to database** (if LLM-based):
+  - Create migration for `prompt_templates` table
+  - Add to `PROMPT_REGISTRY` for fallback (see Section 8)
+  - Add to `linkedPrompts` in `PIPELINE_STAGES`
 
 - [ ] **Register handler**: `services/enrichment-router.ts`
   - Import handler
@@ -110,15 +116,19 @@
 packages/
 ├── shared-types/src/
 │   ├── lesson-enrichment.ts      # Type enum, helpers
-│   └── enrichment-content.ts     # Content Zod schemas
+│   ├── enrichment-content.ts     # Content Zod schemas
+│   └── prompt-template.ts        # PromptStage type (includes 'stage_7')
 │
 ├── course-gen-platform/
-│   ├── supabase/migrations/      # DB migrations
-│   └── src/stages/stage7-enrichments/
-│       ├── handlers/             # Generation handlers
-│       ├── prompts/              # LLM prompts
-│       └── services/
-│           └── enrichment-router.ts  # Handler registry
+│   ├── supabase/migrations/      # DB migrations (incl. prompt_templates)
+│   └── src/
+│       ├── shared/prompts/
+│       │   ├── prompt-service.ts   # createPromptService() - DB + fallback
+│       │   └── prompt-registry.ts  # PROMPT_REGISTRY hardcoded fallback
+│       └── stages/stage7-enrichments/
+│           ├── handlers/           # Generation handlers (use promptService)
+│           └── services/
+│               └── enrichment-router.ts  # Handler registry
 │
 └── web/
     ├── messages/{en,ru}/enrichments.json  # Translations
@@ -214,7 +224,72 @@ Configure model/prompt management in admin panel (`/admin/pipeline`).
 **Phase Name Convention:**
 - Format: `stage_7_{activity_type}` (e.g., `stage_7_cover`, `stage_7_video`)
 - Used for filtering models and prompts in admin UI
-- Stored in `llm_model_config.phase_name` and `prompt_templates.phase_name`
+- Stored in `llm_model_config.phase_name` and `prompt_templates.prompt_key`
+
+### 8. Prompt Templates (Admin-Editable)
+
+Stage 7 prompts are stored in `prompt_templates` table and editable via admin panel.
+Handlers use `createPromptService()` to load prompts from DB with PROMPT_REGISTRY fallback.
+
+**How Handlers Use Prompts:**
+```typescript
+import { createPromptService } from '@/shared/prompts/prompt-service';
+
+// In handler function:
+const promptService = createPromptService();
+
+// Option 1: Render prompt with variables (DB → fallback)
+const prompt = await promptService.renderPrompt('stage7_card_course', {
+  courseTitle: course.title,
+  courseTopic: course.course_description,
+  // ... other variables
+});
+
+// Option 2: Get raw prompt template (for system prompts)
+const result = await promptService.getPrompt('stage7_cover_system');
+const systemPrompt = result?.promptTemplate ?? getDefaultFallback();
+```
+
+**Existing Stage 7 Prompts:**
+| prompt_key | Description |
+|------------|-------------|
+| `stage7_card_course` | Course catalog thumbnail (1:1 square) |
+| `stage7_card_lesson` | Lesson navigation thumbnail (1:1 square) |
+| `stage7_cover_system` | Cover generation system prompt (16:9) |
+| `stage7_cover_user` | Cover generation user context |
+
+**Adding New Prompts:**
+
+1. **Database migration**:
+   ```sql
+   INSERT INTO prompt_templates (stage, prompt_key, prompt_name, ...)
+   VALUES ('stage_7', 'stage7_new_type', 'Stage 7 - New Type', ...);
+   ```
+
+2. **PROMPT_REGISTRY fallback** (`prompt-registry.ts`):
+   - Add to `stage7Prompts` array for offline fallback
+   - Use same structure as existing Stage 7 prompts
+
+3. **linkedPrompts** (`constants.ts` → `PIPELINE_STAGES`):
+   - Add prompt_key to Stage 7's `linkedPrompts` array
+
+4. **Handler code**:
+   - Use `promptService.renderPrompt()` or `promptService.getPrompt()`
+   - Add inline fallback for edge cases
+
+**Prompt Variables (Mustache syntax):**
+- Use `{{variableName}}` placeholders
+- Define in `variables` JSONB column
+- Example: `[{"name": "courseTitle", "description": "...", "required": true}]`
+
+**Files:**
+| File | Purpose |
+|------|---------|
+| `prompt_templates` table | Database storage (admin-editable) |
+| `prompt-registry.ts` | PROMPT_REGISTRY hardcoded fallback |
+| `prompt-service.ts` | `createPromptService()` - DB with fallback |
+| `constants.ts` → `linkedPrompts` | Admin UI linking |
+| `shared-types/prompt-template.ts` | `PromptStage` type definition |
 
 ## Verification
 

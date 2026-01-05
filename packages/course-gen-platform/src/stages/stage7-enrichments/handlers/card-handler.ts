@@ -14,17 +14,10 @@
 
 import { logger } from '@/shared/logger';
 import { getSupabaseAdmin } from '@/shared/supabase/admin';
+import { createPromptService } from '@/shared/prompts/prompt-service';
 import type { CardEnrichmentContent, EnrichmentMetadata } from '@megacampus/shared-types';
 import type { EnrichmentHandler } from '../services/enrichment-router';
 import type { EnrichmentHandlerInput, GenerateResult } from '../types';
-import {
-  buildCourseCardPrompt,
-  buildLessonCardPrompt,
-  getDefaultCourseCardPrompt,
-  getDefaultLessonCardPrompt,
-  type CourseCardParams,
-  type LessonCardParams,
-} from '../prompts/card-prompt';
 import {
   generateCardImage,
   base64ToBuffer,
@@ -217,6 +210,21 @@ function extractLessonObjectives(lessonContent: string | null): string[] {
   return [];
 }
 
+/**
+ * Get default card prompt when DB/PROMPT_REGISTRY unavailable
+ * Provides inline fallback for backward compatibility
+ */
+function getDefaultCardPrompt(
+  title: string,
+  description: string,
+  type: 'course' | 'lesson'
+): string {
+  if (type === 'course') {
+    return `A stunning abstract 1:1 square thumbnail representing "${title}" in the context of ${description}. Modern digital art style with flowing gradients in professional tones. Clean geometric shapes creating depth and visual interest, centered composition optimized for thumbnail display. Professional educational aesthetic, visually striking at small sizes, absolutely no text, no letters, no words, no numbers, no writing, no typography, no inscriptions, text-free image.`;
+  }
+  return `A professional 1:1 square thumbnail for the lesson "${title}" within the course context of ${description}. Abstract visualization with symbolic representation of the lesson topic. Modern digital art with clean composition, centered focal point, harmonious with course visual style. Optimized for sidebar display at small sizes, absolutely no text, no letters, no words, no numbers, no writing, no typography, no inscriptions, text-free image.`;
+}
+
 // ============================================================================
 // MAIN GENERATION FUNCTION
 // ============================================================================
@@ -263,53 +271,66 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
     // Get visual style from course
     const visualStyle = getVisualStyle(course);
 
-    // Build appropriate prompt
+    // Get prompt service (DB with fallback to PROMPT_REGISTRY)
+    const promptService = createPromptService();
+
+    // Build appropriate prompt using database templates
     let imagePrompt: string;
+    const language = course.language ?? 'en';
+    const languageContext = language === 'ru'
+      ? 'Russian educational content'
+      : language === 'en'
+        ? 'English educational content'
+        : `${language} educational content`;
 
     if (isCourseCard) {
-      // Course card prompt
-      const courseCardParams: CourseCardParams = {
-        courseTitle: course.title ?? 'Educational Course',
-        courseTopic: course.course_description ?? course.title ?? 'Education',
-        language: course.language ?? 'en',
-        visualStyle,
-      };
-
+      // Course card prompt from database
       try {
-        imagePrompt = buildCourseCardPrompt(courseCardParams);
-      } catch {
+        imagePrompt = await promptService.renderPrompt('stage7_card_course', {
+          courseTitle: course.title ?? 'Educational Course',
+          courseTopic: course.course_description ?? course.title ?? 'Education',
+          languageContext,
+          colorScheme: visualStyle.colorScheme,
+          aesthetic: visualStyle.aesthetic,
+          visualElements: visualStyle.visualElements,
+          mood: visualStyle.mood,
+        });
+      } catch (err) {
         logger.warn(
-          { enrichmentId: enrichment.id },
-          'Card handler: failed to build course card prompt, using default'
+          { enrichmentId: enrichment.id, error: err },
+          'Card handler: failed to render course card prompt from DB, using inline fallback'
         );
-        imagePrompt = getDefaultCourseCardPrompt(
+        imagePrompt = getDefaultCardPrompt(
           course.title ?? 'Educational Course',
-          course.course_description ?? 'Education'
+          course.course_description ?? 'Education',
+          'course'
         );
       }
     } else {
-      // Lesson card prompt
+      // Lesson card prompt from database
       const lessonObjectives = extractLessonObjectives(lesson.content);
-
-      const lessonCardParams: LessonCardParams = {
-        lessonTitle: lesson.title,
-        lessonObjectives,
-        courseTitle: course.title ?? 'Educational Course',
-        courseTopic: course.course_description ?? course.title ?? 'Education',
-        visualStyle,
-      };
+      const objectivesSummary = lessonObjectives.slice(0, 3).join('; ') || 'Key lesson concepts';
 
       try {
-        imagePrompt = buildLessonCardPrompt(lessonCardParams);
-      } catch {
+        imagePrompt = await promptService.renderPrompt('stage7_card_lesson', {
+          lessonTitle: lesson.title,
+          objectivesSummary,
+          courseTitle: course.title ?? 'Educational Course',
+          courseTopic: course.course_description ?? course.title ?? 'Education',
+          colorScheme: visualStyle.colorScheme,
+          aesthetic: visualStyle.aesthetic,
+          visualElements: visualStyle.visualElements,
+          mood: visualStyle.mood,
+        });
+      } catch (err) {
         logger.warn(
-          { enrichmentId: enrichment.id },
-          'Card handler: failed to build lesson card prompt, using default'
+          { enrichmentId: enrichment.id, error: err },
+          'Card handler: failed to render lesson card prompt from DB, using inline fallback'
         );
-        imagePrompt = getDefaultLessonCardPrompt(
+        imagePrompt = getDefaultCardPrompt(
           lesson.title,
-          course.title ?? 'Educational Course',
-          course.course_description ?? 'Education'
+          `${course.title ?? 'Educational Course'} (${course.course_description ?? 'Education'})`,
+          'lesson'
         );
       }
     }

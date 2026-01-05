@@ -14,7 +14,7 @@
 
 import { getSupabaseAdmin } from '../supabase/admin';
 import logger from '../logger';
-import type { PromptVariable } from '@megacampus/shared-types';
+import type { PromptVariable, PromptStage } from '@megacampus/shared-types';
 import { PROMPT_REGISTRY, getPrompt as getHardcodedPrompt, type HardcodedPrompt } from './prompt-registry';
 
 // ============================================================================
@@ -173,12 +173,10 @@ class PromptServiceImpl {
   /**
    * Get all prompts for a specific stage
    *
-   * @param stage - Stage identifier ('stage_3', 'stage_4', 'stage_5', 'stage_6')
+   * @param stage - Stage identifier (PromptStage)
    * @returns Array of prompts for that stage
    */
-  async getPromptsForStage(
-    stage: 'stage_3' | 'stage_4' | 'stage_5' | 'stage_6'
-  ): Promise<PromptResult[]> {
+  async getPromptsForStage(stage: PromptStage): Promise<PromptResult[]> {
     // Try database lookup first
     try {
       const dbPrompts = await this.fetchPromptsForStageFromDb(stage);
@@ -246,9 +244,7 @@ class PromptServiceImpl {
     };
   }
 
-  private async fetchPromptsForStageFromDb(
-    stage: 'stage_3' | 'stage_4' | 'stage_5' | 'stage_6'
-  ): Promise<PromptResult[]> {
+  private async fetchPromptsForStageFromDb(stage: PromptStage): Promise<PromptResult[]> {
     const supabase = getSupabaseAdmin();
 
     const { data, error } = await supabase
