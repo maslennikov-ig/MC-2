@@ -116,6 +116,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.26.63] - 2026-01-05
+
+### Fixed
+- **course-gen-platform**: update 9 source file(s), add 1 test(s), +3 more (d8cb89c)
+
 ## [0.26.61] - 2026-01-04
 
 ### Changed
