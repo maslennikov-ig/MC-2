@@ -1,6 +1,6 @@
 {
   "name": "@megacampus/shared-logger",
-  "version": "0.26.61",
+  "version": "0.26.62",
   "main": "./dist/index.js",
   "module": "./dist/index.mjs",
   "types": "./dist/index.d.ts",
