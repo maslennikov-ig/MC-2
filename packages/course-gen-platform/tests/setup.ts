@@ -4,6 +4,22 @@
  */
 import { config } from 'dotenv';
 import path from 'path';
+import { JSDOM } from 'jsdom';
+import createDOMPurify from 'dompurify';
+
+// ============================================================================
+// DOM ENVIRONMENT SETUP (Required for mermaid in Node.js)
+// Must be done BEFORE mermaid is imported by any test file
+// ============================================================================
+const dom = new JSDOM('<!DOCTYPE html><body></body>');
+global.document = dom.window.document;
+global.window = dom.window as unknown as Window & typeof globalThis;
+
+// Create DOMPurify instance and attach to window
+// Mermaid requires DOMPurify.addHook() to be available
+const DOMPurify = createDOMPurify(dom.window);
+// @ts-expect-error - Mermaid expects DOMPurify on window
+global.window.DOMPurify = DOMPurify;
 
 // Load environment variables from .env
 config({ path: path.resolve(__dirname, '../.env') });

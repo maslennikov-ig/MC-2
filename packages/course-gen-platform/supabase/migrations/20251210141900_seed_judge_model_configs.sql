@@ -23,9 +23,9 @@ INSERT INTO llm_model_config (
  'Kimi K2', 'GPT-OSS 120B'),
 
 -- Russian: Tiebreaker judge
-('global', 'stage_6_judge', 'minimax/minimax-m2', 'openai/gpt-oss-120b',
+('global', 'stage_6_judge', 'minimax/minimax-m2.1', 'openai/gpt-oss-120b',
  0.3, 4096, 'ru', 'extended', true, 'tiebreaker', 0.72,
- 'Minimax M2', 'GPT-OSS 120B'),
+ 'Minimax M2.1', 'GPT-OSS 120B'),
 
 -- English: Primary judge (Qwen3 since deepseek is used for generation)
 ('global', 'stage_6_judge', 'qwen/qwen3-235b-a22b-2507', 'openai/gpt-oss-120b',
@@ -38,9 +38,9 @@ INSERT INTO llm_model_config (
  'Kimi K2', 'GPT-OSS 120B'),
 
 -- English: Tiebreaker judge
-('global', 'stage_6_judge', 'minimax/minimax-m2', 'openai/gpt-oss-120b',
+('global', 'stage_6_judge', 'minimax/minimax-m2.1', 'openai/gpt-oss-120b',
  0.3, 4096, 'en', 'extended', true, 'tiebreaker', 0.72,
- 'Minimax M2', 'GPT-OSS 120B'),
+ 'Minimax M2.1', 'GPT-OSS 120B'),
 
 -- Any language fallback: Primary judge
 ('global', 'stage_6_judge', 'qwen/qwen3-235b-a22b-2507', 'openai/gpt-oss-120b',
@@ -53,6 +53,6 @@ INSERT INTO llm_model_config (
  'Kimi K2', 'GPT-OSS 120B'),
 
 -- Any language fallback: Tiebreaker judge
-('global', 'stage_6_judge', 'minimax/minimax-m2', 'openai/gpt-oss-120b',
+('global', 'stage_6_judge', 'minimax/minimax-m2.1', 'openai/gpt-oss-120b',
  0.3, 4096, 'any', 'extended', true, 'tiebreaker', 0.72,
- 'Minimax M2', 'GPT-OSS 120B');
+ 'Minimax M2.1', 'GPT-OSS 120B');

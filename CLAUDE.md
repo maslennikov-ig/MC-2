@@ -91,14 +91,6 @@ See speckit.implement.md for details.
 
 ---
 
-## Health Workflows Pattern (5% of cases)
-
-Slash commands: `/health-bugs`, `/health-security`, `/health-cleanup`, `/health-deps`
-
-Follow command-specific instructions. See `docs/Agents Ecosystem/AGENT-ORCHESTRATION.md`.
-
----
-
 ## Project Conventions
 
 **File Organization**:
@@ -186,13 +178,6 @@ Production server SSH available. See `.claude/local.md` for IP and details (giti
 
 ---
 
-## Reference Docs
-
-- Agent orchestration: `docs/Agents Ecosystem/AGENT-ORCHESTRATION.md`
-- Architecture: `docs/Agents Ecosystem/ARCHITECTURE.md`
-- Quality gates: `docs/Agents Ecosystem/QUALITY-GATES-SPECIFICATION.md`
-- Report templates: `docs/Agents Ecosystem/REPORT-TEMPLATE-STANDARD.md`
-
 ## Active Technologies
 - TypeScript 5.x (strict mode)
 - Immer for nested state updates (packages/web) - use `produce()` instead of spread operators
@@ -205,7 +190,3 @@ Production server SSH available. See `.claude/local.md` for IP and details (giti
 - Guide: `.claude/docs/enrichment-guide.md` (checklist for adding new activity types)
 - Types: video, audio, presentation, quiz, document, cover
 - Add to: 6 UI locations + backend handler + DB migration + translations + admin pipeline
-
-## Recent Changes
-- 013-n8n-graph-view: Added Immer for state management
-- 010-stages-456-pipeline: Added TypeScript 5.x (strict mode)

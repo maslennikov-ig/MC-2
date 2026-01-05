@@ -348,7 +348,7 @@
     "config_type": "global",
     "course_id": null,
     "phase_name": "stage_6_judge",
-    "model_id": "minimax/minimax-m2",
+    "model_id": "minimax/minimax-m2.1",
     "fallback_model_id": "xiaomi/mimo-v2-flash:free",
     "temperature": "0.30",
     "max_tokens": 4096,

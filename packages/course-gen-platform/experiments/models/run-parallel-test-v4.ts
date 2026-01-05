@@ -45,7 +45,7 @@ const MODELS = [
   { slug: 'deepseek-chat-v31', apiName: 'deepseek/deepseek-chat-v3.1', name: 'DeepSeek Chat v3.1' },
   { slug: 'grok-4-fast', apiName: 'x-ai/grok-4-fast', name: 'Grok 4 Fast' },
   { slug: 'glm-46', apiName: 'z-ai/glm-4.6', name: 'GLM 4.6' },
-  { slug: 'minimax-m2', apiName: 'minimax/minimax-m2', name: 'MiniMax M2' },
+  { slug: 'minimax-m2.1', apiName: 'minimax/minimax-m2.1', name: 'MiniMax M2.1' },
   { slug: 'qwen3-32b', apiName: 'qwen/qwen3-32b', name: 'Qwen3 32B' },
   { slug: 'qwen3-235b-thinking', apiName: 'qwen/qwen3-235b-a22b-thinking-2507', name: 'Qwen3 235B Thinking' },
   { slug: 'qwen3-235b-a22b-2507', apiName: 'qwen/qwen3-235b-a22b-2507', name: 'Qwen3 235B A22B Instruct 2507' },

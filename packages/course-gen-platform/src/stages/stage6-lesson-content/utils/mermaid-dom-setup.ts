@@ -24,6 +24,7 @@
  */
 
 import { JSDOM } from 'jsdom';
+import createDOMPurify from 'dompurify';
 import { logger } from '@/shared/logger';
 
 // ============================================================================
@@ -74,10 +75,16 @@ export function ensureDOMGlobals(): void {
     global.document = dom.window.document;
     global.window = dom.window as unknown as Window & typeof globalThis;
 
+    // Create DOMPurify instance and attach to window
+    // Mermaid requires DOMPurify.addHook() to be available
+    const DOMPurify = createDOMPurify(dom.window);
+    // @ts-expect-error - Mermaid expects DOMPurify on window
+    global.window.DOMPurify = DOMPurify;
+
     // Mark as initialized
     initialized = true;
 
-    logger.debug('Mermaid DOM setup: JSDOM initialized successfully');
+    logger.debug('Mermaid DOM setup: JSDOM and DOMPurify initialized successfully');
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
     logger.error(

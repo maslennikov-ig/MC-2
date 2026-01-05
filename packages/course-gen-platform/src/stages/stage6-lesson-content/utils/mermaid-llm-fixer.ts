@@ -6,7 +6,7 @@
  * This is a fallback mechanism for complex syntax errors that require semantic understanding.
  *
  * **Strategy:**
- * - Uses google/gemini-2.0-flash-001 (cheapest available model)
+ * - Uses minimax/minimax-m2.1 (good Russian support, cost-efficient)
  * - Rate-limited to 5 fixes per lesson to control costs
  * - Size-limited to 2000 chars to keep token usage low
  * - Validates fixed output with mermaid.parse() before accepting
@@ -60,9 +60,10 @@ const MAX_DIAGRAM_SIZE_FOR_LLM = 2000;
 
 /**
  * LLM model to use for fixing diagrams
- * Using google/gemini-2.0-flash-001 (cheapest available)
+ * Using minimax/minimax-m2.1 (good Russian support, cost-efficient)
+ * Pricing: $0.30/1M input, $1.20/1M output
  */
-const LLM_MODEL_ID = 'google/gemini-2.0-flash-001';
+const LLM_MODEL_ID = 'minimax/minimax-m2.1';
 
 /**
  * Temperature setting for LLM (low for deterministic fixes)
@@ -93,21 +94,100 @@ const llmFixerMetrics = {
 };
 
 /**
- * System prompt for LLM fixer
- * Includes validation checklist to guide the model
+ * Detect diagram type from mermaid code
  */
-const SYSTEM_PROMPT = `You are a Mermaid diagram syntax fixer. Fix the syntax error and return ONLY the corrected diagram code.
+function detectDiagramType(code: string): string {
+  const firstLine = code.trim().split('\n')[0].toLowerCase();
+  if (firstLine.startsWith('mindmap')) return 'mindmap';
+  if (firstLine.startsWith('flowchart') || firstLine.startsWith('graph')) return 'flowchart';
+  if (firstLine.startsWith('sequencediagram')) return 'sequenceDiagram';
+  if (firstLine.startsWith('classdiagram')) return 'classDiagram';
+  if (firstLine.startsWith('statediagram')) return 'stateDiagram';
+  if (firstLine.startsWith('erdiagram')) return 'erDiagram';
+  if (firstLine.startsWith('gantt')) return 'gantt';
+  if (firstLine.startsWith('pie')) return 'pie';
+  if (firstLine.startsWith('journey')) return 'journey';
+  return 'unknown';
+}
 
-VALIDATION CHECKLIST (ensure all pass):
-- All node IDs are valid (alphanumeric, no spaces, no duplicates)
-- All node labels with special characters are wrapped in quotes: A["label (with) special"]
-- All arrows use correct syntax: --> for solid, -.-> for dotted, ==> for thick
-- All brackets and braces are properly closed
-- Subgraph blocks have matching 'end' keywords
-- No unclosed quotes in labels
-- Direction keywords are valid: TB, TD, BT, RL, LR
+/**
+ * Get diagram-type-specific syntax rules
+ */
+function getDiagramTypeRules(diagramType: string): string {
+  switch (diagramType) {
+    case 'mindmap':
+      return `
+MINDMAP SYNTAX RULES:
+- First line must be exactly: mindmap
+- Root node on second line with NO indentation
+- Use consistent indentation (2 or 4 spaces) for hierarchy
+- Child nodes are indented MORE than parent nodes
+- NO arrows (-->, etc.) in mindmap - use ONLY indentation
+- Node text can include special characters without quotes
+- NO brackets [] around nodes in mindmap
+- Example valid mindmap:
+mindmap
+  root((Main Topic))
+    Branch 1
+      Leaf 1.1
+      Leaf 1.2
+    Branch 2
+      Leaf 2.1`;
 
-Return ONLY the fixed diagram. No explanation. No markdown code blocks.`;
+    case 'flowchart':
+      return `
+FLOWCHART SYNTAX RULES:
+- First line: flowchart TD (or TB, BT, LR, RL)
+- Node IDs: alphanumeric, no spaces
+- Labels with special chars need quotes: A["label (with) special"]
+- Arrows: --> (solid), -.-> (dotted), ==> (thick)
+- All brackets must be closed: [], (), {}, (())
+- Subgraph blocks need matching 'end' keyword`;
+
+    case 'sequenceDiagram':
+      return `
+SEQUENCE DIAGRAM SYNTAX RULES:
+- First line: sequenceDiagram
+- Participants: participant A as "Alice"
+- Messages: A->>B: Message text
+- Arrows: ->>, -->, ->, --x, -x
+- Activations: activate/deactivate or +/-
+- Notes: Note over A,B: text`;
+
+    case 'classDiagram':
+      return `
+CLASS DIAGRAM SYNTAX RULES:
+- First line: classDiagram
+- Classes: class ClassName
+- Relationships: <|-- (inheritance), *-- (composition), o-- (aggregation)
+- Methods: +methodName() return_type`;
+
+    default:
+      return `
+GENERAL MERMAID RULES:
+- First line must declare diagram type
+- All brackets and quotes must be properly closed
+- Use consistent indentation
+- No mixing of different diagram syntaxes`;
+  }
+}
+
+/**
+ * Build system prompt for specific diagram type
+ */
+function buildSystemPrompt(diagramType: string): string {
+  const rules = getDiagramTypeRules(diagramType);
+
+  return `You are a Mermaid diagram syntax expert. Fix the ${diagramType} diagram syntax error.
+
+${rules}
+
+IMPORTANT:
+- Return ONLY the fixed diagram code
+- No explanations, no markdown code blocks
+- Preserve the original meaning and structure
+- If you cannot fix it, recreate the diagram from scratch based on visible intent`;
+}
 
 /**
  * Get current LLM fixer metrics
@@ -269,6 +349,10 @@ export async function fixMermaidWithLLM(
   }
 
   try {
+    // Detect diagram type for type-specific prompt
+    const diagramType = detectDiagramType(brokenDiagram);
+    const systemPrompt = buildSystemPrompt(diagramType);
+
     // Create LLM instance
     const model = createOpenRouterModel(
       LLM_MODEL_ID,
@@ -280,7 +364,7 @@ export async function fixMermaidWithLLM(
     model.timeout = LLM_TIMEOUT;
 
     // Build user prompt with error context
-    const userPrompt = `The following Mermaid diagram has a syntax error:
+    const userPrompt = `The following Mermaid ${diagramType} diagram has a syntax error:
 
 \`\`\`mermaid
 ${brokenDiagram}
@@ -288,22 +372,23 @@ ${brokenDiagram}
 
 Parser error: ${parserError}
 
-Fix the syntax error and return ONLY the corrected diagram code.`;
+Fix the syntax error and return ONLY the corrected ${diagramType} diagram code.`;
 
     logger.debug(
       {
         diagramLength: brokenDiagram.length,
+        diagramType,
         errorPreview: parserError.slice(0, 100),
         model: LLM_MODEL_ID,
       },
       'Mermaid LLM fixer: Sending fix request'
     );
 
-    // Call LLM
+    // Call LLM with diagram-type-specific prompt
     const response = await model.invoke([
       new HumanMessage({
         content: [
-          { type: 'text', text: SYSTEM_PROMPT },
+          { type: 'text', text: systemPrompt },
           { type: 'text', text: userPrompt },
         ],
       }),

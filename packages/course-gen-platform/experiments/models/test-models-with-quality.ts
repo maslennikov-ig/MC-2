@@ -112,9 +112,9 @@ const MODELS: ModelConfig[] = [
     apiName: 'x-ai/grok-4-fast',
   },
   {
-    name: 'MiniMax M2',
-    slug: 'minimax-m2',
-    apiName: 'minimax/minimax-m2',
+    name: 'MiniMax M2.1',
+    slug: 'minimax-m2.1',
+    apiName: 'minimax/minimax-m2.1',
   },
 ];
 

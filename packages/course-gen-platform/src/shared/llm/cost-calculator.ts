@@ -57,11 +57,18 @@ export const OPENROUTER_PRICING: Record<string, ModelPricing> = {
     outputPricePerMillion: 0.60,
   },
   "minimax/minimax-m2": {
-    // MODEL-SELECTION-SPECIFICATION.md: Primary model for lesson structure
+    // MODEL-SELECTION-SPECIFICATION.md: Legacy model (deprecated)
     // Pricing: $0.255/$1.02 per 1M tokens (input/output)
-    // Quality: 9.5-10/10, 100% success rate, reasoning tokens
     inputPricePerMillion: 0.255,
     outputPricePerMillion: 1.02,
+  },
+  "minimax/minimax-m2.1": {
+    // MODEL-SELECTION-SPECIFICATION.md: Primary model for lesson structure
+    // Pricing: $0.30/$1.20 per 1M tokens (input/output)
+    // Quality: 9.5-10/10, 100% success rate, reasoning tokens
+    // 10B activated params, 230B total, MoE architecture
+    inputPricePerMillion: 0.30,
+    outputPricePerMillion: 1.20,
   },
   "moonshotai/kimi-k2-thinking": {
     // MODEL-SELECTION-SPECIFICATION.md: Fallback model for lessons

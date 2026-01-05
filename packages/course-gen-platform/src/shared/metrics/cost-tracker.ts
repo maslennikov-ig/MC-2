@@ -86,7 +86,8 @@ export const MODEL_PRICING: Record<string, { input: number; output: number }> = 
   'openai/gpt-oss-120b': { input: 0.20, output: 0.20 },
 
   // Stage 6 judge models
-  'minimax/minimax-m2': { input: 0.255, output: 1.02 },
+  'minimax/minimax-m2': { input: 0.255, output: 1.02 },  // Legacy
+  'minimax/minimax-m2.1': { input: 0.30, output: 1.20 }, // New recommended
   'z-ai/glm-4.6': { input: 0.20, output: 0.80 },
 
   // Legacy models
