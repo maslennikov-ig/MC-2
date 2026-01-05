@@ -112,7 +112,8 @@ log_warn "Using locally cached images (not pulling from registry)"
 
 # Try to start services with existing local images
 # If images don't exist locally, this will fail and that's expected
-docker compose -f "${COMPOSE_FILE}" up -d --no-pull || {
+# Note: docker compose up by default uses cached images if available
+docker compose -f "${COMPOSE_FILE}" up -d --pull never || {
     log_error "Failed to start services with local images"
     log_error "Manual intervention required: docker compose up -d"
     exit 1
