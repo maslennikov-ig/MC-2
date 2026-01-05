@@ -306,10 +306,15 @@ export const DEFAULT_MODEL_CONFIGS: Record<PhaseName, DefaultModelConfig> = {
     fallbackModelId: DEFAULT_FALLBACK_MODEL_ID,
   },
   // Stage 7: Enrichments (Activities)
-  // Cover uses image generation model (SeedDream 4.5) via OpenRouter's image endpoint.
-  // Fallback to text model for prompt generation if image model unavailable.
+  // Cover and Card use image generation models directly
   stage_7_cover: {
-    modelId: 'bytedance-seed/seedream-4.5',
+    modelId: 'google/gemini-2.5-flash-image-preview', // 16:9 aspect ratio, $0.038
+    temperature: 0.7,
+    maxTokens: 1024,
+    fallbackModelId: DEFAULT_MODEL_ID,
+  },
+  stage_7_card: {
+    modelId: 'openai/gpt-5-image-mini', // 1:1 square 1024x1024, $0.007
     temperature: 0.7,
     maxTokens: 1024,
     fallbackModelId: DEFAULT_MODEL_ID,

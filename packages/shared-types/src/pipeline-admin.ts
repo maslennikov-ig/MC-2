@@ -57,6 +57,7 @@ export const phaseNameSchema = z.enum([
   'stage_6_delta_judge',
   // Stage 7: Enrichments (Activities)
   'stage_7_cover',
+  'stage_7_card',
   'stage_7_video',
   'stage_7_audio',
   'stage_7_quiz',

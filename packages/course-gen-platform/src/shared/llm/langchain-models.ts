@@ -218,8 +218,14 @@ const PHASE_FALLBACK_CONFIG: Record<
     maxTokens: 15000,
   },
   // Stage 7: Enrichments (Activities)
+  // Cover and Card use image generation models directly (not LLM text generation)
   stage_7_cover: {
-    modelId: 'bytedance-seed/seedream-4.5', // Image generation for covers
+    modelId: 'google/gemini-2.5-flash-image-preview', // 16:9 aspect ratio, $0.038
+    temperature: 0.7,
+    maxTokens: 1024,
+  },
+  stage_7_card: {
+    modelId: 'openai/gpt-5-image-mini', // 1:1 square 1024x1024, $0.007
     temperature: 0.7,
     maxTokens: 1024,
   },

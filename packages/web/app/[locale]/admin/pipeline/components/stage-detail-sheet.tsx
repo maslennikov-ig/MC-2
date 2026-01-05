@@ -51,6 +51,7 @@ import {
   Headphones,
   HelpCircle,
   Presentation,
+  LayoutGrid,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { formatDuration } from '@/lib/utils/format';
@@ -103,11 +104,12 @@ const stageColors: Record<number, { bg: string; text: string; border: string; gr
  */
 const ENRICHMENT_ACTIVITIES = [
   { key: 'cover', icon: ImageIcon, label: 'Cover', labelRu: 'Обложка', color: 'text-cyan-500' },
+  { key: 'card', icon: LayoutGrid, label: 'Visual Card', labelRu: 'Карточка', color: 'text-pink-500' },
   { key: 'video', icon: Video, label: 'Video', labelRu: 'Видео', color: 'text-red-500' },
   { key: 'audio', icon: Headphones, label: 'Audio', labelRu: 'Аудио', color: 'text-purple-500' },
   { key: 'quiz', icon: HelpCircle, label: 'Quiz', labelRu: 'Тест', color: 'text-green-500' },
   { key: 'presentation', icon: Presentation, label: 'Presentation', labelRu: 'Презентация', color: 'text-orange-500' },
-  { key: 'document', icon: FileText, label: 'Document', labelRu: 'Документ', color: 'text-blue-500' },
+  // { key: 'document', icon: FileText, label: 'Document', labelRu: 'Документ', color: 'text-blue-500' }, // TODO: Handler not implemented
 ] as const;
 
 /**
