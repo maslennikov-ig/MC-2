@@ -3,6 +3,18 @@
 _Released on 2025-12-26_
 
 
+## v0.26.71
+
+_Released on 2026-01-06_
+
+### 🐛 Bug Fixes
+
+- **web**: Code review improvements for visual style feature
+
+---
+
+_This release was automatically generated from 1 commits._
+
 ## v0.26.70
 
 _Released on 2026-01-06_

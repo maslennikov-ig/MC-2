@@ -142,6 +142,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.26.71] - 2026-01-06
+
+### Fixed
+- **web**: code review improvements for visual style feature (822b09e)
+
 ## [0.26.70] - 2026-01-06
 
 ### Added
