@@ -18,6 +18,8 @@ import {
 } from 'lucide-react';
 import { GRAPH_TRANSLATIONS } from '@/lib/generation-graph/translations';
 import { AnalysisResultView } from '../output/AnalysisResultView';
+import { VisualStylePreview } from './VisualStylePreview';
+import { useStaticGraph } from '../../contexts/StaticGraphContext';
 import type { Stage4OutputTabProps, AnalysisHeroProps } from './types';
 import type { AnalysisResult } from '@megacampus/shared-types';
 
@@ -202,6 +204,7 @@ const AnalysisHero = memo<AnalysisHeroProps>(function AnalysisHero({
  *
  * "The Blueprint" - displays analysis results with:
  * - AnalysisHero: Key metrics at a glance (category, lessons, duration, style)
+ * - VisualStylePreview: Visual style recommendations for course imagery (generated in Stage 4)
  * - AnalysisResultView: Detailed accordion sections for all analysis data
  *
  * Color scheme: Violet/Purple (wisdom, synthesis, strategy)
@@ -216,6 +219,10 @@ export const Stage4OutputTab = memo<Stage4OutputTabProps>(function Stage4OutputT
   onApproved,
 }) {
   const t = GRAPH_TRANSLATIONS.stage4 as Record<string, { ru: string; en: string }>;
+
+  // Get visual style from context (generated in Stage 4, stored in courses.visual_style)
+  const { courseInfo } = useStaticGraph();
+  const visualStyle = courseInfo.visualStyle;
 
   // Parse output data as AnalysisResult
   const analysisResult = useMemo((): AnalysisResult | null => {
@@ -276,6 +283,11 @@ export const Stage4OutputTab = memo<Stage4OutputTabProps>(function Stage4OutputT
           teachingStyle={heroData.teachingStyle}
           locale={locale}
         />
+      )}
+
+      {/* Visual Style Preview - only show if visual style data is available */}
+      {visualStyle && (
+        <VisualStylePreview visualStyle={visualStyle} locale={locale} />
       )}
 
       {/* Detailed Analysis View */}

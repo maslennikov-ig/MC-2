@@ -71,14 +71,15 @@ function TabErrorFallback({ error, resetErrorBoundary }: {
  * Unified lesson panel with Content and Activities tabs.
  * Has its own header to avoid duplicate headers from LessonInspector.
  *
- * Layout:
- * ┌─────────────────────────────────┐
- * │ ← Module 1 / Lesson 2: Title  X │  ← Unified header
- * │ ┌─────────┬──────────────┐      │
- * │ │ Content │ Activities   │      │  ← Tabs (inline with header)
- * │ └─────────┴──────────────┘      │
- * │ [Tab content fills space]       │
- * └─────────────────────────────────┘
+ * Layout (single-line header, responsive):
+ * ┌───────────────────────────────────────────────────────┐
+ * │ ← М1/У2: Title   [Content][Activities]   [Max][Close] │
+ * ├───────────────────────────────────────────────────────┤
+ * │ [Tab content fills remaining space]                   │
+ * └───────────────────────────────────────────────────────┘
+ *
+ * Mobile: М1.2 (compact), icon-only tabs
+ * Desktop: М1 / У2: Title, labeled tabs
  */
 export function LessonPanelWithTabs({
   lessonId,
@@ -122,80 +123,81 @@ export function LessonPanelWithTabs({
         onValueChange={setActiveTab}
         className="flex flex-col h-full"
       >
-        {/* Combined Header + Tabs */}
+        {/* Unified Header - single line on desktop, compact on mobile */}
         <header className="shrink-0 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
-          {/* Top row: navigation + title + actions */}
-          <div className="flex items-center justify-between px-4 py-3">
-            <div className="flex items-center gap-3">
+          <div className="flex items-center justify-between px-3 py-2 gap-2">
+            {/* Left: Back button + Title (compact) */}
+            <div className="flex items-center gap-2 min-w-0 flex-1">
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={onBack}
-                className="h-9 w-9 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
+                className="h-8 w-8 shrink-0 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
                 aria-label="Назад"
               >
-                <ArrowLeft className="h-5 w-5" />
+                <ArrowLeft className="h-4 w-4" />
               </Button>
-              <div className="flex items-center gap-2 text-sm">
-                <span className="text-slate-500 dark:text-slate-400">
-                  Модуль {moduleNumber}
+              <div className="flex items-center gap-1.5 text-sm min-w-0">
+                <span className="text-slate-500 dark:text-slate-400 shrink-0 hidden sm:inline">
+                  М{moduleNumber}
                 </span>
-                <span className="text-slate-400 dark:text-slate-600">/</span>
-                <span className="font-medium text-slate-900 dark:text-slate-100 truncate max-w-[300px]">
-                  Урок {lessonNumber}: {lessonTitle}
+                <span className="text-slate-400 dark:text-slate-600 shrink-0 hidden sm:inline">/</span>
+                <span className="font-medium text-slate-900 dark:text-slate-100 truncate">
+                  <span className="sm:hidden">М{moduleNumber}.{lessonNumber}</span>
+                  <span className="hidden sm:inline">У{lessonNumber}: {lessonTitle}</span>
                 </span>
               </div>
             </div>
-            <div className="flex items-center gap-1">
+
+            {/* Center: Tabs (inline) */}
+            <TabsList className="h-8 bg-slate-100 dark:bg-slate-800 p-0.5 gap-0.5 shrink-0">
+              <TabsTrigger
+                value="content"
+                className={cn(
+                  'h-7 px-2.5 text-xs rounded-sm',
+                  'data-[state=active]:bg-white dark:data-[state=active]:bg-slate-700',
+                  'data-[state=active]:shadow-sm'
+                )}
+              >
+                <FileText className="w-3.5 h-3.5 sm:mr-1.5" />
+                <span className="hidden sm:inline">{t('tabs.content')}</span>
+              </TabsTrigger>
+              <TabsTrigger
+                value="enrichments"
+                className={cn(
+                  'h-7 px-2.5 text-xs rounded-sm',
+                  'data-[state=active]:bg-white dark:data-[state=active]:bg-slate-700',
+                  'data-[state=active]:shadow-sm'
+                )}
+              >
+                <Layers className="w-3.5 h-3.5 sm:mr-1.5" />
+                <span className="hidden sm:inline">{t('tabs.enrichments')}</span>
+              </TabsTrigger>
+            </TabsList>
+
+            {/* Right: Action buttons */}
+            <div className="flex items-center gap-0.5 shrink-0">
               {onToggleMaximize && (
                 <Button
                   variant="ghost"
                   size="icon"
                   onClick={onToggleMaximize}
-                  className="h-9 w-9 text-slate-600 dark:text-slate-400"
+                  className="h-8 w-8 text-slate-600 dark:text-slate-400"
                   aria-label={isMaximized ? 'Свернуть' : 'Развернуть'}
                 >
-                  {isMaximized ? <Minimize2 className="h-5 w-5" /> : <Maximize2 className="h-5 w-5" />}
+                  {isMaximized ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
                 </Button>
               )}
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={onClose}
-                className="h-9 w-9 text-slate-600 dark:text-slate-400"
+                className="h-8 w-8 text-slate-600 dark:text-slate-400"
                 aria-label="Закрыть"
               >
-                <X className="h-5 w-5" />
+                <X className="h-4 w-4" />
               </Button>
             </div>
-          </div>
-
-          {/* Tabs row */}
-          <div className="px-4 bg-slate-50 dark:bg-slate-800/50">
-            <TabsList className="h-10 bg-transparent p-0 gap-4">
-              <TabsTrigger
-                value="content"
-                className={cn(
-                  'h-10 px-1 pb-0 rounded-none border-b-2 border-transparent bg-transparent',
-                  'data-[state=active]:border-primary data-[state=active]:bg-transparent',
-                  'data-[state=active]:shadow-none hover:text-foreground'
-                )}
-              >
-                <FileText className="w-4 h-4 mr-2" />
-                <span className="text-sm">{t('tabs.content')}</span>
-              </TabsTrigger>
-              <TabsTrigger
-                value="enrichments"
-                className={cn(
-                  'h-10 px-1 pb-0 rounded-none border-b-2 border-transparent bg-transparent',
-                  'data-[state=active]:border-primary data-[state=active]:bg-transparent',
-                  'data-[state=active]:shadow-none hover:text-foreground'
-                )}
-              >
-                <Layers className="w-4 h-4 mr-2" />
-                <span className="text-sm">{t('tabs.enrichments')}</span>
-              </TabsTrigger>
-            </TabsList>
           </div>
         </header>
 

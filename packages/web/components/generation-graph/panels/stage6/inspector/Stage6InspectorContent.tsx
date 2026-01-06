@@ -264,8 +264,6 @@ export const Stage6InspectorContent = memo(function Stage6InspectorContent({
         <Stage6QualityTab
           selfReviewResult={selfReviewResult || undefined}
           judgeResult={judgeResult || undefined}
-          originalContent={undefined} // TODO: Add diff support
-          fixedContent={selfReviewResult?.patchedContent ? JSON.stringify(selfReviewResult.patchedContent) : undefined}
           locale={locale}
         />
       );

@@ -7,8 +7,8 @@ import type { SelfReviewResult, JudgeVerdictDisplay } from '@megacampus/shared-t
 /**
  * Example usage of Stage6QualityTab component
  *
- * This file demonstrates the Two-Gate Waterfall layout with different
- * self-review and judge result combinations.
+ * This file demonstrates the Quality Assessment tab which shows only
+ * the Judge evaluation results. Self-review is shown in Pipeline panel.
  */
 
 // =============================================================================
@@ -150,8 +150,6 @@ export function Stage6QualityTabFixedExample() {
       <Stage6QualityTab
         selfReviewResult={selfReviewFixedExample}
         judgeResult={judgeResultExample}
-        originalContent="Original content before fixes..."
-        fixedContent="Fixed content after self-review..."
         locale="en"
       />
     </div>

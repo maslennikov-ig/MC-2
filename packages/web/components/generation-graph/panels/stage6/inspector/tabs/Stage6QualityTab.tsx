@@ -1,32 +1,14 @@
 'use client';
 
-import React, { memo, useState } from 'react';
+import React, { memo } from 'react';
 import { cn } from '@/lib/utils';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
 import { Progress } from '@/components/ui/progress';
-import {
-  Dialog,
-  DialogContent,
-  DialogHeader,
-  DialogTitle,
-} from '@/components/ui/dialog';
-import {
-  ShieldCheck,
-  Wrench,
-  AlertTriangle,
-  RefreshCw,
-  ChevronDown,
-  Scale,
-  Eye,
-  XCircle,
-} from 'lucide-react';
-import { DiffViewer } from '../quality/DiffViewer';
+import { Scale, XCircle } from 'lucide-react';
 import type {
   SelfReviewResult,
   JudgeVerdictDisplay,
-  SelfReviewStatus,
   JudgeVerdictType,
   IndividualJudgeVote,
 } from '@megacampus/shared-types';
@@ -36,205 +18,13 @@ import type {
 // =============================================================================
 
 interface Stage6QualityTabProps {
-  /** Self-review result from Gate 1 */
+  /** Self-review result - used to determine if Judge should be disabled */
   selfReviewResult?: SelfReviewResult;
-  /** Judge result from Gate 2 */
+  /** Judge result from final assessment */
   judgeResult?: JudgeVerdictDisplay;
-  /** Original content before fixes (for diff view) */
-  originalContent?: string;
-  /** Fixed content after self-review (for diff view) */
-  fixedContent?: string;
   /** Locale for translations */
   locale?: 'ru' | 'en';
 }
-
-// =============================================================================
-// GATE 1: SELF-REVIEWER COMPONENT
-// =============================================================================
-
-interface SelfReviewGateProps {
-  result?: SelfReviewResult;
-  onViewDiff?: () => void;
-  locale: 'ru' | 'en';
-}
-
-/**
- * SelfReviewGate - Visual representation of Gate 1 (Auto-Correction)
- *
- * Displays self-review status with color-coded cards:
- * - PASS: Green banner
- * - FIXED: Blue card with View Diff button
- * - FLAG_TO_JUDGE: Amber card with warnings
- * - PASS_WITH_FLAGS: Amber card with informational flags
- * - REGENERATE: Red card (critical failure)
- */
-const SelfReviewGate = memo(function SelfReviewGate({
-  result,
-  onViewDiff,
-  locale,
-}: SelfReviewGateProps) {
-  const t = (key: string) => {
-    // Fallback translations for self-review
-    const translations: Record<string, { ru: string; en: string }> = {
-      gate1Title: { ru: 'ЭТАП 1: Автокоррекция (SelfReviewer)', en: 'GATE 1: Auto-Correction (SelfReviewer)' },
-      pending: { ru: 'Ожидание...', en: 'Pending...' },
-      passTitle: { ru: 'Проблем не найдено', en: 'No issues found' },
-      passDesc: { ru: 'Готово к финальной оценке', en: 'Ready for final assessment' },
-      fixedTitle: { ru: 'Исправлено автоматически', en: 'Auto-Fixed' },
-      fixedDesc: { ru: 'проблем исправлено', en: 'issues corrected' },
-      viewDiff: { ru: 'Посмотреть изменения', en: 'View Diff' },
-      flagTitle: { ru: 'Требует внимания', en: 'Needs Review' },
-      flagDesc: { ru: 'Передано судьям для оценки', en: 'Forwarded to judges for evaluation' },
-      passWithFlagsTitle: { ru: 'Прошло с замечаниями', en: 'Passed with Flags' },
-      passWithFlagsDesc: { ru: 'Содержимое приемлемо, но есть наблюдения', en: 'Content acceptable with observations' },
-      regenerateTitle: { ru: 'Требуется перегенерация', en: 'Regeneration Required' },
-      regenerateDesc: { ru: 'Критические ошибки, требуется полная переработка', en: 'Critical errors, full regeneration needed' },
-      tokensUsed: { ru: 'Токены', en: 'Tokens' },
-      duration: { ru: 'Время', en: 'Duration' },
-    };
-    return translations[key]?.[locale] || key;
-  };
-
-  if (!result) {
-    return (
-      <Card className="border-slate-300 dark:border-slate-700">
-        <CardHeader>
-          <CardTitle className="text-sm font-medium text-slate-600 dark:text-slate-400">
-            {t('gate1Title')}
-          </CardTitle>
-        </CardHeader>
-        <CardContent>
-          <div className="flex items-center gap-2 text-slate-500 dark:text-slate-400">
-            <div className="h-4 w-4 animate-pulse rounded-full bg-slate-300 dark:bg-slate-700" />
-            <span className="text-sm">{t('pending')}</span>
-          </div>
-        </CardContent>
-      </Card>
-    );
-  }
-
-  // Status-specific configuration
-  const statusConfig: Record<
-    SelfReviewStatus,
-    {
-      icon: React.ElementType;
-      color: string;
-      bgColor: string;
-      title: string;
-      description: string;
-    }
-  > = {
-    PASS: {
-      icon: ShieldCheck,
-      color: 'text-emerald-700 dark:text-emerald-400',
-      bgColor: 'border-emerald-500 bg-emerald-50 dark:bg-emerald-950/20',
-      title: t('passTitle'),
-      description: t('passDesc'),
-    },
-    FIXED: {
-      icon: Wrench,
-      color: 'text-blue-700 dark:text-blue-400',
-      bgColor: 'border-blue-500 bg-blue-50 dark:bg-blue-950/20',
-      title: t('fixedTitle'),
-      description: `${result.issues?.length || 0} ${t('fixedDesc')}`,
-    },
-    FLAG_TO_JUDGE: {
-      icon: AlertTriangle,
-      color: 'text-amber-700 dark:text-amber-400',
-      bgColor: 'border-amber-500 bg-amber-50 dark:bg-amber-950/20',
-      title: t('flagTitle'),
-      description: t('flagDesc'),
-    },
-    PASS_WITH_FLAGS: {
-      icon: AlertTriangle,
-      color: 'text-amber-700 dark:text-amber-400',
-      bgColor: 'border-amber-500 bg-amber-50 dark:bg-amber-950/20',
-      title: t('passWithFlagsTitle'),
-      description: t('passWithFlagsDesc'),
-    },
-    REGENERATE: {
-      icon: RefreshCw,
-      color: 'text-red-700 dark:text-red-400',
-      bgColor: 'border-red-500 bg-red-50 dark:bg-red-950/20',
-      title: t('regenerateTitle'),
-      description: t('regenerateDesc'),
-    },
-  };
-
-  const config = statusConfig[result.status];
-  const IconComponent = config.icon;
-
-  return (
-    <Card className={cn('border-2', config.bgColor)}>
-      <CardHeader>
-        <div className="flex items-center justify-between">
-          <CardTitle className="text-sm font-medium text-slate-600 dark:text-slate-400">
-            {t('gate1Title')}
-          </CardTitle>
-          <Badge variant="outline" className="text-xs">
-            {result.status}
-          </Badge>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-3">
-        {/* Status banner */}
-        <div className="flex items-start gap-3">
-          <IconComponent className={cn('h-6 w-6 flex-shrink-0', config.color)} />
-          <div className="flex-1">
-            <h4 className={cn('font-semibold', config.color)}>{config.title}</h4>
-            <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">{config.description}</p>
-          </div>
-        </div>
-
-        {/* Reasoning */}
-        {result.reasoning && (
-          <div className="rounded-md bg-slate-100 dark:bg-slate-800 p-3">
-            <p className="text-sm text-slate-700 dark:text-slate-300">{result.reasoning}</p>
-          </div>
-        )}
-
-        {/* Issues list */}
-        {result.issues && result.issues.length > 0 && (
-          <div className="space-y-2">
-            <h5 className="text-xs font-medium text-slate-600 dark:text-slate-400 uppercase tracking-wide">
-              {locale === 'ru' ? 'Обнаружено' : 'Issues Found'}
-            </h5>
-            <ul className="space-y-1">
-              {result.issues.slice(0, 3).map((issue, idx) => (
-                <li key={idx} className="text-sm text-slate-600 dark:text-slate-400">
-                  <span className="font-medium">{issue.location}:</span> {issue.description}
-                </li>
-              ))}
-              {result.issues.length > 3 && (
-                <li className="text-xs text-slate-500 dark:text-slate-500">
-                  {locale === 'ru' ? `+${result.issues.length - 3} ещё` : `+${result.issues.length - 3} more`}
-                </li>
-              )}
-            </ul>
-          </div>
-        )}
-
-        {/* View Diff button for FIXED status */}
-        {result.status === 'FIXED' && onViewDiff && (
-          <Button variant="outline" size="sm" onClick={onViewDiff} className="w-full">
-            <Eye className="h-4 w-4 mr-2" />
-            {t('viewDiff')}
-          </Button>
-        )}
-
-        {/* Metrics */}
-        <div className="flex items-center justify-between text-xs text-slate-500 dark:text-slate-500">
-          <span>
-            {t('tokensUsed')}: {result.tokensUsed || 0}
-          </span>
-          <span>
-            {t('duration')}: {result.durationMs ? `${Math.round(result.durationMs)}ms` : 'N/A'}
-          </span>
-        </div>
-      </CardContent>
-    </Card>
-  );
-});
 
 // =============================================================================
 // CRITERIA LABELS (LOCALIZED)
@@ -559,104 +349,37 @@ const JudgeGate = memo(function JudgeGate({ result, isDisabled, locale }: JudgeG
 JudgeGate.displayName = 'JudgeGate';
 
 // =============================================================================
-// CONNECTING ARROW
-// =============================================================================
-
-const ConnectingArrow = memo(function ConnectingArrow() {
-  return (
-    <div className="flex justify-center py-2">
-      <ChevronDown className="h-6 w-6 text-cyan-500 dark:text-cyan-400 animate-pulse" />
-    </div>
-  );
-});
-
-// =============================================================================
 // MAIN COMPONENT
 // =============================================================================
 
 /**
- * Stage6QualityTab - Two-Gate Waterfall layout for Quality tab
+ * Stage6QualityTab - Quality Assessment tab showing Judge evaluation results
  *
- * Design Decision: "SelfReviewer runs *before* Judge - UI must show linear dependency.
- * Do NOT place them side-by-side."
+ * Shows only the final quality assessment from Judge panel.
+ * Self-review (SelfReviewer) results are displayed separately in the Pipeline panel.
  *
  * Layout:
  * ┌─────────────────────────────────────────────────────────────────┐
- * │ GATE 1: Auto-Correction (SelfReviewer)                          │
- * │ ┌─────────────────────────────────────────────────────────────┐ │
- * │ │ Status card (green/blue/amber/red based on result)          │ │
- * │ └─────────────────────────────────────────────────────────────┘ │
- * │                              ↓                                   │
- * │ GATE 2: Final Assessment (Judge)                                │
+ * │ Финальная оценка (Judge)                                        │
  * │ ┌─────────────────────────────────────────────────────────────┐ │
  * │ │ Rubric grid, verdict, critique                              │ │
  * │ └─────────────────────────────────────────────────────────────┘ │
  * └─────────────────────────────────────────────────────────────────┘
  *
- * Logic: If Gate 1 = REGENERATE, Gate 2 is disabled/grayed (Judge never ran).
+ * Note: Self-review info is shown in Pipeline panel (left side) to avoid duplication.
  */
 export const Stage6QualityTab = memo(function Stage6QualityTab({
   selfReviewResult,
   judgeResult,
-  originalContent,
-  fixedContent,
   locale = 'en',
 }: Stage6QualityTabProps) {
-  const [showDiffModal, setShowDiffModal] = useState(false);
-
-  // Determine if Gate 2 should be disabled
-  const isGate2Disabled = selfReviewResult?.status === 'REGENERATE';
-
-  const handleViewDiff = () => {
-    setShowDiffModal(true);
-  };
-
-  // Check if we have both contents for diff view
-  const hasDiffContent = originalContent && fixedContent;
+  // Determine if Judge should be disabled (if selfReview required regeneration)
+  const isJudgeDisabled = selfReviewResult?.status === 'REGENERATE';
 
   return (
     <div className="space-y-4 p-6">
-      {/* Gate 1: Self-Reviewer */}
-      <SelfReviewGate
-        result={selfReviewResult}
-        onViewDiff={handleViewDiff}
-        locale={locale}
-      />
-
-      {/* Connecting Arrow */}
-      <ConnectingArrow />
-
-      {/* Gate 2: Judge */}
-      <JudgeGate result={judgeResult} isDisabled={isGate2Disabled} locale={locale} />
-
-      {/* DiffViewer Modal - uses Dialog for built-in Escape key support */}
-      <Dialog open={showDiffModal} onOpenChange={setShowDiffModal}>
-        <DialogContent className="max-w-4xl max-h-[85vh] overflow-hidden flex flex-col">
-          <DialogHeader>
-            <DialogTitle>
-              {locale === 'ru' ? 'Сравнение изменений' : 'Changes Comparison'}
-            </DialogTitle>
-          </DialogHeader>
-          <div className="flex-1 overflow-auto">
-            {hasDiffContent ? (
-              <DiffViewer
-                originalContent={originalContent}
-                fixedContent={fixedContent}
-                changes={selfReviewResult?.issues}
-                locale={locale}
-              />
-            ) : (
-              <div className="p-8 text-center text-slate-500 dark:text-slate-400">
-                <p>
-                  {locale === 'ru'
-                    ? 'Нет данных для сравнения. Контент не был изменён.'
-                    : 'No comparison data available. Content was not modified.'}
-                </p>
-              </div>
-            )}
-          </div>
-        </DialogContent>
-      </Dialog>
+      {/* Judge Assessment */}
+      <JudgeGate result={judgeResult} isDisabled={isJudgeDisabled} locale={locale} />
     </div>
   );
 });

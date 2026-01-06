@@ -32,7 +32,7 @@ import { GraphOperationsProvider } from './contexts/GraphOperationsContext';
 import { GRAPH_STAGE_CONFIG, NODE_STYLES, ACTIVE_STATUSES } from '@/lib/generation-graph/constants';
 import { GRAPH_TRANSLATIONS } from '@/lib/generation-graph/translations';
 import { useGenerationRealtime } from '@/components/generation-monitoring/realtime-provider';
-import { RealtimeStatusData, NodeStatusEntry } from '@megacampus/shared-types';
+import { RealtimeStatusData, NodeStatusEntry, VisualStyle } from '@megacampus/shared-types';
 import { GenerationProgress, CourseStatus } from '@/types/course-generation';
 import { mapStatusToNodeStatus, getStageFromStatus, isAwaitingApproval, calculateProgress } from '@/lib/generation-graph/utils';
 import { GraphControls } from './controls/GraphControls';
@@ -238,6 +238,9 @@ function GraphViewInner({ courseId, courseTitle, hasDocuments = true, failedAtSt
   // Default to Pan Mode (n8n style), Space to Select
   const [isPanning, setIsPanning] = useState(true);
 
+  // Visual style for course imagery (fetched from courses.visual_style)
+  const [visualStyle, setVisualStyle] = useState<VisualStyle | null>(null);
+
   // Theme support
   const { resolvedTheme, mounted } = useThemeSync();
   const isDark = mounted && resolvedTheme === 'dark';
@@ -330,11 +333,11 @@ function GraphViewInner({ courseId, courseTitle, hasDocuments = true, failedAtSt
     const fetchCourseStructure = async () => {
       const supabase = createClient();
 
-      // Fetch course structure and completed lessons in parallel
+      // Fetch course structure, visual_style, and completed lessons in parallel
       const [courseResult, lessonsResult] = await Promise.all([
         supabase
           .from('courses')
-          .select('course_structure')
+          .select('course_structure, visual_style')
           .eq('id', courseId)
           .single(),
         supabase
@@ -351,6 +354,11 @@ function GraphViewInner({ courseId, courseTitle, hasDocuments = true, failedAtSt
         // Reset flag on error to allow retry on remount
         courseStructureInitialized.current = false;
         return;
+      }
+
+      // Store visual_style if available (generated in Stage 4)
+      if (courseResult.data?.visual_style) {
+        setVisualStyle(courseResult.data.visual_style as unknown as VisualStyle);
       }
 
       if (courseResult.data?.course_structure) {
@@ -702,10 +710,11 @@ function GraphViewInner({ courseId, courseTitle, hasDocuments = true, failedAtSt
           moduleCount,
           lessonCount,
           tier,
+          visualStyle,
         },
       };
     },
-    [courseId, courseTitle, tier, nodes]
+    [courseId, courseTitle, tier, nodes, visualStyle]
   );
 
   // Mobile view - show simplified graph (no separate list view)

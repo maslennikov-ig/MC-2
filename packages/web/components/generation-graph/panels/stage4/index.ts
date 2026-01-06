@@ -11,5 +11,8 @@ export { Stage4ProcessTab } from './Stage4ProcessTab';
 export { Stage4OutputTab } from './Stage4OutputTab';
 export { Stage4ActivityTab } from './Stage4ActivityTab';
 
+// Helper components
+export { VisualStylePreview } from './VisualStylePreview';
+
 // Types
 export * from './types';

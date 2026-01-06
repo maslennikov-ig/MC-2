@@ -672,6 +672,21 @@ export interface GraphTranslations {
 }
 
 /**
+ * Visual style for course imagery (covers, cards, thumbnails)
+ * Generated in Stage 4 and stored in courses.visual_style
+ */
+export interface VisualStyle {
+  /** Color palette description (e.g., "blue and purple gradients with cyan accents") */
+  colorScheme: string;
+  /** Overall aesthetic (e.g., "modern tech, digital, sleek") */
+  aesthetic: string;
+  /** Visual elements to include (e.g., "abstract code patterns, geometric shapes") */
+  visualElements: string;
+  /** Mood/tone of visuals (e.g., "professional, innovative, clean") */
+  mood: string;
+}
+
+/**
  * Static data that changes rarely
  */
 export interface StaticGraphData {
@@ -693,6 +708,8 @@ export interface StaticGraphData {
     lessonCount: number;
     /** Subscription tier for model selection */
     tier?: 'trial' | 'free' | 'basic' | 'standard' | 'premium';
+    /** Visual style for course imagery (generated in Stage 4) */
+    visualStyle?: VisualStyle | null;
   };
 }
 
