@@ -192,6 +192,69 @@ export function useGraphData(options: UseGraphDataOptions = {}) {
   }, []);
 
   /**
+   * Remove a lesson from the graph after deletion.
+   * This updates parallelItems to remove the lesson and recalculate module status.
+   * @param lessonId - Lesson ID in format "lesson_1_2" or "1.2"
+   */
+  const removeLesson = useCallback((lessonId: string) => {
+    // Normalize to lesson_X_Y format
+    const normalizedId = lessonId.includes('lesson_')
+      ? lessonId
+      : `lesson_${lessonId.replace('.', '_')}`;
+
+    setParallelItems(prevItems => {
+      const existingStage6 = prevItems.get(6);
+      if (!existingStage6 || existingStage6.length === 0) {
+        return prevItems;
+      }
+
+      // Find the lesson to remove
+      const lessonToRemove = existingStage6.find(item => item.id === normalizedId);
+      if (!lessonToRemove) {
+        return prevItems;
+      }
+
+      const parentModuleId = lessonToRemove.parentId;
+
+      // Remove the lesson
+      const updatedItems = existingStage6.filter(item => item.id !== normalizedId);
+
+      // Recalculate module status
+      const finalItems = updatedItems.map(item => {
+        if (item.type === 'module' && item.id === parentModuleId) {
+          const moduleLessons = updatedItems.filter(
+            l => l.type === 'lesson' && l.parentId === item.id
+          );
+          const completedCount = moduleLessons.filter(l => l.status === 'completed').length;
+          const totalCount = moduleLessons.length;
+
+          let moduleStatus: NodeStatus = 'pending';
+          if (totalCount > 0 && completedCount === totalCount) {
+            moduleStatus = 'completed';
+          } else if (completedCount > 0) {
+            moduleStatus = 'active';
+          }
+
+          return {
+            ...item,
+            status: moduleStatus,
+            data: {
+              ...item.data,
+              totalLessons: totalCount,
+              completedLessons: completedCount,
+            }
+          };
+        }
+        return item;
+      });
+
+      const nextItems = new Map(prevItems);
+      nextItems.set(6, finalItems);
+      return nextItems;
+    });
+  }, []);
+
+  /**
    * Update lesson statuses from completed lesson IDs.
    */
   const updateLessonStatuses = useCallback((completedLessonLabels: string[]) => {
@@ -406,6 +469,7 @@ export function useGraphData(options: UseGraphDataOptions = {}) {
     initializeFromCourseStructure,
     initializeDocumentsFromDb,
     updateLessonStatuses,
+    removeLesson,
     setNodes,
     setEdges,
     nodePositionsRef

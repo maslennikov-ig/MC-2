@@ -262,8 +262,17 @@ export function usePartialGeneration(courseId: string) {
           return next;
         });
 
-        const lessonWord = result.jobCount === 1 ? 'урока' : result.jobCount < 5 ? 'уроков' : 'уроков';
-        toast.success(`Запущена генерация ${result.jobCount} ${lessonWord}`);
+        // Show toast with lesson/module info for single lesson, count for multiple
+        if (result.jobCount === 1 && lessonIds[0]) {
+          // Parse lessonId "1.2" to get module (section) and lesson numbers
+          const parts = lessonIds[0].split('.');
+          const moduleNum = parts[0];
+          const lessonNum = parts[1];
+          toast.success(`Запущена генерация урока ${lessonNum} модуля ${moduleNum}`);
+        } else {
+          const lessonWord = result.jobCount < 5 ? 'уроков' : 'уроков';
+          toast.success(`Запущена генерация ${result.jobCount} ${lessonWord}`);
+        }
 
         logger.info('Partial generation started', {
           courseId,

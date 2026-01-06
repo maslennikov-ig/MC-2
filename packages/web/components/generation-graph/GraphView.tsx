@@ -28,6 +28,7 @@ import DataFlowEdge from './edges/DataFlowEdge';
 import { StaticGraphProvider } from './contexts/StaticGraphContext';
 import { RealtimeStatusProvider } from './contexts/RealtimeStatusContext';
 import { FullscreenProvider } from './contexts/FullscreenContext';
+import { GraphOperationsProvider } from './contexts/GraphOperationsContext';
 import { GRAPH_STAGE_CONFIG, NODE_STYLES, ACTIVE_STATUSES } from '@/lib/generation-graph/constants';
 import { GRAPH_TRANSLATIONS } from '@/lib/generation-graph/translations';
 import { useGenerationRealtime } from '@/components/generation-monitoring/realtime-provider';
@@ -307,7 +308,7 @@ function GraphViewInner({ courseId, courseTitle, hasDocuments = true, failedAtSt
   const setStageStatusOptimistic = useGenerationStore(state => state.setStageStatusOptimistic);
 
   // Graph State
-  const { nodes, edges, onNodesChange, onEdgesChange, processTraces, initializeFromCourseStructure, initializeDocumentsFromDb, setNodes, nodePositionsRef } = useGraphData({ getFilename, hasDocuments, stage1CourseData });
+  const { nodes, edges, onNodesChange, onEdgesChange, processTraces, initializeFromCourseStructure, initializeDocumentsFromDb, removeLesson, setNodes, nodePositionsRef } = useGraphData({ getFilename, hasDocuments, stage1CourseData });
   const { layoutNodes, layoutError: _layoutError } = useGraphLayout();
   // Layout generation counter to prevent stale layout results (Fix #6: Race condition)
   const layoutGenerationRef = useRef(0);
@@ -777,6 +778,7 @@ function GraphViewInner({ courseId, courseTitle, hasDocuments = true, failedAtSt
   return (
     <RealtimeStatusProvider value={realtimeData}>
       <StaticGraphProvider {...staticData}>
+        <GraphOperationsProvider removeLesson={removeLesson}>
         <FullscreenProvider portalContainerRef={portalContainerRef} isFullscreen={isFullscreen}>
         <div ref={containerRef} className={`h-full w-full relative flex flex-col ${isDark ? 'bg-slate-900' : 'bg-slate-50'}`}>
           {/* Portal container for dialogs in fullscreen mode */}
@@ -943,6 +945,7 @@ function GraphViewInner({ courseId, courseTitle, hasDocuments = true, failedAtSt
           </div>
         </div>
         </FullscreenProvider>
+        </GraphOperationsProvider>
       </StaticGraphProvider>
     </RealtimeStatusProvider>
   );

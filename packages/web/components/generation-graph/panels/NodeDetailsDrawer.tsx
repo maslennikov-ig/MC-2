@@ -34,6 +34,7 @@ import { RefinementChat } from './RefinementChat';
 import { useRefinement } from '../hooks/useRefinement';
 import { useStaticGraph } from '../contexts/StaticGraphContext';
 import { useFullscreenContext } from '../contexts/FullscreenContext';
+import { useGraphOperations } from '../contexts/GraphOperationsContext';
 import { useGenerationRealtime } from '@/components/generation-monitoring/realtime-provider';
 import { useLessonContent } from '../hooks/useLessonContent';
 import { useNodeStatus } from '../hooks/useNodeStatus';
@@ -77,6 +78,7 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
   const { getNode } = useReactFlow();
   const { courseInfo } = useStaticGraph();
   const { portalContainerRef } = useFullscreenContext();
+  const { removeLesson: removeLessonFromGraph } = useGraphOperations();
   const { isAdmin } = useUserRole();
   const params = useParams();
   const courseSlug = params?.slug as string | undefined;
@@ -248,6 +250,8 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
       const result = await deleteLesson(courseInfo.id, lessonInfoForInspector.lessonId);
       if (result.success) {
         toast.success('Урок удалён');
+        // Remove lesson from graph immediately (optimistic UI update)
+        removeLessonFromGraph(lessonInfoForInspector.lessonId);
         // Close the drawer after successful deletion
         deselectNode();
       } else {
@@ -258,7 +262,7 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
     } finally {
       setIsDeleting(false);
     }
-  }, [lessonInfoForInspector, courseInfo.id, deselectNode]);
+  }, [lessonInfoForInspector, courseInfo.id, removeLessonFromGraph, deselectNode]);
 
   const lessonIdForFetch = useMemo(() => {
     if (!isLessonNode || !selectedNodeId) return null;
