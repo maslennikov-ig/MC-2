@@ -376,5 +376,3 @@ export function useAutoCard({
     regenerate,
   };
 }
-
-export default useAutoCard;

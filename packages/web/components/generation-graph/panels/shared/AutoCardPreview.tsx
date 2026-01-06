@@ -542,5 +542,3 @@ export const AutoCardPreview = memo<AutoCardPreviewProps>(function AutoCardPrevi
     </Card>
   );
 });
-
-export default AutoCardPreview;
