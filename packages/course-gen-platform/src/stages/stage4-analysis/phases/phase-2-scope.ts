@@ -76,8 +76,7 @@ export async function runPhase2Scope(input: Phase2Input): Promise<Phase2Output> 
         completionText: rawOutput,
       });
 
-      console.log(`[Phase 2] Raw output length: ${rawOutput.length} chars`);
-      console.log(`[Phase 2] Raw output preview: ${rawOutput.substring(0, 200)}...`);
+      // Debug logging removed - use observability tracing via storeTraceData instead
 
       // TIER 1: PREPROCESSING (before UnifiedRegenerator)
       let preprocessedOutput = rawOutput;
@@ -120,12 +119,9 @@ export async function runPhase2Scope(input: Phase2Input): Promise<Phase2Output> 
       try {
         // Attempt 0: Direct parse
         parsedOutput = JSON.parse(preprocessedOutput);
-        console.log('[Phase 2] Direct parse SUCCESS');
+        // Direct parse succeeded
       } catch (parseError) {
-        console.log(
-          `[Phase 2] Direct parse FAILED: ${parseError instanceof Error ? parseError.message : String(parseError)}`
-        );
-        console.log('[Phase 2] Using UnifiedRegenerator with all 5 layers');
+        // Direct parse failed, using UnifiedRegenerator with all 5 layers
 
         // Use UnifiedRegenerator with all 5 layers + warning fallback (Stage 4)
         const regenerator = new UnifiedRegenerator<Phase2Output>({
@@ -166,7 +162,7 @@ export async function runPhase2Scope(input: Phase2Input): Promise<Phase2Output> 
           repairMetadata.regenerated_fields = result.metadata.regeneratedFields || [];
           repairMetadata.models_tried = [modelId, ...(result.metadata.modelsUsed || [])];
 
-          console.log(`[Phase 2] UnifiedRegenerator SUCCESS - layer: ${result.metadata.layerUsed}`);
+          // UnifiedRegenerator succeeded via layer: ${result.metadata.layerUsed}
         } else {
           console.error('[Phase 2] ALL REPAIR LAYERS EXHAUSTED');
           throw new Error(
@@ -204,7 +200,7 @@ export async function runPhase2Scope(input: Phase2Input): Promise<Phase2Output> 
         if (recStructure.sections_breakdown && Array.isArray(recStructure.sections_breakdown)) {
           recStructure.sections_breakdown = postProcessSections(recStructure.sections_breakdown as unknown[]);
 
-          console.log(`[Phase 2] Post-processing: Validated ${(recStructure.sections_breakdown as unknown[]).length} sections with all required fields`);
+          // Post-processing validated sections with all required fields
         }
       }
 

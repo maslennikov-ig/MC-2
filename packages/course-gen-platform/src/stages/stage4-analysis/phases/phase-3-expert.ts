@@ -270,9 +270,9 @@ export async function runPhase3Expert(input: Phase3Input): Promise<Phase3Output>
       let parsedOutput: unknown;
       try {
         parsedOutput = JSON.parse(preprocessedContent);
-        console.log('[Phase 3] Direct parse SUCCESS');
+        // Direct parse succeeded
       } catch (parseError) {
-        console.log('[Phase 3] Direct parse FAILED, using UnifiedRegenerator (All 5 layers)');
+        // Direct parse failed, using UnifiedRegenerator (All 5 layers)
         const regenerator = new UnifiedRegenerator<unknown>({
           enabledLayers: ['auto-repair', 'critique-revise', 'partial-regen', 'model-escalation', 'emergency'],
           maxRetries: 3,
@@ -291,7 +291,7 @@ export async function runPhase3Expert(input: Phase3Input): Promise<Phase3Output>
         });
         if (result.success && result.data) {
           parsedOutput = result.data;
-          console.log(`[Phase 3] UnifiedRegenerator SUCCESS - layer: ${result.metadata.layerUsed}`);
+          // UnifiedRegenerator succeeded - observability tracked by metrics
         } else {
           throw new Error(`Phase 3 validation failed after repair: ${result.error}`);
         }

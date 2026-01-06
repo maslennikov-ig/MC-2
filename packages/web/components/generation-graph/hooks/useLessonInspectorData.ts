@@ -418,12 +418,7 @@ function parseJudgeResult(
   );
 
   if (judgeTraces.length === 0) {
-    // Add debug logging
-    console.debug('[parseJudgeResult] No judge traces found', {
-      totalTraces: traces.length,
-      phases: traces.map(t => t.phase).filter(Boolean),
-      stepNames: traces.map(t => t.step_name).filter(Boolean),
-    });
+    // No judge traces found in generation traces
     return null;
   }
 
@@ -437,12 +432,7 @@ function parseJudgeResult(
   const cascadeStage = judgeOutput.cascadeStage as string | undefined;
   const heuristicsData = judgeOutput.heuristics as Record<string, unknown> | undefined;
 
-  // Add logging for successful parse
-  console.debug('[parseJudgeResult] Parsed judge result', {
-    cascadeStage: cascadeStage,
-    hasHeuristics: Boolean(heuristicsData),
-    hasVotes: Boolean(judgeOutput.votes),
-  });
+  // Judge result parsed successfully
 
   // Parse CLEV voting result (handles both old and new formats)
   const votingResult = parseVotingResult(judgeOutput, qualityScore || 0, cascadeStage);
@@ -524,18 +514,12 @@ function parseVotingResult(
   let consensusMethod: ConsensusMethod = 'unanimous';
   let finalVerdict: JudgeVerdictType = determineVerdict(qualityScore);
 
-  // Add logging for cascade stage handling
-  console.debug('[parseVotingResult] Processing cascade stage', {
-    cascadeStage,
-    hasVotes: Boolean(judgeOutput.votes),
-    hasSingleJudge: Boolean(judgeOutput.singleJudge),
-    hasHeuristics: Boolean(judgeOutput.heuristics),
-  });
+  // Processing cascade stage voting result
 
   // Handle enriched format based on cascade stage
   if (cascadeStage) {
     if (cascadeStage === 'heuristic') {
-      console.debug('[parseVotingResult] Heuristic stage - creating synthetic vote');
+      // Heuristic stage - creating synthetic vote
       // Heuristic stage: create synthetic vote indicating heuristic failure
       const heuristicIssues = (judgeOutput.heuristics_issues as string[]) ?? [];
 
@@ -560,7 +544,7 @@ function parseVotingResult(
       consensusMethod = 'unanimous';
       finalVerdict = 'REGENERATE';
     } else if (cascadeStage === 'single_judge' && judgeOutput.singleJudge) {
-      console.debug('[parseVotingResult] Single judge stage');
+      // Single judge stage evaluation
       // Single judge stage: extract verdict from singleJudge object
       const sj = judgeOutput.singleJudge as Record<string, unknown>;
       const criteriaScores = sj.criteriaScores as Record<string, number> | undefined;
@@ -584,7 +568,7 @@ function parseVotingResult(
       consensusMethod = 'unanimous';
       finalVerdict = (sj.recommendation as JudgeVerdictType) || determineVerdict(qualityScore);
     } else if (cascadeStage === 'clev_voting' && votes.length > 0) {
-      console.debug('[parseVotingResult] CLEV voting stage');
+      // CLEV voting stage evaluation
       // CLEV voting stage: parse multiple votes
       parsedVotes = votes.map((vote, idx) => ({
         judgeId: (vote.judge_id as string) || `judge-${idx + 1}`,
@@ -609,7 +593,7 @@ function parseVotingResult(
 
   // Fallback to legacy format if no cascade stage or no votes parsed yet
   if (parsedVotes.length === 0 && votes.length > 0) {
-    console.debug('[parseVotingResult] Using legacy format fallback');
+    // Using legacy format fallback
     parsedVotes = votes.map((vote, idx) => ({
       judgeId: (vote.judge_id as string) || `judge-${idx + 1}`,
       modelId: (vote.model_id as string) || 'unknown',

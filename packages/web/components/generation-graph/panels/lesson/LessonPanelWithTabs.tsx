@@ -19,6 +19,8 @@ type LessonInspectorDataWithRefinement = LessonInspectorData & Partial<LessonIns
 interface LessonPanelWithTabsProps {
   /** Lesson ID in format "module.lesson" (e.g., "1.2") */
   lessonId: string;
+  /** Course UUID - required for AutoCardPreview */
+  courseId?: string;
   /** Lesson inspector data */
   data: LessonInspectorDataWithRefinement | null;
   isLoading?: boolean;
@@ -83,6 +85,7 @@ function TabErrorFallback({ error, resetErrorBoundary }: {
  */
 export function LessonPanelWithTabs({
   lessonId,
+  courseId,
   data,
   isLoading = false,
   error = null,
@@ -223,6 +226,7 @@ export function LessonPanelWithTabs({
               tier={tier}
               className="h-full"
               hideHeader
+              courseId={courseId}
             />
           </TabsContent>
 

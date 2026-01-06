@@ -82,10 +82,10 @@ function buildStage2Group(
 
   // Calculate group height based on collapse state
   const groupHeight = isCollapsed
-    ? STAGE2_LAYOUT_CONFIG.GROUP_COLLAPSED_HEIGHT
-    : STAGE2_LAYOUT_CONFIG.GROUP_HEADER_HEIGHT +
+    ? STAGE2_LAYOUT_CONFIG.CONTAINER_COLLAPSED_HEIGHT
+    : STAGE2_LAYOUT_CONFIG.CONTAINER_HEADER_HEIGHT +
       (documents.length * (STAGE2_LAYOUT_CONFIG.DOCUMENT_HEIGHT + STAGE2_LAYOUT_CONFIG.DOCUMENT_GAP)) +
-      STAGE2_LAYOUT_CONFIG.GROUP_PADDING;
+      STAGE2_LAYOUT_CONFIG.CONTAINER_PADDING;
 
   // Create Stage2Group container node
   const stage2GroupNode: AppNode = {
@@ -93,7 +93,7 @@ function buildStage2Group(
     type: 'stage2group',
     position: getExistingPos('stage2group'),
     style: {
-      width: STAGE2_LAYOUT_CONFIG.GROUP_WIDTH,
+      width: STAGE2_LAYOUT_CONFIG.CONTAINER_WIDTH,
       height: Math.max(groupHeight, 150),
     },
     data: {
@@ -130,9 +130,9 @@ function buildStage2Group(
     }));
 
     // Calculate position relative to parent (stage2group)
-    const docY = STAGE2_LAYOUT_CONFIG.GROUP_HEADER_HEIGHT +
+    const docY = STAGE2_LAYOUT_CONFIG.CONTAINER_HEADER_HEIGHT +
                  (index * (STAGE2_LAYOUT_CONFIG.DOCUMENT_HEIGHT + STAGE2_LAYOUT_CONFIG.DOCUMENT_GAP));
-    const docX = STAGE2_LAYOUT_CONFIG.GROUP_PADDING;
+    const docX = STAGE2_LAYOUT_CONFIG.CONTAINER_PADDING;
 
     documentNodes.push({
       id: docNodeId,
@@ -143,7 +143,7 @@ function buildStage2Group(
       hidden: isCollapsed,
       draggable: false,
       style: {
-        width: STAGE2_LAYOUT_CONFIG.GROUP_WIDTH - (2 * STAGE2_LAYOUT_CONFIG.GROUP_PADDING),
+        width: STAGE2_LAYOUT_CONFIG.CONTAINER_WIDTH - (2 * STAGE2_LAYOUT_CONFIG.CONTAINER_PADDING),
         height: STAGE2_LAYOUT_CONFIG.DOCUMENT_HEIGHT,
       },
       data: {
@@ -182,8 +182,8 @@ function buildEmptyStage2Group(
     type: 'stage2group',
     position: getExistingPos('stage2group'),
     style: {
-      width: STAGE2_LAYOUT_CONFIG.GROUP_WIDTH,
-      height: STAGE2_LAYOUT_CONFIG.GROUP_COLLAPSED_HEIGHT,
+      width: STAGE2_LAYOUT_CONFIG.CONTAINER_WIDTH,
+      height: STAGE2_LAYOUT_CONFIG.CONTAINER_COLLAPSED_HEIGHT,
     },
     data: {
       stageNumber: 2 as const,
@@ -293,8 +293,8 @@ export function buildGraph({
           type: 'stage2group',
           position: getExistingPos('stage2group'),
           style: {
-            width: STAGE2_LAYOUT_CONFIG.GROUP_WIDTH,
-            height: STAGE2_LAYOUT_CONFIG.GROUP_COLLAPSED_HEIGHT,
+            width: STAGE2_LAYOUT_CONFIG.CONTAINER_WIDTH,
+            height: STAGE2_LAYOUT_CONFIG.CONTAINER_COLLAPSED_HEIGHT,
           },
           data: {
             stageNumber: 2 as const,

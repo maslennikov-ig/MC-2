@@ -188,9 +188,9 @@ ${m.content}`).join('\n\n');
   try {
     // Attempt 0: Direct parse
     parsedOutput = JSON.parse(preprocessedOutput) as RawPhase4Output;
-    console.log('[Phase 4] Direct parse SUCCESS');
+    // Direct parse succeeded
   } catch (parseError: unknown) {
-    console.log(`[Phase 4] Direct parse FAILED, using UnifiedRegenerator with all 5 layers`);
+    // Direct parse failed, using UnifiedRegenerator with all 5 layers
 
     // Use UnifiedRegenerator with all 5 layers + warning fallback (Stage 4)
     const regenerator = new UnifiedRegenerator<Phase4Output>({
@@ -231,7 +231,7 @@ ${m.content}`).join('\n\n');
       repairMetadata.regenerated_fields = regenerationResult.metadata.regeneratedFields || [];
       repairMetadata.models_tried = [modelId, ...(regenerationResult.metadata.modelsUsed || [])];
 
-      console.log(`[Phase 4] UnifiedRegenerator SUCCESS - layer: ${regenerationResult.metadata.layerUsed}`);
+      // UnifiedRegenerator succeeded - observability tracked by metrics
     } else {
       console.error('[Phase 4] ALL REPAIR LAYERS EXHAUSTED');
       throw new Error(`Failed to parse Phase 4 JSON after all 5 repair layers. Error: ${regenerationResult.error}`);

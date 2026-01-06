@@ -59,15 +59,6 @@ export const STAGE2_LAYOUT_CONFIG = {
   DOCUMENT_GAP: 8,
   /** Internal padding inside container */
   CONTAINER_PADDING: 12,
-  // Aliases for backward compatibility (graph-builders.ts uses GROUP_* naming)
-  /** @deprecated Use CONTAINER_WIDTH */
-  GROUP_WIDTH: 320,
-  /** @deprecated Use CONTAINER_COLLAPSED_HEIGHT */
-  GROUP_COLLAPSED_HEIGHT: 100,
-  /** @deprecated Use CONTAINER_HEADER_HEIGHT */
-  GROUP_HEADER_HEIGHT: 70,
-  /** @deprecated Use CONTAINER_PADDING */
-  GROUP_PADDING: 12,
 } as const;
 
 // Export type for external use

@@ -188,15 +188,8 @@ export async function runPhase1Classification(input: Phase1Input): Promise<Phase
 
       // TIER 1: PREPROCESSING (before UnifiedRegenerator)
       // Step 1: Strip thinking tags (Qwen3, DeepSeek models add <think> blocks)
-      const hasThinkingTags = /<think|<thinking|<reasoning|<analysis|\[THINK\]/i.test(rawOutput);
+      // Thinking tags stripped if present - trace data already stored via storeTraceData
       let preprocessedOutput = stripThinkingTags(rawOutput);
-
-      // DEBUG: Log raw output to understand what model returns
-      if (hasThinkingTags) {
-        console.log('[Phase 1] Detected thinking tags in raw output, stripped them');
-        console.log('[Phase 1] Raw output preview (first 500 chars):', rawOutput.substring(0, 500));
-        console.log('[Phase 1] Stripped output preview (first 500 chars):', preprocessedOutput.substring(0, 500));
-      }
 
       // Step 2: Try to parse and preprocess enums
       try {
@@ -250,8 +243,7 @@ export async function runPhase1Classification(input: Phase1Input): Promise<Phase
       // Data is now properly normalized by structure normalizer + validated by Zod in Layer 1
       const data = regenResult.data as Omit<Phase1Output, 'phase_metadata'>;
 
-      // Log layer used for observability (useful for monitoring normalization effectiveness)
-      console.log(`[Phase 1] Completed via ${regenResult.metadata.layerUsed}, keys: ${Object.keys(data).join(', ')}`);
+      // Completed via ${regenResult.metadata.layerUsed} - observability tracked by UnifiedRegenerator
 
       // Final safety check (should never fail after normalization + Zod validation)
       if (!data.course_category?.primary) {

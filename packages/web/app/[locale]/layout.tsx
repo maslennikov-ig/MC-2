@@ -188,7 +188,10 @@ export default async function LocaleLayout({ children, params }: Props) {
                   var isDark = theme === 'dark' ||
                     (theme !== 'light' && window.matchMedia('(prefers-color-scheme: dark)').matches);
                   document.documentElement.setAttribute('data-loader-theme', isDark ? 'dark' : 'light');
-                } catch(e) {}
+                } catch(e) {
+                  // Silent failure acceptable - theme preference is optional enhancement
+                  // localStorage may be unavailable in private browsing or restricted contexts
+                }
               })();
             `,
           }}

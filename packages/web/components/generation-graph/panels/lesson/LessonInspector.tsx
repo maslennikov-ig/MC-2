@@ -73,6 +73,8 @@ interface LessonInspectorProps {
   tier?: 'trial' | 'free' | 'basic' | 'standard' | 'premium';
   /** Hide the header (when used inside a tabbed container that provides its own header) */
   hideHeader?: boolean;
+  /** Course UUID - required for AutoCardPreview */
+  courseId?: string;
 }
 
 /**
@@ -101,6 +103,7 @@ export function LessonInspector({
   className,
   tier = 'standard',
   hideHeader = false,
+  courseId,
 }: LessonInspectorProps) {
   // Modal state for viewing node output
   const [outputModal, setOutputModal] = useState<{
@@ -348,6 +351,8 @@ export function LessonInspector({
       isDeleting={isDeleting}
       locale="ru"
       className="h-full"
+      courseId={courseId}
+      lessonId={data.lessonId}
     />
   );
 

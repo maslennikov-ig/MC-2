@@ -246,7 +246,7 @@ function parseAndValidateResponse(
   try {
     parsed = JSON.parse(cleanedResponse);
   } catch (parseError) {
-    console.log('[Phase 6] Direct parse FAILED, using auto-repair');
+    // Direct parse failed, using auto-repair
 
     // Use Layer 1 auto-repair (synchronous, no LLM required)
     // Static imports at top of file for ESM compatibility
@@ -257,7 +257,7 @@ function parseAndValidateResponse(
     }
 
     parsed = fixFieldNames(repaired);
-    console.log('[Phase 6] Auto-repair SUCCESS');
+    // Auto-repair succeeded
   }
 
   // Validate structure
@@ -377,7 +377,7 @@ export async function runPhase6RagPlanning(input: Phase6Input): Promise<Phase6Ou
 
   // CRITICAL: If no documents, return empty mapping (no LLM call needed)
   if (!input.document_summaries || input.document_summaries.length === 0) {
-    console.log('[Phase 6] No documents available, returning empty mapping');
+    // No documents available, returning empty mapping
     return {
       document_relevance_mapping: {},
       phase_metadata: {

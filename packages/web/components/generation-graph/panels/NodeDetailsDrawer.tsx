@@ -681,6 +681,7 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
             /* Lesson Panel with Content + Activities tabs */
             <LessonPanelWithTabs
               lessonId={lessonInfoForInspector?.lessonId ?? ''}
+              courseId={courseInfo.id}
               data={lessonInspectorData}
               isLoading={isLoadingLessonInspector}
               error={lessonInspectorError}
