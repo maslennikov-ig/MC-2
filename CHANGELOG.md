@@ -152,6 +152,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.26.75] - 2026-01-06
+
+### Fixed
+- **web**: update 13 source file(s), update docs (7159e0c)
+
+### Other
+- **web**: remove duplicate default exports (075fe22)
+
 ## [0.26.74] - 2026-01-06
 
 ### Added
