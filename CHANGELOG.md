@@ -5,6 +5,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.26.76] - 2026-01-06
+
+### Fixed
+- **course-gen-platform**: update 5 source file(s), update 2 test(s), +2 more (76f8d11)
+
 ## [0.26.73] - 2026-01-06
 
 ### Fixed
