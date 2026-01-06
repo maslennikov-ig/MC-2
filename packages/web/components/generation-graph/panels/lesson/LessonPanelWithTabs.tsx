@@ -28,9 +28,11 @@ interface LessonPanelWithTabsProps {
   onApprove?: () => void;
   onEdit?: () => void;
   onRegenerate?: () => void;
+  onDelete?: () => void;
   onRetryNode?: (node: string) => void;
   isApproving?: boolean;
   isRegenerating?: boolean;
+  isDeleting?: boolean;
   isMaximized?: boolean;
   onToggleMaximize?: () => void;
   className?: string;
@@ -88,9 +90,11 @@ export function LessonPanelWithTabs({
   onApprove,
   onEdit,
   onRegenerate,
+  onDelete,
   onRetryNode,
   isApproving = false,
   isRegenerating = false,
+  isDeleting = false,
   isMaximized,
   onToggleMaximize,
   className,
@@ -207,9 +211,11 @@ export function LessonPanelWithTabs({
               onApprove={onApprove}
               onEdit={onEdit}
               onRegenerate={onRegenerate}
+              onDelete={onDelete}
               onRetryNode={onRetryNode}
               isApproving={isApproving}
               isRegenerating={isRegenerating}
+              isDeleting={isDeleting}
               isMaximized={isMaximized}
               onToggleMaximize={onToggleMaximize}
               tier={tier}

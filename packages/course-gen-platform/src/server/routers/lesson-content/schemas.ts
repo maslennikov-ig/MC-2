@@ -137,3 +137,25 @@ export const updateLessonContentInputSchema = z.object({
   /** The updated lesson content object */
   content: lessonContentSchema,
 });
+
+/**
+ * Input schema for deleteLesson procedure
+ */
+export const deleteLessonInputSchema = z.object({
+  /** Course ID the lesson belongs to */
+  courseId: z.string().uuid('Invalid course ID'),
+
+  /** Lesson ID: either "section.lesson" format (e.g., "1.2") or lesson UUID */
+  lessonId: z.string().min(1, 'Lesson ID is required'),
+});
+
+/**
+ * Input schema for approveLessons (batch approval) procedure
+ */
+export const approveLessonsInputSchema = z.object({
+  /** Course ID to approve lessons for */
+  courseId: z.string().uuid('Invalid course ID'),
+
+  /** Optional module number (1-based) - if provided, approve only lessons in this module */
+  moduleNumber: z.number().int().min(1, 'Module number must be at least 1').optional(),
+});

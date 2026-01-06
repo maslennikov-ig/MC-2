@@ -34,6 +34,7 @@ export interface Stage6ControlTowerProps {
     /** Status breakdown */
     statusCounts: {
       completed: number;
+      approved: number;
       active: number;
       pending: number;
       failed: number;
@@ -127,13 +128,14 @@ export const Stage6ControlTower = memo<Stage6ControlTowerProps>(function Stage6C
 }) {
   const t = GRAPH_TRANSLATIONS.stage6;
 
-  // Calculate progress percentage
+  // Calculate progress percentage (completed + approved are both "ready")
   const totalLessons =
     stats.statusCounts.completed +
+    stats.statusCounts.approved +
     stats.statusCounts.active +
     stats.statusCounts.pending +
     stats.statusCounts.failed;
-  const readyLessons = stats.statusCounts.completed;
+  const readyLessons = stats.statusCounts.completed + stats.statusCounts.approved;
   const progressPercentage = totalLessons > 0 ? (readyLessons / totalLessons) * 100 : 0;
 
   // Actions disabled when there are active lessons
@@ -191,6 +193,11 @@ export const Stage6ControlTower = memo<Stage6ControlTowerProps>(function Stage6C
 
             {/* Status counts */}
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
+              {stats.statusCounts.approved > 0 && (
+                <Badge variant="outline" className="bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800">
+                  {stats.statusCounts.approved} {t?.status?.approved?.[locale] ?? 'approved'}
+                </Badge>
+              )}
               {stats.statusCounts.completed > 0 && (
                 <Badge variant="outline" className="bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-400 border-green-200 dark:border-green-800">
                   {stats.statusCounts.completed} {t?.status?.completed?.[locale] ?? 'completed'}

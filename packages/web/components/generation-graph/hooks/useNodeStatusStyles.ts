@@ -38,6 +38,10 @@ export function getNodeStatusStyles(
     case 'completed':
       return 'border-emerald-500 bg-emerald-50 dark:bg-emerald-900/30';
 
+    case 'approved':
+      // Approved status - brighter/more vivid green than completed to indicate "reviewed and ready"
+      return 'border-emerald-600 bg-emerald-100 dark:border-emerald-500 dark:bg-emerald-800/40 shadow-[0_0_8px_rgba(16,185,129,0.3)] dark:shadow-[0_0_8px_rgba(16,185,129,0.4)]';
+
     case 'error':
       // Stage nodes have stronger error effects (larger shadow)
       if (variant === 'stage') {
@@ -74,6 +78,8 @@ export function getStatusColor(status: NodeStatus): string {
       return 'bg-blue-500 dark:bg-blue-600';
     case 'completed':
       return 'bg-emerald-500 dark:bg-emerald-600';
+    case 'approved':
+      return 'bg-emerald-600 dark:bg-emerald-500';
     case 'error':
       return 'bg-red-500 dark:bg-red-600';
     case 'awaiting':
@@ -100,6 +106,9 @@ export function getStatusBorderClass(status: NodeStatus): string {
       return 'border-l-4 border-l-blue-500 dark:border-l-blue-400 bg-blue-50 dark:bg-blue-900/30 shadow-[0_0_10px_rgba(59,130,246,0.3)] animate-pulse';
     case 'completed':
       return 'border-l-4 border-l-emerald-500 dark:border-l-emerald-400 bg-emerald-50 dark:bg-emerald-900/30';
+    case 'approved':
+      // Vivid green with subtle glow effect for approved status
+      return 'border-l-4 border-l-emerald-600 dark:border-l-emerald-400 bg-emerald-100 dark:bg-emerald-800/40 shadow-[0_0_8px_rgba(16,185,129,0.25)]';
     case 'error':
       return 'border-l-4 border-l-red-500 dark:border-l-red-400 bg-red-50 dark:bg-red-900/30';
     case 'awaiting':
@@ -122,6 +131,8 @@ export function getProgressBarColor(status: NodeStatus): string {
     case 'active':
       return 'bg-blue-500';
     case 'completed':
+      return 'bg-emerald-500';
+    case 'approved':
       return 'bg-emerald-500';
     case 'error':
       return 'bg-red-500';

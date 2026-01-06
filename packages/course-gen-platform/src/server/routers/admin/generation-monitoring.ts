@@ -14,6 +14,7 @@ import { logger } from '../../../shared/logger/index.js';
 import type { CourseStructure, Language } from '@megacampus/shared-types';
 import { JobType } from '@megacampus/shared-types';
 import { addJob } from '../../../orchestrator/queue';
+import { validateLocale } from '@/shared/validation';
 
 export const generationMonitoringRouter = router({
   /**
@@ -173,7 +174,7 @@ export const generationMonitoringRouter = router({
           ragChunks: [],
           ragContextId: null,
           language,
-          locale: 'ru', // TODO: Get from user session/profile
+          locale: validateLocale(language),
         });
 
         return { success: true, message: 'Lesson generation queued' };
@@ -259,7 +260,7 @@ export const generationMonitoringRouter = router({
             ragChunks: [],
             ragContextId: null,
             language,
-            locale: 'ru', // TODO: Get from user session/profile
+            locale: validateLocale(language),
           });
         }
 

@@ -91,19 +91,21 @@ const translations = {
   },
 };
 
-const statusIcons = {
+const statusIcons: Record<NodeStatus, typeof Circle> = {
   pending: Circle,
   active: Loader2,
   completed: CheckCircle2,
+  approved: CheckCircle2,
   error: XCircle,
   awaiting: Clock,
   skipped: Circle,
 };
 
-const statusColors = {
+const statusColors: Record<NodeStatus, string> = {
   pending: 'text-slate-400',
   active: 'text-blue-500 animate-spin',
   completed: 'text-green-500',
+  approved: 'text-purple-500',
   error: 'text-red-500',
   awaiting: 'text-amber-500',
   skipped: 'text-slate-300',

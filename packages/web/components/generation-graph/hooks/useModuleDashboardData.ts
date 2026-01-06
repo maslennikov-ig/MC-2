@@ -73,8 +73,10 @@ export interface UseModuleDashboardDataOptions {
 /**
  * Map database status to Stage6NodeStatus
  */
-function mapLessonStatus(status: string): 'pending' | 'active' | 'completed' | 'error' {
+function mapLessonStatus(status: string): 'pending' | 'active' | 'completed' | 'approved' | 'error' {
   switch (status.toLowerCase()) {
+    case 'approved':
+      return 'approved';
     case 'completed':
       return 'completed';
     case 'generating':
@@ -134,6 +136,7 @@ function calculateAggregates(
 ): ModuleDashboardAggregates {
   const totalLessons = lessons.length;
   const completedLessons = lessons.filter((l) => l.status === 'completed').length;
+  const approvedLessons = lessons.filter((l) => l.status === 'approved').length;
   const activeLessons = lessons.filter((l) => l.status === 'active').length;
   const errorLessons = lessons.filter((l) => l.status === 'error').length;
   const pendingLessons = lessons.filter((l) => l.status === 'pending').length;
@@ -141,31 +144,31 @@ function calculateAggregates(
   // Sum total cost
   const totalCostUsd = lessons.reduce((sum, l) => sum + l.costUsd, 0);
 
-  // Calculate average quality score (only from completed lessons)
-  const completedWithQuality = lessons.filter(
-    (l) => l.status === 'completed' && l.qualityScore !== null
+  // Calculate average quality score (from completed and approved lessons - they are "done")
+  const doneWithQuality = lessons.filter(
+    (l) => (l.status === 'completed' || l.status === 'approved') && l.qualityScore !== null
   );
   const avgQualityScore =
-    completedWithQuality.length > 0
-      ? completedWithQuality.reduce((sum, l) => sum + (l.qualityScore || 0), 0) /
-        completedWithQuality.length
+    doneWithQuality.length > 0
+      ? doneWithQuality.reduce((sum, l) => sum + (l.qualityScore || 0), 0) /
+        doneWithQuality.length
       : null;
 
-  // Sum total duration (only completed lessons)
+  // Sum total duration (only completed and approved lessons)
   const totalDurationMs = lessons.reduce(
     (sum, l) => sum + (l.durationMs || 0),
     0
   );
 
   // Estimate time remaining
-  // Average duration per completed lesson × number of pending/active lessons
-  const completedWithDuration = lessons.filter(
-    (l) => l.status === 'completed' && l.durationMs !== null && l.durationMs > 0
+  // Average duration per done lesson × number of pending/active lessons
+  const doneWithDuration = lessons.filter(
+    (l) => (l.status === 'completed' || l.status === 'approved') && l.durationMs !== null && l.durationMs > 0
   );
   const avgDurationPerLesson =
-    completedWithDuration.length > 0
-      ? completedWithDuration.reduce((sum, l) => sum + (l.durationMs || 0), 0) /
-        completedWithDuration.length
+    doneWithDuration.length > 0
+      ? doneWithDuration.reduce((sum, l) => sum + (l.durationMs || 0), 0) /
+        doneWithDuration.length
       : null;
 
   const remainingLessons = pendingLessons + activeLessons;
@@ -177,6 +180,7 @@ function calculateAggregates(
   return {
     totalLessons,
     completedLessons,
+    approvedLessons,
     activeLessons,
     errorLessons,
     pendingLessons,
@@ -197,7 +201,8 @@ function getModuleStatus(
 
   if (lessons.some((l) => l.status === 'error')) return 'error';
   if (lessons.some((l) => l.status === 'active')) return 'active';
-  if (lessons.every((l) => l.status === 'completed')) return 'completed';
+  // Module is completed if all lessons are either 'completed' or 'approved'
+  if (lessons.every((l) => l.status === 'completed' || l.status === 'approved')) return 'completed';
 
   return 'pending';
 }
@@ -250,6 +255,10 @@ export function useModuleDashboardData({
 
   // Track current fetch to avoid race conditions
   const fetchIdRef = useRef(0);
+  // Track lesson content IDs in this module for filtering realtime updates
+  const moduleContentIdsRef = useRef<Set<string>>(new Set());
+  // Track lesson IDs (from lessons table) for this module - used to detect new INSERTs
+  const moduleLessonIdsRef = useRef<Set<string>>(new Set());
   const supabase = getSupabaseClient();
 
   // Use external courseStructure if provided, otherwise use internal
@@ -262,6 +271,10 @@ export function useModuleDashboardData({
   useEffect(() => {
     if (!shouldFetch || !courseId || externalCourseStructure) return;
 
+    // Race condition guard: prevents stale responses from updating state
+    // when user rapidly switches between modules
+    let ignore = false;
+
     logger.debug('[useModuleDashboardData] Fetching course structure', { courseId, moduleId });
 
     const fetchCourseStructure = async () => {
@@ -271,6 +284,9 @@ export function useModuleDashboardData({
           .select('course_structure')
           .eq('id', courseId)
           .single();
+
+        // Skip state update if effect was cleaned up (user switched modules)
+        if (ignore) return;
 
         if (courseError) throw courseError;
 
@@ -284,12 +300,18 @@ export function useModuleDashboardData({
           logger.warn('[useModuleDashboardData] Course structure is empty', { courseId });
         }
       } catch (err) {
+        // Skip error handling if effect was cleaned up (user switched modules)
+        if (ignore) return;
         console.error('[useModuleDashboardData] Course structure fetch error:', err);
         logger.error('Failed to fetch course structure', { courseId, error: err });
       }
     };
 
     fetchCourseStructure();
+
+    return () => {
+      ignore = true;
+    };
   }, [shouldFetch, courseId, externalCourseStructure, supabase, moduleId]);
 
   /**
@@ -376,6 +398,7 @@ export function useModuleDashboardData({
           aggregates: {
             totalLessons: 0,
             completedLessons: 0,
+            approvedLessons: 0,
             activeLessons: 0,
             errorLessons: 0,
             pendingLessons: 0,
@@ -449,6 +472,9 @@ export function useModuleDashboardData({
       const lessons = lessonsData || [];
       const lessonIds = lessons.map(l => l.id);
 
+      // Store lesson IDs for filtering realtime INSERT events
+      moduleLessonIdsRef.current = new Set(lessonIds);
+
       logger.debug('[useModuleDashboardData] Fetched lessons from DB', {
         sectionId,
         lessonsCount: lessons.length,
@@ -471,6 +497,9 @@ export function useModuleDashboardData({
         }
 
         lessonContents = contentsData || [];
+
+        // Store lesson content IDs for filtering realtime updates
+        moduleContentIdsRef.current = new Set(lessonContents.map(lc => lc.id));
       }
 
       // Build lesson matrix rows
@@ -588,7 +617,16 @@ export function useModuleDashboardData({
 
   // Fetch on mount and when dependencies change
   useEffect(() => {
+    // Race condition guard: increment fetchIdRef to invalidate any in-flight requests
+    // This works in conjunction with the fetchId check inside fetchLessonData
+    // When user rapidly switches modules, old requests will be ignored
     fetchLessonData();
+
+    return () => {
+      // Cleanup: increment fetchId to mark current fetch as stale
+      // This ensures any pending setState calls in fetchLessonData are skipped
+      fetchIdRef.current++;
+    };
   }, [fetchLessonData]);
 
   // Set up realtime subscription
@@ -604,7 +642,9 @@ export function useModuleDashboardData({
       lessonCount: expectedLessonCount,
     });
 
-    // Subscribe to changes in lesson_contents for this module
+    // Subscribe to changes in lesson_contents for this course
+    // We filter by course_id (simpler Postgres filter) but only react to changes
+    // relevant to the current module by checking against moduleContentIdsRef
     const channel = supabase
       .channel(`module_dashboard:${moduleId}`)
       .on(
@@ -618,14 +658,36 @@ export function useModuleDashboardData({
         (payload) => {
           const newRow = payload.new as Partial<LessonContentRow> | undefined;
           const oldRow = payload.old as Partial<LessonContentRow> | undefined;
+          const changedId = newRow?.id || oldRow?.id;
+          const lessonId = newRow?.lesson_id || oldRow?.lesson_id;
 
-          logger.debug('Realtime update received', {
-            event: payload.eventType,
-            lessonId: newRow?.lesson_id || oldRow?.lesson_id,
-          });
+          // Only refetch if the changed lesson content is in THIS module
+          // For UPDATE/DELETE: check if content ID is in our tracked set
+          // For INSERT: check if the lesson_id belongs to this module
+          const isExistingContentInModule = changedId && moduleContentIdsRef.current.has(changedId);
+          const isNewContentForModuleLesson =
+            payload.eventType === 'INSERT' &&
+            lessonId &&
+            moduleLessonIdsRef.current.has(lessonId);
 
-          // Refetch data on any change
-          fetchLessonData();
+          if (isExistingContentInModule || isNewContentForModuleLesson) {
+            logger.debug('Realtime update received for module lesson', {
+              event: payload.eventType,
+              lessonContentId: changedId,
+              lessonId,
+              isExistingContentInModule,
+              isNewContentForModuleLesson,
+            });
+
+            // Refetch data to get updated state
+            fetchLessonData();
+          } else {
+            logger.debug('Realtime update ignored (not in current module)', {
+              event: payload.eventType,
+              lessonContentId: changedId,
+              lessonId,
+            });
+          }
         }
       )
       .subscribe();

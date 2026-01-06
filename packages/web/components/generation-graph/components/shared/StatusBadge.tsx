@@ -38,6 +38,7 @@ export const StatusBadge = ({
   // Default labels (Russian)
   const defaultLabels: Record<NodeStatus, string> = {
     completed: 'Готово',
+    approved: 'Проверено',
     active: 'Активно',
     error: 'Ошибка',
     awaiting: 'Ожидает',
@@ -48,6 +49,7 @@ export const StatusBadge = ({
   // Variant-specific styling
   const variantStyles: Record<NodeStatus, string> = {
     completed: 'text-emerald-700 dark:text-emerald-300 bg-emerald-100 dark:bg-emerald-900/30',
+    approved: 'text-purple-700 dark:text-purple-300 bg-purple-100 dark:bg-purple-900/30',
     active: 'text-blue-700 dark:text-blue-300 bg-blue-100 dark:bg-blue-900/30',
     error: 'text-red-700 dark:text-red-300 bg-red-100 dark:bg-red-900/30',
     awaiting: 'text-slate-600 dark:text-slate-400 bg-slate-100 dark:bg-slate-800',

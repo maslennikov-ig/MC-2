@@ -22,6 +22,7 @@
 import { NextRequest, NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { logger } from '@/lib/logger';
+import { isValidUUID } from '@/lib/validation-utils';
 
 /**
  * Input schema for file upload request
@@ -87,8 +88,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Validate courseId format (UUID)
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
-    if (!uuidRegex.test(body.courseId)) {
+    if (!isValidUUID(body.courseId)) {
       return NextResponse.json(
         { error: 'Некорректный формат ID курса', code: 'INVALID_REQUEST' },
         { status: 400 }

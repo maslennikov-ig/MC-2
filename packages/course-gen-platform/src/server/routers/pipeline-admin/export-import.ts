@@ -12,6 +12,7 @@
 
 import { z } from 'zod';
 import { TRPCError } from '@trpc/server';
+import { createRequire } from 'node:module';
 import { router } from '../../trpc';
 import { superadminProcedure } from '../../procedures';
 import type {
@@ -24,6 +25,11 @@ import type {
 import { getSupabaseAdmin } from '../../../shared/supabase/admin';
 import { logger } from '../../../shared/logger/index.js';
 import { logPipelineAction } from '../../../services/pipeline-audit';
+
+// Get package version for export metadata
+const require = createRequire(import.meta.url);
+const packageJson = require('../../../../package.json') as { version: string };
+const PLATFORM_VERSION = packageJson.version;
 
 // Type aliases for Database tables
 type PipelineGlobalSetting = Database['public']['Tables']['pipeline_global_settings']['Row'];
@@ -159,7 +165,7 @@ export const exportImportRouter = router({
         version: '1.0' as const,
         exportedAt: new Date().toISOString(),
         exportedBy: ctx.user.id,
-        platformVersion: '0.22.3', // TODO: Read from package.json
+        platformVersion: PLATFORM_VERSION,
         data: {
           modelConfigs,
           promptTemplates,
@@ -494,7 +500,7 @@ export const exportImportRouter = router({
             version: '1.0',
             exportedAt: new Date().toISOString(),
             exportedBy: ctx.user.id,
-            platformVersion: '0.22.3',
+            platformVersion: PLATFORM_VERSION,
             data: {
               modelConfigs: currentModels || [],
               promptTemplates: currentPrompts || [],

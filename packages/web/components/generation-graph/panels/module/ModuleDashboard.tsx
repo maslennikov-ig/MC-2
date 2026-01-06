@@ -44,8 +44,10 @@ interface ModuleDashboardProps {
   onExportAll?: () => void;
   onRegenerateFailed?: () => void;
   onImproveQuality?: () => void;
+  onApproveAll?: () => void;
   isExporting?: boolean;
   isRegenerating?: boolean;
+  isApproving?: boolean;
   className?: string;
 }
 
@@ -64,8 +66,10 @@ export function ModuleDashboard({
   onExportAll,
   onRegenerateFailed,
   onImproveQuality,
+  onApproveAll,
   isExporting = false,
   isRegenerating = false,
+  isApproving = false,
   className,
 }: ModuleDashboardProps) {
   const { selectNode } = useNodeSelection();
@@ -134,6 +138,7 @@ export function ModuleDashboard({
     avgQuality: (data.aggregates.avgQualityScore ?? 0) * 100, // Convert 0-1 to 0-100
     statusCounts: {
       completed: data.aggregates.completedLessons,
+      approved: data.aggregates.approvedLessons ?? 0,
       active: data.aggregates.activeLessons,
       pending: data.aggregates.pendingLessons,
       failed: data.aggregates.errorLessons,
@@ -183,8 +188,10 @@ export function ModuleDashboard({
           onExportAll={onExportAll || (() => {})}
           onRegenerateFailed={onRegenerateFailed || (() => {})}
           onImproveQuality={onImproveQuality || (() => {})}
+          onApproveAll={onApproveAll || (() => {})}
           isExporting={isExporting}
           isRegenerating={isRegenerating}
+          isApproving={isApproving}
           className="flex-shrink-0"
         />
       </div>

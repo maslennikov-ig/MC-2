@@ -2,22 +2,17 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAdminClient } from '@/lib/supabase/client-factory'
 import { logger } from '@/lib/logger'
 import { authenticateRequest } from '@/lib/auth'
+import { isValidUUID } from '@/lib/validation-utils'
 import { type OrgRole } from '@megacampus/shared-types'
-import type { SupabaseClient } from '@supabase/supabase-js'
 
 type RouteParams = { params: Promise<{ orgId: string; userId: string }> }
 
-// Helper to cast supabase client to any for tables not in generated types
-// TODO: Remove after organization_members migration is applied and types regenerated
-function getUntypedClient(): SupabaseClient {
-  return getAdminClient() as unknown as SupabaseClient
-}
 
 /**
  * Helper to get user's role in an organization
  */
 async function getUserOrgRole(userId: string, orgId: string): Promise<OrgRole | null> {
-  const supabase = getUntypedClient()
+  const supabase = getAdminClient()
   const { data } = await supabase
     .from('organization_members')
     .select('role')
@@ -46,11 +41,10 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     }
 
     const { orgId, userId: targetUserId } = await params
-    const supabase = getUntypedClient()
+    const supabase = getAdminClient()
 
     // Validate UUID format
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-    if (!uuidRegex.test(orgId) || !uuidRegex.test(targetUserId)) {
+    if (!isValidUUID(orgId) || !isValidUUID(targetUserId)) {
       return NextResponse.json(
         { error: 'Invalid ID format' },
         { status: 400 }

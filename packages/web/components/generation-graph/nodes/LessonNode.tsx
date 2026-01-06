@@ -154,6 +154,14 @@ const LessonNode = (props: NodeProps<RFLessonNode>) => {
 
   // Status text for Line 2 - consistent with DocumentNode style
   const getStatusText = () => {
+    if (currentStatus === 'approved') {
+      return (
+        <span className="text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-1">
+          <Check size={10} className="inline" />
+          Одобрен
+        </span>
+      );
+    }
     if (currentStatus === 'completed') {
       return (
         <span className="text-green-600 dark:text-green-400 font-medium">

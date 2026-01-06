@@ -71,6 +71,8 @@ function getRowClassName(status: LessonMatrixRow['status']): string {
       return 'bg-blue-50 dark:bg-blue-950/30 font-semibold text-blue-900 dark:text-blue-100';
     case 'completed':
       return '';
+    case 'approved':
+      return 'bg-purple-50 dark:bg-purple-950/20';
     case 'error':
       return 'text-red-600 dark:text-red-400';
   }
@@ -118,6 +120,7 @@ function ActionButton({
         </Button>
       );
     case 'completed':
+    case 'approved':
       return (
         <Button
           variant="ghost"

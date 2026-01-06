@@ -32,7 +32,9 @@ import { getLessonContent } from './procedures/get-lesson-content';
 import { cancelStage6 } from './procedures/cancel';
 import { partialGenerate } from './procedures/partial-generate';
 import { approveLesson } from './procedures/approve-lesson';
+import { approveLessons } from './procedures/approve-lessons';
 import { updateLessonContent } from './procedures/update-content';
+import { deleteLesson } from './procedures/delete-lesson';
 
 /**
  * Lesson content router
@@ -44,8 +46,10 @@ import { updateLessonContent } from './procedures/update-content';
  * - getLessonContent: Retrieve generated content
  * - cancelStage6: Cancel pending jobs
  * - partialGenerate: Regenerate specific lessons or sections
- * - approveLesson: Approve a lesson after review
+ * - approveLesson: Approve a single lesson after review
+ * - approveLessons: Batch approve lessons for a course or module
  * - updateLessonContent: Update lesson content with manual edits
+ * - deleteLesson: Delete a lesson and all related data (cascading)
  */
 export const lessonContentRouter = router({
   startStage6,
@@ -55,7 +59,9 @@ export const lessonContentRouter = router({
   cancelStage6,
   partialGenerate,
   approveLesson,
+  approveLessons,
   updateLessonContent,
+  deleteLesson,
 });
 
 /**

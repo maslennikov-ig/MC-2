@@ -13,6 +13,7 @@ import { addJob } from '../../../../orchestrator/queue';
 import { JobType } from '@megacampus/shared-types';
 import type { LessonContentJobData } from '@megacampus/shared-types';
 import { logger } from '../../../../shared/logger/index.js';
+import { validateLocale } from '@/shared/validation';
 
 /**
  * Start Stage 6 generation for a course
@@ -89,7 +90,7 @@ export const startStage6 = protectedProcedure
             ragChunks: [], // Deprecated: RAG chunks are now fetched by handler via retrieveLessonContext()
             ragContextId: null,
             language: course.language, // Pass course language for content generation
-            locale: 'ru', // TODO: Get from user session/profile
+            locale: validateLocale(course.language),
           };
 
           // Deterministic job ID for deduplication

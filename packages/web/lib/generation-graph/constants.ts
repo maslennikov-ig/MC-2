@@ -104,6 +104,12 @@ export const NODE_STYLES: NodeStyles = {
     text: '#065F46',
     header: '#10B981',
   },
+  approved: {
+    background: '#C7F9E2', // Slightly more saturated green than completed
+    border: '#059669',     // Darker green for approved
+    text: '#064E3B',
+    header: '#059669',
+  },
   error: {
     background: '#FEE2E2',
     border: '#EF4444',

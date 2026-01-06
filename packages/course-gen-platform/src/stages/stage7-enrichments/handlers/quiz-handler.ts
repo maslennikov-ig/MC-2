@@ -14,6 +14,7 @@
 
 import { logger } from '@/shared/logger';
 import { llmClient } from '@/shared/llm/client';
+import { resolveModelWithFallback } from '@/shared/llm/model-config-service';
 import type { EnrichmentHandler } from '../services/enrichment-router';
 import type {
   EnrichmentHandlerInput,
@@ -184,10 +185,14 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
     settings: quizSettings,
   });
 
-  // Get model from settings or use fallback
-  // Priority: settings.model → FALLBACK_MODEL (DEFAULT_MODEL_ID)
-  // TODO: Add support for llm_model_config table lookup (stage_7_quiz phase)
-  const model = (settings.model as string) || FALLBACK_MODEL;
+  // Get model with optimized resolution: settings → database → fallback
+  const model = await resolveModelWithFallback({
+    settingsModel: settings.model as string | undefined,
+    phaseName: 'stage_7_quiz',
+    courseId: enrichmentContext.course.id,
+    fallbackModel: FALLBACK_MODEL,
+    logContext: { enrichmentId: enrichmentContext.enrichment.id, lessonId: enrichmentContext.lesson.id },
+  });
 
   try {
     // Generate quiz via LLM

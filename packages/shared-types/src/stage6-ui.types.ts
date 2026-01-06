@@ -291,7 +291,7 @@ export interface LessonMatrixRow {
   /** Lesson title */
   title: string;
   /** Overall lesson status (derived from pipeline state) */
-  status: 'pending' | 'active' | 'completed' | 'error';
+  status: 'pending' | 'active' | 'completed' | 'approved' | 'error';
   /** Compact pipeline state for micro-stepper */
   pipelineState: MicroStepperState;
   /** Final quality score from judge (0-1, null if not judged yet) */
@@ -315,8 +315,10 @@ export interface LessonMatrixRow {
 export interface ModuleDashboardAggregates {
   /** Total number of lessons in module */
   totalLessons: number;
-  /** Number of completed lessons */
+  /** Number of completed lessons (generated but not yet reviewed) */
   completedLessons: number;
+  /** Number of approved lessons (reviewed and ready for publication) */
+  approvedLessons: number;
   /** Number of active (processing) lessons */
   activeLessons: number;
   /** Number of error lessons */

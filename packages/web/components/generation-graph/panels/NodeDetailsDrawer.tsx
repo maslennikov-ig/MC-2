@@ -40,7 +40,12 @@ import { useNodeStatus } from '../hooks/useNodeStatus';
 import { TraceAttempt } from '@megacampus/shared-types';
 import { isAwaitingApproval as getAwaitingStageNumber } from '@/lib/generation-graph/utils';
 import { toast } from 'sonner';
-import { approveLesson, retryLessonGeneration } from '@/app/actions/lesson-actions';
+import {
+  approveLesson,
+  retryLessonGeneration,
+  deleteLesson,
+  approveLessons,
+} from '@/app/actions/lesson-actions';
 // Stage 6 "Glass Factory" UI components
 import { ModuleDashboard } from './module/ModuleDashboard';
 import { LessonPanelWithTabs } from './lesson/LessonPanelWithTabs';
@@ -83,7 +88,9 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
   const [isLessonMaximized, setIsLessonMaximized] = useState(false);
   const [showRestartDialog, setShowRestartDialog] = useState(false);
   const [isApproving, setIsApproving] = useState(false);
+  const [isApprovingAll, setIsApprovingAll] = useState(false);
   const [isRetrying, setIsRetrying] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
 
   // Check if there's a pending enrichment create from toolbar
   const pendingCreateType = useEnrichmentInspectorStore((state) => state.pendingCreateType);
@@ -232,6 +239,27 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
     }
   }, [lessonInfoForInspector, courseInfo.id]);
 
+  // Handler for deleting a lesson
+  const handleDeleteLesson = useCallback(async () => {
+    if (!lessonInfoForInspector) return;
+
+    setIsDeleting(true);
+    try {
+      const result = await deleteLesson(courseInfo.id, lessonInfoForInspector.lessonId);
+      if (result.success) {
+        toast.success('Урок удалён');
+        // Close the drawer after successful deletion
+        deselectNode();
+      } else {
+        toast.error('Не удалось удалить урок');
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Ошибка удаления урока');
+    } finally {
+      setIsDeleting(false);
+    }
+  }, [lessonInfoForInspector, courseInfo.id, deselectNode]);
+
   const lessonIdForFetch = useMemo(() => {
     if (!isLessonNode || !selectedNodeId) return null;
     // Convert lesson_1_2 format to 1.2 format for API
@@ -257,6 +285,7 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
     data: moduleDashboardData,
     isLoading: isLoadingModuleDashboard,
     error: moduleDashboardError,
+    refetch: refetchModuleDashboard,
   } = useModuleDashboardData({
     courseId: courseInfo.id,
     moduleId: moduleIdForDashboard,
@@ -283,6 +312,38 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
     lessonId: lessonInfoForInspector?.lessonId ?? null,
     enabled: isStage6Lesson && !!lessonInfoForInspector,
   });
+
+  // Handler for approving all lessons in a module
+  const handleApproveAllLessons = useCallback(async () => {
+    if (!moduleIdForDashboard) return;
+
+    // Extract module number from moduleId (e.g., "module_1" -> 1)
+    const match = moduleIdForDashboard.match(/^module_(\d+)$/);
+    const moduleNumber = match ? parseInt(match[1], 10) : undefined;
+
+    setIsApprovingAll(true);
+    try {
+      const result = await approveLessons(courseInfo.id, moduleNumber);
+      if (result.success) {
+        const message = result.approvedCount > 0
+          ? `${t('actions.lessonsApproved')}: ${result.approvedCount}`
+          : t('actions.noLessonsToApprove');
+        if (result.skippedCount > 0) {
+          toast.success(`${message} (${t('actions.skipped')}: ${result.skippedCount})`);
+        } else {
+          toast.success(message);
+        }
+        // Trigger refetch to update dashboard with new approved status
+        refetchModuleDashboard();
+      } else {
+        toast.error(t('actions.failedToApproveLessons'));
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : t('actions.approvalError'));
+    } finally {
+      setIsApprovingAll(false);
+    }
+  }, [moduleIdForDashboard, courseInfo.id, refetchModuleDashboard]);
 
   // Reset phase and attempt selection when node changes
   useEffect(() => {
@@ -608,6 +669,8 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
               onExportAll={() => {/* TODO: Implement export */}}
               onRegenerateFailed={() => {/* TODO: Implement regenerate failed */}}
               onImproveQuality={() => {/* TODO: Implement improve quality */}}
+              onApproveAll={handleApproveAllLessons}
+              isApproving={isApprovingAll}
               className="h-full"
             />
           ) : isStage6Lesson ? (
@@ -622,12 +685,14 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
               onApprove={handleApproveLesson}
               onEdit={handleEditLesson}
               onRegenerate={handleRegenerateLesson}
+              onDelete={handleDeleteLesson}
               onRetryNode={handleRetryNode}
               isMaximized={isLessonMaximized}
               onToggleMaximize={() => setIsLessonMaximized(!isLessonMaximized)}
               className="h-full"
               isApproving={isApproving}
               isRegenerating={isRetrying}
+              isDeleting={isDeleting}
               tier={courseInfo.tier}
               defaultTab={pendingCreateType ? 'enrichments' : 'content'}
             />

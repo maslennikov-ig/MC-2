@@ -60,6 +60,7 @@ import type {
 } from '@megacampus/shared-types/analysis-result';
 import type { Phase6Output } from './phases/phase-6-rag-planning';
 import type pino from 'pino';
+import { validateLocale } from '@/shared/validation';
 
 /**
  * RT-004 style retry configuration for Stage 4 phases
@@ -259,7 +260,7 @@ export async function runAnalysisOrchestration(
       );
 
       // Allocate budget
-      budgetAllocation = allocateStage4Budget(documentInfos, input.language as 'ru' | 'en');
+      budgetAllocation = allocateStage4Budget(documentInfos, validateLocale(input.language));
 
       // Validate allocation
       validateStage4Budget(budgetAllocation);

@@ -61,9 +61,11 @@ interface LessonInspectorProps {
   onApprove?: () => void;
   onEdit?: () => void;
   onRegenerate?: () => void;
+  onDelete?: () => void;
   onRetryNode?: (node: string) => void;
   isApproving?: boolean;
   isRegenerating?: boolean;
+  isDeleting?: boolean;
   isMaximized?: boolean;
   onToggleMaximize?: () => void;
   className?: string;
@@ -89,9 +91,11 @@ export function LessonInspector({
   onApprove,
   onEdit,
   onRegenerate,
+  onDelete,
   onRetryNode,
   isApproving = false,
   isRegenerating = false,
+  isDeleting = false,
   isMaximized,
   onToggleMaximize,
   className,
@@ -338,8 +342,10 @@ export function LessonInspector({
       onApprove={onApprove || (() => {})}
       onEdit={onEdit || (() => {})}
       onRegenerate={onRegenerate || (() => {})}
+      onDelete={onDelete}
       isApproving={isApproving}
       isRegenerating={isRegenerating}
+      isDeleting={isDeleting}
       locale="ru"
       className="h-full"
     />

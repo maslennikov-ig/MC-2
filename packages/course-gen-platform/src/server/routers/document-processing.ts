@@ -29,6 +29,7 @@ import { addJob } from '../../orchestrator/queue';
 import { JobType } from '@megacampus/shared-types';
 import type { DocumentProcessingJobData } from '@megacampus/shared-types';
 import { deleteVectorsForDocument } from '../../shared/qdrant/lifecycle';
+import { validateLocale } from '@/shared/validation';
 
 // ============================================================================
 // Input Schemas
@@ -64,12 +65,12 @@ async function verifyCourseAccess(
   userId: string,
   organizationId: string,
   requestId: string
-): Promise<{ id: string; user_id: string; organization_id: string }> {
+): Promise<{ id: string; user_id: string; organization_id: string; language: string | null }> {
   const supabase = getSupabaseAdmin();
 
   const { data: course, error } = await supabase
     .from('courses')
-    .select('id, user_id, organization_id')
+    .select('id, user_id, organization_id, language')
     .eq('id', courseId)
     .single();
 
@@ -173,8 +174,8 @@ export const documentProcessingRouter = router({
       try {
         const supabase = getSupabaseAdmin();
 
-        // Step 1: Verify course access
-        await verifyCourseAccess(
+        // Step 1: Verify course access and get course language
+        const course = await verifyCourseAccess(
           courseId,
           currentUser.id,
           currentUser.organizationId,
@@ -277,7 +278,7 @@ export const documentProcessingRouter = router({
           chunkSize: 512,
           chunkOverlap: 50,
           createdAt: new Date().toISOString(),
-          locale: 'ru', // TODO: Get from user session/profile
+          locale: validateLocale(course.language),
         };
 
         const job = await addJob(

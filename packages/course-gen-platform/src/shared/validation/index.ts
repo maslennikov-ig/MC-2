@@ -10,3 +10,4 @@ export * from './quota-enforcer';
 export * from './enum-synonyms';
 export * from './preprocessing';
 export * from './semantic-matching';
+export * from './locale-validator';

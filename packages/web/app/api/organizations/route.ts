@@ -7,7 +7,6 @@ import {
   type OrganizationWithMembership,
   type OrgRole,
 } from '@megacampus/shared-types'
-import type { SupabaseClient } from '@supabase/supabase-js'
 
 /**
  * Sanitize text input to prevent XSS attacks
@@ -39,11 +38,6 @@ interface OrganizationRow {
   updated_at: string | null
 }
 
-// Helper to cast supabase client to any for tables not in generated types
-// TODO: Remove after organization_members migration is applied and types regenerated
-function getUntypedClient(): SupabaseClient {
-  return getAdminClient() as unknown as SupabaseClient
-}
 
 /**
  * GET /api/organizations
@@ -60,7 +54,7 @@ export async function GET(request: NextRequest) {
       )
     }
 
-    const supabase = getUntypedClient()
+    const supabase = getAdminClient()
 
     // Get organizations where user is a member, including their role and member count
     const { data: memberships, error: membershipsError } = await supabase
@@ -179,7 +173,7 @@ export async function POST(request: NextRequest) {
     const name = sanitizeText(parseResult.data.name)
     const slug = sanitizeSlug(parseResult.data.slug)
     const { tier, settings } = parseResult.data
-    const supabase = getUntypedClient()
+    const supabase = getAdminClient()
 
     // Check if slug is already taken
     const { data: existing } = await supabase

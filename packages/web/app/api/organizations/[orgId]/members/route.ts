@@ -2,13 +2,13 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getAdminClient } from '@/lib/supabase/client-factory'
 import { logger } from '@/lib/logger'
 import { authenticateRequest } from '@/lib/auth'
+import { isValidUUID } from '@/lib/validation-utils'
 import { z } from 'zod'
 import {
   orgRoleSchema,
   type OrganizationMemberWithUser,
   type OrgRole,
 } from '@megacampus/shared-types'
-import type { SupabaseClient } from '@supabase/supabase-js'
 
 type RouteParams = { params: Promise<{ orgId: string }> }
 
@@ -30,11 +30,6 @@ interface UserRow {
   avatar_url: string | null
 }
 
-// Helper to cast supabase client to any for tables not in generated types
-// TODO: Remove after organization_members migration is applied and types regenerated
-function getUntypedClient(): SupabaseClient {
-  return getAdminClient() as unknown as SupabaseClient
-}
 
 // Input schema for adding a member
 const addMemberInputSchema = z.object({
@@ -58,7 +53,7 @@ const updateMemberInputSchema = z.object({
  * Helper to get user's role in an organization
  */
 async function getUserOrgRole(userId: string, orgId: string): Promise<OrgRole | null> {
-  const supabase = getUntypedClient()
+  const supabase = getAdminClient()
   const { data } = await supabase
     .from('organization_members')
     .select('role')
@@ -93,11 +88,10 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     }
 
     const { orgId } = await params
-    const supabase = getUntypedClient()
+    const supabase = getAdminClient()
 
     // Validate UUID format
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-    if (!uuidRegex.test(orgId)) {
+    if (!isValidUUID(orgId)) {
       return NextResponse.json(
         { error: 'Invalid organization ID format' },
         { status: 400 }
@@ -205,11 +199,10 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     }
 
     const { orgId } = await params
-    const supabase = getUntypedClient()
+    const supabase = getAdminClient()
 
     // Validate UUID format
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-    if (!uuidRegex.test(orgId)) {
+    if (!isValidUUID(orgId)) {
       return NextResponse.json(
         { error: 'Invalid organization ID format' },
         { status: 400 }
@@ -354,11 +347,10 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     }
 
     const { orgId } = await params
-    const supabase = getUntypedClient()
+    const supabase = getAdminClient()
 
     // Validate UUID format
-    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
-    if (!uuidRegex.test(orgId)) {
+    if (!isValidUUID(orgId)) {
       return NextResponse.json(
         { error: 'Invalid organization ID format' },
         { status: 400 }

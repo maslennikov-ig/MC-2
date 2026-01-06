@@ -21,7 +21,8 @@ export type GraphNodeType =
 export type NodeStatus =
   | 'pending'   // Not yet started
   | 'active'    // Currently processing
-  | 'completed' // Successfully finished
+  | 'completed' // Successfully finished (not yet reviewed)
+  | 'approved'  // Reviewed and approved (ready for publication)
   | 'error'     // Failed with error
   | 'awaiting'  // Waiting for user approval
   | 'skipped';  // Optional step was skipped (FR-SS01)
@@ -563,6 +564,7 @@ export interface GraphTranslations {
     pending: { ru: string; en: string };
     active: { ru: string; en: string };
     completed: { ru: string; en: string };
+    approved: { ru: string; en: string };
     error: { ru: string; en: string };
     awaiting: { ru: string; en: string };
     skipped: { ru: string; en: string };
@@ -578,6 +580,26 @@ export interface GraphTranslations {
     zoomOut: { ru: string; en: string };
     approveAndContinue: { ru: string; en: string };
     approvalFailed: { ru: string; en: string };
+    approveAll: { ru: string; en: string };
+    approving: { ru: string; en: string };
+    lessonsApproved: { ru: string; en: string };
+    noLessonsToApprove: { ru: string; en: string };
+    skipped: { ru: string; en: string };
+    failedToApproveLessons: { ru: string; en: string };
+    approvalError: { ru: string; en: string };
+    approveAllLessonsTitle: { ru: string; en: string };
+    approveAllLessonsDescription: { ru: string; en: string };
+    approveAllLessonsWarning: { ru: string; en: string };
+    cancel: { ru: string; en: string };
+    export: { ru: string; en: string };
+    exporting: { ru: string; en: string };
+    exportAll: { ru: string; en: string };
+    noCompletedLessonsForExport: { ru: string; en: string };
+    retryErrors: { ru: string; en: string };
+    retrying: { ru: string; en: string };
+    noLessonsWithErrors: { ru: string; en: string };
+    improveQuality: { ru: string; en: string };
+    noLowQualityLessons: { ru: string; en: string };
     regenerate: { ru: string; en: string };
     regenerating: { ru: string; en: string };
     regenerationStarted: { ru: string; en: string };
@@ -843,6 +865,7 @@ export interface NodeStyles {
   pending: NodeColorScheme;
   active: NodeColorScheme;
   completed: NodeColorScheme;
+  approved: NodeColorScheme;
   error: NodeColorScheme;
   awaiting: NodeColorScheme;
   skipped: NodeColorScheme;
@@ -869,6 +892,12 @@ export const NODE_STYLES: NodeStyles = {
     border: '#10B981',
     text: '#065F46',
     header: '#10B981',
+  },
+  approved: {
+    background: '#C7F9E2', // Slightly more saturated green than completed
+    border: '#059669',     // Darker green for approved
+    text: '#064E3B',
+    header: '#059669',
   },
   error: {
     background: '#FEE2E2',

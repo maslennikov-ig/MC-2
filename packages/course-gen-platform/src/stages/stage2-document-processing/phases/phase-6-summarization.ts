@@ -36,6 +36,7 @@ import {
 } from '../../../shared/validation/quality-validator';
 import { createModelConfigService, getEffectiveStageConfig, type PhaseModelConfig } from '../../../shared/llm/model-config-service';
 import logger from '../../../shared/logger';
+import { validateLocale } from '@/shared/validation';
 
 /**
  * Default threshold for small document bypass (tokens)
@@ -950,7 +951,7 @@ async function getModelConfigForSummarization(
   const modelConfigService = createModelConfigService();
 
   // Language is now 'ru' or 'en' directly (ISO 639-1 format)
-  const langCode = language as 'ru' | 'en';
+  const langCode = validateLocale(language);
 
   // Calculate dynamic threshold based on model's max context and language reserve
   // Standard tier models in llm_model_config have max_context_tokens = 128000

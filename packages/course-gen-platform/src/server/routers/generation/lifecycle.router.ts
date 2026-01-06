@@ -29,6 +29,7 @@ import { generateGenerationCode } from '../../../shared/utils/generation-code';
 import { cleanupCourseResources } from '../../../shared/cleanup';
 import { workerReadiness, getReadinessFromRedis } from '../../../orchestrator/worker-readiness';
 import * as path from 'path';
+import { validateLocale } from '@/shared/validation';
 
 // Type aliases for Database tables
 type Course = Database['public']['Tables']['courses']['Row'];
@@ -98,7 +99,7 @@ export const lifecycleRouter = router({
         // T013: Verify course ownership and get organization tier
         const { data: course, error: courseError } = await supabase
           .from('courses')
-          .select('*, organization:organizations(tier)')
+          .select('*, language, organization:organizations(tier)')
           .eq('id', courseId)
           .single();
 
@@ -273,7 +274,7 @@ export const lifecycleRouter = router({
                 mimeType: file.mime_type,
                 chunkSize: 512,
                 chunkOverlap: 50,
-                locale: 'ru', // TODO: Get from user session/profile
+                locale: validateLocale(course.language),
               },
               options: { priority },
             };
@@ -817,7 +818,7 @@ export const lifecycleRouter = router({
         // Get course data for job payload
         const { data: course } = await supabase
           .from('courses')
-          .select('title, settings')
+          .select('title, settings, language')
           .eq('id', courseId)
           .single();
 
@@ -826,7 +827,7 @@ export const lifecycleRouter = router({
           courseId,
           userId,
           createdAt: new Date().toISOString(),
-          locale: 'ru' as const, // TODO: Get from user session/profile
+          locale: validateLocale(course?.language),
         };
 
         // Map stage number to job type and data

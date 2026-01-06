@@ -123,3 +123,73 @@ export async function retryLessonGeneration(
     jobId: result?.jobIds?.[0],
   };
 }
+
+/**
+ * Delete a lesson and all related data (cascading delete)
+ * Connects to trpc.lessonContent.deleteLesson
+ *
+ * @param courseId - Course UUID
+ * @param lessonId - Lesson ID in format "section.lesson" (e.g., "1.1", "2.3") or UUID
+ */
+export async function deleteLesson(
+  courseId: string,
+  lessonId: string,
+  signal?: AbortSignal
+): Promise<{ success: boolean; deletedLessonId?: string; deletedAssetsCount?: number }> {
+  const headers = await getBackendAuthHeaders();
+
+  const response = await fetch(`${TRPC_URL}/lessonContent.deleteLesson`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ courseId, lessonId }),
+    signal,
+  });
+
+  if (!response.ok) {
+    await extractApiError(response, 'Failed to delete lesson');
+  }
+
+  const data = await response.json();
+  const result = data?.result?.data || data;
+
+  return {
+    success: result?.success ?? false,
+    deletedLessonId: result?.deletedLessonId,
+    deletedAssetsCount: result?.deletedAssetsCount,
+  };
+}
+
+/**
+ * Approve multiple lessons (batch operation)
+ * Connects to trpc.lessonContent.approveLessons
+ *
+ * @param courseId - Course UUID
+ * @param moduleNumber - Optional module number to approve only lessons in that module
+ */
+export async function approveLessons(
+  courseId: string,
+  moduleNumber?: number,
+  signal?: AbortSignal
+): Promise<{ success: boolean; approvedCount: number; skippedCount: number }> {
+  const headers = await getBackendAuthHeaders();
+
+  const response = await fetch(`${TRPC_URL}/lessonContent.approveLessons`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ courseId, moduleNumber }),
+    signal,
+  });
+
+  if (!response.ok) {
+    await extractApiError(response, 'Failed to approve lessons');
+  }
+
+  const data = await response.json();
+  const result = data?.result?.data || data;
+
+  return {
+    success: result?.success ?? false,
+    approvedCount: result?.approvedCount ?? 0,
+    skippedCount: result?.skippedCount ?? 0,
+  };
+}

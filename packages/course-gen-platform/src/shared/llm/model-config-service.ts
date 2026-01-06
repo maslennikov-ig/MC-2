@@ -995,6 +995,88 @@ export function getEffectiveStageConfig(config: PhaseModelConfig): {
 }
 
 // ============================================================================
+// HELPER: MODEL RESOLUTION WITH FALLBACK
+// ============================================================================
+
+/**
+ * Options for model resolution
+ */
+export interface ResolveModelOptions {
+  /** Model from user settings (explicit override) - highest priority */
+  settingsModel?: string;
+  /** Phase name for database lookup */
+  phaseName: string;
+  /** Course ID for course-specific overrides */
+  courseId?: string;
+  /** Fallback model if all else fails */
+  fallbackModel: string;
+  /** Logger context for debugging */
+  logContext?: Record<string, unknown>;
+}
+
+/**
+ * Resolve model ID with priority: settings → database → fallback
+ *
+ * Optimization: skips database call entirely if settingsModel is provided.
+ *
+ * Priority order:
+ * 1. settingsModel (user explicit override) - skip DB call
+ * 2. database config (phaseConfig.modelId)
+ * 3. fallbackModel (hardcoded default)
+ *
+ * @param options - Resolution options
+ * @returns Resolved model ID
+ *
+ * @example
+ * ```typescript
+ * const model = await resolveModelWithFallback({
+ *   settingsModel: settings.model as string | undefined,
+ *   phaseName: 'stage_7_video',
+ *   courseId: enrichmentContext.course.id,
+ *   fallbackModel: DEFAULT_MODEL_ID,
+ *   logContext: { lessonId, enrichmentId },
+ * });
+ * ```
+ */
+export async function resolveModelWithFallback(options: ResolveModelOptions): Promise<string> {
+  const { settingsModel, phaseName, courseId, fallbackModel, logContext = {} } = options;
+
+  // Priority 1: User explicitly set model in settings - use it directly, skip DB call
+  if (settingsModel) {
+    logger.debug(
+      { ...logContext, model: settingsModel, source: 'settings' },
+      'Using model from settings (explicit override)'
+    );
+    return settingsModel;
+  }
+
+  // Priority 2: Try to get from database config
+  try {
+    const modelConfigService = createModelConfigService();
+    const phaseConfig = await modelConfigService.getModelForPhase(phaseName, courseId);
+    const model = phaseConfig.modelId || fallbackModel;
+
+    logger.debug(
+      { ...logContext, model, source: phaseConfig.modelId ? 'database' : 'fallback', phaseName },
+      'Model resolved from database config'
+    );
+    return model;
+  } catch (configError) {
+    // Priority 3: Database failed - use fallback
+    logger.warn(
+      {
+        ...logContext,
+        phaseName,
+        fallbackModel,
+        error: configError instanceof Error ? configError.message : String(configError),
+      },
+      'Failed to get model config from database, using fallback'
+    );
+    return fallbackModel;
+  }
+}
+
+// ============================================================================
 // SINGLETON EXPORT
 // ============================================================================
 

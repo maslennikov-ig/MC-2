@@ -23,6 +23,7 @@ export function ExampleMixedStatus() {
         avgQuality: 92, // 92% quality
         statusCounts: {
           completed: 8,
+          approved: 5,
           active: 1,
           pending: 1,
           failed: 0,
@@ -57,6 +58,7 @@ export function ExampleAllCompleted() {
         avgQuality: 88, // 88% quality
         statusCounts: {
           completed: 10,
+          approved: 10,
           active: 0,
           pending: 0,
           failed: 0,
@@ -85,6 +87,7 @@ export function ExampleWithErrors() {
         avgQuality: 75, // Lower quality due to errors
         statusCounts: {
           completed: 6,
+          approved: 3,
           active: 1,
           pending: 1,
           failed: 2,
@@ -113,6 +116,7 @@ export function ExampleAllPending() {
         avgQuality: 0, // No quality score yet
         statusCounts: {
           completed: 0,
+          approved: 0,
           active: 0,
           pending: 12,
           failed: 0,

@@ -13,6 +13,7 @@ import { addJob } from '../../../../orchestrator/queue';
 import { JobType } from '@megacampus/shared-types';
 import type { LessonContentJobData } from '@megacampus/shared-types';
 import { logger } from '../../../../shared/logger/index.js';
+import { validateLocale } from '@/shared/validation';
 
 /**
  * Retry a failed lesson
@@ -78,7 +79,7 @@ export const retryLesson = protectedProcedure
         ragChunks: [], // Deprecated: RAG chunks are now fetched by handler via retrieveLessonContext()
         ragContextId: null,
         language: course.language, // Pass course language for content generation
-        locale: 'ru', // TODO: Get from user session/profile
+        locale: validateLocale(course.language),
       };
 
       // Unique deduplication ID for retries (includes timestamp)

@@ -7,6 +7,17 @@ import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Badge } from '@/components/ui/badge';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+  AlertDialogTrigger,
+} from '@/components/ui/alert-dialog';
 import { MarkdownRendererFull } from '@/components/markdown';
 import { JsonViewer } from '../../shared/JsonViewer';
 import { Stage6StatsStrip } from './Stage6StatsStrip';
@@ -17,6 +28,7 @@ import {
   RotateCcw,
   AlertCircle,
   Loader2,
+  Trash2,
 } from 'lucide-react';
 import type {
   LessonContentPreview,
@@ -58,8 +70,10 @@ interface Stage6InspectorContentProps {
   onApprove: () => void;
   onEdit: () => void;
   onRegenerate: () => void;
+  onDelete?: () => void;
   isApproving?: boolean;
   isRegenerating?: boolean;
+  isDeleting?: boolean;
 
   // i18n
   locale?: 'ru' | 'en';
@@ -181,8 +195,10 @@ export const Stage6InspectorContent = memo(function Stage6InspectorContent({
   onApprove,
   onEdit,
   onRegenerate,
+  onDelete,
   isApproving = false,
   isRegenerating = false,
+  isDeleting = false,
   locale = 'en',
   className,
 }: Stage6InspectorContentProps) {
@@ -197,11 +213,19 @@ export const Stage6InspectorContent = memo(function Stage6InspectorContent({
     approve: locale === 'ru' ? 'Одобрить' : 'Approve',
     edit: locale === 'ru' ? 'Редактировать' : 'Edit',
     regenerate: locale === 'ru' ? 'Переделать' : 'Regenerate',
+    delete: locale === 'ru' ? 'Удалить' : 'Delete',
     approving: locale === 'ru' ? 'Одобрение...' : 'Approving...',
     regenerating: locale === 'ru' ? 'Переделывается...' : 'Regenerating...',
+    deleting: locale === 'ru' ? 'Удаление...' : 'Deleting...',
     noContent: locale === 'ru' ? 'Контент урока недоступен' : 'Lesson content unavailable',
     noMetadata: locale === 'ru' ? 'Метаданные недоступны' : 'Metadata unavailable',
     error: locale === 'ru' ? 'Ошибка генерации' : 'Generation Error',
+    deleteConfirmTitle: locale === 'ru' ? 'Удалить урок?' : 'Delete lesson?',
+    deleteConfirmDescription: locale === 'ru'
+      ? 'Это действие необратимо. Будут удалены все материалы урока, включая сгенерированный контент, обогащения (видео, аудио, квизы) и связанные файлы.'
+      : 'This action cannot be undone. All lesson materials will be deleted, including generated content, enrichments (videos, audio, quizzes) and related files.',
+    deleteConfirmCancel: locale === 'ru' ? 'Отмена' : 'Cancel',
+    deleteConfirmAction: locale === 'ru' ? 'Удалить' : 'Delete',
   };
 
   // Action bar visibility - show for completed OR error with content
@@ -289,11 +313,54 @@ export const Stage6InspectorContent = memo(function Stage6InspectorContent({
           {/* Actions (right-aligned) */}
           {showActions && (
             <div className="flex items-center gap-2 ml-auto pb-2">
+              {/* Delete button with confirmation dialog */}
+              {onDelete && (
+                <AlertDialog>
+                  <AlertDialogTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="sm"
+                      disabled={isDeleting || isRegenerating || isApproving}
+                      className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:text-red-400 dark:hover:text-red-300 dark:hover:bg-red-950/50"
+                    >
+                      {isDeleting ? (
+                        <>
+                          <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                          {labels.deleting}
+                        </>
+                      ) : (
+                        <>
+                          <Trash2 className="w-4 h-4 mr-2" />
+                          {labels.delete}
+                        </>
+                      )}
+                    </Button>
+                  </AlertDialogTrigger>
+                  <AlertDialogContent>
+                    <AlertDialogHeader>
+                      <AlertDialogTitle>{labels.deleteConfirmTitle}</AlertDialogTitle>
+                      <AlertDialogDescription>
+                        {labels.deleteConfirmDescription}
+                      </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                      <AlertDialogCancel>{labels.deleteConfirmCancel}</AlertDialogCancel>
+                      <AlertDialogAction
+                        onClick={onDelete}
+                        className="bg-red-600 hover:bg-red-700 text-white"
+                      >
+                        {labels.deleteConfirmAction}
+                      </AlertDialogAction>
+                    </AlertDialogFooter>
+                  </AlertDialogContent>
+                </AlertDialog>
+              )}
+
               <Button
                 variant="ghost"
                 size="sm"
                 onClick={onRegenerate}
-                disabled={isRegenerating || isApproving}
+                disabled={isRegenerating || isApproving || isDeleting}
               >
                 {isRegenerating ? (
                   <>
@@ -312,7 +379,7 @@ export const Stage6InspectorContent = memo(function Stage6InspectorContent({
                 variant="outline"
                 size="sm"
                 onClick={onEdit}
-                disabled={isApproving || isRegenerating}
+                disabled={isApproving || isRegenerating || isDeleting}
               >
                 <Edit3 className="w-4 h-4 mr-2" />
                 {labels.edit}
@@ -322,7 +389,7 @@ export const Stage6InspectorContent = memo(function Stage6InspectorContent({
                 variant="default"
                 size="sm"
                 onClick={onApprove}
-                disabled={isApproving || isRegenerating}
+                disabled={isApproving || isRegenerating || isDeleting}
               >
                 {isApproving ? (
                   <>

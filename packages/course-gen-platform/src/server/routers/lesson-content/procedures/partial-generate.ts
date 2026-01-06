@@ -15,6 +15,7 @@ import { JobType, parseAnalysisResult } from '@megacampus/shared-types';
 import type { LessonContentJobData, Language } from '@megacampus/shared-types';
 import type { LessonSpecificationV2 } from '@megacampus/shared-types/lesson-specification-v2';
 import { logger } from '../../../../shared/logger/index.js';
+import { validateLocale } from '@/shared/validation';
 
 /**
  * Partial Stage 6 generation for selected lessons
@@ -334,7 +335,7 @@ export const partialGenerate = protectedProcedure
             ragChunks: [], // Deprecated: RAG chunks are now fetched by handler via retrieveLessonContext()
             ragContextId: null,
             language: courseLanguage, // Pass course language for content generation
-            locale: 'ru', // TODO: Get from user session/profile
+            locale: validateLocale(courseLanguage),
           };
 
           // Deterministic job ID for deduplication
