@@ -11,6 +11,7 @@ import { partialGenerateInputSchema } from '../schemas';
 import { verifyCourseAccess, buildMinimalLessonSpec } from '../helpers';
 import { addJob } from '../../../../orchestrator/queue';
 import { getSupabaseAdmin } from '../../../../shared/supabase/admin';
+import { invalidateLessonUuidCache } from '../../../../shared/database/lesson-resolver';
 import { JobType, parseAnalysisResult } from '@megacampus/shared-types';
 import type { LessonContentJobData, Language } from '@megacampus/shared-types';
 import type { LessonSpecificationV2 } from '@megacampus/shared-types/lesson-specification-v2';
@@ -319,6 +320,77 @@ export const partialGenerate = protectedProcedure
           code: 'BAD_REQUEST',
           message: 'Failed to build lesson specifications from course structure',
         });
+      }
+
+      // Step 5.5: Ensure all lessons exist in database (recreate if deleted)
+      // This handles the case where a lesson was deleted but user wants to regenerate it
+      for (const spec of lessonSpecs) {
+        const [sectionNumStr, lessonNumStr] = spec.lesson_id.split('.');
+        const sectionNum = parseInt(sectionNumStr, 10);
+        const lessonNum = parseInt(lessonNumStr, 10);
+
+        // Find section ID
+        const { data: sectionData } = await supabase
+          .from('sections')
+          .select('id')
+          .eq('course_id', courseId)
+          .eq('order_index', sectionNum)
+          .single();
+
+        if (!sectionData) {
+          logger.warn({
+            requestId,
+            courseId,
+            lessonId: spec.lesson_id,
+            sectionNum,
+          }, 'Section not found in database for lesson recreation');
+          continue;
+        }
+
+        // Check if lesson exists
+        const { data: existingLesson } = await supabase
+          .from('lessons')
+          .select('id')
+          .eq('section_id', sectionData.id)
+          .eq('order_index', lessonNum)
+          .single();
+
+        if (!existingLesson) {
+          // Lesson was deleted - recreate it from course_structure
+          const section = courseStructure.sections.find(s => s.section_number === sectionNum);
+          const lesson = section?.lessons.find(l => l.lesson_number === lessonNum);
+
+          if (lesson) {
+            const { error: createError } = await supabase
+              .from('lessons')
+              .insert({
+                section_id: sectionData.id,
+                title: lesson.lesson_title,
+                order_index: lessonNum,
+                lesson_type: 'text',
+                duration_minutes: lesson.estimated_duration_minutes || 15,
+                objectives: lesson.lesson_objectives || [],
+              });
+
+            if (createError) {
+              logger.error({
+                requestId,
+                courseId,
+                lessonId: spec.lesson_id,
+                error: createError,
+              }, 'Failed to recreate deleted lesson');
+            } else {
+              // Invalidate UUID cache so worker can resolve the new lesson
+              await invalidateLessonUuidCache(courseId, spec.lesson_id);
+
+              logger.info({
+                requestId,
+                courseId,
+                lessonId: spec.lesson_id,
+              }, 'Lesson recreated after deletion');
+            }
+          }
+        }
       }
 
       // Step 6: Enqueue all lessons using addJob with deduplication
