@@ -19,6 +19,8 @@
  * - regenerateDraft: Regenerate draft for two-stage enrichments
  * - updateDraft: Update draft content before final generation
  * - approveDraft: Approve draft and trigger final generation
+ * - getAutoCard: Get automatically generated card for course/lesson
+ * - regenerateAutoCard: Regenerate automatic card for course/lesson
  *
  * Access Control:
  * - All endpoints enforce organization-level RLS via ctx.user.organizationId
@@ -42,6 +44,8 @@ import { updateDraft } from './procedures/update-draft';
 import { approveDraft } from './procedures/approve-draft';
 import { approveCoverDraft } from './procedures/approve-cover-draft';
 import { createBatch } from './procedures/create-batch';
+import { getAutoCard } from './procedures/get-auto-card';
+import { regenerateAutoCard } from './procedures/regenerate-auto-card';
 
 /**
  * Enrichment router
@@ -144,6 +148,18 @@ export const enrichmentRouter = router({
    * @see procedures/approve-cover-draft.ts
    */
   approveCoverDraft,
+
+  /**
+   * Get automatically generated card for course or lesson
+   * @see procedures/get-auto-card.ts
+   */
+  getAutoCard,
+
+  /**
+   * Regenerate automatic card for course or lesson
+   * @see procedures/regenerate-auto-card.ts
+   */
+  regenerateAutoCard,
 });
 
 /**

@@ -20,6 +20,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { MarkdownRendererFull } from '@/components/markdown';
 import { JsonViewer } from '../../shared/JsonViewer';
+import { AutoCardPreview } from '../../shared/AutoCardPreview';
 import { Stage6StatsStrip } from './Stage6StatsStrip';
 import { Stage6QualityTab } from './tabs/Stage6QualityTab';
 import {
@@ -74,6 +75,12 @@ interface Stage6InspectorContentProps {
   isApproving?: boolean;
   isRegenerating?: boolean;
   isDeleting?: boolean;
+
+  // Card preview
+  /** Lesson UUID for card preview */
+  lessonId?: string;
+  /** Course UUID for card preview */
+  courseId?: string;
 
   // i18n
   locale?: 'ru' | 'en';
@@ -199,10 +206,12 @@ export const Stage6InspectorContent = memo(function Stage6InspectorContent({
   isApproving = false,
   isRegenerating = false,
   isDeleting = false,
+  lessonId,
+  courseId,
   locale = 'en',
   className,
 }: Stage6InspectorContentProps) {
-  const [activeTab, setActiveTab] = useState<'preview' | 'quality' | 'blueprint' | 'trace'>('preview');
+  const [activeTab, setActiveTab] = useState<'preview' | 'quality' | 'blueprint' | 'trace' | 'card'>('preview');
 
   // Localized labels
   const labels = {
@@ -210,6 +219,7 @@ export const Stage6InspectorContent = memo(function Stage6InspectorContent({
     quality: locale === 'ru' ? 'Качество' : 'Quality',
     blueprint: locale === 'ru' ? 'Схема' : 'Blueprint',
     trace: locale === 'ru' ? 'Трассировка' : 'Trace',
+    card: locale === 'ru' ? 'Карточка' : 'Card',
     approve: locale === 'ru' ? 'Одобрить' : 'Approve',
     edit: locale === 'ru' ? 'Редактировать' : 'Edit',
     regenerate: locale === 'ru' ? 'Переделать' : 'Regenerate',
@@ -291,6 +301,25 @@ export const Stage6InspectorContent = memo(function Stage6InspectorContent({
       return <LogViewer logs={logs} locale={locale} />;
     }
 
+    if (activeTab === 'card') {
+      // Only render AutoCardPreview if both courseId and lessonId are provided
+      if (!courseId || !lessonId) {
+        return (
+          <div className="text-center py-12 text-sm text-muted-foreground">
+            {locale === 'ru' ? 'Карточка недоступна' : 'Card unavailable'}
+          </div>
+        );
+      }
+
+      return (
+        <AutoCardPreview
+          cardType="lesson"
+          courseId={courseId}
+          lessonId={lessonId}
+        />
+      );
+    }
+
     return null;
   };
 
@@ -305,6 +334,7 @@ export const Stage6InspectorContent = memo(function Stage6InspectorContent({
               <TabsTrigger value="quality">{labels.quality}</TabsTrigger>
               <TabsTrigger value="blueprint">{labels.blueprint}</TabsTrigger>
               <TabsTrigger value="trace">{labels.trace}</TabsTrigger>
+              <TabsTrigger value="card">{labels.card}</TabsTrigger>
             </TabsList>
           </Tabs>
 

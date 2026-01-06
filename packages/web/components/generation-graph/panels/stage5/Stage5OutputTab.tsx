@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { GRAPH_TRANSLATIONS } from '@/lib/generation-graph/translations';
 import { StructureTree } from './components/StructureTree';
+import { AutoCardPreview } from '../shared/AutoCardPreview';
 import type { Stage5OutputTabProps, CourseStructure } from './types';
 
 // ============================================================================
@@ -69,7 +70,7 @@ const DIFFICULTY_COLORS: Record<string, string> = {
  */
 export const Stage5OutputTab = memo<Stage5OutputTabProps>(function Stage5OutputTab({
   outputData,
-  courseId: _courseId, // Available for future use (e.g., fetching additional data)
+  courseId,
   editable: _editable = false, // Available for future use (e.g., inline editing)
   locale = 'ru',
 }) {
@@ -260,6 +261,12 @@ export const Stage5OutputTab = memo<Stage5OutputTabProps>(function Stage5OutputT
           </ScrollArea>
         </CardContent>
       </Card>
+
+      {/* Course Card Preview */}
+      <AutoCardPreview
+        cardType="course"
+        courseId={courseId}
+      />
     </div>
   );
 });

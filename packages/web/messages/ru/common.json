@@ -112,5 +112,20 @@
       "message": "Вы сейчас офлайн",
       "reconnected": "Подключение восстановлено"
     }
+  },
+  "autoCard": {
+    "courseCard": "Обложка курса",
+    "lessonCard": "Карточка урока",
+    "generating": "Генерация...",
+    "ready": "Готово",
+    "error": "Ошибка",
+    "cancelled": "Отменено",
+    "regenerate": "Перегенерировать",
+    "retry": "Повторить",
+    "generatedAt": "Создано",
+    "visualStyle": "Визуальный стиль",
+    "model": "Модель",
+    "notFound": "Карточка ещё не сгенерирована",
+    "cancelledMessage": "Генерация была отменена"
   }
 }

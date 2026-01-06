@@ -139,7 +139,8 @@ export interface Stage5OutputTabProps {
    * or unknown for validation
    */
   outputData?: CourseStructure | unknown;
-  courseId?: string;
+  /** Course UUID - required for AutoCardPreview */
+  courseId: string;
   editable?: boolean;
   locale?: 'ru' | 'en';
 }

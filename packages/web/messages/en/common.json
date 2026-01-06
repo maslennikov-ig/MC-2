@@ -112,5 +112,20 @@
       "message": "You are currently offline",
       "reconnected": "Back online"
     }
+  },
+  "autoCard": {
+    "courseCard": "Course Card",
+    "lessonCard": "Lesson Card",
+    "generating": "Generating...",
+    "ready": "Ready",
+    "error": "Error",
+    "cancelled": "Cancelled",
+    "regenerate": "Regenerate",
+    "retry": "Retry",
+    "generatedAt": "Generated",
+    "visualStyle": "Visual Style",
+    "model": "Model",
+    "notFound": "Card not generated yet",
+    "cancelledMessage": "Generation was cancelled"
   }
 }
