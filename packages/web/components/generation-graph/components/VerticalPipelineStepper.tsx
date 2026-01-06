@@ -774,10 +774,16 @@ function NodeOutputDisplayWithFallback({ node, output }: { node: Stage6NodeName;
 
   // If we have a specialized display for this node, use it
   if (hasSpecializedDisplay(node) && typeof output === 'object') {
+    // Note: For selfReviewer and judge nodes, we don't show ProgressSummaryDisplay
+    // because it contains attempts for ALL nodes, causing duplication.
+    // Their specialized components (SelfReviewerOutputDisplay, JudgeOutputDisplay)
+    // already show all necessary information.
+    const showProgressSummary = progressSummary && node === 'generator';
+
     return (
       <div className="space-y-4">
-        {/* Show progress summary first if available */}
-        {progressSummary && (
+        {/* Show progress summary only for generator node */}
+        {showProgressSummary && (
           <ProgressSummaryDisplay progressSummary={progressSummary} />
         )}
         {/* Then show specialized output display */}
