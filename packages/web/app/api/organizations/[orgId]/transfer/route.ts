@@ -4,7 +4,8 @@ import { authenticateRequest } from '@/lib/auth';
 import { logger } from '@/lib/logger';
 import { z } from 'zod';
 import { validateUUID, requireOrgRole } from '@/lib/organization-helpers';
-import { getRequestId, getClientInfo, ApiErrors } from '@/lib/api-utils';
+import { getRequestId, getClientInfo } from '@/lib/api-utils';
+import { jsonError, ERROR_CODES } from '@/lib/api-response';
 import { logAudit } from '@/lib/audit-log';
 
 const transferOwnershipSchema = z.object({
@@ -25,7 +26,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
     const user = await authenticateRequest(request);
     if (!user) {
-      return ApiErrors.unauthorized(requestId);
+      return jsonError(ERROR_CODES.UNAUTHORIZED, 'Authentication required', 401);
     }
 
     const { orgId } = await params;
@@ -33,13 +34,13 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     // Validate org ID format
     const orgValidation = validateUUID(orgId, 'organization ID');
     if (!orgValidation.valid) {
-      return ApiErrors.badRequest(orgValidation.error!, requestId);
+      return jsonError(ERROR_CODES.VALIDATION_ERROR, orgValidation.error!, 400);
     }
 
     // Only owner can transfer ownership
     const { authorized } = await requireOrgRole(user.id, orgId, ['owner']);
     if (!authorized) {
-      return ApiErrors.forbidden('Only the organization owner can transfer ownership', requestId);
+      return jsonError(ERROR_CODES.FORBIDDEN, 'Only the organization owner can transfer ownership', 403);
     }
 
     // Parse and validate request body
@@ -47,14 +48,14 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const parseResult = transferOwnershipSchema.safeParse(body);
 
     if (!parseResult.success) {
-      return ApiErrors.validationError(parseResult.error.errors, requestId);
+      return jsonError(ERROR_CODES.VALIDATION_ERROR, 'Validation failed', 400, parseResult.error.errors);
     }
 
     const { newOwnerId } = parseResult.data;
 
     // Cannot transfer to self
     if (newOwnerId === user.id) {
-      return ApiErrors.badRequest('Cannot transfer ownership to yourself', requestId);
+      return jsonError(ERROR_CODES.VALIDATION_ERROR, 'Cannot transfer ownership to yourself', 400);
     }
 
     const adminClient = getAdminClient();
@@ -68,13 +69,13 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     if (error) {
       logger.error('Ownership transfer RPC failed', { requestId, error: error.message });
-      return ApiErrors.databaseError(requestId);
+      return jsonError(ERROR_CODES.INTERNAL_ERROR, 'Database operation failed', 500);
     }
 
     const result = data as { success: boolean; error?: string; message?: string; new_owner_id?: string };
 
     if (!result.success) {
-      return ApiErrors.badRequest(result.error || 'Transfer failed', requestId);
+      return jsonError(ERROR_CODES.VALIDATION_ERROR, result.error || 'Transfer failed', 400);
     }
 
     // Log audit event
@@ -108,6 +109,6 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       requestId,
       error: error instanceof Error ? error.message : 'Unknown error',
     });
-    return ApiErrors.internal(requestId);
+    return jsonError(ERROR_CODES.INTERNAL_ERROR, 'An unexpected error occurred', 500);
   }
 }

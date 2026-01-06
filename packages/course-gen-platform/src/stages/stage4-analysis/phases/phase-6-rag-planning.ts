@@ -28,7 +28,7 @@ import { getModelForPhase } from '@/shared/llm/langchain-models';
 import { trackPhaseExecution, storeTraceData } from '../utils/observability';
 import type { SectionBreakdown } from '@megacampus/shared-types/analysis-result';
 import { safeJSONParse } from '@/shared/utils/json-repair';
-import { fixFieldNames } from '../utils/field-name-fix';
+import { fixFieldNames } from '@/shared/utils/field-name-fix';
 
 /**
  * Input data for Phase 6 RAG Planning

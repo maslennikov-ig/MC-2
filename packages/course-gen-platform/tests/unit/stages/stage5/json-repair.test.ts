@@ -11,8 +11,8 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { extractJSON, safeJSONParse } from '@/stages/stage5-generation/utils/json-repair';
-import type { RepairResult } from '@/stages/stage5-generation/utils/json-repair';
+import { extractJSON, safeJSONParse } from '@/shared/utils/json-repair';
+import type { RepairResult } from '@/shared/utils/json-repair';
 
 describe('extractJSON - Brace counting extraction', () => {
   it('should extract JSON from markdown code block', () => {

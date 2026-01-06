@@ -22,7 +22,7 @@ import type {
   SearchResponse,
 } from './search-types';
 import { generateSearchCacheKey, extractPayload } from './search-helpers';
-import { denseSearch, hybridSearch } from './search-operations';
+import { denseSearch, hybridSearchWithFallback } from './search-operations';
 import { logger } from '../logger/index.js';
 
 /**
@@ -150,7 +150,7 @@ export async function searchChunks(
     let searchResults: QdrantScoredPoint[];
 
     if (config.enable_hybrid) {
-      searchResults = await hybridSearch(queryText, config);
+      searchResults = await hybridSearchWithFallback(queryText, config);
     } else {
       searchResults = await denseSearch(queryText, config);
     }

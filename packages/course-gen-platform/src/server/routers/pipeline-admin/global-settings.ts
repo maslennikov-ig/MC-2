@@ -18,7 +18,6 @@ import { getSupabaseAdmin } from '../../../shared/supabase/admin';
 import { logger } from '../../../shared/logger/index.js';
 import type { GlobalSettings, Database } from '@megacampus/shared-types';
 import { logPipelineAction } from '../../../services/pipeline-audit';
-import { clearSettingsCache } from '../../../services/prompt-loader';
 
 // Type aliases for Database tables
 type PipelineGlobalSetting = Database['public']['Tables']['pipeline_global_settings']['Row'];
@@ -157,9 +156,6 @@ export const globalSettingsRouter = router({
           },
           { failOnError: true }
         );
-
-        // Invalidate prompt loader settings cache to ensure fresh feature flags
-        clearSettingsCache();
 
         logger.info(
           {

@@ -11,7 +11,7 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { fixFieldNames, fixFieldNamesWithLogging } from '@/stages/stage5-generation/utils/field-name-fix';
+import { fixFieldNames, fixFieldNamesWithLogging } from '@/shared/utils/field-name-fix';
 
 describe('fixFieldNames - Basic camelCase to snake_case', () => {
   it('should convert courseTitle to course_title', () => {

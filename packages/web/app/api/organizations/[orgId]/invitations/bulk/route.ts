@@ -5,7 +5,8 @@ import { logger } from '@/lib/logger';
 import { nanoid } from 'nanoid';
 import { z } from 'zod';
 import { requireOrgAdminAccess, validateUUID } from '@/lib/organization-helpers';
-import { getRequestId, getClientInfo, ApiErrors } from '@/lib/api-utils';
+import { getRequestId, getClientInfo } from '@/lib/api-utils';
+import { jsonError, ERROR_CODES } from '@/lib/api-response';
 import { logAudit } from '@/lib/audit-log';
 import { INVITATION_BULK_MAX_EMAILS } from '@megacampus/shared-types';
 
@@ -28,26 +29,26 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
   try {
     const user = await authenticateRequest(request);
     if (!user) {
-      return ApiErrors.unauthorized(requestId);
+      return jsonError(ERROR_CODES.UNAUTHORIZED, 'Authentication required', 401);
     }
 
     const { orgId } = await params;
 
     const orgValidation = validateUUID(orgId, 'organization ID');
     if (!orgValidation.valid) {
-      return ApiErrors.badRequest(orgValidation.error!, requestId);
+      return jsonError(ERROR_CODES.VALIDATION_ERROR, orgValidation.error!, 400);
     }
 
     const { authorized } = await requireOrgAdminAccess(user.id, orgId);
     if (!authorized) {
-      return ApiErrors.forbidden('Only owners and managers can create invitations', requestId);
+      return jsonError(ERROR_CODES.FORBIDDEN, 'Only owners and managers can create invitations', 403);
     }
 
     const body = await request.json();
     const parseResult = bulkInvitationSchema.safeParse(body);
 
     if (!parseResult.success) {
-      return ApiErrors.validationError(parseResult.error.errors, requestId);
+      return jsonError(ERROR_CODES.VALIDATION_ERROR, 'Validation failed', 400, parseResult.error.errors);
     }
 
     const { emails, role, expiresInDays } = parseResult.data;
@@ -76,7 +77,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     if (error) {
       logger.error('Bulk invitation creation failed', { requestId, error: error.message });
-      return ApiErrors.databaseError(requestId);
+      return jsonError(ERROR_CODES.INTERNAL_ERROR, 'Database operation failed', 500);
     }
 
     // Log audit event
@@ -102,6 +103,6 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       requestId,
       error: error instanceof Error ? error.message : 'Unknown error',
     });
-    return ApiErrors.internal(requestId);
+    return jsonError(ERROR_CODES.INTERNAL_ERROR, 'An unexpected error occurred', 500);
   }
 }
