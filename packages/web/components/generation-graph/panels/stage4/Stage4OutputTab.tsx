@@ -216,7 +216,7 @@ export const Stage4OutputTab = memo<Stage4OutputTabProps>(function Stage4OutputT
   autoFocus = false,
   readOnly = false,
   locale = 'ru',
-  onApproved,
+  onApproved: _onApproved, // Reserved for future use (approval handled by parent)
 }) {
   const t = GRAPH_TRANSLATIONS.stage4 as Record<string, { ru: string; en: string }>;
 
@@ -299,10 +299,6 @@ export const Stage4OutputTab = memo<Stage4OutputTabProps>(function Stage4OutputT
         autoFocus={autoFocus}
         readOnly={readOnly}
       />
-
-      {/* Approval callback is passed but not used directly here */}
-      {/* It's handled by parent component or AnalysisResultView internally */}
-      {onApproved && null}
     </div>
   );
 });

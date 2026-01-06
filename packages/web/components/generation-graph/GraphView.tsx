@@ -87,6 +87,21 @@ const edgeTypes: EdgeTypes = {
 };
 
 /**
+ * Type guard for validating VisualStyle data from database JSON.
+ * Ensures all 4 required string fields are present before use.
+ */
+function isVisualStyle(data: unknown): data is VisualStyle {
+  if (!data || typeof data !== 'object') return false;
+  const d = data as Record<string, unknown>;
+  return (
+    typeof d.colorScheme === 'string' &&
+    typeof d.aesthetic === 'string' &&
+    typeof d.visualElements === 'string' &&
+    typeof d.mood === 'string'
+  );
+}
+
+/**
  * Props for the GraphView component.
  */
 export interface GraphViewProps {
@@ -357,8 +372,8 @@ function GraphViewInner({ courseId, courseTitle, hasDocuments = true, failedAtSt
       }
 
       // Store visual_style if available (generated in Stage 4)
-      if (courseResult.data?.visual_style) {
-        setVisualStyle(courseResult.data.visual_style as unknown as VisualStyle);
+      if (courseResult.data?.visual_style && isVisualStyle(courseResult.data.visual_style)) {
+        setVisualStyle(courseResult.data.visual_style);
       }
 
       if (courseResult.data?.course_structure) {

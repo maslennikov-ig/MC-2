@@ -4,6 +4,7 @@ import React, { memo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { Palette, Sparkles, Shapes, Heart } from 'lucide-react';
+import { GRAPH_TRANSLATIONS } from '@/lib/generation-graph/translations';
 import type { VisualStyle } from '@megacampus/shared-types';
 
 // ============================================================================
@@ -18,22 +19,6 @@ interface VisualStylePreviewProps {
   /** Optional className */
   className?: string;
 }
-
-// ============================================================================
-// TRANSLATIONS
-// ============================================================================
-
-const TRANSLATIONS = {
-  title: { ru: 'Визуальный стиль курса', en: 'Course Visual Style' },
-  description: {
-    ru: 'Рекомендации для обложек и карточек',
-    en: 'Recommendations for covers and cards',
-  },
-  colorScheme: { ru: 'Цветовая палитра', en: 'Color Scheme' },
-  aesthetic: { ru: 'Эстетика', en: 'Aesthetic' },
-  visualElements: { ru: 'Визуальные элементы', en: 'Visual Elements' },
-  mood: { ru: 'Настроение', en: 'Mood' },
-};
 
 // ============================================================================
 // COMPONENT
@@ -52,33 +37,33 @@ const TRANSLATIONS = {
  */
 export const VisualStylePreview = memo<VisualStylePreviewProps>(
   function VisualStylePreview({ visualStyle, locale = 'ru', className }) {
-    const t = (key: keyof typeof TRANSLATIONS) => TRANSLATIONS[key][locale];
+    const t = GRAPH_TRANSLATIONS.stage4 as Record<string, { ru: string; en: string }>;
 
     const styleItems = [
       {
         icon: Palette,
-        label: t('colorScheme'),
+        label: t.visualStyleColorScheme?.[locale] ?? 'Color Scheme',
         value: visualStyle.colorScheme,
         iconColor: 'text-pink-500 dark:text-pink-400',
         bgColor: 'bg-pink-50 dark:bg-pink-950/30',
       },
       {
         icon: Sparkles,
-        label: t('aesthetic'),
+        label: t.visualStyleAesthetic?.[locale] ?? 'Aesthetic',
         value: visualStyle.aesthetic,
         iconColor: 'text-violet-500 dark:text-violet-400',
         bgColor: 'bg-violet-50 dark:bg-violet-950/30',
       },
       {
         icon: Shapes,
-        label: t('visualElements'),
+        label: t.visualStyleVisualElements?.[locale] ?? 'Visual Elements',
         value: visualStyle.visualElements,
         iconColor: 'text-blue-500 dark:text-blue-400',
         bgColor: 'bg-blue-50 dark:bg-blue-950/30',
       },
       {
         icon: Heart,
-        label: t('mood'),
+        label: t.visualStyleMood?.[locale] ?? 'Mood',
         value: visualStyle.mood,
         iconColor: 'text-amber-500 dark:text-amber-400',
         bgColor: 'bg-amber-50 dark:bg-amber-950/30',
@@ -93,15 +78,22 @@ export const VisualStylePreview = memo<VisualStylePreviewProps>(
           'dark:from-pink-950/20 dark:to-violet-950/20',
           className
         )}
+        role="article"
+        aria-labelledby="visual-style-title"
       >
         <CardHeader className="pb-2">
-          <CardTitle className="text-base font-semibold flex items-center gap-2">
-            <Palette className="h-4 w-4 text-pink-500" />
-            {t('title')}
+          <CardTitle
+            id="visual-style-title"
+            className="text-base font-semibold flex items-center gap-2"
+          >
+            <Palette className="h-4 w-4 text-pink-500" aria-hidden="true" />
+            {t.visualStyleTitle?.[locale] ?? 'Course Visual Style'}
           </CardTitle>
-          <p className="text-xs text-muted-foreground">{t('description')}</p>
+          <p className="text-xs text-muted-foreground">
+            {t.visualStyleDescription?.[locale] ?? 'Recommendations for covers and cards'}
+          </p>
         </CardHeader>
-        <CardContent className="space-y-3">
+        <CardContent className="space-y-3" role="list">
           {styleItems.map((item) => (
             <div
               key={item.label}
@@ -109,12 +101,15 @@ export const VisualStylePreview = memo<VisualStylePreviewProps>(
                 'flex items-start gap-3 p-2.5 rounded-lg',
                 item.bgColor
               )}
+              role="listitem"
+              aria-label={`${item.label}: ${item.value}`}
             >
               <div
                 className={cn(
                   'flex items-center justify-center w-8 h-8 rounded-md shrink-0',
                   'bg-white/80 dark:bg-slate-800/80'
                 )}
+                aria-hidden="true"
               >
                 <item.icon className={cn('h-4 w-4', item.iconColor)} />
               </div>

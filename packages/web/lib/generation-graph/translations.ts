@@ -792,6 +792,15 @@ export const GRAPH_TRANSLATIONS: GraphTranslations & {
     // Error states
     errorAnalysis: { ru: 'Ошибка анализа', en: 'Analysis Error' },
     retryAnalysis: { ru: 'Повторить анализ', en: 'Retry Analysis' },
+
+    // Visual Style Preview
+    visualStyleTitle: { ru: 'Визуальный стиль курса', en: 'Course Visual Style' },
+    visualStyleDescription: { ru: 'Рекомендации для обложек и карточек', en: 'Recommendations for covers and cards' },
+    visualStyleColorScheme: { ru: 'Цветовая палитра', en: 'Color Scheme' },
+    visualStyleAesthetic: { ru: 'Эстетика', en: 'Aesthetic' },
+    visualStyleVisualElements: { ru: 'Визуальные элементы', en: 'Visual Elements' },
+    visualStyleMood: { ru: 'Настроение', en: 'Mood' },
+    teachingStyle: { ru: 'Стиль', en: 'Style' },
   },
   stage5: {
     // Tab names
