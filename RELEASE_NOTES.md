@@ -3,6 +3,18 @@
 _Released on 2025-12-26_
 
 
+## v0.26.70
+
+_Released on 2026-01-06_
+
+### ✨ New Features
+
+- **web**: Add 1 source file(s), update 8 source file(s)
+
+---
+
+_This release was automatically generated from 1 commits._
+
 ## v0.26.69
 
 _Released on 2026-01-06_
