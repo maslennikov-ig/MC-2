@@ -198,15 +198,6 @@ export default async function CoursePage({ params }: CoursePageProps) {
   const sectionsWithLessons = prepareSectionsForViewer(sections, lessons, course.id)
   const lessonsForViewer = prepareLessonsForViewer(lessons, course.id)
 
-  // If course is still generating, redirect to generation page
-  const isGenerating = course.generation_status &&
-    !['completed', 'failed', 'cancelled'].includes(course.generation_status);
-
-  if (isGenerating) {
-    const { redirect } = await import('next/navigation')
-    redirect(`/courses/generating/${slug}`)
-  }
-
   return (
     <CourseErrorBoundary>
       <CourseViewerEnhanced

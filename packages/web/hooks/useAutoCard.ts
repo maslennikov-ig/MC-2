@@ -4,12 +4,26 @@ import { useState, useCallback, useEffect, useRef } from 'react';
 import { useSupabase } from '@/lib/supabase/browser-client';
 
 // Backend URL configuration (client-safe)
+// In production, use relative URL /api (nginx proxies to API server)
+// In development, use env var or default to localhost:3456
 const BACKEND_URL = (() => {
   const url = process.env.NEXT_PUBLIC_COURSEGEN_BACKEND_URL;
-  if (!url && typeof window !== 'undefined' && window.location.hostname !== 'localhost') {
-    console.error('NEXT_PUBLIC_COURSEGEN_BACKEND_URL not set in production');
+
+  // If env var is set, use it
+  if (url) return url;
+
+  // In browser, check if we're in production (not localhost)
+  if (typeof window !== 'undefined') {
+    const isProduction = window.location.hostname !== 'localhost' &&
+                         window.location.hostname !== '127.0.0.1';
+    if (isProduction) {
+      // Use relative URL - nginx proxies /api/trpc to API server
+      return '/api';
+    }
   }
-  return url || 'http://localhost:3456';
+
+  // Development fallback
+  return 'http://localhost:3456';
 })();
 const TRPC_URL = `${BACKEND_URL}/trpc`;
 
