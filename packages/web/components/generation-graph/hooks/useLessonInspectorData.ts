@@ -44,6 +44,7 @@ const NODE_PATTERNS: { pattern: RegExp; node: Stage6NodeName }[] = [
   { pattern: /^generator/i, node: 'generator' },
   { pattern: /^selfReviewer/i, node: 'selfReviewer' },
   { pattern: /^judge/i, node: 'judge' },
+  { pattern: /^coverGenerator/i, node: 'coverGenerator' },
 ];
 
 /**
@@ -54,6 +55,7 @@ const PHASE_TO_NODE_MAP: Record<string, Stage6NodeName> = {
   'generator': 'generator',
   'selfreviewer': 'selfReviewer',
   'judge': 'judge',
+  'covergenerator': 'coverGenerator',
 };
 
 /**
@@ -223,8 +225,8 @@ function buildPipelineState(traces: GenerationTraceRow[]): {
     }
   }
 
-  // Convert map to array in pipeline order (new 3-node pipeline)
-  const pipelineOrder: Stage6NodeName[] = ['generator', 'selfReviewer', 'judge'];
+  // Convert map to array in pipeline order (4-node pipeline with cover generation)
+  const pipelineOrder: Stage6NodeName[] = ['generator', 'selfReviewer', 'judge', 'coverGenerator'];
   const pipelineNodes = pipelineOrder
     .map((node) => nodeMap.get(node))
     .filter((node): node is PipelineNodeState => node !== undefined);
@@ -881,6 +883,16 @@ export function useLessonInspectorData({
 
       if (tracesError) throw tracesError;
 
+      // Step 5: Fetch lesson enrichment (cover/card) for this lesson
+      const { data: enrichmentData } = await supabase
+        .from('lesson_enrichments')
+        .select('id, status, enrichment_type, asset_id, content, metadata, created_at, updated_at')
+        .eq('lesson_id', lessonUuid)
+        .eq('enrichment_type', 'cover')
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
       // Skip if a newer fetch was started
       if (fetchId !== fetchIdRef.current) return;
 
@@ -888,13 +900,63 @@ export function useLessonInspectorData({
 
       // Build pipeline state
       const {
-        pipelineNodes,
+        pipelineNodes: basePipelineNodes,
         currentNode,
         totalTokensUsed,
         totalCostUsd,
         totalDurationMs,
         retryCount,
       } = buildPipelineState(traces);
+
+      // Add coverGenerator node based on enrichment status
+      const pipelineNodes = [...basePipelineNodes];
+      if (enrichmentData) {
+        // Map enrichment status to node status
+        // Enrichment statuses: pending, failed, cancelled, draft_generating, draft_ready, generating
+        let coverStatus: Stage6NodeStatus = 'pending';
+        if (enrichmentData.status === 'draft_ready') {
+          coverStatus = 'completed';
+        } else if (enrichmentData.status === 'generating' || enrichmentData.status === 'draft_generating') {
+          coverStatus = 'active';
+        } else if (enrichmentData.status === 'failed' || enrichmentData.status === 'cancelled') {
+          coverStatus = 'error';
+        }
+
+        const coverNode: PipelineNodeState = {
+          node: 'coverGenerator',
+          status: coverStatus,
+          startedAt: enrichmentData.created_at ? new Date(enrichmentData.created_at) : undefined,
+          completedAt: coverStatus === 'completed' && enrichmentData.updated_at
+            ? new Date(enrichmentData.updated_at)
+            : undefined,
+          output: {
+            status: enrichmentData.status,
+            assetId: enrichmentData.asset_id || undefined,
+            enrichmentId: enrichmentData.id,
+            // Extract imageUrl from content if available
+            imageUrl: (enrichmentData.content as Record<string, unknown>)?.url as string || undefined,
+            ...(enrichmentData.metadata as Record<string, unknown> || {}),
+          },
+        };
+
+        // Add or replace coverGenerator node
+        const existingCoverIndex = pipelineNodes.findIndex(n => n.node === 'coverGenerator');
+        if (existingCoverIndex >= 0) {
+          pipelineNodes[existingCoverIndex] = coverNode;
+        } else {
+          pipelineNodes.push(coverNode);
+        }
+      } else {
+        // No enrichment yet - check if judge is completed to show pending cover
+        const judgeNode = basePipelineNodes.find(n => n.node === 'judge');
+        if (judgeNode?.status === 'completed') {
+          // Judge completed but no cover yet - show as pending/generating
+          pipelineNodes.push({
+            node: 'coverGenerator',
+            status: 'pending',
+          });
+        }
+      }
 
       // Parse content if available
       const content = contentData ? parseLessonContent(contentData) : null;

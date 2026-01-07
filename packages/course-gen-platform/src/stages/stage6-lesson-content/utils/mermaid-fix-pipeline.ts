@@ -431,15 +431,18 @@ export async function runMermaidFixPipeline(
 
           if (llmResult.fixed) {
             // Validate LLM output doesn't contain XSS patterns
+            // NOTE: '-->' is VALID Mermaid flowchart syntax (A --> B), NOT an XSS pattern!
+            // We only check for actual HTML injection patterns
             const hasXSSPatterns =
-              llmResult.content.includes('-->') ||
               llmResult.content.includes('<script') ||
-              llmResult.content.includes('javascript:');
+              llmResult.content.includes('javascript:') ||
+              llmResult.content.includes('onerror=') ||
+              llmResult.content.includes('onclick=');
 
             if (hasXSSPatterns) {
               logger.warn(
                 { blockIndex: i, snippet: getDiagramSnippet(llmResult.content) },
-                'Mermaid pipeline: LLM output contains suspicious XSS patterns, rejecting fix'
+                'Mermaid pipeline: LLM output contains HTML injection patterns, rejecting fix'
               );
               // Don't use the LLM fix, continue to fallback
             } else {

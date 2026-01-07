@@ -19,14 +19,15 @@ import type { JudgeRecommendation, SelfReviewResult } from './judge-types';
 // =============================================================================
 
 /**
- * Stage6NodeName - The 3 pipeline nodes in Stage 6 lesson generation
+ * Stage6NodeName - The 4 pipeline nodes in Stage 6 lesson generation
  *
  * Pipeline flow:
  * 1. generator: Generates full lesson content (intro + sections + summary) in one pass
  * 2. selfReviewer: Pre-judge validation (Fail-Fast architecture)
  * 3. judge: Evaluates quality using CLEV voting and targeted refinement
+ * 4. coverGenerator: Generates lesson cover image (auto-triggered after judge completes)
  */
-export type Stage6NodeName = 'generator' | 'selfReviewer' | 'judge';
+export type Stage6NodeName = 'generator' | 'selfReviewer' | 'judge' | 'coverGenerator';
 
 /**
  * Stage6NodeStatus - Current status of a pipeline node
@@ -489,6 +490,7 @@ export const STAGE6_NODE_LABELS: Record<Stage6NodeName, { ru: string; descriptio
   generator: { ru: 'Генератор', description: 'Генерация полного контента урока' },
   selfReviewer: { ru: 'Самопроверка', description: 'Предварительная проверка качества' },
   judge: { ru: 'Оценка качества', description: 'Проверка критериев и доработка' },
+  coverGenerator: { ru: 'Обложка', description: 'Генерация обложки урока' },
 } as const;
 
 /**

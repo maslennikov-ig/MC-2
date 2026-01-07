@@ -728,15 +728,80 @@ function SelfReviewerOutputDisplay({ output }: { output: SelfReviewerOutput }) {
 
 /**
  * Check if we have a specialized display for this node type
- * 3-node pipeline: generator, selfReviewer, judge
+ * 4-node pipeline: generator, selfReviewer, judge, coverGenerator
  */
 function hasSpecializedDisplay(node: Stage6NodeName): boolean {
-  return ['generator', 'selfReviewer', 'judge'].includes(node);
+  return ['generator', 'selfReviewer', 'judge', 'coverGenerator'].includes(node);
+}
+
+/**
+ * Cover Generator output structure
+ */
+interface CoverGeneratorOutput {
+  status?: string;
+  imageUrl?: string;
+  model?: string;
+  durationMs?: number;
+  enrichmentId?: string;
+}
+
+/**
+ * Render human-readable output for CoverGenerator stage
+ */
+function CoverGeneratorOutputDisplay({ output }: { output: CoverGeneratorOutput }) {
+  const statusLabel = output.status === 'completed'
+    ? 'Готово'
+    : output.status === 'generating'
+      ? 'Генерируется...'
+      : output.status === 'failed'
+        ? 'Ошибка'
+        : output.status || 'Ожидание';
+
+  const statusColor = output.status === 'completed'
+    ? 'text-emerald-600 dark:text-emerald-400'
+    : output.status === 'generating'
+      ? 'text-blue-600 dark:text-blue-400'
+      : output.status === 'failed'
+        ? 'text-red-600 dark:text-red-400'
+        : 'text-slate-600 dark:text-slate-400';
+
+  return (
+    <div className="space-y-2">
+      <div className="flex items-center gap-2 text-slate-700 dark:text-slate-300">
+        <Sparkles className="w-4 h-4 text-pink-500" />
+        <span className="text-sm font-medium">Генерация обложки</span>
+      </div>
+
+      {/* Status */}
+      <div className="flex items-center gap-2 text-xs">
+        <span className="text-slate-600 dark:text-slate-400">Статус:</span>
+        <span className={cn('font-semibold', statusColor)}>{statusLabel}</span>
+      </div>
+
+      {/* Model used */}
+      {output.model && (
+        <div className="text-xs text-slate-500 dark:text-slate-400">
+          Модель: <span className="font-mono">{output.model}</span>
+        </div>
+      )}
+
+      {/* Image preview */}
+      {output.imageUrl && output.status === 'completed' && (
+        <div className="mt-2">
+          <img
+            src={output.imageUrl}
+            alt="Обложка урока"
+            className="w-24 h-24 object-cover rounded-lg border border-slate-200 dark:border-slate-700"
+          />
+        </div>
+      )}
+    </div>
+  );
 }
 
 /**
  * Render human-readable output based on node type
- * 3-node pipeline: generator, selfReviewer, judge
+ * 4-node pipeline: generator, selfReviewer, judge, coverGenerator
  */
 function NodeOutputDisplay({ node, output }: { node: Stage6NodeName; output: unknown }) {
   if (!output || typeof output !== 'object') {
@@ -750,6 +815,8 @@ function NodeOutputDisplay({ node, output }: { node: Stage6NodeName; output: unk
       return <SelfReviewerOutputDisplay output={output as SelfReviewerOutput} />;
     case 'judge':
       return <JudgeOutputDisplay output={output as JudgeOutput} />;
+    case 'coverGenerator':
+      return <CoverGeneratorOutputDisplay output={output as CoverGeneratorOutput} />;
     default:
       return null;
   }
@@ -1062,8 +1129,8 @@ export function VerticalPipelineStepper({
   onViewOutput,
   className,
 }: VerticalPipelineStepperProps) {
-  // Sort nodes in pipeline order (new 3-node pipeline)
-  const nodeOrder: Stage6NodeName[] = ['generator', 'selfReviewer', 'judge'];
+  // Sort nodes in pipeline order (4-node pipeline with cover generation)
+  const nodeOrder: Stage6NodeName[] = ['generator', 'selfReviewer', 'judge', 'coverGenerator'];
   const sortedNodes = nodeOrder.map(nodeName =>
     nodes.find(n => n.node === nodeName) || {
       node: nodeName,
