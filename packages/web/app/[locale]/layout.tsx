@@ -49,13 +49,16 @@ export function generateStaticParams() {
 const manrope = Manrope({
   variable: "--font-manrope",
   subsets: ["latin", "cyrillic"],
+  weight: ["400", "500", "600", "700"], // Only weights actually used
   display: "swap",
 });
 
 const jetbrainsMono = JetBrains_Mono({
   variable: "--font-jetbrains-mono",
   subsets: ["latin", "cyrillic"],
+  weight: ["400", "500"], // Only weights for code blocks
   display: "swap",
+  preload: false, // Don't preload - only used in code blocks
 });
 
 type Props = {
