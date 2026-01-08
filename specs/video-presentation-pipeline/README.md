@@ -2,7 +2,9 @@
 
 > Specification for automated educational video presentation generation
 
-## Current Status: Research Phase
+## Current Status: Research Completed ✅
+
+**Next Phase:** Design & Implementation
 
 ---
 
@@ -14,16 +16,15 @@
 
 ```
 ┌─────────────────────────────────────────────────────────────┐
-│  INTRO (7-15 sec)          │  MAIN CONTENT (3-45 min)      │
+│  INTRO (15 sec)            │  MAIN CONTENT (3-45 min)      │
 │  ─────────────────         │  ─────────────────────────    │
-│  AI Avatar/Talking Head    │  Animated Presentation        │
-│  introduces the topic      │  with voiceover from the      │
-│                            │  same speaker                 │
+│  AI Avatar (MuseTalk)      │  Slides + Voiceover           │
+│  introduces the topic      │  (same speaker voice)         │
 └─────────────────────────────────────────────────────────────┘
 ```
 
-1. **Intro (7-15 seconds)** — AI avatar/talking head presents the lesson topic
-2. **Main Content (3-45 minutes)** — Animated presentation with background voiceover from the same speaker voice
+1. **Intro (15 seconds)** — AI avatar presents the lesson topic
+2. **Main Content (3-45 minutes)** — Slides with voiceover narration
 
 ---
 
@@ -31,32 +32,35 @@
 
 ```
 specs/video-presentation-pipeline/
-├── README.md                      # This file (project context)
+├── README.md                           # This file
 │
-├── research/                      # Deep Research documents
-│   ├── tts/                       # TTS provider research (COMPLETED)
-│   │   ├── TTS Provider Research for Video Pipeline.md
-│   │   ├── TTS Solutions for E-Learning Video Production Complete Analysis.md
-│   │   ├── Murf AI TTS_ Глубокое исследование API.md
-│   │   ├── Исследование Cartesia Sonic-3 TTS.md
-│   │   └── Azure TTS для Video Pipeline_ Исследование.md
+├── docs/                               # Documents for stakeholders
+│   └── cost-comparison-for-client.md   # Cost variants for client (RU)
+│
+├── research/                           # Deep Research documents
+│   ├── AI Avatar Solutions...md        # Avatar research (COMPLETED)
+│   ├── E-Learning Video Generation...  # Script & SSML (COMPLETED)
+│   ├── E-Learning Video Pipeline...    # FFmpeg & Composition (COMPLETED)
+│   ├── Multi-Language Support...md     # 19 languages (COMPLETED)
 │   │
-│   ├── video/                     # Video generation research
-│   │   ├── video-poc-discussion-summary.md
-│   │   └── AI video generation models on hosting platforms (December 2025).md
+│   ├── architecture/                   # Architecture design
+│   │   └── deep-think-pipeline-architecture.md
 │   │
-│   ├── avatars/                   # AI avatar research (PENDING)
+│   ├── prompts/                        # Research prompts
+│   │   ├── deep-research-prompts-split.md
+│   │   └── deep-think-architecture-design.md
 │   │
-│   └── prompts/                   # Deep Research prompts
-│       └── deep-research-video-presentation-comprehensive.md  # ~800 lines
+│   ├── tts/                            # TTS provider research
+│   └── video/                          # Video generation research
 │
-├── guides/                        # Step-by-step setup guides
-│   └── azure-tts-setup-guide.md   # Azure TTS configuration (Russian)
+├── guides/                             # Setup guides
+│   └── azure-tts-setup-guide.md        # Azure TTS configuration
 │
-├── decisions/                     # Architecture Decision Records (ADR)
-│   └── TTS-provider-decision-final.md
+├── decisions/                          # Architecture Decision Records
+│   ├── TTS-provider-decision-final.md  # Azure TTS
+│   └── avatar-provider-decision.md     # MuseTalk (NEW)
 │
-└── spec/                          # Specification documents (TODO)
+└── spec/                               # Specification (TODO)
     ├── requirements.md
     ├── design.md
     └── tasks.md
@@ -66,38 +70,102 @@ specs/video-presentation-pipeline/
 
 ## Confirmed Decisions
 
-### TTS Provider: Azure Cognitive Services
+### 1. TTS Provider: Azure Cognitive Services ✅
 
 | Aspect | Decision |
 |--------|----------|
 | **Provider** | Azure TTS (Batch Synthesis API) |
-| **Why** | Word-level timestamps for ALL languages, Visemes for avatar lip-sync, 99.9% SLA |
+| **Why** | Word-level timestamps for ALL 19 languages, Visemes for lip-sync |
+| **Cost** | ~$0.02-0.03 per 5-min video |
 | **Document** | `decisions/TTS-provider-decision-final.md` |
-| **Setup Guide** | `guides/azure-tts-setup-guide.md` |
 
-**Alternatives Evaluated:** ElevenLabs, Murf AI, Cartesia Sonic-3, Google Cloud TTS, Amazon Polly
+### 2. Avatar: MuseTalk 1.5 (Self-Hosted) ✅
+
+| Aspect | Decision |
+|--------|----------|
+| **Provider** | MuseTalk 1.5 on RunPod GPU |
+| **Why** | MIT license (commercial OK), real-time speed, 60-360x cheaper than HeyGen/Synthesia |
+| **Cost** | ~$0.01 per 15-sec intro |
+| **Fallback** | HeyGen Enterprise API |
+| **Document** | `decisions/avatar-provider-decision.md` |
+
+### 3. Script Generation: Hybrid ✅
+
+| Aspect | Decision |
+|--------|----------|
+| **Approach** | Templates (60-70%) + LLM (30-40%) |
+| **LLM** | GPT-4o-mini or Claude Haiku |
+| **Cost** | ~$0.003 per lesson |
+
+### 4. Video Composition: FFmpeg + Remotion ✅
+
+| Aspect | Decision |
+|--------|----------|
+| **Long-form (45+ min)** | FFmpeg (Remotion has performance issues) |
+| **Animations** | Remotion + shiki-image (optional, Premium tier) |
+| **Encoding** | NVENC on RunPod (5-10x faster) |
+| **Delivery** | Supabase Storage (or Cloudflare Stream for global CDN) |
+
+### 5. Multi-Language: 19 Languages ✅
+
+| Aspect | Decision |
+|--------|----------|
+| **MVP Languages** | Russian + English |
+| **Full Support** | ru, en, zh, es, fr, de, ja, ko, ar, pt, it, tr, vi, th, id, ms, hi, bn, pl |
+| **Fonts** | Noto Sans family (CJK, Arabic, Indic, Thai) |
+| **RTL** | Arabic with proper mirroring |
 
 ---
 
-## Pending Research
+## Cost Summary
 
-| Research Area | Status | Prompt Location |
-|---------------|--------|-----------------|
-| AI Avatar / Talking Head | **NOT COMPLETED** | `research/prompts/deep-research-video-presentation-comprehensive.md` |
-| Animated Presentations | **NOT COMPLETED** | (included in comprehensive prompt above) |
-| Video Compositor | **NOT COMPLETED** | (included in comprehensive prompt above) |
+> Based on: 1 course = 80 lessons × 6.5 min average
 
-### Comprehensive Research Prompt (~800 lines)
+| Variant | Per Course | Per Lesson | Features |
+|---------|------------|------------|----------|
+| **Commercial** (HeyGen/Synthesia) | $800-2,000 | $10-25 | Full quality |
+| **Premium** (animations + CDN) | $16-20 | $0.20-0.25 | AI avatar, animations, global CDN |
+| **Optimal** (recommended) | $4-5 | $0.05-0.06 | AI avatar, static slides |
+| **Budget** | $2.50-3 | $0.03-0.04 | No avatar, static slides |
 
-**File:** `research/prompts/deep-research-video-presentation-comprehensive.md`
+**Details:** `docs/cost-comparison-for-client.md`
 
-**Covers:**
-- **Part 1**: AI Avatars (MuseTalk, LatentSync, Hallo3, HeyGen, D-ID, Synthesia) — **OPEN DECISION**
-- **Part 2**: Script Generation & SSML Synchronization
-- **Part 3**: Code Presentation in Video (syntax highlighting, animations)
-- **Part 4**: Video Composition (FFmpeg, Remotion)
-- **Part 5**: Multi-Language Support (19 languages)
-- **Part 6**: Quality Assurance & Monitoring
+---
+
+## Architecture Overview
+
+```
+LessonContent (JSON)
+    │
+    ├──► Script Generator (LLM) ──► SSML Script
+    │                                    │
+    │                                    ▼
+    │                              Azure TTS ──► Audio + Timestamps
+    │                                    │
+    │                                    ▼
+    │                              MuseTalk ──► Avatar Intro (15s)
+    │
+    ├──► Slide Generator ──► Slide Images (PNG)
+    │
+    └──► FFmpeg Compositor ──► Final Video ──► Storage
+```
+
+**Philosophy:** "Audio is the Master Clock" — visuals are rendered after audio duration is known.
+
+**Details:** `research/architecture/deep-think-pipeline-architecture.md`
+
+---
+
+## Implementation Phases
+
+| Phase | Duration | Deliverables |
+|-------|----------|--------------|
+| **MVP** | 3 weeks | Pipeline: TTS + Slides + FFmpeg (RU + EN) |
+| **Avatar** | +1-2 weeks | MuseTalk integration |
+| **Optimization** | +1-2 weeks | Caching, partial regeneration |
+| **Scale** | +1 week | All 19 languages, QA automation |
+
+**Total:** 6-8 weeks to production-ready
 
 ---
 
@@ -107,42 +175,39 @@ specs/video-presentation-pipeline/
 |-------------|----------|--------|
 | Word-level timestamps | CRITICAL | ✅ Azure TTS |
 | 19 languages support | CRITICAL | ✅ Azure TTS |
-| Visemes for lip-sync | HIGH | ✅ Azure TTS |
-| Animated presentations | HIGH | ⏳ Needs research |
-| AI avatar for intro | HIGH | ⏳ Needs research |
-| Target cost < $5/video | MEDIUM | TBD |
+| AI avatar for intro | HIGH | ✅ MuseTalk |
+| Target cost < $0.50/video | HIGH | ✅ $0.30-0.35 achieved |
+| Partial regeneration | MEDIUM | ✅ Designed |
+| Animated slides (optional) | LOW | ✅ Remotion (Premium tier) |
 
-### Language Support (19 languages)
+---
 
-```
-ru, en, zh, es, fr, de, ja, ko, ar, pt, it, tr, vi, th, id, ms, hi, bn, pl
-```
-
-### Scale Requirements
+## Scale Requirements
 
 - **Volume:** 100+ videos/day at scale
 - **Duration:** 3-45 minutes per lesson (most common: 5-15 min)
-- **Quality:** Corporate training level (not consumer-grade AI artifacts)
-- **Infrastructure:** TypeScript, BullMQ, Supabase, RunPod for GPU
+- **Quality:** Corporate training level
+- **Infrastructure:** TypeScript, BullMQ, Supabase, RunPod
 
 ---
 
 ## Next Steps
 
-1. **Execute Deep Research** — Run the comprehensive prompt to evaluate avatar solutions
-2. **Make Avatar Decision** — Select primary avatar/lip-sync solution
-3. **Azure Setup** — Configure Azure TTS using the setup guide
-4. **POC Implementation** — Build proof-of-concept pipeline
-5. **Write Specification** — Create requirements.md, design.md, tasks.md
+1. ✅ ~~Execute Deep Research~~ — Completed
+2. ✅ ~~Make Avatar Decision~~ — MuseTalk selected
+3. ⏳ **Write Specification** — requirements.md, design.md, tasks.md
+4. ⏳ **Azure Setup** — Configure Azure TTS
+5. ⏳ **POC Implementation** — Build MVP pipeline
+6. ⏳ **Production Deployment**
 
 ---
 
 ## Team
 
 - **Product Owner:** @maslennikov-ig
-- **Research:** Claude Code + Deep Research
+- **Research:** Claude Code + Deep Research + DeepThink
 
 ---
 
 *Created: 2025-12-29*
-*Last Updated: 2025-01-06*
+*Last Updated: 2025-01-08*
