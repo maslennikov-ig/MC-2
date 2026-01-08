@@ -154,6 +154,7 @@ bd formula list
 | `hotfix` | Экстренное исправление в проде |
 | `techdebt` | Работа с техническим долгом |
 | `healthcheck` | Bug-hunter → fix цикл |
+| `codereview` | Issues + Improvements анализ и фиксы |
 | `release` | Процесс релиза версии |
 | `exploration` | Исследование/spike |
 
@@ -206,6 +207,77 @@ bd ready
 bd update mc2-xxx --status in_progress
 # ... implement ...
 bd close mc2-xxx --reason "Done"
+```
+
+---
+
+## Health Check Workflows (с Beads)
+
+Все health workflows автоматически создают Beads wisp, issues для находок, и закрывают их после фикса.
+
+### Доступные workflows
+
+| Skill | Команда | Описание |
+|-------|---------|----------|
+| `code-review-inline` | "Код-ревью для ..." | Issues + Improvements |
+| `bug-health-inline` | `/health-bugs` | Баги и ошибки |
+| `security-health-inline` | `/security-health` | Security уязвимости |
+| `cleanup-health-inline` | `/cleanup-health` | Dead code |
+| `deps-health-inline` | `/deps-health` | Зависимости |
+| `reuse-health-inline` | `/reuse-health` | Дубликаты кода |
+
+### Code Review (Issues + Improvements)
+
+```bash
+# Запуск
+"Код-ревью для packages/web"
+"Код-ревью последних изменений и исправь всё"
+
+# Что делает:
+# 1. bd mol wisp exploration
+# 2. Анализ → Issues (BUG:) + Improvements (IMPROVE:)
+# 3. bd create для каждой находки
+# 4. [Спрашивает] → Fix all / Issues only / Skip
+# 5. Фиксит по приоритетам
+# 6. bd close после фикса
+# 7. bd mol squash + SESSION CLOSE PROTOCOL
+```
+
+**Категории:**
+
+| Категория | Beads Prefix | Приоритеты |
+|-----------|--------------|------------|
+| Issues (баги) | `BUG:`, `CLEANUP:` | P0-P3 |
+| Improvements | `IMPROVE:` | P2-P4 |
+
+### Health Check (Bug/Security/Cleanup/Deps/Reuse)
+
+```bash
+# Общий паттерн для всех health workflows:
+# 1. bd mol wisp {type}
+# 2. Detection → Report
+# 3. bd create для каждой находки
+# 4. Fix по приоритетам (critical → low)
+# 5. bd close после фикса
+# 6. bd mol squash + SESSION CLOSE PROTOCOL
+```
+
+**Примеры:**
+```bash
+# Баги
+/health-bugs
+
+# Security
+/security-health
+
+# Dead code
+/cleanup-health
+
+# Зависимости
+/deps-health
+
+# Дубликаты
+/reuse-health
 ```
 
 ---
@@ -341,4 +413,4 @@ bd daemon restart
 
 ---
 
-*Prefix: `mc2` | Версия: 2026-01-08*
+*Prefix: `mc2` | Версия: 2026-01-08 v2*
