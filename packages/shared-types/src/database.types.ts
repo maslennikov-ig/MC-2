@@ -2880,6 +2880,7 @@ export type Database = {
         | "document"
         | "cover"
         | "card"
+        | "banner"
       enrollment_status: "active" | "completed" | "dropped" | "expired"
       generation_stage: "stage4" | "stage5" | "stage6"
       generation_status:
@@ -3095,6 +3096,7 @@ export const Constants = {
         "document",
         "cover",
         "card",
+        "banner",
       ],
       enrollment_status: ["active", "completed", "dropped", "expired"],
       generation_stage: ["stage4", "stage5", "stage6"],

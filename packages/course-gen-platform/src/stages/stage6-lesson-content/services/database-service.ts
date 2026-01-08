@@ -5,6 +5,7 @@ import type { Stage6Output } from '../orchestrator';
 import { extractContentMarkdown } from './content-utils';
 import type { SanityCheckResult } from '../utils/sanity-check';
 import { LessonUUID, LessonLabel } from '@megacampus/shared-types';
+import type { SelfReviewResult } from '@megacampus/shared-types/judge-types';
 
 /**
  * Handle partial success scenarios
@@ -230,6 +231,120 @@ export async function saveLessonContent(
         lessonLabel,
       },
       'Database error saving lesson content (content available in job result)'
+    );
+  }
+}
+
+/**
+ * Save rejected content to database for debugging purposes
+ *
+ * Called when selfReviewer returns REGENERATE status.
+ * Stores the rejected content with metadata about why it was rejected.
+ *
+ * @param courseId - Course UUID
+ * @param lessonLabel - Lesson label (e.g., "1.1")
+ * @param lessonUuid - Lesson UUID (optional, will be resolved if not provided)
+ * @param generatedContent - The raw markdown content that was rejected
+ * @param selfReviewResult - The selfReviewer result with rejection reasons
+ * @param generationAttempt - Current generation attempt number
+ */
+export async function saveRejectedContent(
+  courseId: string,
+  lessonLabel: string,
+  lessonUuid: string | null,
+  generatedContent: string | null,
+  selfReviewResult: SelfReviewResult,
+  generationAttempt: number
+): Promise<void> {
+  if (!generatedContent) {
+    logger.debug(
+      { courseId, lessonLabel },
+      'No content to save as rejected (generatedContent is null)'
+    );
+    return;
+  }
+
+  const supabaseAdmin = getSupabaseAdmin();
+
+  try {
+    // Resolve lesson UUID if not provided
+    let resolvedLessonUuid = lessonUuid;
+    if (!resolvedLessonUuid) {
+      resolvedLessonUuid = await resolveLessonUuid(courseId, lessonLabel);
+    }
+
+    if (!resolvedLessonUuid) {
+      logger.warn(
+        { courseId, lessonLabel },
+        'Could not resolve lesson UUID - rejected content not saved'
+      );
+      return;
+    }
+
+    // Build content object with raw markdown
+    const contentObject = {
+      raw_markdown: generatedContent,
+      lesson_id: lessonLabel,
+      course_id: courseId,
+    };
+
+    // Build metadata with rejection details
+    const metadata = {
+      lessonLabel,
+      generatedAt: new Date().toISOString(),
+      rejectionReason: selfReviewResult.reasoning,
+      rejectionStatus: selfReviewResult.status,
+      issues: selfReviewResult.issues,
+      heuristicsPassed: selfReviewResult.heuristicsPassed,
+      heuristicDetails: selfReviewResult.heuristicDetails,
+      tokensUsed: selfReviewResult.tokensUsed,
+      durationMs: selfReviewResult.durationMs,
+      contentLength: generatedContent.length,
+      wordCount: generatedContent.split(/\s+/).filter(Boolean).length,
+    };
+
+    const { error } = await supabaseAdmin
+      .from('lesson_contents')
+      .insert({
+        lesson_id: resolvedLessonUuid,
+        course_id: courseId,
+        content: contentObject,
+        metadata,
+        status: 'rejected',
+        generation_attempt: generationAttempt,
+      });
+
+    if (error) {
+      logger.warn(
+        {
+          error: error.message,
+          courseId,
+          lessonLabel,
+          lessonUuid: resolvedLessonUuid,
+        },
+        'Failed to save rejected content to database'
+      );
+    } else {
+      logger.info(
+        {
+          courseId,
+          lessonLabel,
+          lessonUuid: resolvedLessonUuid,
+          generationAttempt,
+          rejectionReason: selfReviewResult.reasoning,
+          issuesCount: selfReviewResult.issues.length,
+        },
+        'Rejected content saved for debugging'
+      );
+    }
+  } catch (error) {
+    logger.warn(
+      {
+        error: error instanceof Error ? error.message : String(error),
+        courseId,
+        lessonLabel,
+      },
+      'Exception while saving rejected content'
     );
   }
 }

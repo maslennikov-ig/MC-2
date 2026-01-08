@@ -248,11 +248,11 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
     enrichment.title === 'course-card' ||
     enrichment.settings?.isCourseCard === true;
 
-  // Log warning if using fallback detection
+  // Log debug if using fallback detection (not a warning - this is normal behavior)
   if (!isCourseCard && (!lesson.content || lesson.id === 'course-level')) {
-    logger.warn(
+    logger.debug(
       { enrichmentId: enrichment.id, lessonId: lesson.id, hasContent: !!lesson.content },
-      'Card enrichment detected as course card via fallback (legacy detection)'
+      'Card enrichment for lesson without content - using lesson card prompt'
     );
   }
 

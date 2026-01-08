@@ -1175,6 +1175,13 @@ execute_release() {
     log_info "Executing release..."
     echo ""
 
+    # Sync Beads before release (if bd is available)
+    if command -v bd &> /dev/null; then
+        log_info "Syncing Beads..."
+        bd sync 2>/dev/null || true
+        log_success "Beads synced"
+    fi
+
     # Clean up backup files BEFORE staging
     cleanup_backups
 

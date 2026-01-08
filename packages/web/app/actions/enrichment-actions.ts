@@ -13,8 +13,13 @@ import { getBackendAuthHeaders, TRPC_URL } from '@/lib/auth';
 const createEnrichmentSchema = z.object({
   lessonId: z.string().regex(/^\d+\.\d+$/, 'Invalid lesson ID format (expected: "1.2")'),
   courseId: z.string().uuid('Invalid course ID'),
-  enrichmentType: z.enum(['video', 'audio', 'quiz', 'presentation', 'document', 'cover', 'card']),
+  enrichmentType: z.enum(['video', 'audio', 'quiz', 'presentation', 'document', 'cover', 'card', 'banner']),
   settings: z.record(z.unknown()).optional(),
+});
+
+const regenerateEnrichmentSchema = z.object({
+  enrichmentId: z.string().uuid('Invalid enrichment ID'),
+  courseId: z.string().uuid('Invalid course ID'),
 });
 
 const reorderEnrichmentsSchema = z.object({
@@ -26,7 +31,7 @@ const reorderEnrichmentsSchema = z.object({
 export interface CreateEnrichmentInput {
   lessonId: string; // In format "1.2" (module.lesson label)
   courseId: string;
-  enrichmentType: 'video' | 'audio' | 'quiz' | 'presentation' | 'document' | 'cover' | 'card';
+  enrichmentType: 'video' | 'audio' | 'quiz' | 'presentation' | 'document' | 'cover' | 'card' | 'banner';
   settings?: Record<string, unknown>;
 }
 
@@ -431,6 +436,122 @@ export async function deleteEnrichment(
 }
 
 // ============================================================================
+// Regenerate Enrichment
+// ============================================================================
+
+export interface RegenerateEnrichmentInput {
+  enrichmentId: string;
+  courseId: string;
+}
+
+export interface RegenerateEnrichmentResult {
+  success: boolean;
+  newJobId?: string;
+  error?: string;
+}
+
+/**
+ * Regenerate an enrichment
+ *
+ * Resets the enrichment status and triggers a new generation job.
+ * Works for failed, cancelled, and completed enrichments.
+ *
+ * @param input - The regenerate input containing enrichmentId and courseId
+ * @returns Success status and new job ID or error message
+ */
+export async function regenerateEnrichment(
+  input: RegenerateEnrichmentInput
+): Promise<RegenerateEnrichmentResult> {
+  try {
+    // Input validation
+    const validation = regenerateEnrichmentSchema.safeParse(input);
+    if (!validation.success) {
+      logger.error('[regenerateEnrichment] Invalid input', {
+        errors: validation.error.flatten(),
+      });
+      return { success: false, error: 'Invalid input data' };
+    }
+
+    const currentUser = await getCurrentUser();
+    if (!currentUser) {
+      return { success: false, error: 'Not authenticated' };
+    }
+
+    const supabase = await getUserClient();
+
+    // Authorization: Verify user owns the course
+    const { data: course, error: courseError } = await supabase
+      .from('courses')
+      .select('user_id')
+      .eq('id', input.courseId)
+      .single();
+
+    if (courseError || !course) {
+      logger.error('[regenerateEnrichment] Course not found', { courseId: input.courseId });
+      return { success: false, error: 'Course not found' };
+    }
+
+    if (course.user_id !== currentUser.id) {
+      logger.error('[regenerateEnrichment] Unauthorized access attempt', {
+        userId: currentUser.id,
+        courseId: input.courseId,
+        courseOwner: course.user_id,
+      });
+      return { success: false, error: 'Unauthorized' };
+    }
+
+    // Call tRPC API to regenerate enrichment
+    const headers = await getBackendAuthHeaders();
+    const response = await fetch(`${TRPC_URL}/enrichment.regenerate`, {
+      method: 'POST',
+      headers: {
+        ...headers,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        enrichmentId: input.enrichmentId,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      logger.error('[regenerateEnrichment] tRPC call failed', {
+        status: response.status,
+        error: errorText,
+      });
+      return { success: false, error: `Failed to regenerate enrichment: ${response.status}` };
+    }
+
+    const result = await response.json();
+
+    if (!result.result?.data?.success) {
+      return {
+        success: false,
+        error: result.result?.data?.error || 'Unknown error',
+      };
+    }
+
+    logger.info('[regenerateEnrichment] Enrichment regeneration started', {
+      enrichmentId: input.enrichmentId,
+      newJobId: result.result.data.newJobId,
+    });
+
+    return {
+      success: true,
+      newJobId: result.result.data.newJobId,
+    };
+  } catch (error) {
+    logger.error('[regenerateEnrichment] Unexpected error', {
+      error: error instanceof Error ? error.message : String(error),
+    });
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'Failed to regenerate enrichment',
+    };
+  }
+}
+
+// ============================================================================
 // Get Single Enrichment
 // ============================================================================
 
@@ -448,7 +569,7 @@ export interface GetEnrichmentResult {
   success: boolean;
   enrichment?: {
     id: string;
-    enrichment_type: 'video' | 'audio' | 'quiz' | 'presentation' | 'document' | 'cover' | 'card';
+    enrichment_type: 'video' | 'audio' | 'quiz' | 'presentation' | 'document' | 'cover' | 'card' | 'banner';
     status:
       | 'pending'
       | 'draft_generating'

@@ -34,6 +34,93 @@ import { calculateAgreementScore } from './krippendorff';
 import { resolveConflicts } from './conflict-resolver';
 import { parseSectionIndex, extractSectionIdFromLocation } from './section-utils';
 import { randomUUID } from 'node:crypto';
+import { logger } from '../../../../shared/logger';
+
+// ============================================================================
+// SEC_GLOBAL HANDLING
+// ============================================================================
+
+/**
+ * Result of processing global issues
+ */
+interface GlobalIssueResult {
+  /** Issues to track in DB (all global issues) */
+  toTrack: JudgeIssue[];
+  /** Issues to redirect to intro/conclusion (major/critical only) */
+  toRedirect: JudgeIssue[];
+  /** Issues to skip (minor global issues) */
+  toSkip: JudgeIssue[];
+}
+
+/**
+ * Process sec_global issues with smart routing strategy
+ *
+ * Strategy:
+ * - ALL global issues: track in lesson_improvement_suggestions table
+ * - Minor global issues: skip (don't spend tokens)
+ * - Major/Critical global issues: redirect to intro + conclusion sections
+ *
+ * @param issues - All issues from judge
+ * @returns Categorized global issues
+ */
+function processGlobalIssues(issues: JudgeIssue[]): GlobalIssueResult {
+  const globalIssues = issues.filter(i =>
+    i.location.toLowerCase().includes('global') ||
+    i.location.toLowerCase() === 'sec_global'
+  );
+
+  const toTrack = globalIssues; // Track ALL global issues for observability
+  const toRedirect = globalIssues.filter(i =>
+    i.severity === 'critical' || i.severity === 'major'
+  );
+  const toSkip = globalIssues.filter(i => i.severity === 'minor');
+
+  if (globalIssues.length > 0) {
+    logger.info({
+      totalGlobal: globalIssues.length,
+      toRedirect: toRedirect.length,
+      toSkip: toSkip.length,
+      severities: globalIssues.map(i => i.severity),
+    }, 'Processing sec_global issues');
+  }
+
+  return { toTrack, toRedirect, toSkip };
+}
+
+/**
+ * Redirect global issues to intro and conclusion sections
+ *
+ * Creates modified issues targeting intro (for opening improvements)
+ * and conclusion (for closing improvements).
+ *
+ * @param globalIssues - Major/critical global issues to redirect
+ * @returns New issues targeting specific sections
+ */
+function redirectGlobalToSections(globalIssues: JudgeIssue[]): JudgeIssue[] {
+  const redirected: JudgeIssue[] = [];
+
+  for (const issue of globalIssues) {
+    // Redirect to intro
+    redirected.push({
+      ...issue,
+      location: 'sec_introduction',
+      description: `[Redirected from global] ${issue.description}`,
+      suggestedFix: `Improve introduction to address: ${issue.suggestedFix}`,
+    });
+
+    // Also redirect critical issues to conclusion
+    if (issue.severity === 'critical') {
+      redirected.push({
+        ...issue,
+        location: 'sec_conclusion',
+        description: `[Redirected from global] ${issue.description}`,
+        suggestedFix: `Reinforce in conclusion: ${issue.suggestedFix}`,
+      });
+    }
+  }
+
+  return redirected;
+}
 
 /**
  * Consolidate verdicts from multiple judges into a unified RefinementPlan
@@ -53,8 +140,28 @@ export async function consolidateVerdicts(input: ArbiterInput): Promise<ArbiterO
   // Filter and resolve conflicts
   const { accepted, rejected, log } = resolveConflicts(allIssues, agreement.score);
 
+  // Process sec_global issues with smart routing
+  const globalResult = processGlobalIssues(accepted);
+
+  // Filter out global issues and add redirected ones
+  const nonGlobalAccepted = accepted.filter(i =>
+    !i.location.toLowerCase().includes('global') &&
+    i.location.toLowerCase() !== 'sec_global'
+  );
+  const redirectedIssues = redirectGlobalToSections(globalResult.toRedirect);
+  const processedAccepted = [...nonGlobalAccepted, ...redirectedIssues];
+
+  // Log global issue tracking info (actual DB save happens in caller with lessonId)
+  if (globalResult.toTrack.length > 0) {
+    logger.info({
+      tracked: globalResult.toTrack.length,
+      redirected: redirectedIssues.length,
+      skipped: globalResult.toSkip.length,
+    }, 'sec_global issues processed - tracking info available in output');
+  }
+
   // Convert to TargetedIssues with targeting info
-  const targetedIssues = convertToTargetedIssues(accepted, input.lessonContent);
+  const targetedIssues = convertToTargetedIssues(processedAccepted, input.lessonContent);
 
   // Group by section into SectionRefinementTasks
   const tasks = groupIntoTasks(targetedIssues);

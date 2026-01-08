@@ -17,3 +17,29 @@ Follow the existing conventional commit style (`type(scope): summary`, e.g., `fi
 
 ## Security & Configuration Tips
 Never commit `.env` files; instead copy `packages/course-gen-platform/.env.example`. Credentials for Supabase, Qdrant, Redis, and Jina must be sourced from 1Password vaults. When testing MCP integrations or Docling proxies, bind to localhost only and confirm logs in `logs/` exclude customer content before uploading artifacts.
+
+## Landing the Plane (Session Completion)
+
+**When ending a work session**, you MUST complete ALL steps below. Work is NOT complete until `git push` succeeds.
+
+**MANDATORY WORKFLOW:**
+
+1. **File issues for remaining work** - Create issues for anything that needs follow-up
+2. **Run quality gates** (if code changed) - Tests, linters, builds
+3. **Update issue status** - Close finished work, update in-progress items
+4. **PUSH TO REMOTE** - This is MANDATORY:
+   ```bash
+   git pull --rebase
+   bd sync
+   git push
+   git status  # MUST show "up to date with origin"
+   ```
+5. **Clean up** - Clear stashes, prune remote branches
+6. **Verify** - All changes committed AND pushed
+7. **Hand off** - Provide context for next session
+
+**CRITICAL RULES:**
+- Work is NOT complete until `git push` succeeds
+- NEVER stop before pushing - that leaves work stranded locally
+- NEVER say "ready to push when you are" - YOU must push
+- If push fails, resolve and retry until it succeeds

@@ -34,6 +34,12 @@ interface CoverPromptParams {
   courseSubject: string;
   language: 'en' | 'ru';
   styleHint?: string;
+  visualStyle?: {
+    colorScheme: string;
+    aesthetic: string;
+    visualElements: string;
+    mood: string;
+  };
 }
 
 /**
@@ -60,6 +66,17 @@ const PROMPT_TEMPERATURE = 0.7;
 
 /** Supabase Storage bucket for cover images */
 const STORAGE_BUCKET = process.env.ENRICHMENTS_STORAGE_BUCKET ?? 'course-enrichments';
+
+/**
+ * Default visual style if none is configured on the course
+ * Used for consistent styling across cover images when course lacks visual_style
+ */
+const DEFAULT_VISUAL_STYLE = {
+  colorScheme: 'blue and purple gradients with subtle accents',
+  aesthetic: 'modern, professional, clean',
+  visualElements: 'abstract geometric shapes, flowing lines',
+  mood: 'professional, engaging, educational',
+};
 
 /**
  * Retry configuration for upload operations
@@ -211,6 +228,54 @@ function extractKeywords(lessonContent: string | null): string[] {
 }
 
 /**
+ * Extract visual style from course data
+ *
+ * Retrieves the visual style from course.visual_style column,
+ * falling back to course.settings.visual_style for legacy courses.
+ * Uses DEFAULT_VISUAL_STYLE if no style is configured.
+ *
+ * @param course - Course data with visual_style and settings
+ * @returns Visual style object with colorScheme, aesthetic, visualElements, mood
+ */
+function getVisualStyle(course: { visual_style?: unknown; settings?: unknown }): {
+  colorScheme: string;
+  aesthetic: string;
+  visualElements: string;
+  mood: string;
+} {
+  // First try dedicated visual_style column
+  if (course.visual_style && typeof course.visual_style === 'object') {
+    const vs = course.visual_style as Record<string, unknown>;
+    if (vs.colorScheme && vs.aesthetic && vs.visualElements && vs.mood) {
+      return {
+        colorScheme: String(vs.colorScheme),
+        aesthetic: String(vs.aesthetic),
+        visualElements: String(vs.visualElements),
+        mood: String(vs.mood),
+      };
+    }
+  }
+
+  // Fallback to settings.visual_style (legacy)
+  if (course.settings && typeof course.settings === 'object') {
+    const settings = course.settings as Record<string, unknown>;
+    if (settings.visual_style && typeof settings.visual_style === 'object') {
+      const vs = settings.visual_style as Record<string, unknown>;
+      if (vs.colorScheme && vs.aesthetic && vs.visualElements && vs.mood) {
+        return {
+          colorScheme: String(vs.colorScheme),
+          aesthetic: String(vs.aesthetic),
+          visualElements: String(vs.visualElements),
+          mood: String(vs.mood),
+        };
+      }
+    }
+  }
+
+  return DEFAULT_VISUAL_STYLE;
+}
+
+/**
  * Extract keywords from lesson objectives
  * Primary source for keyword extraction after Stage 5 completes
  * Objectives contain rich semantic descriptions of lesson content
@@ -244,7 +309,7 @@ Always include in your prompt: "absolutely no text, no letters, no words, no num
 Also avoid: logos, watermarks, signatures, labels, captions, titles, and human faces.
 
 # Style Guidelines
-- Use rich, vibrant colors that convey the subject matter
+- IMPORTANT: Use the provided visual style (color scheme, aesthetic, visual elements) from the course to maintain visual consistency
 - Create depth and visual interest through composition
 - Avoid literal depictions - prefer abstract/conceptual representations
 - Ensure the image works well as a wide banner (16:9 aspect ratio)
@@ -260,8 +325,13 @@ ALWAYS end your prompt with: ", absolutely no text, no letters, no words, no typ
 /**
  * Default fallback prompt if LLM/DB fails to generate one
  */
-function getDefaultImagePrompt(lessonTitle: string, courseSubject: string): string {
-  return `A stunning abstract visualization representing "${lessonTitle}" in the context of ${courseSubject}. Modern digital art style with flowing gradients in professional blue and purple tones. Clean geometric shapes creating depth and movement. Ultra-wide 16:9 format, suitable as an educational hero banner. Clean professional aesthetic, absolutely no text, no letters, no words, no numbers, no writing, no typography, no inscriptions, text-free image.`;
+function getDefaultImagePrompt(
+  lessonTitle: string,
+  courseSubject: string,
+  visualStyle?: { colorScheme: string; aesthetic: string; visualElements: string; mood: string }
+): string {
+  const style = visualStyle ?? DEFAULT_VISUAL_STYLE;
+  return `A stunning abstract visualization representing "${lessonTitle}" in the context of ${courseSubject}. Modern digital art style with ${style.colorScheme}. ${style.visualElements} creating depth and movement. Ultra-wide 16:9 format, suitable as an educational hero banner. ${style.aesthetic} aesthetic with ${style.mood} atmosphere, absolutely no text, no letters, no words, no numbers, no writing, no typography, no inscriptions, text-free image.`;
 }
 
 /**
@@ -340,8 +410,9 @@ Start with { and end with }.
  * User message for generating 3 cover prompt variants (draft phase)
  */
 function getVariantsUserMessage(params: CoverPromptParams): string {
-  const { lessonTitle, keywords, courseSubject, language, styleHint } = params;
+  const { lessonTitle, keywords, courseSubject, language, styleHint, visualStyle } = params;
   const keywordsStr = keywords.length > 0 ? keywords.join(', ') : 'general concepts';
+  const style = visualStyle ?? DEFAULT_VISUAL_STYLE;
 
   return `Generate 3 different image prompt variants for a lesson cover with the following context:
 
@@ -351,7 +422,13 @@ Key Topics: ${keywordsStr}
 Language Context: ${language === 'ru' ? 'Russian educational content' : 'English educational content'}
 ${styleHint ? `Style Preference: ${styleHint}` : ''}
 
-Create 3 distinct prompts for 16:9 hero banner images, each with a unique visual approach.`;
+## Visual Style (MUST be incorporated in all variants):
+- Color Scheme: ${style.colorScheme}
+- Aesthetic: ${style.aesthetic}
+- Visual Elements: ${style.visualElements}
+- Mood: ${style.mood}
+
+Create 3 distinct prompts for 16:9 hero banner images, each with a unique visual approach while maintaining the course visual style.`;
 }
 
 // ============================================================================
@@ -428,12 +505,25 @@ async function generateDraft(input: EnrichmentHandlerInput): Promise<DraftResult
       );
     }
 
+    // Get visual style from course for consistent styling
+    const visualStyle = getVisualStyle(course);
+
     const promptParams: CoverPromptParams = {
       lessonTitle: lesson.title,
       keywords,
       courseSubject: course.title ?? 'Educational Content',
       language: (course.language as 'en' | 'ru') || 'en',
+      visualStyle,
     };
+
+    logger.debug(
+      {
+        enrichmentId: enrichment.id,
+        visualStyleSource: course.visual_style ? 'visual_style' : (course.settings?.visual_style ? 'settings' : 'default'),
+        colorScheme: visualStyle.colorScheme,
+      },
+      'Cover handler: using visual style for draft generation'
+    );
 
     // Build prompts for variant generation (inline helpers)
     // TODO: Migrate to DB prompts (stage7_cover_variants_system, stage7_cover_variants_user)
@@ -496,8 +586,8 @@ async function generateDraft(input: EnrichmentHandlerInput): Promise<DraftResult
             },
             'Cover handler: prohibited content in variant, replacing'
           );
-          // Replace with default prompt
-          variant.prompt_en = getDefaultImagePrompt(lesson.title, course.title ?? 'Educational Content');
+          // Replace with default prompt using course visual style
+          variant.prompt_en = getDefaultImagePrompt(lesson.title, course.title ?? 'Educational Content', visualStyle);
         }
       }
     } catch (error) {
@@ -510,30 +600,30 @@ async function generateDraft(input: EnrichmentHandlerInput): Promise<DraftResult
         'Cover handler: failed to parse variants, using fallback defaults'
       );
 
-      const defaultPrompt = getDefaultImagePrompt(lesson.title, course.title ?? 'Educational Content');
+      const defaultPrompt = getDefaultImagePrompt(lesson.title, course.title ?? 'Educational Content', visualStyle);
 
-      // Create 3 simple variations
+      // Create 3 simple variations using the course visual style
       variants = [
         {
           id: 1,
-          prompt_en: defaultPrompt.replace('blue and purple', 'vibrant blue and teal'),
+          prompt_en: defaultPrompt,
           description_localized: promptParams.language === 'ru'
-            ? 'Абстрактная визуализация с синими тонами'
-            : 'Abstract visualization with blue tones',
+            ? `Абстрактная визуализация с ${visualStyle.colorScheme}`
+            : `Abstract visualization with ${visualStyle.colorScheme}`,
         },
         {
           id: 2,
-          prompt_en: defaultPrompt.replace('blue and purple', 'warm orange and coral'),
+          prompt_en: defaultPrompt.replace('abstract visualization', 'metaphorical illustration'),
           description_localized: promptParams.language === 'ru'
-            ? 'Иллюстративный стиль с теплыми тонами'
-            : 'Illustrative style with warm tones',
+            ? `Иллюстративный стиль: ${visualStyle.aesthetic}`
+            : `Illustrative style: ${visualStyle.aesthetic}`,
         },
         {
           id: 3,
-          prompt_en: defaultPrompt.replace('blue and purple', 'professional green and emerald'),
+          prompt_en: defaultPrompt.replace('abstract visualization', 'minimalist design'),
           description_localized: promptParams.language === 'ru'
-            ? 'Минималистичный дизайн с зелеными акцентами'
-            : 'Minimalist design with green accents',
+            ? `Минималистичный дизайн: ${visualStyle.mood}`
+            : `Minimalist design: ${visualStyle.mood}`,
         },
       ];
     }
@@ -660,6 +750,18 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
     const language = (course.language as 'en' | 'ru') || 'en';
     const languageContext = language === 'ru' ? 'Russian educational content' : 'English educational content';
 
+    // Get visual style from course for consistent styling
+    const visualStyle = getVisualStyle(course);
+
+    logger.debug(
+      {
+        enrichmentId: enrichment.id,
+        visualStyleSource: course.visual_style ? 'visual_style' : (course.settings?.visual_style ? 'settings' : 'default'),
+        colorScheme: visualStyle.colorScheme,
+      },
+      'Cover handler: using visual style for generation'
+    );
+
     let imagePrompt: string;
 
     // Step 1: Load prompts from database (with fallback)
@@ -676,6 +778,11 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
         keywords: keywords.length > 0 ? keywords.join(', ') : 'general concepts',
         languageContext,
         styleHint: '', // Optional, leave empty
+        // Pass visual style for consistent course styling
+        colorScheme: visualStyle.colorScheme,
+        aesthetic: visualStyle.aesthetic,
+        visualElements: visualStyle.visualElements,
+        mood: visualStyle.mood,
       });
     } catch (dbError) {
       logger.warn(
@@ -683,7 +790,7 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
         'Cover handler: DB prompt lookup failed, using hardcoded fallback'
       );
       systemPrompt = getDefaultCoverSystemPrompt();
-      userMessage = `Generate an image prompt for a lesson cover:\nLesson: ${lesson.title}\nCourse: ${course.title ?? 'Educational Content'}\nTopics: ${keywords.join(', ') || 'general concepts'}`;
+      userMessage = `Generate an image prompt for a lesson cover:\nLesson: ${lesson.title}\nCourse: ${course.title ?? 'Educational Content'}\nTopics: ${keywords.join(', ') || 'general concepts'}\n\nVisual Style:\n- Color Scheme: ${visualStyle.colorScheme}\n- Aesthetic: ${visualStyle.aesthetic}\n- Visual Elements: ${visualStyle.visualElements}\n- Mood: ${visualStyle.mood}`;
     }
 
     // Step 2: Call LLM (separate error handling)
@@ -716,7 +823,7 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
           },
           'Cover handler: invalid prompt length, using default'
         );
-        imagePrompt = getDefaultImagePrompt(lesson.title, course.title ?? 'Educational Content');
+        imagePrompt = getDefaultImagePrompt(lesson.title, course.title ?? 'Educational Content', visualStyle);
       }
 
       // Check for prohibited content
@@ -725,7 +832,7 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
           { enrichmentId: enrichment.id },
           'Cover handler: prohibited content detected in LLM-generated prompt, using default'
         );
-        imagePrompt = getDefaultImagePrompt(lesson.title, course.title ?? 'Educational Content');
+        imagePrompt = getDefaultImagePrompt(lesson.title, course.title ?? 'Educational Content', visualStyle);
       }
 
       logger.info(
@@ -745,7 +852,7 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
         },
         'Cover handler: LLM generation failed, using default prompt'
       );
-      imagePrompt = getDefaultImagePrompt(lesson.title, course.title ?? 'Educational Content');
+      imagePrompt = getDefaultImagePrompt(lesson.title, course.title ?? 'Educational Content', visualStyle);
     }
 
     // Phase 2: Generate image

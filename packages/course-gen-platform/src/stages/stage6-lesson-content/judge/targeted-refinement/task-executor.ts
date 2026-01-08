@@ -21,6 +21,10 @@ import {
   selectFixPromptTemplate,
   buildCoherencePreservingPrompt,
 } from '../fix-templates';
+import {
+  processInlineFixes,
+  INLINE_FIXER_ENABLED,
+} from '../inline-fixer';
 
 import { emitEvent } from './events';
 import { extractSectionContent } from './content-utils';
@@ -110,7 +114,53 @@ export async function executePatcherTask(
     });
 
     // Extract section content
-    const sectionContent = extractSectionContent(content, task.sectionId);
+    let sectionContent = extractSectionContent(content, task.sectionId);
+
+    // Step 0: Try InlineFixer first (zero-token surgical fixes)
+    if (INLINE_FIXER_ENABLED && task.sourceIssues.length > 0) {
+      const inlineResult = processInlineFixes(sectionContent, task.sourceIssues);
+
+      if (inlineResult.appliedFixes.length > 0) {
+        // Update section content with inline fixes
+        sectionContent = inlineResult.content;
+
+        logger.info({
+          sectionId: task.sectionId,
+          appliedCount: inlineResult.appliedFixes.length,
+          failedCount: inlineResult.failedFixes.length,
+          tokensSaved: inlineResult.metrics.tokensSaved,
+        }, 'InlineFixer applied surgical fixes');
+
+        // If all issues were fixed inline, skip Patcher entirely
+        if (inlineResult.failedFixes.length === 0) {
+          logger.info({
+            sectionId: task.sectionId,
+            totalIssues: task.sourceIssues.length,
+            tokensSaved: inlineResult.metrics.tokensSaved,
+          }, 'All issues fixed by InlineFixer - skipping Patcher');
+
+          emitEvent(onStreamEvent, {
+            type: 'patch_applied',
+            sectionId: task.sectionId,
+            content: sectionContent,
+            diffSummary: `InlineFixer applied ${inlineResult.appliedFixes.length} fixes (${inlineResult.metrics.tokensSaved} tokens saved)`,
+          });
+
+          emitEvent(onStreamEvent, {
+            type: 'verification_result',
+            sectionId: task.sectionId,
+            passed: true,
+          });
+
+          return {
+            success: true,
+            sectionId: task.sectionId,
+            patchedContent: sectionContent,
+            tokensUsed: 0, // Zero tokens used - all done inline!
+          };
+        }
+      }
+    }
 
     // Determine template type based on score and iteration
     const templateType = selectFixPromptTemplate(

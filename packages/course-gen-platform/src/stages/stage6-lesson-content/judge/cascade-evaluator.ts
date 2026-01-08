@@ -757,13 +757,46 @@ Respond ONLY with valid JSON in this exact format:
     {
       "criterion": "<criterion_name>",
       "severity": "<critical|major|minor>",
-      "location": "<where in content>",
+      "location": "<where in content, e.g. sec_1, sec_2, sec_introduction>",
       "description": "<what is wrong>",
-      "suggestedFix": "<how to fix>"
+      "quotedText": "<OPTIONAL: exact text from content that has the issue, 5-30 words>",
+      "suggestedFix": "<how to fix>",
+      "inlineReplacement": "<OPTIONAL: exact replacement for quotedText>"
     }
   ],
   "strengths": ["<strength 1>", "<strength 2>"]
 }
+
+## INLINE FIX INSTRUCTIONS
+
+For LOCAL issues (typos, incorrect facts, unclear wording) that can be fixed by simple text replacement:
+
+1. Set \`quotedText\` to the EXACT text from the content (5-30 words, unique enough to locate)
+2. Set \`inlineReplacement\` to the corrected text
+
+Example:
+{
+  "criterion": "clarity_readability",
+  "severity": "minor",
+  "location": "sec_2",
+  "description": "Jargon may confuse beginners",
+  "quotedText": "синергетический эффект коллаборации",
+  "suggestedFix": "Replace jargon with simpler terms",
+  "inlineReplacement": "эффект совместной работы"
+}
+
+DO NOT provide inlineReplacement for:
+- Structural changes (moving paragraphs)
+- Adding new examples or content
+- Changes requiring creativity
+- Issues spanning multiple locations
+
+## LOCATION SPECIFICITY
+
+AVOID using "sec_global" when possible. Instead:
+- If the issue appears in specific sections, name them (e.g., "sec_1", "sec_3")
+- If engagement is lacking, identify WHERE examples should be added
+- Only use "sec_global" for truly document-wide issues (e.g., "inconsistent tone throughout")
 
 Evaluate objectively, focusing on educational quality and alignment with objectives.`;
 }

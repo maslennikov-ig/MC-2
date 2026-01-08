@@ -105,6 +105,9 @@ const handlers: Record<EnrichmentType, EnrichmentHandler> = {
   document: documentHandler,
   cover: coverHandler,
   card: cardHandler,
+  // Banner uses coverHandler since they're both decorative images (16:9 hero banners)
+  // The only difference is banner is manually triggered, cover is auto-triggered
+  banner: coverHandler,
 };
 
 /**

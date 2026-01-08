@@ -164,6 +164,19 @@ Check for deep issues requiring Judge attention.
   - Section density varies
   - Minor stylistic inconsistencies
   - Code blocks present but could use more comments
+  - **Content is longer than expected** (NOT a critical issue)
+
+## Content Length Guidelines (IMPORTANT)
+- Content being "too long" alone is NEVER a reason for REGENERATE
+- Repetitive or verbose content should be flagged as PASS_WITH_FLAGS with type "HYGIENE"
+- Only trigger REGENERATE if content has BOTH:
+  1. Critical structural issues (truncation, empty sections, missing elements)
+  2. Additional quality problems
+
+Examples:
+- "Content is 3000 words for 5-min lesson" → PASS_WITH_FLAGS (INFO severity)
+- "Content repeats examples" → PASS_WITH_FLAGS (INFO severity)
+- "Content truncated AND too long" → REGENERATE (truncation is the critical issue, not length)
 
 # Output Format
 CRITICAL: Return ONLY raw JSON. No markdown code blocks.

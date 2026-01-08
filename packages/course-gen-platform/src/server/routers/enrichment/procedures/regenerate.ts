@@ -2,7 +2,8 @@
  * Regenerate Enrichment Procedure
  * @module server/routers/enrichment/procedures/regenerate
  *
- * Regenerates a failed enrichment by resetting status and re-enqueuing a job.
+ * Regenerates an enrichment by resetting status and re-enqueuing a job.
+ * Works for failed, cancelled, and completed enrichments.
  */
 
 import { TRPCError } from '@trpc/server';
@@ -10,9 +11,10 @@ import { nanoid } from 'nanoid';
 import { protectedProcedure } from '../../../middleware/auth';
 import { createRateLimiter } from '../../../middleware/rate-limit.js';
 import { regenerateEnrichmentInputSchema } from '../schemas';
-import { verifyEnrichmentAccess, isTwoStageType } from '../helpers';
+import { verifyEnrichmentAccess, isTwoStageType, buildAssetPath } from '../helpers';
 import { getSupabaseAdmin } from '../../../../shared/supabase/admin';
 import { createStage7Queue, addEnrichmentJob } from '../../../../stages/stage7-enrichments/factory';
+import { deleteEnrichmentAsset } from '../../../../stages/stage7-enrichments/services/storage-service';
 import type { Stage7JobInput } from '../../../../stages/stage7-enrichments/types';
 import type { EnrichmentType } from '@megacampus/shared-types';
 import { logger } from '../../../../shared/logger/index.js';
@@ -27,11 +29,23 @@ function getQueue() {
   return stage7Queue;
 }
 
+// Extension map for storage cleanup
+const EXTENSION_MAP: Record<string, string> = {
+  audio: 'mp3',
+  video: 'mp4',
+  cover: 'webp',
+  banner: 'webp',
+  card: 'webp',
+  presentation: 'pptx',
+  document: 'pdf',
+};
+
 /**
- * Regenerate a failed enrichment
+ * Regenerate an enrichment
  *
  * Purpose: Resets an enrichment to 'pending' status, increments generation_attempt,
- * clears error fields, and enqueues a new BullMQ job.
+ * clears error fields and content, and enqueues a new BullMQ job.
+ * Works for failed, cancelled, and completed enrichments.
  *
  * Authorization: Requires authenticated user (protectedProcedure)
  *
@@ -77,7 +91,8 @@ export const regenerate = protectedProcedure
       );
 
       // Step 2: Check if enrichment can be regenerated
-      if (enrichment.status !== 'failed' && enrichment.status !== 'cancelled') {
+      const allowedStatuses = ['failed', 'cancelled', 'completed'];
+      if (!allowedStatuses.includes(enrichment.status)) {
         logger.warn({
           requestId,
           enrichmentId,
@@ -86,22 +101,58 @@ export const regenerate = protectedProcedure
 
         throw new TRPCError({
           code: 'BAD_REQUEST',
-          message: `Cannot regenerate enrichment with status '${enrichment.status}'. Only 'failed' or 'cancelled' enrichments can be regenerated.`,
+          message: `Cannot regenerate enrichment with status '${enrichment.status}'. Only failed, cancelled, or completed enrichments can be regenerated.`,
         });
       }
 
-      // Step 3: Update enrichment record
+      // Step 2.5: For completed enrichments, clean up existing assets
+      if (enrichment.status === 'completed') {
+        const extension = EXTENSION_MAP[enrichment.enrichment_type];
+        if (extension) {
+          try {
+            const assetPath = buildAssetPath(
+              enrichment.course_id,
+              enrichment.lesson_id,
+              enrichmentId,
+              extension
+            );
+            await deleteEnrichmentAsset(assetPath);
+            logger.info({
+              requestId,
+              enrichmentId,
+              assetPath,
+            }, 'Deleted existing asset for regeneration');
+          } catch (storageError) {
+            // Log but don't fail - file may not exist
+            logger.warn({
+              requestId,
+              enrichmentId,
+              error: storageError instanceof Error ? storageError.message : String(storageError),
+            }, 'Failed to delete existing asset (continuing with regeneration)');
+          }
+        }
+      }
+
+      // Step 3: Update enrichment record (clear content for completed enrichments)
       const supabase = getSupabaseAdmin();
       const newAttempt = enrichment.generation_attempt + 1;
+      const updateData: Record<string, unknown> = {
+        status: 'pending',
+        generation_attempt: newAttempt,
+        error_message: null,
+        error_details: null,
+        updated_at: new Date().toISOString(),
+      };
+
+      // Clear content and draft_content when regenerating completed enrichments
+      if (enrichment.status === 'completed') {
+        updateData.content = null;
+        updateData.draft_content = null;
+      }
+
       const { error: updateError } = await supabase
         .from('lesson_enrichments')
-        .update({
-          status: 'pending',
-          generation_attempt: newAttempt,
-          error_message: null,
-          error_details: null,
-          updated_at: new Date().toISOString(),
-        })
+        .update(updateData)
         .eq('id', enrichmentId);
 
       if (updateError) {

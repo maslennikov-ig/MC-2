@@ -19,6 +19,7 @@ import { useEnrichmentInspectorStore } from '../../../stores/enrichment-inspecto
 import {
   getEnrichment,
   deleteEnrichment,
+  regenerateEnrichment,
   approveCoverDraft,
 } from '@/app/actions/enrichment-actions';
 import { type CoverDraftContent } from '../CoverPreview';
@@ -347,6 +348,10 @@ interface CoverPreviewHandlers {
   onSelectVariant?: (variantId: number) => void;
   onApproveDraft?: () => void;
   isApproving?: boolean;
+  onRegenerate?: () => void;
+  isRegenerating?: boolean;
+  onDelete?: () => void;
+  isDeleting?: boolean;
 }
 
 /**
@@ -370,6 +375,10 @@ function renderPreview(enrichment: EnrichmentData, coverHandlers?: CoverPreviewH
           onSelectVariant={coverHandlers?.onSelectVariant}
           onApproveDraft={coverHandlers?.onApproveDraft}
           isApproving={coverHandlers?.isApproving}
+          onRegenerate={coverHandlers?.onRegenerate}
+          isRegenerating={coverHandlers?.isRegenerating}
+          onDelete={coverHandlers?.onDelete}
+          isDeleting={coverHandlers?.isDeleting}
         />
       );
     default: {
@@ -388,6 +397,9 @@ export function DetailView({ enrichmentId, className }: DetailViewProps) {
   // Delete confirmation state
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
+
+  // Regenerate state
+  const [isRegenerating, setIsRegenerating] = useState(false);
 
   // Cover draft approval state
   const [selectedCoverVariant, setSelectedCoverVariant] = useState<number | null>(null);
@@ -439,10 +451,46 @@ export function DetailView({ enrichmentId, className }: DetailViewProps) {
     setShowDeleteDialog(false);
   }, []);
 
-  // Handle regenerate action (Coming soon)
-  const handleRegenerate = useCallback(() => {
-    toast.info(locale === 'ru' ? 'Скоро будет доступно' : 'Coming soon');
-  }, [locale]);
+  // Handle regenerate action
+  const handleRegenerate = useCallback(async () => {
+    if (!courseInfo?.id) {
+      toast.error(locale === 'ru' ? 'Курс не найден' : 'Course not found');
+      return;
+    }
+
+    setIsRegenerating(true);
+
+    try {
+      const result = await regenerateEnrichment({
+        enrichmentId,
+        courseId: courseInfo.id,
+      });
+
+      if (result.success) {
+        toast.success(
+          locale === 'ru'
+            ? 'Перегенерация запущена'
+            : 'Regeneration started'
+        );
+        // Refetch to show updated status
+        dataState.refetch();
+      } else {
+        toast.error(
+          locale === 'ru'
+            ? `Ошибка: ${result.error}`
+            : `Error: ${result.error}`
+        );
+      }
+    } catch {
+      toast.error(
+        locale === 'ru'
+          ? 'Не удалось запустить перегенерацию'
+          : 'Failed to start regeneration'
+      );
+    } finally {
+      setIsRegenerating(false);
+    }
+  }, [enrichmentId, courseInfo?.id, locale, dataState]);
 
   // Handle approve action (Coming soon for non-cover types)
   const handleApprove = useCallback(() => {
@@ -525,12 +573,17 @@ export function DetailView({ enrichmentId, className }: DetailViewProps) {
                 onSelectVariant: handleCoverVariantSelect,
                 onApproveDraft: handleCoverApprove,
                 isApproving: isApprovingCover,
+                onRegenerate: handleRegenerate,
+                isRegenerating,
+                onDelete: handleDeleteClick,
+                isDeleting,
               }
             : {};
 
-        // Hide action bar for cover draft_ready state (CoverPreview has its own action bar)
+        // Hide action bar for cover draft_ready and completed states (CoverPreview has its own action bar)
         const hideCoverActionBar =
-          enrichment.type === 'cover' && enrichment.status === 'draft_ready';
+          enrichment.type === 'cover' &&
+          (enrichment.status === 'draft_ready' || enrichment.status === 'completed');
 
         // Render preview with action bar
         return (

@@ -1,94 +1,61 @@
 # Agent Orchestration Rules
 
-> **IMPORTANT**: This file overrides default Claude Code behavior. Follow these rules strictly.
+> **IMPORTANT**: This file overrides default Claude Code behavior. Follow strictly.
 
 ## Main Pattern: You Are The Orchestrator
 
-This is the DEFAULT pattern used in 95% of cases for feature development, bug fixes, refactoring, and general coding tasks.
-
 ### Core Rules
 
-**1. GATHER FULL CONTEXT FIRST (MANDATORY)**
-
-Before delegating or implementing any task:
-- Read existing code in related files
-- Search codebase for similar patterns
-- Review relevant documentation (specs, design docs, ADRs)
-- Check recent commits in related areas
-- Understand dependencies and integration points
-
-NEVER delegate or implement blindly.
+**1. GATHER CONTEXT FIRST (MANDATORY)**
+- Read existing code, search patterns, check recent commits
+- NEVER delegate or implement blindly
 
 **2. DELEGATE TO SUBAGENTS**
+- Provide complete context (code, paths, patterns)
+- ALWAYS verify results (read files, type-check, lint)
+- Re-delegate if incorrect
 
-Before delegation:
-- Provide complete context (code snippets, file paths, patterns, docs)
-- Specify exact expected output and validation criteria
+**3. EXECUTE DIRECTLY** — Only for: single-line fixes, simple imports, minimal configs
 
-After delegation (CRITICAL):
-- ALWAYS verify results (read modified files, run type-check, run lint)
-- NEVER skip verification
-- If incorrect: re-delegate with corrections and errors
-- If TypeScript errors: re-delegate to same agent OR typescript-types-specialist
-- If lint errors: fix directly or re-delegate
+**4. TRACK PROGRESS** — TodoWrite: in_progress BEFORE, completed AFTER verification
 
-**3. EXECUTE DIRECTLY (MINIMAL ONLY)**
-
-Direct execution only for:
-- Single dependency install
-- Single-line fixes (typos, obvious bugs)
-- Simple imports
-- Minimal config changes
-
-Everything else: delegate.
-
-**4. TRACK PROGRESS**
-
-- Create todos at task start
-- Mark in_progress BEFORE starting
-- Mark completed AFTER verification only
-
-**5. COMMIT STRATEGY**
-
-Run `/push patch` after EACH completed task:
-- Mark task [X] in tasks.md
-- Add artifacts: `→ Artifacts: [file1](path), [file2](path)`
-- Update TodoWrite to completed
-- Then `/push patch`
+**5. COMMIT** — `/push patch` after each task
 
 **6. EXECUTION PATTERN**
-
 ```
-FOR EACH TASK:
-1. Read task description
-2. GATHER FULL CONTEXT (code + docs + patterns + history)
-3. Delegate to subagent OR execute directly (trivial only)
-4. VERIFY results (read files + run type-check + run lint) - NEVER skip
-5. Accept/reject loop (re-delegate if needed)
-6. Update TodoWrite to completed
-7. Mark task [X] in tasks.md + add artifacts
-8. Run /push patch
-9. Move to next task
+1. Read task → 2. Gather context → 3. Delegate/execute
+4. VERIFY (never skip) → 5. Re-delegate if needed
+6. TodoWrite completed → 7. /push patch → 8. Next task
 ```
 
-**7. HANDLING CONTRADICTIONS**
+**7. CONTRADICTIONS** — Gather context, analyze patterns. Ask user only if truly ambiguous (~10%).
 
-If contradictions occur:
-- Gather context, analyze project patterns
-- If truly ambiguous: ask user with specific options
-- Only ask when unable to determine best practice (rare, ~10%)
+**8. TYPESCRIPT ERRORS** — Re-delegate to same agent OR `typescript-types-specialist`
 
-### Planning Phase (ALWAYS First)
+---
 
-Before implementing tasks:
-- Analyze execution model (parallel/sequential)
-- Assign executors: MAIN for trivial, existing if 100% match, FUTURE otherwise
-- Create FUTURE agents: launch N meta-agent-v3 calls in single message, ask restart
-- Resolve research (simple: solve now, complex: deepresearch prompt)
-- Atomicity: 1 task = 1 agent call
-- Parallel: launch N calls in single message (not sequentially)
+## Task Management with Beads
 
-See speckit.implement.md for details.
+> Constitution v1.2.0: All work MUST be tracked in Beads.
+
+```bash
+bd ready                          # Available tasks
+bd update <id> --status in_progress
+bd close <id> --reason "Done"
+bd sync                           # MANDATORY at session end
+```
+
+| Work Type | Tool | Command |
+|-----------|------|---------|
+| Big feature (>1 day) | Spec-kit → Beads | `/speckit.specify` → `/speckit.tobeads` |
+| Small feature | Beads | `bd create -t feature` |
+| Bug fix | Beads | `bd create -t bug` |
+| Tech debt | Beads | `bd create -t chore` |
+| Exploration | Beads wisp | `bd mol wisp exploration` |
+
+**Emergent work**: `bd create "Issue" -t bug --deps discovered-from:<current-id>`
+
+**Conventions**: Prefix `mc2`, auto-sync via `/push`, guide: `.claude/docs/beads-quickstart.md`
 
 ---
 
@@ -97,97 +64,46 @@ See speckit.implement.md for details.
 **File Organization**:
 - Agents: `.claude/agents/{domain}/{orchestrators|workers}/`
 - Commands: `.claude/commands/`
-- Skills: `.claude/skills/{skill-name}/SKILL.md`
-- Temporary: `.tmp/current/` (git ignored)
+- Skills: `.claude/skills/{name}/SKILL.md`
+- Temp: `.tmp/current/` (gitignored)
 - Reports: `docs/reports/{domain}/{YYYY-MM}/`
 
-**Code Standards**:
-- Type-check must pass before commit
-- Build must pass before commit
-- No hardcoded credentials
+**Code Standards**: Type-check + build + lint must pass before commit. No hardcoded credentials.
 
 **Agent Selection**:
-- Worker: Plan file specifies nextAgent (health workflows only)
+- Worker: Plan file specifies `nextAgent` (health workflows only)
 - Skill: Reusable utility, no state, <100 lines
 
-**Supabase Operations**:
-- Use Supabase MCP when `.mcp.json` includes supabase server
-- Project: MegaCampusAI (ref: `diqooqbuchsliypgwksu`)
+**Supabase**:
+- MCP server: project `diqooqbuchsliypgwksu`
 - Migrations: `packages/course-gen-platform/supabase/migrations/`
+- Two admin clients by design (different runtimes): `course-gen-platform/src/shared/supabase/admin.ts` (Node.js) and `web/lib/supabase-admin.ts` (Next.js)
 
-**Supabase Admin Client (Intentional Duplication)**:
-Two separate admin client implementations exist by design:
-- `packages/course-gen-platform/src/shared/supabase/admin.ts` - Node.js backend (tRPC, BullMQ)
-  - Uses `SUPABASE_SERVICE_KEY` env variable
-  - Lazy singleton initialization
-  - Types from `@megacampus/shared-types`
-- `packages/web/lib/supabase-admin.ts` - Next.js Server (Components, Actions, API Routes)
-  - Uses `SUPABASE_SERVICE_ROLE_KEY` env variable
-  - Eager initialization (module caching)
-  - Types from `@/types/database.generated`
-  - Access via: `import { getAdminClient } from '@/lib/supabase/client-factory'`
+**Single Source of Truth** (NEVER duplicate, always import from `@megacampus/shared-types`):
 
-Reasons NOT to unify:
-1. Different runtime environments (Node.js vs Next.js Server)
-2. Different env variable names (historical)
-3. Different type sources and configurations
-4. Unification would require new shared package with significant refactoring
+| Type | File |
+|------|------|
+| Database types | `shared-types/src/database.types.ts` |
+| Analysis schemas | `shared-types/src/analysis-schemas.ts` |
+| File upload constants | `shared-types/src/file-upload-constants.ts` |
+| Common enums | `shared-types/src/common-enums.ts` |
+| Course styles | `shared-types/src/style-prompts.ts` |
 
-**Database Types (Single Source of Truth)**:
-- MAIN file: `packages/shared-types/src/database.types.ts`
-- All other packages use re-export: `export * from '@megacampus/shared-types/database.types'`
-- To regenerate: `mcp__supabase__generate_typescript_types` → update MAIN file only
-- NEVER duplicate database types - always re-export from shared-types
-
-**Analysis Types (Single Source of Truth)**:
-- TypeScript interfaces: `packages/shared-types/src/analysis-result.ts`
-- Zod schemas: `packages/shared-types/src/analysis-schemas.ts` (canonical location)
-- Import schemas from: `@megacampus/shared-types` or `@megacampus/shared-types/analysis-schemas`
-- Import types from: `@megacampus/shared-types/analysis-result`
-- Deprecated re-export file: `packages/course-gen-platform/src/types/analysis-result.ts`
-- NEVER create new analysis Zod schemas outside shared-types
-
-**File Upload Constants (Single Source of Truth)**:
-- MAIN file: `packages/shared-types/src/file-upload-constants.ts`
-- Contains: MIME_TYPES_BY_TIER, FILE_SIZE_LIMITS_BY_TIER, FILE_COUNT_LIMITS_BY_TIER, FILE_UPLOAD
-- Import from: `@megacampus/shared-types`
-- Web package re-exports via `packages/web/lib/constants.ts`
-- NEVER define file types/sizes locally - always import from shared-types
-
-**Common Enums (Single Source of Truth)**:
-- MAIN file: `packages/shared-types/src/common-enums.ts`
-- Contains: languageSchema, difficultySchema, courseLevelSchema with types and arrays
-- Import from: `@megacampus/shared-types`
-- NEVER define language/difficulty enums locally - always import from shared-types
-
-**Course Styles (Single Source of Truth)**:
-- MAIN file: `packages/shared-types/src/style-prompts.ts`
-- Contains: COURSE_STYLES, STYLE_PROMPTS, CourseStyle type
-- Web uses: imports + adds UI metadata (icons, localized text) in `learning-styles.ts`
-- NEVER duplicate style prompts - always import from shared-types
-
-**MCP Configuration**:
+**MCP Config**:
 - BASE (`.mcp.base.json`): context7 + sequential-thinking (~600 tokens)
-- FULL (`.mcp.full.json`): + supabase + playwright + n8n + shadcn (~5000 tokens)
+- FULL (`.mcp.full.json`): + supabase + playwright + shadcn (~5000 tokens)
 - Switch: `./switch-mcp.sh`
+
+---
+
+## Technologies
+
+- TypeScript 5.x (strict), Immer for state (`produce()`)
+- i18n: `packages/web/src/i18n/config.ts`, guide: `.claude/docs/i18n-guide.md`
+- Enrichments: guide `.claude/docs/enrichment-guide.md` (video, audio, presentation, quiz, document, cover)
 
 ---
 
 ## Server Access
 
-Production server SSH available. See `.claude/local.md` for IP and details (gitignored).
-
----
-
-## Active Technologies
-- TypeScript 5.x (strict mode)
-- Immer for nested state updates (packages/web) - use `produce()` instead of spread operators
-
-**Internationalization (i18n)**:
-- Config: `packages/web/src/i18n/config.ts` (Single Source of Truth)
-- Guide: `.claude/docs/i18n-guide.md` (full reference for translations)
-
-**Enrichments (Stage 7 Activities)**:
-- Guide: `.claude/docs/enrichment-guide.md` (checklist for adding new activity types)
-- Types: video, audio, presentation, quiz, document, cover
-- Add to: 6 UI locations + backend handler + DB migration + translations + admin pipeline
+SSH details: `.claude/local.md` (gitignored)

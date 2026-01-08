@@ -3,7 +3,7 @@
 import React, { useState, useMemo } from 'react';
 import { useLocale } from 'next-intl';
 import Image from 'next/image';
-import { ImageIcon, FileText, Download, Loader2, Sparkles } from 'lucide-react';
+import { ImageIcon, FileText, Download, Loader2, Sparkles, RefreshCw, Trash2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -53,6 +53,14 @@ export interface CoverPreviewProps {
   onApproveDraft?: () => void;
   /** Loading state for approval button */
   isApproving?: boolean;
+  /** Callback when user wants to regenerate the cover */
+  onRegenerate?: () => void;
+  /** Loading state for regenerate button */
+  isRegenerating?: boolean;
+  /** Callback when user wants to delete the cover */
+  onDelete?: () => void;
+  /** Loading state for delete button */
+  isDeleting?: boolean;
   className?: string;
 }
 
@@ -73,6 +81,10 @@ const TRANSLATIONS = {
     selectVariantFirst: 'Выберите вариант',
     draftReady: 'Черновик готов',
     generatingDraft: 'Генерация вариантов...',
+    regenerate: 'Перегенерировать',
+    regenerating: 'Перегенерация...',
+    delete: 'Удалить',
+    deleting: 'Удаление...',
   },
   en: {
     selectCoverStyle: 'Select cover style',
@@ -86,6 +98,10 @@ const TRANSLATIONS = {
     selectVariantFirst: 'Select a variant',
     draftReady: 'Draft Ready',
     generatingDraft: 'Generating variants...',
+    regenerate: 'Regenerate',
+    regenerating: 'Regenerating...',
+    delete: 'Delete',
+    deleting: 'Deleting...',
   },
 };
 
@@ -296,10 +312,22 @@ function DraftView({
 interface CompletedViewProps {
   content: CoverContent;
   t: Translations;
+  onRegenerate?: () => void;
+  isRegenerating?: boolean;
+  onDelete?: () => void;
+  isDeleting?: boolean;
   className?: string;
 }
 
-function CompletedView({ content, t, className }: CompletedViewProps) {
+function CompletedView({
+  content,
+  t,
+  onRegenerate,
+  isRegenerating,
+  onDelete,
+  isDeleting,
+  className,
+}: CompletedViewProps) {
   const handleDownload = () => {
     const link = document.createElement('a');
     link.href = content.imageUrl;
@@ -324,16 +352,51 @@ function CompletedView({ content, t, className }: CompletedViewProps) {
           />
         </div>
 
-        {/* Download button overlay */}
-        <Button
-          variant="secondary"
-          size="sm"
-          className="absolute bottom-3 right-3 gap-2"
-          onClick={handleDownload}
-        >
-          <Download className="w-4 h-4" />
-          {t.download}
-        </Button>
+        {/* Action buttons overlay */}
+        <div className="absolute bottom-3 right-3 flex gap-2">
+          {onRegenerate && (
+            <Button
+              variant="secondary"
+              size="sm"
+              className="gap-2"
+              onClick={onRegenerate}
+              disabled={isRegenerating || isDeleting}
+            >
+              {isRegenerating ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <RefreshCw className="w-4 h-4" />
+              )}
+              {isRegenerating ? t.regenerating : t.regenerate}
+            </Button>
+          )}
+          <Button
+            variant="secondary"
+            size="sm"
+            className="gap-2"
+            onClick={handleDownload}
+            disabled={isRegenerating || isDeleting}
+          >
+            <Download className="w-4 h-4" />
+            {t.download}
+          </Button>
+          {onDelete && (
+            <Button
+              variant="destructive"
+              size="sm"
+              className="gap-2"
+              onClick={onDelete}
+              disabled={isRegenerating || isDeleting}
+            >
+              {isDeleting ? (
+                <Loader2 className="w-4 h-4 animate-spin" />
+              ) : (
+                <Trash2 className="w-4 h-4" />
+              )}
+              {isDeleting ? t.deleting : t.delete}
+            </Button>
+          )}
+        </div>
       </div>
 
       {/* Metadata */}
@@ -429,6 +492,10 @@ export function CoverPreview({
   onSelectVariant,
   onApproveDraft,
   isApproving = false,
+  onRegenerate,
+  isRegenerating = false,
+  onDelete,
+  isDeleting = false,
   className,
 }: CoverPreviewProps) {
   const locale = useLocale() as 'ru' | 'en';
@@ -497,7 +564,17 @@ export function CoverPreview({
 
   // Render completed cover
   if (isCompleted && enrichment.content) {
-    return <CompletedView content={enrichment.content} t={t} className={className} />;
+    return (
+      <CompletedView
+        content={enrichment.content}
+        t={t}
+        onRegenerate={onRegenerate}
+        isRegenerating={isRegenerating}
+        onDelete={onDelete}
+        isDeleting={isDeleting}
+        className={className}
+      />
+    );
   }
 
   // Render empty state

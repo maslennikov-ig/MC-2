@@ -77,6 +77,9 @@ export function ensureDOMGlobals(): void {
     // Create DOMPurify instance and attach to both window and global
     // Mermaid may look for DOMPurify in different places depending on version
     const DOMPurify = createDOMPurify(dom.window);
+    // CRITICAL: Copy instance methods to module for Mermaid 11 compatibility
+    // Mermaid calls DOMPurify.addHook() on the imported module, not the instance
+    Object.assign(createDOMPurify, DOMPurify);
     // @ts-expect-error - Mermaid expects DOMPurify on window
     global.window.DOMPurify = DOMPurify;
     // @ts-expect-error - Also set global.DOMPurify for mermaid's direct access

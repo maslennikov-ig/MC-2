@@ -131,6 +131,17 @@ export const JudgeIssueSchema = z.object({
   quotedText: z.string().optional().describe('Exact text that has the issue'),
   /** Actionable suggestion for fixing the issue */
   suggestedFix: z.string().min(10).describe('Concrete fix suggestion'),
+  /**
+   * Ready-to-apply replacement for quotedText (InlineFixer zero-token fix).
+   * When provided with quotedText, InlineFixer can apply this directly via str.replace()
+   * instead of calling Patcher LLM (~1500 tokens saved per fix).
+   *
+   * Should ONLY be provided for:
+   * - Local issues (typos, incorrect facts, unclear wording)
+   * - Simple text replacements (not structural changes)
+   * - Short replacements (<300 chars, <50% size difference from quotedText)
+   */
+  inlineReplacement: z.string().optional().describe('Exact replacement text for quotedText (for InlineFixer)'),
 });
 
 /** JudgeIssue type */
