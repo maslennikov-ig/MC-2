@@ -13,7 +13,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { useTranslations, useLocale } from 'next-intl';
-import { Layers, Video, HelpCircle, Volume2, Presentation, AlertCircle, ImageIcon } from 'lucide-react';
+import { Layers, Video, HelpCircle, Volume2, Presentation, AlertCircle, ImageIcon, PanelTop } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
 import { toast } from 'sonner';
@@ -63,6 +63,7 @@ function EnrichmentAddGrid({
     colorClass: string;
   }> = [
     { type: 'cover', icon: ImageIcon, labelKey: 'cover', colorClass: 'text-cyan-500' },
+    { type: 'banner', icon: PanelTop, labelKey: 'banner', colorClass: 'text-rose-500' },
     { type: 'video', icon: Video, labelKey: 'video', colorClass: 'text-blue-500' },
     { type: 'quiz', icon: HelpCircle, labelKey: 'quiz', colorClass: 'text-purple-500' },
     { type: 'audio', icon: Volume2, labelKey: 'audio', colorClass: 'text-green-500' },
@@ -74,7 +75,7 @@ function EnrichmentAddGrid({
       <p className="text-xs text-muted-foreground mb-2 px-1">
         {t('inspector.addEnrichment')}
       </p>
-      <div className="grid grid-cols-5 gap-1.5">
+      <div className="grid grid-cols-6 gap-1.5">
         {enrichmentTypes.map(({ type, icon: Icon, labelKey, colorClass }) => (
           <button
             key={type}
@@ -340,12 +341,15 @@ function useEnrichmentsByLesson(lessonId: string): DataState & { refetch: () => 
         return;
       }
 
-      const enrichmentList: EnrichmentListItemData[] = (enrichments || []).map((e, index) => ({
-        id: e.id,
-        type: e.enrichment_type as EnrichmentType,
-        status: e.status as EnrichmentStatus,
-        display_order: e.order_index ?? index,
-      }));
+      // Filter out 'card' enrichments - they're auto-generated and shown in the pipeline
+      const enrichmentList: EnrichmentListItemData[] = (enrichments || [])
+        .filter((e) => e.enrichment_type !== 'card')
+        .map((e, index) => ({
+          id: e.id,
+          type: e.enrichment_type as EnrichmentType,
+          status: e.status as EnrichmentStatus,
+          display_order: e.order_index ?? index,
+        }));
 
       setState({ status: 'success', data: enrichmentList });
     } catch (err) {

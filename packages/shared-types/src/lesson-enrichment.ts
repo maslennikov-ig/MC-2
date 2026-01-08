@@ -29,8 +29,9 @@ export const enrichmentTypeSchema = z.enum([
   'presentation',
   'quiz',
   'document',
-  'cover',
-  'card',
+  'cover',   // Auto-generated lesson hero image (after Stage 5)
+  'card',    // Auto-generated thumbnail (lesson card after Stage 6, course card after Stage 5)
+  'banner',  // Manually created decorative header image
 ]);
 
 export type EnrichmentType = z.infer<typeof enrichmentTypeSchema>;
@@ -263,7 +264,7 @@ export function isEnrichmentSummary(value: unknown): value is EnrichmentSummary 
  * @returns True if type requires Supabase Storage asset
  */
 export function requiresAsset(type: EnrichmentType): boolean {
-  return type === 'audio' || type === 'video' || type === 'cover' || type === 'card';
+  return type === 'audio' || type === 'video' || type === 'cover' || type === 'card' || type === 'banner';
 }
 
 /**
@@ -293,6 +294,7 @@ export function getDefaultEnrichmentTitle(
     document: { en: 'Downloadable Document', ru: 'Документ для скачивания' },
     cover: { en: 'Lesson Cover', ru: 'Обложка урока' },
     card: { en: 'Visual Card', ru: 'Визуальная карточка' },
+    banner: { en: 'Decorative Banner', ru: 'Декоративный баннер' },
   };
 
   return titles[type][locale];

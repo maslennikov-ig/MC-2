@@ -63,6 +63,7 @@ export function useEnrichmentSelection(
       presentation: 0,
       document: 0,
       card: 0,
+      banner: 0,
     };
 
     for (const enrichment of items) {

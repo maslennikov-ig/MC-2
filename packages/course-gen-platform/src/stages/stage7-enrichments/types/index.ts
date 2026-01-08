@@ -152,6 +152,8 @@ export interface EnrichmentWithContext {
     title: string;
     content: string | null;
     course_id: string;
+    /** Lesson objectives from Stage 5 (used for keyword extraction) */
+    objectives: string[] | null;
   };
 
   /** Parent course data */

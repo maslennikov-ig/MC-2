@@ -179,9 +179,11 @@ export const getAutoCard = protectedProcedure
         query = query.eq('title', 'course-card');
       } else {
         // Lesson card: for specific lesson, NOT a course card
+        // Note: .neq() doesn't match NULL values in PostgreSQL, so we use .or()
+        // to include records where title IS NULL or title != 'course-card'
         query = query
           .eq('lesson_id', lessonId!)
-          .neq('title', 'course-card');
+          .or('title.neq.course-card,title.is.null');
       }
 
       const { data: card, error } = await query.maybeSingle();

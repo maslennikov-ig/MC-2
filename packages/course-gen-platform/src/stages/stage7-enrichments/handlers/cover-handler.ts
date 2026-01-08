@@ -211,6 +211,19 @@ function extractKeywords(lessonContent: string | null): string[] {
 }
 
 /**
+ * Extract keywords from lesson objectives
+ * Primary source for keyword extraction after Stage 5 completes
+ * Objectives contain rich semantic descriptions of lesson content
+ */
+function extractKeywordsFromObjectives(objectives: string[] | null): string[] {
+  if (!objectives || objectives.length === 0) {
+    return [];
+  }
+  // Take up to 5 objectives as keywords (they're already descriptive)
+  return objectives.slice(0, 5);
+}
+
+/**
  * Default system prompt for cover generation (inline fallback)
  */
 function getDefaultCoverSystemPrompt(): string {
@@ -373,8 +386,47 @@ async function generateDraft(input: EnrichmentHandlerInput): Promise<DraftResult
   );
 
   try {
-    // Extract keywords from lesson content
-    const keywords = extractKeywords(lesson.content);
+    // Priority 1: Use objectives from Stage 5 (available immediately)
+    // Priority 2: Fallback to content keywords from Stage 6 (if available)
+    let keywords: string[];
+    let keywordSource: 'objectives' | 'content' | 'none';
+
+    if (lesson.objectives && lesson.objectives.length > 0) {
+      keywords = extractKeywordsFromObjectives(lesson.objectives);
+      keywordSource = 'objectives';
+      logger.debug(
+        {
+          enrichmentId: enrichment.id,
+          keywordSource,
+          keywordCount: keywords.length,
+          objectivesCount: lesson.objectives.length,
+        },
+        'Cover handler: using objectives for keyword extraction for draft generation'
+      );
+    } else if (lesson.content) {
+      keywords = extractKeywords(lesson.content);
+      keywordSource = 'content';
+      logger.debug(
+        {
+          enrichmentId: enrichment.id,
+          keywordSource,
+          keywordCount: keywords.length,
+        },
+        'Cover handler: objectives not available, using content for keywords for draft generation'
+      );
+    } else {
+      keywords = [];
+      keywordSource = 'none';
+      logger.warn(
+        {
+          enrichmentId: enrichment.id,
+          lessonId: lesson.id,
+          hasObjectives: !!lesson.objectives,
+          hasContent: !!lesson.content,
+        },
+        'Cover handler: no keyword sources available - using default prompt for draft generation'
+      );
+    }
 
     const promptParams: CoverPromptParams = {
       lessonTitle: lesson.title,
@@ -561,7 +613,48 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
 
   try {
     // Phase 1: Generate image prompt using LLM with DB prompts
-    const keywords = extractKeywords(lesson.content);
+    // Priority 1: Use objectives from Stage 5 (available immediately)
+    // Priority 2: Fallback to content keywords from Stage 6 (if available)
+    let keywords: string[];
+    let keywordSource: 'objectives' | 'content' | 'none';
+
+    if (lesson.objectives && lesson.objectives.length > 0) {
+      keywords = extractKeywordsFromObjectives(lesson.objectives);
+      keywordSource = 'objectives';
+      logger.debug(
+        {
+          enrichmentId: enrichment.id,
+          keywordSource,
+          keywordCount: keywords.length,
+          objectivesCount: lesson.objectives.length,
+        },
+        'Cover handler: using objectives for keyword extraction for generation'
+      );
+    } else if (lesson.content) {
+      keywords = extractKeywords(lesson.content);
+      keywordSource = 'content';
+      logger.debug(
+        {
+          enrichmentId: enrichment.id,
+          keywordSource,
+          keywordCount: keywords.length,
+        },
+        'Cover handler: objectives not available, using content for keywords for generation'
+      );
+    } else {
+      keywords = [];
+      keywordSource = 'none';
+      logger.warn(
+        {
+          enrichmentId: enrichment.id,
+          lessonId: lesson.id,
+          hasObjectives: !!lesson.objectives,
+          hasContent: !!lesson.content,
+        },
+        'Cover handler: no keyword sources available - using default prompt for generation'
+      );
+    }
+
     const promptService = createPromptService();
 
     const language = (course.language as 'en' | 'ru') || 'en';
@@ -722,12 +815,14 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
 
     const content: CoverEnrichmentContent = {
       type: 'cover',
-      image_url: imageUrl,
-      width: imageResult.width,
-      height: imageResult.height,
-      aspect_ratio: '16:9',
+      imageUrl,
+      dimensions: {
+        width: imageResult.width,
+        height: imageResult.height,
+      },
+      aspectRatio: '16:9',
       generation_prompt: imagePrompt,
-      alt_text: getLocalizedAltText(course.language ?? 'en', lesson.title),
+      altText: getLocalizedAltText(course.language ?? 'en', lesson.title),
       format: 'webp',
       file_size_bytes: webpResult.sizeBytes,
     };
@@ -902,12 +997,14 @@ async function generateFinal(
 
     const content: CoverEnrichmentContent = {
       type: 'cover',
-      image_url: imageUrl,
-      width: imageResult.width,
-      height: imageResult.height,
-      aspect_ratio: '16:9',
+      imageUrl,
+      dimensions: {
+        width: imageResult.width,
+        height: imageResult.height,
+      },
+      aspectRatio: '16:9',
       generation_prompt: imagePrompt,
-      alt_text: getLocalizedAltText(course.language ?? 'en', lesson.title),
+      altText: getLocalizedAltText(course.language ?? 'en', lesson.title),
       format: 'webp',
       file_size_bytes: webpResult.sizeBytes,
     };

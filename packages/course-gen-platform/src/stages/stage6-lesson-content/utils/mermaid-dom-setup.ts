@@ -70,20 +70,23 @@ export function ensureDOMGlobals(): void {
     // Create minimal DOM environment
     const dom = new JSDOM('<!DOCTYPE html><body></body>');
 
-    // Assign to Node.js globals
-    // TypeScript: JSDOM's window is compatible with DOM Window type
+    // Assign to Node.js globals (required by mermaid at import time)
     global.document = dom.window.document;
     global.window = dom.window as unknown as Window & typeof globalThis;
 
-    // Create DOMPurify instance and attach to window
-    // Mermaid requires DOMPurify.addHook() to be available
+    // Create DOMPurify instance and attach to both window and global
+    // Mermaid may look for DOMPurify in different places depending on version
     const DOMPurify = createDOMPurify(dom.window);
     // @ts-expect-error - Mermaid expects DOMPurify on window
     global.window.DOMPurify = DOMPurify;
+    // @ts-expect-error - Also set global.DOMPurify for mermaid's direct access
+    global.DOMPurify = DOMPurify;
 
     // Mark as initialized
     initialized = true;
 
+    // NOTE: global.window is required for mermaid at import time.
+    // OpenAI SDK is configured with dangerouslyAllowBrowser: true to handle this.
     logger.debug('Mermaid DOM setup: JSDOM and DOMPurify initialized successfully');
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
@@ -115,19 +118,41 @@ export function isDOMInitialized(): boolean {
 
 /**
  * Clean up DOM globals to prevent memory leaks in long-running processes.
- * Should be called after mermaid operations are complete.
  *
- * This is critical for BullMQ workers processing thousands of lessons
- * to avoid memory leaks from accumulated JSDOM instances.
+ * **WARNING: DO NOT call this between mermaid operations!**
+ *
+ * Mermaid is a singleton that caches DOMPurify reference at first initialization.
+ * If you call cleanupDOMGlobals() and then try to use mermaid again, you will get:
+ * `DOMPurify.addHook is not a function`
+ *
+ * **When to call:**
+ * - At worker shutdown (after all jobs complete)
+ * - NOT after each pipeline run
+ * - NOT in try/finally blocks around mermaid operations
+ *
+ * **When NOT to call:**
+ * - Between mermaid.parse() calls
+ * - In mermaid-fix-pipeline.ts
+ * - During lesson content generation
+ *
+ * Memory is safe without cleanup because ensureDOMGlobals() is idempotent -
+ * it creates JSDOM once and reuses it for all subsequent calls.
  *
  * @example
  * ```typescript
+ * // WRONG - will break mermaid:
  * try {
  *   ensureDOMGlobals();
- *   // ... mermaid operations
+ *   await mermaid.parse(code1);
  * } finally {
- *   cleanupDOMGlobals();
+ *   cleanupDOMGlobals(); // BREAKS subsequent mermaid calls!
  * }
+ *
+ * // CORRECT - only cleanup at shutdown:
+ * process.on('SIGTERM', () => {
+ *   cleanupDOMGlobals();
+ *   process.exit(0);
+ * });
  * ```
  */
 export function cleanupDOMGlobals(): void {
@@ -145,6 +170,8 @@ export function cleanupDOMGlobals(): void {
     delete global.document;
     // @ts-expect-error - Intentionally deleting globals for cleanup
     delete global.window;
+    // @ts-expect-error - Intentionally deleting globals for cleanup
+    delete global.DOMPurify;
 
     initialized = false;
 

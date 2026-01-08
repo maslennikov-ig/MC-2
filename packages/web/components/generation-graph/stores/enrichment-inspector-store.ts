@@ -22,6 +22,7 @@ export type CreateEnrichmentType =
   | 'quiz'
   | 'document'
   | 'cover'
+  | 'banner'
   // Legacy aliases (kept for backward compatibility)
   | 'podcast'
   | 'mindmap'

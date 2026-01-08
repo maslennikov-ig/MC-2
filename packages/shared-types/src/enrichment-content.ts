@@ -352,22 +352,25 @@ export const coverEnrichmentContentSchema = z.object({
   type: z.literal('cover'),
 
   /** Generated image URL (Supabase Storage public URL) */
-  image_url: z.string().url(),
+  imageUrl: z.string().url(),
 
-  /** Image width in pixels */
-  width: z.number().int().positive().default(1280),
+  /** Image dimensions */
+  dimensions: z.object({
+    /** Image width in pixels */
+    width: z.number().int().positive().default(1280),
 
-  /** Image height in pixels */
-  height: z.number().int().positive().default(720),
+    /** Image height in pixels */
+    height: z.number().int().positive().default(720),
+  }),
 
   /** Aspect ratio string (e.g., "16:9") */
-  aspect_ratio: z.string().default('16:9'),
+  aspectRatio: z.string().default('16:9'),
 
   /** The prompt used for image generation (stored for regeneration/debugging) */
   generation_prompt: z.string(),
 
-  /** Optional alt text for accessibility */
-  alt_text: z.string().optional(),
+  /** Alt text for accessibility */
+  altText: z.string().optional(),
 
   /** Image format */
   format: z.enum(['png', 'jpeg', 'webp']).default('png'),
@@ -433,6 +436,51 @@ export const cardEnrichmentContentSchema = z.object({
 export type CardEnrichmentContent = z.infer<typeof cardEnrichmentContentSchema>;
 
 // ============================================================================
+// BANNER ENRICHMENT CONTENT (Manual Decorative Header)
+// ============================================================================
+
+/**
+ * Banner enrichment content structure
+ *
+ * Stores manually created decorative header image metadata and URL.
+ * Unlike cover (auto-generated), banners are user-initiated for extra visual appeal.
+ * Displayed as decorative header in lesson or course sections.
+ */
+export const bannerEnrichmentContentSchema = z.object({
+  /** Content type discriminator */
+  type: z.literal('banner'),
+
+  /** Generated image URL (Supabase Storage public URL) */
+  imageUrl: z.string().url(),
+
+  /** Alt text for accessibility */
+  altText: z.string(),
+
+  /** Image dimensions */
+  dimensions: z.object({
+    /** Image width in pixels */
+    width: z.number().int().positive().default(1280),
+
+    /** Image height in pixels */
+    height: z.number().int().positive().default(400),
+  }),
+
+  /** Aspect ratio string (e.g., "32:10") */
+  aspectRatio: z.string().default('32:10'),
+
+  /** The prompt used for image generation (stored for regeneration/debugging) */
+  generation_prompt: z.string(),
+
+  /** Image format */
+  format: z.enum(['png', 'jpeg', 'webp']).default('png'),
+
+  /** File size in bytes (optional) */
+  file_size_bytes: z.number().int().positive().optional(),
+});
+
+export type BannerEnrichmentContent = z.infer<typeof bannerEnrichmentContentSchema>;
+
+// ============================================================================
 // DISCRIMINATED UNION OF ALL CONTENT TYPES
 // ============================================================================
 
@@ -450,6 +498,7 @@ export const enrichmentContentSchema = z.discriminatedUnion('type', [
   documentEnrichmentContentSchema,
   coverEnrichmentContentSchema,
   cardEnrichmentContentSchema,
+  bannerEnrichmentContentSchema,
 ]);
 
 export type EnrichmentContent = z.infer<typeof enrichmentContentSchema>;

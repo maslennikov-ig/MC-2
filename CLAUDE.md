@@ -26,10 +26,11 @@ Before delegation:
 - Specify exact expected output and validation criteria
 
 After delegation (CRITICAL):
-- ALWAYS verify results (read modified files, run type-check)
+- ALWAYS verify results (read modified files, run type-check, run lint)
 - NEVER skip verification
 - If incorrect: re-delegate with corrections and errors
 - If TypeScript errors: re-delegate to same agent OR typescript-types-specialist
+- If lint errors: fix directly or re-delegate
 
 **3. EXECUTE DIRECTLY (MINIMAL ONLY)**
 
@@ -62,7 +63,7 @@ FOR EACH TASK:
 1. Read task description
 2. GATHER FULL CONTEXT (code + docs + patterns + history)
 3. Delegate to subagent OR execute directly (trivial only)
-4. VERIFY results (read files + run type-check) - NEVER skip
+4. VERIFY results (read files + run type-check + run lint) - NEVER skip
 5. Accept/reject loop (re-delegate if needed)
 6. Update TodoWrite to completed
 7. Mark task [X] in tasks.md + add artifacts

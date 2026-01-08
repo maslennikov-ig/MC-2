@@ -178,8 +178,8 @@ export default function LessonContent({ lesson, section, assets, lessonContent, 
 
     if (!coverEnrichment?.content) return null
 
-    const content = coverEnrichment.content as { type: string; image_url?: string }
-    return content.type === 'cover' ? content.image_url ?? null : null
+    const content = coverEnrichment.content as { type: string; imageUrl?: string }
+    return content.type === 'cover' ? content.imageUrl ?? null : null
   }, [enrichments])
 
   return (

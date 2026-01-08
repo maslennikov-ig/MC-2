@@ -352,7 +352,7 @@ export function LessonInspector({
       locale="ru"
       className="h-full"
       courseId={courseId}
-      lessonId={data.lessonId}
+      lessonId={data.lessonUuid || undefined}
     />
   );
 

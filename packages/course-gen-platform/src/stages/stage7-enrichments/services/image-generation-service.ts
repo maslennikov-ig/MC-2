@@ -33,7 +33,7 @@ const DEFAULT_COST_USD = 0.04;
 
 const DEFAULT_ASPECT_RATIO = '16:9';
 const DEFAULT_IMAGE_SIZE = '1K'; // 1344x768 for 16:9 - optimal for web covers
-const API_TIMEOUT_MS = 60000; // 1 minute for image generation
+const API_TIMEOUT_MS = 120000; // 2 minutes for image generation (some models like gpt-5-image-mini take 60-90s)
 
 /**
  * Negative prompt to avoid unwanted artifacts in generated images.

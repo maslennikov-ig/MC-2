@@ -419,8 +419,10 @@ export interface LessonContentPreview {
  * Top-level data structure for the Lesson Inspector component.
  */
 export interface LessonInspectorData {
-  /** Lesson UUID */
+  /** Lesson label (e.g., "1.2" for module 1, lesson 2) */
   lessonId: string;
+  /** Lesson UUID (actual database ID) */
+  lessonUuid: string | null;
   /** Lesson number within module (1-based) */
   lessonNumber: number;
   /** Module UUID */

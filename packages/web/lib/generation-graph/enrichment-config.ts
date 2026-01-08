@@ -12,13 +12,14 @@ import {
   HelpCircle,
   FileText,
   Image,
+  PanelTop,
   type LucideIcon,
 } from 'lucide-react';
 
 /**
  * Enrichment type (matches database enum)
  */
-export type EnrichmentType = 'video' | 'audio' | 'presentation' | 'quiz' | 'document' | 'cover' | 'card';
+export type EnrichmentType = 'video' | 'audio' | 'presentation' | 'quiz' | 'document' | 'cover' | 'card' | 'banner';
 
 /**
  * Enrichment status (matches database enum)
@@ -137,6 +138,17 @@ export const ENRICHMENT_TYPE_CONFIG: Record<EnrichmentType, EnrichmentTypeConfig
     twoStage: false,
     order: 6,
   },
+  banner: {
+    icon: PanelTop,
+    color: 'text-rose-500 dark:text-rose-400',
+    colorClass: 'text-rose-500 dark:text-rose-400',
+    bgColor: 'bg-rose-100 dark:bg-rose-900/30',
+    bgClass: 'bg-rose-100 dark:bg-rose-900/30',
+    label: 'Decorative Banner',
+    labelRu: 'Декоративный баннер',
+    twoStage: false,
+    order: 7,
+  },
 };
 
 /**
@@ -254,4 +266,5 @@ export const ENRICHMENT_TYPES_ORDERED: EnrichmentType[] = [
   'quiz',
   'document',
   'card',
+  'banner',
 ];

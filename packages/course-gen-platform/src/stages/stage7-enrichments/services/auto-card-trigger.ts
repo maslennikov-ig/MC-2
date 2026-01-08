@@ -22,23 +22,69 @@ import type { Stage7JobInput, Stage7JobResult } from '../types';
 // ============================================================================
 
 /**
- * Card job priority configuration
+ * Enrichment job priority configuration
  *
  * BullMQ priority: lower number = higher priority
- * - 1: Cards (highest - generate before other enrichments)
- * - 5: Quizzes (normal priority)
+ *
+ * Priority levels:
+ * - 1: Cards (highest - thumbnails needed for UI immediately)
+ * - 2: Covers (high - hero images for visual appeal)
+ * - 3: [RESERVED] - Future: interactive elements
+ * - 4: [RESERVED] - Future: documents/presentations
+ * - 5: Quizzes (normal - assessment content)
  * - 10: Video/Audio (lowest - expensive operations)
+ *
+ * Note: Priorities 3-4 are reserved for future enrichment types.
+ * When adding new types, use the next available priority.
  */
 const CARD_JOB_PRIORITY = 1;
 
 /**
- * Order index for card enrichments in the lesson enrichment list
- * Cards always appear first (index 0) for visual prominence
+ * Cover job priority configuration
+ * Slightly lower priority than cards (2 vs 1) since covers are larger images
  */
-const CARD_ORDER_INDEX = 0;
+const COVER_JOB_PRIORITY = 2;
+
+/**
+ * Order index for card enrichments in the lesson enrichment list
+ * Cards always appear first (index 1) for visual prominence
+ * Note: Database constraint requires order_index > 0
+ */
+const CARD_ORDER_INDEX = 1;
+
+/**
+ * Order index for cover enrichments in the lesson enrichment list
+ * Covers appear after cards (index 2) since they're hero images
+ */
+const COVER_ORDER_INDEX = 2;
 
 /** Whether auto-card generation is enabled */
 const AUTO_CARD_ENABLED = process.env.AUTO_CARD_GENERATION !== 'false';
+
+// ============================================================================
+// ENRICHMENT TYPE CONFIGURATION
+// ============================================================================
+
+/** Supported lesson-level enrichment types for auto-triggering */
+type LessonEnrichmentType = 'card' | 'cover';
+
+/** Configuration for each enrichment type */
+interface LessonEnrichmentConfig {
+  orderIndex: number;
+  priority: number;
+}
+
+/** Enrichment type configurations */
+const LESSON_ENRICHMENT_CONFIG: Record<LessonEnrichmentType, LessonEnrichmentConfig> = {
+  card: {
+    orderIndex: CARD_ORDER_INDEX,
+    priority: CARD_JOB_PRIORITY,
+  },
+  cover: {
+    orderIndex: COVER_ORDER_INDEX,
+    priority: COVER_JOB_PRIORITY,
+  },
+};
 
 // ============================================================================
 // SINGLETON QUEUE MANAGEMENT
@@ -54,7 +100,7 @@ let shutdownHandlersRegistered = false;
 let isShuttingDown = false;
 
 /**
- * Log structured card generation failure for tracking and monitoring
+ * Log structured enrichment generation failure for tracking and monitoring
  *
  * Provides structured error logging with consistent fields for:
  * - Monitoring dashboards (filtering by event type)
@@ -64,23 +110,43 @@ let isShuttingDown = false;
  * @param params - Failure context parameters
  */
 function logCardGenerationFailure(params: {
-  cardType: 'lesson' | 'course';
+  enrichmentType: 'card' | 'cover';
+  scope: 'lesson' | 'course';
   courseId: string;
   lessonId?: string;
-  error: Error | unknown;
+  error: unknown;
   phase: 'trigger' | 'queue' | 'enrichment-creation';
   context?: Record<string, unknown>;
 }): void {
-  const { cardType, courseId, lessonId, error, phase, context } = params;
+  const { enrichmentType, scope, courseId, lessonId, error, phase, context } = params;
 
-  const errorMessage = error instanceof Error ? error.message : String(error);
-  const errorStack = error instanceof Error ? error.stack : undefined;
+  // Handle different error types: Error instances, Supabase errors (plain objects), or primitives
+  let errorMessage: string;
+  let errorStack: string | undefined;
+
+  if (error instanceof Error) {
+    errorMessage = error.message;
+    errorStack = error.stack;
+  } else if (error && typeof error === 'object' && 'message' in error) {
+    // Supabase PostgrestError or similar object with message property
+    errorMessage = String((error as { message: unknown }).message);
+  } else if (error && typeof error === 'object') {
+    // Plain object - try to JSON stringify
+    try {
+      errorMessage = JSON.stringify(error);
+    } catch {
+      errorMessage = String(error);
+    }
+  } else {
+    errorMessage = String(error);
+  }
 
   // Structured error log for monitoring/alerting systems
   logger.error(
     {
-      event: 'card_generation_failure',
-      cardType,
+      event: 'enrichment_generation_failure',
+      enrichmentType,
+      scope,
       courseId,
       lessonId,
       phase,
@@ -89,7 +155,7 @@ function logCardGenerationFailure(params: {
       timestamp: new Date().toISOString(),
       ...context,
     },
-    `Card generation failure: ${cardType} card failed during ${phase} phase`
+    `Enrichment generation failure: ${scope} ${enrichmentType} failed during ${phase} phase`
   );
 }
 
@@ -165,37 +231,40 @@ export async function shutdownAutoCardQueue(): Promise<void> {
 }
 
 // ============================================================================
-// LESSON CARD TRIGGER
+// GENERIC LESSON ENRICHMENT TRIGGER (INTERNAL)
 // ============================================================================
 
 /**
- * Trigger lesson card generation after Stage 6 completion
+ * Generic trigger for lesson enrichments (cards, covers, etc.)
  *
- * Creates a card enrichment record and queues a Stage7 job for generation.
- * Should be called after successful lesson content generation in Stage 6.
- *
- * @param params - Lesson card trigger parameters
- * @returns Created enrichment ID or null if skipped/failed
+ * @internal - Use triggerLessonCard() or triggerLessonCover() instead
  */
-export async function triggerLessonCard(params: {
-  courseId: string;
-  lessonId: string;
-  userId?: string;
-  organizationId?: string;
-}): Promise<string | null> {
+async function triggerLessonEnrichment(
+  enrichmentType: LessonEnrichmentType,
+  params: {
+    courseId: string;
+    lessonId: string;
+    userId?: string;
+    organizationId?: string;
+  }
+): Promise<string | null> {
   const { courseId, lessonId } = params;
   let { userId, organizationId } = params;
+  const config = LESSON_ENRICHMENT_CONFIG[enrichmentType];
 
   // Input validation
   if (!courseId || !lessonId) {
-    logger.error({ courseId, lessonId }, 'Missing required parameters for lesson card trigger');
+    logger.error(
+      { courseId, lessonId },
+      `Missing required parameters for lesson ${enrichmentType} trigger`
+    );
     return null;
   }
 
   if (!AUTO_CARD_ENABLED) {
     logger.debug(
       { lessonId, courseId },
-      'Auto-card generation disabled, skipping lesson card trigger'
+      `Auto-card generation disabled, skipping lesson ${enrichmentType} trigger`
     );
     return null;
   }
@@ -215,7 +284,8 @@ export async function triggerLessonCard(params: {
 
       if (courseError || !course) {
         logCardGenerationFailure({
-          cardType: 'lesson',
+          enrichmentType,
+          scope: 'lesson',
           courseId,
           lessonId,
           error: courseError || new Error('Course not found'),
@@ -225,7 +295,6 @@ export async function triggerLessonCard(params: {
         return null;
       }
 
-      // Null safety check for required fields from database
       if (!course.user_id || !course.organization_id) {
         logger.error(
           { courseId, user_id: course.user_id, organization_id: course.organization_id },
@@ -238,20 +307,20 @@ export async function triggerLessonCard(params: {
       organizationId = organizationId || course.organization_id;
     }
 
-    // Check if lesson card already exists
-    const { data: existingCard } = await supabase
+    // Check if enrichment already exists
+    const { data: existing } = await supabase
       .from('lesson_enrichments')
       .select('id')
       .eq('lesson_id', lessonId)
-      .eq('enrichment_type', 'card')
+      .eq('enrichment_type', enrichmentType)
       .maybeSingle();
 
-    if (existingCard) {
+    if (existing) {
       logger.debug(
-        { lessonId, existingCardId: existingCard.id },
-        'Lesson card already exists, skipping'
+        { lessonId, existingId: existing.id },
+        `Lesson ${enrichmentType} already exists, skipping`
       );
-      return existingCard.id;
+      return existing.id;
     }
 
     // Create enrichment record with upsert to handle race conditions
@@ -263,9 +332,11 @@ export async function triggerLessonCard(params: {
           id: enrichmentId,
           lesson_id: lessonId,
           course_id: courseId,
-          enrichment_type: 'card',
+          enrichment_type: enrichmentType,
           status: 'pending',
-          order_index: CARD_ORDER_INDEX,
+          order_index: config.orderIndex,
+          // Mark auto-generated covers to distinguish from manual banner enrichments
+          settings: enrichmentType === 'cover' ? { isAutoGenerated: true } : undefined,
           generation_attempt: 0,
           created_at: new Date().toISOString(),
           updated_at: new Date().toISOString(),
@@ -279,17 +350,16 @@ export async function triggerLessonCard(params: {
       .single();
 
     if (upsertError) {
-      // PGRST116 means no rows returned (duplicate was ignored)
-      // This is expected behavior when ignoreDuplicates is true
       if (upsertError.code === 'PGRST116') {
         logger.debug(
           { lessonId, courseId },
-          'Lesson card already exists (race condition handled), skipping job queue'
+          `Lesson ${enrichmentType} already exists (race condition handled), skipping job queue`
         );
         return null;
       }
       logCardGenerationFailure({
-        cardType: 'lesson',
+        enrichmentType,
+        scope: 'lesson',
         courseId,
         lessonId,
         error: upsertError,
@@ -299,13 +369,12 @@ export async function triggerLessonCard(params: {
       return null;
     }
 
-    // Use the actual enrichment ID (could be new or existing)
     const actualEnrichmentId = upsertResult?.id || enrichmentId;
 
     // Queue Stage7 job with deterministic jobId for deduplication
     const jobInput: Stage7JobInput = {
       enrichmentId: actualEnrichmentId,
-      enrichmentType: 'card',
+      enrichmentType,
       lessonId,
       courseId,
       userId,
@@ -316,7 +385,8 @@ export async function triggerLessonCard(params: {
     const queue = await getQueue();
     if (!queue) {
       logCardGenerationFailure({
-        cardType: 'lesson',
+        enrichmentType,
+        scope: 'lesson',
         courseId,
         lessonId,
         error: new Error('Queue unavailable (shutdown in progress)'),
@@ -326,21 +396,22 @@ export async function triggerLessonCard(params: {
     }
 
     await addEnrichmentJob(queue, jobInput, {
-      priority: CARD_JOB_PRIORITY,
-      jobId: `card-lesson-${lessonId}`,
+      priority: config.priority,
+      jobId: `${enrichmentType}-lesson-${lessonId}`,
     });
 
     const durationMs = Date.now() - startTime;
 
     logger.info(
       { lessonId, courseId, enrichmentId: actualEnrichmentId, durationMs },
-      'Lesson card generation triggered'
+      `Lesson ${enrichmentType} generation triggered`
     );
 
     return actualEnrichmentId;
   } catch (error) {
     logCardGenerationFailure({
-      cardType: 'lesson',
+      enrichmentType,
+      scope: 'lesson',
       courseId,
       lessonId,
       error,
@@ -348,6 +419,51 @@ export async function triggerLessonCard(params: {
     });
     return null;
   }
+}
+
+// ============================================================================
+// LESSON CARD TRIGGER
+// ============================================================================
+
+/**
+ * Trigger lesson card generation after Stage 6 completion
+ *
+ * Creates a card enrichment record and queues a Stage7 job for generation.
+ * Should be called after successful lesson content generation in Stage 6.
+ *
+ * @param params - Lesson card trigger parameters
+ * @returns Created enrichment ID or null if skipped/failed
+ */
+export async function triggerLessonCard(params: {
+  courseId: string;
+  lessonId: string;
+  userId?: string;
+  organizationId?: string;
+}): Promise<string | null> {
+  return triggerLessonEnrichment('card', params);
+}
+
+// ============================================================================
+// LESSON COVER TRIGGER
+// ============================================================================
+
+/**
+ * Trigger lesson cover generation after Stage 5 completion
+ *
+ * Creates a cover enrichment record and queues a Stage7 job for generation.
+ * Can be called immediately after Stage 5 since covers use lesson.objectives
+ * instead of lesson.content for keyword extraction.
+ *
+ * @param params - Lesson cover trigger parameters
+ * @returns Created enrichment ID or null if skipped/failed
+ */
+export async function triggerLessonCover(params: {
+  courseId: string;
+  lessonId: string;
+  userId?: string;
+  organizationId?: string;
+}): Promise<string | null> {
+  return triggerLessonEnrichment('cover', params);
 }
 
 // ============================================================================
@@ -403,7 +519,8 @@ export async function triggerCourseCard(params: {
 
       if (courseError || !course) {
         logCardGenerationFailure({
-          cardType: 'course',
+          enrichmentType: 'card',
+          scope: 'course',
           courseId,
           error: courseError || new Error('Course not found'),
           phase: 'trigger',
@@ -499,7 +616,8 @@ export async function triggerCourseCard(params: {
         return null;
       }
       logCardGenerationFailure({
-        cardType: 'course',
+        enrichmentType: 'card',
+        scope: 'course',
         courseId,
         error: upsertError,
         phase: 'enrichment-creation',
@@ -526,7 +644,8 @@ export async function triggerCourseCard(params: {
     const queue = await getQueue();
     if (!queue) {
       logCardGenerationFailure({
-        cardType: 'course',
+        enrichmentType: 'card',
+        scope: 'course',
         courseId,
         error: new Error('Queue unavailable (shutdown in progress)'),
         phase: 'queue',
@@ -549,7 +668,8 @@ export async function triggerCourseCard(params: {
     return actualEnrichmentId;
   } catch (error) {
     logCardGenerationFailure({
-      cardType: 'course',
+      enrichmentType: 'card',
+      scope: 'course',
       courseId,
       error,
       phase: 'trigger',
@@ -578,9 +698,25 @@ export interface BatchTriggerResult {
  * Trigger card generation for all lessons in a course
  *
  * Useful for backfilling cards on existing courses.
+ * Skips lessons that already have card enrichments.
  *
  * @param params - Batch trigger parameters
- * @returns Object with succeeded, failed, and skipped lesson details
+ * @param params.courseId - Course UUID to generate cards for
+ * @param params.userId - User UUID who initiated the generation
+ * @param params.organizationId - Organization UUID for billing/tracking
+ * @returns Promise resolving to BatchTriggerResult with:
+ *   - succeeded: Array of created enrichment IDs
+ *   - failed: Array of {lessonId, error} for failed triggers
+ *   - skipped: Array of lesson IDs that already have cards
+ *
+ * @example
+ * ```typescript
+ * const result = await triggerAllLessonCards({
+ *   courseId: '123e4567-e89b-12d3-a456-426614174000',
+ *   userId: '123e4567-e89b-12d3-a456-426614174001',
+ *   organizationId: '123e4567-e89b-12d3-a456-426614174002'
+ * });
+ * ```
  */
 export async function triggerAllLessonCards(params: {
   courseId: string;
@@ -677,6 +813,133 @@ export async function triggerAllLessonCards(params: {
         error: error instanceof Error ? error.message : String(error),
       },
       'Failed to trigger batch lesson cards'
+    );
+    return result;
+  }
+}
+
+/**
+ * Trigger cover generation for all lessons in a course
+ *
+ * Called after Stage 5 completes to generate covers in parallel with Stage 6.
+ * Skips lessons that already have cover enrichments.
+ *
+ * @param params - Batch trigger parameters
+ * @param params.courseId - Course UUID to generate covers for
+ * @param params.userId - User UUID who initiated the generation
+ * @param params.organizationId - Organization UUID for billing/tracking
+ * @returns Promise resolving to BatchTriggerResult with:
+ *   - succeeded: Array of created enrichment IDs
+ *   - failed: Array of {lessonId, error} for failed triggers
+ *   - skipped: Array of lesson IDs that already have covers
+ *
+ * @example
+ * ```typescript
+ * const result = await triggerAllLessonCovers({
+ *   courseId: '123e4567-e89b-12d3-a456-426614174000',
+ *   userId: '123e4567-e89b-12d3-a456-426614174001',
+ *   organizationId: '123e4567-e89b-12d3-a456-426614174002'
+ * });
+ *
+ * console.log(`Triggered: ${result.succeeded.length}`);
+ * console.log(`Failed: ${result.failed.length}`);
+ * console.log(`Skipped: ${result.skipped.length}`);
+ * ```
+ */
+export async function triggerAllLessonCovers(params: {
+  courseId: string;
+  userId: string;
+  organizationId: string;
+}): Promise<BatchTriggerResult> {
+  const { courseId, userId, organizationId } = params;
+
+  const result: BatchTriggerResult = {
+    succeeded: [],
+    failed: [],
+    skipped: [],
+  };
+
+  try {
+    const supabase = getSupabaseAdmin();
+
+    // Note: Using two separate queries for clarity and reliability.
+    // A single JOIN query would be more efficient but harder to maintain.
+
+    // Get all lessons
+    const { data: lessons, error: lessonsError } = await supabase
+      .from('lessons')
+      .select('id')
+      .eq('course_id', courseId)
+      .order('order_index', { ascending: true });
+
+    if (lessonsError || !lessons || lessons.length === 0) {
+      logger.warn(
+        { courseId, error: lessonsError?.message },
+        'No lessons found for batch cover trigger'
+      );
+      return result;
+    }
+
+    // Get existing cover enrichments
+    const { data: existingCovers } = await supabase
+      .from('lesson_enrichments')
+      .select('lesson_id')
+      .eq('course_id', courseId)
+      .eq('enrichment_type', 'cover');
+
+    const existingLessonIds = new Set(existingCovers?.map((c) => c.lesson_id) || []);
+
+    // Trigger covers for lessons that don't have them
+    for (const lesson of lessons) {
+      if (existingLessonIds.has(lesson.id)) {
+        result.skipped.push(lesson.id);
+        continue;
+      }
+
+      try {
+        const enrichmentId = await triggerLessonCover({
+          courseId,
+          lessonId: lesson.id,
+          userId,
+          organizationId,
+        });
+
+        if (enrichmentId) {
+          result.succeeded.push(enrichmentId);
+        } else {
+          // triggerLessonCover returned null without throwing
+          result.failed.push({
+            lessonId: lesson.id,
+            error: 'Trigger returned null (check logs for details)',
+          });
+        }
+      } catch (error) {
+        result.failed.push({
+          lessonId: lesson.id,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }
+
+    logger.info(
+      {
+        courseId,
+        succeededCount: result.succeeded.length,
+        failedCount: result.failed.length,
+        skippedCount: result.skipped.length,
+        totalLessons: lessons.length,
+      },
+      'Batch lesson cover trigger completed'
+    );
+
+    return result;
+  } catch (error) {
+    logger.error(
+      {
+        courseId,
+        error: error instanceof Error ? error.message : String(error),
+      },
+      'Failed to trigger batch lesson covers'
     );
     return result;
   }

@@ -20,18 +20,20 @@ mkdir -p "$LOGS_DIR"
 # Log files for current session
 BACKEND_LOG="$LOGS_DIR/backend-$SESSION_ID.log"
 WORKER_LOG="$LOGS_DIR/worker-$SESSION_ID.log"
+WORKER_STAGE7_LOG="$LOGS_DIR/worker-stage7-$SESSION_ID.log"
 FRONTEND_LOG="$LOGS_DIR/frontend-$SESSION_ID.log"
 COMBINED_LOG="$LOGS_DIR/combined-$SESSION_ID.log"
 
 # Symlinks to latest logs (for easy access)
 ln -sf "backend-$SESSION_ID.log" "$LOGS_DIR/backend-latest.log"
 ln -sf "worker-$SESSION_ID.log" "$LOGS_DIR/worker-latest.log"
+ln -sf "worker-stage7-$SESSION_ID.log" "$LOGS_DIR/worker-stage7-latest.log"
 ln -sf "frontend-$SESSION_ID.log" "$LOGS_DIR/frontend-latest.log"
 ln -sf "combined-$SESSION_ID.log" "$LOGS_DIR/combined-latest.log"
 
 # Cleanup old logs (keep last 10 sessions)
 cleanup_old_logs() {
-    for prefix in backend worker frontend combined; do
+    for prefix in backend worker worker-stage7 frontend combined; do
         ls -t "$LOGS_DIR/$prefix-"*.log 2>/dev/null | tail -n +11 | xargs -r rm -f
     done
 }
@@ -86,11 +88,19 @@ fi
 
 # Clean stalled BullMQ jobs (optional - only if Redis is running)
 if redis-cli ping &>/dev/null; then
+    # Clean Stage 6 stalled jobs
     STALLED_COUNT=$(redis-cli SCARD "bull:course-generation:stalled" 2>/dev/null || echo "0")
     if [ "$STALLED_COUNT" != "0" ] && [ -n "$STALLED_COUNT" ]; then
-        echo -e "   Found $STALLED_COUNT stalled jobs, cleaning..."
+        echo -e "   Found $STALLED_COUNT stalled Stage 6 jobs, cleaning..."
         redis-cli DEL "bull:course-generation:stalled" &>/dev/null
-        echo -e "   ${GREEN}✅ Stalled jobs cleared${NC}"
+        echo -e "   ${GREEN}✅ Stalled Stage 6 jobs cleared${NC}"
+    fi
+    # Clean Stage 7 stalled jobs
+    STALLED_COUNT_S7=$(redis-cli SCARD "bull:stage7-enrichments:stalled" 2>/dev/null || echo "0")
+    if [ "$STALLED_COUNT_S7" != "0" ] && [ -n "$STALLED_COUNT_S7" ]; then
+        echo -e "   Found $STALLED_COUNT_S7 stalled Stage 7 jobs, cleaning..."
+        redis-cli DEL "bull:stage7-enrichments:stalled" &>/dev/null
+        echo -e "   ${GREEN}✅ Stalled Stage 7 jobs cleared${NC}"
     fi
 fi
 
@@ -144,13 +154,18 @@ echo -e "\n${BLUE}⚙️  Starting Backend (course-gen-platform) on port 3456...
 (PORT=3456 pnpm --filter course-gen-platform dev 2>&1 | tee "$BACKEND_LOG" | npx pino-pretty --colorize --translateTime 'HH:MM:ss' --ignore pid,hostname,service,environment,version | sed "s/^/[backend] /" | log_service backend "$BACKEND_LOG") &
 BACKEND_PID=$!
 
-# 3. Start BullMQ Worker (job processor)
+# 3. Start BullMQ Worker (Stage 6 - lesson content generation)
 # JSON logs to file, pino-pretty for terminal readability
-echo -e "\n${BLUE}👷 Starting BullMQ Worker...${NC}"
+echo -e "\n${BLUE}👷 Starting BullMQ Worker (Stage 6)...${NC}"
 (pnpm --filter course-gen-platform dev:worker 2>&1 | tee "$WORKER_LOG" | npx pino-pretty --colorize --translateTime 'HH:MM:ss' --ignore pid,hostname,service,environment,version | sed "s/^/[worker] /" | log_service worker "$WORKER_LOG") &
 WORKER_PID=$!
 
-# 4. Start Frontend (using webpack mode for ElkJS/React Flow compatibility)
+# 4. Start Stage 7 Enrichment Worker (covers, audio, video, quiz, presentations)
+echo -e "\n${BLUE}🎨 Starting Stage 7 Enrichment Worker...${NC}"
+(pnpm --filter course-gen-platform dev:worker:stage7 2>&1 | tee "$WORKER_STAGE7_LOG" | npx pino-pretty --colorize --translateTime 'HH:MM:ss' --ignore pid,hostname,service,environment,version | sed "s/^/[stage7] /" | log_service stage7 "$WORKER_STAGE7_LOG") &
+WORKER_STAGE7_PID=$!
+
+# 5. Start Frontend (using webpack mode for ElkJS/React Flow compatibility)
 echo -e "\n${BLUE}🖥️  Starting Frontend (web)...${NC}"
 # Use webpack mode instead of turbopack for ElkJS web-worker compatibility
 (cd "$SCRIPT_DIR/packages/web" && pnpm dev:webpack 2>&1 | tee >(ansifilter > "$FRONTEND_LOG") | sed "s/^/[frontend] /" | log_service frontend "$FRONTEND_LOG") &
@@ -177,13 +192,15 @@ fi
 
 echo -e "\n${GREEN}✅ All services started!${NC}"
 echo -e "   - ⚙️  Backend API: http://localhost:3456"
-echo -e "   - 👷 BullMQ Worker: running"
+echo -e "   - 👷 BullMQ Worker (Stage 6): running"
+echo -e "   - 🎨 Stage 7 Enrichments: running"
 echo -e "   - 🖥️  Frontend: http://localhost:${DETECTED_PORT}"
 echo -e "   - 📦 BullMQ UI: http://localhost:3456/admin/queues"
 echo -e ""
 echo -e "${BLUE}📝 Log files:${NC}"
 echo -e "   - Backend:  $BACKEND_LOG"
 echo -e "   - Worker:   $WORKER_LOG"
+echo -e "   - Stage 7:  $WORKER_STAGE7_LOG"
 echo -e "   - Frontend: $FRONTEND_LOG"
 echo -e "   - Combined: $COMBINED_LOG"
 echo -e ""
@@ -197,4 +214,4 @@ echo -e ""
 echo -e "${YELLOW}Press Ctrl+C to stop all services.${NC}\n"
 
 # Wait for all processes
-wait $BACKEND_PID $WORKER_PID $FRONTEND_PID
+wait $BACKEND_PID $WORKER_PID $WORKER_STAGE7_PID $FRONTEND_PID

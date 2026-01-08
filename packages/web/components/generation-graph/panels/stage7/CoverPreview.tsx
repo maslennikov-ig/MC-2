@@ -10,26 +10,20 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import type { EnrichmentStatus } from '@megacampus/shared-types';
+import type {
+  EnrichmentStatus,
+  CoverEnrichmentContent,
+} from '@megacampus/shared-types';
 
 // ============================================================================
-// Types
+// Types - Single Source of Truth from @megacampus/shared-types
 // ============================================================================
 
 /**
- * Cover content structure from CoverEnrichmentContent (final state)
+ * Re-export CoverEnrichmentContent for backward compatibility
+ * @see packages/shared-types/src/enrichment-content.ts
  */
-interface CoverContent {
-  type: 'cover';
-  image_url: string;
-  width: number;
-  height: number;
-  aspect_ratio?: string;
-  generation_prompt: string;
-  alt_text?: string;
-  format?: 'png' | 'jpeg' | 'webp';
-  file_size_bytes?: number;
-}
+type CoverContent = CoverEnrichmentContent;
 
 /**
  * Cover draft content structure (prompt variants for selection)
@@ -308,7 +302,7 @@ interface CompletedViewProps {
 function CompletedView({ content, t, className }: CompletedViewProps) {
   const handleDownload = () => {
     const link = document.createElement('a');
-    link.href = content.image_url;
+    link.href = content.imageUrl;
     link.download = `cover.${content.format || 'png'}`;
     link.target = '_blank';
     link.click();
@@ -320,8 +314,8 @@ function CompletedView({ content, t, className }: CompletedViewProps) {
       <div className="relative bg-slate-100 dark:bg-slate-800">
         <div className="aspect-video relative">
           <Image
-            src={content.image_url}
-            alt={content.alt_text || 'Lesson cover'}
+            src={content.imageUrl}
+            alt={content.altText || 'Lesson cover'}
             fill
             className="object-cover"
             sizes="(max-width: 768px) 100vw, 600px"
@@ -347,9 +341,9 @@ function CompletedView({ content, t, className }: CompletedViewProps) {
         {/* Dimensions and format */}
         <div className="flex flex-wrap gap-2">
           <Badge variant="outline">
-            {content.width} x {content.height}
+            {content.dimensions.width} x {content.dimensions.height}
           </Badge>
-          {content.aspect_ratio && <Badge variant="outline">{content.aspect_ratio}</Badge>}
+          {content.aspectRatio && <Badge variant="outline">{content.aspectRatio}</Badge>}
           {content.format && <Badge variant="outline">{content.format.toUpperCase()}</Badge>}
           {content.file_size_bytes && (
             <Badge variant="outline">{formatFileSize(content.file_size_bytes)}</Badge>

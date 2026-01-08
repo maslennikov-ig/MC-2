@@ -29,7 +29,7 @@
 
 import crypto from 'crypto';
 import mermaid from 'mermaid';
-import { ensureDOMGlobals } from './mermaid-dom-setup';
+import { ensureDOMGlobals, isDOMInitialized } from './mermaid-dom-setup';
 import { logger } from '@/shared/logger';
 
 // ============================================================================
@@ -132,10 +132,25 @@ let mermaidInitPromise: Promise<void> | null = null;
 /**
  * Ensure mermaid is initialized (thread-safe).
  * Uses promise-based mutex to prevent race conditions.
+ *
+ * IMPORTANT: Checks if DOM globals are still valid. If cleanupDOMGlobals()
+ * was called, DOM globals are gone but mermaidInitialized may still be true.
+ * In this case, we need to reinitialize both DOM and mermaid.
  */
 async function ensureMermaidInitialized(): Promise<void> {
-  if (mermaidInitialized) {
+  // Check if DOM globals were cleaned up (fixes DOMPurify.addHook error)
+  // This can happen when cleanupDOMGlobals() is called in mermaid-fix-pipeline.ts
+  const domStillValid = isDOMInitialized();
+
+  if (mermaidInitialized && domStillValid) {
     return;
+  }
+
+  // If DOM was cleaned up, reset our state and reinitialize
+  if (mermaidInitialized && !domStillValid) {
+    logger.debug('Mermaid validator: DOM globals were cleaned up, reinitializing');
+    mermaidInitialized = false;
+    mermaidInitPromise = null;
   }
 
   // If initialization is in progress, wait for it

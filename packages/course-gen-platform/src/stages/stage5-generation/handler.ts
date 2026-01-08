@@ -34,7 +34,7 @@ import { sanitizeCourseStructure } from './utils/sanitize';
 import { qdrantClient } from '@/shared/qdrant/client';
 import { generationLockService } from '@/shared/locks';
 import { logTrace } from '../../shared/trace-logger';
-import { triggerCourseCard } from '../stage7-enrichments/services/auto-card-trigger';
+import { triggerCourseCard, triggerAllLessonCovers } from '../stage7-enrichments/services/auto-card-trigger';
 
 /**
  * Model fallback configuration for Stage 5
@@ -653,6 +653,44 @@ class Stage5GenerationHandler {
         jobLogger.warn(
           { courseId: course_id, error: err instanceof Error ? err.message : String(err) },
           'Non-blocking: Failed to trigger course card generation'
+        );
+      });
+
+      // =================================================================
+      // STEP 5.6: Auto-trigger Lesson Cover Generation (non-blocking)
+      // Covers can use lesson.objectives from Stage 5 for keyword extraction,
+      // so they can run in parallel with Stage 6 content generation.
+      // =================================================================
+      triggerAllLessonCovers({
+        courseId: course_id,
+        userId: user_id,
+        organizationId: organization_id,
+      }).then((coverResult) => {
+        // Log summary for monitoring
+        jobLogger.info(
+          {
+            courseId: course_id,
+            triggeredCovers: coverResult.succeeded.length,
+            failedCovers: coverResult.failed.length,
+            skippedCovers: coverResult.skipped.length,
+          },
+          'Cover generation trigger completed'
+        );
+
+        // Warn if all covers failed
+        if (coverResult.succeeded.length === 0 && coverResult.failed.length > 0) {
+          jobLogger.warn(
+            {
+              courseId: course_id,
+              failedLessons: coverResult.failed.map(f => f.lessonId),
+            },
+            'All cover triggers failed - covers will not be generated'
+          );
+        }
+      }).catch((err) => {
+        jobLogger.warn(
+          { courseId: course_id, error: err instanceof Error ? err.message : String(err) },
+          'Non-blocking: Failed to trigger lesson cover generation'
         );
       });
 

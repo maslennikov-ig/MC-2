@@ -2,6 +2,10 @@
 
 import { useState, useCallback, useEffect, useRef } from 'react';
 import { useSupabase } from '@/lib/supabase/browser-client';
+import type {
+  CardEnrichmentContent,
+  EnrichmentMetadata,
+} from '@megacampus/shared-types';
 
 // Backend URL configuration (client-safe)
 // In production, use relative URL /api (nginx proxies to API server)
@@ -35,8 +39,17 @@ const TRPC_URL = `${BACKEND_URL}/trpc`;
 const DEFAULT_POLLING_INTERVAL_MS = 3000;
 
 // ============================================================================
-// Types
+// Types - Single Source of Truth from @megacampus/shared-types
 // ============================================================================
+
+/**
+ * Re-export shared types for convenience.
+ * CardEnrichmentContent is the canonical type for card content.
+ * EnrichmentMetadata is the canonical type for generation metadata.
+ *
+ * @see packages/shared-types/src/enrichment-content.ts
+ */
+export type { CardEnrichmentContent, EnrichmentMetadata };
 
 /**
  * Card data returned from the API
@@ -46,46 +59,16 @@ export interface CardData {
   id: string;
   /** Current generation status */
   status: 'pending' | 'generating' | 'completed' | 'failed' | 'cancelled';
-  /** Card content (image URL, etc.) */
-  content: CardContent | null;
-  /** Card metadata */
-  metadata: CardMetadata | null;
+  /** Card content - uses CardEnrichmentContent from shared-types */
+  content: CardEnrichmentContent | null;
+  /** Card metadata - uses EnrichmentMetadata from shared-types */
+  metadata: EnrichmentMetadata | null;
   /** Last update timestamp */
   updatedAt: string;
   /** Generation attempt number */
   generationAttempt: number;
   /** Error message if failed */
   errorMessage: string | null;
-}
-
-/**
- * Card content structure (from CardEnrichmentContent schema)
- */
-export interface CardContent {
-  type: 'card';
-  image_url: string;
-  width: number;
-  height: number;
-  aspect_ratio?: string;
-  generation_prompt: string;
-  alt_text?: string;
-  format?: 'png' | 'jpeg' | 'webp';
-  file_size_bytes?: number;
-}
-
-/**
- * Card metadata structure
- */
-export interface CardMetadata {
-  visualStyle?: {
-    colorScheme?: string;
-    aesthetic?: string;
-    visualElements?: string[];
-    mood?: string;
-  };
-  model?: string;
-  generationDurationMs?: number;
-  [key: string]: unknown;
 }
 
 /**
@@ -143,7 +126,7 @@ export interface UseAutoCardResult {
  * });
  *
  * if (isLoading) return <Skeleton />;
- * if (card?.content) return <Image src={card.content.image_url} />;
+ * if (card?.content) return <Image src={card.content.imageUrl} />;
  * ```
  */
 export function useAutoCard({

@@ -39,9 +39,10 @@ export async function getEnrichment(
     }
 
     // Get the lesson (lessons don't have course_id, so we get it from enrichment)
+    // Include objectives for keyword extraction in cover generation
     const { data: lesson, error: lessonError } = await supabaseAdmin
       .from('lessons')
-      .select('id, title, content')
+      .select('id, title, content, objectives')
       .eq('id', enrichment.lesson_id)
       .single();
 
@@ -99,6 +100,7 @@ export async function getEnrichment(
         title: lesson.title,
         content: lessonContent,
         course_id: enrichment.course_id, // Use from enrichment (denormalized)
+        objectives: (lesson.objectives as string[] | null) ?? null,
       },
       course: {
         id: course.id,

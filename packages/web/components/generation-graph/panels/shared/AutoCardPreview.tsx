@@ -19,7 +19,12 @@ import { Card, CardHeader, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Skeleton } from '@/components/ui/skeleton';
-import { useAutoCard, type CardData, type CardContent as CardContentType } from '@/hooks/useAutoCard';
+import {
+  useAutoCard,
+  type CardData,
+  type CardEnrichmentContent,
+  type EnrichmentMetadata,
+} from '@/hooks/useAutoCard';
 
 // ============================================================================
 // Types
@@ -248,8 +253,8 @@ function CompletedState({
   isRegenerating,
   t,
 }: {
-  content: CardContentType;
-  metadata: CardData['metadata'];
+  content: CardEnrichmentContent;
+  metadata: EnrichmentMetadata | null;
   updatedAt: string;
   locale: string;
   compact?: boolean;
@@ -257,7 +262,8 @@ function CompletedState({
   isRegenerating: boolean;
   t: ReturnType<typeof useTranslations>;
 }) {
-  const visualStyle = metadata?.visualStyle;
+  // Visual style is in CardEnrichmentContent (optional)
+  const visualStyle = content.visualStyle;
 
   return (
     <div className="space-y-4">
@@ -271,8 +277,8 @@ function CompletedState({
           )}
         >
           <Image
-            src={content.image_url}
-            alt={content.alt_text || 'Generated card image'}
+            src={content.imageUrl}
+            alt={content.altText || 'Generated card image'}
             fill
             className="object-cover"
             sizes={compact
@@ -285,7 +291,7 @@ function CompletedState({
 
         {/* Metadata */}
         <div className={cn('flex-1 space-y-3', compact && 'pt-2')}>
-          {/* Visual style badges */}
+          {/* Visual style badges (shown only if visualStyle is present) */}
           {visualStyle && (
             <div className="space-y-1.5">
               <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -303,11 +309,6 @@ function CompletedState({
                     {visualStyle.aesthetic}
                   </Badge>
                 )}
-                {visualStyle.mood && (
-                  <Badge variant="outline" className="text-xs">
-                    {visualStyle.mood}
-                  </Badge>
-                )}
               </div>
             </div>
           )}
@@ -319,11 +320,11 @@ function CompletedState({
               <span>{t('autoCard.generatedAt')}:</span>
               <span className="font-medium">{formatDate(updatedAt, locale)}</span>
             </div>
-            {metadata?.model && (
+            {metadata?.model_used && (
               <div className="flex items-center gap-1.5">
                 <Cpu className="w-3 h-3" />
                 <span>{t('autoCard.model')}:</span>
-                <span className="font-medium">{metadata.model}</span>
+                <span className="font-medium">{metadata.model_used}</span>
               </div>
             )}
           </div>
@@ -516,7 +517,7 @@ export const AutoCardPreview = memo<AutoCardPreviewProps>(function AutoCardPrevi
             {/* Completed */}
             {card.status === 'completed' && card.content && (
               <CompletedState
-                content={card.content as CardContentType}
+                content={card.content}
                 metadata={card.metadata}
                 updatedAt={card.updatedAt}
                 locale={locale}

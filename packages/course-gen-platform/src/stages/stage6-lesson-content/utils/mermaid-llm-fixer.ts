@@ -422,6 +422,23 @@ Fix the syntax error and return ONLY the corrected ${diagramType} diagram code.`
     // Extract diagram from response
     const fixedDiagram = extractDiagram(response.content as string);
 
+    // Guard: Check if LLM returned empty content
+    if (!fixedDiagram || fixedDiagram.trim().length === 0) {
+      llmFixerMetrics.failedFixes++;
+      logger.warn(
+        {
+          responseLength: (response.content as string).length,
+          extractedLength: fixedDiagram.length,
+        },
+        'Mermaid LLM fixer: LLM returned empty diagram, returning original content'
+      );
+      return {
+        fixed: false,
+        content: brokenDiagram,
+        tokensUsed,
+      };
+    }
+
     // Increment fix count on success
     context.llmFixCount++;
 

@@ -743,7 +743,9 @@ export function useLessonInspectorData({
    * 3. Get lesson contents from lesson_contents table (by lesson UUID)
    * 4. Get generation traces from generation_trace table (by lesson UUID)
    */
-  const fetchLessonData = useCallback(async () => {
+  const fetchLessonData = useCallback(async (options?: { silent?: boolean }) => {
+    const { silent = false } = options || {};
+
     // Extract module/lesson numbers from lesson label (e.g., "1.2" -> module 1, lesson 2)
     const lessonParts = lessonId ? lessonId.split('.') : null;
     const moduleNumber = lessonParts ? parseInt(lessonParts[0], 10) : null;
@@ -758,7 +760,10 @@ export function useLessonInspectorData({
     }
 
     const fetchId = ++fetchIdRef.current;
-    setIsLoading(true);
+    // Only show loading spinner on initial load, not on realtime updates (silent mode)
+    if (!silent) {
+      setIsLoading(true);
+    }
     setError(null);
 
     try {
@@ -795,6 +800,7 @@ export function useLessonInspectorData({
         // No section yet - lesson is pending
         setData({
           lessonId,
+          lessonUuid: null,
           lessonNumber,
           moduleId,
           title: `Урок ${lessonNumber}`,
@@ -831,6 +837,7 @@ export function useLessonInspectorData({
         // No lesson yet - lesson is pending
         setData({
           lessonId,
+          lessonUuid: null,
           lessonNumber,
           moduleId,
           title: `Урок ${lessonNumber}`,
@@ -883,12 +890,13 @@ export function useLessonInspectorData({
 
       if (tracesError) throw tracesError;
 
-      // Step 5: Fetch lesson enrichment (cover/card) for this lesson
+      // Step 5: Fetch lesson enrichment (card) for this lesson
+      // Card enrichments are triggered after Stage 6 via triggerLessonCard()
       const { data: enrichmentData } = await supabase
         .from('lesson_enrichments')
         .select('id, status, enrichment_type, asset_id, content, metadata, created_at, updated_at')
         .eq('lesson_id', lessonUuid)
-        .eq('enrichment_type', 'cover')
+        .eq('enrichment_type', 'card')
         .order('created_at', { ascending: false })
         .limit(1)
         .maybeSingle();
@@ -912,9 +920,9 @@ export function useLessonInspectorData({
       const pipelineNodes = [...basePipelineNodes];
       if (enrichmentData) {
         // Map enrichment status to node status
-        // Enrichment statuses: pending, failed, cancelled, draft_generating, draft_ready, generating
+        // Enrichment statuses: pending, failed, cancelled, draft_generating, draft_ready, generating, completed
         let coverStatus: Stage6NodeStatus = 'pending';
-        if (enrichmentData.status === 'draft_ready') {
+        if (enrichmentData.status === 'draft_ready' || enrichmentData.status === 'completed') {
           coverStatus = 'completed';
         } else if (enrichmentData.status === 'generating' || enrichmentData.status === 'draft_generating') {
           coverStatus = 'active';
@@ -933,8 +941,8 @@ export function useLessonInspectorData({
             status: enrichmentData.status,
             assetId: enrichmentData.asset_id || undefined,
             enrichmentId: enrichmentData.id,
-            // Extract imageUrl from content if available
-            imageUrl: (enrichmentData.content as Record<string, unknown>)?.url as string || undefined,
+            // Extract imageUrl from content (CoverEnrichmentContent uses 'imageUrl' field)
+            imageUrl: (enrichmentData.content as Record<string, unknown>)?.imageUrl as string || undefined,
             ...(enrichmentData.metadata as Record<string, unknown> || {}),
           },
         };
@@ -1017,6 +1025,7 @@ export function useLessonInspectorData({
       // Construct final data
       const inspectorData: LessonInspectorData = {
         lessonId,
+        lessonUuid,
         lessonNumber,
         moduleId,
         title: lessonTitle,
@@ -1072,6 +1081,7 @@ export function useLessonInspectorData({
   /**
    * Debounced fetch for realtime updates
    * Batches rapid updates (500ms) to prevent constant page refreshes
+   * Uses silent mode to avoid showing loading spinner on background updates
    */
   const debouncedFetch = useCallback(() => {
     // Clear existing timer
@@ -1079,9 +1089,9 @@ export function useLessonInspectorData({
       clearTimeout(debounceTimerRef.current);
     }
 
-    // Set new timer
+    // Set new timer - use silent mode to avoid loading spinner flicker
     debounceTimerRef.current = setTimeout(() => {
-      fetchLessonData();
+      fetchLessonData({ silent: true });
       debounceTimerRef.current = null;
     }, 500); // 500ms debounce
   }, [fetchLessonData]);
@@ -1138,6 +1148,19 @@ export function useLessonInspectorData({
         },
         () => {
           logger.debug('Lesson content updated', { lessonId, lessonUuidForRealtime });
+          debouncedFetchRef.current(); // Use ref to get latest callback
+        }
+      )
+      .on(
+        'postgres_changes',
+        {
+          event: '*', // INSERT or UPDATE
+          schema: 'public',
+          table: 'lesson_enrichments',
+          filter: `lesson_id=eq.${lessonUuidForRealtime}`,
+        },
+        () => {
+          logger.debug('Lesson enrichment changed', { lessonId, lessonUuidForRealtime });
           debouncedFetchRef.current(); // Use ref to get latest callback
         }
       )

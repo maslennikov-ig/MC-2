@@ -7,6 +7,7 @@
     "document": "Document",
     "cover": "Hero Image",
     "card": "Visual Card",
+    "banner": "Decorative Banner",
     "podcast": "Podcast",
     "mindmap": "Mindmap",
     "case_study": "Case Study",
@@ -23,7 +24,8 @@
     "quiz": "Comprehension quiz to reinforce learning",
     "document": "Additional document for download",
     "cover": "Premium 16:9 hero banner for lesson page header (manual generation)",
-    "card": "AI-generated 1:1 thumbnail for course catalog and navigation (automatic)"
+    "card": "AI-generated 1:1 thumbnail for course catalog and navigation (automatic)",
+    "banner": "Manually created decorative header image for extra visual appeal"
   },
   "status": {
     "pending": "Pending",
@@ -237,7 +239,8 @@
       "quiz": "Quiz",
       "document": "Document",
       "cover": "Hero Image",
-      "card": "Visual Card"
+      "card": "Visual Card",
+      "banner": "Decorative Banner"
     }
   }
 }

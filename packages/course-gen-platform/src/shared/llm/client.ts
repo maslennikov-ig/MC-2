@@ -119,6 +119,9 @@ export class LLMClient {
         'X-Title': 'MegaCampus Course Generator',
       },
       timeout: 60000, // 60s default timeout
+      // Allow browser-like environment (JSDOM for mermaid creates global.window)
+      // This is safe because we're running in Node.js, not a real browser
+      dangerouslyAllowBrowser: true,
     });
 
     this.initialized = true;

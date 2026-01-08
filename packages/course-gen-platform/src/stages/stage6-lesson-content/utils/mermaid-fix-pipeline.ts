@@ -53,7 +53,10 @@
 import { sanitizeMermaidBlocks, MERMAID_BLOCK_REGEX } from './mermaid-sanitizer';
 import { validateMermaidSyntax } from './mermaid-validator';
 import { fixMermaidWithLLM } from './mermaid-llm-fixer';
-import { cleanupDOMGlobals } from './mermaid-dom-setup';
+// Note: cleanupDOMGlobals intentionally not imported/called here.
+// Mermaid is a singleton that caches DOMPurify reference at first initialization.
+// Calling cleanup would break subsequent pipeline calls with "DOMPurify.addHook is not a function".
+// Memory is safe: JSDOM instance is reused via idempotent ensureDOMGlobals().
 import { logger } from '@/shared/logger';
 
 // ============================================================================
@@ -587,9 +590,16 @@ export async function runMermaidFixPipeline(
       modified: anyModified,
       metrics,
     };
-  } finally {
-    // Clean up DOM globals to prevent memory leaks
-    logger.debug({}, 'Mermaid pipeline: Cleaning up DOM globals');
-    cleanupDOMGlobals();
+  } catch (error) {
+    // Re-throw after logging - don't swallow errors
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    logger.error(
+      { error: errorMessage },
+      'Mermaid pipeline: Unexpected error during processing'
+    );
+    throw error;
   }
+  // Note: No finally/cleanup block here.
+  // DOM globals (JSDOM, DOMPurify) are reused across pipeline calls.
+  // Mermaid singleton caches DOMPurify reference - cleanup would break it.
 }

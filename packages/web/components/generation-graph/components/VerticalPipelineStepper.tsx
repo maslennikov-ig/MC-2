@@ -2,7 +2,7 @@
 
 import React, { useState, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
-import { ChevronDown, RefreshCw, CheckCircle2, Circle, AlertCircle, Loader2, Sparkles, Scale, ThumbsUp, ThumbsDown, AlertTriangle } from 'lucide-react';
+import { ChevronDown, RefreshCw, CheckCircle2, Circle, AlertCircle, Loader2, Sparkles, Scale, ThumbsUp, ThumbsDown, AlertTriangle, Maximize2 } from 'lucide-react';
 import * as Accordion from '@radix-ui/react-accordion';
 import { cn } from '@/lib/utils';
 import {
@@ -15,6 +15,12 @@ import type { ProgressSummary } from '@megacampus/shared-types/judge-types';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
 import { ProgressSummaryDisplay } from './ProgressSummaryDisplay';
 import { ErrorBoundary } from 'react-error-boundary';
 
@@ -749,6 +755,8 @@ interface CoverGeneratorOutput {
  * Render human-readable output for CoverGenerator stage
  */
 function CoverGeneratorOutputDisplay({ output }: { output: CoverGeneratorOutput }) {
+  const [isImageOpen, setIsImageOpen] = useState(false);
+
   const statusLabel = output.status === 'completed'
     ? 'Готово'
     : output.status === 'generating'
@@ -785,14 +793,64 @@ function CoverGeneratorOutputDisplay({ output }: { output: CoverGeneratorOutput 
         </div>
       )}
 
-      {/* Image preview */}
+      {/* Image preview - larger and clickable */}
       {output.imageUrl && output.status === 'completed' && (
-        <div className="mt-2">
-          <img
-            src={output.imageUrl}
-            alt="Обложка урока"
-            className="w-24 h-24 object-cover rounded-lg border border-slate-200 dark:border-slate-700"
-          />
+        <>
+          <div className="mt-3 relative group">
+            <button
+              onClick={() => setIsImageOpen(true)}
+              className="block w-full focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 rounded-lg overflow-hidden"
+            >
+              <img
+                src={output.imageUrl}
+                alt="Обложка урока"
+                className="w-full aspect-video object-cover rounded-lg border border-slate-200 dark:border-slate-700 transition-transform group-hover:scale-[1.02]"
+              />
+              {/* Hover overlay */}
+              <div className="absolute inset-0 bg-black/0 group-hover:bg-black/10 transition-colors rounded-lg flex items-center justify-center">
+                <Maximize2 className="w-6 h-6 text-white opacity-0 group-hover:opacity-100 transition-opacity drop-shadow-lg" />
+              </div>
+            </button>
+            <p className="text-xs text-slate-500 dark:text-slate-400 text-center mt-1">
+              Нажмите для увеличения
+            </p>
+          </div>
+
+          {/* Fullscreen dialog */}
+          <Dialog open={isImageOpen} onOpenChange={setIsImageOpen}>
+            <DialogContent className="max-w-4xl w-full p-0 overflow-hidden">
+              <DialogHeader className="p-4 pb-2">
+                <DialogTitle>Обложка урока</DialogTitle>
+              </DialogHeader>
+              <div className="p-4 pt-0">
+                <img
+                  src={output.imageUrl}
+                  alt="Обложка урока"
+                  className="w-full h-auto rounded-lg"
+                />
+              </div>
+            </DialogContent>
+          </Dialog>
+        </>
+      )}
+
+      {/* Generating state */}
+      {output.status === 'generating' && (
+        <div className="mt-3 flex items-center justify-center py-8 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-dashed border-slate-300 dark:border-slate-600">
+          <div className="text-center">
+            <Loader2 className="w-8 h-8 animate-spin text-slate-400 mx-auto mb-2" />
+            <p className="text-xs text-slate-500">Генерация изображения...</p>
+          </div>
+        </div>
+      )}
+
+      {/* Pending/No data state */}
+      {(!output.status || output.status === 'pending') && !output.imageUrl && (
+        <div className="mt-3 flex items-center justify-center py-6 bg-slate-50 dark:bg-slate-800/50 rounded-lg border border-dashed border-slate-300 dark:border-slate-600">
+          <div className="text-center">
+            <Sparkles className="w-6 h-6 text-slate-300 mx-auto mb-2" />
+            <p className="text-xs text-slate-500">Обложка ещё не сгенерирована</p>
+          </div>
         </div>
       )}
     </div>
@@ -826,8 +884,12 @@ function NodeOutputDisplay({ node, output }: { node: Stage6NodeName; output: unk
  * Render human-readable output with JSON fallback for unsupported types
  */
 function NodeOutputDisplayWithFallback({ node, output }: { node: Stage6NodeName; output: unknown }) {
-  // If output is invalid, show nothing
+  // If output is invalid, show fallback message
   if (!output) {
+    // Special case for coverGenerator - show placeholder
+    if (node === 'coverGenerator') {
+      return <CoverGeneratorOutputDisplay output={{}} />;
+    }
     return (
       <div className="text-xs text-slate-500 dark:text-slate-400 italic">
         Данные вывода недоступны
@@ -899,7 +961,9 @@ function PipelineNodeCard({ node, isActive, onRetry, onViewOutput }: PipelineNod
     node.tokensUsed !== undefined &&
     node.durationMs !== undefined;
   const hasOutput = node.output != null;
-  const canExpand = hasOutput || (node.status === 'error' && node.errorMessage);
+  // coverGenerator is always expandable (shows placeholder if no output)
+  const isCoverGenerator = node.node === 'coverGenerator';
+  const canExpand = hasOutput || (node.status === 'error' && node.errorMessage) || isCoverGenerator;
 
   // Handle card click to toggle accordion
   const handleCardClick = useCallback(() => {
