@@ -1,7 +1,7 @@
 ---
 name: code-review-inline
-description: Inline orchestration workflow for code review with Beads integration. Provides comprehensive code analysis, issue creation, priority-based fixing, and verification cycles.
-version: 1.0.0
+description: Inline orchestration workflow for code review with Beads integration. Provides comprehensive analysis of issues (bugs) AND improvements (recommendations), issue creation, priority-based fixing, and verification cycles.
+version: 1.1.0
 ---
 
 # Code Review (Inline Orchestration)
@@ -74,30 +74,66 @@ prompt: |
 
   Use Context7 for documentation and examples where relevant.
 
+  ## Part 1: Issues (bugs, errors, problems)
+
   Review checklist:
-  - TypeScript patterns and best practices
   - Security vulnerabilities (SQL injection, XSS, auth issues)
-  - Performance issues
-  - Error handling
-  - Code consistency
-  - Naming conventions
+  - Type errors and type safety
+  - Runtime bugs and edge cases
+  - Error handling gaps
   - Dead code and debug statements
   - Missing validation
+  - Hardcoded values that should be configurable
+
+  For each ISSUE found:
+  - Category: bug/security/type-error/dead-code
+  - Priority: critical/high/medium/low
+  - File path and line number
+  - Problem description
+  - Fix with code example
+
+  ## Part 2: Improvements (recommendations, enhancements)
+
+  Review checklist:
+  - Performance optimizations
+  - Code readability and clarity
+  - Better abstractions and patterns
+  - Naming improvements
   - Architecture compliance
+  - Missing tests suggestions
+  - Documentation gaps
+  - DRY violations (code duplication)
+  - Modern TypeScript patterns
+  - React/Next.js best practices
 
-  For each issue found:
-  - Assign priority: critical/high/medium/low
-  - Provide file path and line number
-  - Explain the problem
-  - Suggest fix with code example
+  For each IMPROVEMENT found:
+  - Category: performance/readability/architecture/testing/docs/refactor
+  - Priority: high/medium/low (no critical for improvements)
+  - File path and line number
+  - Current state description
+  - Recommended improvement with code example
+  - Impact: what gets better
 
-  Run validation:
+  ## Validation
+
+  Run:
   - pnpm type-check
   - pnpm build
 
-  Generate report: docs/reports/code-reviews/{YYYY-MM}/CR-{date}-{topic}.md
+  ## Report
 
-  Return summary with issue counts per priority.
+  Generate: docs/reports/code-reviews/{YYYY-MM}/CR-{date}-{topic}.md
+
+  Sections:
+  1. Executive Summary
+  2. Issues Found (by priority)
+  3. Improvements Recommended (by priority)
+  4. Validation Results
+  5. Next Steps
+
+  Return summary:
+  - Issue counts per priority
+  - Improvement counts per priority
 ```
 
 **After code-reviewer returns**:
@@ -110,32 +146,51 @@ prompt: |
 
 ## Phase 3: Create Beads Issues
 
-**For each issue found**, create a Beads issue:
+### 3.1 Issues (bugs, errors)
 
 ```bash
 # Critical (P0) - Security, crashes, data loss
-bd create "CR: {issue_title}" -t bug -p 0 -d "{file}:{line} - {description}" \
+bd create "BUG: {issue_title}" -t bug -p 0 -d "{file}:{line} - {description}" \
   --deps discovered-from:{wisp_id}
 
-# High (P1) - Correctness, major bugs
-bd create "CR: {issue_title}" -t bug -p 1 -d "{file}:{line} - {description}" \
+# High (P1) - Type errors, runtime bugs
+bd create "BUG: {issue_title}" -t bug -p 1 -d "{file}:{line} - {description}" \
   --deps discovered-from:{wisp_id}
 
-# Medium (P2) - Best practices, consistency
-bd create "CR: {issue_title}" -t chore -p 2 -d "{file}:{line} - {description}" \
+# Medium (P2) - Error handling, validation
+bd create "BUG: {issue_title}" -t bug -p 2 -d "{file}:{line} - {description}" \
   --deps discovered-from:{wisp_id}
 
-# Low (P3) - Style, documentation, minor improvements
-bd create "CR: {issue_title}" -t chore -p 3 -d "{file}:{line} - {description}" \
+# Low (P3) - Dead code, minor issues
+bd create "CLEANUP: {issue_title}" -t chore -p 3 -d "{file}:{line} - {description}" \
   --deps discovered-from:{wisp_id}
 ```
 
-**Add label**:
+### 3.2 Improvements (recommendations)
+
+```bash
+# High (P2) - Performance, architecture
+bd create "IMPROVE: {improvement_title}" -t feature -p 2 -d "{file}:{line} - {description}. Impact: {impact}" \
+  --deps discovered-from:{wisp_id}
+
+# Medium (P3) - Readability, refactoring
+bd create "IMPROVE: {improvement_title}" -t chore -p 3 -d "{file}:{line} - {description}. Impact: {impact}" \
+  --deps discovered-from:{wisp_id}
+
+# Low (P4) - Docs, naming, style
+bd create "IMPROVE: {improvement_title}" -t chore -p 4 -d "{file}:{line} - {description}" \
+  --deps discovered-from:{wisp_id}
+```
+
+**Add labels**:
 ```bash
 bd update {issue_id} --add-label code-review
+bd update {improvement_id} --add-label improvement
 ```
 
-**Track issue IDs** in a mapping for later closure.
+**Track IDs** in two mappings:
+- `issues_map`: bug/error issues
+- `improvements_map`: improvement recommendations
 
 Update TodoWrite: mark "Create Beads issues" complete.
 
@@ -151,24 +206,34 @@ Update TodoWrite: mark "Create Beads issues" complete.
 **Wisp ID**: {wisp_id}
 **Report**: docs/reports/code-reviews/{YYYY-MM}/CR-{date}-{topic}.md
 
-### Issues Found
+### Issues (bugs, errors)
 - Critical: {count}
 - High: {count}
 - Medium: {count}
 - Low: {count}
 
-### Beads Issues Created
-{list of issue IDs}
+### Improvements (recommendations)
+- High: {count}
+- Medium: {count}
+- Low: {count}
+
+### Beads Created
+- Issues: {count} (BUG:, CLEANUP:)
+- Improvements: {count} (IMPROVE:)
 
 **Options**:
-1. Fix all issues automatically
-2. Fix only critical/high issues
-3. Review report first, then decide
-4. Skip fixing (keep issues in Beads for later)
+1. Fix all (issues + improvements)
+2. Fix issues only (bugs, errors)
+3. Fix critical/high issues only
+4. Review report first, then decide
+5. Skip fixing (keep in Beads for later)
 ```
 
-**If user chooses to fix** → proceed to Phase 5
-**If user skips** → proceed to Phase 7
+**If user chooses**:
+- Option 1 → Fix issues (Phase 5), then improvements (Phase 5b)
+- Option 2 → Fix issues only (Phase 5)
+- Option 3 → Fix critical/high issues only (Phase 5, partial)
+- Option 4/5 → proceed to Phase 7
 
 ---
 
@@ -362,17 +427,29 @@ To rollback:
 
 ---
 
-## Issue Categories
+## Categories & Agents
+
+### Issues (bugs, errors)
 
 | Category | Priority | Agent |
 |----------|----------|-------|
-| Security vulnerability | Critical/High | vulnerability-fixer |
-| Type errors | High | typescript-types-specialist |
-| Runtime bugs | High | bug-fixer |
-| Dead code | Medium | dead-code-remover |
-| Best practices | Medium | Direct execution |
-| Documentation | Low | Direct execution |
-| Code style | Low | Direct execution |
+| Security vulnerability | P0 Critical | vulnerability-fixer |
+| Type errors | P1 High | typescript-types-specialist |
+| Runtime bugs | P1-P2 | bug-fixer |
+| Error handling | P2 Medium | bug-fixer |
+| Dead code | P3 Low | dead-code-remover |
+
+### Improvements (recommendations)
+
+| Category | Priority | Agent |
+|----------|----------|-------|
+| Performance | P2 High | Direct + profiling |
+| Architecture | P2 High | Direct (careful review) |
+| Readability | P3 Medium | Direct execution |
+| Refactoring | P3 Medium | reuse-fixer (if duplication) |
+| Testing | P3 Medium | test-writer |
+| Documentation | P4 Low | Direct execution |
+| Naming/Style | P4 Low | Direct execution |
 
 ---
 
@@ -381,14 +458,15 @@ To rollback:
 Reports are saved to: `docs/reports/code-reviews/{YYYY-MM}/CR-{date}-{topic}.md`
 
 Standard sections:
-1. Executive Summary
+1. Executive Summary (issues + improvements counts)
 2. Key Metrics
-3. Detailed Findings (by priority)
-4. Best Practices Validation
-5. Security Review
-6. Validation Results
-7. Recommendations Summary
-8. Next Steps
+3. **Issues Found** (by priority: critical → low)
+4. **Improvements Recommended** (by priority: high → low)
+5. Best Practices Validation
+6. Security Review
+7. Validation Results
+8. Recommendations Summary
+9. Next Steps
 
 ---
 
