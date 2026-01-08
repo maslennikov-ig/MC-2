@@ -172,6 +172,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.26.80] - 2026-01-08
+
+### Fixed
+- **course-gen-platform**: update 28 source file(s), update docs (076aeea)
+
 ## [0.26.75] - 2026-01-06
 
 ### Fixed
