@@ -5,6 +5,15 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.26.81] - 2026-01-08
+
+### Added
+- **course-gen-platform**: add 14 source file(s), update 18 source file(s), +5 more (908aec2)
+
+### Other
+- bd sync: 2026-01-08 16:37:48 (e123ce3)
+- **video-pipeline**: complete research phase, add avatar decision (5f14e8a)
+
 ## [0.26.79] - 2026-01-07
 
 ### Added
