@@ -20,6 +20,25 @@
 
 ---
 
+## Critical: Session Close Protocol
+
+**"Land the Plane" Rule**: NEVER say "done" without completing ALL steps:
+
+```bash
+[ ] 1. git status              # Check what changed
+[ ] 2. git add <files>         # Stage code changes
+[ ] 3. bd sync                 # Commit beads changes
+[ ] 4. git commit -m "... (mc2-xxx)"  # Commit with issue ID
+[ ] 5. bd sync                 # Commit any new beads changes
+[ ] 6. git push                # Push to remote
+```
+
+**Work is NOT done until pushed.** Unpushed work breaks multi-agent coordination.
+
+**Commit message format**: Include issue ID in parentheses: `"Fix auth bug (mc2-abc)"`
+
+---
+
 ## Architecture Overview
 
 ### Philosophy
@@ -89,6 +108,17 @@ bd info
 bd doctor
 ```
 
+### Context & Priming
+
+```bash
+bd prime                    # Output workflow context (~1-2k tokens)
+bd prime --full             # Force full CLI output
+bd prime --mcp              # Minimal output for MCP mode
+bd prime --export           # Export default content for customization
+```
+
+**Auto-invoked** by SessionStart and PreCompact hooks in Claude Code.
+
 ### Core Commands
 
 #### Task Lifecycle
@@ -96,6 +126,7 @@ bd doctor
 ```bash
 # View
 bd ready                              # Tasks with no blockers
+bd blocked                            # Tasks blocked by dependencies
 bd list                               # All open tasks
 bd list --all                         # Include closed
 bd list -t bug -p 2                   # Filter by type/priority
@@ -114,8 +145,9 @@ bd update <id> --priority 1
 bd update <id> --add-label security
 bd update <id> --add-dep blocks:<other-id>
 
-# Close
+# Close (single or batch)
 bd close <id> --reason "Description of completion"
+bd close <id1> <id2> <id3> --reason "Batch complete"  # Multiple at once
 bd close <id> --reason "Not needed" --wontfix
 ```
 
@@ -140,7 +172,18 @@ bd close <id> --reason "Not needed" --wontfix
 | P3 | Medium - normal (default) |
 | P4 | Low - backlog |
 
-#### Dependencies (`--deps`)
+#### Dependencies
+
+```bash
+# At creation
+bd create "Task" --deps blocked-by:<id>
+
+# Add to existing
+bd dep add <issue> <depends-on>    # issue depends on depends-on
+
+# View blocked
+bd blocked                          # All blocked issues
+```
 
 | Type | Meaning |
 |------|---------|
@@ -209,8 +252,17 @@ bd daemon start
 ### mc2 Conventions
 
 - **Issue prefix**: `mc2` (e.g., `mc2-a3f2dd`)
+- **Nested IDs**: Subtasks use dot notation: `mc2-a3f8.1`, `mc2-a3f8.1.1`
 - **Formulas location**: `.beads/formulas/`
 - **Skill location**: `.claude/skills/beads/SKILL.md`
+
+### Special Modes
+
+```bash
+bd init --stealth           # Private tracking (no shared repo modifications)
+bd prime --stealth          # No git operations in session close
+bd config set no-git-ops true  # Disable git ops globally
+```
 
 ---
 

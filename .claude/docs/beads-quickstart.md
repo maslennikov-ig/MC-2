@@ -4,6 +4,23 @@
 
 ---
 
+## SESSION CLOSE PROTOCOL (ОБЯЗАТЕЛЬНО!)
+
+**НИКОГДА не говори "готово" без выполнения этих шагов:**
+
+```bash
+git status              # 1. Что изменилось?
+git add <files>         # 2. Добавить код
+bd sync                 # 3. Sync beads
+git commit -m "... (mc2-xxx)"  # 4. Коммит с ID issue
+bd sync                 # 5. Sync новые изменения
+git push                # 6. Push в remote
+```
+
+**Работа НЕ завершена пока не сделан push!**
+
+---
+
 ## Когда что использовать
 
 | Сценарий | Инструмент | Команда |
@@ -85,7 +102,10 @@ bd create "Кнопка не работает" -t bug -p 1 --deps discovered-fro
 bd create "Задача" -t feature --deps ТИП:ID
 
 # Добавить к существующей
-bd update ID --add-dep ТИП:ДРУГОЙ_ID
+bd dep add ISSUE DEPENDS_ON    # ISSUE зависит от DEPENDS_ON
+
+# Посмотреть заблокированные
+bd blocked
 ```
 
 | Тип зависимости | Значение |
@@ -232,8 +252,9 @@ bd update ID --priority 1
 # Добавить метку
 bd update ID --add-label security
 
-# Закрыть
+# Закрыть (одну или несколько)
 bd close ID --reason "Готово"
+bd close ID1 ID2 ID3 --reason "Batch done"   # Несколько сразу
 bd close ID --reason "Не актуально" --wontfix
 ```
 
@@ -257,7 +278,8 @@ bd sync --force             # Принудительно из JSONL
 ```bash
 bd doctor                   # Проверка здоровья
 bd info                     # Статус проекта
-bd info --json              # В JSON формате
+bd prime                    # Контекст workflow (~1-2k tokens)
+bd prime --full             # Полный контекст (CLI mode)
 ```
 
 ---
@@ -286,17 +308,25 @@ bd daemon restart
 
 ```
 ┌──────────────────────────────────────────────────┐
-│ СТАРТ     bd ready / bd info                     │
+│ СТАРТ     bd ready / bd prime                    │
 │ ВЗЯТЬ     bd update ID --status in_progress      │
 │ СОЗДАТЬ   bd create "..." -t type -p N           │
 │ ЗАКРЫТЬ   bd close ID --reason "..."             │
-│ КОНЕЦ     bd sync (ОБЯЗАТЕЛЬНО!)                 │
+├──────────────────────────────────────────────────┤
+│ КОНЕЦ СЕССИИ (ВСЕ 6 ШАГОВ!)                      │
+│   1. git status                                  │
+│   2. git add <files>                             │
+│   3. bd sync                                     │
+│   4. git commit -m "... (mc2-xxx)"               │
+│   5. bd sync                                     │
+│   6. git push                                    │
 ├──────────────────────────────────────────────────┤
 │ WORKFLOWS bd formula list                        │
 │           bd mol wisp NAME --vars "k=v"          │
 │           bd mol squash/burn WISP_ID             │
 ├──────────────────────────────────────────────────┤
-│ ПОИСК     bd list [-t type] [-p prio] [--status] │
+│ ПОИСК     bd ready / bd blocked                  │
+│           bd list [-t type] [-p prio] [--status] │
 │           bd show ID [--tree]                    │
 └──────────────────────────────────────────────────┘
 ```
