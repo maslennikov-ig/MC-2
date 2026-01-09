@@ -304,3 +304,50 @@ Write the exercises in markdown format. Do NOT include a section header - just t
     tokensUsed: tokenResult.tokens,
   };
 }
+
+// ============================================================================
+// OUTPUT VALIDATION
+// ============================================================================
+
+/**
+ * Prompt template markers that should never appear in generated content.
+ * These markers come from patcher-prompt.ts and indicate the model is
+ * generating prompt structure instead of actual content.
+ */
+const PROMPT_TEMPLATE_MARKERS = [
+  '## SECTION TITLE',
+  '## ORIGINAL CONTENT',
+  '## FIX INSTRUCTIONS',
+  '## CONTEXT FOR COHERENCE',
+  '## TARGET AREA',
+  '## OUTPUT REQUIREMENTS',
+  'COMPLETE CORRECTED SECTION:',
+] as const;
+
+/**
+ * Validate generated content for prompt template markers
+ *
+ * Detects if LLM output contains patcher prompt structure,
+ * which indicates the model is reproducing training data
+ * instead of generating actual lesson content.
+ *
+ * @param content - Generated content to validate
+ * @returns Object with isValid flag and detected markers
+ */
+export function validateGeneratedContent(content: string): {
+  isValid: boolean;
+  detectedMarkers: string[];
+} {
+  const detectedMarkers: string[] = [];
+
+  for (const marker of PROMPT_TEMPLATE_MARKERS) {
+    if (content.includes(marker)) {
+      detectedMarkers.push(marker);
+    }
+  }
+
+  return {
+    isValid: detectedMarkers.length === 0,
+    detectedMarkers,
+  };
+}

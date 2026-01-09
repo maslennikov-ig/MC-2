@@ -31,7 +31,7 @@ import { runMermaidFixPipeline } from '../utils/mermaid-fix-pipeline';
 
 // Import from extracted modules
 import { calculateDynamicContextWindow } from './generator/generator-constants';
-import { generateIntroduction, generateSummary, generateExercises } from './generator/generator-content';
+import { generateIntroduction, generateSummary, generateExercises, validateGeneratedContent } from './generator/generator-content';
 import { generateSection } from './generator/generator-section';
 
 // Re-export for backward compatibility
@@ -190,6 +190,18 @@ export async function generatorNode(
           'Mermaid fix pipeline failed, using original content'
         );
         // Keep original content - self-reviewer will catch issues later
+      }
+
+      // Validate for prompt template markers
+      const validation = validateGeneratedContent(finalContent);
+      if (!validation.isValid) {
+        logger.error({
+          sectionTitle: section.title,
+          detectedMarkers: validation.detectedMarkers,
+        }, 'Generated content contains prompt template markers - indicates model reproducing training data');
+
+        // For now, log and continue - in future could trigger regeneration
+        // throw new Error(`Content generation failed: prompt template leak detected in section "${section.title}"`);
       }
 
       // Add section to content

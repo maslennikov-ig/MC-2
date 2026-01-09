@@ -181,7 +181,7 @@ export async function consolidateVerdicts(input: ArbiterInput): Promise<ArbiterO
   const targetedIssues = convertToTargetedIssues(processedAccepted, input.lessonContent);
 
   // Group by section into SectionRefinementTasks
-  const tasks = groupIntoTasks(targetedIssues);
+  const tasks = groupIntoTasks(targetedIssues, input.lessonContent);
 
   // Create execution batches (non-adjacent sections can run in parallel)
   const batches = createExecutionBatches(tasks);
@@ -390,7 +390,10 @@ function buildFixInstructions(issue: JudgeIssue): string {
  * Consolidates multiple issues for the same section into a single task
  * with synthesized instructions.
  */
-function groupIntoTasks(issues: TargetedIssue[]): SectionRefinementTask[] {
+function groupIntoTasks(
+  issues: TargetedIssue[],
+  lessonContent: ArbiterInput['lessonContent']
+): SectionRefinementTask[] {
   // Group by section (skip sec_global - these should be filtered earlier but adding safety check)
   const sectionGroups = new Map<string, TargetedIssue[]>();
 
@@ -424,8 +427,15 @@ function groupIntoTasks(issues: TargetedIssue[]): SectionRefinementTask[] {
     // Synthesize instructions
     const synthesizedInstructions = synthesizeInstructions(sectionIssues);
 
-    // Extract section title (would come from lessonContent in real implementation)
-    const sectionTitle = `Section ${sectionId.replace('sec_', '')}`;
+    // Extract actual section title from lessonContent
+    const contentStructure = lessonContent as LessonContentStructure;
+    const sections = contentStructure.sections || [];
+
+    // Extract section index from sectionId (e.g., 'sec_1' -> 0, 'sec_2' -> 1)
+    const sectionIndex = parseInt(sectionId.replace('sec_', ''), 10) - 1;
+    const sectionTitle = (sectionIndex >= 0 && sectionIndex < sections.length)
+      ? sections[sectionIndex]?.title || `Section ${sectionIndex + 1}`
+      : `Section ${sectionId.replace('sec_', '')}`;
 
     // Create task
     const task: SectionRefinementTask = {

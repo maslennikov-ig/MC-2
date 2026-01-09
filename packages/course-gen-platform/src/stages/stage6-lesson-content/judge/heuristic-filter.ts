@@ -721,6 +721,16 @@ const LANGUAGE_UNEXPECTED_SCRIPTS: Record<string, (keyof typeof UNICODE_SCRIPTS)
 };
 
 /**
+ * Scripts that require ZERO tolerance (any occurrence is a failure)
+ * These are completely incompatible scripts that never appear legitimately
+ */
+const ZERO_TOLERANCE_SCRIPTS: Set<string> = new Set([
+  'CJK',        // Chinese/Japanese/Korean ideographs
+  'ARABIC',     // Arabic script
+  'DEVANAGARI', // Hindi/Sanskrit script
+]);
+
+/**
  * Extract text content from markdown, excluding code blocks
  * Code blocks can legitimately contain any characters
  */
@@ -782,9 +792,17 @@ export function checkLanguageConsistency(
   /** Divisor for language score contribution calculation */
   const LANGUAGE_SCORE_DIVISOR = 20;
 
-  // Threshold: more than 5 foreign characters is a failure
-  // 1-5 characters might be typos or edge cases
-  const passed = totalForeignCount <= MINOR_LANGUAGE_THRESHOLD;
+  // Check if any zero-tolerance scripts were found
+  // CJK, Arabic, Devanagari should NEVER appear in incompatible languages
+  const hasZeroToleranceViolation = scriptsFound.some(
+    (script) => ZERO_TOLERANCE_SCRIPTS.has(script)
+  );
+
+  // For zero-tolerance scripts: ANY occurrence is a failure
+  // For other scripts (e.g., Latin in Russian): allow up to 5 chars as typos
+  const passed = hasZeroToleranceViolation
+    ? totalForeignCount === 0
+    : totalForeignCount <= MINOR_LANGUAGE_THRESHOLD;
 
   // Score contribution: 1.0 if clean, reduces based on foreign count
   const scoreContribution = totalForeignCount === 0
