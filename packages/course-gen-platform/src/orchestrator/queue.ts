@@ -165,7 +165,10 @@ export async function removeJobsByCourseId(
 
     // Filter jobs by courseId and remove them
     for (const job of allJobs) {
-      if (job.data?.courseId === courseId) {
+      // Skip undefined/null jobs (can happen with stale queue data)
+      if (!job || !job.data) continue;
+
+      if (job.data.courseId === courseId) {
         try {
           // For active jobs, we can't remove them directly - they must complete or fail
           const state = await job.getState();
