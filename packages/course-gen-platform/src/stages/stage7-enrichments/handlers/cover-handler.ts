@@ -153,15 +153,37 @@ async function retryWithBackoff<T>(
 }
 
 /**
+ * Alt text templates for cover images - all 19 supported languages
+ */
+const COVER_ALT_TEMPLATES: Record<string, string> = {
+  en: 'Cover illustration for lesson:',
+  ru: 'Обложка урока:',
+  zh: '课程封面插图:',
+  es: 'Ilustración de portada de la lección:',
+  fr: 'Illustration de couverture de la leçon:',
+  de: 'Titelbild der Lektion:',
+  ja: 'レッスンのカバー画像:',
+  ko: '수업 표지 일러스트:',
+  ar: 'صورة غلاف الدرس:',
+  pt: 'Ilustração de capa da lição:',
+  it: 'Illustrazione di copertina della lezione:',
+  tr: 'Ders kapak resmi:',
+  vi: 'Hình minh họa bìa bài học:',
+  th: 'ภาพปกบทเรียน:',
+  id: 'Ilustrasi sampul pelajaran:',
+  ms: 'Ilustrasi kulit pelajaran:',
+  hi: 'पाठ के लिए कवर चित्रण:',
+  bn: 'পাঠের কভার ইলাস্ট্রেশন:',
+  pl: 'Ilustracja okładki lekcji:',
+};
+
+/**
  * Generate localized alt text for cover images
  */
 function getLocalizedAltText(language: string, lessonTitle: string): string {
   const safeTitle = lessonTitle.slice(0, 100); // Limit length
-  const templates: Record<string, string> = {
-    en: `Cover illustration for lesson: ${safeTitle}`,
-    ru: `Обложка урока: ${safeTitle}`,
-  };
-  return templates[language] ?? templates.en;
+  const template = COVER_ALT_TEMPLATES[language] ?? COVER_ALT_TEMPLATES.en;
+  return `${template} ${safeTitle}`;
 }
 
 /**

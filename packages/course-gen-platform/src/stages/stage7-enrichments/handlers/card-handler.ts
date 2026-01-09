@@ -99,27 +99,43 @@ async function retryWithBackoff<T>(
 }
 
 /**
+ * Alt text templates for card images - all 19 supported languages
+ */
+const CARD_ALT_TEMPLATES: Record<string, { lesson: string; course: string }> = {
+  en: { lesson: 'Card for lesson:', course: 'Card for course:' },
+  ru: { lesson: 'Карточка урока:', course: 'Карточка курса:' },
+  zh: { lesson: '课程卡片:', course: '课程卡片:' },
+  es: { lesson: 'Tarjeta de lección:', course: 'Tarjeta del curso:' },
+  fr: { lesson: 'Carte de leçon:', course: 'Carte de cours:' },
+  de: { lesson: 'Lektionskarte:', course: 'Kurskarte:' },
+  ja: { lesson: 'レッスンカード:', course: 'コースカード:' },
+  ko: { lesson: '수업 카드:', course: '코스 카드:' },
+  ar: { lesson: 'بطاقة الدرس:', course: 'بطاقة الدورة:' },
+  pt: { lesson: 'Cartão da lição:', course: 'Cartão do curso:' },
+  it: { lesson: 'Scheda della lezione:', course: 'Scheda del corso:' },
+  tr: { lesson: 'Ders kartı:', course: 'Kurs kartı:' },
+  vi: { lesson: 'Thẻ bài học:', course: 'Thẻ khóa học:' },
+  th: { lesson: 'การ์ดบทเรียน:', course: 'การ์ดหลักสูตร:' },
+  id: { lesson: 'Kartu pelajaran:', course: 'Kartu kursus:' },
+  ms: { lesson: 'Kad pelajaran:', course: 'Kad kursus:' },
+  hi: { lesson: 'पाठ कार्ड:', course: 'कोर्स कार्ड:' },
+  bn: { lesson: 'পাঠ কার্ড:', course: 'কোর্স কার্ড:' },
+  pl: { lesson: 'Karta lekcji:', course: 'Karta kursu:' },
+};
+
+/**
  * Get localized alt text for card images
  *
  * @param language - Language code (e.g., 'ru', 'en')
- * @param isCourseCard - Whether this is a course card or lesson card
  * @param title - Course or lesson title
+ * @param isLesson - Whether this is a lesson card or course card
  * @returns Localized alt text string
  */
 function getLocalizedAltText(language: string, title: string, isLesson: boolean): string {
   const safeTitle = title.slice(0, 100);
-  const templates: Record<string, { lesson: string; course: string }> = {
-    en: {
-      lesson: `Card illustration for lesson: ${safeTitle}`,
-      course: `Card illustration for course: ${safeTitle}`,
-    },
-    ru: {
-      lesson: `Карточка урока: ${safeTitle}`,
-      course: `Карточка курса: ${safeTitle}`,
-    },
-  };
-  const lang = templates[language] ?? templates.en;
-  return isLesson ? lang.lesson : lang.course;
+  const templates = CARD_ALT_TEMPLATES[language] ?? CARD_ALT_TEMPLATES.en;
+  const prefix = isLesson ? templates.lesson : templates.course;
+  return `${prefix} ${safeTitle}`;
 }
 
 /**
