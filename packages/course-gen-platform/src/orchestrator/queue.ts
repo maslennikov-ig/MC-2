@@ -153,7 +153,8 @@ export async function removeJobsByCourseId(
 
   try {
     // Get jobs from all states that might need cleanup
-    const jobStates: Array<'active' | 'waiting' | 'delayed' | 'paused'> = ['active', 'waiting', 'delayed', 'paused'];
+    // Note: 'prioritized' is separate from 'waiting' in BullMQ for jobs with priority
+    const jobStates: Array<'active' | 'waiting' | 'prioritized' | 'delayed' | 'paused'> = ['active', 'waiting', 'prioritized', 'delayed', 'paused'];
     const allJobs = await queue.getJobs(jobStates);
 
     // Filter jobs by courseId and remove them
