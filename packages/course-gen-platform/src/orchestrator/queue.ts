@@ -132,27 +132,33 @@ export async function closeQueue(): Promise<void> {
 /**
  * Remove all jobs for a specific course from the queue
  *
- * This is used when restarting a stage to clean up any pending/active jobs
- * that might interfere with the restart.
+ * This is used when restarting a stage or deleting a course to clean up
+ * any pending/active jobs that might interfere.
+ *
+ * Cleans up:
+ * 1. Jobs in queue states (active, waiting, prioritized, delayed, paused)
+ * 2. Orphaned job hash keys in Redis (jobs that left queues but data remains)
  *
  * @param {string} courseId - The course ID to remove jobs for
- * @returns {Promise<{ removed: number; errors: number }>} Count of removed and failed removals
+ * @returns {Promise<{ removed: number; errors: number; orphanedCleaned: number }>} Cleanup stats
  *
  * @example
  * ```typescript
  * const result = await removeJobsByCourseId('course-uuid');
- * console.log(`Removed ${result.removed} jobs`);
+ * console.log(`Removed ${result.removed} jobs, cleaned ${result.orphanedCleaned} orphaned`);
  * ```
  */
 export async function removeJobsByCourseId(
   courseId: string
-): Promise<{ removed: number; errors: number }> {
+): Promise<{ removed: number; errors: number; orphanedCleaned: number }> {
   const queue = getQueue();
+  const redis = getRedisClient();
   let removed = 0;
   let errors = 0;
+  let orphanedCleaned = 0;
 
   try {
-    // Get jobs from all states that might need cleanup
+    // Phase 1: Remove jobs from queue states
     // Note: 'prioritized' is separate from 'waiting' in BullMQ for jobs with priority
     const jobStates: Array<'active' | 'waiting' | 'prioritized' | 'delayed' | 'paused'> = ['active', 'waiting', 'prioritized', 'delayed', 'paused'];
     const allJobs = await queue.getJobs(jobStates);
@@ -165,13 +171,13 @@ export async function removeJobsByCourseId(
           const state = await job.getState();
           if (state === 'active') {
             // Move to failed state to stop processing
-            await job.moveToFailed(new Error('Job cancelled due to stage restart'), 'restart');
+            await job.moveToFailed(new Error('Job cancelled due to course deletion'), 'deletion');
             removed++;
             logger.debug({
               jobId: job.id,
               jobType: job.name,
               courseId,
-            }, 'Active job moved to failed for restart');
+            }, 'Active job moved to failed for deletion');
           } else {
             await job.remove();
             removed++;
@@ -192,12 +198,74 @@ export async function removeJobsByCourseId(
       }
     }
 
-    if (removed > 0 || errors > 0) {
+    // Phase 2: Clean up orphaned job hash keys
+    // These are job data hashes that remain in Redis after jobs leave queues
+    // Pattern: bull:course-generation:* (where * is job ID)
+    const keyPattern = `bull:${QUEUE_NAME}:*`;
+    let cursor = '0';
+    const keysToDelete: string[] = [];
+
+    do {
+      // Use SCAN to iterate through keys without blocking Redis
+      const [nextCursor, keys] = await redis.scan(cursor, 'MATCH', keyPattern, 'COUNT', 100);
+      cursor = nextCursor;
+
+      for (const key of keys) {
+        // Skip non-job keys (meta, events, etc.)
+        const keyPart = key.replace(`bull:${QUEUE_NAME}:`, '');
+        if (keyPart.includes(':') || ['meta', 'id', 'events', 'stalled-check', 'waiting', 'active', 'paused', 'completed', 'failed', 'delayed', 'prioritized'].includes(keyPart)) {
+          continue;
+        }
+
+        try {
+          // Check if this hash contains our courseId
+          const data = await redis.hget(key, 'data');
+          if (data && data.includes(courseId)) {
+            keysToDelete.push(key);
+          }
+        } catch {
+          // Ignore errors reading individual keys
+        }
+      }
+    } while (cursor !== '0');
+
+    // Delete orphaned keys
+    if (keysToDelete.length > 0) {
+      for (const key of keysToDelete) {
+        try {
+          await redis.del(key);
+          orphanedCleaned++;
+        } catch {
+          errors++;
+        }
+      }
+    }
+
+    // Phase 3: Clean up related Redis keys (lesson UUID mappings, etc.)
+    const relatedPatterns = [
+      `lesson:uuid:${courseId}:*`,
+      `rag:${courseId}:*`,
+    ];
+
+    for (const pattern of relatedPatterns) {
+      let relatedCursor = '0';
+      do {
+        const [nextCursor, keys] = await redis.scan(relatedCursor, 'MATCH', pattern, 'COUNT', 100);
+        relatedCursor = nextCursor;
+        if (keys.length > 0) {
+          await redis.del(...keys);
+          orphanedCleaned += keys.length;
+        }
+      } while (relatedCursor !== '0');
+    }
+
+    if (removed > 0 || errors > 0 || orphanedCleaned > 0) {
       logger.info({
         courseId,
         removed,
+        orphanedCleaned,
         errors,
-      }, 'Cleaned up jobs for course restart');
+      }, 'Cleaned up jobs and orphaned data for course');
     }
   } catch (error) {
     logger.error({
@@ -207,7 +275,7 @@ export async function removeJobsByCourseId(
     throw error;
   }
 
-  return { removed, errors };
+  return { removed, errors, orphanedCleaned };
 }
 
 export default getQueue;

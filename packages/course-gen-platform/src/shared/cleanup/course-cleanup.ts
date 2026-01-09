@@ -72,6 +72,7 @@ export interface CourseCleanupResult {
   bullmq: {
     success: boolean;
     jobsRemoved: number;
+    orphanedCleaned: number;
   };
   /** Total duration in milliseconds */
   durationMs: number;
@@ -142,7 +143,7 @@ export async function cleanupCourseResources(
       ragContext: { success: false, entriesDeleted: 0 },
       files: { success: false, filesDeleted: 0, bytesFreed: 0, error: 'Invalid UUID' },
       doclingCache: { success: false, filesDeleted: 0, bytesFreed: 0 },
-      bullmq: { success: false, jobsRemoved: 0 },
+      bullmq: { success: false, jobsRemoved: 0, orphanedCleaned: 0 },
       durationMs: Date.now() - startTime,
       errors: ['Invalid UUID format'],
     };
@@ -261,23 +262,25 @@ export async function cleanupCourseResources(
     doclingCacheResult.success = false;
   }
 
-  // 6. Clean BullMQ jobs (waiting, active, delayed, paused)
-  let bullmqResult = { success: true, jobsRemoved: 0 };
+  // 6. Clean BullMQ jobs (waiting, active, delayed, paused) and orphaned Redis data
+  let bullmqResult = { success: true, jobsRemoved: 0, orphanedCleaned: 0 };
   try {
     const result = await removeJobsByCourseId(courseId);
     bullmqResult = {
       success: result.errors === 0,
       jobsRemoved: result.removed,
+      orphanedCleaned: result.orphanedCleaned,
     };
     if (result.errors > 0) {
       errors.push(`BullMQ cleanup: ${result.errors} jobs failed to remove`);
     }
-    if (result.removed > 0) {
+    if (result.removed > 0 || result.orphanedCleaned > 0) {
       logger.info({
         courseId,
         jobsRemoved: result.removed,
+        orphanedCleaned: result.orphanedCleaned,
         jobErrors: result.errors,
-      }, '[Course Cleanup] BullMQ jobs cleaned up');
+      }, '[Course Cleanup] BullMQ jobs and orphaned data cleaned up');
     }
   } catch (error) {
     const errorMsg = `BullMQ cleanup failed: ${error instanceof Error ? error.message : String(error)}`;
@@ -320,6 +323,7 @@ export async function cleanupCourseResources(
     doclingCacheDeleted: doclingCacheResult.filesDeleted,
     doclingCacheBytesFreed: doclingCacheResult.bytesFreed,
     bullmqJobsRemoved: bullmqResult.jobsRemoved,
+    bullmqOrphanedCleaned: bullmqResult.orphanedCleaned,
     durationMs,
     errorCount: errors.length,
   }, '[Course Cleanup] Cleanup complete');
