@@ -41,7 +41,9 @@ export interface MermaidFix {
     | 'UNICODE_CLEANED'
     | 'LABEL_QUOTED'
     | 'ENTITY_ESCAPED'
-    | 'SUBGRAPH_END_ADDED';
+    | 'SUBGRAPH_END_ADDED'
+    | 'RAW_QUOTE_REMOVED'
+    | 'EDGE_LABEL_ESCAPED';
   /** Number of occurrences fixed */
   count: number;
   /** Block index (0-based) */
@@ -417,6 +419,65 @@ export function sanitizeMermaidBlocks(content: string): MermaidSanitizeResult {
       }, 'Mermaid sanitizer: added missing subgraph end keywords');
     }
 
+    // -------------------------------------------------------------------------
+    // Fix 9: Remove raw quotes from node labels (not escaped with \)
+    // Pattern: A[Text: "quoted"] → A[Text: quoted]
+    // These cause 'got STR' parse errors in Mermaid
+    // -------------------------------------------------------------------------
+    let rawQuotesRemoved = 0;
+    sanitized = sanitized.replace(
+      /(\w+)\[([^\]]*)"([^\]"]*)"([^\]]*)\]/g,
+      (_, id, before, quoted, after) => {
+        rawQuotesRemoved++;
+        // Remove the quotes, keep the content
+        return `${id}[${before}${quoted}${after}]`;
+      }
+    );
+
+    if (rawQuotesRemoved > 0) {
+      fixes.push({
+        type: 'RAW_QUOTE_REMOVED',
+        count: rawQuotesRemoved,
+        blockIndex,
+      });
+      modified = true;
+
+      logger.debug({
+        blockIndex,
+        rawQuotesRemoved,
+      }, 'Mermaid sanitizer: removed raw quotes from node labels');
+    }
+
+    // -------------------------------------------------------------------------
+    // Fix 10: Escape special characters in edge labels |...|
+    // Pattern: -->|Text (with parens)| → -->|Text with parens|
+    // Parentheses in edge labels cause 'got PS' parse errors
+    // -------------------------------------------------------------------------
+    let edgeLabelsFixed = 0;
+    sanitized = sanitized.replace(
+      /\|([^|]*[()][^|]*)\|/g,
+      (_, label) => {
+        edgeLabelsFixed++;
+        // Remove parentheses from edge labels
+        const cleaned = label.replace(/[()]/g, '');
+        return `|${cleaned}|`;
+      }
+    );
+
+    if (edgeLabelsFixed > 0) {
+      fixes.push({
+        type: 'EDGE_LABEL_ESCAPED',
+        count: edgeLabelsFixed,
+        blockIndex,
+      });
+      modified = true;
+
+      logger.debug({
+        blockIndex,
+        edgeLabelsFixed,
+      }, 'Mermaid sanitizer: fixed special characters in edge labels');
+    }
+
     return `\`\`\`mermaid\n${sanitized}\`\`\``;
   });
 
@@ -495,6 +556,16 @@ export function hasBrokenMermaidSyntax(content: string): boolean {
     const subgraphCount = (block.match(/\bsubgraph\b/g) || []).length;
     const endCount = (block.match(/\bend\b/g) || []).length;
     if (subgraphCount !== endCount) {
+      return true;
+    }
+
+    // Check for raw quotes in node labels (causes 'got STR' errors)
+    if (/\w+\[[^\]]*"[^\]"]*"[^\]]*\]/.test(block)) {
+      return true;
+    }
+
+    // Check for parentheses in edge labels (causes 'got PS' errors)
+    if (/\|[^|]*[()][^|]*\|/.test(block)) {
       return true;
     }
   }

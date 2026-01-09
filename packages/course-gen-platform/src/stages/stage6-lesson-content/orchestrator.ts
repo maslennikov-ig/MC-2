@@ -127,6 +127,17 @@ export interface Stage6Output {
     /** Quality score from judge (0-1, or 0 if not evaluated) */
     qualityScore: number;
   };
+  /** Human review metadata (for UI warnings) */
+  reviewInfo?: {
+    /** Whether content needs human review */
+    needsReview: boolean;
+    /** Reasons for review requirement */
+    reasons: string[];
+    /** Factual verification accuracy score (0-1) */
+    factualAccuracyScore?: number;
+    /** Number of unverified claims */
+    unverifiedClaims?: number;
+  };
 }
 
 // ============================================================================
@@ -1107,6 +1118,32 @@ async function judgeNode(state: LessonGraphStateType): Promise<LessonGraphStateU
     const durationMs = Date.now() - startTime;
     const totalTokensUsed = cascadeResult.totalTokensUsed + refinementTokensUsed;
 
+    // Build reviewInfo for UI warnings
+    const factualResult = cascadeResult.factualVerificationResult;
+    const reviewReasons: string[] = [];
+
+    if (needsHumanReview) {
+      reviewReasons.push('Judge escalated to human review');
+    }
+    if (factualResult?.requiresHumanReview) {
+      if (factualResult.contradictedClaims > 0) {
+        reviewReasons.push(`${factualResult.contradictedClaims} claim(s) contradict source materials`);
+      }
+      if (factualResult.unverifiedClaims > 0) {
+        reviewReasons.push(`${factualResult.unverifiedClaims} claim(s) could not be verified`);
+      }
+      if (factualResult.noEvidenceClaims > 0) {
+        reviewReasons.push(`${factualResult.noEvidenceClaims} claim(s) have no evidence in sources`);
+      }
+    }
+
+    const reviewInfo = reviewReasons.length > 0 ? {
+      needsReview: true,
+      reasons: reviewReasons,
+      factualAccuracyScore: factualResult?.overallAccuracyScore,
+      unverifiedClaims: (factualResult?.unverifiedClaims ?? 0) + (factualResult?.noEvidenceClaims ?? 0),
+    } : null;
+
     // Build enriched output for trace
     const enrichedOutput = buildEnrichedJudgeOutput(
       cascadeResult,
@@ -1159,6 +1196,7 @@ async function judgeNode(state: LessonGraphStateType): Promise<LessonGraphStateU
       judgeRecommendation: finalRecommendation,
       needsRegeneration,
       needsHumanReview,
+      reviewInfo,
       previousScores: [finalScore],
       refinementIterationCount: state.refinementIterationCount + 1,
       // Increment retryCount if regeneration needed
@@ -1657,6 +1695,8 @@ export async function executeStage6(input: Stage6Input): Promise<Stage6Output> {
         modelUsed: result.modelUsed ?? null,
         qualityScore: result.qualityScore ?? 0,
       },
+      // Include review info for UI warnings (undefined if not set)
+      reviewInfo: result.reviewInfo ?? undefined,
     };
   } catch (error) {
     const durationMs = Date.now() - startTime;

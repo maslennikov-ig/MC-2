@@ -171,6 +171,8 @@ export async function saveLessonContent(
             charCount: sanityResult.metrics?.charCount,
             wordCount: sanityResult.metrics?.wordCount,
           } : undefined,
+          // Human review info for UI warnings (only present if review needed)
+          reviewInfo: result.reviewInfo ?? undefined,
         })),
         status: 'completed',
         generation_attempt: 1,

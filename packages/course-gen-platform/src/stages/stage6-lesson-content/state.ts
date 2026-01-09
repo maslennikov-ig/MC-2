@@ -361,6 +361,20 @@ export const LessonGraphState = Annotation.Root({
   }),
 
   /**
+   * Human review info with reasons and factual verification details
+   * Used for UI warnings when content may need manual review
+   */
+  reviewInfo: Annotation<{
+    needsReview: boolean;
+    reasons: string[];
+    factualAccuracyScore?: number;
+    unverifiedClaims?: number;
+  } | null>({
+    reducer: (x, y) => y ?? x,
+    default: () => null,
+  }),
+
+  /**
    * Previous quality scores for trend analysis
    * Used by decision engine to detect diminishing returns
    */
