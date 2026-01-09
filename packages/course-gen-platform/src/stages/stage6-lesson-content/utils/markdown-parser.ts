@@ -15,6 +15,7 @@
  */
 
 import type { ContentSection } from '@megacampus/shared-types/lesson-content';
+import { CONTENT_LABELS } from '@megacampus/shared-types';
 import { logger } from '@/shared/logger';
 
 // ============================================================================
@@ -56,6 +57,92 @@ export interface MarkdownValidationResult {
 // ============================================================================
 
 /**
+ * Build multilingual pattern alternatives from CONTENT_LABELS
+ * Extracts unique values for a given label key across all 19 languages
+ */
+function getMultilingualAlternatives(labelKey: keyof typeof CONTENT_LABELS.en): string[] {
+  const alternatives = new Set<string>();
+  for (const lang of Object.keys(CONTENT_LABELS) as Array<keyof typeof CONTENT_LABELS>) {
+    const label = CONTENT_LABELS[lang][labelKey];
+    if (label) {
+      // Escape special regex characters
+      alternatives.add(label.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'));
+    }
+  }
+  return Array.from(alternatives);
+}
+
+/**
+ * All exercise-related terms across 19 languages
+ * Includes: Exercises, Упражнения, 练习, Ejercicios, etc.
+ */
+const EXERCISE_TERMS = [
+  ...getMultilingualAlternatives('exercises'),
+  ...getMultilingualAlternatives('exercise'),
+  // Additional English variations
+  'Practice', 'Problems?', 'Questions?',
+];
+
+/**
+ * All summary-related terms across 19 languages
+ * Includes: Summary, Заключение, 总结, Resumen, etc.
+ */
+const SUMMARY_TERMS = [
+  ...getMultilingualAlternatives('summary'),
+  // Additional English variations
+  'Conclusion', 'Key\\s*Takeaways?', 'Wrap[- ]?up',
+];
+
+/**
+ * All introduction-related terms across 19 languages
+ * Includes: Introduction, Введение, 引言, Introducción, etc.
+ */
+const INTRODUCTION_TERMS = getMultilingualAlternatives('introduction');
+
+/**
+ * Build lowercase special section names from all 19 languages
+ * Used to filter out non-content sections when extracting
+ */
+function buildSpecialSections(): Set<string> {
+  const sections = new Set<string>();
+
+  // Get all labels from all languages
+  for (const lang of Object.keys(CONTENT_LABELS) as Array<keyof typeof CONTENT_LABELS>) {
+    const labels = CONTENT_LABELS[lang];
+    // Add introduction variants
+    sections.add(labels.introduction.toLowerCase());
+    // Add exercise variants
+    sections.add(labels.exercises.toLowerCase());
+    sections.add(labels.exercise.toLowerCase());
+    // Add summary variants
+    sections.add(labels.summary.toLowerCase());
+    // Add task variants
+    sections.add(labels.task.toLowerCase());
+  }
+
+  // Add common English variations not in CONTENT_LABELS
+  sections.add('practice');
+  sections.add('problems');
+  sections.add('problem');
+  sections.add('questions');
+  sections.add('question');
+  sections.add('conclusion');
+  sections.add('key takeaways');
+  sections.add('key takeaway');
+  sections.add('wrap-up');
+  sections.add('wrapup');
+  sections.add('wrap up');
+
+  return sections;
+}
+
+/**
+ * Set of special section names (lowercase) to exclude from content sections
+ * Built dynamically from CONTENT_LABELS for all 19 languages
+ */
+const SPECIAL_SECTIONS = buildSpecialSections();
+
+/**
  * Regex patterns for markdown parsing
  */
 const PATTERNS = {
@@ -71,12 +158,21 @@ const PATTERNS = {
   inlineCode: /`[^`]+`/g,
   /** Match HTML comments */
   htmlComment: /<!--[\s\S]*?-->/g,
-  /** Match exercise sections */
-  exerciseSection: /##\s*(?:Exercises?|Practice|Problems?|Questions?)\s*\n([\s\S]*?)(?=\n##\s|\n#\s|$)/gi,
-  /** Match summary sections */
-  summarySection: /##\s*(?:Summary|Conclusion|Key\s*Takeaways?|Wrap[- ]?up)\s*\n([\s\S]*?)(?=\n##\s|\n#\s|$)/gi,
-  /** Match introduction section */
-  introSection: /##\s*Introduction\s*\n([\s\S]*?)(?=\n##\s)/i,
+  /** Match exercise sections (all 19 languages) */
+  exerciseSection: new RegExp(
+    `##\\s*(?:${EXERCISE_TERMS.join('|')})\\s*\\n([\\s\\S]*?)(?=\\n##\\s|\\n#\\s|$)`,
+    'gi'
+  ),
+  /** Match summary sections (all 19 languages) */
+  summarySection: new RegExp(
+    `##\\s*(?:${SUMMARY_TERMS.join('|')})\\s*\\n([\\s\\S]*?)(?=\\n##\\s|\\n#\\s|$)`,
+    'gi'
+  ),
+  /** Match introduction section (all 19 languages) */
+  introSection: new RegExp(
+    `##\\s*(?:${INTRODUCTION_TERMS.join('|')})\\s*\\n([\\s\\S]*?)(?=\\n##\\s)`,
+    'i'
+  ),
 };
 
 // ============================================================================
@@ -207,25 +303,6 @@ export function extractSections(markdown: string): ContentSection[] {
 
   const sections: ContentSection[] = [];
 
-  // Special section titles to exclude
-  const specialSections = [
-    'introduction',
-    'exercises',
-    'exercise',
-    'practice',
-    'problems',
-    'problem',
-    'questions',
-    'question',
-    'summary',
-    'conclusion',
-    'key takeaways',
-    'key takeaway',
-    'wrap-up',
-    'wrapup',
-    'wrap up',
-  ];
-
   // Split by H2 headers
   const h2Pattern = /^##\s+(.+)$/gm;
   const matches: { title: string; index: number }[] = [];
@@ -243,8 +320,9 @@ export function extractSections(markdown: string): ContentSection[] {
     const currentMatch = matches[i];
     const title = currentMatch.title;
 
-    // Skip special sections
-    if (specialSections.some((s) => title.toLowerCase().includes(s))) {
+    // Skip special sections (intro, exercises, summary, etc. in all 19 languages)
+    const lowerTitle = title.toLowerCase();
+    if (SPECIAL_SECTIONS.has(lowerTitle) || [...SPECIAL_SECTIONS].some((s) => lowerTitle.includes(s))) {
       continue;
     }
 
@@ -517,8 +595,16 @@ function extractExercises(markdown: string): string[] {
     const exerciseContent = match[1].trim();
 
     // First try: Split by H3 exercise headers (from generateExercises prompt format)
-    // Pattern: ### Exercise 1: Title or ### Упражнение 1: Название
-    const h3Pattern = /###\s*(?:Exercise|Упражнение|Задание)\s*\d+\s*[:\.\-]?\s*/gi;
+    // Pattern: ### Exercise 1: Title or ### Упражнение 1: Название (all 19 languages)
+    // Build pattern from multilingual exercise and task terms
+    const exerciseH3Terms = [
+      ...getMultilingualAlternatives('exercise'),
+      ...getMultilingualAlternatives('task'),
+    ].join('|');
+    const h3Pattern = new RegExp(
+      `###\\s*(?:${exerciseH3Terms})\\s*\\d+\\s*[:\\.\\-]?\\s*`,
+      'gi'
+    );
     const h3Parts = exerciseContent.split(h3Pattern).filter((p) => p.trim().length > 0);
 
     if (h3Parts.length >= 2) {
