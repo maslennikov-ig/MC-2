@@ -37,6 +37,22 @@ import { generateSection } from './generator/generator-section';
 export { calculateDynamicContextWindow, generateSection };
 
 /**
+ * Localized section headers based on language
+ */
+const sectionHeaders = {
+  ru: {
+    introduction: 'Введение',
+    summary: 'Заключение',
+    exercises: 'Упражнения',
+  },
+  en: {
+    introduction: 'Introduction',
+    summary: 'Summary',
+    exercises: 'Exercises',
+  },
+};
+
+/**
  * Generator Node - Serial section-by-section content generation
  *
  * Replaces the Planner + Expander + Assembler + Smoother pipeline with a
@@ -56,6 +72,9 @@ export async function generatorNode(
 ): Promise<LessonGraphStateUpdate> {
   const startTime = performance.now();
   const { lessonSpec, ragChunks, courseId, lessonUuid, language } = state;
+
+  // Get localized section headers
+  const headers = sectionHeaders[language as keyof typeof sectionHeaders] || sectionHeaders.en;
 
   logger.info(
     {
@@ -117,7 +136,7 @@ export async function generatorNode(
     // Start building full content
     contentParts.push(`# ${lessonSpec.title}`);
     contentParts.push('');
-    contentParts.push('## Introduction');
+    contentParts.push(`## ${headers.introduction}`);
     contentParts.push('');
     contentParts.push(introResult.content);
     contentParts.push('');
@@ -238,7 +257,7 @@ export async function generatorNode(
     const summaryResult = await generateSummary(lessonSpec, sectionTitles, language, model);
     totalTokens += summaryResult.tokensUsed;
 
-    contentParts.push('## Summary');
+    contentParts.push(`## ${headers.summary}`);
     contentParts.push('');
     contentParts.push(summaryResult.content);
     contentParts.push('');
@@ -250,7 +269,7 @@ export async function generatorNode(
     const exercisesResult = await generateExercises(lessonSpec, sectionTitles, language, model);
     totalTokens += exercisesResult.tokensUsed;
 
-    contentParts.push('## Exercises');
+    contentParts.push(`## ${headers.exercises}`);
     contentParts.push('');
     contentParts.push(exercisesResult.content);
     contentParts.push('');

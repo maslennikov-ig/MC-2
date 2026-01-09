@@ -197,6 +197,28 @@ Write in markdown format. Do NOT include a header - just the summary paragraphs.
 // ============================================================================
 
 /**
+ * Localized labels for exercises based on language
+ */
+const exerciseLabels = {
+  ru: {
+    exercise: 'Упражнение',
+    task: 'Задание',
+    scenario: 'Сценарий/Контекст',
+    yourAnswer: 'Ваш ответ',
+    hint: 'Подсказка',
+    sampleAnswer: 'Образец ответа',
+  },
+  en: {
+    exercise: 'Exercise',
+    task: 'Task',
+    scenario: 'Scenario/Context',
+    yourAnswer: 'Your Answer',
+    hint: 'Hint',
+    sampleAnswer: 'Sample Answer',
+  },
+};
+
+/**
  * Generate practical exercises for the lesson
  * Creates 2-3 exercises based on learning objectives and covered content.
  *
@@ -219,6 +241,9 @@ export async function generateExercises(
   const sectionsList = sectionTitles
     .map((t, i) => `${i + 1}. ${t}`)
     .join('\n');
+
+  // Get localized labels
+  const labels = exerciseLabels[language as keyof typeof exerciseLabels] || exerciseLabels.en;
 
   const prompt = `<context>
 <lesson>
@@ -247,24 +272,18 @@ Exercise Types to Use (pick the most appropriate for this content):
 3. **Classification** - Give examples and ask learner to categorize/classify them
 4. **Short Answer** - Ask conceptual questions that test understanding
 
-Format each exercise as:
-### Exercise [number]: [Exercise title]
+Format each exercise EXACTLY as shown (use ${getLanguageName(language)} labels):
+### ${labels.exercise} [number]: [Exercise title in ${getLanguageName(language)}]
 
-**Task:** [Clear description of what the learner should do - 2-4 sentences]
+**${labels.task}:** [Clear description of what the learner should do - 2-4 sentences]
 
-**Scenario/Context:** [If applicable, provide a specific scenario - 2-3 sentences]
+**${labels.scenario}:** [If applicable, provide a specific scenario - 2-3 sentences]
 
-**Your Answer:** [Leave blank for learner response]
+**${labels.yourAnswer}:**
 
-<details>
-<summary>Hint</summary>
-[Provide a helpful hint - 1-2 sentences]
-</details>
+> **${labels.hint}:** [Provide a helpful hint - 1-2 sentences]
 
-<details>
-<summary>Sample Answer</summary>
-[Provide a model answer - 2-4 sentences]
-</details>
+> **${labels.sampleAnswer}:** [Provide a model answer - 2-4 sentences]
 
 ---
 
@@ -274,13 +293,15 @@ Format each exercise as:
 - Use practical, real-world scenarios relevant to ${lessonSpec.metadata.target_audience}
 - Difficulty: ${lessonSpec.difficulty_level}
 - Exercises should be completable in 5-10 minutes each
+- ALL labels (${labels.exercise}, ${labels.task}, ${labels.hint}, etc.) MUST be in ${getLanguageName(language)}
+- DO NOT use HTML tags like <details> or <summary>
 
 **Verification**: Before submitting, count your exercises. If you have fewer than 2 or more than 2, you must revise.
 
 <output_language>
 MANDATORY: Write ALL content in ${getLanguageName(language)}.
 Every word, header, example, scenario, hint, and answer must be in ${getLanguageName(language)}.
-DO NOT mix languages.
+DO NOT mix languages. DO NOT use English labels like "Exercise", "Hint", "Sample Answer" if language is Russian.
 </output_language>
 
 Write the exercises in markdown format. Do NOT include a section header - just the exercises.
