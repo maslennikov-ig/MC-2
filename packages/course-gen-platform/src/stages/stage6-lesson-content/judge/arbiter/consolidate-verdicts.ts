@@ -391,10 +391,19 @@ function buildFixInstructions(issue: JudgeIssue): string {
  * with synthesized instructions.
  */
 function groupIntoTasks(issues: TargetedIssue[]): SectionRefinementTask[] {
-  // Group by section
+  // Group by section (skip sec_global - these should be filtered earlier but adding safety check)
   const sectionGroups = new Map<string, TargetedIssue[]>();
 
   for (const issue of issues) {
+    // Safety check: skip any issues targeting sec_global
+    if (issue.targetSectionId === 'sec_global') {
+      logger.debug({
+        issue: issue.description?.slice(0, 50),
+        location: issue.location,
+      }, 'Skipping sec_global issue in groupIntoTasks (should have been filtered earlier)');
+      continue;
+    }
+
     const existing = sectionGroups.get(issue.targetSectionId) || [];
     existing.push(issue);
     sectionGroups.set(issue.targetSectionId, existing);

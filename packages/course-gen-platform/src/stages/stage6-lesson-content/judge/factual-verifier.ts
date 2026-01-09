@@ -114,30 +114,62 @@ const VERIFICATION_WEIGHTS: Record<VerificationStatus, number> = {
 };
 
 /**
- * Patterns for identifying factual claims
+ * Patterns for identifying factual claims (English + Russian)
  */
 const FACTUAL_CLAIM_PATTERNS: RegExp[] = [
-  // Dates and years
+  // ==========================================================================
+  // ENGLISH PATTERNS
+  // ==========================================================================
+
+  // Dates and years (English)
   /\b(in|during|since|from|until|by)\s+\d{4}\b/gi,
   /\b(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2},?\s+\d{4}\b/gi,
   /\b\d{1,2}(?:st|nd|rd|th)?\s+(?:of\s+)?(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{4}\b/gi,
 
-  // Numeric facts and statistics
+  // Numeric facts and statistics (English)
   /\b\d+(?:\.\d+)?%\b/g,
   /\b\d+(?:,\d{3})*(?:\.\d+)?\s*(?:million|billion|trillion|thousand|hundred)\b/gi,
   /\bapproximately\s+\d+/gi,
   /\babout\s+\d+/gi,
 
-  // Named entities and technical terms
+  // Named entities and technical terms (English)
   /\b[A-Z][a-z]+\s+[A-Z][a-z]+\b/g, // Proper names (FirstName LastName)
   /\b(?:Dr\.|Prof\.|Mr\.|Mrs\.|Ms\.)\s+[A-Z][a-z]+/g, // Titles with names
 
-  // Definitive statements
+  // Definitive statements (English)
   /\bis\s+(?:the\s+)?(?:first|last|only|largest|smallest|most|least)\b/gi,
   /\bwas\s+(?:the\s+)?(?:first|last|only|largest|smallest|most|least)\b/gi,
   /\baccording\s+to\b/gi,
   /\bstudies\s+(?:show|have shown|indicate|suggest)\b/gi,
   /\bresearch\s+(?:shows|indicates|suggests|demonstrates)\b/gi,
+
+  // ==========================================================================
+  // RUSSIAN PATTERNS
+  // ==========================================================================
+
+  // Dates and years (Russian) - "в 2024 году", "с 2020 года"
+  /\b[вВ]\s+\d{4}\s+году?\b/g,
+  /\b[сС]\s+\d{4}\s+года?\b/g,
+  /\b[дД]о\s+\d{4}\s+года?\b/g,
+
+  // Russian months with dates - "15 января 2024", "март 2023"
+  /\b\d{1,2}\s+(?:января|февраля|марта|апреля|мая|июня|июля|августа|сентября|октября|ноября|декабря)\s+\d{4}\b/gi,
+  /\b(?:январь|февраль|март|апрель|май|июнь|июль|август|сентябрь|октябрь|ноябрь|декабрь)\s+\d{4}\b/gi,
+
+  // Numeric facts (Russian) - "около 50%", "примерно 100"
+  /\b(?:около|примерно|приблизительно|более|менее|свыше|порядка)\s+\d+/gi,
+  /\b\d+(?:[.,]\d+)?\s*(?:миллион|миллиард|тысяч|процент)/gi,
+
+  // Statistics (Russian) - "по данным", "согласно исследованиям"
+  /\b(?:по данным|согласно|по статистике|по результатам)\b/gi,
+  /\b(?:исследования|статистика|опросы?)\s+(?:показыва|свидетельству|демонстриру)/gi,
+
+  // Definitive statements (Russian) - "является первым", "самый большой"
+  /\b(?:является|был[аои]?|стал[аои]?)\s+(?:первым?|последним?|единственным?|крупнейшим?|наибольшим?)\b/gi,
+  /\b(?:самый|наиболее|наименее)\s+\w+/gi,
+
+  // Russian named entities - Cyrillic capitalized words (approximation)
+  /\b[А-ЯЁ][а-яё]+\s+[А-ЯЁ][а-яё]+\b/g, // Russian proper names
 ];
 
 // ============================================================================

@@ -238,7 +238,8 @@ ${sectionsList}
 </context>
 
 <instructions>
-Create 2-3 practical exercises that help reinforce the key concepts from this lesson.
+**CRITICAL REQUIREMENT**: You MUST create EXACTLY 2 exercises. Not 1, not 3 - exactly 2 exercises.
+This is a strict requirement that cannot be bypassed.
 
 Exercise Types to Use (pick the most appropriate for this content):
 1. **Reflection/Analysis** - Ask the learner to analyze a scenario or case study
@@ -267,11 +268,14 @@ Format each exercise as:
 
 ---
 
-Requirements:
+**MANDATORY Requirements**:
+- EXACTLY 2 exercises - no more, no less (this is critical!)
 - Each exercise should target at least one learning objective
 - Use practical, real-world scenarios relevant to ${lessonSpec.metadata.target_audience}
 - Difficulty: ${lessonSpec.difficulty_level}
 - Exercises should be completable in 5-10 minutes each
+
+**Verification**: Before submitting, count your exercises. If you have fewer than 2 or more than 2, you must revise.
 
 <output_language>
 MANDATORY: Write ALL content in ${getLanguageName(language)}.

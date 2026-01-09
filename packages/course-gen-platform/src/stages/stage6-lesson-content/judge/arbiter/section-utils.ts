@@ -142,7 +142,14 @@ export function extractSectionIdFromLocation(
 ): string {
   const normalized = location.toLowerCase().trim();
 
-  // Try to extract section number
+  // Try to extract section number - multiple patterns
+  // Pattern 1: "sec_4", "SEC_1", etc.
+  const secMatch = normalized.match(/sec_(\d+)/);
+  if (secMatch) {
+    return `sec_${secMatch[1]}`;
+  }
+
+  // Pattern 2: "section 4", "section1", etc.
   const sectionMatch = normalized.match(/section\s*(\d+)/);
   if (sectionMatch) {
     return `sec_${sectionMatch[1]}`;

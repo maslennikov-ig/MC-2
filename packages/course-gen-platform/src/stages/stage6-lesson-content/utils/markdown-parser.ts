@@ -500,6 +500,11 @@ function extractIntroduction(markdown: string): string {
 
 /**
  * Extract exercises from markdown
+ *
+ * Supports multiple exercise formats:
+ * 1. Numbered list: `1. Exercise content`
+ * 2. Bullet list: `- Exercise content`
+ * 3. H3 headers: `### Exercise 1: Title` (from generateExercises prompt)
  */
 function extractExercises(markdown: string): string[] {
   const exercises: string[] = [];
@@ -511,13 +516,23 @@ function extractExercises(markdown: string): string[] {
   if (match && match[1]) {
     const exerciseContent = match[1].trim();
 
-    // Split by numbered items or bullet points
-    const items = exerciseContent
-      .split(/(?:^|\n)(?:\d+\.|[-*])\s+/)
-      .filter((item) => item.trim().length > 0)
-      .map((item) => item.trim());
+    // First try: Split by H3 exercise headers (from generateExercises prompt format)
+    // Pattern: ### Exercise 1: Title or ### Упражнение 1: Название
+    const h3Pattern = /###\s*(?:Exercise|Упражнение|Задание)\s*\d+\s*[:\.\-]?\s*/gi;
+    const h3Parts = exerciseContent.split(h3Pattern).filter((p) => p.trim().length > 0);
 
-    exercises.push(...items);
+    if (h3Parts.length >= 2) {
+      // Successfully split by H3 headers
+      exercises.push(...h3Parts.map((p) => p.trim()));
+    } else {
+      // Fallback: Split by numbered items or bullet points
+      const items = exerciseContent
+        .split(/(?:^|\n)(?:\d+\.|[-*])\s+/)
+        .filter((item) => item.trim().length > 0)
+        .map((item) => item.trim());
+
+      exercises.push(...items);
+    }
   }
 
   return exercises;
