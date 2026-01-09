@@ -30,7 +30,7 @@ import { runMermaidFixPipeline } from '../utils/mermaid-fix-pipeline';
 
 // Import from extracted modules
 import { calculateDynamicContextWindow } from './generator/generator-constants';
-import { generateIntroduction, generateSummary } from './generator/generator-content';
+import { generateIntroduction, generateSummary, generateExercises } from './generator/generator-content';
 import { generateSection } from './generator/generator-section';
 
 // Re-export for backward compatibility
@@ -244,7 +244,19 @@ export async function generatorNode(
     contentParts.push('');
 
     // ========================================================================
-    // 4. ASSEMBLE FINAL CONTENT
+    // 4. GENERATE EXERCISES
+    // ========================================================================
+    logger.debug({ lessonId: lessonSpec.lesson_id }, 'Generating exercises');
+    const exercisesResult = await generateExercises(lessonSpec, sectionTitles, language, model);
+    totalTokens += exercisesResult.tokensUsed;
+
+    contentParts.push('## Exercises');
+    contentParts.push('');
+    contentParts.push(exercisesResult.content);
+    contentParts.push('');
+
+    // ========================================================================
+    // 5. ASSEMBLE FINAL CONTENT
     // ========================================================================
     const generatedContent = contentParts.join('\n');
     const durationMs = Math.round(performance.now() - startTime);
@@ -288,6 +300,7 @@ export async function generatorNode(
         avgSectionLength,
         hasIntro: true,
         hasSummary: true,
+        hasExercises: true,
         modelUsed: modelId,
       },
       tokensUsed: totalTokens,

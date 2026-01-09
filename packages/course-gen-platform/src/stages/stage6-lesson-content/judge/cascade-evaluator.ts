@@ -203,9 +203,9 @@ const DEFAULT_HEURISTIC_THRESHOLDS: HeuristicThresholds = {
   minWordCount: 500,
   maxWordCount: 10000,
   targetFleschKincaid: { min: 8, max: 12 },
-  requiredSections: ['introduction', 'conclusion'],
-  minExamples: 0, // Disabled: examples extraction not implemented yet (smoother.ts line 268)
-  minExercises: 0, // TODO: Re-enable when exercises generation is implemented in smoother.ts
+  requiredSections: ['introduction', 'conclusion', 'exercises'],
+  minExamples: 0, // Disabled: examples extraction not implemented yet
+  minExercises: 2, // Enabled: exercises generation implemented in generator.ts
 };
 
 /**
@@ -395,6 +395,15 @@ function checkRequiredSections(
           CONCLUSION_REGEX.test(sectionTitles[sectionTitles.length - 1]));
 
       if (!hasConclusion) {
+        missing.push(required);
+      }
+      continue;
+    }
+
+    // Special handling for "exercises" - check content.exercises array
+    if (requiredLower === 'exercises') {
+      const hasExercises = content.exercises && content.exercises.length >= 2;
+      if (!hasExercises) {
         missing.push(required);
       }
       continue;

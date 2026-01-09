@@ -29,6 +29,22 @@ export async function generateIntroduction(
   language: string,
   model: ChatOpenAI
 ): Promise<{ content: string; tokensUsed: number }> {
+  // Defensive check for missing intro_blueprint
+  if (!lessonSpec.intro_blueprint) {
+    logger.warn(
+      { lessonId: lessonSpec.lesson_id },
+      'Missing intro_blueprint in lessonSpec, using defaults'
+    );
+    // Create minimal intro_blueprint with defaults
+    lessonSpec.intro_blueprint = {
+      hook_strategy: 'challenge',
+      hook_topic: lessonSpec.title,
+      key_learning_objectives: lessonSpec.learning_objectives
+        .map((lo) => lo.objective)
+        .join(', '),
+    };
+  }
+
   const hookExamples = {
     analogy: 'Start with a relatable comparison that connects the topic to everyday experience',
     statistic: 'Lead with a surprising or compelling statistic that grabs attention',
@@ -166,6 +182,116 @@ Write in markdown format. Do NOT include a header - just the summary paragraphs.
   if (tokenResult.isEstimated) {
     logger.debug(
       { phase: 'summary', estimatedTokens: tokenResult.tokens },
+      'Token usage estimated from content length (model did not report usage)'
+    );
+  }
+
+  return {
+    content,
+    tokensUsed: tokenResult.tokens,
+  };
+}
+
+// ============================================================================
+// EXERCISES GENERATION
+// ============================================================================
+
+/**
+ * Generate practical exercises for the lesson
+ * Creates 2-3 exercises based on learning objectives and covered content.
+ *
+ * @param lessonSpec - Full lesson specification
+ * @param sectionTitles - Array of section titles covered
+ * @param language - ISO language code ('en', 'ru')
+ * @param model - ChatOpenAI model instance
+ * @returns Generated exercises content and token usage
+ */
+export async function generateExercises(
+  lessonSpec: LessonSpecificationV2,
+  sectionTitles: string[],
+  language: string,
+  model: ChatOpenAI
+): Promise<{ content: string; tokensUsed: number }> {
+  const objectivesList = lessonSpec.learning_objectives
+    .map((lo, i) => `${i + 1}. ${lo.objective}`)
+    .join('\n');
+
+  const sectionsList = sectionTitles
+    .map((t, i) => `${i + 1}. ${t}`)
+    .join('\n');
+
+  const prompt = `<context>
+<lesson>
+<title>${lessonSpec.title}</title>
+<target_audience>${lessonSpec.metadata.target_audience}</target_audience>
+<tone>${lessonSpec.metadata.tone}</tone>
+<difficulty>${lessonSpec.difficulty_level}</difficulty>
+</lesson>
+
+<learning_objectives>
+${objectivesList}
+</learning_objectives>
+
+<sections_covered>
+${sectionsList}
+</sections_covered>
+</context>
+
+<instructions>
+Create 2-3 practical exercises that help reinforce the key concepts from this lesson.
+
+Exercise Types to Use (pick the most appropriate for this content):
+1. **Reflection/Analysis** - Ask the learner to analyze a scenario or case study
+2. **Application** - Present a situation and ask learner to apply learned concepts
+3. **Classification** - Give examples and ask learner to categorize/classify them
+4. **Short Answer** - Ask conceptual questions that test understanding
+
+Format each exercise as:
+### Exercise [number]: [Exercise title]
+
+**Task:** [Clear description of what the learner should do - 2-4 sentences]
+
+**Scenario/Context:** [If applicable, provide a specific scenario - 2-3 sentences]
+
+**Your Answer:** [Leave blank for learner response]
+
+<details>
+<summary>Hint</summary>
+[Provide a helpful hint - 1-2 sentences]
+</details>
+
+<details>
+<summary>Sample Answer</summary>
+[Provide a model answer - 2-4 sentences]
+</details>
+
+---
+
+Requirements:
+- Each exercise should target at least one learning objective
+- Use practical, real-world scenarios relevant to ${lessonSpec.metadata.target_audience}
+- Difficulty: ${lessonSpec.difficulty_level}
+- Exercises should be completable in 5-10 minutes each
+
+<output_language>
+MANDATORY: Write ALL content in ${getLanguageName(language)}.
+Every word, header, example, scenario, hint, and answer must be in ${getLanguageName(language)}.
+DO NOT mix languages.
+</output_language>
+
+Write the exercises in markdown format. Do NOT include a section header - just the exercises.
+</instructions>`;
+
+  const response = await model.invoke(prompt);
+  const content =
+    typeof response.content === 'string'
+      ? response.content
+      : JSON.stringify(response.content);
+
+  const tokenResult = extractTokenUsageWithFallback(response, prompt, language);
+  if (tokenResult.isEstimated) {
+    logger.debug(
+      { phase: 'exercises', estimatedTokens: tokenResult.tokens },
       'Token usage estimated from content length (model did not report usage)'
     );
   }

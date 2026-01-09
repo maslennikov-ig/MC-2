@@ -145,19 +145,94 @@ const FACTUAL_CLAIM_PATTERNS: RegExp[] = [
 // ============================================================================
 
 /**
+ * Preprocess Markdown content to extract clean text for claim extraction
+ *
+ * Removes:
+ * - Headers (## Title)
+ * - Code blocks (``` ... ```)
+ * - Inline code (`code`)
+ * - Mermaid diagrams
+ * - Callout syntax ([!NOTE], [!TIP], etc.)
+ * - Image/link syntax
+ * - List markers
+ * - Horizontal rules
+ *
+ * @param markdown - Raw markdown content
+ * @returns Clean text suitable for sentence extraction
+ */
+function preprocessMarkdownForClaims(markdown: string): string {
+  let text = markdown;
+
+  // Remove code blocks (including mermaid, language-specific)
+  text = text.replace(/```[\s\S]*?```/g, ' ');
+
+  // Remove inline code
+  text = text.replace(/`[^`]+`/g, ' ');
+
+  // Remove images
+  text = text.replace(/!\[.*?\]\(.*?\)/g, ' ');
+
+  // Remove links but keep text
+  text = text.replace(/\[([^\]]+)\]\([^)]+\)/g, '$1');
+
+  // Remove headers (keep the text after #)
+  text = text.replace(/^#{1,6}\s*/gm, '');
+
+  // Remove callout syntax but keep content
+  text = text.replace(/>\s*\[!(NOTE|TIP|WARNING|DANGER|INFO|IMPORTANT|CAUTION)\]\s*/gi, '');
+
+  // Remove blockquote markers
+  text = text.replace(/^>\s*/gm, '');
+
+  // Remove horizontal rules
+  text = text.replace(/^[-*_]{3,}\s*$/gm, '');
+
+  // Remove list markers
+  text = text.replace(/^\s*[-*+]\s+/gm, '');
+  text = text.replace(/^\s*\d+\.\s+/gm, '');
+
+  // Remove bold/italic markers
+  text = text.replace(/\*\*([^*]+)\*\*/g, '$1');
+  text = text.replace(/\*([^*]+)\*/g, '$1');
+  text = text.replace(/__([^_]+)__/g, '$1');
+  text = text.replace(/_([^_]+)_/g, '$1');
+
+  // Remove table syntax (keep cell content)
+  text = text.replace(/\|/g, ' ');
+  text = text.replace(/^[-:|\s]+$/gm, '');
+
+  // Collapse multiple whitespace
+  text = text.replace(/\s+/g, ' ');
+
+  // Collapse multiple newlines
+  text = text.replace(/\n{2,}/g, '\n');
+
+  return text.trim();
+}
+
+/**
  * Split content into sentences
  *
- * @param content - Text content to split
+ * @param content - Text content to split (can be Markdown)
  * @returns Array of sentences with their indices
  */
 function splitIntoSentences(content: string): { text: string; index: number }[] {
-  const sentencePattern = /[^.!?]+[.!?]+|[^.!?]+$/g;
-  const matches = content.match(sentencePattern) || [];
+  // Preprocess Markdown to get clean text
+  const cleanContent = preprocessMarkdownForClaims(content);
 
-  return matches.map((text, index) => ({
-    text: text.trim(),
-    index,
-  }));
+  // Enhanced sentence pattern that handles:
+  // - Standard sentence endings (.!?)
+  // - Abbreviations (e.g., Dr., Mr., etc.) - avoid splitting on them
+  // - Sentences without ending punctuation (end of content)
+  const sentencePattern = /[^.!?]+[.!?]+(?:\s+|$)|[^.!?\n]+(?:\n|$)/g;
+  const matches = cleanContent.match(sentencePattern) || [];
+
+  return matches
+    .map((text, index) => ({
+      text: text.trim(),
+      index,
+    }))
+    .filter(({ text }) => text.length > 0);
 }
 
 /**

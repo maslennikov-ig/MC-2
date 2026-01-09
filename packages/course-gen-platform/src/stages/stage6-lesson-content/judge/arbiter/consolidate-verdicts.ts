@@ -41,6 +41,29 @@ import { logger } from '../../../../shared/logger';
 // ============================================================================
 
 /**
+ * Check if an issue targets a global section (not a specific section)
+ *
+ * Matches all variations:
+ * - sec_global, SEC_GLOBAL, Sec_Global
+ * - global, GLOBAL, Global
+ * - sec_global_issues, global_issues
+ * - Any location containing 'global' as substring
+ *
+ * @param issue - Judge issue to check
+ * @returns True if this is a global issue
+ */
+function isGlobalIssue(issue: JudgeIssue): boolean {
+  const loc = issue.location.toLowerCase().trim();
+  return (
+    loc === 'sec_global' ||
+    loc === 'global' ||
+    loc.startsWith('global_') ||
+    loc.startsWith('sec_global_') ||
+    loc.includes('global') // Catch-all for any variation
+  );
+}
+
+/**
  * Result of processing global issues
  */
 interface GlobalIssueResult {
@@ -64,10 +87,7 @@ interface GlobalIssueResult {
  * @returns Categorized global issues
  */
 function processGlobalIssues(issues: JudgeIssue[]): GlobalIssueResult {
-  const globalIssues = issues.filter(i =>
-    i.location.toLowerCase().includes('global') ||
-    i.location.toLowerCase() === 'sec_global'
-  );
+  const globalIssues = issues.filter(isGlobalIssue);
 
   const toTrack = globalIssues; // Track ALL global issues for observability
   const toRedirect = globalIssues.filter(i =>
@@ -143,11 +163,8 @@ export async function consolidateVerdicts(input: ArbiterInput): Promise<ArbiterO
   // Process sec_global issues with smart routing
   const globalResult = processGlobalIssues(accepted);
 
-  // Filter out global issues and add redirected ones
-  const nonGlobalAccepted = accepted.filter(i =>
-    !i.location.toLowerCase().includes('global') &&
-    i.location.toLowerCase() !== 'sec_global'
-  );
+  // Filter out global issues and add redirected ones (using isGlobalIssue for consistency)
+  const nonGlobalAccepted = accepted.filter(i => !isGlobalIssue(i));
   const redirectedIssues = redirectGlobalToSections(globalResult.toRedirect);
   const processedAccepted = [...nonGlobalAccepted, ...redirectedIssues];
 
@@ -175,9 +192,10 @@ export async function consolidateVerdicts(input: ArbiterInput): Promise<ArbiterO
   const sectionsToPreserve = allSectionIds.filter((id) => !sectionsToModify.includes(id));
 
   // Build RefinementPlan
+  // IMPORTANT: Use processedAccepted (with global issues filtered out) not the original accepted
   const plan: RefinementPlan = {
     status: 'PENDING',
-    issues: accepted,
+    issues: processedAccepted, // Fixed: was 'accepted' which included sec_global issues
     sectionsToPreserve,
     sectionsToModify,
     preserveTerminology: [],

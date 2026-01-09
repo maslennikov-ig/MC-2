@@ -802,13 +802,29 @@ async function judgeNode(state: LessonGraphStateType): Promise<LessonGraphStateU
           const sectionPart = colonIndex > 0 ? issue.slice(colonIndex + 1).trim() : 'content';
           // Take first section name if multiple
           const sectionName = sectionPart.split(',')[0].trim().toLowerCase();
+
+          // Map section names to valid section IDs to avoid sec_global fallback
+          // exercises → sec_conclusion (exercises are typically at the end)
+          // introduction/intro → sec_introduction
+          // conclusion/summary → sec_conclusion
+          let location: string;
+          if (sectionName === 'exercises' || sectionName === 'examples') {
+            location = 'sec_conclusion'; // Exercises go at the end of the lesson
+          } else if (sectionName === 'introduction' || sectionName === 'intro') {
+            location = 'sec_introduction';
+          } else if (sectionName === 'conclusion' || sectionName === 'summary') {
+            location = 'sec_conclusion';
+          } else {
+            location = `sec_${sectionName}` || 'sec_1'; // Fallback to first section
+          }
+
           return {
             description: issue,
             // Use 'completeness' criterion - this triggers REGENERATE_SECTION in arbiter
             // (pedagogical_structure with major severity would trigger SURGICAL_EDIT)
             criterion: 'completeness' as const,
             severity: 'major' as const,
-            location: sectionName || 'content',
+            location,
             suggestedFix: `Add the missing ${sectionName} section with appropriate content based on the lesson specification`,
           };
         });

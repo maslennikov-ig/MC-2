@@ -163,7 +163,8 @@ export async function generateSection(
     contentArchetype: section.content_archetype,
     depth,
     depthGuidance,
-    keyPoints: formatKeyPointsList(section.key_points_to_cover || []),
+    // Provide fallback if key_points_to_cover is empty (required by prompt template)
+    keyPoints: formatKeyPointsList(section.key_points_to_cover || []) || `1. ${section.title}`,
     requiredKeywords,
     prohibitedTerms,
     outputLanguage: getLanguageName(language),

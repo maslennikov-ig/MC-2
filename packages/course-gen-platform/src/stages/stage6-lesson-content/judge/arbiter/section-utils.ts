@@ -155,6 +155,10 @@ export function extractSectionIdFromLocation(
   if (normalized.includes('conclusion') || normalized.includes('summary')) {
     return 'sec_conclusion';
   }
+  // Exercises/examples are typically at the end of the lesson → map to conclusion
+  if (normalized === 'exercises' || normalized === 'examples') {
+    return 'sec_conclusion';
+  }
 
   // Handle global/lesson-wide locations - map to special "global" section
   // Includes common judge response patterns that refer to multiple/all sections
