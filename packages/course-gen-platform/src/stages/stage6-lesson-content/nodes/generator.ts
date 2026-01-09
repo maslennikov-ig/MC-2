@@ -25,6 +25,7 @@ import { logTrace } from '@/shared/trace-logger';
 import { createOpenRouterModel } from '@/shared/llm/langchain-models';
 import { createModelConfigService } from '@/shared/llm/model-config-service';
 import { getRecommendedTemperatureV2 } from '@megacampus/shared-types/lesson-specification-v2';
+import { getContentLabels } from '@megacampus/shared-types';
 import type { LessonGraphStateType, LessonGraphStateUpdate } from '../state';
 import { runMermaidFixPipeline } from '../utils/mermaid-fix-pipeline';
 
@@ -35,22 +36,6 @@ import { generateSection } from './generator/generator-section';
 
 // Re-export for backward compatibility
 export { calculateDynamicContextWindow, generateSection };
-
-/**
- * Localized section headers based on language
- */
-const sectionHeaders = {
-  ru: {
-    introduction: 'Введение',
-    summary: 'Заключение',
-    exercises: 'Упражнения',
-  },
-  en: {
-    introduction: 'Introduction',
-    summary: 'Summary',
-    exercises: 'Exercises',
-  },
-};
 
 /**
  * Generator Node - Serial section-by-section content generation
@@ -73,8 +58,8 @@ export async function generatorNode(
   const startTime = performance.now();
   const { lessonSpec, ragChunks, courseId, lessonUuid, language } = state;
 
-  // Get localized section headers
-  const headers = sectionHeaders[language as keyof typeof sectionHeaders] || sectionHeaders.en;
+  // Get localized section headers (supports all 19 languages via shared-types)
+  const headers = getContentLabels(language);
 
   logger.info(
     {

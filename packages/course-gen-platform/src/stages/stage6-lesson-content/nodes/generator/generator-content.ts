@@ -7,7 +7,7 @@
 
 import { ChatOpenAI } from '@langchain/openai';
 import { logger } from '@/shared/logger';
-import { getLanguageName } from '@megacampus/shared-types';
+import { getLanguageName, getContentLabels } from '@megacampus/shared-types';
 import type { LessonSpecificationV2 } from '@megacampus/shared-types/lesson-specification-v2';
 import { extractTokenUsageWithFallback } from './generator-helpers';
 
@@ -197,34 +197,12 @@ Write in markdown format. Do NOT include a header - just the summary paragraphs.
 // ============================================================================
 
 /**
- * Localized labels for exercises based on language
- */
-const exerciseLabels = {
-  ru: {
-    exercise: 'Упражнение',
-    task: 'Задание',
-    scenario: 'Сценарий/Контекст',
-    yourAnswer: 'Ваш ответ',
-    hint: 'Подсказка',
-    sampleAnswer: 'Образец ответа',
-  },
-  en: {
-    exercise: 'Exercise',
-    task: 'Task',
-    scenario: 'Scenario/Context',
-    yourAnswer: 'Your Answer',
-    hint: 'Hint',
-    sampleAnswer: 'Sample Answer',
-  },
-};
-
-/**
  * Generate practical exercises for the lesson
  * Creates 2-3 exercises based on learning objectives and covered content.
  *
  * @param lessonSpec - Full lesson specification
  * @param sectionTitles - Array of section titles covered
- * @param language - ISO language code ('en', 'ru')
+ * @param language - ISO language code (supports all 19 languages)
  * @param model - ChatOpenAI model instance
  * @returns Generated exercises content and token usage
  */
@@ -242,8 +220,8 @@ export async function generateExercises(
     .map((t, i) => `${i + 1}. ${t}`)
     .join('\n');
 
-  // Get localized labels
-  const labels = exerciseLabels[language as keyof typeof exerciseLabels] || exerciseLabels.en;
+  // Get localized labels (supports all 19 languages via shared-types)
+  const labels = getContentLabels(language);
 
   const prompt = `<context>
 <lesson>
