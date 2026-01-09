@@ -164,30 +164,40 @@ export async function removeJobsByCourseId(
     const allJobs = await queue.getJobs(jobStates);
 
     // Filter jobs by courseId and remove them
+    // Also clean up orphaned jobs with no data (they can't be processed anyway)
     for (const job of allJobs) {
-      // Skip undefined/null jobs (can happen with stale queue data)
-      if (!job || !job.data) continue;
+      // Skip completely undefined jobs
+      if (!job) continue;
 
-      if (job.data.courseId === courseId) {
+      // Check if job has no data (orphaned/corrupted) or belongs to our course
+      const isOrphanedJob = !job.data || !job.data.courseId;
+      const belongsToCourse = job.data?.courseId === courseId;
+
+      if (isOrphanedJob || belongsToCourse) {
         try {
           // For active jobs, we can't remove them directly - they must complete or fail
           const state = await job.getState();
           if (state === 'active') {
             // Move to failed state to stop processing
-            await job.moveToFailed(new Error('Job cancelled due to course deletion'), 'deletion');
+            const reason = isOrphanedJob
+              ? 'Orphaned job with missing data'
+              : 'Job cancelled due to course deletion';
+            await job.moveToFailed(new Error(reason), 'cleanup');
             removed++;
             logger.debug({
               jobId: job.id,
               jobType: job.name,
-              courseId,
-            }, 'Active job moved to failed for deletion');
+              courseId: isOrphanedJob ? 'unknown' : courseId,
+              reason: isOrphanedJob ? 'orphaned' : 'course_deletion',
+            }, 'Active job moved to failed for cleanup');
           } else {
             await job.remove();
             removed++;
             logger.debug({
               jobId: job.id,
               jobType: job.name,
-              courseId,
+              courseId: isOrphanedJob ? 'unknown' : courseId,
+              reason: isOrphanedJob ? 'orphaned' : 'course_deletion',
             }, 'Job removed from queue');
           }
         } catch (error) {
