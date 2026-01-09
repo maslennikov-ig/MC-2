@@ -20,6 +20,7 @@ import { getSupabaseAdmin } from '../supabase/admin';
 import { cleanupRedisForCourse, type RedisCleanupResult } from './redis-cleanup';
 import { deleteUploadedFiles, type FilesCleanupResult } from './files-cleanup';
 import { cleanupDoclingCacheForCourse } from './docling-cleanup';
+import { removeJobsByCourseId } from '../../orchestrator/queue';
 
 /**
  * UUID validation regex pattern
@@ -66,6 +67,11 @@ export interface CourseCleanupResult {
     success: boolean;
     filesDeleted: number;
     bytesFreed: number;
+  };
+  /** BullMQ jobs cleanup result */
+  bullmq: {
+    success: boolean;
+    jobsRemoved: number;
   };
   /** Total duration in milliseconds */
   durationMs: number;
@@ -136,6 +142,7 @@ export async function cleanupCourseResources(
       ragContext: { success: false, entriesDeleted: 0 },
       files: { success: false, filesDeleted: 0, bytesFreed: 0, error: 'Invalid UUID' },
       doclingCache: { success: false, filesDeleted: 0, bytesFreed: 0 },
+      bullmq: { success: false, jobsRemoved: 0 },
       durationMs: Date.now() - startTime,
       errors: ['Invalid UUID format'],
     };
@@ -254,6 +261,31 @@ export async function cleanupCourseResources(
     doclingCacheResult.success = false;
   }
 
+  // 6. Clean BullMQ jobs (waiting, active, delayed, paused)
+  let bullmqResult = { success: true, jobsRemoved: 0 };
+  try {
+    const result = await removeJobsByCourseId(courseId);
+    bullmqResult = {
+      success: result.errors === 0,
+      jobsRemoved: result.removed,
+    };
+    if (result.errors > 0) {
+      errors.push(`BullMQ cleanup: ${result.errors} jobs failed to remove`);
+    }
+    if (result.removed > 0) {
+      logger.info({
+        courseId,
+        jobsRemoved: result.removed,
+        jobErrors: result.errors,
+      }, '[Course Cleanup] BullMQ jobs cleaned up');
+    }
+  } catch (error) {
+    const errorMsg = `BullMQ cleanup failed: ${error instanceof Error ? error.message : String(error)}`;
+    errors.push(errorMsg);
+    logger.error({ courseId, error: errorMsg }, '[Course Cleanup] BullMQ cleanup error');
+    bullmqResult.success = false;
+  }
+
   const durationMs = Date.now() - startTime;
   // Note: Docling cache cleanup is best-effort and does not affect overall success
   // It's a performance optimization, not a data integrity requirement
@@ -271,6 +303,7 @@ export async function cleanupCourseResources(
     ragContext: ragResult,
     files: filesResult,
     doclingCache: doclingCacheResult,
+    bullmq: bullmqResult,
     durationMs,
     errors,
   };
@@ -286,6 +319,7 @@ export async function cleanupCourseResources(
     bytesFreed: filesResult.bytesFreed,
     doclingCacheDeleted: doclingCacheResult.filesDeleted,
     doclingCacheBytesFreed: doclingCacheResult.bytesFreed,
+    bullmqJobsRemoved: bullmqResult.jobsRemoved,
     durationMs,
     errorCount: errors.length,
   }, '[Course Cleanup] Cleanup complete');

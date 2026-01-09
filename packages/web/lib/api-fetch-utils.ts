@@ -65,24 +65,37 @@ export async function fetchWithFallback(
   const controller = new AbortController()
   const timeoutId = setTimeout(() => controller.abort(), timeout)
 
+  // Skip internal Docker URL when running locally to avoid timeout delays
+  // Docker network URLs (like http://api:4000) are not accessible from localhost
+  const isLocalDev = ENV.COURSEGEN_BACKEND_URL.includes('localhost')
+
   try {
     let response: Response
     let usedUrl: 'internal' | 'public'
 
-    // Try internal URL first (Docker network)
-    try {
-      response = await fetch(internalUrl, {
-        ...fetchOptions,
-        signal: controller.signal,
-      })
-      usedUrl = 'internal'
-    } catch {
-      // Internal URL failed, try public URL
+    // In local dev, skip internal Docker URL to avoid wasting timeout on DNS failures
+    if (isLocalDev) {
       response = await fetch(publicUrl, {
         ...fetchOptions,
         signal: controller.signal,
       })
       usedUrl = 'public'
+    } else {
+      // Production/Docker: Try internal URL first (Docker network)
+      try {
+        response = await fetch(internalUrl, {
+          ...fetchOptions,
+          signal: controller.signal,
+        })
+        usedUrl = 'internal'
+      } catch {
+        // Internal URL failed, try public URL
+        response = await fetch(publicUrl, {
+          ...fetchOptions,
+          signal: controller.signal,
+        })
+        usedUrl = 'public'
+      }
     }
 
     return { response, usedUrl }
