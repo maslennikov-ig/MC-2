@@ -15,6 +15,7 @@
 import { logger } from '@/shared/logger';
 import type { LessonSpecificationV2, SectionSpecV2 } from '@megacampus/shared-types/lesson-specification-v2';
 import type { RAGChunk } from '@megacampus/shared-types/lesson-content';
+import { getContentLabels } from '@megacampus/shared-types';
 import { generateSection } from '../nodes/generator';
 import {
   parseMarkdownSections,
@@ -101,8 +102,9 @@ async function regenerateIntroduction(
   modelOverride?: string | null
 ): Promise<{ content: string; tokensUsed: number }> {
   // Create a synthetic section spec for introduction
+  const labels = getContentLabels(language);
   const introSection: SectionSpecV2 = {
-    title: language === 'ru' ? 'Введение' : 'Introduction',
+    title: labels.introduction,
     key_points_to_cover: lessonSpec.intro_blueprint.key_learning_objectives.split(', '),
     rag_context_id: 'introduction',
     content_archetype: 'concept_explainer',
@@ -135,8 +137,9 @@ async function regenerateSummary(
   modelOverride?: string | null
 ): Promise<{ content: string; tokensUsed: number }> {
   // Create a synthetic section spec for summary
+  const labels = getContentLabels(language);
   const summarySection: SectionSpecV2 = {
-    title: language === 'ru' ? 'Итог' : 'Summary',
+    title: labels.summary,
     key_points_to_cover: lessonSpec.learning_objectives.map((lo) => lo.objective),
     rag_context_id: 'summary',
     content_archetype: 'concept_explainer',
