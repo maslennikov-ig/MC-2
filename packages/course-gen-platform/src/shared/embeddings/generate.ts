@@ -104,6 +104,63 @@ export interface BatchEmbeddingResult {
 const EMBEDDING_CACHE_TTL = 3600;
 
 /**
+ * Jina API maximum tokens per batch (8194 tokens total)
+ * Apply 95% safety margin to avoid edge cases
+ */
+const JINA_MAX_TOKENS = 8194;
+const SAFETY_MARGIN = 0.95;
+const EFFECTIVE_TOKEN_LIMIT = Math.floor(JINA_MAX_TOKENS * SAFETY_MARGIN);
+
+/**
+ * Creates token-aware batches from chunks
+ *
+ * Dynamically groups chunks to maximize batch size while respecting Jina API's
+ * 8194 token limit. Uses actual token_count from each chunk's metadata.
+ *
+ * @param chunks - Array of enriched chunks with token_count metadata
+ * @returns Array of batches, each respecting token limit
+ */
+function createTokenAwareBatches(chunks: EnrichedChunk[]): EnrichedChunk[][] {
+  const batches: EnrichedChunk[][] = [];
+  let currentBatch: EnrichedChunk[] = [];
+  let currentTokens = 0;
+
+  for (const chunk of chunks) {
+    const chunkTokens = chunk.token_count;
+
+    // If adding this chunk would exceed limit AND we have chunks in current batch,
+    // finalize current batch and start new one
+    if (currentTokens + chunkTokens > EFFECTIVE_TOKEN_LIMIT && currentBatch.length > 0) {
+      batches.push(currentBatch);
+      logger.debug({
+        batchSize: currentBatch.length,
+        totalTokens: currentTokens,
+        tokenLimit: EFFECTIVE_TOKEN_LIMIT,
+      }, 'Token-aware batch created');
+
+      currentBatch = [chunk];
+      currentTokens = chunkTokens;
+    } else {
+      // Add chunk to current batch
+      currentBatch.push(chunk);
+      currentTokens += chunkTokens;
+    }
+  }
+
+  // Add final batch if not empty
+  if (currentBatch.length > 0) {
+    batches.push(currentBatch);
+    logger.debug({
+      batchSize: currentBatch.length,
+      totalTokens: currentTokens,
+      tokenLimit: EFFECTIVE_TOKEN_LIMIT,
+    }, 'Token-aware batch created (final)');
+  }
+
+  return batches;
+}
+
+/**
  * Generates a cache key for embedding
  *
  * @param text - Text content to embed
@@ -363,18 +420,20 @@ export async function generateEmbeddingsWithLateChunking(
     };
   }
 
-  // TEMPORARY FIX: Reduced batch size to avoid Jina API 8194 token limit
-  // When processing large documents with parent chunks (~1500 tokens each),
-  // a batch of 100 can easily exceed 8194 tokens total.
-  // TODO: Implement token-aware batching (see docs/Future/TOKEN-AWARE-BATCHING.md)
-  const BATCH_SIZE = 5;
+  // Create token-aware batches (respects Jina API 8194 token limit)
+  const batches = createTokenAwareBatches(chunks);
   const embeddings: EmbeddingResult[] = [];
   let totalTokens = 0;
   let batchCount = 0;
 
-  // Process chunks in batches
-  for (let i = 0; i < chunks.length; i += BATCH_SIZE) {
-    const batch = chunks.slice(i, i + BATCH_SIZE);
+  logger.info({
+    totalChunks: chunks.length,
+    totalBatches: batches.length,
+    tokenLimit: EFFECTIVE_TOKEN_LIMIT,
+  }, 'Starting token-aware batch processing');
+
+  // Process token-aware batches
+  for (const batch of batches) {
     const textsToEmbed: string[] = [];
     const chunkIndexMap: number[] = []; // Maps API response index to batch index
     const cachedResults: Map<number, number[]> = new Map(); // batch index -> cached embedding
