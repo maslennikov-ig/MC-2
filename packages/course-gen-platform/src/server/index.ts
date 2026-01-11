@@ -136,6 +136,9 @@ const NODE_ENV = process.env.NODE_ENV || 'development';
 const IS_PRODUCTION = NODE_ENV === 'production';
 const CORS_ORIGIN = process.env.CORS_ORIGIN?.split(',').map(o => o.trim()) || '*';
 
+// Module-level reference to shutdown timer for cleanup in global handlers
+let forceShutdownTimerRef: ReturnType<typeof setTimeout> | null = null;
+
 /**
  * Initialize Express application with middleware
  */
@@ -472,7 +475,7 @@ async function startServer() {
       logger.info({ signal }, 'Shutdown signal received');
 
       // Set force shutdown timeout (30 seconds)
-      const forceShutdownTimer = setTimeout(() => {
+      forceShutdownTimerRef = setTimeout(() => {
         logger.error('Graceful shutdown timeout (30s), forcing exit');
         process.exit(1);
       }, 30000);
@@ -499,7 +502,10 @@ async function startServer() {
       );
 
       // Clear the force shutdown timer
-      clearTimeout(forceShutdownTimer);
+      if (forceShutdownTimerRef) {
+        clearTimeout(forceShutdownTimerRef);
+        forceShutdownTimerRef = null;
+      }
 
       // Exit with appropriate code
       process.exit(result.failed > 0 ? 1 : 0);
@@ -538,6 +544,12 @@ process.on('unhandledRejection', (reason, promise) => {
 
 // Handle uncaught exceptions
 process.on('uncaughtException', error => {
+  // Clear shutdown timer if running to prevent memory leak
+  if (forceShutdownTimerRef) {
+    clearTimeout(forceShutdownTimerRef);
+    forceShutdownTimerRef = null;
+  }
+
   logger.error({
     err: error,
     stack: error.stack,

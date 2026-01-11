@@ -75,6 +75,8 @@ interface LessonInspectorProps {
   hideHeader?: boolean;
   /** Course UUID - required for AutoCardPreview */
   courseId?: string;
+  /** Locale for translations. Defaults to 'ru'. */
+  locale?: 'ru' | 'en';
 }
 
 /**
@@ -104,6 +106,7 @@ export function LessonInspector({
   tier = 'standard',
   hideHeader = false,
   courseId,
+  locale = 'ru',
 }: LessonInspectorProps) {
   // Modal state for viewing node output
   const [outputModal, setOutputModal] = useState<{
@@ -350,7 +353,7 @@ export function LessonInspector({
       isApproving={isApproving}
       isRegenerating={isRegenerating}
       isDeleting={isDeleting}
-      locale="ru"
+      locale={locale}
       className="h-full"
       courseId={courseId}
       lessonId={data.lessonUuid || undefined}

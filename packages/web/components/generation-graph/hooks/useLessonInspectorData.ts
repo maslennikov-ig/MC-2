@@ -18,6 +18,7 @@ import {
   ConsensusMethod,
   SourceDocument,
 } from '@megacampus/shared-types';
+import { isValidSourceDocument } from '../panels/lesson/SourceDocumentsPanel';
 import type { Database } from '@/types/database.generated';
 
 type GenerationTraceRow = Database['public']['Tables']['generation_trace']['Row'];
@@ -866,9 +867,10 @@ export function useLessonInspectorData({
       const lessonTitle = lessonData.title || `Урок ${lessonNumber}`;
 
       // Parse source_documents from lesson data
-      // Note: Json type needs explicit cast through unknown
+      // Use type guard to filter invalid/malformed documents (fixes Issue #4: type bypass)
+      // Cast to unknown[] first so the type guard can properly narrow the type
       const sourceDocuments: SourceDocument[] = Array.isArray(lessonData.source_documents)
-        ? (lessonData.source_documents as unknown as SourceDocument[])
+        ? (lessonData.source_documents as unknown[]).filter(isValidSourceDocument)
         : [];
 
       // Store UUID for realtime subscription

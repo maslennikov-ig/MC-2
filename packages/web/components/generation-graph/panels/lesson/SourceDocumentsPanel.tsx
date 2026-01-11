@@ -14,6 +14,34 @@ import { FileText, ChevronDown, Layers, BookOpen, FileQuestion } from 'lucide-re
 import type { SourceDocument } from '@megacampus/shared-types';
 
 // =============================================================================
+// TYPE GUARDS
+// =============================================================================
+
+/**
+ * Type guard to validate if an unknown value is a valid SourceDocument.
+ * Used to filter invalid/malformed documents from API responses.
+ *
+ * @param doc - Unknown value to validate
+ * @returns True if the value is a valid SourceDocument
+ */
+export function isValidSourceDocument(doc: unknown): doc is SourceDocument {
+  return (
+    typeof doc === 'object' &&
+    doc !== null &&
+    'document_id' in doc &&
+    typeof (doc as Record<string, unknown>).document_id === 'string' &&
+    'document_name' in doc &&
+    typeof (doc as Record<string, unknown>).document_name === 'string' &&
+    'document_priority' in doc &&
+    ['CORE', 'IMPORTANT', 'SUPPLEMENTARY'].includes(
+      (doc as Record<string, unknown>).document_priority as string
+    ) &&
+    'chunk_count' in doc &&
+    typeof (doc as Record<string, unknown>).chunk_count === 'number'
+  );
+}
+
+// =============================================================================
 // TYPES
 // =============================================================================
 
@@ -74,8 +102,11 @@ const SourceDocumentItem = memo(function SourceDocumentItem({
   document,
   locale,
 }: SourceDocumentItemProps) {
-  const priorityStyle = PRIORITY_STYLES[document.document_priority];
+  // Defensive: use fallback if priority is somehow invalid
+  const priorityStyle = PRIORITY_STYLES[document.document_priority] ?? PRIORITY_STYLES.SUPPLEMENTARY;
   const PriorityIcon = priorityStyle.icon;
+  // Defensive: ensure chunk_count is a valid number
+  const chunkCount = document.chunk_count ?? 0;
 
   return (
     <div className="group flex items-start gap-3 p-3 rounded-lg bg-slate-50 dark:bg-slate-900/50 border border-slate-200 dark:border-slate-800 hover:border-slate-300 dark:hover:border-slate-700 transition-colors">
@@ -100,9 +131,9 @@ const SourceDocumentItem = memo(function SourceDocumentItem({
             {priorityStyle.label[locale]}
           </Badge>
           <span className="text-xs text-slate-500 dark:text-slate-400">
-            {document.chunk_count} {locale === 'ru'
-              ? (document.chunk_count === 1 ? 'фрагмент' : document.chunk_count < 5 ? 'фрагмента' : 'фрагментов')
-              : (document.chunk_count === 1 ? 'chunk' : 'chunks')}
+            {chunkCount} {locale === 'ru'
+              ? (chunkCount === 1 ? 'фрагмент' : chunkCount < 5 ? 'фрагмента' : 'фрагментов')
+              : (chunkCount === 1 ? 'chunk' : 'chunks')}
           </span>
         </div>
       </div>
@@ -148,6 +179,13 @@ export const SourceDocumentsPanel = memo(function SourceDocumentsPanel({
     },
   };
 
+  // Filter out invalid documents before processing
+  // This protects against malformed data from the backend
+  const validDocuments = React.useMemo(
+    () => sourceDocuments.filter(isValidSourceDocument),
+    [sourceDocuments]
+  );
+
   // Sort documents: CORE first, then IMPORTANT, then SUPPLEMENTARY
   // Within each priority, sort by chunk_count descending
   const sortedDocuments = React.useMemo(() => {
@@ -157,21 +195,21 @@ export const SourceDocumentsPanel = memo(function SourceDocumentsPanel({
       SUPPLEMENTARY: 2,
     };
 
-    return [...sourceDocuments].sort((a, b) => {
+    return [...validDocuments].sort((a, b) => {
       const priorityDiff = priorityOrder[a.document_priority] - priorityOrder[b.document_priority];
       if (priorityDiff !== 0) return priorityDiff;
       return b.chunk_count - a.chunk_count; // Higher chunk count first
     });
-  }, [sourceDocuments]);
+  }, [validDocuments]);
 
-  // Calculate total chunks
+  // Calculate total chunks (use validated documents)
   const totalChunks = React.useMemo(
-    () => sourceDocuments.reduce((sum, doc) => sum + doc.chunk_count, 0),
-    [sourceDocuments]
+    () => validDocuments.reduce((sum, doc) => sum + (doc.chunk_count ?? 0), 0),
+    [validDocuments]
   );
 
-  // Empty state
-  if (sourceDocuments.length === 0) {
+  // Empty state - show if no valid documents (either none provided or all invalid)
+  if (validDocuments.length === 0) {
     return (
       <div className={cn('text-center py-8', className)}>
         <FileText className="h-12 w-12 mx-auto text-slate-300 dark:text-slate-600 mb-3" />
@@ -193,7 +231,7 @@ export const SourceDocumentsPanel = memo(function SourceDocumentsPanel({
                 <div>
                   <CardTitle className="text-base font-semibold">{labels.title}</CardTitle>
                   <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5">
-                    {labels.documentsCount(sourceDocuments.length)} &bull; {totalChunks} {locale === 'ru' ? 'фрагментов' : 'chunks'}
+                    {labels.documentsCount(validDocuments.length)} &bull; {totalChunks} {locale === 'ru' ? 'фрагментов' : 'chunks'}
                   </p>
                 </div>
               </div>

@@ -119,8 +119,28 @@ const EFFECTIVE_TOKEN_LIMIT = Math.floor(JINA_MAX_TOKENS * SAFETY_MARGIN);
  *
  * @param chunks - Array of enriched chunks with token_count metadata
  * @returns Array of batches, each respecting token limit
+ * @throws {Error} If any chunk exceeds the effective token limit (7784)
  */
 function createTokenAwareBatches(chunks: EnrichedChunk[]): EnrichedChunk[][] {
+  // Validate no single chunk exceeds limit
+  const oversizedChunks = chunks.filter(c => c.token_count > EFFECTIVE_TOKEN_LIMIT);
+  if (oversizedChunks.length > 0) {
+    logger.error({
+      oversizedCount: oversizedChunks.length,
+      limit: EFFECTIVE_TOKEN_LIMIT,
+      chunks: oversizedChunks.map(c => ({
+        id: c.chunk_id,
+        tokens: c.token_count
+      })),
+    }, 'Chunks exceed Jina token limit - cannot create valid batches');
+
+    throw new Error(
+      `${oversizedChunks.length} chunk(s) exceed Jina token limit (${EFFECTIVE_TOKEN_LIMIT}). ` +
+      `Largest: ${Math.max(...oversizedChunks.map(c => c.token_count))} tokens. ` +
+      'Consider splitting larger chunks during document ingestion.'
+    );
+  }
+
   const batches: EnrichedChunk[][] = [];
   let currentBatch: EnrichedChunk[] = [];
   let currentTokens = 0;

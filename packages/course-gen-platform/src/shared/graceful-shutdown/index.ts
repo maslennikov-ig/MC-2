@@ -100,62 +100,93 @@ export async function runCleanupHandlers(
   // Sort by priority (lower first)
   const sortedHandlers = [...cleanupHandlers].sort((a, b) => a.priority - b.priority);
 
-  let succeeded = 0;
-  let failed = 0;
-  let timedOut = false;
+  // Use object for mutable state that can be captured accurately at timeout
+  const stats = {
+    succeeded: 0,
+    failed: 0,
+    currentHandler: null as string | null,
+  };
+
+  // AbortController to signal handlers to stop processing on timeout
+  const abortController = new AbortController();
+  let timeoutId: ReturnType<typeof setTimeout> | null = null;
 
   // Create a timeout promise
   const timeoutPromise = new Promise<'timeout'>((resolve) => {
-    setTimeout(() => resolve('timeout'), timeoutMs);
+    timeoutId = setTimeout(() => {
+      abortController.abort();
+      resolve('timeout');
+    }, timeoutMs);
   });
 
-  // Run handlers with timeout
+  // Run handlers with abort signal check
   const cleanupPromise = (async () => {
     for (const { name, handler, priority } of sortedHandlers) {
+      // Check abort signal before starting each handler
+      if (abortController.signal.aborted) {
+        break;
+      }
+
+      stats.currentHandler = name;
       const startTime = Date.now();
 
       try {
         logger.debug({ name, priority }, 'Running cleanup handler');
         await handler();
-        const duration = Date.now() - startTime;
-        succeeded++;
-        logger.info({ name, duration }, 'Cleanup handler completed');
+
+        // Only count as succeeded if we weren't aborted during execution
+        if (!abortController.signal.aborted) {
+          const duration = Date.now() - startTime;
+          stats.succeeded++;
+          logger.info({ name, duration }, 'Cleanup handler completed');
+        }
       } catch (error) {
-        const duration = Date.now() - startTime;
-        failed++;
-        logger.error(
-          {
-            name,
-            duration,
-            error: error instanceof Error ? error.message : String(error),
-            stack: error instanceof Error ? error.stack : undefined,
-          },
-          'Cleanup handler failed'
-        );
+        // Only count as failed if we weren't aborted during execution
+        if (!abortController.signal.aborted) {
+          const duration = Date.now() - startTime;
+          stats.failed++;
+          logger.error(
+            {
+              name,
+              duration,
+              error: error instanceof Error ? error.message : String(error),
+              stack: error instanceof Error ? error.stack : undefined,
+            },
+            'Cleanup handler failed'
+          );
+        }
       }
     }
+    stats.currentHandler = null;
     return 'done' as const;
   })();
 
   // Race between cleanup and timeout
   const result = await Promise.race([cleanupPromise, timeoutPromise]);
 
+  // Clear timeout if cleanup finished first
+  if (timeoutId !== null) {
+    clearTimeout(timeoutId);
+  }
+
   if (result === 'timeout') {
-    timedOut = true;
+    // Stats are now accurate since we stopped iteration via abort signal
+    const remaining = total - stats.succeeded - stats.failed;
     logger.error(
       {
         timeoutMs,
-        succeeded,
-        failed,
-        remaining: total - succeeded - failed,
+        succeeded: stats.succeeded,
+        failed: stats.failed,
+        remaining,
+        currentHandler: stats.currentHandler,
       },
       'Cleanup handlers timed out'
     );
-  } else {
-    logger.info({ total, succeeded, failed }, 'All cleanup handlers completed');
+    return { total, succeeded: stats.succeeded, failed: stats.failed, timedOut: true };
   }
 
-  return { total, succeeded, failed, timedOut };
+  logger.info({ total, succeeded: stats.succeeded, failed: stats.failed }, 'All cleanup handlers completed');
+  return { total, succeeded: stats.succeeded, failed: stats.failed, timedOut: false };
 }
 
 /**
