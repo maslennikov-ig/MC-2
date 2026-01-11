@@ -148,6 +148,12 @@ export interface LessonRAGParams {
   targetChunks?: number;
   /** Whether to use/populate cache (default: true) */
   useCache?: boolean;
+  /**
+   * Enable priority-based score boosting for CORE/IMPORTANT documents
+   * @default true
+   * @see docs/tasks/REFACTOR-RAG-PRIORITY-BASED-RETRIEVAL.md
+   */
+  enablePriorityBoost?: boolean;
 }
 
 // ============================================================================
@@ -187,6 +193,7 @@ export async function retrieveLessonContext(
     lessonSpec,
     targetChunks = LESSON_RAG_CONFIG.TARGET_CHUNKS,
     useCache = true,
+    enablePriorityBoost = true, // Default: boost CORE/IMPORTANT documents
   } = params;
 
   logger.debug({
@@ -194,6 +201,7 @@ export async function retrieveLessonContext(
     lessonId: lessonSpec.lesson_id,
     targetChunks,
     useCache,
+    enablePriorityBoost,
   }, '[Lesson RAG] Starting retrieval');
 
   // Check cache first if enabled
@@ -273,6 +281,9 @@ export async function retrieveLessonContext(
         limit: Math.ceil(candidateCount / queries.length) + 2, // Extra for deduplication
         score_threshold: LESSON_RAG_CONFIG.SCORE_THRESHOLD,
         enable_hybrid: LESSON_RAG_CONFIG.ENABLE_HYBRID,
+        // Priority boosting: CORE +20%, IMPORTANT +12% score boost
+        // @see docs/tasks/REFACTOR-RAG-PRIORITY-BASED-RETRIEVAL.md
+        enable_priority_boost: enablePriorityBoost,
         filters: {
           course_id: courseId,
           // Filter by primary documents if specified (empty array = search all)

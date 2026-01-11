@@ -350,3 +350,70 @@ export async function saveRejectedContent(
     );
   }
 }
+
+/**
+ * Save source documents attribution to lessons table
+ *
+ * Records which documents contributed to lesson content generation.
+ * Called during Stage 6 after RAG retrieval.
+ *
+ * @param courseId - Course UUID
+ * @param lessonUuid - Lesson UUID
+ * @param sourceDocuments - Source documents from extractSourceDocuments()
+ * @see docs/tasks/REFACTOR-RAG-PRIORITY-BASED-RETRIEVAL.md
+ */
+export async function saveSourceDocuments(
+  courseId: string,
+  lessonUuid: LessonUUID,
+  sourceDocuments: Array<{
+    document_id: string;
+    document_name: string;
+    document_priority: 'CORE' | 'IMPORTANT' | 'SUPPLEMENTARY';
+    chunk_count: number;
+  }>
+): Promise<void> {
+  if (!lessonUuid) {
+    logger.warn({ courseId }, 'Cannot save source_documents - lessonUuid not provided');
+    return;
+  }
+
+  if (sourceDocuments.length === 0) {
+    logger.debug({ courseId, lessonUuid }, 'No source_documents to save');
+    return;
+  }
+
+  const supabaseAdmin = getSupabaseAdmin();
+
+  try {
+    const { error } = await supabaseAdmin
+      .from('lessons')
+      .update({
+        source_documents: sourceDocuments,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', lessonUuid);
+
+    if (error) {
+      logger.warn({
+        courseId,
+        lessonUuid,
+        error: error.message,
+        documentCount: sourceDocuments.length,
+      }, 'Failed to save source_documents to lessons table');
+    } else {
+      logger.debug({
+        courseId,
+        lessonUuid,
+        documentCount: sourceDocuments.length,
+        coreCount: sourceDocuments.filter(d => d.document_priority === 'CORE').length,
+        importantCount: sourceDocuments.filter(d => d.document_priority === 'IMPORTANT').length,
+      }, 'Source documents saved to lesson');
+    }
+  } catch (error) {
+    logger.warn({
+      courseId,
+      lessonUuid,
+      error: error instanceof Error ? error.message : String(error),
+    }, 'Exception while saving source_documents');
+  }
+}

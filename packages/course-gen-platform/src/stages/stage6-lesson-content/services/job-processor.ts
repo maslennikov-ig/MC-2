@@ -7,14 +7,14 @@ import {
   type Stage6Input,
   type Stage6Output,
 } from '../orchestrator';
-import { retrieveLessonContext, type LessonRAGResult } from '../utils/lesson-rag-retriever';
+import { retrieveLessonContext, extractSourceDocuments, type LessonRAGResult, type SourceDocument } from '../utils/lesson-rag-retriever';
 import { quickSanityCheck, type SanityCheckResult } from '../utils/sanity-check';
 import { createLessonLabel, LessonLabel } from '@megacampus/shared-types';
 
 import { Stage6JobInput, Stage6JobResult, ProgressUpdate, ModelConfig } from '../types';
 import { MODEL_FALLBACK } from '../config';
 import { getStage6ModelConfig } from './model-service';
-import { handlePartialSuccess, markForReview, saveLessonContent } from './database-service';
+import { handlePartialSuccess, markForReview, saveLessonContent, saveSourceDocuments } from './database-service';
 import { extractContentMarkdown } from './content-utils';
 import { triggerLessonCard } from '../../stage7-enrichments/services/auto-card-trigger';
 
@@ -226,14 +226,20 @@ export async function processStage6Job(
 
   let ragChunks: any[] = [];
   let ragContextId: string | null = null;
+  let sourceDocuments: SourceDocument[] = [];
 
   try {
     const ragResult: LessonRAGResult = await retrieveLessonContext({
       courseId,
       lessonSpec,
+      // Priority boost is enabled by default in retrieveLessonContext
     });
     ragChunks = ragResult.chunks;
     ragContextId = ragResult.lessonId;
+
+    // Extract source document attribution for traceability
+    // @see docs/tasks/REFACTOR-RAG-PRIORITY-BASED-RETRIEVAL.md
+    sourceDocuments = extractSourceDocuments(ragChunks);
 
     logger.info({
       lessonId: lessonSpec.lesson_id,
@@ -242,6 +248,8 @@ export async function processStage6Job(
       cached: ragResult.cached,
       coverageScore: ragResult.coverageScore,
       retrievalDurationMs: ragResult.retrievalDurationMs,
+      sourceDocumentsCount: sourceDocuments.length,
+      coreDocsUsed: sourceDocuments.filter(d => d.document_priority === 'CORE').length,
     }, 'RAG context retrieved for lesson');
   } catch (error) {
     logger.warn({
@@ -373,6 +381,12 @@ export async function processStage6Job(
 
     if (result.success && result.lessonContent) {
       await saveLessonContent(courseId, lessonSpec.lesson_id, result, sanityResult);
+
+      // Save source documents attribution for traceability
+      // @see docs/tasks/REFACTOR-RAG-PRIORITY-BASED-RETRIEVAL.md
+      if (lessonUuid && sourceDocuments.length > 0) {
+        await saveSourceDocuments(courseId, lessonUuid, sourceDocuments);
+      }
 
       // Auto-trigger lesson card generation (non-blocking)
       if (lessonUuid) {
