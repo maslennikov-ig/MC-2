@@ -41,7 +41,7 @@
 
 import { StateGraph, START, END } from '@langchain/langgraph';
 import { LessonGraphState, type LessonGraphStateType, type LessonGraphStateUpdate, type LessonGraphNode } from './state';
-import { generatorNode } from './nodes/generator';
+import { generatorNode } from './nodes/generator.js';
 import { selfReviewerNode } from './nodes/self-reviewer-node';
 import type { LessonSpecificationV2 } from '@megacampus/shared-types/lesson-specification-v2';
 import type { LessonContent, LessonContentBody, RAGChunk } from '@megacampus/shared-types/lesson-content';
