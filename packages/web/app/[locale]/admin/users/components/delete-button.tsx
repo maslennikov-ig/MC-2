@@ -41,14 +41,16 @@ export function DeleteButton({
   const [open, setOpen] = useState(false);
 
   const isSuperadmin = currentUserRole === 'superadmin';
+  const isAdmin = currentUserRole === 'admin' || isSuperadmin;
 
-  // Only superadmins can delete users
+  // Admins can delete students and instructors
+  // Superadmins can delete anyone (except themselves and last superadmin)
   // Cannot delete yourself
-  // Non-superadmins cannot delete superadmin users
-  const canDelete = isSuperadmin && !isCurrentUser;
-  const cannotDeleteSuperadmin = userRole === 'superadmin' && !isSuperadmin;
+  const canAdminDelete = isAdmin && !isCurrentUser && (userRole === 'student' || userRole === 'instructor');
+  const canSuperadminDelete = isSuperadmin && !isCurrentUser;
+  const canDelete = canSuperadminDelete || canAdminDelete;
 
-  if (!canDelete || cannotDeleteSuperadmin) {
+  if (!canDelete) {
     return null;
   }
 

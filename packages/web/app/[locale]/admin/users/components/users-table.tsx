@@ -120,7 +120,6 @@ export function UsersTable() {
   };
 
   const isRoleLoaded = currentUserRole !== 'loading';
-  const isSuperadmin = currentUserRole === 'superadmin';
 
   return (
     <div className="space-y-4">
@@ -244,7 +243,7 @@ export function UsersTable() {
                             disabled={currentUserId === 'loading' || isCurrentUser}
                             onToggled={handleActivationToggle}
                           />
-                          {isRoleLoaded && isSuperadmin && (
+                          {isRoleLoaded && (
                             <DeleteButton
                               userId={user.id}
                               userEmail={user.email}

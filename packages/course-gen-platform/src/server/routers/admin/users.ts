@@ -574,9 +574,10 @@ export const usersRouter = router({
    * Validations:
    * - Cannot delete own account
    * - Cannot delete the last superadmin
+   * - Admins cannot delete superadmins or other admins
    * - Deletes from both users table and auth.users
    */
-  deleteUser: superadminProcedure.input(deleteUserInputSchema).mutation(async ({ ctx, input }) => {
+  deleteUser: adminProcedure.input(deleteUserInputSchema).mutation(async ({ ctx, input }) => {
     const { userId } = input;
     const currentUser = ctx.user!;
 
@@ -610,6 +611,16 @@ export const usersRouter = router({
           code: 'INTERNAL_SERVER_ERROR',
           message: ErrorMessages.databaseError('User lookup', fetchError.message),
         });
+      }
+
+      // Validation: Admins cannot delete superadmins or other admins
+      if (currentUser.role !== 'superadmin') {
+        if (targetUser.role === 'superadmin' || targetUser.role === 'admin') {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'Admins can only delete students and instructors.',
+          });
+        }
       }
 
       // Validation: Cannot delete the last superadmin
