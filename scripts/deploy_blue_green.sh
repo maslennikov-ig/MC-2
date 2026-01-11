@@ -52,12 +52,18 @@ cp "$BASE_PATH/.env.$ENV" "$BASE_PATH/.env.$NEW_COLOR"
     echo "COMPOSE_PROJECT_NAME=megacampus-$NEW_COLOR"
 } >> "$BASE_PATH/.env.$NEW_COLOR"
 
-# 4. Deploy Application to New Color
+# 4. Docker Login to GHCR (if GITHUB_TOKEN provided)
+if [ -n "$GITHUB_TOKEN" ]; then
+    echo "Logging in to GHCR..."
+    echo "$GITHUB_TOKEN" | docker login ghcr.io -u "${GITHUB_ACTOR:-maslennikov-ig}" --password-stdin
+fi
+
+# 5. Deploy Application to New Color
 echo "Pulling and starting $NEW_COLOR containers..."
 docker compose -f "$BASE_PATH/docker-compose.app.yml" --env-file "$BASE_PATH/.env.$NEW_COLOR" pull
 docker compose -f "$BASE_PATH/docker-compose.app.yml" --env-file "$BASE_PATH/.env.$NEW_COLOR" up -d --remove-orphans
 
-# 5. Health Check (check both web and api)
+# 6. Health Check (check both web and api)
 echo "Performing Health Checks..."
 
 # Check API health
@@ -99,7 +105,7 @@ fi
 
 echo ""
 
-# 6. Switch Traffic
+# 7. Switch Traffic
 echo "Switching traffic to $NEW_COLOR..."
 
 if [ -f "$BASE_PATH/nginx.conf.template" ]; then
@@ -123,10 +129,10 @@ else
     exit 1
 fi
 
-# 7. Update State
+# 8. Update State
 echo "$NEW_COLOR" > "$BASE_PATH/active_color"
 
-# 8. Cleanup Old Application Environment
+# 9. Cleanup Old Application Environment
 echo ""
 echo "Stopping old application environment ($CURRENT_COLOR)..."
 docker compose -f "$BASE_PATH/docker-compose.app.yml" -p "megacampus-$CURRENT_COLOR" down 2>/dev/null || true
