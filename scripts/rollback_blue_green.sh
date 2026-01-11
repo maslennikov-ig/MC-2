@@ -1,77 +1,131 @@
 #!/bin/bash
 set -e
 
-# Usage: ./rollback_blue_green.sh <environment>
-ENV=$1
+# MegaCampus Blue/Green Rollback Script
+# Usage: ./rollback_blue_green.sh [environment]
+#
+# Instantly switches traffic back to the previous color.
+# Ports:
+#   Blue:  web:3001, api:4001
+#   Green: web:3002, api:4002
 
-if [ -z "$ENV" ]; then
-    echo "Usage: $0 <environment>"
-    exit 1
-fi
-
+ENV=${1:-production}
 BASE_PATH="/opt/megacampus"
-NGINX_CONFIG_PATH="/etc/nginx/conf.d/megacampus.conf"
+NGINX_CONFIG_PATH="/etc/nginx/sites-enabled/megacampus"
 
 # 1. Determine Current Active Color
 if [ -f "$BASE_PATH/active_color" ]; then
     CURRENT_COLOR=$(cat "$BASE_PATH/active_color")
 else
-    echo "❌ Error: active_color file not found. Cannot determine current state for rollback."
+    echo "❌ Error: active_color file not found. Cannot determine current state."
+    echo "   Expected: $BASE_PATH/active_color"
     exit 1
 fi
 
 # 2. Determine Target Color (The previous one)
 if [ "$CURRENT_COLOR" == "blue" ]; then
     TARGET_COLOR="green"
-    TARGET_PORT=4002
+    TARGET_WEB_PORT=3002
+    TARGET_API_PORT=4002
 elif [ "$CURRENT_COLOR" == "green" ]; then
     TARGET_COLOR="blue"
-    TARGET_PORT=4001
+    TARGET_WEB_PORT=3001
+    TARGET_API_PORT=4001
 else
     echo "❌ Error: Unknown active color '$CURRENT_COLOR'."
     exit 1
 fi
 
-echo "🔄 Initiating Rollback: $CURRENT_COLOR -> $TARGET_COLOR (Port: $TARGET_PORT)"
+echo "🔄 Initiating Rollback"
+echo "   Current: $CURRENT_COLOR"
+echo "   Target:  $TARGET_COLOR (web:$TARGET_WEB_PORT, api:$TARGET_API_PORT)"
+echo ""
 
 # 3. Verify Target Configuration Exists
 if [ ! -f "$BASE_PATH/.env.$TARGET_COLOR" ]; then
-    echo "❌ Error: Configuration for $TARGET_COLOR not found at $BASE_PATH/.env.$TARGET_COLOR"
+    echo "❌ Error: Configuration for $TARGET_COLOR not found."
+    echo "   Expected: $BASE_PATH/.env.$TARGET_COLOR"
+    echo ""
+    echo "   This may mean there was no previous deployment to roll back to."
     exit 1
 fi
 
-# 4. Start Target Environment
-echo "📦 Starting $TARGET_COLOR environment..."
-# We use the existing env file for the target color, preserving the previous version's config
+# 4. Start Target Environment (if not running)
+echo "📦 Ensuring $TARGET_COLOR environment is running..."
 docker compose -f "$BASE_PATH/docker-compose.$ENV.yml" --env-file "$BASE_PATH/.env.$TARGET_COLOR" up -d --remove-orphans
 
 # 5. Health Check
-echo "🏥 Performing Health Check on $TARGET_COLOR (localhost:$TARGET_PORT)..."
-HEALTHY=false
-for i in {1..12}; do
-    if curl -s -f "http://localhost:$TARGET_PORT/api/health" > /dev/null; then
-        echo "✅ Health check passed!"
-        HEALTHY=true
+echo "🏥 Performing Health Checks on $TARGET_COLOR..."
+
+# Check API
+API_HEALTHY=false
+echo "   Checking API on localhost:$TARGET_API_PORT..."
+for i in {1..6}; do
+    if curl -s -f "http://localhost:$TARGET_API_PORT/health" > /dev/null 2>&1; then
+        echo "   ✅ API health check passed!"
+        API_HEALTHY=true
         break
     fi
-    echo "Waiting for service... ($i/12)"
+    echo "   Waiting for API... ($i/6)"
     sleep 5
 done
 
-if [ "$HEALTHY" = false ]; then
-    echo "❌ Rollback target ($TARGET_COLOR) failed health check. Aborting rollback."
-    docker compose -f "$BASE_PATH/docker-compose.$ENV.yml" --env-file "$BASE_PATH/.env.$TARGET_COLOR" down
+# Check Web
+WEB_HEALTHY=false
+echo "   Checking Web on localhost:$TARGET_WEB_PORT..."
+for i in {1..6}; do
+    if curl -s -f "http://localhost:$TARGET_WEB_PORT" > /dev/null 2>&1; then
+        echo "   ✅ Web health check passed!"
+        WEB_HEALTHY=true
+        break
+    fi
+    echo "   Waiting for Web... ($i/6)"
+    sleep 5
+done
+
+if [ "$API_HEALTHY" = false ] || [ "$WEB_HEALTHY" = false ]; then
+    echo ""
+    echo "❌ Rollback target ($TARGET_COLOR) failed health check!"
+    [ "$API_HEALTHY" = false ] && echo "   - API not healthy"
+    [ "$WEB_HEALTHY" = false ] && echo "   - Web not healthy"
+    echo ""
+    echo "   Aborting rollback. Current active: $CURRENT_COLOR"
     exit 1
 fi
 
+echo ""
+
 # 6. Switch Traffic
 echo "🔀 Switching Nginx to $TARGET_COLOR..."
-sed "s/{{PORT}}/$TARGET_PORT/g" "$BASE_PATH/nginx.conf.template" | sudo tee "$NGINX_CONFIG_PATH" > /dev/null
-sudo nginx -s reload
 
-# 7. Update State & Cleanup
+if [ -f "$BASE_PATH/nginx.conf.template" ]; then
+    sed -e "s/{{WEB_PORT}}/$TARGET_WEB_PORT/g" \
+        -e "s/{{API_PORT}}/$TARGET_API_PORT/g" \
+        -e "s/{{COLOR}}/$TARGET_COLOR/g" \
+        "$BASE_PATH/nginx.conf.template" | sudo tee "$NGINX_CONFIG_PATH" > /dev/null
+
+    if sudo nginx -t 2>/dev/null; then
+        sudo nginx -s reload
+        echo "   ✅ Traffic switched to $TARGET_COLOR!"
+    else
+        echo "   ❌ Nginx config test failed! Traffic NOT switched."
+        exit 1
+    fi
+else
+    echo "   ❌ Nginx template not found!"
+    exit 1
+fi
+
+# 7. Update State
 echo "$TARGET_COLOR" > "$BASE_PATH/active_color"
-echo "🛑 Stopping broken environment ($CURRENT_COLOR)..."
-docker compose -p "megacampus-$CURRENT_COLOR" down
 
-echo "🎉 Rollback Complete! Active environment is now: $TARGET_COLOR"
+# 8. Stop broken environment
+echo ""
+echo "🛑 Stopping broken environment ($CURRENT_COLOR)..."
+docker compose -p "megacampus-$CURRENT_COLOR" down 2>/dev/null || true
+
+echo ""
+echo "🎉 Rollback Complete!"
+echo "   Active: $TARGET_COLOR"
+echo "   Web:    http://localhost:$TARGET_WEB_PORT"
+echo "   API:    http://localhost:$TARGET_API_PORT"

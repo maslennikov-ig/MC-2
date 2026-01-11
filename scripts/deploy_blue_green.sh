@@ -1,11 +1,17 @@
 #!/bin/bash
 set -e
 
+# MegaCampus Blue/Green Deployment Script
 # Usage: ./deploy_blue_green.sh <environment> <docker_tag>
-ENV=$1
-TAG=$2
+#
+# Ports:
+#   Blue:  web:3001, api:4001
+#   Green: web:3002, api:4002
+
+ENV=${1:-production}
+TAG=${2:-latest}
 BASE_PATH="/opt/megacampus"
-NGINX_CONFIG_PATH="/etc/nginx/conf.d/megacampus.conf"
+NGINX_CONFIG_PATH="/etc/nginx/sites-enabled/megacampus"
 
 # 1. Determine Active Color (Default to blue if first run)
 if [ -f "$BASE_PATH/active_color" ]; then
@@ -16,58 +22,97 @@ fi
 
 if [ "$CURRENT_COLOR" == "blue" ]; then
     NEW_COLOR="green"
-    NEW_PORT=4002
+    NEW_WEB_PORT=3002
+    NEW_API_PORT=4002
 else
     NEW_COLOR="blue"
-    NEW_PORT=4001
+    NEW_WEB_PORT=3001
+    NEW_API_PORT=4001
 fi
 
 echo "🚀 Starting Blue/Green Deployment"
-echo "Current: $CURRENT_COLOR | Target: $NEW_COLOR (Port: $NEW_PORT)"
+echo "   Environment: $ENV"
+echo "   Current: $CURRENT_COLOR"
+echo "   Target:  $NEW_COLOR (web:$NEW_WEB_PORT, api:$NEW_API_PORT)"
+echo ""
 
 # 2. Prepare Environment Configuration
-# Copy the base .env file created by GitHub Actions and append Blue/Green specifics
+echo "📝 Preparing environment..."
 cp "$BASE_PATH/.env.$ENV" "$BASE_PATH/.env.$NEW_COLOR"
-echo "PORT=$NEW_PORT" >> "$BASE_PATH/.env.$NEW_COLOR"
-echo "COMPOSE_PROJECT_NAME=megacampus-$NEW_COLOR" >> "$BASE_PATH/.env.$NEW_COLOR"
+{
+    echo "WEB_PORT=$NEW_WEB_PORT"
+    echo "API_PORT=$NEW_API_PORT"
+    echo "COMPOSE_PROJECT_NAME=megacampus-$NEW_COLOR"
+} >> "$BASE_PATH/.env.$NEW_COLOR"
 
 # 3. Deploy to New Color
-echo "📦 Deploying to $NEW_COLOR environment..."
+echo "📦 Pulling and starting $NEW_COLOR containers..."
 docker compose -f "$BASE_PATH/docker-compose.$ENV.yml" --env-file "$BASE_PATH/.env.$NEW_COLOR" pull
 docker compose -f "$BASE_PATH/docker-compose.$ENV.yml" --env-file "$BASE_PATH/.env.$NEW_COLOR" up -d --remove-orphans
 
-# 4. Health Check (Smoke Test)
-echo "🏥 Performing Health Check on localhost:$NEW_PORT..."
-HEALTHY=false
+# 4. Health Check (check both web and api)
+echo "🏥 Performing Health Checks..."
+
+# Check API health
+API_HEALTHY=false
+echo "   Checking API on localhost:$NEW_API_PORT..."
 for i in {1..12}; do
-    # Check internal health endpoint
-    if curl -s -f "http://localhost:$NEW_PORT/api/health" > /dev/null; then
-        echo "✅ Health check passed!"
-        HEALTHY=true
+    if curl -s -f "http://localhost:$NEW_API_PORT/health" > /dev/null 2>&1; then
+        echo "   ✅ API health check passed!"
+        API_HEALTHY=true
         break
     fi
-    echo "Waiting for service... ($i/12)"
+    echo "   Waiting for API... ($i/12)"
     sleep 5
 done
 
-if [ "$HEALTHY" = false ]; then
-    echo "❌ Health check failed. Rolling back (stopping $NEW_COLOR)..."
+# Check Web health
+WEB_HEALTHY=false
+echo "   Checking Web on localhost:$NEW_WEB_PORT..."
+for i in {1..12}; do
+    if curl -s -f "http://localhost:$NEW_WEB_PORT" > /dev/null 2>&1; then
+        echo "   ✅ Web health check passed!"
+        WEB_HEALTHY=true
+        break
+    fi
+    echo "   Waiting for Web... ($i/12)"
+    sleep 5
+done
+
+if [ "$API_HEALTHY" = false ] || [ "$WEB_HEALTHY" = false ]; then
+    echo ""
+    echo "❌ Health check failed!"
+    [ "$API_HEALTHY" = false ] && echo "   - API not healthy"
+    [ "$WEB_HEALTHY" = false ] && echo "   - Web not healthy"
+    echo ""
+    echo "🔄 Rolling back (stopping $NEW_COLOR)..."
     docker compose -f "$BASE_PATH/docker-compose.$ENV.yml" --env-file "$BASE_PATH/.env.$NEW_COLOR" down
     exit 1
 fi
 
-# 5. Switch Traffic
-echo "🔄 Switching Traffic to $NEW_COLOR..."
+echo ""
 
-# Ensure template exists
+# 5. Switch Traffic
+echo "🔄 Switching traffic to $NEW_COLOR..."
+
 if [ -f "$BASE_PATH/nginx.conf.template" ]; then
-    # Replace {{PORT}} in template and write to Nginx config
-    # Note: This requires the deploy user to have sudo permissions for 'tee' and 'nginx'
-    sed "s/{{PORT}}/$NEW_PORT/g" "$BASE_PATH/nginx.conf.template" | sudo tee "$NGINX_CONFIG_PATH" > /dev/null
-    sudo nginx -s reload
-    echo "✅ Traffic switched successfully!"
+    # Replace both WEB_PORT and API_PORT in template
+    sed -e "s/{{WEB_PORT}}/$NEW_WEB_PORT/g" \
+        -e "s/{{API_PORT}}/$NEW_API_PORT/g" \
+        -e "s/{{COLOR}}/$NEW_COLOR/g" \
+        "$BASE_PATH/nginx.conf.template" | sudo tee "$NGINX_CONFIG_PATH" > /dev/null
+
+    # Test nginx config before reload
+    if sudo nginx -t 2>/dev/null; then
+        sudo nginx -s reload
+        echo "   ✅ Traffic switched successfully!"
+    else
+        echo "   ❌ Nginx config test failed! Traffic NOT switched."
+        exit 1
+    fi
 else
-    echo "⚠️ Nginx template not found at $BASE_PATH/nginx.conf.template. Traffic NOT switched."
+    echo "   ⚠️ Nginx template not found at $BASE_PATH/nginx.conf.template"
+    echo "   Traffic NOT switched."
     exit 1
 fi
 
@@ -75,7 +120,12 @@ fi
 echo "$NEW_COLOR" > "$BASE_PATH/active_color"
 
 # 7. Cleanup Old Environment
+echo ""
 echo "🛑 Stopping old environment ($CURRENT_COLOR)..."
-docker compose -p "megacampus-$CURRENT_COLOR" down
+docker compose -p "megacampus-$CURRENT_COLOR" down 2>/dev/null || true
 
+echo ""
 echo "🎉 Deployment Complete!"
+echo "   Active: $NEW_COLOR"
+echo "   Web:    http://localhost:$NEW_WEB_PORT"
+echo "   API:    http://localhost:$NEW_API_PORT"
