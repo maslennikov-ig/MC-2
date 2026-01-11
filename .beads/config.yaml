@@ -43,124 +43,6 @@ daemon.auto-pull: true
 # sync-branch: "beads-sync"
 
 # =============================================================================
-# DIRECTORY LABELS (Auto-categorization)
-# =============================================================================
-# Automatically assign labels based on file paths when creating issues
-# Usage: bd create "Fix X" --files packages/web/app/page.tsx
-#        → automatically gets labels: frontend, nextjs
-
-directory-labels:
-  "packages/web": ["frontend", "nextjs"]
-  "packages/web/app/[locale]/admin": ["frontend", "admin"]
-  "packages/course-gen-platform": ["backend", "pipeline"]
-  "packages/course-gen-platform/src/stages": ["pipeline", "stages"]
-  "packages/course-gen-platform/src/orchestrator": ["backend", "orchestrator"]
-  "packages/shared-types": ["types", "shared"]
-  "supabase/migrations": ["database", "migrations"]
-  ".beads": ["beads", "config"]
-  ".claude": ["agent", "config"]
-
-# =============================================================================
-# EXCLUSIVE LOCK PROTOCOL (Multi-terminal safety)
-# =============================================================================
-# Prevents conflicts when multiple Claude sessions work in parallel
-# Lock is acquired when: bd update --status in_progress
-# Lock is released when: bd close or bd update --status open
-
-exclusive-lock:
-  enabled: true
-  timeout: "30m"           # Auto-release after 30 minutes of inactivity
-  lock-file: ".beads/locks.json"
-  on-conflict: "warn"      # warn | block | steal
-
-# =============================================================================
-# PROTECTED BRANCH MODE (Safe deployment)
-# =============================================================================
-# Prevents accidental pushes to main branch
-# Work happens in develop/feature branches, merge to main for deploy
-
-protected-branches:
-  enabled: true
-  production: "main"       # Protected branch (auto-deploys)
-  development: "develop"   # Default work branch
-  # Workflow:
-  #   1. Work in develop (or feature/*)
-  #   2. /push → goes to develop
-  #   3. When ready: git checkout main && git merge develop && git push → deploy
-
-# =============================================================================
-# PATROL PATTERN (Recurring workflows)
-# =============================================================================
-# Patrols are scheduled or on-demand recurring tasks
-# Run with: bd patrol run <name>
-
-patrols:
-  code-review:
-    description: "Code review after major implementation"
-    formula: "codereview"
-    trigger: "on_demand"   # manual trigger via bd patrol run code-review
-    default-vars:
-      fix_mode: "ask"
-    # Shortcut: Instead of long prompt, just run:
-    #   bd patrol run code-review --vars "scope=packages/web,topic=recent-changes"
-
-  health-check:
-    description: "Weekly codebase health check"
-    formula: "healthcheck"
-    trigger: "on_demand"
-    # Run: bd patrol run health-check
-
-# =============================================================================
-# MOLECULE BONDING (Complex feature pipelines)
-# =============================================================================
-# Bond multiple molecules into a pipeline for large features
-# Each stage can have its own formula and dependencies
-
-molecule-bonds:
-  bigfeature-pipeline:
-    description: "Full feature lifecycle with bonded stages"
-    stages:
-      - id: "spec"
-        formula: "exploration"
-        output: "spec.md"
-      - id: "design"
-        formula: "exploration"
-        depends_on: ["spec"]
-        output: "plan.md"
-      - id: "implement"
-        formula: "bigfeature"
-        depends_on: ["design"]
-      - id: "review"
-        formula: "codereview"
-        depends_on: ["implement"]
-      - id: "release"
-        formula: "release"
-        depends_on: ["review"]
-    auto_advance: false    # Manual approval between stages
-
-# =============================================================================
-# DAEMON SETTINGS (Auto-Sync)
-# =============================================================================
-# These settings enable fully automatic synchronization:
-# - Changes are committed automatically
-# - Commits are pushed to remote automatically
-# - Remote changes are pulled automatically
-
-daemon.auto-commit: true
-daemon.auto-push: true
-daemon.auto-pull: true
-
-# =============================================================================
-# GIT INTEGRATION
-# =============================================================================
-# Git hooks are installed automatically (pre-commit, pre-push, post-merge)
-# They trigger bd sync on git operations for zero-lag synchronization
-
-# Sync branch (optional) - use separate branch for beads commits
-# Recommended for team projects to isolate beads sync from main branch
-# sync-branch: "beads-sync"
-
-# =============================================================================
 # AGENT WORKFLOW NOTES
 # =============================================================================
 #
@@ -170,24 +52,15 @@ daemon.auto-pull: true
 #
 # Core workflow for AI agents:
 #   1. bd ready                  - Find available work
-#   2. bd update ID --status in_progress - Claim task (acquires lock)
+#   2. bd update ID --status in_progress - Claim task
 #   3. Do the work
-#   4. bd close ID --reason "..." - Complete task (releases lock)
+#   4. bd close ID --reason "..." - Complete task
 #   5. Daemon auto-syncs (or bd sync manually)
-#
-# Multi-terminal work:
-#   - Each terminal should work on DIFFERENT issues
-#   - Lock prevents two terminals from editing same issue
-#   - If locked: bd list --unlocked to find available work
 #
 # Creating new work:
 #   bd create "Title" -t feature|bug|chore -p 0-4
 #
 # Emergent work (discovered during other task):
 #   bd create "Found issue" -t bug --deps discovered-from:mc2-current
-#
-# Patrols (recurring tasks):
-#   bd patrol run code-review --vars "scope=recent,topic=my-feature"
-#   bd patrol run health-check
 #
 # =============================================================================
