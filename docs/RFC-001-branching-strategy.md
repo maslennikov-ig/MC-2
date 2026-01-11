@@ -1,7 +1,8 @@
 # RFC-001: Branching Strategy and Environment Alignment
 
 **Date**: 2025-10-30
-**Status**: Proposed
+**Status**: Implemented
+**Implementation**: [ADR-005](./ADR-005-deployment-strategy.md)
 
 ## 1. Context and Problem Statement
 
@@ -15,11 +16,11 @@ We propose adopting a flow where specific branches map 1:1 to deployment environ
 
 ### 2.1. Branches and Environments
 
-| Branch | Environment | Purpose | Deployment Strategy |
-| :--- | :--- | :--- | :--- |
-| `develop` | **Dev** | Integration of feature branches. Continuous deployment for internal testing. | Rolling Update (Fast) |
-| `staging` | **Stage** | Pre-production environment. Parity with Prod. Used for QA/UAT. | Blue/Green (Parity) |
-| `main` | **Prod** | Live user traffic. Highest stability required. | Blue/Green (Zero Downtime) |
+| Branch    | Environment | Purpose                                                                      | Deployment Strategy        |
+| :-------- | :---------- | :--------------------------------------------------------------------------- | :------------------------- |
+| `develop` | **Dev**     | Integration of feature branches. Continuous deployment for internal testing. | Rolling Update (Fast)      |
+| `staging` | **Stage**   | Pre-production environment. Parity with Prod. Used for QA/UAT.               | Blue/Green (Parity)        |
+| `main`    | **Prod**    | Live user traffic. Highest stability required.                               | Blue/Green (Zero Downtime) |
 
 ### 2.2. Workflow
 
@@ -31,17 +32,20 @@ We propose adopting a flow where specific branches map 1:1 to deployment environ
 ## 3. Implementation Details
 
 ### 3.1. GitHub Actions
-*   Update `deploy.yml` to trigger on pushes to `develop`, `staging`, and `main`.
-*   Use GitHub Environments (`dev`, `staging`, `production`) to manage secrets and variables for each target.
+
+- Update `deploy.yml` to trigger on pushes to `develop`, `staging`, and `main`.
+- Use GitHub Environments (`dev`, `staging`, `production`) to manage secrets and variables for each target.
 
 ### 3.2. Infrastructure
-*   **Dev**: Can run on smaller resources or the same cluster with a different namespace/port.
-*   **Stage**: Should mirror Production infrastructure (Blue/Green setup) to validate the deployment process itself.
-*   **Prod**: Full Blue/Green setup.
+
+- **Dev**: Can run on smaller resources or the same cluster with a different namespace/port.
+- **Stage**: Should mirror Production infrastructure (Blue/Green setup) to validate the deployment process itself.
+- **Prod**: Full Blue/Green setup.
 
 ### 3.3. CI/CD Optimization
-*   **Pre-commit Hooks**: Move all linter and formatter jobs to pre-commit hooks to ensure code quality locally and reduce CI usage. We will use **Husky** to manage git hooks. Additionally, we consider **commitlint** for enforcing conventional commit messages and **lint-staged** for running linters on staged files as optional but recommended tooling.
-*   **Test Separation**: Implement a tiered testing strategy based on the branch. Instead of running the full test circle for every environment, we will run a minimum viable test suite for lower environments (Dev) and comprehensive tests for higher environments (Stage/Prod).
+
+- **Pre-commit Hooks**: Move all linter and formatter jobs to pre-commit hooks to ensure code quality locally and reduce CI usage. We will use **Husky** to manage git hooks. Additionally, we consider **commitlint** for enforcing conventional commit messages and **lint-staged** for running linters on staged files as optional but recommended tooling.
+- **Test Separation**: Implement a tiered testing strategy based on the branch. Instead of running the full test circle for every environment, we will run a minimum viable test suite for lower environments (Dev) and comprehensive tests for higher environments (Stage/Prod).
 
 ## 4. Migration Plan
 
@@ -52,5 +56,5 @@ We propose adopting a flow where specific branches map 1:1 to deployment environ
 
 ## 5. Consequences
 
-*   **Positive**: Clear separation of concerns. Risky changes are tested in Dev/Stage before reaching users.
-*   **Negative**: Slightly more overhead in managing merges between branches (Dev -> Stage -> Prod).
+- **Positive**: Clear separation of concerns. Risky changes are tested in Dev/Stage before reaching users.
+- **Negative**: Slightly more overhead in managing merges between branches (Dev -> Stage -> Prod).

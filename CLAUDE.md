@@ -7,10 +7,12 @@
 ### Core Rules
 
 **1. GATHER CONTEXT FIRST (MANDATORY)**
+
 - Read existing code, search patterns, check recent commits
 - NEVER delegate or implement blindly
 
 **2. DELEGATE TO SUBAGENTS**
+
 - Provide complete context (code, paths, patterns)
 - **NEVER TRUST SUBAGENT REPORTS** — always verify yourself:
   - Read modified files (`Read` tool)
@@ -26,6 +28,7 @@
 **5. COMMIT** — `/push patch` after each task
 
 **6. EXECUTION PATTERN**
+
 ```
 1. Read task → 2. Gather context → 3. Delegate/execute
 4. VERIFY (never skip) → 5. Re-delegate if needed
@@ -43,6 +46,7 @@
 > Constitution v1.2.0: All work MUST be tracked in Beads.
 
 ### Session Workflow
+
 ```bash
 # SESSION START (auto via hooks)
 # bd prime runs automatically → injects context
@@ -63,13 +67,16 @@ git add . && git commit -m "..." && git push
 ```
 
 ### Multi-Terminal Work
+
 When working in multiple terminals simultaneously:
+
 - Each terminal acquires **exclusive lock** via `bd update --status in_progress`
 - Lock auto-releases after 30min inactivity
 - **Rule**: Each terminal works on DIFFERENT issues
 - Find unlocked: `bd list --unlocked`
 
 ### Protected Branches
+
 - `main` — production (auto-deploy, protected)
 - `develop` — main working branch
 - `feature/*` — feature branches for parallel work
@@ -86,24 +93,42 @@ When working in multiple terminals simultaneously:
 /deploy --force                   # → skip type-check/build
 ```
 
+### Environments
+
+| Environment | URL                          | Branch  | Strategy   |
+| ----------- | ---------------------------- | ------- | ---------- |
+| Staging     | https://ai.megacampus.ru     | master  | Blue/Green |
+| Dev         | https://dev.ai.megacampus.ru | develop | Rolling    |
+
+**Blue/Green Deploy** (zero-downtime):
+
+- Blue: web:3001, api:4001
+- Green: web:3002, api:4002
+- Health check before traffic switch
+- Instant rollback via nginx reload
+
+**Details**: `docs/ADR-005-deployment-strategy.md`, `.claude/docs/deployment-guide.md`
+
 ### How User Gives Me Tasks
+
 1. **From Beads**: Just say "Работай над mc2-xxx" or "bd ready" output
 2. **New task**: I create beads task FIRST, then work
 3. **Discussion**: If clarifying/researching, no task needed yet
 
 ### Task Types
 
-| Work Type | Tool | Command |
-|-----------|------|---------|
-| Big feature (>1 day) | Bonded Pipeline | `bd mol bond bigfeature-pipeline` |
-| Small feature | Beads | `bd create -t feature --files path/to/file.tsx` |
-| Bug fix | Beads | `bd create -t bug` |
-| Tech debt | Beads | `bd create -t chore` |
-| Exploration | Beads wisp | `bd mol wisp exploration` |
-| Code review | Patrol | `bd patrol run code-review --vars "scope=X,topic=Y"` |
-| Health check | Patrol | `bd patrol run health-check` |
+| Work Type            | Tool            | Command                                              |
+| -------------------- | --------------- | ---------------------------------------------------- |
+| Big feature (>1 day) | Bonded Pipeline | `bd mol bond bigfeature-pipeline`                    |
+| Small feature        | Beads           | `bd create -t feature --files path/to/file.tsx`      |
+| Bug fix              | Beads           | `bd create -t bug`                                   |
+| Tech debt            | Beads           | `bd create -t chore`                                 |
+| Exploration          | Beads wisp      | `bd mol wisp exploration`                            |
+| Code review          | Patrol          | `bd patrol run code-review --vars "scope=X,topic=Y"` |
+| Health check         | Patrol          | `bd patrol run health-check`                         |
 
 ### Automation
+
 - **Daemon auto-sync**: Enabled (auto-commit, auto-push, auto-pull for beads)
 - **Hooks**: SessionStart/PreCompact → `bd prime`, Stop → `bd sync`
 - **Directory Labels**: Auto-assigned based on `--files` path (see config.yaml)
@@ -118,10 +143,12 @@ When working in multiple terminals simultaneously:
 ## Project Conventions
 
 **Project Knowledge**: `bd search "REF:"` — reference issues for entities, pages, pipeline, tech stack
+
 - **Update REF: issues** when changing: DB schema, pages, pipeline stages, tech stack
 - Pattern: `bd update mc2-xxx --description="..."`
 
 **File Organization**:
+
 - Agents: `.claude/agents/{domain}/{orchestrators|workers}/`
 - Commands: `.claude/commands/`
 - Skills: `.claude/skills/{name}/SKILL.md`
@@ -131,25 +158,28 @@ When working in multiple terminals simultaneously:
 **Code Standards**: Type-check + build + lint must pass before commit. No hardcoded credentials.
 
 **Agent Selection**:
+
 - Worker: Plan file specifies `nextAgent` (health workflows only)
 - Skill: Reusable utility, no state, <100 lines
 
 **Supabase**:
+
 - MCP server: project `diqooqbuchsliypgwksu`
 - Migrations: `packages/course-gen-platform/supabase/migrations/`
 - Two admin clients by design (different runtimes): `course-gen-platform/src/shared/supabase/admin.ts` (Node.js) and `web/lib/supabase-admin.ts` (Next.js)
 
 **Single Source of Truth** (NEVER duplicate, always import from `@megacampus/shared-types`):
 
-| Type | File |
-|------|------|
-| Database types | `shared-types/src/database.types.ts` |
-| Analysis schemas | `shared-types/src/analysis-schemas.ts` |
+| Type                  | File                                        |
+| --------------------- | ------------------------------------------- |
+| Database types        | `shared-types/src/database.types.ts`        |
+| Analysis schemas      | `shared-types/src/analysis-schemas.ts`      |
 | File upload constants | `shared-types/src/file-upload-constants.ts` |
-| Common enums | `shared-types/src/common-enums.ts` |
-| Course styles | `shared-types/src/style-prompts.ts` |
+| Common enums          | `shared-types/src/common-enums.ts`          |
+| Course styles         | `shared-types/src/style-prompts.ts`         |
 
 **MCP Config**:
+
 - BASE (`.mcp.base.json`): context7 + sequential-thinking (~600 tokens)
 - FULL (`.mcp.full.json`): + supabase + playwright + shadcn (~5000 tokens)
 - Switch: `./switch-mcp.sh`
@@ -159,6 +189,7 @@ When working in multiple terminals simultaneously:
 ## External Documentation (Context7)
 
 **Before implementing** with external libraries, query Context7 for latest docs:
+
 ```
 mcp__context7__resolve-library-id → mcp__context7__query-docs
 ```
@@ -169,18 +200,18 @@ mcp__context7__resolve-library-id → mcp__context7__query-docs
 
 ## Subagent Selection
 
-| Domain | Subagent | Labels | When |
-|--------|----------|--------|------|
-| DB/migrations | `database-architect` | database, migrations | Schema changes, RLS |
-| UI components | `nextjs-ui-designer` | frontend, nextjs | New pages, components |
-| Admin panel | `nextjs-ui-designer` | frontend, admin | Admin pages |
-| Pipeline stages | `stage-pipeline-specialist` | pipeline, stages | Stages 1-7 |
-| Backend services | `fullstack-nextjs-specialist` | backend, orchestrator | APIs, workers |
-| Tests | `test-writer` | — | Unit/integration tests |
-| Bugs from report | `bug-fixer` | — | Fix bug-hunting-report |
-| Code exploration | `Explore` | — | Find files, understand code |
-| TypeScript types | `typescript-types-specialist` | types, shared | Complex types, generics |
-| Security | `vulnerability-fixer` | — | Security fixes |
+| Domain           | Subagent                      | Labels                | When                        |
+| ---------------- | ----------------------------- | --------------------- | --------------------------- |
+| DB/migrations    | `database-architect`          | database, migrations  | Schema changes, RLS         |
+| UI components    | `nextjs-ui-designer`          | frontend, nextjs      | New pages, components       |
+| Admin panel      | `nextjs-ui-designer`          | frontend, admin       | Admin pages                 |
+| Pipeline stages  | `stage-pipeline-specialist`   | pipeline, stages      | Stages 1-7                  |
+| Backend services | `fullstack-nextjs-specialist` | backend, orchestrator | APIs, workers               |
+| Tests            | `test-writer`                 | —                     | Unit/integration tests      |
+| Bugs from report | `bug-fixer`                   | —                     | Fix bug-hunting-report      |
+| Code exploration | `Explore`                     | —                     | Find files, understand code |
+| TypeScript types | `typescript-types-specialist` | types, shared         | Complex types, generics     |
+| Security         | `vulnerability-fixer`         | —                     | Security fixes              |
 
 **Label-based routing**: Use `bd ready --label X` to find tasks for specific subagent.
 
