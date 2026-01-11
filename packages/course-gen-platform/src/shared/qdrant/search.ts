@@ -47,6 +47,8 @@ const DEFAULT_SEARCH_OPTIONS: Required<Omit<SearchOptions, 'filters'>> & {
   enable_hybrid: false,
   include_payload: false,
   filters: {},
+  enable_priority_boost: false,
+  priority_boost_factor: 0.4,
 };
 
 /**
@@ -153,6 +155,27 @@ export async function searchChunks(
       searchResults = await hybridSearchWithFallback(queryText, config);
     } else {
       searchResults = await denseSearch(queryText, config);
+    }
+
+    // Apply priority boosting if enabled
+    // @see docs/tasks/REFACTOR-RAG-PRIORITY-BASED-RETRIEVAL.md
+    if (config.enable_priority_boost) {
+      const boostFactor = config.priority_boost_factor;
+      // Apply boost directly on raw results before conversion
+      for (const point of searchResults) {
+        // Get document_weight from payload (default: 0.5 for SUPPLEMENTARY)
+        const payload = point.payload as Record<string, unknown> | undefined;
+        const weight = (payload?.document_weight as number) ?? 0.5;
+        // Apply boost: CORE (1.0) gets +20% with 0.4 factor, SUPPLEMENTARY (0.5) gets 0%
+        point.score = point.score * (1 + (weight - 0.5) * boostFactor);
+      }
+      // Re-sort by boosted score
+      searchResults.sort((a, b) => b.score - a.score);
+
+      logger.debug({
+        boostFactor,
+        resultCount: searchResults.length,
+      }, 'Priority boosting applied');
     }
 
     // Convert to search results

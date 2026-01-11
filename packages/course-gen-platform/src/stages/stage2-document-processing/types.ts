@@ -6,6 +6,7 @@
 
 import { DoclingDocument } from './docling/types.js';
 import { ImageMetadata } from '../../shared/embeddings/index.js';
+import type { DocumentPriorityLevel } from '@megacampus/shared-types';
 
 /**
  * Type-safe interface for file metadata with organization tier
@@ -18,6 +19,12 @@ export interface FileWithOrganization {
   organizations: {
     tier: 'free' | 'trial' | 'basic' | 'standard' | 'premium';
   } | null;
+  /**
+   * Document priority from file_catalog.priority column
+   * Used for priority boosting during RAG retrieval
+   * @see docs/tasks/REFACTOR-RAG-PRIORITY-BASED-RETRIEVAL.md
+   */
+  priority: DocumentPriorityLevel | null;
 }
 
 /**

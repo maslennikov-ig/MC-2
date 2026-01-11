@@ -12,6 +12,7 @@
 
 import type { TextChunk } from './markdown-chunker';
 import type { DoclingDocument } from '../../stages/stage2-document-processing/docling/types';
+import type { DocumentPriorityLevel } from '@megacampus/shared-types';
 
 /**
  * Enriched chunk with comprehensive metadata for Qdrant payload
@@ -46,6 +47,19 @@ export interface EnrichedChunk extends TextChunk {
 
   /** Table references in this chunk */
   table_refs: TableReference[];
+
+  /**
+   * Document priority from file_catalog
+   * Used for priority boosting during RAG retrieval
+   * @see docs/tasks/REFACTOR-RAG-PRIORITY-BASED-RETRIEVAL.md
+   */
+  document_priority: DocumentPriorityLevel;
+
+  /**
+   * Document weight for priority boosting
+   * 1.0 for CORE, 0.8 for IMPORTANT, 0.5 for SUPPLEMENTARY
+   */
+  document_weight: number;
 }
 
 /**
@@ -96,6 +110,18 @@ export interface EnrichmentOptions {
   course_id: string;
   /** DoclingDocument JSON (optional, for enhanced metadata) */
   docling_json?: DoclingDocument;
+  /**
+   * Document priority from file_catalog
+   * Used for priority boosting during RAG retrieval
+   * Default: SUPPLEMENTARY
+   */
+  document_priority?: DocumentPriorityLevel;
+  /**
+   * Document weight for priority boosting
+   * 1.0 for CORE, 0.8 for IMPORTANT, 0.5 for SUPPLEMENTARY
+   * Default: 0.5
+   */
+  document_weight?: number;
 }
 
 /**
@@ -350,6 +376,10 @@ export function enrichChunk(
     // References
     image_refs,
     table_refs,
+
+    // Priority for RAG boosting (default: SUPPLEMENTARY with weight 0.5)
+    document_priority: options.document_priority ?? 'SUPPLEMENTARY',
+    document_weight: options.document_weight ?? 0.5,
   };
 }
 
@@ -422,6 +452,10 @@ export function toQdrantPayload(chunk: EnrichedChunk): Record<string, unknown> {
     // References (serialized as JSON)
     image_refs: chunk.image_refs,
     table_refs: chunk.table_refs,
+
+    // Priority for RAG boosting
+    document_priority: chunk.document_priority,
+    document_weight: chunk.document_weight,
   };
 }
 

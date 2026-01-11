@@ -84,6 +84,18 @@ export interface SearchOptions {
   include_payload?: boolean;
   /** Search filters */
   filters?: SearchFilters;
+  /**
+   * Enable priority boosting based on document_priority/document_weight
+   * Boosts scores for CORE/IMPORTANT documents
+   * @see docs/tasks/REFACTOR-RAG-PRIORITY-BASED-RETRIEVAL.md
+   */
+  enable_priority_boost?: boolean;
+  /**
+   * Multiplier for priority boosting (default: 0.4)
+   * Final score = base_score * (1 + (weight - 0.5) * boost_factor)
+   * With 0.4: CORE (1.0) gets +20% boost, SUPPLEMENTARY (0.5) gets 0%
+   */
+  priority_boost_factor?: number;
 }
 
 /**

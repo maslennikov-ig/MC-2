@@ -19,7 +19,21 @@ import { logger } from '../../shared/logger/index.js';
 import { getSupabaseAdmin } from '../../shared/supabase/admin';
 import { executeDocumentClassificationComparative } from './phases/phase-classification';
 import type { Stage3Input, Stage3Output } from './types';
-import type { DocumentPriority } from '@megacampus/shared-types';
+import type { DocumentPriority, DocumentPriorityLevel } from '@megacampus/shared-types';
+
+/**
+ * Feature flag to disable LLM-based Stage 3 classification
+ *
+ * When set to 'true', Stage 3 completes immediately as a no-op,
+ * relying on user-assigned or default priorities instead of LLM classification.
+ *
+ * This is part of the RAG refactoring to eliminate LLM classification errors
+ * and use priority boosting during retrieval instead.
+ *
+ * @see docs/tasks/REFACTOR-RAG-PRIORITY-BASED-RETRIEVAL.md
+ * @default 'false' - LLM classification is enabled by default
+ */
+const SKIP_STAGE3_CLASSIFICATION = process.env.SKIP_STAGE3_CLASSIFICATION === 'true';
 
 /**
  * Stage 3 Classification Orchestrator
@@ -36,6 +50,22 @@ export class Stage3ClassificationOrchestrator {
   async execute(input: Stage3Input): Promise<Stage3Output> {
     const { courseId, organizationId, onProgress } = input;
     const startTime = Date.now();
+
+    // Check feature flag to skip LLM classification
+    if (SKIP_STAGE3_CLASSIFICATION) {
+      logger.info({
+        courseId,
+        organizationId,
+        reason: 'SKIP_STAGE3_CLASSIFICATION=true',
+      }, 'Stage 3 classification SKIPPED - using user/default priorities');
+
+      if (onProgress) {
+        onProgress(100, 'Classification skipped (using existing priorities)');
+      }
+
+      // Return success with empty classifications (relies on existing file_catalog.priority)
+      return await this.skipClassification(courseId, startTime);
+    }
 
     logger.info({ courseId, organizationId }, 'Starting Stage 3 document classification');
 
@@ -186,5 +216,69 @@ export class Stage3ClassificationOrchestrator {
     } else {
       return 'SUPPLEMENTARY';
     }
+  }
+
+  /**
+   * Skip LLM classification and return success with existing priorities
+   *
+   * Called when SKIP_STAGE3_CLASSIFICATION feature flag is enabled.
+   * Loads existing priorities from file_catalog and returns them without LLM calls.
+   *
+   * @see docs/tasks/REFACTOR-RAG-PRIORITY-BASED-RETRIEVAL.md
+   */
+  private async skipClassification(
+    courseId: string,
+    startTime: number
+  ): Promise<Stage3Output> {
+    const supabase = getSupabaseAdmin();
+
+    // Load documents with existing priorities
+    const { data, error } = await supabase
+      .from('file_catalog')
+      .select('id, filename, priority')
+      .eq('course_id', courseId);
+
+    if (error) {
+      logger.error({ error, courseId }, 'Failed to load documents for skip classification');
+      throw new Error(`Failed to load documents: ${error.message}`);
+    }
+
+    const documents = data || [];
+
+    // Build classifications from existing priorities
+    const classifications = documents.map((doc) => ({
+      fileId: doc.id,
+      filename: doc.filename,
+      priority: (doc.priority as DocumentPriorityLevel) ?? 'SUPPLEMENTARY',
+      rationale: 'Using existing priority (Stage 3 classification skipped)',
+    }));
+
+    // Count priority levels
+    const coreCount = classifications.filter((c) => c.priority === 'CORE').length;
+    const importantCount = classifications.filter((c) => c.priority === 'IMPORTANT').length;
+    const supplementaryCount = classifications.filter((c) => c.priority === 'SUPPLEMENTARY').length;
+
+    const processingTimeMs = Date.now() - startTime;
+
+    logger.info({
+      courseId,
+      totalDocuments: documents.length,
+      coreCount,
+      importantCount,
+      supplementaryCount,
+      processingTimeMs,
+      skipped: true,
+    }, 'Stage 3 classification skipped - using existing priorities');
+
+    return {
+      success: true,
+      courseId,
+      classifications,
+      totalDocuments: documents.length,
+      coreCount,
+      importantCount,
+      supplementaryCount,
+      processingTimeMs,
+    };
   }
 }

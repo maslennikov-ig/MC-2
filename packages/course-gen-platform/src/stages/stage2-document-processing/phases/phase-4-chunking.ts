@@ -8,7 +8,7 @@
  */
 
 import { Job } from 'bullmq';
-import type { DocumentProcessingJobData } from '@megacampus/shared-types';
+import type { DocumentProcessingJobData, DocumentPriorityLevel } from '@megacampus/shared-types';
 import { chunkMarkdown, getAllChunks, DEFAULT_CHUNKING_CONFIG } from '../../../shared/embeddings/markdown-chunker.js';
 import { enrichChunks } from '../../../shared/embeddings/metadata-enricher.js';
 import { logger } from '../../../shared/logger/index.js';
@@ -21,6 +21,17 @@ export interface ChunkMetadata {
   document_name: string;
   organization_id: string;
   course_id: string;
+  /**
+   * Document priority from file_catalog
+   * Used for priority boosting during RAG retrieval
+   * @see docs/tasks/REFACTOR-RAG-PRIORITY-BASED-RETRIEVAL.md
+   */
+  document_priority: DocumentPriorityLevel;
+  /**
+   * Document weight for priority boosting
+   * 1.0 for CORE, 0.8 for IMPORTANT, 0.5 for SUPPLEMENTARY
+   */
+  document_weight: number;
 }
 
 /**
@@ -67,6 +78,8 @@ export async function executeChunking(
     document_name: metadata.document_name,
     organization_id: metadata.organization_id,
     course_id: metadata.course_id,
+    document_priority: metadata.document_priority,
+    document_weight: metadata.document_weight,
   });
 
   await job.updateProgress(60);

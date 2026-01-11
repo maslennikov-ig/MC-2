@@ -95,6 +95,24 @@ interface LessonRAGChunk {
   similarity_score: number;
   /** Query that retrieved this chunk */
   matched_query: string;
+  /** Document priority (optional, from chunk metadata) */
+  document_priority?: 'CORE' | 'IMPORTANT' | 'SUPPLEMENTARY';
+}
+
+/**
+ * Source document attribution from retrieved chunks
+ * Tracks which documents contributed to lesson content generation
+ * @see docs/tasks/REFACTOR-RAG-PRIORITY-BASED-RETRIEVAL.md
+ */
+export interface SourceDocument {
+  /** Document UUID from file_catalog */
+  document_id: string;
+  /** Document filename */
+  document_name: string;
+  /** Document priority from file_catalog */
+  document_priority: 'CORE' | 'IMPORTANT' | 'SUPPLEMENTARY';
+  /** Number of chunks retrieved from this document */
+  chunk_count: number;
 }
 
 /**
@@ -481,6 +499,55 @@ export function formatLessonChunksForPrompt(
     : '';
 
   return `<rag_context lesson_id="${escapeXml(lessonId)}" chunks="${xmlParts.length}" total_available="${chunks.length}">${truncationNote}\n${content}\n</rag_context>`;
+}
+
+// ============================================================================
+// SOURCE ATTRIBUTION
+// ============================================================================
+
+/**
+ * Extract unique source documents from retrieved RAG chunks
+ *
+ * Aggregates chunks by document_id and returns attribution data
+ * for storing in lessons.source_documents column.
+ *
+ * @param chunks - Retrieved RAG chunks
+ * @returns Array of SourceDocument sorted by chunk_count (most used first)
+ *
+ * @see docs/tasks/REFACTOR-RAG-PRIORITY-BASED-RETRIEVAL.md
+ *
+ * @example
+ * ```typescript
+ * const result = await retrieveLessonContext(params);
+ * const sourceDocuments = extractSourceDocuments(result.chunks);
+ * // Returns: [
+ * //   { document_id: 'doc1', document_name: 'main.pdf', document_priority: 'CORE', chunk_count: 5 },
+ * //   { document_id: 'doc2', document_name: 'supp.pdf', document_priority: 'SUPPLEMENTARY', chunk_count: 2 },
+ * // ]
+ * ```
+ */
+export function extractSourceDocuments(chunks: RAGChunk[]): SourceDocument[] {
+  const docMap = new Map<string, SourceDocument>();
+
+  for (const chunk of chunks) {
+    const existing = docMap.get(chunk.document_id);
+    if (existing) {
+      existing.chunk_count++;
+    } else {
+      // Extract priority from metadata if available
+      const priority = (chunk.metadata?.document_priority as SourceDocument['document_priority']) ?? 'SUPPLEMENTARY';
+
+      docMap.set(chunk.document_id, {
+        document_id: chunk.document_id,
+        document_name: chunk.document_name,
+        document_priority: priority,
+        chunk_count: 1,
+      });
+    }
+  }
+
+  // Sort by chunk_count descending (most used documents first)
+  return Array.from(docMap.values()).sort((a, b) => b.chunk_count - a.chunk_count);
 }
 
 // ============================================================================

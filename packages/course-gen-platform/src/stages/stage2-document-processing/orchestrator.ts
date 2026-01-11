@@ -16,7 +16,7 @@
  */
 
 import { Job } from 'bullmq';
-import type { DocumentProcessingJobData } from '@megacampus/shared-types';
+import type { DocumentProcessingJobData, DocumentPriorityLevel } from '@megacampus/shared-types';
 import { DocumentProcessingResult, FileWithOrganization } from './types';
 import { getSupabaseAdmin } from '../../shared/supabase/admin';
 import { logger } from '../../shared/logger/index.js';
@@ -68,12 +68,14 @@ export class DocumentProcessingOrchestrator {
     await this.updateProgress(job, 5, 'Fetching file metadata');
     // Update DB for UI real-time updates
     await this.updateCourseProgressInDB(courseId, t('stage2.init'));
-    const { tier, mimeType } = await this.getFileMetadata(fileId);
+    const { tier, mimeType, priority, priorityWeight } = await this.getFileMetadata(fileId);
 
     logger.info({
       fileId,
       tier,
       mimeType,
+      priority,
+      priorityWeight,
     }, 'File metadata retrieved');
 
     // Step 2: Determine processing strategy based on tier
@@ -146,6 +148,8 @@ export class DocumentProcessingOrchestrator {
         document_name: filePath.split('/').pop() || 'unknown',
         organization_id: organizationId,
         course_id: courseId || '',
+        document_priority: priority,
+        document_weight: priorityWeight,
       },
       job
     );
@@ -382,14 +386,19 @@ export class DocumentProcessingOrchestrator {
   }
 
   /**
-   * Get file metadata including organization tier
+   * Get file metadata including organization tier and document priority
    */
-  private async getFileMetadata(fileId: string): Promise<{ tier: string; mimeType: string }> {
+  private async getFileMetadata(fileId: string): Promise<{
+    tier: string;
+    mimeType: string;
+    priority: DocumentPriorityLevel;
+    priorityWeight: number;
+  }> {
     const supabase = getSupabaseAdmin();
 
     const { data, error } = await supabase
       .from('file_catalog')
-      .select('mime_type, organization_id, organizations(tier)')
+      .select('mime_type, organization_id, priority, organizations(tier)')
       .eq('id', fileId)
       .single();
 
@@ -410,10 +419,32 @@ export class DocumentProcessingOrchestrator {
       );
     }
 
+    // Get priority with default fallback
+    const priority = fileData.priority ?? 'SUPPLEMENTARY';
+    const priorityWeight = this.getPriorityWeight(priority);
+
     return {
       tier: fileData.organizations.tier,
       mimeType: fileData.mime_type,
+      priority,
+      priorityWeight,
     };
+  }
+
+  /**
+   * Convert document priority level to numeric weight for RAG boosting
+   * @see docs/tasks/REFACTOR-RAG-PRIORITY-BASED-RETRIEVAL.md
+   */
+  private getPriorityWeight(priority: DocumentPriorityLevel): number {
+    switch (priority) {
+      case 'CORE':
+        return 1.0;
+      case 'IMPORTANT':
+        return 0.8;
+      case 'SUPPLEMENTARY':
+      default:
+        return 0.5;
+    }
   }
 
   /**
