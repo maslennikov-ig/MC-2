@@ -15,6 +15,14 @@ import { ErrorMessages } from '../../utils/error-messages.js';
 import { listUsersInputSchema } from './shared/schemas';
 import { roleSchema } from '@megacampus/shared-types';
 import type { UserListResponse } from './shared/types';
+import {
+  validateNotSelf,
+  validateSuperadminOnly,
+  validateCanModifyTarget,
+  validateAdminCanOnlyModifyLowerRoles,
+  validateNotLastSuperadmin,
+  fetchUserForValidation,
+} from './shared/validators';
 
 /**
  * Fallback organization name when organization data is not available
@@ -300,81 +308,25 @@ export const usersRouter = router({
     .input(updateUserRoleInputSchema)
     .mutation(async ({ ctx, input }) => {
       const { userId, role } = input;
-      // adminProcedure guarantees ctx.user is non-null
       const currentUser = ctx.user!;
+      const supabase = getSupabaseAdmin();
 
-      // Validation: Cannot change own role
-      if (userId === currentUser.id) {
-        throw new TRPCError({
-          code: 'BAD_REQUEST',
-          message: 'Cannot change your own role. Ask another admin to make this change.',
-        });
+      // Validations
+      validateNotSelf(userId, currentUser.id, 'change role');
+      if (role === 'superadmin') {
+        validateSuperadminOnly(currentUser.role, 'assign the superadmin role');
       }
 
-      // Validation: Only superadmins can assign superadmin role
-      if (role === 'superadmin' && currentUser.role !== 'superadmin') {
-        throw new TRPCError({
-          code: 'FORBIDDEN',
-          message: 'Only superadmins can assign the superadmin role.',
-        });
+      // Fetch target user and validate permissions
+      const targetUser = await fetchUserForValidation(supabase, userId, 'role update');
+      validateCanModifyTarget(targetUser.role, currentUser.role, 'modify');
+
+      // Check if demoting a superadmin
+      if (targetUser.role === 'superadmin' && role !== 'superadmin') {
+        await validateNotLastSuperadmin(supabase, targetUser.role, 'demote');
       }
 
       try {
-        const supabase = getSupabaseAdmin();
-
-        // Get the current user's role to check if demoting a superadmin
-        const { data: targetUser, error: fetchError } = await supabase
-          .from('users')
-          .select('role')
-          .eq('id', userId)
-          .single();
-
-        if (fetchError) {
-          if (fetchError.code === 'PGRST116') {
-            throw new TRPCError({
-              code: 'NOT_FOUND',
-              message: ErrorMessages.notFound('User', userId),
-            });
-          }
-          logger.error({ err: fetchError.message, userId }, 'Failed to fetch user for role update');
-          throw new TRPCError({
-            code: 'INTERNAL_SERVER_ERROR',
-            message: ErrorMessages.databaseError('User lookup', fetchError.message),
-          });
-        }
-
-        // Validation: Admins cannot modify superadmin users
-        if (targetUser.role === 'superadmin' && currentUser.role !== 'superadmin') {
-          throw new TRPCError({
-            code: 'FORBIDDEN',
-            message: 'Only superadmins can modify superadmin users.',
-          });
-        }
-
-        // Validation: Cannot demote the last superadmin
-        if (targetUser.role === 'superadmin' && role !== 'superadmin') {
-          const { count, error: countError } = await supabase
-            .from('users')
-            .select('*', { count: 'exact', head: true })
-            .eq('role', 'superadmin');
-
-          if (countError) {
-            logger.error({ err: countError.message }, 'Failed to count superadmins');
-            throw new TRPCError({
-              code: 'INTERNAL_SERVER_ERROR',
-              message: ErrorMessages.databaseError('Superadmin count', countError.message),
-            });
-          }
-
-          if (count !== null && count <= 1) {
-            throw new TRPCError({
-              code: 'BAD_REQUEST',
-              message:
-                'Cannot demote the last superadmin. Promote another user to superadmin first.',
-            });
-          }
-        }
-
         // Update the user's role
         const { data: updatedUser, error: updateError } = await supabase
           .from('users')
@@ -451,52 +403,19 @@ export const usersRouter = router({
     .input(toggleUserActivationInputSchema)
     .mutation(async ({ ctx, input }) => {
       const { userId, isActive } = input;
-      // adminProcedure guarantees ctx.user is non-null
       const currentUser = ctx.user!;
+      const supabase = getSupabaseAdmin();
 
-      // Validation: Cannot deactivate own account
-      if (userId === currentUser.id && !isActive) {
-        throw new TRPCError({
-          code: 'BAD_REQUEST',
-          message: 'Cannot deactivate your own account. Ask another admin to make this change.',
-        });
+      // Only validate self-deactivation (self-activation is allowed)
+      if (!isActive) {
+        validateNotSelf(userId, currentUser.id, 'deactivate');
       }
 
+      // Fetch target user and validate permissions
+      const targetUser = await fetchUserForValidation(supabase, userId, 'activation toggle');
+      validateCanModifyTarget(targetUser.role, currentUser.role, 'change activation of');
+
       try {
-        const supabase = getSupabaseAdmin();
-
-        // Check if user exists and get their role
-        const { data: targetUser, error: fetchError } = await supabase
-          .from('users')
-          .select('id, role')
-          .eq('id', userId)
-          .single();
-
-        if (fetchError) {
-          if (fetchError.code === 'PGRST116') {
-            throw new TRPCError({
-              code: 'NOT_FOUND',
-              message: ErrorMessages.notFound('User', userId),
-            });
-          }
-          logger.error(
-            { err: fetchError.message, userId },
-            'Failed to fetch user for activation toggle'
-          );
-          throw new TRPCError({
-            code: 'INTERNAL_SERVER_ERROR',
-            message: ErrorMessages.databaseError('User lookup', fetchError.message),
-          });
-        }
-
-        // Validation: Admins cannot deactivate superadmin users
-        if (targetUser.role === 'superadmin' && currentUser.role !== 'superadmin') {
-          throw new TRPCError({
-            code: 'FORBIDDEN',
-            message: 'Only superadmins can change activation status of superadmin users.',
-          });
-        }
-
         // Update the user's is_active status
         const { data: updatedUser, error: updateError } = await supabase
           .from('users')
@@ -580,72 +499,17 @@ export const usersRouter = router({
   deleteUser: adminProcedure.input(deleteUserInputSchema).mutation(async ({ ctx, input }) => {
     const { userId } = input;
     const currentUser = ctx.user!;
+    const supabase = getSupabaseAdmin();
 
-    // Validation: Cannot delete own account
-    if (userId === currentUser.id) {
-      throw new TRPCError({
-        code: 'BAD_REQUEST',
-        message: 'Cannot delete your own account.',
-      });
-    }
+    // Validations
+    validateNotSelf(userId, currentUser.id, 'delete');
+
+    // Fetch target user and validate permissions
+    const targetUser = await fetchUserForValidation(supabase, userId, 'deletion');
+    validateAdminCanOnlyModifyLowerRoles(targetUser.role, currentUser.role, 'delete');
+    await validateNotLastSuperadmin(supabase, targetUser.role, 'delete');
 
     try {
-      const supabase = getSupabaseAdmin();
-
-      // Check if user exists and get their role
-      const { data: targetUser, error: fetchError } = await supabase
-        .from('users')
-        .select('id, email, role')
-        .eq('id', userId)
-        .single();
-
-      if (fetchError) {
-        if (fetchError.code === 'PGRST116') {
-          throw new TRPCError({
-            code: 'NOT_FOUND',
-            message: ErrorMessages.notFound('User', userId),
-          });
-        }
-        logger.error({ err: fetchError.message, userId }, 'Failed to fetch user for deletion');
-        throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: ErrorMessages.databaseError('User lookup', fetchError.message),
-        });
-      }
-
-      // Validation: Admins cannot delete superadmins or other admins
-      if (currentUser.role !== 'superadmin') {
-        if (targetUser.role === 'superadmin' || targetUser.role === 'admin') {
-          throw new TRPCError({
-            code: 'FORBIDDEN',
-            message: 'Admins can only delete students and instructors.',
-          });
-        }
-      }
-
-      // Validation: Cannot delete the last superadmin
-      if (targetUser.role === 'superadmin') {
-        const { count, error: countError } = await supabase
-          .from('users')
-          .select('*', { count: 'exact', head: true })
-          .eq('role', 'superadmin');
-
-        if (countError) {
-          logger.error({ err: countError.message }, 'Failed to count superadmins');
-          throw new TRPCError({
-            code: 'INTERNAL_SERVER_ERROR',
-            message: ErrorMessages.databaseError('Superadmin count', countError.message),
-          });
-        }
-
-        if (count !== null && count <= 1) {
-          throw new TRPCError({
-            code: 'BAD_REQUEST',
-            message: 'Cannot delete the last superadmin.',
-          });
-        }
-      }
-
       // Delete from users table first (this will cascade if configured, or just delete the profile)
       const { error: deleteError } = await supabase.from('users').delete().eq('id', userId);
 
@@ -701,7 +565,7 @@ export const usersRouter = router({
    * Get the current user's role
    * Used by the frontend to determine which role options to show
    */
-  getCurrentUserRole: adminProcedure.query(async ({ ctx }) => {
+  getCurrentUserRole: adminProcedure.query(({ ctx }) => {
     const currentUser = ctx.user!;
     return { role: currentUser.role };
   }),
