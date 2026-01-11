@@ -254,10 +254,21 @@ run_preflight_checks() {
     if [ -z "$BRANCH" ]; then
         log_error "You are in detached HEAD state"
         echo "Checkout a branch first:"
-        echo "  git checkout main"
+        echo "  git checkout develop"
         exit 1
     fi
     log_success "On branch: $BRANCH"
+
+    # Protected branch check - auto-switch to develop if on main
+    if [ "$BRANCH" = "main" ] || [ "$BRANCH" = "master" ]; then
+        log_warning "Cannot push directly to '$BRANCH' (protected, auto-deploys)"
+        log_info "Switching to develop branch..."
+        git checkout develop 2>/dev/null || git checkout -b develop
+        BRANCH="develop"
+        log_success "Now on branch: $BRANCH"
+        echo ""
+        log_info "Use /deploy to merge into main when ready"
+    fi
 
     # Auto-commit uncommitted changes before release
     if ! git diff-index --quiet HEAD -- 2>/dev/null; then

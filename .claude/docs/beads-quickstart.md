@@ -55,6 +55,59 @@ bd sync                     # Синхронизация перед выходо
 
 ---
 
+## REF: Issues — Проектные знания
+
+> **Правило**: При изменении DB-схемы, страниц, пайплайна или tech stack → обнови соответствующий REF: issue.
+
+### Что такое REF: issues?
+
+REF: issues — это **живая документация** проекта в формате Beads issues. Они содержат актуальную информацию о ключевых доменах и обновляются вместе с кодом.
+
+### Доступные REF: issues
+
+| ID | Название | Что содержит |
+|----|----------|--------------|
+| `mc2-yp5` | REF: Business Entities | Все сущности БД: courses, modules, slides и т.д. |
+| `mc2-w50` | REF: Web App Pages | Все страницы веб-приложения и их назначение |
+| `mc2-g06` | REF: Pipeline Stages 1-7 | Стадии генерации курса |
+| `mc2-0e0` | REF: Tech Stack | Технологии, версии, архитектура |
+| `mc2-4ul` | REF: Guides Index | Указатель на все гайды проекта |
+| `mc2-wm8` | REF: Auth Patterns | Аутентификация и авторизация |
+| `mc2-mgb` | REF: i18n Languages | Интернационализация (ru, en) |
+| `mc2-vf0` | REF: Error Handling | Обработка ошибок |
+| `mc2-w7r` | REF: Logging Conventions | Логирование |
+| `mc2-6yg` | REF: Docker Services | Контейнеризация и деплой |
+
+### Когда обновлять REF: issues
+
+```bash
+# Изменил схему БД → обнови REF: Business Entities
+bd show mc2-yp5  # Посмотреть
+# ... добавь новую сущность в описание ...
+
+# Добавил страницу → обнови REF: Web App Pages
+bd show mc2-w50
+
+# Изменил стадию пайплайна → обнови REF: Pipeline Stages
+bd show mc2-g06
+
+# Добавил технологию → обнови REF: Tech Stack
+bd show mc2-0e0
+```
+
+### Как использовать
+
+```bash
+# Перед работой — изучи релевантные REF:
+bd show mc2-yp5    # Понять структуру данных
+bd show mc2-g06    # Понять пайплайн
+
+# В bd prime уже включены ключевые REF: issues
+bd prime           # Автоматически покажет контекст
+```
+
+---
+
 ## Создание задач
 
 ### Базовая команда
@@ -180,6 +233,115 @@ bd mol burn WISP_ID
 ```bash
 bd mol progress WISP_ID     # Статус выполнения
 bd mol current              # Текущая позиция в workflow
+```
+
+---
+
+## Directory Labels (автокатегоризация)
+
+Автоматическое присвоение labels на основе путей к файлам.
+
+```bash
+# При создании задачи с указанием файлов
+bd create "Fix login page" --files packages/web/app/login/page.tsx
+# → автоматически получит labels: frontend, nextjs
+
+# Фильтрация по области
+bd ready --label frontend    # Только frontend задачи
+bd ready --label pipeline    # Только pipeline задачи
+bd ready --label backend     # Только backend задачи
+```
+
+**Настроенные маппинги** (см. `.beads/config.yaml`):
+| Путь | Labels |
+|------|--------|
+| `packages/web` | frontend, nextjs |
+| `packages/web/app/[locale]/admin` | frontend, admin |
+| `packages/course-gen-platform` | backend, pipeline |
+| `packages/course-gen-platform/src/stages` | pipeline, stages |
+| `packages/shared-types` | types, shared |
+
+---
+
+## Exclusive Lock (multi-terminal)
+
+Защита от конфликтов при работе в нескольких терминалах параллельно.
+
+```bash
+# Терминал 1
+bd update mc2-abc --status in_progress  # → захватил lock
+
+# Терминал 2
+bd update mc2-abc --status in_progress  # → WARNING: Issue locked by another session
+
+# Найти незалоченные задачи
+bd list --unlocked
+```
+
+**Конфигурация** (`.beads/config.yaml`):
+- `timeout: 30m` — автоосвобождение через 30 минут неактивности
+- `on-conflict: warn` — предупреждение при конфликте
+
+---
+
+## Patrol Pattern (повторяющиеся задачи)
+
+Patrols — это стандартизированные повторяющиеся workflow.
+
+```bash
+# Вместо длинного текста "Запусти код-ревью, создай отчёт, создай задачи..."
+bd patrol run code-review --vars "scope=packages/web,topic=auth-refactor"
+
+# Health check
+bd patrol run health-check
+```
+
+**Настроенные patrols** (`.beads/config.yaml`):
+| Patrol | Formula | Описание |
+|--------|---------|----------|
+| `code-review` | codereview | Код-ревью после реализации |
+| `health-check` | healthcheck | Проверка здоровья кодовой базы |
+
+---
+
+## Protected Branch Mode (безопасный deploy)
+
+Защита от случайного push в production ветку.
+
+**Текущая конфигурация:**
+- `main` — production ветка (auto-deploy)
+- `develop` — рабочая ветка
+
+**Workflow:**
+```bash
+# 1. Работаем в develop
+git checkout develop
+# ... работа ...
+/push patch                  # → push в develop (НЕ deploy)
+
+# 2. Когда готовы к deploy
+git checkout main
+git merge develop
+git push                     # → deploy на сервер
+```
+
+---
+
+## Molecule Bonding (большие фичи)
+
+Связывание нескольких molecules в pipeline для complex features.
+
+**Настроенный pipeline** `bigfeature-pipeline`:
+```
+[spec] → [design] → [implement] → [review] → [release]
+```
+
+```bash
+# Запуск bonded pipeline
+bd mol bond bigfeature-pipeline --vars "feature_name=user-auth"
+
+# Pipeline создаст связанные molecules с зависимостями
+# Каждый этап требует manual approval (auto_advance: false)
 ```
 
 ---
@@ -385,6 +547,24 @@ bd daemon restart
 │ СОЗДАТЬ   bd create "..." -t type -p N           │
 │ ЗАКРЫТЬ   bd close ID --reason "..."             │
 ├──────────────────────────────────────────────────┤
+│ REF: ISSUES (живая документация)                 │
+│   mc2-yp5  Business Entities (DB схема)          │
+│   mc2-w50  Web App Pages                         │
+│   mc2-g06  Pipeline Stages 1-7                   │
+│   mc2-0e0  Tech Stack                            │
+│   → Изменил домен? Обнови REF: issue!            │
+├──────────────────────────────────────────────────┤
+│ НОВЫЕ ФИЧИ                                       │
+│   bd create "..." --files path/to/file.tsx       │
+│   bd ready --label frontend                      │
+│   bd list --unlocked (multi-terminal)            │
+│   bd patrol run code-review --vars "scope=X"     │
+│   bd mol bond bigfeature-pipeline                │
+├──────────────────────────────────────────────────┤
+│ ВЕТКИ (Protected Branch Mode)                    │
+│   develop  — работа (НЕ deploy)                  │
+│   main     — production (auto-deploy)            │
+├──────────────────────────────────────────────────┤
 │ КОНЕЦ СЕССИИ (ВСЕ 6 ШАГОВ!)                      │
 │   1. git status                                  │
 │   2. git add <files>                             │
@@ -413,4 +593,4 @@ bd daemon restart
 
 ---
 
-*Prefix: `mc2` | Версия: 2026-01-08 v2*
+*Prefix: `mc2` | Версия: 2026-01-11 v4 — добавлены Directory Labels, Exclusive Lock, Patrol, Protected Branch, Molecule Bonding*

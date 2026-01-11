@@ -12,7 +12,11 @@
 
 **2. DELEGATE TO SUBAGENTS**
 - Provide complete context (code, paths, patterns)
-- ALWAYS verify results (read files, type-check, lint)
+- **NEVER TRUST SUBAGENT REPORTS** — always verify yourself:
+  - Read modified files (`Read` tool)
+  - Run type-check (`pnpm type-check`)
+  - Run build if needed (`pnpm build`)
+  - Check for regressions
 - Re-delegate if incorrect
 
 **3. EXECUTE DIRECTLY** — Only for: single-line fixes, simple imports, minimal configs
@@ -45,15 +49,41 @@
 
 # FIND WORK
 bd ready                          # Available tasks (no blockers)
+bd ready --label frontend         # Only frontend tasks
+bd list --unlocked                # Tasks not locked by other terminals
 bd show <id>                      # Task details
 
 # WORK
-bd update <id> --status in_progress
+bd update <id> --status in_progress   # Acquires exclusive lock
 # ... do the work ...
-bd close <id> --reason "Done"
+bd close <id> --reason "Done"         # Releases lock
 
-# SESSION END (daemon auto-syncs, but always commit code!)
+# SESSION END
 git add . && git commit -m "..." && git push
+```
+
+### Multi-Terminal Work
+When working in multiple terminals simultaneously:
+- Each terminal acquires **exclusive lock** via `bd update --status in_progress`
+- Lock auto-releases after 30min inactivity
+- **Rule**: Each terminal works on DIFFERENT issues
+- Find unlocked: `bd list --unlocked`
+
+### Protected Branches
+- `main` — production (auto-deploy, protected)
+- `develop` — main working branch
+- `feature/*` — feature branches for parallel work
+
+```bash
+# On main → auto-switches to develop
+/push patch                       # → develop (auto-switch from main)
+
+# On develop or feature/*
+/push patch                       # → current branch (no deploy)
+
+# Deploy from ANY branch to main
+/deploy                           # → current branch → main (deploy!)
+/deploy --force                   # → skip type-check/build
 ```
 
 ### How User Gives Me Tasks
@@ -65,16 +95,19 @@ git add . && git commit -m "..." && git push
 
 | Work Type | Tool | Command |
 |-----------|------|---------|
-| Big feature (>1 day) | Spec-kit → Beads | `/speckit.specify` → `/speckit.tobeads` |
-| Small feature | Beads | `bd create -t feature` |
+| Big feature (>1 day) | Bonded Pipeline | `bd mol bond bigfeature-pipeline` |
+| Small feature | Beads | `bd create -t feature --files path/to/file.tsx` |
 | Bug fix | Beads | `bd create -t bug` |
 | Tech debt | Beads | `bd create -t chore` |
 | Exploration | Beads wisp | `bd mol wisp exploration` |
+| Code review | Patrol | `bd patrol run code-review --vars "scope=X,topic=Y"` |
+| Health check | Patrol | `bd patrol run health-check` |
 
 ### Automation
 - **Daemon auto-sync**: Enabled (auto-commit, auto-push, auto-pull for beads)
 - **Hooks**: SessionStart/PreCompact → `bd prime`, Stop → `bd sync`
-- **No manual bd sync needed** — daemon handles it
+- **Directory Labels**: Auto-assigned based on `--files` path (see config.yaml)
+- **Exclusive Lock**: Prevents conflicts in multi-terminal work
 
 **Emergent work**: `bd create "Issue" -t bug --deps discovered-from:<current-id>`
 
@@ -83,6 +116,10 @@ git add . && git commit -m "..." && git push
 ---
 
 ## Project Conventions
+
+**Project Knowledge**: `bd search "REF:"` — reference issues for entities, pages, pipeline, tech stack
+- **Update REF: issues** when changing: DB schema, pages, pipeline stages, tech stack
+- Pattern: `bd update mc2-xxx --description="..."`
 
 **File Organization**:
 - Agents: `.claude/agents/{domain}/{orchestrators|workers}/`
@@ -119,11 +156,35 @@ git add . && git commit -m "..." && git push
 
 ---
 
-## Technologies
+## External Documentation (Context7)
 
-- TypeScript 5.x (strict), Immer for state (`produce()`)
-- i18n: `packages/web/src/i18n/config.ts`, guide: `.claude/docs/i18n-guide.md`
-- Enrichments: guide `.claude/docs/enrichment-guide.md` (video, audio, presentation, quiz, document, cover)
+**Before implementing** with external libraries, query Context7 for latest docs:
+```
+mcp__context7__resolve-library-id → mcp__context7__query-docs
+```
+
+**When to use**: Next.js, Supabase, BullMQ, Qdrant, LangChain, Zod APIs
+
+---
+
+## Subagent Selection
+
+| Domain | Subagent | Labels | When |
+|--------|----------|--------|------|
+| DB/migrations | `database-architect` | database, migrations | Schema changes, RLS |
+| UI components | `nextjs-ui-designer` | frontend, nextjs | New pages, components |
+| Admin panel | `nextjs-ui-designer` | frontend, admin | Admin pages |
+| Pipeline stages | `stage-pipeline-specialist` | pipeline, stages | Stages 1-7 |
+| Backend services | `fullstack-nextjs-specialist` | backend, orchestrator | APIs, workers |
+| Tests | `test-writer` | — | Unit/integration tests |
+| Bugs from report | `bug-fixer` | — | Fix bug-hunting-report |
+| Code exploration | `Explore` | — | Find files, understand code |
+| TypeScript types | `typescript-types-specialist` | types, shared | Complex types, generics |
+| Security | `vulnerability-fixer` | — | Security fixes |
+
+**Label-based routing**: Use `bd ready --label X` to find tasks for specific subagent.
+
+**Rule**: For complex tasks, ALWAYS consider delegation. Verify result yourself.
 
 ---
 
