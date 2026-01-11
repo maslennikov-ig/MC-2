@@ -394,14 +394,17 @@ jobs:
       - name: Copy deployment files
         run: |
           scp -i ~/.ssh/deploy_key \
+            docker-compose.infra.yml \
+            docker-compose.app.yml \
             docker-compose.production.yml \
             nginx-docling-proxy.conf \
             nginx-megacampus.conf \
+            nginx.conf.template \
             ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }}:${{ env.DEPLOY_PATH }}/
 
           scp -i ~/.ssh/deploy_key \
-            scripts/deploy.sh \
-            scripts/rollback.sh \
+            scripts/deploy_blue_green.sh \
+            scripts/rollback_blue_green.sh \
             ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }}:${{ env.DEPLOY_PATH }}/scripts/
 
       - name: Update nginx config
@@ -444,7 +447,7 @@ jobs:
         run: |
           ssh -i ~/.ssh/deploy_key \
             ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} \
-            "cd ${{ env.DEPLOY_PATH }} && GITHUB_TOKEN='${{ secrets.GITHUB_TOKEN }}' GITHUB_ACTOR='${{ github.actor }}' bash scripts/deploy.sh production latest"
+            "cd ${{ env.DEPLOY_PATH }} && GITHUB_TOKEN='${{ secrets.GITHUB_TOKEN }}' GITHUB_ACTOR='${{ github.actor }}' bash scripts/deploy_blue_green.sh production latest"
 
       - name: Verify deployment
         run: |
@@ -495,7 +498,7 @@ jobs:
         run: |
           ssh -i ~/.ssh/deploy_key \
             ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} \
-            "cd ${{ env.DEPLOY_PATH }} && bash scripts/rollback.sh"
+            "cd ${{ env.DEPLOY_PATH }} && bash scripts/rollback_blue_green.sh"
 
       - name: Cleanup SSH
         if: always()
