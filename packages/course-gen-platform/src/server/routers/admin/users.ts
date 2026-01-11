@@ -67,9 +67,7 @@ export const usersRouter = router({
         const sanitizedSearch = search ? search.replace(/[%_\\]/g, '\\$&') : undefined;
 
         // Build count query with same filters (before pagination)
-        let countQuery = supabase
-          .from('users')
-          .select('*', { count: 'exact', head: true });
+        let countQuery = supabase.from('users').select('*', { count: 'exact', head: true });
 
         // Apply same filters to count query
         if (organizationId) {
@@ -88,11 +86,14 @@ export const usersRouter = router({
         const { count, error: countError } = await countQuery;
 
         if (countError) {
-          logger.error({
-            err: countError.message,
-            organizationId,
-            role,
-          }, 'Failed to count users');
+          logger.error(
+            {
+              err: countError.message,
+              organizationId,
+              role,
+            },
+            'Failed to count users'
+          );
           throw new TRPCError({
             code: 'INTERNAL_SERVER_ERROR',
             message: ErrorMessages.databaseError('User count', countError.message),
@@ -143,13 +144,16 @@ export const usersRouter = router({
 
         // Handle database errors
         if (error) {
-          logger.error({
-            err: error.message,
-            limit,
-            offset,
-            organizationId,
-            role,
-          }, 'Failed to fetch users');
+          logger.error(
+            {
+              err: error.message,
+              limit,
+              offset,
+              organizationId,
+              role,
+            },
+            'Failed to fetch users'
+          );
           throw new TRPCError({
             code: 'INTERNAL_SERVER_ERROR',
             message: ErrorMessages.databaseError('User listing', error.message),
@@ -185,13 +189,16 @@ export const usersRouter = router({
         }
 
         // Log and wrap unexpected errors
-        logger.error({
-          err: error instanceof Error ? error.message : String(error),
-          limit,
-          offset,
-          organizationId,
-          role,
-        }, 'Unexpected error in listUsers');
+        logger.error(
+          {
+            err: error instanceof Error ? error.message : String(error),
+            limit,
+            offset,
+            organizationId,
+            role,
+          },
+          'Unexpected error in listUsers'
+        );
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
           message: ErrorMessages.internalError(
@@ -205,18 +212,16 @@ export const usersRouter = router({
   /**
    * Get a single user by ID with organization info
    */
-  getUserById: superadminProcedure
-    .input(getUserByIdInputSchema)
-    .query(async ({ input }) => {
-      const { userId } = input;
+  getUserById: superadminProcedure.input(getUserByIdInputSchema).query(async ({ input }) => {
+    const { userId } = input;
 
-      try {
-        const supabase = getSupabaseAdmin();
+    try {
+      const supabase = getSupabaseAdmin();
 
-        const { data, error } = await supabase
-          .from('users')
-          .select(
-            `
+      const { data, error } = await supabase
+        .from('users')
+        .select(
+          `
             id,
             email,
             role,
@@ -230,55 +235,58 @@ export const usersRouter = router({
               tier
             )
           `
-          )
-          .eq('id', userId)
-          .single();
+        )
+        .eq('id', userId)
+        .single();
 
-        if (error) {
-          if (error.code === 'PGRST116') {
-            throw new TRPCError({
-              code: 'NOT_FOUND',
-              message: ErrorMessages.notFound('User', userId),
-            });
-          }
-          logger.error({ err: error.message, userId }, 'Failed to fetch user');
+      if (error) {
+        if (error.code === 'PGRST116') {
           throw new TRPCError({
-            code: 'INTERNAL_SERVER_ERROR',
-            message: ErrorMessages.databaseError('User lookup', error.message),
+            code: 'NOT_FOUND',
+            message: ErrorMessages.notFound('User', userId),
           });
         }
-
-        const org = data.organizations as { id: string; name: string; tier: string } | null;
-
-        return {
-          id: data.id,
-          email: data.email,
-          role: data.role,
-          organizationId: data.organization_id,
-          organizationName: org?.name || UNKNOWN_ORG_NAME,
-          organizationTier: org?.tier || 'unknown',
-          isActive: data.is_active,
-          createdAt: data.created_at || new Date().toISOString(),
-          updatedAt: data.updated_at,
-        };
-      } catch (error) {
-        if (error instanceof TRPCError) {
-          throw error;
-        }
-
-        logger.error({
-          err: error instanceof Error ? error.message : String(error),
-          userId,
-        }, 'Unexpected error in getUserById');
+        logger.error({ err: error.message, userId }, 'Failed to fetch user');
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
-          message: ErrorMessages.internalError(
-            'User lookup',
-            error instanceof Error ? error.message : undefined
-          ),
+          message: ErrorMessages.databaseError('User lookup', error.message),
         });
       }
-    }),
+
+      const org = data.organizations as { id: string; name: string; tier: string } | null;
+
+      return {
+        id: data.id,
+        email: data.email,
+        role: data.role,
+        organizationId: data.organization_id,
+        organizationName: org?.name || UNKNOWN_ORG_NAME,
+        organizationTier: org?.tier || 'unknown',
+        isActive: data.is_active,
+        createdAt: data.created_at || new Date().toISOString(),
+        updatedAt: data.updated_at,
+      };
+    } catch (error) {
+      if (error instanceof TRPCError) {
+        throw error;
+      }
+
+      logger.error(
+        {
+          err: error instanceof Error ? error.message : String(error),
+          userId,
+        },
+        'Unexpected error in getUserById'
+      );
+      throw new TRPCError({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: ErrorMessages.internalError(
+          'User lookup',
+          error instanceof Error ? error.message : undefined
+        ),
+      });
+    }
+  }),
 
   /**
    * Update a user's role
@@ -361,7 +369,8 @@ export const usersRouter = router({
           if (count !== null && count <= 1) {
             throw new TRPCError({
               code: 'BAD_REQUEST',
-              message: 'Cannot demote the last superadmin. Promote another user to superadmin first.',
+              message:
+                'Cannot demote the last superadmin. Promote another user to superadmin first.',
             });
           }
         }
@@ -414,11 +423,14 @@ export const usersRouter = router({
           throw error;
         }
 
-        logger.error({
-          err: error instanceof Error ? error.message : String(error),
-          userId,
-          role,
-        }, 'Unexpected error in updateUserRole');
+        logger.error(
+          {
+            err: error instanceof Error ? error.message : String(error),
+            userId,
+            role,
+          },
+          'Unexpected error in updateUserRole'
+        );
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
           message: ErrorMessages.internalError(
@@ -433,29 +445,30 @@ export const usersRouter = router({
    * Toggle user activation status
    * Validations:
    * - Cannot deactivate own account
+   * - Admins cannot deactivate superadmin users
    */
-  toggleUserActivation: superadminProcedure
+  toggleUserActivation: adminProcedure
     .input(toggleUserActivationInputSchema)
     .mutation(async ({ ctx, input }) => {
       const { userId, isActive } = input;
-      // superadminProcedure guarantees ctx.user is non-null
+      // adminProcedure guarantees ctx.user is non-null
       const currentUser = ctx.user!;
 
       // Validation: Cannot deactivate own account
       if (userId === currentUser.id && !isActive) {
         throw new TRPCError({
           code: 'BAD_REQUEST',
-          message: 'Cannot deactivate your own account. Ask another superadmin to make this change.',
+          message: 'Cannot deactivate your own account. Ask another admin to make this change.',
         });
       }
 
       try {
         const supabase = getSupabaseAdmin();
 
-        // Check if user exists
-        const { error: fetchError } = await supabase
+        // Check if user exists and get their role
+        const { data: targetUser, error: fetchError } = await supabase
           .from('users')
-          .select('id')
+          .select('id, role')
           .eq('id', userId)
           .single();
 
@@ -466,10 +479,21 @@ export const usersRouter = router({
               message: ErrorMessages.notFound('User', userId),
             });
           }
-          logger.error({ err: fetchError.message, userId }, 'Failed to fetch user for activation toggle');
+          logger.error(
+            { err: fetchError.message, userId },
+            'Failed to fetch user for activation toggle'
+          );
           throw new TRPCError({
             code: 'INTERNAL_SERVER_ERROR',
             message: ErrorMessages.databaseError('User lookup', fetchError.message),
+          });
+        }
+
+        // Validation: Admins cannot deactivate superadmin users
+        if (targetUser.role === 'superadmin' && currentUser.role !== 'superadmin') {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'Only superadmins can change activation status of superadmin users.',
           });
         }
 
@@ -478,7 +502,7 @@ export const usersRouter = router({
           .from('users')
           .update({
             is_active: isActive,
-            updated_at: new Date().toISOString()
+            updated_at: new Date().toISOString(),
           })
           .eq('id', userId)
           .select(
@@ -498,7 +522,10 @@ export const usersRouter = router({
           .single();
 
         if (updateError) {
-          logger.error({ err: updateError.message, userId, isActive }, 'Failed to update user activation');
+          logger.error(
+            { err: updateError.message, userId, isActive },
+            'Failed to update user activation'
+          );
           throw new TRPCError({
             code: 'INTERNAL_SERVER_ERROR',
             message: ErrorMessages.databaseError('User activation update', updateError.message),
@@ -524,11 +551,14 @@ export const usersRouter = router({
           throw error;
         }
 
-        logger.error({
-          err: error instanceof Error ? error.message : String(error),
-          userId,
-          isActive,
-        }, 'Unexpected error in toggleUserActivation');
+        logger.error(
+          {
+            err: error instanceof Error ? error.message : String(error),
+            userId,
+            isActive,
+          },
+          'Unexpected error in toggleUserActivation'
+        );
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
           message: ErrorMessages.internalError(
@@ -546,111 +576,115 @@ export const usersRouter = router({
    * - Cannot delete the last superadmin
    * - Deletes from both users table and auth.users
    */
-  deleteUser: superadminProcedure
-    .input(deleteUserInputSchema)
-    .mutation(async ({ ctx, input }) => {
-      const { userId } = input;
-      const currentUser = ctx.user!;
+  deleteUser: superadminProcedure.input(deleteUserInputSchema).mutation(async ({ ctx, input }) => {
+    const { userId } = input;
+    const currentUser = ctx.user!;
 
-      // Validation: Cannot delete own account
-      if (userId === currentUser.id) {
-        throw new TRPCError({
-          code: 'BAD_REQUEST',
-          message: 'Cannot delete your own account.',
-        });
-      }
+    // Validation: Cannot delete own account
+    if (userId === currentUser.id) {
+      throw new TRPCError({
+        code: 'BAD_REQUEST',
+        message: 'Cannot delete your own account.',
+      });
+    }
 
-      try {
-        const supabase = getSupabaseAdmin();
+    try {
+      const supabase = getSupabaseAdmin();
 
-        // Check if user exists and get their role
-        const { data: targetUser, error: fetchError } = await supabase
-          .from('users')
-          .select('id, email, role')
-          .eq('id', userId)
-          .single();
+      // Check if user exists and get their role
+      const { data: targetUser, error: fetchError } = await supabase
+        .from('users')
+        .select('id, email, role')
+        .eq('id', userId)
+        .single();
 
-        if (fetchError) {
-          if (fetchError.code === 'PGRST116') {
-            throw new TRPCError({
-              code: 'NOT_FOUND',
-              message: ErrorMessages.notFound('User', userId),
-            });
-          }
-          logger.error({ err: fetchError.message, userId }, 'Failed to fetch user for deletion');
+      if (fetchError) {
+        if (fetchError.code === 'PGRST116') {
           throw new TRPCError({
-            code: 'INTERNAL_SERVER_ERROR',
-            message: ErrorMessages.databaseError('User lookup', fetchError.message),
+            code: 'NOT_FOUND',
+            message: ErrorMessages.notFound('User', userId),
           });
         }
-
-        // Validation: Cannot delete the last superadmin
-        if (targetUser.role === 'superadmin') {
-          const { count, error: countError } = await supabase
-            .from('users')
-            .select('*', { count: 'exact', head: true })
-            .eq('role', 'superadmin');
-
-          if (countError) {
-            logger.error({ err: countError.message }, 'Failed to count superadmins');
-            throw new TRPCError({
-              code: 'INTERNAL_SERVER_ERROR',
-              message: ErrorMessages.databaseError('Superadmin count', countError.message),
-            });
-          }
-
-          if (count !== null && count <= 1) {
-            throw new TRPCError({
-              code: 'BAD_REQUEST',
-              message: 'Cannot delete the last superadmin.',
-            });
-          }
-        }
-
-        // Delete from users table first (this will cascade if configured, or just delete the profile)
-        const { error: deleteError } = await supabase
-          .from('users')
-          .delete()
-          .eq('id', userId);
-
-        if (deleteError) {
-          logger.error({ err: deleteError.message, userId }, 'Failed to delete user from users table');
-          throw new TRPCError({
-            code: 'INTERNAL_SERVER_ERROR',
-            message: ErrorMessages.databaseError('User deletion', deleteError.message),
-          });
-        }
-
-        // Delete from auth.users (this requires admin client)
-        const { error: authDeleteError } = await supabase.auth.admin.deleteUser(userId);
-
-        if (authDeleteError) {
-          logger.error({ err: authDeleteError.message, userId }, 'Failed to delete user from auth.users');
-          // Note: We don't throw here because the user profile is already deleted
-          // The auth user will be orphaned but won't have access to the system
-        }
-
-        logger.info({ userId, email: targetUser.email }, 'User deleted');
-
-        return { success: true, deletedUserId: userId };
-      } catch (error) {
-        if (error instanceof TRPCError) {
-          throw error;
-        }
-
-        logger.error({
-          err: error instanceof Error ? error.message : String(error),
-          userId,
-        }, 'Unexpected error in deleteUser');
+        logger.error({ err: fetchError.message, userId }, 'Failed to fetch user for deletion');
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
-          message: ErrorMessages.internalError(
-            'User deletion',
-            error instanceof Error ? error.message : undefined
-          ),
+          message: ErrorMessages.databaseError('User lookup', fetchError.message),
         });
       }
-    }),
+
+      // Validation: Cannot delete the last superadmin
+      if (targetUser.role === 'superadmin') {
+        const { count, error: countError } = await supabase
+          .from('users')
+          .select('*', { count: 'exact', head: true })
+          .eq('role', 'superadmin');
+
+        if (countError) {
+          logger.error({ err: countError.message }, 'Failed to count superadmins');
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: ErrorMessages.databaseError('Superadmin count', countError.message),
+          });
+        }
+
+        if (count !== null && count <= 1) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'Cannot delete the last superadmin.',
+          });
+        }
+      }
+
+      // Delete from users table first (this will cascade if configured, or just delete the profile)
+      const { error: deleteError } = await supabase.from('users').delete().eq('id', userId);
+
+      if (deleteError) {
+        logger.error(
+          { err: deleteError.message, userId },
+          'Failed to delete user from users table'
+        );
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: ErrorMessages.databaseError('User deletion', deleteError.message),
+        });
+      }
+
+      // Delete from auth.users (this requires admin client)
+      const { error: authDeleteError } = await supabase.auth.admin.deleteUser(userId);
+
+      if (authDeleteError) {
+        logger.error(
+          { err: authDeleteError.message, userId },
+          'Failed to delete user from auth.users'
+        );
+        // Note: We don't throw here because the user profile is already deleted
+        // The auth user will be orphaned but won't have access to the system
+      }
+
+      logger.info({ userId, email: targetUser.email }, 'User deleted');
+
+      return { success: true, deletedUserId: userId };
+    } catch (error) {
+      if (error instanceof TRPCError) {
+        throw error;
+      }
+
+      logger.error(
+        {
+          err: error instanceof Error ? error.message : String(error),
+          userId,
+        },
+        'Unexpected error in deleteUser'
+      );
+      throw new TRPCError({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: ErrorMessages.internalError(
+          'User deletion',
+          error instanceof Error ? error.message : undefined
+        ),
+      });
+    }
+  }),
 
   /**
    * Get the current user's role
