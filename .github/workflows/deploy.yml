@@ -213,6 +213,7 @@ jobs:
             scripts/deploy.sh \
             scripts/rollback.sh \
             scripts/deploy_blue_green.sh \
+            scripts/rollback_blue_green.sh \
             ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }}:${{ env.DEPLOY_PATH }}/scripts/
 
       - name: Create .env.${{ env.TARGET_ENV }} from secrets
@@ -316,6 +317,20 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Set Environment Variables
+        run: |
+          if [ "${{ github.ref }}" = "refs/heads/master" ]; then
+            echo "TARGET_ENV=production" >> $GITHUB_ENV
+            echo "DEPLOY_HOST=${{ vars.DEPLOY_HOST || '95.81.98.230' }}" >> $GITHUB_ENV
+            echo "DEPLOY_USER=${{ vars.DEPLOY_USER || 'claude-deploy' }}" >> $GITHUB_ENV
+            echo "DEPLOY_PATH=${{ vars.DEPLOY_PATH || '/opt/megacampus' }}" >> $GITHUB_ENV
+          else
+            echo "TARGET_ENV=staging" >> $GITHUB_ENV
+            echo "DEPLOY_HOST=${{ vars.DEPLOY_HOST }}" >> $GITHUB_ENV
+            echo "DEPLOY_USER=${{ vars.DEPLOY_USER }}" >> $GITHUB_ENV
+            echo "DEPLOY_PATH=${{ vars.DEPLOY_PATH }}" >> $GITHUB_ENV
+          fi
+
       - name: Setup SSH key
         run: |
           mkdir -p ~/.ssh
@@ -327,7 +342,7 @@ jobs:
         run: |
           ssh -i ~/.ssh/deploy_key \
             ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} \
-            "cd ${{ env.DEPLOY_PATH }} && bash scripts/rollback.sh"
+            "cd ${{ env.DEPLOY_PATH }} && bash scripts/rollback_blue_green.sh ${{ env.TARGET_ENV }}"
 
       - name: Cleanup SSH key
         if: always()
