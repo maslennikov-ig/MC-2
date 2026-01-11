@@ -454,6 +454,7 @@ jobs:
           echo "Waiting for services..."
           sleep 30
 
+          # Check Web via HTTPS (nginx proxies to correct port)
           if curl -f -s https://ai.megacampus.ru/api/health > /dev/null; then
             echo "Web service healthy"
           else
@@ -461,9 +462,22 @@ jobs:
             exit 1
           fi
 
+          # Get active color to determine API port
+          ACTIVE_COLOR=$(ssh -i ~/.ssh/deploy_key \
+            ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} \
+            "cat ${{ env.DEPLOY_PATH }}/active_color")
+
+          if [ "$ACTIVE_COLOR" = "blue" ]; then
+            API_PORT=4001
+          else
+            API_PORT=4002
+          fi
+
+          echo "Active color: $ACTIVE_COLOR, API port: $API_PORT"
+
           if ssh -i ~/.ssh/deploy_key \
             ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} \
-            "curl -f -s http://localhost:4000/health" > /dev/null; then
+            "curl -f -s http://localhost:$API_PORT/health" > /dev/null; then
             echo "API service healthy"
           else
             echo "API health check failed!"
