@@ -383,6 +383,25 @@ export interface LessonLogEntry {
 }
 
 /**
+ * SourceDocument - A document that contributed to lesson generation
+ *
+ * Tracks which documents (and how many chunks from each) were used
+ * during RAG retrieval for lesson content generation.
+ *
+ * @see lessons.source_documents column in database
+ */
+export interface SourceDocument {
+  /** Document UUID from file_catalog */
+  document_id: string;
+  /** Original document name for display */
+  document_name: string;
+  /** Document priority tier */
+  document_priority: 'CORE' | 'IMPORTANT' | 'SUPPLEMENTARY';
+  /** Number of chunks from this document used in RAG retrieval */
+  chunk_count: number;
+}
+
+/**
  * LessonContentPreview - Preview of generated lesson content
  *
  * Provides a structured summary of the lesson without full markdown.
@@ -443,6 +462,8 @@ export interface LessonInspectorData {
   content: LessonContentPreview | null;
   /** Raw markdown content (null if not generated yet) */
   rawMarkdown: string | null;
+  /** Source documents used in RAG retrieval for this lesson */
+  sourceDocuments?: SourceDocument[];
 
   // Quality
   /** Self-review result from pre-judge validation (null if not reviewed yet) */

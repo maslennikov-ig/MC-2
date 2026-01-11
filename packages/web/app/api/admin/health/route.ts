@@ -397,6 +397,79 @@ async function checkWorkerReadiness(): Promise<ServiceStatus> {
 }
 
 /**
+ * Check Stage 7 Worker Readiness
+ * Verifies that the Stage 7 enrichment worker is ready to process jobs
+ */
+async function checkWorkerStage7Readiness(): Promise<ServiceStatus> {
+  const startTime = Date.now()
+  const lastCheck = new Date().toISOString()
+
+  const internalUrl = 'http://api:4000/readiness/stage7'
+  const publicUrl = `${ENV.COURSEGEN_BACKEND_URL}/readiness/stage7`
+
+  try {
+    let response: Response | null = null
+
+    try {
+      response = await fetchWithTimeout(internalUrl)
+    } catch {
+      response = await fetchWithTimeout(publicUrl)
+    }
+
+    const responseTime = Date.now() - startTime
+
+    if (response.ok) {
+      const data = await response.json()
+
+      if (data.data?.ready === true) {
+        return {
+          name: 'Worker Stage 7',
+          status: 'healthy',
+          responseTime,
+          message: 'Enrichment worker ready',
+          lastCheck,
+        }
+      }
+
+      return {
+        name: 'Worker Stage 7',
+        status: 'degraded',
+        responseTime,
+        message: 'Worker not ready',
+        lastCheck,
+      }
+    }
+
+    // 503 means worker is not ready
+    if (response.status === 503) {
+      return {
+        name: 'Worker Stage 7',
+        status: 'degraded',
+        responseTime,
+        message: 'Worker not ready (starting or stopped)',
+        lastCheck,
+      }
+    }
+
+    return {
+      name: 'Worker Stage 7',
+      status: 'error',
+      responseTime,
+      message: `HTTP ${response.status}: ${response.statusText}`,
+      lastCheck,
+    }
+  } catch (error) {
+    return {
+      name: 'Worker Stage 7',
+      status: 'error',
+      responseTime: Date.now() - startTime,
+      message: error instanceof Error ? error.message : 'Connection failed',
+      lastCheck,
+    }
+  }
+}
+
+/**
  * Check Qdrant vector database
  */
 async function checkQdrant(): Promise<ServiceStatus> {
@@ -520,6 +593,7 @@ export async function GET(request: NextRequest): Promise<NextResponse<HealthResp
       doclingStatus,
       qdrantStatus,
       workerStatus,
+      workerStage7Status,
     ] = await Promise.allSettled([
       checkSupabase(),
       checkApiServer(),
@@ -527,6 +601,7 @@ export async function GET(request: NextRequest): Promise<NextResponse<HealthResp
       checkDoclingMcp(),
       checkQdrant(),
       checkWorkerReadiness(),
+      checkWorkerStage7Readiness(),
     ])
 
     // Extract results, handling rejected promises
@@ -549,6 +624,9 @@ export async function GET(request: NextRequest): Promise<NextResponse<HealthResp
       workerStatus.status === 'fulfilled'
         ? workerStatus.value
         : { name: 'Worker', status: 'error' as const, responseTime: 0, message: 'Check failed', lastCheck: new Date().toISOString() },
+      workerStage7Status.status === 'fulfilled'
+        ? workerStage7Status.value
+        : { name: 'Worker Stage 7', status: 'error' as const, responseTime: 0, message: 'Check failed', lastCheck: new Date().toISOString() },
     ]
 
     // Determine overall status

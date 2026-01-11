@@ -16,6 +16,7 @@ import {
   IndividualJudgeVote,
   CLEVVotingResult,
   ConsensusMethod,
+  SourceDocument,
 } from '@megacampus/shared-types';
 import type { Database } from '@/types/database.generated';
 
@@ -824,10 +825,10 @@ export function useLessonInspectorData({
         return;
       }
 
-      // Step 2: Get lesson UUID
+      // Step 2: Get lesson UUID and source_documents
       const { data: lessonData, error: lessonError } = await supabase
         .from('lessons')
-        .select('id, title')
+        .select('id, title, source_documents')
         .eq('section_id', sectionData.id)
         .eq('order_index', lessonNumber)
         .single();
@@ -863,6 +864,12 @@ export function useLessonInspectorData({
 
       const lessonUuid = lessonData.id;
       const lessonTitle = lessonData.title || `Урок ${lessonNumber}`;
+
+      // Parse source_documents from lesson data
+      // Note: Json type needs explicit cast through unknown
+      const sourceDocuments: SourceDocument[] = Array.isArray(lessonData.source_documents)
+        ? (lessonData.source_documents as unknown as SourceDocument[])
+        : [];
 
       // Store UUID for realtime subscription
       setLessonUuidForRealtime(lessonUuid);
@@ -1034,6 +1041,7 @@ export function useLessonInspectorData({
         currentNode,
         content,
         rawMarkdown,
+        sourceDocuments: sourceDocuments.length > 0 ? sourceDocuments : undefined,
         judgeResult,
         totalTokensUsed,
         totalCostUsd,
@@ -1056,6 +1064,7 @@ export function useLessonInspectorData({
         pipelineNodesCount: pipelineNodes.length,
         logsCount: logs.length,
         hasContent: !!content,
+        sourceDocumentsCount: sourceDocuments.length,
       });
     } catch (err) {
       // Skip if a newer fetch was started

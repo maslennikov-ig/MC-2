@@ -18,3 +18,37 @@ ON lessons USING gin (source_documents jsonb_path_ops);
 
 -- Add RLS policy to allow reading source_documents
 -- (inherits existing lessons policies, no additional policy needed)
+
+-- ============================================================================
+-- TESTING GUIDANCE
+-- ============================================================================
+-- After applying this migration, verify with the following SQL commands:
+--
+-- 1. Check column exists:
+--    SELECT column_name, data_type, column_default
+--    FROM information_schema.columns
+--    WHERE table_name = 'lessons' AND column_name = 'source_documents';
+--    -- Expected: column_name='source_documents', data_type='jsonb', column_default='[]::jsonb'
+--
+-- 2. Check GIN index exists:
+--    SELECT indexname, indexdef
+--    FROM pg_indexes
+--    WHERE indexname = 'idx_lessons_source_documents';
+--    -- Expected: Returns 1 row with the index definition
+--
+-- 3. Test insert with sample data:
+--    UPDATE lessons
+--    SET source_documents = '[{"document_id": "00000000-0000-0000-0000-000000000001", "document_name": "test.pdf", "document_priority": "CORE", "chunk_count": 5}]'::jsonb
+--    WHERE id = (SELECT id FROM lessons LIMIT 1);
+--    -- Expected: 1 row updated
+--
+-- 4. Test GIN index query (find lessons using a specific document):
+--    SELECT id, title
+--    FROM lessons
+--    WHERE source_documents @> '[{"document_id": "00000000-0000-0000-0000-000000000001"}]';
+--    -- Expected: Returns lesson(s) containing that document_id
+--
+-- 5. Verify RLS still works (as authenticated user):
+--    -- Existing RLS policies on lessons table automatically apply to new column
+--    -- No additional policy configuration needed
+-- ============================================================================

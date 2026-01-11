@@ -18,6 +18,7 @@ import { getQueue } from './queue';
 import { exportMetrics } from './metrics';
 import logger from '../shared/logger';
 import { workerReadiness, getUploadsPath, getReadinessFromRedis } from './worker-readiness';
+import { cache } from '../shared/cache/redis';
 import { ERROR_MESSAGES } from '../shared/constants/messages';
 
 /**
@@ -268,6 +269,73 @@ export function createMetricsRouter(): Router {
       res.status(503).json({
         success: false,
         error: ERROR_MESSAGES.READINESS_CHECK_FAILED,
+        timestamp: new Date().toISOString(),
+      });
+    }
+  }));
+
+  /**
+   * GET /readiness/stage7 - Stage 7 Worker readiness check endpoint
+   *
+   * Returns whether the Stage 7 enrichment worker is ready to process jobs.
+   * Uses Redis for cross-process synchronization.
+   */
+  router.get('/readiness/stage7', readinessLimiter, asyncHandler(async (_req, res) => {
+    try {
+      // Get Stage 7 worker status from Redis
+      const redisStatus = await cache.get<{
+        ready: boolean;
+        startedAt: string;
+        lastHeartbeat: string;
+        workerId: string;
+        queueName: string;
+        concurrency: number;
+      }>('worker-stage7:readiness:status');
+
+      if (!redisStatus) {
+        // No status in Redis - worker hasn't started or status expired
+        logger.info({
+          endpoint: '/readiness/stage7',
+          ready: false,
+          reason: 'no_status_in_redis',
+        }, 'Stage 7 readiness check: no status');
+
+        res.status(503).json({
+          success: false,
+          data: {
+            ready: false,
+            message: 'Stage 7 worker status not available (not started or expired)',
+          },
+          timestamp: new Date().toISOString(),
+        });
+        return;
+      }
+
+      const httpStatus = redisStatus.ready ? 200 : 503;
+
+      logger.info({
+        endpoint: '/readiness/stage7',
+        ready: redisStatus.ready,
+        workerId: redisStatus.workerId,
+      }, 'Stage 7 readiness check completed');
+
+      res.status(httpStatus).json({
+        success: redisStatus.ready,
+        data: {
+          ready: redisStatus.ready,
+          queueName: redisStatus.queueName,
+          concurrency: redisStatus.concurrency,
+          startedAt: redisStatus.startedAt,
+          lastHeartbeat: redisStatus.lastHeartbeat,
+          workerId: redisStatus.workerId,
+        },
+        timestamp: new Date().toISOString(),
+      });
+    } catch (error) {
+      logger.error({ err: error }, 'Stage 7 readiness check failed');
+      res.status(503).json({
+        success: false,
+        error: 'Stage 7 readiness check failed',
         timestamp: new Date().toISOString(),
       });
     }

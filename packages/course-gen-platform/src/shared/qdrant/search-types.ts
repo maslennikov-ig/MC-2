@@ -91,9 +91,27 @@ export interface SearchOptions {
    */
   enable_priority_boost?: boolean;
   /**
-   * Multiplier for priority boosting (default: 0.4)
-   * Final score = base_score * (1 + (weight - 0.5) * boost_factor)
-   * With 0.4: CORE (1.0) gets +20% boost, SUPPLEMENTARY (0.5) gets 0%
+   * Priority boost factor for document priority scoring.
+   *
+   * Formula: finalScore = baseScore * (1 + (document_weight - 0.5) * priority_boost_factor)
+   *
+   * Examples with priority_boost_factor = 0.4 (default):
+   * - CORE document (weight=1.0): score * 1.2 (+20% boost)
+   * - IMPORTANT document (weight=0.8): score * 1.12 (+12% boost)
+   * - SUPPLEMENTARY document (weight=0.5): score * 1.0 (no change)
+   *
+   * Score calculation breakdown:
+   * - CORE: 1 + (1.0 - 0.5) * 0.4 = 1 + 0.5 * 0.4 = 1.2
+   * - IMPORTANT: 1 + (0.8 - 0.5) * 0.4 = 1 + 0.3 * 0.4 = 1.12
+   * - SUPPLEMENTARY: 1 + (0.5 - 0.5) * 0.4 = 1 + 0 * 0.4 = 1.0
+   *
+   * Tuning guidelines:
+   * - 0.2 = subtle boost (CORE gets +10%, barely noticeable)
+   * - 0.4 = balanced (CORE gets +20%, recommended default)
+   * - 0.8 = aggressive (CORE gets +40%, may overwhelm semantic relevance)
+   *
+   * @default 0.4
+   * @see docs/tasks/REFACTOR-RAG-PRIORITY-BASED-RETRIEVAL.md
    */
   priority_boost_factor?: number;
 }

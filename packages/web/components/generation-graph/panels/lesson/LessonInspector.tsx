@@ -331,6 +331,7 @@ export function LessonInspector({
       rawMarkdown={data.rawMarkdown}
       metadata={buildMetadata}
       logs={transformedLogs}
+      sourceDocuments={data.sourceDocuments}
       selfReviewResult={data.selfReviewResult ?? null}
       judgeResult={data.judgeResult}
       stats={{

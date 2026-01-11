@@ -36,7 +36,9 @@ import type {
   SelfReviewResult,
   JudgeVerdictDisplay,
   Stage6NodeName,
+  SourceDocument,
 } from '@megacampus/shared-types';
+import { SourceDocumentsPanel } from '../../lesson/SourceDocumentsPanel';
 
 // =============================================================================
 // TYPES
@@ -48,6 +50,8 @@ interface Stage6InspectorContentProps {
   rawMarkdown: string | null;
   metadata: Record<string, unknown> | null;
   logs: Array<{ level: string; message: string; timestamp: string; details?: unknown }>;
+  /** Source documents used in RAG retrieval for this lesson */
+  sourceDocuments?: SourceDocument[];
 
   // Quality data
   selfReviewResult: SelfReviewResult | null;
@@ -194,6 +198,7 @@ export const Stage6InspectorContent = memo(function Stage6InspectorContent({
   rawMarkdown,
   metadata,
   logs,
+  sourceDocuments,
   selfReviewResult,
   judgeResult,
   stats,
@@ -211,12 +216,13 @@ export const Stage6InspectorContent = memo(function Stage6InspectorContent({
   locale = 'en',
   className,
 }: Stage6InspectorContentProps) {
-  const [activeTab, setActiveTab] = useState<'preview' | 'quality' | 'blueprint' | 'trace' | 'card'>('preview');
+  const [activeTab, setActiveTab] = useState<'preview' | 'quality' | 'sources' | 'blueprint' | 'trace' | 'card'>('preview');
 
   // Localized labels
   const labels = {
     preview: locale === 'ru' ? 'Просмотр' : 'Preview',
     quality: locale === 'ru' ? 'Качество' : 'Quality',
+    sources: locale === 'ru' ? 'Источники' : 'Sources',
     blueprint: locale === 'ru' ? 'Схема' : 'Blueprint',
     trace: locale === 'ru' ? 'Трассировка' : 'Trace',
     card: locale === 'ru' ? 'Карточка' : 'Card',
@@ -279,6 +285,15 @@ export const Stage6InspectorContent = memo(function Stage6InspectorContent({
       );
     }
 
+    if (activeTab === 'sources') {
+      return (
+        <SourceDocumentsPanel
+          sourceDocuments={sourceDocuments || []}
+          locale={locale}
+        />
+      );
+    }
+
     if (activeTab === 'blueprint') {
       if (!metadata) {
         return (
@@ -332,6 +347,7 @@ export const Stage6InspectorContent = memo(function Stage6InspectorContent({
             <TabsList>
               <TabsTrigger value="preview">{labels.preview}</TabsTrigger>
               <TabsTrigger value="quality">{labels.quality}</TabsTrigger>
+              <TabsTrigger value="sources">{labels.sources}</TabsTrigger>
               <TabsTrigger value="blueprint">{labels.blueprint}</TabsTrigger>
               <TabsTrigger value="trace">{labels.trace}</TabsTrigger>
               <TabsTrigger value="card">{labels.card}</TabsTrigger>

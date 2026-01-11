@@ -1368,6 +1368,59 @@ export type Database = {
           },
         ]
       }
+      lesson_improvement_suggestions: {
+        Row: {
+          created_at: string
+          criterion: string
+          description: string
+          id: string
+          lesson_id: string
+          location: string
+          quoted_text: string | null
+          severity: string
+          source: string
+          status: string
+          suggested_fix: string | null
+          updated_at: string
+        }
+        Insert: {
+          created_at?: string
+          criterion: string
+          description: string
+          id?: string
+          lesson_id: string
+          location?: string
+          quoted_text?: string | null
+          severity: string
+          source?: string
+          status?: string
+          suggested_fix?: string | null
+          updated_at?: string
+        }
+        Update: {
+          created_at?: string
+          criterion?: string
+          description?: string
+          id?: string
+          lesson_id?: string
+          location?: string
+          quoted_text?: string | null
+          severity?: string
+          source?: string
+          status?: string
+          suggested_fix?: string | null
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "lesson_improvement_suggestions_lesson_id_fkey"
+            columns: ["lesson_id"]
+            isOneToOne: false
+            referencedRelation: "lessons"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       lessons: {
         Row: {
           content: Json | null
@@ -1380,6 +1433,7 @@ export type Database = {
           objectives: string[] | null
           order_index: number
           section_id: string
+          source_documents: Json | null
           status: Database["public"]["Enums"]["lesson_status"]
           title: string
           updated_at: string | null
@@ -1395,6 +1449,7 @@ export type Database = {
           objectives?: string[] | null
           order_index: number
           section_id: string
+          source_documents?: Json | null
           status?: Database["public"]["Enums"]["lesson_status"]
           title: string
           updated_at?: string | null
@@ -1410,6 +1465,7 @@ export type Database = {
           objectives?: string[] | null
           order_index?: number
           section_id?: string
+          source_documents?: Json | null
           status?: Database["public"]["Enums"]["lesson_status"]
           title?: string
           updated_at?: string | null
@@ -2825,7 +2881,7 @@ export type Database = {
               p_course_id: string
               p_error_details?: Json
               p_error_message?: string
-              p_message: string
+              p_message?: string
               p_metadata?: Json
               p_status: string
               p_step_id: number

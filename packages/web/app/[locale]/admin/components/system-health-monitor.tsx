@@ -74,6 +74,7 @@ const SERVICE_CONFIG: Record<string, { key: string; icon: React.ElementType }> =
   'Docling MCP': { key: 'docling', icon: FileText },
   'Qdrant': { key: 'qdrant', icon: Search },
   'Worker': { key: 'worker', icon: Cog },
+  'Worker Stage 7': { key: 'workerStage7', icon: Cog },
 };
 
 // Overall status icon mapping
@@ -95,7 +96,7 @@ function ServiceStatusCard({ service }: ServiceStatusCardProps) {
   const Icon = config.icon;
 
   // Get localized name and description using type-safe keys
-  type ServiceKey = 'redis' | 'docling' | 'api' | 'worker' | 'supabase' | 'qdrant';
+  type ServiceKey = 'redis' | 'docling' | 'api' | 'worker' | 'workerStage7' | 'supabase' | 'qdrant';
   const serviceKey = config.key as ServiceKey;
 
   // Use a mapping approach for type safety
@@ -104,6 +105,7 @@ function ServiceStatusCard({ service }: ServiceStatusCardProps) {
     docling: t('services.docling'),
     api: t('services.api'),
     worker: t('services.worker'),
+    workerStage7: t('services.workerStage7'),
     supabase: t('services.supabase'),
     qdrant: t('services.qdrant'),
   };
@@ -113,6 +115,7 @@ function ServiceStatusCard({ service }: ServiceStatusCardProps) {
     docling: t('services.doclingDesc'),
     api: t('services.apiDesc'),
     worker: t('services.workerDesc'),
+    workerStage7: t('services.workerStage7Desc'),
     supabase: t('services.supabaseDesc'),
     qdrant: t('services.qdrantDesc'),
   };
@@ -235,8 +238,8 @@ export function SystemHealthMonitor({
       <div className="bg-white dark:bg-transparent admin-glass-card p-6 rounded-xl border border-gray-200 dark:border-slate-700/50">
         <div className="animate-pulse space-y-4">
           <div className="h-6 bg-gray-200 dark:bg-gray-700 rounded w-1/3" />
-          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-4">
-            {Array.from({ length: 5 }).map((_, i) => (
+          <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-7 gap-4">
+            {Array.from({ length: 7 }).map((_, i) => (
               <div key={i} className="h-28 bg-gray-200 dark:bg-gray-700 rounded-xl" />
             ))}
           </div>
@@ -309,7 +312,7 @@ export function SystemHealthMonitor({
       </div>
 
       {/* Service Status Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-5 gap-3">
+      <div className="grid grid-cols-2 md:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-7 gap-3">
         {healthData.services.map((service) => (
           <ServiceStatusCard key={service.name} service={service} />
         ))}

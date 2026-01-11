@@ -68,6 +68,10 @@ import logger from '../shared/logger';
 import { validateEnvironment } from '../shared/config/env-validator';
 import { warmupEmbeddingCache } from '../shared/validation/semantic-matching';
 import { findAvailablePort } from '../shared/utils/find-available-port';
+import { registerCleanupHandler, runCleanupHandlers } from '../shared/graceful-shutdown';
+import { closeRedisClient } from '../shared/cache/redis';
+import { closeQueue, stopWorker } from '../orchestrator';
+import { generationLockService } from '../shared/locks';
 
 // Validate all required environment variables at startup
 // This ensures fail-fast behavior if critical configuration is missing
@@ -417,41 +421,93 @@ async function startServer() {
     });
 
     /**
+     * Register cleanup handlers for graceful shutdown
+     *
+     * Priority order (lower = first):
+     * 1. Release generation locks (priority 5) - prevent deadlocks
+     * 2. Stop BullMQ workers (priority 10) - stop processing new jobs
+     * 3. Close BullMQ queue (priority 20) - close queue connections
+     * 4. Close Redis client (priority 100) - last since others depend on it
+     *
+     * Note: Supabase client doesn't need explicit cleanup - it uses HTTP
+     * connections that close automatically.
+     */
+    registerCleanupHandler('generation-locks', async () => {
+      const released = await generationLockService.releaseAllLocks();
+      logger.info({ released }, 'Generation locks released');
+    }, 5);
+
+    registerCleanupHandler('bullmq-workers', async () => {
+      await stopWorker(false); // graceful stop
+    }, 10);
+
+    registerCleanupHandler('bullmq-queue', async () => {
+      await closeQueue();
+    }, 20);
+
+    registerCleanupHandler('redis', async () => {
+      await closeRedisClient();
+    }, 100);
+
+    /**
      * Graceful Shutdown Handler
      *
      * Handles SIGTERM and SIGINT signals to gracefully shut down the server.
      * This ensures:
      * - Active requests are completed
-     * - Database connections are closed
-     * - Worker processes are stopped
+     * - Generation locks are released
+     * - BullMQ workers stop processing
+     * - Queue and Redis connections are closed
      */
-    function gracefulShutdown(signal: string) {
+    let isShuttingDown = false;
+
+    async function gracefulShutdown(signal: string): Promise<void> {
+      // Prevent multiple shutdown attempts
+      if (isShuttingDown) {
+        logger.warn({ signal }, 'Shutdown already in progress, ignoring signal');
+        return;
+      }
+      isShuttingDown = true;
+
       logger.info({ signal }, 'Shutdown signal received');
 
-      server.close(() => {
-        logger.info('HTTP server closed');
-
-        // Close database connections, workers, etc.
-        // TODO: Add cleanup for:
-        // - Supabase client connections
-        // - Redis connections
-        // - BullMQ worker instances
-        // - Any other resources that need cleanup
-
-        logger.info('Graceful shutdown complete');
-        process.exit(0);
-      });
-
-      // Force shutdown after 30 seconds if graceful shutdown fails
-      setTimeout(() => {
-        logger.error('Graceful shutdown timeout, forcing exit');
+      // Set force shutdown timeout (30 seconds)
+      const forceShutdownTimer = setTimeout(() => {
+        logger.error('Graceful shutdown timeout (30s), forcing exit');
         process.exit(1);
       }, 30000);
+
+      // Close HTTP server first (stop accepting new requests)
+      await new Promise<void>((resolve) => {
+        server.close(() => {
+          logger.info('HTTP server closed');
+          resolve();
+        });
+      });
+
+      // Run all cleanup handlers (with 25s timeout, leaving 5s buffer)
+      const result = await runCleanupHandlers(25000);
+
+      logger.info(
+        {
+          total: result.total,
+          succeeded: result.succeeded,
+          failed: result.failed,
+          timedOut: result.timedOut,
+        },
+        'Graceful shutdown complete'
+      );
+
+      // Clear the force shutdown timer
+      clearTimeout(forceShutdownTimer);
+
+      // Exit with appropriate code
+      process.exit(result.failed > 0 ? 1 : 0);
     }
 
     // Register shutdown handlers
-    process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
-    process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+    process.on('SIGTERM', () => void gracefulShutdown('SIGTERM'));
+    process.on('SIGINT', () => void gracefulShutdown('SIGINT'));
 
     return server;
   } catch (error) {

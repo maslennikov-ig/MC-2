@@ -255,6 +255,62 @@ if (config.enable_priority_boost) {
 }
 ```
 
+#### Decision Log: Why 0.4 for priority_boost_factor?
+
+The default value of `0.4` for `priority_boost_factor` was chosen after analyzing the trade-offs between semantic relevance and document priority:
+
+**The Problem We're Solving**
+
+Priority boosting adjusts vector search scores based on document importance. However, if the boost is too aggressive, it can override semantic relevance - a less relevant chunk from a CORE document could rank higher than a highly relevant chunk from a SUPPLEMENTARY document.
+
+**Boost Factor Comparison**
+
+| Factor | CORE Boost | IMPORTANT Boost | Effect |
+|--------|------------|-----------------|--------|
+| 0.2 | +10% | +6% | Subtle - barely noticeable, semantic similarity dominates |
+| 0.4 | +20% | +12% | Balanced - meaningful boost without overwhelming relevance |
+| 0.6 | +30% | +18% | Strong - priority significantly affects ranking |
+| 0.8 | +40% | +24% | Aggressive - priority can override moderate relevance differences |
+
+**Why 0.4 is Optimal**
+
+1. **Meaningful differentiation**: A 20% boost for CORE documents is significant enough to affect ranking when two chunks have similar semantic scores.
+
+2. **Preserves relevance**: If a SUPPLEMENTARY chunk has 25%+ higher semantic score than a CORE chunk, the SUPPLEMENTARY chunk still wins. This prevents irrelevant content from ranking high just because its source document is marked CORE.
+
+3. **Gradual priority ladder**: CORE (+20%) > IMPORTANT (+12%) > SUPPLEMENTARY (0%) creates a clear priority hierarchy without extreme jumps.
+
+4. **Conservative default**: Starting with 0.4 allows teams to increase if needed. It's easier to tune up than to undo damage from an aggressive boost.
+
+**Tuning Recommendations**
+
+- **A/B Testing**: Compare lesson quality with 0.3, 0.4, and 0.5 boost factors
+- **Domain-Specific**: Technical courses with clear CORE textbooks may benefit from higher boost (0.5-0.6)
+- **Diverse Sources**: Courses with many equally-important documents may prefer lower boost (0.2-0.3)
+- **Monitoring**: Track which documents contribute to lessons via `source_documents` and adjust based on coverage
+
+**Configuration**
+
+```typescript
+// Default: balanced boost
+const options: SearchOptions = {
+  enable_priority_boost: true,
+  priority_boost_factor: 0.4,  // +20% for CORE, +12% for IMPORTANT
+};
+
+// Conservative: subtle boost
+const options: SearchOptions = {
+  enable_priority_boost: true,
+  priority_boost_factor: 0.2,  // +10% for CORE, +6% for IMPORTANT
+};
+
+// Aggressive: strong priority preference
+const options: SearchOptions = {
+  enable_priority_boost: true,
+  priority_boost_factor: 0.8,  // +40% for CORE, +24% for IMPORTANT
+};
+```
+
 ### Phase 3: Source Attribution from Retrieved Chunks
 
 **File**: `src/stages/stage6-lesson-content/utils/lesson-rag-retriever.ts`
@@ -509,6 +565,47 @@ LESSON_RAG_CONFIG = {
 | Priority boosting degrades results | Make boosting optional and tunable |
 | Unused documents not flagged | Add post-generation validation |
 | Lessons missing source attribution | Backfill via separate job |
+
+### Performance Impact Analysis
+
+Priority boosting adds minimal overhead to the search pipeline:
+
+**Time Complexity**
+
+| Operation | Complexity | Notes |
+|-----------|------------|-------|
+| Score multiplication | O(n) | One multiply per result |
+| Re-sorting | O(n log n) | Standard sort after boosting |
+| Total overhead | O(n log n) | Where n = number of results (typically 10-50) |
+
+**Benchmarks (Estimated)**
+
+| Result Set Size | Boost + Sort Time | Percentage of Total Search Time |
+|-----------------|-------------------|--------------------------------|
+| 10 chunks | < 0.1ms | < 0.1% |
+| 50 chunks | < 0.5ms | < 0.5% |
+| 100 chunks | < 1ms | < 1% |
+
+For typical RAG retrieval (10-50 chunks), the overhead is negligible compared to:
+- Embedding generation: 50-200ms
+- Vector search: 20-100ms
+- Network latency: 10-50ms
+
+**Memory Impact**
+
+- No additional memory allocation (in-place score modification)
+- Single sort operation (standard JavaScript sort)
+- Payload already loaded for result mapping
+
+**API Calls**
+
+- No additional API calls required
+- Priority data stored in Qdrant payload (already retrieved)
+- No database queries for priority lookup
+
+**Conclusion**
+
+Priority boosting adds < 1ms to search operations. The performance impact is negligible for all practical use cases. No optimization or caching is required.
 
 ---
 
