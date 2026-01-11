@@ -1,0 +1,18 @@
+upstream app_upstream {
+    # The script replaces {{PORT}} with the active Blue or Green port
+    server 127.0.0.1:{{PORT}};
+}
+
+server {
+    listen 80;
+    # Adjust server_name as needed or use a wildcard if handled by an outer proxy
+    server_name _;
+
+    location / {
+        proxy_pass http://app_upstream;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
