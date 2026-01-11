@@ -17,6 +17,7 @@
 
 import { Job } from 'bullmq';
 import type { DocumentProcessingJobData, DocumentPriorityLevel } from '@megacampus/shared-types';
+import { getPriorityWeight } from '../../shared/constants/priority-weights';
 import { DocumentProcessingResult, FileWithOrganization } from './types';
 import { getSupabaseAdmin } from '../../shared/supabase/admin';
 import { logger } from '../../shared/logger/index.js';
@@ -419,9 +420,9 @@ export class DocumentProcessingOrchestrator {
       );
     }
 
-    // Get priority with default fallback
+    // Get priority with default fallback, using shared constant
     const priority = fileData.priority ?? 'SUPPLEMENTARY';
-    const priorityWeight = this.getPriorityWeight(priority);
+    const priorityWeight = getPriorityWeight(priority, { fileId });
 
     return {
       tier: fileData.organizations.tier,
@@ -429,22 +430,6 @@ export class DocumentProcessingOrchestrator {
       priority,
       priorityWeight,
     };
-  }
-
-  /**
-   * Convert document priority level to numeric weight for RAG boosting
-   * @see docs/tasks/REFACTOR-RAG-PRIORITY-BASED-RETRIEVAL.md
-   */
-  private getPriorityWeight(priority: DocumentPriorityLevel): number {
-    switch (priority) {
-      case 'CORE':
-        return 1.0;
-      case 'IMPORTANT':
-        return 0.8;
-      case 'SUPPLEMENTARY':
-      default:
-        return 0.5;
-    }
   }
 
   /**

@@ -157,25 +157,27 @@ export async function searchChunks(
       searchResults = await denseSearch(queryText, config);
     }
 
-    // Apply priority boosting if enabled
+    // Apply priority boosting if enabled (immutable - creates new objects)
     // @see docs/tasks/REFACTOR-RAG-PRIORITY-BASED-RETRIEVAL.md
     if (config.enable_priority_boost) {
       const boostFactor = config.priority_boost_factor;
-      // Apply boost directly on raw results before conversion
-      for (const point of searchResults) {
-        // Get document_weight from payload (default: 0.5 for SUPPLEMENTARY)
-        const payload = point.payload as Record<string, unknown> | undefined;
-        const weight = (payload?.document_weight as number) ?? 0.5;
-        // Apply boost: CORE (1.0) gets +20% with 0.4 factor, SUPPLEMENTARY (0.5) gets 0%
-        point.score = point.score * (1 + (weight - 0.5) * boostFactor);
-      }
-      // Re-sort by boosted score
-      searchResults.sort((a, b) => b.score - a.score);
+      // Apply boost immutably - create new objects instead of mutating
+      searchResults = searchResults
+        .map((point) => {
+          const payload = point.payload as Record<string, unknown> | undefined;
+          const weight = (payload?.document_weight as number) ?? 0.5;
+          // Validate weight bounds (should be 0.5-1.0)
+          const validWeight = Math.max(0.5, Math.min(1.0, weight));
+          // Apply boost: CORE (1.0) gets +20% with 0.4 factor, SUPPLEMENTARY (0.5) gets 0%
+          const boostedScore = point.score * (1 + (validWeight - 0.5) * boostFactor);
+          return { ...point, score: boostedScore };
+        })
+        .sort((a, b) => b.score - a.score);
 
       logger.debug({
         boostFactor,
         resultCount: searchResults.length,
-      }, 'Priority boosting applied');
+      }, 'Priority boosting applied (immutable)');
     }
 
     // Convert to search results

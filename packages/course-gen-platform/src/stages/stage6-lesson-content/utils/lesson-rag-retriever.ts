@@ -25,6 +25,7 @@ import type { LessonSpecificationV2 } from '@megacampus/shared-types/lesson-spec
 import { ragContextCache } from '@/stages/stage5-generation/utils/rag-context-cache';
 import type { RAGChunk as SectionRAGChunk } from '@/stages/stage5-generation/utils/section-rag-retriever';
 import { logger } from '@/shared/logger';
+import { validatePriorityLevel } from '@/shared/constants/priority-weights';
 import { rerankDocuments, type RerankResult } from '../../../shared/jina';
 import { logTrace } from '../../../shared/trace-logger';
 
@@ -534,8 +535,11 @@ export function extractSourceDocuments(chunks: RAGChunk[]): SourceDocument[] {
     if (existing) {
       existing.chunk_count++;
     } else {
-      // Extract priority from metadata if available
-      const priority = (chunk.metadata?.document_priority as SourceDocument['document_priority']) ?? 'SUPPLEMENTARY';
+      // Extract and validate priority from metadata using shared utility
+      const priority = validatePriorityLevel(
+        chunk.metadata?.document_priority,
+        { chunkId: chunk.chunk_id, documentId: chunk.document_id }
+      );
 
       docMap.set(chunk.document_id, {
         document_id: chunk.document_id,

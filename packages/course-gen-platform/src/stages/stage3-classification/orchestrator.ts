@@ -18,6 +18,7 @@
 import { logger } from '../../shared/logger/index.js';
 import { getSupabaseAdmin } from '../../shared/supabase/admin';
 import { executeDocumentClassificationComparative } from './phases/phase-classification';
+import { logTrace } from '../../shared/trace-logger';
 import type { Stage3Input, Stage3Output } from './types';
 import type { DocumentPriority, DocumentPriorityLevel } from '@megacampus/shared-types';
 
@@ -53,11 +54,27 @@ export class Stage3ClassificationOrchestrator {
 
     // Check feature flag to skip LLM classification
     if (SKIP_STAGE3_CLASSIFICATION) {
-      logger.info({
+      // SECURITY AUDIT: Log feature flag bypass for observability
+      logger.warn({
         courseId,
         organizationId,
-        reason: 'SKIP_STAGE3_CLASSIFICATION=true',
-      }, 'Stage 3 classification SKIPPED - using user/default priorities');
+        featureFlag: 'SKIP_STAGE3_CLASSIFICATION',
+        reason: 'LLM classification bypassed via environment variable',
+      }, 'SECURITY: Stage 3 classification bypassed via feature flag');
+
+      // Log to trace system for full observability
+      await logTrace({
+        courseId,
+        stage: 'stage_3',
+        phase: 'classification_skip',
+        stepName: 'feature_flag_triggered',
+        inputData: {
+          organizationId,
+          reason: 'SKIP_STAGE3_CLASSIFICATION=true',
+          triggeredBy: 'environment_variable',
+        },
+        durationMs: 0,
+      });
 
       if (onProgress) {
         onProgress(100, 'Classification skipped (using existing priorities)');
@@ -245,12 +262,25 @@ export class Stage3ClassificationOrchestrator {
 
     const documents = data || [];
 
+    // Validate: warn if documents are missing priority values
+    const documentsWithoutPriority = documents.filter((doc) => !doc.priority);
+    if (documentsWithoutPriority.length > 0) {
+      logger.warn({
+        courseId,
+        documentCount: documents.length,
+        missingPriorityCount: documentsWithoutPriority.length,
+        affectedFileIds: documentsWithoutPriority.map((d) => d.id),
+      }, 'Documents missing priority values when Stage 3 classification skipped - defaulting to SUPPLEMENTARY');
+    }
+
     // Build classifications from existing priorities
     const classifications = documents.map((doc) => ({
       fileId: doc.id,
       filename: doc.filename,
       priority: (doc.priority as DocumentPriorityLevel) ?? 'SUPPLEMENTARY',
-      rationale: 'Using existing priority (Stage 3 classification skipped)',
+      rationale: doc.priority
+        ? 'Using existing priority (Stage 3 classification skipped)'
+        : 'Using default SUPPLEMENTARY (no priority set, Stage 3 skipped)',
     }));
 
     // Count priority levels
