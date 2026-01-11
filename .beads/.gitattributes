@@ -1,0 +1,2 @@
+# Prevent bd sync from overwriting config
+config.yaml merge=ours
