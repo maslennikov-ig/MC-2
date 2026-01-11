@@ -4,13 +4,20 @@ import { logger } from "@/lib/client-logger";
 import { readFileAsBase64 } from '@/components/forms/file-upload';
 import type { UploadedFile, FileUploadStatus } from '@/components/forms/file-upload';
 
+/** Maximum retry attempts for rate-limited uploads */
+const MAX_RETRIES = 3;
+
+/** Helper to wait for specified milliseconds */
+const delay = (ms: number) => new Promise(resolve => setTimeout(resolve, ms));
+
 export function useFileUpload() {
   const [uploadedFiles, setUploadedFiles] = useState<UploadedFile[]>([]);
   const [isUploadingFiles, setIsUploadingFiles] = useState(false);
 
   const uploadSingleFile = useCallback(async (
     file: UploadedFile,
-    courseId: string
+    courseId: string,
+    retryCount = 0
   ): Promise<string | null> => {
     try {
       const fileContent = await readFileAsBase64(file.file);
@@ -48,6 +55,33 @@ export function useFileUpload() {
       const data = await response.json();
 
       if (!response.ok) {
+        // Handle rate limiting with automatic retry and queue behavior
+        if (response.status === 429 && retryCount < MAX_RETRIES) {
+          // Get retry delay from response header or error message, default to 5 seconds
+          const retryAfterHeader = response.headers.get('Retry-After');
+          const retryAfterFromMessage = data.error?.match(/try again in (\d+) seconds/)?.[1];
+          const retryAfterSec = parseInt(retryAfterHeader || retryAfterFromMessage || '5', 10);
+
+          logger.info('Rate limited, waiting before retry', {
+            filename: file.file.name,
+            retryAfterSec,
+            retryCount: retryCount + 1,
+          });
+
+          // Update status to show waiting state
+          setUploadedFiles(prev =>
+            prev.map(f =>
+              f.id === file.id
+                ? { ...f, status: 'uploading' as FileUploadStatus, progress: 10, error: `Ожидание ${retryAfterSec}с...` }
+                : f
+            )
+          );
+
+          // Wait and retry
+          await delay(retryAfterSec * 1000);
+          return uploadSingleFile(file, courseId, retryCount + 1);
+        }
+
         if (data.code === 'QUOTA_EXCEEDED' || (data.message && data.message.includes('quota exceeded'))) {
           toast.warning("Превышен лимит хранилища", {
             description: "Не удалось загрузить файл. Место на диске закончилось.",
@@ -61,7 +95,7 @@ export function useFileUpload() {
       setUploadedFiles(prev =>
         prev.map(f =>
           f.id === file.id
-            ? { ...f, status: 'success' as FileUploadStatus, progress: 100, fileId: data.fileId }
+            ? { ...f, status: 'success' as FileUploadStatus, progress: 100, fileId: data.fileId, error: undefined }
             : f
         )
       );
