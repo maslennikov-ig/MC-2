@@ -1,0 +1,71 @@
+#!/bin/bash
+set -e
+
+# MegaCampus Dev Environment Deployment Script
+# Simple rolling deployment for develop branch
+# Usage: ./deploy_dev.sh
+
+BASE_PATH="/opt/megacampus"
+
+echo "Starting Dev Environment Deployment"
+echo "   Domain: dev.ai.megacampus.ru"
+echo "   Ports:  web:3010, api:4010"
+echo ""
+
+# 1. Docker Login to GHCR (if GITHUB_TOKEN provided)
+if [ -n "$GITHUB_TOKEN" ]; then
+    echo "Logging in to GHCR..."
+    echo "$GITHUB_TOKEN" | docker login ghcr.io -u "${GITHUB_ACTOR:-maslennikov-ig}" --password-stdin
+fi
+
+# 2. Pull latest images
+echo "Pulling latest develop images..."
+docker compose -f "$BASE_PATH/docker-compose.dev.yml" --env-file "$BASE_PATH/.env.dev" pull
+
+# 3. Deploy with zero-downtime (docker compose handles graceful restart)
+echo "Deploying dev containers..."
+docker compose -f "$BASE_PATH/docker-compose.dev.yml" --env-file "$BASE_PATH/.env.dev" up -d --remove-orphans
+
+# 4. Health Check
+echo "Performing Health Checks..."
+
+# Check API health
+API_HEALTHY=false
+echo "   Checking API on localhost:4010..."
+for i in {1..12}; do
+    if curl -s -f "http://localhost:4010/health" > /dev/null 2>&1; then
+        echo "   API health check passed!"
+        API_HEALTHY=true
+        break
+    fi
+    echo "   Waiting for API... ($i/12)"
+    sleep 5
+done
+
+# Check Web health
+WEB_HEALTHY=false
+echo "   Checking Web on localhost:3010..."
+for i in {1..12}; do
+    if curl -s -f "http://localhost:3010" > /dev/null 2>&1; then
+        echo "   Web health check passed!"
+        WEB_HEALTHY=true
+        break
+    fi
+    echo "   Waiting for Web... ($i/12)"
+    sleep 5
+done
+
+if [ "$API_HEALTHY" = false ] || [ "$WEB_HEALTHY" = false ]; then
+    echo ""
+    echo "Health check failed!"
+    [ "$API_HEALTHY" = false ] && echo "   - API not healthy"
+    [ "$WEB_HEALTHY" = false ] && echo "   - Web not healthy"
+    echo ""
+    echo "Check logs with: docker compose -f docker-compose.dev.yml logs"
+    exit 1
+fi
+
+echo ""
+echo "Dev Deployment Complete!"
+echo "   Web: https://dev.ai.megacampus.ru"
+echo "   API: https://dev.ai.megacampus.ru/health"

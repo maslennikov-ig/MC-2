@@ -519,28 +519,140 @@ jobs:
         run: rm -f ~/.ssh/deploy_key
 
   # ============================================
+  # STAGE 7b: Deploy to Dev Environment
+  # ============================================
+  deploy-dev:
+    name: Deploy to Dev
+    runs-on: ubuntu-latest
+    needs: [build-docker]
+    if: github.ref == 'refs/heads/develop' && github.event_name == 'push'
+    timeout-minutes: 10
+    environment:
+      name: development
+      url: https://dev.ai.megacampus.ru
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup SSH
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ env.DEPLOY_HOST }} >> ~/.ssh/known_hosts
+
+      - name: Copy deployment files
+        run: |
+          scp -i ~/.ssh/deploy_key \
+            docker-compose.dev.yml \
+            nginx-dev.conf \
+            ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }}:${{ env.DEPLOY_PATH }}/
+
+          scp -i ~/.ssh/deploy_key \
+            scripts/deploy_dev.sh \
+            ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }}:${{ env.DEPLOY_PATH }}/scripts/
+
+      - name: Create .env.dev
+        run: |
+          ssh -i ~/.ssh/deploy_key \
+            ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} \
+            "cat > ${{ env.DEPLOY_PATH }}/.env.dev << 'ENVEOF'
+          NODE_ENV=production
+          PORT=4000
+          LOG_LEVEL=debug
+          SUPABASE_URL=${{ secrets.SUPABASE_URL }}
+          SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_KEY=${{ secrets.SUPABASE_SERVICE_KEY }}
+          NEXT_PUBLIC_SUPABASE_URL=${{ secrets.SUPABASE_URL }}
+          NEXT_PUBLIC_SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }}
+          SUPABASE_SERVICE_ROLE_KEY=${{ secrets.SUPABASE_SERVICE_KEY }}
+          REDIS_URL=redis://megacampus-redis:6379
+          QDRANT_URL=${{ secrets.QDRANT_URL }}
+          QDRANT_API_KEY=${{ secrets.QDRANT_API_KEY }}
+          JINA_API_KEY=${{ secrets.JINA_API_KEY }}
+          ENCRYPTION_KEY=${{ secrets.ENCRYPTION_KEY }}
+          OPENROUTER_API_KEY=${{ secrets.OPENROUTER_API_KEY }}
+          NEXT_PUBLIC_SITE_URL=https://dev.ai.megacampus.ru
+          NEXT_PUBLIC_APP_URL=https://dev.ai.megacampus.ru
+          CORS_ORIGIN=https://dev.ai.megacampus.ru,https://ai.megacampus.ru
+          DOCLING_MCP_URL=http://megacampus-docling-mcp:8000/mcp
+          COURSEGEN_BACKEND_URL=http://megacampus-api-dev:4000
+          NEXT_TELEMETRY_DISABLED=1
+          NODE_OPTIONS=--max-old-space-size=1024
+          ENVEOF
+          chmod 600 ${{ env.DEPLOY_PATH }}/.env.dev"
+
+      - name: Deploy
+        run: |
+          ssh -i ~/.ssh/deploy_key \
+            ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} \
+            "cd ${{ env.DEPLOY_PATH }} && GITHUB_TOKEN='${{ secrets.GITHUB_TOKEN }}' GITHUB_ACTOR='${{ github.actor }}' bash scripts/deploy_dev.sh"
+
+      - name: Verify deployment
+        run: |
+          echo "Waiting for services..."
+          sleep 20
+
+          # Check via SSH (DNS might not be ready yet)
+          if ssh -i ~/.ssh/deploy_key \
+            ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} \
+            "curl -f -s http://localhost:4010/health" > /dev/null; then
+            echo "API service healthy"
+          else
+            echo "API health check failed!"
+            exit 1
+          fi
+
+          if ssh -i ~/.ssh/deploy_key \
+            ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} \
+            "curl -f -s -o /dev/null -w '%{http_code}' http://localhost:3010" | grep -q "200"; then
+            echo "Web service healthy"
+          else
+            echo "Web health check failed!"
+            exit 1
+          fi
+
+      - name: Cleanup SSH
+        if: always()
+        run: rm -f ~/.ssh/deploy_key
+
+  # ============================================
   # STAGE 8: Notifications
   # ============================================
   notify:
     name: Notify
     runs-on: ubuntu-latest
-    needs: [deploy]
-    if: always() && (github.ref == 'refs/heads/master' || inputs.force_deploy)
+    needs: [deploy, deploy-dev]
+    if: always() && (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/develop')
 
     steps:
       - name: Send Telegram notification
         env:
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-          DEPLOY_RESULT: ${{ needs.deploy.result }}
+          DEPLOY_PROD_RESULT: ${{ needs.deploy.result }}
+          DEPLOY_DEV_RESULT: ${{ needs.deploy-dev.result }}
           COMMIT_SHA: ${{ github.sha }}
           ACTOR: ${{ github.actor }}
+          BRANCH: ${{ github.ref_name }}
           RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
         run: |
-          if [ "$DEPLOY_RESULT" == "success" ]; then
-            MESSAGE="🚀 *MegaCampus Deploy*%0A%0A✅ SUCCESS%0A%0A📦 Commit: \`${COMMIT_SHA:0:7}\`%0A👤 Author: $ACTOR%0A🔗 [View]($RUN_URL)%0A%0A🌐 https://ai.megacampus.ru"
+          # Determine which deploy ran and its result
+          if [ "$BRANCH" == "master" ]; then
+            DEPLOY_RESULT="$DEPLOY_PROD_RESULT"
+            ENV_NAME="Staging"
+            ENV_URL="https://ai.megacampus.ru"
           else
-            MESSAGE="🚀 *MegaCampus Deploy*%0A%0A❌ FAILED%0A%0A📦 Commit: \`${COMMIT_SHA:0:7}\`%0A👤 Author: $ACTOR%0A🔗 [Logs]($RUN_URL)"
+            DEPLOY_RESULT="$DEPLOY_DEV_RESULT"
+            ENV_NAME="Dev"
+            ENV_URL="https://dev.ai.megacampus.ru"
+          fi
+
+          if [ "$DEPLOY_RESULT" == "success" ]; then
+            MESSAGE="🚀 *MegaCampus $ENV_NAME*%0A%0A✅ SUCCESS%0A%0A📦 Commit: \`${COMMIT_SHA:0:7}\`%0A🌿 Branch: $BRANCH%0A👤 Author: $ACTOR%0A🔗 [View]($RUN_URL)%0A%0A🌐 $ENV_URL"
+          else
+            MESSAGE="🚀 *MegaCampus $ENV_NAME*%0A%0A❌ FAILED%0A%0A📦 Commit: \`${COMMIT_SHA:0:7}\`%0A🌿 Branch: $BRANCH%0A👤 Author: $ACTOR%0A🔗 [Logs]($RUN_URL)"
           fi
           curl -s -X POST "https://api.telegram.org/bot${TELEGRAM_BOT_TOKEN}/sendMessage" \
             -d "chat_id=${TELEGRAM_CHAT_ID}" \
