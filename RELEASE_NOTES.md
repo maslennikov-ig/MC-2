@@ -3,6 +3,46 @@
 _Released on 2025-12-26_
 
 
+## v0.26.82
+
+_Released on 2026-01-11_
+
+### ✨ New Features
+
+- Add 1 command(s), update scripts, +1 more
+- Batch improvements - graceful shutdown, source docs UI, RAG docs
+- **embeddings**: Implement token-aware batching for Jina API
+- **stage6**: Enable priority boosting and save source_documents attribution
+- **rag**: Implement priority-based retrieval and Stage 3 deprecation
+- **stage6**: Add RAG relevance validation to generator prompt
+- **stage7**: Add 19-language support for image alt text
+- **i18n**: Add full 19-language support for lesson content labels
+- **stage6**: Add reviewInfo for UI warnings and fix Mermaid parsing
+- **Skills**: Add improvements support to code-review-inline v1.1.0
+- **Skills**: Add code-review-inline skill with Beads integration
+- **beads**: Integrate Beads workflow into all health check skills
+
+### 🐛 Bug Fixes
+
+- Code review improvements - race conditions, validation, memory leaks
+- **rag**: Address code review findings for priority-based retrieval
+- **stage6**: Resolve ESM module resolution conflict for generator import
+- **queue**: Clean up orphaned jobs with missing data during course deletion
+- **queue**: Handle undefined jobs in removeJobsByCourseId
+- **cleanup**: Add orphaned Redis data cleanup to course deletion
+- **queue**: Include prioritized queue in removeJobsByCourseId cleanup
+- Add BullMQ job cleanup to course deletion and fix local dev fetch timeout
+- **stage6**: Resolve multiple production issues in lesson generation
+- **stage6**: Add 19-language support to markdown parser
+- **stage6**: Use getContentLabels for section-regenerator titles
+- **stage6**: Localize section headers and exercise labels for Russian
+- **stage6**: Resolve exercises parsing, factual verification, and sec_global issues
+- **stage6**: Resolve multiple production issues in lesson generation
+
+---
+
+_This release was automatically generated from 70 commits._
+
 ## v0.26.81
 
 _Released on 2026-01-08_
