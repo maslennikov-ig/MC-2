@@ -1,62 +1,66 @@
-# Beads Configuration File
-# This file configures default behavior for all bd commands in this repository
-# All settings can also be set via environment variables (BD_* prefix)
-# or overridden with command-line flags
+# Beads Configuration File for mc2 Project
+# ==========================================
+#
+# This is the main memory system for AI agent workflows.
+# All task tracking, dependencies, and workflow state lives here.
+#
+# Documentation: https://github.com/steveyegge/beads
+# Local guide: .claude/docs/beads-quickstart.md
 
-# Issue prefix for this repository (used by bd init)
-# If not set, bd init will auto-detect from directory name
-# Example: issue-prefix: "myproject" creates issues like "myproject-1", "myproject-2", etc.
-# issue-prefix: ""
+# =============================================================================
+# CORE SETTINGS
+# =============================================================================
 
-# Use no-db mode: load from JSONL, no SQLite, write back after each command
-# When true, bd will use .beads/issues.jsonl as the source of truth
-# instead of SQLite database
-# no-db: false
+# Issue prefix - all issues will be mc2-xxx
+issue-prefix: "mc2"
 
-# Disable daemon for RPC communication (forces direct database access)
-# no-daemon: false
+# Auto-start daemon when running bd commands
+auto-start-daemon: true
 
-# Disable auto-flush of database to JSONL after mutations
-# no-auto-flush: false
+# Debounce interval for auto-flush (how often to sync to JSONL)
+flush-debounce: "5s"
 
-# Disable auto-import from JSONL when it's newer than database
-# no-auto-import: false
+# =============================================================================
+# DAEMON SETTINGS (Auto-Sync)
+# =============================================================================
+# These settings enable fully automatic synchronization:
+# - Changes are committed automatically
+# - Commits are pushed to remote automatically
+# - Remote changes are pulled automatically
 
-# Enable JSON output by default
-# json: false
+daemon.auto-commit: true
+daemon.auto-push: true
+daemon.auto-pull: true
 
-# Default actor for audit trails (overridden by BD_ACTOR or --actor)
-# actor: ""
+# =============================================================================
+# GIT INTEGRATION
+# =============================================================================
+# Git hooks are installed automatically (pre-commit, pre-push, post-merge)
+# They trigger bd sync on git operations for zero-lag synchronization
 
-# Path to database (overridden by BEADS_DB or --db)
-# db: ""
-
-# Auto-start daemon if not running (can also use BEADS_AUTO_START_DAEMON)
-# auto-start-daemon: true
-
-# Debounce interval for auto-flush (can also use BEADS_FLUSH_DEBOUNCE)
-# flush-debounce: "5s"
-
-# Git branch for beads commits (bd sync will commit to this branch)
-# IMPORTANT: Set this for team projects so all clones use the same sync branch.
-# This setting persists across clones (unlike database config which is gitignored).
-# Can also use BEADS_SYNC_BRANCH env var for local override.
-# If not set, bd sync will require you to run 'bd config set sync.branch <branch>'.
+# Sync branch (optional) - use separate branch for beads commits
+# Recommended for team projects to isolate beads sync from main branch
 # sync-branch: "beads-sync"
 
-# Multi-repo configuration (experimental - bd-307)
-# Allows hydrating from multiple repositories and routing writes to the correct JSONL
-# repos:
-#   primary: "."  # Primary repo (where this database lives)
-#   additional:   # Additional repos to hydrate from (read-only)
-#     - ~/beads-planning  # Personal planning repo
-#     - ~/work-planning   # Work planning repo
-
-# Integration settings (access with 'bd config get/set')
-# These are stored in the database, not in this file:
-# - jira.url
-# - jira.project
-# - linear.url
-# - linear.api-key
-# - github.org
-# - github.repo
+# =============================================================================
+# AGENT WORKFLOW NOTES
+# =============================================================================
+#
+# SessionStart hook: bd prime → injects workflow context
+# PreCompact hook:   bd prime → restores context after compaction
+# Stop hook:         bd sync  → ensures all changes are synced
+#
+# Core workflow for AI agents:
+#   1. bd ready                  - Find available work
+#   2. bd update ID --status in_progress - Claim task
+#   3. Do the work
+#   4. bd close ID --reason "..." - Complete task
+#   5. Daemon auto-syncs (or bd sync manually)
+#
+# Creating new work:
+#   bd create "Title" -t feature|bug|chore -p 0-4
+#
+# Emergent work (discovered during other task):
+#   bd create "Found issue" -t bug --deps discovered-from:mc2-current
+#
+# =============================================================================

@@ -38,12 +38,30 @@
 
 > Constitution v1.2.0: All work MUST be tracked in Beads.
 
+### Session Workflow
 ```bash
-bd ready                          # Available tasks
+# SESSION START (auto via hooks)
+# bd prime runs automatically → injects context
+
+# FIND WORK
+bd ready                          # Available tasks (no blockers)
+bd show <id>                      # Task details
+
+# WORK
 bd update <id> --status in_progress
+# ... do the work ...
 bd close <id> --reason "Done"
-bd sync                           # MANDATORY at session end
+
+# SESSION END (daemon auto-syncs, but always commit code!)
+git add . && git commit -m "..." && git push
 ```
+
+### How User Gives Me Tasks
+1. **From Beads**: Just say "Работай над mc2-xxx" or "bd ready" output
+2. **New task**: I create beads task FIRST, then work
+3. **Discussion**: If clarifying/researching, no task needed yet
+
+### Task Types
 
 | Work Type | Tool | Command |
 |-----------|------|---------|
@@ -53,9 +71,14 @@ bd sync                           # MANDATORY at session end
 | Tech debt | Beads | `bd create -t chore` |
 | Exploration | Beads wisp | `bd mol wisp exploration` |
 
+### Automation
+- **Daemon auto-sync**: Enabled (auto-commit, auto-push, auto-pull for beads)
+- **Hooks**: SessionStart/PreCompact → `bd prime`, Stop → `bd sync`
+- **No manual bd sync needed** — daemon handles it
+
 **Emergent work**: `bd create "Issue" -t bug --deps discovered-from:<current-id>`
 
-**Conventions**: Prefix `mc2`, auto-sync via `/push`, guide: `.claude/docs/beads-quickstart.md`
+**Guide**: `.claude/docs/beads-quickstart.md`
 
 ---
 
