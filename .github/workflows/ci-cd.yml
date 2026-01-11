@@ -304,13 +304,13 @@ jobs:
           echo "All critical CI checks passed!"
 
   # ============================================
-  # STAGE 5: Parallel Docker Builds (master only)
+  # STAGE 5: Parallel Docker Builds (master + develop)
   # ============================================
   build-docker:
     name: Build Docker - ${{ matrix.image }}
     runs-on: ubuntu-latest
     needs: [ci-success]
-    if: github.ref == 'refs/heads/master' || inputs.force_deploy
+    if: (github.ref == 'refs/heads/master' || github.ref == 'refs/heads/develop') || inputs.force_deploy
     timeout-minutes: 20
 
     strategy:
