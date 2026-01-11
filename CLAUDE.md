@@ -75,39 +75,47 @@ When working in multiple terminals simultaneously:
 - **Rule**: Each terminal works on DIFFERENT issues
 - Find unlocked: `bd list --unlocked`
 
-### Protected Branches
+### Branches & Environments
 
-- `main` — production (auto-deploy, protected)
-- `develop` — main working branch
-- `feature/*` — feature branches for parallel work
+| Branch    | Environment | URL                          | Auto-deploy? |
+| --------- | ----------- | ---------------------------- | ------------ |
+| `develop` | Dev         | https://dev.ai.megacampus.ru | Yes (push)   |
+| `master`  | Staging     | https://ai.megacampus.ru     | Yes (push)   |
+
+### Daily Workflow
 
 ```bash
-# On main → auto-switches to develop
-/push patch                       # → develop (auto-switch from main)
+# 1. Работаем на develop
+git checkout develop
 
-# On develop or feature/*
-/push patch                       # → current branch (no deploy)
+# 2. Делаем изменения, коммитим
+git add . && git commit -m "feat: new feature"
 
-# Deploy from ANY branch to main
-/deploy                           # → current branch → main (deploy!)
-/deploy --force                   # → skip type-check/build
+# 3. Пушим → АВТОМАТИЧЕСКИ деплоится на Dev
+git push                          # → dev.ai.megacampus.ru
+
+# 4. Готовы к Staging? Используем /deploy
+/deploy                           # → merge develop → master → ai.megacampus.ru
 ```
 
-### Environments
+### Commands Cheatsheet
 
-| Environment | URL                          | Branch  | Strategy   |
-| ----------- | ---------------------------- | ------- | ---------- |
-| Staging     | https://ai.megacampus.ru     | master  | Blue/Green |
-| Dev         | https://dev.ai.megacampus.ru | develop | Rolling    |
+| Что хочу                   | Команда       | Результат                                        |
+| -------------------------- | ------------- | ------------------------------------------------ |
+| Задеплоить на **Dev**      | `git push`    | develop → dev.ai.megacampus.ru                   |
+| Задеплоить на **Staging**  | `/deploy`     | develop → master → ai.megacampus.ru (Blue/Green) |
+| Создать **релиз** (версия) | `/push patch` | Bump version + changelog + tag                   |
+| Форсировать деплой         | `/deploy -f`  | Skip type-check/build                            |
 
-**Blue/Green Deploy** (zero-downtime):
+### Blue/Green (Staging only)
 
 - Blue: web:3001, api:4001
 - Green: web:3002, api:4002
-- Health check before traffic switch
-- Instant rollback via nginx reload
+- Zero-downtime, instant rollback
 
-**Details**: `docs/ADR-005-deployment-strategy.md`, `.claude/docs/deployment-guide.md`
+**Rollback:** `ssh megacampus-prod "bash /opt/megacampus/scripts/rollback_blue_green.sh"`
+
+**Details**: `docs/ADR-005-deployment-strategy.md`
 
 ### How User Gives Me Tasks
 
