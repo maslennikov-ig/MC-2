@@ -107,6 +107,8 @@ COPY --from=builder --chown=nodejs:nodejs /app/packages/course-gen-platform/tsco
 
 # Create uploads directory
 RUN mkdir -p /app/uploads && chown nodejs:nodejs /app/uploads
+# Create data directory for worker LKG config
+RUN mkdir -p /app/data && chown nodejs:nodejs /app/data
 
 # Switch to non-root user
 USER nodejs
