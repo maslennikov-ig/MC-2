@@ -14,8 +14,9 @@ import logger from '../shared/logger';
 
 /**
  * Queue name for all course generation jobs
+ * Configurable via BULLMQ_QUEUE_NAME env variable for environment isolation (e.g., DEV vs production)
  */
-export const QUEUE_NAME = 'course-generation';
+export const QUEUE_NAME = process.env.BULLMQ_QUEUE_NAME || 'course-generation';
 
 /**
  * BullMQ Queue instance for course generation jobs
@@ -106,12 +107,15 @@ export async function addJob(
 
   const job = await queue.add(jobType, jobData, options);
 
-  logger.info({
-    jobId: job.id,
-    jobType,
-    organizationId: jobData.organizationId,
-    courseId: jobData.courseId,
-  }, 'Job added to queue');
+  logger.info(
+    {
+      jobId: job.id,
+      jobType,
+      organizationId: jobData.organizationId,
+      courseId: jobData.courseId,
+    },
+    'Job added to queue'
+  );
 
   return job;
 }
@@ -160,7 +164,13 @@ export async function removeJobsByCourseId(
   try {
     // Phase 1: Remove jobs from queue states
     // Note: 'prioritized' is separate from 'waiting' in BullMQ for jobs with priority
-    const jobStates: Array<'active' | 'waiting' | 'prioritized' | 'delayed' | 'paused'> = ['active', 'waiting', 'prioritized', 'delayed', 'paused'];
+    const jobStates: Array<'active' | 'waiting' | 'prioritized' | 'delayed' | 'paused'> = [
+      'active',
+      'waiting',
+      'prioritized',
+      'delayed',
+      'paused',
+    ];
     const allJobs = await queue.getJobs(jobStates);
 
     // Filter jobs by courseId and remove them
@@ -184,29 +194,38 @@ export async function removeJobsByCourseId(
               : 'Job cancelled due to course deletion';
             await job.moveToFailed(new Error(reason), 'cleanup');
             removed++;
-            logger.debug({
-              jobId: job.id,
-              jobType: job.name,
-              courseId: isOrphanedJob ? 'unknown' : courseId,
-              reason: isOrphanedJob ? 'orphaned' : 'course_deletion',
-            }, 'Active job moved to failed for cleanup');
+            logger.debug(
+              {
+                jobId: job.id,
+                jobType: job.name,
+                courseId: isOrphanedJob ? 'unknown' : courseId,
+                reason: isOrphanedJob ? 'orphaned' : 'course_deletion',
+              },
+              'Active job moved to failed for cleanup'
+            );
           } else {
             await job.remove();
             removed++;
-            logger.debug({
-              jobId: job.id,
-              jobType: job.name,
-              courseId: isOrphanedJob ? 'unknown' : courseId,
-              reason: isOrphanedJob ? 'orphaned' : 'course_deletion',
-            }, 'Job removed from queue');
+            logger.debug(
+              {
+                jobId: job.id,
+                jobType: job.name,
+                courseId: isOrphanedJob ? 'unknown' : courseId,
+                reason: isOrphanedJob ? 'orphaned' : 'course_deletion',
+              },
+              'Job removed from queue'
+            );
           }
         } catch (error) {
           errors++;
-          logger.warn({
-            jobId: job.id,
-            courseId,
-            error: error instanceof Error ? error.message : String(error),
-          }, 'Failed to remove job from queue');
+          logger.warn(
+            {
+              jobId: job.id,
+              courseId,
+              error: error instanceof Error ? error.message : String(error),
+            },
+            'Failed to remove job from queue'
+          );
         }
       }
     }
@@ -226,7 +245,22 @@ export async function removeJobsByCourseId(
       for (const key of keys) {
         // Skip non-job keys (meta, events, etc.)
         const keyPart = key.replace(`bull:${QUEUE_NAME}:`, '');
-        if (keyPart.includes(':') || ['meta', 'id', 'events', 'stalled-check', 'waiting', 'active', 'paused', 'completed', 'failed', 'delayed', 'prioritized'].includes(keyPart)) {
+        if (
+          keyPart.includes(':') ||
+          [
+            'meta',
+            'id',
+            'events',
+            'stalled-check',
+            'waiting',
+            'active',
+            'paused',
+            'completed',
+            'failed',
+            'delayed',
+            'prioritized',
+          ].includes(keyPart)
+        ) {
           continue;
         }
 
@@ -255,10 +289,7 @@ export async function removeJobsByCourseId(
     }
 
     // Phase 3: Clean up related Redis keys (lesson UUID mappings, etc.)
-    const relatedPatterns = [
-      `lesson:uuid:${courseId}:*`,
-      `rag:${courseId}:*`,
-    ];
+    const relatedPatterns = [`lesson:uuid:${courseId}:*`, `rag:${courseId}:*`];
 
     for (const pattern of relatedPatterns) {
       let relatedCursor = '0';
@@ -273,18 +304,24 @@ export async function removeJobsByCourseId(
     }
 
     if (removed > 0 || errors > 0 || orphanedCleaned > 0) {
-      logger.info({
-        courseId,
-        removed,
-        orphanedCleaned,
-        errors,
-      }, 'Cleaned up jobs and orphaned data for course');
+      logger.info(
+        {
+          courseId,
+          removed,
+          orphanedCleaned,
+          errors,
+        },
+        'Cleaned up jobs and orphaned data for course'
+      );
     }
   } catch (error) {
-    logger.error({
-      courseId,
-      error: error instanceof Error ? error.message : String(error),
-    }, 'Error cleaning up jobs for course');
+    logger.error(
+      {
+        courseId,
+        error: error instanceof Error ? error.message : String(error),
+      },
+      'Error cleaning up jobs for course'
+    );
     throw error;
   }
 

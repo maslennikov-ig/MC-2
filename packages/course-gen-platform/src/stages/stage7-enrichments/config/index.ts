@@ -10,8 +10,8 @@
  * Stage 7 worker and queue configuration
  */
 export const STAGE7_CONFIG = {
-  /** Queue name for Stage 7 enrichment jobs */
-  QUEUE_NAME: 'stage7-enrichments',
+  /** Queue name for Stage 7 enrichment jobs (configurable for environment isolation) */
+  QUEUE_NAME: process.env.BULLMQ_STAGE7_QUEUE_NAME || 'stage7-enrichments',
 
   /** Number of concurrent workers (lower than Stage 6 due to heavier I/O operations) */
   CONCURRENCY: 5,
