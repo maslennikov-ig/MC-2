@@ -60,6 +60,9 @@ services:
       - PORT=4000
       - REDIS_URL=redis://megacampus-redis:6379
       - DOCLING_MCP_URL=http://megacampus-docling-mcp:8000/mcp
+      # DEV queue isolation - prevents DEV jobs from being picked up by production workers
+      - BULLMQ_QUEUE_NAME=course-generation-dev
+      - BULLMQ_STAGE7_QUEUE_NAME=stage7-enrichments-dev
     volumes:
       - ./data/uploads-dev:/app/uploads
     healthcheck:
@@ -86,6 +89,85 @@ services:
       options:
         max-size: '50m'
         max-file: '3'
+
+  # BullMQ Worker (Dev) - processes course generation jobs
+  worker-dev:
+    image: ghcr.io/maslennikov-ig/mc-2/api:develop
+    container_name: megacampus-worker-dev
+    restart: unless-stopped
+    command: ['tsx', 'dist/orchestrator/worker-entrypoint.js']
+    healthcheck:
+      disable: true
+    env_file:
+      - .env.dev
+    environment:
+      - NODE_ENV=production
+      - REDIS_URL=redis://megacampus-redis:6379
+      - DOCLING_MCP_URL=http://megacampus-docling-mcp:8000/mcp
+      - DOCLING_CACHE_PATH=/app/docling-cache
+      - LKG_CONFIG_PATH=/app/data/lkg-config.json
+      # DEV queue isolation - listens to DEV-only queue
+      - BULLMQ_QUEUE_NAME=course-generation-dev
+    volumes:
+      - ./data/uploads-dev:/app/uploads
+      - docling-json-cache:/app/docling-cache
+      - worker-dev-data:/app/data
+    networks:
+      - megacampus
+    depends_on:
+      api-dev:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+    logging:
+      driver: 'json-file'
+      options:
+        max-size: '50m'
+        max-file: '3'
+
+  # Stage 7 Enrichment Worker (Dev) - cover images, audio, video, quiz, presentation
+  worker-stage7-dev:
+    image: ghcr.io/maslennikov-ig/mc-2/api:develop
+    container_name: megacampus-worker-stage7-dev
+    restart: unless-stopped
+    command: ['tsx', 'dist/stages/stage7-enrichments/worker-entrypoint.js']
+    healthcheck:
+      disable: true
+    env_file:
+      - .env.dev
+    environment:
+      - NODE_ENV=production
+      - REDIS_URL=redis://megacampus-redis:6379
+      - ENRICHMENTS_STORAGE_BUCKET=course-enrichments
+      # DEV queue isolation - listens to DEV-only stage7 queue
+      - BULLMQ_STAGE7_QUEUE_NAME=stage7-enrichments-dev
+    volumes:
+      - ./data/uploads-dev:/app/uploads
+    networks:
+      - megacampus
+    depends_on:
+      api-dev:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1G
+    logging:
+      driver: 'json-file'
+      options:
+        max-size: '50m'
+        max-file: '3'
+
+volumes:
+  docling-json-cache:
+    external: true
+    name: megacampus_docling-json-cache
+  worker-dev-data:
+    name: megacampus_worker-dev-data
 
 networks:
   megacampus:
