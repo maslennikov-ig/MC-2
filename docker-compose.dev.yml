@@ -108,6 +108,7 @@ services:
       - LKG_CONFIG_PATH=/app/data/lkg-config.json
       # DEV queue isolation - listens to DEV-only queue
       - BULLMQ_QUEUE_NAME=course-generation-dev
+      - ENRICHMENTS_STORAGE_BUCKET=course-enrichments
     volumes:
       - ./data/uploads-dev:/app/uploads
       - docling-json-cache:/app/docling-cache
