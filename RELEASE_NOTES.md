@@ -2,6 +2,53 @@
 
 _Released on 2025-12-26_
 
+## v0.26.83
+
+_Released on 2026-01-12_
+
+### ✨ New Features
+
+- **worker**: Make BullMQ queue names configurable via env vars
+- Add dev environment deployment (dev.ai.megacampus.ru)
+- **dx**: Add Husky + lint-staged for pre-commit checks
+- **deploy**: Split docker-compose for Blue/Green deployment
+- **deploy**: Configure Blue/Green deployment infrastructure
+- Add Blue/Green deployment infrastructure
+- **beads**: Add directory-labels, exclusive-lock, protected-branches, patrols, molecule-bonds
+- Update Blue/Green deployment documentation and add branching strategy RFC
+- Add Blue/Green rollback script and update deployment workflow
+- Implement Blue/Green deployment strategy with GitHub Actions and Nginx configuration
+
+### 🔧 Improvements
+
+- **styles**: Reorder course styles by popularity
+- **admin**: Extract user validators to shared module
+
+### 🐛 Bug Fixes
+
+- **worker**: Increase maxListeners to prevent AbortSignal warning
+- **docker**: Create /app/data directory with correct permissions
+- **validation**: Add underscore synonyms for primary_strategy and teaching_style
+- **deploy**: Add worker services to DEV compose with queue isolation
+- **web**: Reduce preloader hang on back navigation
+- **deploy**: Don't remove shared infrastructure in dev deploy
+- Convert scripts to Unix line endings (LF)
+- **lint**: Resolve ESLint errors in admin users components
+- **upload**: Increase rate limit and add retry queue for bulk uploads
+- **admin**: Allow admins to delete students and instructors
+- **admin**: Allow admins to toggle user activation status
+- Enable Docker build on develop branch
+- **CI/CD**: Verify deployment with correct Blue/Green port
+- **deploy**: Add docker login to GHCR before pull
+- **scripts**: Make Blue/Green scripts executable
+- **deploy**: Update scripts for multi-service Blue/Green
+- Improve formatting and clarity in branching strategy documentation
+- Update scripts and config to use master instead of main
+- **beads**: Restore config.yaml with new features (no duplicates)
+
+---
+
+_This release was automatically generated from 55 commits._
 
 ## v0.26.82
 
