@@ -18,10 +18,19 @@
  */
 
 import 'dotenv/config';
+import { setMaxListeners } from 'events';
 import { startWorker } from './worker';
 import logger from '../shared/logger';
+
+// Increase max listeners globally to prevent MaxListenersExceededWarning
+// during parallel LLM requests with AbortSignal timeouts
+// Default is 10, we set to 30 to accommodate concurrent batch operations
+setMaxListeners(30);
 import { validateEnvironment } from '../shared/config/env-validator';
-import { initializeModelConfigBunker, getModelConfigBunker } from '../shared/llm/model-config-bunker';
+import {
+  initializeModelConfigBunker,
+  getModelConfigBunker,
+} from '../shared/llm/model-config-bunker';
 import { TIMEOUTS } from '../shared/constants/timeouts';
 import { refreshReadinessHeartbeat } from './worker-readiness';
 
@@ -85,18 +94,24 @@ function startMemoryMonitoring(): void {
 
     // Threshold-based logging - always log warnings/errors immediately
     if (heapMB >= MEMORY_THRESHOLDS.emergency) {
-      logger.error({ heapMB, rssMB, peakMB, threshold: 'emergency' },
-        'EMERGENCY: Memory critical, forcing GC');
+      logger.error(
+        { heapMB, rssMB, peakMB, threshold: 'emergency' },
+        'EMERGENCY: Memory critical, forcing GC'
+      );
       // Force garbage collection if available (requires --expose-gc flag)
       if (typeof global.gc === 'function') {
         global.gc();
       }
     } else if (heapMB >= MEMORY_THRESHOLDS.critical) {
-      logger.error({ heapMB, rssMB, peakMB, threshold: 'critical' },
-        'CRITICAL: Memory pressure detected');
+      logger.error(
+        { heapMB, rssMB, peakMB, threshold: 'critical' },
+        'CRITICAL: Memory pressure detected'
+      );
     } else if (heapMB >= MEMORY_THRESHOLDS.warning) {
-      logger.warn({ heapMB, rssMB, peakMB, threshold: 'warning' },
-        'WARNING: Elevated memory usage');
+      logger.warn(
+        { heapMB, rssMB, peakMB, threshold: 'warning' },
+        'WARNING: Elevated memory usage'
+      );
     } else if (memoryCheckCount % DEBUG_LOG_EVERY_N_CHECKS === 0) {
       // Only log debug every Nth check (30 seconds) to reduce log volume
       logger.debug({ heapMB, rssMB, peakMB }, 'Memory status');
@@ -123,20 +138,24 @@ function stopMemoryMonitoring(): void {
 function startReadinessHeartbeat(): void {
   if (readinessHeartbeatInterval) return;
 
-  readinessHeartbeatInterval = setInterval(async () => {
-    try {
-      const success = await refreshReadinessHeartbeat();
-      if (!success) {
-        logger.warn('Failed to refresh readiness heartbeat');
-      }
-    } catch (error) {
-      logger.error({ error }, 'Error in readiness heartbeat');
-    }
+  readinessHeartbeatInterval = setInterval(() => {
+    refreshReadinessHeartbeat()
+      .then(success => {
+        if (!success) {
+          logger.warn('Failed to refresh readiness heartbeat');
+        }
+      })
+      .catch((error: unknown) => {
+        logger.error({ error }, 'Error in readiness heartbeat');
+      });
   }, READINESS_HEARTBEAT_INTERVAL_MS);
 
-  logger.info({
-    intervalMs: READINESS_HEARTBEAT_INTERVAL_MS,
-  }, 'Readiness heartbeat started');
+  logger.info(
+    {
+      intervalMs: READINESS_HEARTBEAT_INTERVAL_MS,
+    },
+    'Readiness heartbeat started'
+  );
 }
 
 /**
@@ -183,9 +202,7 @@ async function withTimeout<T>(
 ): Promise<T> {
   return Promise.race([
     promise,
-    new Promise<T>((_, reject) =>
-      setTimeout(() => reject(new Error(errorMessage)), timeoutMs)
-    ),
+    new Promise<T>((_, reject) => setTimeout(() => reject(new Error(errorMessage)), timeoutMs)),
   ]);
 }
 
@@ -206,10 +223,10 @@ async function main() {
       `Pre-flight checks timed out after ${TIMEOUTS.PRE_FLIGHT_TOTAL / 1000} seconds`
     );
 
-    const failedChecks = preFlightResults.filter((r) => !r.passed);
+    const failedChecks = preFlightResults.filter(r => !r.passed);
     if (failedChecks.length > 0) {
       logger.error(
-        { failedChecks: failedChecks.map((c) => c.name) },
+        { failedChecks: failedChecks.map(c => c.name) },
         'Pre-flight checks failed, aborting worker startup'
       );
       process.exit(1);
@@ -224,11 +241,14 @@ async function main() {
       `ModelConfigBunker initialization timed out after ${TIMEOUTS.BUNKER_INIT / 1000} seconds`
     );
     const health = bunker.getHealth();
-    logger.info({
-      configCount: health.configCount,
-      cacheAge: health.cacheAge,
-      source: health.source,
-    }, 'ModelConfigBunker initialized');
+    logger.info(
+      {
+        configCount: health.configCount,
+        cacheAge: health.cacheAge,
+        source: health.source,
+      },
+      'ModelConfigBunker initialized'
+    );
 
     // Start worker with default concurrency (5)
     // Adjust concurrency based on server resources:
@@ -242,19 +262,22 @@ async function main() {
     // This allows API server to detect if worker crashes
     startReadinessHeartbeat();
 
-    logger.info({
-      concurrency,
-      queueName: 'course-generation',
-      registeredHandlers: [
-        'TEST_JOB',
-        'INITIALIZE',
-        'DOCUMENT_PROCESSING',
-        'DOCUMENT_CLASSIFICATION',
-        'STRUCTURE_ANALYSIS',
-        'STRUCTURE_GENERATION',
-        'LESSON_CONTENT',
-      ],
-    }, 'Worker started successfully');
+    logger.info(
+      {
+        concurrency,
+        queueName: 'course-generation',
+        registeredHandlers: [
+          'TEST_JOB',
+          'INITIALIZE',
+          'DOCUMENT_PROCESSING',
+          'DOCUMENT_CLASSIFICATION',
+          'STRUCTURE_ANALYSIS',
+          'STRUCTURE_GENERATION',
+          'LESSON_CONTENT',
+        ],
+      },
+      'Worker started successfully'
+    );
   } catch (error) {
     logger.error({ err: error }, 'Failed to start worker');
     process.exit(1);
@@ -262,7 +285,7 @@ async function main() {
 }
 
 // Start the worker
-main().catch((error) => {
+main().catch(error => {
   logger.error({ err: error }, 'Fatal error in worker entrypoint');
   process.exit(1);
 });
