@@ -2,12 +2,25 @@
  * Auto Card Trigger Service
  * @module stages/stage7-enrichments/services/auto-card-trigger
  *
- * Automatically triggers card generation after Stage 5 and Stage 6 completion.
- * Creates enrichment records and queues Stage7 jobs for card generation.
+ * Automatically triggers card and cover generation during the course pipeline.
+ * Creates enrichment records and queues Stage7 jobs for visual enrichments.
  *
- * Usage:
- * - After Stage 5 completes: triggerCourseCard() - generates course catalog thumbnail
- * - After Stage 6 lesson completes: triggerLessonCard() - generates lesson navigation thumbnail
+ * AUTO-GENERATED ENRICHMENTS (Pipeline):
+ * - After Stage 5 completes:
+ *   - triggerCourseCard() - generates course catalog thumbnail (1024x1024)
+ *   - triggerAllLessonCovers() - generates lesson hero images (1280x720)
+ * - After Stage 6 lesson completes:
+ *   - triggerLessonCard() - generates lesson navigation thumbnail (1024x1024)
+ *
+ * ON-DEMAND ENRICHMENTS (User-initiated from UI, NOT auto-generated):
+ * - quiz: Interactive quizzes
+ * - audio: Lesson narration
+ * - presentation: Slide decks
+ * - video: Video content (not yet implemented)
+ * - banner: Decorative headers
+ *
+ * @see packages/course-gen-platform/src/stages/stage7-enrichments/config/index.ts
+ * @see packages/web/app/api/enrichments/generate/route.ts (on-demand API)
  */
 
 import { randomUUID } from 'crypto';
