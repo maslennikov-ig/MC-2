@@ -985,35 +985,35 @@ update_changelog() {
     # Track for rollback
     MODIFIED_FILES+=("$changelog_file")
 
-    # Generate new entry
-    local new_entry=$(generate_changelog_entry "$version" "$date")
+    # Generate new entry to temp file (avoid pipe issues with large content)
+    local temp_entry=$(mktemp)
+    generate_changelog_entry "$version" "$date" > "$temp_entry"
 
     # Read existing changelog
     if [ -f "$changelog_file" ]; then
-        local existing_content=$(<"$changelog_file")
+        local temp_output=$(mktemp)
 
         # Insert new entry after [Unreleased] section
-        if echo "$existing_content" | grep -q "## \[Unreleased\]"; then
+        if grep -q "## \[Unreleased\]" "$changelog_file"; then
             # Find the line number of [Unreleased]
-            # Using safe_first instead of head -1 to avoid SIGPIPE
-            local unreleased_line=$(echo "$existing_content" | grep -n "## \[Unreleased\]" | safe_first | cut -d: -f1)
+            local unreleased_line=$(grep -n "## \[Unreleased\]" "$changelog_file" | head -1 | cut -d: -f1)
 
-            # Insert after [Unreleased] and its blank line
-            {
-                echo "$existing_content" | safe_head "$((unreleased_line))"
-                echo ""
-                echo "$new_entry"
-                echo "$existing_content" | safe_tail_from "$((unreleased_line + 1))"
-            } > "$changelog_file"
+            # Use sed to insert new entry after [Unreleased] line
+            # This avoids piping large content through echo
+            head -n "$unreleased_line" "$changelog_file" > "$temp_output"
+            echo "" >> "$temp_output"
+            cat "$temp_entry" >> "$temp_output"
+            tail -n +"$((unreleased_line + 1))" "$changelog_file" >> "$temp_output"
         else
-            # No [Unreleased] section, insert at the beginning after header
-            {
-                echo "$existing_content" | safe_head 6
-                echo ""
-                echo "$new_entry"
-                echo "$existing_content" | safe_tail_from 7
-            } > "$changelog_file"
+            # No [Unreleased] section, insert at the beginning after header (line 6)
+            head -n 6 "$changelog_file" > "$temp_output"
+            echo "" >> "$temp_output"
+            cat "$temp_entry" >> "$temp_output"
+            tail -n +7 "$changelog_file" >> "$temp_output"
         fi
+
+        mv "$temp_output" "$changelog_file"
+        rm -f "$temp_entry"
     else
         # Create new CHANGELOG.md
         cat > "$changelog_file" << EOF
@@ -1026,8 +1026,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-$new_entry
 EOF
+        cat "$temp_entry" >> "$changelog_file"
+        rm -f "$temp_entry"
     fi
 
     log_success "CHANGELOG.md updated"
@@ -1052,64 +1053,60 @@ update_release_notes() {
     # Track for rollback
     MODIFIED_FILES+=("$release_notes_file")
 
-    # Generate new entry
-    local new_entry=$(generate_user_facing_notes_entry "$version" "$date")
+    # Generate new entry to temp file (avoid pipe issues)
+    local temp_entry=$(mktemp)
+    generate_user_facing_notes_entry "$version" "$date" > "$temp_entry"
 
     # Read existing release notes and prepend new entry
     if [ -f "$release_notes_file" ]; then
-        local existing_content=$(<"$release_notes_file")
+        local temp_output=$(mktemp)
 
         # Check if file has header "# Release Notes"
-        if echo "$existing_content" | grep -q "^# Release Notes"; then
+        if grep -q "^# Release Notes" "$release_notes_file"; then
             # Find the first ## section (first release) to insert before it
-            local first_release_line=$(echo "$existing_content" | grep -n "^## v" | safe_first | cut -d: -f1)
+            local first_release_line=$(grep -n "^## v" "$release_notes_file" | head -1 | cut -d: -f1)
 
             if [ -n "$first_release_line" ] && [ "$first_release_line" -gt 0 ]; then
                 # Insert new entry before the first release
-                {
-                    echo "$existing_content" | safe_head "$((first_release_line - 1))"
-                    echo "$new_entry"
-                    echo ""
-                    echo "$existing_content" | safe_tail_from "$first_release_line"
-                } > "$release_notes_file"
+                head -n "$((first_release_line - 1))" "$release_notes_file" > "$temp_output"
+                cat "$temp_entry" >> "$temp_output"
+                echo "" >> "$temp_output"
+                tail -n +"$first_release_line" "$release_notes_file" >> "$temp_output"
             else
                 # No releases yet, append after header
-                {
-                    echo "$existing_content" | safe_head 4
-                    echo ""
-                    echo "$new_entry"
-                } > "$release_notes_file"
+                head -n 4 "$release_notes_file" > "$temp_output"
+                echo "" >> "$temp_output"
+                cat "$temp_entry" >> "$temp_output"
             fi
         else
             # Old format or missing header - recreate with new structure
-            {
-                cat << EOF
+            cat > "$temp_output" << EOF
 # Release Notes
 
 User-facing release notes for all versions.
 
 EOF
-                echo "$new_entry"
-                echo ""
-                # Keep old content after separator
-                echo "---"
-                echo ""
-                echo "## Previous Releases"
-                echo ""
-                echo "$existing_content"
-            } > "$release_notes_file"
+            cat "$temp_entry" >> "$temp_output"
+            echo "" >> "$temp_output"
+            echo "---" >> "$temp_output"
+            echo "" >> "$temp_output"
+            echo "## Previous Releases" >> "$temp_output"
+            echo "" >> "$temp_output"
+            cat "$release_notes_file" >> "$temp_output"
         fi
+
+        mv "$temp_output" "$release_notes_file"
+        rm -f "$temp_entry"
     else
         # Create new RELEASE_NOTES.md with header
-        {
-            cat << EOF
+        cat > "$release_notes_file" << EOF
 # Release Notes
 
 User-facing release notes for all versions.
 
 EOF
-            echo "$new_entry"
-        } > "$release_notes_file"
+        cat "$temp_entry" >> "$release_notes_file"
+        rm -f "$temp_entry"
     fi
 
     log_success "RELEASE_NOTES.md updated"
