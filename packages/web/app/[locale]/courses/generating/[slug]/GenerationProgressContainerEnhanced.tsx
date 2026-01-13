@@ -589,10 +589,11 @@ export default function GenerationProgressContainerEnhanced({
     };
 
     setupSubscription();
-    startPolling(); // Initial fallback
+    // Polling starts only on CHANNEL_ERROR/TIMED_OUT (not initially)
 
     return () => {
       if (channel && supabase) {
+        channel.unsubscribe(); // Unsubscribe before removing channel (Supabase best practice)
         supabase.removeChannel(channel);
       }
       stopPolling();
@@ -677,7 +678,7 @@ export default function GenerationProgressContainerEnhanced({
         return;
       }
 
-      const particleCount = 50 * (timeLeft / duration);
+      const particleCount = 25 * (timeLeft / duration); // Reduced from 50 for better performance
 
       confetti({
         ...defaults,
@@ -691,7 +692,7 @@ export default function GenerationProgressContainerEnhanced({
         origin: { x: randomInRange(0.7, 0.9), y: Math.random() - 0.2 },
         colors: ['#3b82f6', '#8b5cf6', '#ec4899', '#10b981'],
       });
-    }, 250);
+    }, 500); // Reduced frequency from 250ms for better performance
   };
 
   return (

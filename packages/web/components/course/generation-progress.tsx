@@ -105,6 +105,7 @@ export function GenerationProgress({
     const supabase = createClient()
     let channel: ReturnType<typeof supabase.channel> | null = null
     let pollingInterval: NodeJS.Timeout | null = null
+    let healthCheckInterval: NodeJS.Timeout | null = null
     let reconnectAttempts = 0
     let reconnectTimeout: NodeJS.Timeout | null = null
     const maxReconnectAttempts = 5
@@ -179,6 +180,21 @@ export function GenerationProgress({
             if (status === 'SUBSCRIBED') {
               setIsConnected(true)
               reconnectAttempts = 0 // Reset reconnect counter on success
+
+              // Stop polling fallback when realtime is connected (prevents double load)
+              if (pollingInterval) {
+                clearInterval(pollingInterval)
+                pollingInterval = null
+                logger.info('Polling stopped - realtime connected', { courseId })
+              }
+
+              // Stop health check when realtime is connected (realtime will provide updates)
+              if (healthCheckInterval) {
+                clearInterval(healthCheckInterval)
+                healthCheckInterval = null
+                logger.info('Health check stopped - realtime connected', { courseId })
+              }
+
               logger.info('Realtime subscription established', { courseId, channelName })
             } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
               logger.warn('Realtime connection lost', { status, error: err, courseId })
@@ -283,7 +299,7 @@ export function GenerationProgress({
     setupSubscription()
 
     // Also start a health check timer to verify status
-    const healthCheckInterval = setInterval(async () => {
+    healthCheckInterval = setInterval(async () => {
       if (status === 'completed' || status === 'failed' || status === 'cancelled') {
         return // No need to check if already finished
       }

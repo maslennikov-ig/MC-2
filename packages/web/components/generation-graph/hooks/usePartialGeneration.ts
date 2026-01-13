@@ -62,6 +62,7 @@ export function usePartialGeneration(courseId: string) {
   // Refs for SYNCHRONOUS checks (prevents race conditions on rapid clicks)
   const pendingLessonIdsRef = useRef<Set<string>>(new Set());
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const initialPollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const trackedJobsRef = useRef<TrackedJob[]>([]);
 
   // Keep ref in sync with state
@@ -160,8 +161,8 @@ export function usePartialGeneration(courseId: string) {
     if (trackedJobs.length > 0 && !pollIntervalRef.current) {
       // Start polling at interval (don't call immediately to avoid double-call)
       pollIntervalRef.current = setInterval(pollJobStatuses, POLL_INTERVAL);
-      // Initial poll after short delay
-      setTimeout(pollJobStatuses, 500);
+      // Initial poll after short delay (save ref for cleanup)
+      initialPollTimeoutRef.current = setTimeout(pollJobStatuses, 500);
     }
 
     // Cleanup only when no jobs left
@@ -169,6 +170,14 @@ export function usePartialGeneration(courseId: string) {
       clearInterval(pollIntervalRef.current);
       pollIntervalRef.current = null;
     }
+
+    // Cleanup on unmount
+    return () => {
+      if (initialPollTimeoutRef.current) {
+        clearTimeout(initialPollTimeoutRef.current);
+        initialPollTimeoutRef.current = null;
+      }
+    };
   }, [trackedJobs.length, pollJobStatuses]);
 
   /**
