@@ -20,6 +20,7 @@ import type { SearchOptions, SearchResult } from '@/shared/qdrant/search-types';
 import { logger } from '@/shared/logger';
 import { rerankDocuments, type RerankResult } from '../../../shared/jina';
 import { logTrace } from '../../../shared/trace-logger';
+import { checkCourseHasIndexedDocuments } from '@/shared/rag/document-availability';
 
 // ============================================================================
 // CONSTANTS
@@ -177,9 +178,7 @@ function estimateTokens(text: string): number {
  * // Returns: { chunks: [...], totalRetrieved: 25, coverageScore: 0.85, ... }
  * ```
  */
-export async function retrieveSectionContext(
-  params: SectionRAGParams
-): Promise<SectionRAGResult> {
+export async function retrieveSectionContext(params: SectionRAGParams): Promise<SectionRAGResult> {
   const startTime = Date.now();
   const {
     courseId,
@@ -189,21 +188,42 @@ export async function retrieveSectionContext(
     scoreThreshold = SECTION_RAG_DEFAULTS.SCORE_THRESHOLD,
   } = params;
 
-  logger.info({
-    courseId,
-    sectionId,
-    queryCount: ragPlan.search_queries.length,
-    targetChunks,
-    scoreThreshold,
-  }, '[Section RAG] Starting retrieval');
+  logger.info(
+    {
+      courseId,
+      sectionId,
+      queryCount: ragPlan.search_queries.length,
+      targetChunks,
+      scoreThreshold,
+    },
+    '[Section RAG] Starting retrieval'
+  );
 
   try {
+    // OPTIMIZATION: Check if course has any indexed documents before making Qdrant queries
+    // This prevents wasted time when course has no uploaded documents
+    const hasIndexedDocuments = await checkCourseHasIndexedDocuments(courseId);
+    if (!hasIndexedDocuments) {
+      logger.info(
+        {
+          courseId,
+          sectionId,
+        },
+        '[Section RAG] Course has no indexed documents, skipping RAG retrieval'
+      );
+
+      return createEmptyResult(sectionId, Date.now() - startTime);
+    }
+
     // Validate RAG plan
     if (!ragPlan.search_queries || ragPlan.search_queries.length === 0) {
-      logger.warn({
-        courseId,
-        sectionId,
-      }, '[Section RAG] No search queries provided - returning empty result');
+      logger.warn(
+        {
+          courseId,
+          sectionId,
+        },
+        '[Section RAG] No search queries provided - returning empty result'
+      );
 
       return createEmptyResult(sectionId, Date.now() - startTime);
     }
@@ -216,7 +236,9 @@ export async function retrieveSectionContext(
 
     // Calculate how many chunks to fetch per query
     const chunksPerQuery = RERANKER_CONFIG.enabled
-      ? Math.ceil((targetChunks * RERANKER_CONFIG.candidateMultiplier) / ragPlan.search_queries.length)
+      ? Math.ceil(
+          (targetChunks * RERANKER_CONFIG.candidateMultiplier) / ragPlan.search_queries.length
+        )
       : SECTION_RAG_DEFAULTS.CHUNKS_PER_QUERY;
 
     for (const query of ragPlan.search_queries) {
@@ -244,21 +266,26 @@ export async function retrieveSectionContext(
           successfulQueries.push(query);
         }
 
-        logger.debug({
-          courseId,
-          sectionId,
-          query: query.substring(0, 50),
-          chunksRetrieved: queryChunks.length,
-          totalUnique: allChunks.length,
-        }, '[Section RAG] Query executed');
-
+        logger.debug(
+          {
+            courseId,
+            sectionId,
+            query: query.substring(0, 50),
+            chunksRetrieved: queryChunks.length,
+            totalUnique: allChunks.length,
+          },
+          '[Section RAG] Query executed'
+        );
       } catch (queryError) {
-        logger.warn({
-          err: queryError instanceof Error ? queryError.message : String(queryError),
-          courseId,
-          sectionId,
-          query: query.substring(0, 50),
-        }, '[Section RAG] Query failed - continuing with remaining queries');
+        logger.warn(
+          {
+            err: queryError instanceof Error ? queryError.message : String(queryError),
+            courseId,
+            sectionId,
+            query: query.substring(0, 50),
+          },
+          '[Section RAG] Query failed - continuing with remaining queries'
+        );
       }
     }
 
@@ -277,12 +304,15 @@ export async function retrieveSectionContext(
         // Create combined query from all search queries for reranking
         const combinedQuery = ragPlan.search_queries.join(' ');
 
-        logger.debug({
-          courseId,
-          sectionId,
-          candidateCount: sortedChunks.length,
-          targetCount: targetChunks,
-        }, '[Section RAG] Starting reranking');
+        logger.debug(
+          {
+            courseId,
+            sectionId,
+            candidateCount: sortedChunks.length,
+            targetCount: targetChunks,
+          },
+          '[Section RAG] Starting reranking'
+        );
 
         // Rerank all candidates
         const reranked: RerankResult[] = await rerankDocuments(
@@ -305,31 +335,39 @@ export async function retrieveSectionContext(
         const maxScore = Math.max(...scores);
         const avgScore = scores.reduce((sum, s) => sum + s, 0) / scores.length;
 
-        logger.info({
-          courseId,
-          sectionId,
-          latencyMs: rerankerLatency,
-          candidateCount: sortedChunks.length,
-          rerankedCount: rerankedChunks.length,
-          scoreDistribution: {
-            min: minScore.toFixed(3),
-            max: maxScore.toFixed(3),
-            avg: avgScore.toFixed(3),
-          },
-        }, '[Section RAG] Reranking completed successfully');
-
-        sortedChunks = rerankedChunks;
-
-      } catch (rerankerError) {
-        if (RERANKER_CONFIG.fallbackOnError) {
-          logger.warn({
-            err: rerankerError instanceof Error ? rerankerError.message : String(rerankerError),
+        logger.info(
+          {
             courseId,
             sectionId,
-          }, '[Section RAG] Reranker failed - falling back to Qdrant scores');
+            latencyMs: rerankerLatency,
+            candidateCount: sortedChunks.length,
+            rerankedCount: rerankedChunks.length,
+            scoreDistribution: {
+              min: minScore.toFixed(3),
+              max: maxScore.toFixed(3),
+              avg: avgScore.toFixed(3),
+            },
+          },
+          '[Section RAG] Reranking completed successfully'
+        );
+
+        sortedChunks = rerankedChunks;
+      } catch (rerankerError) {
+        if (RERANKER_CONFIG.fallbackOnError) {
+          logger.warn(
+            {
+              err: rerankerError instanceof Error ? rerankerError.message : String(rerankerError),
+              courseId,
+              sectionId,
+            },
+            '[Section RAG] Reranker failed - falling back to Qdrant scores'
+          );
 
           // Fallback: use original Qdrant scores
-          sortedChunks = sortedChunks.slice(0, Math.min(targetChunks, SECTION_RAG_DEFAULTS.MAX_CHUNKS));
+          sortedChunks = sortedChunks.slice(
+            0,
+            Math.min(targetChunks, SECTION_RAG_DEFAULTS.MAX_CHUNKS)
+          );
         } else {
           throw rerankerError;
         }
@@ -338,32 +376,35 @@ export async function retrieveSectionContext(
       // No reranking needed, just take top chunks
       sortedChunks = sortedChunks.slice(0, Math.min(targetChunks, SECTION_RAG_DEFAULTS.MAX_CHUNKS));
 
-      logger.debug({
-        courseId,
-        sectionId,
-        rerankerEnabled: RERANKER_CONFIG.enabled,
-        chunkCount: sortedChunks.length,
-        targetCount: targetChunks,
-      }, '[Section RAG] Reranking skipped (disabled or insufficient candidates)');
+      logger.debug(
+        {
+          courseId,
+          sectionId,
+          rerankerEnabled: RERANKER_CONFIG.enabled,
+          chunkCount: sortedChunks.length,
+          targetCount: targetChunks,
+        },
+        '[Section RAG] Reranking skipped (disabled or insufficient candidates)'
+      );
     }
 
     // Calculate coverage score
-    const coverageScore = calculateCoverageScore(
-      sortedChunks,
-      ragPlan.expected_topics
-    );
+    const coverageScore = calculateCoverageScore(sortedChunks, ragPlan.expected_topics);
 
     const retrievalDurationMs = Date.now() - startTime;
 
-    logger.info({
-      courseId,
-      sectionId,
-      totalRetrieved: sortedChunks.length,
-      queriesUsed: successfulQueries.length,
-      queriesTotal: ragPlan.search_queries.length,
-      coverageScore: coverageScore.toFixed(2),
-      durationMs: retrievalDurationMs,
-    }, '[Section RAG] Retrieval complete');
+    logger.info(
+      {
+        courseId,
+        sectionId,
+        totalRetrieved: sortedChunks.length,
+        queriesUsed: successfulQueries.length,
+        queriesTotal: ragPlan.search_queries.length,
+        coverageScore: coverageScore.toFixed(2),
+        durationMs: retrievalDurationMs,
+      },
+      '[Section RAG] Retrieval complete'
+    );
 
     // Log trace for observability in TraceViewer
     try {
@@ -383,21 +424,27 @@ export async function retrieveSectionContext(
           candidatesCount: candidatesBeforeRerank,
           rerankedCount: sortedChunks.length,
           rerankerLatencyMs: rerankerLatency,
-          scoreDistribution: sortedChunks.length > 0 ? {
-            min: Math.min(...scores),
-            max: Math.max(...scores),
-            avg: scores.reduce((s, c) => s + c, 0) / scores.length,
-          } : { min: 0, max: 0, avg: 0 },
+          scoreDistribution:
+            sortedChunks.length > 0
+              ? {
+                  min: Math.min(...scores),
+                  max: Math.max(...scores),
+                  avg: scores.reduce((s, c) => s + c, 0) / scores.length,
+                }
+              : { min: 0, max: 0, avg: 0 },
           coverageScore,
         },
         durationMs: retrievalDurationMs,
       });
     } catch (traceError) {
       // Don't fail retrieval if trace logging fails
-      logger.warn({
-        err: traceError instanceof Error ? traceError.message : String(traceError),
-        sectionId,
-      }, '[Section RAG] Failed to log trace');
+      logger.warn(
+        {
+          err: traceError instanceof Error ? traceError.message : String(traceError),
+          sectionId,
+        },
+        '[Section RAG] Failed to log trace'
+      );
     }
 
     return {
@@ -408,13 +455,15 @@ export async function retrieveSectionContext(
       coverageScore,
       retrievalDurationMs,
     };
-
   } catch (error) {
-    logger.error({
-      err: error instanceof Error ? error.message : String(error),
-      courseId,
-      sectionId,
-    }, '[Section RAG] Retrieval failed - returning empty result');
+    logger.error(
+      {
+        err: error instanceof Error ? error.message : String(error),
+        courseId,
+        sectionId,
+      },
+      '[Section RAG] Retrieval failed - returning empty result'
+    );
 
     return createEmptyResult(sectionId, Date.now() - startTime);
   }
@@ -439,10 +488,7 @@ export async function retrieveSectionContext(
  * // Returns: 0.67 (if 2 of 3 topics found)
  * ```
  */
-export function calculateCoverageScore(
-  chunks: RAGChunk[],
-  expectedTopics: string[]
-): number {
+export function calculateCoverageScore(chunks: RAGChunk[], expectedTopics: string[]): number {
   if (!expectedTopics || expectedTopics.length === 0) {
     return 1.0; // No expectations = full coverage
   }
@@ -452,9 +498,7 @@ export function calculateCoverageScore(
   }
 
   // Combine all chunk content for searching
-  const combinedContent = chunks
-    .map((chunk) => chunk.content.toLowerCase())
-    .join(' ');
+  const combinedContent = chunks.map(chunk => chunk.content.toLowerCase()).join(' ');
 
   // Count topics found
   let topicsFound = 0;
@@ -650,7 +694,7 @@ export async function retrieveMultipleSections(
   const results = new Map<string, SectionRAGResult>();
 
   // Execute in parallel with Promise.all
-  const promises = params.map(async (param) => {
+  const promises = params.map(async param => {
     const result = await retrieveSectionContext(param);
     return { sectionId: param.sectionId, result };
   });
@@ -661,9 +705,12 @@ export async function retrieveMultipleSections(
     if (outcome.status === 'fulfilled') {
       results.set(outcome.value.sectionId, outcome.value.result);
     } else {
-      logger.error({
-        err: outcome.reason instanceof Error ? outcome.reason.message : String(outcome.reason),
-      }, '[Section RAG] Batch retrieval item failed');
+      logger.error(
+        {
+          err: outcome.reason instanceof Error ? outcome.reason.message : String(outcome.reason),
+        },
+        '[Section RAG] Batch retrieval item failed'
+      );
     }
   }
 
