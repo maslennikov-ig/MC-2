@@ -2,6 +2,23 @@
 
 _Released on 2025-12-26_
 
+## v0.27.5
+
+_Released on 2026-01-13_
+
+### ✨ New Features
+
+- **admin**: Add clickable help tooltips for pipeline stages and phases
+- **web**: Add error logging to all API routes for admin visibility
+
+### 🐛 Bug Fixes
+
+- **web**: Reduce noisy health check logs
+
+---
+
+_This release was automatically generated from 5 commits._
+
 ## v0.27.4
 
 _Released on 2026-01-13_

@@ -311,6 +311,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.27.5] - 2026-01-13
+
+### Added
+
+- **admin**: add clickable help tooltips for pipeline stages and phases (9041662)
+- **web**: add error logging to all API routes for admin visibility (55e5c5f)
+
+### Fixed
+
+- **web**: reduce noisy health check logs (be5d801)
+
+### Other
+
+- bd sync: 2026-01-13 15:50:59 (c0f1abd)
+- bd sync: 2026-01-13 15:39:35 (546caec)
+
 ## [0.27.4] - 2026-01-13
 
 ### Fixed
