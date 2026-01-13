@@ -31,7 +31,7 @@ const withPWA = withPWAInit({
     skipWaiting: false, // Don't take control mid-session
     clientsClaim: false, // Don't claim clients immediately
     // Clean up outdated caches on deploy
-    cleanUpOutdatedCaches: true,
+    cleanupOutdatedCaches: true,
     // Exclude JS/CSS/JSON and build manifests from precache manifest
     exclude: [/\.js$/, /\.css$/, /\.json$/, /app-build-manifest\.json$/, /\.map$/],
     // MINIMAL runtime caching - ONLY fonts, images, and media
