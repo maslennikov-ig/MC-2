@@ -23,12 +23,13 @@ import type {
 interface FilterBarProps {
   filters: LogFilters
   onFilterChange: (filters: LogFilters) => void
+  actions?: React.ReactNode
 }
 
 /**
  * Filter controls for log monitoring dashboard
  */
-export function FilterBar({ filters, onFilterChange }: FilterBarProps) {
+export function FilterBar({ filters, onFilterChange, actions }: FilterBarProps) {
   const t = useTranslations('admin.logs')
 
   const handleLevelChange = useCallback(
@@ -222,13 +223,16 @@ export function FilterBar({ filters, onFilterChange }: FilterBarProps) {
           </div>
         </div>
 
-        {/* Clear filters button */}
-        {hasFilters && (
-          <Button variant="outline" size="sm" onClick={handleClearFilters} className="gap-2">
-            <X className="h-4 w-4" />
-            {t('filters.clear')}
-          </Button>
-        )}
+        {/* Right side: Clear button and actions */}
+        <div className="flex items-center gap-2">
+          {hasFilters && (
+            <Button variant="outline" size="sm" onClick={handleClearFilters} className="gap-2">
+              <X className="h-4 w-4" />
+              {t('filters.clear')}
+            </Button>
+          )}
+          {actions}
+        </div>
       </div>
     </div>
   )
