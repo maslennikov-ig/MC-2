@@ -311,6 +311,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.27.1] - 2026-01-13
+
+### Added
+
+- **styles**: reorder course styles for B2B focus with professional as default (aae0cf9)
+
 ## [0.27.0] - 2026-01-13
 
 ### Added

@@ -2,6 +2,18 @@
 
 _Released on 2025-12-26_
 
+## v0.27.1
+
+_Released on 2026-01-13_
+
+### ✨ New Features
+
+- **styles**: Reorder course styles for B2B focus with professional as default
+
+---
+
+_This release was automatically generated from 1 commits._
+
 ## v0.27.0
 
 _Released on 2026-01-13_
