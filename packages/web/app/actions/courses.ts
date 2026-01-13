@@ -546,7 +546,7 @@ export async function updateDraftAndStartGeneration(
       logPermanentFailure({
         user_id: user.id,
         error_message: updateError?.message || 'Failed to update draft course',
-        stack_trace: updateError?.details || null,
+        stack_trace: updateError?.details || undefined,
         severity: 'ERROR',
         job_type: 'COURSE_UPDATE',
         metadata: {
@@ -585,7 +585,7 @@ export async function updateDraftAndStartGeneration(
     // Log to error_logs for admin visibility
     logPermanentFailure({
       error_message: error instanceof Error ? error.message : 'Unknown error',
-      stack_trace: error instanceof Error ? error.stack : null,
+      stack_trace: error instanceof Error ? error.stack : undefined,
       severity: 'ERROR',
       job_type: 'COURSE_UPDATE',
       metadata: {

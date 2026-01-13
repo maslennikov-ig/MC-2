@@ -120,7 +120,7 @@ async function proxyRequest(
     // Log to error_logs for admin visibility
     logPermanentFailure({
       error_message: error instanceof Error ? error.message : 'Unknown error',
-      stack_trace: error instanceof Error ? error.stack : null,
+      stack_trace: error instanceof Error ? error.stack : undefined,
       severity: 'ERROR',
       job_type: 'TRPC_PROXY',
       metadata: {
