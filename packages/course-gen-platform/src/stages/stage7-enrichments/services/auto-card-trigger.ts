@@ -205,8 +205,12 @@ function registerShutdownHandlers(): void {
     await shutdownAutoCardQueue();
   };
 
-  process.on('SIGTERM', () => handleShutdown('SIGTERM'));
-  process.on('SIGINT', () => handleShutdown('SIGINT'));
+  process.on('SIGTERM', () => {
+    void handleShutdown('SIGTERM');
+  });
+  process.on('SIGINT', () => {
+    void handleShutdown('SIGINT');
+  });
 
   shutdownHandlersRegistered = true;
   logger.debug('Auto-card queue shutdown handlers registered');
@@ -510,10 +514,7 @@ export async function triggerCourseCard(params: {
   }
 
   if (!AUTO_CARD_ENABLED) {
-    logger.debug(
-      { courseId },
-      'Auto-card generation disabled, skipping course card trigger'
-    );
+    logger.debug({ courseId }, 'Auto-card generation disabled, skipping course card trigger');
     return null;
   }
 
@@ -556,10 +557,12 @@ export async function triggerCourseCard(params: {
     }
 
     // Get the first lesson of the course to attach the course card to
+    // Note: lessons are linked via sections (lessons.section_id -> sections.course_id)
     const { data: firstLesson, error: lessonError } = await supabase
       .from('lessons')
-      .select('id')
-      .eq('course_id', courseId)
+      .select('id, sections!inner(course_id, order_index)')
+      .eq('sections.course_id', courseId)
+      .order('sections.order_index', { ascending: true })
       .order('order_index', { ascending: true })
       .limit(1)
       .maybeSingle();
@@ -773,7 +776,7 @@ export async function triggerAllLessonCards(params: {
       .eq('enrichment_type', 'card')
       .not('title', 'eq', 'course-card'); // Exclude course card
 
-    const existingLessonIds = new Set(existingCards?.map((c) => c.lesson_id) || []);
+    const existingLessonIds = new Set(existingCards?.map(c => c.lesson_id) || []);
 
     // Trigger cards for lessons that don't have them
     for (const lesson of lessons) {
@@ -878,11 +881,12 @@ export async function triggerAllLessonCovers(params: {
     // Note: Using two separate queries for clarity and reliability.
     // A single JOIN query would be more efficient but harder to maintain.
 
-    // Get all lessons
+    // Get all lessons via sections join (lessons.section_id -> sections.course_id)
     const { data: lessons, error: lessonsError } = await supabase
       .from('lessons')
-      .select('id')
-      .eq('course_id', courseId)
+      .select('id, sections!inner(course_id, order_index)')
+      .eq('sections.course_id', courseId)
+      .order('sections.order_index', { ascending: true })
       .order('order_index', { ascending: true });
 
     if (lessonsError || !lessons || lessons.length === 0) {
@@ -900,7 +904,7 @@ export async function triggerAllLessonCovers(params: {
       .eq('course_id', courseId)
       .eq('enrichment_type', 'cover');
 
-    const existingLessonIds = new Set(existingCovers?.map((c) => c.lesson_id) || []);
+    const existingLessonIds = new Set(existingCovers?.map(c => c.lesson_id) || []);
 
     // Trigger covers for lessons that don't have them
     for (const lesson of lessons) {
