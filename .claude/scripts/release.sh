@@ -77,6 +77,13 @@ safe_first() {
     awk 'NR==1 {print; exit}'
 }
 
+# Safe replacement for tail -n +N (skip first N-1 lines)
+# Usage: command | safe_tail_from 5
+safe_tail_from() {
+    local n="${1:-1}"
+    awk -v n="$n" 'NR >= n {print}'
+}
+
 # Get commits range handling first release edge case
 # Usage: get_commits_range "$LAST_TAG"
 get_commits_range() {
@@ -992,7 +999,7 @@ update_changelog() {
                 echo "$existing_content" | safe_head "$((unreleased_line))"
                 echo ""
                 echo "$new_entry"
-                echo "$existing_content" | tail -n +$((unreleased_line + 1))
+                echo "$existing_content" | safe_tail_from "$((unreleased_line + 1))"
             } > "$changelog_file"
         else
             # No [Unreleased] section, insert at the beginning after header
@@ -1000,7 +1007,7 @@ update_changelog() {
                 echo "$existing_content" | safe_head 6
                 echo ""
                 echo "$new_entry"
-                echo "$existing_content" | tail -n +7
+                echo "$existing_content" | safe_tail_from 7
             } > "$changelog_file"
         fi
     else
@@ -1059,7 +1066,7 @@ update_release_notes() {
                     echo "$existing_content" | safe_head "$((first_release_line - 1))"
                     echo "$new_entry"
                     echo ""
-                    echo "$existing_content" | tail -n +"$first_release_line"
+                    echo "$existing_content" | safe_tail_from "$first_release_line"
                 } > "$release_notes_file"
             else
                 # No releases yet, append after header
