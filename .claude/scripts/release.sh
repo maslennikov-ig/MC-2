@@ -417,7 +417,7 @@ Co-Authored-By: Claude <noreply@anthropic.com>"
             COMMIT_MSG="${commit_prefix}: ${commit_desc}
 
 Changes in this commit:
-$(echo -e "$changes_body")
+$(printf '%b' "$changes_body")
 Auto-committed ${TOTAL_COUNT} file(s) before creating release.
 
 Files changed:
@@ -428,11 +428,29 @@ ${FILE_LIST}
 Co-Authored-By: Claude <noreply@anthropic.com>"
         fi
 
-        # Create commit
-        git commit -m "$COMMIT_MSG" >/dev/null 2>&1 || {
-            log_error "Failed to auto-commit changes"
-            exit 1
-        }
+        # Create commit with retry for lint-staged modifications
+        # lint-staged (via pre-commit hook) may modify files, requiring re-stage
+        local commit_output
+        local commit_exit_code
+
+        commit_output=$(git commit -m "$COMMIT_MSG" 2>&1) || commit_exit_code=$?
+
+        if [ -n "${commit_exit_code:-}" ]; then
+            # Check if lint-staged modified files (common with prettier)
+            if git diff --name-only | grep -q .; then
+                log_info "lint-staged modified files, re-staging and retrying commit..."
+                git add -A
+                commit_output=$(git commit -m "$COMMIT_MSG" 2>&1) || {
+                    log_error "Failed to auto-commit changes after retry"
+                    log_error "Git output: $commit_output"
+                    exit 1
+                }
+            else
+                log_error "Failed to auto-commit changes"
+                log_error "Git output: $commit_output"
+                exit 1
+            fi
+        fi
 
         log_success "Changes committed (${TOTAL_COUNT} files)"
         log_info "Commit: ${commit_prefix}: ${commit_desc}"
