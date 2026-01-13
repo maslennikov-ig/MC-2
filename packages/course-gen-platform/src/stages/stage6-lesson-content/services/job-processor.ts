@@ -7,14 +7,25 @@ import {
   type Stage6Input,
   type Stage6Output,
 } from '../orchestrator';
-import { retrieveLessonContext, extractSourceDocuments, type LessonRAGResult, type SourceDocument } from '../utils/lesson-rag-retriever';
+import {
+  retrieveLessonContext,
+  extractSourceDocuments,
+  type LessonRAGResult,
+  type SourceDocument,
+} from '../utils/lesson-rag-retriever';
 import { quickSanityCheck, type SanityCheckResult } from '../utils/sanity-check';
 import { createLessonLabel, LessonLabel } from '@megacampus/shared-types';
 
 import { Stage6JobInput, Stage6JobResult, ProgressUpdate, ModelConfig } from '../types';
 import { MODEL_FALLBACK } from '../config';
 import { getStage6ModelConfig } from './model-service';
-import { handlePartialSuccess, markForReview, saveLessonContent, saveSourceDocuments } from './database-service';
+import {
+  handlePartialSuccess,
+  markForReview,
+  saveLessonContent,
+  saveSourceDocuments,
+  checkAndSetStage6Complete,
+} from './database-service';
 import { extractContentMarkdown } from './content-utils';
 import { triggerLessonCard } from '../../stage7-enrichments/services/auto-card-trigger';
 
@@ -25,10 +36,7 @@ function sleep(ms: number): Promise<void> {
 /**
  * Update job progress for streaming
  */
-export async function updateJobProgress(
-  job: Job,
-  update: ProgressUpdate
-): Promise<void> {
+export async function updateJobProgress(job: Job, update: ProgressUpdate): Promise<void> {
   try {
     await job.updateProgress(update);
 
@@ -55,7 +63,15 @@ export async function updateJobProgress(
  * Execute Stage 6 orchestrator adapter
  */
 async function executeStage6(input: Stage6JobInput): Promise<Stage6Output> {
-  const { lessonSpec, courseId, ragChunks, ragContextId, language, modelOverride, userRefinementPrompt } = input;
+  const {
+    lessonSpec,
+    courseId,
+    ragChunks,
+    ragContextId,
+    language,
+    modelOverride,
+    userRefinementPrompt,
+  } = input;
 
   const lessonLabel = lessonSpec.lesson_id;
   const lessonUuid = await resolveLessonUuid(courseId, lessonLabel);
@@ -207,7 +223,12 @@ export async function processStage6Job(
   const { lessonSpec, courseId, language, userRefinementPrompt: _userRefinementPrompt } = job.data;
   const startTime = Date.now();
 
-  if (!lessonSpec || !lessonSpec.lesson_id || !lessonSpec.sections || !Array.isArray(lessonSpec.sections)) {
+  if (
+    !lessonSpec ||
+    !lessonSpec.lesson_id ||
+    !lessonSpec.sections ||
+    !Array.isArray(lessonSpec.sections)
+  ) {
     const errorMsg = 'Invalid job input: lessonSpec must have lesson_id and sections array';
     logger.error({ jobId: job.id, lessonSpec }, errorMsg);
     return {
@@ -241,22 +262,28 @@ export async function processStage6Job(
     // @see docs/tasks/REFACTOR-RAG-PRIORITY-BASED-RETRIEVAL.md
     sourceDocuments = extractSourceDocuments(ragChunks);
 
-    logger.info({
-      lessonId: lessonSpec.lesson_id,
-      courseId,
-      chunksCount: ragChunks.length,
-      cached: ragResult.cached,
-      coverageScore: ragResult.coverageScore,
-      retrievalDurationMs: ragResult.retrievalDurationMs,
-      sourceDocumentsCount: sourceDocuments.length,
-      coreDocsUsed: sourceDocuments.filter(d => d.document_priority === 'CORE').length,
-    }, 'RAG context retrieved for lesson');
+    logger.info(
+      {
+        lessonId: lessonSpec.lesson_id,
+        courseId,
+        chunksCount: ragChunks.length,
+        cached: ragResult.cached,
+        coverageScore: ragResult.coverageScore,
+        retrievalDurationMs: ragResult.retrievalDurationMs,
+        sourceDocumentsCount: sourceDocuments.length,
+        coreDocsUsed: sourceDocuments.filter(d => d.document_priority === 'CORE').length,
+      },
+      'RAG context retrieved for lesson'
+    );
   } catch (error) {
-    logger.warn({
-      lessonId: lessonSpec.lesson_id,
-      courseId,
-      error: error instanceof Error ? error.message : String(error),
-    }, 'RAG retrieval failed, continuing without context');
+    logger.warn(
+      {
+        lessonId: lessonSpec.lesson_id,
+        courseId,
+        error: error instanceof Error ? error.message : String(error),
+      },
+      'RAG retrieval failed, continuing without context'
+    );
   }
 
   let lessonLabel: LessonLabel;
@@ -315,9 +342,9 @@ export async function processStage6Job(
       lessonTitle: lessonSpec.title,
       ragChunksCount: ragChunks.length,
       ragContextId,
-      primaryModel: modelConfig.primary
+      primaryModel: modelConfig.primary,
     },
-    durationMs: 0
+    durationMs: 0,
   });
 
   await updateJobProgress(job, {
@@ -347,10 +374,7 @@ export async function processStage6Job(
           'Content failed sanity check (non-blocking warning)'
         );
       } else {
-        jobLogger.debug(
-          { metrics: sanityResult.metrics },
-          'Content passed sanity check'
-        );
+        jobLogger.debug({ metrics: sanityResult.metrics }, 'Content passed sanity check');
       }
     }
 
@@ -364,18 +388,9 @@ export async function processStage6Job(
 
     if (result.lessonContent && result.errors.length > 0) {
       if (lessonUuid) {
-        await handlePartialSuccess(
-          job.id ?? 'unknown',
-          courseId,
-          lessonUuid,
-          lessonLabel,
-          result
-        );
+        await handlePartialSuccess(job.id ?? 'unknown', courseId, lessonUuid, lessonLabel, result);
       } else {
-        jobLogger.warn(
-          { lessonLabel },
-          'Cannot save partial success - lessonUuid not resolved'
-        );
+        jobLogger.warn({ lessonLabel }, 'Cannot save partial success - lessonUuid not resolved');
       }
     }
 
@@ -390,13 +405,22 @@ export async function processStage6Job(
 
       // Auto-trigger lesson card generation (non-blocking)
       if (lessonUuid) {
-        triggerLessonCard({ courseId, lessonId: lessonUuid }).catch((err) => {
+        triggerLessonCard({ courseId, lessonId: lessonUuid }).catch(err => {
           jobLogger.warn(
             { lessonId: lessonUuid, error: err instanceof Error ? err.message : String(err) },
             'Non-blocking: Failed to trigger lesson card generation'
           );
         });
       }
+
+      // Check if all lessons are complete and update course status to stage_6_complete
+      // This runs after each successful lesson save (non-blocking)
+      checkAndSetStage6Complete(courseId).catch(err => {
+        jobLogger.warn(
+          { courseId, error: err instanceof Error ? err.message : String(err) },
+          'Non-blocking: Failed to check Stage 6 completion'
+        );
+      });
     }
 
     jobLogger.info(
@@ -421,9 +445,9 @@ export async function processStage6Job(
       outputData: {
         qualityScore: result.metrics.qualityScore,
         modelUsed: result.metrics.modelUsed,
-        tokensUsed: result.metrics.tokensUsed
+        tokensUsed: result.metrics.tokensUsed,
       },
-      durationMs
+      durationMs,
     });
 
     return {
@@ -458,7 +482,7 @@ export async function processStage6Job(
       stepName: 'failed',
       inputData: { lessonLabel },
       errorData: { error: errorMsg },
-      durationMs
+      durationMs,
     });
 
     if (lessonUuid) {
@@ -469,10 +493,7 @@ export async function processStage6Job(
         `Generation failed after model fallback: ${errorMsg}`
       );
     } else {
-      jobLogger.warn(
-        { lessonLabel, errorMsg },
-        'Cannot mark for review - lessonUuid not resolved'
-      );
+      jobLogger.warn({ lessonLabel, errorMsg }, 'Cannot mark for review - lessonUuid not resolved');
     }
 
     await updateJobProgress(job, {

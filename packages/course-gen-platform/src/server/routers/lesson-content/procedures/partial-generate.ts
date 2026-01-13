@@ -80,15 +80,18 @@ export const partialGenerate = protectedProcedure
     // ctx.user is guaranteed non-null by protectedProcedure middleware
     const currentUser = ctx.user;
 
-    logger.info({
-      requestId,
-      courseId,
-      userId: currentUser.id,
-      organizationId: currentUser.organizationId,
-      lessonIds,
-      sectionIds,
-      priority,
-    }, 'Partial Stage 6 generation request');
+    logger.info(
+      {
+        requestId,
+        courseId,
+        userId: currentUser.id,
+        organizationId: currentUser.organizationId,
+        lessonIds,
+        sectionIds,
+        priority,
+      },
+      'Partial Stage 6 generation request'
+    );
 
     try {
       // Step 1: Verify course access
@@ -104,11 +107,14 @@ export const partialGenerate = protectedProcedure
         .single();
 
       if (courseError || !course) {
-        logger.error({
-          requestId,
-          courseId,
-          error: courseError,
-        }, 'Failed to fetch course structure');
+        logger.error(
+          {
+            requestId,
+            courseId,
+            error: courseError,
+          },
+          'Failed to fetch course structure'
+        );
 
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
@@ -133,10 +139,13 @@ export const partialGenerate = protectedProcedure
       } | null;
 
       if (!courseStructure || !courseStructure.sections) {
-        logger.warn({
-          requestId,
-          courseId,
-        }, 'Course structure is missing - Stage 5 may not be completed');
+        logger.warn(
+          {
+            requestId,
+            courseId,
+          },
+          'Course structure is missing - Stage 5 may not be completed'
+        );
 
         throw new TRPCError({
           code: 'BAD_REQUEST',
@@ -153,26 +162,115 @@ export const partialGenerate = protectedProcedure
         .single();
 
       const currentStatus = statusData?.generation_status;
-      if (currentStatus === 'stage_5_awaiting_approval') {
-        logger.info({
-          requestId,
-          courseId,
-          currentStatus,
-        }, 'Auto-approving Stage 5 - structure approved for partial generation');
 
-        // Update status to stage_5_complete (Stage 6 work proceeds from here)
+      // Stage 6 status flow: stage_5_complete -> stage_6_init -> stage_6_generating -> stage_6_complete
+      // When user starts generation, we transition to stage_6_generating
+      const statusesAllowingStage6 = [
+        'stage_5_complete',
+        'stage_5_awaiting_approval',
+        'stage_6_init',
+        'stage_6_generating',
+        'stage_6_complete',
+      ];
+
+      if (currentStatus === 'stage_5_awaiting_approval') {
+        logger.info(
+          {
+            requestId,
+            courseId,
+            currentStatus,
+          },
+          'Auto-approving Stage 5 and starting Stage 6'
+        );
+
+        // FSM requires: stage_5_awaiting_approval -> stage_6_init -> stage_6_generating
+        // First transition to stage_6_init
+        await supabase
+          .from('courses')
+          .update({ generation_status: 'stage_6_init' })
+          .eq('id', courseId);
+
+        // Then transition to stage_6_generating
         const { error: updateError } = await supabase
           .from('courses')
-          .update({ generation_status: 'stage_5_complete' })
+          .update({ generation_status: 'stage_6_generating' })
           .eq('id', courseId);
 
         if (updateError) {
-          logger.error({
+          logger.error(
+            {
+              requestId,
+              courseId,
+              error: updateError,
+            },
+            'Failed to update generation_status to stage_6_generating'
+          );
+        }
+      } else if (currentStatus === 'stage_5_complete') {
+        // FSM requires: stage_5_complete -> stage_6_init -> stage_6_generating
+        await supabase
+          .from('courses')
+          .update({ generation_status: 'stage_6_init' })
+          .eq('id', courseId);
+
+        const { error: updateError } = await supabase
+          .from('courses')
+          .update({ generation_status: 'stage_6_generating' })
+          .eq('id', courseId);
+
+        if (updateError) {
+          logger.error(
+            {
+              requestId,
+              courseId,
+              error: updateError,
+            },
+            'Failed to update generation_status to stage_6_generating'
+          );
+        }
+
+        logger.info(
+          {
             requestId,
             courseId,
-            error: updateError,
-          }, 'Failed to update generation_status');
+          },
+          'Started Stage 6 generation from stage_5_complete'
+        );
+      } else if (currentStatus === 'stage_6_init') {
+        // Transition to stage_6_generating when starting generation
+        logger.info(
+          {
+            requestId,
+            courseId,
+            currentStatus,
+          },
+          'Starting Stage 6 generation'
+        );
+
+        const { error: updateError } = await supabase
+          .from('courses')
+          .update({ generation_status: 'stage_6_generating' })
+          .eq('id', courseId);
+
+        if (updateError) {
+          logger.error(
+            {
+              requestId,
+              courseId,
+              error: updateError,
+            },
+            'Failed to update generation_status to stage_6_generating'
+          );
         }
+      } else if (!statusesAllowingStage6.includes(currentStatus || '')) {
+        logger.warn(
+          {
+            requestId,
+            courseId,
+            currentStatus,
+          },
+          'Course not ready for Stage 6 generation'
+        );
       }
 
       // Step 3.6: Materialize sections and lessons from course_structure if not exists
@@ -184,10 +282,13 @@ export const partialGenerate = protectedProcedure
         .limit(1);
 
       if (!existingSections || existingSections.length === 0) {
-        logger.info({
-          requestId,
-          courseId,
-        }, 'Materializing sections and lessons from course_structure');
+        logger.info(
+          {
+            requestId,
+            courseId,
+          },
+          'Materializing sections and lessons from course_structure'
+        );
 
         // Create sections
         for (const section of courseStructure.sections) {
@@ -202,44 +303,51 @@ export const partialGenerate = protectedProcedure
             .single();
 
           if (sectionError || !newSection) {
-            logger.error({
-              requestId,
-              courseId,
-              sectionNumber: section.section_number,
-              error: sectionError,
-            }, 'Failed to create section');
+            logger.error(
+              {
+                requestId,
+                courseId,
+                sectionNumber: section.section_number,
+                error: sectionError,
+              },
+              'Failed to create section'
+            );
             continue;
           }
 
           // Create lessons for this section
           for (const lesson of section.lessons) {
-            const { error: lessonError } = await supabase
-              .from('lessons')
-              .insert({
-                section_id: newSection.id,
-                title: lesson.lesson_title,
-                order_index: lesson.lesson_number,
-                lesson_type: 'text',
-                duration_minutes: lesson.estimated_duration_minutes || 15,
-                objectives: lesson.lesson_objectives || [],
-              });
+            const { error: lessonError } = await supabase.from('lessons').insert({
+              section_id: newSection.id,
+              title: lesson.lesson_title,
+              order_index: lesson.lesson_number,
+              lesson_type: 'text',
+              duration_minutes: lesson.estimated_duration_minutes || 15,
+              objectives: lesson.lesson_objectives || [],
+            });
 
             if (lessonError) {
-              logger.error({
-                requestId,
-                courseId,
-                lessonId: `${section.section_number}.${lesson.lesson_number}`,
-                error: lessonError,
-              }, 'Failed to create lesson');
+              logger.error(
+                {
+                  requestId,
+                  courseId,
+                  lessonId: `${section.section_number}.${lesson.lesson_number}`,
+                  error: lessonError,
+                },
+                'Failed to create lesson'
+              );
             }
           }
         }
 
-        logger.info({
-          requestId,
-          courseId,
-          sectionsCount: courseStructure.sections.length,
-        }, 'Sections and lessons materialized successfully');
+        logger.info(
+          {
+            requestId,
+            courseId,
+            sectionsCount: courseStructure.sections.length,
+          },
+          'Sections and lessons materialized successfully'
+        );
       }
 
       // Step 4: Build list of lesson IDs to generate
@@ -261,12 +369,15 @@ export const partialGenerate = protectedProcedure
       }
 
       if (lessonIdsToGenerate.length === 0) {
-        logger.warn({
-          requestId,
-          courseId,
-          lessonIds,
-          sectionIds,
-        }, 'No lessons found to generate');
+        logger.warn(
+          {
+            requestId,
+            courseId,
+            lessonIds,
+            sectionIds,
+          },
+          'No lessons found to generate'
+        );
 
         throw new TRPCError({
           code: 'BAD_REQUEST',
@@ -284,37 +395,52 @@ export const partialGenerate = protectedProcedure
 
         const section = courseStructure.sections.find(s => s.section_number === sectionNum);
         if (!section) {
-          logger.warn({
-            requestId,
-            lessonId,
-            sectionNum,
-          }, 'Section not found in course_structure');
+          logger.warn(
+            {
+              requestId,
+              lessonId,
+              sectionNum,
+            },
+            'Section not found in course_structure'
+          );
           continue;
         }
 
         const lesson = section.lessons.find(l => l.lesson_number === lessonNum);
         if (!lesson) {
-          logger.warn({
-            requestId,
-            lessonId,
-            sectionNum,
-            lessonNum,
-          }, 'Lesson not found in course_structure');
+          logger.warn(
+            {
+              requestId,
+              lessonId,
+              sectionNum,
+              lessonNum,
+            },
+            'Lesson not found in course_structure'
+          );
           continue;
         }
 
         // Safely parse analysis_result using runtime type guard
         const analysisResult = parseAnalysisResult(course.analysis_result);
-        const spec = buildMinimalLessonSpec(lessonId, lesson, sectionNum, requestId, analysisResult);
+        const spec = buildMinimalLessonSpec(
+          lessonId,
+          lesson,
+          sectionNum,
+          requestId,
+          analysisResult
+        );
         lessonSpecs.push(spec);
       }
 
       if (lessonSpecs.length === 0) {
-        logger.warn({
-          requestId,
-          courseId,
-          lessonIdsToGenerate,
-        }, 'No lesson specifications built from course_structure');
+        logger.warn(
+          {
+            requestId,
+            courseId,
+            lessonIdsToGenerate,
+          },
+          'No lesson specifications built from course_structure'
+        );
 
         throw new TRPCError({
           code: 'BAD_REQUEST',
@@ -338,12 +464,15 @@ export const partialGenerate = protectedProcedure
           .single();
 
         if (!sectionData) {
-          logger.warn({
-            requestId,
-            courseId,
-            lessonId: spec.lesson_id,
-            sectionNum,
-          }, 'Section not found in database for lesson recreation');
+          logger.warn(
+            {
+              requestId,
+              courseId,
+              lessonId: spec.lesson_id,
+              sectionNum,
+            },
+            'Section not found in database for lesson recreation'
+          );
           continue;
         }
 
@@ -361,33 +490,37 @@ export const partialGenerate = protectedProcedure
           const lesson = section?.lessons.find(l => l.lesson_number === lessonNum);
 
           if (lesson) {
-            const { error: createError } = await supabase
-              .from('lessons')
-              .insert({
-                section_id: sectionData.id,
-                title: lesson.lesson_title,
-                order_index: lessonNum,
-                lesson_type: 'text',
-                duration_minutes: lesson.estimated_duration_minutes || 15,
-                objectives: lesson.lesson_objectives || [],
-              });
+            const { error: createError } = await supabase.from('lessons').insert({
+              section_id: sectionData.id,
+              title: lesson.lesson_title,
+              order_index: lessonNum,
+              lesson_type: 'text',
+              duration_minutes: lesson.estimated_duration_minutes || 15,
+              objectives: lesson.lesson_objectives || [],
+            });
 
             if (createError) {
-              logger.error({
-                requestId,
-                courseId,
-                lessonId: spec.lesson_id,
-                error: createError,
-              }, 'Failed to recreate deleted lesson');
+              logger.error(
+                {
+                  requestId,
+                  courseId,
+                  lessonId: spec.lesson_id,
+                  error: createError,
+                },
+                'Failed to recreate deleted lesson'
+              );
             } else {
               // Invalidate UUID cache so worker can resolve the new lesson
               await invalidateLessonUuidCache(courseId, spec.lesson_id);
 
-              logger.info({
-                requestId,
-                courseId,
-                lessonId: spec.lesson_id,
-              }, 'Lesson recreated after deletion');
+              logger.info(
+                {
+                  requestId,
+                  courseId,
+                  lessonId: spec.lesson_id,
+                },
+                'Lesson recreated after deletion'
+              );
             }
           }
         }
@@ -396,7 +529,7 @@ export const partialGenerate = protectedProcedure
       // Step 6: Enqueue all lessons using addJob with deduplication
       const courseLanguage = (course.language || 'en') as Language;
       const jobs = await Promise.all(
-        lessonSpecs.map((spec) => {
+        lessonSpecs.map(spec => {
           const jobData: LessonContentJobData = {
             organizationId: currentUser.organizationId,
             courseId,
@@ -425,18 +558,21 @@ export const partialGenerate = protectedProcedure
       );
 
       // Step 7: Log success
-      logger.info({
-        requestId,
-        courseId,
-        lessonsEnqueued: jobs.length,
-        jobIds: jobs.map((j) => j.id),
-        selectedLessonIds: lessonSpecs.map(s => s.lesson_id),
-      }, 'Partial Stage 6 jobs enqueued');
+      logger.info(
+        {
+          requestId,
+          courseId,
+          lessonsEnqueued: jobs.length,
+          jobIds: jobs.map(j => j.id),
+          selectedLessonIds: lessonSpecs.map(s => s.lesson_id),
+        },
+        'Partial Stage 6 jobs enqueued'
+      );
 
       return {
         success: true,
         jobCount: jobs.length,
-        jobIds: jobs.map((j) => j.id).filter((id): id is string => id !== undefined),
+        jobIds: jobs.map(j => j.id).filter((id): id is string => id !== undefined),
         selectedLessonIds: lessonSpecs.map(s => s.lesson_id),
       };
     } catch (error) {
@@ -446,11 +582,14 @@ export const partialGenerate = protectedProcedure
       }
 
       // Log and wrap unexpected errors
-      logger.error({
-        requestId,
-        courseId,
-        error: error instanceof Error ? error.message : String(error),
-      }, 'Partial Stage 6 generation failed');
+      logger.error(
+        {
+          requestId,
+          courseId,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        'Partial Stage 6 generation failed'
+      );
 
       throw new TRPCError({
         code: 'INTERNAL_SERVER_ERROR',
