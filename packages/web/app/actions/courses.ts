@@ -581,6 +581,19 @@ export async function updateDraftAndStartGeneration(
     }
   } catch (error) {
     logger.error('Error updating draft course', { error })
+
+    // Log to error_logs for admin visibility
+    logPermanentFailure({
+      error_message: error instanceof Error ? error.message : 'Unknown error',
+      stack_trace: error instanceof Error ? error.stack : null,
+      severity: 'ERROR',
+      job_type: 'COURSE_UPDATE',
+      metadata: {
+        action: 'updateDraftAndStartGeneration',
+        errorCode: 'UNKNOWN_ERROR',
+      },
+    }).catch(() => {})
+
     return {
       error: 'Failed to start course generation',
       code: 'UNKNOWN_ERROR',

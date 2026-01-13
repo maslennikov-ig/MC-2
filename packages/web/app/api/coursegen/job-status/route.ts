@@ -7,9 +7,9 @@
  * @module api/coursegen/job-status
  */
 
-import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
-import { logger } from '@/lib/logger';
+import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
+import { logger, logPermanentFailure } from '@/lib/logger'
 
 /**
  * GET handler for job status query
@@ -20,41 +20,40 @@ import { logger } from '@/lib/logger';
 export async function GET(request: NextRequest) {
   try {
     // Secure auth check using getUser() to verify with Supabase Auth server
-    const supabase = await createClient();
+    const supabase = await createClient()
     const {
       data: { user },
       error: authError,
-    } = await supabase.auth.getUser();
+    } = await supabase.auth.getUser()
 
     if (authError || !user) {
       return NextResponse.json(
         { error: 'Requires authorization', code: 'UNAUTHORIZED' },
         { status: 401 }
-      );
+      )
     }
 
     // Get session for access token (needed for tRPC call)
-    const { data: { session } } = await supabase.auth.getSession();
+    const {
+      data: { session },
+    } = await supabase.auth.getSession()
     if (!session?.access_token) {
-      return NextResponse.json(
-        { error: 'Session expired', code: 'UNAUTHORIZED' },
-        { status: 401 }
-      );
+      return NextResponse.json({ error: 'Session expired', code: 'UNAUTHORIZED' }, { status: 401 })
     }
-    const accessToken = session.access_token;
-    const { searchParams } = new URL(request.url);
-    const jobId = searchParams.get('jobId');
+    const accessToken = session.access_token
+    const { searchParams } = new URL(request.url)
+    const jobId = searchParams.get('jobId')
 
     if (!jobId) {
       return NextResponse.json(
         { error: 'jobId parameter is required', code: 'INVALID_REQUEST' },
         { status: 400 }
-      );
+      )
     }
 
     // Call tRPC endpoint
-    const backendUrl = process.env.COURSEGEN_BACKEND_URL || 'http://localhost:3456';
-    const tRPCUrl = `${backendUrl}/trpc`;
+    const backendUrl = process.env.COURSEGEN_BACKEND_URL || 'http://localhost:3456'
+    const tRPCUrl = `${backendUrl}/trpc`
     const response = await fetch(
       `${tRPCUrl}/jobs.getStatus?input=${encodeURIComponent(JSON.stringify({ jobId }))}`,
       {
@@ -64,9 +63,9 @@ export async function GET(request: NextRequest) {
           Authorization: `Bearer ${accessToken}`,
         },
       }
-    );
+    )
 
-    const data = await response.json();
+    const data = await response.json()
 
     if (!response.ok) {
       logger.error('tRPC jobs.getStatus failed', {
@@ -74,17 +73,30 @@ export async function GET(request: NextRequest) {
         jobId,
         status: response.status,
         error: data,
-      });
+      })
     }
 
-    return NextResponse.json(data, { status: response.status });
+    return NextResponse.json(data, { status: response.status })
   } catch (error) {
     logger.error('Unexpected error in /api/coursegen/job-status', {
       error: error instanceof Error ? error.message : 'Unknown error',
-    });
+    })
+
+    // Log to error_logs for admin visibility
+    logPermanentFailure({
+      error_message: error instanceof Error ? error.message : 'Unknown error',
+      stack_trace: error instanceof Error ? error.stack : null,
+      severity: 'ERROR',
+      job_type: 'JOB_STATUS',
+      metadata: {
+        route: '/api/coursegen/job-status',
+        errorCode: 'INTERNAL_ERROR',
+      },
+    }).catch(() => {})
+
     return NextResponse.json(
       { error: 'Internal server error', code: 'INTERNAL_ERROR' },
       { status: 500 }
-    );
+    )
   }
 }

@@ -7,9 +7,9 @@
  * @module api/coursegen/lesson-content
  */
 
-import { NextRequest, NextResponse } from 'next/server';
-import { createClient } from '@/lib/supabase/server';
-import { logger } from '@/lib/logger';
+import { NextRequest, NextResponse } from 'next/server'
+import { createClient } from '@/lib/supabase/server'
+import { logger, logPermanentFailure } from '@/lib/logger'
 
 /**
  * GET handler for fetching lesson content
@@ -27,72 +27,72 @@ import { logger } from '@/lib/logger';
 export async function GET(request: NextRequest) {
   try {
     // Minimal auth check
-    const supabase = await createClient();
+    const supabase = await createClient()
     const {
       data: { session },
       error: authError,
-    } = await supabase.auth.getSession();
+    } = await supabase.auth.getSession()
 
     if (authError || !session?.user) {
       logger.warn('Unauthorized access attempt to /api/coursegen/lesson-content', {
         error: authError?.message,
         ip: request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip'),
-      });
+      })
       return NextResponse.json(
         { error: 'Требуется авторизация', code: 'UNAUTHORIZED' },
         { status: 401 }
-      );
+      )
     }
 
-    const user = session.user;
-    const accessToken = session.access_token;
+    const user = session.user
+    const accessToken = session.access_token
 
     // Parse query params
-    const { searchParams } = new URL(request.url);
-    const courseId = searchParams.get('courseId');
-    const lessonId = searchParams.get('lessonId');
+    const { searchParams } = new URL(request.url)
+    const courseId = searchParams.get('courseId')
+    const lessonId = searchParams.get('lessonId')
 
     // Validate required fields
     if (!courseId) {
-      logger.warn('Missing courseId in lesson-content request', { userId: user.id });
+      logger.warn('Missing courseId in lesson-content request', { userId: user.id })
       return NextResponse.json(
         { error: 'courseId обязателен', code: 'INVALID_REQUEST' },
         { status: 400 }
-      );
+      )
     }
 
     if (!lessonId) {
       logger.warn('Missing lessonId in lesson-content request', {
         userId: user.id,
         courseId,
-      });
+      })
       return NextResponse.json(
         { error: 'lessonId обязателен', code: 'INVALID_REQUEST' },
         { status: 400 }
-      );
+      )
     }
 
     logger.debug('Fetching lesson content', {
       userId: user.id,
       courseId,
       lessonId,
-    });
+    })
 
     // Call tRPC endpoint (GET query)
-    const backendUrl = process.env.COURSEGEN_BACKEND_URL || 'http://localhost:3456';
-    const tRPCUrl = `${backendUrl}/trpc`;
+    const backendUrl = process.env.COURSEGEN_BACKEND_URL || 'http://localhost:3456'
+    const tRPCUrl = `${backendUrl}/trpc`
 
     // tRPC query format: ?input=JSON_ENCODED_INPUT
-    const input = encodeURIComponent(JSON.stringify({ courseId, lessonId }));
+    const input = encodeURIComponent(JSON.stringify({ courseId, lessonId }))
     const response = await fetch(`${tRPCUrl}/lessonContent.getLessonContent?input=${input}`, {
       method: 'GET',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${accessToken}`,
       },
-    });
+    })
 
-    const data = await response.json();
+    const data = await response.json()
 
     // Log tRPC errors
     if (!response.ok) {
@@ -102,26 +102,39 @@ export async function GET(request: NextRequest) {
         lessonId,
         status: response.status,
         error: data,
-      });
+      })
     } else {
-      const contentFound = !!data.result?.data;
+      const contentFound = !!data.result?.data
       logger.debug('Lesson content fetched', {
         userId: user.id,
         courseId,
         lessonId,
         found: contentFound,
-      });
+      })
     }
 
-    return NextResponse.json(data, { status: response.status });
+    return NextResponse.json(data, { status: response.status })
   } catch (error) {
     logger.error('Unexpected error in /api/coursegen/lesson-content', {
       error: error instanceof Error ? error.message : 'Unknown error',
       stack: error instanceof Error ? error.stack : undefined,
-    });
+    })
+
+    // Log to error_logs for admin visibility
+    logPermanentFailure({
+      error_message: error instanceof Error ? error.message : 'Unknown error',
+      stack_trace: error instanceof Error ? error.stack : null,
+      severity: 'ERROR',
+      job_type: 'LESSON_CONTENT',
+      metadata: {
+        route: '/api/coursegen/lesson-content',
+        errorCode: 'INTERNAL_ERROR',
+      },
+    }).catch(() => {})
+
     return NextResponse.json(
       { error: 'Внутренняя ошибка сервера', code: 'INTERNAL_ERROR' },
       { status: 500 }
-    );
+    )
   }
 }
