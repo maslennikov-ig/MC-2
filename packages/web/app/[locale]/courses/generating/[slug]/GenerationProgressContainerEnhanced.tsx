@@ -2,10 +2,14 @@
 
 import { useEffect, useReducer, useCallback, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
+import { useTranslations } from 'next-intl';
+import Link from 'next/link';
 // import { useTheme } from 'next-themes'; // DISABLED: MissionControlBanner moved to GraphView
 import { createClient } from '@/lib/supabase/client';
 import { motion, AnimatePresence } from 'framer-motion';
 import confetti from 'canvas-confetti';
+import { Button } from '@/components/ui/button';
+import { X } from 'lucide-react';
 import {
   GenerationProgress,
   GenerationStep,
@@ -179,7 +183,7 @@ export default function GenerationProgressContainerEnhanced({
   onComplete,
   onError,
   showDebugInfo: _showDebugInfo = false,
-  autoRedirect = true,
+  autoRedirect = false,
   redirectDelay = 3000,
   userRole: _userRole = null,
   failedAtStage,
@@ -187,6 +191,7 @@ export default function GenerationProgressContainerEnhanced({
   stage1CourseData,
 }: GenerationProgressContainerProps) {
   const router = useRouter();
+  const t = useTranslations('generation.success');
   // isDark - DISABLED: MissionControlBanner moved to GraphView
   // const { resolvedTheme } = useTheme();
   // const isDark = resolvedTheme === 'dark';
@@ -750,14 +755,23 @@ export default function GenerationProgressContainerEnhanced({
               initial={{ opacity: 0, scale: 0.8 }}
               animate={{ opacity: 1, scale: 1 }}
               exit={{ opacity: 0, scale: 0.8 }}
-              className="fixed inset-0 flex items-center justify-center pointer-events-none z-[100]"
+              className="fixed inset-0 flex items-center justify-center z-[100] bg-black/20"
             >
               <motion.div
                 initial={{ scale: 0 }}
                 animate={{ scale: 1 }}
                 transition={{ type: 'spring', stiffness: 200, damping: 10 }}
-                className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-8 text-center"
+                className="bg-white dark:bg-gray-800 rounded-2xl shadow-2xl p-8 text-center relative"
               >
+                {/* Close button */}
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="absolute top-2 right-2 h-8 w-8"
+                  onClick={() => setShowSuccess(false)}
+                >
+                  <X className="h-4 w-4" />
+                </Button>
                 <motion.div
                   initial={{ scale: 0 }}
                   animate={{ scale: 1 }}
@@ -779,11 +793,14 @@ export default function GenerationProgressContainerEnhanced({
                   </svg>
                 </motion.div>
                 <h3 className="text-2xl font-bold text-gray-900 dark:text-gray-100 mb-2">
-                  Course Generated!
+                  {t('title')}
                 </h3>
-                <p className="text-gray-600 dark:text-gray-400">
-                  Your course is ready. Redirecting...
+                <p className="text-gray-600 dark:text-gray-400 mb-6">
+                  {t('message')}
                 </p>
+                <Button asChild>
+                  <Link href={`/courses/${slug}`}>{t('viewCourse')}</Link>
+                </Button>
               </motion.div>
             </motion.div>
           )}
