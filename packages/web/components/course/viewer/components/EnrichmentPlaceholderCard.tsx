@@ -49,9 +49,10 @@ const ENRICHMENT_CONFIG: Record<
 
 interface EnrichmentPlaceholderCardProps {
   type: EnrichmentType
-  onGenerate: () => void
+  onGenerate: (settings: Record<string, unknown>) => void
   estimatedTime: string
   disabled?: boolean
+  isGenerating?: boolean
 }
 
 export function EnrichmentPlaceholderCard({
@@ -59,17 +60,47 @@ export function EnrichmentPlaceholderCard({
   onGenerate,
   estimatedTime,
   disabled = false,
+  isGenerating = false,
 }: EnrichmentPlaceholderCardProps) {
   const t = useTranslations('enrichments')
   const [isOptionsOpen, setIsOptionsOpen] = useState(false)
 
-  // Options state (not connected to backend yet - Phase 3)
+  // Options state for generation settings
   const [quizQuestions, setQuizQuestions] = useState('10')
   const [quizDifficulty, setQuizDifficulty] = useState('medium')
   const [audioVoice, setAudioVoice] = useState('default')
   const [audioSpeed, setAudioSpeed] = useState('normal')
   const [presentationSlides, setPresentationSlides] = useState('8')
   const [presentationTheme, setPresentationTheme] = useState('light')
+
+  /**
+   * Collect current settings based on enrichment type
+   */
+  const getSettings = (): Record<string, unknown> => {
+    switch (type) {
+      case 'quiz':
+        return {
+          questionCount: parseInt(quizQuestions, 10),
+          difficulty: quizDifficulty,
+        }
+      case 'audio':
+        return {
+          voice: audioVoice,
+          speed: audioSpeed,
+        }
+      case 'presentation':
+        return {
+          slideCount: parseInt(presentationSlides, 10),
+          theme: presentationTheme,
+        }
+      default:
+        return {}
+    }
+  }
+
+  const handleGenerate = () => {
+    onGenerate(getSettings())
+  }
 
   const config = ENRICHMENT_CONFIG[type]
   const Icon = config.icon
@@ -237,8 +268,8 @@ export function EnrichmentPlaceholderCard({
           {disabled ? (
             <Badge variant="secondary">{t('placeholder.video.comingSoon')}</Badge>
           ) : (
-            <Button onClick={onGenerate} size="sm">
-              {t('generate')}
+            <Button onClick={handleGenerate} size="sm" disabled={isGenerating}>
+              {isGenerating ? t('generating') : t('generate')}
             </Button>
           )}
         </div>

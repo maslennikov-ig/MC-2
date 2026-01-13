@@ -1,7 +1,8 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useCallback } from 'react'
 import { useTranslations } from 'next-intl'
+import { toast } from 'sonner'
 import {
   Video,
   Headphones,
@@ -18,6 +19,8 @@ import { AudioPlayer } from '../enrichments/AudioPlayer'
 import { QuizPlayer } from '../enrichments/QuizPlayer'
 import { EnrichmentErrorBoundary } from '../enrichments/EnrichmentErrorBoundary'
 import { EnrichmentPlaceholderCard } from './EnrichmentPlaceholderCard'
+import { EnrichmentGeneratingCard } from './EnrichmentGeneratingCard'
+import { useEnrichmentGeneration } from '@/lib/hooks/useEnrichmentGeneration'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -27,6 +30,7 @@ import type {
   PresentationEnrichmentContent,
   AudioEnrichmentContent,
 } from '@megacampus/shared-types/enrichment-content'
+import type { OnDemandEnrichmentType } from '@megacampus/shared-types'
 
 type EnrichmentRow = Database['public']['Tables']['lesson_enrichments']['Row']
 
@@ -125,11 +129,48 @@ interface EnrichmentsPanelProps {
   enrichments: EnrichmentRow[]
   /** Error message if enrichments failed to load */
   enrichmentsLoadError?: string
+  /** Lesson UUID for generating new enrichments */
+  lessonId?: string
+  /** Course UUID for generating new enrichments */
+  courseId?: string
+  /** Callback when enrichments should be refreshed (after generation completes) */
+  onRefreshEnrichments?: () => void
 }
 
-export function EnrichmentsPanel({ enrichments, enrichmentsLoadError }: EnrichmentsPanelProps) {
+export function EnrichmentsPanel({
+  enrichments,
+  enrichmentsLoadError,
+  lessonId,
+  courseId,
+  onRefreshEnrichments,
+}: EnrichmentsPanelProps) {
   const t = useTranslations('enrichments')
   const [activeEnrichmentId, setActiveEnrichmentId] = useState<string | null>(null)
+
+  // Handle generation completion
+  const handleGenerationComplete = useCallback(
+    (_enrichmentId: string) => {
+      toast.success(t('viewer.generationComplete'))
+      onRefreshEnrichments?.()
+    },
+    [t, onRefreshEnrichments]
+  )
+
+  // Handle generation error
+  const handleGenerationError = useCallback(
+    (error: string) => {
+      toast.error(`${t('viewer.generationFailed')}: ${error}`)
+    },
+    [t]
+  )
+
+  // Use enrichment generation hook (only if lessonId and courseId are available)
+  const { startGeneration, cancelGeneration, isGenerating, getProgress } = useEnrichmentGeneration({
+    lessonId: lessonId || '',
+    courseId: courseId || '',
+    onComplete: handleGenerationComplete,
+    onError: handleGenerationError,
+  })
 
   // Filter out cover type - it's displayed as hero banner in lesson content
   const filteredEnrichments = enrichments.filter((e) => (e.enrichment_type as string) !== 'cover')
@@ -263,9 +304,13 @@ export function EnrichmentsPanel({ enrichments, enrichmentsLoadError }: Enrichme
         </EnrichmentErrorBoundary>
       ))}
 
-      {/* Placeholder Cards for Missing Types */}
+      {/* Placeholder Cards for Missing Types and Generating Cards */}
       <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
         {PLACEHOLDER_TYPES.filter((type) => !groupedEnrichments[type]).map((type) => {
+          // Check if this type is currently generating
+          const generatingProgress = getProgress(type)
+          const typeIsGenerating = isGenerating(type)
+
           // Inline estimated time to avoid type inference issues
           const estimatedTime =
             type === 'quiz'
@@ -276,16 +321,39 @@ export function EnrichmentsPanel({ enrichments, enrichmentsLoadError }: Enrichme
                   ? t('placeholder.presentation.estimatedTime' as any)
                   : t('placeholder.video.estimatedTime' as any)
 
+          // Show generating card if generation is in progress
+          if (typeIsGenerating && generatingProgress) {
+            return (
+              <EnrichmentGeneratingCard
+                key={type}
+                type={type}
+                progress={generatingProgress.progress}
+                currentStep={generatingProgress.currentStep || t('generating')}
+                onCancel={() => void cancelGeneration(type)}
+              />
+            )
+          }
+
+          // Show placeholder card otherwise
           return (
             <EnrichmentPlaceholderCard
               key={type}
               type={type}
-              onGenerate={() => {
-                // TODO: Phase 3 - implement API call
-                console.log('Generate', type)
+              onGenerate={(settings) => {
+                // Only allow generation if lessonId is available
+                if (!lessonId) {
+                  toast.error(t('viewer.noMaterials'))
+                  return
+                }
+                // Only generate on-demand types (quiz, audio, presentation)
+                if (type === 'video') {
+                  return
+                }
+                void startGeneration(type, settings)
               }}
               estimatedTime={estimatedTime}
-              disabled={type === 'video'}
+              disabled={type === 'video' || !lessonId}
+              isGenerating={typeIsGenerating}
             />
           )
         })}

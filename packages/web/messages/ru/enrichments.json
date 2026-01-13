@@ -241,7 +241,9 @@
       "cover": "Обложка",
       "card": "Карточка",
       "banner": "Декоративный баннер"
-    }
+    },
+    "generationComplete": "Дополнение успешно создано",
+    "generationFailed": "Не удалось создать дополнение"
   },
   "placeholder": {
     "quiz": {

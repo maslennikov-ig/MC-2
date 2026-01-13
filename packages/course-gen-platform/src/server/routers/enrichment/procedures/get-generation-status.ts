@@ -20,7 +20,6 @@ import {
   getGenerationStatusInputSchema,
   statusToProgress,
   statusToStep,
-  type EnrichmentStatus,
 } from '@megacampus/shared-types';
 import { verifyEnrichmentAccess } from '../helpers';
 import { logger } from '../../../../shared/logger/index.js';

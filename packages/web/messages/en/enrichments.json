@@ -241,7 +241,9 @@
       "cover": "Hero Image",
       "card": "Visual Card",
       "banner": "Decorative Banner"
-    }
+    },
+    "generationComplete": "Enrichment generated successfully",
+    "generationFailed": "Failed to generate enrichment"
   },
   "placeholder": {
     "quiz": {
