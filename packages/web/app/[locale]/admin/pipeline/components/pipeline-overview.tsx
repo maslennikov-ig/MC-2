@@ -235,7 +235,13 @@ export function PipelineOverview() {
                             />
                           </TooltipTrigger>
                           <TooltipContent side="bottom" className="max-w-[350px] text-sm">
-                            <p>{t(`pipeline.stages.tooltips.stage${stage.number}`)}</p>
+                            <p>
+                              {t(
+                                `pipeline.stages.tooltips.stage${stage.number}` as Parameters<
+                                  typeof t
+                                >[0]
+                              )}
+                            </p>
                           </TooltipContent>
                         </Tooltip>
                       </div>
