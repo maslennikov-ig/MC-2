@@ -242,5 +242,32 @@
       "card": "Visual Card",
       "banner": "Decorative Banner"
     }
-  }
+  },
+  "placeholder": {
+    "quiz": {
+      "title": "Quiz",
+      "description": "Check your knowledge",
+      "estimatedTime": "~45 sec"
+    },
+    "audio": {
+      "title": "Audio",
+      "description": "Listen to the lesson",
+      "estimatedTime": "~30 sec"
+    },
+    "presentation": {
+      "title": "Presentation",
+      "description": "Key slides from the lesson",
+      "estimatedTime": "~90 sec"
+    },
+    "video": {
+      "title": "Video",
+      "description": "AI video lecture",
+      "comingSoon": "Coming Soon"
+    }
+  },
+  "generate": "Generate",
+  "generating": "Generating...",
+  "options": "Options",
+  "cancel": "Cancel",
+  "retry": "Retry"
 }

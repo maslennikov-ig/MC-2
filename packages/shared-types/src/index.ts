@@ -73,6 +73,7 @@ export * from './tier-settings';
 export * from './enrichment-content';
 export * from './lesson-enrichment';
 export * from './enrichment-settings';
+export * from './enrichment-on-demand';
 export * from './activity-limits';
 
 // Organization Management Types
