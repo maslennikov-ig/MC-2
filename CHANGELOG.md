@@ -311,6 +311,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.27.2] - 2026-01-13
+
+### Added
+
+- **courses**: increase course catalog cards from 10 to 12 (804cba0)
+
 ## [0.27.1] - 2026-01-13
 
 ### Added
