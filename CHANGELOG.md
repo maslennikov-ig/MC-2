@@ -5,6 +5,20 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [0.26.84] - 2026-01-13
+
+### Fixed
+
+- **web**: remove excessive full-page loaders from fast pages (7464e9d)
+- **db**: allow both lesson cards and course cards on same lesson (6c301f8)
+- **web**: prevent Select/RadioGroup controlled/uncontrolled switching (53075f3)
+- **security**: restrict RLS INSERT policies for users and service tables (670f4bf)
+
+### Other
+
+- **beads**: close mc2-kfa (Leaked Password Protection requires Pro Plan) (b45a9b3)
+- **scripts**: add trigger-stage5.ts for E2E testing (6832415)
+
 ## [0.26.82] - 2026-01-11
 
 ### Added
