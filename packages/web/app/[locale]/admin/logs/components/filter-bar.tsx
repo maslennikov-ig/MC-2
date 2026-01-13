@@ -1,120 +1,135 @@
-'use client';
+'use client'
 
-import { useCallback } from 'react';
-import { useTranslations } from 'next-intl';
-import { Search, X, Calendar } from 'lucide-react';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
+import { useCallback } from 'react'
+import { useTranslations } from 'next-intl'
+import { Search, X, Calendar } from 'lucide-react'
+import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from '@/components/ui/select';
-import type { LogFilters, LogLevel, LogType, LogStatus } from '@/app/actions/admin-logs';
+} from '@/components/ui/select'
+import type {
+  LogFilters,
+  LogLevel,
+  LogType,
+  LogStatus,
+  LogEnvironment,
+} from '@/app/actions/admin-logs'
 
 interface FilterBarProps {
-  filters: LogFilters;
-  onFilterChange: (filters: LogFilters) => void;
+  filters: LogFilters
+  onFilterChange: (filters: LogFilters) => void
 }
 
 /**
  * Filter controls for log monitoring dashboard
  */
 export function FilterBar({ filters, onFilterChange }: FilterBarProps) {
-  const t = useTranslations('admin.logs');
+  const t = useTranslations('admin.logs')
 
   const handleLevelChange = useCallback(
     (value: string) => {
       onFilterChange({
         ...filters,
         level: value === 'all' ? undefined : (value as LogLevel),
-      });
+      })
     },
     [filters, onFilterChange]
-  );
+  )
 
   const handleSourceChange = useCallback(
     (value: string) => {
       onFilterChange({
         ...filters,
         source: value === 'all' ? undefined : (value as LogType),
-      });
+      })
     },
     [filters, onFilterChange]
-  );
+  )
 
   const handleStatusChange = useCallback(
     (value: string) => {
       onFilterChange({
         ...filters,
         status: value === 'all' ? undefined : (value as LogStatus),
-      });
+      })
     },
     [filters, onFilterChange]
-  );
+  )
+
+  const handleEnvironmentChange = useCallback(
+    (value: string) => {
+      onFilterChange({
+        ...filters,
+        environment: value === 'all' ? undefined : (value as LogEnvironment),
+      })
+    },
+    [filters, onFilterChange]
+  )
 
   const handleSearchChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
-      const value = e.target.value;
+      const value = e.target.value
       onFilterChange({
         ...filters,
         search: value || undefined,
-      });
+      })
     },
     [filters, onFilterChange]
-  );
+  )
 
   const handleDateFromChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
-      const value = e.target.value;
+      const value = e.target.value
       onFilterChange({
         ...filters,
         dateFrom: value ? new Date(value).toISOString() : undefined,
-      });
+      })
     },
     [filters, onFilterChange]
-  );
+  )
 
   const handleDateToChange = useCallback(
     (e: React.ChangeEvent<HTMLInputElement>) => {
-      const value = e.target.value;
+      const value = e.target.value
       onFilterChange({
         ...filters,
         dateTo: value ? new Date(value).toISOString() : undefined,
-      });
+      })
     },
     [filters, onFilterChange]
-  );
+  )
 
   const handleClearFilters = useCallback(() => {
-    onFilterChange({});
-  }, [onFilterChange]);
+    onFilterChange({})
+  }, [onFilterChange])
 
   const hasFilters =
     filters.level ||
     filters.source ||
     filters.status ||
+    filters.environment ||
     filters.search ||
     filters.dateFrom ||
-    filters.dateTo;
+    filters.dateTo
 
   // Convert ISO dates back to input format for display
   const dateFromValue = filters.dateFrom
     ? new Date(filters.dateFrom).toISOString().split('T')[0]
-    : '';
-  const dateToValue = filters.dateTo
-    ? new Date(filters.dateTo).toISOString().split('T')[0]
-    : '';
+    : ''
+  const dateToValue = filters.dateTo ? new Date(filters.dateTo).toISOString().split('T')[0] : ''
 
   return (
-    <div className="flex flex-col gap-4 p-4 bg-card rounded-lg border shadow-sm">
+    <div className="bg-card flex flex-col gap-4 rounded-lg border p-4 shadow-sm">
       {/* Top row: Search and main filters */}
-      <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
+      <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
         {/* Search input */}
         <div className="relative w-full sm:w-80">
-          <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+          <Search className="text-muted-foreground absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2" />
           <Input
             placeholder={t('filters.search')}
             value={filters.search || ''}
@@ -125,12 +140,9 @@ export function FilterBar({ filters, onFilterChange }: FilterBarProps) {
         </div>
 
         {/* Filter dropdowns */}
-        <div className="flex flex-wrap items-center gap-2 w-full sm:w-auto">
+        <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
           {/* Level filter */}
-          <Select
-            value={filters.level || 'all'}
-            onValueChange={handleLevelChange}
-          >
+          <Select value={filters.level || 'all'} onValueChange={handleLevelChange}>
             <SelectTrigger className="w-[130px]" aria-label={t('filters.level')}>
               <SelectValue placeholder={t('filters.level')} />
             </SelectTrigger>
@@ -143,10 +155,7 @@ export function FilterBar({ filters, onFilterChange }: FilterBarProps) {
           </Select>
 
           {/* Source filter */}
-          <Select
-            value={filters.source || 'all'}
-            onValueChange={handleSourceChange}
-          >
+          <Select value={filters.source || 'all'} onValueChange={handleSourceChange}>
             <SelectTrigger className="w-[150px]" aria-label={t('filters.source')}>
               <SelectValue placeholder={t('filters.source')} />
             </SelectTrigger>
@@ -158,10 +167,7 @@ export function FilterBar({ filters, onFilterChange }: FilterBarProps) {
           </Select>
 
           {/* Status filter */}
-          <Select
-            value={filters.status || 'all'}
-            onValueChange={handleStatusChange}
-          >
+          <Select value={filters.status || 'all'} onValueChange={handleStatusChange}>
             <SelectTrigger className="w-[140px]" aria-label={t('filters.status')}>
               <SelectValue placeholder={t('filters.status')} />
             </SelectTrigger>
@@ -173,31 +179,43 @@ export function FilterBar({ filters, onFilterChange }: FilterBarProps) {
               <SelectItem value="ignored">{t('status.ignored')}</SelectItem>
             </SelectContent>
           </Select>
+
+          {/* Environment filter */}
+          <Select value={filters.environment || 'all'} onValueChange={handleEnvironmentChange}>
+            <SelectTrigger className="w-[140px]" aria-label={t('filters.environment')}>
+              <SelectValue placeholder={t('filters.environment')} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{t('filters.all')}</SelectItem>
+              <SelectItem value="dev">Dev</SelectItem>
+              <SelectItem value="stage">Stage</SelectItem>
+            </SelectContent>
+          </Select>
         </div>
       </div>
 
       {/* Bottom row: Date range and clear */}
-      <div className="flex flex-col sm:flex-row gap-4 justify-between items-start sm:items-center">
+      <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
         {/* Date range */}
         <div className="flex flex-wrap items-center gap-2">
           <div className="flex items-center gap-2">
-            <Calendar className="h-4 w-4 text-muted-foreground" />
-            <span className="text-sm text-muted-foreground">{t('filters.dateFrom')}:</span>
+            <Calendar className="text-muted-foreground h-4 w-4" />
+            <span className="text-muted-foreground text-sm">{t('filters.dateFrom')}:</span>
             <Input
               type="date"
               value={dateFromValue}
               onChange={handleDateFromChange}
-              className="w-[150px] h-9"
+              className="h-9 w-[150px]"
               aria-label={t('filters.dateFrom')}
             />
           </div>
           <div className="flex items-center gap-2">
-            <span className="text-sm text-muted-foreground">{t('filters.dateTo')}:</span>
+            <span className="text-muted-foreground text-sm">{t('filters.dateTo')}:</span>
             <Input
               type="date"
               value={dateToValue}
               onChange={handleDateToChange}
-              className="w-[150px] h-9"
+              className="h-9 w-[150px]"
               aria-label={t('filters.dateTo')}
             />
           </div>
@@ -205,17 +223,12 @@ export function FilterBar({ filters, onFilterChange }: FilterBarProps) {
 
         {/* Clear filters button */}
         {hasFilters && (
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={handleClearFilters}
-            className="gap-2"
-          >
+          <Button variant="outline" size="sm" onClick={handleClearFilters} className="gap-2">
             <X className="h-4 w-4" />
             {t('filters.clear')}
           </Button>
         )}
       </div>
     </div>
-  );
+  )
 }

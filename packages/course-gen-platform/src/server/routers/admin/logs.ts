@@ -32,7 +32,7 @@ export type LogType = z.infer<typeof logTypeSchema>;
 /**
  * Log issue status enum
  */
-export const logStatusSchema = z.enum(['new', 'in_progress', 'resolved', 'ignored']);
+export const logStatusSchema = z.enum(['new', 'in_progress', 'to_verify', 'resolved', 'ignored']);
 export type LogStatus = z.infer<typeof logStatusSchema>;
 
 /**
@@ -56,6 +56,7 @@ export const logFiltersSchema = z.object({
   dateFrom: z.string().datetime().optional(),
   dateTo: z.string().datetime().optional(),
   courseId: z.string().uuid().optional(),
+  environment: z.enum(['dev', 'stage']).optional(),
 });
 
 /**
@@ -65,10 +66,12 @@ export const listLogsInputSchema = z.object({
   page: z.number().int().positive().default(1),
   limit: z.number().int().positive().max(100).default(20),
   filters: logFiltersSchema.optional(),
-  sort: z.object({
-    field: z.enum(['created_at', 'severity']).default('created_at'),
-    direction: sortDirectionSchema.default('desc'),
-  }).optional(),
+  sort: z
+    .object({
+      field: z.enum(['created_at', 'severity']).default('created_at'),
+      direction: sortDirectionSchema.default('desc'),
+    })
+    .optional(),
 });
 
 /**
@@ -93,10 +96,15 @@ export const updateStatusInputSchema = z.object({
  * Input schema for bulkUpdateStatus procedure
  */
 export const bulkUpdateStatusInputSchema = z.object({
-  items: z.array(z.object({
-    logType: logTypeSchema,
-    logId: z.string().uuid(),
-  })).min(1).max(100),
+  items: z
+    .array(
+      z.object({
+        logType: logTypeSchema,
+        logId: z.string().uuid(),
+      })
+    )
+    .min(1)
+    .max(100),
   status: logStatusSchema,
 });
 
@@ -120,6 +128,9 @@ export type UnifiedLogItem = {
   phase: string | null;
   status: LogStatus;
   metadata: Record<string, unknown> | null;
+  problemId: string | null;
+  environment: string | null;
+  courseName: string | null;
 };
 
 /**
@@ -183,7 +194,13 @@ export const logsRouter = router({
 
         // Build separate queries for each table and combine results
         const errorLogsPromise = buildErrorLogsQuery(supabase, filters, sort, limit, offset);
-        const generationTracePromise = buildGenerationTraceQuery(supabase, filters, sort, limit, offset);
+        const generationTracePromise = buildGenerationTraceQuery(
+          supabase,
+          filters,
+          sort,
+          limit,
+          offset
+        );
 
         // Execute both queries in parallel
         const [errorLogsResult, generationTraceResult] = await Promise.all([
@@ -238,10 +255,13 @@ export const logsRouter = router({
       } catch (error) {
         if (error instanceof TRPCError) throw error;
 
-        logger.error({
-          err: error instanceof Error ? error.message : String(error),
-          input,
-        }, 'Unexpected error in admin logs list');
+        logger.error(
+          {
+            err: error instanceof Error ? error.message : String(error),
+            input,
+          },
+          'Unexpected error in admin logs list'
+        );
 
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
@@ -299,6 +319,9 @@ export const logsRouter = router({
             phase: null,
             status: status?.status || 'new',
             metadata: log.metadata as Record<string, unknown> | null,
+            problemId: log.problem_id || null,
+            environment: log.environment || null,
+            courseName: null,
             stackTrace: log.stack_trace,
             errorData: null,
             inputData: null,
@@ -338,7 +361,7 @@ export const logsRouter = router({
             logType: 'generation_trace',
             createdAt: log.created_at,
             severity,
-            message: errorData?.message as string || log.step_name || 'Unknown',
+            message: (errorData?.message as string) || log.step_name || 'Unknown',
             source: `${log.stage}/${log.phase}`,
             courseId: log.course_id,
             lessonId: log.lesson_id || null,
@@ -346,7 +369,10 @@ export const logsRouter = router({
             phase: log.phase,
             status: status?.status || 'new',
             metadata: null,
-            stackTrace: errorData?.stack as string || null,
+            problemId: null,
+            environment: null,
+            courseName: null,
+            stackTrace: (errorData?.stack as string) || null,
             errorData,
             inputData: log.input_data as Record<string, unknown> | null,
             outputData: log.output_data as Record<string, unknown> | null,
@@ -362,10 +388,13 @@ export const logsRouter = router({
       } catch (error) {
         if (error instanceof TRPCError) throw error;
 
-        logger.error({
-          err: error instanceof Error ? error.message : String(error),
-          input,
-        }, 'Unexpected error in admin logs getById');
+        logger.error(
+          {
+            err: error instanceof Error ? error.message : String(error),
+            input,
+          },
+          'Unexpected error in admin logs getById'
+        );
 
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
@@ -384,74 +413,79 @@ export const logsRouter = router({
    *
    * Authorization: admin or superadmin only
    */
-  updateStatus: adminProcedure
-    .input(updateStatusInputSchema)
-    .mutation(async ({ ctx, input }) => {
-      try {
-        const supabase = getSupabaseAdmin();
-        const { logType, logId, status, notes } = input;
+  updateStatus: adminProcedure.input(updateStatusInputSchema).mutation(async ({ ctx, input }) => {
+    try {
+      const supabase = getSupabaseAdmin();
+      const { logType, logId, status, notes } = input;
 
-        // ctx.user is guaranteed non-null by adminProcedure
-        const userId = ctx.user!.id;
+      // ctx.user is guaranteed non-null by adminProcedure
+      const userId = ctx.user!.id;
 
-        // Verify log exists
-        const logExists = await verifyLogExists(supabase, logType, logId);
-        if (!logExists) {
-          throw new TRPCError({
-            code: 'NOT_FOUND',
-            message: ErrorMessages.notFound(
-              logType === 'error_log' ? 'Error log' : 'Generation trace',
-              logId
-            ),
-          });
+      // Verify log exists
+      const logExists = await verifyLogExists(supabase, logType, logId);
+      if (!logExists) {
+        throw new TRPCError({
+          code: 'NOT_FOUND',
+          message: ErrorMessages.notFound(
+            logType === 'error_log' ? 'Error log' : 'Generation trace',
+            logId
+          ),
+        });
+      }
+
+      // Upsert status
+      const { error } = await supabase.from('log_issue_status').upsert(
+        {
+          log_type: logType,
+          log_id: logId,
+          status,
+          notes: notes || null,
+          updated_by: userId,
+          updated_at: new Date().toISOString(),
+        },
+        {
+          onConflict: 'log_type,log_id',
         }
+      );
 
-        // Upsert status
-        const { error } = await supabase
-          .from('log_issue_status')
-          .upsert({
-            log_type: logType,
-            log_id: logId,
-            status,
-            notes: notes || null,
-            updated_by: userId,
-            updated_at: new Date().toISOString(),
-          }, {
-            onConflict: 'log_type,log_id',
-          });
+      if (error) {
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: ErrorMessages.databaseError('Status update', error.message),
+        });
+      }
 
-        if (error) {
-          throw new TRPCError({
-            code: 'INTERNAL_SERVER_ERROR',
-            message: ErrorMessages.databaseError('Status update', error.message),
-          });
-        }
-
-        logger.info({
+      logger.info(
+        {
           logType,
           logId,
           status,
           updatedBy: userId,
-        }, 'Log status updated');
+        },
+        'Log status updated'
+      );
 
-        return { success: true };
-      } catch (error) {
-        if (error instanceof TRPCError) throw error;
+      return { success: true };
+    } catch (error) {
+      if (error instanceof TRPCError) throw error;
 
-        logger.error({
+      logger.error(
+        {
           err: error instanceof Error ? error.message : String(error),
           input,
-        }, 'Unexpected error in admin logs updateStatus');
+        },
+        'Unexpected error in admin logs updateStatus'
+      );
 
-        throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: ErrorMessages.internalError(
-            'Status update',
-            error instanceof Error ? error.message : undefined
-          ),
-        });
-      }
-    }),
+      throw new TRPCError({
+        code: 'INTERNAL_SERVER_ERROR',
+        message: ErrorMessages.internalError(
+          'Status update',
+          error instanceof Error ? error.message : undefined
+        ),
+      });
+    }
+  }),
 
   /**
    * Bulk update status
@@ -481,11 +515,9 @@ export const logsRouter = router({
         }));
 
         // Bulk upsert
-        const { error } = await supabase
-          .from('log_issue_status')
-          .upsert(upsertData, {
-            onConflict: 'log_type,log_id',
-          });
+        const { error } = await supabase.from('log_issue_status').upsert(upsertData, {
+          onConflict: 'log_type,log_id',
+        });
 
         if (error) {
           throw new TRPCError({
@@ -494,11 +526,14 @@ export const logsRouter = router({
           });
         }
 
-        logger.info({
-          count: items.length,
-          status,
-          updatedBy: userId,
-        }, 'Bulk log status updated');
+        logger.info(
+          {
+            count: items.length,
+            status,
+            updatedBy: userId,
+          },
+          'Bulk log status updated'
+        );
 
         return {
           success: true,
@@ -507,10 +542,13 @@ export const logsRouter = router({
       } catch (error) {
         if (error instanceof TRPCError) throw error;
 
-        logger.error({
-          err: error instanceof Error ? error.message : String(error),
-          input,
-        }, 'Unexpected error in admin logs bulkUpdateStatus');
+        logger.error(
+          {
+            err: error instanceof Error ? error.message : String(error),
+            input,
+          },
+          'Unexpected error in admin logs bulkUpdateStatus'
+        );
 
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
@@ -539,7 +577,10 @@ async function buildErrorLogsQuery(
 ): Promise<{ items: UnifiedLogItem[]; total: number }> {
   let query = supabase
     .from('error_logs')
-    .select('id, created_at, severity, error_message, job_type, metadata', { count: 'exact' });
+    .select(
+      'id, created_at, severity, error_message, job_type, metadata, problem_id, environment',
+      { count: 'exact' }
+    );
 
   // Apply filters
   if (filters?.level) {
@@ -557,6 +598,10 @@ async function buildErrorLogsQuery(
 
   if (filters?.dateTo) {
     query = query.lte('created_at', filters.dateTo);
+  }
+
+  if (filters?.environment) {
+    query = query.eq('environment', filters.environment);
   }
 
   // Note: error_logs doesn't have course_id, so skip that filter
@@ -594,6 +639,9 @@ async function buildErrorLogsQuery(
     phase: null,
     status: statuses.get(log.id) || 'new',
     metadata: log.metadata as Record<string, unknown> | null,
+    problemId: log.problem_id || null,
+    environment: log.environment || null,
+    courseName: null,
   }));
 
   return { items, total: count || 0 };
@@ -611,7 +659,9 @@ async function buildGenerationTraceQuery(
 ): Promise<{ items: UnifiedLogItem[]; total: number }> {
   let query = supabase
     .from('generation_trace')
-    .select('id, created_at, stage, phase, step_name, course_id, lesson_id, error_data', { count: 'exact' })
+    .select('id, created_at, stage, phase, step_name, course_id, lesson_id, error_data', {
+      count: 'exact',
+    })
     .not('error_data', 'is', null); // Only traces with errors
 
   // Apply filters
@@ -665,6 +715,9 @@ async function buildGenerationTraceQuery(
       phase: log.phase,
       status: statuses.get(log.id) || 'new',
       metadata: null,
+      problemId: null,
+      environment: null,
+      courseName: null,
     };
   });
 
@@ -737,7 +790,12 @@ async function fetchLogStatus(
   supabase: ReturnType<typeof getSupabaseAdmin>,
   logType: LogType,
   logId: string
-): Promise<{ status: LogStatus; notes: string | null; updated_at: string | null; updatedByEmail: string | null } | null> {
+): Promise<{
+  status: LogStatus;
+  notes: string | null;
+  updated_at: string | null;
+  updatedByEmail: string | null;
+} | null> {
   // Query status without join first (to avoid relationship ambiguity)
   const { data } = await supabase
     .from('log_issue_status')
@@ -777,11 +835,7 @@ async function verifyLogExists(
 ): Promise<boolean> {
   const table = logType === 'error_log' ? 'error_logs' : 'generation_trace';
 
-  const { data } = await supabase
-    .from(table)
-    .select('id')
-    .eq('id', logId)
-    .single();
+  const { data } = await supabase.from(table).select('id').eq('id', logId).single();
 
   return !!data;
 }

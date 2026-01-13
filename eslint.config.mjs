@@ -15,6 +15,7 @@ export default tseslint.config(
       "**/.next/**",
       "**/out/**",
       "**/build/**",
+      "**/database.types.ts", // Auto-generated Supabase types
     ],
   },
 

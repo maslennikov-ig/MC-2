@@ -1,8 +1,8 @@
-'use client';
+'use client'
 
-import { useEffect, useState, useCallback, useMemo } from 'react';
-import { useTranslations } from 'next-intl';
-import { formatDistanceToNow } from 'date-fns';
+import { useEffect, useState, useCallback, useMemo } from 'react'
+import { useTranslations } from 'next-intl'
+import { formatDistanceToNow } from 'date-fns'
 import {
   Loader2,
   ChevronLeft,
@@ -12,37 +12,37 @@ import {
   AlertTriangle,
   XCircle,
   AlertOctagon,
-} from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Checkbox } from '@/components/ui/checkbox';
-import { cn } from '@/lib/utils';
-import { toast } from 'sonner';
-import { listLogsAction } from '@/app/actions/admin-logs';
+} from 'lucide-react'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Checkbox } from '@/components/ui/checkbox'
+import { cn } from '@/lib/utils'
+import { toast } from 'sonner'
+import { listLogsAction } from '@/app/actions/admin-logs'
 import type {
   UnifiedLogItem,
   LogFilters,
   LogType,
   LogStatus,
   LogListResponse,
-} from '@/app/actions/admin-logs';
+} from '@/app/actions/admin-logs'
 
 /** Debounce timeout for filters in milliseconds */
-const FILTER_DEBOUNCE_MS = 300;
+const FILTER_DEBOUNCE_MS = 300
 
 /** Auto-refresh interval in milliseconds (5 seconds) */
-const REFRESH_INTERVAL_MS = 5000;
+const REFRESH_INTERVAL_MS = 5000
 
 interface LogTableProps {
-  filters: LogFilters;
-  selectedItems: Array<{ logType: LogType; logId: string }>;
-  onRowSelect: (item: UnifiedLogItem, selected: boolean) => void;
-  onSelectAll: (items: UnifiedLogItem[], selected: boolean) => void;
-  onRowClick: (item: UnifiedLogItem) => void;
+  filters: LogFilters
+  selectedItems: Array<{ logType: LogType; logId: string }>
+  onRowSelect: (item: UnifiedLogItem, selected: boolean) => void
+  onSelectAll: (items: UnifiedLogItem[], selected: boolean) => void
+  onRowClick: (item: UnifiedLogItem) => void
 }
 
-type SortField = 'created_at' | 'severity';
-type SortDirection = 'asc' | 'desc';
+type SortField = 'created_at' | 'severity'
+type SortDirection = 'asc' | 'desc'
 
 /**
  * Log data table with sorting, selection, and pagination
@@ -54,24 +54,24 @@ export function LogTable({
   onSelectAll,
   onRowClick,
 }: LogTableProps) {
-  const t = useTranslations('admin.logs');
+  const t = useTranslations('admin.logs')
 
   // Data state
-  const [data, setData] = useState<UnifiedLogItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [totalCount, setTotalCount] = useState(0);
-  const [page, setPage] = useState(1);
-  const [pageSize] = useState(20);
-  const [error, setError] = useState<string | null>(null);
+  const [data, setData] = useState<UnifiedLogItem[]>([])
+  const [loading, setLoading] = useState(true)
+  const [totalCount, setTotalCount] = useState(0)
+  const [page, setPage] = useState(1)
+  const [pageSize] = useState(20)
+  const [error, setError] = useState<string | null>(null)
 
   // Sort state
-  const [sortField, setSortField] = useState<SortField>('created_at');
-  const [sortDirection, setSortDirection] = useState<SortDirection>('desc');
+  const [sortField, setSortField] = useState<SortField>('created_at')
+  const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
 
   // Load data function
   const loadData = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+    setLoading(true)
+    setError(null)
     try {
       const result: LogListResponse = await listLogsAction({
         page,
@@ -81,85 +81,82 @@ export function LogTable({
           field: sortField,
           direction: sortDirection,
         },
-      });
+      })
 
-      setData(result.items);
-      setTotalCount(result.total);
+      setData(result.items)
+      setTotalCount(result.total)
     } catch (err) {
-      console.error('Failed to fetch logs', err);
-      const errorMessage =
-        err instanceof Error ? err.message : 'Failed to load logs';
-      setError(errorMessage);
-      toast.error(errorMessage);
+      console.error('Failed to fetch logs', err)
+      const errorMessage = err instanceof Error ? err.message : 'Failed to load logs'
+      setError(errorMessage)
+      toast.error(errorMessage)
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  }, [page, pageSize, filters, sortField, sortDirection]);
+  }, [page, pageSize, filters, sortField, sortDirection])
 
   // Initial load and filter change with debounce
   useEffect(() => {
     const timer = setTimeout(() => {
-      loadData();
-    }, FILTER_DEBOUNCE_MS);
-    return () => clearTimeout(timer);
-  }, [loadData]);
+      loadData()
+    }, FILTER_DEBOUNCE_MS)
+    return () => clearTimeout(timer)
+  }, [loadData])
 
   // Auto-refresh polling
   useEffect(() => {
     const interval = setInterval(() => {
-      loadData();
-    }, REFRESH_INTERVAL_MS);
-    return () => clearInterval(interval);
-  }, [loadData]);
+      loadData()
+    }, REFRESH_INTERVAL_MS)
+    return () => clearInterval(interval)
+  }, [loadData])
 
   // Reset page when filters change
   useEffect(() => {
-    setPage(1);
-  }, [filters]);
+    setPage(1)
+  }, [filters])
 
   // Calculate pagination
-  const totalPages = Math.ceil(totalCount / pageSize);
+  const totalPages = Math.ceil(totalCount / pageSize)
 
   // Check if all current items are selected
   const allSelected = useMemo(() => {
-    if (data.length === 0) return false;
+    if (data.length === 0) return false
     return data.every((item) =>
       selectedItems.some((s) => s.logId === item.id && s.logType === item.logType)
-    );
-  }, [data, selectedItems]);
+    )
+  }, [data, selectedItems])
 
   // Check if item is selected
   const isSelected = useCallback(
     (item: UnifiedLogItem) => {
-      return selectedItems.some(
-        (s) => s.logId === item.id && s.logType === item.logType
-      );
+      return selectedItems.some((s) => s.logId === item.id && s.logType === item.logType)
     },
     [selectedItems]
-  );
+  )
 
   // Toggle sort
   const toggleSort = useCallback(
     (field: SortField) => {
       if (sortField === field) {
-        setSortDirection((d) => (d === 'asc' ? 'desc' : 'asc'));
+        setSortDirection((d) => (d === 'asc' ? 'desc' : 'asc'))
       } else {
-        setSortField(field);
-        setSortDirection('desc');
+        setSortField(field)
+        setSortDirection('desc')
       }
     },
     [sortField]
-  );
+  )
 
   // Render sort indicator
   const renderSortIndicator = (field: SortField) => {
-    if (sortField !== field) return null;
+    if (sortField !== field) return null
     return sortDirection === 'asc' ? (
-      <ChevronUp className="h-4 w-4 inline ml-1" />
+      <ChevronUp className="ml-1 inline h-4 w-4" />
     ) : (
-      <ChevronDown className="h-4 w-4 inline ml-1" />
-    );
-  };
+      <ChevronDown className="ml-1 inline h-4 w-4" />
+    )
+  }
 
   // Get severity badge
   const getSeverityBadge = (severity: string) => {
@@ -173,7 +170,7 @@ export function LogTable({
             <AlertOctagon className="h-3 w-3" />
             {t('levels.CRITICAL')}
           </Badge>
-        );
+        )
       case 'ERROR':
         return (
           <Badge
@@ -183,7 +180,7 @@ export function LogTable({
             <XCircle className="h-3 w-3" />
             {t('levels.ERROR')}
           </Badge>
-        );
+        )
       case 'WARNING':
         return (
           <Badge
@@ -193,11 +190,11 @@ export function LogTable({
             <AlertTriangle className="h-3 w-3" />
             {t('levels.WARNING')}
           </Badge>
-        );
+        )
       default:
-        return <Badge variant="secondary">{severity}</Badge>;
+        return <Badge variant="secondary">{severity}</Badge>
     }
-  };
+  }
 
   // Get status badge
   const getStatusBadge = (status: LogStatus) => {
@@ -210,7 +207,7 @@ export function LogTable({
           >
             {t('status.new')}
           </Badge>
-        );
+        )
       case 'in_progress':
         return (
           <Badge
@@ -219,7 +216,7 @@ export function LogTable({
           >
             {t('status.in_progress')}
           </Badge>
-        );
+        )
       case 'resolved':
         return (
           <Badge
@@ -228,7 +225,7 @@ export function LogTable({
           >
             {t('status.resolved')}
           </Badge>
-        );
+        )
       case 'ignored':
         return (
           <Badge
@@ -237,26 +234,53 @@ export function LogTable({
           >
             {t('status.ignored')}
           </Badge>
-        );
+        )
+      case 'to_verify':
+        return (
+          <Badge
+            variant="secondary"
+            className="bg-amber-500/10 text-amber-600 hover:bg-amber-500/20 dark:bg-amber-500/20 dark:text-amber-400"
+          >
+            To Verify
+          </Badge>
+        )
       default:
-        return <Badge variant="secondary">{status}</Badge>;
+        return <Badge variant="secondary">{status}</Badge>
     }
-  };
+  }
+
+  // Get environment badge
+  const getEnvironmentBadge = (environment: string | null) => {
+    if (!environment) return null
+
+    return (
+      <Badge
+        variant={environment === 'dev' ? 'outline' : 'secondary'}
+        className={
+          environment === 'dev'
+            ? 'border-blue-500 text-blue-500'
+            : 'bg-purple-500/10 text-purple-600'
+        }
+      >
+        {environment}
+      </Badge>
+    )
+  }
 
   // Truncate message
   const truncateMessage = (message: string, maxLength: number = 80) => {
-    if (message.length <= maxLength) return message;
-    return message.substring(0, maxLength) + '...';
-  };
+    if (message.length <= maxLength) return message
+    return message.substring(0, maxLength) + '...'
+  }
 
   return (
-    <div className="space-y-4 h-full flex flex-col">
+    <div className="flex h-full flex-col space-y-4">
       {/* Table */}
-      <div className="rounded-md border bg-card shadow-sm overflow-hidden flex-1 min-h-0">
-        <div className="relative w-full h-full overflow-auto">
+      <div className="bg-card min-h-0 flex-1 overflow-hidden rounded-md border shadow-sm">
+        <div className="relative h-full w-full overflow-auto">
           <table className="w-full caption-bottom text-sm">
-            <thead className="[&_tr]:border-b sticky top-0 bg-card z-10">
-              <tr className="border-b transition-colors hover:bg-muted/50">
+            <thead className="bg-card sticky top-0 z-10 [&_tr]:border-b">
+              <tr className="hover:bg-muted/50 border-b transition-colors">
                 {/* Select all checkbox */}
                 <th className="h-12 w-12 px-4 align-middle">
                   <Checkbox
@@ -266,9 +290,13 @@ export function LogTable({
                     disabled={data.length === 0}
                   />
                 </th>
+                {/* Problem ID */}
+                <th className="text-muted-foreground h-12 w-[140px] px-4 text-left align-middle font-medium">
+                  Problem ID
+                </th>
                 {/* Timestamp */}
                 <th
-                  className="h-12 px-4 text-left align-middle font-medium text-muted-foreground cursor-pointer hover:text-foreground transition-colors"
+                  className="text-muted-foreground hover:text-foreground h-12 cursor-pointer px-4 text-left align-middle font-medium transition-colors"
                   onClick={() => toggleSort('created_at')}
                 >
                   {t('table.timestamp')}
@@ -276,26 +304,26 @@ export function LogTable({
                 </th>
                 {/* Level */}
                 <th
-                  className="h-12 px-4 text-left align-middle font-medium text-muted-foreground cursor-pointer hover:text-foreground transition-colors"
+                  className="text-muted-foreground hover:text-foreground h-12 cursor-pointer px-4 text-left align-middle font-medium transition-colors"
                   onClick={() => toggleSort('severity')}
                 >
                   {t('table.level')}
                   {renderSortIndicator('severity')}
                 </th>
                 {/* Source */}
-                <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">
+                <th className="text-muted-foreground h-12 px-4 text-left align-middle font-medium">
                   {t('table.source')}
                 </th>
                 {/* Message */}
-                <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">
+                <th className="text-muted-foreground h-12 px-4 text-left align-middle font-medium">
                   {t('table.message')}
                 </th>
                 {/* Course */}
-                <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground hidden lg:table-cell">
+                <th className="text-muted-foreground hidden h-12 px-4 text-left align-middle font-medium lg:table-cell">
                   {t('table.course')}
                 </th>
                 {/* Status */}
-                <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">
+                <th className="text-muted-foreground h-12 px-4 text-left align-middle font-medium">
                   {t('table.status')}
                 </th>
               </tr>
@@ -303,22 +331,19 @@ export function LogTable({
             <tbody className="[&_tr:last-child]:border-0">
               {loading && data.length === 0 ? (
                 <tr>
-                  <td colSpan={7} className="h-24 text-center">
-                    <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
+                  <td colSpan={8} className="h-24 text-center">
+                    <Loader2 className="text-muted-foreground mx-auto h-6 w-6 animate-spin" />
                   </td>
                 </tr>
               ) : error ? (
                 <tr>
-                  <td colSpan={7} className="h-24 text-center text-red-500">
+                  <td colSpan={8} className="h-24 text-center text-red-500">
                     {error}
                   </td>
                 </tr>
               ) : data.length === 0 ? (
                 <tr>
-                  <td
-                    colSpan={7}
-                    className="h-24 text-center text-muted-foreground"
-                  >
+                  <td colSpan={8} className="text-muted-foreground h-24 text-center">
                     {t('empty')}
                   </td>
                 </tr>
@@ -327,51 +352,55 @@ export function LogTable({
                   <tr
                     key={`${item.logType}-${item.id}`}
                     className={cn(
-                      'border-b transition-colors hover:bg-muted/50 cursor-pointer',
+                      'hover:bg-muted/50 cursor-pointer border-b transition-colors',
                       isSelected(item) && 'bg-muted/30'
                     )}
                     onClick={() => onRowClick(item)}
                   >
                     {/* Checkbox */}
-                    <td
-                      className="p-4 align-middle"
-                      onClick={(e) => e.stopPropagation()}
-                    >
+                    <td className="p-4 align-middle" onClick={(e) => e.stopPropagation()}>
                       <Checkbox
                         checked={isSelected(item)}
-                        onCheckedChange={(checked) =>
-                          onRowSelect(item, !!checked)
-                        }
+                        onCheckedChange={(checked) => onRowSelect(item, !!checked)}
                         aria-label={`Select log ${item.id}`}
                       />
                     </td>
+                    {/* Problem ID */}
+                    <td className="p-4 align-middle">
+                      <span className="text-primary font-mono text-sm font-semibold">
+                        {item.problemId || '-'}
+                      </span>
+                    </td>
                     {/* Timestamp */}
-                    <td className="p-4 align-middle text-muted-foreground whitespace-nowrap">
+                    <td className="text-muted-foreground p-4 align-middle whitespace-nowrap">
                       {formatDistanceToNow(new Date(item.createdAt), {
                         addSuffix: true,
                       })}
                     </td>
                     {/* Level */}
                     <td className="p-4 align-middle">
-                      {getSeverityBadge(item.severity)}
+                      <div className="flex flex-wrap items-center gap-2">
+                        {getSeverityBadge(item.severity)}
+                        {getEnvironmentBadge(item.environment)}
+                      </div>
                     </td>
                     {/* Source */}
                     <td className="p-4 align-middle">
-                      <span className="text-xs font-mono bg-muted px-2 py-1 rounded">
+                      <span className="bg-muted rounded px-2 py-1 font-mono text-xs">
                         {item.source || item.logType}
                       </span>
                     </td>
                     {/* Message */}
-                    <td className="p-4 align-middle max-w-[300px]">
+                    <td className="max-w-[300px] p-4 align-middle">
                       <span className="text-sm" title={item.message}>
                         {truncateMessage(item.message)}
                       </span>
                     </td>
                     {/* Course */}
-                    <td className="p-4 align-middle hidden lg:table-cell">
+                    <td className="hidden p-4 align-middle lg:table-cell">
                       {item.courseId ? (
                         <span
-                          className="text-xs font-mono text-muted-foreground"
+                          className="text-muted-foreground font-mono text-xs"
                           title={item.courseId}
                         >
                           {item.courseId.substring(0, 8)}...
@@ -381,9 +410,7 @@ export function LogTable({
                       )}
                     </td>
                     {/* Status */}
-                    <td className="p-4 align-middle">
-                      {getStatusBadge(item.status)}
-                    </td>
+                    <td className="p-4 align-middle">{getStatusBadge(item.status)}</td>
                   </tr>
                 ))
               )}
@@ -394,11 +421,11 @@ export function LogTable({
 
       {/* Pagination */}
       <div className="flex items-center justify-between px-2">
-        <div className="text-sm text-muted-foreground">
+        <div className="text-muted-foreground text-sm">
           {totalCount > 0 && (
             <>
-              Showing {(page - 1) * pageSize + 1} to{' '}
-              {Math.min(page * pageSize, totalCount)} of {totalCount} results
+              Showing {(page - 1) * pageSize + 1} to {Math.min(page * pageSize, totalCount)} of{' '}
+              {totalCount} results
             </>
           )}
         </div>
@@ -413,7 +440,7 @@ export function LogTable({
             <ChevronLeft className="h-4 w-4" />
             Previous
           </Button>
-          <span className="text-sm text-muted-foreground">
+          <span className="text-muted-foreground text-sm">
             Page {page} of {totalPages || 1}
           </span>
           <Button
@@ -429,5 +456,5 @@ export function LogTable({
         </div>
       </div>
     </div>
-  );
+  )
 }
