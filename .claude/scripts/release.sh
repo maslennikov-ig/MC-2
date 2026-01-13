@@ -28,6 +28,10 @@
 
 set -euo pipefail
 
+# Ignore SIGPIPE - this prevents exit code 141 when pipe readers close early
+# This is safe because we handle errors explicitly in critical sections
+trap '' SIGPIPE
+
 # === CONFIGURATION ===
 readonly DATE=$(date +%Y-%m-%d)
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
