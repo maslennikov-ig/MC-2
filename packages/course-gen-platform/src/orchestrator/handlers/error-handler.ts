@@ -11,7 +11,7 @@
 
 import { Job } from 'bullmq';
 import { JobData, JobType } from '@megacampus/shared-types';
-import logger from '../../shared/logger';
+import logger, { logPermanentFailure } from '../../shared/logger';
 import { metricsStore } from '../metrics';
 
 /**
@@ -102,49 +102,61 @@ export function shouldRetryJob(job: Job<JobData>, error: Error | unknown): boole
 
   // Never retry permanent errors
   if (errorType === ErrorType.PERMANENT) {
-    logger.warn({
-      jobId: job.id,
-      jobType: job.name,
-      errorType,
-      currentAttempt,
-      maxAttempts,
-    }, 'Job failed with permanent error, will not retry');
+    logger.warn(
+      {
+        jobId: job.id,
+        jobType: job.name,
+        errorType,
+        currentAttempt,
+        maxAttempts,
+      },
+      'Job failed with permanent error, will not retry'
+    );
     return false;
   }
 
   // Retry transient errors if we haven't exhausted attempts
   if (errorType === ErrorType.TRANSIENT && currentAttempt < maxAttempts) {
-    logger.info({
-      jobId: job.id,
-      jobType: job.name,
-      errorType,
-      currentAttempt,
-      maxAttempts,
-      remainingAttempts: maxAttempts - currentAttempt,
-    }, 'Job failed with transient error, will retry');
+    logger.info(
+      {
+        jobId: job.id,
+        jobType: job.name,
+        errorType,
+        currentAttempt,
+        maxAttempts,
+        remainingAttempts: maxAttempts - currentAttempt,
+      },
+      'Job failed with transient error, will retry'
+    );
     return true;
   }
 
   // For unknown errors, retry if we have attempts left
   if (errorType === ErrorType.UNKNOWN && currentAttempt < maxAttempts) {
-    logger.warn({
+    logger.warn(
+      {
+        jobId: job.id,
+        jobType: job.name,
+        errorType,
+        currentAttempt,
+        maxAttempts,
+      },
+      'Job failed with unknown error, will retry cautiously'
+    );
+    return true;
+  }
+
+  // No more retries
+  logger.error(
+    {
       jobId: job.id,
       jobType: job.name,
       errorType,
       currentAttempt,
       maxAttempts,
-    }, 'Job failed with unknown error, will retry cautiously');
-    return true;
-  }
-
-  // No more retries
-  logger.error({
-    jobId: job.id,
-    jobType: job.name,
-    errorType,
-    currentAttempt,
-    maxAttempts,
-  }, 'Job failed and exhausted all retry attempts');
+    },
+    'Job failed and exhausted all retry attempts'
+  );
   return false;
 }
 
@@ -196,11 +208,38 @@ export function handleJobFailure(job: Job<JobData>, error: Error | unknown): voi
     metricsStore.recordJobRetry(job.name as JobType);
   }
 
-  // TODO (Future): Send failure notifications
-  // - Alert admins for critical jobs
-  // - Notify users for user-facing jobs
-  // - Update job status in database
-  // - Trigger cleanup if needed
+  // Log ALL errors to error_logs table for admin visibility
+  // - WARNING for retryable errors (transient issues that will retry)
+  // - ERROR for final failures (all retries exhausted)
+  // - CRITICAL for permanent errors (won't retry due to error type)
+  const getSeverity = (): 'WARNING' | 'ERROR' | 'CRITICAL' => {
+    if (willRetry) return 'WARNING';
+    if (errorType === ErrorType.PERMANENT) return 'CRITICAL';
+    return 'ERROR';
+  };
+
+  logPermanentFailure({
+    organization_id: jobData.organizationId,
+    user_id: jobData.userId,
+    // Use job_id as problem_id to group related retry errors together
+    problem_id: job.id,
+    error_message: error instanceof Error ? error.message : String(error),
+    stack_trace: error instanceof Error ? error.stack : undefined,
+    severity: getSeverity(),
+    job_id: job.id,
+    job_type: job.name,
+    metadata: {
+      courseId: jobData.courseId,
+      errorType,
+      attemptsMade: job.attemptsMade,
+      attemptsMax: job.opts.attempts || 3,
+      willRetry,
+      isFinalError: !willRetry,
+    },
+  }).catch(dbError => {
+    // Don't fail the handler if DB logging fails
+    logger.warn({ err: dbError }, 'Failed to log error to database');
+  });
 }
 
 /**
@@ -212,12 +251,15 @@ export function handleJobFailure(job: Job<JobData>, error: Error | unknown): voi
  * @param {JobType} jobType - The type of job
  */
 export function handleJobStalled(jobId: string, jobType: JobType): void {
-  logger.warn({
-    jobId,
-    jobType,
-    timestamp: new Date().toISOString(),
-    note: 'Worker may have crashed or job timed out',
-  }, 'Job stalled');
+  logger.warn(
+    {
+      jobId,
+      jobType,
+      timestamp: new Date().toISOString(),
+      note: 'Worker may have crashed or job timed out',
+    },
+    'Job stalled'
+  );
 
   // TODO (Future): Implement stalled job recovery
   // - Check if worker is still alive
@@ -233,13 +275,16 @@ export function handleJobStalled(jobId: string, jobType: JobType): void {
  * @param {Job<JobData>} job - The timed out job
  */
 export function handleJobTimeout(job: Job<JobData>): void {
-  logger.error({
-    jobId: job.id,
-    jobType: job.name,
-    organizationId: job.data.organizationId,
-    courseId: job.data.courseId,
-    timestamp: new Date().toISOString(),
-  }, 'Job timed out');
+  logger.error(
+    {
+      jobId: job.id,
+      jobType: job.name,
+      organizationId: job.data.organizationId,
+      courseId: job.data.courseId,
+      timestamp: new Date().toISOString(),
+    },
+    'Job timed out'
+  );
 
   // TODO (Future): Implement timeout-specific handling
   // - Cancel any ongoing work
