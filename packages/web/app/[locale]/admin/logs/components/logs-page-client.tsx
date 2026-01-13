@@ -136,20 +136,17 @@ function LogsPageContent() {
 
   return (
     <div className="flex h-full flex-col space-y-4">
-      {/* Header with filters and connection indicator */}
-      <FilterBar
-        filters={filters}
-        onFilterChange={handleFilterChange}
-        actions={
-          <>
-            <Button variant="outline" size="sm" onClick={requestRefresh} className="gap-2">
-              <RefreshCw className="h-4 w-4" />
-              <span className="hidden sm:inline">Refresh</span>
-            </Button>
-            <ConnectionIndicator />
-          </>
-        }
-      />
+      {/* Action buttons row - above filters */}
+      <div className="flex items-center justify-end gap-2">
+        <Button variant="outline" size="sm" onClick={requestRefresh} className="gap-2">
+          <RefreshCw className="h-4 w-4" />
+          <span className="hidden sm:inline">Refresh</span>
+        </Button>
+        <ConnectionIndicator />
+      </div>
+
+      {/* Filters */}
+      <FilterBar filters={filters} onFilterChange={handleFilterChange} />
 
       {/* New logs notification */}
       <NewLogsBanner />
