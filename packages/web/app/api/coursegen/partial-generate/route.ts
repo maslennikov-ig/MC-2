@@ -31,6 +31,8 @@ interface PartialGenerateRequest {
  * 4. Returns formatted response
  */
 export async function POST(request: NextRequest) {
+  let userId: string | undefined
+
   try {
     // Minimal auth check
     const supabase = await createClient()
@@ -52,6 +54,7 @@ export async function POST(request: NextRequest) {
 
     const user = session.user
     const accessToken = session.access_token
+    userId = user.id
 
     let body: PartialGenerateRequest
     try {
@@ -142,6 +145,7 @@ export async function POST(request: NextRequest) {
 
     // Log to error_logs for admin visibility
     logPermanentFailure({
+      user_id: userId,
       error_message: error instanceof Error ? error.message : 'Unknown error',
       stack_trace: error instanceof Error ? error.stack : undefined,
       severity: 'ERROR',

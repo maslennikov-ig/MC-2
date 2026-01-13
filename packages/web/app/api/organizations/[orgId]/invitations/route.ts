@@ -157,7 +157,7 @@ export async function GET(
     const offset = (page - 1) * pageSize
 
     // Get invitations - use type assertion for new table (not yet in generated types)
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+
     const {
       data: invitations,
       count,
@@ -186,6 +186,7 @@ export async function GET(
           route: `/api/organizations/${orgId}/invitations`,
           errorCode: 'INTERNAL_ERROR',
           requestId,
+          invitationType: undefined, // List operation - no specific type
         },
       }).catch(() => {})
       return NextResponse.json(
@@ -266,6 +267,7 @@ export async function GET(
         route: '/api/organizations/[orgId]/invitations',
         errorCode: 'INTERNAL_ERROR',
         requestId,
+        invitationType: undefined, // List operation - no specific type
       },
     }).catch(() => {})
 
@@ -455,6 +457,7 @@ export async function POST(
         route: '/api/organizations/[orgId]/invitations',
         errorCode: 'INTERNAL_ERROR',
         requestId,
+        invitationType: undefined, // Not available in catch block
       },
     }).catch(() => {})
 

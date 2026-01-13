@@ -18,6 +18,8 @@ import { logger, logPermanentFailure } from '@/lib/logger'
  * - jobId: BullMQ job ID (required)
  */
 export async function GET(request: NextRequest) {
+  let userId: string | undefined
+
   try {
     // Secure auth check using getUser() to verify with Supabase Auth server
     const supabase = await createClient()
@@ -32,6 +34,8 @@ export async function GET(request: NextRequest) {
         { status: 401 }
       )
     }
+
+    userId = user.id
 
     // Get session for access token (needed for tRPC call)
     const {
@@ -84,6 +88,7 @@ export async function GET(request: NextRequest) {
 
     // Log to error_logs for admin visibility
     logPermanentFailure({
+      user_id: userId,
       error_message: error instanceof Error ? error.message : 'Unknown error',
       stack_trace: error instanceof Error ? error.stack : undefined,
       severity: 'ERROR',

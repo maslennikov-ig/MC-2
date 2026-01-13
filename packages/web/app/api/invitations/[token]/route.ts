@@ -163,6 +163,8 @@ export async function GET(
         route: '/api/invitations/[token]',
         errorCode: 'INTERNAL_ERROR',
         requestId,
+        invitationType: 'link',
+        invitationId: undefined, // Not available in catch block
       },
     }).catch(() => {})
 
@@ -315,6 +317,8 @@ export async function POST(
           route: '/api/invitations/[token]',
           errorCode: (memberError as { code: string }).code || 'INTERNAL_ERROR',
           requestId,
+          invitationType: 'link',
+          invitationId: invitation.id,
         },
       }).catch(() => {})
       return NextResponse.json(
@@ -399,6 +403,8 @@ export async function POST(
         route: '/api/invitations/[token]',
         errorCode: 'INTERNAL_ERROR',
         requestId,
+        invitationType: 'link',
+        invitationId: undefined, // Not available in catch block
       },
     }).catch(() => {})
 

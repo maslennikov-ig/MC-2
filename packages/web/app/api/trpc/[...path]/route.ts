@@ -47,6 +47,7 @@ async function proxyRequest(
   method: 'GET' | 'POST'
 ): Promise<NextResponse> {
   const procedure = path.join('/')
+  let userId: string | undefined
 
   try {
     // Get auth token from Supabase session
@@ -55,6 +56,7 @@ async function proxyRequest(
       data: { session },
     } = await supabase.auth.getSession()
     const accessToken = session?.access_token
+    userId = session?.user?.id
 
     // Build target URL
     const targetUrl = new URL(`${BACKEND_URL}/trpc/${procedure}`)
@@ -119,6 +121,7 @@ async function proxyRequest(
 
     // Log to error_logs for admin visibility
     logPermanentFailure({
+      user_id: userId,
       error_message: error instanceof Error ? error.message : 'Unknown error',
       stack_trace: error instanceof Error ? error.stack : undefined,
       severity: 'ERROR',

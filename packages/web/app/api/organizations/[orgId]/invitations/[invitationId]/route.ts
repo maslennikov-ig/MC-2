@@ -165,6 +165,7 @@ export async function DELETE(
           route: `/api/organizations/${orgId}/invitations/${invitationId}`,
           errorCode: 'INTERNAL_ERROR',
           requestId,
+          invitationType: invitation.invitation_type as 'link' | 'code' | undefined,
           invitationId,
         },
       }).catch(() => {})
@@ -203,6 +204,8 @@ export async function DELETE(
         route: '/api/organizations/[orgId]/invitations/[invitationId]',
         errorCode: 'INTERNAL_ERROR',
         requestId,
+        invitationType: undefined, // Not available in catch block
+        invitationId: undefined, // Not available in catch block
       },
     }).catch(() => {})
 

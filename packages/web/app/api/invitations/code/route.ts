@@ -193,6 +193,8 @@ export async function POST(request: NextRequest) {
           route: '/api/invitations/code',
           errorCode: (memberError as { code: string }).code || 'INTERNAL_ERROR',
           requestId,
+          invitationType: 'code',
+          invitationId: invitation.id,
         },
       }).catch(() => {})
       return NextResponse.json(
@@ -273,6 +275,8 @@ export async function POST(request: NextRequest) {
         route: '/api/invitations/code',
         errorCode: 'INTERNAL_ERROR',
         requestId,
+        invitationType: 'code',
+        invitationId: undefined, // Not available in catch block
       },
     }).catch(() => {})
 

@@ -31,6 +31,8 @@ export async function POST(
   request: NextRequest,
   { params }: { params: Promise<{ slug: string }> }
 ) {
+  let userId: string | undefined
+
   try {
     const { slug } = await params
     const supabase = await createClient()
@@ -51,6 +53,8 @@ export async function POST(
         { status: 401 }
       )
     }
+
+    userId = user.id
 
     // Get course by slug to get courseId
     const { data: course, error: courseError } = await supabase
@@ -169,6 +173,7 @@ export async function POST(
 
     // Log to error_logs for admin visibility
     logPermanentFailure({
+      user_id: userId,
       error_message: error instanceof Error ? error.message : 'Unknown error',
       stack_trace: error instanceof Error ? error.stack : undefined,
       severity: 'ERROR',
