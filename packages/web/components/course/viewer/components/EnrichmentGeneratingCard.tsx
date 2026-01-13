@@ -87,11 +87,20 @@ export function EnrichmentGeneratingCard({
               {Math.round(progress)}%
             </span>
           </div>
-          <Progress value={progress} className="w-full" />
+          <Progress
+            value={progress}
+            className="w-full"
+            aria-label={`${getTitle()} generation progress: ${Math.round(progress)}%`}
+          />
         </div>
 
         <div className="flex justify-end">
-          <Button variant="outline" size="sm" onClick={onCancel}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onCancel}
+            aria-label={`Cancel ${type} generation`}
+          >
             {t('cancel')}
           </Button>
         </div>

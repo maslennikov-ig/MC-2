@@ -30,7 +30,6 @@ import type {
   PresentationEnrichmentContent,
   AudioEnrichmentContent,
 } from '@megacampus/shared-types/enrichment-content'
-import type { OnDemandEnrichmentType } from '@megacampus/shared-types'
 
 type EnrichmentRow = Database['public']['Tables']['lesson_enrichments']['Row']
 

@@ -268,7 +268,13 @@ export function EnrichmentPlaceholderCard({
           {disabled ? (
             <Badge variant="secondary">{t('placeholder.video.comingSoon')}</Badge>
           ) : (
-            <Button onClick={handleGenerate} size="sm" disabled={isGenerating}>
+            <Button
+              onClick={handleGenerate}
+              size="sm"
+              disabled={isGenerating}
+              aria-label={`Generate ${type} enrichment`}
+              aria-busy={isGenerating}
+            >
               {isGenerating ? t('generating') : t('generate')}
             </Button>
           )}

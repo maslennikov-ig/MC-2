@@ -24,6 +24,90 @@ import { enrichmentStatusSchema } from './lesson-enrichment';
 export const onDemandEnrichmentTypeSchema = z.enum(['quiz', 'audio', 'presentation']);
 export type OnDemandEnrichmentType = z.infer<typeof onDemandEnrichmentTypeSchema>;
 
+// ============================================================================
+// ON-DEMAND ENRICHMENT SETTINGS SCHEMAS
+// ============================================================================
+
+/**
+ * Simplified quiz settings for on-demand API
+ *
+ * User-facing settings for quiz generation requests.
+ * These are transformed into full QuizSettings for workers.
+ *
+ * @example
+ * ```typescript
+ * const settings: OnDemandQuizSettings = {
+ *   questionCount: 10,
+ *   difficulty: 'medium'
+ * };
+ * ```
+ */
+export const onDemandQuizSettingsSchema = z.object({
+  /** Number of quiz questions to generate (5-15) */
+  questionCount: z.number().int().min(5).max(15).default(10),
+
+  /** Difficulty level for quiz questions */
+  difficulty: z.enum(['easy', 'medium', 'hard']).default('medium'),
+});
+export type OnDemandQuizSettings = z.infer<typeof onDemandQuizSettingsSchema>;
+
+/**
+ * Simplified audio settings for on-demand API
+ *
+ * User-facing settings for audio generation requests.
+ * These are transformed into full AudioSettings for workers.
+ *
+ * @example
+ * ```typescript
+ * const settings: OnDemandAudioSettings = {
+ *   voice: 'female',
+ *   speed: 'normal'
+ * };
+ * ```
+ */
+export const onDemandAudioSettingsSchema = z.object({
+  /** Voice type for audio narration */
+  voice: z.enum(['default', 'male', 'female']).default('default'),
+
+  /** Narration speed */
+  speed: z.enum(['slow', 'normal', 'fast']).default('normal'),
+});
+export type OnDemandAudioSettings = z.infer<typeof onDemandAudioSettingsSchema>;
+
+/**
+ * Simplified presentation settings for on-demand API
+ *
+ * User-facing settings for presentation generation requests.
+ * These are transformed into full PresentationSettings for workers.
+ *
+ * @example
+ * ```typescript
+ * const settings: OnDemandPresentationSettings = {
+ *   slideCount: 8,
+ *   theme: 'colorful'
+ * };
+ * ```
+ */
+export const onDemandPresentationSettingsSchema = z.object({
+  /** Number of slides to generate (5-10) */
+  slideCount: z.number().int().min(5).max(10).default(8),
+
+  /** Presentation visual theme */
+  theme: z.enum(['light', 'dark', 'colorful']).default('light'),
+});
+export type OnDemandPresentationSettings = z.infer<typeof onDemandPresentationSettingsSchema>;
+
+/**
+ * Union type for all on-demand enrichment settings
+ *
+ * These are simplified, user-facing settings that differ from
+ * the internal worker settings in enrichment-settings.ts
+ */
+export type OnDemandEnrichmentSettings =
+  | OnDemandQuizSettings
+  | OnDemandAudioSettings
+  | OnDemandPresentationSettings;
+
 /**
  * Generation steps for progress tracking in UI
  *
@@ -51,7 +135,7 @@ export type GenerationStep = z.infer<typeof generationStepSchema>;
  * const input = {
  *   lessonId: 'uuid',
  *   enrichmentType: 'quiz',
- *   settings: { questionCount: 5 }
+ *   settings: { questionCount: 5, difficulty: 'easy' }
  * };
  * ```
  */
@@ -63,7 +147,13 @@ export const generateOnDemandInputSchema = z.object({
   enrichmentType: onDemandEnrichmentTypeSchema,
 
   /** Optional type-specific generation settings */
-  settings: z.record(z.unknown()).optional(),
+  settings: z
+    .union([
+      onDemandQuizSettingsSchema,
+      onDemandAudioSettingsSchema,
+      onDemandPresentationSettingsSchema,
+    ])
+    .optional(),
 });
 export type GenerateOnDemandInput = z.infer<typeof generateOnDemandInputSchema>;
 
@@ -126,6 +216,23 @@ export type GenerationStatusResponse = z.infer<typeof generationStatusResponseSc
 // ============================================================================
 
 /**
+ * Progress percentages for each enrichment status
+ *
+ * These values provide visual feedback to users during generation:
+ * - pending: Job queued but not started (0%)
+ * - draft_generating: Creating draft content (25%)
+ * - draft_ready: Draft complete, awaiting final generation (50%)
+ * - generating: Final generation in progress (75%)
+ * - completed: Generation finished (100%)
+ * - failed/cancelled: Reset to 0%
+ */
+const PROGRESS_PENDING = 0;
+const PROGRESS_DRAFT_GENERATING = 25;
+const PROGRESS_DRAFT_READY = 50;
+const PROGRESS_GENERATING = 75;
+const PROGRESS_COMPLETED = 100;
+
+/**
  * Map enrichment status to progress percentage
  *
  * Used to convert database status to UI progress display.
@@ -135,11 +242,11 @@ export type GenerationStatusResponse = z.infer<typeof generationStatusResponseSc
  */
 export function statusToProgress(status: z.infer<typeof enrichmentStatusSchema>): number {
   const progressMap: Record<z.infer<typeof enrichmentStatusSchema>, number> = {
-    pending: 0,
-    draft_generating: 25,
-    draft_ready: 50,
-    generating: 75,
-    completed: 100,
+    pending: PROGRESS_PENDING,
+    draft_generating: PROGRESS_DRAFT_GENERATING,
+    draft_ready: PROGRESS_DRAFT_READY,
+    generating: PROGRESS_GENERATING,
+    completed: PROGRESS_COMPLETED,
     failed: 0,
     cancelled: 0,
   };
