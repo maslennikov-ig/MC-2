@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
+import { useEffect, useState, useCallback, useMemo } from 'react'
 import { useTranslations } from 'next-intl'
 import { formatDistanceToNow } from 'date-fns'
 import { Loader2, ChevronLeft, ChevronRight, ChevronUp, ChevronDown } from 'lucide-react'
@@ -22,15 +22,14 @@ import type {
 /** Debounce timeout for filters in milliseconds */
 const FILTER_DEBOUNCE_MS = 300
 
-/** Auto-refresh interval in milliseconds (5 seconds) */
-const REFRESH_INTERVAL_MS = 5000
-
 interface LogTableProps {
   filters: LogFilters
   selectedItems: Array<{ logType: LogType; logId: string }>
   onRowSelect: (item: UnifiedLogItem, selected: boolean) => void
   onSelectAll: (items: UnifiedLogItem[], selected: boolean) => void
   onRowClick: (item: UnifiedLogItem) => void
+  /** Optional trigger to force a data refresh - increment to trigger reload */
+  triggerRefresh?: number
 }
 
 type SortField = 'created_at' | 'severity'
@@ -45,6 +44,7 @@ export function LogTable({
   onRowSelect,
   onSelectAll,
   onRowClick,
+  triggerRefresh,
 }: LogTableProps) {
   const t = useTranslations('admin.logs')
 
@@ -103,12 +103,6 @@ export function LogTable({
     [page, pageSize, filters, sortField, sortDirection]
   )
 
-  // Ref to hold latest loadData for polling (avoids interval restart on filter change)
-  const loadDataRef = useRef(loadData)
-  useEffect(() => {
-    loadDataRef.current = loadData
-  }, [loadData])
-
   // Initial load and filter change with debounce
   useEffect(() => {
     const abortController = new AbortController()
@@ -123,13 +117,12 @@ export function LogTable({
     }
   }, [loadData])
 
-  // Auto-refresh polling - uses ref to avoid restarting interval on filter changes
+  // Trigger refresh when triggerRefresh prop changes (from realtime provider)
   useEffect(() => {
-    const interval = setInterval(() => {
-      void loadDataRef.current()
-    }, REFRESH_INTERVAL_MS)
-    return () => clearInterval(interval)
-  }, []) // Empty deps - interval set once, uses latest loadData via ref
+    if (triggerRefresh !== undefined && triggerRefresh > 0) {
+      void loadData()
+    }
+  }, [triggerRefresh, loadData])
 
   // Reset page when filters change
   useEffect(() => {

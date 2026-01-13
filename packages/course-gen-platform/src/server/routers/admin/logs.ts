@@ -657,6 +657,12 @@ async function buildGenerationTraceQuery(
   limit: number,
   offset: number
 ): Promise<{ items: UnifiedLogItem[]; total: number }> {
+  // generation_trace with error_data are always ERROR severity
+  // Skip query entirely if filtering for WARNING or CRITICAL
+  if (filters?.level && filters.level !== 'ERROR') {
+    return { items: [], total: 0 };
+  }
+
   let query = supabase
     .from('generation_trace')
     .select('id, created_at, stage, phase, step_name, course_id, lesson_id, error_data', {
