@@ -28,13 +28,28 @@ const STAGE_PROGRESS_CONFIG: StageProgressConfig[] = [
 ];
 
 /**
+ * Options for progress calculation
+ */
+interface CalculateProgressOptions {
+  /** Number of lessons completed in Stage 6 */
+  lessonsCompleted?: number;
+  /** Total number of lessons to generate in Stage 6 */
+  lessonsTotal?: number;
+}
+
+/**
  * Calculate overall progress percentage based on current status and configuration
  *
  * @param status - Current pipeline status
  * @param hasDocuments - Whether the course has documents (affects active stages)
+ * @param options - Optional lesson counts for Stage 6 progress interpolation
  * @returns Progress percentage (0-100)
  */
-export function calculateProgress(status: string | null, hasDocuments: boolean): number {
+export function calculateProgress(
+  status: string | null,
+  hasDocuments: boolean,
+  options?: CalculateProgressOptions
+): number {
   if (!status) return 0;
   if (status === 'completed') return 100;
   if (status === 'failed' || status === 'cancelled') return 0;
@@ -63,7 +78,16 @@ export function calculateProgress(status: string | null, hasDocuments: boolean):
         rawProgress = stage.completedWeight;
       } else {
         // Current stage is in progress
-        rawProgress = stage.activeWeight;
+        // For Stage 6, interpolate based on lessons completed
+        if (stage.stageNumber === 6 && options?.lessonsTotal && options.lessonsTotal > 0) {
+          const lessonsCompleted = options.lessonsCompleted ?? 0;
+          const lessonProgress = lessonsCompleted / options.lessonsTotal;
+          // Interpolate between activeWeight (60%) and completedWeight (100%)
+          rawProgress = stage.activeWeight +
+            (stage.completedWeight - stage.activeWeight) * lessonProgress;
+        } else {
+          rawProgress = stage.activeWeight;
+        }
       }
       break;
     }

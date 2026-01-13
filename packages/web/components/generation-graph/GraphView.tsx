@@ -690,9 +690,13 @@ function GraphViewInner({ courseId, courseTitle, hasDocuments = true, failedAtSt
 
     // Use progressPercentage from database when available (ensures consistency with CelestialHeader)
     // Fall back to calculated progress from status for backward compatibility
+    // Pass lesson counts for Stage 6 progress interpolation
     const overallProgress = progressPercentage !== undefined
       ? progressPercentage
-      : calculateProgress(pipelineStatus, hasDocuments);
+      : calculateProgress(pipelineStatus, hasDocuments, {
+          lessonsCompleted: generationProgress?.lessons_completed,
+          lessonsTotal: generationProgress?.lessons_total,
+        });
 
     return {
       nodeStatuses,
@@ -704,7 +708,7 @@ function GraphViewInner({ courseId, courseTitle, hasDocuments = true, failedAtSt
       isConnected,
       lastUpdated: new Date(),
     };
-  }, [pipelineStatus, isConnected, hasDocuments, failedAtStage, nodes, progressPercentage]);
+  }, [pipelineStatus, isConnected, hasDocuments, failedAtStage, nodes, progressPercentage, generationProgress?.lessons_completed, generationProgress?.lessons_total]);
 
   // Static Data (includes dynamic counts for EndNode display)
   const staticData = useMemo(

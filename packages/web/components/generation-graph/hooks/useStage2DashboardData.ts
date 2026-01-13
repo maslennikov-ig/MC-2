@@ -657,11 +657,12 @@ export function useStage2DashboardData({
             // Fallback: try to stringify if no structured data
             raw: (!err.message && !err.name) ? JSON.stringify(err) : undefined,
           } : { message: 'Unknown error' };
-          logger.warn('[useStage2DashboardData] File catalog realtime subscription error (may be transient)', {
+          // Log as debug - realtime errors are expected when tables aren't in publication
+          // or when RLS policies with JOINs block access. Data loads via polling fallback.
+          logger.debug('[useStage2DashboardData] File catalog realtime subscription error (expected - using polling fallback)', {
             ...errorDetails,
             courseId,
           });
-          // Don't show toast - this is often transient and data still loads via polling
         } else if (status === 'TIMED_OUT') {
           logger.warn('[useStage2DashboardData] File catalog realtime subscription timed out');
           if (isMounted) {
@@ -714,11 +715,12 @@ export function useStage2DashboardData({
             hint: (err as { hint?: string }).hint,
             raw: (!err.message && !err.name) ? JSON.stringify(err) : undefined,
           } : { message: 'Unknown error' };
-          logger.warn('[useStage2DashboardData] Trace realtime subscription error (may be transient)', {
+          // Log as debug - realtime errors are expected when tables aren't in publication
+          // or when RLS policies with JOINs block access. Data loads via polling fallback.
+          logger.debug('[useStage2DashboardData] Trace realtime subscription error (expected - using polling fallback)', {
             ...errorDetails,
             courseId,
           });
-          // Don't show toast - this is often transient and data still loads via polling
         } else if (status === 'TIMED_OUT') {
           logger.warn('[useStage2DashboardData] Trace realtime subscription timed out');
           if (isMounted) {

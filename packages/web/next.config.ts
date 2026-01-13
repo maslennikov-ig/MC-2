@@ -343,7 +343,7 @@ const nextConfig: NextConfig = {
                 frame-ancestors 'none';
                 base-uri 'self';
                 form-action 'self';
-                worker-src 'self';
+                worker-src 'self' blob:;
               `.replace(/\s{2,}/g, ' ').trim()
               : `
                 default-src 'self';
@@ -357,7 +357,7 @@ const nextConfig: NextConfig = {
                 frame-ancestors 'none';
                 base-uri 'self';
                 form-action 'self';
-                worker-src 'self';
+                worker-src 'self' blob:;
               `.replace(/\s{2,}/g, ' ').trim()
           }
         ]
