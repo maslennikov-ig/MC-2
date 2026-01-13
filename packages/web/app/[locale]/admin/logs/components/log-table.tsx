@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback, useMemo } from 'react'
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { useTranslations } from 'next-intl'
 import { formatDistanceToNow } from 'date-fns'
 import { Loader2, ChevronLeft, ChevronRight, ChevronUp, ChevronDown } from 'lucide-react'
@@ -103,6 +103,12 @@ export function LogTable({
     [page, pageSize, filters, sortField, sortDirection]
   )
 
+  // Ref to hold latest loadData (avoids recreating effects on loadData change)
+  const loadDataRef = useRef(loadData)
+  useEffect(() => {
+    loadDataRef.current = loadData
+  }, [loadData])
+
   // Initial load and filter change with debounce
   useEffect(() => {
     const abortController = new AbortController()
@@ -120,9 +126,9 @@ export function LogTable({
   // Trigger refresh when triggerRefresh prop changes (from realtime provider)
   useEffect(() => {
     if (triggerRefresh !== undefined && triggerRefresh > 0) {
-      void loadData()
+      void loadDataRef.current()
     }
-  }, [triggerRefresh, loadData])
+  }, [triggerRefresh])
 
   // Reset page when filters change
   useEffect(() => {
