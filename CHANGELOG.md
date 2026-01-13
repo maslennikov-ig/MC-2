@@ -311,6 +311,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.27.0] - 2026-01-13
+
+### Added
+
+- **admin**: replace polling with Supabase Realtime for logs page (9f0f5a2)
+- **db**: add generation_trace lifecycle management (74562e0)
+- **admin**: enhanced logs page with problem ID, environment, copy button (293b9c0)
+
+### Changed
+
+- **admin**: extract SeverityBadge component (0626954)
+
+### Fixed
+
+- **scripts**: use temp files instead of pipes in release.sh (fd7c6c4)
+- **scripts**: ignore SIGPIPE to prevent exit 141 in release.sh (231e324)
+- **scripts**: replace tail with safe_tail_from to avoid SIGPIPE (850bb76)
+- **admin**: move Refresh/Live buttons above filter card (c9a560e)
+- **admin**: move Refresh/Live to top row with filters (e02285b)
+- **admin**: move Refresh and Live buttons inside filter card (3e4e3e8)
+- **web**: memory leak on course generation page (4GB RAM, 100% CPU) (d818948)
+- **scripts**: fix deploy.sh SIGPIPE and non-interactive mode (2538456)
+- **admin**: prevent infinite loop in logs page refresh (35bce6e)
+- **admin**: code review fixes for logs page (719f86b)
+- **auth**: remove redundant client-side session refresh (c672292)
+- **scripts**: improve release.sh auto-commit error handling (c1bf14d)
+
+### Other
+
+- bd sync: 2026-01-13 14:26:47 (83d6232)
+- bd sync: 2026-01-13 13:17:13 (c1ba424)
+- bd sync: 2026-01-13 13:06:07 (c2e871d)
+- bd sync: 2026-01-13 13:03:03 (d20d004)
+- bd sync: 2026-01-13 12:58:50 (5c9852a)
+- bd sync: 2026-01-13 12:36:49 (fc127ed)
+- bd sync: 2026-01-13 12:26:37 (6f22764)
+- bd sync: 2026-01-13 12:03:19 (8ccec0f)
+- bd sync: 2026-01-13 11:48:44 (aa89ab5)
+
 ## [0.26.83] - 2026-01-12
 
 ### Added

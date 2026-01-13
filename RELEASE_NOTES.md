@@ -2,6 +2,39 @@
 
 _Released on 2025-12-26_
 
+## v0.27.0
+
+_Released on 2026-01-13_
+
+### ✨ New Features
+
+- **admin**: Replace polling with Supabase Realtime for logs page
+- **Database**: Add generation_trace lifecycle management
+- **admin**: Enhanced logs page with problem ID, environment, copy button
+
+### 🔧 Improvements
+
+- **admin**: Extract SeverityBadge component
+
+### 🐛 Bug Fixes
+
+- **scripts**: Use temp files instead of pipes in release.sh
+- **scripts**: Ignore SIGPIPE to prevent exit 141 in release.sh
+- **scripts**: Replace tail with safe_tail_from to avoid SIGPIPE
+- **admin**: Move Refresh/Live buttons above filter card
+- **admin**: Move Refresh/Live to top row with filters
+- **admin**: Move Refresh and Live buttons inside filter card
+- **web**: Memory leak on course generation page (4GB RAM, 100% CPU)
+- **scripts**: Fix deploy.sh SIGPIPE and non-interactive mode
+- **admin**: Prevent infinite loop in logs page refresh
+- **admin**: Code review fixes for logs page
+- **Authentication**: Remove redundant client-side session refresh
+- **scripts**: Improve release.sh auto-commit error handling
+
+---
+
+_This release was automatically generated from 25 commits._
+
 ## v0.26.83
 
 _Released on 2026-01-12_
