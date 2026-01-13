@@ -2982,6 +2982,9 @@ export type Database = {
         | "stage_5_generating"
         | "stage_5_complete"
         | "stage_5_awaiting_approval"
+        | "stage_6_init"
+        | "stage_6_generating"
+        | "stage_6_complete"
         | "finalizing"
         | "completed"
         | "failed"
@@ -3199,6 +3202,9 @@ export const Constants = {
         "stage_5_generating",
         "stage_5_complete",
         "stage_5_awaiting_approval",
+        "stage_6_init",
+        "stage_6_generating",
+        "stage_6_complete",
         "finalizing",
         "completed",
         "failed",
