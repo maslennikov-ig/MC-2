@@ -1,18 +1,13 @@
 import type { NextConfig } from 'next'
 import webpack from 'webpack'
 import createNextIntlPlugin from 'next-intl/plugin'
+import withPWAInit from '@ducanh2912/next-pwa'
+import packageJson from './package.json'
 
 // Read version from package.json for cache invalidation
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const packageJson = require('./package.json') as { version: string }
 const APP_VERSION = packageJson.version
 
-// eslint-disable-next-line @typescript-eslint/no-require-imports
-const withPWA = (
-  require('@ducanh2912/next-pwa').default as (
-    config: Record<string, unknown>
-  ) => (nextConfig: NextConfig) => NextConfig
-)({
+const withPWA = withPWAInit({
   dest: 'public',
   register: true,
   // Disable in development to avoid conflicts with hot reload
