@@ -1,7 +1,7 @@
-import { Metadata } from "next"
+import { Metadata } from 'next'
 import { Suspense } from 'react'
-import { setRequestLocale } from 'next-intl/server';
-import { Locale } from '@/src/i18n/config';
+import { setRequestLocale } from 'next-intl/server'
+import { Locale } from '@/src/i18n/config'
 import { getCurrentUser } from '@/lib/auth-helpers'
 import { getCourses, getCoursesStatistics, checkFavorites } from './actions'
 import { CoursesHeader } from './_components/courses-header'
@@ -15,26 +15,27 @@ export const dynamic = 'force-dynamic'
 export const fetchCache = 'force-no-store'
 
 export const metadata: Metadata = {
-  title: "Каталог курсов",
-  description: "Просмотрите все доступные курсы, созданные с помощью искусственного интеллекта. Найдите подходящий курс по вашей тематике и уровню сложности.",
-  keywords: ["каталог курсов", "онлайн обучение", "курсы AI", "образовательные программы"],
+  title: 'Каталог курсов',
+  description:
+    'Просмотрите все доступные курсы, созданные с помощью искусственного интеллекта. Найдите подходящий курс по вашей тематике и уровню сложности.',
+  keywords: ['каталог курсов', 'онлайн обучение', 'курсы AI', 'образовательные программы'],
   openGraph: {
-    title: "Каталог курсов | MegaCampusAI",
-    description: "Просмотрите все доступные курсы, созданные с помощью искусственного интеллекта",
-    url: "/courses",
-    type: "website",
+    title: 'Каталог курсов | MegaCampusAI',
+    description: 'Просмотрите все доступные курсы, созданные с помощью искусственного интеллекта',
+    url: '/courses',
+    type: 'website',
   },
   twitter: {
-    title: "Каталог курсов | MegaCampusAI",
-    description: "Просмотрите все доступные курсы, созданные с помощью искусственного интеллекта",
+    title: 'Каталог курсов | MegaCampusAI',
+    description: 'Просмотрите все доступные курсы, созданные с помощью искусственного интеллекта',
   },
   alternates: {
-    canonical: "/courses",
+    canonical: '/courses',
   },
 }
 
 interface PageProps {
-  params: Promise<{ locale: Locale }>;
+  params: Promise<{ locale: Locale }>
   searchParams: Promise<{
     search?: string
     status?: string
@@ -46,8 +47,8 @@ interface PageProps {
 }
 
 export default async function CoursesPage({ params, searchParams }: PageProps) {
-  const { locale } = await params;
-  setRequestLocale(locale); // Enable static rendering
+  const { locale } = await params
+  setRequestLocale(locale) // Enable static rendering
 
   const searchParamsResolved = await searchParams
   const user = await getCurrentUser()
@@ -60,7 +61,7 @@ export default async function CoursesPage({ params, searchParams }: PageProps) {
     favorites: searchParamsResolved.favorites === 'true',
     sort: searchParamsResolved.sort || 'created_desc',
     page: parseInt(searchParamsResolved.page || '1'),
-    limit: 10
+    limit: 12,
   })
 
   // Get full statistics (not filtered by pagination)
@@ -69,41 +70,39 @@ export default async function CoursesPage({ params, searchParams }: PageProps) {
   // Check favorites for all courses if user is authenticated
   let favoritesMap: Record<string, boolean> = {}
   if (user) {
-    const courseIds = coursesData.courses.map(c => c.id)
+    const courseIds = coursesData.courses.map((c) => c.id)
     favoritesMap = await checkFavorites(courseIds)
   }
 
   // Add favorites status to courses
-  const coursesWithFavorites = coursesData.courses.map(course => ({
+  const coursesWithFavorites = coursesData.courses.map((course) => ({
     ...course,
-    isFavorited: favoritesMap[course.id] || false
+    isFavorited: favoritesMap[course.id] || false,
   }))
 
   // Favorites have been mapped to courses
-  
+
   return (
-    <div className="min-h-screen bg-gradient-to-br from-white via-purple-50/20 to-gray-50 dark:from-slate-950 dark:via-purple-950/20 dark:to-slate-950 transition-colors duration-200">
+    <div className="min-h-screen bg-gradient-to-br from-white via-purple-50/20 to-gray-50 transition-colors duration-200 dark:from-slate-950 dark:via-purple-950/20 dark:to-slate-950">
       <div className="relative z-10">
         {/* Header with auth status */}
         <CoursesHeader />
-        
+
         {/* Main content */}
-        <main className="max-w-[1920px] mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        <main className="mx-auto max-w-[1920px] px-4 py-8 sm:px-6 lg:px-8">
           {/* Page title */}
-          <div className="text-center mb-6">
-            <h1 className="text-4xl font-bold mb-2 text-gray-900 dark:text-white transition-colors duration-200">
+          <div className="mb-6 text-center">
+            <h1 className="mb-2 text-4xl font-bold text-gray-900 transition-colors duration-200 dark:text-white">
               Каталог курсов
             </h1>
-            <p className="text-gray-600 dark:text-gray-400 transition-colors duration-200">
+            <p className="text-gray-600 transition-colors duration-200 dark:text-gray-400">
               Изучайте курсы, созданные с помощью искусственного интеллекта
             </p>
           </div>
-          
+
           {/* Statistics */}
-          <CourseStatistics 
-            statistics={statistics}
-          />
-          
+          <CourseStatistics statistics={statistics} />
+
           {/* Filters */}
           <CoursesFilters
             initialSearch={searchParamsResolved.search}
@@ -112,7 +111,7 @@ export default async function CoursesPage({ params, searchParams }: PageProps) {
             initialSort={searchParamsResolved.sort || 'created_desc'}
             totalCount={coursesData.totalCount}
           />
-          
+
           {/* Course grid with loading state */}
           <Suspense fallback={<CoursesLoading />}>
             <CourseGrid

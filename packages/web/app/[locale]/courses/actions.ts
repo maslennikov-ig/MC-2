@@ -12,11 +12,10 @@ import { getBackendAuthHeaders, TRPC_URL } from '@/lib/auth'
 
 // Type definitions
 type StatisticsQueryResponse = {
-  status: string;
-  generation_status: string | null;
-  total_lessons_count: number | null;
+  status: string
+  generation_status: string | null
+  total_lessons_count: number | null
 }
-
 
 /**
  * Get courses with RLS enforcement
@@ -29,7 +28,7 @@ export async function getCourses({
   favorites,
   sort = 'created_desc',
   page = 1,
-  limit = 10
+  limit = 12,
 }: {
   search?: string
   status?: string
@@ -46,7 +45,9 @@ export async function getCourses({
 
   // SECURITY: First validate user authenticity with getUser()
   // getUser() validates JWT by contacting Supabase Auth server
-  const { data: { user: authenticatedUser } } = await supabase.auth.getUser()
+  const {
+    data: { user: authenticatedUser },
+  } = await supabase.auth.getUser()
 
   // Declare session variable in outer scope for later use
   let session = null
@@ -56,7 +57,9 @@ export async function getCourses({
     logger.info(`Authenticated as: ${authenticatedUser.email} (ID: ${authenticatedUser.id})`)
 
     // Now get session to access JWT custom claims (user is already validated)
-    const { data: { session: validatedSession } } = await supabase.auth.getSession()
+    const {
+      data: { session: validatedSession },
+    } = await supabase.auth.getSession()
     session = validatedSession
 
     if (session) {
@@ -78,13 +81,12 @@ export async function getCourses({
   } else {
     logger.info('No authenticated user found')
   }
-  
+
   // Build query - RLS will automatically filter based on user permissions
   // Note: We don't fetch sections/lessons here to avoid deep recursion and performance issues
   // The counts are stored in total_lessons_count and total_sections_count columns
-  let query = supabase
-    .from('courses')
-    .select(`
+  let query = supabase.from('courses').select(
+    `
       id,
       title,
       slug,
@@ -109,7 +111,9 @@ export async function getCourses({
       target_audience,
       estimated_lessons,
       estimated_sections
-    `, { count: 'exact' })
+    `,
+    { count: 'exact' }
+  )
 
   // Apply business filters (not access control)
   if (search) {
@@ -119,42 +123,42 @@ export async function getCourses({
   if (status && status !== 'all') {
     query = query.eq('status', status as 'draft' | 'published' | 'archived')
   }
-  
+
   if (difficulty && difficulty !== 'all') {
     query = query.eq('difficulty', difficulty)
   }
-  
+
   // Handle favorites
   if (favorites === true) {
     const user = await getCurrentUser()
     if (!user) {
-      return { 
-        courses: [], 
+      return {
+        courses: [],
         totalCount: 0,
         currentPage: page,
         totalPages: 0,
-        hasMore: false
+        hasMore: false,
       }
     }
-    
+
     const userFavorites = await getUserFavorites(user.id)
     if (userFavorites.length === 0) {
-      return { 
-        courses: [], 
+      return {
+        courses: [],
         totalCount: 0,
         currentPage: page,
         totalPages: 0,
-        hasMore: false
+        hasMore: false,
       }
     }
-    
+
     query = query.in('id', userFavorites)
   }
-  
+
   // Apply sorting
   const [sortField, sortDirection] = sort.split('_')
   const ascending = sortDirection === 'asc'
-  
+
   switch (sortField) {
     case 'created':
       query = query.order('created_at', { ascending })
@@ -171,120 +175,134 @@ export async function getCourses({
     default:
       query = query.order('created_at', { ascending: false })
   }
-  
+
   // Apply pagination
   query = query.range(offset, offset + limit - 1)
-  
+
   // Execute query - RLS policies are automatically applied
   const { data: courses, error, count } = await query
-  
+
   if (error) {
     logger.error('Error fetching courses:', error)
-    return { 
-      courses: [], 
+    return {
+      courses: [],
       totalCount: 0,
       currentPage: page,
       totalPages: 0,
-      hasMore: false
+      hasMore: false,
     }
   }
-  
-  // Process courses
-  const processedCourses = courses?.map((course) => {
-    // Use the cached counts from the database columns
-    const sectionsCount = course.total_sections_count || 0
-    const lessonsCount = course.total_lessons_count || 0
-    
-    let description = course.course_description
-    let learningOutcomes = course.learning_outcomes
-    let prerequisites = course.prerequisites
-    let targetAudience = course.target_audience
-    
-    if (course.course_structure && typeof course.course_structure === 'object') {
-      const structure = course.course_structure as CourseStructureData
-      if (structure.course_description) {
-        description = structure.course_description
-      }
-      if (structure.learning_outcomes) {
-        // Convert array of objects or strings to comma-separated string
-        // learning_outcomes can be: string | string[] | {text: string, id: string, language: string}[]
-        learningOutcomes = Array.isArray(structure.learning_outcomes)
-          ? structure.learning_outcomes
-              .map((o: unknown) => {
-                if (typeof o === 'string') return o
-                if (typeof o === 'object' && o !== null && 'text' in o) {
-                  return (o as { text: string }).text
-                }
-                return null
-              })
-              .filter(Boolean)
-              .join(', ')
-          : structure.learning_outcomes
-      }
-      if (structure.prerequisites) {
-        // Convert array to string if needed
-        prerequisites = Array.isArray(structure.prerequisites)
-          ? structure.prerequisites.join(', ')
-          : structure.prerequisites
-      }
-      if (structure.target_audience) {
-        targetAudience = structure.target_audience
-      }
-    }
-    
-    const slug = course.slug || generateSlug(course.title)
 
-    const processedCourse = {
-      ...course,
-      slug,
-      course_description: description,
-      course_structure: course.course_structure as Record<string, unknown> | null,
-      status: (course.status || 'draft') as 'draft' | 'published' | 'archived',
-      generation_status: course.generation_status as 'pending' | 'initializing' | 'processing_documents' | 'analyzing_task' | 'generating_structure' | 'generating_content' | 'finalizing' | 'completed' | 'failed' | 'cancelled' | null,
-      generation_progress: course.generation_progress as GenerationProgress | null,
-      language: course.language || 'en',
-      difficulty: course.difficulty || 'intermediate',
-      style: course.style || 'academic',
-      is_published: course.is_published || false,
-      visibility: course.visibility || 'private',
-      created_at: course.created_at || new Date().toISOString(),
-      updated_at: course.updated_at || new Date().toISOString(),
-      learning_outcomes: learningOutcomes,
-      prerequisites: prerequisites,
-      target_audience: targetAudience,
-      actual_sections_count: sectionsCount,
-      actual_lessons_count: lessonsCount,
-      sectionsCount,
-      lessonsCount,
-      estimatedDuration: lessonsCount * 5
-    }
-    
-    return processedCourse
-  }) || []
-  
+  // Process courses
+  const processedCourses =
+    courses?.map((course) => {
+      // Use the cached counts from the database columns
+      const sectionsCount = course.total_sections_count || 0
+      const lessonsCount = course.total_lessons_count || 0
+
+      let description = course.course_description
+      let learningOutcomes = course.learning_outcomes
+      let prerequisites = course.prerequisites
+      let targetAudience = course.target_audience
+
+      if (course.course_structure && typeof course.course_structure === 'object') {
+        const structure = course.course_structure as CourseStructureData
+        if (structure.course_description) {
+          description = structure.course_description
+        }
+        if (structure.learning_outcomes) {
+          // Convert array of objects or strings to comma-separated string
+          // learning_outcomes can be: string | string[] | {text: string, id: string, language: string}[]
+          learningOutcomes = Array.isArray(structure.learning_outcomes)
+            ? structure.learning_outcomes
+                .map((o: unknown) => {
+                  if (typeof o === 'string') return o
+                  if (typeof o === 'object' && o !== null && 'text' in o) {
+                    return (o as { text: string }).text
+                  }
+                  return null
+                })
+                .filter(Boolean)
+                .join(', ')
+            : structure.learning_outcomes
+        }
+        if (structure.prerequisites) {
+          // Convert array to string if needed
+          prerequisites = Array.isArray(structure.prerequisites)
+            ? structure.prerequisites.join(', ')
+            : structure.prerequisites
+        }
+        if (structure.target_audience) {
+          targetAudience = structure.target_audience
+        }
+      }
+
+      const slug = course.slug || generateSlug(course.title)
+
+      const processedCourse = {
+        ...course,
+        slug,
+        course_description: description,
+        course_structure: course.course_structure as Record<string, unknown> | null,
+        status: course.status || 'draft',
+        generation_status: course.generation_status as
+          | 'pending'
+          | 'initializing'
+          | 'processing_documents'
+          | 'analyzing_task'
+          | 'generating_structure'
+          | 'generating_content'
+          | 'finalizing'
+          | 'completed'
+          | 'failed'
+          | 'cancelled'
+          | null,
+        generation_progress: course.generation_progress as GenerationProgress | null,
+        language: course.language || 'en',
+        difficulty: course.difficulty || 'intermediate',
+        style: course.style || 'academic',
+        is_published: course.is_published || false,
+        visibility: course.visibility || 'private',
+        created_at: course.created_at || new Date().toISOString(),
+        updated_at: course.updated_at || new Date().toISOString(),
+        learning_outcomes: learningOutcomes,
+        prerequisites: prerequisites,
+        target_audience: targetAudience,
+        actual_sections_count: sectionsCount,
+        actual_lessons_count: lessonsCount,
+        sectionsCount,
+        lessonsCount,
+        estimatedDuration: lessonsCount * 5,
+      }
+
+      return processedCourse
+    }) || []
+
   const totalPages = Math.ceil((count || 0) / limit)
-  
+
   // Get user favorites if logged in
   const user = await getCurrentUser()
   let userFavorites: string[] = []
   if (user?.id) {
     userFavorites = await getUserFavorites(user.id)
   }
-  
+
   // Add favorite status to courses
-  const coursesWithFavorites = processedCourses.map(course => ({
+  const coursesWithFavorites = processedCourses.map((course) => ({
     ...course,
-    isFavorite: userFavorites.includes(course.id)
+    isFavorite: userFavorites.includes(course.id),
   }))
-  
-  logger.info(`Returning ${coursesWithFavorites.length} courses out of ${count} total for user ${authenticatedUser?.email || 'unknown'}`)
-  
-  return { 
-    courses: coursesWithFavorites, 
+
+  logger.info(
+    `Returning ${coursesWithFavorites.length} courses out of ${count} total for user ${authenticatedUser?.email || 'unknown'}`
+  )
+
+  return {
+    courses: coursesWithFavorites,
     totalCount: count || 0,
     currentPage: page,
     totalPages,
-    hasMore: page < totalPages
+    hasMore: page < totalPages,
   }
 }
 
@@ -296,8 +314,8 @@ export async function getCourses({
  * @returns Cleanup result or null if cleanup failed
  */
 async function cleanupCourseResources(courseId: string): Promise<{
-  success: boolean;
-  errors: string[];
+  success: boolean
+  errors: string[]
 } | null> {
   try {
     const headers = await getBackendAuthHeaders()
@@ -349,11 +367,11 @@ export async function deleteCourse(courseSlug: string) {
 
   try {
     // Get course - RLS will check access
-    const { data: course, error: fetchError } = await supabase
+    const { data: course, error: fetchError } = (await supabase
       .from('courses')
       .select('id, title')
       .eq('slug', courseSlug)
-      .single() as { data: { id: string; title: string } | null; error: PostgrestError | null }
+      .single()) as { data: { id: string; title: string } | null; error: PostgrestError | null }
 
     if (fetchError || !course) {
       throw new Error('Course not found or access denied')
@@ -397,7 +415,7 @@ export async function deleteCourse(courseSlug: string) {
       .eq('course_id', courseId)
 
     if (sectionsData && sectionsData.length > 0) {
-      const sectionIds = sectionsData.map(s => s.id)
+      const sectionIds = sectionsData.map((s) => s.id)
       await adminClient.from('lessons').delete().in('section_id', sectionIds)
     }
 
@@ -408,10 +426,7 @@ export async function deleteCourse(courseSlug: string) {
     await adminClient.from('file_catalog').delete().eq('course_id', courseId)
 
     // 2e. Finally, delete the course using user client to enforce RLS
-    const { error: deleteError } = await supabase
-      .from('courses')
-      .delete()
-      .eq('id', courseId)
+    const { error: deleteError } = await supabase.from('courses').delete().eq('id', courseId)
 
     if (deleteError) {
       // RLS will block if user doesn't have permission
@@ -431,7 +446,7 @@ export async function deleteCourse(courseSlug: string) {
  */
 export async function togglePublishCourse(courseSlug: string, isPublished: boolean) {
   const supabase = await getUserClient()
-  
+
   try {
     // Update using user client - RLS will check permissions
     const { error } = await supabase
@@ -440,14 +455,14 @@ export async function togglePublishCourse(courseSlug: string, isPublished: boole
       .eq('slug', courseSlug)
       .select()
       .single()
-    
+
     if (error) {
       if (error.code === 'PGRST116') {
         throw new Error('Course not found or access denied')
       }
       throw new Error('Failed to update course')
     }
-    
+
     revalidatePath('/courses')
     return { success: true }
   } catch (error) {
@@ -474,14 +489,12 @@ export async function getCoursesStatistics() {
   const supabase = await getUserClient()
 
   // Use cached counts to avoid deep joins and performance issues
-  const { data, error } = await supabase
-    .from('courses')
-    .select(`
+  const { data, error } = (await supabase.from('courses').select(`
       status,
       generation_status,
       total_lessons_count
-    `) as { data: StatisticsQueryResponse[] | null; error: PostgrestError | null }
-  
+    `)) as { data: StatisticsQueryResponse[] | null; error: PostgrestError | null }
+
   if (error) {
     logger.error('Error fetching statistics:', error)
     return {
@@ -491,23 +504,25 @@ export async function getCoursesStatistics() {
       structureReadyCount: 0,
       draftCount: 0,
       totalLessons: 0,
-      totalHours: 0
+      totalHours: 0,
     }
   }
-  
+
   // Use the cached total_lessons_count from database
-  const totalLessonsCount = data?.reduce((acc: number, course: StatisticsQueryResponse) => {
-    return acc + (course.total_lessons_count || 0)
-  }, 0) || 0
-  
+  const totalLessonsCount =
+    data?.reduce((acc: number, course: StatisticsQueryResponse) => {
+      return acc + (course.total_lessons_count || 0)
+    }, 0) || 0
+
   return {
     totalCount: data?.length || 0,
-    completedCount: data?.filter(c => c.status === 'completed').length || 0,
-    inProgressCount: data?.filter(c => c.status === 'generating' || c.status === 'processing').length || 0,
-    structureReadyCount: data?.filter(c => c.status === 'structure_ready').length || 0,
-    draftCount: data?.filter(c => c.status === 'draft').length || 0,
+    completedCount: data?.filter((c) => c.status === 'completed').length || 0,
+    inProgressCount:
+      data?.filter((c) => c.status === 'generating' || c.status === 'processing').length || 0,
+    structureReadyCount: data?.filter((c) => c.status === 'structure_ready').length || 0,
+    draftCount: data?.filter((c) => c.status === 'draft').length || 0,
     totalLessons: totalLessonsCount,
-    totalHours: Math.round((totalLessonsCount * 5) / 60)
+    totalHours: Math.round((totalLessonsCount * 5) / 60),
   }
 }
 
@@ -516,24 +531,21 @@ export async function getCoursesStatistics() {
  */
 export async function getUserCourses(userId?: string) {
   const supabase = await getUserClient()
-  
-  let query = supabase
-    .from('courses')
-    .select('*')
-    .order('created_at', { ascending: false })
-  
+
+  let query = supabase.from('courses').select('*').order('created_at', { ascending: false })
+
   // If userId provided, filter by it (for public profiles)
   if (userId) {
     query = query.eq('user_id', userId).eq('is_published', true)
   }
-  
+
   const { data, error } = await query
-  
+
   if (error) {
     logger.error('Error fetching user courses:', error)
     return []
   }
-  
+
   return data || []
 }
 
@@ -541,18 +553,12 @@ export async function getUserCourses(userId?: string) {
  * Check if user can access a course
  * RLS will handle the actual permission check
  */
-export async function canUserAccessCourse(
-  courseId: string
-): Promise<boolean> {
+export async function canUserAccessCourse(courseId: string): Promise<boolean> {
   const supabase = await getUserClient()
-  
+
   // Try to fetch the course - RLS will determine access
-  const { data, error } = await supabase
-    .from('courses')
-    .select('id')
-    .eq('id', courseId)
-    .single()
-  
+  const { data, error } = await supabase.from('courses').select('id').eq('id', courseId).single()
+
   return !error && !!data
 }
 
@@ -606,7 +612,7 @@ export async function togglePublishStatus(courseId: string) {
       .from('courses')
       .update({
         visibility: newVisibility,
-        is_published: newIsPublished // Keep is_published in sync for backward compatibility
+        is_published: newIsPublished, // Keep is_published in sync for backward compatibility
       })
       .eq('id', courseId)
 
@@ -615,7 +621,9 @@ export async function togglePublishStatus(courseId: string) {
       throw updateError
     }
 
-    logger.info(`togglePublishStatus: Successfully updated courseId=${courseId} to visibility=${newVisibility}`)
+    logger.info(
+      `togglePublishStatus: Successfully updated courseId=${courseId} to visibility=${newVisibility}`
+    )
     return { success: true, isPublished: newIsPublished, visibility: newVisibility }
   } catch (error) {
     logger.error('togglePublishStatus: Error', error)
@@ -677,7 +685,7 @@ export async function updateCourseVisibility(courseId: string, visibility: Cours
       .from('courses')
       .update({
         visibility,
-        is_published: isPublished
+        is_published: isPublished,
       })
       .eq('id', courseId)
 
@@ -686,7 +694,9 @@ export async function updateCourseVisibility(courseId: string, visibility: Cours
       throw updateError
     }
 
-    logger.info(`updateCourseVisibility: Successfully updated courseId=${courseId} to visibility=${visibility}`)
+    logger.info(
+      `updateCourseVisibility: Successfully updated courseId=${courseId} to visibility=${visibility}`
+    )
     revalidatePath('/courses')
     return { success: true, visibility }
   } catch (error) {
@@ -708,7 +718,9 @@ export async function toggleFavorite(courseId: string) {
     return { error: 'Not authenticated' }
   }
 
-  logger.info(`toggleFavorite: User ${user.email} (${user.id}) toggling favorite for course ${courseId}`)
+  logger.info(
+    `toggleFavorite: User ${user.email} (${user.id}) toggling favorite for course ${courseId}`
+  )
 
   try {
     // user_favorites table doesn't exist in database
@@ -728,17 +740,21 @@ export async function checkFavorites(courseIds: string[]) {
   const user = await getCurrentUser()
 
   if (!user || courseIds.length === 0) {
-    logger.info(`checkFavorites: No user or empty courseIds. User: ${user?.email}, courseIds: ${courseIds.length}`)
+    logger.info(
+      `checkFavorites: No user or empty courseIds. User: ${user?.email}, courseIds: ${courseIds.length}`
+    )
     return {}
   }
 
-  logger.info(`checkFavorites: Checking favorites for user ${user.email} with ${courseIds.length} courses`)
+  logger.info(
+    `checkFavorites: Checking favorites for user ${user.email} with ${courseIds.length} courses`
+  )
 
   try {
     // user_favorites table doesn't exist in database
     // Return all courses as not favorited
     const favoritesMap: Record<string, boolean> = {}
-    courseIds.forEach(id => {
+    courseIds.forEach((id) => {
       favoritesMap[id] = false
     })
 
