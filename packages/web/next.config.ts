@@ -19,14 +19,8 @@ const withPWA = withPWAInit({
   // Both options required per @ducanh2912/next-pwa docs
   cacheStartUrl: false,
   dynamicStartUrl: false,
-  // Clean up outdated caches on deploy
-  cleanupOutdatedCaches: true,
-  // Version in cacheId for cache invalidation
-  cacheId: `megacampus-${APP_VERSION}`,
   // Do NOT use default runtimeCaching (uses CacheFirst for JS = 502 after deploy)
   extendDefaultRuntimeCaching: false,
-  // Exclude _next from precache - files change every build
-  buildExcludes: [/app-build-manifest\.json$/, /\.map$/],
   publicExcludes: ['!_next/**/*'],
   // CRITICAL: All caching config must be inside workboxOptions to truly override defaults
   // Top-level skipWaiting is IGNORED - must be in workboxOptions!
@@ -36,8 +30,10 @@ const withPWA = withPWAInit({
     // See: https://github.com/nicolo-ribaudo/next-pwa/issues/issues
     skipWaiting: false, // Don't take control mid-session
     clientsClaim: false, // Don't claim clients immediately
-    // Exclude JS/CSS/JSON from precache manifest
-    exclude: [/\.js$/, /\.css$/, /\.json$/],
+    // Clean up outdated caches on deploy
+    cleanUpOutdatedCaches: true,
+    // Exclude JS/CSS/JSON and build manifests from precache manifest
+    exclude: [/\.js$/, /\.css$/, /\.json$/, /app-build-manifest\.json$/, /\.map$/],
     // MINIMAL runtime caching - ONLY fonts, images, and media
     // NO JS/CSS/JSON - these change on every deploy and cause 502 errors when cached
     // The SW will NOT intercept any code-related requests
