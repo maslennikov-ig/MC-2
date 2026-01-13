@@ -24,7 +24,7 @@ import { Badge } from '@/components/ui/badge'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import {
   Table,
   TableBody,
@@ -100,6 +100,34 @@ interface StageDetailSheetProps {
   onEditPrompt?: (prompt: PromptTemplate) => void
   /** Key to trigger data refresh (increment after external saves) */
   refreshKey?: number
+}
+
+/**
+ * Clickable tooltip component - shows on hover and click
+ */
+function ClickableTooltip({ content, children }: { content: string; children?: React.ReactNode }) {
+  return (
+    <Popover>
+      <PopoverTrigger asChild>
+        <button
+          type="button"
+          className="inline-flex items-center"
+          onClick={(e) => e.stopPropagation()}
+        >
+          {children || (
+            <HelpCircle className="text-muted-foreground hover:text-foreground h-3.5 w-3.5 cursor-help transition-colors" />
+          )}
+        </button>
+      </PopoverTrigger>
+      <PopoverContent
+        side="top"
+        className="max-w-[350px] text-sm"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <p>{content}</p>
+      </PopoverContent>
+    </Popover>
+  )
 }
 
 /**
@@ -383,20 +411,13 @@ export function StageDetailSheet({
                 <SheetTitle className="text-xl font-semibold text-gray-900 dark:text-zinc-100">
                   {stage.name}
                 </SheetTitle>
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <HelpCircle className="text-muted-foreground hover:text-foreground h-4 w-4 cursor-help transition-colors" />
-                    </TooltipTrigger>
-                    <TooltipContent side="bottom" className="max-w-[350px] text-sm">
-                      <p>
-                        {t(
-                          `pipeline.stages.tooltips.stage${stage.number}` as Parameters<typeof t>[0]
-                        )}
-                      </p>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
+                <ClickableTooltip
+                  content={t(
+                    `pipeline.stages.tooltips.stage${stage.number}` as Parameters<typeof t>[0]
+                  )}
+                >
+                  <HelpCircle className="text-muted-foreground hover:text-foreground h-4 w-4 cursor-help transition-colors" />
+                </ClickableTooltip>
               </div>
               <SheetDescription className="mt-1 text-gray-600 dark:text-zinc-400">
                 {stage.description}
@@ -674,9 +695,18 @@ export function StageDetailSheet({
                                         <div className="flex items-center gap-3">
                                           <ActivityIcon className={cn('h-5 w-5', activity.color)} />
                                           <div>
-                                            <code className="font-mono text-sm text-purple-500 dark:text-cyan-400">
-                                              {model.modelId.split('/').pop()}
-                                            </code>
+                                            <div className="flex items-center gap-2">
+                                              <code className="font-mono text-sm text-purple-500 dark:text-cyan-400">
+                                                {model.modelId.split('/').pop()}
+                                              </code>
+                                              <ClickableTooltip
+                                                content={t(
+                                                  `pipeline.stages.tooltips.phases.${model.phaseName}` as Parameters<
+                                                    typeof t
+                                                  >[0]
+                                                )}
+                                              />
+                                            </div>
                                             <div className="mt-1 flex items-center gap-2 text-xs text-gray-500 dark:text-zinc-500">
                                               <span className="flex items-center gap-1">
                                                 <Thermometer className="h-3 w-3" />
@@ -962,6 +992,13 @@ export function StageDetailSheet({
                                                 >
                                                   {model.phaseName}
                                                 </Badge>
+                                                <ClickableTooltip
+                                                  content={t(
+                                                    `pipeline.stages.tooltips.phases.${model.phaseName}` as Parameters<
+                                                      typeof t
+                                                    >[0]
+                                                  )}
+                                                />
                                                 <Badge
                                                   variant="secondary"
                                                   className="bg-gray-200 text-xs text-gray-600 dark:bg-zinc-800 dark:text-zinc-400"

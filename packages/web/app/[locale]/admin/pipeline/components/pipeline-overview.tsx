@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ArrowRight, Clock, DollarSign, ChevronRight, HelpCircle } from 'lucide-react'
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
 import { getStagesInfo } from '@/app/actions/pipeline-admin'
 import type { PipelineStage, ModelConfigWithVersion } from '@megacampus/shared-types'
 import { useTranslations } from 'next-intl'
@@ -191,7 +191,7 @@ export function PipelineOverview() {
   if (!stages) return null
 
   return (
-    <TooltipProvider>
+    <>
       <div className="space-y-4">
         <div className="flex items-center gap-3 overflow-x-auto pb-6">
           {stages.map((stage, index) => {
@@ -227,14 +227,21 @@ export function PipelineOverview() {
                         >
                           {stage.name}
                         </CardTitle>
-                        <Tooltip>
-                          <TooltipTrigger asChild>
-                            <HelpCircle
-                              className="text-muted-foreground hover:text-foreground h-4 w-4 cursor-help transition-colors"
+                        <Popover>
+                          <PopoverTrigger asChild>
+                            <button
+                              type="button"
+                              className="inline-flex items-center"
                               onClick={(e) => e.stopPropagation()}
-                            />
-                          </TooltipTrigger>
-                          <TooltipContent side="bottom" className="max-w-[350px] text-sm">
+                            >
+                              <HelpCircle className="text-muted-foreground hover:text-foreground h-4 w-4 cursor-help transition-colors" />
+                            </button>
+                          </PopoverTrigger>
+                          <PopoverContent
+                            side="bottom"
+                            className="max-w-[350px] text-sm"
+                            onClick={(e) => e.stopPropagation()}
+                          >
                             <p>
                               {t(
                                 `pipeline.stages.tooltips.stage${stage.number}` as Parameters<
@@ -242,8 +249,8 @@ export function PipelineOverview() {
                                 >[0]
                               )}
                             </p>
-                          </TooltipContent>
-                        </Tooltip>
+                          </PopoverContent>
+                        </Popover>
                       </div>
                       <ChevronRight
                         className={cn(
@@ -343,6 +350,6 @@ export function PipelineOverview() {
         prompt={editingPrompt}
         onSaved={handlePromptSaved}
       />
-    </TooltipProvider>
+    </>
   )
 }
