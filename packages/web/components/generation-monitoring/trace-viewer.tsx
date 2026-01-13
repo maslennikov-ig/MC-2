@@ -11,13 +11,34 @@ import {
   AccordionTrigger,
 } from '@/components/ui/accordion'
 import { Button } from '@/components/ui/button'
-import { Check, Copy, XCircle } from 'lucide-react'
-import { useState } from 'react'
+import { Check, Copy, XCircle, Loader2 } from 'lucide-react'
+import { useState, useEffect } from 'react'
 import { cn } from '@/lib/utils'
 
 export function TraceViewer() {
-  const { traces, selectedTraceId } = useGenerationRealtime()
+  const { traces, selectedTraceId, fetchTraceDetails } = useGenerationRealtime()
+  const [isLoadingDetails, setIsLoadingDetails] = useState(false)
   const trace = traces.find((t) => t.id === selectedTraceId)
+
+  // Lazy load full trace details when a trace is selected
+  useEffect(() => {
+    if (!selectedTraceId) return
+
+    const loadDetails = async () => {
+      const existing = traces.find((t) => t.id === selectedTraceId)
+      // Skip if already has input_data loaded (not just undefined from skeleton)
+      if (existing?.input_data !== undefined) return
+
+      setIsLoadingDetails(true)
+      try {
+        await fetchTraceDetails(selectedTraceId)
+      } finally {
+        setIsLoadingDetails(false)
+      }
+    }
+
+    void loadDetails()
+  }, [selectedTraceId, fetchTraceDetails, traces])
 
   if (!trace) {
     return (
@@ -84,7 +105,12 @@ export function TraceViewer() {
             )}
 
             <AccordionItem value="input">
-              <AccordionTrigger>Input Data</AccordionTrigger>
+              <AccordionTrigger>
+                <span className="flex items-center gap-2">
+                  Input Data
+                  {isLoadingDetails && <Loader2 className="h-3 w-3 animate-spin" />}
+                </span>
+              </AccordionTrigger>
               <AccordionContent>
                 <CodeBlock
                   content={
