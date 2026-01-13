@@ -311,6 +311,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.27.6] - 2026-01-13
+
+### Added
+
+- **viewer**: add on-demand enrichment placeholder cards UI (3478de2)
+
+### Fixed
+
+- **ui**: Stage 6 UX improvements - hide regenerate, add finalize button (2f59272)
+- **ui**: fix accordion content clipping when open (8b39b34)
+- **logging**: add error_logs DB logging to more API routes (05be83e)
+- **admin**: fix invisible Input Data content in trace viewer (8c6be80)
+- **logging**: add error_logs DB logging to BullMQ job failures (a0d6b8b)
+- **courses**: allow superadmin to view workflow of any course (873d892)
+- **security**: add SuperAdmin role check for cross-org analytics (814dbdf)
+- **pipeline**: skip RAG retrieval for courses without documents (abb3c52)
+
+### Other
+
+- bd sync: 2026-01-13 18:19:39 (fa03e63)
+- bd sync: 2026-01-13 18:17:24 (5fbfba1)
+- bd sync: 2026-01-13 18:10:04 (2c4ab9d)
+- bd sync: 2026-01-13 16:50:23 (dde02c3)
+- bd sync: 2026-01-13 16:49:38 (f5ec43d)
+- bd sync: 2026-01-13 16:45:44 (5e95cb1)
+- bd sync: 2026-01-13 16:35:16 (e737220)
+
 ## [0.27.5] - 2026-01-13
 
 ### Added

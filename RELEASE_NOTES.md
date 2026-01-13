@@ -2,6 +2,29 @@
 
 _Released on 2025-12-26_
 
+## v0.27.6
+
+_Released on 2026-01-13_
+
+### ✨ New Features
+
+- **viewer**: Add on-demand enrichment placeholder cards UI
+
+### 🐛 Bug Fixes
+
+- **Interface**: Stage 6 UX improvements - hide regenerate, add finalize button
+- **Interface**: Fix accordion content clipping when open
+- **logging**: Add error_logs DB logging to more API routes
+- **admin**: Fix invisible Input Data content in trace viewer
+- **logging**: Add error_logs DB logging to BullMQ job failures
+- **courses**: Allow superadmin to view workflow of any course
+- **Security**: Add SuperAdmin role check for cross-org analytics
+- **pipeline**: Skip RAG retrieval for courses without documents
+
+---
+
+_This release was automatically generated from 16 commits._
+
 ## v0.27.5
 
 _Released on 2026-01-13_
