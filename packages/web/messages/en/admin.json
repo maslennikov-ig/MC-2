@@ -183,10 +183,21 @@
       "stage5Desc": "Course structure planning",
       "stage6": "Stage 6: Generation",
       "stage6Desc": "Lesson content generation",
+      "stage7": "Stage 7: Enrichment",
+      "stage7Desc": "Multimedia enrichment of lessons",
       "noLlmPhases": "No LLM phases",
       "models": "models",
       "prompts": "prompts",
-      "active": "active"
+      "active": "active",
+      "tooltips": {
+        "stage1": "The model uploads user documents via tRPC and validates them: file format, size, and extension compliance. Files are temporarily stored for further processing.",
+        "stage2": "Docling converts documents to text, chunks them into sections, creates embeddings, and uploads vectors to Qdrant for semantic search.",
+        "stage3": "LLM analyzes document content and assigns priorities: CORE (key materials), IMPORTANT (supplementary), SUPPLEMENTARY (reference). Tournament classification is used for large sets.",
+        "stage4": "Multi-phase LLM analysis: course categorization (6 types), scope definition, expert analysis (critical for quality), result synthesis, and RAG context planning.",
+        "stage5": "Generates course structure: metadata, section hierarchy, V2 lesson specifications with learning objectives, duration, and complexity.",
+        "stage6": "Generates lesson content via Hybrid Map-Reduce-Refine: Planner creates outline, Expander fills sections, Assembler combines them, Smoother polishes. CLEV 3-judge panel evaluates quality.",
+        "stage7": "Creates multimedia enrichments for lessons: course covers, visual cards, videos, audio, quizzes, and presentations. Each enrichment type uses its own LLM model."
+      }
     }
   },
   "pricing": {
