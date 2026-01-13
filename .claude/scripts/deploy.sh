@@ -7,7 +7,9 @@
 #        --yes: Skip confirmation prompt
 #        --sync: Auto-sync develop with master after deploy
 
-set -euo pipefail
+set -eo pipefail
+# Note: -u (nounset) removed - causes issues with empty arrays
+# pipefail kept but head/tail patterns handled carefully
 
 readonly SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 readonly PROJECT_ROOT="$(cd "$SCRIPT_DIR/../.." && pwd)"
@@ -89,15 +91,25 @@ main() {
     # Show what will be deployed
     echo ""
     log_info "Commits to deploy ($source_branch → master):"
-    git log master.."$source_branch" --oneline | head -20
+    git log master.."$source_branch" --oneline -20
+    if [ "$commits_ahead" -gt 20 ]; then
+        echo "  ... and $((commits_ahead - 20)) more commits"
+    fi
     echo ""
 
     # Confirmation
     if [ "$auto_confirm" != "true" ]; then
-        read -p "Deploy these $commits_ahead commit(s) to production? [Y/n]: " confirm
-        if [[ ! "$confirm" =~ ^[Yy]?$ ]]; then
-            log_warning "Deploy cancelled"
-            exit 0
+        # Check if running interactively
+        if [ -t 0 ]; then
+            read -p "Deploy these $commits_ahead commit(s) to production? [Y/n]: " confirm
+            if [[ ! "$confirm" =~ ^[Yy]?$ ]]; then
+                log_warning "Deploy cancelled"
+                exit 0
+            fi
+        else
+            log_error "Non-interactive mode requires --yes flag"
+            echo "Usage: /deploy --yes"
+            exit 1
         fi
     fi
 
