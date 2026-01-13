@@ -13,28 +13,32 @@ import { z } from 'zod';
 // ============================================================================
 
 export const COURSE_STYLES = [
-  'academic',
+  // Top 4 - most popular, shown first in UI
+  'practical',
   'conversational',
   'storytelling',
-  'practical',
+  'professional',
+  // Other popular styles
+  'engaging',
+  'problem_based',
+  'interactive',
   'motivational',
+  // Specialized styles
+  'academic',
+  'technical',
+  'analytical',
+  'research',
+  // Niche styles
   'visual',
   'gamified',
   'minimalist',
-  'research',
-  'engaging',
-  'professional',
-  'socratic',
-  'problem_based',
-  'collaborative',
-  'technical',
   'microlearning',
+  'socratic',
+  'collaborative',
   'inspirational',
-  'interactive',
-  'analytical',
 ] as const;
 
-export type CourseStyle = typeof COURSE_STYLES[number];
+export type CourseStyle = (typeof COURSE_STYLES)[number];
 
 export const CourseStyleSchema = z.enum(COURSE_STYLES);
 
@@ -43,43 +47,62 @@ export const CourseStyleSchema = z.enum(COURSE_STYLES);
 // ============================================================================
 
 export const STYLE_PROMPTS: Record<CourseStyle, string> = {
-  academic: "Write with scholarly rigor and theoretical depth. Present multiple perspectives with critical analysis. Use formal academic language, define terminology precisely, include theoretical frameworks. Structure arguments with clear thesis statements supported by evidence. Maintain objective tone through passive voice constructions.",
+  academic:
+    'Write with scholarly rigor and theoretical depth. Present multiple perspectives with critical analysis. Use formal academic language, define terminology precisely, include theoretical frameworks. Structure arguments with clear thesis statements supported by evidence. Maintain objective tone through passive voice constructions.',
 
-  conversational: "Write as friendly dialogue with the reader. Use personal pronouns 'you' and 'we' throughout. Include relatable everyday analogies and real-life examples. Ask rhetorical questions to engage. Keep sentences short and paragraphs scannable. Maintain warm, approachable tone like explaining to a curious friend.",
+  conversational:
+    "Write as friendly dialogue with the reader. Use personal pronouns 'you' and 'we' throughout. Include relatable everyday analogies and real-life examples. Ask rhetorical questions to engage. Keep sentences short and paragraphs scannable. Maintain warm, approachable tone like explaining to a curious friend.",
 
-  storytelling: "Structure lessons as compelling narratives with characters facing real challenges. Begin with intriguing hooks, build tension through conflict, resolve with learning moments. Weave theoretical concepts naturally into story progression. Create emotional connections that make abstract concepts memorable through concrete scenarios.",
+  storytelling:
+    'Structure lessons as compelling narratives with characters facing real challenges. Begin with intriguing hooks, build tension through conflict, resolve with learning moments. Weave theoretical concepts naturally into story progression. Create emotional connections that make abstract concepts memorable through concrete scenarios.',
 
-  practical: "Focus entirely on actionable implementation. Provide step-by-step instructions, numbered procedures, and clear checklists. Use imperative mood: 'Open the file', 'Click here', 'Run this command'. Include troubleshooting sections for common problems. Minimize theory, maximize hands-on application with immediate results.",
+  practical:
+    "Focus entirely on actionable implementation. Provide step-by-step instructions, numbered procedures, and clear checklists. Use imperative mood: 'Open the file', 'Click here', 'Run this command'. Include troubleshooting sections for common problems. Minimize theory, maximize hands-on application with immediate results.",
 
-  motivational: "Write with infectious enthusiasm and empowering energy. Include success stories and transformation examples. Frame challenges as exciting opportunities for growth. Use phrases like 'You're capable of amazing things', 'Every expert started here'. Build confidence through positive reinforcement and celebration of small wins.",
+  motivational:
+    "Write with infectious enthusiasm and empowering energy. Include success stories and transformation examples. Frame challenges as exciting opportunities for growth. Use phrases like 'You're capable of amazing things', 'Every expert started here'. Build confidence through positive reinforcement and celebration of small wins.",
 
-  visual: "Create vivid mental images through rich descriptive language. Use spatial metaphors and visual analogies: 'Think of memory as a filing cabinet'. Paint detailed word pictures that help readers see concepts. Describe abstract ideas through concrete visual scenes, diagrams, and spatial relationships.",
+  visual:
+    "Create vivid mental images through rich descriptive language. Use spatial metaphors and visual analogies: 'Think of memory as a filing cabinet'. Paint detailed word pictures that help readers see concepts. Describe abstract ideas through concrete visual scenes, diagrams, and spatial relationships.",
 
-  gamified: "Transform learning into an adventure game. Frame content as quests, missions, and challenges to complete. Use gaming language: 'Level up your skills', 'Achievement unlocked', 'Boss battle ahead'. Create sense of progression with experience points and skill trees. Make failure fun with 'Game Over - Try Again!' attitude.",
+  gamified:
+    "Transform learning into an adventure game. Frame content as quests, missions, and challenges to complete. Use gaming language: 'Level up your skills', 'Achievement unlocked', 'Boss battle ahead'. Create sense of progression with experience points and skill trees. Make failure fun with 'Game Over - Try Again!' attitude.",
 
-  minimalist: "Strip content to absolute essentials. Short declarative sentences. Core concepts only. No elaboration unless critical. Direct statements without qualification. Each paragraph delivers one complete idea. Eliminate adjectives, adverbs, and filler words. Maximum clarity through minimum complexity.",
+  minimalist:
+    'Strip content to absolute essentials. Short declarative sentences. Core concepts only. No elaboration unless critical. Direct statements without qualification. Each paragraph delivers one complete idea. Eliminate adjectives, adverbs, and filler words. Maximum clarity through minimum complexity.',
 
-  research: "Guide learning through strategic inquiry and investigation. Start with thought-provoking questions: 'What would happen if...?', 'Why do you think...?'. Present hypotheses to test, experiments to try. Encourage critical thinking by challenging assumptions. Balance open-ended exploration with evidence-based conclusions.",
+  research:
+    "Guide learning through strategic inquiry and investigation. Start with thought-provoking questions: 'What would happen if...?', 'Why do you think...?'. Present hypotheses to test, experiments to try. Encourage critical thinking by challenging assumptions. Balance open-ended exploration with evidence-based conclusions.",
 
-  engaging: "Hook readers instantly with surprising facts, paradoxes, or 'Did you know?' moments. Create curiosity gaps that demand resolution. Use cliffhangers between sections: 'But there's a catch...'. Make content personally relevant: 'This could save you hours'. Include interactive moments: 'Stop and try this before reading on'.",
+  engaging:
+    "Hook readers instantly with surprising facts, paradoxes, or 'Did you know?' moments. Create curiosity gaps that demand resolution. Use cliffhangers between sections: 'But there's a catch...'. Make content personally relevant: 'This could save you hours'. Include interactive moments: 'Stop and try this before reading on'.",
 
-  professional: "Adopt corporate tone focusing on business value and ROI. Emphasize industry best practices, case studies from Fortune 500 companies. Use executive language: strategic advantages, core competencies, value propositions. Structure with executive summaries and actionable takeaways for implementation.",
+  professional:
+    'Adopt corporate tone focusing on business value and ROI. Emphasize industry best practices, case studies from Fortune 500 companies. Use executive language: strategic advantages, core competencies, value propositions. Structure with executive summaries and actionable takeaways for implementation.',
 
-  socratic: "Never give direct answers, guide discovery through questions. Use progressive questioning to lead learners to insights. 'What do you notice about...?', 'How might this relate to...?'. Let students uncover principles themselves. Build understanding layer by layer through guided inquiry.",
+  socratic:
+    "Never give direct answers, guide discovery through questions. Use progressive questioning to lead learners to insights. 'What do you notice about...?', 'How might this relate to...?'. Let students uncover principles themselves. Build understanding layer by layer through guided inquiry.",
 
-  problem_based: "Start every section with real-world problem scenario. Present symptoms and context first, then guide through diagnostic process. Explore multiple solution paths with trade-offs. Use case study format: situation, complication, resolution. Include decision points where readers choose approach.",
+  problem_based:
+    'Start every section with real-world problem scenario. Present symptoms and context first, then guide through diagnostic process. Explore multiple solution paths with trade-offs. Use case study format: situation, complication, resolution. Include decision points where readers choose approach.',
 
-  collaborative: "Write for group learning contexts. Include instructions for peer discussions: 'Share with your partner', 'Debate in groups'. Suggest team exercises and collaborative projects. Create opportunities for knowledge exchange. Use inclusive language that assumes multiple learners working together.",
+  collaborative:
+    "Write for group learning contexts. Include instructions for peer discussions: 'Share with your partner', 'Debate in groups'. Suggest team exercises and collaborative projects. Create opportunities for knowledge exchange. Use inclusive language that assumes multiple learners working together.",
 
-  technical: "Prioritize precision and technical accuracy above all. Include exact specifications, code snippets, mathematical formulas. Use proper technical terminology without simplification. Focus on system architecture, algorithms, and implementation details. Assume reader comfort with technical complexity.",
+  technical:
+    'Prioritize precision and technical accuracy above all. Include exact specifications, code snippets, mathematical formulas. Use proper technical terminology without simplification. Focus on system architecture, algorithms, and implementation details. Assume reader comfort with technical complexity.',
 
-  microlearning: "Deliver ultra-focused micro-lessons on single concepts. Each lesson standalone and immediately applicable. Use memorable mnemonics and rules of thumb. Create quick wins and instant value. Design for 2-3 minute consumption during coffee breaks.",
+  microlearning:
+    'Deliver ultra-focused micro-lessons on single concepts. Each lesson standalone and immediately applicable. Use memorable mnemonics and rules of thumb. Create quick wins and instant value. Design for 2-3 minute consumption during coffee breaks.',
 
-  inspirational: "Ignite passion for learning and transformation. Paint vivid pictures of future possibilities: 'Imagine yourself in one year...'. Share stories of ordinary people achieving extraordinary results. Use uplifting language that sparks dreams and ambitions. Focus on unlimited potential and life-changing outcomes.",
+  inspirational:
+    "Ignite passion for learning and transformation. Paint vivid pictures of future possibilities: 'Imagine yourself in one year...'. Share stories of ordinary people achieving extraordinary results. Use uplifting language that sparks dreams and ambitions. Focus on unlimited potential and life-changing outcomes.",
 
-  interactive: "Demand constant reader participation and engagement. Embed exercises directly in text: 'Before reading further, write down...'. Include self-assessments, reflection prompts, and hands-on activities. Never let reader be passive consumer. Create dialogue through anticipated questions and responses.",
+  interactive:
+    "Demand constant reader participation and engagement. Embed exercises directly in text: 'Before reading further, write down...'. Include self-assessments, reflection prompts, and hands-on activities. Never let reader be passive consumer. Create dialogue through anticipated questions and responses.",
 
-  analytical: "Approach topics through data and logical analysis. Present statistics, metrics, and quantifiable evidence. Build arguments through systematic reasoning and cause-effect relationships. Use structured analytical frameworks. Break complex systems into components for detailed examination.",
+  analytical:
+    'Approach topics through data and logical analysis. Present statistics, metrics, and quantifiable evidence. Build arguments through systematic reasoning and cause-effect relationships. Use structured analytical frameworks. Break complex systems into components for detailed examination.',
 };
 
 // ============================================================================

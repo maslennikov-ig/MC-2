@@ -4,7 +4,6 @@ import { createBrowserClient } from '@supabase/ssr'
 import { Database } from '@/types/database.generated'
 import { createContext, useContext, useEffect, useState } from 'react'
 import { SupabaseClient, Session } from '@supabase/supabase-js'
-import { useRouter } from 'next/navigation'
 
 type SupabaseContext = {
   supabase: SupabaseClient<Database>
@@ -55,10 +54,10 @@ function getSupabaseClient() {
         persistSession: true,
         autoRefreshToken: true,
         detectSessionInUrl: true,
-        flowType: 'pkce'
+        flowType: 'pkce',
         // Use default cookie-based storage for SSR compatibility
         // Do NOT provide custom storage implementation as it prevents SSR
-      }
+      },
       // NOTE: Do NOT set global Accept header here - it breaks array queries (406 error)
       // The .single() method automatically sets the correct header when needed
     }
@@ -67,43 +66,39 @@ function getSupabaseClient() {
   return browserClient
 }
 
-export function SupabaseProvider({ 
-  children 
-}: { 
-  children: React.ReactNode 
-}) {
+export function SupabaseProvider({ children }: { children: React.ReactNode }) {
   const [session, setSession] = useState<Session | null>(null)
   const [isLoading, setIsLoading] = useState(true)
-  const router = useRouter()
   const supabase = getSupabaseClient()
 
   useEffect(() => {
     let mounted = true
 
-    // Get initial session
+    // Get initial session from cache
+    // NOTE: Middleware handles token refresh on server requests,
+    // so we only need to read cached session here
     const initSession = async () => {
       try {
-        // Always use getSession first to get cached session
-        const { data: { session: cachedSession } } = await supabase.auth.getSession()
-        
+        const {
+          data: { session: cachedSession },
+        } = await supabase.auth.getSession()
+
         if (cachedSession && mounted) {
           setSession(cachedSession)
-          
-          // Then validate with getUser in background
+
+          // Validate session with getUser in background
+          // This ensures we don't show stale session data
           supabase.auth.getUser().then(({ data: { user }, error }) => {
-            if (mounted) {
-              if (error || !user) {
-                // Session invalid, clear it
-                setSession(null)
-                supabase.auth.signOut()
-              }
+            if (mounted && (error || !user)) {
+              // Session invalid, clear it
+              setSession(null)
+              supabase.auth.signOut()
             }
           })
         } else if (mounted) {
           setSession(null)
         }
       } catch {
-        // Session init error handled silently
         if (mounted) {
           setSession(null)
         }
@@ -116,73 +111,37 @@ export function SupabaseProvider({
 
     initSession()
 
-    // Listen to auth changes
+    // Listen to auth state changes and update React state
+    // NOTE: We do NOT call router.refresh() here because:
+    // 1. Middleware already handles token refresh on every server request
+    // 2. router.refresh() causes full page reload with loading spinner
+    // 3. UI should react to session changes via React state, not page reload
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange(async (event, newSession) => {
+    } = supabase.auth.onAuthStateChange((event, newSession) => {
       if (!mounted) return
 
-      // Auth state changed: event
-      
-      if (event === 'TOKEN_REFRESHED') {
-        // Token refreshed successfully
-      }
-      
+      // Update React state - this will re-render components using useSupabase()
       setSession(newSession)
-      
-      // Force router refresh on auth changes
-      if (event === 'SIGNED_IN' || event === 'SIGNED_OUT') {
-        router.refresh()
+
+      // Log auth events for debugging (dev only)
+      if (process.env.NODE_ENV === 'development') {
+        console.log('[Auth]', event, newSession ? 'session exists' : 'no session')
       }
     })
 
-    // Set up token refresh interval
-    const refreshInterval = setInterval(async () => {
-      if (mounted) {
-        // Check current session from Supabase directly
-        const { data: { session: currentSession } } = await supabase.auth.getSession()
-        if (currentSession) {
-          // Proactive token refresh
-          const { data, error } = await supabase.auth.refreshSession()
-          if (error) {
-            // Token refresh error handled silently
-          } else if (data.session) {
-            setSession(data.session)
-          }
-        }
-      }
-    }, 10 * 60 * 1000) // Refresh every 10 minutes
-
-    // Refresh on window focus
-    const handleFocus = async () => {
-      if (mounted) {
-        // Check current session from Supabase directly
-        const { data: { session: currentSession } } = await supabase.auth.getSession()
-        if (currentSession) {
-          // Window focused, refreshing session
-          const { data, error } = await supabase.auth.refreshSession()
-          if (!error && data.session) {
-            setSession(data.session)
-          }
-        }
-      }
-    }
-
-    window.addEventListener('focus', handleFocus)
+    // NOTE: We removed handleFocus and refreshInterval because:
+    // 1. Middleware refreshes tokens on every server request (navigation, data fetch)
+    // 2. Supabase client has autoRefreshToken: true which handles background refresh
+    // 3. Redundant client-side refresh caused unnecessary reloads and UX issues
 
     return () => {
       mounted = false
       subscription.unsubscribe()
-      clearInterval(refreshInterval)
-      window.removeEventListener('focus', handleFocus)
     }
-  }, [supabase, router])
+  }, [supabase])
 
-  return (
-    <Context.Provider value={{ supabase, session, isLoading }}>
-      {children}
-    </Context.Provider>
-  )
+  return <Context.Provider value={{ supabase, session, isLoading }}>{children}</Context.Provider>
 }
 
 export const useSupabase = () => {

@@ -8,7 +8,30 @@
 
 import { getSupabaseAdmin } from '../supabase/admin';
 import { logger } from './index.js';
-import type { ErrorLog, ErrorSeverity, CreateErrorLogParams } from './types';
+import type { ErrorLog, ErrorSeverity, CreateErrorLogParams, LogEnvironment } from './types';
+
+/**
+ * Detect environment from APP_URL or NEXT_PUBLIC_APP_URL
+ * @returns 'dev' | 'stage' | null
+ */
+function detectEnvironment(): LogEnvironment | null {
+  const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || '';
+
+  // Use URL.hostname for precise matching
+  try {
+    const url = new URL(appUrl);
+    const hostname = url.hostname;
+
+    if (hostname === 'dev.ai.megacampus.ru') return 'dev';
+    if (hostname === 'ai.megacampus.ru') return 'stage';
+  } catch {
+    // Fallback for invalid URLs
+    if (appUrl.includes('dev.ai.megacampus.ru')) return 'dev';
+    if (appUrl.includes('ai.megacampus.ru') && !appUrl.includes('dev.')) return 'stage';
+  }
+
+  return null;
+}
 
 /**
  * Log a permanent failure to the error_logs table
@@ -41,10 +64,11 @@ import type { ErrorLog, ErrorSeverity, CreateErrorLogParams } from './types';
  * }
  * ```
  */
-export async function logPermanentFailure(
-  params: CreateErrorLogParams
-): Promise<void> {
+export async function logPermanentFailure(params: CreateErrorLogParams): Promise<void> {
   const supabase = getSupabaseAdmin();
+
+  // Auto-detect environment if not provided
+  const environment = params.environment || detectEnvironment();
 
   // Insert error log entry
   const { error } = await supabase.from('error_logs' as any).insert({
@@ -53,6 +77,7 @@ export async function logPermanentFailure(
     error_message: params.error_message,
     stack_trace: params.stack_trace || null,
     severity: params.severity,
+    environment: environment,
     file_name: params.file_name || null,
     file_size: params.file_size || null,
     file_format: params.file_format || null,
@@ -63,19 +88,25 @@ export async function logPermanentFailure(
 
   if (error) {
     // Fallback to Pino logger if database insert fails
-    logger.error({
-      err: error.message,
-      params,
-    }, 'Failed to insert error_logs entry');
+    logger.error(
+      {
+        err: error.message,
+        params,
+      },
+      'Failed to insert error_logs entry'
+    );
     throw new Error(`Failed to log permanent failure: ${error.message}`);
   }
 
   // Log successful insert
-  logger.info({
-    organization_id: params.organization_id,
-    severity: params.severity,
-    job_id: params.job_id,
-  }, 'Permanent failure logged to error_logs table');
+  logger.info(
+    {
+      organization_id: params.organization_id,
+      severity: params.severity,
+      job_id: params.job_id,
+    },
+    'Permanent failure logged to error_logs table'
+  );
 }
 
 /**
@@ -126,11 +157,14 @@ export async function getOrganizationErrors(
   const { data, error } = await query;
 
   if (error) {
-    logger.error({
-      err: error.message,
-      organizationId,
-      options,
-    }, 'Failed to fetch organization errors');
+    logger.error(
+      {
+        err: error.message,
+        organizationId,
+        options,
+      },
+      'Failed to fetch organization errors'
+    );
     throw new Error(`Failed to fetch error logs: ${error.message}`);
   }
 
@@ -166,4 +200,67 @@ export async function getCriticalErrors(limit = 100): Promise<ErrorLog[]> {
   }
 
   return (data || []) as unknown as ErrorLog[];
+}
+
+/**
+ * Log a warning to the error_logs table
+ *
+ * Convenience function for tracking important warnings that should be
+ * visible in the admin logs dashboard.
+ *
+ * @param message - Warning message
+ * @param context - Additional context (organizationId, metadata, etc.)
+ * @returns Promise that resolves when warning is logged (fire-and-forget safe)
+ *
+ * @example
+ * ```typescript
+ * // Fire and forget - don't await in hot paths
+ * logWarningToDb('Low quality score detected', {
+ *   organization_id: orgId,
+ *   job_type: 'CONTENT_GENERATION',
+ *   metadata: { qualityScore: 0.4, lessonId }
+ * }).catch(() => {}); // Silently ignore failures
+ *
+ * // Or await if you need confirmation
+ * await logWarningToDb('Missing source document', {
+ *   organization_id: orgId,
+ *   metadata: { courseId, documentId }
+ * });
+ * ```
+ */
+export async function logWarningToDb(
+  message: string,
+  context: {
+    organization_id?: string;
+    user_id?: string;
+    job_type?: string;
+    job_id?: string;
+    metadata?: Record<string, unknown>;
+  } = {}
+): Promise<void> {
+  const supabase = getSupabaseAdmin();
+  const environment = detectEnvironment();
+
+  const { error } = await supabase.from('error_logs' as any).insert({
+    error_message: message,
+    severity: 'WARNING' as ErrorSeverity,
+    environment: environment,
+    organization_id: context.organization_id || null,
+    user_id: context.user_id || null,
+    job_type: context.job_type || null,
+    job_id: context.job_id || null,
+    metadata: context.metadata || null,
+  });
+
+  if (error) {
+    // Log to console but don't throw - warnings should not break the app
+    logger.warn(
+      {
+        err: error.message,
+        message,
+        context,
+      },
+      'Failed to log warning to database'
+    );
+  }
 }

@@ -624,6 +624,7 @@ export type Database = {
       error_logs: {
         Row: {
           created_at: string
+          environment: string | null
           error_message: string
           file_format: string | null
           file_name: string | null
@@ -633,12 +634,14 @@ export type Database = {
           job_type: string | null
           metadata: Json | null
           organization_id: string | null
+          problem_id: string | null
           severity: string
           stack_trace: string | null
           user_id: string | null
         }
         Insert: {
           created_at?: string
+          environment?: string | null
           error_message: string
           file_format?: string | null
           file_name?: string | null
@@ -648,12 +651,14 @@ export type Database = {
           job_type?: string | null
           metadata?: Json | null
           organization_id?: string | null
+          problem_id?: string | null
           severity: string
           stack_trace?: string | null
           user_id?: string | null
         }
         Update: {
           created_at?: string
+          environment?: string | null
           error_message?: string
           file_format?: string | null
           file_name?: string | null
@@ -663,6 +668,7 @@ export type Database = {
           job_type?: string | null
           metadata?: Json | null
           organization_id?: string | null
+          problem_id?: string | null
           severity?: string
           stack_trace?: string | null
           user_id?: string | null
@@ -1971,6 +1977,24 @@ export type Database = {
           },
         ]
       }
+      problem_id_sequences: {
+        Row: {
+          created_at: string | null
+          date_key: string
+          next_sequence: number
+        }
+        Insert: {
+          created_at?: string | null
+          date_key: string
+          next_sequence?: number
+        }
+        Update: {
+          created_at?: string | null
+          date_key?: string
+          next_sequence?: number
+        }
+        Relationships: []
+      }
       prompt_templates: {
         Row: {
           created_at: string | null
@@ -2718,6 +2742,7 @@ export type Database = {
           vector_status: string
         }[]
       }
+      generate_problem_id: { Args: never; Returns: string }
       get_current_auth_context: { Args: never; Returns: Json }
       get_organization_from_api_key: {
         Args: { key_prefix_param: string }

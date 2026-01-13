@@ -12,11 +12,18 @@
 export type ErrorSeverity = 'WARNING' | 'ERROR' | 'CRITICAL';
 
 /**
+ * Environment type for tracking where the error occurred
+ */
+export type LogEnvironment = 'dev' | 'stage';
+
+/**
  * Complete error_logs table record
  */
 export interface ErrorLog {
   /** UUID primary key */
   id: string;
+  /** Human-readable problem ID (e.g., 2025-01-13#42) */
+  problem_id: string | null;
   /** Timestamp when error was logged */
   created_at: string;
   /** User ID (nullable, references auth.users) */
@@ -29,6 +36,8 @@ export interface ErrorLog {
   stack_trace: string | null;
   /** Error severity level */
   severity: ErrorSeverity;
+  /** Environment where error occurred (dev/stage) */
+  environment: LogEnvironment | null;
   /** File name that caused the error (nullable) */
   file_name: string | null;
   /** File size in bytes (nullable) */
@@ -57,6 +66,8 @@ export interface CreateErrorLogParams {
   stack_trace?: string;
   /** Error severity level (required) */
   severity: ErrorSeverity;
+  /** Environment (auto-detected if not provided) */
+  environment?: LogEnvironment;
   /** File name that caused the error (optional) */
   file_name?: string;
   /** File size in bytes (optional) */

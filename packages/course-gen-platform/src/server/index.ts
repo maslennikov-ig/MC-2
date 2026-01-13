@@ -58,8 +58,13 @@
  */
 
 import 'dotenv/config';
+import { setMaxListeners } from 'events';
 import express, { type Request, type Response, type NextFunction } from 'express';
 import cors from 'cors';
+
+// Increase max listeners globally to prevent MaxListenersExceededWarning
+// during parallel LLM requests with AbortSignal timeouts
+setMaxListeners(30);
 import { createExpressMiddleware } from '@trpc/server/adapters/express';
 import { appRouter } from './app-router';
 import { createContext } from './trpc';
@@ -90,13 +95,34 @@ async function initializeServices() {
 
     await warmupEmbeddingCache({
       // Stage 4: exercise_types (advisory guidance)
-      exercise_types: ['coding', 'derivation', 'interpretation', 'debugging', 'refactoring', 'analysis'],
+      exercise_types: [
+        'coding',
+        'derivation',
+        'interpretation',
+        'debugging',
+        'refactoring',
+        'analysis',
+      ],
 
       // Stage 5: exercise_type (database)
-      exercise_type: ['self_assessment', 'case_study', 'hands_on', 'discussion', 'quiz', 'simulation', 'reflection'],
+      exercise_type: [
+        'self_assessment',
+        'case_study',
+        'hands_on',
+        'discussion',
+        'quiz',
+        'simulation',
+        'reflection',
+      ],
 
       // primary_strategy
-      primary_strategy: ['problem-based learning', 'lecture-based', 'inquiry-based', 'project-based', 'mixed'],
+      primary_strategy: [
+        'problem-based learning',
+        'lecture-based',
+        'inquiry-based',
+        'project-based',
+        'mixed',
+      ],
 
       // target_audience
       target_audience: ['beginner', 'intermediate', 'advanced', 'mixed'],
@@ -123,7 +149,10 @@ async function initializeServices() {
     logger.info('[Startup] Embedding cache ready');
   } catch (error) {
     // Non-critical - server can start without semantic matching
-    logger.warn({ error }, '[Startup] Failed to warm up embedding cache (semantic matching will be unavailable)');
+    logger.warn(
+      { error },
+      '[Startup] Failed to warm up embedding cache (semantic matching will be unavailable)'
+    );
   }
 }
 
@@ -190,12 +219,15 @@ app.use((req: Request, res: Response, next: NextFunction) => {
   const { method, url } = req;
 
   // Log request start only at trace level (reduces noise in dev)
-  logger.trace({
-    method,
-    url,
-    userAgent: req.get('user-agent'),
-    ip: req.ip,
-  }, 'Request started');
+  logger.trace(
+    {
+      method,
+      url,
+      userAgent: req.get('user-agent'),
+      ip: req.ip,
+    },
+    'Request started'
+  );
 
   // Log single aggregated entry on response finish
   res.on('finish', () => {
@@ -207,12 +239,15 @@ app.use((req: Request, res: Response, next: NextFunction) => {
 
     // Use warn for errors, trace for polling, info for normal requests
     const logLevel = statusCode >= 400 ? 'warn' : isPolling ? 'trace' : 'info';
-    logger[logLevel]({
-      method,
-      url,
-      statusCode,
-      duration,
-    }, `${method} ${url.split('?')[0]} ${statusCode} (${duration}ms)`);
+    logger[logLevel](
+      {
+        method,
+        url,
+        statusCode,
+        duration,
+      },
+      `${method} ${url.split('?')[0]} ${statusCode} (${duration}ms)`
+    );
   });
 
   next();
@@ -297,15 +332,18 @@ app.use(
     },
     onError: ({ path, error, type, ctx }) => {
       // Log tRPC errors with context
-      logger.error({
-        path,
-        type,
-        code: error.code,
-        message: error.message,
-        userId: ctx?.user?.id,
-        organizationId: ctx?.user?.organizationId,
-        stack: error.stack,
-      }, 'tRPC error');
+      logger.error(
+        {
+          path,
+          type,
+          code: error.code,
+          message: error.message,
+          userId: ctx?.user?.id,
+          organizationId: ctx?.user?.organizationId,
+          stack: error.stack,
+        },
+        'tRPC error'
+      );
     },
   })
 );
@@ -342,9 +380,12 @@ try {
 try {
   const metricsRouter = createMetricsRouter();
   app.use(metricsRouter);
-  logger.info({
-    endpoints: ['/metrics', '/health'],
-  }, 'Metrics router mounted');
+  logger.info(
+    {
+      endpoints: ['/metrics', '/health'],
+    },
+    'Metrics router mounted'
+  );
 } catch (error) {
   logger.error({ err: error }, 'Failed to setup metrics router');
   // Non-critical - server can continue without metrics
@@ -370,12 +411,15 @@ app.use((_req: Request, res: Response) => {
  * Returns JSON error responses and logs errors with context.
  */
 app.use((err: Error, req: Request, res: Response, _next: NextFunction) => {
-  logger.error({
-    err,
-    method: req.method,
-    url: req.url,
-    stack: err.stack,
-  }, 'Unhandled Express error');
+  logger.error(
+    {
+      err,
+      method: req.method,
+      url: req.url,
+      stack: err.stack,
+    },
+    'Unhandled Express error'
+  );
 
   res.status(500).json({
     success: false,
@@ -397,30 +441,39 @@ async function startServer() {
 
     // Log a warning if we had to use a different port
     if (port !== PREFERRED_PORT) {
-      logger.warn({
-        preferredPort: PREFERRED_PORT,
-        actualPort: port,
-        reason: 'Preferred port was already in use',
-      }, 'Using alternative port');
+      logger.warn(
+        {
+          preferredPort: PREFERRED_PORT,
+          actualPort: port,
+          reason: 'Preferred port was already in use',
+        },
+        'Using alternative port'
+      );
     }
 
     // Start the HTTP server
     const server = app.listen(port, () => {
-      logger.info({
-        port,
-        nodeEnv: NODE_ENV,
-        endpoints: {
-          api: `http://localhost:${port}/trpc`,
-          adminUI: `http://localhost:${port}/admin/queues`,
-          metrics: `http://localhost:${port}/metrics`,
-          health: `http://localhost:${port}/health`,
+      logger.info(
+        {
+          port,
+          nodeEnv: NODE_ENV,
+          endpoints: {
+            api: `http://localhost:${port}/trpc`,
+            adminUI: `http://localhost:${port}/admin/queues`,
+            metrics: `http://localhost:${port}/metrics`,
+            health: `http://localhost:${port}/health`,
+          },
         },
-      }, 'Server started');
+        'Server started'
+      );
 
       // Log CORS configuration
-      logger.info({
-        origins: IS_PRODUCTION ? CORS_ORIGIN : 'All origins (development)',
-      }, 'CORS configured');
+      logger.info(
+        {
+          origins: IS_PRODUCTION ? CORS_ORIGIN : 'All origins (development)',
+        },
+        'CORS configured'
+      );
     });
 
     /**
@@ -435,22 +488,38 @@ async function startServer() {
      * Note: Supabase client doesn't need explicit cleanup - it uses HTTP
      * connections that close automatically.
      */
-    registerCleanupHandler('generation-locks', async () => {
-      const released = await generationLockService.releaseAllLocks();
-      logger.info({ released }, 'Generation locks released');
-    }, 5);
+    registerCleanupHandler(
+      'generation-locks',
+      async () => {
+        const released = await generationLockService.releaseAllLocks();
+        logger.info({ released }, 'Generation locks released');
+      },
+      5
+    );
 
-    registerCleanupHandler('bullmq-workers', async () => {
-      await stopWorker(false); // graceful stop
-    }, 10);
+    registerCleanupHandler(
+      'bullmq-workers',
+      async () => {
+        await stopWorker(false); // graceful stop
+      },
+      10
+    );
 
-    registerCleanupHandler('bullmq-queue', async () => {
-      await closeQueue();
-    }, 20);
+    registerCleanupHandler(
+      'bullmq-queue',
+      async () => {
+        await closeQueue();
+      },
+      20
+    );
 
-    registerCleanupHandler('redis', async () => {
-      await closeRedisClient();
-    }, 100);
+    registerCleanupHandler(
+      'redis',
+      async () => {
+        await closeRedisClient();
+      },
+      100
+    );
 
     /**
      * Graceful Shutdown Handler
@@ -481,7 +550,7 @@ async function startServer() {
       }, 30000);
 
       // Close HTTP server first (stop accepting new requests)
-      await new Promise<void>((resolve) => {
+      await new Promise<void>(resolve => {
         server.close(() => {
           logger.info('HTTP server closed');
           resolve();
@@ -518,26 +587,32 @@ async function startServer() {
     return server;
   } catch (error) {
     // Failed to find an available port or start the server
-    logger.error({
-      err: error,
-      preferredPort: PREFERRED_PORT,
-    }, 'Failed to start server');
+    logger.error(
+      {
+        err: error,
+        preferredPort: PREFERRED_PORT,
+      },
+      'Failed to start server'
+    );
     process.exit(1);
   }
 }
 
 // Start the server
-startServer().catch((err) => {
+startServer().catch(err => {
   logger.error({ err }, 'Unhandled error during server startup');
   process.exit(1);
 });
 
 // Handle unhandled promise rejections
 process.on('unhandledRejection', (reason, promise) => {
-  logger.error({
-    reason,
-    promise,
-  }, 'Unhandled Promise Rejection');
+  logger.error(
+    {
+      reason,
+      promise,
+    },
+    'Unhandled Promise Rejection'
+  );
   // In production, you might want to exit the process
   // process.exit(1);
 });
@@ -550,10 +625,13 @@ process.on('uncaughtException', error => {
     forceShutdownTimerRef = null;
   }
 
-  logger.error({
-    err: error,
-    stack: error.stack,
-  }, 'Uncaught Exception');
+  logger.error(
+    {
+      err: error,
+      stack: error.stack,
+    },
+    'Uncaught Exception'
+  );
   // Exit process on uncaught exception
   process.exit(1);
 });

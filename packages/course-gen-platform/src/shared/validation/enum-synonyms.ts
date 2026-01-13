@@ -16,54 +16,65 @@ export const ENUM_SYNONYMS: Record<string, Record<string, string>> = {
   // primary_strategy
   primary_strategy: {
     'problem based learning': 'problem-based learning',
+    problem_based_learning: 'problem-based learning',
     'lecture based': 'lecture-based',
+    lecture_based: 'lecture-based',
     'inquiry based': 'inquiry-based',
+    inquiry_based: 'inquiry-based',
     'project based': 'project-based',
+    project_based: 'project-based',
+  },
+
+  // teaching_style
+  teaching_style: {
+    hands_on: 'hands-on',
+    theory_first: 'theory-first',
+    project_based: 'project-based',
   },
 
   // target_audience
   target_audience: {
     'entry-level': 'beginner',
-    'entry_level': 'beginner',
-    'novice': 'beginner',
-    'expert': 'advanced',
-    'professional': 'advanced',
+    entry_level: 'beginner',
+    novice: 'beginner',
+    expert: 'advanced',
+    professional: 'advanced',
   },
 
   // difficulty_level
   difficulty_level: {
-    'easy': 'beginner',
-    'medium': 'intermediate',
-    'hard': 'advanced',
-    'expert': 'advanced',
+    easy: 'beginner',
+    medium: 'intermediate',
+    hard: 'advanced',
+    expert: 'advanced',
   },
 
   // importance (sections_breakdown.importance: 'core' | 'important' | 'optional')
   // LLMs often confuse this with difficulty enum values
   importance: {
-    'advanced': 'important', // Misuse of difficulty value
-    'intermediate': 'important', // Misuse of difficulty value
-    'beginner': 'core', // Misuse of difficulty value
-    'high': 'core',
-    'medium': 'important',
-    'low': 'optional',
-    'critical': 'core',
-    'essential': 'core',
-    'main': 'core',
-    'primary': 'core',
-    'secondary': 'important',
-    'supplementary': 'optional',
-    'extra': 'optional',
-    'bonus': 'optional',
+    advanced: 'important', // Misuse of difficulty value
+    intermediate: 'important', // Misuse of difficulty value
+    beginner: 'core', // Misuse of difficulty value
+    high: 'core',
+    medium: 'important',
+    low: 'optional',
+    critical: 'core',
+    essential: 'core',
+    main: 'core',
+    primary: 'core',
+    secondary: 'important',
+    supplementary: 'optional',
+    extra: 'optional',
+    bonus: 'optional',
   },
 
   // bloom_level (cognitiveLevel)
   cognitiveLevel: {
-    'recall': 'remember',
-    'comprehend': 'understand',
-    'apply_knowledge': 'apply',
-    'analyse': 'analyze', // UK spelling
-    'synthesis': 'create',
+    recall: 'remember',
+    comprehend: 'understand',
+    apply_knowledge: 'apply',
+    analyse: 'analyze', // UK spelling
+    synthesis: 'create',
   },
 
   // Add more mappings as discovered from logs

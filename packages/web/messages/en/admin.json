@@ -279,6 +279,8 @@
       "level": "Level",
       "source": "Source",
       "status": "Status",
+      "environment": "Environment",
+      "all": "All",
       "search": "Search messages...",
       "dateFrom": "From",
       "dateTo": "To",

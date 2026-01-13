@@ -1,67 +1,76 @@
-'use client';
+'use client'
 
-import { useEffect, useState, useCallback } from 'react';
-import { formatDistanceToNow } from 'date-fns';
-import { Loader2, Search, ChevronLeft, ChevronRight, Mail, Building2 } from 'lucide-react';
-import { Input } from '@/components/ui/input';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { listUsersAction, getCurrentUserRoleAction } from '@/app/actions/admin-users';
-import { cn } from '@/lib/utils';
-import { toast } from 'sonner';
-import { RoleBadge } from '@/components/common/role-badge';
-import { RoleSelect } from './role-select';
-import { ActivationSwitch } from './activation-switch';
-import { DeleteButton } from './delete-button';
-import { useTranslations } from 'next-intl';
-import { createBrowserClient } from '@supabase/ssr';
-import type { UserListItem, UserRole } from '@/app/actions/admin-users';
+import { useEffect, useState, useCallback } from 'react'
+import { formatDistanceToNow } from 'date-fns'
+import { Loader2, Search, ChevronLeft, ChevronRight, Mail, Building2 } from 'lucide-react'
+import { Input } from '@/components/ui/input'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { listUsersAction, getCurrentUserRoleAction } from '@/app/actions/admin-users'
+import { cn } from '@/lib/utils'
+import { toast } from 'sonner'
+import { RoleBadge } from '@/components/common/role-badge'
+import { RoleSelect } from './role-select'
+import { ActivationSwitch } from './activation-switch'
+import { DeleteButton } from './delete-button'
+import { useTranslations } from 'next-intl'
+import { createBrowserClient } from '@supabase/ssr'
+import type { UserListItem, UserRole } from '@/app/actions/admin-users'
 
 /** Debounce timeout for search input in milliseconds */
-const SEARCH_DEBOUNCE_MS = 300;
+const SEARCH_DEBOUNCE_MS = 300
 
 export function UsersTable() {
-  const t = useTranslations('admin.users');
-  const [data, setData] = useState<UserListItem[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [totalCount, setTotalCount] = useState(0);
-  const [page, setPage] = useState(1);
-  const [pageSize] = useState(20);
-  const [search, setSearch] = useState('');
-  const [roleFilter, setRoleFilter] = useState<string>('all');
-  const [statusFilter, setStatusFilter] = useState<string>('all');
-  const [error, setError] = useState<string | null>(null);
-  const [currentUserId, setCurrentUserId] = useState<string | null | 'loading'>('loading');
-  const [currentUserRole, setCurrentUserRole] = useState<UserRole | 'loading'>('loading');
+  const t = useTranslations('admin.users')
+  const [data, setData] = useState<UserListItem[]>([])
+  const [loading, setLoading] = useState(true)
+  const [totalCount, setTotalCount] = useState(0)
+  const [page, setPage] = useState(1)
+  const [pageSize] = useState(20)
+  const [search, setSearch] = useState('')
+  const [roleFilter, setRoleFilter] = useState<string>('all')
+  const [statusFilter, setStatusFilter] = useState<string>('all')
+  const [error, setError] = useState<string | null>(null)
+  const [currentUserId, setCurrentUserId] = useState<string | null>('loading')
+  const [currentUserRole, setCurrentUserRole] = useState<UserRole | 'loading'>('loading')
 
   useEffect(() => {
     const supabase = createBrowserClient(
       process.env.NEXT_PUBLIC_SUPABASE_URL!,
       process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-    );
-    supabase.auth.getUser().then(({ data }) => {
-      setCurrentUserId(data.user?.id || null);
-    }).catch((err) => {
-      console.error('Failed to fetch current user:', err);
-      setCurrentUserId(null);
-      toast.error('Failed to identify current user. Some actions disabled for safety.');
-    });
+    )
+    supabase.auth
+      .getUser()
+      .then(({ data }) => {
+        setCurrentUserId(data.user?.id || null)
+      })
+      .catch((err) => {
+        console.error('Failed to fetch current user:', err)
+        setCurrentUserId(null)
+        toast.error('Failed to identify current user. Some actions disabled for safety.')
+      })
 
     // Fetch current user's role
     getCurrentUserRoleAction()
       .then((result) => {
-        setCurrentUserRole(result.role);
+        setCurrentUserRole(result.role)
       })
       .catch((err) => {
-        console.error('Failed to fetch current user role:', err);
-        setCurrentUserRole('admin'); // Default to admin (safer - less permissions)
-      });
-  }, []);
+        console.error('Failed to fetch current user role:', err)
+        setCurrentUserRole('admin') // Default to admin (safer - less permissions)
+      })
+  }, [])
 
   const loadData = useCallback(async () => {
-    setLoading(true);
-    setError(null);
+    setLoading(true)
+    setError(null)
     try {
       const result = await listUsersAction({
         limit: pageSize,
@@ -69,40 +78,40 @@ export function UsersTable() {
         search: search || undefined,
         role: roleFilter !== 'all' ? roleFilter : undefined,
         isActive: statusFilter === 'all' ? undefined : statusFilter === 'active',
-      });
+      })
 
-      setData(result.users);
-      setTotalCount(result.totalCount);
+      setData(result.users)
+      setTotalCount(result.totalCount)
     } catch (err) {
-      console.error('Failed to fetch users', err);
-      const errorMessage = err instanceof Error ? err.message : t('errors.loadFailed');
-      setError(errorMessage);
-      toast.error(errorMessage);
+      console.error('Failed to fetch users', err)
+      const errorMessage = err instanceof Error ? err.message : t('errors.loadFailed')
+      setError(errorMessage)
+      toast.error(errorMessage)
     } finally {
-      setLoading(false);
+      setLoading(false)
     }
-  }, [pageSize, page, search, roleFilter, statusFilter, t]);
+  }, [pageSize, page, search, roleFilter, statusFilter, t])
 
   useEffect(() => {
     const timer = setTimeout(() => {
-      loadData();
-    }, SEARCH_DEBOUNCE_MS);
-    return () => clearTimeout(timer);
-  }, [loadData]);
+      void loadData()
+    }, SEARCH_DEBOUNCE_MS)
+    return () => clearTimeout(timer)
+  }, [loadData])
 
   const handleRoleUpdate = useCallback(() => {
-    loadData();
-  }, [loadData]);
+    void loadData()
+  }, [loadData])
 
   const handleActivationToggle = useCallback(() => {
-    loadData();
-  }, [loadData]);
+    void loadData()
+  }, [loadData])
 
   const handleUserDeleted = useCallback(() => {
-    loadData();
-  }, [loadData]);
+    void loadData()
+  }, [loadData])
 
-  const totalPages = Math.ceil(totalCount / pageSize);
+  const totalPages = Math.ceil(totalCount / pageSize)
 
   const getStatusBadge = (isActive: boolean) => {
     if (isActive) {
@@ -110,23 +119,20 @@ export function UsersTable() {
         <Badge variant="secondary" className="bg-green-500/10 text-green-500 hover:bg-green-500/20">
           {t('status.active')}
         </Badge>
-      );
+      )
     }
     return (
       <Badge variant="secondary" className="bg-gray-500/10 text-gray-500 hover:bg-gray-500/20">
         {t('status.inactive')}
       </Badge>
-    );
-  };
-
-  const isRoleLoaded = currentUserRole !== 'loading';
-  const isSuperadmin = currentUserRole === 'superadmin';
+    )
+  }
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row gap-4 justify-between items-center bg-card p-4 rounded-lg border shadow-sm">
+      <div className="bg-card flex flex-col items-center justify-between gap-4 rounded-lg border p-4 shadow-sm sm:flex-row">
         <div className="relative w-full sm:w-72">
-          <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+          <Search className="text-muted-foreground absolute top-2.5 left-2 h-4 w-4" />
           <Input
             placeholder={t('filters.searchPlaceholder')}
             value={search}
@@ -136,7 +142,7 @@ export function UsersTable() {
           />
         </div>
 
-        <div className="flex items-center gap-2 w-full sm:w-auto">
+        <div className="flex w-full items-center gap-2 sm:w-auto">
           <Select value={roleFilter} onValueChange={setRoleFilter}>
             <SelectTrigger className="w-[140px]" aria-label={t('filters.roleLabel')}>
               <SelectValue placeholder={t('filters.roleLabel')} />
@@ -161,60 +167,78 @@ export function UsersTable() {
             </SelectContent>
           </Select>
 
-          <Button variant="outline" size="icon" onClick={loadData} disabled={loading} aria-label={t('actions.refresh')}>
-             <Loader2 className={cn("h-4 w-4", loading && "animate-spin")} />
+          <Button
+            variant="outline"
+            size="icon"
+            onClick={() => void loadData()}
+            disabled={loading}
+            aria-label={t('actions.refresh')}
+          >
+            <Loader2 className={cn('h-4 w-4', loading && 'animate-spin')} />
           </Button>
         </div>
       </div>
 
-      <div className="rounded-md border bg-card shadow-sm overflow-hidden">
+      <div className="bg-card overflow-hidden rounded-md border shadow-sm">
         <div className="relative w-full overflow-auto">
           <table className="w-full caption-bottom text-sm">
             <thead className="[&_tr]:border-b">
-              <tr className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted">
-                <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">{t('table.email')}</th>
-                <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">{t('table.organization')}</th>
-                <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">{t('table.role')}</th>
-                <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">{t('table.status')}</th>
-                <th className="h-12 px-4 text-left align-middle font-medium text-muted-foreground">{t('table.created')}</th>
-                <th className="h-12 px-4 text-right align-middle font-medium text-muted-foreground">{t('table.actions')}</th>
+              <tr className="hover:bg-muted/50 data-[state=selected]:bg-muted border-b transition-colors">
+                <th className="text-muted-foreground h-12 px-4 text-left align-middle font-medium">
+                  {t('table.email')}
+                </th>
+                <th className="text-muted-foreground h-12 px-4 text-left align-middle font-medium">
+                  {t('table.organization')}
+                </th>
+                <th className="text-muted-foreground h-12 px-4 text-left align-middle font-medium">
+                  {t('table.role')}
+                </th>
+                <th className="text-muted-foreground h-12 px-4 text-left align-middle font-medium">
+                  {t('table.status')}
+                </th>
+                <th className="text-muted-foreground h-12 px-4 text-left align-middle font-medium">
+                  {t('table.created')}
+                </th>
+                <th className="text-muted-foreground h-12 px-4 text-right align-middle font-medium">
+                  {t('table.actions')}
+                </th>
               </tr>
             </thead>
             <tbody className="[&_tr:last-child]:border-0">
               {loading && data.length === 0 ? (
                 <tr>
                   <td colSpan={6} className="h-24 text-center">
-                    <Loader2 className="h-6 w-6 animate-spin mx-auto text-muted-foreground" />
+                    <Loader2 className="text-muted-foreground mx-auto h-6 w-6 animate-spin" />
                   </td>
                 </tr>
               ) : error ? (
-                 <tr>
+                <tr>
                   <td colSpan={6} className="h-24 text-center text-red-500">
                     {error}
                   </td>
                 </tr>
               ) : data.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="h-24 text-center text-muted-foreground">
+                  <td colSpan={6} className="text-muted-foreground h-24 text-center">
                     {t('table.noUsers')}
                   </td>
                 </tr>
               ) : (
                 data.map((user) => {
-                  const isCurrentUser = currentUserId === user.id;
+                  const isCurrentUser = currentUserId === user.id
                   return (
                     <tr
                       key={user.id}
-                      className="border-b transition-colors hover:bg-muted/50 data-[state=selected]:bg-muted"
+                      className="hover:bg-muted/50 data-[state=selected]:bg-muted border-b transition-colors"
                     >
                       <td className="p-4 align-middle">
                         <div className="flex items-center gap-2">
-                          <Mail className="h-4 w-4 text-muted-foreground" />
+                          <Mail className="text-muted-foreground h-4 w-4" />
                           <span className="font-medium">{user.email}</span>
                         </div>
                       </td>
                       <td className="p-4 align-middle">
-                        <div className="flex items-center gap-2 text-muted-foreground">
+                        <div className="text-muted-foreground flex items-center gap-2">
                           <Building2 className="h-4 w-4" />
                           <span>{user.organizationName}</span>
                         </div>
@@ -222,19 +246,18 @@ export function UsersTable() {
                       <td className="p-4 align-middle">
                         <RoleBadge role={user.role} />
                       </td>
-                      <td className="p-4 align-middle">
-                        {getStatusBadge(user.isActive)}
-                      </td>
-                      <td className="p-4 align-middle text-muted-foreground">
-                        {user.createdAt && formatDistanceToNow(new Date(user.createdAt), { addSuffix: true })}
+                      <td className="p-4 align-middle">{getStatusBadge(user.isActive)}</td>
+                      <td className="text-muted-foreground p-4 align-middle">
+                        {user.createdAt &&
+                          formatDistanceToNow(new Date(user.createdAt), { addSuffix: true })}
                       </td>
                       <td className="p-4 align-middle">
                         <div className="flex items-center justify-end gap-3">
-                          {isRoleLoaded && (
+                          {currentUserRole !== 'loading' && (
                             <RoleSelect
                               userId={user.id}
                               currentRole={user.role}
-                              currentUserRole={currentUserRole as UserRole}
+                              currentUserRole={currentUserRole}
                               onRoleUpdated={handleRoleUpdate}
                             />
                           )}
@@ -244,12 +267,12 @@ export function UsersTable() {
                             disabled={currentUserId === 'loading' || isCurrentUser}
                             onToggled={handleActivationToggle}
                           />
-                          {isRoleLoaded && isSuperadmin && (
+                          {currentUserRole !== 'loading' && (
                             <DeleteButton
                               userId={user.id}
                               userEmail={user.email}
                               userRole={user.role}
-                              currentUserRole={currentUserRole as UserRole}
+                              currentUserRole={currentUserRole}
                               isCurrentUser={isCurrentUser}
                               onDeleted={handleUserDeleted}
                             />
@@ -257,7 +280,7 @@ export function UsersTable() {
                         </div>
                       </td>
                     </tr>
-                  );
+                  )
                 })
               )}
             </tbody>
@@ -266,18 +289,18 @@ export function UsersTable() {
       </div>
 
       <div className="flex items-center justify-between px-2">
-        <div className="text-sm text-muted-foreground">
+        <div className="text-muted-foreground text-sm">
           {t('pagination.showing', {
             from: (page - 1) * pageSize + 1,
             to: Math.min(page * pageSize, totalCount),
-            total: totalCount
+            total: totalCount,
           })}
         </div>
         <div className="flex items-center space-x-2">
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setPage(p => Math.max(1, p - 1))}
+            onClick={() => setPage((p) => Math.max(1, p - 1))}
             disabled={page === 1 || loading}
             aria-label={t('pagination.previous')}
           >
@@ -287,7 +310,7 @@ export function UsersTable() {
           <Button
             variant="outline"
             size="sm"
-            onClick={() => setPage(p => Math.min(totalPages, p + 1))}
+            onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
             disabled={page === totalPages || loading}
             aria-label={t('pagination.next')}
           >
@@ -297,5 +320,5 @@ export function UsersTable() {
         </div>
       </div>
     </div>
-  );
+  )
 }

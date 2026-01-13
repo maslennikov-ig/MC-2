@@ -1,19 +1,16 @@
-'use client';
+'use client'
 
-import React, { useState, useMemo } from 'react';
-import { useLocale } from 'next-intl';
-import Image from 'next/image';
-import { ImageIcon, FileText, Download, Loader2, Sparkles, RefreshCw, Trash2 } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
-import { Card, CardContent, CardHeader } from '@/components/ui/card';
-import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import type {
-  EnrichmentStatus,
-  CoverEnrichmentContent,
-} from '@megacampus/shared-types';
+import React, { useState, useMemo } from 'react'
+import { useLocale } from 'next-intl'
+import Image from 'next/image'
+import { ImageIcon, FileText, Download, Loader2, Sparkles, RefreshCw, Trash2 } from 'lucide-react'
+import { cn } from '@/lib/utils'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Card, CardContent, CardHeader } from '@/components/ui/card'
+import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import type { EnrichmentStatus, CoverEnrichmentContent } from '@megacampus/shared-types'
 
 // ============================================================================
 // Types - Single Source of Truth from @megacampus/shared-types
@@ -23,45 +20,45 @@ import type {
  * Re-export CoverEnrichmentContent for backward compatibility
  * @see packages/shared-types/src/enrichment-content.ts
  */
-type CoverContent = CoverEnrichmentContent;
+type CoverContent = CoverEnrichmentContent
 
 /**
  * Cover draft content structure (prompt variants for selection)
  */
 export interface CoverDraftContent {
-  type: 'cover_draft';
+  type: 'cover_draft'
   variants: Array<{
-    id: number;
-    prompt_en: string;
-    description_localized: string;
-  }>;
-  selected_variant?: number;
+    id: number
+    prompt_en: string
+    description_localized: string
+  }>
+  selected_variant?: number
 }
 
 export interface CoverPreviewProps {
   enrichment: {
-    id: string;
-    status: EnrichmentStatus;
-    content: CoverContent | null;
-    draft_content: CoverDraftContent | null;
-    metadata: Record<string, unknown> | null;
-    error_message: string | null;
-  };
+    id: string
+    status: EnrichmentStatus
+    content: CoverContent | null
+    draft_content: CoverDraftContent | null
+    metadata: Record<string, unknown> | null
+    error_message: string | null
+  }
   /** Callback when user selects a variant */
-  onSelectVariant?: (variantId: number) => void;
+  onSelectVariant?: (variantId: number) => void
   /** Callback when user approves draft with selected variant */
-  onApproveDraft?: () => void;
+  onApproveDraft?: () => void
   /** Loading state for approval button */
-  isApproving?: boolean;
+  isApproving?: boolean
   /** Callback when user wants to regenerate the cover */
-  onRegenerate?: () => void;
+  onRegenerate?: () => void
   /** Loading state for regenerate button */
-  isRegenerating?: boolean;
+  isRegenerating?: boolean
   /** Callback when user wants to delete the cover */
-  onDelete?: () => void;
+  onDelete?: () => void
   /** Loading state for delete button */
-  isDeleting?: boolean;
-  className?: string;
+  isDeleting?: boolean
+  className?: string
 }
 
 // ============================================================================
@@ -103,9 +100,9 @@ const TRANSLATIONS = {
     delete: 'Delete',
     deleting: 'Deleting...',
   },
-};
+}
 
-type Translations = (typeof TRANSLATIONS)['ru'];
+type Translations = (typeof TRANSLATIONS)['ru']
 
 // ============================================================================
 // Helper Functions
@@ -115,27 +112,27 @@ type Translations = (typeof TRANSLATIONS)['ru'];
  * Format file size for display
  */
 function formatFileSize(bytes?: number): string {
-  if (!bytes) return '';
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`;
+  if (!bytes) return ''
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(2)} MB`
 }
 
 /**
  * Get variant number indicator
  */
 function getVariantIndicator(index: number): string {
-  const indicators = ['1', '2', '3', '4', '5'];
-  return indicators[index] || String(index + 1);
+  const indicators = ['1', '2', '3', '4', '5']
+  return indicators[index] || String(index + 1)
 }
 
 /**
  * Check if draft content is valid
  */
 function isValidDraftContent(draft: unknown): draft is CoverDraftContent {
-  if (!draft || typeof draft !== 'object') return false;
-  const d = draft as CoverDraftContent;
-  return d.type === 'cover_draft' && Array.isArray(d.variants) && d.variants.length > 0;
+  if (!draft || typeof draft !== 'object') return false
+  const d = draft as CoverDraftContent
+  return d.type === 'cover_draft' && Array.isArray(d.variants) && d.variants.length > 0
 }
 
 // ============================================================================
@@ -143,11 +140,11 @@ function isValidDraftContent(draft: unknown): draft is CoverDraftContent {
 // ============================================================================
 
 interface VariantCardProps {
-  variant: CoverDraftContent['variants'][number];
-  index: number;
-  isSelected: boolean;
-  onSelect: () => void;
-  t: Translations;
+  variant: CoverDraftContent['variants'][number]
+  index: number
+  isSelected: boolean
+  onSelect: () => void
+  t: Translations
 }
 
 /**
@@ -160,7 +157,7 @@ function VariantCard({ variant, index, isSelected, onSelect, t }: VariantCardPro
         'relative cursor-pointer transition-all duration-200',
         'hover:shadow-md',
         isSelected
-          ? 'border-primary bg-primary/5 ring-2 ring-primary/20'
+          ? 'border-primary bg-primary/5 ring-primary/20 ring-2'
           : 'hover:border-primary/50'
       )}
       onClick={onSelect}
@@ -177,56 +174,51 @@ function VariantCard({ variant, index, isSelected, onSelect, t }: VariantCardPro
           {/* Variant number badge */}
           <div
             className={cn(
-              'flex items-center justify-center w-8 h-8 rounded-full text-sm font-bold',
-              isSelected
-                ? 'bg-primary text-primary-foreground'
-                : 'bg-muted text-muted-foreground'
+              'flex h-8 w-8 items-center justify-center rounded-full text-sm font-bold',
+              isSelected ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'
             )}
           >
             {getVariantIndicator(index)}
           </div>
 
           <div className="flex-1">
-            <label
-              htmlFor={`variant-${variant.id}`}
-              className="text-sm font-medium cursor-pointer"
-            >
+            <label htmlFor={`variant-${variant.id}`} className="cursor-pointer text-sm font-medium">
               {t.variant} {index + 1}
             </label>
           </div>
         </div>
       </CardHeader>
 
-      <CardContent className="pt-0 space-y-3">
+      <CardContent className="space-y-3 pt-0">
         {/* Localized description (user-facing) */}
         <p className="text-sm leading-relaxed">{variant.description_localized}</p>
 
         {/* English prompt (technical) */}
         <div className="space-y-1">
-          <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
-            <Sparkles className="w-3 h-3" />
+          <div className="text-muted-foreground flex items-center gap-1.5 text-xs">
+            <Sparkles className="h-3 w-3" />
             {t.imagePrompt}
           </div>
-          <p className="text-xs text-muted-foreground bg-slate-50 dark:bg-slate-900 rounded p-2 font-mono">
+          <p className="text-muted-foreground rounded bg-slate-50 p-2 font-mono text-xs dark:bg-slate-900">
             {variant.prompt_en}
           </p>
         </div>
       </CardContent>
     </Card>
-  );
+  )
 }
 
 /**
  * Draft state view - shows variant selection cards
  */
 interface DraftViewProps {
-  draftContent: CoverDraftContent;
-  selectedVariant: number | null;
-  onSelectVariant: (variantId: number) => void;
-  onApprove: () => void;
-  isApproving: boolean;
-  t: Translations;
-  className?: string;
+  draftContent: CoverDraftContent
+  selectedVariant: number | null
+  onSelectVariant: (variantId: number) => void
+  onApprove: () => void
+  isApproving: boolean
+  t: Translations
+  className?: string
 }
 
 function DraftView({
@@ -239,12 +231,12 @@ function DraftView({
   className,
 }: DraftViewProps) {
   return (
-    <div className={cn('flex flex-col h-full', className)}>
+    <div className={cn('flex h-full flex-col', className)}>
       {/* Header */}
-      <div className="px-4 py-3 border-b border-slate-200 dark:border-slate-800">
+      <div className="border-b border-slate-200 px-4 py-3 dark:border-slate-800">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <ImageIcon className="w-5 h-5 text-cyan-500 dark:text-cyan-400" />
+            <ImageIcon className="h-5 w-5 text-cyan-500 dark:text-cyan-400" />
             <h3 className="font-medium">{t.selectCoverStyle}</h3>
           </div>
           <Badge variant="secondary" className="text-xs">
@@ -257,9 +249,9 @@ function DraftView({
       <ScrollArea className="flex-1">
         <div className="p-4">
           <RadioGroup
-            value={selectedVariant !== null ? String(selectedVariant) : undefined}
+            value={selectedVariant !== null ? String(selectedVariant) : ''}
             onValueChange={(value) => onSelectVariant(Number(value))}
-            className="grid grid-cols-1 lg:grid-cols-3 gap-4"
+            className="grid grid-cols-1 gap-4 lg:grid-cols-3"
           >
             {draftContent.variants.map((variant, index) => (
               <VariantCard
@@ -276,12 +268,10 @@ function DraftView({
       </ScrollArea>
 
       {/* Action bar */}
-      <div className="border-t border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-950 p-4">
+      <div className="border-t border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-950">
         <div className="flex items-center justify-end gap-2">
           {selectedVariant === null && (
-            <span className="text-sm text-muted-foreground mr-2">
-              {t.selectVariantFirst}
-            </span>
+            <span className="text-muted-foreground mr-2 text-sm">{t.selectVariantFirst}</span>
           )}
           <Button
             onClick={onApprove}
@@ -290,12 +280,12 @@ function DraftView({
           >
             {isApproving ? (
               <>
-                <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                 {t.generating}
               </>
             ) : (
               <>
-                <Sparkles className="w-4 h-4 mr-2" />
+                <Sparkles className="mr-2 h-4 w-4" />
                 {t.generateImage}
               </>
             )}
@@ -303,20 +293,20 @@ function DraftView({
         </div>
       </div>
     </div>
-  );
+  )
 }
 
 /**
  * Completed state view - shows generated cover image
  */
 interface CompletedViewProps {
-  content: CoverContent;
-  t: Translations;
-  onRegenerate?: () => void;
-  isRegenerating?: boolean;
-  onDelete?: () => void;
-  isDeleting?: boolean;
-  className?: string;
+  content: CoverContent
+  t: Translations
+  onRegenerate?: () => void
+  isRegenerating?: boolean
+  onDelete?: () => void
+  isDeleting?: boolean
+  className?: string
 }
 
 function CompletedView({
@@ -329,18 +319,18 @@ function CompletedView({
   className,
 }: CompletedViewProps) {
   const handleDownload = () => {
-    const link = document.createElement('a');
-    link.href = content.imageUrl;
-    link.download = `cover.${content.format || 'png'}`;
-    link.target = '_blank';
-    link.click();
-  };
+    const link = document.createElement('a')
+    link.href = content.imageUrl
+    link.download = `cover.${content.format || 'png'}`
+    link.target = '_blank'
+    link.click()
+  }
 
   return (
-    <div className={cn('flex flex-col h-full overflow-auto', className)}>
+    <div className={cn('flex h-full flex-col overflow-auto', className)}>
       {/* Image Preview */}
       <div className="relative bg-slate-100 dark:bg-slate-800">
-        <div className="aspect-video relative">
+        <div className="relative aspect-video">
           <Image
             src={content.imageUrl}
             alt={content.altText || 'Lesson cover'}
@@ -353,7 +343,7 @@ function CompletedView({
         </div>
 
         {/* Action buttons overlay */}
-        <div className="absolute bottom-3 right-3 flex gap-2">
+        <div className="absolute right-3 bottom-3 flex gap-2">
           {onRegenerate && (
             <Button
               variant="secondary"
@@ -363,9 +353,9 @@ function CompletedView({
               disabled={isRegenerating || isDeleting}
             >
               {isRegenerating ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
+                <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
-                <RefreshCw className="w-4 h-4" />
+                <RefreshCw className="h-4 w-4" />
               )}
               {isRegenerating ? t.regenerating : t.regenerate}
             </Button>
@@ -377,7 +367,7 @@ function CompletedView({
             onClick={handleDownload}
             disabled={isRegenerating || isDeleting}
           >
-            <Download className="w-4 h-4" />
+            <Download className="h-4 w-4" />
             {t.download}
           </Button>
           {onDelete && (
@@ -389,9 +379,9 @@ function CompletedView({
               disabled={isRegenerating || isDeleting}
             >
               {isDeleting ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
+                <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
-                <Trash2 className="w-4 h-4" />
+                <Trash2 className="h-4 w-4" />
               )}
               {isDeleting ? t.deleting : t.delete}
             </Button>
@@ -400,7 +390,7 @@ function CompletedView({
       </div>
 
       {/* Metadata */}
-      <div className="p-4 space-y-4">
+      <div className="space-y-4 p-4">
         {/* Dimensions and format */}
         <div className="flex flex-wrap gap-2">
           <Badge variant="outline">
@@ -415,55 +405,55 @@ function CompletedView({
 
         {/* Generation prompt */}
         <div>
-          <div className="flex items-center gap-2 mb-2 text-sm font-medium text-muted-foreground">
-            <FileText className="w-4 h-4" />
+          <div className="text-muted-foreground mb-2 flex items-center gap-2 text-sm font-medium">
+            <FileText className="h-4 w-4" />
             {t.generationPrompt}
           </div>
-          <p className="text-sm bg-slate-50 dark:bg-slate-900 rounded-lg p-3 whitespace-pre-wrap">
+          <p className="rounded-lg bg-slate-50 p-3 text-sm whitespace-pre-wrap dark:bg-slate-900">
             {content.generation_prompt}
           </p>
         </div>
       </div>
     </div>
-  );
+  )
 }
 
 /**
  * Empty state view - no content available
  */
 interface EmptyViewProps {
-  t: Translations;
-  className?: string;
+  t: Translations
+  className?: string
 }
 
 function EmptyView({ t, className }: EmptyViewProps) {
   return (
-    <div className={cn('flex items-center justify-center h-full p-8', className)}>
-      <div className="text-center text-muted-foreground">
-        <ImageIcon className="w-12 h-12 mx-auto mb-4 opacity-50" />
+    <div className={cn('flex h-full items-center justify-center p-8', className)}>
+      <div className="text-muted-foreground text-center">
+        <ImageIcon className="mx-auto mb-4 h-12 w-12 opacity-50" />
         <p>{t.coverNotGenerated}</p>
       </div>
     </div>
-  );
+  )
 }
 
 /**
  * Loading state for draft generation
  */
 interface LoadingViewProps {
-  t: Translations;
-  className?: string;
+  t: Translations
+  className?: string
 }
 
 function LoadingView({ t, className }: LoadingViewProps) {
   return (
-    <div className={cn('flex items-center justify-center h-full p-8', className)}>
-      <div className="text-center text-muted-foreground">
-        <Loader2 className="w-12 h-12 mx-auto mb-4 animate-spin opacity-50" />
+    <div className={cn('flex h-full items-center justify-center p-8', className)}>
+      <div className="text-muted-foreground text-center">
+        <Loader2 className="mx-auto mb-4 h-12 w-12 animate-spin opacity-50" />
         <p>{t.generatingDraft}</p>
       </div>
     </div>
-  );
+  )
 }
 
 // ============================================================================
@@ -498,53 +488,53 @@ export function CoverPreview({
   isDeleting = false,
   className,
 }: CoverPreviewProps) {
-  const locale = useLocale() as 'ru' | 'en';
-  const t: Translations = TRANSLATIONS[locale] || TRANSLATIONS.en;
+  const locale = useLocale()
+  const t: Translations = TRANSLATIONS[locale] || TRANSLATIONS.en
 
   // Local state for selected variant
-  const [selectedVariantLocal, setSelectedVariantLocal] = useState<number | null>(null);
+  const [selectedVariantLocal, setSelectedVariantLocal] = useState<number | null>(null)
 
   // Determine which view to render based on status and content
-  const isDraftReady = enrichment.status === 'draft_ready';
-  const isDraftGenerating = enrichment.status === 'draft_generating';
-  const isCompleted = enrichment.status === 'completed';
+  const isDraftReady = enrichment.status === 'draft_ready'
+  const isDraftGenerating = enrichment.status === 'draft_generating'
+  const isCompleted = enrichment.status === 'completed'
 
   // Parse draft content from draft_content or content field
   const draftContent = useMemo(() => {
     // First try draft_content field
     if (isValidDraftContent(enrichment.draft_content)) {
-      return enrichment.draft_content;
+      return enrichment.draft_content
     }
     // Fall back to content field (when draft data is stored there)
     if (isDraftReady && isValidDraftContent(enrichment.content)) {
-      return enrichment.content as unknown as CoverDraftContent;
+      return enrichment.content as unknown as CoverDraftContent
     }
-    return null;
-  }, [enrichment.draft_content, enrichment.content, isDraftReady]);
+    return null
+  }, [enrichment.draft_content, enrichment.content, isDraftReady])
 
   // Initialize selected variant from draft content
   const selectedVariant = useMemo(() => {
-    if (selectedVariantLocal !== null) return selectedVariantLocal;
-    if (draftContent?.selected_variant) return draftContent.selected_variant;
-    return null;
-  }, [selectedVariantLocal, draftContent?.selected_variant]);
+    if (selectedVariantLocal !== null) return selectedVariantLocal
+    if (draftContent?.selected_variant) return draftContent.selected_variant
+    return null
+  }, [selectedVariantLocal, draftContent?.selected_variant])
 
   // Handle variant selection
   const handleSelectVariant = (variantId: number) => {
-    setSelectedVariantLocal(variantId);
-    onSelectVariant?.(variantId);
-  };
+    setSelectedVariantLocal(variantId)
+    onSelectVariant?.(variantId)
+  }
 
   // Handle draft approval
   const handleApprove = () => {
     if (selectedVariant !== null) {
-      onApproveDraft?.();
+      onApproveDraft?.()
     }
-  };
+  }
 
   // Render loading state during draft generation
   if (isDraftGenerating) {
-    return <LoadingView t={t} className={className} />;
+    return <LoadingView t={t} className={className} />
   }
 
   // Render draft variant selection
@@ -559,7 +549,7 @@ export function CoverPreview({
         t={t}
         className={className}
       />
-    );
+    )
   }
 
   // Render completed cover
@@ -574,11 +564,11 @@ export function CoverPreview({
         isDeleting={isDeleting}
         className={className}
       />
-    );
+    )
   }
 
   // Render empty state
-  return <EmptyView t={t} className={className} />;
+  return <EmptyView t={t} className={className} />
 }
 
-export default CoverPreview;
+export default CoverPreview

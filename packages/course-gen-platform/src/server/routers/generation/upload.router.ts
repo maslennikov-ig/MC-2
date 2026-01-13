@@ -26,7 +26,7 @@ export const uploadRouter = router({
    * - Database record insertion
    */
   uploadFile: instructorProcedure
-    .use(createRateLimiter({ requests: 5, window: 60 })) // 5 uploads per minute
+    .use(createRateLimiter({ requests: 30, window: 60 })) // 30 uploads per minute (bulk uploads up to 30 files)
     .input(uploadFileInputSchema)
     .mutation(async ({ ctx, input }) => {
       const { courseId, filename, fileSize, mimeType, fileContent } = input;
