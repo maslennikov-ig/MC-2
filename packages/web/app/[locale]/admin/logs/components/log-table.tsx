@@ -3,22 +3,14 @@
 import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { useTranslations } from 'next-intl'
 import { formatDistanceToNow } from 'date-fns'
-import {
-  Loader2,
-  ChevronLeft,
-  ChevronRight,
-  ChevronUp,
-  ChevronDown,
-  AlertTriangle,
-  XCircle,
-  AlertOctagon,
-} from 'lucide-react'
+import { Loader2, ChevronLeft, ChevronRight, ChevronUp, ChevronDown } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Checkbox } from '@/components/ui/checkbox'
 import { cn } from '@/lib/utils'
 import { toast } from 'sonner'
 import { listLogsAction } from '@/app/actions/admin-logs'
+import { SeverityBadge } from './severity-badge'
 import type {
   UnifiedLogItem,
   LogFilters,
@@ -69,31 +61,47 @@ export function LogTable({
   const [sortDirection, setSortDirection] = useState<SortDirection>('desc')
 
   // Load data function
-  const loadData = useCallback(async () => {
-    setLoading(true)
-    setError(null)
-    try {
-      const result: LogListResponse = await listLogsAction({
-        page,
-        limit: pageSize,
-        filters,
-        sort: {
-          field: sortField,
-          direction: sortDirection,
-        },
-      })
+  const loadData = useCallback(
+    async (signal?: AbortSignal) => {
+      setLoading(true)
+      setError(null)
+      try {
+        const result: LogListResponse = await listLogsAction({
+          page,
+          limit: pageSize,
+          filters,
+          sort: {
+            field: sortField,
+            direction: sortDirection,
+          },
+        })
 
-      setData(result.items)
-      setTotalCount(result.total)
-    } catch (err) {
-      console.error('Failed to fetch logs', err)
-      const errorMessage = err instanceof Error ? err.message : 'Failed to load logs'
-      setError(errorMessage)
-      toast.error(errorMessage)
-    } finally {
-      setLoading(false)
-    }
-  }, [page, pageSize, filters, sortField, sortDirection])
+        // Check if request was aborted before setting state
+        if (signal?.aborted) {
+          return
+        }
+
+        setData(result.items)
+        setTotalCount(result.total)
+      } catch (err) {
+        // Don't show error if request was aborted
+        if (signal?.aborted) {
+          return
+        }
+
+        console.error('Failed to fetch logs', err)
+        const errorMessage = err instanceof Error ? err.message : 'Failed to load logs'
+        setError(errorMessage)
+        toast.error(errorMessage)
+      } finally {
+        // Don't update loading state if request was aborted
+        if (!signal?.aborted) {
+          setLoading(false)
+        }
+      }
+    },
+    [page, pageSize, filters, sortField, sortDirection]
+  )
 
   // Ref to hold latest loadData for polling (avoids interval restart on filter change)
   const loadDataRef = useRef(loadData)
@@ -103,10 +111,16 @@ export function LogTable({
 
   // Initial load and filter change with debounce
   useEffect(() => {
+    const abortController = new AbortController()
+
     const timer = setTimeout(() => {
-      void loadData()
+      void loadData(abortController.signal)
     }, FILTER_DEBOUNCE_MS)
-    return () => clearTimeout(timer)
+
+    return () => {
+      clearTimeout(timer)
+      abortController.abort()
+    }
   }, [loadData])
 
   // Auto-refresh polling - uses ref to avoid restarting interval on filter changes
@@ -162,44 +176,6 @@ export function LogTable({
     ) : (
       <ChevronDown className="ml-1 inline h-4 w-4" />
     )
-  }
-
-  // Get severity badge
-  const getSeverityBadge = (severity: string) => {
-    switch (severity) {
-      case 'CRITICAL':
-        return (
-          <Badge
-            variant="destructive"
-            className="gap-1 bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-800"
-          >
-            <AlertOctagon className="h-3 w-3" />
-            {t('levels.CRITICAL')}
-          </Badge>
-        )
-      case 'ERROR':
-        return (
-          <Badge
-            variant="destructive"
-            className="gap-1 bg-orange-600 hover:bg-orange-700 dark:bg-orange-700 dark:hover:bg-orange-800"
-          >
-            <XCircle className="h-3 w-3" />
-            {t('levels.ERROR')}
-          </Badge>
-        )
-      case 'WARNING':
-        return (
-          <Badge
-            variant="secondary"
-            className="gap-1 bg-yellow-500/20 text-yellow-700 hover:bg-yellow-500/30 dark:bg-yellow-500/20 dark:text-yellow-400 dark:hover:bg-yellow-500/30"
-          >
-            <AlertTriangle className="h-3 w-3" />
-            {t('levels.WARNING')}
-          </Badge>
-        )
-      default:
-        return <Badge variant="secondary">{severity}</Badge>
-    }
   }
 
   // Get status badge
@@ -386,7 +362,7 @@ export function LogTable({
                     {/* Level */}
                     <td className="p-4 align-middle">
                       <div className="flex flex-wrap items-center gap-2">
-                        {getSeverityBadge(item.severity)}
+                        <SeverityBadge severity={item.severity} />
                         {getEnvironmentBadge(item.environment)}
                       </div>
                     </td>

@@ -3,23 +3,11 @@
 import { useEffect, useState, useCallback } from 'react'
 import { useTranslations } from 'next-intl'
 import { formatDistanceToNow, format } from 'date-fns'
-import {
-  Loader2,
-  AlertTriangle,
-  XCircle,
-  AlertOctagon,
-  Clock,
-  Cpu,
-  DollarSign,
-  FileCode,
-  Save,
-  Copy,
-  Check,
-  Plus,
-} from 'lucide-react'
+import { Loader2, Clock, Cpu, DollarSign, FileCode, Save, Copy, Check, Plus } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Textarea } from '@/components/ui/textarea'
+import { SeverityBadge } from './severity-badge'
 import {
   Select,
   SelectContent,
@@ -138,44 +126,6 @@ Course: ${details.courseName || 'N/A'}${details.courseId ? ` (${details.courseId
     }
   }, [logItem, status, notes, onStatusUpdate, onClose])
 
-  // Get severity badge
-  const getSeverityBadge = (severity: string) => {
-    switch (severity) {
-      case 'CRITICAL':
-        return (
-          <Badge
-            variant="destructive"
-            className="gap-1 bg-red-600 hover:bg-red-700 dark:bg-red-700 dark:hover:bg-red-800"
-          >
-            <AlertOctagon className="h-3 w-3" />
-            {t('levels.CRITICAL')}
-          </Badge>
-        )
-      case 'ERROR':
-        return (
-          <Badge
-            variant="destructive"
-            className="gap-1 bg-orange-600 hover:bg-orange-700 dark:bg-orange-700 dark:hover:bg-orange-800"
-          >
-            <XCircle className="h-3 w-3" />
-            {t('levels.ERROR')}
-          </Badge>
-        )
-      case 'WARNING':
-        return (
-          <Badge
-            variant="secondary"
-            className="gap-1 bg-yellow-500/20 text-yellow-700 hover:bg-yellow-500/30 dark:bg-yellow-500/20 dark:text-yellow-400 dark:hover:bg-yellow-500/30"
-          >
-            <AlertTriangle className="h-3 w-3" />
-            {t('levels.WARNING')}
-          </Badge>
-        )
-      default:
-        return <Badge variant="secondary">{severity}</Badge>
-    }
-  }
-
   // Format JSON for display
   const formatJson = (data: Record<string, unknown> | null) => {
     if (!data) return null
@@ -192,7 +142,7 @@ Course: ${details.courseName || 'N/A'}${details.courseId ? ` (${details.courseId
         <SheetHeader>
           <SheetTitle className="flex items-center gap-2">
             {t('drawer.title')}
-            {details && getSeverityBadge(details.severity)}
+            {details && <SeverityBadge severity={details.severity} />}
           </SheetTitle>
           <SheetDescription>
             {details && <span className="font-mono text-xs">{details.id}</span>}
