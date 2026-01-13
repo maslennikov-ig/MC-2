@@ -2,11 +2,12 @@
 
 import React, { useCallback, useState, useEffect, useMemo } from 'react';
 import { motion, AnimatePresence, useMotionValue, useTransform, PanInfo } from 'framer-motion';
-import { Play, X, CheckSquare, Rocket, ChevronUp, ChevronDown, Sparkles, ChevronLeft, ChevronRight, Trophy, ExternalLink, Layers, BookOpen } from 'lucide-react';
+import { Play, X, CheckSquare, Rocket, ChevronUp, ChevronDown, Sparkles, ChevronLeft, ChevronRight, Trophy, ExternalLink, Layers, BookOpen, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useOptionalPartialGenerationContext } from '../contexts/PartialGenerationContext';
 import { useNodeSelection } from '../hooks/useNodeSelection';
 import { createClient } from '@/lib/supabase/client';
+import { finalizeCourse } from '@/app/actions/admin-generation';
 import { toast } from 'sonner';
 import type { CourseStructure } from '@megacampus/shared-types';
 import { useThemeSync } from '@/lib/hooks/use-theme-sync';
@@ -30,22 +31,18 @@ interface SelectionToolbarProps {
   moduleCount?: number;
   /** Total number of lessons (displayed in completion stats) */
   lessonCount?: number;
+  /** Current generation pipeline status (e.g., 'stage_6_generating', 'stage_6_complete') */
+  generationStatus?: string;
 }
 
 /**
  * Stage 6 Control Banner for lesson generation workflow.
  *
- * Two visual states:
- * 1. **Generation Mode** (isCompleted=false):
- *    - "Generate All" button to start all lessons
- *    - "Select" button to choose specific lessons
- *    - Swipe gesture to minimize
- *
- * 2. **Celebration Mode** (isCompleted=true):
- *    - Green gradient celebration banner
- *    - Trophy icon with sparkles
- *    - Course stats (modules/lessons with Russian pluralization)
- *    - "Open Course" button linking to course page
+ * Four visual states:
+ * 1. **Initial Mode** (stage_6_init): "Generate All" / "Select" buttons
+ * 2. **Generating Mode** (stage_6_generating): Progress indicator, disabled actions
+ * 3. **Ready to Finalize** (stage_6_complete): "Finalize Course" button
+ * 4. **Celebration Mode** (completed): Green banner with "Open Course" link
  *
  * Features:
  * - Persists minimized state to localStorage
@@ -61,6 +58,7 @@ interface SelectionToolbarProps {
  *   courseSlug="my-course"
  *   moduleCount={5}
  *   lessonCount={25}
+ *   generationStatus="completed"
  * />
  * ```
  */
@@ -70,6 +68,7 @@ export function SelectionToolbar({
   courseSlug,
   moduleCount = 0,
   lessonCount = 0,
+  generationStatus,
 }: SelectionToolbarProps) {
   const contextValue = useOptionalPartialGenerationContext();
   const { selectedNodeId } = useNodeSelection();
@@ -184,8 +183,35 @@ export function SelectionToolbar({
     }
   }, [courseId, contextValue, isGeneratingAll]);
 
+  // State for finalize course action
+  const [isFinalizingCourse, setIsFinalizingCourse] = useState(false);
+
+  /**
+   * Finalize the course after all lessons are generated
+   */
+  const handleFinalizeCourse = useCallback(async () => {
+    if (!courseId || isFinalizingCourse) return;
+
+    setIsFinalizingCourse(true);
+    try {
+      await finalizeCourse(courseId);
+      toast.success('Курс завершён!');
+    } catch (error) {
+      toast.error('Не удалось завершить курс', {
+        description: error instanceof Error ? error.message : 'Неизвестная ошибка'
+      });
+    } finally {
+      setIsFinalizingCourse(false);
+    }
+  }, [courseId, isFinalizingCourse]);
+
+  // Determine if we're in stage_6_generating or stage_6_complete state
+  const isStage6Generating = generationStatus === 'stage_6_generating';
+  const isStage6Complete = generationStatus === 'stage_6_complete';
+
   // For completed state, we don't need contextValue
-  if (!isCompleted && !contextValue) return null;
+  // For stage_6_complete state, we also don't need contextValue (just showing finalize button)
+  if (!isCompleted && !isStage6Complete && !contextValue) return null;
 
   const {
     selectedCount = 0,
@@ -337,7 +363,155 @@ export function SelectionToolbar({
     );
   }
 
-  // Generation mode - original UI
+  // Stage 6 Complete state - Ready to Finalize Banner (blue/purple gradient)
+  if (isStage6Complete) {
+    return (
+      <AnimatePresence mode="wait">
+        {isMinimized ? (
+          /* Edge Tab - minimized state (stage_6_complete) */
+          <motion.div
+            key="edge-tab-stage6-complete"
+            initial={{ x: 100, opacity: 0 }}
+            animate={{ x: 0, opacity: 1 }}
+            exit={{ x: 100, opacity: 0 }}
+            transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+            className="fixed bottom-6 right-0 z-50 pointer-events-auto"
+          >
+            <motion.button
+              onClick={() => toggleMinimized(false)}
+              whileTap={{ scale: 0.98 }}
+              className={`group flex items-center gap-1.5 pr-2 py-2.5 rounded-l-xl shadow-lg backdrop-blur-md transition-all duration-200 pl-3 hover:pl-5 ${
+                isDark
+                  ? 'bg-gradient-to-r from-blue-900/95 to-indigo-900/95 border border-r-0 border-blue-500/30 hover:border-blue-400/50'
+                  : 'bg-gradient-to-r from-blue-50/95 to-indigo-50/95 border border-r-0 border-blue-200/50 hover:border-blue-300/70'
+              }`}
+              aria-label={t('selectionToolbar.expandPanel')}
+            >
+              <div className={`p-1 rounded-full border shrink-0 ${
+                isDark
+                  ? 'bg-blue-500/20 border-blue-500/30 text-blue-400'
+                  : 'bg-blue-100 border-blue-200 text-blue-600'
+              }`}>
+                <CheckCircle className="w-3 h-3" />
+              </div>
+              <span className={`text-xs font-medium ${isDark ? 'text-blue-200' : 'text-blue-700'}`}>
+                ✓
+              </span>
+              <ChevronLeft className={`w-3 h-3 ${isDark ? 'text-blue-400' : 'text-blue-500'}`} />
+            </motion.button>
+          </motion.div>
+        ) : (
+          /* Main Ready to Finalize Banner - stage_6_complete state */
+          <motion.div
+            key="finalize-banner"
+            initial={{ y: 50, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            exit={{ x: 200, opacity: 0 }}
+            transition={{ type: 'spring', stiffness: 400, damping: 30 }}
+            className="fixed bottom-6 left-0 right-0 z-50 px-4 pointer-events-none flex justify-center"
+          >
+            <motion.div
+              drag="x"
+              dragConstraints={{ left: -150, right: 0 }}
+              dragElastic={0.2}
+              onDragEnd={handleDragEnd}
+              style={{ x, opacity }}
+              className="w-full max-w-3xl pointer-events-auto touch-pan-y"
+              title={t('selectionToolbar.swipeToCollapse')}
+            >
+              <div className={`backdrop-blur-md rounded-lg shadow-lg overflow-hidden ${
+                isDark
+                  ? 'bg-gradient-to-r from-blue-900/95 to-indigo-900/95 border border-blue-500/30'
+                  : 'bg-gradient-to-r from-blue-50/95 to-indigo-50/95 border border-blue-200/50 shadow-blue-500/10'
+              }`}>
+
+                {/* Header with finalize content */}
+                <div className="px-3 py-2.5 flex items-center justify-between gap-3">
+                  {/* Left: CheckCircle + Title + Stats */}
+                  <div className="flex items-center gap-3 overflow-hidden">
+                    {/* CheckCircle Icon */}
+                    <div className={`p-2 rounded-full shrink-0 ${
+                      isDark
+                        ? 'bg-blue-500/20 text-blue-400'
+                        : 'bg-blue-100 text-blue-600'
+                    }`}>
+                      <CheckCircle className="w-5 h-5" />
+                    </div>
+
+                    {/* Title and Stats */}
+                    <div className="flex flex-col min-w-0">
+                      <h3 className={`text-sm font-semibold truncate ${isDark ? 'text-blue-100' : 'text-blue-800'}`}>
+                        {t('selectionToolbar.allLessonsGenerated')}
+                      </h3>
+                      <div className={`flex items-center gap-3 text-xs ${isDark ? 'text-blue-300/80' : 'text-blue-600/80'}`} role="status" aria-live="polite">
+                        {moduleCount > 0 && (
+                          <span className="flex items-center gap-1">
+                            <Layers size={12} />
+                            {moduleCount} {moduleLabel}
+                          </span>
+                        )}
+                        {lessonCount > 0 && (
+                          <span className="flex items-center gap-1">
+                            <BookOpen size={12} />
+                            {lessonCount} {lessonLabel}
+                          </span>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Sparkle decoration */}
+                    <Sparkles size={16} className={`shrink-0 animate-pulse ${isDark ? 'text-blue-400' : 'text-blue-500'}`} />
+                  </div>
+
+                  {/* Right: Finalize Button + Minimize */}
+                  <div className="flex items-center gap-2 shrink-0">
+                    {/* Finalize Course Button */}
+                    <Button
+                      size="compact"
+                      onClick={() => void handleFinalizeCourse()}
+                      disabled={isFinalizingCourse}
+                      className="bg-blue-500 hover:bg-blue-600 text-white transition-all shadow-md shadow-blue-500/25 border-0 dark:bg-blue-600 dark:hover:bg-blue-500"
+                    >
+                      {isFinalizingCourse ? (
+                        <>
+                          <Loader2 className="animate-spin" size={14} />
+                          <span className="ml-1.5">{t('selectionToolbar.finalizing')}</span>
+                        </>
+                      ) : (
+                        <>
+                          <span>{t('selectionToolbar.finalizeCourse')}</span>
+                          <CheckCircle size={14} className="ml-1.5" />
+                        </>
+                      )}
+                    </Button>
+
+                    {/* Minimize button */}
+                    <button
+                      onClick={() => toggleMinimized(true)}
+                      className={`p-1.5 rounded-md transition-colors ${
+                        isDark
+                          ? 'text-blue-400 hover:text-blue-200 hover:bg-white/5'
+                          : 'text-blue-500 hover:text-blue-700 hover:bg-blue-100/50'
+                      }`}
+                      aria-label={t('selectionToolbar.collapsePanel')}
+                      title={t('selectionToolbar.swipeToCollapse')}
+                    >
+                      <ChevronRight className="w-4 h-4" />
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
+    );
+  }
+
+  // Generation mode - original UI (includes stage_6_init and stage_6_generating)
+  // When stage_6_generating, we show a generating indicator and disable actions
+  const showGeneratingIndicator = isStage6Generating || isProcessing;
+
   return (
     <AnimatePresence mode="wait">
       {isMinimized ? (
@@ -438,58 +612,74 @@ export function SelectionToolbar({
 
                 {/* Right: Action buttons + Minimize */}
                 <div className="flex items-center gap-1.5 shrink-0">
-                  {/* Selection mode toggle / Cancel button */}
-                  <Button
-                    variant="secondary"
-                    size="compact"
-                    onClick={() => {
-                      if (isSelectionMode) {
-                        clearSelection();
-                        setSelectionMode(false);
-                      } else {
-                        setSelectionMode(true);
-                      }
-                    }}
-                    className={
+                  {/* When stage_6_generating, show generating status instead of action buttons */}
+                  {isStage6Generating ? (
+                    /* Generating Status Badge */
+                    <div className={`flex items-center gap-2 px-3 py-1.5 rounded-md ${
                       isDark
-                        ? 'bg-gray-800 text-gray-200 hover:bg-gray-700 border-gray-700'
-                        : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border-gray-200'
-                    }
-                  >
-                    {isSelectionMode ? (
-                      <>
-                        <X size={16} />
-                        {t('selectionToolbar.cancel')}
-                      </>
-                    ) : (
-                      <>
-                        <CheckSquare size={16} />
-                        {t('selectionToolbar.select')}
-                      </>
-                    )}
-                  </Button>
+                        ? 'bg-purple-500/20 text-purple-300'
+                        : 'bg-purple-100 text-purple-700'
+                    }`}>
+                      <Loader2 className="animate-spin" size={14} />
+                      <span className="text-xs font-medium">{t('selectionToolbar.generatingLessons')}</span>
+                    </div>
+                  ) : (
+                    <>
+                      {/* Selection mode toggle / Cancel button */}
+                      <Button
+                        variant="secondary"
+                        size="compact"
+                        onClick={() => {
+                          if (isSelectionMode) {
+                            clearSelection();
+                            setSelectionMode(false);
+                          } else {
+                            setSelectionMode(true);
+                          }
+                        }}
+                        disabled={showGeneratingIndicator}
+                        className={
+                          isDark
+                            ? 'bg-gray-800 text-gray-200 hover:bg-gray-700 border-gray-700'
+                            : 'bg-gray-100 text-gray-700 hover:bg-gray-200 border-gray-200'
+                        }
+                      >
+                        {isSelectionMode ? (
+                          <>
+                            <X size={16} />
+                            {t('selectionToolbar.cancel')}
+                          </>
+                        ) : (
+                          <>
+                            <CheckSquare size={16} />
+                            {t('selectionToolbar.select')}
+                          </>
+                        )}
+                      </Button>
 
-                  {/* Main action button - changes based on selection */}
-                  <Button
-                    size="compact"
-                    onClick={hasSelection ? generateSelected : generateAllLessons}
-                    disabled={isProcessing}
-                    className="bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 text-white transition-all shadow-md shadow-purple-500/25 border-0"
-                  >
-                    {isProcessing ? (
-                      <Loader2 className="animate-spin" size={16} />
-                    ) : hasSelection ? (
-                      <>
-                        <Play size={16} />
-                        {selectedCount} {getLessonWord(selectedCount, t, 'common')}
-                      </>
-                    ) : (
-                      <>
-                        <Rocket size={16} />
-                        {t('selectionToolbar.generateAll')}
-                      </>
-                    )}
-                  </Button>
+                      {/* Main action button - changes based on selection */}
+                      <Button
+                        size="compact"
+                        onClick={hasSelection ? generateSelected : generateAllLessons}
+                        disabled={showGeneratingIndicator}
+                        className="bg-gradient-to-r from-purple-500 to-indigo-600 hover:from-purple-600 hover:to-indigo-700 text-white transition-all shadow-md shadow-purple-500/25 border-0"
+                      >
+                        {showGeneratingIndicator ? (
+                          <Loader2 className="animate-spin" size={16} />
+                        ) : hasSelection ? (
+                          <>
+                            <Play size={16} />
+                            {selectedCount} {getLessonWord(selectedCount, t, 'common')}
+                          </>
+                        ) : (
+                          <>
+                            <Rocket size={16} />
+                            {t('selectionToolbar.generateAll')}
+                          </>
+                        )}
+                      </Button>
+                    </>
+                  )}
 
                   {/* Minimize button */}
                   <button

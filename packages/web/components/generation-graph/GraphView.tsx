@@ -964,6 +964,7 @@ function GraphViewInner({ courseId, courseTitle, hasDocuments = true, failedAtSt
                 courseSlug={courseSlug}
                 moduleCount={staticData.courseInfo.moduleCount}
                 lessonCount={staticData.courseInfo.lessonCount}
+                generationStatus={pipelineStatus ?? undefined}
               />
             )}
           </div>
