@@ -1,6 +1,6 @@
 'use client'
 
-import { useEffect, useState, useCallback, useMemo } from 'react'
+import { useEffect, useState, useCallback, useMemo, useRef } from 'react'
 import { useTranslations } from 'next-intl'
 import { formatDistanceToNow } from 'date-fns'
 import {
@@ -95,21 +95,27 @@ export function LogTable({
     }
   }, [page, pageSize, filters, sortField, sortDirection])
 
+  // Ref to hold latest loadData for polling (avoids interval restart on filter change)
+  const loadDataRef = useRef(loadData)
+  useEffect(() => {
+    loadDataRef.current = loadData
+  }, [loadData])
+
   // Initial load and filter change with debounce
   useEffect(() => {
     const timer = setTimeout(() => {
-      loadData()
+      void loadData()
     }, FILTER_DEBOUNCE_MS)
     return () => clearTimeout(timer)
   }, [loadData])
 
-  // Auto-refresh polling
+  // Auto-refresh polling - uses ref to avoid restarting interval on filter changes
   useEffect(() => {
     const interval = setInterval(() => {
-      loadData()
+      void loadDataRef.current()
     }, REFRESH_INTERVAL_MS)
     return () => clearInterval(interval)
-  }, [loadData])
+  }, []) // Empty deps - interval set once, uses latest loadData via ref
 
   // Reset page when filters change
   useEffect(() => {

@@ -16,8 +16,20 @@ import type { ErrorLog, ErrorSeverity, CreateErrorLogParams, LogEnvironment } fr
  */
 function detectEnvironment(): LogEnvironment | null {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || '';
-  if (appUrl.includes('dev.ai.megacampus.ru')) return 'dev';
-  if (appUrl.includes('ai.megacampus.ru') && !appUrl.includes('dev.')) return 'stage';
+
+  // Use URL.hostname for precise matching
+  try {
+    const url = new URL(appUrl);
+    const hostname = url.hostname;
+
+    if (hostname === 'dev.ai.megacampus.ru') return 'dev';
+    if (hostname === 'ai.megacampus.ru') return 'stage';
+  } catch {
+    // Fallback for invalid URLs
+    if (appUrl.includes('dev.ai.megacampus.ru')) return 'dev';
+    if (appUrl.includes('ai.megacampus.ru') && !appUrl.includes('dev.')) return 'stage';
+  }
+
   return null;
 }
 

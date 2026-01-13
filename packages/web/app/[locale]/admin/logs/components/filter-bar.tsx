@@ -175,6 +175,7 @@ export function FilterBar({ filters, onFilterChange }: FilterBarProps) {
               <SelectItem value="all">{t('filters.status')}: All</SelectItem>
               <SelectItem value="new">{t('status.new')}</SelectItem>
               <SelectItem value="in_progress">{t('status.in_progress')}</SelectItem>
+              <SelectItem value="to_verify">To Verify</SelectItem>
               <SelectItem value="resolved">{t('status.resolved')}</SelectItem>
               <SelectItem value="ignored">{t('status.ignored')}</SelectItem>
             </SelectContent>

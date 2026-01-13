@@ -64,6 +64,13 @@ export function LogDetailDrawer({ logItem, open, onClose, onStatusUpdate }: LogD
   // Copy to clipboard state
   const [copied, setCopied] = useState(false)
 
+  // Auto-reset copied state with cleanup
+  useEffect(() => {
+    if (!copied) return
+    const timeoutId = setTimeout(() => setCopied(false), 2000)
+    return () => clearTimeout(timeoutId)
+  }, [copied])
+
   // Fetch full details when drawer opens
   useEffect(() => {
     if (open && logItem) {
@@ -91,7 +98,7 @@ export function LogDetailDrawer({ logItem, open, onClose, onStatusUpdate }: LogD
   }, [open, logItem])
 
   // Handle markdown copy to clipboard
-  const handleCopyMarkdown = useCallback(() => {
+  const handleCopyMarkdown = useCallback(async () => {
     if (!details) return
 
     const markdown = `[${details.problemId || details.id.substring(0, 8)}] ${details.severity} in ${details.source || details.logType}
@@ -99,9 +106,13 @@ Message: ${details.message}
 Env: ${details.environment || 'unknown'}
 Course: ${details.courseName || 'N/A'}${details.courseId ? ` (${details.courseId})` : ''}`
 
-    navigator.clipboard.writeText(markdown)
-    setCopied(true)
-    setTimeout(() => setCopied(false), 2000)
+    try {
+      await navigator.clipboard.writeText(markdown)
+      setCopied(true)
+    } catch (error) {
+      console.error('Failed to copy to clipboard:', error)
+      toast.error('Failed to copy to clipboard')
+    }
   }, [details])
 
   // Handle status save
@@ -189,17 +200,20 @@ Course: ${details.courseName || 'N/A'}${details.courseId ? ` (${details.courseId
           {/* Action buttons */}
           {details && (
             <div className="flex gap-2 pt-2">
-              <Button variant="outline" size="sm" onClick={handleCopyMarkdown} className="gap-2">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => void handleCopyMarkdown()}
+                className="gap-2"
+              >
                 {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
                 {copied ? 'Copied!' : 'Copy'}
               </Button>
               <Button
                 variant="secondary"
                 size="sm"
-                onClick={() => {
-                  // TODO: Implement Beads integration
-                  alert('Create Issue - Coming Soon')
-                }}
+                disabled
+                title="Beads integration coming soon"
                 className="gap-2"
               >
                 <Plus className="h-4 w-4" />
