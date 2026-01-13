@@ -2,6 +2,19 @@
 
 _Released on 2025-12-26_
 
+## v0.27.3
+
+_Released on 2026-01-13_
+
+### 🐛 Bug Fixes
+
+- **web**: Update 1 source file(s)
+- **web**: Add database error logging to admin logs
+
+---
+
+_This release was automatically generated from 3 commits._
+
 ## v0.27.2
 
 _Released on 2026-01-13_

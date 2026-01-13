@@ -311,6 +311,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.27.3] - 2026-01-13
+
+### Fixed
+
+- **web**: update 1 source file(s) (d3efc47)
+- **web**: add database error logging to admin logs (7a44d3d)
+
+### Other
+
+- bd sync: 2026-01-13 15:09:03 (8dc5609)
+
 ## [0.27.2] - 2026-01-13
 
 ### Added
