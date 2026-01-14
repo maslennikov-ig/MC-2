@@ -260,23 +260,31 @@ export type FinalizationJobData = z.infer<typeof FinalizationJobDataSchema>;
 export const LessonContentJobDataSchema = BaseJobDataSchema.extend({
   jobType: z.literal(JobType.LESSON_CONTENT),
   /** Lesson specification from Stage 5 (validated by handler using canonical schema) */
-  lessonSpec: z.object({
-    lesson_id: z.string(),
-    title: z.string(),
-    sections: z.array(z.object({ title: z.string() }).passthrough()),
-    metadata: z.object({}).passthrough().optional(),
-  }).passthrough(),
+  lessonSpec: z
+    .object({
+      lesson_id: z.string(),
+      title: z.string(),
+      sections: z.array(z.object({ title: z.string() }).passthrough()),
+      metadata: z.object({}).passthrough().optional(),
+    })
+    .passthrough(),
   /** RAG chunks retrieved for this lesson (validated by handler using canonical schema) */
-  ragChunks: z.array(z.object({
-    chunk_id: z.string(),
-    content: z.string(),
-  }).passthrough()),
+  ragChunks: z.array(
+    z
+      .object({
+        chunk_id: z.string(),
+        content: z.string(),
+      })
+      .passthrough()
+  ),
   /** RAG context cache ID for tracking */
   ragContextId: z.string().nullable(),
   /** Target language for content generation (ISO 639-1 code from supported set) */
   language: languageSchema.default('en'),
   /** Optional model override for fallback retry */
   modelOverride: z.string().optional(),
+  /** Course content style (e.g., 'gamified', 'professional', 'storytelling') */
+  style: z.string().optional(),
 });
 
 export type LessonContentJobData = z.infer<typeof LessonContentJobDataSchema>;

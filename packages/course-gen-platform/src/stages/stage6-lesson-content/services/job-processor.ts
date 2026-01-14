@@ -89,11 +89,7 @@ async function isCoursePaused(courseId: string): Promise<boolean> {
  * @throws DelayedError if the job was moved to delayed state
  * @throws Error if token is missing when pause is needed
  */
-async function checkPauseAndDelay(
-  job: Job,
-  courseId: string,
-  token?: string
-): Promise<void> {
+async function checkPauseAndDelay(job: Job, courseId: string, token?: string): Promise<void> {
   const isPaused = await isCoursePaused(courseId);
 
   if (isPaused) {
@@ -104,10 +100,7 @@ async function checkPauseAndDelay(
       throw new Error('Job token is required for pause/delay operations');
     }
 
-    logger.info(
-      { jobId: job.id, courseId },
-      'Course generation is paused, delaying job'
-    );
+    logger.info({ jobId: job.id, courseId }, 'Course generation is paused, delaying job');
 
     // Move job to delayed state - it will be picked up again after PAUSE_DELAY_MS
     await job.moveToDelayed(Date.now() + PAUSE_DELAY_MS, token);
@@ -155,6 +148,7 @@ async function executeStage6(input: Stage6JobInput): Promise<Stage6Output> {
     language,
     modelOverride,
     userRefinementPrompt,
+    style,
   } = input;
 
   const lessonLabel = lessonSpec.lesson_id;
@@ -169,6 +163,7 @@ async function executeStage6(input: Stage6JobInput): Promise<Stage6Output> {
     ragContextId: ragContextId ?? undefined,
     userRefinementPrompt,
     modelOverride,
+    style,
   };
 
   return executeStage6Orchestrator(orchestratorInput);
@@ -307,6 +302,7 @@ export async function processStage6Job(
   job: Job<Stage6JobInput, Stage6JobResult>,
   token?: string
 ): Promise<Stage6JobResult> {
+  // Note: style flows through job.data spread in processWithFallback -> executeStage6
   const { lessonSpec, courseId, language, userRefinementPrompt: _userRefinementPrompt } = job.data;
   const startTime = Date.now();
 
