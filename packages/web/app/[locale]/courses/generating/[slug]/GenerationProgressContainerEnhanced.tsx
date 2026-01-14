@@ -384,6 +384,16 @@ export default function GenerationProgressContainerEnhanced({
   // Automatic Mode Control Handlers (after showToast declaration to avoid hoisting issues)
   const handlePause = useCallback(async () => {
     if (!supabase) return
+    // Don't pause if already paused or generation is terminal
+    if (generationPausedAt) {
+      showToast('warning', 'Генерация уже приостановлена')
+      return
+    }
+    const terminalStatuses = ['completed', 'failed', 'cancelled']
+    if (terminalStatuses.includes(state.status as string)) {
+      showToast('warning', 'Генерация уже завершена')
+      return
+    }
     try {
       const { error } = await supabase
         .from('courses')
@@ -396,10 +406,15 @@ export default function GenerationProgressContainerEnhanced({
       showToast('error', 'Не удалось приостановить генерацию')
       console.error(error)
     }
-  }, [courseId, supabase, showToast])
+  }, [courseId, supabase, showToast, generationPausedAt, state.status])
 
   const handleResume = useCallback(async () => {
     if (!supabase) return
+    // Only resume if paused
+    if (!generationPausedAt) {
+      showToast('warning', 'Генерация не приостановлена')
+      return
+    }
     try {
       const { error } = await supabase
         .from('courses')
@@ -412,7 +427,7 @@ export default function GenerationProgressContainerEnhanced({
       showToast('error', 'Не удалось продолжить генерацию')
       console.error(error)
     }
-  }, [courseId, supabase, showToast])
+  }, [courseId, supabase, showToast, generationPausedAt])
 
   const handleCancel = useCallback(async () => {
     if (!confirm('Вы уверены, что хотите отменить генерацию? Это действие нельзя отменить.')) return

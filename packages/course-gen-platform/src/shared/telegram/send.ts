@@ -5,6 +5,7 @@
  */
 
 import { logger } from '../logger/index.js';
+import { getStageName } from '@megacampus/shared-types';
 
 const TELEGRAM_BOT_TOKEN = process.env.TELEGRAM_BOT_TOKEN;
 
@@ -99,16 +100,10 @@ export function formatCourseErrorMessage(
  * Format message for stage completion notification
  */
 export function formatStageCompleteMessage(courseTitle: string, stage: number): string {
-  const stageNames: Record<number, string> = {
-    2: 'Обработка документов',
-    3: 'Классификация документов',
-    4: 'Анализ структуры',
-    5: 'Генерация структуры',
-    6: 'Генерация уроков',
-  };
+  const stageName = getStageName(stage, 'ru');
 
   return `⚡ *Этап ${stage} завершён*
 
 Курс: "${courseTitle}"
-Этап: ${stageNames[stage] || `Этап ${stage}`} ✓`;
+Этап: ${stageName} ✓`;
 }
