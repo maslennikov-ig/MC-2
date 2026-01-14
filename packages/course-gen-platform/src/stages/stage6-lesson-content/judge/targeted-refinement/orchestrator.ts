@@ -1,5 +1,10 @@
 import { REFINEMENT_CONFIG } from '@megacampus/shared-types';
-import type { StopReason, TaskPriority } from '@megacampus/shared-types';
+import type {
+  StopReason,
+  TaskPriority,
+  RefinementStatus,
+  BestEffortResult,
+} from '@megacampus/shared-types';
 
 import { logger } from '../../../../shared/logger';
 import { shouldContinueIteration, updateSectionLocks } from './iteration-controller';
@@ -355,8 +360,8 @@ export async function executeTargetedRefinement(
   // Determine final status and handle best-effort selection
   const finalScore = state.scoreHistory[state.scoreHistory.length - 1];
   const modeConfig = REFINEMENT_CONFIG.modes[operationMode];
-  let finalStatus: string; // RefinementStatus type issue workaround if needed
-  let bestEffortResult: unknown;
+  let finalStatus: RefinementStatus;
+  let bestEffortResult: BestEffortResult | undefined;
 
   if (finalScore >= modeConfig.acceptThreshold) {
     finalStatus = 'accepted';
