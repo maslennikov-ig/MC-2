@@ -28,6 +28,7 @@ import { executeQdrantUpload } from './phases/phase-6-qdrant-upload';
 import { executePhase6Summarization } from './phases/phase-6-summarization';
 import { logTrace } from '../../shared/trace-logger';
 import { getTranslator } from '../../shared/i18n';
+import { handleStageCompletion } from '../../shared/auto-approval';
 
 /**
  * Document Processing Orchestrator
@@ -50,11 +51,14 @@ export class DocumentProcessingOrchestrator {
     const startTime = Date.now();
     const t = getTranslator(locale);
 
-    logger.info({
-      fileId,
-      filePath,
-      courseId,
-    }, 'Starting document processing orchestration');
+    logger.info(
+      {
+        fileId,
+        filePath,
+        courseId,
+      },
+      'Starting document processing orchestration'
+    );
 
     await logTrace({
       courseId,
@@ -62,7 +66,7 @@ export class DocumentProcessingOrchestrator {
       phase: 'init',
       stepName: 'start',
       inputData: { fileId, filePath, organizationId },
-      durationMs: 0
+      durationMs: 0,
     });
 
     // Step 1: Get file metadata and organization tier (5% progress)
@@ -71,13 +75,16 @@ export class DocumentProcessingOrchestrator {
     await this.updateCourseProgressInDB(courseId, t('stage2.init'));
     const { tier, mimeType, priority, priorityWeight } = await this.getFileMetadata(fileId);
 
-    logger.info({
-      fileId,
-      tier,
-      mimeType,
-      priority,
-      priorityWeight,
-    }, 'File metadata retrieved');
+    logger.info(
+      {
+        fileId,
+        tier,
+        mimeType,
+        priority,
+        priorityWeight,
+      },
+      'File metadata retrieved'
+    );
 
     // Step 2: Determine processing strategy based on tier
     const usePlainText = this.shouldUsePlainTextProcessing(tier, mimeType);
@@ -98,7 +105,7 @@ export class DocumentProcessingOrchestrator {
         stepName: 'plaintext_read',
         inputData: { fileId, filePath, mimeType },
         outputData: { markdownLength: processingResult.markdown.length },
-        durationMs: Date.now() - processingStartTime
+        durationMs: Date.now() - processingStartTime,
       });
     } else {
       // STANDARD/PREMIUM tier: Docling processing
@@ -121,9 +128,9 @@ export class DocumentProcessingOrchestrator {
         outputData: {
           markdownLength: processingResult.markdown.length,
           pages: processingResult.stats.pages,
-          images: processingResult.stats.images
+          images: processingResult.stats.images,
         },
-        durationMs: Date.now() - processingStartTime
+        durationMs: Date.now() - processingStartTime,
       });
     }
 
@@ -155,12 +162,15 @@ export class DocumentProcessingOrchestrator {
       job
     );
 
-    logger.info({
-      fileId,
-      parentChunks: chunkingResult.chunks.parent_chunks.length,
-      childChunks: chunkingResult.chunks.child_chunks.length,
-      totalChunks: chunkingResult.enrichedChunks.length,
-    }, 'Document chunked');
+    logger.info(
+      {
+        fileId,
+        parentChunks: chunkingResult.chunks.parent_chunks.length,
+        childChunks: chunkingResult.chunks.child_chunks.length,
+        totalChunks: chunkingResult.enrichedChunks.length,
+      },
+      'Document chunked'
+    );
 
     await logTrace({
       courseId,
@@ -171,9 +181,9 @@ export class DocumentProcessingOrchestrator {
       outputData: {
         parentChunks: chunkingResult.chunks.parent_chunks.length,
         childChunks: chunkingResult.chunks.child_chunks.length,
-        totalChunks: chunkingResult.enrichedChunks.length
+        totalChunks: chunkingResult.enrichedChunks.length,
       },
-      durationMs: Date.now() - chunkingStartTime
+      durationMs: Date.now() - chunkingStartTime,
     });
 
     // Phase 5: Embedding Generation (50-70% progress)
@@ -182,11 +192,14 @@ export class DocumentProcessingOrchestrator {
     const embeddingStartTime = Date.now();
     const batchResult = await executeEmbeddingGeneration(chunkingResult.enrichedChunks, job);
 
-    logger.info({
-      fileId,
-      embeddingCount: batchResult.embeddings.length,
-      totalTokens: batchResult.total_tokens,
-    }, 'Embeddings generated');
+    logger.info(
+      {
+        fileId,
+        embeddingCount: batchResult.embeddings.length,
+        totalTokens: batchResult.total_tokens,
+      },
+      'Embeddings generated'
+    );
 
     await logTrace({
       courseId,
@@ -196,10 +209,10 @@ export class DocumentProcessingOrchestrator {
       inputData: { fileId, chunkCount: chunkingResult.enrichedChunks.length },
       outputData: {
         embeddingCount: batchResult.embeddings.length,
-        totalTokens: batchResult.total_tokens
+        totalTokens: batchResult.total_tokens,
       },
       tokensUsed: batchResult.total_tokens,
-      durationMs: Date.now() - embeddingStartTime
+      durationMs: Date.now() - embeddingStartTime,
     });
 
     // Phase 6: Qdrant Upload (70-80% progress)
@@ -208,12 +221,15 @@ export class DocumentProcessingOrchestrator {
     const uploadStartTime = Date.now();
     const uploadResult = await executeQdrantUpload(batchResult.embeddings, job);
 
-    logger.info({
-      fileId,
-      pointsUploaded: uploadResult.points_uploaded,
-      batchCount: uploadResult.batch_count,
-      durationMs: uploadResult.duration_ms,
-    }, 'Vectors uploaded to Qdrant');
+    logger.info(
+      {
+        fileId,
+        pointsUploaded: uploadResult.points_uploaded,
+        batchCount: uploadResult.batch_count,
+        durationMs: uploadResult.duration_ms,
+      },
+      'Vectors uploaded to Qdrant'
+    );
 
     await logTrace({
       courseId,
@@ -222,7 +238,7 @@ export class DocumentProcessingOrchestrator {
       stepName: 'qdrant_upload',
       inputData: { fileId, pointsCount: batchResult.embeddings.length },
       outputData: { pointsUploaded: uploadResult.points_uploaded },
-      durationMs: Date.now() - uploadStartTime
+      durationMs: Date.now() - uploadStartTime,
     });
 
     // Phase 7: Document Summarization (80-90% progress)
@@ -241,17 +257,20 @@ export class DocumentProcessingOrchestrator {
             const mappedProgress = 80 + Math.floor(progress * 0.1);
             // Fire-and-forget: progress updates are non-blocking
             void this.updateProgress(job, mappedProgress, message);
-          }
+          },
         }
       );
 
-      logger.info({
-        fileId,
-        method: summarizationResult.processingMethod,
-        summaryTokens: summarizationResult.summaryTokens,
-        originalTokens: summarizationResult.originalTokens,
-        qualityScore: summarizationResult.metadata.qualityScore,
-      }, 'Document summarization complete');
+      logger.info(
+        {
+          fileId,
+          method: summarizationResult.processingMethod,
+          summaryTokens: summarizationResult.summaryTokens,
+          originalTokens: summarizationResult.originalTokens,
+          qualityScore: summarizationResult.metadata.qualityScore,
+        },
+        'Document summarization complete'
+      );
 
       await logTrace({
         courseId,
@@ -265,7 +284,7 @@ export class DocumentProcessingOrchestrator {
           qualityScore: summarizationResult.metadata.qualityScore,
         },
         tokensUsed: summarizationResult.summaryTokens,
-        durationMs: Date.now() - summarizationStartTime
+        durationMs: Date.now() - summarizationStartTime,
       });
 
       // Store summary result in processing result
@@ -277,10 +296,16 @@ export class DocumentProcessingOrchestrator {
       };
     } catch (summarizationError) {
       // Summarization failure is non-fatal - Stage 3 classification can use markdown_content
-      logger.warn({
-        fileId,
-        error: summarizationError instanceof Error ? summarizationError.message : String(summarizationError),
-      }, 'Document summarization failed (non-fatal), Stage 3 classification will use markdown_content');
+      logger.warn(
+        {
+          fileId,
+          error:
+            summarizationError instanceof Error
+              ? summarizationError.message
+              : String(summarizationError),
+        },
+        'Document summarization failed (non-fatal), Stage 3 classification will use markdown_content'
+      );
 
       await logTrace({
         courseId,
@@ -288,8 +313,13 @@ export class DocumentProcessingOrchestrator {
         phase: 'summarization',
         stepName: 'generate_summary',
         inputData: { fileId },
-        errorData: { error: summarizationError instanceof Error ? summarizationError.message : String(summarizationError) },
-        durationMs: Date.now() - summarizationStartTime
+        errorData: {
+          error:
+            summarizationError instanceof Error
+              ? summarizationError.message
+              : String(summarizationError),
+        },
+        durationMs: Date.now() - summarizationStartTime,
       });
     }
 
@@ -297,11 +327,14 @@ export class DocumentProcessingOrchestrator {
     await this.updateProgress(job, 95, 'Finalizing indexing');
     await this.updateCourseProgressInDB(courseId, t('stage2.finalizing'));
 
-    logger.info({
-      fileId,
-      vectorsIndexed: uploadResult.points_uploaded,
-      status: 'indexed',
-    }, 'Document processing pipeline complete');
+    logger.info(
+      {
+        fileId,
+        vectorsIndexed: uploadResult.points_uploaded,
+        status: 'indexed',
+      },
+      'Document processing pipeline complete'
+    );
 
     // Update course progress
     const supabase = getSupabaseAdmin();
@@ -322,7 +355,7 @@ export class DocumentProcessingOrchestrator {
       phase: 'complete',
       stepName: 'finish',
       inputData: { fileId },
-      durationMs: Date.now() - startTime
+      durationMs: Date.now() - startTime,
     });
 
     return processingResult;
@@ -415,8 +448,8 @@ export class DocumentProcessingOrchestrator {
     if (!fileData.organizations?.tier) {
       throw new Error(
         `Organization tier not found for file ${fileId}. ` +
-        `Organization ID: ${fileData.organization_id}. ` +
-        `This may indicate a database integrity issue.`
+          `Organization ID: ${fileData.organization_id}. ` +
+          `This may indicate a database integrity issue.`
       );
     }
 
@@ -455,11 +488,14 @@ export class DocumentProcessingOrchestrator {
       throw new Error(`Failed to store processed document: ${error.message}`);
     }
 
-    logger.info({
-      fileId,
-      markdown_length: processingResult.markdown.length,
-      json_size: JSON.stringify(processingResult.json).length,
-    }, 'Processed document stored successfully');
+    logger.info(
+      {
+        fileId,
+        markdown_length: processingResult.markdown.length,
+        json_size: JSON.stringify(processingResult.json).length,
+      },
+      'Processed document stored successfully'
+    );
   }
 
   /**
@@ -617,10 +653,13 @@ export class DocumentProcessingOrchestrator {
             );
           }
         } else {
-          logger.info(
-            { courseId, totalCount: total },
-            'All documents complete for course'
-          );
+          logger.info({ courseId, totalCount: total }, 'All documents complete for course');
+
+          // Handle automatic mode - auto-approve and proceed to Stage 3
+          const { autoApproved } = await handleStageCompletion(courseId, 2);
+          if (autoApproved) {
+            logger.info({ courseId }, 'Stage 2 auto-approved, proceeding to Stage 3');
+          }
         }
       }
     } catch (err) {
@@ -640,11 +679,14 @@ export class DocumentProcessingOrchestrator {
     message: string
   ): Promise<void> {
     await job.updateProgress(progress);
-    logger.debug({
-      jobId: job.id,
-      progress,
-      message,
-    }, 'Progress updated');
+    logger.debug(
+      {
+        jobId: job.id,
+        progress,
+        message,
+      },
+      'Progress updated'
+    );
   }
 
   /**
@@ -679,9 +721,10 @@ export class DocumentProcessingOrchestrator {
       const supabase = getSupabaseAdmin();
 
       // Build message with document count if provided
-      const displayMessage = completed !== undefined && total !== undefined
-        ? `${message} (${completed}/${total})`
-        : message;
+      const displayMessage =
+        completed !== undefined && total !== undefined
+          ? `${message} (${completed}/${total})`
+          : message;
 
       const { error: rpcError } = await supabase.rpc('update_course_progress', {
         p_course_id: courseId,
@@ -697,10 +740,7 @@ export class DocumentProcessingOrchestrator {
           'Failed to update course progress in DB (non-fatal)'
         );
       } else {
-        logger.debug(
-          { courseId, message: displayMessage },
-          'Course progress updated in DB'
-        );
+        logger.debug({ courseId, message: displayMessage }, 'Course progress updated in DB');
       }
     } catch (err) {
       // Non-fatal: log warning but don't throw
