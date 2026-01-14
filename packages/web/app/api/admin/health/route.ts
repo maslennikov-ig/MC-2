@@ -55,10 +55,7 @@ async function checkSupabase(): Promise<ServiceStatus> {
     const supabase = await createAdminClient()
 
     // Simple query to verify connection
-    const { error } = await supabase
-      .from('courses')
-      .select('id')
-      .limit(1)
+    const { error } = await supabase.from('courses').select('id').limit(1)
 
     const responseTime = Date.now() - startTime
 
@@ -231,7 +228,7 @@ async function checkDoclingMcp(): Promise<ServiceStatus> {
     // Without this header, the server returns HTTP 406 Not Acceptable
     const mcpHeaders = {
       'Content-Type': 'application/json',
-      'Accept': 'application/json, text/event-stream',
+      Accept: 'application/json, text/event-stream',
     }
 
     try {
@@ -269,11 +266,12 @@ async function checkDoclingMcp(): Promise<ServiceStatus> {
             name: 'Docling MCP',
             status: 'healthy',
             responseTime,
-            message: toolCount !== undefined
-              ? `${toolCount} tool(s) available`
-              : isSessionError
-                ? 'MCP protocol responding (session required)'
-                : `Service responding at ${usedUrl.includes('docling-mcp:8000') ? 'internal' : 'external'} URL`,
+            message:
+              toolCount !== undefined
+                ? `${toolCount} tool(s) available`
+                : isSessionError
+                  ? 'MCP protocol responding (session required)'
+                  : `Service responding at ${usedUrl.includes('docling-mcp:8000') ? 'internal' : 'external'} URL`,
             lastCheck,
           }
         }
@@ -360,9 +358,10 @@ async function checkWorkerReadiness(): Promise<ServiceStatus> {
         name: 'Worker',
         status: 'degraded',
         responseTime,
-        message: failedChecks.length > 0
-          ? `Pre-flight checks failed: ${failedChecks.map((c: { name: string }) => c.name).join(', ')}`
-          : 'Worker not ready',
+        message:
+          failedChecks.length > 0
+            ? `Pre-flight checks failed: ${failedChecks.map((c: { name: string }) => c.name).join(', ')}`
+            : 'Worker not ready',
         lastCheck,
       }
     }
@@ -470,6 +469,103 @@ async function checkWorkerStage7Readiness(): Promise<ServiceStatus> {
 }
 
 /**
+ * Check Telegram Bot connectivity
+ * Verifies the bot is accessible and webhook is configured
+ */
+async function checkTelegramBot(): Promise<ServiceStatus> {
+  const startTime = Date.now()
+  const lastCheck = new Date().toISOString()
+
+  const botToken = process.env.TELEGRAM_BOT_TOKEN
+
+  if (!botToken) {
+    return {
+      name: 'Telegram Bot',
+      status: 'unknown',
+      responseTime: 0,
+      message: 'TELEGRAM_BOT_TOKEN not configured',
+      lastCheck,
+    }
+  }
+
+  try {
+    // Check bot info and webhook status in parallel
+    const [botResponse, webhookResponse] = await Promise.all([
+      fetchWithTimeout(`https://api.telegram.org/bot${botToken}/getMe`),
+      fetchWithTimeout(`https://api.telegram.org/bot${botToken}/getWebhookInfo`),
+    ])
+
+    const responseTime = Date.now() - startTime
+
+    if (!botResponse.ok) {
+      return {
+        name: 'Telegram Bot',
+        status: 'error',
+        responseTime,
+        message: `Bot API error: HTTP ${botResponse.status}`,
+        lastCheck,
+      }
+    }
+
+    const botData = await botResponse.json()
+    const webhookData = await webhookResponse.json()
+
+    if (!botData.ok) {
+      return {
+        name: 'Telegram Bot',
+        status: 'error',
+        responseTime,
+        message: botData.description || 'Bot not accessible',
+        lastCheck,
+      }
+    }
+
+    const botUsername = botData.result?.username
+    const webhookUrl = webhookData.result?.url
+    const pendingUpdates = webhookData.result?.pending_update_count || 0
+    const lastError = webhookData.result?.last_error_message
+
+    // Check webhook configuration
+    if (!webhookUrl) {
+      return {
+        name: 'Telegram Bot',
+        status: 'degraded',
+        responseTime,
+        message: `@${botUsername}: webhook not configured`,
+        lastCheck,
+      }
+    }
+
+    // Check for recent errors
+    if (lastError) {
+      return {
+        name: 'Telegram Bot',
+        status: 'degraded',
+        responseTime,
+        message: `@${botUsername}: ${lastError}`,
+        lastCheck,
+      }
+    }
+
+    return {
+      name: 'Telegram Bot',
+      status: 'healthy',
+      responseTime,
+      message: `@${botUsername}, pending: ${pendingUpdates}`,
+      lastCheck,
+    }
+  } catch (error) {
+    return {
+      name: 'Telegram Bot',
+      status: 'error',
+      responseTime: Date.now() - startTime,
+      message: error instanceof Error ? error.message : 'Connection failed',
+      lastCheck,
+    }
+  }
+}
+
+/**
  * Check Qdrant vector database
  */
 async function checkQdrant(): Promise<ServiceStatus> {
@@ -547,42 +643,37 @@ async function checkQdrant(): Promise<ServiceStatus> {
  * - Docling MCP (document processing)
  * - Qdrant (vector database)
  */
-export async function GET(request: NextRequest): Promise<NextResponse<HealthResponse | { error: string }>> {
+export async function GET(
+  request: NextRequest
+): Promise<NextResponse<HealthResponse | { error: string }>> {
   const startTime = Date.now()
 
   // Authenticate and authorize
   try {
     const supabase = await createClient()
-    const { data: { user }, error: authError } = await supabase.auth.getUser()
+    const {
+      data: { user },
+      error: authError,
+    } = await supabase.auth.getUser()
 
     if (authError || !user) {
       logger.warn('Unauthorized health check attempt', {
         error: authError?.message,
-        ip: request.headers.get('x-forwarded-for') || 'unknown'
+        ip: request.headers.get('x-forwarded-for') || 'unknown',
       })
-      return NextResponse.json(
-        { error: 'Authentication required' },
-        { status: 401 }
-      )
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
     }
 
     // Check user role
-    const { data: profile } = await supabase
-      .from('users')
-      .select('role')
-      .eq('id', user.id)
-      .single()
+    const { data: profile } = await supabase.from('users').select('role').eq('id', user.id).single()
 
     const role = profile?.role
     if (role !== 'admin' && role !== 'superadmin') {
       logger.warn('Forbidden health check attempt', {
         userId: user.id,
-        role
+        role,
       })
-      return NextResponse.json(
-        { error: 'Admin access required' },
-        { status: 403 }
-      )
+      return NextResponse.json({ error: 'Admin access required' }, { status: 403 })
     }
 
     // Run all health checks in parallel
@@ -594,6 +685,7 @@ export async function GET(request: NextRequest): Promise<NextResponse<HealthResp
       qdrantStatus,
       workerStatus,
       workerStage7Status,
+      telegramStatus,
     ] = await Promise.allSettled([
       checkSupabase(),
       checkApiServer(),
@@ -602,37 +694,89 @@ export async function GET(request: NextRequest): Promise<NextResponse<HealthResp
       checkQdrant(),
       checkWorkerReadiness(),
       checkWorkerStage7Readiness(),
+      checkTelegramBot(),
     ])
 
     // Extract results, handling rejected promises
     const services: ServiceStatus[] = [
       supabaseStatus.status === 'fulfilled'
         ? supabaseStatus.value
-        : { name: 'Supabase', status: 'error' as const, responseTime: 0, message: 'Check failed', lastCheck: new Date().toISOString() },
+        : {
+            name: 'Supabase',
+            status: 'error' as const,
+            responseTime: 0,
+            message: 'Check failed',
+            lastCheck: new Date().toISOString(),
+          },
       apiServerStatus.status === 'fulfilled'
         ? apiServerStatus.value
-        : { name: 'API Server', status: 'error' as const, responseTime: 0, message: 'Check failed', lastCheck: new Date().toISOString() },
+        : {
+            name: 'API Server',
+            status: 'error' as const,
+            responseTime: 0,
+            message: 'Check failed',
+            lastCheck: new Date().toISOString(),
+          },
       redisStatus.status === 'fulfilled'
         ? redisStatus.value
-        : { name: 'Redis', status: 'error' as const, responseTime: 0, message: 'Check failed', lastCheck: new Date().toISOString() },
+        : {
+            name: 'Redis',
+            status: 'error' as const,
+            responseTime: 0,
+            message: 'Check failed',
+            lastCheck: new Date().toISOString(),
+          },
       doclingStatus.status === 'fulfilled'
         ? doclingStatus.value
-        : { name: 'Docling MCP', status: 'error' as const, responseTime: 0, message: 'Check failed', lastCheck: new Date().toISOString() },
+        : {
+            name: 'Docling MCP',
+            status: 'error' as const,
+            responseTime: 0,
+            message: 'Check failed',
+            lastCheck: new Date().toISOString(),
+          },
       qdrantStatus.status === 'fulfilled'
         ? qdrantStatus.value
-        : { name: 'Qdrant', status: 'error' as const, responseTime: 0, message: 'Check failed', lastCheck: new Date().toISOString() },
+        : {
+            name: 'Qdrant',
+            status: 'error' as const,
+            responseTime: 0,
+            message: 'Check failed',
+            lastCheck: new Date().toISOString(),
+          },
       workerStatus.status === 'fulfilled'
         ? workerStatus.value
-        : { name: 'Worker', status: 'error' as const, responseTime: 0, message: 'Check failed', lastCheck: new Date().toISOString() },
+        : {
+            name: 'Worker',
+            status: 'error' as const,
+            responseTime: 0,
+            message: 'Check failed',
+            lastCheck: new Date().toISOString(),
+          },
       workerStage7Status.status === 'fulfilled'
         ? workerStage7Status.value
-        : { name: 'Worker Stage 7', status: 'error' as const, responseTime: 0, message: 'Check failed', lastCheck: new Date().toISOString() },
+        : {
+            name: 'Worker Stage 7',
+            status: 'error' as const,
+            responseTime: 0,
+            message: 'Check failed',
+            lastCheck: new Date().toISOString(),
+          },
+      telegramStatus.status === 'fulfilled'
+        ? telegramStatus.value
+        : {
+            name: 'Telegram Bot',
+            status: 'error' as const,
+            responseTime: 0,
+            message: 'Check failed',
+            lastCheck: new Date().toISOString(),
+          },
     ]
 
     // Determine overall status
-    const hasError = services.some(s => s.status === 'error')
-    const hasDegraded = services.some(s => s.status === 'degraded')
-    const hasUnknown = services.some(s => s.status === 'unknown')
+    const hasError = services.some((s) => s.status === 'error')
+    const hasDegraded = services.some((s) => s.status === 'degraded')
+    const hasUnknown = services.some((s) => s.status === 'unknown')
 
     let overall: 'healthy' | 'degraded' | 'error' = 'healthy'
     if (hasError) {
@@ -651,16 +795,13 @@ export async function GET(request: NextRequest): Promise<NextResponse<HealthResp
       overall,
       duration: Date.now() - startTime,
       userId: user.id,
-      services: services.map(s => ({ name: s.name, status: s.status })),
+      services: services.map((s) => ({ name: s.name, status: s.status })),
     })
 
     // Always return 200, status is in the body
     return NextResponse.json(response)
   } catch (error) {
     logger.error('Admin health check failed', { error })
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
