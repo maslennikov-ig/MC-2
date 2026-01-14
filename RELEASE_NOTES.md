@@ -2,6 +2,34 @@
 
 _Released on 2025-12-26_
 
+## v0.27.11
+
+_Released on 2026-01-14_
+
+### ✨ New Features
+
+- **telegram**: Add webhook handler for bot commands
+- **profile**: Add Telegram notification settings section
+- **shared-types**: Add i18n UI labels for CourseSizeSelector
+- **web**: Add form validation for courseSize/estimatedLessons dependency
+- **course-size**: Add 'auto' option as default selection
+- **course-size**: Add course size presets (mini/compact/standard/comprehensive)
+
+### 🔧 Improvements
+
+- **profile**: Simplify Telegram connection with Login Widget
+
+### 🐛 Bug Fixes
+
+- **types**: Resolve TypeScript build errors
+- **lint**: Resolve remaining ESLint errors in web package
+- **lint**: Resolve all ESLint errors across packages
+- **course-size**: Address code review findings
+
+---
+
+_This release was automatically generated from 24 commits._
+
 ## v0.27.10
 
 _Released on 2026-01-14_
