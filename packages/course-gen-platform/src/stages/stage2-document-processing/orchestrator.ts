@@ -29,7 +29,7 @@ import { executePhase6Summarization } from './phases/phase-6-summarization';
 import { logTrace } from '../../shared/trace-logger';
 import { getTranslator } from '../../shared/i18n';
 import { handleStageCompletion } from '../../shared/auto-approval';
-import { notifyStageComplete } from '../../shared/notifications';
+import { notifyStageComplete, notifyCourseError } from '../../shared/notifications';
 
 /**
  * Document Processing Orchestrator
@@ -657,13 +657,31 @@ export class DocumentProcessingOrchestrator {
           logger.info({ courseId, totalCount: total }, 'All documents complete for course');
 
           // Handle automatic mode - auto-approve and proceed to Stage 3
-          const { autoApproved } = await handleStageCompletion(courseId, 2);
-          if (autoApproved) {
-            logger.info({ courseId }, 'Stage 2 auto-approved, proceeding to Stage 3');
-          }
+          try {
+            const { autoApproved } = await handleStageCompletion(courseId, 2);
+            if (autoApproved) {
+              logger.info({ courseId }, 'Stage 2 auto-approved, proceeding to Stage 3');
+            }
 
-          // Send stage completion notification (if enabled)
-          await notifyStageComplete(courseId, 2);
+            // Send stage completion notification (if enabled)
+            await notifyStageComplete(courseId, 2);
+          } catch (stageError) {
+            logger.error(
+              {
+                courseId,
+                error: stageError instanceof Error ? stageError.message : String(stageError),
+              },
+              'Failed to handle stage completion for Stage 2'
+            );
+            // Notify user about the error
+            try {
+              await notifyCourseError(courseId, 2, 'Auto-approval failed');
+            } catch (notifyErr) {
+              logger.warn({ courseId }, 'Failed to send error notification');
+            }
+            // Re-throw to mark job as failed
+            throw stageError;
+          }
         }
       }
     } catch (err) {
