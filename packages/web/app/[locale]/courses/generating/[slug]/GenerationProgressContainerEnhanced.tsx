@@ -21,6 +21,8 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 // DISABLED: MissionControlBanner handlers moved to GraphView
 // import { approveStage, cancelGeneration, startGeneration } from '@/app/actions/admin-generation';
 import { GraphViewWrapper } from '@/components/generation-graph'
+import { AutomaticModeControlPanel } from '@/components/generation'
+import { cancelGeneration } from '@/app/actions/admin-generation'
 
 // Celestial Design Imports - SpaceBackground REMOVED: GraphView takes full screen now
 // MissionControlBanner - DISABLED: Now rendered inside GraphView
@@ -48,6 +50,10 @@ interface GenerationProgressContainerProps {
   generationCode?: string | null
   /** Pre-loaded Stage 1 course data for immediate display */
   stage1CourseData?: Stage1CourseData
+  /** Generation mode (automatic, semi_automatic, or null) */
+  generationMode?: 'automatic' | 'semi_automatic' | null
+  /** Timestamp when generation was paused (null if not paused) */
+  generationPausedAt?: string | null
 }
 
 // Session storage keys
@@ -198,6 +204,8 @@ export default function GenerationProgressContainerEnhanced({
   failedAtStage,
   generationCode,
   stage1CourseData,
+  generationMode = null,
+  generationPausedAt = null,
 }: GenerationProgressContainerProps) {
   const router = useRouter()
   const t = useTranslations('generation.success')

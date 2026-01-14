@@ -311,6 +311,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.27.8] - 2026-01-14
+
+### Added
+
+- **generation**: add automatic generation mode with auto-approval (fd1fc7d)
+- add notification services for automatic generation mode (7f17872)
+- **web**: add generation mode UI components to course creation form (9108238)
+
+### Fixed
+
+- **course-gen-platform**: update 1 source file(s) (8384a82)
+- **stage6**: send completion notifications when all lessons generated (264155d)
+
+### Other
+
+- bd sync: 2026-01-14 13:11:39 (2e04059)
+
 ## [0.27.7] - 2026-01-14
 
 ### Added

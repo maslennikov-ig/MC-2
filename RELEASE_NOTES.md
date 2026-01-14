@@ -2,6 +2,25 @@
 
 _Released on 2025-12-26_
 
+## v0.27.8
+
+_Released on 2026-01-14_
+
+### ✨ New Features
+
+- **generation**: Add automatic generation mode with auto-approval
+- Add notification services for automatic generation mode
+- **web**: Add generation mode UI components to course creation form
+
+### 🐛 Bug Fixes
+
+- **course-gen-platform**: Update 1 source file(s)
+- **stage6**: Send completion notifications when all lessons generated
+
+---
+
+_This release was automatically generated from 6 commits._
+
 ## v0.27.7
 
 _Released on 2026-01-14_
