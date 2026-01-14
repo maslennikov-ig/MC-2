@@ -311,6 +311,21 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.27.9] - 2026-01-14
+
+### Added
+
+- **course-gen-platform**: add 2 source file(s), update 7 source file(s), +1 more (b9bf595)
+- **graph**: add readOnly prop for automatic generation mode (cc6f097)
+- **notifications**: add stage completion notifications to stages 2-4 (98efd8e)
+- **generation**: integrate AutomaticModeControlPanel into generation progress page (d2f8ee5)
+
+### Other
+
+- bd sync: 2026-01-14 13:47:01 (e0b84e6)
+- bd sync: 2026-01-14 13:46:45 (dafb4f0)
+- bd sync: 2026-01-14 13:34:36 (b80c0f2)
+
 ## [0.27.8] - 2026-01-14
 
 ### Added

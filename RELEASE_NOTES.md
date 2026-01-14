@@ -2,6 +2,21 @@
 
 _Released on 2025-12-26_
 
+## v0.27.9
+
+_Released on 2026-01-14_
+
+### ✨ New Features
+
+- **course-gen-platform**: Add 2 source file(s), update 7 source file(s), +1 more
+- **graph**: Add readOnly prop for automatic generation mode
+- **notifications**: Add stage completion notifications to stages 2-4
+- **generation**: Integrate AutomaticModeControlPanel into generation progress page
+
+---
+
+_This release was automatically generated from 7 commits._
+
 ## v0.27.8
 
 _Released on 2026-01-14_
