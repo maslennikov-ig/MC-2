@@ -34,12 +34,18 @@ function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
 }
 
-/** How long to delay a job when paused (30 seconds) */
-const PAUSE_DELAY_MS = 30_000;
+/** How long to delay a job when paused (default 30 seconds, configurable via env) */
+const PAUSE_DELAY_MS = parseInt(process.env.PAUSE_DELAY_MS || '30000', 10);
 
 /**
  * Check if course generation is paused by querying the generation_paused_at column.
  * Returns true if the course is currently paused, false otherwise.
+ *
+ * Note: This is a non-locking read. There is a small theoretical race window
+ * where a pause could be set between this check and job processing.
+ * This is acceptable: jobs that start during pause will complete normally,
+ * and subsequent jobs will be delayed. The pause RPC uses FOR UPDATE for
+ * atomic state changes.
  */
 async function isCoursePaused(courseId: string): Promise<boolean> {
   try {
@@ -58,8 +64,9 @@ async function isCoursePaused(courseId: string): Promise<boolean> {
     }
 
     // Course is paused if generation_paused_at is not null
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    return (data as any)?.generation_paused_at !== null;
+    // Type assertion needed as Supabase client doesn't narrow the select
+    type PauseStatus = { generation_paused_at: string | null };
+    return (data as PauseStatus)?.generation_paused_at !== null;
   } catch (err) {
     logger.warn(
       { courseId, error: err instanceof Error ? err.message : String(err) },
@@ -71,7 +78,16 @@ async function isCoursePaused(courseId: string): Promise<boolean> {
 
 /**
  * Check if course is paused and delay the job if so.
+ *
+ * NOTE: This check only happens at the START of job processing.
+ * If a job is already running when the user pauses, it will continue
+ * to completion. New jobs will be delayed until the course is resumed.
+ *
+ * @param job - The BullMQ job to delay
+ * @param courseId - The course ID to check pause status for
+ * @param token - Job token for lock management (required for moveToDelayed, validated at runtime)
  * @throws DelayedError if the job was moved to delayed state
+ * @throws Error if token is missing when pause is needed
  */
 async function checkPauseAndDelay(
   job: Job,
@@ -81,6 +97,13 @@ async function checkPauseAndDelay(
   const isPaused = await isCoursePaused(courseId);
 
   if (isPaused) {
+    // Token is required for moveToDelayed (Issue #6 from code review)
+    // BullMQ types say token is optional, but it's required for proper lock management
+    if (!token) {
+      logger.error({ jobId: job.id, courseId }, 'Cannot delay job: token is missing');
+      throw new Error('Job token is required for pause/delay operations');
+    }
+
     logger.info(
       { jobId: job.id, courseId },
       'Course generation is paused, delaying job'
@@ -278,7 +301,7 @@ export async function processWithFallback(
 /**
  * Process a single Stage 6 job
  * @param job - The BullMQ job to process
- * @param token - Optional job token for lock management (used for pause/delay)
+ * @param token - Job token for lock management (required for pause/delay, validated at runtime)
  */
 export async function processStage6Job(
   job: Job<Stage6JobInput, Stage6JobResult>,
@@ -379,6 +402,10 @@ export async function processStage6Job(
   const lessonUuid = await resolveLessonUuid(courseId, lessonLabel);
   const modelConfig: ModelConfig = await getStage6ModelConfig(lessonSpec, language);
 
+  // Check pause status for logging (Issue #9 from code review)
+  // Note: If we reached here, course was not paused at job start (checkPauseAndDelay passed)
+  const pauseStatusForLogging = await isCoursePaused(courseId);
+
   const jobLogger = logger.child({
     jobId: job.id,
     lessonId: lessonLabel,
@@ -387,6 +414,7 @@ export async function processStage6Job(
     attempt: job.attemptsMade + 1,
     language,
     primaryModel: modelConfig.primary,
+    isPaused: pauseStatusForLogging,
   });
 
   jobLogger.info(
@@ -394,6 +422,7 @@ export async function processStage6Job(
       lessonTitle: lessonSpec.title,
       sectionsCount: lessonSpec.sections.length,
       ragChunksCount: ragChunks.length,
+      isPaused: pauseStatusForLogging,
     },
     'Processing Stage 6 job'
   );
@@ -410,6 +439,7 @@ export async function processStage6Job(
       ragChunksCount: ragChunks.length,
       ragContextId,
       primaryModel: modelConfig.primary,
+      isPaused: pauseStatusForLogging,
     },
     durationMs: 0,
   });

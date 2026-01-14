@@ -346,3 +346,56 @@ export type CourseLevel = z.infer<typeof courseLevelSchema>;
 
 /** Array of all course levels */
 export const COURSE_LEVELS = courseLevelSchema.options;
+
+// ============================================================================
+// Generation Status Constants (Issue #10 from code review)
+// ============================================================================
+
+/**
+ * Generation statuses that allow pausing
+ * Used to determine if a course can be paused during generation
+ */
+export const PAUSABLE_STATUSES = [
+  'stage_2_init', 'stage_2_processing',
+  'stage_3_init', 'stage_3_summarizing',
+  'stage_4_init', 'stage_4_analyzing',
+  'stage_5_init', 'stage_5_generating',
+  'stage_6_init', 'stage_6_generating',
+] as const;
+
+/** Type for pausable generation statuses */
+export type PausableStatus = typeof PAUSABLE_STATUSES[number];
+
+/**
+ * Generation statuses that allow cancellation
+ * Includes all pausable statuses plus additional early statuses
+ */
+export const CANCELLABLE_STATUSES = [
+  ...PAUSABLE_STATUSES,
+  'pending',
+  'initializing',
+  'generating',
+  'processing_documents',
+  'document_processing',
+  'generating_structure',
+  'finalizing',
+] as const;
+
+/** Type for cancellable generation statuses */
+export type CancellableStatus = typeof CANCELLABLE_STATUSES[number];
+
+/**
+ * Check if a generation status allows pausing
+ * @param status - The current generation status
+ */
+export function canPauseGeneration(status: string | null | undefined): boolean {
+  return PAUSABLE_STATUSES.includes(status as PausableStatus);
+}
+
+/**
+ * Check if a generation status allows cancellation
+ * @param status - The current generation status
+ */
+export function canCancelGeneration(status: string | null | undefined): boolean {
+  return CANCELLABLE_STATUSES.includes(status as CancellableStatus);
+}

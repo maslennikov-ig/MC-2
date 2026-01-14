@@ -96,7 +96,11 @@ export function GenerationProgress({
   const [error, setError] = useState<string | null>(null)
   const [isConnected, setIsConnected] = useState(false)
   const [generationCode, setGenerationCode] = useState<string | null>(null)
-  const [isPaused, setIsPaused] = useState(false)
+  // Initialize isPaused from database state (Issue #5 from code review)
+  const [isPaused, setIsPaused] = useState(
+    () => (initialProgress as any)?.generation_paused_at !== null &&
+          (initialProgress as any)?.generation_paused_at !== undefined
+  )
   const [pauseLoading, setPauseLoading] = useState(false)
 
   // Calculate estimated time remaining
@@ -119,6 +123,13 @@ export function GenerationProgress({
     const handleCourseUpdate = (payload: { new: Course }) => {
       logger.info('Realtime update received', { courseId, payload })
       const updatedCourse = payload.new
+
+      // Sync pause state from database (Issue #5 from code review)
+      if ('generation_paused_at' in updatedCourse) {
+        const newIsPaused = updatedCourse.generation_paused_at !== null
+        setIsPaused(newIsPaused)
+        logger.info('Pause state synced', { courseId, isPaused: newIsPaused })
+      }
 
       // Update generation code if present
       if (updatedCourse.generation_code) {

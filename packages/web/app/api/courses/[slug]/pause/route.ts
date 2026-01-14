@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { createClient } from '@/lib/supabase/server'
 import { logger } from '@/lib/logger'
+import { canPauseGeneration } from '@megacampus/shared-types'
 
 /**
  * POST handler to pause course generation
@@ -110,13 +111,8 @@ export async function GET(
     }
 
     const isPaused = course.generation_paused_at !== null
-    const canPause = [
-      'stage_2_init', 'stage_2_processing',
-      'stage_3_init', 'stage_3_summarizing',
-      'stage_4_init', 'stage_4_analyzing',
-      'stage_5_init', 'stage_5_generating',
-      'stage_6_init', 'stage_6_generating',
-    ].includes(course.generation_status || '')
+    // Use shared constants for pausable statuses (Issue #10 from code review)
+    const canPause = canPauseGeneration(course.generation_status)
 
     return NextResponse.json({
       isPaused,

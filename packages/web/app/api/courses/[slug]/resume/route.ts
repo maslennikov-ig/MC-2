@@ -28,10 +28,10 @@ export async function POST(
       return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
     }
 
-    // Fetch course to get ID and verify ownership
+    // Fetch course to get ID, verify ownership, and check pause status
     const { data: course, error: fetchError } = await supabase
       .from('courses')
-      .select('id, user_id')
+      .select('id, user_id, generation_paused_at')
       .eq('slug', slug)
       .single()
 
@@ -43,6 +43,14 @@ export async function POST(
       return NextResponse.json(
         { error: 'You do not have permission to resume this course' },
         { status: 403 }
+      )
+    }
+
+    // Early validation: Check if actually paused (Issue #4 from code review)
+    if (!course.generation_paused_at) {
+      return NextResponse.json(
+        { error: 'Generation is not paused' },
+        { status: 400 }
       )
     }
 
