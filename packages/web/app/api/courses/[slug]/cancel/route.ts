@@ -60,24 +60,34 @@ export async function POST(
     }
 
     // Check if cancellation is allowed based on status
+    // Extended to support all generation stages including Stage 6 lesson generation
     const cancellableStatuses = [
+      // Legacy statuses
       'generating',
       'processing_documents',
       'document_processing',
       'generating_structure',
+      // New FSM-based statuses (all active stages can be cancelled)
+      'pending',
+      'stage_2_init', 'stage_2_processing',
+      'stage_3_init', 'stage_3_summarizing',
+      'stage_4_init', 'stage_4_analyzing',
+      'stage_5_init', 'stage_5_generating',
+      'stage_6_init', 'stage_6_generating',
+      'finalizing',
     ]
 
     const courseStatus = course.status || ''
 
     if (!cancellableStatuses.includes(courseStatus)) {
-      logger.info('Cancel rejected - course too far along', {
+      logger.info('Cancel rejected - course in terminal or non-cancellable state', {
         slug,
         status: course.status,
       })
       return NextResponse.json(
         {
           error: 'Cannot cancel at this stage',
-          message: 'The course generation has progressed too far to be cancelled.',
+          message: 'The course is either completed, already cancelled, or in a state that cannot be cancelled.',
           currentStatus: course.status,
         },
         { status: 400 }
@@ -262,12 +272,21 @@ export async function GET(
       return NextResponse.json({ canCancel: false, reason: 'Not the owner' }, { status: 403 })
     }
 
-    // Check if cancellable
+    // Check if cancellable - extended to support all stages
     const cancellableStatuses = [
+      // Legacy statuses
       'generating',
       'processing_documents',
       'document_processing',
       'generating_structure',
+      // New FSM-based statuses
+      'pending',
+      'stage_2_init', 'stage_2_processing',
+      'stage_3_init', 'stage_3_summarizing',
+      'stage_4_init', 'stage_4_analyzing',
+      'stage_5_init', 'stage_5_generating',
+      'stage_6_init', 'stage_6_generating',
+      'finalizing',
     ]
 
     const courseStatus = course.status || ''

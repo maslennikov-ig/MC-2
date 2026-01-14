@@ -1,7 +1,8 @@
-import { Job } from 'bullmq';
+import { Job, DelayedError } from 'bullmq';
 import { logger } from '@/shared/logger';
 import { logTrace } from '@/shared/trace-logger';
 import { resolveLessonUuid } from '@/shared/database/lesson-resolver';
+import { getSupabaseAdmin } from '@/shared/supabase/admin';
 import {
   executeStage6 as executeStage6Orchestrator,
   type Stage6Input,
@@ -31,6 +32,66 @@ import { triggerLessonCard } from '../../stage7-enrichments/services/auto-card-t
 
 function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+/** How long to delay a job when paused (30 seconds) */
+const PAUSE_DELAY_MS = 30_000;
+
+/**
+ * Check if course generation is paused
+ * @returns true if paused, false otherwise
+ */
+async function isCoursePaused(courseId: string): Promise<boolean> {
+  try {
+    const supabase = getSupabaseAdmin();
+    // NOTE: generation_paused_at column will be added in future migration
+    // For now, use 'id' as placeholder and always return false
+    const { data, error } = await supabase
+      .from('courses')
+      .select('id')
+      .eq('id', courseId)
+      .single();
+
+    if (error) {
+      logger.warn({ courseId, error: error.message }, 'Failed to check pause status');
+      return false;
+    }
+
+    // TODO: Change to `data?.generation_paused_at !== null` when column is added
+    void data; // Silence unused variable warning
+    return false; // Pause feature not yet implemented
+  } catch (err) {
+    logger.warn(
+      { courseId, error: err instanceof Error ? err.message : String(err) },
+      'Exception checking pause status'
+    );
+    return false;
+  }
+}
+
+/**
+ * Check if course is paused and delay the job if so.
+ * @throws DelayedError if the job was moved to delayed state
+ */
+async function checkPauseAndDelay(
+  job: Job,
+  courseId: string,
+  token?: string
+): Promise<void> {
+  const isPaused = await isCoursePaused(courseId);
+
+  if (isPaused) {
+    logger.info(
+      { jobId: job.id, courseId },
+      'Course generation is paused, delaying job'
+    );
+
+    // Move job to delayed state - it will be picked up again after PAUSE_DELAY_MS
+    await job.moveToDelayed(Date.now() + PAUSE_DELAY_MS, token);
+
+    // Throw DelayedError to signal the worker that the job was delayed
+    throw new DelayedError();
+  }
 }
 
 /**
@@ -216,12 +277,18 @@ export async function processWithFallback(
 
 /**
  * Process a single Stage 6 job
+ * @param job - The BullMQ job to process
+ * @param token - Optional job token for lock management (used for pause/delay)
  */
 export async function processStage6Job(
-  job: Job<Stage6JobInput, Stage6JobResult>
+  job: Job<Stage6JobInput, Stage6JobResult>,
+  token?: string
 ): Promise<Stage6JobResult> {
   const { lessonSpec, courseId, language, userRefinementPrompt: _userRefinementPrompt } = job.data;
   const startTime = Date.now();
+
+  // Check if course generation is paused - if so, delay this job
+  await checkPauseAndDelay(job, courseId, token);
 
   if (
     !lessonSpec ||

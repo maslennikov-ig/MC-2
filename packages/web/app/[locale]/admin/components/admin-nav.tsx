@@ -60,7 +60,7 @@ export function AdminNav({ role, messages }: AdminNavProps) {
             className={`admin-nav-link px-3 py-2 rounded-md text-gray-700 dark:text-gray-300 hover:text-purple-600 dark:hover:text-purple-400 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors ${
               isActive('/admin/pricing') ? 'admin-nav-link-active bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400' : ''
             }`}
-            href={'/admin/pricing' as any}
+            href="/admin/pricing"
           >
             {messages.admin?.navigation?.pricing || 'Pricing'}
           </Link>
@@ -76,7 +76,7 @@ export function AdminNav({ role, messages }: AdminNavProps) {
             className={`admin-nav-link px-3 py-2 rounded-md text-gray-700 dark:text-gray-300 hover:text-purple-600 dark:hover:text-purple-400 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors ${
               isActive('/admin/logs') ? 'admin-nav-link-active bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400' : ''
             }`}
-            href={'/admin/logs' as any}
+            href="/admin/logs"
           >
             {messages.admin?.navigation?.logs || 'Logs'}
           </Link>
@@ -84,7 +84,7 @@ export function AdminNav({ role, messages }: AdminNavProps) {
             className={`admin-nav-link px-3 py-2 rounded-md text-gray-700 dark:text-gray-300 hover:text-purple-600 dark:hover:text-purple-400 hover:bg-gray-100 dark:hover:bg-slate-800 transition-colors ${
               isActive('/admin/analytics') ? 'admin-nav-link-active bg-purple-50 dark:bg-purple-500/10 text-purple-600 dark:text-purple-400' : ''
             }`}
-            href={'/admin/analytics' as any}
+            href="/admin/analytics"
           >
             {messages.admin?.navigation?.analytics || 'Analytics'}
           </Link>

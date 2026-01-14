@@ -383,13 +383,14 @@ async function triggerLessonEnrichment(
     const actualEnrichmentId = enrichmentId;
 
     // Queue Stage7 job with deterministic jobId for deduplication
+    // userId and organizationId are guaranteed to be set at this point (either from params or fetched from course)
     const jobInput: Stage7JobInput = {
       enrichmentId: actualEnrichmentId,
       enrichmentType,
       lessonId,
       courseId,
-      userId,
-      organizationId,
+      userId: userId!,
+      organizationId: organizationId!,
       retryAttempt: 0,
     };
 
@@ -644,13 +645,14 @@ export async function triggerCourseCard(params: {
     }
 
     // Queue Stage7 job with deterministic jobId for deduplication
+    // userId and organizationId are guaranteed to be set at this point (either from params or fetched from course)
     const jobInput: Stage7JobInput = {
       enrichmentId,
       enrichmentType: 'card',
       lessonId: firstLesson.id,
       courseId,
-      userId,
-      organizationId,
+      userId: userId!,
+      organizationId: organizationId!,
       settings: { isCourseCard: true },
       retryAttempt: 0,
     };

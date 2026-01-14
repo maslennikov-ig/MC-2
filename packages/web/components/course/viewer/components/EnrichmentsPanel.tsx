@@ -310,15 +310,11 @@ export function EnrichmentsPanel({
           const generatingProgress = getProgress(type)
           const typeIsGenerating = isGenerating(type)
 
-          // Inline estimated time to avoid type inference issues
-          const estimatedTime =
-            type === 'quiz'
-              ? t('placeholder.quiz.estimatedTime' as any)
-              : type === 'audio'
-                ? t('placeholder.audio.estimatedTime' as any)
-                : type === 'presentation'
-                  ? t('placeholder.presentation.estimatedTime' as any)
-                  : t('placeholder.video.estimatedTime' as any)
+          // Construct translation key dynamically - path exists in enrichments.json
+          type PlaceholderKey = `placeholder.${typeof type}.estimatedTime`;
+          const estimatedTimeKey = `placeholder.${type}.estimatedTime` as PlaceholderKey;
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Dynamic key not in strict types
+          const estimatedTime = t(estimatedTimeKey as Parameters<typeof t>[0])
 
           // Show generating card if generation is in progress
           if (typeIsGenerating && generatingProgress) {

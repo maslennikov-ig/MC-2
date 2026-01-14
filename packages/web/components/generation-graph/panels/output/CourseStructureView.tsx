@@ -164,10 +164,11 @@ export const CourseStructureView = ({
   const applyFieldValue = useCallback(<T,>(data: T, path: string, value: unknown): T => {
     return produce(data, (draft) => {
       const parts = path.replace(/\[/g, '.').replace(/\]/g, '').split('.');
-      let current: any = draft;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Dynamic path traversal requires any
+      let current: Record<string, unknown> = draft as Record<string, unknown>;
 
       for (let i = 0; i < parts.length - 1; i++) {
-        current = current[parts[i]];
+        current = current[parts[i]] as Record<string, unknown>;
       }
 
       current[parts[parts.length - 1]] = value;
@@ -281,7 +282,7 @@ export const CourseStructureView = ({
   }, [autoFocus, canEdit]);
 
   // Handler for lesson changes (optimistic updates)
-  const handleLessonChange = (sectionIdx: number, lessonIdx: number, updatedLesson: any) => {
+  const handleLessonChange = (sectionIdx: number, lessonIdx: number, updatedLesson: Lesson) => {
     if (!onStructureChange) return;
 
     // Update lesson timestamp
@@ -310,7 +311,8 @@ export const CourseStructureView = ({
     });
 
     const updatedStructure = produce(data, (draft) => {
-      const section = draft.sections[sectionIdx] as any;
+      // Dynamic field assignment requires index signature access
+      const section = draft.sections[sectionIdx] as Section & Record<string, unknown>;
       section[field] = value;
     });
 

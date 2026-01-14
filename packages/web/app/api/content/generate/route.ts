@@ -68,7 +68,7 @@ async function handleContentGeneration(request: NextRequest, user: AuthUser | nu
       lessonId,
       lessonNumber: lessonNumber || lesson?.order_index || 1,
       lessonTitle: lessonTitle || lesson?.title || 'Test Lesson',
-      lessonContent: lesson?.content_text || lesson?.content || 'Test content for webhook testing',
+      lessonContent: 'Test content for webhook testing', // Content is in lesson_contents table, not lessons
       lessonObjectives: lesson?.objectives || [],
       lessonDuration: lesson?.duration_minutes || 5,
       sectionId,

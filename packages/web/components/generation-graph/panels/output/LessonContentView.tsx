@@ -124,9 +124,11 @@ export function LessonContentView({
       const outputContent = data.outputData.content || data.outputData.lesson_content;
       if (typeof outputContent === 'string') return outputContent;
       if (outputContent && typeof outputContent === 'object') {
-        if ('content' in (outputContent as any) && typeof (outputContent as any).content === 'object') {
-          contentObj = (outputContent as any).content as LessonContentStructure;
-        } else if ('sections' in (outputContent as any)) {
+        // Type guard: outputContent is object, check for nested content or sections
+        const outputObj = outputContent as Record<string, unknown>;
+        if ('content' in outputObj && typeof outputObj.content === 'object' && outputObj.content !== null) {
+          contentObj = outputObj.content as LessonContentStructure;
+        } else if ('sections' in outputObj) {
           contentObj = outputContent as LessonContentStructure;
         }
       }
