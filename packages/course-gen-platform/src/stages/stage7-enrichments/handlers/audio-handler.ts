@@ -28,6 +28,7 @@ import {
   type TTSFormat,
 } from '../prompts/audio-prompt';
 import { AUDIO_CONFIG } from '../config';
+import { getLessonContent } from '../services/database-service';
 import { uploadEnrichmentAsset } from '../services/storage-service';
 
 // ============================================================================
@@ -154,6 +155,12 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
   );
 
   try {
+    // Fetch lesson content from lesson_contents table
+    const lessonContent = await getLessonContent(enrichmentContext.lesson.id);
+    if (!lessonContent) {
+      throw new Error(`No lesson content found for lesson ${enrichmentContext.lesson.id}`);
+    }
+
     // 1. Validate and extract settings
     const language = (enrichmentContext.course.language || 'en') as 'en' | 'ru';
     const rawVoice = (settings.voice as TTSVoice) || getDefaultVoice(language);
@@ -172,7 +179,7 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
     // 2. Preprocess lesson content using audio-prompt.ts
     const processedScript = prepareAudioScript({
       lessonTitle: enrichmentContext.lesson.title,
-      lessonContent: enrichmentContext.lesson.content || '',
+      lessonContent,
       language,
       settings: {
         voice,

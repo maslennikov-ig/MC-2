@@ -23,6 +23,7 @@ import {
   base64ToBuffer,
   convertToWebP,
 } from '../services/image-generation-service';
+import { getLessonContent } from '../services/database-service';
 
 // ============================================================================
 // CONFIGURATION
@@ -264,10 +265,16 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
     enrichment.title === 'course-card' ||
     enrichment.settings?.isCourseCard === true;
 
+  // Fetch lesson content from lesson_contents table (for lesson cards)
+  let lessonContent: string | null = null;
+  if (!isCourseCard) {
+    lessonContent = await getLessonContent(lesson.id);
+  }
+
   // Log debug if using fallback detection (not a warning - this is normal behavior)
-  if (!isCourseCard && (!lesson.content || lesson.id === 'course-level')) {
+  if (!isCourseCard && (!lessonContent || lesson.id === 'course-level')) {
     logger.debug(
-      { enrichmentId: enrichment.id, lessonId: lesson.id, hasContent: !!lesson.content },
+      { enrichmentId: enrichment.id, lessonId: lesson.id, hasContent: !!lessonContent },
       'Card enrichment for lesson without content - using lesson card prompt'
     );
   }
@@ -324,7 +331,7 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
       }
     } else {
       // Lesson card prompt from database
-      const lessonObjectives = extractLessonObjectives(lesson.content);
+      const lessonObjectives = extractLessonObjectives(lessonContent);
       const objectivesSummary = lessonObjectives.slice(0, 3).join('; ') || 'Key lesson concepts';
 
       try {

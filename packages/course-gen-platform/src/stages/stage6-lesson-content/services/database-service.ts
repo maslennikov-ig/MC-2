@@ -24,13 +24,24 @@ export async function handlePartialSuccess(
   const supabaseAdmin = getSupabaseAdmin();
 
   try {
+    // Save partial content to lesson_contents table (not lessons table)
+    // Serialize content to convert Date objects to strings (LessonContent has Date fields)
     const { error } = await supabaseAdmin
-      .from('lessons')
-      .update({
-        content: extractContentMarkdown(result.lessonContent),
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', lessonUuid);
+      .from('lesson_contents')
+      .upsert({
+        lesson_id: lessonUuid,
+        course_id: courseId,
+        content: JSON.parse(JSON.stringify(result.lessonContent)),
+        status: 'review_required', // Mark as partial success requiring review
+        metadata: JSON.parse(JSON.stringify({
+          markdownContent: extractContentMarkdown(result.lessonContent),
+          partial: true,
+          errors: result.errors,
+          qualityScore: result.metrics.qualityScore,
+        })),
+      }, {
+        onConflict: 'lesson_id',
+      });
 
     if (error) {
       logger.warn(
@@ -41,7 +52,7 @@ export async function handlePartialSuccess(
           lessonLabel,
           error: error.message,
         },
-        'Failed to save partial content to database'
+        'Failed to save partial content to lesson_contents table'
       );
     } else {
       logger.warn(
@@ -55,7 +66,7 @@ export async function handlePartialSuccess(
           errors: result.errors,
           qualityScore: result.metrics.qualityScore,
         },
-        'Partial success - content saved for review'
+        'Partial success - content saved to lesson_contents for review'
       );
     }
   } catch (error) {

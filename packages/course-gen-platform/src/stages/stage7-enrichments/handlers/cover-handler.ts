@@ -23,6 +23,7 @@ import {
   base64ToBuffer,
   convertToWebP,
 } from '../services/image-generation-service';
+import { getLessonContent } from '../services/database-service';
 
 // ============================================================================
 // TYPES
@@ -485,6 +486,9 @@ async function generateDraft(input: EnrichmentHandlerInput): Promise<DraftResult
   );
 
   try {
+    // Fetch lesson content from lesson_contents table (for fallback keywords)
+    const lessonContent = await getLessonContent(lesson.id);
+
     // Priority 1: Use objectives from Stage 5 (available immediately)
     // Priority 2: Fallback to content keywords from Stage 6 (if available)
     let keywords: string[];
@@ -502,8 +506,8 @@ async function generateDraft(input: EnrichmentHandlerInput): Promise<DraftResult
         },
         'Cover handler: using objectives for keyword extraction for draft generation'
       );
-    } else if (lesson.content) {
-      keywords = extractKeywords(lesson.content);
+    } else if (lessonContent) {
+      keywords = extractKeywords(lessonContent);
       keywordSource = 'content';
       logger.debug(
         {
@@ -521,7 +525,7 @@ async function generateDraft(input: EnrichmentHandlerInput): Promise<DraftResult
           enrichmentId: enrichment.id,
           lessonId: lesson.id,
           hasObjectives: !!lesson.objectives,
-          hasContent: !!lesson.content,
+          hasContent: !!lessonContent,
         },
         'Cover handler: no keyword sources available - using default prompt for draft generation'
       );
@@ -724,6 +728,9 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
   );
 
   try {
+    // Fetch lesson content from lesson_contents table (for fallback keywords)
+    const lessonContent = await getLessonContent(lesson.id);
+
     // Phase 1: Generate image prompt using LLM with DB prompts
     // Priority 1: Use objectives from Stage 5 (available immediately)
     // Priority 2: Fallback to content keywords from Stage 6 (if available)
@@ -742,8 +749,8 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
         },
         'Cover handler: using objectives for keyword extraction for generation'
       );
-    } else if (lesson.content) {
-      keywords = extractKeywords(lesson.content);
+    } else if (lessonContent) {
+      keywords = extractKeywords(lessonContent);
       keywordSource = 'content';
       logger.debug(
         {
@@ -761,7 +768,7 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
           enrichmentId: enrichment.id,
           lessonId: lesson.id,
           hasObjectives: !!lesson.objectives,
-          hasContent: !!lesson.content,
+          hasContent: !!lessonContent,
         },
         'Cover handler: no keyword sources available - using default prompt for generation'
       );
