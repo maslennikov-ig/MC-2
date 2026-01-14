@@ -311,6 +311,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.27.11] - 2026-01-14
+
+### Added
+
+- **telegram**: add webhook handler for bot commands (7356498)
+- **profile**: add Telegram notification settings section (226b5b6)
+- **shared-types**: add i18n UI labels for CourseSizeSelector (c1a8d29)
+- **web**: add form validation for courseSize/estimatedLessons dependency (431b06a)
+- **course-size**: add 'auto' option as default selection (c5f527f)
+- **course-size**: add course size presets (mini/compact/standard/comprehensive) (3ad6b73)
+
+### Changed
+
+- **profile**: simplify Telegram connection with Login Widget (266c539)
+
+### Fixed
+
+- **types**: resolve TypeScript build errors (2554554)
+- **lint**: resolve remaining ESLint errors in web package (0ed1af4)
+- **lint**: resolve all ESLint errors across packages (0359353)
+- **course-size**: address code review findings (0afdb0d)
+
+### Other
+
+- bd sync: 2026-01-14 19:15:49 (292251f)
+- bd sync: 2026-01-14 16:51:47 (5d38fbf)
+- bd sync: 2026-01-14 16:48:53 (8a00a48)
+- bd sync: 2026-01-14 16:44:37 (85e28aa)
+- bd sync: 2026-01-14 16:43:52 (22240ef)
+- bd sync: 2026-01-14 16:41:31 (5b305d4)
+- bd sync: 2026-01-14 16:40:55 (6dab329)
+- bd sync: 2026-01-14 16:34:47 (8e85937)
+- bd sync: 2026-01-14 16:25:01 (c40b157)
+- bd sync: 2026-01-14 16:24:36 (1fda912)
+- bd sync: 2026-01-14 16:11:11 (49bf611)
+- bd sync: 2026-01-14 16:08:41 (32e963e)
+- bd sync: 2026-01-14 14:37:21 (c4a9b3f)
+
 ## [0.27.10] - 2026-01-14
 
 ### Fixed
