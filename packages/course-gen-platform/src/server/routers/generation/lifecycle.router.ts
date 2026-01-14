@@ -109,12 +109,15 @@ export const lifecycleRouter = router({
         }
 
         if (course.user_id !== userId) {
-          logger.warn({
-            requestId,
-            userId,
-            courseId,
-            courseOwnerId: course.user_id,
-          }, 'Course ownership violation');
+          logger.warn(
+            {
+              requestId,
+              userId,
+              courseId,
+              courseOwnerId: course.user_id,
+            },
+            'Course ownership violation'
+          );
           throw new TRPCError({
             code: 'FORBIDDEN',
             message: 'You do not have access to this course',
@@ -127,20 +130,23 @@ export const lifecycleRouter = router({
 
         // Map database tier format to ConcurrencyTracker format
         const tierMap: Record<string, 'FREE' | 'BASIC' | 'STANDARD' | 'TRIAL' | 'PREMIUM'> = {
-          'trial': 'TRIAL',
-          'free': 'FREE',
-          'basic': 'BASIC',
-          'standard': 'STANDARD',
-          'premium': 'PREMIUM',
+          trial: 'TRIAL',
+          free: 'FREE',
+          basic: 'BASIC',
+          standard: 'STANDARD',
+          premium: 'PREMIUM',
         };
         const tier = tierMap[dbTier] || 'FREE';
 
-        logger.info({
-          requestId,
-          userId,
-          tier,
-          courseId,
-        }, 'Course generation request');
+        logger.info(
+          {
+            requestId,
+            userId,
+            tier,
+            courseId,
+          },
+          'Course generation request'
+        );
 
         // T014: Check concurrency limits using ConcurrencyTracker
         const concurrencyTracker = new ConcurrencyTracker();
@@ -149,12 +155,15 @@ export const lifecycleRouter = router({
         try {
           concurrencyCheck = await concurrencyTracker.checkAndReserve(userId, tier);
         } catch (concurrencyError) {
-          logger.error({
-            requestId,
-            userId,
-            tier,
-            error: concurrencyError,
-          }, 'Concurrency check failed');
+          logger.error(
+            {
+              requestId,
+              userId,
+              tier,
+              error: concurrencyError,
+            },
+            'Concurrency check failed'
+          );
           throw new TRPCError({
             code: 'INTERNAL_SERVER_ERROR',
             message: 'Failed to check concurrency limits',
@@ -162,12 +171,15 @@ export const lifecycleRouter = router({
         }
 
         if (!concurrencyCheck.allowed) {
-          logger.warn({
-            requestId,
-            userId,
-            tier,
-            concurrencyCheck,
-          }, 'Concurrency limit hit');
+          logger.warn(
+            {
+              requestId,
+              userId,
+              tier,
+              concurrencyCheck,
+            },
+            'Concurrency limit hit'
+          );
 
           // Write to system_metrics
           await supabase.from('system_metrics').insert({
@@ -201,17 +213,18 @@ export const lifecycleRouter = router({
         const redisReadiness = await getReadinessFromRedis();
         const readinessStatus = redisReadiness || workerReadiness.getStatus();
         if (!readinessStatus.ready) {
-          const failedChecks = readinessStatus.checks
-            .filter(c => !c.passed)
-            .map(c => c.name);
+          const failedChecks = readinessStatus.checks.filter(c => !c.passed).map(c => c.name);
 
-          logger.warn({
-            requestId,
-            userId,
-            courseId,
-            readinessStatus,
-            failedChecks,
-          }, 'Worker not ready - rejecting generation request');
+          logger.warn(
+            {
+              requestId,
+              userId,
+              courseId,
+              readinessStatus,
+              failedChecks,
+            },
+            'Worker not ready - rejecting generation request'
+          );
 
           throw new TRPCError({
             code: 'SERVICE_UNAVAILABLE',
@@ -232,7 +245,10 @@ export const lifecycleRouter = router({
           .eq('vector_status', 'pending'); // Only process pending files
 
         if (filesError) {
-          logger.error({ requestId, courseId, error: filesError }, 'Failed to check uploaded files');
+          logger.error(
+            { requestId, courseId, error: filesError },
+            'Failed to check uploaded files'
+          );
           throw new TRPCError({
             code: 'INTERNAL_SERVER_ERROR',
             message: 'Failed to fetch uploaded files',
@@ -243,7 +259,16 @@ export const lifecycleRouter = router({
         const jobType = hasFiles ? JobType.DOCUMENT_PROCESSING : JobType.STRUCTURE_ANALYSIS;
         const priority = TIER_PRIORITY[tier] || 1;
 
-        logger.info({ requestId, courseId, hasFiles, jobType, uploadedFilesCount: uploadedFiles?.length || 0 }, 'Determined job type');
+        logger.info(
+          {
+            requestId,
+            courseId,
+            hasFiles,
+            jobType,
+            uploadedFilesCount: uploadedFiles?.length || 0,
+          },
+          'Determined job type'
+        );
 
         // T016: Build job data array for Transactional Outbox
         let jobs: Array<{
@@ -255,11 +280,14 @@ export const lifecycleRouter = router({
 
         if (hasFiles) {
           // Path 1: Document processing (hasFiles=true, start at Stage 2)
-          jobs = uploadedFiles.map((file) => {
+          jobs = uploadedFiles.map(file => {
             // Convert relative storage_path to absolute path
             // storage_path is relative to project root (e.g., "uploads/org-id/course-id/filename")
             // Use DOCLING_UPLOADS_BASE_PATH for Docker container compatibility
-            const absoluteFilePath = path.join(process.env.DOCLING_UPLOADS_BASE_PATH || process.cwd(), file.storage_path);
+            const absoluteFilePath = path.join(
+              process.env.DOCLING_UPLOADS_BASE_PATH || process.cwd(),
+              file.storage_path
+            );
 
             return {
               queue: JobType.DOCUMENT_PROCESSING, // 'document_processing'
@@ -281,34 +309,42 @@ export const lifecycleRouter = router({
           });
           initialState = 'stage_2_init';
 
-          logger.info({
-            requestId,
-            courseId,
-            fileCount: uploadedFiles.length,
-          }, 'Course generation path: document processing (Stage 2)');
+          logger.info(
+            {
+              requestId,
+              courseId,
+              fileCount: uploadedFiles.length,
+            },
+            'Course generation path: document processing (Stage 2)'
+          );
         } else {
           // Path 2: Analysis-only (hasFiles=false, skip to Stage 4)
-          jobs = [{
-            queue: JobType.STRUCTURE_ANALYSIS, // 'structure_analysis'
-            data: {
-              jobType: JobType.STRUCTURE_ANALYSIS,
-              organizationId: currentUser.organizationId,
-              courseId,
-              userId,
-              createdAt: new Date().toISOString(),
-              webhookUrl: webhookUrl || null,
-              // Include basic course data for worker context
-              title: course.title,
-              settings: course.settings,
+          jobs = [
+            {
+              queue: JobType.STRUCTURE_ANALYSIS, // 'structure_analysis'
+              data: {
+                jobType: JobType.STRUCTURE_ANALYSIS,
+                organizationId: currentUser.organizationId,
+                courseId,
+                userId,
+                createdAt: new Date().toISOString(),
+                webhookUrl: webhookUrl || null,
+                // Include basic course data for worker context
+                title: course.title,
+                settings: course.settings,
+              },
+              options: { priority },
             },
-            options: { priority },
-          }];
+          ];
           initialState = 'stage_4_init';
 
-          logger.info({
-            requestId,
-            courseId,
-          }, 'Course generation path: analysis-only (Stage 4, no documents)');
+          logger.info(
+            {
+              requestId,
+              courseId,
+            },
+            'Course generation path: analysis-only (Stage 4, no documents)'
+          );
         }
 
         // T017: Execute command (atomic FSM init + outbox creation)
@@ -337,23 +373,29 @@ export const lifecycleRouter = router({
           .from('courses')
           .update({
             generation_code: generationCode,
-            generation_started_at: new Date().toISOString()
+            generation_started_at: new Date().toISOString(),
           })
           .eq('id', courseId);
 
         if (updateError) {
-          logger.warn({ requestId, courseId, error: updateError }, 'Failed to save generation code');
+          logger.warn(
+            { requestId, courseId, error: updateError },
+            'Failed to save generation code'
+          );
         }
 
         // T019: Success response
-        logger.info({
-          requestId,
-          courseId,
-          generationCode,
-          jobCount: result.outboxEntries.length,
-          fromCache: result.fromCache,
-          initialState,
-        }, 'Course generation initiated via transactional outbox');
+        logger.info(
+          {
+            requestId,
+            courseId,
+            generationCode,
+            jobCount: result.outboxEntries.length,
+            fromCache: result.fromCache,
+            initialState,
+          },
+          'Course generation initiated via transactional outbox'
+        );
 
         return {
           success: true,
@@ -365,10 +407,13 @@ export const lifecycleRouter = router({
       } catch (error) {
         if (error instanceof TRPCError) throw error;
 
-        logger.error({
-          requestId,
-          error: error instanceof Error ? error.message : String(error),
-        }, 'Unexpected error in generation.initiate');
+        logger.error(
+          {
+            requestId,
+            error: error instanceof Error ? error.message : String(error),
+          },
+          'Unexpected error in generation.initiate'
+        );
 
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
@@ -441,12 +486,15 @@ export const lifecycleRouter = router({
         }
 
         if (course.user_id !== userId) {
-          logger.warn({
-            requestId,
-            userId,
-            courseId,
-            courseOwnerId: course.user_id,
-          }, 'Course ownership violation');
+          logger.warn(
+            {
+              requestId,
+              userId,
+              courseId,
+              courseOwnerId: course.user_id,
+            },
+            'Course ownership violation'
+          );
           throw new TRPCError({
             code: 'FORBIDDEN',
             message: 'You do not have access to this course',
@@ -457,20 +505,23 @@ export const lifecycleRouter = router({
         const courseWithOrg = course as unknown as Course & { organization: Organization | null };
         const dbTier = (courseWithOrg.organization?.tier || 'free') as string;
         const tierMap: Record<string, 'FREE' | 'BASIC' | 'STANDARD' | 'TRIAL' | 'PREMIUM'> = {
-          'trial': 'TRIAL',
-          'free': 'FREE',
-          'basic': 'BASIC',
-          'standard': 'STANDARD',
-          'premium': 'PREMIUM',
+          trial: 'TRIAL',
+          free: 'FREE',
+          basic: 'BASIC',
+          standard: 'STANDARD',
+          premium: 'PREMIUM',
         };
         const tier = tierMap[dbTier] || 'FREE';
 
-        logger.info({
-          requestId,
-          userId,
-          tier,
-          courseId,
-        }, 'Generation request');
+        logger.info(
+          {
+            requestId,
+            userId,
+            tier,
+            courseId,
+          },
+          'Generation request'
+        );
 
         // Step 2: Validate generation status (allow retry if failed)
         // Note: Using type assertion since generation_status enum values
@@ -480,15 +531,27 @@ export const lifecycleRouter = router({
         // Check for any "in progress" generation status
         // Valid values: stage 2-5 states (init, processing, analyzing, generating, complete)
         const inProgressStatuses = [
-          'generating', 'queued',
-          'stage_2_init', 'stage_2_processing', 'stage_2_complete',
-          'stage_3_init', 'stage_3_summarizing', 'stage_3_complete',
-          'stage_4_init', 'stage_4_analyzing', 'stage_4_complete',
-          'stage_5_init', 'stage_5_generating', 'stage_5_complete',
-          'finalizing'
+          'generating',
+          'queued',
+          'stage_2_init',
+          'stage_2_processing',
+          'stage_2_complete',
+          'stage_3_init',
+          'stage_3_summarizing',
+          'stage_3_complete',
+          'stage_4_init',
+          'stage_4_analyzing',
+          'stage_4_complete',
+          'stage_5_init',
+          'stage_5_generating',
+          'stage_5_complete',
+          'finalizing',
         ];
         if (inProgressStatuses.includes(generationStatus)) {
-          logger.warn({ requestId, courseId, status: generationStatus }, 'Generation already in progress');
+          logger.warn(
+            { requestId, courseId, status: generationStatus },
+            'Generation already in progress'
+          );
           throw new TRPCError({
             code: 'CONFLICT',
             message: 'Course generation already in progress',
@@ -502,12 +565,15 @@ export const lifecycleRouter = router({
         try {
           concurrencyCheck = await concurrencyTracker.checkAndReserve(userId, tier);
         } catch (concurrencyError) {
-          logger.error({
-            requestId,
-            userId,
-            tier,
-            error: concurrencyError,
-          }, 'Concurrency check failed');
+          logger.error(
+            {
+              requestId,
+              userId,
+              tier,
+              error: concurrencyError,
+            },
+            'Concurrency check failed'
+          );
           throw new TRPCError({
             code: 'INTERNAL_SERVER_ERROR',
             message: 'Failed to check concurrency limits',
@@ -515,12 +581,15 @@ export const lifecycleRouter = router({
         }
 
         if (!concurrencyCheck.allowed) {
-          logger.warn({
-            requestId,
-            userId,
-            tier,
-            concurrencyCheck,
-          }, 'Concurrency limit hit');
+          logger.warn(
+            {
+              requestId,
+              userId,
+              tier,
+              concurrencyCheck,
+            },
+            'Concurrency limit hit'
+          );
 
           // Write to system_metrics
           await supabase.from('system_metrics').insert({
@@ -555,7 +624,8 @@ export const lifecycleRouter = router({
           logger.warn({ requestId, courseId }, 'Cannot generate: analysis_result is missing');
           throw new TRPCError({
             code: 'BAD_REQUEST',
-            message: 'Course analysis must be completed before generating structure. Please complete Stage 4 analysis first.',
+            message:
+              'Course analysis must be completed before generating structure. Please complete Stage 4 analysis first.',
           });
         }
 
@@ -564,24 +634,32 @@ export const lifecycleRouter = router({
           .from('file_catalog')
           .select('id, filename, processed_content, mime_type')
           .eq('course_id', courseId)
-          .eq('vector_status', 'indexed' as unknown as Database['public']['Enums']['vector_status']); // Use 'indexed' instead of 'completed'
+          .eq(
+            'vector_status',
+            'indexed' as unknown as Database['public']['Enums']['vector_status']
+          ); // Use 'indexed' instead of 'completed'
 
         // If file_catalog query fails (e.g., in tests without file_catalog table),
         // treat as having no documents rather than throwing error
         if (filesError) {
-          logger.warn({ requestId, courseId, error: filesError }, 'Failed to check vectorized files, assuming no documents');
+          logger.warn(
+            { requestId, courseId, error: filesError },
+            'Failed to check vectorized files, assuming no documents'
+          );
         }
 
         const hasVectorizedDocs = !filesError && vectorizedFiles && vectorizedFiles.length > 0;
 
         // Build document summaries for RAG context
         const documentSummaries = hasVectorizedDocs
-          ? (vectorizedFiles as Array<{
-              id: string;
-              filename: string;
-              processed_content: string | null;
-              mime_type: string;
-            }>).map((file) => ({
+          ? (
+              vectorizedFiles as Array<{
+                id: string;
+                filename: string;
+                processed_content: string | null;
+                mime_type: string;
+              }>
+            ).map(file => ({
               file_id: file.id,
               file_name: file.filename,
               summary: file.processed_content || '',
@@ -600,9 +678,12 @@ export const lifecycleRouter = router({
             language: course.language,
             style: course.style,
             target_audience: (course.settings as unknown as CourseSettings)?.target_audience,
-            desired_lessons_count: (course.settings as unknown as CourseSettings)?.desired_lessons_count,
-            desired_modules_count: (course.settings as unknown as CourseSettings)?.desired_modules_count,
-            lesson_duration_minutes: (course.settings as unknown as CourseSettings)?.lesson_duration_minutes,
+            desired_lessons_count: (course.settings as unknown as CourseSettings)
+              ?.desired_lessons_count,
+            desired_modules_count: (course.settings as unknown as CourseSettings)
+              ?.desired_modules_count,
+            lesson_duration_minutes: (course.settings as unknown as CourseSettings)
+              ?.lesson_duration_minutes,
             learning_outcomes: (course.settings as unknown as CourseSettings)?.learning_outcomes,
           },
           vectorized_documents: hasVectorizedDocs,
@@ -616,31 +697,38 @@ export const lifecycleRouter = router({
         const job = await addJob(jobType, jobInput as unknown as JobData, { priority });
         const jobId = job.id as string;
 
-        logger.info({
-          requestId,
-          jobId,
-          courseId,
-          priority,
-          hasVectorizedDocs,
-          documentCount: documentSummaries.length,
-        }, 'Generation job created');
+        logger.info(
+          {
+            requestId,
+            jobId,
+            courseId,
+            priority,
+            hasVectorizedDocs,
+            documentCount: documentSummaries.length,
+          },
+          'Generation job created'
+        );
 
         // Step 7: Update course status
         // Note: Using type assertion since generation_status='queued' not yet in generated types
         await supabase
           .from('courses')
           .update({
-            generation_status: 'queued' as unknown as Database['public']['Enums']['generation_status'],
+            generation_status:
+              'queued' as unknown as Database['public']['Enums']['generation_status'],
             updated_at: new Date().toISOString(),
           })
           .eq('id', courseId);
 
         // Step 8: Success response
-        logger.info({
-          requestId,
-          jobId,
-          courseId,
-        }, 'Course generation initiated successfully');
+        logger.info(
+          {
+            requestId,
+            jobId,
+            courseId,
+          },
+          'Course generation initiated successfully'
+        );
 
         return {
           jobId,
@@ -650,10 +738,13 @@ export const lifecycleRouter = router({
       } catch (error) {
         if (error instanceof TRPCError) throw error;
 
-        logger.error({
-          requestId,
-          error: error instanceof Error ? error.message : String(error),
-        }, 'Unexpected error in generation.generate');
+        logger.error(
+          {
+            requestId,
+            error: error instanceof Error ? error.message : String(error),
+          },
+          'Unexpected error in generation.generate'
+        );
 
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
@@ -726,30 +817,38 @@ export const lifecycleRouter = router({
       const userId = ctx.user.id;
 
       try {
-        logger.info({
-          requestId,
-          courseId,
-          stageNumber,
-          userId,
-        }, 'Restart stage request received');
+        logger.info(
+          {
+            requestId,
+            courseId,
+            stageNumber,
+            userId,
+          },
+          'Restart stage request received'
+        );
 
         // Step 1: Call RPC to reset status (handles ownership check internally)
         // Note: restart_from_stage RPC is defined in migration 20251207000000
         // Using raw SQL call since generated types may not include new RPC yet
-        const { data: rpcResult, error: rpcError } = await supabase
-          .rpc('restart_from_stage' as unknown as never, {
+        const { data: rpcResult, error: rpcError } = await supabase.rpc(
+          'restart_from_stage' as unknown as never,
+          {
             p_course_id: courseId,
             p_stage_number: stageNumber,
             p_user_id: userId,
-          } as unknown as never);
+          } as unknown as never
+        );
 
         if (rpcError) {
-          logger.error({
-            requestId,
-            courseId,
-            stageNumber,
-            error: rpcError,
-          }, 'RPC restart_from_stage failed');
+          logger.error(
+            {
+              requestId,
+              courseId,
+              stageNumber,
+              error: rpcError,
+            },
+            'RPC restart_from_stage failed'
+          );
 
           throw new TRPCError({
             code: 'INTERNAL_SERVER_ERROR',
@@ -758,7 +857,7 @@ export const lifecycleRouter = router({
         }
 
         // Type assertion for RPC result
-        const result = (rpcResult as unknown) as {
+        const result = rpcResult as unknown as {
           success: boolean;
           error?: string;
           code?: string;
@@ -769,18 +868,21 @@ export const lifecycleRouter = router({
         };
 
         if (!result.success) {
-          logger.warn({
-            requestId,
-            courseId,
-            stageNumber,
-            rpcResult: result,
-          }, 'Restart stage rejected by RPC');
+          logger.warn(
+            {
+              requestId,
+              courseId,
+              stageNumber,
+              rpcResult: result,
+            },
+            'Restart stage rejected by RPC'
+          );
 
           const codeMap: Record<string, 'NOT_FOUND' | 'FORBIDDEN' | 'BAD_REQUEST'> = {
-            'NOT_FOUND': 'NOT_FOUND',
-            'FORBIDDEN': 'FORBIDDEN',
-            'INVALID_STAGE': 'BAD_REQUEST',
-            'INVALID_STATE': 'BAD_REQUEST',
+            NOT_FOUND: 'NOT_FOUND',
+            FORBIDDEN: 'FORBIDDEN',
+            INVALID_STAGE: 'BAD_REQUEST',
+            INVALID_STATE: 'BAD_REQUEST',
           };
 
           throw new TRPCError({
@@ -794,21 +896,27 @@ export const lifecycleRouter = router({
         try {
           const cleanupResult = await removeJobsByCourseId(courseId);
           if (cleanupResult.removed > 0) {
-            logger.info({
-              requestId,
-              courseId,
-              stageNumber,
-              removedJobs: cleanupResult.removed,
-              errors: cleanupResult.errors,
-            }, 'Cleaned up existing jobs before restart');
+            logger.info(
+              {
+                requestId,
+                courseId,
+                stageNumber,
+                removedJobs: cleanupResult.removed,
+                errors: cleanupResult.errors,
+              },
+              'Cleaned up existing jobs before restart'
+            );
           }
         } catch (cleanupError) {
           // Log but don't fail - job cleanup is best-effort
-          logger.warn({
-            requestId,
-            courseId,
-            error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
-          }, 'Failed to clean up existing jobs, continuing with restart');
+          logger.warn(
+            {
+              requestId,
+              courseId,
+              error: cleanupError instanceof Error ? cleanupError.message : String(cleanupError),
+            },
+            'Failed to clean up existing jobs, continuing with restart'
+          );
         }
 
         // Step 3: Queue the appropriate job based on stage
@@ -841,7 +949,10 @@ export const lifecycleRouter = router({
 
           if (files && files.length > 0) {
             // Clean up existing vectors in Qdrant before re-processing
-            logger.info({ requestId, courseId, fileCount: files.length }, 'Deleting vectors for all course documents before Stage 2 restart');
+            logger.info(
+              { requestId, courseId, fileCount: files.length },
+              'Deleting vectors for all course documents before Stage 2 restart'
+            );
             for (const file of files) {
               await deleteVectorsForDocument(file.id, courseId);
             }
@@ -893,7 +1004,10 @@ export const lifecycleRouter = router({
             .single();
 
           if (fullCourseError || !fullCourse) {
-            logger.error({ requestId, courseId, error: fullCourseError }, 'Failed to fetch course for Stage 5 restart');
+            logger.error(
+              { requestId, courseId, error: fullCourseError },
+              'Failed to fetch course for Stage 5 restart'
+            );
             throw new TRPCError({
               code: 'INTERNAL_SERVER_ERROR',
               message: 'Failed to fetch course data',
@@ -902,10 +1016,14 @@ export const lifecycleRouter = router({
 
           // Validate analysis_result exists
           if (!fullCourse.analysis_result) {
-            logger.warn({ requestId, courseId }, 'Cannot restart Stage 5: analysis_result is missing');
+            logger.warn(
+              { requestId, courseId },
+              'Cannot restart Stage 5: analysis_result is missing'
+            );
             throw new TRPCError({
               code: 'BAD_REQUEST',
-              message: 'Course analysis must be completed before generating structure. Please complete Stage 4 analysis first.',
+              message:
+                'Course analysis must be completed before generating structure. Please complete Stage 4 analysis first.',
             });
           }
 
@@ -914,18 +1032,23 @@ export const lifecycleRouter = router({
             .from('file_catalog')
             .select('id, filename, processed_content, mime_type')
             .eq('course_id', courseId)
-            .eq('vector_status', 'indexed' as unknown as Database['public']['Enums']['vector_status']);
+            .eq(
+              'vector_status',
+              'indexed' as unknown as Database['public']['Enums']['vector_status']
+            );
 
           const hasVectorizedDocs = !filesError && vectorizedFiles && vectorizedFiles.length > 0;
 
           // Build document summaries for RAG context
           const documentSummaries = hasVectorizedDocs
-            ? (vectorizedFiles as Array<{
-                id: string;
-                filename: string;
-                processed_content: string | null;
-                mime_type: string;
-              }>).map((file) => ({
+            ? (
+                vectorizedFiles as Array<{
+                  id: string;
+                  filename: string;
+                  processed_content: string | null;
+                  mime_type: string;
+                }>
+              ).map(file => ({
                 file_id: file.id,
                 file_name: file.filename,
                 summary: file.processed_content || '',
@@ -944,28 +1067,38 @@ export const lifecycleRouter = router({
               language: fullCourse.language,
               style: fullCourse.style,
               target_audience: (fullCourse.settings as unknown as CourseSettings)?.target_audience,
-              desired_lessons_count: (fullCourse.settings as unknown as CourseSettings)?.desired_lessons_count,
-              desired_modules_count: (fullCourse.settings as unknown as CourseSettings)?.desired_modules_count,
-              lesson_duration_minutes: (fullCourse.settings as unknown as CourseSettings)?.lesson_duration_minutes,
-              learning_outcomes: (fullCourse.settings as unknown as CourseSettings)?.learning_outcomes,
+              desired_lessons_count: (fullCourse.settings as unknown as CourseSettings)
+                ?.desired_lessons_count,
+              desired_modules_count: (fullCourse.settings as unknown as CourseSettings)
+                ?.desired_modules_count,
+              lesson_duration_minutes: (fullCourse.settings as unknown as CourseSettings)
+                ?.lesson_duration_minutes,
+              learning_outcomes: (fullCourse.settings as unknown as CourseSettings)
+                ?.learning_outcomes,
             },
             vectorized_documents: hasVectorizedDocs,
             document_summaries: documentSummaries,
           };
 
-          const job = await addJob(JobType.STRUCTURE_GENERATION, stage5JobInput as unknown as JobData);
+          const job = await addJob(
+            JobType.STRUCTURE_GENERATION,
+            stage5JobInput as unknown as JobData
+          );
           jobId = job.id;
         }
         // Stage 6: Triggered automatically when Stage 5 completes
 
-        logger.info({
-          requestId,
-          courseId,
-          stageNumber,
-          previousStatus: result.previousStatus,
-          newStatus: result.newStatus,
-          jobId,
-        }, 'Stage restart initiated successfully');
+        logger.info(
+          {
+            requestId,
+            courseId,
+            stageNumber,
+            previousStatus: result.previousStatus,
+            newStatus: result.newStatus,
+            jobId,
+          },
+          'Stage restart initiated successfully'
+        );
 
         return {
           success: true,
@@ -977,12 +1110,15 @@ export const lifecycleRouter = router({
       } catch (error) {
         if (error instanceof TRPCError) throw error;
 
-        logger.error({
-          requestId,
-          courseId,
-          stageNumber,
-          error: error instanceof Error ? error.message : String(error),
-        }, 'Unexpected error in restartStage');
+        logger.error(
+          {
+            requestId,
+            courseId,
+            stageNumber,
+            error: error instanceof Error ? error.message : String(error),
+          },
+          'Unexpected error in restartStage'
+        );
 
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
@@ -1047,7 +1183,10 @@ export const lifecycleRouter = router({
           .single();
 
         if (courseError || !course) {
-          logger.warn({ requestId, userId, courseId, error: courseError }, 'Course not found for cleanup');
+          logger.warn(
+            { requestId, userId, courseId, error: courseError },
+            'Course not found for cleanup'
+          );
           throw new TRPCError({ code: 'NOT_FOUND', message: 'Course not found' });
         }
 
@@ -1057,50 +1196,248 @@ export const lifecycleRouter = router({
         const isNoOwnerCourse = course.user_id === null;
 
         if (!isSuperAdmin && !isOwner && !isNoOwnerCourse) {
-          logger.warn({
-            requestId,
-            userId,
-            courseId,
-            courseOwnerId: course.user_id,
-          }, 'Unauthorized cleanup attempt');
+          logger.warn(
+            {
+              requestId,
+              userId,
+              courseId,
+              courseOwnerId: course.user_id,
+            },
+            'Unauthorized cleanup attempt'
+          );
           throw new TRPCError({
             code: 'FORBIDDEN',
             message: 'You do not have permission to cleanup this course',
           });
         }
 
-        logger.info({
-          requestId,
-          userId,
-          courseId,
-          organizationId: course.organization_id,
-        }, 'Starting course cleanup');
+        logger.info(
+          {
+            requestId,
+            userId,
+            courseId,
+            organizationId: course.organization_id,
+          },
+          'Starting course cleanup'
+        );
 
         // Step 3: Execute cleanup
         const cleanupResult = await cleanupCourseResources(courseId, course.organization_id);
 
-        logger.info({
-          requestId,
-          userId,
-          courseId,
-          success: cleanupResult.success,
-          durationMs: cleanupResult.durationMs,
-          errorCount: cleanupResult.errors.length,
-        }, 'Course cleanup completed');
+        logger.info(
+          {
+            requestId,
+            userId,
+            courseId,
+            success: cleanupResult.success,
+            durationMs: cleanupResult.durationMs,
+            errorCount: cleanupResult.errors.length,
+          },
+          'Course cleanup completed'
+        );
 
         return cleanupResult;
       } catch (error) {
         if (error instanceof TRPCError) throw error;
 
-        logger.error({
-          requestId,
-          courseId,
-          error: error instanceof Error ? error.message : String(error),
-        }, 'Unexpected error in cleanupCourse');
+        logger.error(
+          {
+            requestId,
+            courseId,
+            error: error instanceof Error ? error.message : String(error),
+          },
+          'Unexpected error in cleanupCourse'
+        );
 
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
           message: 'Failed to cleanup course resources',
+        });
+      }
+    }),
+
+  /**
+   * Switch from automatic to manual (semi-automatic) generation mode
+   *
+   * Purpose: Allows users to take manual control of the generation process
+   * when the course is paused in automatic mode. This enables review and
+   * modification of intermediate results.
+   *
+   * Authorization: Requires instructor or admin role (course owner)
+   *
+   * Preconditions:
+   * - Course must be in automatic mode (generation_mode = 'automatic')
+   * - Course must be paused (generation_paused_at is NOT NULL)
+   *
+   * Input:
+   * - courseId: UUID of the course to switch
+   *
+   * Output:
+   * - success: Boolean indicating successful mode switch
+   * - message: Human-readable confirmation message
+   * - previousMode: 'automatic'
+   * - newMode: 'semi_automatic'
+   *
+   * @example
+   * ```typescript
+   * const result = await trpc.generation.lifecycle.switchToManualMode.mutate({
+   *   courseId: '123e4567-e89b-12d3-a456-426614174000',
+   * });
+   * // { success: true, message: 'Switched to manual mode', previousMode: 'automatic', newMode: 'semi_automatic' }
+   * ```
+   */
+  switchToManualMode: instructorProcedure
+    .use(createRateLimiter({ requests: 10, window: 60 }))
+    .input(z.object({ courseId: z.string().uuid('Invalid course ID') }))
+    .mutation(async ({ ctx, input }) => {
+      const { courseId } = input;
+      const supabase = getSupabaseAdmin();
+      const requestId = nanoid();
+
+      // Defensive check
+      if (!ctx.user) {
+        throw new TRPCError({
+          code: 'UNAUTHORIZED',
+          message: 'Authentication required',
+        });
+      }
+
+      const userId = ctx.user.id;
+
+      try {
+        // Step 1: Fetch course and verify ownership
+        // Note: generation_mode column may not be in generated types yet, using type assertion
+        const { data: course, error: courseError } = await supabase
+          .from('courses')
+          .select('id, user_id, generation_mode, generation_paused_at, generation_status')
+          .eq('id', courseId)
+          .single();
+
+        // Type assertion for course with generation_mode (new column not yet in generated types)
+        type CourseWithGenerationMode = {
+          id: string;
+          user_id: string | null;
+          generation_mode: string | null;
+          generation_paused_at: string | null;
+          generation_status: string | null;
+        };
+        const typedCourse = course as unknown as CourseWithGenerationMode | null;
+
+        if (courseError || !typedCourse) {
+          logger.warn({ requestId, userId, courseId, error: courseError }, 'Course not found');
+          throw new TRPCError({ code: 'NOT_FOUND', message: 'Course not found' });
+        }
+
+        // Step 2: Verify ownership
+        if (typedCourse.user_id !== userId) {
+          logger.warn(
+            {
+              requestId,
+              userId,
+              courseId,
+              courseOwnerId: typedCourse.user_id,
+            },
+            'Course ownership violation for switchToManualMode'
+          );
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'You do not have permission to modify this course',
+          });
+        }
+
+        // Step 3: Verify automatic mode
+        if (typedCourse.generation_mode !== 'automatic') {
+          logger.warn(
+            {
+              requestId,
+              courseId,
+              currentMode: typedCourse.generation_mode,
+            },
+            'Cannot switch to manual: not in automatic mode'
+          );
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'Course is not in automatic generation mode',
+          });
+        }
+
+        // Step 4: Verify course is paused
+        if (!typedCourse.generation_paused_at) {
+          logger.warn(
+            {
+              requestId,
+              courseId,
+              status: typedCourse.generation_status,
+            },
+            'Cannot switch to manual: course not paused'
+          );
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message:
+              'Course must be paused before switching to manual mode. Please pause the generation first.',
+          });
+        }
+
+        // Step 5: Update mode and clear pause
+        // Note: Using type assertion for update since generation_mode not yet in generated types
+        const { error: updateError } = await supabase
+          .from('courses')
+          .update({
+            generation_mode: 'semi_automatic',
+            generation_paused_at: null, // Clear pause - user takes control
+            updated_at: new Date().toISOString(),
+          } as unknown as Database['public']['Tables']['courses']['Update'])
+          .eq('id', courseId);
+
+        if (updateError) {
+          logger.error(
+            {
+              requestId,
+              courseId,
+              error: updateError,
+            },
+            'Failed to switch to manual mode'
+          );
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Failed to switch generation mode',
+          });
+        }
+
+        logger.info(
+          {
+            requestId,
+            courseId,
+            userId,
+            previousMode: 'automatic',
+            newMode: 'semi_automatic',
+            currentStatus: typedCourse.generation_status,
+          },
+          'Switched to manual generation mode'
+        );
+
+        return {
+          success: true,
+          message:
+            'Переключено в ручной режим. Вы можете просматривать и изменять результаты каждого этапа.',
+          previousMode: 'automatic' as const,
+          newMode: 'semi_automatic' as const,
+        };
+      } catch (error) {
+        if (error instanceof TRPCError) throw error;
+
+        logger.error(
+          {
+            requestId,
+            courseId,
+            error: error instanceof Error ? error.message : String(error),
+          },
+          'Unexpected error in switchToManualMode'
+        );
+
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to switch generation mode',
         });
       }
     }),

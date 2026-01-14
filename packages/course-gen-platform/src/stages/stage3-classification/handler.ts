@@ -20,6 +20,7 @@ import type { Stage3Input } from './types';
 import { BaseJobHandler, JobResult } from '../../orchestrator/handlers/base-handler';
 import { DocumentClassificationJobData, JobType } from '@megacampus/shared-types';
 import { getSupabaseAdmin } from '../../shared/supabase/admin';
+import { handleStageCompletion } from '../../shared/auto-approval';
 
 /**
  * Stage 3 Classification Job Handler
@@ -85,21 +86,13 @@ export class Stage3ClassificationHandler extends BaseJobHandler<DocumentClassifi
         processingTimeMs: output.processingTimeMs,
       });
 
-      // Update course status to stage_3_awaiting_approval
-      const supabase = getSupabaseAdmin();
-      const { error: updateError } = await supabase
-        .from('courses')
-        .update({ generation_status: 'stage_3_awaiting_approval' as any })
-        .eq('id', courseId);
+      // Handle stage completion with automatic mode support
+      const { autoApproved } = await handleStageCompletion(courseId, 3);
 
-      if (updateError) {
-        this.log(job, 'error', 'Failed to update course status to stage_3_awaiting_approval', {
-          courseId,
-          error: updateError.message,
-        });
-        // Don't fail the job, classification was successful
-      } else {
+      if (!autoApproved) {
         this.log(job, 'info', 'Course status updated to stage_3_awaiting_approval', { courseId });
+      } else {
+        this.log(job, 'info', 'Stage 3 auto-approved, proceeding to Stage 4', { courseId });
       }
 
       return {
