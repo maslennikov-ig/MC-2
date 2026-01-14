@@ -1,8 +1,15 @@
-import { getRequestConfig } from 'next-intl/server';
-import { cookies } from 'next/headers';
-import { namespaces, localeCookie, getLocaleOrDefault, defaultLocale, type Namespace, type Locale } from './config';
+import { getRequestConfig } from 'next-intl/server'
+import { cookies } from 'next/headers'
+import {
+  namespaces,
+  localeCookie,
+  getLocaleOrDefault,
+  defaultLocale,
+  type Namespace,
+  type Locale,
+} from './config'
 
-type Messages = Record<Namespace, Record<string, unknown>>;
+type Messages = Record<Namespace, Record<string, unknown>>
 
 /**
  * Dynamically imports a namespace file for a given locale.
@@ -10,33 +17,36 @@ type Messages = Record<Namespace, Record<string, unknown>>;
  * In development: fails fast to catch missing translations early.
  * In production: falls back to default locale, then empty object.
  */
-async function loadNamespace(locale: string, namespace: Namespace): Promise<Record<string, unknown>> {
+async function loadNamespace(
+  locale: string,
+  namespace: Namespace
+): Promise<Record<string, unknown>> {
   try {
-    const module = await import(`../../messages/${locale}/${namespace}.json`);
-    return module.default;
+    const localeModule = await import(`../../messages/${locale}/${namespace}.json`)
+    return localeModule.default
   } catch (error) {
     // In development, fail fast to catch missing translations early
     if (process.env.NODE_ENV === 'development') {
-      console.error(`[i18n] Failed to load namespace "${namespace}" for locale "${locale}":`, error);
-      throw new Error(`Missing translation namespace: ${namespace} for locale: ${locale}`);
+      console.error(`[i18n] Failed to load namespace "${namespace}" for locale "${locale}":`, error)
+      throw new Error(`Missing translation namespace: ${namespace} for locale: ${locale}`)
     }
 
     // In production, log error and try fallback
-    console.error(`Failed to load namespace "${namespace}" for locale "${locale}":`, error);
+    console.error(`Failed to load namespace "${namespace}" for locale "${locale}":`, error)
 
     // If already trying default locale, return empty object
     if (locale === defaultLocale) {
-      return {};
+      return {}
     }
 
     // Try to load default locale namespace as fallback
     try {
-      const fallbackModule = await import(`../../messages/${defaultLocale}/${namespace}.json`);
-      console.warn(`Using fallback locale "${defaultLocale}" for namespace "${namespace}"`);
-      return fallbackModule.default;
+      const fallbackModule = await import(`../../messages/${defaultLocale}/${namespace}.json`)
+      console.warn(`Using fallback locale "${defaultLocale}" for namespace "${namespace}"`)
+      return fallbackModule.default
     } catch {
-      console.error(`Failed to load fallback namespace "${namespace}"`);
-      return {};
+      console.error(`Failed to load fallback namespace "${namespace}"`)
+      return {}
     }
   }
 }
@@ -47,32 +57,32 @@ async function loadNamespace(locale: string, namespace: Namespace): Promise<Reco
 async function loadAllMessages(locale: string): Promise<Messages> {
   const entries = await Promise.all(
     namespaces.map(async (namespace) => {
-      const messages = await loadNamespace(locale, namespace);
-      return [namespace, messages] as const;
+      const messages = await loadNamespace(locale, namespace)
+      return [namespace, messages] as const
     })
-  );
+  )
 
-  return Object.fromEntries(entries) as Messages;
+  return Object.fromEntries(entries) as Messages
 }
 
 export default getRequestConfig(async ({ requestLocale }) => {
   // Primary: requestLocale from next-intl's createMiddleware
   // next-intl middleware handles locale detection via cookies and headers
-  let locale = await requestLocale;
+  let locale = await requestLocale
 
   // Fallback: Read cookie directly (edge cases where middleware didn't run)
   if (!locale) {
-    const cookieStore = await cookies();
-    locale = cookieStore.get(localeCookie.name)?.value;
+    const cookieStore = await cookies()
+    locale = cookieStore.get(localeCookie.name)?.value
   }
 
   // Validate and get locale with fallback to default
-  const validLocale: Locale = getLocaleOrDefault(locale);
+  const validLocale: Locale = getLocaleOrDefault(locale)
 
-  const messages = await loadAllMessages(validLocale);
+  const messages = await loadAllMessages(validLocale)
 
   return {
     locale: validLocale,
     messages,
-  };
-});
+  }
+})
