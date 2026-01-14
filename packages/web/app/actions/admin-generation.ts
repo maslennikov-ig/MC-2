@@ -1,26 +1,26 @@
-'use server';
+'use server'
 
-import { createClient } from '@/lib/supabase/server';
-import { revalidatePath } from 'next/cache';
-import { getBackendAuthHeaders, TRPC_URL } from '@/lib/auth';
-import { extractApiError } from '@/lib/api-error-handler';
+import { createClient } from '@/lib/supabase/server'
+import { revalidatePath } from 'next/cache'
+import { getBackendAuthHeaders, TRPC_URL } from '@/lib/auth'
+import { extractApiError } from '@/lib/api-error-handler'
 
 export async function triggerStage6ForLesson(lessonId: string) {
-  const headers = await getBackendAuthHeaders();
-  
+  const headers = await getBackendAuthHeaders()
+
   const response = await fetch(`${TRPC_URL}/admin.triggerStage6ForLesson`, {
     method: 'POST',
     headers,
     body: JSON.stringify({ lessonId }),
-  });
+  })
 
   if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.message || 'Failed to trigger generation');
+    const error = await response.json()
+    throw new Error(error.message || 'Failed to trigger generation')
   }
 
-  revalidatePath('/admin/generation/[courseId]', 'page');
-  return response.json();
+  revalidatePath('/admin/generation/[courseId]', 'page')
+  return response.json()
 }
 
 export async function regenerateLessonWithRefinement(
@@ -28,25 +28,25 @@ export async function regenerateLessonWithRefinement(
   refinementType: 'fix' | 'add' | 'simplify' | 'restructure' | 'custom',
   userInstructions: string
 ) {
-  const headers = await getBackendAuthHeaders();
+  const headers = await getBackendAuthHeaders()
 
   const response = await fetch(`${TRPC_URL}/admin.regenerateLessonWithRefinement`, {
     method: 'POST',
     headers,
     body: JSON.stringify({ lessonId, refinementType, userInstructions }),
-  });
+  })
 
   if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.message || 'Failed to regenerate lesson');
+    const error = await response.json()
+    throw new Error(error.message || 'Failed to regenerate lesson')
   }
 
-  revalidatePath('/admin/generation/[courseId]', 'page');
-  return response.json();
+  revalidatePath('/admin/generation/[courseId]', 'page')
+  return response.json()
 }
 
 export async function finalizeCourse(courseId: string) {
-  const headers = await getBackendAuthHeaders();
+  const headers = await getBackendAuthHeaders()
 
   // Note: This endpoint might need to be created in admin router first if it doesn't exist
   // Assuming we will create admin.finalizeCourse
@@ -54,15 +54,15 @@ export async function finalizeCourse(courseId: string) {
     method: 'POST',
     headers,
     body: JSON.stringify({ courseId }),
-  });
+  })
 
   if (!response.ok) {
-    const error = await response.json();
-    throw new Error(error.message || 'Failed to finalize course');
+    const error = await response.json()
+    throw new Error(error.message || 'Failed to finalize course')
   }
 
-  revalidatePath('/admin/generation/[courseId]', 'page');
-  return response.json();
+  revalidatePath('/admin/generation/[courseId]', 'page')
+  return response.json()
 }
 
 /**
@@ -70,20 +70,20 @@ export async function finalizeCourse(courseId: string) {
  * Triggers the generation.initiate tRPC endpoint
  */
 export async function startGeneration(courseId: string) {
-  const headers = await getBackendAuthHeaders();
+  const headers = await getBackendAuthHeaders()
 
   const response = await fetch(`${TRPC_URL}/generation.initiate`, {
     method: 'POST',
     headers,
     body: JSON.stringify({ courseId, webhookUrl: null }),
-  });
+  })
 
   if (!response.ok) {
-    await extractApiError(response, 'Failed to start generation');
+    await extractApiError(response, 'Failed to start generation')
   }
 
-  revalidatePath('/courses/generating/[slug]', 'page');
-  return response.json();
+  revalidatePath('/courses/generating/[slug]', 'page')
+  return response.json()
 }
 
 /**
@@ -91,20 +91,20 @@ export async function startGeneration(courseId: string) {
  * Used by StageApprovalBanner component for staged generation gates
  */
 export async function approveStage(courseId: string, currentStage: number) {
-  const headers = await getBackendAuthHeaders();
+  const headers = await getBackendAuthHeaders()
 
   const response = await fetch(`${TRPC_URL}/generation.approveStage`, {
     method: 'POST',
     headers,
     body: JSON.stringify({ courseId, currentStage }),
-  });
+  })
 
   if (!response.ok) {
-    await extractApiError(response, 'Failed to approve stage');
+    await extractApiError(response, 'Failed to approve stage')
   }
 
-  revalidatePath('/courses/generating/[slug]', 'page');
-  return response.json();
+  revalidatePath('/courses/generating/[slug]', 'page')
+  return response.json()
 }
 
 /**
@@ -112,19 +112,19 @@ export async function approveStage(courseId: string, currentStage: number) {
  * Sets the course status to 'cancelled'
  */
 export async function cancelGeneration(courseId: string) {
-  const supabase = await createClient();
+  const supabase = await createClient()
 
   const { error } = await supabase
     .from('courses')
     .update({ generation_status: 'cancelled' })
-    .eq('id', courseId);
+    .eq('id', courseId)
 
   if (error) {
-    throw new Error(error.message || 'Failed to cancel generation');
+    throw new Error(error.message || 'Failed to cancel generation')
   }
 
-  revalidatePath('/courses/generating/[slug]', 'page');
-  return { success: true };
+  revalidatePath('/courses/generating/[slug]', 'page')
+  return { success: true }
 }
 
 /**
@@ -132,19 +132,22 @@ export async function cancelGeneration(courseId: string) {
  * Used by StageResultsPreview component
  */
 export async function getStageResults(courseId: string, stage: number) {
-  const headers = await getBackendAuthHeaders();
+  const headers = await getBackendAuthHeaders()
 
-  const response = await fetch(`${TRPC_URL}/generation.getStageResults?input=${encodeURIComponent(JSON.stringify({ courseId, stage }))}`, {
-    method: 'GET',
-    headers,
-  });
+  const response = await fetch(
+    `${TRPC_URL}/generation.getStageResults?input=${encodeURIComponent(JSON.stringify({ courseId, stage }))}`,
+    {
+      method: 'GET',
+      headers,
+    }
+  )
 
   if (!response.ok) {
-    await extractApiError(response, 'Failed to get stage results');
+    await extractApiError(response, 'Failed to get stage results')
   }
 
-  const data = await response.json();
-  return data?.result?.data || data;
+  const data = await response.json()
+  return data?.result?.data || data
 }
 
 /**
@@ -157,21 +160,21 @@ export async function updateFieldAction(
   fieldPath: string,
   value: unknown
 ) {
-  const headers = await getBackendAuthHeaders();
+  const headers = await getBackendAuthHeaders()
 
   const response = await fetch(`${TRPC_URL}/generation.updateField`, {
     method: 'POST',
     headers,
     body: JSON.stringify({ courseId, stageId, fieldPath, value }),
-  });
+  })
 
   if (!response.ok) {
-    await extractApiError(response, 'Failed to update field');
+    await extractApiError(response, 'Failed to update field')
   }
 
-  revalidatePath('/courses/generating/[slug]', 'page');
-  const data = await response.json();
-  return data?.result?.data || data;
+  revalidatePath('/courses/generating/[slug]', 'page')
+  const data = await response.json()
+  return data?.result?.data || data
 }
 
 /**
@@ -185,7 +188,7 @@ export async function addElementAction(
   position: 'start' | 'end' | number,
   userInstruction: string
 ) {
-  const headers = await getBackendAuthHeaders();
+  const headers = await getBackendAuthHeaders()
 
   const response = await fetch(`${TRPC_URL}/generation.addElement`, {
     method: 'POST',
@@ -195,17 +198,17 @@ export async function addElementAction(
       elementType,
       parentPath,
       position,
-      userInstruction
+      userInstruction,
     }),
-  });
+  })
 
   if (!response.ok) {
-    await extractApiError(response, 'Failed to add element');
+    await extractApiError(response, 'Failed to add element')
   }
 
-  revalidatePath('/courses/generating/[slug]', 'page');
-  const data = await response.json();
-  return data?.result?.data || data;
+  revalidatePath('/courses/generating/[slug]', 'page')
+  const data = await response.json()
+  return data?.result?.data || data
 }
 
 /**
@@ -219,7 +222,7 @@ export async function regenerateBlockAction(
   blockPath: string,
   userInstruction: string
 ) {
-  const headers = await getBackendAuthHeaders();
+  const headers = await getBackendAuthHeaders()
 
   const response = await fetch(`${TRPC_URL}/generation.regenerateBlock`, {
     method: 'POST',
@@ -228,17 +231,17 @@ export async function regenerateBlockAction(
       courseId,
       stageId,
       blockPath,
-      userInstruction
+      userInstruction,
     }),
-  });
+  })
 
   if (!response.ok) {
-    await extractApiError(response, 'Failed to regenerate block');
+    await extractApiError(response, 'Failed to regenerate block')
   }
 
-  revalidatePath('/courses/generating/[slug]', 'page');
-  const data = await response.json();
-  return data?.result?.data || data;
+  revalidatePath('/courses/generating/[slug]', 'page')
+  const data = await response.json()
+  return data?.result?.data || data
 }
 
 /**
@@ -246,11 +249,8 @@ export async function regenerateBlockAction(
  * Calls generation.getBlockDependencies tRPC endpoint
  * Used by ImpactAnalysisModal to show how many elements will be affected
  */
-export async function getBlockDependenciesAction(
-  courseId: string,
-  blockPath: string
-) {
-  const headers = await getBackendAuthHeaders();
+export async function getBlockDependenciesAction(courseId: string, blockPath: string) {
+  const headers = await getBackendAuthHeaders()
 
   const response = await fetch(
     `${TRPC_URL}/generation.getBlockDependencies?input=${encodeURIComponent(JSON.stringify({ courseId, blockPath }))}`,
@@ -258,14 +258,14 @@ export async function getBlockDependenciesAction(
       method: 'GET',
       headers,
     }
-  );
+  )
 
   if (!response.ok) {
-    await extractApiError(response, 'Failed to get block dependencies');
+    await extractApiError(response, 'Failed to get block dependencies')
   }
 
-  const data = await response.json();
-  return data?.result?.data || data;
+  const data = await response.json()
+  return data?.result?.data || data
 }
 
 /**
@@ -278,7 +278,7 @@ export async function cascadeUpdateAction(
   blockPath: string,
   mode: 'mark_stale' | 'auto_regenerate' | 'review_each'
 ) {
-  const headers = await getBackendAuthHeaders();
+  const headers = await getBackendAuthHeaders()
 
   const response = await fetch(`${TRPC_URL}/generation.cascadeUpdate`, {
     method: 'POST',
@@ -286,17 +286,17 @@ export async function cascadeUpdateAction(
     body: JSON.stringify({
       courseId,
       blockPath,
-      mode
+      mode,
     }),
-  });
+  })
 
   if (!response.ok) {
-    await extractApiError(response, 'Failed to perform cascade update');
+    await extractApiError(response, 'Failed to perform cascade update')
   }
 
-  revalidatePath('/courses/generating/[slug]', 'page');
-  const data = await response.json();
-  return data?.result?.data || data;
+  revalidatePath('/courses/generating/[slug]', 'page')
+  const data = await response.json()
+  return data?.result?.data || data
 }
 
 /**
@@ -313,7 +313,7 @@ export async function deleteElementAction(
   elementPath: string,
   confirm: boolean = false
 ) {
-  const headers = await getBackendAuthHeaders();
+  const headers = await getBackendAuthHeaders()
 
   const response = await fetch(`${TRPC_URL}/generation.deleteElement`, {
     method: 'POST',
@@ -321,15 +321,42 @@ export async function deleteElementAction(
     body: JSON.stringify({
       courseId,
       elementPath,
-      confirm
+      confirm,
     }),
-  });
+  })
 
   if (!response.ok) {
-    await extractApiError(response, 'Failed to delete element');
+    await extractApiError(response, 'Failed to delete element')
   }
 
-  revalidatePath('/courses/generating/[slug]', 'page');
-  const data = await response.json();
-  return data?.result?.data || data;
+  revalidatePath('/courses/generating/[slug]', 'page')
+  const data = await response.json()
+  return data?.result?.data || data
+}
+
+/**
+ * Switch course from automatic to manual (semi-automatic) generation mode
+ * Calls generation.switchToManualMode tRPC endpoint
+ * Used by AutomaticModeControlPanel when user wants to take manual control
+ *
+ * Preconditions:
+ * - Course must be in automatic mode
+ * - Course must be paused
+ */
+export async function switchToManualMode(courseId: string) {
+  const headers = await getBackendAuthHeaders()
+
+  const response = await fetch(`${TRPC_URL}/generation.switchToManualMode`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ courseId }),
+  })
+
+  if (!response.ok) {
+    await extractApiError(response, 'Failed to switch to manual mode')
+  }
+
+  revalidatePath('/courses/generating/[slug]', 'page')
+  const data = await response.json()
+  return data?.result?.data || data
 }

@@ -50,7 +50,11 @@ export default async function CourseGeneratingPage({ params, searchParams }: Pag
   if (isPrivilegedRole) {
     // Use admin client to bypass RLS and view any course
     const adminClient = await createAdminClient()
-    const { data, error } = await adminClient.from('courses').select('*').eq('slug', slug).single()
+    const { data, error } = await adminClient
+      .from('courses')
+      .select('*, generation_mode, generation_paused_at')
+      .eq('slug', slug)
+      .single()
 
     if (error || !data) {
       notFound()
@@ -60,7 +64,7 @@ export default async function CourseGeneratingPage({ params, searchParams }: Pag
     // Regular users can only view their own courses
     const { data, error } = await supabase
       .from('courses')
-      .select('*')
+      .select('*, generation_mode, generation_paused_at')
       .eq('slug', slug)
       .eq('user_id', user.id)
       .single()
@@ -213,6 +217,10 @@ export default async function CourseGeneratingPage({ params, searchParams }: Pag
             failedAtStage={course.failed_at_stage}
             generationCode={course.generation_code}
             stage1CourseData={stage1CourseData}
+            generationMode={
+              (course.generation_mode as 'automatic' | 'semi_automatic' | null) || null
+            }
+            generationPausedAt={course.generation_paused_at || null}
           />
         </GenerationRealtimeProvider>
       </GenerationErrorBoundary>

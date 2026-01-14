@@ -22,7 +22,7 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 // import { approveStage, cancelGeneration, startGeneration } from '@/app/actions/admin-generation';
 import { GraphViewWrapper } from '@/components/generation-graph'
 import { AutomaticModeControlPanel } from '@/components/generation'
-import { cancelGeneration } from '@/app/actions/admin-generation'
+import { cancelGeneration, switchToManualMode } from '@/app/actions/admin-generation'
 
 // Celestial Design Imports - SpaceBackground REMOVED: GraphView takes full screen now
 // MissionControlBanner - DISABLED: Now rendered inside GraphView
@@ -380,6 +380,61 @@ export default function GenerationProgressContainerEnhanced({
     },
     []
   )
+
+  // Automatic Mode Control Handlers (after showToast declaration to avoid hoisting issues)
+  const handlePause = useCallback(async () => {
+    if (!supabase) return
+    try {
+      const { error } = await supabase
+        .from('courses')
+        .update({ generation_paused_at: new Date().toISOString() })
+        .eq('id', courseId)
+
+      if (error) throw error
+      showToast('info', 'Генерация приостановлена')
+    } catch (error) {
+      showToast('error', 'Не удалось приостановить генерацию')
+      console.error(error)
+    }
+  }, [courseId, supabase, showToast])
+
+  const handleResume = useCallback(async () => {
+    if (!supabase) return
+    try {
+      const { error } = await supabase
+        .from('courses')
+        .update({ generation_paused_at: null })
+        .eq('id', courseId)
+
+      if (error) throw error
+      showToast('success', 'Генерация продолжена')
+    } catch (error) {
+      showToast('error', 'Не удалось продолжить генерацию')
+      console.error(error)
+    }
+  }, [courseId, supabase, showToast])
+
+  const handleCancel = useCallback(async () => {
+    if (!confirm('Вы уверены, что хотите отменить генерацию? Это действие нельзя отменить.')) return
+
+    try {
+      await cancelGeneration(courseId)
+      showToast('info', 'Генерация отменена')
+    } catch (error) {
+      showToast('error', 'Не удалось отменить генерацию')
+      console.error(error)
+    }
+  }, [courseId, showToast])
+
+  const handleSwitchToManual = useCallback(async () => {
+    try {
+      const data = await switchToManualMode(courseId)
+      showToast('success', data?.message || 'Переключено в ручной режим')
+    } catch (error) {
+      showToast('error', 'Не удалось переключить в ручной режим')
+      console.error(error)
+    }
+  }, [courseId, showToast])
 
   // Calculate estimated time based on progress
   const calculateEstimatedTime = useCallback((progress: GenerationProgress) => {
@@ -782,6 +837,20 @@ export default function GenerationProgressContainerEnhanced({
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* Automatic Mode Control Panel - shown above graph when in automatic mode */}
+      {generationMode === 'automatic' && (
+        <div className="absolute top-4 left-1/2 z-50 w-full max-w-3xl -translate-x-1/2 px-4">
+          <AutomaticModeControlPanel
+            status={state.status as string}
+            isPaused={!!generationPausedAt}
+            onPause={handlePause}
+            onResume={handleResume}
+            onCancel={handleCancel}
+            onSwitchToManual={handleSwitchToManual}
+          />
+        </div>
+      )}
 
       {/* GraphView - Full screen */}
       <GraphViewWrapper
