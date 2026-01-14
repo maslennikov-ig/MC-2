@@ -13,7 +13,7 @@ import { getSummaryByCourseInputSchema } from '../schemas';
 import { verifyCourseAccess } from '../helpers';
 import { getSupabaseAdmin } from '../../../../shared/supabase/admin';
 import { logger } from '../../../../shared/logger/index.js';
-import type { EnrichmentSummary, EnrichmentType, EnrichmentStatus } from '@megacampus/shared-types';
+import type { EnrichmentSummary } from '@megacampus/shared-types';
 
 /**
  * Get enrichment summary for all lessons in a course

@@ -12,7 +12,6 @@ import { verifyCourseAccess } from '../helpers';
 import { getQueue } from '../../../../orchestrator/queue';
 import { getSupabaseAdmin } from '../../../../shared/supabase/admin';
 import { JobType } from '@megacampus/shared-types';
-import type { LessonContentJobData } from '@megacampus/shared-types';
 import { logger } from '../../../../shared/logger/index.js';
 
 /**

@@ -14,7 +14,7 @@ import { getNextOrderIndex, isTwoStageType } from '../helpers';
 import { getSupabaseAdmin } from '../../../../shared/supabase/admin';
 import { createStage7Queue, addEnrichmentJob } from '../../../../stages/stage7-enrichments/factory';
 import type { Stage7JobInput } from '../../../../stages/stage7-enrichments/types';
-import type { EnrichmentType, EnrichmentStatus } from '@megacampus/shared-types';
+import type { EnrichmentStatus } from '@megacampus/shared-types';
 import { logger } from '../../../../shared/logger/index.js';
 
 // Create queue instance (singleton)
