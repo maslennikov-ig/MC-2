@@ -66,6 +66,11 @@ export interface GraphViewWrapperProps {
    * Used for connection indicator in header.
    */
   isRealtimeConnected?: boolean;
+  /**
+   * Read-only mode for automatic generation.
+   * Hides edit, regenerate, and approve buttons.
+   */
+  readOnly?: boolean;
 }
 
 /**
@@ -92,7 +97,8 @@ export function GraphViewWrapper({
   stage1CourseData,
   generationProgress,
   generationStatus,
-  isRealtimeConnected
+  isRealtimeConnected,
+  readOnly
 }: GraphViewWrapperProps) {
   return (
     <GraphViewDynamic
@@ -106,6 +112,7 @@ export function GraphViewWrapper({
       generationProgress={generationProgress}
       generationStatus={generationStatus}
       isRealtimeConnected={isRealtimeConnected}
+      readOnly={readOnly}
     />
   );
 }

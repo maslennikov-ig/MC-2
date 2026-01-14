@@ -137,8 +137,9 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
   // Editing permission:
   // - When stage is awaiting approval, EVERYONE can edit (to review/change before approving)
   // - Otherwise, admins get read-only view, owners can edit
+  // - In automatic mode (readOnly=true), nobody can edit
   const isAwaitingApproval = isThisStageAwaiting || realtimeStatus?.status === 'awaiting' || data?.status === 'awaiting';
-  const canEdit = isAwaitingApproval || !isAdmin;
+  const canEdit = !courseInfo.readOnly && (isAwaitingApproval || !isAdmin);
 
   // Detect if this is a lesson node and extract lessonId for content fetching
   const isLessonNode = selectedNode?.type === 'lesson';
@@ -913,7 +914,7 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
                       courseId={courseInfo.id}
                       outputData={displayData?.outputData}
                       editable={canEdit}
-                      readOnly={isAdmin && !isAwaitingApproval}
+                      readOnly={courseInfo.readOnly || (isAdmin && !isAwaitingApproval)}
                       autoFocus={autoOpened}
                       onApproved={handleStageApproved}
                     />
@@ -929,7 +930,7 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
                       stageId={`stage_${data?.stageNumber}`}
                       courseId={courseInfo.id}
                       editable={canEdit}
-                      readOnly={isAdmin && !isAwaitingApproval}
+                      readOnly={courseInfo.readOnly || (isAdmin && !isAwaitingApproval)}
                       autoFocus={autoOpened}
                       onApproved={deselectNode}
                       nodeType={selectedNode?.type}

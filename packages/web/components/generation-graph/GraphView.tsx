@@ -155,6 +155,11 @@ export interface GraphViewProps {
    * Used for connection indicator in header.
    */
   isRealtimeConnected?: boolean;
+  /**
+   * Read-only mode for automatic generation.
+   * Hides edit, regenerate, and approve buttons.
+   */
+  readOnly?: boolean;
 }
 
 /**
@@ -195,7 +200,7 @@ function GraphInteractions({ setIsPanning }: GraphInteractionsProps) {
  *
  * @param props - Component props
  */
-function GraphViewInner({ courseId, courseTitle, hasDocuments = true, failedAtStage, progressPercentage, generationCode, stage1CourseData, tier = 'standard', generationProgress, generationStatus, isRealtimeConnected }: GraphViewProps) {
+function GraphViewInner({ courseId, courseTitle, hasDocuments = true, failedAtStage, progressPercentage, generationCode, stage1CourseData, tier = 'standard', generationProgress, generationStatus, isRealtimeConnected, readOnly }: GraphViewProps) {
   const { isTablet } = useBreakpoint(768);
   const nodesInitialized = useNodesInitialized();
   const { fitView, getNodes, setCenter } = useReactFlow();
@@ -730,10 +735,11 @@ function GraphViewInner({ courseId, courseTitle, hasDocuments = true, failedAtSt
           lessonCount,
           tier,
           visualStyle,
+          readOnly,
         },
       };
     },
-    [courseId, courseTitle, tier, nodes, visualStyle]
+    [courseId, courseTitle, tier, nodes, visualStyle, readOnly]
   );
 
   // Mobile view - show simplified graph (no separate list view)
