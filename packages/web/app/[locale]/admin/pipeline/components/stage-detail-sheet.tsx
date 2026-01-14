@@ -382,7 +382,7 @@ export function StageDetailSheet({
     if (open && stage && refreshKey !== undefined) {
       loadStageData()
     }
-  }, [refreshKey])
+  }, [refreshKey, open, stage, loadStageData])
 
   if (!stage) return null
 

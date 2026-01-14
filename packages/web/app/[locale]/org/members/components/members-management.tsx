@@ -1,6 +1,7 @@
 'use client';
 
 import { useState, useEffect, useCallback } from 'react';
+import Image from 'next/image';
 import { useTranslations } from 'next-intl';
 import { formatDistanceToNow } from 'date-fns';
 import {
@@ -272,10 +273,12 @@ export function MembersManagement({ organizationId }: MembersManagementProps) {
                       <TableCell>
                         <div className="flex items-center gap-2">
                           {member.user.avatarUrl ? (
-                            <img
+                            <Image
                               src={member.user.avatarUrl}
-                              alt=""
-                              className="h-6 w-6 rounded-full"
+                              alt={member.user.fullName || 'User avatar'}
+                              width={24}
+                              height={24}
+                              className="h-6 w-6 rounded-full object-cover"
                             />
                           ) : (
                             <User className="h-4 w-4 text-muted-foreground" />

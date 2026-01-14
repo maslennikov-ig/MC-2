@@ -29,7 +29,7 @@ const SheetOverlay = React.forwardRef<
   React.ComponentPropsWithoutRef<typeof SheetPrimitive.Overlay>
 >(({ className, ...props }, ref) => {
   // Filter out props that conflict with motion.div
-  const { onDrag, onDragStart, onDragEnd, ...motionSafeProps } = props as any
+  const { onDrag: _onDrag, onDragStart: _onDragStart, onDragEnd, ...motionSafeProps } = props as any
 
   return (
     <SheetPrimitive.Overlay asChild>

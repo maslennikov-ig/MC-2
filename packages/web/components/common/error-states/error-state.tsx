@@ -29,6 +29,7 @@ export function ErrorState({
 }: ErrorStateProps) {
   const [detailsOpen, setDetailsOpen] = useState(false)
   const t = useTranslations('common.errors.generic')
+  const tNotFound = useTranslations('common.errors.notFound')
 
   useEffect(() => {
     if (error) {
@@ -62,7 +63,7 @@ export function ErrorState({
       {showHomeButton && (
         <Link
           href="/"
-          aria-label={useTranslations('common.errors.notFound')('goHome')}
+          aria-label={tNotFound('goHome')}
           className={cn(
             'inline-flex items-center gap-2 px-6 py-3',
             'bg-muted hover:bg-muted/80 text-foreground rounded-xl',
@@ -71,7 +72,7 @@ export function ErrorState({
           )}
         >
           <Home className="w-5 h-5" />
-          {useTranslations('common.errors.notFound')('goHome')}
+          {tNotFound('goHome')}
         </Link>
       )}
     </>

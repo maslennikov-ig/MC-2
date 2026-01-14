@@ -49,7 +49,7 @@ export function ManualStage6Panel() {
       }
 
       setLessons(data as unknown as LessonWithContent[]); // Type cast due to join structure
-    } catch (err) {
+    } catch (_err) {
       setError('An unexpected error occurred');
       toast.error('An unexpected error occurred');
     } finally {

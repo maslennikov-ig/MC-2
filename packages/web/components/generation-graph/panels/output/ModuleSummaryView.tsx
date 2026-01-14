@@ -146,9 +146,11 @@ export function ModuleSummaryView({
   const t = translations[locale];
 
   // Extract lessons from various possible locations
-  const lessons: LessonSummary[] = data.lessons ||
-                                   (data.outputData?.lessons as LessonSummary[]) ||
-                                   [];
+  // Wrapped in useMemo to prevent creating new array reference on every render
+  const lessons: LessonSummary[] = useMemo(
+    () => data.lessons || (data.outputData?.lessons as LessonSummary[]) || [],
+    [data.lessons, data.outputData?.lessons]
+  );
 
   // Calculate statistics
   const stats = useMemo(() => {

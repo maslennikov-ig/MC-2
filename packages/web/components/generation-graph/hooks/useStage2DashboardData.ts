@@ -758,8 +758,9 @@ export function useStage2DashboardData({
       traceChannel.unsubscribe()
     }
     // IMPORTANT: Only depend on courseId and enableRealtime
-    // supabase is stored in ref (stable), fetchRef is used for fetch function
-  }, [enableRealtime, courseId])
+    // supabase is from ref (stable), fetchRef is used for fetch function
+    // Added supabase to satisfy eslint exhaustive-deps (it's stable)
+  }, [enableRealtime, courseId, supabase])
 
   // Refetch function for manual refresh
   const refetch = useCallback(() => {

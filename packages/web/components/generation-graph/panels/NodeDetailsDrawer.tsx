@@ -106,7 +106,11 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
 
   // Detect if this node has phases (stages 4, 5)
   const hasPhases = data?.stageNumber && (data.stageNumber === 4 || data.stageNumber === 5);
-  const phases = getStagePhases(data as AppNodeData | undefined) || [];
+  // Memoize phases to prevent creating new array on every render
+  const phases = useMemo(
+    () => getStagePhases(data as AppNodeData | undefined) || [],
+    [data]
+  );
 
   // Get realtime status from context (more reliable than node data)
   const realtimeStatus = useNodeStatus(selectedNodeId || '');
@@ -347,7 +351,7 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
     } finally {
       setIsApprovingAll(false);
     }
-  }, [moduleIdForDashboard, courseInfo.id, refetchModuleDashboard]);
+  }, [moduleIdForDashboard, courseInfo.id, refetchModuleDashboard, t]);
 
   // Reset phase and attempt selection when node changes
   useEffect(() => {
@@ -372,7 +376,7 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
           setSelectedAttemptNum(null);
           setSelectedPhaseId(null);
       }
-  }, [selectedNodeId, data?.attempts, hasPhases, phases]);
+  }, [selectedNodeId, data?.attempts, data?.stageNumber, hasPhases, phases]);
 
   // Reset lesson maximization when drawer closes
   useEffect(() => {

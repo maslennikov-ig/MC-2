@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useState, useCallback } from 'react';
+import Image from 'next/image';
 import { motion, AnimatePresence } from 'framer-motion';
 import { ChevronDown, RefreshCw, CheckCircle2, Circle, AlertCircle, Loader2, Sparkles, Scale, ThumbsUp, ThumbsDown, AlertTriangle, Maximize2 } from 'lucide-react';
 import * as Accordion from '@radix-ui/react-accordion';
@@ -801,9 +802,11 @@ function CoverGeneratorOutputDisplay({ output }: { output: CoverGeneratorOutput 
               onClick={() => setIsImageOpen(true)}
               className="block w-full focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2 rounded-lg overflow-hidden"
             >
-              <img
+              <Image
                 src={output.imageUrl}
                 alt="Обложка урока"
+                width={640}
+                height={360}
                 className="w-full aspect-video object-cover rounded-lg border border-slate-200 dark:border-slate-700 transition-transform group-hover:scale-[1.02]"
               />
               {/* Hover overlay */}
@@ -823,9 +826,11 @@ function CoverGeneratorOutputDisplay({ output }: { output: CoverGeneratorOutput 
                 <DialogTitle>Обложка урока</DialogTitle>
               </DialogHeader>
               <div className="p-4 pt-0">
-                <img
+                <Image
                   src={output.imageUrl}
                   alt="Обложка урока"
+                  width={896}
+                  height={504}
                   className="w-full h-auto rounded-lg"
                 />
               </div>
@@ -1213,7 +1218,7 @@ export function VerticalPipelineStepper({
             <React.Fragment key={node.node}>
               {/* Node Card */}
               <PipelineNodeCard
-                node={node as PipelineNodeState}
+                node={node}
                 isActive={isActive}
                 onRetry={
                   node.status === 'error' && onRetryNode
