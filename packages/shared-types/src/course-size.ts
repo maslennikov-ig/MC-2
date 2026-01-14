@@ -467,3 +467,166 @@ export function isValidCourseSize(size: string): size is CourseSize {
  * 'auto' lets LLM analyze topic and decide optimal structure
  */
 export const DEFAULT_COURSE_SIZE: CourseSize = 'auto';
+
+// ============================================================================
+// UI LABELS FOR COURSE SIZE SELECTOR (i18n)
+// ============================================================================
+
+export interface CourseSizeUILabels {
+  /** Section title */
+  sectionTitle: string;
+  /** Legend for screen readers */
+  legendText: string;
+  /** Advisory note at bottom */
+  advisoryNote: string;
+  /** Helper text when auto is selected */
+  autoHelperText: string;
+}
+
+/**
+ * Localized UI labels for CourseSizeSelector component
+ * Supports all 19 platform languages
+ */
+export const COURSE_SIZE_UI_LABELS: Record<Language, CourseSizeUILabels> = {
+  ru: {
+    sectionTitle: 'Размер курса',
+    legendText: 'Выберите размер курса',
+    advisoryNote: 'Это рекомендация - фактический размер может отличаться',
+    autoHelperText:
+      'ИИ автоматически определит оптимальный размер курса на основе анализа темы и загруженных материалов.',
+  },
+  en: {
+    sectionTitle: 'Course Size',
+    legendText: 'Select course size',
+    advisoryNote: 'This is a recommendation - actual size may vary',
+    autoHelperText:
+      'AI will automatically determine optimal course size based on topic analysis and uploaded materials.',
+  },
+  zh: {
+    sectionTitle: '课程规模',
+    legendText: '选择课程规模',
+    advisoryNote: '这是建议 - 实际规模可能有所不同',
+    autoHelperText: 'AI将根据主题分析和上传的材料自动确定最佳课程规模。',
+  },
+  es: {
+    sectionTitle: 'Tamaño del curso',
+    legendText: 'Seleccionar tamaño del curso',
+    advisoryNote: 'Esta es una recomendación - el tamaño real puede variar',
+    autoHelperText:
+      'La IA determinará automáticamente el tamaño óptimo del curso según el análisis del tema y los materiales cargados.',
+  },
+  fr: {
+    sectionTitle: 'Taille du cours',
+    legendText: 'Sélectionner la taille du cours',
+    advisoryNote: 'Ceci est une recommandation - la taille réelle peut varier',
+    autoHelperText:
+      "L'IA déterminera automatiquement la taille optimale du cours en fonction de l'analyse du sujet et des documents téléchargés.",
+  },
+  de: {
+    sectionTitle: 'Kursgröße',
+    legendText: 'Kursgröße auswählen',
+    advisoryNote: 'Dies ist eine Empfehlung - die tatsächliche Größe kann variieren',
+    autoHelperText:
+      'KI wird die optimale Kursgröße basierend auf der Themenanalyse und hochgeladenen Materialien automatisch bestimmen.',
+  },
+  ja: {
+    sectionTitle: 'コースサイズ',
+    legendText: 'コースサイズを選択',
+    advisoryNote: 'これは推奨です - 実際のサイズは異なる場合があります',
+    autoHelperText:
+      'AIがトピック分析とアップロードされた資料に基づいて最適なコースサイズを自動的に決定します。',
+  },
+  ko: {
+    sectionTitle: '코스 크기',
+    legendText: '코스 크기 선택',
+    advisoryNote: '이것은 권장 사항입니다 - 실제 크기는 다를 수 있습니다',
+    autoHelperText:
+      'AI가 주제 분석과 업로드된 자료를 바탕으로 최적의 코스 크기를 자동으로 결정합니다.',
+  },
+  ar: {
+    sectionTitle: 'حجم الدورة',
+    legendText: 'اختر حجم الدورة',
+    advisoryNote: 'هذه توصية - قد يختلف الحجم الفعلي',
+    autoHelperText:
+      'سيحدد الذكاء الاصطناعي تلقائيًا الحجم الأمثل للدورة بناءً على تحليل الموضوع والمواد المرفوعة.',
+  },
+  pt: {
+    sectionTitle: 'Tamanho do curso',
+    legendText: 'Selecionar tamanho do curso',
+    advisoryNote: 'Esta é uma recomendação - o tamanho real pode variar',
+    autoHelperText:
+      'A IA determinará automaticamente o tamanho ideal do curso com base na análise do tema e nos materiais carregados.',
+  },
+  it: {
+    sectionTitle: 'Dimensione del corso',
+    legendText: 'Seleziona dimensione del corso',
+    advisoryNote: 'Questa è una raccomandazione - la dimensione effettiva può variare',
+    autoHelperText:
+      "L'IA determinerà automaticamente la dimensione ottimale del corso in base all'analisi dell'argomento e ai materiali caricati.",
+  },
+  tr: {
+    sectionTitle: 'Kurs boyutu',
+    legendText: 'Kurs boyutunu seçin',
+    advisoryNote: 'Bu bir öneridir - gerçek boyut farklı olabilir',
+    autoHelperText:
+      'AI, konu analizi ve yüklenen materyallere göre en uygun kurs boyutunu otomatik olarak belirleyecektir.',
+  },
+  vi: {
+    sectionTitle: 'Quy mô khóa học',
+    legendText: 'Chọn quy mô khóa học',
+    advisoryNote: 'Đây là khuyến nghị - quy mô thực tế có thể khác',
+    autoHelperText:
+      'AI sẽ tự động xác định quy mô khóa học tối ưu dựa trên phân tích chủ đề và tài liệu đã tải lên.',
+  },
+  th: {
+    sectionTitle: 'ขนาดหลักสูตร',
+    legendText: 'เลือกขนาดหลักสูตร',
+    advisoryNote: 'นี่เป็นคำแนะนำ - ขนาดจริงอาจแตกต่างกัน',
+    autoHelperText:
+      'AI จะกำหนดขนาดหลักสูตรที่เหมาะสมโดยอัตโนมัติตามการวิเคราะห์หัวข้อและเอกสารที่อัปโหลด',
+  },
+  id: {
+    sectionTitle: 'Ukuran kursus',
+    legendText: 'Pilih ukuran kursus',
+    advisoryNote: 'Ini adalah rekomendasi - ukuran sebenarnya dapat bervariasi',
+    autoHelperText:
+      'AI akan secara otomatis menentukan ukuran kursus yang optimal berdasarkan analisis topik dan materi yang diunggah.',
+  },
+  ms: {
+    sectionTitle: 'Saiz kursus',
+    legendText: 'Pilih saiz kursus',
+    advisoryNote: 'Ini adalah cadangan - saiz sebenar mungkin berbeza',
+    autoHelperText:
+      'AI akan menentukan saiz kursus optimum secara automatik berdasarkan analisis topik dan bahan yang dimuat naik.',
+  },
+  hi: {
+    sectionTitle: 'कोर्स का आकार',
+    legendText: 'कोर्स का आकार चुनें',
+    advisoryNote: 'यह एक सिफारिश है - वास्तविक आकार भिन्न हो सकता है',
+    autoHelperText:
+      'AI विषय विश्लेषण और अपलोड की गई सामग्री के आधार पर स्वचालित रूप से इष्टतम कोर्स आकार निर्धारित करेगा।',
+  },
+  bn: {
+    sectionTitle: 'কোর্সের আকার',
+    legendText: 'কোর্সের আকার নির্বাচন করুন',
+    advisoryNote: 'এটি একটি সুপারিশ - প্রকৃত আকার ভিন্ন হতে পারে',
+    autoHelperText:
+      'AI বিষয় বিশ্লেষণ এবং আপলোড করা উপকরণের উপর ভিত্তি করে স্বয়ংক্রিয়ভাবে সর্বোত্তম কোর্সের আকার নির্ধারণ করবে।',
+  },
+  pl: {
+    sectionTitle: 'Rozmiar kursu',
+    legendText: 'Wybierz rozmiar kursu',
+    advisoryNote: 'To jest zalecenie - rzeczywisty rozmiar może się różnić',
+    autoHelperText:
+      'AI automatycznie określi optymalny rozmiar kursu na podstawie analizy tematu i przesłanych materiałów.',
+  },
+};
+
+/**
+ * Get localized UI labels for CourseSizeSelector
+ * Falls back to English for unknown language codes
+ */
+export function getCourseSizeUILabels(language: string): CourseSizeUILabels {
+  const labels = COURSE_SIZE_UI_LABELS[language as Language];
+  return labels || COURSE_SIZE_UI_LABELS.en;
+}
