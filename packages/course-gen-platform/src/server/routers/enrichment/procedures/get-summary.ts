@@ -47,20 +47,18 @@ export const getSummaryByCourse = protectedProcedure
     const requestId = nanoid();
     const currentUser = ctx.user;
 
-    logger.debug({
-      requestId,
-      courseId,
-      userId: currentUser.id,
-    }, 'Get enrichment summary by course request');
+    logger.debug(
+      {
+        requestId,
+        courseId,
+        userId: currentUser.id,
+      },
+      'Get enrichment summary by course request'
+    );
 
     try {
       // Step 1: Verify course access
-      await verifyCourseAccess(
-        courseId,
-        currentUser.id,
-        currentUser.organizationId,
-        requestId
-      );
+      await verifyCourseAccess(courseId, currentUser.id, currentUser.organizationId, requestId);
 
       // Step 2: Query enrichments with minimal fields for summary
       const supabase = getSupabaseAdmin();
@@ -72,11 +70,14 @@ export const getSummaryByCourse = protectedProcedure
         .order('order_index', { ascending: true });
 
       if (error) {
-        logger.error({
-          requestId,
-          courseId,
-          error: error.message,
-        }, 'Failed to fetch enrichment summary');
+        logger.error(
+          {
+            requestId,
+            courseId,
+            error: error.message,
+          },
+          'Failed to fetch enrichment summary'
+        );
 
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
@@ -94,19 +95,22 @@ export const getSummaryByCourse = protectedProcedure
         }
 
         summaryByLesson[lessonId].push({
-          type: enrichment.enrichment_type as EnrichmentType,
-          status: enrichment.status as EnrichmentStatus,
+          type: enrichment.enrichment_type,
+          status: enrichment.status,
           hasError: !!enrichment.error_message,
           title: enrichment.title || undefined,
         });
       }
 
-      logger.debug({
-        requestId,
-        courseId,
-        lessonCount: Object.keys(summaryByLesson).length,
-        totalEnrichments: enrichments?.length || 0,
-      }, 'Enrichment summary fetched');
+      logger.debug(
+        {
+          requestId,
+          courseId,
+          lessonCount: Object.keys(summaryByLesson).length,
+          totalEnrichments: enrichments?.length || 0,
+        },
+        'Enrichment summary fetched'
+      );
 
       return summaryByLesson;
     } catch (error) {
@@ -116,11 +120,14 @@ export const getSummaryByCourse = protectedProcedure
       }
 
       // Log and wrap unexpected errors
-      logger.error({
-        requestId,
-        courseId,
-        error: error instanceof Error ? error.message : String(error),
-      }, 'Get enrichment summary failed');
+      logger.error(
+        {
+          requestId,
+          courseId,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        'Get enrichment summary failed'
+      );
 
       throw new TRPCError({
         code: 'INTERNAL_SERVER_ERROR',

@@ -43,7 +43,10 @@ export async function denseSearch(
   });
   const searchTime = Date.now() - searchStartTime;
 
-  logger.info({ searchTimeMs: searchTime, resultCount: searchResults.length }, 'Dense search completed');
+  logger.info(
+    { searchTimeMs: searchTime, resultCount: searchResults.length },
+    'Dense search completed'
+  );
 
   return searchResults;
 }
@@ -77,7 +80,10 @@ export async function sparseSearch(
   });
   const searchTime = Date.now() - searchStartTime;
 
-  logger.info({ searchTimeMs: searchTime, resultCount: searchResults.length }, 'Sparse search completed');
+  logger.info(
+    { searchTimeMs: searchTime, resultCount: searchResults.length },
+    'Sparse search completed'
+  );
 
   return searchResults;
 }
@@ -108,11 +114,14 @@ export async function hybridSearchNative(
   const filter = buildQdrantFilter(options.filters);
   const prefetchLimit = Math.max(options.limit * 3, 30); // Fetch more for better RRF
 
-  logger.debug({
-    sparseTermCount: sparseVector.indices.length,
-    prefetchLimit,
-    scoreThreshold: options.score_threshold,
-  }, 'Preparing native hybrid search');
+  logger.debug(
+    {
+      sparseTermCount: sparseVector.indices.length,
+      prefetchLimit,
+      scoreThreshold: options.score_threshold,
+    },
+    'Preparing native hybrid search'
+  );
 
   // Use Qdrant's native query API with prefetch for server-side RRF
   const results = await qdrantClient.query(options.collection_name, {
@@ -140,12 +149,15 @@ export async function hybridSearchNative(
     with_payload: true,
   });
 
-  logger.info({
-    resultCount: results.points.length,
-    method: 'native-rrf',
-  }, 'Native hybrid search completed');
+  logger.info(
+    {
+      resultCount: results.points.length,
+      method: 'native-rrf',
+    },
+    'Native hybrid search completed'
+  );
 
-  return results.points as QdrantScoredPoint[];
+  return results.points;
 }
 
 /**
@@ -173,8 +185,10 @@ export async function hybridSearchWithFallback(
     return denseSearch(queryText, options);
   } catch (error) {
     // On any error, fallback to dense-only
-    logger.warn({ error: error instanceof Error ? error.message : String(error) },
-      'Hybrid search failed, falling back to dense-only');
+    logger.warn(
+      { error: error instanceof Error ? error.message : String(error) },
+      'Hybrid search failed, falling back to dense-only'
+    );
     return denseSearch(queryText, options);
   }
 }
@@ -192,7 +206,10 @@ export async function hybridSearch(
   queryText: string,
   options: Required<Omit<SearchOptions, 'filters'>> & { filters: SearchFilters }
 ): Promise<QdrantScoredPoint[]> {
-  logger.info({ method: 'native-RRF', queryText: queryText.slice(0, 50) }, 'Performing hybrid search');
+  logger.info(
+    { method: 'native-RRF', queryText: queryText.slice(0, 50) },
+    'Performing hybrid search'
+  );
   return hybridSearchWithFallback(queryText, options);
 }
 
@@ -219,10 +236,13 @@ export async function hybridSearchClientSideRRF(
     sparseSearch(queryText, searchOptions),
   ]);
 
-  logger.debug({
-    denseCount: denseResults.length,
-    sparseCount: sparseResults.length
-  }, 'Search results obtained');
+  logger.debug(
+    {
+      denseCount: denseResults.length,
+      sparseCount: sparseResults.length,
+    },
+    'Search results obtained'
+  );
 
   // Merge results using Reciprocal Rank Fusion
   const mergedResults = reciprocalRankFusion(denseResults, sparseResults);

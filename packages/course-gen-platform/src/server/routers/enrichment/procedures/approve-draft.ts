@@ -61,11 +61,14 @@ export const approveDraft = protectedProcedure
     const requestId = nanoid();
     const currentUser = ctx.user;
 
-    logger.info({
-      requestId,
-      enrichmentId,
-      userId: currentUser.id,
-    }, 'Approve draft request');
+    logger.info(
+      {
+        requestId,
+        enrichmentId,
+        userId: currentUser.id,
+      },
+      'Approve draft request'
+    );
 
     try {
       // Step 1: Verify enrichment access and get current data
@@ -78,11 +81,14 @@ export const approveDraft = protectedProcedure
 
       // Step 2: Verify this is a two-stage enrichment type
       if (!isTwoStageType(enrichment.enrichment_type)) {
-        logger.warn({
-          requestId,
-          enrichmentId,
-          enrichmentType: enrichment.enrichment_type,
-        }, 'Approve draft not applicable for this enrichment type');
+        logger.warn(
+          {
+            requestId,
+            enrichmentId,
+            enrichmentType: enrichment.enrichment_type,
+          },
+          'Approve draft not applicable for this enrichment type'
+        );
 
         throw new TRPCError({
           code: 'BAD_REQUEST',
@@ -92,11 +98,14 @@ export const approveDraft = protectedProcedure
 
       // Step 3: Check if enrichment is in draft_ready status
       if (enrichment.status !== 'draft_ready') {
-        logger.warn({
-          requestId,
-          enrichmentId,
-          currentStatus: enrichment.status,
-        }, 'Cannot approve draft with current status');
+        logger.warn(
+          {
+            requestId,
+            enrichmentId,
+            currentStatus: enrichment.status,
+          },
+          'Cannot approve draft with current status'
+        );
 
         throw new TRPCError({
           code: 'BAD_REQUEST',
@@ -105,13 +114,16 @@ export const approveDraft = protectedProcedure
       }
 
       // Step 3.5: Validate that draft content exists
-      const draftContent = (enrichment.content as Record<string, unknown> | null)?.draft;
+      const draftContent = enrichment.content?.draft;
       if (!draftContent) {
-        logger.error({
-          requestId,
-          enrichmentId,
-          content: enrichment.content,
-        }, 'Draft content missing for approval');
+        logger.error(
+          {
+            requestId,
+            enrichmentId,
+            content: enrichment.content,
+          },
+          'Draft content missing for approval'
+        );
 
         throw new TRPCError({
           code: 'BAD_REQUEST',
@@ -130,11 +142,14 @@ export const approveDraft = protectedProcedure
         .eq('id', enrichmentId);
 
       if (updateError) {
-        logger.error({
-          requestId,
-          enrichmentId,
-          error: updateError.message,
-        }, 'Failed to update enrichment status to generating');
+        logger.error(
+          {
+            requestId,
+            enrichmentId,
+            error: updateError.message,
+          },
+          'Failed to update enrichment status to generating'
+        );
 
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
@@ -161,12 +176,15 @@ export const approveDraft = protectedProcedure
         jobId: `enrich-final-${enrichmentId}-${Date.now()}`,
       });
 
-      logger.info({
-        requestId,
-        enrichmentId,
-        jobId: job.id,
-        enrichmentType,
-      }, 'Draft approved, final generation enqueued');
+      logger.info(
+        {
+          requestId,
+          enrichmentId,
+          jobId: job.id,
+          enrichmentType,
+        },
+        'Draft approved, final generation enqueued'
+      );
 
       return {
         success: true,
@@ -180,11 +198,14 @@ export const approveDraft = protectedProcedure
       }
 
       // Log and wrap unexpected errors
-      logger.error({
-        requestId,
-        enrichmentId,
-        error: error instanceof Error ? error.message : String(error),
-      }, 'Approve draft failed');
+      logger.error(
+        {
+          requestId,
+          enrichmentId,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        'Approve draft failed'
+      );
 
       throw new TRPCError({
         code: 'INTERNAL_SERVER_ERROR',

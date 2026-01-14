@@ -163,8 +163,8 @@ async function main(): Promise<void> {
     worker = createStage7Worker();
 
     // Register shutdown handlers
-    process.on('SIGINT', () => handleShutdown('SIGINT'));
-    process.on('SIGTERM', () => handleShutdown('SIGTERM'));
+    process.on('SIGINT', () => void handleShutdown('SIGINT'));
+    process.on('SIGTERM', () => void handleShutdown('SIGTERM'));
 
     // Save initial readiness status and start heartbeat
     await saveReadinessToRedis(true);
@@ -191,7 +191,7 @@ async function main(): Promise<void> {
 }
 
 // Start the worker
-main().catch((error) => {
+main().catch(error => {
   logger.error(
     {
       error: error instanceof Error ? error.message : String(error),

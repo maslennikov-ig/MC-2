@@ -11,9 +11,9 @@
 /* eslint-disable complexity */
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
-/* eslint-disable @typescript-eslint/no-unsafe-call */
+
 /* eslint-disable @typescript-eslint/no-unsafe-assignment */
-/* eslint-disable @typescript-eslint/no-unsafe-argument */
+
 /* eslint-disable max-lines */
 
 import { Job } from 'bullmq';
@@ -77,44 +77,56 @@ export async function createJobStatus(job: Job<JobData>): Promise<void> {
     // instead of failing on duplicate key constraint
     const { data, error } = await supabase
       .from('job_status')
-      .upsert({
-        job_id: job.id!,
-        job_type: job.name,
-        organization_id: organizationId,
-        course_id: job.data.courseId || (job.data as any).course_id || null,
-        user_id: job.data.userId || (job.data as any).user_id || null,
-        status: JobStatus.PENDING,
-        progress: {},
-        attempts: 0,
-        max_attempts: job.opts.attempts || 3,
-      }, {
-        onConflict: 'job_id',
-      })
+      .upsert(
+        {
+          job_id: job.id!,
+          job_type: job.name,
+          organization_id: organizationId,
+          course_id: job.data.courseId || (job.data as any).course_id || null,
+          user_id: job.data.userId || (job.data as any).user_id || null,
+          status: JobStatus.PENDING,
+          progress: {},
+          attempts: 0,
+          max_attempts: job.opts.attempts || 3,
+        },
+        {
+          onConflict: 'job_id',
+        }
+      )
       .select()
       .single();
 
     if (error) {
-      logger.error({
-        jobId: job.id,
-        jobType: job.name,
-        err: error.message,
-      }, 'Failed to upsert job status');
+      logger.error(
+        {
+          jobId: job.id,
+          jobType: job.name,
+          err: error.message,
+        },
+        'Failed to upsert job status'
+      );
       return;
     }
 
     if (data) {
-      logger.debug({
-        jobId: job.id,
-        jobType: job.name,
-        statusId: (data as Database['public']['Tables']['job_status']['Row']).id,
-      }, 'Job status upserted');
+      logger.debug(
+        {
+          jobId: job.id,
+          jobType: job.name,
+          statusId: (data as Database['public']['Tables']['job_status']['Row']).id,
+        },
+        'Job status upserted'
+      );
     }
   } catch (error) {
-    logger.error({
-      jobId: job.id,
-      jobType: job.name,
-      err: error,
-    }, 'Exception upserting job status');
+    logger.error(
+      {
+        jobId: job.id,
+        jobType: job.name,
+        err: error,
+      },
+      'Exception upserting job status'
+    );
   }
 }
 
@@ -153,11 +165,14 @@ export async function updateJobStatus(
       dbUpdates.failed_at = updates.failed_at.toISOString();
     }
 
-    logger.debug({
-      jobId,
-      dbUpdates,
-      options,
-    }, 'Updating job status in database');
+    logger.debug(
+      {
+        jobId,
+        dbUpdates,
+        options,
+      },
+      'Updating job status in database'
+    );
 
     // Build the update query with conditional where clauses
     let query = supabase.from('job_status').update(dbUpdates).eq('job_id', jobId);
@@ -171,38 +186,50 @@ export async function updateJobStatus(
     const { data, error } = await query.select();
 
     if (error) {
-      logger.error({
-        jobId,
-        err: error,
-        errorDetails: error.message,
-        updates,
-        dbUpdates,
-        options,
-      }, 'Failed to update job status');
+      logger.error(
+        {
+          jobId,
+          err: error,
+          errorDetails: error.message,
+          updates,
+          dbUpdates,
+          options,
+        },
+        'Failed to update job status'
+      );
       return;
     }
 
     if (!data || data.length === 0) {
-      logger.warn({
-        jobId,
-        updates,
-        dbUpdates,
-        options,
-      }, 'Job status update returned no data - job may have already been completed');
+      logger.warn(
+        {
+          jobId,
+          updates,
+          dbUpdates,
+          options,
+        },
+        'Job status update returned no data - job may have already been completed'
+      );
       return;
     }
 
-    logger.debug({
-      jobId,
-      updates,
-      updatedRow: data[0],
-    }, 'Job status updated successfully');
+    logger.debug(
+      {
+        jobId,
+        updates,
+        updatedRow: data[0],
+      },
+      'Job status updated successfully'
+    );
   } catch (error) {
-    logger.error({
-      jobId,
-      err: error,
-      updates,
-    }, 'Exception updating job status');
+    logger.error(
+      {
+        jobId,
+        err: error,
+        updates,
+      },
+      'Exception updating job status'
+    );
   }
 }
 
@@ -226,22 +253,28 @@ export async function markJobActive(job: Job<JobData>): Promise<void> {
       .maybeSingle();
 
     if (quickCheck?.completed_at || quickCheck?.failed_at || quickCheck?.cancelled) {
-      logger.debug({
-        jobId: job.id,
-        completedAt: quickCheck.completed_at,
-        failedAt: quickCheck.failed_at,
-        cancelled: quickCheck.cancelled,
-        status: quickCheck.status,
-      }, 'Skipping markJobActive - job already in terminal state');
+      logger.debug(
+        {
+          jobId: job.id,
+          completedAt: quickCheck.completed_at,
+          failedAt: quickCheck.failed_at,
+          cancelled: quickCheck.cancelled,
+          status: quickCheck.status,
+        },
+        'Skipping markJobActive - job already in terminal state'
+      );
       return;
     }
 
     // Also check status field for terminal states
     if (quickCheck?.status === 'completed' || quickCheck?.status === 'failed') {
-      logger.debug({
-        jobId: job.id,
-        status: quickCheck.status,
-      }, 'Skipping markJobActive - job status is terminal');
+      logger.debug(
+        {
+          jobId: job.id,
+          status: quickCheck.status,
+        },
+        'Skipping markJobActive - job status is terminal'
+      );
       return;
     }
 
@@ -261,22 +294,28 @@ export async function markJobActive(job: Job<JobData>): Promise<void> {
 
     // Skip started_at update if job reached any terminal state during delay
     if (postDelayCheck?.completed_at || postDelayCheck?.failed_at || postDelayCheck?.cancelled) {
-      logger.debug({
-        jobId: job.id,
-        completedAt: postDelayCheck.completed_at,
-        failedAt: postDelayCheck.failed_at,
-        cancelled: postDelayCheck.cancelled,
-        status: postDelayCheck.status,
-      }, 'Skipping markJobActive - job reached terminal state during delay');
+      logger.debug(
+        {
+          jobId: job.id,
+          completedAt: postDelayCheck.completed_at,
+          failedAt: postDelayCheck.failed_at,
+          cancelled: postDelayCheck.cancelled,
+          status: postDelayCheck.status,
+        },
+        'Skipping markJobActive - job reached terminal state during delay'
+      );
       return;
     }
 
     // Also skip if status indicates terminal state
     if (postDelayCheck?.status === 'completed' || postDelayCheck?.status === 'failed') {
-      logger.debug({
-        jobId: job.id,
-        status: postDelayCheck.status,
-      }, 'Skipping markJobActive - job status is terminal');
+      logger.debug(
+        {
+          jobId: job.id,
+          status: postDelayCheck.status,
+        },
+        'Skipping markJobActive - job status is terminal'
+      );
       return;
     }
 
@@ -288,10 +327,13 @@ export async function markJobActive(job: Job<JobData>): Promise<void> {
       .maybeSingle();
 
     if (fetchError) {
-      logger.error({
-        jobId: job.id,
-        err: fetchError,
-      }, 'Database error fetching job status in markJobActive');
+      logger.error(
+        {
+          jobId: job.id,
+          err: fetchError,
+        },
+        'Database error fetching job status in markJobActive'
+      );
       return; // Exit early on real database errors
     }
 
@@ -303,20 +345,26 @@ export async function markJobActive(job: Job<JobData>): Promise<void> {
     // Don't update to 'active' if job has already reached a terminal state
     // This prevents race conditions where the 'active' event handler runs after 'completed'
     if (existingStatus?.status === 'completed' || existingStatus?.status === 'failed') {
-      logger.debug({
-        jobId: job.id,
-        currentStatus: existingStatus.status,
-      }, 'Skipping markJobActive - job already in terminal state');
+      logger.debug(
+        {
+          jobId: job.id,
+          currentStatus: existingStatus.status,
+        },
+        'Skipping markJobActive - job already in terminal state'
+      );
       return;
     }
 
     // CRITICAL: Don't update if completed_at is already set (job completed before active event fired)
     // This prevents started_at > completed_at constraint violations
     if (existingStatus?.completed_at) {
-      logger.debug({
-        jobId: job.id,
-        completedAt: existingStatus.completed_at,
-      }, 'Skipping markJobActive - job already has completed_at timestamp');
+      logger.debug(
+        {
+          jobId: job.id,
+          completedAt: existingStatus.completed_at,
+        },
+        'Skipping markJobActive - job already has completed_at timestamp'
+      );
       return;
     }
 
@@ -326,11 +374,14 @@ export async function markJobActive(job: Job<JobData>): Promise<void> {
     // we need to be extra careful with timestamps to avoid constraint violations
     const isRetry = currentAttempt > 1;
     if (isRetry && existingStatus?.status === 'active') {
-      logger.debug({
-        jobId: job.id,
-        currentAttempt,
-        existingAttempts: existingStatus.attempts,
-      }, 'Skipping markJobActive - job already active from previous attempt');
+      logger.debug(
+        {
+          jobId: job.id,
+          currentAttempt,
+          existingAttempts: existingStatus.attempts,
+        },
+        'Skipping markJobActive - job already active from previous attempt'
+      );
       // Just update the attempt count without changing started_at
       await updateJobStatus(job.id!, {
         attempts: currentAttempt,
@@ -375,10 +426,13 @@ export async function markJobActive(job: Job<JobData>): Promise<void> {
         .maybeSingle();
 
       if (finalCheckError) {
-        logger.error({
-          jobId: job.id,
-          err: finalCheckError,
-        }, 'Database error in final check for markJobActive');
+        logger.error(
+          {
+            jobId: job.id,
+            err: finalCheckError,
+          },
+          'Database error in final check for markJobActive'
+        );
         return; // Exit early on real database errors
       }
 
@@ -390,33 +444,42 @@ export async function markJobActive(job: Job<JobData>): Promise<void> {
       if (finalCheck?.completed_at) {
         const completedAt = new Date(finalCheck.completed_at);
         if (startedAt >= completedAt) {
-          logger.warn({
-            jobId: job.id,
-            attemptsMade: job.attemptsMade,
-            currentAttempt,
-            startedAt: startedAt.toISOString(),
-            completedAt: completedAt.toISOString(),
-          }, 'Skipping started_at - would violate constraint (completed_at already set)');
+          logger.warn(
+            {
+              jobId: job.id,
+              attemptsMade: job.attemptsMade,
+              currentAttempt,
+              startedAt: startedAt.toISOString(),
+              completedAt: completedAt.toISOString(),
+            },
+            'Skipping started_at - would violate constraint (completed_at already set)'
+          );
           return;
         }
       }
 
       updates.started_at = startedAt;
 
-      logger.debug({
-        jobId: job.id,
-        attemptsMade: job.attemptsMade,
-        currentAttempt,
-        isRetry,
-        startedAt: updates.started_at.toISOString(),
-        createdAt: existingStatus?.created_at,
-      }, 'Setting started_at for job');
+      logger.debug(
+        {
+          jobId: job.id,
+          attemptsMade: job.attemptsMade,
+          currentAttempt,
+          isRetry,
+          startedAt: updates.started_at.toISOString(),
+          createdAt: existingStatus?.created_at,
+        },
+        'Setting started_at for job'
+      );
     } else {
-      logger.debug({
-        jobId: job.id,
-        attemptsMade: job.attemptsMade,
-        existingStartedAt: existingStatus.started_at,
-      }, 'Skipping started_at for job (already set)');
+      logger.debug(
+        {
+          jobId: job.id,
+          attemptsMade: job.attemptsMade,
+          existingStartedAt: existingStatus.started_at,
+        },
+        'Skipping started_at for job (already set)'
+      );
     }
 
     // Use atomic database-level check to prevent overwriting completed jobs
@@ -424,10 +487,13 @@ export async function markJobActive(job: Job<JobData>): Promise<void> {
     // This ensures we never set started_at after completed_at has been set
     await updateJobStatus(job.id!, updates, { onlyIfNotCompleted: true });
   } catch (error) {
-    logger.error({
-      jobId: job.id,
-      err: error,
-    }, 'Exception in markJobActive');
+    logger.error(
+      {
+        jobId: job.id,
+        err: error,
+      },
+      'Exception in markJobActive'
+    );
   }
 }
 
@@ -454,10 +520,13 @@ export async function markJobCompleted(job: Job<JobData>): Promise<void> {
       .maybeSingle();
 
     if (fetchError) {
-      logger.error({
-        jobId: job.id,
-        err: fetchError,
-      }, 'Database error fetching job status in markJobCompleted');
+      logger.error(
+        {
+          jobId: job.id,
+          err: fetchError,
+        },
+        'Database error fetching job status in markJobCompleted'
+      );
       return; // Exit early on real database errors
     }
 
@@ -473,11 +542,14 @@ export async function markJobCompleted(job: Job<JobData>): Promise<void> {
       const createdAt = new Date(existingStatus?.created_at || Date.now());
       const calculatedStartedAt = new Date(createdAt.getTime() + 1);
 
-      logger.debug({
-        jobId: job.id,
-        createdAt: createdAt.toISOString(),
-        calculatedStartedAt: calculatedStartedAt.toISOString(),
-      }, 'Setting started_at before completed_at (fast job)');
+      logger.debug(
+        {
+          jobId: job.id,
+          createdAt: createdAt.toISOString(),
+          calculatedStartedAt: calculatedStartedAt.toISOString(),
+        },
+        'Setting started_at before completed_at (fast job)'
+      );
 
       // Write started_at WITHOUT changing status
       // This allows markJobActive to see started_at is set and skip overwriting it
@@ -501,12 +573,15 @@ export async function markJobCompleted(job: Job<JobData>): Promise<void> {
 
       if (completedAt < minCompletedAt) {
         completedAt = minCompletedAt;
-        logger.debug({
-          jobId: job.id,
-          startedAt: startedAt.toISOString(),
-          originalCompletedAt: now.toISOString(),
-          adjustedCompletedAt: completedAt.toISOString(),
-        }, 'Adjusted completed_at to be after started_at');
+        logger.debug(
+          {
+            jobId: job.id,
+            startedAt: startedAt.toISOString(),
+            originalCompletedAt: now.toISOString(),
+            adjustedCompletedAt: completedAt.toISOString(),
+          },
+          'Adjusted completed_at to be after started_at'
+        );
       }
     }
 
@@ -517,10 +592,13 @@ export async function markJobCompleted(job: Job<JobData>): Promise<void> {
       progress: { status: 'completed', percent: 100 },
     });
   } catch (error) {
-    logger.error({
-      jobId: job.id,
-      err: error,
-    }, 'Exception in markJobCompleted');
+    logger.error(
+      {
+        jobId: job.id,
+        err: error,
+      },
+      'Exception in markJobCompleted'
+    );
   }
 }
 
@@ -547,10 +625,13 @@ export async function markJobCancelled(jobId: string, cancelledBy?: string): Pro
       .maybeSingle();
 
     if (fetchError) {
-      logger.error({
-        jobId,
-        err: fetchError,
-      }, 'Database error fetching job status in markJobCancelled');
+      logger.error(
+        {
+          jobId,
+          err: fetchError,
+        },
+        'Database error fetching job status in markJobCancelled'
+      );
       return; // Exit early on real database errors
     }
 
@@ -570,12 +651,15 @@ export async function markJobCancelled(jobId: string, cancelledBy?: string): Pro
 
       if (now < minFailedAt) {
         failedAt = minFailedAt;
-        logger.debug({
-          jobId,
-          startedAt: startedAt.toISOString(),
-          originalFailedAt: now.toISOString(),
-          adjustedFailedAt: failedAt.toISOString(),
-        }, 'Adjusted failed_at to be after started_at for cancelled job');
+        logger.debug(
+          {
+            jobId,
+            startedAt: startedAt.toISOString(),
+            originalFailedAt: now.toISOString(),
+            adjustedFailedAt: failedAt.toISOString(),
+          },
+          'Adjusted failed_at to be after started_at for cancelled job'
+        );
       }
     } else if (existingStatus?.created_at) {
       // If started_at is not set yet, ensure failed_at is after created_at
@@ -611,24 +695,33 @@ export async function markJobCancelled(jobId: string, cancelledBy?: string): Pro
     const { error } = await supabase.from('job_status').update(updates).eq('job_id', jobId);
 
     if (error) {
-      logger.error({
-        jobId,
-        cancelledBy,
-        err: error.message,
-      }, 'Failed to mark job as cancelled');
+      logger.error(
+        {
+          jobId,
+          cancelledBy,
+          err: error.message,
+        },
+        'Failed to mark job as cancelled'
+      );
       return;
     }
 
-    logger.info({
-      jobId,
-      cancelledBy,
-    }, 'Job marked as cancelled in database');
+    logger.info(
+      {
+        jobId,
+        cancelledBy,
+      },
+      'Job marked as cancelled in database'
+    );
   } catch (error) {
-    logger.error({
-      jobId,
-      cancelledBy,
-      err: error,
-    }, 'Exception marking job as cancelled');
+    logger.error(
+      {
+        jobId,
+        cancelledBy,
+        err: error,
+      },
+      'Exception marking job as cancelled'
+    );
   }
 }
 
@@ -683,10 +776,13 @@ export async function markJobFailed(job: Job<JobData>, error: Error): Promise<vo
         .maybeSingle();
 
       if (fetchError) {
-        logger.error({
-          jobId: job.id,
-          err: fetchError,
-        }, 'Database error fetching job status in markJobFailed');
+        logger.error(
+          {
+            jobId: job.id,
+            err: fetchError,
+          },
+          'Database error fetching job status in markJobFailed'
+        );
         return; // Exit early on real database errors
       }
 
@@ -706,24 +802,30 @@ export async function markJobFailed(job: Job<JobData>, error: Error): Promise<vo
 
         if (now < minFailedAt) {
           failedAt = minFailedAt;
-          logger.debug({
-            jobId: job.id,
-            startedAt: startedAt.toISOString(),
-            originalFailedAt: now.toISOString(),
-            adjustedFailedAt: failedAt.toISOString(),
-          }, 'Adjusted failed_at to be after started_at');
+          logger.debug(
+            {
+              jobId: job.id,
+              startedAt: startedAt.toISOString(),
+              originalFailedAt: now.toISOString(),
+              adjustedFailedAt: failedAt.toISOString(),
+            },
+            'Adjusted failed_at to be after started_at'
+          );
         }
       } else if (existingStatus?.created_at) {
         // If started_at is not set yet, ensure failed_at is after created_at
         const createdAt = new Date(existingStatus.created_at);
         if (now <= createdAt) {
           failedAt = new Date(createdAt.getTime() + 2); // created_at + 2ms to leave room for started_at
-          logger.debug({
-            jobId: job.id,
-            createdAt: createdAt.toISOString(),
-            originalFailedAt: now.toISOString(),
-            adjustedFailedAt: failedAt.toISOString(),
-          }, 'Adjusted failed_at to be after created_at (no started_at yet)');
+          logger.debug(
+            {
+              jobId: job.id,
+              createdAt: createdAt.toISOString(),
+              originalFailedAt: now.toISOString(),
+              adjustedFailedAt: failedAt.toISOString(),
+            },
+            'Adjusted failed_at to be after created_at (no started_at yet)'
+          );
         }
       }
 
@@ -732,10 +834,13 @@ export async function markJobFailed(job: Job<JobData>, error: Error): Promise<vo
 
     await updateJobStatus(job.id!, updates);
   } catch (error: any) {
-    logger.error({
-      jobId: job.id,
-      err: error,
-    }, 'Exception in markJobFailed');
+    logger.error(
+      {
+        jobId: job.id,
+        err: error,
+      },
+      'Exception in markJobFailed'
+    );
   }
 }
 
@@ -769,16 +874,22 @@ export async function getJobStatus(jobId: string): Promise<object | null> {
       .single();
 
     if (error) {
-      logger.error({
-        jobId,
-        err: error.message,
-      }, 'Failed to get job status');
+      logger.error(
+        {
+          jobId,
+          err: error.message,
+        },
+        'Failed to get job status'
+      );
       return null;
     }
 
     return data;
   } catch (error) {
-    logger.error({ jobId, err: error instanceof Error ? error.message : String(error) }, 'Exception getting job status');
+    logger.error(
+      { jobId, err: error instanceof Error ? error.message : String(error) },
+      'Exception getting job status'
+    );
     return null;
   }
 }

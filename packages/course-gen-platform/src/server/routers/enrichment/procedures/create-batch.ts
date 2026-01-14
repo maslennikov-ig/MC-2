@@ -80,13 +80,16 @@ export const createBatch = protectedProcedure
     const requestId = nanoid();
     const currentUser = ctx.user;
 
-    logger.info({
-      requestId,
-      lessonCount: lessonIds.length,
-      enrichmentType,
-      userId: currentUser.id,
-      organizationId: currentUser.organizationId,
-    }, 'Create batch enrichments request');
+    logger.info(
+      {
+        requestId,
+        lessonCount: lessonIds.length,
+        enrichmentType,
+        userId: currentUser.id,
+        organizationId: currentUser.organizationId,
+      },
+      'Create batch enrichments request'
+    );
 
     try {
       // Step 1: Get all lessons and verify they belong to accessible courses
@@ -94,14 +97,19 @@ export const createBatch = protectedProcedure
       const supabase = getSupabaseAdmin();
       const { data: lessonsData, error: lessonsError } = await supabase
         .from('lessons')
-        .select('id, title, section_id, sections!inner(course_id, courses!inner(user_id, organization_id))')
+        .select(
+          'id, title, section_id, sections!inner(course_id, courses!inner(user_id, organization_id))'
+        )
         .in('id', lessonIds);
 
       if (lessonsError) {
-        logger.error({
-          requestId,
-          error: lessonsError.message,
-        }, 'Failed to fetch lessons');
+        logger.error(
+          {
+            requestId,
+            error: lessonsError.message,
+          },
+          'Failed to fetch lessons'
+        );
 
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
@@ -117,10 +125,13 @@ export const createBatch = protectedProcedure
         const foundIds = new Set(lessons?.map(l => l.id) || []);
         const missingIds = lessonIds.filter(id => !foundIds.has(id));
 
-        logger.warn({
-          requestId,
-          missingIds,
-        }, 'Some lessons not found');
+        logger.warn(
+          {
+            requestId,
+            missingIds,
+          },
+          'Some lessons not found'
+        );
 
         throw new TRPCError({
           code: 'NOT_FOUND',
@@ -136,13 +147,19 @@ export const createBatch = protectedProcedure
         const courseId = section.course_id;
 
         // Check ownership or same organization
-        if (course.user_id !== currentUser.id && course.organization_id !== currentUser.organizationId) {
-          logger.warn({
-            requestId,
-            lessonId: lesson.id,
-            courseId,
-            userId: currentUser.id,
-          }, 'Access denied to lesson in batch');
+        if (
+          course.user_id !== currentUser.id &&
+          course.organization_id !== currentUser.organizationId
+        ) {
+          logger.warn(
+            {
+              requestId,
+              lessonId: lesson.id,
+              courseId,
+              userId: currentUser.id,
+            },
+            'Access denied to lesson in batch'
+          );
 
           throw new TRPCError({
             code: 'FORBIDDEN',
@@ -167,7 +184,7 @@ export const createBatch = protectedProcedure
           id: crypto.randomUUID(),
           lesson_id: lesson.id,
           course_id: courseId,
-          enrichment_type: enrichmentType as EnrichmentType,
+          enrichment_type: enrichmentType,
           order_index: orderIndices.get(lesson.id) || 1,
           title: null as string | null,
           content: null,
@@ -185,11 +202,14 @@ export const createBatch = protectedProcedure
         .insert(enrichmentRecords);
 
       if (insertError) {
-        logger.error({
-          requestId,
-          error: insertError.message,
-          lessonCount: lessonIds.length,
-        }, 'Failed to insert batch enrichment records');
+        logger.error(
+          {
+            requestId,
+            error: insertError.message,
+            lessonCount: lessonIds.length,
+          },
+          'Failed to insert batch enrichment records'
+        );
 
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
@@ -222,13 +242,16 @@ export const createBatch = protectedProcedure
       const enrichmentIds = enrichmentRecords.map(r => r.id);
       const jobIds = jobs.map(j => j.id).filter((id): id is string => id !== undefined);
 
-      logger.info({
-        requestId,
-        created: enrichmentRecords.length,
-        enrichmentIds,
-        jobIds,
-        enrichmentType,
-      }, 'Batch enrichments created and jobs enqueued');
+      logger.info(
+        {
+          requestId,
+          created: enrichmentRecords.length,
+          enrichmentIds,
+          jobIds,
+          enrichmentType,
+        },
+        'Batch enrichments created and jobs enqueued'
+      );
 
       return {
         success: true,
@@ -243,12 +266,15 @@ export const createBatch = protectedProcedure
       }
 
       // Log and wrap unexpected errors
-      logger.error({
-        requestId,
-        lessonCount: lessonIds.length,
-        enrichmentType,
-        error: error instanceof Error ? error.message : String(error),
-      }, 'Create batch enrichments failed');
+      logger.error(
+        {
+          requestId,
+          lessonCount: lessonIds.length,
+          enrichmentType,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        'Create batch enrichments failed'
+      );
 
       throw new TRPCError({
         code: 'INTERNAL_SERVER_ERROR',
