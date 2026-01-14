@@ -1,6 +1,7 @@
 import { getSupabaseAdmin } from '@/shared/supabase/admin';
 import { logger } from '@/shared/logger';
 import { resolveLessonUuid } from '@/shared/database/lesson-resolver';
+import { notifyCourseCompletion } from '@/shared/notifications/course-notifications';
 import type { Stage6Output } from '../orchestrator';
 import { extractContentMarkdown } from './content-utils';
 import type { SanityCheckResult } from '../utils/sanity-check';
@@ -26,22 +27,25 @@ export async function handlePartialSuccess(
   try {
     // Save partial content to lesson_contents table (not lessons table)
     // Serialize content to convert Date objects to strings (LessonContent has Date fields)
-    const { error } = await supabaseAdmin
-      .from('lesson_contents')
-      .upsert({
+    const { error } = await supabaseAdmin.from('lesson_contents').upsert(
+      {
         lesson_id: lessonUuid,
         course_id: courseId,
         content: JSON.parse(JSON.stringify(result.lessonContent)),
         status: 'review_required', // Mark as partial success requiring review
-        metadata: JSON.parse(JSON.stringify({
-          markdownContent: extractContentMarkdown(result.lessonContent),
-          partial: true,
-          errors: result.errors,
-          qualityScore: result.metrics.qualityScore,
-        })),
-      }, {
+        metadata: JSON.parse(
+          JSON.stringify({
+            markdownContent: extractContentMarkdown(result.lessonContent),
+            partial: true,
+            errors: result.errors,
+            qualityScore: result.metrics.qualityScore,
+          })
+        ),
+      },
+      {
         onConflict: 'lesson_id',
-      });
+      }
+    );
 
     if (error) {
       logger.warn(
@@ -550,6 +554,9 @@ export async function checkAndSetStage6Complete(courseId: string): Promise<void>
           },
           'All lessons generated - course status updated to stage_6_complete'
         );
+
+        // Send completion notifications for automatic mode
+        await notifyCourseCompletion(courseId);
       }
     }
   } catch (error) {
