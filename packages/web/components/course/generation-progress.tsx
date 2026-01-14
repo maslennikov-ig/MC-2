@@ -102,6 +102,7 @@ export function GenerationProgress({
           (initialProgress as any)?.generation_paused_at !== undefined
   )
   const [pauseLoading, setPauseLoading] = useState(false)
+  const [pauseResumeOperation, setPauseResumeOperation] = useState<'pausing' | 'resuming' | null>(null)
 
   // Calculate estimated time remaining
   const estimatedMinutesRemaining = Math.ceil(
@@ -117,8 +118,17 @@ export function GenerationProgress({
     let healthCheckInterval: NodeJS.Timeout | null = null
     let reconnectAttempts = 0
     let reconnectTimeout: NodeJS.Timeout | null = null
+    // Constants for timing (mc2-1w3: refactored magic numbers)
     const maxReconnectAttempts = 5
     const baseReconnectDelay = 1000 // 1 second
+    const maxReconnectDelay = 30000 // Max 30 seconds for reconnect backoff
+    const healthCheckIntervalMs = 30000 // 30 seconds
+    // Exponential backoff state for polling (Issue #4 mc2-o5k)
+    let lastStatus: CourseStatus | null = null
+    let pollDelay = 3000 // Start at 3 seconds
+    const minPollDelay = 3000
+    const maxPollDelay = 30000
+    const backoffMultiplier = 1.5
 
     const handleCourseUpdate = (payload: { new: Course }) => {
       logger.info('Realtime update received', { courseId, payload })
@@ -199,7 +209,7 @@ export function GenerationProgress({
 
               // Stop polling fallback when realtime is connected (prevents double load)
               if (pollingInterval) {
-                clearInterval(pollingInterval)
+                clearTimeout(pollingInterval) // Changed from clearInterval to clearTimeout
                 pollingInterval = null
                 logger.info('Polling stopped - realtime connected', { courseId })
               }
@@ -237,7 +247,7 @@ export function GenerationProgress({
       }
 
       reconnectAttempts++
-      const delay = Math.min(baseReconnectDelay * Math.pow(2, reconnectAttempts - 1), 30000) // Max 30 seconds
+      const delay = Math.min(baseReconnectDelay * Math.pow(2, reconnectAttempts - 1), maxReconnectDelay)
 
       logger.info(`Attempting to reconnect in ${delay}ms`, { courseId, attempt: reconnectAttempts })
 
@@ -256,13 +266,13 @@ export function GenerationProgress({
       }, delay)
     }
 
-    // Fallback to polling if realtime fails
+    // Fallback to polling if realtime fails (with exponential backoff)
     const setupPollingFallback = () => {
       if (pollingInterval) return // Already polling
-      
+
       logger.info('Falling back to polling', { courseId })
-      
-      pollingInterval = setInterval(async () => {
+
+      const poll = async () => {
         try {
           const supabase = createClient()
           const { data, error } = await supabase
@@ -277,6 +287,20 @@ export function GenerationProgress({
           }
 
           if (data) {
+            const currentStatus = data.generation_status as CourseStatus
+
+            // Exponential backoff logic (Issue #4 mc2-o5k)
+            if (lastStatus === currentStatus) {
+              // Status unchanged - increase delay
+              pollDelay = Math.min(pollDelay * backoffMultiplier, maxPollDelay)
+              logger.debug('Status unchanged, increasing poll delay', { pollDelay, courseId })
+            } else {
+              // Status changed - reset to minimum delay
+              pollDelay = minPollDelay
+              logger.debug('Status changed, resetting poll delay', { lastStatus, currentStatus, courseId })
+            }
+            lastStatus = currentStatus
+
             if (data.generation_code) {
               setGenerationCode(data.generation_code)
             }
@@ -285,11 +309,11 @@ export function GenerationProgress({
             }
             if (data.generation_status) {
               setStatus(data.generation_status as CourseStatus)
-              
+
               // Stop polling if completed or failed
               if (['completed', 'failed', 'cancelled'].includes(data.generation_status || '')) {
                 if (pollingInterval) {
-                  clearInterval(pollingInterval)
+                  clearTimeout(pollingInterval) // Changed from clearInterval to clearTimeout
                   pollingInterval = null
                 }
 
@@ -302,13 +326,20 @@ export function GenerationProgress({
                   setError(data.error_message || 'Произошла ошибка')
                   toast.error(data.error_message || 'Произошла ошибка при создании курса')
                 }
+                return // Exit without scheduling next poll
               }
             }
           }
         } catch (err) {
           logger.error('Polling error', { error: err, courseId })
         }
-      }, 3000) // Poll every 3 seconds
+
+        // Schedule next poll with current delay
+        pollingInterval = setTimeout(poll, pollDelay) as any
+      }
+
+      // Start polling immediately
+      poll()
     }
 
     // Initial setup
@@ -341,7 +372,7 @@ export function GenerationProgress({
       } catch (err) {
         logger.error('Health check failed', { error: err, courseId })
       }
-    }, 30000) // Check every 30 seconds
+    }, healthCheckIntervalMs)
 
     // Cleanup
     return () => {
@@ -353,7 +384,7 @@ export function GenerationProgress({
         }
       }
       if (pollingInterval) {
-        clearInterval(pollingInterval)
+        clearTimeout(pollingInterval) // Changed from clearInterval to clearTimeout
       }
       if (healthCheckInterval) {
         clearInterval(healthCheckInterval)
@@ -391,6 +422,7 @@ export function GenerationProgress({
   // Pause generation
   const handlePause = useCallback(async () => {
     setPauseLoading(true)
+    setPauseResumeOperation('pausing')
     try {
       const response = await fetch(`/api/courses/${slug}/pause`, {
         method: 'POST'
@@ -408,12 +440,14 @@ export function GenerationProgress({
       toast.error('Произошла ошибка при приостановке')
     } finally {
       setPauseLoading(false)
+      setPauseResumeOperation(null)
     }
   }, [slug])
 
   // Resume generation
   const handleResume = useCallback(async () => {
     setPauseLoading(true)
+    setPauseResumeOperation('resuming')
     try {
       const response = await fetch(`/api/courses/${slug}/resume`, {
         method: 'POST'
@@ -431,6 +465,7 @@ export function GenerationProgress({
       toast.error('Произошла ошибка при возобновлении')
     } finally {
       setPauseLoading(false)
+      setPauseResumeOperation(null)
     }
   }, [slug])
 
@@ -629,6 +664,16 @@ export function GenerationProgress({
             </motion.div>
           )}
           
+          {/* Loading indicator during pause/resume operations */}
+          {pauseResumeOperation && (
+            <Alert className="border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950">
+              <Loader2 className="h-4 w-4 text-blue-600 animate-spin" />
+              <AlertDescription className="text-blue-800 dark:text-blue-200">
+                {pauseResumeOperation === 'pausing' ? 'Приостановка генерации...' : 'Возобновление генерации...'}
+              </AlertDescription>
+            </Alert>
+          )}
+
           {/* Action buttons */}
           <div className="flex justify-between items-center pt-4 gap-2">
             {/* Pause/Resume buttons - shown during active content generation */}
