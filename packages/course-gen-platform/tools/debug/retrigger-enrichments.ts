@@ -83,11 +83,17 @@ async function main() {
   console.log(`   Lesson cards: ${lessonCards?.length ?? 0}`);
   console.log(`   Covers: ${covers?.length ?? 0}\n`);
 
-  // Get total lessons count
-  const { data: lessons } = await supabase
-    .from('lessons')
-    .select('id, sections!inner(course_id)')
-    .eq('sections.course_id', course.id);
+  // Get total lessons count via two-step query (sections -> lessons)
+  const { data: sections } = await supabase
+    .from('sections')
+    .select('id')
+    .eq('course_id', course.id);
+
+  const sectionIds = sections?.map(s => s.id) ?? [];
+  const { data: lessons } =
+    sectionIds.length > 0
+      ? await supabase.from('lessons').select('id').in('section_id', sectionIds)
+      : { data: [] };
 
   const totalLessons = lessons?.length ?? 0;
   console.log(`   Total lessons: ${totalLessons}\n`);
