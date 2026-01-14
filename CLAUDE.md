@@ -150,10 +150,12 @@ git push                          # → dev.ai.megacampus.ru
 
 ## Project Conventions
 
-**Project Knowledge**: `bd search "REF:"` — reference issues for entities, pages, pipeline, tech stack
+**Documentation**: All project knowledge in Beads REF: issues.
 
-- **Update REF: issues** when changing: DB schema, pages, pipeline stages, tech stack
-- Pattern: `bd update mc2-xxx --description="..."`
+- Find: `bd search "REF:"` → lists all reference issues
+- Read: `bd show mc2-xxx` → full content of specific issue
+- Covers: entities, pages, stages, tech, i18n, docker, logging, errors, auth, guides
+- Update when domain changes: `bd update mc2-xxx --description="..."`
 
 **File Organization**:
 
