@@ -768,6 +768,15 @@ export default function GenerationProgressContainerEnhanced({
     }
   }, [])
 
+  // Cleanup toast timeout on unmount
+  useEffect(() => {
+    return () => {
+      if (toastTimeout.current) {
+        clearTimeout(toastTimeout.current)
+      }
+    }
+  }, [])
+
   // Confetti celebration animation
   const triggerConfetti = () => {
     const duration = 3000

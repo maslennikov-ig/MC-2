@@ -1,8 +1,9 @@
 'use client'
 
-import React from 'react'
+import React, { useMemo } from 'react'
 import { motion, AnimatePresence } from 'framer-motion'
 import { DollarSign, FileText, BarChart3, BookOpen, Info } from 'lucide-react'
+import { estimateCost, type CostEstimate } from '@megacampus/shared-types'
 
 interface CostPreviewCardProps {
   documentCount: number
@@ -17,14 +18,17 @@ export function CostPreviewCard({
   hasDocuments,
   isVisible,
 }: CostPreviewCardProps) {
-  // Cost estimation logic (based on MODEL_PRICING from cost-tracker.ts)
-  const stage2Cost = hasDocuments ? documentCount * 0.0005 : 0
-  const stage4Cost = hasDocuments ? 0.05 : 0.02
-  const stage5Cost = 0.05 + estimatedLessons * 0.002
-  const stage6Cost = estimatedLessons * 0.08
+  // Use the shared cost estimation service
+  const estimate: CostEstimate = useMemo(
+    () => estimateCost({ documentCount, estimatedLessons, hasDocuments }),
+    [documentCount, estimatedLessons, hasDocuments]
+  )
 
-  const minTotal = stage2Cost + stage4Cost + stage5Cost + stage6Cost * 0.8
-  const maxTotal = stage2Cost + stage4Cost + stage5Cost + stage6Cost * 1.3
+  const { breakdown, minUsd: minTotal, maxUsd: maxTotal } = estimate
+  const stage2Cost = breakdown.stage2_embeddings
+  const stage4Cost = breakdown.stage4_analysis
+  const stage5Cost = breakdown.stage5_structure
+  const stage6Cost = breakdown.stage6_lessons
 
   return (
     <AnimatePresence>

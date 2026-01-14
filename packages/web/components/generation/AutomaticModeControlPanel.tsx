@@ -128,11 +128,16 @@ export function AutomaticModeControlPanel({
                   disabled={actionLoading !== null}
                 >
                   {actionLoading === 'manual' ? (
-                    <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                    <>
+                      <Loader2 className="mr-1 h-4 w-4 animate-spin" />
+                      Переключение...
+                    </>
                   ) : (
-                    <Settings className="mr-1 h-4 w-4" />
+                    <>
+                      <Settings className="mr-1 h-4 w-4" />
+                      Ручной режим
+                    </>
                   )}
-                  Ручной режим
                 </Button>
 
                 <Button

@@ -75,7 +75,7 @@ export function formatCourseCompletionMessage(courseTitle: string, courseSlug: s
 
 Ваш курс "${courseTitle}" успешно создан.
 
-[Открыть курс](${process.env.NEXT_PUBLIC_APP_URL || 'https://ai.megacampus.ru'}/courses/${courseSlug})`;
+[Открыть курс](${process.env.APP_URL || process.env.NEXT_PUBLIC_APP_URL || 'https://ai.megacampus.ru'}/courses/${courseSlug})`;
 }
 
 /**
