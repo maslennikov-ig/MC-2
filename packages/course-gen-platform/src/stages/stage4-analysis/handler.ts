@@ -19,7 +19,7 @@
 import { Job } from 'bullmq';
 import type { StructureAnalysisJobData } from '@megacampus/shared-types';
 import type { AnalysisResult } from '@megacampus/shared-types/analysis-result';
-import { COURSE_SIZE_PRESETS, type CourseSize } from '@megacampus/shared-types';
+import { getCourseSizePreset, type CourseSize } from '@megacampus/shared-types';
 import logger from '../../shared/logger';
 import { getSupabaseAdmin } from '../../shared/supabase/admin';
 import { runAnalysisOrchestration } from './orchestrator';
@@ -380,10 +380,13 @@ class Stage4AnalysisHandler {
       const language = rawLang.length === 2 ? rawLang : languageNameToCode[rawLang] || 'ru';
 
       // Extract course_size preset (advisory guidance for LLM)
+      // For 'auto', getCourseSizePreset returns undefined (LLM decides without guidance)
       const courseSize = courseForInput.course_size as CourseSize | null;
-      const sizePreset = courseSize ? COURSE_SIZE_PRESETS[courseSize] : null;
+      const sizePreset = courseSize ? getCourseSizePreset(courseSize) : null;
 
       // Build StructureAnalysisInput for orchestrator
+      // Note: for 'auto', sizePreset is undefined so all size fields will be undefined
+      // (LLM decides optimal size without guidance)
       const analysisInput: import('@megacampus/shared-types').StructureAnalysisInput = {
         topic: courseForInput.title || 'Course Topic',
         language,
@@ -393,7 +396,8 @@ class Stage4AnalysisHandler {
         lesson_duration_minutes: lessonDuration,
         document_summaries: documentSummaries,
         // Course size fields (advisory - LLM may deviate if needed)
-        course_size: courseSize || undefined,
+        // When 'auto' is selected, all size fields are undefined
+        course_size: sizePreset?.size,
         target_lessons: sizePreset?.targetLessons,
         target_sections: sizePreset?.targetSections,
         size_guidance: sizePreset?.llmGuidance,

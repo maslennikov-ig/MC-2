@@ -9,7 +9,6 @@ import type { FormData } from '../_schemas/form-schema'
 import type { UploadedFile } from '@/components/forms/file-upload'
 import { createDraftCourse, updateDraftAndStartGeneration } from '@/app/actions/courses'
 import { materializeDraftSession } from '@/app/actions/draft-session'
-import type { CreateCourseError } from '@/types/course-generation'
 import type { Route } from 'next'
 
 interface UseSubmitCourseProps {

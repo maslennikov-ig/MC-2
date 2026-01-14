@@ -14,6 +14,7 @@ import { loadUserPreferences } from '@/lib/user-preferences'
 import { canCreateCourses } from '@/app/actions/courses'
 import { createDraftSession } from '@/app/actions/draft-session'
 import { formSchema, type FormData } from '../_schemas/form-schema'
+import { DEFAULT_COURSE_SIZE } from '@megacampus/shared-types'
 import { useFileUpload } from './useFileUpload'
 import { useAutoSave } from './useAutoSave'
 import { useSubmitCourse } from './useSubmitCourse'
@@ -49,6 +50,7 @@ export function useCreateCourseForm() {
       writingStyle: userPreferredStyle || getSavedPreferences()?.writingStyle || 'professional',
       language: getSavedPreferences()?.language || 'ru',
       contentStrategy: 'auto',
+      courseSize: DEFAULT_COURSE_SIZE,
       formats: ['text'],
       lessonDuration: 5,
     },

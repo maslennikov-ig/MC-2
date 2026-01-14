@@ -13,6 +13,8 @@ import { logger } from '../logger/index.js';
 import type { Database } from '@megacampus/shared-types';
 import type { CourseSettings } from '../../server/routers/generation/_shared/types';
 
+type GenerationStatus = Database['public']['Enums']['generation_status'];
+
 // Minimal course interface for auto-approval
 interface CourseForAutoApproval {
   user_id: string | null;
@@ -63,11 +65,11 @@ export async function handleStageCompletion(
 
   if (!isAutomatic) {
     // Semi-automatic: set to awaiting_approval
-    const awaitingStatus = `stage_${currentStage}_awaiting_approval`;
+    const awaitingStatus = `stage_${currentStage}_awaiting_approval` as GenerationStatus;
     await db
       .from('courses')
       .update({
-        generation_status: awaitingStatus as any,
+        generation_status: awaitingStatus,
         updated_at: new Date().toISOString(),
       })
       .eq('id', courseId);
@@ -83,13 +85,13 @@ export async function handleStageCompletion(
   logger.info({ courseId, currentStage }, 'Auto-approving stage (automatic mode)');
 
   const nextStage = currentStage + 1;
-  const nextStatus = `stage_${nextStage}_init`;
+  const nextStatus = `stage_${nextStage}_init` as GenerationStatus;
 
   // Update status to next stage
   await db
     .from('courses')
     .update({
-      generation_status: nextStatus as any,
+      generation_status: nextStatus,
       updated_at: new Date().toISOString(),
     })
     .eq('id', courseId);
@@ -99,7 +101,7 @@ export async function handleStageCompletion(
     await queueNextStageJob(courseId, nextStage, course);
   } catch (queueError) {
     // Rollback status on job queueing failure
-    const rollbackStatus = `stage_${currentStage}_complete`;
+    const rollbackStatus = `stage_${currentStage}_complete` as GenerationStatus;
     logger.error(
       {
         courseId,
@@ -112,7 +114,7 @@ export async function handleStageCompletion(
     await db
       .from('courses')
       .update({
-        generation_status: rollbackStatus as any,
+        generation_status: rollbackStatus,
         updated_at: new Date().toISOString(),
       })
       .eq('id', courseId);

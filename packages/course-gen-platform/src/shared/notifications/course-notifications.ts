@@ -7,6 +7,7 @@
 
 import { logger } from '../logger/index.js';
 import { getSupabaseAdmin } from '../supabase/admin';
+import { getStageName } from '@megacampus/shared-types';
 import {
   sendTelegramMessage,
   formatCourseCompletionMessage,
@@ -182,17 +183,11 @@ export async function notifyStageComplete(courseId: string, stage: number): Prom
     return;
   }
 
-  const stageNames: Record<number, string> = {
-    2: 'Обработка документов',
-    3: 'Классификация документов',
-    4: 'Анализ структуры',
-    5: 'Генерация структуры',
-    6: 'Генерация уроков',
-  };
+  const stageName = getStageName(stage, 'ru');
 
   const payload: NotificationPayload = {
     title: `Этап ${stage} завершён`,
-    body: `${stageNames[stage] || `Этап ${stage}`} - выполнено ✓`,
+    body: `${stageName} - выполнено ✓`,
     url: `/courses/generating/${course.slug}`,
   };
 

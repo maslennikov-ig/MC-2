@@ -81,9 +81,7 @@ export function CostPreviewCard({
                   <BookOpen className="h-4 w-4" />
                   Генерация {estimatedLessons} уроков
                 </span>
-                <span>
-                  ~${(stage6Cost * 0.8).toFixed(2)} - ${(stage6Cost * 1.3).toFixed(2)}
-                </span>
+                <span>~${stage6Cost.toFixed(2)}</span>
               </div>
             </div>
 

@@ -1,17 +1,19 @@
 import React from 'react'
 import { useFormContext } from 'react-hook-form'
 import { motion } from 'framer-motion'
-import { Zap, BookOpen, Library, GraduationCap } from 'lucide-react'
+import { Sparkles, Zap, BookOpen, Library, GraduationCap } from 'lucide-react'
 import {
   COURSE_SIZES,
   COURSE_SIZE_PRESETS,
   getAllCourseSizeLabels,
   type CourseSize,
+  type PresetCourseSize,
 } from '@megacampus/shared-types'
 import { type FormData } from '../_schemas/form-schema'
 
 // Map course sizes to icons
 const COURSE_SIZE_ICONS: Record<CourseSize, React.ComponentType<{ className?: string }>> = {
+  auto: Sparkles,
   mini: Zap,
   compact: BookOpen,
   standard: Library,
@@ -27,11 +29,83 @@ export function CourseSizeSelector() {
   const labels = getAllCourseSizeLabels(language)
 
   // Handle size selection - also set estimatedLessons and estimatedSections
+  // For 'auto', we don't set these values - LLM decides
   const handleSizeClick = (size: CourseSize) => {
     setValue('courseSize', size)
-    const preset = COURSE_SIZE_PRESETS[size]
-    setValue('estimatedLessons', preset.targetLessons)
-    setValue('estimatedSections', preset.targetSections)
+    if (size !== 'auto') {
+      const preset = COURSE_SIZE_PRESETS[size]
+      setValue('estimatedLessons', preset.targetLessons)
+      setValue('estimatedSections', preset.targetSections)
+    }
+  }
+
+  // Separate 'auto' from preset sizes for different layout
+  const autoSize = 'auto' as CourseSize
+  const presetSizes = COURSE_SIZES.filter((s) => s !== 'auto')
+
+  const renderSizeCard = (size: CourseSize, isAuto: boolean = false) => {
+    const isSelected = courseSize === size
+    const Icon = COURSE_SIZE_ICONS[size]
+    const label = labels[size]
+
+    // Auto uses cyan/teal gradient, presets use purple
+    const selectedStyles = isAuto
+      ? 'border-cyan-500 bg-gradient-to-br from-cyan-500/20 to-teal-500/20 backdrop-blur-md dark:border-cyan-400'
+      : 'border-purple-500 bg-gradient-to-br from-purple-500/20 to-pink-500/20 backdrop-blur-md dark:border-purple-400'
+
+    const iconColor = isAuto
+      ? 'text-cyan-500 dark:text-cyan-400'
+      : 'text-purple-500 dark:text-purple-400'
+
+    const subtitleColor = isAuto
+      ? 'text-cyan-600 dark:text-cyan-300'
+      : 'text-purple-600 dark:text-purple-300'
+
+    return (
+      <label
+        key={size}
+        className={`relative cursor-pointer transition-all ${isSelected ? 'scale-[1.02]' : ''}`}
+      >
+        <input
+          type="radio"
+          {...register('courseSize')}
+          value={size}
+          className="sr-only"
+          aria-describedby={`size-${size}-desc`}
+          onClick={() => handleSizeClick(size)}
+        />
+        <motion.div
+          whileHover={{ scale: isSelected ? 1 : 1.02 }}
+          whileTap={{ scale: 0.98 }}
+          className={`flex h-full flex-col rounded-xl border-2 p-4 transition-all ${
+            isSelected
+              ? selectedStyles
+              : 'border-slate-200 bg-slate-50 backdrop-blur-sm hover:border-slate-400 dark:border-white/10 dark:bg-black/20 dark:hover:border-white/30'
+          }`}
+          role="radio"
+          aria-checked={isSelected}
+          tabIndex={isSelected ? 0 : -1}
+        >
+          <div className="flex items-start gap-3">
+            <div className="flex-shrink-0">
+              <Icon className={`h-7 w-7 sm:h-8 sm:w-8 ${iconColor}`} aria-hidden="true" />
+            </div>
+            <div className="min-w-0 flex-1">
+              <h4 className="mb-1 text-base font-bold text-slate-900 sm:text-lg dark:text-white">
+                {label.title}
+              </h4>
+              <p className={`mb-1 text-xs sm:text-sm ${subtitleColor}`}>{label.subtitle}</p>
+              <p
+                id={`size-${size}-desc`}
+                className="text-xs text-slate-600 sm:text-sm dark:text-white/70"
+              >
+                {label.description}
+              </p>
+            </div>
+          </div>
+        </motion.div>
+      </label>
+    )
   }
 
   return (
@@ -40,65 +114,13 @@ export function CourseSizeSelector() {
 
       <fieldset>
         <legend className="sr-only">Выберите размер курса</legend>
-        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:gap-4">
-          {COURSE_SIZES.map((size) => {
-            const isSelected = courseSize === size
-            const Icon = COURSE_SIZE_ICONS[size]
-            const label = labels[size]
 
-            return (
-              <label
-                key={size}
-                className={`relative cursor-pointer transition-all ${
-                  isSelected ? 'scale-105' : ''
-                }`}
-              >
-                <input
-                  type="radio"
-                  {...register('courseSize')}
-                  value={size}
-                  className="sr-only"
-                  aria-describedby={`size-${size}-desc`}
-                  onClick={() => handleSizeClick(size)}
-                />
-                <motion.div
-                  whileHover={{ scale: isSelected ? 1 : 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                  className={`flex h-full flex-col rounded-xl border-2 p-4 transition-all ${
-                    isSelected
-                      ? 'border-purple-500 bg-gradient-to-br from-purple-500/20 to-pink-500/20 backdrop-blur-md dark:border-purple-400'
-                      : 'border-slate-200 bg-slate-50 backdrop-blur-sm hover:border-slate-400 dark:border-white/10 dark:bg-black/20 dark:hover:border-white/30'
-                  }`}
-                  role="radio"
-                  aria-checked={isSelected}
-                  tabIndex={isSelected ? 0 : -1}
-                >
-                  <div className="flex items-start gap-3">
-                    <div className="flex-shrink-0">
-                      <Icon
-                        className="h-7 w-7 text-purple-500 sm:h-8 sm:w-8 dark:text-purple-400"
-                        aria-hidden="true"
-                      />
-                    </div>
-                    <div className="min-w-0 flex-1">
-                      <h4 className="mb-1 text-base font-bold text-slate-900 sm:text-lg dark:text-white">
-                        {label.title}
-                      </h4>
-                      <p className="mb-1 text-xs text-purple-600 sm:text-sm dark:text-purple-300">
-                        {label.subtitle}
-                      </p>
-                      <p
-                        id={`size-${size}-desc`}
-                        className="text-xs text-slate-600 sm:text-sm dark:text-white/70"
-                      >
-                        {label.description}
-                      </p>
-                    </div>
-                  </div>
-                </motion.div>
-              </label>
-            )
-          })}
+        {/* Auto option - full width at top */}
+        <div className="mb-3">{renderSizeCard(autoSize, true)}</div>
+
+        {/* Preset sizes - 2x2 grid */}
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:gap-4">
+          {presetSizes.map((size) => renderSizeCard(size, false))}
         </div>
       </fieldset>
 
