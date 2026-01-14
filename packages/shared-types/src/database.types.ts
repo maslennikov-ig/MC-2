@@ -368,12 +368,14 @@ export type Database = {
           error_details: Json | null
           error_message: string | null
           estimated_completion_minutes: number | null
+          estimated_cost_usd: number | null
           estimated_lessons: number | null
           estimated_sections: number | null
           failed_at_stage: number | null
           generation_code: string | null
           generation_completed_at: string | null
           generation_metadata: Json | null
+          generation_mode: string | null
           generation_paused_at: string | null
           generation_paused_by: string | null
           generation_progress: Json | null
@@ -387,6 +389,9 @@ export type Database = {
           language: string | null
           last_progress_update: string | null
           learning_outcomes: string | null
+          notify_on_completion: boolean | null
+          notify_on_error: boolean | null
+          notify_on_stage_complete: boolean | null
           organization_id: string
           output_formats: string[] | null
           pause_at_stage_5: boolean | null
@@ -422,12 +427,14 @@ export type Database = {
           error_details?: Json | null
           error_message?: string | null
           estimated_completion_minutes?: number | null
+          estimated_cost_usd?: number | null
           estimated_lessons?: number | null
           estimated_sections?: number | null
           failed_at_stage?: number | null
           generation_code?: string | null
           generation_completed_at?: string | null
           generation_metadata?: Json | null
+          generation_mode?: string | null
           generation_paused_at?: string | null
           generation_paused_by?: string | null
           generation_progress?: Json | null
@@ -441,6 +448,9 @@ export type Database = {
           language?: string | null
           last_progress_update?: string | null
           learning_outcomes?: string | null
+          notify_on_completion?: boolean | null
+          notify_on_error?: boolean | null
+          notify_on_stage_complete?: boolean | null
           organization_id: string
           output_formats?: string[] | null
           pause_at_stage_5?: boolean | null
@@ -476,12 +486,14 @@ export type Database = {
           error_details?: Json | null
           error_message?: string | null
           estimated_completion_minutes?: number | null
+          estimated_cost_usd?: number | null
           estimated_lessons?: number | null
           estimated_sections?: number | null
           failed_at_stage?: number | null
           generation_code?: string | null
           generation_completed_at?: string | null
           generation_metadata?: Json | null
+          generation_mode?: string | null
           generation_paused_at?: string | null
           generation_paused_by?: string | null
           generation_progress?: Json | null
@@ -495,6 +507,9 @@ export type Database = {
           language?: string | null
           last_progress_update?: string | null
           learning_outcomes?: string | null
+          notify_on_completion?: boolean | null
+          notify_on_error?: boolean | null
+          notify_on_stage_complete?: boolean | null
           organization_id?: string
           output_formats?: string[] | null
           pause_at_stage_5?: boolean | null
@@ -2503,6 +2518,8 @@ export type Database = {
           is_active: boolean
           organization_id: string
           role: Database["public"]["Enums"]["role"]
+          telegram_chat_id: string | null
+          telegram_notifications_enabled: boolean | null
           updated_at: string | null
         }
         Insert: {
@@ -2515,6 +2532,8 @@ export type Database = {
           is_active?: boolean
           organization_id: string
           role?: Database["public"]["Enums"]["role"]
+          telegram_chat_id?: string | null
+          telegram_notifications_enabled?: boolean | null
           updated_at?: string | null
         }
         Update: {
@@ -2527,6 +2546,8 @@ export type Database = {
           is_active?: boolean
           organization_id?: string
           role?: Database["public"]["Enums"]["role"]
+          telegram_chat_id?: string | null
+          telegram_notifications_enabled?: boolean | null
           updated_at?: string | null
         }
         Relationships: [
