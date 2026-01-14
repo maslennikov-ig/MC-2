@@ -21,6 +21,7 @@ import { BaseJobHandler, JobResult } from '../../orchestrator/handlers/base-hand
 import { DocumentClassificationJobData, JobType } from '@megacampus/shared-types';
 import { getSupabaseAdmin } from '../../shared/supabase/admin';
 import { handleStageCompletion } from '../../shared/auto-approval';
+import { notifyStageComplete } from '../../shared/notifications';
 
 /**
  * Stage 3 Classification Job Handler
@@ -94,6 +95,9 @@ export class Stage3ClassificationHandler extends BaseJobHandler<DocumentClassifi
       } else {
         this.log(job, 'info', 'Stage 3 auto-approved, proceeding to Stage 4', { courseId });
       }
+
+      // Send stage completion notification (if enabled)
+      await notifyStageComplete(courseId, 3);
 
       return {
         success: true,

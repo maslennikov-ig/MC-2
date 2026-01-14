@@ -29,6 +29,7 @@ import { executePhase6Summarization } from './phases/phase-6-summarization';
 import { logTrace } from '../../shared/trace-logger';
 import { getTranslator } from '../../shared/i18n';
 import { handleStageCompletion } from '../../shared/auto-approval';
+import { notifyStageComplete } from '../../shared/notifications';
 
 /**
  * Document Processing Orchestrator
@@ -660,6 +661,9 @@ export class DocumentProcessingOrchestrator {
           if (autoApproved) {
             logger.info({ courseId }, 'Stage 2 auto-approved, proceeding to Stage 3');
           }
+
+          // Send stage completion notification (if enabled)
+          await notifyStageComplete(courseId, 2);
         }
       }
     } catch (err) {

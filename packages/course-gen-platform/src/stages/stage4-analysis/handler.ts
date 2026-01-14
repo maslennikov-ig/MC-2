@@ -25,6 +25,7 @@ import { runAnalysisOrchestration } from './orchestrator';
 import { generationLockService } from '@/shared/locks';
 import { generateVisualStyle } from './utils/visual-style-generator';
 import { handleStageCompletion } from '../../shared/auto-approval';
+import { notifyStageComplete } from '../../shared/notifications';
 
 /**
  * Error details for STRUCTURE_ANALYSIS jobs
@@ -603,6 +604,9 @@ class Stage4AnalysisHandler {
         } else {
           jobLogger.info({ courseId: course_id }, 'Stage 4 awaiting approval');
         }
+
+        // Send stage completion notification (if enabled)
+        await notifyStageComplete(course_id, 4);
 
         // =================================================================
         // STEP 3: Calculate Final Metrics
