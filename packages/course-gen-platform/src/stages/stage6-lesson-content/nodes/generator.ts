@@ -31,7 +31,12 @@ import { runMermaidFixPipeline } from '../utils/mermaid-fix-pipeline';
 
 // Import from extracted modules
 import { calculateDynamicContextWindow } from './generator/generator-constants';
-import { generateIntroduction, generateSummary, generateExercises, validateGeneratedContent } from './generator/generator-content';
+import {
+  generateIntroduction,
+  generateSummary,
+  generateExercises,
+  validateGeneratedContent,
+} from './generator/generator-content';
 import { generateSection } from './generator/generator-section';
 
 // Re-export for backward compatibility
@@ -52,11 +57,9 @@ export { calculateDynamicContextWindow, generateSection };
  * @param state - Current graph state with lessonSpec and ragChunks
  * @returns Updated state with generatedContent and metrics
  */
-export async function generatorNode(
-  state: LessonGraphStateType
-): Promise<LessonGraphStateUpdate> {
+export async function generatorNode(state: LessonGraphStateType): Promise<LessonGraphStateUpdate> {
   const startTime = performance.now();
-  const { lessonSpec, ragChunks, courseId, lessonUuid, language } = state;
+  const { lessonSpec, ragChunks, courseId, lessonUuid, language, style } = state;
 
   // Get localized section headers (supports all 19 languages via shared-types)
   const headers = getContentLabels(language);
@@ -90,20 +93,22 @@ export async function generatorNode(
 
   try {
     // Get temperature based on content archetype
-    const temperature = getRecommendedTemperatureV2(
-      lessonSpec.metadata.content_archetype
-    );
+    const temperature = getRecommendedTemperatureV2(lessonSpec.metadata.content_archetype);
 
     // Get model from ModelConfigService (database-driven, throws on failure)
     const modelConfigService = createModelConfigService();
-    const modelId = state.modelOverride
-      ?? (await modelConfigService.getModelForPhase('stage_6_refinement')).modelId;
+    const modelId =
+      state.modelOverride ??
+      (await modelConfigService.getModelForPhase('stage_6_refinement')).modelId;
 
-    logger.info({
-      lessonId: lessonSpec.lesson_id,
-      modelId,
-      source: state.modelOverride ? 'override' : 'database',
-    }, 'Using model config for generator');
+    logger.info(
+      {
+        lessonId: lessonSpec.lesson_id,
+        modelId,
+        source: state.modelOverride ? 'override' : 'database',
+      },
+      'Using model config for generator'
+    );
 
     // Create LLM instance for intro and summary generation
     const model = createOpenRouterModel(modelId, temperature, 4096);
@@ -146,7 +151,8 @@ export async function generatorNode(
         ragChunks,
         accumulatedContent, // Pass context window
         language,
-        state.modelOverride
+        state.modelOverride,
+        style // Pass course content style for style-specific prompts
       );
 
       totalTokens += sectionResult.tokensUsed;
@@ -195,10 +201,13 @@ export async function generatorNode(
       // Validate for prompt template markers
       const validation = validateGeneratedContent(finalContent);
       if (!validation.isValid) {
-        logger.error({
-          sectionTitle: section.title,
-          detectedMarkers: validation.detectedMarkers,
-        }, 'Generated content contains prompt template markers - indicates model reproducing training data');
+        logger.error(
+          {
+            sectionTitle: section.title,
+            detectedMarkers: validation.detectedMarkers,
+          },
+          'Generated content contains prompt template markers - indicates model reproducing training data'
+        );
 
         // For now, log and continue - in future could trigger regeneration
         // throw new Error(`Content generation failed: prompt template leak detected in section "${section.title}"`);
@@ -279,9 +288,7 @@ export async function generatorNode(
 
     // Calculate metrics
     const wordCount = generatedContent.split(/\s+/).filter(Boolean).length;
-    const avgSectionLength = Math.round(
-      generatedContent.length / lessonSpec.sections.length
-    );
+    const avgSectionLength = Math.round(generatedContent.length / lessonSpec.sections.length);
 
     logger.info(
       {
@@ -330,8 +337,7 @@ export async function generatorNode(
       currentNode: 'selfReviewer',
     };
   } catch (error) {
-    const errorMessage =
-      error instanceof Error ? error.message : String(error);
+    const errorMessage = error instanceof Error ? error.message : String(error);
     const durationMs = Math.round(performance.now() - startTime);
 
     logger.error(

@@ -29,6 +29,9 @@ export interface Stage6JobInput {
 
   /** Optional user instructions for refinement */
   userRefinementPrompt?: string;
+
+  /** Course content style (e.g., 'gamified', 'professional', 'storytelling') */
+  style?: string;
 }
 
 /**

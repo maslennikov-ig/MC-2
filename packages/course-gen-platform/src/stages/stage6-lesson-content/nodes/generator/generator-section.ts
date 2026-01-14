@@ -14,7 +14,7 @@ import {
   type SectionSpecV2,
   type LessonSpecificationV2,
 } from '@megacampus/shared-types/lesson-specification-v2';
-import { getLanguageName, getTokenMultiplier } from '@megacampus/shared-types';
+import { getLanguageName, getTokenMultiplier, getStylePrompt } from '@megacampus/shared-types';
 import type { RAGChunk } from '@megacampus/shared-types/lesson-content';
 import { createPromptService } from '@/shared/prompts/prompt-service';
 import { formatRAGContextXML, filterChunksForSection } from '@/shared/prompts';
@@ -42,6 +42,7 @@ import {
  * @param previousContext - Accumulated content from previous sections
  * @param language - ISO language code ('en', 'ru')
  * @param modelOverride - Optional model ID override
+ * @param style - Course content style (e.g., 'gamified', 'professional')
  * @returns Generated section content and token usage
  */
 export async function generateSection(
@@ -50,7 +51,8 @@ export async function generateSection(
   ragChunks: RAGChunk[],
   previousContext: string,
   language: string,
-  modelOverride: string | null = null
+  modelOverride: string | null = null,
+  style: string | null = null
 ): Promise<{ content: string; tokensUsed: number }> {
   const startTime = performance.now();
 
@@ -86,13 +88,20 @@ export async function generateSection(
   // Calculate maxTokens dynamically
   const maxTokens = calculateMaxTokensForSection(lessonSpec, section, language);
 
-  logger.debug({
-    sectionTitle: section.title,
-    modelId,
-    depth,
-    maxTokens,
-    previousContextLength: previousContext.length,
-  }, 'Generating section with context window');
+  // Get style prompt for content generation
+  const stylePrompt = getStylePrompt(style);
+
+  logger.debug(
+    {
+      sectionTitle: section.title,
+      modelId,
+      depth,
+      maxTokens,
+      style: style || 'professional (default)',
+      previousContextLength: previousContext.length,
+    },
+    'Generating section with context window'
+  );
 
   // Create LLM instance with section-specific temperature and dynamic token limit
   const model = createOpenRouterModel(modelId, temperature, maxTokens);
@@ -115,13 +124,9 @@ export async function generateSection(
   const requiredKeywordsArr = section.constraints?.required_keywords || [];
   const prohibitedTermsArr = section.constraints?.prohibited_terms || [];
   const requiredKeywords =
-    requiredKeywordsArr.length > 0
-      ? requiredKeywordsArr.join(', ')
-      : 'None specified';
+    requiredKeywordsArr.length > 0 ? requiredKeywordsArr.join(', ') : 'None specified';
   const prohibitedTerms =
-    prohibitedTermsArr.length > 0
-      ? prohibitedTermsArr.join(', ')
-      : 'None specified';
+    prohibitedTermsArr.length > 0 ? prohibitedTermsArr.join(', ') : 'None specified';
 
   // Calculate dynamic context window based on lesson duration and language
   const durationMinutes = lessonSpec.estimated_duration_minutes || 15;
@@ -172,14 +177,14 @@ export async function generateSection(
     previousContext: previousContextValue,
     // Inter-lesson context for coherence (optional, rendered as XML string)
     interLessonContext: formatInterLessonContextXML(lessonSpec.lesson_context),
+    // Course content style (e.g., gamified, professional, storytelling)
+    stylePrompt,
   });
 
   // Generate content
   const response = await model.invoke(prompt);
   const content =
-    typeof response.content === 'string'
-      ? response.content
-      : JSON.stringify(response.content);
+    typeof response.content === 'string' ? response.content : JSON.stringify(response.content);
 
   const tokenResult = extractTokenUsageWithFallback(response, prompt, language);
   if (tokenResult.isEstimated) {

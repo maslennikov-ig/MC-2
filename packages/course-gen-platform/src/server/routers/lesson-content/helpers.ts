@@ -36,22 +36,31 @@ export async function verifyCourseAccess(
   userId: string,
   organizationId: string,
   requestId: string
-): Promise<{ id: string; user_id: string; organization_id: string; language: Language }> {
+): Promise<{
+  id: string;
+  user_id: string;
+  organization_id: string;
+  language: Language;
+  style: string | null;
+}> {
   const supabase = getSupabaseAdmin();
 
   const { data: course, error } = await supabase
     .from('courses')
-    .select('id, user_id, organization_id, language')
+    .select('id, user_id, organization_id, language, style')
     .eq('id', courseId)
     .single();
 
   if (error || !course) {
-    logger.warn({
-      requestId,
-      courseId,
-      userId,
-      error,
-    }, 'Course not found');
+    logger.warn(
+      {
+        requestId,
+        courseId,
+        userId,
+        error,
+      },
+      'Course not found'
+    );
 
     throw new TRPCError({
       code: 'NOT_FOUND',
@@ -61,14 +70,17 @@ export async function verifyCourseAccess(
 
   // Check ownership or same organization
   if (course.user_id !== userId && course.organization_id !== organizationId) {
-    logger.warn({
-      requestId,
-      courseId,
-      userId,
-      organizationId,
-      courseOwnerId: course.user_id,
-      courseOrgId: course.organization_id,
-    }, 'Course access denied');
+    logger.warn(
+      {
+        requestId,
+        courseId,
+        userId,
+        organizationId,
+        courseOwnerId: course.user_id,
+        courseOrgId: course.organization_id,
+      },
+      'Course access denied'
+    );
 
     throw new TRPCError({
       code: 'FORBIDDEN',
@@ -81,6 +93,7 @@ export async function verifyCourseAccess(
     user_id: course.user_id,
     organization_id: course.organization_id,
     language: (course.language || 'en') as Language, // Default to English if not set
+    style: course.style ?? null,
   };
 }
 
@@ -119,17 +132,20 @@ export function buildMinimalLessonSpec(
   const primaryDocsCount = ragPlan?.primary_documents?.length ?? 0;
   const usedFallback = !hasDRM || primaryDocsCount === 0;
 
-  logger.debug({
-    requestId,
-    lessonId,
-    sectionNumber,
-    hasDRM,
-    primaryDocsCount,
-    usedFallback,
-    searchQueriesCount: ragPlan?.search_queries?.length ?? 0,
-  }, usedFallback
-    ? 'DRM fallback: searching all documents'
-    : 'DRM found: filtering by primary_documents');
+  logger.debug(
+    {
+      requestId,
+      lessonId,
+      sectionNumber,
+      hasDRM,
+      primaryDocsCount,
+      usedFallback,
+      searchQueriesCount: ragPlan?.search_queries?.length ?? 0,
+    },
+    usedFallback
+      ? 'DRM fallback: searching all documents'
+      : 'DRM found: filtering by primary_documents'
+  );
 
   // Create a minimal SectionBreakdown for inference functions
   // This allows us to reuse semantic-scaffolding inference
@@ -152,39 +168,48 @@ export function buildMinimalLessonSpec(
     lesson.lesson_objectives || [],
     lesson.key_topics || []
   );
-  const inferredComplianceLevel = inferredContentArchetype === 'legal_warning' ? 'strict' : 'standard';
+  const inferredComplianceLevel =
+    inferredContentArchetype === 'legal_warning' ? 'strict' : 'standard';
   const inferredDepth = mapDepth(lesson.difficulty_level, 'important');
 
-  logger.debug({
-    requestId,
-    lessonId,
-    inferredTargetAudience,
-    inferredTone,
-    inferredContentArchetype,
-    inferredHookStrategy,
-    inferredComplianceLevel,
-    inferredDepth,
-  }, 'Inferred semantic scaffolding values for minimal lesson spec');
+  logger.debug(
+    {
+      requestId,
+      lessonId,
+      inferredTargetAudience,
+      inferredTone,
+      inferredContentArchetype,
+      inferredHookStrategy,
+      inferredComplianceLevel,
+      inferredDepth,
+    },
+    'Inferred semantic scaffolding values for minimal lesson spec'
+  );
 
   // Build learning objectives with inferred Bloom levels
-  const learningObjectives = (lesson.lesson_objectives || ['Complete this lesson']).map((text, idx) => ({
-    id: `LO-${lessonId}-${idx + 1}`,
-    objective: text.length >= 10 ? text : `Learn about ${lesson.lesson_title}`,
-    bloom_level: inferBloomLevel(text),
-  }));
+  const learningObjectives = (lesson.lesson_objectives || ['Complete this lesson']).map(
+    (text, idx) => ({
+      id: `LO-${lessonId}-${idx + 1}`,
+      objective: text.length >= 10 ? text : `Learn about ${lesson.lesson_title}`,
+      bloom_level: inferBloomLevel(text),
+    })
+  );
 
   // Build key points from key_topics
   const keyPoints = (lesson.key_topics || [lesson.lesson_title]).map(topic =>
     topic.length >= 5 ? topic : `Introduction to ${topic}`
   );
 
-  logger.debug({
-    requestId,
-    lessonId,
-    title: lesson.lesson_title,
-    objectivesCount: learningObjectives.length,
-    keyPointsCount: keyPoints.length,
-  }, 'Building minimal lesson spec from course_structure');
+  logger.debug(
+    {
+      requestId,
+      lessonId,
+      title: lesson.lesson_title,
+      objectivesCount: learningObjectives.length,
+      keyPointsCount: keyPoints.length,
+    },
+    'Building minimal lesson spec from course_structure'
+  );
 
   // Build sections from key_topics (like Stage 5 does) instead of hardcoded "Main Content"
   // This ensures section titles match the actual content topics
@@ -255,7 +280,9 @@ export function buildMinimalLessonSpec(
     exercises: [],
     rag_context: {
       primary_documents: ragPlan?.primary_documents?.length ? ragPlan.primary_documents : [],
-      search_queries: ragPlan?.search_queries?.length ? ragPlan.search_queries : (lesson.key_topics || [lesson.lesson_title]),
+      search_queries: ragPlan?.search_queries?.length
+        ? ragPlan.search_queries
+        : lesson.key_topics || [lesson.lesson_title],
       expected_chunks: 7,
     },
     estimated_duration_minutes: lesson.estimated_duration_minutes || 15,

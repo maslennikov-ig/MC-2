@@ -64,22 +64,30 @@ export const startStage6 = protectedProcedure
     // ctx.user is guaranteed non-null by protectedProcedure middleware
     const currentUser = ctx.user;
 
-    logger.info({
-      requestId,
-      courseId,
-      userId: currentUser.id,
-      organizationId: currentUser.organizationId,
-      lessonCount: lessonSpecs.length,
-      priority,
-    }, 'Stage 6 start request');
+    logger.info(
+      {
+        requestId,
+        courseId,
+        userId: currentUser.id,
+        organizationId: currentUser.organizationId,
+        lessonCount: lessonSpecs.length,
+        priority,
+      },
+      'Stage 6 start request'
+    );
 
     try {
       // Step 1: Verify course access and get course language
-      const course = await verifyCourseAccess(courseId, currentUser.id, currentUser.organizationId, requestId);
+      const course = await verifyCourseAccess(
+        courseId,
+        currentUser.id,
+        currentUser.organizationId,
+        requestId
+      );
 
       // Step 2: Enqueue all lessons using addJob with deduplication
       const jobs = await Promise.all(
-        lessonSpecs.map((spec) => {
+        lessonSpecs.map(spec => {
           const jobData: LessonContentJobData = {
             organizationId: currentUser.organizationId,
             courseId,
@@ -91,6 +99,7 @@ export const startStage6 = protectedProcedure
             ragContextId: null,
             language: course.language, // Pass course language for content generation
             locale: validateLocale(course.language),
+            style: course.style ?? undefined, // Pass course style for content generation
           };
 
           // Deterministic job ID for deduplication
@@ -108,17 +117,20 @@ export const startStage6 = protectedProcedure
       );
 
       // Step 3: Log success
-      logger.info({
-        requestId,
-        courseId,
-        lessonsEnqueued: jobs.length,
-        jobIds: jobs.map((j) => j.id),
-      }, 'Stage 6 jobs enqueued');
+      logger.info(
+        {
+          requestId,
+          courseId,
+          lessonsEnqueued: jobs.length,
+          jobIds: jobs.map(j => j.id),
+        },
+        'Stage 6 jobs enqueued'
+      );
 
       return {
         success: true,
         jobCount: jobs.length,
-        jobIds: jobs.map((j) => j.id).filter((id): id is string => id !== undefined),
+        jobIds: jobs.map(j => j.id).filter((id): id is string => id !== undefined),
       };
     } catch (error) {
       // Re-throw tRPC errors as-is
@@ -127,11 +139,14 @@ export const startStage6 = protectedProcedure
       }
 
       // Log and wrap unexpected errors
-      logger.error({
-        requestId,
-        courseId,
-        error: error instanceof Error ? error.message : String(error),
-      }, 'Stage 6 start failed');
+      logger.error(
+        {
+          requestId,
+          courseId,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        'Stage 6 start failed'
+      );
 
       throw new TRPCError({
         code: 'INTERNAL_SERVER_ERROR',

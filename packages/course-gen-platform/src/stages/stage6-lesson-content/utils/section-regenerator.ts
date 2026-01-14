@@ -13,7 +13,10 @@
  */
 
 import { logger } from '@/shared/logger';
-import type { LessonSpecificationV2, SectionSpecV2 } from '@megacampus/shared-types/lesson-specification-v2';
+import type {
+  LessonSpecificationV2,
+  SectionSpecV2,
+} from '@megacampus/shared-types/lesson-specification-v2';
 import type { RAGChunk } from '@megacampus/shared-types/lesson-content';
 import { getContentLabels } from '@megacampus/shared-types';
 import { generateSection } from '../nodes/generator';
@@ -59,6 +62,8 @@ export interface SectionRegenerationInput {
   language: string;
   /** Optional model override */
   modelOverride?: string | null;
+  /** Course content style (e.g., 'gamified', 'professional', 'storytelling') */
+  style?: string | null;
 }
 
 /**
@@ -99,7 +104,8 @@ function findSectionSpec(
 async function regenerateIntroduction(
   lessonSpec: LessonSpecificationV2,
   language: string,
-  modelOverride?: string | null
+  modelOverride?: string | null,
+  style?: string | null
 ): Promise<{ content: string; tokensUsed: number }> {
   // Create a synthetic section spec for introduction
   const labels = getContentLabels(language);
@@ -121,7 +127,8 @@ async function regenerateIntroduction(
     [], // No RAG for intro
     '', // No previous context for intro
     language,
-    modelOverride
+    modelOverride,
+    style
   );
 }
 
@@ -134,13 +141,14 @@ async function regenerateSummary(
   lessonSpec: LessonSpecificationV2,
   previousContext: string,
   language: string,
-  modelOverride?: string | null
+  modelOverride?: string | null,
+  style?: string | null
 ): Promise<{ content: string; tokensUsed: number }> {
   // Create a synthetic section spec for summary
   const labels = getContentLabels(language);
   const summarySection: SectionSpecV2 = {
     title: labels.summary,
-    key_points_to_cover: lessonSpec.learning_objectives.map((lo) => lo.objective),
+    key_points_to_cover: lessonSpec.learning_objectives.map(lo => lo.objective),
     rag_context_id: 'summary',
     content_archetype: 'concept_explainer',
     constraints: {
@@ -156,7 +164,8 @@ async function regenerateSummary(
     [], // No RAG for summary
     previousContext,
     language,
-    modelOverride
+    modelOverride,
+    style
   );
 }
 
@@ -173,14 +182,7 @@ export async function regenerateSections(
   input: SectionRegenerationInput
 ): Promise<SectionRegenerationResult> {
   const startTime = performance.now();
-  const {
-    markdown,
-    sectionIds,
-    lessonSpec,
-    ragChunks,
-    language,
-    modelOverride,
-  } = input;
+  const { markdown, sectionIds, lessonSpec, ragChunks, language, modelOverride, style } = input;
 
   const nodeLogger = logger.child({
     component: 'section-regenerator',
@@ -195,7 +197,7 @@ export async function regenerateSections(
     const parsed = parseMarkdownSections(markdown);
     nodeLogger.debug({
       msg: 'Parsed markdown',
-      sectionsFound: parsed.sections.map((s) => s.id),
+      sectionsFound: parsed.sections.map(s => s.id),
     });
 
     let currentMarkdown = markdown;
@@ -215,9 +217,9 @@ export async function regenerateSections(
         let result: { content: string; tokensUsed: number };
 
         if (sectionId === 'introduction') {
-          result = await regenerateIntroduction(lessonSpec, language, modelOverride);
+          result = await regenerateIntroduction(lessonSpec, language, modelOverride, style);
         } else if (sectionId === 'summary') {
-          result = await regenerateSummary(lessonSpec, context, language, modelOverride);
+          result = await regenerateSummary(lessonSpec, context, language, modelOverride, style);
         } else {
           const sectionSpec = findSectionSpec(sectionId, lessonSpec);
           if (!sectionSpec) {
@@ -232,21 +234,18 @@ export async function regenerateSections(
             ragChunks,
             context,
             language,
-            modelOverride
+            modelOverride,
+            style
           );
         }
 
         // The generated content doesn't include the header, so add it
-        const section = currentParsed.sections.find((s) => s.id === sectionId);
+        const section = currentParsed.sections.find(s => s.id === sectionId);
         const sectionTitle = section?.title || sectionId;
         const newSectionContent = `## ${sectionTitle}\n\n${result.content}`;
 
         // Merge back into markdown
-        currentMarkdown = mergeSectionIntoMarkdown(
-          currentParsed,
-          sectionId,
-          newSectionContent
-        );
+        currentMarkdown = mergeSectionIntoMarkdown(currentParsed, sectionId, newSectionContent);
 
         totalTokens += result.tokensUsed;
         regeneratedSections.push(sectionId);
@@ -287,9 +286,10 @@ export async function regenerateSections(
       durationMs,
       regeneratedSections,
       failedSections,
-      errorMessage: failedSections.length > 0
-        ? `Failed to regenerate sections: ${failedSections.join(', ')}`
-        : undefined,
+      errorMessage:
+        failedSections.length > 0
+          ? `Failed to regenerate sections: ${failedSections.join(', ')}`
+          : undefined,
     };
   } catch (error) {
     const errorMessage = error instanceof Error ? error.message : String(error);
