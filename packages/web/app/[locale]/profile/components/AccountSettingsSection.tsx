@@ -1,24 +1,28 @@
 'use client'
 
-import { useState, memo, Suspense } from 'react'
+import { useState, memo, Suspense, useCallback } from 'react'
 import dynamic from 'next/dynamic'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
 import { useThemeSync } from '@/lib/hooks/use-theme-sync'
+import { useSupabase } from '@/lib/supabase/browser-client'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-// import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group' // Replaced with custom buttons
 import { FormField } from '@/components/ui/form-field'
 import {
   Lock, Download, Trash2, Moon, Sun,
-  Loader2, AlertTriangle, Send, ExternalLink
+  Loader2, AlertTriangle, Send
 } from 'lucide-react'
+import { TelegramLoginButton, type TelegramAuthData } from '@/components/telegram/telegram-login-button'
 import { passwordSchema, type PasswordFormData } from '../validation-schemas'
 import type { UserProfile } from '../page'
 import type { UserPreferences } from '@/lib/user-preferences'
+
+// Bot username from env (set in next.config.js publicRuntimeConfig or hardcode)
+const TELEGRAM_BOT_USERNAME = process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME || 'MegaCampusAIBot'
 
 // Lazy load heavy components
 const Select = dynamic(() => import('@/components/ui/select').then(mod => ({
@@ -82,50 +86,74 @@ const AccountSettingsSection = memo(function AccountSettingsSection({
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [deleteConfirmText, setDeleteConfirmText] = useState('')
   const { theme, setTheme } = useThemeSync()
+  const { session } = useSupabase()
 
-  // Telegram settings state
-  const [telegramChatId, setTelegramChatId] = useState(
-    'telegram_chat_id' in profile ? (profile.telegram_chat_id || '') : ''
-  )
-  const [telegramEnabled, setTelegramEnabled] = useState(
-    'telegram_notifications_enabled' in profile ? (profile.telegram_notifications_enabled || false) : false
-  )
-  const [telegramSaving, setTelegramSaving] = useState(false)
-  const [telegramError, setTelegramError] = useState<string | null>(null)
+  // Telegram connection state
+  const isTelegramConnected = 'telegram_chat_id' in profile && !!profile.telegram_chat_id
+  const telegramUsername = 'telegram_username' in profile ? (profile as Record<string, unknown>).telegram_username as string : undefined
 
-  // Check if telegram settings have changed
-  const hasTelegramChanges =
-    telegramChatId !== ('telegram_chat_id' in profile ? (profile.telegram_chat_id || '') : '') ||
-    telegramEnabled !== ('telegram_notifications_enabled' in profile ? (profile.telegram_notifications_enabled || false) : false)
-
-  // Validate chat_id (only digits, optionally starting with -)
-  const validateChatId = (value: string): boolean => {
-    if (!value) return true // Empty is valid (will disable notifications)
-    return /^-?\d+$/.test(value)
-  }
-
-  // Handle telegram settings save
-  const handleTelegramSave = async () => {
-    if (!validateChatId(telegramChatId)) {
-      setTelegramError('Chat ID должен содержать только цифры')
+  // Handle Telegram auth from widget
+  const handleTelegramAuth = useCallback(async (data: TelegramAuthData) => {
+    if (!session?.access_token) {
+      toast.error('Необходима авторизация')
       return
     }
 
-    setTelegramError(null)
-    setTelegramSaving(true)
+    try {
+      const response = await fetch('/api/telegram/connect', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${session.access_token}`
+        },
+        body: JSON.stringify(data)
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(errorData.error || 'Ошибка подключения')
+      }
+
+      const result = await response.json()
+
+      // Update profile via parent
+      await onUpdate({
+        telegram_chat_id: result.telegram_chat_id,
+        telegram_notifications_enabled: true
+      })
+
+      toast.success('Telegram успешно подключен!')
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Не удалось подключить Telegram')
+    }
+  }, [session, onUpdate])
+
+  // Handle Telegram disconnect
+  const handleTelegramDisconnect = useCallback(async () => {
+    if (!session?.access_token) return
 
     try {
-      await onUpdate({
-        telegram_chat_id: telegramChatId || null,
-        telegram_notifications_enabled: telegramChatId ? telegramEnabled : false
+      const response = await fetch('/api/telegram/connect', {
+        method: 'DELETE',
+        headers: {
+          'Authorization': `Bearer ${session.access_token}`
+        }
       })
-      toast.success('Настройки Telegram сохранены')
+
+      if (!response.ok) {
+        throw new Error('Ошибка отключения')
+      }
+
+      await onUpdate({
+        telegram_chat_id: null,
+        telegram_notifications_enabled: false
+      })
+
+      toast.success('Telegram отключен')
     } catch {
-      toast.error('Не удалось сохранить настройки Telegram')
-    } finally {
-      setTelegramSaving(false)
+      toast.error('Не удалось отключить Telegram')
     }
-  }
+  }, [session, onUpdate])
 
   const passwordForm = useForm<PasswordFormData>({
     resolver: zodResolver(passwordSchema),
@@ -269,7 +297,7 @@ const AccountSettingsSection = memo(function AccountSettingsSection({
         </div>
       </Card>
 
-      {/* Telegram Notifications Settings */}
+      {/* Telegram Notifications - Simple one-click connection */}
       <Card className="bg-card border rounded-xl p-6 shadow-sm hover:shadow-lg transition-shadow duration-300">
         <div className="flex items-center gap-2 mb-2">
           <Send className="h-5 w-5 text-[#0088cc]" />
@@ -281,77 +309,13 @@ const AccountSettingsSection = memo(function AccountSettingsSection({
           Получайте уведомления о статусе генерации курсов в Telegram
         </p>
 
-        <div className="space-y-4">
-          {/* Chat ID Input */}
-          <div className="space-y-2">
-            <Label htmlFor="telegram-chat-id">Telegram Chat ID</Label>
-            <Input
-              id="telegram-chat-id"
-              type="text"
-              value={telegramChatId}
-              onChange={(e) => {
-                setTelegramChatId(e.target.value)
-                setTelegramError(null)
-              }}
-              placeholder="Введите ваш Chat ID"
-              className={telegramError ? 'border-destructive' : ''}
-            />
-            {telegramError && (
-              <p className="text-sm text-destructive">{telegramError}</p>
-            )}
-            <p className="text-xs text-muted-foreground flex items-center gap-1">
-              Напишите боту{' '}
-              <a
-                href="https://t.me/userinfobot"
-                target="_blank"
-                rel="noopener noreferrer"
-                className="text-[#0088cc] hover:underline inline-flex items-center gap-0.5"
-              >
-                @userinfobot
-                <ExternalLink className="h-3 w-3" />
-              </a>
-              {' '}в Telegram, чтобы узнать свой Chat ID
-            </p>
-          </div>
-
-          {/* Enable/Disable Switch */}
-          <div className="flex items-center justify-between py-2">
-            <div className="space-y-0.5">
-              <Label htmlFor="telegram-enabled">Включить уведомления</Label>
-              <p className="text-sm text-muted-foreground">
-                Уведомления о завершении, ошибках и этапах генерации
-              </p>
-            </div>
-            <Switch
-              id="telegram-enabled"
-              checked={telegramEnabled}
-              onCheckedChange={setTelegramEnabled}
-              disabled={!telegramChatId}
-              aria-label="Включить Telegram уведомления"
-            />
-          </div>
-
-          {/* Save Button */}
-          {hasTelegramChanges && (
-            <Button
-              onClick={() => void handleTelegramSave()}
-              disabled={telegramSaving}
-              className="w-full sm:w-auto"
-            >
-              {telegramSaving ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Сохранение...
-                </>
-              ) : (
-                <>
-                  <Send className="mr-2 h-4 w-4" />
-                  Сохранить настройки Telegram
-                </>
-              )}
-            </Button>
-          )}
-        </div>
+        <TelegramLoginButton
+          botUsername={TELEGRAM_BOT_USERNAME}
+          onAuth={handleTelegramAuth}
+          isConnected={isTelegramConnected}
+          connectedUsername={telegramUsername}
+          onDisconnect={handleTelegramDisconnect}
+        />
       </Card>
 
       {/* Privacy Settings */}
