@@ -38,17 +38,17 @@ function sleep(ms: number): Promise<void> {
 const PAUSE_DELAY_MS = 30_000;
 
 /**
- * Check if course generation is paused
- * @returns true if paused, false otherwise
+ * Check if course generation is paused by querying the generation_paused_at column.
+ * Returns true if the course is currently paused, false otherwise.
  */
 async function isCoursePaused(courseId: string): Promise<boolean> {
   try {
     const supabase = getSupabaseAdmin();
-    // NOTE: generation_paused_at column will be added in future migration
-    // For now, use 'id' as placeholder and always return false
+    // Query the generation_paused_at column to check pause status
+    // Column added in migration: 20260114100000_add_generation_pause_fields.sql
     const { data, error } = await supabase
       .from('courses')
-      .select('id')
+      .select('generation_paused_at')
       .eq('id', courseId)
       .single();
 
@@ -57,9 +57,9 @@ async function isCoursePaused(courseId: string): Promise<boolean> {
       return false;
     }
 
-    // TODO: Change to `data?.generation_paused_at !== null` when column is added
-    void data; // Silence unused variable warning
-    return false; // Pause feature not yet implemented
+    // Course is paused if generation_paused_at is not null
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return (data as any)?.generation_paused_at !== null;
   } catch (err) {
     logger.warn(
       { courseId, error: err instanceof Error ? err.message : String(err) },

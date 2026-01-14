@@ -24,7 +24,10 @@ import {
   Clock,
   RefreshCw,
   ArrowRight,
-  Copy
+  Copy,
+  Pause,
+  Play,
+  Square
 } from 'lucide-react'
 import type { 
   GenerationProgress as GenerationProgressType, 
@@ -93,6 +96,8 @@ export function GenerationProgress({
   const [error, setError] = useState<string | null>(null)
   const [isConnected, setIsConnected] = useState(false)
   const [generationCode, setGenerationCode] = useState<string | null>(null)
+  const [isPaused, setIsPaused] = useState(false)
+  const [pauseLoading, setPauseLoading] = useState(false)
 
   // Calculate estimated time remaining
   const estimatedMinutesRemaining = Math.ceil(
@@ -113,7 +118,7 @@ export function GenerationProgress({
 
     const handleCourseUpdate = (payload: { new: Course }) => {
       logger.info('Realtime update received', { courseId, payload })
-      const updatedCourse = payload.new as Course
+      const updatedCourse = payload.new
 
       // Update generation code if present
       if (updatedCourse.generation_code) {
@@ -372,6 +377,52 @@ export function GenerationProgress({
     }
   }, [courseId, router])
 
+  // Pause generation
+  const handlePause = useCallback(async () => {
+    setPauseLoading(true)
+    try {
+      const response = await fetch(`/api/courses/${slug}/pause`, {
+        method: 'POST'
+      })
+
+      if (response.ok) {
+        setIsPaused(true)
+        toast.success('Генерация приостановлена')
+      } else {
+        const data = await response.json()
+        toast.error(data.error || 'Не удалось приостановить генерацию')
+      }
+    } catch (err) {
+      logger.error('Failed to pause generation', { error: err })
+      toast.error('Произошла ошибка при приостановке')
+    } finally {
+      setPauseLoading(false)
+    }
+  }, [slug])
+
+  // Resume generation
+  const handleResume = useCallback(async () => {
+    setPauseLoading(true)
+    try {
+      const response = await fetch(`/api/courses/${slug}/resume`, {
+        method: 'POST'
+      })
+
+      if (response.ok) {
+        setIsPaused(false)
+        toast.success('Генерация возобновлена')
+      } else {
+        const data = await response.json()
+        toast.error(data.error || 'Не удалось возобновить генерацию')
+      }
+    } catch (err) {
+      logger.error('Failed to resume generation', { error: err })
+      toast.error('Произошла ошибка при возобновлении')
+    } finally {
+      setPauseLoading(false)
+    }
+  }, [slug])
+
   // Copy generation code to clipboard
   const handleCopyCode = useCallback(() => {
     if (generationCode) {
@@ -568,17 +619,60 @@ export function GenerationProgress({
           )}
           
           {/* Action buttons */}
-          <div className="flex justify-between items-center pt-4">
-            {(status === 'initializing' || status === 'processing_documents' || status === 'analyzing_task' || status === 'generating_structure') && progress.current_step <= 3 && (
+          <div className="flex justify-between items-center pt-4 gap-2">
+            {/* Pause/Resume buttons - shown during active content generation */}
+            {(status === 'generating_content' || status?.startsWith('stage_6_')) && !isPaused && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handlePause}
+                disabled={pauseLoading}
+              >
+                {pauseLoading ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Pause className="h-4 w-4 mr-2" />
+                )}
+                Приостановить
+              </Button>
+            )}
+
+            {isPaused && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleResume}
+                disabled={pauseLoading}
+                className="border-green-500 text-green-600 hover:bg-green-50 dark:hover:bg-green-950"
+              >
+                {pauseLoading ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Play className="h-4 w-4 mr-2" />
+                )}
+                Продолжить
+              </Button>
+            )}
+
+            {/* Cancel/Stop button - expanded to work during all active stages including Stage 6 */}
+            {(status === 'initializing' ||
+              status === 'processing_documents' ||
+              status === 'analyzing_task' ||
+              status === 'generating_structure' ||
+              status === 'generating_content' ||
+              status === 'finalizing' ||
+              status?.startsWith('stage_')) && (
               <Button
                 variant="outline"
                 size="sm"
                 onClick={handleCancel}
+                className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950"
               >
-                Отменить генерацию
+                <Square className="h-4 w-4 mr-2" />
+                Остановить
               </Button>
             )}
-            
+
             {status === 'failed' && (
               <Button
                 variant="outline"
@@ -589,7 +683,7 @@ export function GenerationProgress({
                 Попробовать снова
               </Button>
             )}
-            
+
             {isCourseReady && (
               <Button
                 className="ml-auto"
@@ -600,6 +694,16 @@ export function GenerationProgress({
               </Button>
             )}
           </div>
+
+          {/* Paused indicator */}
+          {isPaused && (
+            <Alert className="border-yellow-200 bg-yellow-50 dark:border-yellow-800 dark:bg-yellow-950 mt-4">
+              <Pause className="h-4 w-4 text-yellow-600" />
+              <AlertDescription className="text-yellow-800 dark:text-yellow-200">
+                Генерация приостановлена. Текущие задачи будут завершены, новые не начнутся.
+              </AlertDescription>
+            </Alert>
+          )}
         </CardContent>
       </Card>
       
