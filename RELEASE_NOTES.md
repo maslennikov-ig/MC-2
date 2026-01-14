@@ -2,6 +2,51 @@
 
 _Released on 2025-12-26_
 
+## v0.27.7
+
+_Released on 2026-01-14_
+
+### ✨ New Features
+
+- **generation**: Complete pause/stop code review improvements
+- **generation**: Add pause/resume/stop controls for course generation
+- **stage6**: Add stage_6 status transitions in backend
+- **Database**: Add stage_6 enum values to generation_status
+- **enrichments**: Implement on-demand generation from course viewer
+
+### 🔧 Improvements
+
+- **config**: Move LKG config from .tmp/ to .local/
+- **Database**: Cleanup unused lesson content structures
+- **config**: Convert require() to ES imports in next.config.ts
+
+### 🐛 Bug Fixes
+
+- **web**: Show Stage 6 spinner only when actively generating
+- **stage6,stage7**: Align database queries with lesson_contents table
+- **generation**: Address code review issues for pause/stop feature
+- Comprehensive health check - fix all vulnerabilities and bugs
+- **workflow**: Stage 4/5 phases now display lazy-loaded trace data
+- **web**: Health check - fix React hooks violations and code quality issues
+- **tools**: Fix PostgREST query in retrigger-enrichments script
+- **stage7**: Fix enrichment creation and lesson query issues
+- **pwa**: Correct cleanUpOutdatedCaches typo
+- **stage7**: Fix course card constraint and enrichment triggers
+- **stage7**: Correct lessons query in triggerCourseCard and triggerAllLessonCovers
+- **web**: Convert require to ES imports and prevent lint-staged rollback
+- **lint**: Resolve ESLint errors and improve code quality
+- **logging**: Improve error context with userId capture and metadata standardization
+- **enrichments**: Address code review findings for on-demand generation
+- **Interface**: Stage 6 progress bar shows real lesson completion percentage
+- **generation**: Improve success overlay UX and fix lint errors
+- **logging**: Add comprehensive error_logs DB logging to all API routes
+- **generation**: Improve success overlay UX
+- **admin**: Lazy load trace details for Input/Output Data
+
+---
+
+_This release was automatically generated from 51 commits._
+
 ## v0.27.6
 
 _Released on 2026-01-13_

@@ -311,6 +311,71 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.27.7] - 2026-01-14
+
+### Added
+
+- **generation**: complete pause/stop code review improvements (5a62438)
+- **generation**: add pause/resume/stop controls for course generation (3d462c1)
+- **stage6**: add stage_6 status transitions in backend (b738e6b)
+- **db**: add stage_6 enum values to generation_status (8eca224)
+- **enrichments**: implement on-demand generation from course viewer (b6a7254)
+
+### Changed
+
+- **config**: move LKG config from .tmp/ to .local/ (d214b4e)
+- **db**: cleanup unused lesson content structures (26bb90c)
+- **config**: convert require() to ES imports in next.config.ts (f991a9e)
+
+### Fixed
+
+- **web**: show Stage 6 spinner only when actively generating (5df73f5)
+- **stage6,stage7**: align database queries with lesson_contents table (0ae9339)
+- **generation**: address code review issues for pause/stop feature (2ef6f45)
+- comprehensive health check - fix all vulnerabilities and bugs (745243e)
+- **workflow**: Stage 4/5 phases now display lazy-loaded trace data (4769f78)
+- **web**: health check - fix React hooks violations and code quality issues (ed01c62)
+- **tools**: fix PostgREST query in retrigger-enrichments script (a3a1445)
+- **stage7**: fix enrichment creation and lesson query issues (a1a8e59)
+- **pwa**: correct cleanUpOutdatedCaches typo (fafc6d3)
+- **stage7**: fix course card constraint and enrichment triggers (5d2518d)
+- **stage7**: correct lessons query in triggerCourseCard and triggerAllLessonCovers (29d03fd)
+- **web**: convert require to ES imports and prevent lint-staged rollback (308305b)
+- **lint**: resolve ESLint errors and improve code quality (831dacf)
+- **logging**: improve error context with userId capture and metadata standardization (a80e21b)
+- **enrichments**: address code review findings for on-demand generation (84a91b2)
+- **ui**: Stage 6 progress bar shows real lesson completion percentage (98d5f91)
+- **generation**: improve success overlay UX and fix lint errors (ed26de5)
+- **logging**: add comprehensive error_logs DB logging to all API routes (177b1ba)
+- **generation**: improve success overlay UX (5fdefe6)
+- **admin**: lazy load trace details for Input/Output Data (0a28be7)
+
+### Other
+
+- bd sync: 2026-01-14 11:50:16 (8909156)
+- bd sync: 2026-01-14 11:36:56 (90e39e2)
+- bd sync: 2026-01-14 10:22:40 (7e07991)
+- bd sync: 2026-01-14 10:19:20 (7fdf8ff)
+- bd sync: 2026-01-14 08:27:00 (8e2c519)
+- bd sync: 2026-01-14 07:45:22 (554dc85)
+- bd sync: 2026-01-14 07:32:33 (e6fa069)
+- bd sync: 2026-01-13 21:15:00 (66f86f3)
+- **enrichments**: add unit tests for on-demand enrichment generation (def3fc2)
+- bd sync: 2026-01-13 21:11:03 (b81a061)
+- bd sync: 2026-01-13 21:10:12 (b8e794c)
+- bd sync: 2026-01-13 21:07:26 (89dc93c)
+- bd sync: 2026-01-13 20:38:53 (6e96aaf)
+- bd sync: 2026-01-13 20:36:09 (833194e)
+- bd sync: 2026-01-13 20:32:34 (811ba92)
+- bd sync: apply DB changes after import (ebb913a)
+- bd sync: 2026-01-13 20:30:45 (d00e07a)
+- bd sync: 2026-01-13 20:27:39 (a1ae5d5)
+- bd sync: 2026-01-13 20:23:08 (809287b)
+- **types**: add stage_6 values to generation_status enum (ac0b79e)
+- bd sync: 2026-01-13 18:37:40 (da05b1c)
+- bd sync: 2026-01-13 18:34:18 (c0f4e91)
+- **enrichments**: clarify auto-generated vs on-demand enrichment types (d262e5e)
+
 ## [0.27.6] - 2026-01-13
 
 ### Added
