@@ -18,8 +18,7 @@ export const COURSE_STYLES = [
   'practical',
   'problem_based',
   'analytical',
-  // Other popular styles
-  'engaging',
+  // Popular styles
   'conversational',
   'storytelling',
   'interactive',
@@ -28,9 +27,10 @@ export const COURSE_STYLES = [
   'academic',
   'technical',
   'research',
-  // Niche styles
-  'visual',
   'gamified',
+  // Additional styles
+  'engaging',
+  'visual',
   'minimalist',
   'microlearning',
   'socratic',
@@ -47,8 +47,17 @@ export const CourseStyleSchema = z.enum(COURSE_STYLES);
 // ============================================================================
 
 export const STYLE_PROMPTS: Record<CourseStyle, string> = {
-  academic:
-    'Write with scholarly rigor and theoretical depth. Present multiple perspectives with critical analysis. Use formal academic language, define terminology precisely, include theoretical frameworks. Structure arguments with clear thesis statements supported by evidence. Maintain objective tone through passive voice constructions.',
+  professional:
+    'Adopt corporate tone focusing on business value, ROI, and measurable outcomes. Emphasize industry best practices with real case studies from leading companies. Use executive language: strategic advantages, core competencies, value propositions, KPIs. Structure with executive summaries, key takeaways, and actionable implementation steps. Include metrics and benchmarks where relevant. Address common business challenges and their solutions.',
+
+  practical:
+    "Focus entirely on actionable implementation with immediate business applicability. Provide step-by-step instructions, numbered procedures, and clear checklists. Use imperative mood: 'Open the file', 'Click here', 'Run this command'. Include troubleshooting sections for common problems and edge cases. Minimize theory, maximize hands-on application. Add 'Quick Win' boxes for immediate results and 'Pro Tips' for efficiency gains.",
+
+  problem_based:
+    'Start every section with real-world business problem scenario that readers recognize from their work. Present symptoms and context first, then guide through diagnostic process. Explore multiple solution paths with clear trade-offs (cost, time, complexity). Use case study format: situation, complication, resolution, lessons learned. Include decision points where readers evaluate options. End with actionable recommendations and success metrics.',
+
+  analytical:
+    'Approach topics through data-driven analysis and logical reasoning. Present statistics, metrics, benchmarks, and quantifiable evidence from industry research. Build arguments through systematic reasoning and cause-effect relationships. Use structured analytical frameworks (SWOT, root cause analysis, decision matrices). Break complex systems into components. Include data visualizations descriptions, comparison tables, and evidence-based conclusions.',
 
   conversational:
     "Write as friendly dialogue with the reader. Use personal pronouns 'you' and 'we' throughout. Include relatable everyday analogies and real-life examples. Ask rhetorical questions to engage. Keep sentences short and paragraphs scannable. Maintain warm, approachable tone like explaining to a curious friend.",
@@ -56,53 +65,44 @@ export const STYLE_PROMPTS: Record<CourseStyle, string> = {
   storytelling:
     'Structure lessons as compelling narratives with characters facing real challenges. Begin with intriguing hooks, build tension through conflict, resolve with learning moments. Weave theoretical concepts naturally into story progression. Create emotional connections that make abstract concepts memorable through concrete scenarios.',
 
-  practical:
-    "Focus entirely on actionable implementation with immediate business applicability. Provide step-by-step instructions, numbered procedures, and clear checklists. Use imperative mood: 'Open the file', 'Click here', 'Run this command'. Include troubleshooting sections for common problems and edge cases. Minimize theory, maximize hands-on application. Add 'Quick Win' boxes for immediate results and 'Pro Tips' for efficiency gains.",
+  interactive:
+    "Demand constant reader participation and engagement. Embed exercises directly in text: 'Before reading further, write down...'. Include self-assessments, reflection prompts, and hands-on activities. Never let reader be passive consumer. Create dialogue through anticipated questions and responses.",
 
   motivational:
     "Write with infectious enthusiasm and empowering energy. Include success stories and transformation examples. Frame challenges as exciting opportunities for growth. Use phrases like 'You're capable of amazing things', 'Every expert started here'. Build confidence through positive reinforcement and celebration of small wins.",
 
-  visual:
-    "Create vivid mental images through rich descriptive language. Use spatial metaphors and visual analogies: 'Think of memory as a filing cabinet'. Paint detailed word pictures that help readers see concepts. Describe abstract ideas through concrete visual scenes, diagrams, and spatial relationships.",
-
-  gamified:
-    "Transform learning into an adventure game. Frame content as quests, missions, and challenges to complete. Use gaming language: 'Level up your skills', 'Achievement unlocked', 'Boss battle ahead'. Create sense of progression with experience points and skill trees. Make failure fun with 'Game Over - Try Again!' attitude.",
-
-  minimalist:
-    'Strip content to absolute essentials. Short declarative sentences. Core concepts only. No elaboration unless critical. Direct statements without qualification. Each paragraph delivers one complete idea. Eliminate adjectives, adverbs, and filler words. Maximum clarity through minimum complexity.',
-
-  research:
-    "Guide learning through strategic inquiry and investigation. Start with thought-provoking questions: 'What would happen if...?', 'Why do you think...?'. Present hypotheses to test, experiments to try. Encourage critical thinking by challenging assumptions. Balance open-ended exploration with evidence-based conclusions.",
-
-  engaging:
-    "Hook readers instantly with surprising facts, paradoxes, or 'Did you know?' moments. Create curiosity gaps that demand resolution. Use cliffhangers between sections: 'But there's a catch...'. Make content personally relevant: 'This could save you hours'. Include interactive moments: 'Stop and try this before reading on'.",
-
-  professional:
-    'Adopt corporate tone focusing on business value, ROI, and measurable outcomes. Emphasize industry best practices with real case studies from leading companies. Use executive language: strategic advantages, core competencies, value propositions, KPIs. Structure with executive summaries, key takeaways, and actionable implementation steps. Include metrics and benchmarks where relevant. Address common business challenges and their solutions.',
-
-  socratic:
-    "Never give direct answers, guide discovery through questions. Use progressive questioning to lead learners to insights. 'What do you notice about...?', 'How might this relate to...?'. Let students uncover principles themselves. Build understanding layer by layer through guided inquiry.",
-
-  problem_based:
-    'Start every section with real-world business problem scenario that readers recognize from their work. Present symptoms and context first, then guide through diagnostic process. Explore multiple solution paths with clear trade-offs (cost, time, complexity). Use case study format: situation, complication, resolution, lessons learned. Include decision points where readers evaluate options. End with actionable recommendations and success metrics.',
-
-  collaborative:
-    "Write for group learning contexts. Include instructions for peer discussions: 'Share with your partner', 'Debate in groups'. Suggest team exercises and collaborative projects. Create opportunities for knowledge exchange. Use inclusive language that assumes multiple learners working together.",
+  academic:
+    'Write with scholarly rigor and theoretical depth. Present multiple perspectives with critical analysis. Use formal academic language, define terminology precisely, include theoretical frameworks. Structure arguments with clear thesis statements supported by evidence. Maintain objective tone through passive voice constructions.',
 
   technical:
     'Prioritize precision and technical accuracy above all. Include exact specifications, code snippets, mathematical formulas. Use proper technical terminology without simplification. Focus on system architecture, algorithms, and implementation details. Assume reader comfort with technical complexity.',
 
+  research:
+    "Guide learning through strategic inquiry and investigation. Start with thought-provoking questions: 'What would happen if...?', 'Why do you think...?'. Present hypotheses to test, experiments to try. Encourage critical thinking by challenging assumptions. Balance open-ended exploration with evidence-based conclusions.",
+
+  gamified:
+    "Transform learning into an adventure game. Frame content as quests, missions, and challenges to complete. Use gaming language: 'Level up your skills', 'Achievement unlocked', 'Boss battle ahead'. Create sense of progression with experience points and skill trees. Make failure fun with 'Game Over - Try Again!' attitude.",
+
+  engaging:
+    'Create vibrant, captivating content that hooks readers from the first sentence. Use surprising facts, intriguing questions, and unexpected connections. Include memorable anecdotes and fascinating examples. Maintain high energy throughout with varied pacing and dynamic transitions. Make every paragraph feel like a discovery.',
+
+  visual:
+    'Paint vivid mental pictures through rich descriptions and powerful metaphors. Help readers visualize abstract concepts through concrete imagery. Use sensory language that engages imagination. Structure information spatially with clear visual hierarchies. Describe processes as visual flows and transformations.',
+
+  minimalist:
+    'Distill everything to essential elements. One idea per paragraph. Short sentences. No filler words. Present facts directly without elaboration. Use bullet points and numbered lists. White space is your friend. Every word must earn its place. Remove anything that does not directly serve comprehension.',
+
   microlearning:
-    'Deliver ultra-focused micro-lessons on single concepts. Each lesson standalone and immediately applicable. Use memorable mnemonics and rules of thumb. Create quick wins and instant value. Design for 2-3 minute consumption during coffee breaks.',
+    'Break content into bite-sized modules of 3-5 minutes each. Start each module with a clear learning objective. End with immediate takeaway or action item. Use frequent knowledge checks. Design for mobile consumption. Enable non-linear navigation between modules. Optimize for interrupted learning sessions.',
+
+  socratic:
+    "Lead learners to discover answers through carefully crafted questions. Never give direct answers when a question can guide to insight. Build understanding through dialogue: pose question, acknowledge response, follow up. Challenge assumptions gently: 'What makes you think so?' Celebrate moments of discovery.",
+
+  collaborative:
+    'Design content for team learning and peer discussion. Include discussion prompts for group exploration. Suggest pair activities and team exercises. Reference diverse perspectives and experiences. Create opportunities for knowledge sharing. Build in reflection points for collective sense-making.',
 
   inspirational:
-    "Ignite passion for learning and transformation. Paint vivid pictures of future possibilities: 'Imagine yourself in one year...'. Share stories of ordinary people achieving extraordinary results. Use uplifting language that sparks dreams and ambitions. Focus on unlimited potential and life-changing outcomes.",
-
-  interactive:
-    "Demand constant reader participation and engagement. Embed exercises directly in text: 'Before reading further, write down...'. Include self-assessments, reflection prompts, and hands-on activities. Never let reader be passive consumer. Create dialogue through anticipated questions and responses.",
-
-  analytical:
-    'Approach topics through data-driven analysis and logical reasoning. Present statistics, metrics, benchmarks, and quantifiable evidence from industry research. Build arguments through systematic reasoning and cause-effect relationships. Use structured analytical frameworks (SWOT, root cause analysis, decision matrices). Break complex systems into components. Include data visualizations descriptions, comparison tables, and evidence-based conclusions.',
+    'Connect learning to meaningful purpose and personal growth. Share stories of transformation and breakthrough moments. Highlight real people who mastered these skills. Frame challenges as stepping stones to achievement. Remind learners of their potential. End sections with motivating calls to action.',
 };
 
 // ============================================================================
@@ -113,7 +113,7 @@ export const STYLE_PROMPTS: Record<CourseStyle, string> = {
  * Get the prompt text for a given course style with validation
  *
  * Validates the input style and returns the corresponding prompt.
- * If the style is invalid or null, silently defaults to 'conversational'.
+ * If the style is invalid or null, silently defaults to 'professional'.
  * Use isValidCourseStyle() to validate before calling if explicit error handling is needed.
  *
  * @param style - Course style identifier (optional, nullable)
@@ -125,14 +125,14 @@ export const STYLE_PROMPTS: Record<CourseStyle, string> = {
  * // Returns: "Write with scholarly rigor..."
  *
  * @example
- * // Invalid style - silently defaults to conversational
+ * // Invalid style - silently defaults to professional
  * const prompt = getStylePrompt('invalid-style');
- * // Returns: "Write as friendly dialogue..."
+ * // Returns: "Adopt corporate tone..."
  *
  * @example
- * // Null/undefined - defaults to conversational
+ * // Null/undefined - defaults to professional
  * const prompt = getStylePrompt(null);
- * // Returns: "Write as friendly dialogue..."
+ * // Returns: "Adopt corporate tone..."
  */
 export function getStylePrompt(style?: string | null): string {
   // Validate and normalize style

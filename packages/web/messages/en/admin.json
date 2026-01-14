@@ -295,7 +295,9 @@
       "supabase": "Database",
       "supabaseDesc": "PostgreSQL + Auth",
       "qdrant": "Qdrant",
-      "qdrantDesc": "Vector database"
+      "qdrantDesc": "Vector database",
+      "telegram": "Telegram Bot",
+      "telegramDesc": "Notifications"
     },
     "status": {
       "healthy": "Healthy",
