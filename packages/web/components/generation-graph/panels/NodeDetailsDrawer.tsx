@@ -114,7 +114,7 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
 
   // Get realtime status from context (more reliable than node data)
   const realtimeStatus = useNodeStatus(selectedNodeId || '');
-  const { status: generationStatus, fetchTraceDetails } = useGenerationRealtime();
+  const { status: generationStatus, fetchTraceDetails, traces } = useGenerationRealtime();
 
   // Check if THIS stage is awaiting approval based on course generation_status
   // generationStatus contains the raw generation_status like 'stage_5_awaiting_approval'
@@ -408,10 +408,26 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
       if (hasPhases && selectedPhaseId && phases.length > 0) {
           const phase = phases.find((p: any) => p.phaseId === selectedPhaseId);
           if (phase) {
+              // If phase.outputData is missing but we have a traceId, check the traces array
+              // This handles the case where lazy loading via fetchTraceDetails updated traces
+              // but phasesMap wasn't updated (since it's a separate state in useGraphData)
+              let outputData = phase.outputData;
+              let inputData = phase.inputData;
+              if ((outputData === undefined || inputData === undefined) && phase.traceId && traces.length > 0) {
+                  const trace = traces.find(t => t.id === phase.traceId);
+                  if (trace) {
+                      if (outputData === undefined && trace.output_data !== undefined) {
+                          outputData = trace.output_data;
+                      }
+                      if (inputData === undefined && trace.input_data !== undefined) {
+                          inputData = trace.input_data;
+                      }
+                  }
+              }
               return {
                   label: `${data?.label} - ${phase.phaseName}`,
-                  inputData: phase.inputData,
-                  outputData: phase.outputData,
+                  inputData,
+                  outputData,
                   duration: phase.processMetrics?.duration,
                   tokens: phase.processMetrics?.tokens,
                   model: phase.processMetrics?.model,
