@@ -360,6 +360,7 @@ export type Database = {
           completed_at: string | null
           content_strategy: string | null
           course_description: string | null
+          course_size: string | null
           course_structure: Json | null
           created_at: string | null
           difficulty: string | null
@@ -419,6 +420,7 @@ export type Database = {
           completed_at?: string | null
           content_strategy?: string | null
           course_description?: string | null
+          course_size?: string | null
           course_structure?: Json | null
           created_at?: string | null
           difficulty?: string | null
@@ -478,6 +480,7 @@ export type Database = {
           completed_at?: string | null
           content_strategy?: string | null
           course_description?: string | null
+          course_size?: string | null
           course_structure?: Json | null
           created_at?: string | null
           difficulty?: string | null
@@ -3470,4 +3473,3 @@ export const Constants = {
     },
   },
 } as const
-

@@ -1,4 +1,5 @@
 import { z } from 'zod'
+import { courseSizeSchema } from '@megacampus/shared-types'
 
 export const formSchema = z.object({
   topic: z.string().min(3, 'Тема должна содержать минимум 3 символа').max(200),
@@ -50,6 +51,7 @@ export const formSchema = z.object({
       'pl',
     ])
     .optional(),
+  courseSize: courseSizeSchema.optional(),
   targetAudience: z.string().optional(),
   estimatedLessons: z
     .number()

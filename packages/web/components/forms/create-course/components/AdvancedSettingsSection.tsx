@@ -3,6 +3,7 @@ import { useFormContext } from 'react-hook-form'
 import { motion } from 'framer-motion'
 import { Settings2, ChevronDown, Users, Target } from 'lucide-react'
 import { type FormData } from '../_schemas/form-schema'
+import { CourseSizeSelector } from './CourseSizeSelector'
 
 export function AdvancedSettingsSection() {
   const {
@@ -57,6 +58,12 @@ export function AdvancedSettingsSection() {
         className="overflow-hidden"
       >
         <div className="p-6 pt-4 md:p-8 md:pt-6">
+          {/* Course Size Selector */}
+          <CourseSizeSelector />
+
+          {/* Separator */}
+          <div className="mb-6 border-t border-slate-200 dark:border-white/10" />
+
           <div className="grid grid-cols-1 gap-6 md:grid-cols-2">
             {/* Целевая аудитория */}
             <div>
