@@ -389,8 +389,8 @@ async function triggerLessonEnrichment(
       enrichmentType,
       lessonId,
       courseId,
-      userId: userId!,
-      organizationId: organizationId!,
+      userId: userId,
+      organizationId: organizationId,
       retryAttempt: 0,
     };
 
@@ -651,8 +651,8 @@ export async function triggerCourseCard(params: {
       enrichmentType: 'card',
       lessonId: firstLesson.id,
       courseId,
-      userId: userId!,
-      organizationId: organizationId!,
+      userId: userId,
+      organizationId: organizationId,
       settings: { isCourseCard: true },
       retryAttempt: 0,
     };

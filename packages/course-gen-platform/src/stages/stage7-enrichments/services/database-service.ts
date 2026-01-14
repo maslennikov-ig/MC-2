@@ -8,7 +8,11 @@
 
 import { getSupabaseAdmin } from '@/shared/supabase/admin';
 import { logger } from '@/shared/logger';
-import type { EnrichmentStatus, EnrichmentContent, EnrichmentMetadata } from '@megacampus/shared-types';
+import type {
+  EnrichmentStatus,
+  EnrichmentContent,
+  EnrichmentMetadata,
+} from '@megacampus/shared-types';
 import type { EnrichmentWithContext } from '../types';
 
 /**
@@ -17,9 +21,7 @@ import type { EnrichmentWithContext } from '../types';
  * @param enrichmentId - Enrichment UUID
  * @returns Enrichment with context or null if not found
  */
-export async function getEnrichment(
-  enrichmentId: string
-): Promise<EnrichmentWithContext | null> {
+export async function getEnrichment(enrichmentId: string): Promise<EnrichmentWithContext | null> {
   const supabaseAdmin = getSupabaseAdmin();
 
   try {
@@ -31,10 +33,7 @@ export async function getEnrichment(
       .single();
 
     if (enrichmentError || !enrichment) {
-      logger.warn(
-        { enrichmentId, error: enrichmentError?.message },
-        'Enrichment not found'
-      );
+      logger.warn({ enrichmentId, error: enrichmentError?.message }, 'Enrichment not found');
       return null;
     }
 
@@ -110,7 +109,7 @@ export async function getEnrichment(
         title: lesson.title,
         content: lessonContent,
         course_id: enrichment.course_id, // Use from enrichment (denormalized)
-        objectives: (lesson.objectives as string[] | null) ?? null,
+        objectives: lesson.objectives ?? null,
       },
       course: {
         id: course.id,
@@ -228,10 +227,7 @@ export async function saveEnrichmentContent(
       .eq('id', enrichmentId);
 
     if (error) {
-      logger.error(
-        { enrichmentId, error: error.message },
-        'Failed to save enrichment content'
-      );
+      logger.error({ enrichmentId, error: error.message }, 'Failed to save enrichment content');
       throw error;
     }
 
@@ -262,10 +258,7 @@ export async function saveEnrichmentContent(
  * @param enrichmentId - Enrichment UUID
  * @param assetId - Supabase Storage asset UUID
  */
-export async function linkEnrichmentAsset(
-  enrichmentId: string,
-  assetId: string
-): Promise<void> {
+export async function linkEnrichmentAsset(enrichmentId: string, assetId: string): Promise<void> {
   const supabaseAdmin = getSupabaseAdmin();
 
   try {
@@ -305,9 +298,7 @@ export async function linkEnrichmentAsset(
  * @param enrichmentId - Enrichment UUID
  * @returns New attempt count
  */
-export async function incrementGenerationAttempt(
-  enrichmentId: string
-): Promise<number> {
+export async function incrementGenerationAttempt(enrichmentId: string): Promise<number> {
   const supabaseAdmin = getSupabaseAdmin();
 
   try {
@@ -345,10 +336,7 @@ export async function incrementGenerationAttempt(
       throw updateError;
     }
 
-    logger.debug(
-      { enrichmentId, attempt: newAttempt },
-      'Generation attempt incremented'
-    );
+    logger.debug({ enrichmentId, attempt: newAttempt }, 'Generation attempt incremented');
 
     return newAttempt;
   } catch (error) {
@@ -389,10 +377,7 @@ export async function saveDraftContent(
       .eq('id', enrichmentId);
 
     if (error) {
-      logger.error(
-        { enrichmentId, error: error.message },
-        'Failed to save draft content'
-      );
+      logger.error({ enrichmentId, error: error.message }, 'Failed to save draft content');
       throw error;
     }
 

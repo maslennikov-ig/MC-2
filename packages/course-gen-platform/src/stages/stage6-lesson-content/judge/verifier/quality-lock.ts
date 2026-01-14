@@ -83,18 +83,17 @@ export function checkQualityLocks(
 export function calculateUniversalReadability(text: string): UniversalReadabilityMetrics {
   // Split into sentences (handle multiple languages)
   // Matches periods, exclamation marks, question marks (Latin and Cyrillic)
-  const sentences = text.split(/[.!?。！？]+/).filter((s) => s.trim().length > 0);
+  const sentences = text.split(/[.!?。！？]+/).filter(s => s.trim().length > 0);
 
   // Split into words
-  const words = text.split(/\s+/).filter((w) => w.length > 0);
+  const words = text.split(/\s+/).filter(w => w.length > 0);
 
   // Split into paragraphs (double newline separation)
-  const paragraphs = text.split(/\n\n+/).filter((p) => p.trim().length > 0);
+  const paragraphs = text.split(/\n\n+/).filter(p => p.trim().length > 0);
 
   return {
     avgSentenceLength: words.length / Math.max(1, sentences.length),
-    avgWordLength:
-      words.reduce((sum, w) => sum + w.length, 0) / Math.max(1, words.length),
+    avgWordLength: words.reduce((sum, w) => sum + w.length, 0) / Math.max(1, words.length),
     paragraphBreakRatio: paragraphs.length / Math.max(1, sentences.length),
   };
 }
@@ -154,7 +153,7 @@ export function initializeQualityLocks(
 ): Record<string, number> {
   const locks: Record<string, number> = {};
 
-  for (const [criterion, score] of Object.entries(scores) as [string, number][]) {
+  for (const [criterion, score] of Object.entries(scores)) {
     if (score >= threshold) {
       locks[criterion] = score;
     }

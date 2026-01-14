@@ -120,7 +120,7 @@ export abstract class BaseJobHandler<T extends JobData = JobData> {
    */
   async process(job: Job<T>): Promise<JobResult> {
     const startTime = Date.now();
-    const { courseId, userId, locale = 'ru' } = job.data as JobData;
+    const { courseId, userId, locale = 'ru' } = job.data;
     const jobLogger = logger.child({
       jobId: job.id,
       jobType: this.jobType,
@@ -129,10 +129,13 @@ export abstract class BaseJobHandler<T extends JobData = JobData> {
       userId,
     });
 
-    jobLogger.info({
-      attemptsMade: job.attemptsMade,
-      attemptsMax: job.opts.attempts,
-    }, 'Job processing started');
+    jobLogger.info(
+      {
+        attemptsMade: job.attemptsMade,
+        attemptsMax: job.opts.attempts,
+      },
+      'Job processing started'
+    );
 
     metricsStore.recordJobStart(this.jobType);
 
@@ -166,10 +169,13 @@ export abstract class BaseJobHandler<T extends JobData = JobData> {
 
       if (result.success) {
         metricsStore.recordJobSuccess(this.jobType, duration);
-        jobLogger.info({
-          duration,
-          message: result.message,
-        }, 'Job completed successfully');
+        jobLogger.info(
+          {
+            duration,
+            message: result.message,
+          },
+          'Job completed successfully'
+        );
 
         // T021: Update course progress to 'completed' on success
         if (stepId && stepId > 1) {
@@ -186,11 +192,14 @@ export abstract class BaseJobHandler<T extends JobData = JobData> {
         }
       } else {
         metricsStore.recordJobFailure(this.jobType, duration);
-        jobLogger.warn({
-          duration,
-          message: result.message,
-          error: result.error,
-        }, 'Job completed with failure');
+        jobLogger.warn(
+          {
+            duration,
+            message: result.message,
+            error: result.error,
+          },
+          'Job completed with failure'
+        );
 
         // T021: Update course progress to 'failed' on failure
         if (stepId && stepId > 1) {
@@ -218,12 +227,15 @@ export abstract class BaseJobHandler<T extends JobData = JobData> {
       const duration = Date.now() - startTime;
       metricsStore.recordJobFailure(this.jobType, duration);
 
-      jobLogger.error({
-        duration,
-        error,
-        attemptsMade: job.attemptsMade,
-        attemptsMax: job.opts.attempts,
-      }, 'Job processing failed');
+      jobLogger.error(
+        {
+          duration,
+          error,
+          attemptsMade: job.attemptsMade,
+          attemptsMax: job.opts.attempts,
+        },
+        'Job processing failed'
+      );
 
       // T021: Update course progress to 'failed' on exception
       const stepId = JOB_TYPE_TO_STEP[this.jobType];
@@ -244,9 +256,12 @@ export abstract class BaseJobHandler<T extends JobData = JobData> {
             }
           );
         } catch (progressError) {
-          jobLogger.error({
-            error: progressError,
-          }, 'Failed to update course progress on error');
+          jobLogger.error(
+            {
+              error: progressError,
+            },
+            'Failed to update course progress on error'
+          );
         }
       }
 
@@ -411,7 +426,11 @@ export abstract class BaseJobHandler<T extends JobData = JobData> {
    * @param {Logger} jobLogger - Logger instance with job context
    * @returns {Promise<void>}
    */
-  private async checkAndRecoverStep1(job: Job<T>, supabase: SupabaseClient<Database>, jobLogger: Logger): Promise<void> {
+  private async checkAndRecoverStep1(
+    job: Job<T>,
+    supabase: SupabaseClient<Database>,
+    jobLogger: Logger
+  ): Promise<void> {
     const { courseId, userId } = job.data;
 
     try {
@@ -429,7 +448,7 @@ export abstract class BaseJobHandler<T extends JobData = JobData> {
 
       const progress = course?.generation_progress as Record<string, unknown> | null;
       const steps = progress?.steps as Array<{ id: number; status: string }> | undefined;
-      const step1 = steps?.find((s) => s.id === 1);
+      const step1 = steps?.find(s => s.id === 1);
 
       // Check if step 1 is orphaned (status !== 'completed')
       if (!step1 || step1.status !== 'completed') {

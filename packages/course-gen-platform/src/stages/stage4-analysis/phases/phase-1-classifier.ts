@@ -52,7 +52,6 @@ export interface Phase1Input {
   lesson_duration_minutes?: number;
 }
 
-
 /**
  * Builds the classification prompt for Phase 1
  *
@@ -67,9 +66,11 @@ function buildClassificationPrompt(input: Phase1Input): [SystemMessage, HumanMes
   const schemaDescription = zodToPromptSchema(Phase1OutputSchema);
 
   // Determine output language based on course language
-  const outputLanguage = input.language === 'en' ? 'English' : input.language === 'ru' ? 'Russian' : input.language;
+  const outputLanguage =
+    input.language === 'en' ? 'English' : input.language === 'ru' ? 'Russian' : input.language;
 
-  const systemMessage = new SystemMessage(`You are an expert curriculum architect with 15+ years of experience in adult education (andragogy).
+  const systemMessage =
+    new SystemMessage(`You are an expert curriculum architect with 15+ years of experience in adult education (andragogy).
 
 Your task is to analyze course topics and classify them into one of 6 categories, generate contextual motivational language, and perform topic analysis.
 
@@ -126,7 +127,10 @@ ${contextualLanguageSection}`);
 
     documentContext = '\n\nDOCUMENT SUMMARIES (from Stage 3 processing, truncated for context):\n';
     documentContext += input.document_summaries
-      .map((doc, index) => `[Document ${index + 1}: ${doc.file_name}]\n${truncateContent(doc.processed_content, tokensPerDocument)}`)
+      .map(
+        (doc, index) =>
+          `[Document ${index + 1}: ${doc.file_name}]\n${truncateContent(doc.processed_content, tokensPerDocument)}`
+      )
       .join('\n\n');
   }
 
@@ -180,7 +184,9 @@ export async function runPhase1Classification(input: Phase1Input): Promise<Phase
       const rawOutput = response.content as string;
 
       // Store trace data for orchestrator to log
-      const promptText = promptMessages.map(m => `${m._getType().toUpperCase()}:\n${m.content}`).join('\n\n');
+      const promptText = promptMessages
+        .map(m => `${m._getType().toUpperCase()}:\n${m.content}`)
+        .join('\n\n');
       storeTraceData(courseId, 'stage_4_classification', {
         promptText,
         completionText: rawOutput,
@@ -203,8 +209,14 @@ export async function runPhase1Classification(input: Phase1Input): Promise<Phase
         preprocessedOutput = JSON.stringify(preprocessed);
       } catch (error) {
         // If preprocessing fails, continue with stripped output (UnifiedRegenerator will handle)
-        console.warn('[Phase 1] Preprocessing JSON parse failed, continuing with stripped output:', error);
-        console.warn('[Phase 1] Stripped output preview (first 1000 chars):', preprocessedOutput.substring(0, 1000));
+        console.warn(
+          '[Phase 1] Preprocessing JSON parse failed, continuing with stripped output:',
+          error
+        );
+        console.warn(
+          '[Phase 1] Stripped output preview (first 1000 chars):',
+          preprocessedOutput.substring(0, 1000)
+        );
       }
 
       // Extract core schema (without phase_metadata)
@@ -212,7 +224,13 @@ export async function runPhase1Classification(input: Phase1Input): Promise<Phase
 
       // Setup UnifiedRegenerator with all 5 layers + structure normalizer + warning fallback
       const regenerator = new UnifiedRegenerator<Omit<Phase1Output, 'phase_metadata'>>({
-        enabledLayers: ['auto-repair', 'critique-revise', 'partial-regen', 'model-escalation', 'emergency'],
+        enabledLayers: [
+          'auto-repair',
+          'critique-revise',
+          'partial-regen',
+          'model-escalation',
+          'emergency',
+        ],
         maxRetries: 3,
         stage: 'analyze',
         courseId,
@@ -241,7 +259,7 @@ export async function runPhase1Classification(input: Phase1Input): Promise<Phase
       }
 
       // Data is now properly normalized by structure normalizer + validated by Zod in Layer 1
-      const data = regenResult.data as Omit<Phase1Output, 'phase_metadata'>;
+      const data = regenResult.data;
 
       // Completed via ${regenResult.metadata.layerUsed} - observability tracked by UnifiedRegenerator
 
@@ -264,7 +282,7 @@ export async function runPhase1Classification(input: Phase1Input): Promise<Phase
 
       // Construct complete output with metadata
       const output: Phase1Output = {
-        ...(data as Omit<Phase1Output, 'phase_metadata'>),
+        ...data,
         phase_metadata: {
           duration_ms: endTime - startTime,
           model_used: regenResult.metadata.modelsUsed?.join(' → ') || modelId,
@@ -298,10 +316,7 @@ export async function runPhase1Classification(input: Phase1Input): Promise<Phase
  * @param qualityScore - Semantic similarity score (0-1)
  * @returns Updated Phase1Output with quality score
  */
-export function updatePhase1QualityScore(
-  output: Phase1Output,
-  qualityScore: number
-): Phase1Output {
+export function updatePhase1QualityScore(output: Phase1Output, qualityScore: number): Phase1Output {
   return {
     ...output,
     phase_metadata: {
