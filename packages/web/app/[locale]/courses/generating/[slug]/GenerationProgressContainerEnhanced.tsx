@@ -864,6 +864,7 @@ export default function GenerationProgressContainerEnhanced({
         generationProgress={state.progress}
         generationStatus={state.status}
         isRealtimeConnected={state.isConnected}
+        readOnly={generationMode === 'automatic'}
       />
 
       {/* Success Overlay Animation */}

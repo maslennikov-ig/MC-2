@@ -710,6 +710,8 @@ export interface StaticGraphData {
     tier?: 'trial' | 'free' | 'basic' | 'standard' | 'premium';
     /** Visual style for course imagery (generated in Stage 4) */
     visualStyle?: VisualStyle | null;
+    /** Read-only mode for automatic generation (hides edit/regenerate/approve buttons) */
+    readOnly?: boolean;
   };
 }
 
