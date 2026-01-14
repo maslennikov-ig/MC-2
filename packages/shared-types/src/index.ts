@@ -82,3 +82,6 @@ export * from './invitation-constants';
 
 // Cost Preview (Automatic Generation Mode)
 export * from './cost-preview';
+
+// Course Size Presets (Advisory parameters for LLM)
+export * from './course-size';

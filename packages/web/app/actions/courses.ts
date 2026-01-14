@@ -3,7 +3,7 @@
 import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { z } from 'zod'
-import { DocumentPriorityLevelSchema } from '@megacampus/shared-types'
+import { DocumentPriorityLevelSchema, courseSizeSchema } from '@megacampus/shared-types'
 import { extractDocumentUUID } from '@/lib/generation-graph/utils'
 import crypto from 'crypto'
 import { CreateCourseResponse, CreateCourseError, GenerationStep } from '@/types/course-generation'
@@ -27,6 +27,7 @@ const courseSchema = z.object({
     .default(['text']),
   estimated_lessons: z.number().min(10).max(100).optional(),
   estimated_sections: z.number().min(3).max(30).optional(),
+  course_size: courseSizeSchema.optional(),
   lesson_duration_minutes: z.number().min(3).max(45).optional().default(15),
   content_strategy: z
     .enum(['auto', 'create_from_scratch', 'expand_and_enhance'])
@@ -449,6 +450,7 @@ export async function updateDraftAndStartGeneration(
       estimated_sections: formData.get('estimated_sections')
         ? parseInt(formData.get('estimated_sections') as string)
         : undefined,
+      course_size: formData.get('course_size') || undefined,
       lesson_duration_minutes: formData.get('lesson_duration_minutes')
         ? parseInt(formData.get('lesson_duration_minutes') as string)
         : undefined,
@@ -511,6 +513,7 @@ export async function updateDraftAndStartGeneration(
         output_formats: validatedData.output_formats || ['text'],
         estimated_lessons: validatedData.estimated_lessons || null,
         estimated_sections: validatedData.estimated_sections || null,
+        course_size: validatedData.course_size || null,
         content_strategy: validatedData.content_strategy || 'auto',
         prerequisites: validatedData.prerequisites || null,
         learning_outcomes: validatedData.learning_outcomes || null,

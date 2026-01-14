@@ -19,6 +19,7 @@
 import { Job } from 'bullmq';
 import type { StructureAnalysisJobData } from '@megacampus/shared-types';
 import type { AnalysisResult } from '@megacampus/shared-types/analysis-result';
+import { COURSE_SIZE_PRESETS, type CourseSize } from '@megacampus/shared-types';
 import logger from '../../shared/logger';
 import { getSupabaseAdmin } from '../../shared/supabase/admin';
 import { runAnalysisOrchestration } from './orchestrator';
@@ -304,10 +305,10 @@ class Stage4AnalysisHandler {
       // =================================================================
       jobLogger.info('Fetching course data from database for analysis input');
 
-      // Fetch course metadata
+      // Fetch course metadata (including course_size for size preset guidance)
       const { data: courseForInput, error: courseInputError } = await supabaseForValidation
         .from('courses')
-        .select('title, language, style, difficulty, settings')
+        .select('title, language, style, difficulty, settings, course_size')
         .eq('id', course_id)
         .single();
 
@@ -378,6 +379,10 @@ class Stage4AnalysisHandler {
       // If it's already a 2-char code, use it; otherwise convert from name
       const language = rawLang.length === 2 ? rawLang : languageNameToCode[rawLang] || 'ru';
 
+      // Extract course_size preset (advisory guidance for LLM)
+      const courseSize = courseForInput.course_size as CourseSize | null;
+      const sizePreset = courseSize ? COURSE_SIZE_PRESETS[courseSize] : null;
+
       // Build StructureAnalysisInput for orchestrator
       const analysisInput: import('@megacampus/shared-types').StructureAnalysisInput = {
         topic: courseForInput.title || 'Course Topic',
@@ -387,6 +392,11 @@ class Stage4AnalysisHandler {
         difficulty: courseForInput.difficulty || 'intermediate',
         lesson_duration_minutes: lessonDuration,
         document_summaries: documentSummaries,
+        // Course size fields (advisory - LLM may deviate if needed)
+        course_size: courseSize || undefined,
+        target_lessons: sizePreset?.targetLessons,
+        target_sections: sizePreset?.targetSections,
+        size_guidance: sizePreset?.llmGuidance,
       };
 
       jobLogger.info(
