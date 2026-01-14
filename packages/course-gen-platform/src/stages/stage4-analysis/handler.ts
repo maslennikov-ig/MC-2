@@ -25,7 +25,7 @@ import { runAnalysisOrchestration } from './orchestrator';
 import { generationLockService } from '@/shared/locks';
 import { generateVisualStyle } from './utils/visual-style-generator';
 import { handleStageCompletion } from '../../shared/auto-approval';
-import { notifyStageComplete } from '../../shared/notifications';
+import { notifyStageComplete, notifyCourseError } from '../../shared/notifications';
 
 /**
  * Error details for STRUCTURE_ANALYSIS jobs
@@ -597,16 +597,34 @@ class Stage4AnalysisHandler {
         );
 
         // Handle stage completion separately (auto-approve if automatic mode)
-        const { autoApproved } = await handleStageCompletion(course_id, 4);
+        try {
+          const { autoApproved } = await handleStageCompletion(course_id, 4);
 
-        if (autoApproved) {
-          jobLogger.info({ courseId: course_id }, 'Stage 4 auto-approved, proceeding to Stage 5');
-        } else {
-          jobLogger.info({ courseId: course_id }, 'Stage 4 awaiting approval');
+          if (autoApproved) {
+            jobLogger.info({ courseId: course_id }, 'Stage 4 auto-approved, proceeding to Stage 5');
+          } else {
+            jobLogger.info({ courseId: course_id }, 'Stage 4 awaiting approval');
+          }
+
+          // Send stage completion notification (if enabled)
+          await notifyStageComplete(course_id, 4);
+        } catch (stageError) {
+          jobLogger.error(
+            {
+              courseId: course_id,
+              error: stageError instanceof Error ? stageError.message : String(stageError),
+            },
+            'Failed to handle stage completion for Stage 4'
+          );
+          // Notify user about the error
+          try {
+            await notifyCourseError(course_id, 4, 'Auto-approval failed');
+          } catch (notifyErr) {
+            jobLogger.warn({ courseId: course_id }, 'Failed to send error notification');
+          }
+          // Re-throw to mark job as failed
+          throw stageError;
         }
-
-        // Send stage completion notification (if enabled)
-        await notifyStageComplete(course_id, 4);
 
         // =================================================================
         // STEP 3: Calculate Final Metrics

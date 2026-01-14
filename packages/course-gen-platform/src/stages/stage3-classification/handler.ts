@@ -21,7 +21,7 @@ import { BaseJobHandler, JobResult } from '../../orchestrator/handlers/base-hand
 import { DocumentClassificationJobData, JobType } from '@megacampus/shared-types';
 import { getSupabaseAdmin } from '../../shared/supabase/admin';
 import { handleStageCompletion } from '../../shared/auto-approval';
-import { notifyStageComplete } from '../../shared/notifications';
+import { notifyStageComplete, notifyCourseError } from '../../shared/notifications';
 
 /**
  * Stage 3 Classification Job Handler
@@ -88,16 +88,31 @@ export class Stage3ClassificationHandler extends BaseJobHandler<DocumentClassifi
       });
 
       // Handle stage completion with automatic mode support
-      const { autoApproved } = await handleStageCompletion(courseId, 3);
+      try {
+        const { autoApproved } = await handleStageCompletion(courseId, 3);
 
-      if (!autoApproved) {
-        this.log(job, 'info', 'Course status updated to stage_3_awaiting_approval', { courseId });
-      } else {
-        this.log(job, 'info', 'Stage 3 auto-approved, proceeding to Stage 4', { courseId });
+        if (!autoApproved) {
+          this.log(job, 'info', 'Course status updated to stage_3_awaiting_approval', { courseId });
+        } else {
+          this.log(job, 'info', 'Stage 3 auto-approved, proceeding to Stage 4', { courseId });
+        }
+
+        // Send stage completion notification (if enabled)
+        await notifyStageComplete(courseId, 3);
+      } catch (stageError) {
+        this.log(job, 'error', 'Failed to handle stage completion for Stage 3', {
+          courseId,
+          error: stageError instanceof Error ? stageError.message : String(stageError),
+        });
+        // Notify user about the error
+        try {
+          await notifyCourseError(courseId, 3, 'Auto-approval failed');
+        } catch (notifyErr) {
+          this.log(job, 'warn', 'Failed to send error notification', { courseId });
+        }
+        // Re-throw to mark job as failed
+        throw stageError;
       }
-
-      // Send stage completion notification (if enabled)
-      await notifyStageComplete(courseId, 3);
 
       return {
         success: true,
