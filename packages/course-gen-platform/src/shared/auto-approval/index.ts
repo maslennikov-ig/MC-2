@@ -95,7 +95,32 @@ export async function handleStageCompletion(
     .eq('id', courseId);
 
   // Queue next stage job based on stage number
-  await queueNextStageJob(courseId, nextStage, course);
+  try {
+    await queueNextStageJob(courseId, nextStage, course);
+  } catch (queueError) {
+    // Rollback status on job queueing failure
+    const rollbackStatus = `stage_${currentStage}_complete`;
+    logger.error(
+      {
+        courseId,
+        nextStage,
+        error: queueError instanceof Error ? queueError.message : String(queueError),
+      },
+      'Failed to queue next stage job, rolling back status'
+    );
+
+    await db
+      .from('courses')
+      .update({
+        generation_status: rollbackStatus as any,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', courseId);
+
+    throw new Error(
+      `Failed to queue stage ${nextStage}: ${queueError instanceof Error ? queueError.message : String(queueError)}`
+    );
+  }
 
   logger.info({ courseId, currentStage, nextStage }, 'Stage auto-approved, next stage queued');
   return { autoApproved: true, nextStage };

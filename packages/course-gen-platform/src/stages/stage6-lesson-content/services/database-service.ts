@@ -555,8 +555,18 @@ export async function checkAndSetStage6Complete(courseId: string): Promise<void>
           'All lessons generated - course status updated to stage_6_complete'
         );
 
-        // Send completion notifications for automatic mode
-        await notifyCourseCompletion(courseId);
+        // Send completion notifications for automatic mode (non-blocking)
+        try {
+          await notifyCourseCompletion(courseId);
+        } catch (notifyError) {
+          logger.warn(
+            {
+              courseId,
+              error: notifyError instanceof Error ? notifyError.message : String(notifyError),
+            },
+            'Failed to send completion notifications (non-fatal)'
+          );
+        }
       }
     }
   } catch (error) {
