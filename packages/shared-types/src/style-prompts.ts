@@ -28,14 +28,6 @@ export const COURSE_STYLES = [
   'technical',
   'research',
   'gamified',
-  // Additional styles
-  'engaging',
-  'visual',
-  'minimalist',
-  'microlearning',
-  'socratic',
-  'collaborative',
-  'inspirational',
 ] as const;
 
 export type CourseStyle = (typeof COURSE_STYLES)[number];
@@ -82,27 +74,6 @@ export const STYLE_PROMPTS: Record<CourseStyle, string> = {
 
   gamified:
     "Transform learning into an adventure game. Frame content as quests, missions, and challenges to complete. Use gaming language: 'Level up your skills', 'Achievement unlocked', 'Boss battle ahead'. Create sense of progression with experience points and skill trees. Make failure fun with 'Game Over - Try Again!' attitude.",
-
-  engaging:
-    'Create vibrant, captivating content that hooks readers from the first sentence. Use surprising facts, intriguing questions, and unexpected connections. Include memorable anecdotes and fascinating examples. Maintain high energy throughout with varied pacing and dynamic transitions. Make every paragraph feel like a discovery.',
-
-  visual:
-    'Paint vivid mental pictures through rich descriptions and powerful metaphors. Help readers visualize abstract concepts through concrete imagery. Use sensory language that engages imagination. Structure information spatially with clear visual hierarchies. Describe processes as visual flows and transformations.',
-
-  minimalist:
-    'Distill everything to essential elements. One idea per paragraph. Short sentences. No filler words. Present facts directly without elaboration. Use bullet points and numbered lists. White space is your friend. Every word must earn its place. Remove anything that does not directly serve comprehension.',
-
-  microlearning:
-    'Break content into bite-sized modules of 3-5 minutes each. Start each module with a clear learning objective. End with immediate takeaway or action item. Use frequent knowledge checks. Design for mobile consumption. Enable non-linear navigation between modules. Optimize for interrupted learning sessions.',
-
-  socratic:
-    "Lead learners to discover answers through carefully crafted questions. Never give direct answers when a question can guide to insight. Build understanding through dialogue: pose question, acknowledge response, follow up. Challenge assumptions gently: 'What makes you think so?' Celebrate moments of discovery.",
-
-  collaborative:
-    'Design content for team learning and peer discussion. Include discussion prompts for group exploration. Suggest pair activities and team exercises. Reference diverse perspectives and experiences. Create opportunities for knowledge sharing. Build in reflection points for collective sense-making.',
-
-  inspirational:
-    'Connect learning to meaningful purpose and personal growth. Share stories of transformation and breakthrough moments. Highlight real people who mastered these skills. Frame challenges as stepping stones to achievement. Remind learners of their potential. End sections with motivating calls to action.',
 };
 
 // ============================================================================
