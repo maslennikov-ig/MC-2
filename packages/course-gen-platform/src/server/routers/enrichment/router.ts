@@ -46,6 +46,8 @@ import { approveCoverDraft } from './procedures/approve-cover-draft';
 import { createBatch } from './procedures/create-batch';
 import { getAutoCard } from './procedures/get-auto-card';
 import { regenerateAutoCard } from './procedures/regenerate-auto-card';
+import { generateOnDemand } from './procedures/generate-on-demand';
+import { getGenerationStatus } from './procedures/get-generation-status';
 
 /**
  * Enrichment router
@@ -69,6 +71,10 @@ import { regenerateAutoCard } from './procedures/regenerate-auto-card';
  * - regenerateDraft: Regenerate draft phase
  * - updateDraft: Update draft content before final generation
  * - approveDraft: Approve draft and trigger final generation
+ *
+ * ## On-Demand Generation (Course Viewer UI)
+ * - generateOnDemand: Create and queue enrichment for on-demand generation
+ * - getGenerationStatus: Poll generation progress for UI display
  */
 export const enrichmentRouter = router({
   /**
@@ -160,6 +166,18 @@ export const enrichmentRouter = router({
    * @see procedures/regenerate-auto-card.ts
    */
   regenerateAutoCard,
+
+  /**
+   * Generate on-demand enrichment from course viewer UI
+   * @see procedures/generate-on-demand.ts
+   */
+  generateOnDemand,
+
+  /**
+   * Get generation status for UI polling
+   * @see procedures/get-generation-status.ts
+   */
+  getGenerationStatus,
 });
 
 /**

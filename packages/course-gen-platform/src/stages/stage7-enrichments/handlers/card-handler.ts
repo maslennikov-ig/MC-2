@@ -23,6 +23,7 @@ import {
   base64ToBuffer,
   convertToWebP,
 } from '../services/image-generation-service';
+import { getLessonContent } from '../services/database-service';
 
 // ============================================================================
 // CONFIGURATION
@@ -95,7 +96,7 @@ async function retryWithBackoff<T>(
     }
   }
 
-  throw lastError;
+  throw lastError instanceof Error ? lastError : new Error(String(lastError));
 }
 
 /**
@@ -208,9 +209,7 @@ function extractLessonObjectives(lessonContent: string | null): string[] {
     const objectivesText = objectivesMatch[1];
     const bullets = objectivesText.match(/[-*]\s+(.+)/g);
     if (bullets && bullets.length > 0) {
-      return bullets
-        .map((b) => b.replace(/^[-*]\s+/, '').trim())
-        .slice(0, 5);
+      return bullets.map(b => b.replace(/^[-*]\s+/, '').trim()).slice(0, 5);
     }
   }
 
@@ -218,8 +217,8 @@ function extractLessonObjectives(lessonContent: string | null): string[] {
   const sections = lessonContent.match(/^## (.+)$/gm);
   if (sections && sections.length > 0) {
     return sections
-      .map((s) => s.replace(/^## /, '').trim())
-      .filter((s) => !s.match(/introduction|summary|conclusion|references|цели|итоги/i))
+      .map(s => s.replace(/^## /, '').trim())
+      .filter(s => !s.match(/introduction|summary|conclusion|references|цели|итоги/i))
       .slice(0, 3);
   }
 
@@ -261,13 +260,18 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
   // Determine if this is a course card or lesson card
   // Use explicit markers as source of truth, remove overly broad conditions
   const isCourseCard =
-    enrichment.title === 'course-card' ||
-    enrichment.settings?.isCourseCard === true;
+    enrichment.title === 'course-card' || enrichment.settings?.isCourseCard === true;
+
+  // Fetch lesson content from lesson_contents table (for lesson cards)
+  let lessonContent: string | null = null;
+  if (!isCourseCard) {
+    lessonContent = await getLessonContent(lesson.id);
+  }
 
   // Log debug if using fallback detection (not a warning - this is normal behavior)
-  if (!isCourseCard && (!lesson.content || lesson.id === 'course-level')) {
+  if (!isCourseCard && (!lessonContent || lesson.id === 'course-level')) {
     logger.debug(
-      { enrichmentId: enrichment.id, lessonId: lesson.id, hasContent: !!lesson.content },
+      { enrichmentId: enrichment.id, lessonId: lesson.id, hasContent: !!lessonContent },
       'Card enrichment for lesson without content - using lesson card prompt'
     );
   }
@@ -293,11 +297,12 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
     // Build appropriate prompt using database templates
     let imagePrompt: string;
     const language = course.language ?? 'en';
-    const languageContext = language === 'ru'
-      ? 'Russian educational content'
-      : language === 'en'
-        ? 'English educational content'
-        : `${language} educational content`;
+    const languageContext =
+      language === 'ru'
+        ? 'Russian educational content'
+        : language === 'en'
+          ? 'English educational content'
+          : `${language} educational content`;
 
     if (isCourseCard) {
       // Course card prompt from database
@@ -324,7 +329,7 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
       }
     } else {
       // Lesson card prompt from database
-      const lessonObjectives = extractLessonObjectives(lesson.content);
+      const lessonObjectives = extractLessonObjectives(lessonContent);
       const objectivesSummary = lessonObjectives.slice(0, 3).join('; ') || 'Key lesson concepts';
 
       try {
@@ -358,7 +363,11 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
         lessonId: lesson.id,
         promptLength: imagePrompt.length,
         isCourseCard,
-        visualStyleSource: course.visual_style ? 'visual_style' : (course.settings?.visual_style ? 'settings' : 'default'),
+        visualStyleSource: course.visual_style
+          ? 'visual_style'
+          : course.settings?.visual_style
+            ? 'settings'
+            : 'default',
       },
       'Card handler: prompt built'
     );
@@ -400,23 +409,25 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
       ? `${course.id}/card.webp`
       : `${course.id}/${lesson.id}/${enrichment.id}.webp`;
 
-    await retryWithBackoff(async () => {
-      const { error: uploadError } = await supabase.storage
-        .from(STORAGE_BUCKET)
-        .upload(storagePath, webpResult.buffer, {
-          contentType: 'image/webp',
-          upsert: true,
-        });
+    await retryWithBackoff(
+      async () => {
+        const { error: uploadError } = await supabase.storage
+          .from(STORAGE_BUCKET)
+          .upload(storagePath, webpResult.buffer, {
+            contentType: 'image/webp',
+            upsert: true,
+          });
 
-      if (uploadError) {
-        throw new Error(`Failed to upload card: ${uploadError.message}`);
-      }
-    }, 3, 1000);
+        if (uploadError) {
+          throw new Error(`Failed to upload card: ${uploadError.message}`);
+        }
+      },
+      3,
+      1000
+    );
 
     // Get public URL
-    const { data: publicUrlData } = supabase.storage
-      .from(STORAGE_BUCKET)
-      .getPublicUrl(storagePath);
+    const { data: publicUrlData } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(storagePath);
 
     const imageUrl = publicUrlData.publicUrl;
 
@@ -439,7 +450,7 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
       imageUrl,
       altText: getLocalizedAltText(
         course.language ?? 'en',
-        isCourseCard ? course.title ?? 'Course' : lesson.title,
+        isCourseCard ? (course.title ?? 'Course') : lesson.title,
         !isCourseCard
       ),
       dimensions: {
@@ -475,7 +486,11 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
         durationMs,
         costUsd: imageCostUsd,
         cardType: isCourseCard ? 'course' : 'lesson',
-        visualStyleSource: course.visual_style ? 'visual_style' : (course.settings?.visual_style ? 'settings' : 'default'),
+        visualStyleSource: course.visual_style
+          ? 'visual_style'
+          : course.settings?.visual_style
+            ? 'settings'
+            : 'default',
       },
       'Card handler: card generation complete'
     );

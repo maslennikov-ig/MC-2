@@ -24,7 +24,10 @@ import {
   Clock,
   RefreshCw,
   ArrowRight,
-  Copy
+  Copy,
+  Pause,
+  Play,
+  Square
 } from 'lucide-react'
 import type { 
   GenerationProgress as GenerationProgressType, 
@@ -93,6 +96,13 @@ export function GenerationProgress({
   const [error, setError] = useState<string | null>(null)
   const [isConnected, setIsConnected] = useState(false)
   const [generationCode, setGenerationCode] = useState<string | null>(null)
+  // Initialize isPaused from database state (Issue #5 from code review)
+  const [isPaused, setIsPaused] = useState(
+    () => (initialProgress as any)?.generation_paused_at !== null &&
+          (initialProgress as any)?.generation_paused_at !== undefined
+  )
+  const [pauseLoading, setPauseLoading] = useState(false)
+  const [pauseResumeOperation, setPauseResumeOperation] = useState<'pausing' | 'resuming' | null>(null)
 
   // Calculate estimated time remaining
   const estimatedMinutesRemaining = Math.ceil(
@@ -105,14 +115,31 @@ export function GenerationProgress({
     const supabase = createClient()
     let channel: ReturnType<typeof supabase.channel> | null = null
     let pollingInterval: NodeJS.Timeout | null = null
+    let healthCheckInterval: NodeJS.Timeout | null = null
     let reconnectAttempts = 0
     let reconnectTimeout: NodeJS.Timeout | null = null
+    // Constants for timing (mc2-1w3: refactored magic numbers)
     const maxReconnectAttempts = 5
     const baseReconnectDelay = 1000 // 1 second
+    const maxReconnectDelay = 30000 // Max 30 seconds for reconnect backoff
+    const healthCheckIntervalMs = 30000 // 30 seconds
+    // Exponential backoff state for polling (Issue #4 mc2-o5k)
+    let lastStatus: CourseStatus | null = null
+    let pollDelay = 3000 // Start at 3 seconds
+    const minPollDelay = 3000
+    const maxPollDelay = 30000
+    const backoffMultiplier = 1.5
 
     const handleCourseUpdate = (payload: { new: Course }) => {
       logger.info('Realtime update received', { courseId, payload })
-      const updatedCourse = payload.new as Course
+      const updatedCourse = payload.new
+
+      // Sync pause state from database (Issue #5 from code review)
+      if ('generation_paused_at' in updatedCourse) {
+        const newIsPaused = updatedCourse.generation_paused_at !== null
+        setIsPaused(newIsPaused)
+        logger.info('Pause state synced', { courseId, isPaused: newIsPaused })
+      }
 
       // Update generation code if present
       if (updatedCourse.generation_code) {
@@ -179,6 +206,21 @@ export function GenerationProgress({
             if (status === 'SUBSCRIBED') {
               setIsConnected(true)
               reconnectAttempts = 0 // Reset reconnect counter on success
+
+              // Stop polling fallback when realtime is connected (prevents double load)
+              if (pollingInterval) {
+                clearTimeout(pollingInterval) // Changed from clearInterval to clearTimeout
+                pollingInterval = null
+                logger.info('Polling stopped - realtime connected', { courseId })
+              }
+
+              // Stop health check when realtime is connected (realtime will provide updates)
+              if (healthCheckInterval) {
+                clearInterval(healthCheckInterval)
+                healthCheckInterval = null
+                logger.info('Health check stopped - realtime connected', { courseId })
+              }
+
               logger.info('Realtime subscription established', { courseId, channelName })
             } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
               logger.warn('Realtime connection lost', { status, error: err, courseId })
@@ -205,7 +247,7 @@ export function GenerationProgress({
       }
 
       reconnectAttempts++
-      const delay = Math.min(baseReconnectDelay * Math.pow(2, reconnectAttempts - 1), 30000) // Max 30 seconds
+      const delay = Math.min(baseReconnectDelay * Math.pow(2, reconnectAttempts - 1), maxReconnectDelay)
 
       logger.info(`Attempting to reconnect in ${delay}ms`, { courseId, attempt: reconnectAttempts })
 
@@ -224,13 +266,13 @@ export function GenerationProgress({
       }, delay)
     }
 
-    // Fallback to polling if realtime fails
+    // Fallback to polling if realtime fails (with exponential backoff)
     const setupPollingFallback = () => {
       if (pollingInterval) return // Already polling
-      
+
       logger.info('Falling back to polling', { courseId })
-      
-      pollingInterval = setInterval(async () => {
+
+      const poll = async () => {
         try {
           const supabase = createClient()
           const { data, error } = await supabase
@@ -245,6 +287,20 @@ export function GenerationProgress({
           }
 
           if (data) {
+            const currentStatus = data.generation_status as CourseStatus
+
+            // Exponential backoff logic (Issue #4 mc2-o5k)
+            if (lastStatus === currentStatus) {
+              // Status unchanged - increase delay
+              pollDelay = Math.min(pollDelay * backoffMultiplier, maxPollDelay)
+              logger.debug('Status unchanged, increasing poll delay', { pollDelay, courseId })
+            } else {
+              // Status changed - reset to minimum delay
+              pollDelay = minPollDelay
+              logger.debug('Status changed, resetting poll delay', { lastStatus, currentStatus, courseId })
+            }
+            lastStatus = currentStatus
+
             if (data.generation_code) {
               setGenerationCode(data.generation_code)
             }
@@ -253,11 +309,11 @@ export function GenerationProgress({
             }
             if (data.generation_status) {
               setStatus(data.generation_status as CourseStatus)
-              
+
               // Stop polling if completed or failed
               if (['completed', 'failed', 'cancelled'].includes(data.generation_status || '')) {
                 if (pollingInterval) {
-                  clearInterval(pollingInterval)
+                  clearTimeout(pollingInterval) // Changed from clearInterval to clearTimeout
                   pollingInterval = null
                 }
 
@@ -270,20 +326,27 @@ export function GenerationProgress({
                   setError(data.error_message || 'Произошла ошибка')
                   toast.error(data.error_message || 'Произошла ошибка при создании курса')
                 }
+                return // Exit without scheduling next poll
               }
             }
           }
         } catch (err) {
           logger.error('Polling error', { error: err, courseId })
         }
-      }, 3000) // Poll every 3 seconds
+
+        // Schedule next poll with current delay
+        pollingInterval = setTimeout(poll, pollDelay) as any
+      }
+
+      // Start polling immediately
+      poll()
     }
 
     // Initial setup
     setupSubscription()
 
     // Also start a health check timer to verify status
-    const healthCheckInterval = setInterval(async () => {
+    healthCheckInterval = setInterval(async () => {
       if (status === 'completed' || status === 'failed' || status === 'cancelled') {
         return // No need to check if already finished
       }
@@ -309,7 +372,7 @@ export function GenerationProgress({
       } catch (err) {
         logger.error('Health check failed', { error: err, courseId })
       }
-    }, 30000) // Check every 30 seconds
+    }, healthCheckIntervalMs)
 
     // Cleanup
     return () => {
@@ -321,7 +384,7 @@ export function GenerationProgress({
         }
       }
       if (pollingInterval) {
-        clearInterval(pollingInterval)
+        clearTimeout(pollingInterval) // Changed from clearInterval to clearTimeout
       }
       if (healthCheckInterval) {
         clearInterval(healthCheckInterval)
@@ -355,6 +418,56 @@ export function GenerationProgress({
       toast.error('Произошла ошибка при отмене')
     }
   }, [courseId, router])
+
+  // Pause generation
+  const handlePause = useCallback(async () => {
+    setPauseLoading(true)
+    setPauseResumeOperation('pausing')
+    try {
+      const response = await fetch(`/api/courses/${slug}/pause`, {
+        method: 'POST'
+      })
+
+      if (response.ok) {
+        setIsPaused(true)
+        toast.success('Генерация приостановлена')
+      } else {
+        const data = await response.json()
+        toast.error(data.error || 'Не удалось приостановить генерацию')
+      }
+    } catch (err) {
+      logger.error('Failed to pause generation', { error: err })
+      toast.error('Произошла ошибка при приостановке')
+    } finally {
+      setPauseLoading(false)
+      setPauseResumeOperation(null)
+    }
+  }, [slug])
+
+  // Resume generation
+  const handleResume = useCallback(async () => {
+    setPauseLoading(true)
+    setPauseResumeOperation('resuming')
+    try {
+      const response = await fetch(`/api/courses/${slug}/resume`, {
+        method: 'POST'
+      })
+
+      if (response.ok) {
+        setIsPaused(false)
+        toast.success('Генерация возобновлена')
+      } else {
+        const data = await response.json()
+        toast.error(data.error || 'Не удалось возобновить генерацию')
+      }
+    } catch (err) {
+      logger.error('Failed to resume generation', { error: err })
+      toast.error('Произошла ошибка при возобновлении')
+    } finally {
+      setPauseLoading(false)
+      setPauseResumeOperation(null)
+    }
+  }, [slug])
 
   // Copy generation code to clipboard
   const handleCopyCode = useCallback(() => {
@@ -551,18 +664,71 @@ export function GenerationProgress({
             </motion.div>
           )}
           
+          {/* Loading indicator during pause/resume operations */}
+          {pauseResumeOperation && (
+            <Alert className="border-blue-200 bg-blue-50 dark:border-blue-800 dark:bg-blue-950">
+              <Loader2 className="h-4 w-4 text-blue-600 animate-spin" />
+              <AlertDescription className="text-blue-800 dark:text-blue-200">
+                {pauseResumeOperation === 'pausing' ? 'Приостановка генерации...' : 'Возобновление генерации...'}
+              </AlertDescription>
+            </Alert>
+          )}
+
           {/* Action buttons */}
-          <div className="flex justify-between items-center pt-4">
-            {(status === 'initializing' || status === 'processing_documents' || status === 'analyzing_task' || status === 'generating_structure') && progress.current_step <= 3 && (
+          <div className="flex justify-between items-center pt-4 gap-2">
+            {/* Pause/Resume buttons - shown during active content generation */}
+            {(status === 'generating_content' || status?.startsWith('stage_6_')) && !isPaused && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handlePause}
+                disabled={pauseLoading}
+              >
+                {pauseLoading ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Pause className="h-4 w-4 mr-2" />
+                )}
+                Приостановить
+              </Button>
+            )}
+
+            {isPaused && (
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handleResume}
+                disabled={pauseLoading}
+                className="border-green-500 text-green-600 hover:bg-green-50 dark:hover:bg-green-950"
+              >
+                {pauseLoading ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <Play className="h-4 w-4 mr-2" />
+                )}
+                Продолжить
+              </Button>
+            )}
+
+            {/* Cancel/Stop button - expanded to work during all active stages including Stage 6 */}
+            {(status === 'initializing' ||
+              status === 'processing_documents' ||
+              status === 'analyzing_task' ||
+              status === 'generating_structure' ||
+              status === 'generating_content' ||
+              status === 'finalizing' ||
+              status?.startsWith('stage_')) && (
               <Button
                 variant="outline"
                 size="sm"
                 onClick={handleCancel}
+                className="text-red-600 hover:text-red-700 hover:bg-red-50 dark:hover:bg-red-950"
               >
-                Отменить генерацию
+                <Square className="h-4 w-4 mr-2" />
+                Остановить
               </Button>
             )}
-            
+
             {status === 'failed' && (
               <Button
                 variant="outline"
@@ -573,7 +739,7 @@ export function GenerationProgress({
                 Попробовать снова
               </Button>
             )}
-            
+
             {isCourseReady && (
               <Button
                 className="ml-auto"
@@ -584,6 +750,16 @@ export function GenerationProgress({
               </Button>
             )}
           </div>
+
+          {/* Paused indicator */}
+          {isPaused && (
+            <Alert className="border-yellow-200 bg-yellow-50 dark:border-yellow-800 dark:bg-yellow-950 mt-4">
+              <Pause className="h-4 w-4 text-yellow-600" />
+              <AlertDescription className="text-yellow-800 dark:text-yellow-200">
+                Генерация приостановлена. Текущие задачи будут завершены, новые не начнутся.
+              </AlertDescription>
+            </Alert>
+          )}
         </CardContent>
       </Card>
       

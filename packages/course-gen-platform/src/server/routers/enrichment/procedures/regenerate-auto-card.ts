@@ -30,26 +30,28 @@ import { wrapTRPCError } from '../../../shared/errors';
 /**
  * Input schema for regenerateAutoCard procedure
  */
-export const regenerateAutoCardInputSchema = z.object({
-  /** Course UUID */
-  courseId: z.string().uuid('Invalid course ID'),
-  /** Lesson UUID (required for lesson cards) */
-  lessonId: z.string().uuid('Invalid lesson ID').optional(),
-  /** Type of card to regenerate */
-  cardType: z.enum(['course', 'lesson']),
-}).refine(
-  (data) => {
-    // For lesson cards, lessonId is required
-    if (data.cardType === 'lesson' && !data.lessonId) {
-      return false;
+export const regenerateAutoCardInputSchema = z
+  .object({
+    /** Course UUID */
+    courseId: z.string().uuid('Invalid course ID'),
+    /** Lesson UUID (required for lesson cards) */
+    lessonId: z.string().uuid('Invalid lesson ID').optional(),
+    /** Type of card to regenerate */
+    cardType: z.enum(['course', 'lesson']),
+  })
+  .refine(
+    data => {
+      // For lesson cards, lessonId is required
+      if (data.cardType === 'lesson' && !data.lessonId) {
+        return false;
+      }
+      return true;
+    },
+    {
+      message: 'lessonId is required when cardType is "lesson"',
+      path: ['lessonId'],
     }
-    return true;
-  },
-  {
-    message: 'lessonId is required when cardType is "lesson"',
-    path: ['lessonId'],
-  }
-);
+  );
 
 /**
  * Output schema for regenerateAutoCard procedure
@@ -102,11 +104,11 @@ function getQueue() {
         }
       };
 
-      process.on('SIGTERM', cleanup);
-      process.on('SIGINT', cleanup);
+      process.on('SIGTERM', () => void cleanup());
+      process.on('SIGINT', () => void cleanup());
 
       // Handle uncaught exceptions gracefully
-      process.on('beforeExit', cleanup);
+      process.on('beforeExit', () => void cleanup());
     }
   }
   return stage7Queue;
@@ -160,13 +162,16 @@ export const regenerateAutoCard = protectedProcedure
     const requestId = nanoid();
     const currentUser = ctx.user;
 
-    logger.info({
-      requestId,
-      courseId,
-      lessonId,
-      cardType,
-      userId: currentUser.id,
-    }, 'Regenerate auto card request');
+    logger.info(
+      {
+        requestId,
+        courseId,
+        lessonId,
+        cardType,
+        userId: currentUser.id,
+      },
+      'Regenerate auto card request'
+    );
 
     try {
       // Step 1: Verify access based on card type
@@ -183,12 +188,7 @@ export const regenerateAutoCard = protectedProcedure
         actualLessonId = lesson.id;
       } else {
         // For course cards, verify course access
-        await verifyCourseAccess(
-          courseId,
-          currentUser.id,
-          currentUser.organizationId,
-          requestId
-        );
+        await verifyCourseAccess(courseId, currentUser.id, currentUser.organizationId, requestId);
         // Course cards are attached to the first lesson, we'll get it from the enrichment
         actualLessonId = ''; // Will be set from enrichment lookup
       }
@@ -205,21 +205,22 @@ export const regenerateAutoCard = protectedProcedure
       if (cardType === 'course') {
         query = query.eq('title', 'course-card');
       } else {
-        query = query
-          .eq('lesson_id', lessonId!)
-          .neq('title', 'course-card');
+        query = query.eq('lesson_id', lessonId!).neq('title', 'course-card');
       }
 
       const { data: card, error: cardError } = await query.maybeSingle();
 
       if (cardError) {
-        logger.error({
-          requestId,
-          courseId,
-          lessonId,
-          cardType,
-          error: cardError.message,
-        }, 'Failed to fetch card for regeneration');
+        logger.error(
+          {
+            requestId,
+            courseId,
+            lessonId,
+            cardType,
+            error: cardError.message,
+          },
+          'Failed to fetch card for regeneration'
+        );
 
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
@@ -228,12 +229,15 @@ export const regenerateAutoCard = protectedProcedure
       }
 
       if (!card) {
-        logger.warn({
-          requestId,
-          courseId,
-          lessonId,
-          cardType,
-        }, 'Card not found for regeneration');
+        logger.warn(
+          {
+            requestId,
+            courseId,
+            lessonId,
+            cardType,
+          },
+          'Card not found for regeneration'
+        );
 
         throw new TRPCError({
           code: 'NOT_FOUND',
@@ -261,11 +265,14 @@ export const regenerateAutoCard = protectedProcedure
         .eq('id', card.id);
 
       if (updateError) {
-        logger.error({
-          requestId,
-          enrichmentId: card.id,
-          error: updateError.message,
-        }, 'Failed to update card for regeneration');
+        logger.error(
+          {
+            requestId,
+            enrichmentId: card.id,
+            error: updateError.message,
+          },
+          'Failed to update card for regeneration'
+        );
 
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
@@ -296,13 +303,16 @@ export const regenerateAutoCard = protectedProcedure
         jobId: `${jobIdPrefix}-regen-${newAttempt}`,
       });
 
-      logger.info({
-        requestId,
-        enrichmentId: card.id,
-        newAttempt,
-        jobId: job.id,
-        cardType,
-      }, 'Auto card regeneration enqueued');
+      logger.info(
+        {
+          requestId,
+          enrichmentId: card.id,
+          newAttempt,
+          jobId: job.id,
+          cardType,
+        },
+        'Auto card regeneration enqueued'
+      );
 
       return {
         success: true,

@@ -13,20 +13,20 @@ import { z } from 'zod';
 // ============================================================================
 
 export const COURSE_STYLES = [
-  // Top 4 - most popular, shown first in UI
-  'practical',
-  'conversational',
-  'storytelling',
+  // Top 4 - B2B focused, shown first in UI
   'professional',
+  'practical',
+  'problem_based',
+  'analytical',
   // Other popular styles
   'engaging',
-  'problem_based',
+  'conversational',
+  'storytelling',
   'interactive',
   'motivational',
   // Specialized styles
   'academic',
   'technical',
-  'analytical',
   'research',
   // Niche styles
   'visual',
@@ -57,7 +57,7 @@ export const STYLE_PROMPTS: Record<CourseStyle, string> = {
     'Structure lessons as compelling narratives with characters facing real challenges. Begin with intriguing hooks, build tension through conflict, resolve with learning moments. Weave theoretical concepts naturally into story progression. Create emotional connections that make abstract concepts memorable through concrete scenarios.',
 
   practical:
-    "Focus entirely on actionable implementation. Provide step-by-step instructions, numbered procedures, and clear checklists. Use imperative mood: 'Open the file', 'Click here', 'Run this command'. Include troubleshooting sections for common problems. Minimize theory, maximize hands-on application with immediate results.",
+    "Focus entirely on actionable implementation with immediate business applicability. Provide step-by-step instructions, numbered procedures, and clear checklists. Use imperative mood: 'Open the file', 'Click here', 'Run this command'. Include troubleshooting sections for common problems and edge cases. Minimize theory, maximize hands-on application. Add 'Quick Win' boxes for immediate results and 'Pro Tips' for efficiency gains.",
 
   motivational:
     "Write with infectious enthusiasm and empowering energy. Include success stories and transformation examples. Frame challenges as exciting opportunities for growth. Use phrases like 'You're capable of amazing things', 'Every expert started here'. Build confidence through positive reinforcement and celebration of small wins.",
@@ -78,13 +78,13 @@ export const STYLE_PROMPTS: Record<CourseStyle, string> = {
     "Hook readers instantly with surprising facts, paradoxes, or 'Did you know?' moments. Create curiosity gaps that demand resolution. Use cliffhangers between sections: 'But there's a catch...'. Make content personally relevant: 'This could save you hours'. Include interactive moments: 'Stop and try this before reading on'.",
 
   professional:
-    'Adopt corporate tone focusing on business value and ROI. Emphasize industry best practices, case studies from Fortune 500 companies. Use executive language: strategic advantages, core competencies, value propositions. Structure with executive summaries and actionable takeaways for implementation.',
+    'Adopt corporate tone focusing on business value, ROI, and measurable outcomes. Emphasize industry best practices with real case studies from leading companies. Use executive language: strategic advantages, core competencies, value propositions, KPIs. Structure with executive summaries, key takeaways, and actionable implementation steps. Include metrics and benchmarks where relevant. Address common business challenges and their solutions.',
 
   socratic:
     "Never give direct answers, guide discovery through questions. Use progressive questioning to lead learners to insights. 'What do you notice about...?', 'How might this relate to...?'. Let students uncover principles themselves. Build understanding layer by layer through guided inquiry.",
 
   problem_based:
-    'Start every section with real-world problem scenario. Present symptoms and context first, then guide through diagnostic process. Explore multiple solution paths with trade-offs. Use case study format: situation, complication, resolution. Include decision points where readers choose approach.',
+    'Start every section with real-world business problem scenario that readers recognize from their work. Present symptoms and context first, then guide through diagnostic process. Explore multiple solution paths with clear trade-offs (cost, time, complexity). Use case study format: situation, complication, resolution, lessons learned. Include decision points where readers evaluate options. End with actionable recommendations and success metrics.',
 
   collaborative:
     "Write for group learning contexts. Include instructions for peer discussions: 'Share with your partner', 'Debate in groups'. Suggest team exercises and collaborative projects. Create opportunities for knowledge exchange. Use inclusive language that assumes multiple learners working together.",
@@ -102,7 +102,7 @@ export const STYLE_PROMPTS: Record<CourseStyle, string> = {
     "Demand constant reader participation and engagement. Embed exercises directly in text: 'Before reading further, write down...'. Include self-assessments, reflection prompts, and hands-on activities. Never let reader be passive consumer. Create dialogue through anticipated questions and responses.",
 
   analytical:
-    'Approach topics through data and logical analysis. Present statistics, metrics, and quantifiable evidence. Build arguments through systematic reasoning and cause-effect relationships. Use structured analytical frameworks. Break complex systems into components for detailed examination.',
+    'Approach topics through data-driven analysis and logical reasoning. Present statistics, metrics, benchmarks, and quantifiable evidence from industry research. Build arguments through systematic reasoning and cause-effect relationships. Use structured analytical frameworks (SWOT, root cause analysis, decision matrices). Break complex systems into components. Include data visualizations descriptions, comparison tables, and evidence-based conclusions.',
 };
 
 // ============================================================================
@@ -139,9 +139,9 @@ export function getStylePrompt(style?: string | null): string {
   const result = CourseStyleSchema.safeParse(style);
 
   if (!result.success) {
-    // Invalid style - silently default to conversational
+    // Invalid style - silently default to professional (first in B2B-focused order)
     // Callers should validate with isValidCourseStyle() if they need to handle invalid styles explicitly
-    return STYLE_PROMPTS.conversational;
+    return STYLE_PROMPTS.professional;
   }
 
   return STYLE_PROMPTS[result.data];

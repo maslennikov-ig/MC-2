@@ -432,6 +432,18 @@ function DocumentMatrix({
 }: DocumentMatrixProps) {
   const { t, locale } = useTranslation();
 
+  // Sort by priority (CORE > IMPORTANT > SUPPLEMENTARY) then by filename
+  // Must be called before any early returns to comply with React hooks rules
+  const sortedDocuments = useMemo(() => {
+    const priorityOrder: Record<string, number> = { CORE: 0, IMPORTANT: 1, SUPPLEMENTARY: 2 };
+    return [...documents].sort((a, b) => {
+      const aPriority = a.priority ? priorityOrder[a.priority] ?? 3 : 3;
+      const bPriority = b.priority ? priorityOrder[b.priority] ?? 3 : 3;
+      if (aPriority !== bPriority) return aPriority - bPriority;
+      return a.filename.localeCompare(b.filename);
+    });
+  }, [documents]);
+
   // Loading skeleton state
   if (isLoading) {
     return (
@@ -480,17 +492,6 @@ function DocumentMatrix({
       </div>
     );
   }
-
-  // Sort by priority (CORE > IMPORTANT > SUPPLEMENTARY) then by filename
-  const sortedDocuments = useMemo(() => {
-    const priorityOrder: Record<string, number> = { CORE: 0, IMPORTANT: 1, SUPPLEMENTARY: 2 };
-    return [...documents].sort((a, b) => {
-      const aPriority = a.priority ? priorityOrder[a.priority] ?? 3 : 3;
-      const bPriority = b.priority ? priorityOrder[b.priority] ?? 3 : 3;
-      if (aPriority !== bPriority) return aPriority - bPriority;
-      return a.filename.localeCompare(b.filename);
-    });
-  }, [documents]);
 
   return (
     <div

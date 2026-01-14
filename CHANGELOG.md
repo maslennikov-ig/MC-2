@@ -311,6 +311,258 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.27.11] - 2026-01-14
+
+### Added
+
+- **telegram**: add webhook handler for bot commands (7356498)
+- **profile**: add Telegram notification settings section (226b5b6)
+- **shared-types**: add i18n UI labels for CourseSizeSelector (c1a8d29)
+- **web**: add form validation for courseSize/estimatedLessons dependency (431b06a)
+- **course-size**: add 'auto' option as default selection (c5f527f)
+- **course-size**: add course size presets (mini/compact/standard/comprehensive) (3ad6b73)
+
+### Changed
+
+- **profile**: simplify Telegram connection with Login Widget (266c539)
+
+### Fixed
+
+- **types**: resolve TypeScript build errors (2554554)
+- **lint**: resolve remaining ESLint errors in web package (0ed1af4)
+- **lint**: resolve all ESLint errors across packages (0359353)
+- **course-size**: address code review findings (0afdb0d)
+
+### Other
+
+- bd sync: 2026-01-14 19:15:49 (292251f)
+- bd sync: 2026-01-14 16:51:47 (5d38fbf)
+- bd sync: 2026-01-14 16:48:53 (8a00a48)
+- bd sync: 2026-01-14 16:44:37 (85e28aa)
+- bd sync: 2026-01-14 16:43:52 (22240ef)
+- bd sync: 2026-01-14 16:41:31 (5b305d4)
+- bd sync: 2026-01-14 16:40:55 (6dab329)
+- bd sync: 2026-01-14 16:34:47 (8e85937)
+- bd sync: 2026-01-14 16:25:01 (c40b157)
+- bd sync: 2026-01-14 16:24:36 (1fda912)
+- bd sync: 2026-01-14 16:11:11 (49bf611)
+- bd sync: 2026-01-14 16:08:41 (32e963e)
+- bd sync: 2026-01-14 14:37:21 (c4a9b3f)
+
+## [0.27.10] - 2026-01-14
+
+### Fixed
+
+- **course-gen-platform**: update 2 source file(s) (72e1f27)
+
+## [0.27.9] - 2026-01-14
+
+### Added
+
+- **course-gen-platform**: add 2 source file(s), update 7 source file(s), +1 more (b9bf595)
+- **graph**: add readOnly prop for automatic generation mode (cc6f097)
+- **notifications**: add stage completion notifications to stages 2-4 (98efd8e)
+- **generation**: integrate AutomaticModeControlPanel into generation progress page (d2f8ee5)
+
+### Other
+
+- bd sync: 2026-01-14 13:47:01 (e0b84e6)
+- bd sync: 2026-01-14 13:46:45 (dafb4f0)
+- bd sync: 2026-01-14 13:34:36 (b80c0f2)
+
+## [0.27.8] - 2026-01-14
+
+### Added
+
+- **generation**: add automatic generation mode with auto-approval (fd1fc7d)
+- add notification services for automatic generation mode (7f17872)
+- **web**: add generation mode UI components to course creation form (9108238)
+
+### Fixed
+
+- **course-gen-platform**: update 1 source file(s) (8384a82)
+- **stage6**: send completion notifications when all lessons generated (264155d)
+
+### Other
+
+- bd sync: 2026-01-14 13:11:39 (2e04059)
+
+## [0.27.7] - 2026-01-14
+
+### Added
+
+- **generation**: complete pause/stop code review improvements (5a62438)
+- **generation**: add pause/resume/stop controls for course generation (3d462c1)
+- **stage6**: add stage_6 status transitions in backend (b738e6b)
+- **db**: add stage_6 enum values to generation_status (8eca224)
+- **enrichments**: implement on-demand generation from course viewer (b6a7254)
+
+### Changed
+
+- **config**: move LKG config from .tmp/ to .local/ (d214b4e)
+- **db**: cleanup unused lesson content structures (26bb90c)
+- **config**: convert require() to ES imports in next.config.ts (f991a9e)
+
+### Fixed
+
+- **web**: show Stage 6 spinner only when actively generating (5df73f5)
+- **stage6,stage7**: align database queries with lesson_contents table (0ae9339)
+- **generation**: address code review issues for pause/stop feature (2ef6f45)
+- comprehensive health check - fix all vulnerabilities and bugs (745243e)
+- **workflow**: Stage 4/5 phases now display lazy-loaded trace data (4769f78)
+- **web**: health check - fix React hooks violations and code quality issues (ed01c62)
+- **tools**: fix PostgREST query in retrigger-enrichments script (a3a1445)
+- **stage7**: fix enrichment creation and lesson query issues (a1a8e59)
+- **pwa**: correct cleanUpOutdatedCaches typo (fafc6d3)
+- **stage7**: fix course card constraint and enrichment triggers (5d2518d)
+- **stage7**: correct lessons query in triggerCourseCard and triggerAllLessonCovers (29d03fd)
+- **web**: convert require to ES imports and prevent lint-staged rollback (308305b)
+- **lint**: resolve ESLint errors and improve code quality (831dacf)
+- **logging**: improve error context with userId capture and metadata standardization (a80e21b)
+- **enrichments**: address code review findings for on-demand generation (84a91b2)
+- **ui**: Stage 6 progress bar shows real lesson completion percentage (98d5f91)
+- **generation**: improve success overlay UX and fix lint errors (ed26de5)
+- **logging**: add comprehensive error_logs DB logging to all API routes (177b1ba)
+- **generation**: improve success overlay UX (5fdefe6)
+- **admin**: lazy load trace details for Input/Output Data (0a28be7)
+
+### Other
+
+- bd sync: 2026-01-14 11:50:16 (8909156)
+- bd sync: 2026-01-14 11:36:56 (90e39e2)
+- bd sync: 2026-01-14 10:22:40 (7e07991)
+- bd sync: 2026-01-14 10:19:20 (7fdf8ff)
+- bd sync: 2026-01-14 08:27:00 (8e2c519)
+- bd sync: 2026-01-14 07:45:22 (554dc85)
+- bd sync: 2026-01-14 07:32:33 (e6fa069)
+- bd sync: 2026-01-13 21:15:00 (66f86f3)
+- **enrichments**: add unit tests for on-demand enrichment generation (def3fc2)
+- bd sync: 2026-01-13 21:11:03 (b81a061)
+- bd sync: 2026-01-13 21:10:12 (b8e794c)
+- bd sync: 2026-01-13 21:07:26 (89dc93c)
+- bd sync: 2026-01-13 20:38:53 (6e96aaf)
+- bd sync: 2026-01-13 20:36:09 (833194e)
+- bd sync: 2026-01-13 20:32:34 (811ba92)
+- bd sync: apply DB changes after import (ebb913a)
+- bd sync: 2026-01-13 20:30:45 (d00e07a)
+- bd sync: 2026-01-13 20:27:39 (a1ae5d5)
+- bd sync: 2026-01-13 20:23:08 (809287b)
+- **types**: add stage_6 values to generation_status enum (ac0b79e)
+- bd sync: 2026-01-13 18:37:40 (da05b1c)
+- bd sync: 2026-01-13 18:34:18 (c0f4e91)
+- **enrichments**: clarify auto-generated vs on-demand enrichment types (d262e5e)
+
+## [0.27.6] - 2026-01-13
+
+### Added
+
+- **viewer**: add on-demand enrichment placeholder cards UI (3478de2)
+
+### Fixed
+
+- **ui**: Stage 6 UX improvements - hide regenerate, add finalize button (2f59272)
+- **ui**: fix accordion content clipping when open (8b39b34)
+- **logging**: add error_logs DB logging to more API routes (05be83e)
+- **admin**: fix invisible Input Data content in trace viewer (8c6be80)
+- **logging**: add error_logs DB logging to BullMQ job failures (a0d6b8b)
+- **courses**: allow superadmin to view workflow of any course (873d892)
+- **security**: add SuperAdmin role check for cross-org analytics (814dbdf)
+- **pipeline**: skip RAG retrieval for courses without documents (abb3c52)
+
+### Other
+
+- bd sync: 2026-01-13 18:19:39 (fa03e63)
+- bd sync: 2026-01-13 18:17:24 (5fbfba1)
+- bd sync: 2026-01-13 18:10:04 (2c4ab9d)
+- bd sync: 2026-01-13 16:50:23 (dde02c3)
+- bd sync: 2026-01-13 16:49:38 (f5ec43d)
+- bd sync: 2026-01-13 16:45:44 (5e95cb1)
+- bd sync: 2026-01-13 16:35:16 (e737220)
+
+## [0.27.5] - 2026-01-13
+
+### Added
+
+- **admin**: add clickable help tooltips for pipeline stages and phases (9041662)
+- **web**: add error logging to all API routes for admin visibility (55e5c5f)
+
+### Fixed
+
+- **web**: reduce noisy health check logs (be5d801)
+
+### Other
+
+- bd sync: 2026-01-13 15:50:59 (c0f1abd)
+- bd sync: 2026-01-13 15:39:35 (546caec)
+
+## [0.27.4] - 2026-01-13
+
+### Fixed
+
+- **web**: update 2 source file(s) (9e05eab)
+
+## [0.27.3] - 2026-01-13
+
+### Fixed
+
+- **web**: update 1 source file(s) (d3efc47)
+- **web**: add database error logging to admin logs (7a44d3d)
+
+### Other
+
+- bd sync: 2026-01-13 15:09:03 (8dc5609)
+
+## [0.27.2] - 2026-01-13
+
+### Added
+
+- **courses**: increase course catalog cards from 10 to 12 (804cba0)
+
+## [0.27.1] - 2026-01-13
+
+### Added
+
+- **styles**: reorder course styles for B2B focus with professional as default (aae0cf9)
+
+## [0.27.0] - 2026-01-13
+
+### Added
+
+- **admin**: replace polling with Supabase Realtime for logs page (9f0f5a2)
+- **db**: add generation_trace lifecycle management (74562e0)
+- **admin**: enhanced logs page with problem ID, environment, copy button (293b9c0)
+
+### Changed
+
+- **admin**: extract SeverityBadge component (0626954)
+
+### Fixed
+
+- **scripts**: use temp files instead of pipes in release.sh (fd7c6c4)
+- **scripts**: ignore SIGPIPE to prevent exit 141 in release.sh (231e324)
+- **scripts**: replace tail with safe_tail_from to avoid SIGPIPE (850bb76)
+- **admin**: move Refresh/Live buttons above filter card (c9a560e)
+- **admin**: move Refresh/Live to top row with filters (e02285b)
+- **admin**: move Refresh and Live buttons inside filter card (3e4e3e8)
+- **web**: memory leak on course generation page (4GB RAM, 100% CPU) (d818948)
+- **scripts**: fix deploy.sh SIGPIPE and non-interactive mode (2538456)
+- **admin**: prevent infinite loop in logs page refresh (35bce6e)
+- **admin**: code review fixes for logs page (719f86b)
+- **auth**: remove redundant client-side session refresh (c672292)
+- **scripts**: improve release.sh auto-commit error handling (c1bf14d)
+
+### Other
+
+- bd sync: 2026-01-13 14:26:47 (83d6232)
+- bd sync: 2026-01-13 13:17:13 (c1ba424)
+- bd sync: 2026-01-13 13:06:07 (c2e871d)
+- bd sync: 2026-01-13 13:03:03 (d20d004)
+- bd sync: 2026-01-13 12:58:50 (5c9852a)
+- bd sync: 2026-01-13 12:36:49 (fc127ed)
+- bd sync: 2026-01-13 12:26:37 (6f22764)
+- bd sync: 2026-01-13 12:03:19 (8ccec0f)
+- bd sync: 2026-01-13 11:48:44 (aa89ab5)
+
 ## [0.26.83] - 2026-01-12
 
 ### Added

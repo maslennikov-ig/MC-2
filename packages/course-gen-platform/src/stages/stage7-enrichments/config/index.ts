@@ -74,6 +74,31 @@ export const STORAGE_CONFIG = {
 } as const;
 
 /**
+ * Enrichment types that are auto-generated in the course generation pipeline.
+ *
+ * The pipeline automatically generates:
+ * - 'cover': Lesson hero images (1280x720, 16:9) - triggered after Stage 5
+ * - 'card': Course/lesson thumbnails (1024x1024, 1:1) - triggered after Stage 5/6
+ *
+ * Other enrichment types are generated ON-DEMAND from the course viewer UI:
+ * - 'quiz': Interactive quizzes (user-initiated)
+ * - 'audio': Lesson narration (user-initiated)
+ * - 'presentation': Slide decks (user-initiated)
+ * - 'video': Video content (user-initiated, not yet implemented)
+ * - 'banner': Decorative headers (user-initiated)
+ *
+ * @see packages/course-gen-platform/src/stages/stage7-enrichments/services/auto-card-trigger.ts
+ * @see packages/web/app/api/enrichments/generate/route.ts (on-demand API)
+ */
+export const AUTO_GENERATED_ENRICHMENT_TYPES = ['cover', 'card'] as const;
+
+/**
+ * Enrichment types that are generated on-demand only (not in pipeline).
+ * These are triggered manually by users from the course viewer UI.
+ */
+export const ON_DEMAND_ENRICHMENT_TYPES = ['quiz', 'audio', 'presentation', 'video', 'banner'] as const;
+
+/**
  * Audio generation configuration
  */
 export const AUDIO_CONFIG = {

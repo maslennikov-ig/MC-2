@@ -1,16 +1,17 @@
 import { REFINEMENT_CONFIG } from '@megacampus/shared-types';
-import type { StopReason, TaskPriority } from '@megacampus/shared-types';
+import type {
+  StopReason,
+  TaskPriority,
+  RefinementStatus,
+  BestEffortResult,
+} from '@megacampus/shared-types';
 
 import { logger } from '../../../../shared/logger';
 import { shouldContinueIteration, updateSectionLocks } from './iteration-controller';
 import { selectBestIteration } from './best-effort-selector';
 import { createExecutionBatches } from '../router';
 
-import type {
-  TargetedRefinementInput,
-  TargetedRefinementOutput,
-  RefinementState,
-} from './types';
+import type { TargetedRefinementInput, TargetedRefinementOutput, RefinementState } from './types';
 import { DELTA_JUDGE_ESTIMATED_TOKENS } from './constants';
 import { emitEvent } from './events';
 import { initializeQualityLocksFromArbiter } from './state-manager';
@@ -24,17 +25,29 @@ import { executePatcherTask, executeExpanderTask } from './task-executor';
 export async function executeTargetedRefinement(
   input: TargetedRefinementInput
 ): Promise<TargetedRefinementOutput> {
-  const { content, arbiterOutput, operationMode, llmCall, onStreamEvent, ragChunks, lessonSpec, language } = input;
+  const {
+    content,
+    arbiterOutput,
+    operationMode,
+    llmCall,
+    onStreamEvent,
+    ragChunks,
+    lessonSpec,
+    language,
+  } = input;
   const startTime = Date.now();
 
-  logger.info({
-    operationMode,
-    tasksCount: arbiterOutput.plan.tasks.length,
-    agreementScore: arbiterOutput.agreementScore,
-    language: language || 'default (en)',
-    hasRagChunks: (ragChunks?.length || 0) > 0,
-    hasLessonSpec: !!lessonSpec,
-  }, 'Starting targeted refinement loop');
+  logger.info(
+    {
+      operationMode,
+      tasksCount: arbiterOutput.plan.tasks.length,
+      agreementScore: arbiterOutput.agreementScore,
+      language: language || 'default (en)',
+      hasRagChunks: (ragChunks?.length || 0) > 0,
+      hasLessonSpec: !!lessonSpec,
+    },
+    'Starting targeted refinement loop'
+  );
 
   // Pre-populate sectionEditCount with all target sections
   const sectionEditCount: Record<string, number> = {};
@@ -87,11 +100,14 @@ export async function executeTargetedRefinement(
   while (shouldContinue) {
     state.iteration++;
 
-    logger.info({
-      iteration: state.iteration,
-      lockedSections: state.lockedSections.length,
-      tokensUsed: state.tokensUsed,
-    }, `Starting refinement iteration ${state.iteration}`);
+    logger.info(
+      {
+        iteration: state.iteration,
+        lockedSections: state.lockedSections.length,
+        tokensUsed: state.tokensUsed,
+      },
+      `Starting refinement iteration ${state.iteration}`
+    );
 
     // Filter out locked sections from tasks
     const availableTasks = arbiterOutput.plan.tasks.filter(
@@ -107,11 +123,14 @@ export async function executeTargetedRefinement(
     // Advisory budget check
     if (state.tokensUsed >= REFINEMENT_CONFIG.limits.maxTokens) {
       const overBudget = state.tokensUsed - REFINEMENT_CONFIG.limits.maxTokens;
-      logger.warn({
-        tokensUsed: state.tokensUsed,
-        maxTokens: REFINEMENT_CONFIG.limits.maxTokens,
-        overBudget,
-      }, 'Token budget exceeded (advisory) - continuing with tasks');
+      logger.warn(
+        {
+          tokensUsed: state.tokensUsed,
+          maxTokens: REFINEMENT_CONFIG.limits.maxTokens,
+          overBudget,
+        },
+        'Token budget exceeded (advisory) - continuing with tasks'
+      );
 
       emitEvent(onStreamEvent, {
         type: 'budget_warning',
@@ -141,12 +160,15 @@ export async function executeTargetedRefinement(
         sections: batchSections,
       });
 
-      logger.info({
-        batchIndex,
-        tasksCount: batch.length,
-        sections: batchSections,
-        estimatedDeltaJudgeTokens: batch.length * DELTA_JUDGE_ESTIMATED_TOKENS,
-      }, 'Executing batch');
+      logger.info(
+        {
+          batchIndex,
+          tasksCount: batch.length,
+          sections: batchSections,
+          estimatedDeltaJudgeTokens: batch.length * DELTA_JUDGE_ESTIMATED_TOKENS,
+        },
+        'Executing batch'
+      );
 
       const patcherTasks = batch.filter(t => t.actionType === 'SURGICAL_EDIT');
       const expanderTasks = batch.filter(t => t.actionType === 'REGENERATE_SECTION');
@@ -159,22 +181,32 @@ export async function executeTargetedRefinement(
         }
 
         const patchResults = await Promise.all(
-          patcherTasks.map(task => executePatcherTask(task, currentContent, llmCall, onStreamEvent, {
-            score: state.scoreHistory[state.scoreHistory.length - 1] || 0.7,
-            iteration: state.iteration,
-            issues: collectAllIssues(arbiterOutput.plan.tasks),
-            iterationHistory: convertToIterationHistory(state.contentHistory),
-            lessonSpec,
-            strengths: arbiterOutput.acceptedIssues.length === 0 ? ['Content meets quality standards'] : [],
-            language, // Pass language for token budget calculation
-          }))
+          patcherTasks.map(task =>
+            executePatcherTask(task, currentContent, llmCall, onStreamEvent, {
+              score: state.scoreHistory[state.scoreHistory.length - 1] || 0.7,
+              iteration: state.iteration,
+              issues: collectAllIssues(arbiterOutput.plan.tasks),
+              iterationHistory: convertToIterationHistory(state.contentHistory),
+              lessonSpec,
+              strengths:
+                arbiterOutput.acceptedIssues.length === 0
+                  ? ['Content meets quality standards']
+                  : [],
+              language, // Pass language for token budget calculation
+            })
+          )
         );
 
         for (const result of patchResults) {
           if (result.success) {
-            currentContent = applyPatchToContent(currentContent, result.sectionId, result.patchedContent);
+            currentContent = applyPatchToContent(
+              currentContent,
+              result.sectionId,
+              result.patchedContent
+            );
             state.tokensUsed += result.tokensUsed;
-            state.sectionEditCount[result.sectionId] = (state.sectionEditCount[result.sectionId] || 0) + 1;
+            state.sectionEditCount[result.sectionId] =
+              (state.sectionEditCount[result.sectionId] || 0) + 1;
           }
         }
       }
@@ -192,9 +224,14 @@ export async function executeTargetedRefinement(
           );
 
           if (result.success) {
-            currentContent = applyPatchToContent(currentContent, result.sectionId, result.regeneratedContent);
+            currentContent = applyPatchToContent(
+              currentContent,
+              result.sectionId,
+              result.regeneratedContent
+            );
             state.tokensUsed += result.tokensUsed;
-            state.sectionEditCount[result.sectionId] = (state.sectionEditCount[result.sectionId] || 0) + 1;
+            state.sectionEditCount[result.sectionId] =
+              (state.sectionEditCount[result.sectionId] || 0) + 1;
           }
         }
       }
@@ -221,10 +258,7 @@ export async function executeTargetedRefinement(
       }
     }
 
-    state.lockedSections = [...new Set([
-      ...state.lockedSections,
-      ...newlyLockedSections,
-    ])];
+    state.lockedSections = [...new Set([...state.lockedSections, ...newlyLockedSections])];
 
     // Re-evaluate score
     const tasksCompletedThisIteration = sectionsEditedThisIteration.length;
@@ -242,12 +276,15 @@ export async function executeTargetedRefinement(
 
     if (oscillationDetected.detected) {
       sectionsToLockForOscillation.push(...sectionsEditedThisIteration);
-      logger.warn({
-        sections: sectionsEditedThisIteration,
-        previousScore: oscillationDetected.previousScore,
-        improvedScore: oscillationDetected.improvedScore,
-        currentScore: newScore,
-      }, 'Oscillation detected - locking sections to prevent further score degradation');
+      logger.warn(
+        {
+          sections: sectionsEditedThisIteration,
+          previousScore: oscillationDetected.previousScore,
+          improvedScore: oscillationDetected.improvedScore,
+          currentScore: newScore,
+        },
+        'Oscillation detected - locking sections to prevent further score degradation'
+      );
     }
 
     for (const sectionId of sectionsToLockForOscillation) {
@@ -260,10 +297,7 @@ export async function executeTargetedRefinement(
       }
     }
 
-    state.lockedSections = [...new Set([
-      ...state.lockedSections,
-      ...sectionsToLockForOscillation,
-    ])];
+    state.lockedSections = [...new Set([...state.lockedSections, ...sectionsToLockForOscillation])];
 
     // Store iteration result
     const remainingIssues = collectAllIssues(
@@ -282,12 +316,15 @@ export async function executeTargetedRefinement(
       score: newScore,
     });
 
-    logger.info({
-      iteration: state.iteration,
-      score: newScore,
-      scoreImprovement: newScore - state.scoreHistory[state.scoreHistory.length - 2],
-      lockedSections: state.lockedSections.length,
-    }, 'Iteration complete');
+    logger.info(
+      {
+        iteration: state.iteration,
+        score: newScore,
+        scoreImprovement: newScore - state.scoreHistory[state.scoreHistory.length - 2],
+        lockedSections: state.lockedSections.length,
+      },
+      'Iteration complete'
+    );
 
     // Check if we should continue
     const decision = shouldContinueIteration({
@@ -309,19 +346,22 @@ export async function executeTargetedRefinement(
     stopReason = decision.reason;
 
     if (!shouldContinue) {
-      logger.info({
-        reason: stopReason,
-        finalScore: newScore,
-        iterations: state.iteration,
-      }, 'Stopping refinement loop');
+      logger.info(
+        {
+          reason: stopReason,
+          finalScore: newScore,
+          iterations: state.iteration,
+        },
+        'Stopping refinement loop'
+      );
     }
   }
 
   // Determine final status and handle best-effort selection
   const finalScore = state.scoreHistory[state.scoreHistory.length - 1];
   const modeConfig = REFINEMENT_CONFIG.modes[operationMode];
-  let finalStatus: any; // RefinementStatus type issue workaround if needed
-  let bestEffortResult: any | undefined;
+  let finalStatus: RefinementStatus;
+  let bestEffortResult: BestEffortResult | undefined;
 
   if (finalScore >= modeConfig.acceptThreshold) {
     finalStatus = 'accepted';
@@ -339,12 +379,15 @@ export async function executeTargetedRefinement(
     finalStatus = selectorResult.finalStatus;
     currentContent = bestEffortResult.content; // Safe cast
 
-    logger.info({
-      selectedIteration: selectorResult.selectedIteration,
-      bestScore: bestEffortResult.bestScore,
-      qualityStatus: bestEffortResult.qualityStatus,
-      selectionReason: selectorResult.selectionReason,
-    }, 'Selected best iteration (full-auto mode)');
+    logger.info(
+      {
+        selectedIteration: selectorResult.selectedIteration,
+        bestScore: bestEffortResult.bestScore,
+        qualityStatus: bestEffortResult.qualityStatus,
+        selectionReason: selectorResult.selectionReason,
+      },
+      'Selected best iteration (full-auto mode)'
+    );
   } else if (stopReason === 'stop_max_iterations' && operationMode === 'semi-auto') {
     finalStatus = 'escalated';
   } else {
@@ -369,13 +412,16 @@ export async function executeTargetedRefinement(
     status: finalStatus,
   });
 
-  logger.info({
-    finalStatus,
-    finalScore,
-    iterations: state.iteration,
-    tokensUsed: state.tokensUsed,
-    durationMs,
-  }, 'Targeted refinement complete');
+  logger.info(
+    {
+      finalStatus,
+      finalScore,
+      iterations: state.iteration,
+      tokensUsed: state.tokensUsed,
+      durationMs,
+    },
+    'Targeted refinement complete'
+  );
 
   return {
     content: currentContent,

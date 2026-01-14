@@ -15,24 +15,24 @@ export async function GET(request: NextRequest) {
   const envCheck = {
     NEXT_PUBLIC_SUPABASE_URL: {
       exists: !!process.env.NEXT_PUBLIC_SUPABASE_URL,
-      configured: process.env.NEXT_PUBLIC_SUPABASE_URL ? 'CONFIGURED' : 'MISSING'
+      configured: process.env.NEXT_PUBLIC_SUPABASE_URL ? 'CONFIGURED' : 'MISSING',
     },
     NEXT_PUBLIC_SUPABASE_ANON_KEY: {
       exists: !!process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-      configured: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? 'CONFIGURED' : 'MISSING'
+      configured: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ? 'CONFIGURED' : 'MISSING',
     },
     SUPABASE_SERVICE_ROLE_KEY: {
       exists: !!process.env.SUPABASE_SERVICE_ROLE_KEY,
-      configured: process.env.SUPABASE_SERVICE_ROLE_KEY ? 'CONFIGURED' : 'MISSING'
+      configured: process.env.SUPABASE_SERVICE_ROLE_KEY ? 'CONFIGURED' : 'MISSING',
     },
     NODE_ENV: process.env.NODE_ENV,
-    NEXT_PUBLIC_SITE_URL: !!process.env.NEXT_PUBLIC_SITE_URL ? 'CONFIGURED' : 'MISSING',
-    NEXT_PUBLIC_APP_URL: !!process.env.NEXT_PUBLIC_APP_URL ? 'CONFIGURED' : 'MISSING',
-    N8N_WEBHOOK_URL: !!process.env.N8N_WEBHOOK_URL ? 'CONFIGURED' : 'MISSING',
+    NEXT_PUBLIC_SITE_URL: process.env.NEXT_PUBLIC_SITE_URL ? 'CONFIGURED' : 'MISSING',
+    NEXT_PUBLIC_APP_URL: process.env.NEXT_PUBLIC_APP_URL ? 'CONFIGURED' : 'MISSING',
+    N8N_WEBHOOK_URL: process.env.N8N_WEBHOOK_URL ? 'CONFIGURED' : 'MISSING',
     ENABLE_DEV_AUTH: process.env.ENABLE_DEV_AUTH || 'false',
-    API_KEY: !!process.env.API_KEY ? 'CONFIGURED' : 'NOT_SET'
+    API_KEY: process.env.API_KEY ? 'CONFIGURED' : 'NOT_SET',
   }
-  
+
   // Пробуем создать Supabase клиент
   const supabaseCheck = {
     client_created: false,
@@ -46,12 +46,14 @@ export async function GET(request: NextRequest) {
     anon_rls_denied: false,
     admin_query_time: 0,
     anon_query_time: 0,
-    rls_error_code: null as string | null
+    rls_error_code: null as string | null,
   }
 
   try {
     const supabaseStart = Date.now()
-    const { createClient, createAdminClient, checkSupabaseConnection } = await import('@/lib/supabase/server')
+    const { createClient, createAdminClient, checkSupabaseConnection } = await import(
+      '@/lib/supabase/server'
+    )
 
     // Test regular client
     const supabase = await createClient()
@@ -64,25 +66,23 @@ export async function GET(request: NextRequest) {
 
       // Test admin privileged query
       const adminQueryStart = Date.now()
-      const { error: adminQueryError } = await adminClient
-        .from('users')
-        .select('id')
-        .limit(1)
+      const { error: adminQueryError } = await adminClient.from('users').select('id').limit(1)
 
       supabaseCheck.admin_query_time = Date.now() - adminQueryStart
 
-      if (!adminQueryError || adminQueryError.code === 'PGRST116') { // PGRST116 = no rows
+      if (!adminQueryError || adminQueryError.code === 'PGRST116') {
+        // PGRST116 = no rows
         supabaseCheck.admin_privileged_ok = true
       } else {
         logger.warn('Admin privileged query failed', {
           error: adminQueryError.message,
-          code: adminQueryError.code
+          code: adminQueryError.code,
         })
       }
     } catch (adminError) {
       supabaseCheck.admin_client_created = false
       logger.warn('Admin client creation failed in health check', {
-        error: adminError instanceof Error ? adminError.message : 'Unknown error'
+        error: adminError instanceof Error ? adminError.message : 'Unknown error',
       })
     }
 
@@ -90,13 +90,10 @@ export async function GET(request: NextRequest) {
     supabaseCheck.connection_healthy = await checkSupabaseConnection()
 
     // Пробуем простой запрос
-    const { error } = await supabase
-      .from('courses')
-      .select('id')
-      .limit(1)
-      .single()
+    const { error } = await supabase.from('courses').select('id').limit(1).single()
 
-    if (!error || error.code === 'PGRST116') { // PGRST116 = no rows
+    if (!error || error.code === 'PGRST116') {
+      // PGRST116 = no rows
       supabaseCheck.test_query = true
     } else {
       supabaseCheck.error = error.message
@@ -104,23 +101,22 @@ export async function GET(request: NextRequest) {
 
     // Test anon client RLS (should be blocked on profiles table)
     const anonQueryStart = Date.now()
-    const { error: anonError } = await supabase
-      .from('users')
-      .select('id')
-      .limit(1)
+    const { error: anonError } = await supabase.from('users').select('id').limit(1)
 
     supabaseCheck.anon_query_time = Date.now() - anonQueryStart
 
     // Check if RLS properly blocks anon access
-    if (anonError && (anonError.code === 'PGRST301' || anonError.message.includes('permission denied'))) {
+    if (
+      anonError &&
+      (anonError.code === 'PGRST301' || anonError.message.includes('permission denied'))
+    ) {
       supabaseCheck.anon_rls_denied = true
       supabaseCheck.rls_error_code = anonError.code
     } else if (!anonError || anonError.code === 'PGRST116') {
-      // If no error or just no rows, RLS might not be properly configured
-      logger.warn('RLS may not be properly configured - anon client could read profiles', {
-        error: anonError,
-        code: anonError?.code
-      })
+      // Note: anon reading empty results from users table may be expected
+      // RLS returns empty set instead of error for some configurations
+      // Only set flag, don't log warning every health check
+      supabaseCheck.anon_rls_denied = false
     }
 
     supabaseCheck.response_time = Date.now() - supabaseStart
@@ -133,7 +129,7 @@ export async function GET(request: NextRequest) {
   const authCheck = {
     authenticateRequest_available: false,
     mock_auth_test: false,
-    error: null as string | null
+    error: null as string | null,
   }
 
   try {
@@ -158,7 +154,7 @@ export async function GET(request: NextRequest) {
   const shareTokenCheck = {
     nanoid_available: false,
     token_generation: false,
-    sample_token: null as string | null
+    sample_token: null as string | null,
   }
 
   try {
@@ -169,7 +165,7 @@ export async function GET(request: NextRequest) {
   } catch (e) {
     logger.error('Share token check failed in health endpoint', { error: e })
   }
-  
+
   // Build comprehensive response
   const response = {
     status: 'ok',
@@ -179,16 +175,16 @@ export async function GET(request: NextRequest) {
       node_version: process.version,
       node_env: process.env.NODE_ENV,
       uptime: process.uptime(),
-      memory: process.memoryUsage()
+      memory: process.memoryUsage(),
     },
     checks: {
       environment: envCheck,
       supabase: supabaseCheck,
       authentication: authCheck,
-      shareToken: shareTokenCheck
+      shareToken: shareTokenCheck,
     },
     execution_time: `${Date.now() - startTime}ms`,
-    recommendations: [] as string[]
+    recommendations: [] as string[],
   }
 
   // Add recommendations based on checks
@@ -197,11 +193,15 @@ export async function GET(request: NextRequest) {
   }
 
   if (!supabaseCheck.admin_privileged_ok && supabaseCheck.admin_client_created) {
-    response.recommendations.push('Admin client may lack proper privileges - check service role configuration')
+    response.recommendations.push(
+      'Admin client may lack proper privileges - check service role configuration'
+    )
   }
 
   if (!supabaseCheck.anon_rls_denied) {
-    response.recommendations.push('RLS policies may not be properly configured - anon users can access protected tables')
+    response.recommendations.push(
+      'RLS policies may not be properly configured - anon users can access protected tables'
+    )
   }
 
   if (!authCheck.mock_auth_test && process.env.NODE_ENV === 'development') {
@@ -209,7 +209,9 @@ export async function GET(request: NextRequest) {
   }
 
   if (!envCheck.NEXT_PUBLIC_SITE_URL || !envCheck.NEXT_PUBLIC_APP_URL) {
-    response.recommendations.push('Configure NEXT_PUBLIC_SITE_URL or NEXT_PUBLIC_APP_URL for share links')
+    response.recommendations.push(
+      'Configure NEXT_PUBLIC_SITE_URL or NEXT_PUBLIC_APP_URL for share links'
+    )
   }
 
   // Determine overall health status
@@ -244,15 +246,18 @@ export async function GET(request: NextRequest) {
     healthCheckId,
     status: overallStatus,
     duration: Date.now() - startTime,
-    criticalErrors
+    criticalErrors,
   })
 
   // Return appropriate status code
   if (overallStatus === 'critical') {
-    return NextResponse.json({
-      ...response,
-      critical_errors: criticalErrors
-    }, { status: 500 })
+    return NextResponse.json(
+      {
+        ...response,
+        critical_errors: criticalErrors,
+      },
+      { status: 500 }
+    )
   }
 
   if (overallStatus === 'degraded') {

@@ -72,9 +72,9 @@ export async function MarkdownRenderer({
   // Untrusted: includes rehype-sanitize for XSS protection
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const remarkPlugins = getRemarkPlugins(config) as any[];
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const rehypePlugins = (trusted
     ? getRehypePluginsTrusted(config)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     : getRehypePluginsUntrusted(config)) as any[];
 
   // Build components map based on features

@@ -90,18 +90,19 @@ function processGlobalIssues(issues: JudgeIssue[]): GlobalIssueResult {
   const globalIssues = issues.filter(isGlobalIssue);
 
   const toTrack = globalIssues; // Track ALL global issues for observability
-  const toRedirect = globalIssues.filter(i =>
-    i.severity === 'critical' || i.severity === 'major'
-  );
+  const toRedirect = globalIssues.filter(i => i.severity === 'critical' || i.severity === 'major');
   const toSkip = globalIssues.filter(i => i.severity === 'minor');
 
   if (globalIssues.length > 0) {
-    logger.info({
-      totalGlobal: globalIssues.length,
-      toRedirect: toRedirect.length,
-      toSkip: toSkip.length,
-      severities: globalIssues.map(i => i.severity),
-    }, 'Processing sec_global issues');
+    logger.info(
+      {
+        totalGlobal: globalIssues.length,
+        toRedirect: toRedirect.length,
+        toSkip: toSkip.length,
+        severities: globalIssues.map(i => i.severity),
+      },
+      'Processing sec_global issues'
+    );
   }
 
   return { toTrack, toRedirect, toSkip };
@@ -152,7 +153,7 @@ export async function consolidateVerdicts(input: ArbiterInput): Promise<ArbiterO
   const startTime = Date.now();
 
   // Extract all issues from all verdicts
-  const allIssues = input.clevResult.verdicts.flatMap((v) => v.issues);
+  const allIssues = input.clevResult.verdicts.flatMap(v => v.issues);
 
   // Calculate Krippendorff's Alpha agreement score
   const agreement = calculateAgreementScore(input.clevResult.verdicts);
@@ -170,11 +171,14 @@ export async function consolidateVerdicts(input: ArbiterInput): Promise<ArbiterO
 
   // Log global issue tracking info (actual DB save happens in caller with lessonId)
   if (globalResult.toTrack.length > 0) {
-    logger.info({
-      tracked: globalResult.toTrack.length,
-      redirected: redirectedIssues.length,
-      skipped: globalResult.toSkip.length,
-    }, 'sec_global issues processed - tracking info available in output');
+    logger.info(
+      {
+        tracked: globalResult.toTrack.length,
+        redirected: redirectedIssues.length,
+        skipped: globalResult.toSkip.length,
+      },
+      'sec_global issues processed - tracking info available in output'
+    );
   }
 
   // Convert to TargetedIssues with targeting info
@@ -187,9 +191,9 @@ export async function consolidateVerdicts(input: ArbiterInput): Promise<ArbiterO
   const batches = createExecutionBatches(tasks);
 
   // Identify sections to preserve (no issues) and modify (have issues)
-  const sectionsToModify = [...new Set(targetedIssues.map((i) => i.targetSectionId))];
+  const sectionsToModify = [...new Set(targetedIssues.map(i => i.targetSectionId))];
   const allSectionIds = extractAllSectionIds(input.lessonContent);
-  const sectionsToPreserve = allSectionIds.filter((id) => !sectionsToModify.includes(id));
+  const sectionsToPreserve = allSectionIds.filter(id => !sectionsToModify.includes(id));
 
   // Build RefinementPlan
   // IMPORTANT: Use processedAccepted (with global issues filtered out) not the original accepted
@@ -235,7 +239,7 @@ function convertToTargetedIssues(
   issues: JudgeIssue[],
   lessonContent: ArbiterInput['lessonContent']
 ): TargetedIssue[] {
-  return issues.map((issue) => {
+  return issues.map(issue => {
     // Extract target section ID from location
     const targetSectionId = extractSectionId(issue.location, lessonContent);
 
@@ -291,7 +295,7 @@ function extractSectionId(location: string, lessonContent: ArbiterInput['lessonC
   // Extract section titles for matching
   const contentStructure = lessonContent as LessonContentStructure;
   const sections = contentStructure.sections || [];
-  const sectionTitles = sections.map((s) => s.title || '');
+  const sectionTitles = sections.map(s => s.title || '');
 
   // Use shared utility
   return extractSectionIdFromLocation(location, sectionTitles);
@@ -321,7 +325,10 @@ function determineFixAction(issue: JudgeIssue): FixAction {
   }
 
   // Structural issues require regeneration
-  if (issue.criterion === 'pedagogical_structure' || issue.criterion === 'learning_objective_alignment') {
+  if (
+    issue.criterion === 'pedagogical_structure' ||
+    issue.criterion === 'learning_objective_alignment'
+  ) {
     if (issue.severity === 'critical') {
       return 'REGENERATE_SECTION';
     }
@@ -400,10 +407,13 @@ function groupIntoTasks(
   for (const issue of issues) {
     // Safety check: skip any issues targeting sec_global
     if (issue.targetSectionId === 'sec_global') {
-      logger.debug({
-        issue: issue.description?.slice(0, 50),
-        location: issue.location,
-      }, 'Skipping sec_global issue in groupIntoTasks (should have been filtered earlier)');
+      logger.debug(
+        {
+          issue: issue.description?.slice(0, 50),
+          location: issue.location,
+        },
+        'Skipping sec_global issue in groupIntoTasks (should have been filtered earlier)'
+      );
       continue;
     }
 
@@ -417,7 +427,7 @@ function groupIntoTasks(
 
   for (const [sectionId, sectionIssues] of sectionGroups) {
     // Determine action type (REGENERATE if any issue requires it)
-    const actionType = sectionIssues.some((i) => i.fixAction === 'REGENERATE_SECTION')
+    const actionType = sectionIssues.some(i => i.fixAction === 'REGENERATE_SECTION')
       ? 'REGENERATE_SECTION'
       : 'SURGICAL_EDIT';
 
@@ -433,15 +443,16 @@ function groupIntoTasks(
 
     // Extract section index from sectionId (e.g., 'sec_1' -> 0, 'sec_2' -> 1)
     const sectionIndex = parseInt(sectionId.replace('sec_', ''), 10) - 1;
-    const sectionTitle = (sectionIndex >= 0 && sectionIndex < sections.length)
-      ? sections[sectionIndex]?.title || `Section ${sectionIndex + 1}`
-      : `Section ${sectionId.replace('sec_', '')}`;
+    const sectionTitle =
+      sectionIndex >= 0 && sectionIndex < sections.length
+        ? sections[sectionIndex]?.title || `Section ${sectionIndex + 1}`
+        : `Section ${sectionId.replace('sec_', '')}`;
 
     // Create task
     const task: SectionRefinementTask = {
       sectionId,
       sectionTitle,
-      actionType: actionType as 'SURGICAL_EDIT' | 'REGENERATE_SECTION',
+      actionType: actionType,
       synthesizedInstructions,
       contextAnchors: {
         prevSectionEnd: undefined, // Filled by executor
@@ -462,10 +473,10 @@ function groupIntoTasks(
  * Determine task priority from issues
  */
 function determineTaskPriority(issues: TargetedIssue[]): TaskPriority {
-  if (issues.some((i) => i.severity === 'critical')) {
+  if (issues.some(i => i.severity === 'critical')) {
     return 'critical';
   }
-  if (issues.some((i) => i.severity === 'major')) {
+  if (issues.some(i => i.severity === 'major')) {
     return 'major';
   }
   return 'minor';
@@ -534,7 +545,7 @@ function createExecutionBatches(tasks: SectionRefinementTask[]): SectionRefineme
       }
 
       // Check if task can be added (non-adjacent constraint)
-      const canAdd = batch.every((t) => {
+      const canAdd = batch.every(t => {
         const tIdx = parseSectionIndex(t.sectionId);
         return Math.abs(tIdx - sectionIdx) > 1; // Adjacent gap = 1
       });
@@ -555,7 +566,6 @@ function createExecutionBatches(tasks: SectionRefinementTask[]): SectionRefineme
   return batches;
 }
 
-
 /**
  * Estimate token cost for refinement tasks
  *
@@ -567,15 +577,20 @@ function estimateTokenCost(tasks: SectionRefinementTask[]): number {
   for (const task of tasks) {
     if (task.actionType === 'SURGICAL_EDIT') {
       // Patcher: ~800 tokens avg
-      totalCost += (REFINEMENT_CONFIG.tokenCosts.patcher.min + REFINEMENT_CONFIG.tokenCosts.patcher.max) / 2;
+      totalCost +=
+        (REFINEMENT_CONFIG.tokenCosts.patcher.min + REFINEMENT_CONFIG.tokenCosts.patcher.max) / 2;
     } else {
       // Section-Expander: ~1500 tokens avg
       totalCost +=
-        (REFINEMENT_CONFIG.tokenCosts.sectionExpander.min + REFINEMENT_CONFIG.tokenCosts.sectionExpander.max) / 2;
+        (REFINEMENT_CONFIG.tokenCosts.sectionExpander.min +
+          REFINEMENT_CONFIG.tokenCosts.sectionExpander.max) /
+        2;
     }
 
     // Add Delta Judge verification cost
-    totalCost += (REFINEMENT_CONFIG.tokenCosts.deltaJudge.min + REFINEMENT_CONFIG.tokenCosts.deltaJudge.max) / 2;
+    totalCost +=
+      (REFINEMENT_CONFIG.tokenCosts.deltaJudge.min + REFINEMENT_CONFIG.tokenCosts.deltaJudge.max) /
+      2;
   }
 
   return Math.round(totalCost);

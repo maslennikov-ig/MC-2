@@ -1,15 +1,17 @@
-"use client"
+'use client'
 
-import React from "react"
-import { FormProvider } from "react-hook-form"
-import { Loader2 } from "lucide-react"
-import { useCreateCourseForm } from "./create-course/_hooks/useCreateCourseForm"
-import { BasicInfoSection } from "./create-course/components/BasicInfoSection"
-import { FormatsSection } from "./create-course/components/FormatsSection"
-import { StyleSection } from "./create-course/components/StyleSection"
-import { UploadSection } from "./create-course/components/UploadSection"
-import { AdvancedSettingsSection } from "./create-course/components/AdvancedSettingsSection"
-import { SubmitSection } from "./create-course/components/SubmitSection"
+import React from 'react'
+import { FormProvider } from 'react-hook-form'
+import { Loader2 } from 'lucide-react'
+import { useCreateCourseForm } from './create-course/_hooks/useCreateCourseForm'
+import { BasicInfoSection } from './create-course/components/BasicInfoSection'
+import { FormatsSection } from './create-course/components/FormatsSection'
+import { StyleSection } from './create-course/components/StyleSection'
+import { UploadSection } from './create-course/components/UploadSection'
+import { AdvancedSettingsSection } from './create-course/components/AdvancedSettingsSection'
+import { GenerationModeSection } from './create-course/components/GenerationModeSection'
+import { CostPreviewCard } from './create-course/components/CostPreviewCard'
+import { SubmitSection } from './create-course/components/SubmitSection'
 import { AuthRequiredState, PermissionDeniedState } from '@/components/common/error-states'
 
 export default function CreateCourseForm() {
@@ -36,9 +38,9 @@ export default function CreateCourseForm() {
   // Show loading state while checking permissions
   if (canCreate === null) {
     return (
-      <div className="w-full max-w-5xl mx-auto">
-        <div className="bg-white/90 dark:bg-black/70 backdrop-blur-xl rounded-2xl p-8 border border-slate-200 dark:border-white/10 text-center">
-          <Loader2 className="w-12 h-12 text-purple-400 animate-spin mx-auto mb-4" />
+      <div className="mx-auto w-full max-w-5xl">
+        <div className="rounded-2xl border border-slate-200 bg-white/90 p-8 text-center backdrop-blur-xl dark:border-white/10 dark:bg-black/70">
+          <Loader2 className="mx-auto mb-4 h-12 w-12 animate-spin text-purple-400" />
           <p className="text-slate-600 dark:text-white/80">Проверка прав доступа...</p>
         </div>
       </div>
@@ -48,7 +50,7 @@ export default function CreateCourseForm() {
   // Show restriction notice for unauthenticated users
   if (!canCreate && userRole === 'unauthenticated') {
     return (
-      <div className="w-full max-w-5xl mx-auto">
+      <div className="mx-auto w-full max-w-5xl">
         <AuthRequiredState
           variant="card"
           onSignIn={() => authModal.open('login')}
@@ -61,7 +63,7 @@ export default function CreateCourseForm() {
   // Show restriction notice for authenticated users without permissions
   if (!canCreate) {
     return (
-      <div className="w-full max-w-5xl mx-auto">
+      <div className="mx-auto w-full max-w-5xl">
         <PermissionDeniedState
           variant="card"
           userRole={userRole}
@@ -73,24 +75,21 @@ export default function CreateCourseForm() {
   }
 
   return (
-    <div className="w-full mx-auto">
+    <div className="mx-auto w-full">
       <FormProvider {...form}>
-        <form onSubmit={handleFormSubmit} className="grid grid-cols-1 xl:grid-cols-2 gap-6 xl:gap-8">
-          
+        <form
+          onSubmit={(e) => {
+            void handleFormSubmit(e)
+          }}
+          className="grid grid-cols-1 gap-6 xl:grid-cols-2 xl:gap-8"
+        >
           <BasicInfoSection onBlur={handleFormChange} />
 
-          <FormatsSection 
-            mounted={mounted} 
-            toggleFormat={toggleFormat} 
-            formats={formats} 
-          />
+          <FormatsSection mounted={mounted} toggleFormat={toggleFormat} formats={formats} />
 
-          <StyleSection 
-            mounted={mounted} 
-            reorderedStyles={reorderedStyles} 
-          />
+          <StyleSection mounted={mounted} reorderedStyles={reorderedStyles} />
 
-          <UploadSection 
+          <UploadSection
             draftCourseId={draftCourseId}
             uploadedFiles={uploadedFiles}
             setUploadedFiles={setUploadedFiles}
@@ -101,13 +100,25 @@ export default function CreateCourseForm() {
 
           <AdvancedSettingsSection />
 
+          <GenerationModeSection />
+
+          <div className="xl:col-span-2">
+            <CostPreviewCard
+              documentCount={uploadedFiles.length}
+              estimatedLessons={
+                form.watch('estimatedLessons') || (form.watch('courseSize') === 'auto' ? 30 : 15)
+              }
+              hasDocuments={uploadedFiles.length > 0}
+              isVisible={form.watch('generationMode') === 'automatic'}
+            />
+          </div>
+
           <SubmitSection
             isSubmitting={isSubmitting}
             workerReady={workerReadiness.ready}
             workerLoading={workerReadiness.loading}
             workerError={workerReadiness.error}
           />
-
         </form>
       </FormProvider>
     </div>

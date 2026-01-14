@@ -145,11 +145,14 @@ export function planTournamentClassification(
 ): TournamentPlan {
   const totalTokens = documents.reduce((sum, d) => sum + d.summaryTokens, 0);
 
-  logger.debug({
-    totalTokens,
-    availableBudget,
-    documentCount: documents.length,
-  }, '[Tournament] Planning classification strategy');
+  logger.debug(
+    {
+      totalTokens,
+      availableBudget,
+      documentCount: documents.length,
+    },
+    '[Tournament] Planning classification strategy'
+  );
 
   // If all summaries fit in budget, use single-stage classification
   if (totalTokens <= availableBudget) {
@@ -167,11 +170,14 @@ export function planTournamentClassification(
   // Calculate number of groups needed
   const numGroups = Math.ceil(totalTokens / availableBudget);
 
-  logger.info({
-    totalTokens,
-    availableBudget,
-    numGroups,
-  }, '[Tournament] Two-stage classification required');
+  logger.info(
+    {
+      totalTokens,
+      availableBudget,
+      numGroups,
+    },
+    '[Tournament] Two-stage classification required'
+  );
 
   // Sort by tokens DESC for bin packing (largest first)
   const sorted = [...documents].sort((a, b) => b.summaryTokens - a.summaryTokens);
@@ -184,9 +190,7 @@ export function planTournamentClassification(
 
   for (const doc of sorted) {
     // Find group with minimum tokens
-    const minGroup = groups.reduce((min, g) =>
-      g.totalTokens < min.totalTokens ? g : min
-    );
+    const minGroup = groups.reduce((min, g) => (g.totalTokens < min.totalTokens ? g : min));
     minGroup.documents.push(doc);
     minGroup.totalTokens += doc.summaryTokens;
   }
@@ -198,12 +202,15 @@ export function planTournamentClassification(
   const maxFinalists = Math.floor(availableBudget / avgTokensPerDoc);
   const finalistsPerGroup = Math.max(2, Math.floor(maxFinalists / numGroups));
 
-  logger.info({
-    numGroups,
-    finalistsPerGroup,
-    avgTokensPerDoc,
-    groupSizes: groups.map(g => g.documents.length),
-  }, '[Tournament] Classification plan created');
+  logger.info(
+    {
+      numGroups,
+      finalistsPerGroup,
+      avgTokensPerDoc,
+      groupSizes: groups.map(g => g.documents.length),
+    },
+    '[Tournament] Classification plan created'
+  );
 
   return {
     groups,
@@ -240,42 +247,44 @@ export async function executeTournamentClassification(
   plan: TournamentPlan,
   courseContext: { title: string; description: string }
 ): Promise<TournamentClassificationResult> {
-  logger.info({
-    requiresTwoStage: plan.requiresTwoStage,
-    groupCount: plan.groups.length,
-  }, '[Tournament] Starting classification execution');
+  logger.info(
+    {
+      requiresTwoStage: plan.requiresTwoStage,
+      groupCount: plan.groups.length,
+    },
+    '[Tournament] Starting classification execution'
+  );
 
   // Single-stage classification (all documents fit)
   if (!plan.requiresTwoStage) {
     logger.debug('[Tournament] Executing single-stage classification');
-    return await executeSingleStageClassification(
-      plan.groups[0].documents,
-      courseContext
-    );
+    return await executeSingleStageClassification(plan.groups[0].documents, courseContext);
   }
 
   // Two-stage classification
-  logger.info({
-    groupCount: plan.groups.length,
-    finalistsPerGroup: plan.finalistsPerGroup,
-  }, '[Tournament] Starting group stage classification');
+  logger.info(
+    {
+      groupCount: plan.groups.length,
+      finalistsPerGroup: plan.finalistsPerGroup,
+    },
+    '[Tournament] Starting group stage classification'
+  );
 
   // Stage 1: Classify each group
   const allGroupResults: GroupClassificationResult[] = [];
 
   for (let i = 0; i < plan.groups.length; i++) {
     const group = plan.groups[i];
-    logger.info({
-      groupIndex: i,
-      documentCount: group.documents.length,
-      totalTokens: group.totalTokens,
-    }, `[Tournament] Classifying group ${i + 1}/${plan.groups.length}`);
-
-    const groupResults = await classifyDocumentGroup(
-      group.documents,
-      courseContext,
-      i
+    logger.info(
+      {
+        groupIndex: i,
+        documentCount: group.documents.length,
+        totalTokens: group.totalTokens,
+      },
+      `[Tournament] Classifying group ${i + 1}/${plan.groups.length}`
     );
+
+    const groupResults = await classifyDocumentGroup(group.documents, courseContext, i);
 
     allGroupResults.push(...groupResults);
   }
@@ -283,22 +292,20 @@ export async function executeTournamentClassification(
   // Stage 2: Select finalists from each group
   const finalists = selectFinalists(allGroupResults, plan.finalistsPerGroup);
 
-  logger.info({
-    finalistCount: finalists.length,
-    expectedCount: plan.groups.length * plan.finalistsPerGroup,
-  }, '[Tournament] Starting final classification');
+  logger.info(
+    {
+      finalistCount: finalists.length,
+      expectedCount: plan.groups.length * plan.finalistsPerGroup,
+    },
+    '[Tournament] Starting final classification'
+  );
 
   // Stage 3: Final classification of all finalists
-  const finalistDocuments = finalists.map(f =>
-    plan.groups
-      .flatMap(g => g.documents)
-      .find(d => d.id === f.id)!
+  const finalistDocuments = finalists.map(
+    f => plan.groups.flatMap(g => g.documents).find(d => d.id === f.id)!
   );
 
-  const finalResults = await executeSingleStageClassification(
-    finalistDocuments,
-    courseContext
-  );
+  const finalResults = await executeSingleStageClassification(finalistDocuments, courseContext);
 
   // Merge final results with non-finalists
   const finalClassifications = mergeResults(
@@ -307,9 +314,12 @@ export async function executeTournamentClassification(
     finalists.map(f => f.id)
   );
 
-  logger.info({
-    totalDocuments: finalClassifications.classifications.length,
-  }, '[Tournament] Classification complete');
+  logger.info(
+    {
+      totalDocuments: finalClassifications.classifications.length,
+    },
+    '[Tournament] Classification complete'
+  );
 
   return finalClassifications;
 }
@@ -332,9 +342,7 @@ async function executeSingleStageClassification(
     modelConfig.maxTokens
   );
 
-  const structuredModel = model.withStructuredOutput(
-    GroupClassificationResponseSchema
-  );
+  const structuredModel = model.withStructuredOutput(GroupClassificationResponseSchema);
 
   const [systemMsg, humanMsg] = buildClassificationPrompt(
     documents,
@@ -345,11 +353,12 @@ async function executeSingleStageClassification(
   const response = await structuredModel.invoke([systemMsg, humanMsg]);
   const typedClassifications = response.classifications as GroupDocumentClassification[];
 
-  const classifications: TournamentClassificationResult['classifications'] = typedClassifications.map(c => ({
-    id: c.id as string,
-    priority: c.priority as 'CORE' | 'IMPORTANT' | 'SUPPLEMENTARY',
-    rationale: c.rationale as string,
-  }));
+  const classifications: TournamentClassificationResult['classifications'] =
+    typedClassifications.map(c => ({
+      id: c.id,
+      priority: c.priority,
+      rationale: c.rationale,
+    }));
 
   return { classifications };
 }
@@ -369,9 +378,7 @@ async function classifyDocumentGroup(
     modelConfig.maxTokens
   );
 
-  const structuredModel = model.withStructuredOutput(
-    GroupClassificationResponseSchema
-  );
+  const structuredModel = model.withStructuredOutput(GroupClassificationResponseSchema);
 
   const [systemMsg, humanMsg] = buildClassificationPrompt(
     documents,
@@ -383,10 +390,10 @@ async function classifyDocumentGroup(
   const typedClassifications = response.classifications as GroupDocumentClassification[];
 
   const results: GroupClassificationResult[] = typedClassifications.map(c => ({
-    id: c.id as string,
-    priority: c.priority as 'CORE' | 'IMPORTANT' | 'SUPPLEMENTARY',
+    id: c.id,
+    priority: c.priority,
     rationale: `[Group ${groupIndex + 1}] ${c.rationale}`,
-    groupRank: c.rank as number,
+    groupRank: c.rank,
   }));
 
   return results;
@@ -400,7 +407,8 @@ function buildClassificationPrompt(
   courseContext: { title: string; description: string },
   _selectTopN: number
 ): [SystemMessage, HumanMessage] {
-  const systemMessage = new SystemMessage(`You are a document classification expert for educational content.
+  const systemMessage =
+    new SystemMessage(`You are a document classification expert for educational content.
 
 TASK: Classify documents by importance for course generation using COMPARATIVE ranking.
 
@@ -424,10 +432,9 @@ Be decisive and comparative. Don't mark everything as important - truly distingu
 
   // Use generated_title when available for meaningful document identification
   const documentDescriptions = documents
-    .map(
-      (doc, index) => {
-        const hasGeneratedTitle = !!doc.generated_title;
-        return `
+    .map((doc, index) => {
+      const hasGeneratedTitle = !!doc.generated_title;
+      return `
 [Document ${index + 1}]
 ID: ${doc.id}
 ${hasGeneratedTitle ? `Title: ${doc.generated_title}` : ''}
@@ -436,8 +443,7 @@ File Type: ${doc.mime_type}
 Summary (${doc.summaryTokens} tokens):
 ${doc.summary.substring(0, 2000)}${doc.summary.length > 2000 ? '...[truncated]' : ''}
 ---`;
-      }
-    )
+    })
     .join('\n');
 
   const humanMessage = new HumanMessage(`COURSE CONTEXT:
@@ -479,11 +485,14 @@ function selectFinalists(
     const sortedByRank = results.sort((a, b) => a.groupRank - b.groupRank);
     const topN = sortedByRank.slice(0, finalistsPerGroup);
 
-    logger.debug({
-      groupIndex,
-      selectedCount: topN.length,
-      topDocuments: topN.map(f => ({ id: f.id, rank: f.groupRank })),
-    }, '[Tournament] Selected finalists from group');
+    logger.debug(
+      {
+        groupIndex,
+        selectedCount: topN.length,
+        topDocuments: topN.map(f => ({ id: f.id, rank: f.groupRank })),
+      },
+      '[Tournament] Selected finalists from group'
+    );
 
     finalists.push(...topN);
   }

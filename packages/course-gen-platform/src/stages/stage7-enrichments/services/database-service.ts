@@ -8,7 +8,11 @@
 
 import { getSupabaseAdmin } from '@/shared/supabase/admin';
 import { logger } from '@/shared/logger';
-import type { EnrichmentStatus, EnrichmentContent, EnrichmentMetadata } from '@megacampus/shared-types';
+import type {
+  EnrichmentStatus,
+  EnrichmentContent,
+  EnrichmentMetadata,
+} from '@megacampus/shared-types';
 import type { EnrichmentWithContext } from '../types';
 
 /**
@@ -17,9 +21,7 @@ import type { EnrichmentWithContext } from '../types';
  * @param enrichmentId - Enrichment UUID
  * @returns Enrichment with context or null if not found
  */
-export async function getEnrichment(
-  enrichmentId: string
-): Promise<EnrichmentWithContext | null> {
+export async function getEnrichment(enrichmentId: string): Promise<EnrichmentWithContext | null> {
   const supabaseAdmin = getSupabaseAdmin();
 
   try {
@@ -31,10 +33,7 @@ export async function getEnrichment(
       .single();
 
     if (enrichmentError || !enrichment) {
-      logger.warn(
-        { enrichmentId, error: enrichmentError?.message },
-        'Enrichment not found'
-      );
+      logger.warn({ enrichmentId, error: enrichmentError?.message }, 'Enrichment not found');
       return null;
     }
 
@@ -42,7 +41,7 @@ export async function getEnrichment(
     // Include objectives for keyword extraction in cover generation
     const { data: lesson, error: lessonError } = await supabaseAdmin
       .from('lessons')
-      .select('id, title, content, objectives')
+      .select('id, title, objectives')
       .eq('id', enrichment.lesson_id)
       .single();
 
@@ -53,6 +52,16 @@ export async function getEnrichment(
       );
       return null;
     }
+
+    // Get the lesson content from lesson_contents table (content is stored separately)
+    const { data: lessonContentData } = await supabaseAdmin
+      .from('lesson_contents')
+      .select('content')
+      .eq('lesson_id', enrichment.lesson_id)
+      .eq('status', 'active')
+      .order('created_at', { ascending: false })
+      .limit(1)
+      .single();
 
     // Get the course (using course_id from enrichment, which is denormalized)
     // Include visual_style for card/cover image generation and course_description for context
@@ -70,11 +79,11 @@ export async function getEnrichment(
       return null;
     }
 
-    // Handle nullable content from lesson - can be Json type
-    const lessonContent = lesson.content
-      ? typeof lesson.content === 'string'
-        ? lesson.content
-        : JSON.stringify(lesson.content)
+    // Handle nullable content from lesson_contents - can be Json type
+    const lessonContent = lessonContentData?.content
+      ? typeof lessonContentData.content === 'string'
+        ? lessonContentData.content
+        : JSON.stringify(lessonContentData.content)
       : null;
 
     return {
@@ -100,7 +109,7 @@ export async function getEnrichment(
         title: lesson.title,
         content: lessonContent,
         course_id: enrichment.course_id, // Use from enrichment (denormalized)
-        objectives: (lesson.objectives as string[] | null) ?? null,
+        objectives: lesson.objectives ?? null,
       },
       course: {
         id: course.id,
@@ -218,10 +227,7 @@ export async function saveEnrichmentContent(
       .eq('id', enrichmentId);
 
     if (error) {
-      logger.error(
-        { enrichmentId, error: error.message },
-        'Failed to save enrichment content'
-      );
+      logger.error({ enrichmentId, error: error.message }, 'Failed to save enrichment content');
       throw error;
     }
 
@@ -252,10 +258,7 @@ export async function saveEnrichmentContent(
  * @param enrichmentId - Enrichment UUID
  * @param assetId - Supabase Storage asset UUID
  */
-export async function linkEnrichmentAsset(
-  enrichmentId: string,
-  assetId: string
-): Promise<void> {
+export async function linkEnrichmentAsset(enrichmentId: string, assetId: string): Promise<void> {
   const supabaseAdmin = getSupabaseAdmin();
 
   try {
@@ -295,9 +298,7 @@ export async function linkEnrichmentAsset(
  * @param enrichmentId - Enrichment UUID
  * @returns New attempt count
  */
-export async function incrementGenerationAttempt(
-  enrichmentId: string
-): Promise<number> {
+export async function incrementGenerationAttempt(enrichmentId: string): Promise<number> {
   const supabaseAdmin = getSupabaseAdmin();
 
   try {
@@ -335,10 +336,7 @@ export async function incrementGenerationAttempt(
       throw updateError;
     }
 
-    logger.debug(
-      { enrichmentId, attempt: newAttempt },
-      'Generation attempt incremented'
-    );
+    logger.debug({ enrichmentId, attempt: newAttempt }, 'Generation attempt incremented');
 
     return newAttempt;
   } catch (error) {
@@ -379,10 +377,7 @@ export async function saveDraftContent(
       .eq('id', enrichmentId);
 
     if (error) {
-      logger.error(
-        { enrichmentId, error: error.message },
-        'Failed to save draft content'
-      );
+      logger.error({ enrichmentId, error: error.message }, 'Failed to save draft content');
       throw error;
     }
 
@@ -419,39 +414,20 @@ export async function getLessonContent(lessonId: string): Promise<string | null>
       .limit(1)
       .maybeSingle();
 
-    if (lessonContent?.content) {
-      // Extract markdown content from metadata if available
-      const metadata = lessonContent.metadata as Record<string, unknown> | null;
-      if (metadata?.markdownContent && typeof metadata.markdownContent === 'string') {
-        return metadata.markdownContent;
-      }
-      // Fall back to stringified content
-      return typeof lessonContent.content === 'string'
-        ? lessonContent.content
-        : JSON.stringify(lessonContent.content);
-    }
-
-    // Fall back to lessons table content field
-    const { data: lesson, error: lessonError } = await supabaseAdmin
-      .from('lessons')
-      .select('content')
-      .eq('id', lessonId)
-      .single();
-
-    if (lessonError) {
-      logger.warn(
-        { lessonId, error: lessonError.message },
-        'Failed to fetch lesson content'
-      );
+    if (!lessonContent?.content) {
+      logger.warn({ lessonId }, 'No lesson content found');
       return null;
     }
 
-    if (!lesson?.content) return null;
-
-    // Handle Json type from database
-    return typeof lesson.content === 'string'
-      ? lesson.content
-      : JSON.stringify(lesson.content);
+    // Extract markdown content from metadata if available
+    const metadata = lessonContent.metadata as Record<string, unknown> | null;
+    if (metadata?.markdownContent && typeof metadata.markdownContent === 'string') {
+      return metadata.markdownContent;
+    }
+    // Fall back to stringified content
+    return typeof lessonContent.content === 'string'
+      ? lessonContent.content
+      : JSON.stringify(lessonContent.content);
   } catch (error) {
     logger.error(
       {

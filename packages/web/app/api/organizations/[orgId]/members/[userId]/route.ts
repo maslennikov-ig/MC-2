@@ -1,12 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAdminClient } from '@/lib/supabase/client-factory'
-import { logger } from '@/lib/logger'
+import { logger, logPermanentFailure } from '@/lib/logger'
 import { authenticateRequest } from '@/lib/auth'
 import { isValidUUID } from '@/lib/validation-utils'
 import { type OrgRole } from '@megacampus/shared-types'
 
 type RouteParams = { params: Promise<{ orgId: string; userId: string }> }
-
 
 /**
  * Helper to get user's role in an organization
@@ -34,10 +33,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     const user = await authenticateRequest(request)
 
     if (!user) {
-      return NextResponse.json(
-        { error: 'Authentication required' },
-        { status: 401 }
-      )
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
     }
 
     const { orgId, userId: targetUserId } = await params
@@ -45,10 +41,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
 
     // Validate UUID format
     if (!isValidUUID(orgId) || !isValidUUID(targetUserId)) {
-      return NextResponse.json(
-        { error: 'Invalid ID format' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'Invalid ID format' }, { status: 400 })
     }
 
     // Get current user's role in the organization
@@ -69,10 +62,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
       .single()
 
     if (memberError || !targetMember) {
-      return NextResponse.json(
-        { error: 'Member not found' },
-        { status: 404 }
-      )
+      return NextResponse.json({ error: 'Member not found' }, { status: 404 })
     }
 
     const targetMemberRow = targetMember as { id: string; role: string }
@@ -114,23 +104,42 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
 
     if (deleteError) {
       logger.error('Error removing member:', deleteError)
-      return NextResponse.json(
-        { error: 'Failed to remove member' },
-        { status: 500 }
-      )
+      logPermanentFailure({
+        user_id: user.id,
+        organization_id: orgId,
+        error_message: deleteError.message || 'Error removing member',
+        stack_trace: undefined,
+        severity: 'ERROR',
+        job_type: 'ORG_MEMBER_REMOVE',
+        metadata: {
+          route: `/api/organizations/${orgId}/members/${targetUserId}`,
+          errorCode: 'INTERNAL_ERROR',
+          targetUserId,
+        },
+      }).catch(() => {})
+      return NextResponse.json({ error: 'Failed to remove member' }, { status: 500 })
     }
 
     // Return appropriate message based on whether user left or was removed
-    const message = isSelf
-      ? 'You have left the organization'
-      : 'Member removed successfully'
+    const message = isSelf ? 'You have left the organization' : 'Member removed successfully'
 
     return NextResponse.json({ message }, { status: 200 })
   } catch (error) {
     logger.error('Unexpected error in DELETE /api/organizations/[orgId]/members/[userId]:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    logPermanentFailure({
+      user_id: undefined,
+      error_message:
+        error instanceof Error
+          ? error.message
+          : 'Unexpected error in DELETE /api/organizations/[orgId]/members/[userId]',
+      stack_trace: error instanceof Error ? error.stack : undefined,
+      severity: 'ERROR',
+      job_type: 'ORG_MEMBER_REMOVE',
+      metadata: {
+        route: '/api/organizations/[orgId]/members/[userId]',
+        errorCode: 'INTERNAL_ERROR',
+      },
+    }).catch(() => {})
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

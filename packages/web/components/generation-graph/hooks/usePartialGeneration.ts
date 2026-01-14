@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useCallback, useRef, useEffect } from 'react';
+import { useState, useCallback, useRef, useEffect, useMemo } from 'react';
 import { toast } from 'sonner';
 import { logger } from '@/lib/client-logger';
 
@@ -62,6 +62,7 @@ export function usePartialGeneration(courseId: string) {
   // Refs for SYNCHRONOUS checks (prevents race conditions on rapid clicks)
   const pendingLessonIdsRef = useRef<Set<string>>(new Set());
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const initialPollTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const trackedJobsRef = useRef<TrackedJob[]>([]);
 
   // Keep ref in sync with state
@@ -160,8 +161,8 @@ export function usePartialGeneration(courseId: string) {
     if (trackedJobs.length > 0 && !pollIntervalRef.current) {
       // Start polling at interval (don't call immediately to avoid double-call)
       pollIntervalRef.current = setInterval(pollJobStatuses, POLL_INTERVAL);
-      // Initial poll after short delay
-      setTimeout(pollJobStatuses, 500);
+      // Initial poll after short delay (save ref for cleanup)
+      initialPollTimeoutRef.current = setTimeout(pollJobStatuses, 500);
     }
 
     // Cleanup only when no jobs left
@@ -169,6 +170,14 @@ export function usePartialGeneration(courseId: string) {
       clearInterval(pollIntervalRef.current);
       pollIntervalRef.current = null;
     }
+
+    // Cleanup on unmount
+    return () => {
+      if (initialPollTimeoutRef.current) {
+        clearTimeout(initialPollTimeoutRef.current);
+        initialPollTimeoutRef.current = null;
+      }
+    };
   }, [trackedJobs.length, pollJobStatuses]);
 
   /**
@@ -415,12 +424,13 @@ export function usePartialGeneration(courseId: string) {
   // Compute generating lesson IDs from tracked jobs AND pending lessons
   // pendingLessonIds = lessons clicked but API not yet responded
   // trackedJobs = lessons with active jobs in progress
-  const generatingLessonIds = new Set([
+  // Wrapped in useMemo to prevent creating new Set on every render
+  const generatingLessonIds = useMemo(() => new Set([
     ...pendingLessonIds,
     ...trackedJobs
       .filter(j => j.status !== 'completed' && j.status !== 'failed')
       .map(j => j.lessonId),
-  ]);
+  ]), [pendingLessonIds, trackedJobs]);
 
   // Check if specific lesson is generating (instant response)
   const isLessonGenerating = useCallback(

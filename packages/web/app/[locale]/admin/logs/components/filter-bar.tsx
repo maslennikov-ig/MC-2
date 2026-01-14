@@ -23,12 +23,13 @@ import type {
 interface FilterBarProps {
   filters: LogFilters
   onFilterChange: (filters: LogFilters) => void
+  actions?: React.ReactNode
 }
 
 /**
  * Filter controls for log monitoring dashboard
  */
-export function FilterBar({ filters, onFilterChange }: FilterBarProps) {
+export function FilterBar({ filters, onFilterChange, actions }: FilterBarProps) {
   const t = useTranslations('admin.logs')
 
   const handleLevelChange = useCallback(
@@ -125,7 +126,7 @@ export function FilterBar({ filters, onFilterChange }: FilterBarProps) {
 
   return (
     <div className="bg-card flex flex-col gap-4 rounded-lg border p-4 shadow-sm">
-      {/* Top row: Search and main filters */}
+      {/* Top row: Search, filters, and actions */}
       <div className="flex flex-col items-start justify-between gap-4 sm:flex-row sm:items-center">
         {/* Search input */}
         <div className="relative w-full sm:w-80">
@@ -139,7 +140,7 @@ export function FilterBar({ filters, onFilterChange }: FilterBarProps) {
           />
         </div>
 
-        {/* Filter dropdowns */}
+        {/* Filter dropdowns and actions */}
         <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
           {/* Level filter */}
           <Select value={filters.level || 'all'} onValueChange={handleLevelChange}>
@@ -192,6 +193,9 @@ export function FilterBar({ filters, onFilterChange }: FilterBarProps) {
               <SelectItem value="stage">Stage</SelectItem>
             </SelectContent>
           </Select>
+
+          {/* Actions (Refresh, Live indicator) */}
+          {actions}
         </div>
       </div>
 

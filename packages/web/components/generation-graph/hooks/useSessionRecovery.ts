@@ -17,8 +17,9 @@ export function useSessionRecovery(courseId?: string) {
         try {
             const viewport = getViewport();
             localStorage.setItem(storageKey, JSON.stringify(viewport));
-        } catch (_e) {
-            // localStorage might be full or disabled - ignore silently
+        } catch (e) {
+            // localStorage might be full or disabled - log for debugging
+            console.debug('[useSessionRecovery] Failed to save viewport:', e instanceof Error ? e.message : 'Unknown error');
         }
     }, [getViewport, storageKey]);
 
@@ -49,8 +50,9 @@ export function useSessionRecovery(courseId?: string) {
                     // Set viewport immediately
                     setViewport(viewport);
                 }
-            } catch (_e) {
-                // Ignore invalid storage data
+            } catch (e) {
+                // Invalid storage data - log for debugging
+                console.debug('[useSessionRecovery] Failed to parse viewport:', e instanceof Error ? e.message : 'Unknown error');
             }
         }
     }, [setViewport, storageKey]);

@@ -54,10 +54,7 @@ let cache: CacheEntry | null = null;
 async function fetchTierSettingsFromDB(): Promise<TierSettings[]> {
   const supabase = getSupabaseAdmin();
 
-  const { data, error } = await supabase
-    .from('tier_settings')
-    .select('*')
-    .order('tier_key');
+  const { data, error } = await supabase.from('tier_settings').select('*').order('tier_key');
 
   if (error) {
     throw new Error(`Failed to fetch tier settings: ${error.message}`);
@@ -67,7 +64,7 @@ async function fetchTierSettingsFromDB(): Promise<TierSettings[]> {
     throw new Error('No tier settings found in database');
   }
 
-  return data.map((row) => toTierSettings(row as TierSettingsRow));
+  return data.map(row => toTierSettings(row as TierSettingsRow));
 }
 
 /**
@@ -104,14 +101,14 @@ function updateCache(data: TierSettings[]): void {
 export async function getAllTierSettings(): Promise<TierSettings[]> {
   // Return cached data if valid
   if (isCacheValid() && cache) {
-    return cache.data.filter((tier) => tier.isActive);
+    return cache.data.filter(tier => tier.isActive);
   }
 
   try {
     const settings = await fetchTierSettingsFromDB();
     updateCache(settings);
     logger.debug({ count: settings.length }, '[TierSettingsService] Cache updated from database');
-    return settings.filter((tier) => tier.isActive);
+    return settings.filter(tier => tier.isActive);
   } catch (error) {
     logger.warn(
       { err: error instanceof Error ? error.message : String(error) },
@@ -119,7 +116,7 @@ export async function getAllTierSettings(): Promise<TierSettings[]> {
     );
 
     // Use defaults but don't cache them (so we retry DB on next call)
-    return getAllDefaultTierSettings().filter((tier) => tier.isActive);
+    return getAllDefaultTierSettings().filter(tier => tier.isActive);
   }
 }
 
@@ -142,7 +139,7 @@ export async function getAllTierSettings(): Promise<TierSettings[]> {
 export async function getTierSettings(tierKey: TierKey): Promise<TierSettings> {
   // Return cached data if valid
   if (isCacheValid() && cache) {
-    const cached = cache.data.find((tier) => tier.tierKey === tierKey);
+    const cached = cache.data.find(tier => tier.tierKey === tierKey);
     if (cached) {
       return cached;
     }
@@ -152,7 +149,7 @@ export async function getTierSettings(tierKey: TierKey): Promise<TierSettings> {
     const settings = await fetchTierSettingsFromDB();
     updateCache(settings);
 
-    const tierSettings = settings.find((tier) => tier.tierKey === tierKey);
+    const tierSettings = settings.find(tier => tier.tierKey === tierKey);
     if (!tierSettings) {
       throw new Error(`Tier settings not found for tier: ${tierKey}`);
     }
@@ -166,7 +163,7 @@ export async function getTierSettings(tierKey: TierKey): Promise<TierSettings> {
 
     // Use defaults but don't cache them (so we retry DB on next call)
     const defaults = getAllDefaultTierSettings();
-    const tierSettings = defaults.find((tier) => tier.tierKey === tierKey);
+    const tierSettings = defaults.find(tier => tier.tierKey === tierKey);
 
     if (!tierSettings) {
       throw new Error(`Tier settings not found for tier: ${tierKey}`);
@@ -229,7 +226,7 @@ export async function refreshCache(): Promise<void> {
  * ```
  */
 export async function getEffectiveTierSettings(
-  userRole: Role | string | undefined | null,
+  userRole: Role | undefined | null,
   orgTier: Tier
 ): Promise<TierSettings> {
   // Superadmins always get premium tier settings

@@ -13,7 +13,7 @@
  *
  * Access Control:
  * - All endpoints enforce organization-level RLS via ctx.user.organizationId
- * - SuperAdmin users can query any organization (future enhancement)
+ * - SuperAdmin users can query any organization via organization_id param
  * - Regular users can only access their own organization's data
  */
 
@@ -31,7 +31,7 @@ import type { SummaryMetadata } from '@megacampus/shared-types';
  * SuperAdmin users can optionally filter by organization_id.
  */
 const getCostAnalyticsInput = z.object({
-  /** Optional organization ID (SuperAdmin only, future enhancement) */
+  /** Optional organization ID (SuperAdmin only) */
   organization_id: z.string().uuid().optional(),
 
   /** Start date in ISO 8601 format (default: 30 days ago) */
@@ -74,10 +74,7 @@ function groupByModel(
   total_cost_usd: number;
   avg_quality_score: number;
 }> {
-  const modelMap = new Map<
-    string,
-    { count: number; cost: number; qualitySum: number }
-  >();
+  const modelMap = new Map<string, { count: number; cost: number; qualitySum: number }>();
 
   for (const file of files) {
     if (!file.summary_metadata) continue;
@@ -88,8 +85,7 @@ function groupByModel(
     modelMap.set(model, {
       count: existing.count + 1,
       cost: existing.cost + (file.summary_metadata.estimated_cost_usd || 0),
-      qualitySum:
-        existing.qualitySum + (file.summary_metadata.quality_score || 0),
+      qualitySum: existing.qualitySum + (file.summary_metadata.quality_score || 0),
     });
   }
 
@@ -118,10 +114,7 @@ function groupByStrategy(
   total_cost_usd: number;
   avg_quality_score: number;
 }> {
-  const strategyMap = new Map<
-    string,
-    { count: number; cost: number; qualitySum: number }
-  >();
+  const strategyMap = new Map<string, { count: number; cost: number; qualitySum: number }>();
 
   for (const file of files) {
     if (!file.processing_method) continue;
@@ -135,12 +128,8 @@ function groupByStrategy(
 
     strategyMap.set(strategy, {
       count: existing.count + 1,
-      cost:
-        existing.cost +
-        (file.summary_metadata?.estimated_cost_usd || 0),
-      qualitySum:
-        existing.qualitySum +
-        (file.summary_metadata?.quality_score || 0),
+      cost: existing.cost + (file.summary_metadata?.estimated_cost_usd || 0),
+      qualitySum: existing.qualitySum + (file.summary_metadata?.quality_score || 0),
     });
   }
 
@@ -167,7 +156,7 @@ export const summarizationRouter = router({
    *
    * Access Control:
    * - Regular users: Can only query their own organization
-   * - SuperAdmin: Can query any organization (future enhancement)
+   * - SuperAdmin: Can query any organization via organization_id param
    *
    * @param input.organization_id - Optional org ID (SuperAdmin only)
    * @param input.start_date - Start of date range (default: 30 days ago)
@@ -182,13 +171,25 @@ export const summarizationRouter = router({
       // Default date range: last 30 days
       const endDate = input.end_date || new Date().toISOString();
       const startDate =
-        input.start_date ||
-        new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
+        input.start_date || new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString();
 
       // Use organization_id from input (SuperAdmin) or ctx.user (regular user)
-      // For now, ignore input.organization_id and always use ctx.user.organizationId
-      // TODO: Add SuperAdmin role check for cross-org analytics
-      const orgId = ctx.user.organizationId;
+      // SuperAdmin can query any organization, regular users only their own
+      let orgId: string;
+
+      if (input.organization_id) {
+        // Cross-org query requested - verify superadmin role
+        if (ctx.user.role !== 'superadmin') {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'Cross-organization analytics requires superadmin role',
+          });
+        }
+        orgId = input.organization_id;
+      } else {
+        // Default to user's own organization
+        orgId = ctx.user.organizationId;
+      }
 
       // Query file_catalog for files with summary_metadata in date range
       const { data: files, error } = await supabase
@@ -196,14 +197,8 @@ export const summarizationRouter = router({
         .select('summary_metadata, processing_method, organization_id')
         .eq('organization_id', orgId)
         .not('summary_metadata', 'is', null)
-        .gte(
-          'summary_metadata->>processing_timestamp',
-          startDate
-        )
-        .lte(
-          'summary_metadata->>processing_timestamp',
-          endDate
-        );
+        .gte('summary_metadata->>processing_timestamp', startDate)
+        .lte('summary_metadata->>processing_timestamp', endDate);
 
       if (error) {
         throw new TRPCError({
@@ -213,7 +208,7 @@ export const summarizationRouter = router({
       }
 
       // Parse summary_metadata from JSONB
-      const typedFiles = (files || []).map((f) => ({
+      const typedFiles = (files || []).map(f => ({
         ...f,
         summary_metadata: f.summary_metadata as SummaryMetadata | null,
       }));
@@ -244,8 +239,7 @@ export const summarizationRouter = router({
         period_end: endDate,
         total_cost_usd: totalCost,
         documents_summarized: typedFiles.length,
-        avg_cost_per_document:
-          typedFiles.length > 0 ? totalCost / typedFiles.length : 0,
+        avg_cost_per_document: typedFiles.length > 0 ? totalCost / typedFiles.length : 0,
         total_input_tokens: totalInputTokens,
         total_output_tokens: totalOutputTokens,
         total_tokens: totalInputTokens + totalOutputTokens,
@@ -288,7 +282,11 @@ export const summarizationRouter = router({
       }
 
       // Query file_catalog for all files in this course
-      const { data: files, error, count } = await supabase
+      const {
+        data: files,
+        error,
+        count,
+      } = await supabase
         .from('file_catalog')
         .select('*', { count: 'exact' })
         .eq('course_id', input.course_id)
@@ -302,32 +300,24 @@ export const summarizationRouter = router({
       }
 
       // Parse summary_metadata from JSONB
-      const typedFiles = (files || []).map((f) => ({
+      const typedFiles = (files || []).map(f => ({
         ...f,
         summary_metadata: f.summary_metadata as SummaryMetadata | null,
       }));
 
       // Count documents by status
       const completedCount = typedFiles.filter(
-        (f) =>
-          f.processed_content !== null &&
-          f.summary_metadata?.quality_check_passed === true
+        f => f.processed_content !== null && f.summary_metadata?.quality_check_passed === true
       ).length;
 
-      const failedCount = typedFiles.filter(
-        (f) => f.error_message !== null
-      ).length;
+      const failedCount = typedFiles.filter(f => f.error_message !== null).length;
 
-      const bypassedCount = typedFiles.filter(
-        (f) => f.processing_method === 'full_text'
-      ).length;
+      const bypassedCount = typedFiles.filter(f => f.processing_method === 'full_text').length;
 
-      const inProgressCount =
-        (count || 0) - completedCount - failedCount - bypassedCount;
+      const inProgressCount = (count || 0) - completedCount - failedCount - bypassedCount;
 
       // Calculate progress percentage
-      const progressPercentage =
-        count && count > 0 ? (completedCount / count) * 100 : 0;
+      const progressPercentage = count && count > 0 ? (completedCount / count) * 100 : 0;
 
       return {
         course_id: input.course_id,
@@ -339,7 +329,7 @@ export const summarizationRouter = router({
         bypassed_count: bypassedCount,
         progress_percentage: progressPercentage,
         current_status: course.generation_status || 'UNKNOWN',
-        files: typedFiles.map((f) => ({
+        files: typedFiles.map(f => ({
           file_id: f.id,
           original_filename: f.filename,
           processing_method: f.processing_method,
@@ -390,8 +380,7 @@ export const summarizationRouter = router({
 
       // Create preview from processed_content (first 500 chars)
       const preview = file.processed_content
-        ? file.processed_content.slice(0, 500) +
-          (file.processed_content.length > 500 ? '...' : '')
+        ? file.processed_content.slice(0, 500) + (file.processed_content.length > 500 ? '...' : '')
         : null;
 
       return {

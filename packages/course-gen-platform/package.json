@@ -1,6 +1,6 @@
 {
   "name": "@megacampus/course-gen-platform",
-  "version": "0.26.84",
+  "version": "0.27.11",
   "private": true,
   "type": "module",
   "description": "Main API server for MegaCampusAI course generation platform",
@@ -37,12 +37,12 @@
   "dependencies": {
     "@bull-board/api": "^5.14.0",
     "@bull-board/express": "^5.14.0",
-    "@langchain/core": "^1.1.5",
+    "@langchain/core": "^1.1.8",
     "@langchain/langgraph": "^1.0.5",
     "@langchain/openai": "^1.2.0",
     "@langchain/textsplitters": "^1.0.1",
     "@megacampus/shared-logger": "workspace:*",
-    "@modelcontextprotocol/sdk": "^1.24.3",
+    "@modelcontextprotocol/sdk": "^1.25.2",
     "@qdrant/js-client-rest": "^1.16.2",
     "@supabase/supabase-js": "^2.87.2",
     "@trpc/server": "^11.8.0",

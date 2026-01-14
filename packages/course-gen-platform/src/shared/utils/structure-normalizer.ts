@@ -27,7 +27,14 @@ import logger from '@/shared/logger';
 /**
  * Valid course category values
  */
-const VALID_CATEGORIES = ['professional', 'personal', 'creative', 'hobby', 'spiritual', 'academic'] as const;
+const VALID_CATEGORIES = [
+  'professional',
+  'personal',
+  'creative',
+  'hobby',
+  'spiritual',
+  'academic',
+] as const;
 
 /**
  * Valid complexity values
@@ -42,7 +49,13 @@ const VALID_AUDIENCES = ['beginner', 'intermediate', 'advanced', 'mixed'] as con
 /**
  * Valid primary strategy values
  */
-const VALID_STRATEGIES = ['problem-based learning', 'lecture-based', 'inquiry-based', 'project-based', 'mixed'] as const;
+const VALID_STRATEGIES = [
+  'problem-based learning',
+  'lecture-based',
+  'inquiry-based',
+  'project-based',
+  'mixed',
+] as const;
 
 /**
  * Field name variant mappings (common LLM variations → expected names)
@@ -149,9 +162,7 @@ function normalizeCourseCategory(data: Record<string, unknown>): Record<string, 
 
   // If it's a string, convert to object
   if (typeof categoryData === 'string') {
-    const primary = isValidEnum(categoryData, VALID_CATEGORIES)
-      ? categoryData
-      : 'professional'; // Default if invalid
+    const primary = isValidEnum(categoryData, VALID_CATEGORIES) ? categoryData : 'professional'; // Default if invalid
 
     categoryData = {
       primary,
@@ -159,7 +170,10 @@ function normalizeCourseCategory(data: Record<string, unknown>): Record<string, 
       reasoning: 'Auto-classified based on topic analysis',
       secondary: null,
     };
-    logger.info({ original: data.course_category, normalized: categoryData }, 'Normalized course_category from string');
+    logger.info(
+      { original: data.course_category, normalized: categoryData },
+      'Normalized course_category from string'
+    );
   }
 
   // If it's an object, ensure required fields
@@ -210,12 +224,30 @@ function normalizeContextualLanguage(data: Record<string, unknown>): Record<stri
   if (!langData || typeof langData !== 'object' || Array.isArray(langData)) {
     // Try to construct from flat fields
     langData = {
-      why_matters_context: data.why_matters_context || data.why_matters || 'This knowledge will transform your approach and open new possibilities.',
-      motivators: data.motivators || data.motivation || 'Master practical skills that create immediate value in your work and life.',
-      experience_prompt: data.experience_prompt || data.experience || 'Think about situations where this knowledge would have helped you succeed.',
-      problem_statement_context: data.problem_statement_context || data.problem_statement || 'Many people struggle with this topic without proper guidance.',
-      knowledge_bridge: data.knowledge_bridge || data.bridge || 'Build on what you already know to achieve deeper understanding.',
-      practical_benefit_focus: data.practical_benefit_focus || data.practical_benefit || 'Apply these concepts immediately to see tangible results.',
+      why_matters_context:
+        data.why_matters_context ||
+        data.why_matters ||
+        'This knowledge will transform your approach and open new possibilities.',
+      motivators:
+        data.motivators ||
+        data.motivation ||
+        'Master practical skills that create immediate value in your work and life.',
+      experience_prompt:
+        data.experience_prompt ||
+        data.experience ||
+        'Think about situations where this knowledge would have helped you succeed.',
+      problem_statement_context:
+        data.problem_statement_context ||
+        data.problem_statement ||
+        'Many people struggle with this topic without proper guidance.',
+      knowledge_bridge:
+        data.knowledge_bridge ||
+        data.bridge ||
+        'Build on what you already know to achieve deeper understanding.',
+      practical_benefit_focus:
+        data.practical_benefit_focus ||
+        data.practical_benefit ||
+        'Apply these concepts immediately to see tangible results.',
     };
     logger.info('Constructed contextual_language from flat fields or defaults');
   }
@@ -242,7 +274,7 @@ function normalizeContextualLanguage(data: Record<string, unknown>): Record<stri
   };
 
   for (const field of requiredFields) {
-    if (typeof langObj[field] !== 'string' || (langObj[field] as string).length < 50) {
+    if (typeof langObj[field] !== 'string' || langObj[field].length < 50) {
       langObj[field] = defaultMessages[field];
     }
   }
@@ -254,7 +286,10 @@ function normalizeContextualLanguage(data: Record<string, unknown>): Record<stri
 /**
  * Normalize topic_analysis structure
  */
-function normalizeTopicAnalysis(data: Record<string, unknown>, originalTopic?: string): Record<string, unknown> {
+function normalizeTopicAnalysis(
+  data: Record<string, unknown>,
+  originalTopic?: string
+): Record<string, unknown> {
   let topicData = data.topic_analysis;
 
   if (!topicData || typeof topicData !== 'object' || Array.isArray(topicData)) {
@@ -267,7 +302,8 @@ function normalizeTopicAnalysis(data: Record<string, unknown>, originalTopic?: s
       target_audience: data.target_audience || data.audience || 'mixed',
       missing_elements: data.missing_elements || data.missing || null,
       key_concepts: data.key_concepts || data.concepts || ['concept1', 'concept2', 'concept3'],
-      domain_keywords: data.domain_keywords || data.keywords || ['keyword1', 'keyword2', 'keyword3', 'keyword4', 'keyword5'],
+      domain_keywords: data.domain_keywords ||
+        data.keywords || ['keyword1', 'keyword2', 'keyword3', 'keyword4', 'keyword5'],
     };
     logger.info('Constructed topic_analysis from flat fields or defaults');
   }
@@ -289,14 +325,25 @@ function normalizeTopicAnalysis(data: Record<string, unknown>, originalTopic?: s
   if (typeof topicObj.information_completeness !== 'number') {
     topicObj.information_completeness = 70;
   }
-  if (typeof topicObj.reasoning !== 'string' || (topicObj.reasoning as string).length < 50) {
-    topicObj.reasoning = 'Topic analysis based on provided course information and context analysis.';
+  if (typeof topicObj.reasoning !== 'string' || topicObj.reasoning.length < 50) {
+    topicObj.reasoning =
+      'Topic analysis based on provided course information and context analysis.';
   }
   if (!Array.isArray(topicObj.key_concepts) || topicObj.key_concepts.length < 3) {
-    topicObj.key_concepts = topicObj.key_concepts || ['fundamental concepts', 'core principles', 'practical applications'];
+    topicObj.key_concepts = topicObj.key_concepts || [
+      'fundamental concepts',
+      'core principles',
+      'practical applications',
+    ];
   }
   if (!Array.isArray(topicObj.domain_keywords) || topicObj.domain_keywords.length < 5) {
-    topicObj.domain_keywords = topicObj.domain_keywords || ['keyword1', 'keyword2', 'keyword3', 'keyword4', 'keyword5'];
+    topicObj.domain_keywords = topicObj.domain_keywords || [
+      'keyword1',
+      'keyword2',
+      'keyword3',
+      'keyword4',
+      'keyword5',
+    ];
   }
   if (topicObj.missing_elements === undefined) {
     topicObj.missing_elements = null;
@@ -318,7 +365,8 @@ function normalizePedagogicalPatterns(data: Record<string, unknown>): Record<str
       primary_strategy: data.primary_strategy || data.strategy || 'mixed',
       theory_practice_ratio: data.theory_practice_ratio || data.ratio || '40:60',
       assessment_types: data.assessment_types || data.assessments || ['quizzes', 'projects'],
-      key_patterns: data.key_patterns || data.patterns || ['learn by doing', 'progressive complexity'],
+      key_patterns: data.key_patterns ||
+        data.patterns || ['learn by doing', 'progressive complexity'],
     };
     logger.info('Constructed pedagogical_patterns from flat fields or defaults');
   }
@@ -331,7 +379,10 @@ function normalizePedagogicalPatterns(data: Record<string, unknown>): Record<str
   }
 
   // Validate theory_practice_ratio format (XX:YY)
-  if (typeof patternsObj.theory_practice_ratio !== 'string' || !/^\d+:\d+$/.test(patternsObj.theory_practice_ratio as string)) {
+  if (
+    typeof patternsObj.theory_practice_ratio !== 'string' ||
+    !/^\d+:\d+$/.test(patternsObj.theory_practice_ratio)
+  ) {
     patternsObj.theory_practice_ratio = '40:60';
   }
 
@@ -362,7 +413,12 @@ function unwrapNestedData(data: Record<string, unknown>): Record<string, unknown
     if (data[key] && typeof data[key] === 'object' && !Array.isArray(data[key])) {
       // Check if it looks like it contains the actual data
       const inner = data[key] as Record<string, unknown>;
-      if (inner.course_category || inner.topic_analysis || inner.contextual_language || inner.category) {
+      if (
+        inner.course_category ||
+        inner.topic_analysis ||
+        inner.contextual_language ||
+        inner.category
+      ) {
         logger.info({ wrapperKey: key }, 'Unwrapped nested data structure');
         return inner;
       }

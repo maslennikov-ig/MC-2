@@ -38,7 +38,7 @@ import { useGraphOperations } from '../contexts/GraphOperationsContext';
 import { useGenerationRealtime } from '@/components/generation-monitoring/realtime-provider';
 import { useLessonContent } from '../hooks/useLessonContent';
 import { useNodeStatus } from '../hooks/useNodeStatus';
-import { TraceAttempt } from '@megacampus/shared-types';
+import { TraceAttempt, PhaseData } from '@megacampus/shared-types';
 import { isAwaitingApproval as getAwaitingStageNumber } from '@/lib/generation-graph/utils';
 import { toast } from 'sonner';
 import {
@@ -70,6 +70,19 @@ interface DisplayData {
   retryCount?: number;
   /** Trace ID for lazy loading full data */
   traceId?: string;
+}
+
+/**
+ * Helper to safely extract qualityScore from lesson content metadata.
+ * The metadata is typed as Record<string, unknown> but may contain quality_score field.
+ */
+function getQualityScoreFromMetadata(metadata: Record<string, unknown> | null | undefined): number | undefined {
+  if (!metadata) return undefined;
+  // Check for quality_score (snake_case from DB schema)
+  if (typeof metadata.quality_score === 'number') return metadata.quality_score;
+  // Check for qualityScore (camelCase for backward compatibility)
+  if (typeof metadata.qualityScore === 'number') return metadata.qualityScore;
+  return undefined;
 }
 
 export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
@@ -106,11 +119,15 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
 
   // Detect if this node has phases (stages 4, 5)
   const hasPhases = data?.stageNumber && (data.stageNumber === 4 || data.stageNumber === 5);
-  const phases = getStagePhases(data as AppNodeData | undefined) || [];
+  // Memoize phases to prevent creating new array on every render
+  const phases = useMemo(
+    () => getStagePhases(data as AppNodeData | undefined) || [],
+    [data]
+  );
 
   // Get realtime status from context (more reliable than node data)
   const realtimeStatus = useNodeStatus(selectedNodeId || '');
-  const { status: generationStatus, fetchTraceDetails } = useGenerationRealtime();
+  const { status: generationStatus, fetchTraceDetails, traces } = useGenerationRealtime();
 
   // Check if THIS stage is awaiting approval based on course generation_status
   // generationStatus contains the raw generation_status like 'stage_5_awaiting_approval'
@@ -120,8 +137,9 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
   // Editing permission:
   // - When stage is awaiting approval, EVERYONE can edit (to review/change before approving)
   // - Otherwise, admins get read-only view, owners can edit
+  // - In automatic mode (readOnly=true), nobody can edit
   const isAwaitingApproval = isThisStageAwaiting || realtimeStatus?.status === 'awaiting' || data?.status === 'awaiting';
-  const canEdit = isAwaitingApproval || !isAdmin;
+  const canEdit = !courseInfo.readOnly && (isAwaitingApproval || !isAdmin);
 
   // Detect if this is a lesson node and extract lessonId for content fetching
   const isLessonNode = selectedNode?.type === 'lesson';
@@ -347,14 +365,14 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
     } finally {
       setIsApprovingAll(false);
     }
-  }, [moduleIdForDashboard, courseInfo.id, refetchModuleDashboard]);
+  }, [moduleIdForDashboard, courseInfo.id, refetchModuleDashboard, t]);
 
   // Reset phase and attempt selection when node changes
   useEffect(() => {
       if (hasPhases && phases.length > 0) {
           // For Stage 4 and 5: prefer 'complete' phase since it contains the final result
           // Other phases contain intermediate data that doesn't match the expected output format
-          const completePhase = phases.find((p: any) => p.phaseId === 'complete');
+          const completePhase = phases.find((p: PhaseData) => p.phaseId === 'complete');
           if (completePhase && (data?.stageNumber === 4 || data?.stageNumber === 5)) {
               setSelectedPhaseId('complete');
           } else {
@@ -372,7 +390,7 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
           setSelectedAttemptNum(null);
           setSelectedPhaseId(null);
       }
-  }, [selectedNodeId, data?.attempts, hasPhases, phases]);
+  }, [selectedNodeId, data?.attempts, data?.stageNumber, hasPhases, phases]);
 
   // Reset lesson maximization when drawer closes
   useEffect(() => {
@@ -402,12 +420,28 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
   const displayData = useMemo((): DisplayData | undefined => {
       // If phases exist and a phase is selected, show phase data
       if (hasPhases && selectedPhaseId && phases.length > 0) {
-          const phase = phases.find((p: any) => p.phaseId === selectedPhaseId);
+          const phase = phases.find((p: PhaseData) => p.phaseId === selectedPhaseId);
           if (phase) {
+              // If phase.outputData is missing but we have a traceId, check the traces array
+              // This handles the case where lazy loading via fetchTraceDetails updated traces
+              // but phasesMap wasn't updated (since it's a separate state in useGraphData)
+              let outputData = phase.outputData;
+              let inputData = phase.inputData;
+              if ((outputData === undefined || inputData === undefined) && phase.traceId && traces.length > 0) {
+                  const trace = traces.find(t => t.id === phase.traceId);
+                  if (trace) {
+                      if (outputData === undefined && trace.output_data !== undefined) {
+                          outputData = trace.output_data;
+                      }
+                      if (inputData === undefined && trace.input_data !== undefined) {
+                          inputData = trace.input_data;
+                      }
+                  }
+              }
               return {
                   label: `${data?.label} - ${phase.phaseName}`,
-                  inputData: phase.inputData,
-                  outputData: phase.outputData,
+                  inputData,
+                  outputData,
                   duration: phase.processMetrics?.duration,
                   tokens: phase.processMetrics?.tokens,
                   model: phase.processMetrics?.model,
@@ -415,7 +449,7 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
                   status: phase.status,
                   attempts: phase.attempts || [],
                   attemptNumber: 1,
-                  retryCount: phase.attempts?.filter((a: TraceAttempt) => a.status === 'failed').length || 0,
+                  retryCount: phase.attempts?.filter((a) => a.status === 'failed').length || 0,
                   traceId: phase.traceId, // For lazy loading full trace data
               };
           }
@@ -434,7 +468,7 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
                     status: lessonContentData.status,
                     metadata: lessonContentData.metadata,
                     // Extract quality info from metadata
-                    qualityScore: (lessonContentData.metadata as any)?.qualityScore,
+                    qualityScore: getQualityScoreFromMetadata(lessonContentData.metadata),
                   }
                 : attempt.outputData;
 
@@ -463,9 +497,9 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
                   lessonContent: lessonContentData.content,
                   status: lessonContentData.status,
                   metadata: lessonContentData.metadata,
-                  qualityScore: (lessonContentData.metadata as any)?.qualityScore,
+                  qualityScore: getQualityScoreFromMetadata(lessonContentData.metadata),
               },
-              qualityScore: (lessonContentData.metadata as any)?.qualityScore,
+              qualityScore: getQualityScoreFromMetadata(lessonContentData.metadata),
               status: lessonContentData.status === 'completed' ? 'completed' : data?.status,
           };
       }
@@ -753,11 +787,14 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
               {hasPhases && phases.length > 0 && (
                 <PhaseSelector
                   stageId={`stage_${data?.stageNumber}`}
-                  phases={phases.map((p: any) => ({
+                  phases={phases.map((p: PhaseData) => ({
                     phaseId: p.phaseId,
                     attemptNumber: 1,
                     timestamp: p.timestamp.toISOString(),
-                    status: p.status
+                    // PhaseSelector only handles core statuses, map other statuses appropriately
+                    status: (['pending', 'active', 'completed', 'error'].includes(p.status)
+                      ? p.status
+                      : 'completed') as 'pending' | 'active' | 'completed' | 'error'
                   }))}
                   selectedPhase={selectedPhaseId}
                   onSelectPhase={setSelectedPhaseId}
@@ -877,7 +914,7 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
                       courseId={courseInfo.id}
                       outputData={displayData?.outputData}
                       editable={canEdit}
-                      readOnly={isAdmin && !isAwaitingApproval}
+                      readOnly={courseInfo.readOnly || (isAdmin && !isAwaitingApproval)}
                       autoFocus={autoOpened}
                       onApproved={handleStageApproved}
                     />
@@ -893,7 +930,7 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
                       stageId={`stage_${data?.stageNumber}`}
                       courseId={courseInfo.id}
                       editable={canEdit}
-                      readOnly={isAdmin && !isAwaitingApproval}
+                      readOnly={courseInfo.readOnly || (isAdmin && !isAwaitingApproval)}
                       autoFocus={autoOpened}
                       onApproved={deselectNode}
                       nodeType={selectedNode?.type}

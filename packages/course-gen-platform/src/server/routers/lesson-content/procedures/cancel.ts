@@ -12,7 +12,6 @@ import { verifyCourseAccess } from '../helpers';
 import { getQueue } from '../../../../orchestrator/queue';
 import { getSupabaseAdmin } from '../../../../shared/supabase/admin';
 import { JobType } from '@megacampus/shared-types';
-import type { LessonContentJobData } from '@megacampus/shared-types';
 import { logger } from '../../../../shared/logger/index.js';
 
 /**
@@ -55,11 +54,14 @@ export const cancelStage6 = protectedProcedure
     // ctx.user is guaranteed non-null by protectedProcedure middleware
     const currentUser = ctx.user;
 
-    logger.info({
-      requestId,
-      courseId,
-      userId: currentUser.id,
-    }, 'Stage 6 cancel request');
+    logger.info(
+      {
+        requestId,
+        courseId,
+        userId: currentUser.id,
+      },
+      'Stage 6 cancel request'
+    );
 
     try {
       // Step 1: Verify course access
@@ -74,12 +76,15 @@ export const cancelStage6 = protectedProcedure
       // Filter jobs by courseId
       const courseJobs = pendingJobs.filter(job => job.data?.courseId === courseId);
 
-      logger.info({
-        requestId,
-        courseId,
-        totalPendingJobs: pendingJobs.length,
-        courseJobsFound: courseJobs.length,
-      }, 'Found pending jobs to cancel');
+      logger.info(
+        {
+          requestId,
+          courseId,
+          totalPendingJobs: pendingJobs.length,
+          courseJobsFound: courseJobs.length,
+        },
+        'Found pending jobs to cancel'
+      );
 
       // Step 3: Remove each matching job
       let cancelledCount = 0;
@@ -89,23 +94,30 @@ export const cancelStage6 = protectedProcedure
         try {
           await job.remove();
           cancelledCount++;
-          const lessonId = job.data?.jobType === JobType.LESSON_CONTENT
-            ? (job.data as LessonContentJobData).lessonSpec?.lesson_id
-            : undefined;
-          logger.debug({
-            requestId,
-            jobId: job.id,
-            lessonId,
-          }, 'Cancelled job');
+          const lessonId =
+            job.data?.jobType === JobType.LESSON_CONTENT
+              ? job.data.lessonSpec?.lesson_id
+              : undefined;
+          logger.debug(
+            {
+              requestId,
+              jobId: job.id,
+              lessonId,
+            },
+            'Cancelled job'
+          );
         } catch (jobError) {
           // Job might have moved to active state between getJobs and remove
           const jobId = job.id ?? 'unknown';
           failedJobIds.push(jobId);
-          logger.warn({
-            requestId,
-            jobId,
-            error: jobError instanceof Error ? jobError.message : String(jobError),
-          }, 'Failed to remove job (may have started processing)');
+          logger.warn(
+            {
+              requestId,
+              jobId,
+              error: jobError instanceof Error ? jobError.message : String(jobError),
+            },
+            'Failed to remove job (may have started processing)'
+          );
         }
       }
 
@@ -127,20 +139,26 @@ export const cancelStage6 = protectedProcedure
         dbUpdatedCount = data?.length ?? 0;
       } catch (dbError) {
         // Non-critical - log and continue
-        logger.warn({
-          requestId,
-          courseId,
-          error: dbError instanceof Error ? dbError.message : String(dbError),
-        }, 'Failed to update lesson records (non-critical)');
+        logger.warn(
+          {
+            requestId,
+            courseId,
+            error: dbError instanceof Error ? dbError.message : String(dbError),
+          },
+          'Failed to update lesson records (non-critical)'
+        );
       }
 
-      logger.info({
-        requestId,
-        courseId,
-        cancelledCount,
-        failedCount: failedJobIds.length,
-        dbUpdatedCount,
-      }, 'Stage 6 cancellation completed');
+      logger.info(
+        {
+          requestId,
+          courseId,
+          cancelledCount,
+          failedCount: failedJobIds.length,
+          dbUpdatedCount,
+        },
+        'Stage 6 cancellation completed'
+      );
 
       return {
         success: true,
@@ -154,11 +172,14 @@ export const cancelStage6 = protectedProcedure
       }
 
       // Log and wrap unexpected errors
-      logger.error({
-        requestId,
-        courseId,
-        error: error instanceof Error ? error.message : String(error),
-      }, 'Stage 6 cancel failed');
+      logger.error(
+        {
+          requestId,
+          courseId,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        'Stage 6 cancel failed'
+      );
 
       throw new TRPCError({
         code: 'INTERNAL_SERVER_ERROR',

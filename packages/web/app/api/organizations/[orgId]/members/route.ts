@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAdminClient } from '@/lib/supabase/client-factory'
-import { logger } from '@/lib/logger'
+import { logger, logPermanentFailure } from '@/lib/logger'
 import { authenticateRequest } from '@/lib/auth'
 import { isValidUUID } from '@/lib/validation-utils'
 import { z } from 'zod'
@@ -30,23 +30,20 @@ interface UserRow {
   avatar_url: string | null
 }
 
-
 // Input schema for adding a member
 const addMemberInputSchema = z.object({
   userId: z.string().uuid('Invalid user ID'),
-  role: orgRoleSchema.refine(
-    (role) => role !== 'owner',
-    { message: 'Cannot directly assign owner role' }
-  ),
+  role: orgRoleSchema.refine((role) => role !== 'owner', {
+    message: 'Cannot directly assign owner role',
+  }),
 })
 
 // Input schema for updating a member's role
 const updateMemberInputSchema = z.object({
   userId: z.string().uuid('Invalid user ID'),
-  role: orgRoleSchema.refine(
-    (role) => role !== 'owner',
-    { message: 'Cannot change role to owner' }
-  ),
+  role: orgRoleSchema.refine((role) => role !== 'owner', {
+    message: 'Cannot change role to owner',
+  }),
 })
 
 /**
@@ -81,10 +78,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const user = await authenticateRequest(request)
 
     if (!user) {
-      return NextResponse.json(
-        { error: 'Authentication required' },
-        { status: 401 }
-      )
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
     }
 
     const { orgId } = await params
@@ -92,10 +86,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     // Validate UUID format
     if (!isValidUUID(orgId)) {
-      return NextResponse.json(
-        { error: 'Invalid organization ID format' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'Invalid organization ID format' }, { status: 400 })
     }
 
     // Check if user is a member of the organization
@@ -114,9 +105,14 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const offset = (page - 1) * pageSize
 
     // Get all members with user information (paginated)
-    const { data: members, count, error: membersError } = await supabase
+    const {
+      data: members,
+      count,
+      error: membersError,
+    } = await supabase
       .from('organization_members')
-      .select(`
+      .select(
+        `
         id,
         organization_id,
         user_id,
@@ -129,25 +125,38 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
           full_name,
           avatar_url
         )
-      `, { count: 'exact' })
+      `,
+        { count: 'exact' }
+      )
       .eq('organization_id', orgId)
       .order('joined_at', { ascending: true })
       .range(offset, offset + pageSize - 1)
 
     if (membersError) {
       logger.error('Error fetching organization members:', membersError)
-      return NextResponse.json(
-        { error: 'Failed to fetch members' },
-        { status: 500 }
-      )
+      logPermanentFailure({
+        user_id: user.id,
+        organization_id: orgId,
+        error_message: membersError.message || 'Error fetching organization members',
+        stack_trace: undefined,
+        severity: 'ERROR',
+        job_type: 'ORG_MEMBER_LIST',
+        metadata: {
+          route: `/api/organizations/${orgId}/members`,
+          errorCode: 'INTERNAL_ERROR',
+        },
+      }).catch(() => {})
+      return NextResponse.json({ error: 'Failed to fetch members' }, { status: 500 })
     }
 
     type MemberWithUser = OrganizationMemberRow & { users: UserRow | null }
 
     // Transform to OrganizationMemberWithUser format
-    const result: OrganizationMemberWithUser[] = ((members as unknown as MemberWithUser[] | null) || [])
-      .filter(m => m.users)
-      .map(m => {
+    const result: OrganizationMemberWithUser[] = (
+      (members as unknown as MemberWithUser[] | null) || []
+    )
+      .filter((m) => m.users)
+      .map((m) => {
         const userData = m.users!
         return {
           id: m.id,
@@ -176,10 +185,21 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     })
   } catch (error) {
     logger.error('Unexpected error in GET /api/organizations/[orgId]/members:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    logPermanentFailure({
+      user_id: undefined,
+      error_message:
+        error instanceof Error
+          ? error.message
+          : 'Unexpected error in GET /api/organizations/[orgId]/members',
+      stack_trace: error instanceof Error ? error.stack : undefined,
+      severity: 'ERROR',
+      job_type: 'ORG_MEMBER_LIST',
+      metadata: {
+        route: '/api/organizations/[orgId]/members',
+        errorCode: 'INTERNAL_ERROR',
+      },
+    }).catch(() => {})
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
 
@@ -192,10 +212,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     const user = await authenticateRequest(request)
 
     if (!user) {
-      return NextResponse.json(
-        { error: 'Authentication required' },
-        { status: 401 }
-      )
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
     }
 
     const { orgId } = await params
@@ -203,10 +220,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     // Validate UUID format
     if (!isValidUUID(orgId)) {
-      return NextResponse.json(
-        { error: 'Invalid organization ID format' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'Invalid organization ID format' }, { status: 400 })
     }
 
     // Check if user is admin or owner
@@ -239,10 +253,7 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       .single()
 
     if (userError || !targetUser) {
-      return NextResponse.json(
-        { error: 'User not found' },
-        { status: 404 }
-      )
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
     const targetUserRow = targetUser as UserRow
@@ -269,7 +280,8 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
       .eq('id', orgId)
       .single()
 
-    const maxMembers = ((org as { settings: Record<string, unknown> | null } | null)?.settings)?.maxMembers as number | null
+    const maxMembers = (org as { settings: Record<string, unknown> | null } | null)?.settings
+      ?.maxMembers as number | null
     if (maxMembers) {
       const { count } = await supabase
         .from('organization_members')
@@ -298,10 +310,20 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
 
     if (insertError || !newMember) {
       logger.error('Error adding member:', insertError)
-      return NextResponse.json(
-        { error: 'Failed to add member' },
-        { status: 500 }
-      )
+      logPermanentFailure({
+        user_id: user.id,
+        organization_id: orgId,
+        error_message: insertError?.message || 'Error adding member',
+        stack_trace: undefined,
+        severity: 'ERROR',
+        job_type: 'ORG_MEMBER_ADD',
+        metadata: {
+          route: `/api/organizations/${orgId}/members`,
+          errorCode: 'INTERNAL_ERROR',
+          targetUserId: newUserId,
+        },
+      }).catch(() => {})
+      return NextResponse.json({ error: 'Failed to add member' }, { status: 500 })
     }
 
     const newMemberRow = newMember as OrganizationMemberRow
@@ -324,10 +346,21 @@ export async function POST(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ member: result }, { status: 201 })
   } catch (error) {
     logger.error('Unexpected error in POST /api/organizations/[orgId]/members:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    logPermanentFailure({
+      user_id: undefined,
+      error_message:
+        error instanceof Error
+          ? error.message
+          : 'Unexpected error in POST /api/organizations/[orgId]/members',
+      stack_trace: error instanceof Error ? error.stack : undefined,
+      severity: 'ERROR',
+      job_type: 'ORG_MEMBER_ADD',
+      metadata: {
+        route: '/api/organizations/[orgId]/members',
+        errorCode: 'INTERNAL_ERROR',
+      },
+    }).catch(() => {})
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
 
@@ -340,10 +373,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     const user = await authenticateRequest(request)
 
     if (!user) {
-      return NextResponse.json(
-        { error: 'Authentication required' },
-        { status: 401 }
-      )
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
     }
 
     const { orgId } = await params
@@ -351,10 +381,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
     // Validate UUID format
     if (!isValidUUID(orgId)) {
-      return NextResponse.json(
-        { error: 'Invalid organization ID format' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'Invalid organization ID format' }, { status: 400 })
     }
 
     // Check if user is admin or owner
@@ -388,10 +415,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       .single()
 
     if (memberError || !existingMember) {
-      return NextResponse.json(
-        { error: 'Member not found' },
-        { status: 404 }
-      )
+      return NextResponse.json({ error: 'Member not found' }, { status: 404 })
     }
 
     const existingMemberRow = existingMember as { id: string; role: string }
@@ -399,7 +423,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     // Cannot change owner's role (ownership transfer is a separate operation)
     if (existingMemberRow.role === 'owner') {
       return NextResponse.json(
-        { error: 'Cannot change the owner\'s role. Use ownership transfer instead.' },
+        { error: "Cannot change the owner's role. Use ownership transfer instead." },
         { status: 400 }
       )
     }
@@ -409,7 +433,8 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       .from('organization_members')
       .update({ role: newRole })
       .eq('id', existingMemberRow.id)
-      .select(`
+      .select(
+        `
         id,
         organization_id,
         user_id,
@@ -422,15 +447,26 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
           full_name,
           avatar_url
         )
-      `)
+      `
+      )
       .single()
 
     if (updateError || !updatedMember) {
       logger.error('Error updating member role:', updateError)
-      return NextResponse.json(
-        { error: 'Failed to update member role' },
-        { status: 500 }
-      )
+      logPermanentFailure({
+        user_id: user.id,
+        organization_id: orgId,
+        error_message: updateError?.message || 'Error updating member role',
+        stack_trace: undefined,
+        severity: 'ERROR',
+        job_type: 'ORG_MEMBER_UPDATE',
+        metadata: {
+          route: `/api/organizations/${orgId}/members`,
+          errorCode: 'INTERNAL_ERROR',
+          targetUserId: targetUserId,
+        },
+      }).catch(() => {})
+      return NextResponse.json({ error: 'Failed to update member role' }, { status: 500 })
     }
 
     type MemberWithUser = OrganizationMemberRow & { users: UserRow | null }
@@ -455,9 +491,20 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     return NextResponse.json({ member: result })
   } catch (error) {
     logger.error('Unexpected error in PATCH /api/organizations/[orgId]/members:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    logPermanentFailure({
+      user_id: undefined,
+      error_message:
+        error instanceof Error
+          ? error.message
+          : 'Unexpected error in PATCH /api/organizations/[orgId]/members',
+      stack_trace: error instanceof Error ? error.stack : undefined,
+      severity: 'ERROR',
+      job_type: 'ORG_MEMBER_UPDATE',
+      metadata: {
+        route: '/api/organizations/[orgId]/members',
+        errorCode: 'INTERNAL_ERROR',
+      },
+    }).catch(() => {})
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
