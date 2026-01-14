@@ -87,6 +87,8 @@ export interface UserProfile extends Profile {
   courses_completed?: number
   total_learning_hours?: number
   last_activity?: string
+  telegram_chat_id?: string | null
+  telegram_notifications_enabled?: boolean | null
 }
 
 // Tab configuration
@@ -337,6 +339,8 @@ export default function ProfilePage() {
           avatar_url: data.avatar_url || undefined,
           bio: data.bio || undefined,
           role: (data.role as 'student' | 'admin' | 'superadmin') || 'student',
+          telegram_chat_id: data.telegram_chat_id || undefined,
+          telegram_notifications_enabled: data.telegram_notifications_enabled ?? false,
           created_at: data.created_at || undefined,
           updated_at: data.updated_at || undefined,
           preferences: userPreferences,
@@ -494,10 +498,12 @@ export default function ProfilePage() {
 
     try {
       // Separate profile fields from preference fields
-      const { full_name, avatar_url } = updates
+      const { full_name, avatar_url, telegram_chat_id, telegram_notifications_enabled } = updates
       const profileUpdates: Partial<Profile> = {}
       if (full_name !== undefined) profileUpdates.full_name = full_name
       if (avatar_url !== undefined) profileUpdates.avatar_url = avatar_url
+      if (telegram_chat_id !== undefined) profileUpdates.telegram_chat_id = telegram_chat_id
+      if (telegram_notifications_enabled !== undefined) profileUpdates.telegram_notifications_enabled = telegram_notifications_enabled
 
       // Update profile in database if needed
       if (Object.keys(profileUpdates).length > 0) {
@@ -528,7 +534,7 @@ export default function ProfilePage() {
       const preferenceUpdates: Partial<UserPrefs> = {}
       let hasPreferenceUpdates = false
 
-      for (const key of preferenceKeys as Array<keyof UserPrefs>) {
+      for (const key of preferenceKeys) {
         if (key in updates) {
           const value = updates[key as keyof typeof updates]
           if (value !== undefined) {

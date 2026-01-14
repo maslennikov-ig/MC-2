@@ -270,5 +270,10 @@
   "header": {
     "missionProgress": "Mission Progress",
     "noConnection": "No Connection"
+  },
+  "success": {
+    "title": "Course Generated!",
+    "message": "Your course is ready.",
+    "viewCourse": "View Course"
   }
 }

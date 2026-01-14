@@ -45,17 +45,22 @@ export async function verifyEnrichmentAccess(
   // First get the enrichment with its course_id
   const { data: enrichment, error } = await supabase
     .from('lesson_enrichments')
-    .select('id, lesson_id, course_id, enrichment_type, status, order_index, asset_id, generation_attempt, content')
+    .select(
+      'id, lesson_id, course_id, enrichment_type, status, order_index, asset_id, generation_attempt, content'
+    )
     .eq('id', enrichmentId)
     .single();
 
   if (error || !enrichment) {
-    logger.warn({
-      requestId,
-      enrichmentId,
-      userId,
-      error,
-    }, 'Enrichment not found');
+    logger.warn(
+      {
+        requestId,
+        enrichmentId,
+        userId,
+        error,
+      },
+      'Enrichment not found'
+    );
 
     throw new TRPCError({
       code: 'NOT_FOUND',
@@ -71,13 +76,16 @@ export async function verifyEnrichmentAccess(
     .single();
 
   if (courseError || !course) {
-    logger.warn({
-      requestId,
-      enrichmentId,
-      courseId: enrichment.course_id,
-      userId,
-      error: courseError,
-    }, 'Course not found for enrichment');
+    logger.warn(
+      {
+        requestId,
+        enrichmentId,
+        courseId: enrichment.course_id,
+        userId,
+        error: courseError,
+      },
+      'Course not found for enrichment'
+    );
 
     throw new TRPCError({
       code: 'NOT_FOUND',
@@ -87,15 +95,18 @@ export async function verifyEnrichmentAccess(
 
   // Check ownership or same organization
   if (course.user_id !== userId && course.organization_id !== organizationId) {
-    logger.warn({
-      requestId,
-      enrichmentId,
-      courseId: enrichment.course_id,
-      userId,
-      organizationId,
-      courseOwnerId: course.user_id,
-      courseOrgId: course.organization_id,
-    }, 'Enrichment access denied');
+    logger.warn(
+      {
+        requestId,
+        enrichmentId,
+        courseId: enrichment.course_id,
+        userId,
+        organizationId,
+        courseOwnerId: course.user_id,
+        courseOrgId: course.organization_id,
+      },
+      'Enrichment access denied'
+    );
 
     throw new TRPCError({
       code: 'FORBIDDEN',
@@ -108,7 +119,7 @@ export async function verifyEnrichmentAccess(
     lesson_id: enrichment.lesson_id,
     course_id: enrichment.course_id,
     enrichment_type: enrichment.enrichment_type,
-    status: enrichment.status as EnrichmentStatus,
+    status: enrichment.status,
     order_index: enrichment.order_index,
     asset_id: enrichment.asset_id,
     generation_attempt: enrichment.generation_attempt ?? 0,
@@ -141,12 +152,15 @@ export async function verifyCourseAccess(
     .single();
 
   if (error || !course) {
-    logger.warn({
-      requestId,
-      courseId,
-      userId,
-      error,
-    }, 'Course not found');
+    logger.warn(
+      {
+        requestId,
+        courseId,
+        userId,
+        error,
+      },
+      'Course not found'
+    );
 
     throw new TRPCError({
       code: 'NOT_FOUND',
@@ -156,14 +170,17 @@ export async function verifyCourseAccess(
 
   // Check ownership or same organization
   if (course.user_id !== userId && course.organization_id !== organizationId) {
-    logger.warn({
-      requestId,
-      courseId,
-      userId,
-      organizationId,
-      courseOwnerId: course.user_id,
-      courseOrgId: course.organization_id,
-    }, 'Course access denied');
+    logger.warn(
+      {
+        requestId,
+        courseId,
+        userId,
+        organizationId,
+        courseOwnerId: course.user_id,
+        courseOrgId: course.organization_id,
+      },
+      'Course access denied'
+    );
 
     throw new TRPCError({
       code: 'FORBIDDEN',
@@ -205,17 +222,22 @@ export async function verifyLessonAccess(
   // Get lesson with section and course info (lessons -> sections -> courses)
   const { data: lesson, error } = await supabase
     .from('lessons')
-    .select('id, title, section_id, sections!inner(course_id, courses!inner(user_id, organization_id, language))')
+    .select(
+      'id, title, section_id, sections!inner(course_id, courses!inner(user_id, organization_id, language))'
+    )
     .eq('id', lessonId)
     .single();
 
   if (error || !lesson) {
-    logger.warn({
-      requestId,
-      lessonId,
-      userId,
-      error,
-    }, 'Lesson not found');
+    logger.warn(
+      {
+        requestId,
+        lessonId,
+        userId,
+        error,
+      },
+      'Lesson not found'
+    );
 
     throw new TRPCError({
       code: 'NOT_FOUND',
@@ -237,15 +259,18 @@ export async function verifyLessonAccess(
 
   // Check ownership or same organization
   if (course.user_id !== userId && course.organization_id !== organizationId) {
-    logger.warn({
-      requestId,
-      lessonId,
-      courseId,
-      userId,
-      organizationId,
-      courseOwnerId: course.user_id,
-      courseOrgId: course.organization_id,
-    }, 'Lesson access denied');
+    logger.warn(
+      {
+        requestId,
+        lessonId,
+        courseId,
+        userId,
+        organizationId,
+        courseOwnerId: course.user_id,
+        courseOrgId: course.organization_id,
+      },
+      'Lesson access denied'
+    );
 
     throw new TRPCError({
       code: 'FORBIDDEN',
@@ -278,10 +303,13 @@ export async function getNextOrderIndex(lessonId: string): Promise<number> {
     .limit(1);
 
   if (error) {
-    logger.error({
-      lessonId,
-      error: error.message,
-    }, 'Failed to get next order index');
+    logger.error(
+      {
+        lessonId,
+        error: error.message,
+      },
+      'Failed to get next order index'
+    );
     throw new TRPCError({
       code: 'INTERNAL_SERVER_ERROR',
       message: 'Failed to get next order index',
@@ -303,7 +331,9 @@ export async function getNextOrderIndex(lessonId: string): Promise<number> {
  * @returns True if type uses draft -> final flow
  */
 export function isTwoStageType(enrichmentType: string): boolean {
-  return enrichmentType === 'video' || enrichmentType === 'presentation' || enrichmentType === 'cover';
+  return (
+    enrichmentType === 'video' || enrichmentType === 'presentation' || enrichmentType === 'cover'
+  );
 }
 
 /**
@@ -318,7 +348,7 @@ export const CANCELLABLE_STATUSES = ['pending', 'draft_generating', 'generating'
  * @returns True if enrichment can be cancelled
  */
 export function isCancellableStatus(status: string): boolean {
-  return CANCELLABLE_STATUSES.includes(status as typeof CANCELLABLE_STATUSES[number]);
+  return CANCELLABLE_STATUSES.includes(status as (typeof CANCELLABLE_STATUSES)[number]);
 }
 
 /**

@@ -2,6 +2,247 @@
 
 _Released on 2025-12-26_
 
+## v0.27.11
+
+_Released on 2026-01-14_
+
+### ✨ New Features
+
+- **telegram**: Add webhook handler for bot commands
+- **profile**: Add Telegram notification settings section
+- **shared-types**: Add i18n UI labels for CourseSizeSelector
+- **web**: Add form validation for courseSize/estimatedLessons dependency
+- **course-size**: Add 'auto' option as default selection
+- **course-size**: Add course size presets (mini/compact/standard/comprehensive)
+
+### 🔧 Improvements
+
+- **profile**: Simplify Telegram connection with Login Widget
+
+### 🐛 Bug Fixes
+
+- **types**: Resolve TypeScript build errors
+- **lint**: Resolve remaining ESLint errors in web package
+- **lint**: Resolve all ESLint errors across packages
+- **course-size**: Address code review findings
+
+---
+
+_This release was automatically generated from 24 commits._
+
+## v0.27.10
+
+_Released on 2026-01-14_
+
+### 🐛 Bug Fixes
+
+- **course-gen-platform**: Update 2 source file(s)
+
+---
+
+_This release was automatically generated from 1 commits._
+
+## v0.27.9
+
+_Released on 2026-01-14_
+
+### ✨ New Features
+
+- **course-gen-platform**: Add 2 source file(s), update 7 source file(s), +1 more
+- **graph**: Add readOnly prop for automatic generation mode
+- **notifications**: Add stage completion notifications to stages 2-4
+- **generation**: Integrate AutomaticModeControlPanel into generation progress page
+
+---
+
+_This release was automatically generated from 7 commits._
+
+## v0.27.8
+
+_Released on 2026-01-14_
+
+### ✨ New Features
+
+- **generation**: Add automatic generation mode with auto-approval
+- Add notification services for automatic generation mode
+- **web**: Add generation mode UI components to course creation form
+
+### 🐛 Bug Fixes
+
+- **course-gen-platform**: Update 1 source file(s)
+- **stage6**: Send completion notifications when all lessons generated
+
+---
+
+_This release was automatically generated from 6 commits._
+
+## v0.27.7
+
+_Released on 2026-01-14_
+
+### ✨ New Features
+
+- **generation**: Complete pause/stop code review improvements
+- **generation**: Add pause/resume/stop controls for course generation
+- **stage6**: Add stage_6 status transitions in backend
+- **Database**: Add stage_6 enum values to generation_status
+- **enrichments**: Implement on-demand generation from course viewer
+
+### 🔧 Improvements
+
+- **config**: Move LKG config from .tmp/ to .local/
+- **Database**: Cleanup unused lesson content structures
+- **config**: Convert require() to ES imports in next.config.ts
+
+### 🐛 Bug Fixes
+
+- **web**: Show Stage 6 spinner only when actively generating
+- **stage6,stage7**: Align database queries with lesson_contents table
+- **generation**: Address code review issues for pause/stop feature
+- Comprehensive health check - fix all vulnerabilities and bugs
+- **workflow**: Stage 4/5 phases now display lazy-loaded trace data
+- **web**: Health check - fix React hooks violations and code quality issues
+- **tools**: Fix PostgREST query in retrigger-enrichments script
+- **stage7**: Fix enrichment creation and lesson query issues
+- **pwa**: Correct cleanUpOutdatedCaches typo
+- **stage7**: Fix course card constraint and enrichment triggers
+- **stage7**: Correct lessons query in triggerCourseCard and triggerAllLessonCovers
+- **web**: Convert require to ES imports and prevent lint-staged rollback
+- **lint**: Resolve ESLint errors and improve code quality
+- **logging**: Improve error context with userId capture and metadata standardization
+- **enrichments**: Address code review findings for on-demand generation
+- **Interface**: Stage 6 progress bar shows real lesson completion percentage
+- **generation**: Improve success overlay UX and fix lint errors
+- **logging**: Add comprehensive error_logs DB logging to all API routes
+- **generation**: Improve success overlay UX
+- **admin**: Lazy load trace details for Input/Output Data
+
+---
+
+_This release was automatically generated from 51 commits._
+
+## v0.27.6
+
+_Released on 2026-01-13_
+
+### ✨ New Features
+
+- **viewer**: Add on-demand enrichment placeholder cards UI
+
+### 🐛 Bug Fixes
+
+- **Interface**: Stage 6 UX improvements - hide regenerate, add finalize button
+- **Interface**: Fix accordion content clipping when open
+- **logging**: Add error_logs DB logging to more API routes
+- **admin**: Fix invisible Input Data content in trace viewer
+- **logging**: Add error_logs DB logging to BullMQ job failures
+- **courses**: Allow superadmin to view workflow of any course
+- **Security**: Add SuperAdmin role check for cross-org analytics
+- **pipeline**: Skip RAG retrieval for courses without documents
+
+---
+
+_This release was automatically generated from 16 commits._
+
+## v0.27.5
+
+_Released on 2026-01-13_
+
+### ✨ New Features
+
+- **admin**: Add clickable help tooltips for pipeline stages and phases
+- **web**: Add error logging to all API routes for admin visibility
+
+### 🐛 Bug Fixes
+
+- **web**: Reduce noisy health check logs
+
+---
+
+_This release was automatically generated from 5 commits._
+
+## v0.27.4
+
+_Released on 2026-01-13_
+
+### 🐛 Bug Fixes
+
+- **web**: Update 2 source file(s)
+
+---
+
+_This release was automatically generated from 1 commits._
+
+## v0.27.3
+
+_Released on 2026-01-13_
+
+### 🐛 Bug Fixes
+
+- **web**: Update 1 source file(s)
+- **web**: Add database error logging to admin logs
+
+---
+
+_This release was automatically generated from 3 commits._
+
+## v0.27.2
+
+_Released on 2026-01-13_
+
+### ✨ New Features
+
+- **courses**: Increase course catalog cards from 10 to 12
+
+---
+
+_This release was automatically generated from 1 commits._
+
+## v0.27.1
+
+_Released on 2026-01-13_
+
+### ✨ New Features
+
+- **styles**: Reorder course styles for B2B focus with professional as default
+
+---
+
+_This release was automatically generated from 1 commits._
+
+## v0.27.0
+
+_Released on 2026-01-13_
+
+### ✨ New Features
+
+- **admin**: Replace polling with Supabase Realtime for logs page
+- **Database**: Add generation_trace lifecycle management
+- **admin**: Enhanced logs page with problem ID, environment, copy button
+
+### 🔧 Improvements
+
+- **admin**: Extract SeverityBadge component
+
+### 🐛 Bug Fixes
+
+- **scripts**: Use temp files instead of pipes in release.sh
+- **scripts**: Ignore SIGPIPE to prevent exit 141 in release.sh
+- **scripts**: Replace tail with safe_tail_from to avoid SIGPIPE
+- **admin**: Move Refresh/Live buttons above filter card
+- **admin**: Move Refresh/Live to top row with filters
+- **admin**: Move Refresh and Live buttons inside filter card
+- **web**: Memory leak on course generation page (4GB RAM, 100% CPU)
+- **scripts**: Fix deploy.sh SIGPIPE and non-interactive mode
+- **admin**: Prevent infinite loop in logs page refresh
+- **admin**: Code review fixes for logs page
+- **Authentication**: Remove redundant client-side session refresh
+- **scripts**: Improve release.sh auto-commit error handling
+
+---
+
+_This release was automatically generated from 25 commits._
+
 ## v0.26.83
 
 _Released on 2026-01-12_

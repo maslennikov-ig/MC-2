@@ -1,24 +1,24 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getUserClient } from '@/lib/supabase/client-factory'
 import { supabaseAdmin } from '@/lib/supabase-admin'
-import { logger } from '@/lib/logger'
+import { logger, logPermanentFailure } from '@/lib/logger'
 import { withOptionalAuth, withDevBypass, withAuth, AuthUser } from '@/lib/auth'
 import { PostgrestError } from '@supabase/supabase-js'
 
 interface Lesson {
-  lesson_number: number;
-  [key: string]: unknown;
+  lesson_number: number
+  [key: string]: unknown
 }
 
 interface Section {
-  section_number: number;
-  lessons?: Lesson[];
-  [key: string]: unknown;
+  section_number: number
+  lessons?: Lesson[]
+  [key: string]: unknown
 }
 
 interface CourseWithSections {
-  sections?: Section[];
-  [key: string]: unknown;
+  sections?: Section[]
+  [key: string]: unknown
 }
 
 async function handleGetCourse(
@@ -28,22 +28,24 @@ async function handleGetCourse(
 ) {
   try {
     const { slug } = await params
-    
+
     // Get appropriate client based on auth status
     const supabase = await getUserClient()
-    
+
     // Build query based on auth status
     let query = supabase
       .from('courses')
-      .select(`
+      .select(
+        `
         *,
         sections:sections(
           *,
           lessons:lessons(*)
         )
-      `)
+      `
+      )
       .eq('slug', slug)
-    
+
     // If user is not authenticated, only show public courses
     // If user is authenticated, show their courses OR public courses
     // Note: organization visibility is handled by RLS policy based on user's organization
@@ -54,14 +56,20 @@ async function handleGetCourse(
       // First get public courses OR user's own courses using proper OR conditions
       // Note: Supabase .or() expects comma-separated conditions as string format
       // This is the expected Supabase syntax, but we validate user.id is a safe UUID
-      if (typeof user.id !== 'string' || !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(user.id)) {
+      if (
+        typeof user.id !== 'string' ||
+        !/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(user.id)
+      ) {
         return NextResponse.json({ error: 'Invalid user ID format' }, { status: 400 })
       }
       query = query.or(`user_id.eq.${user.id},visibility.eq.public`)
     }
-    
-    const { data: course, error } = await query.single() as { data: CourseWithSections | null, error: PostgrestError | null }
-    
+
+    const { data: course, error } = (await query.single()) as {
+      data: CourseWithSections | null
+      error: PostgrestError | null
+    }
+
     // Сортируем секции и уроки после загрузки
     if (course && course.sections) {
       course.sections.sort((a: Section, b: Section) => a.section_number - b.section_number)
@@ -71,29 +79,43 @@ async function handleGetCourse(
         }
       })
     }
-    
+
     if (error) {
       logger.error('Error fetching course:', error)
-      return NextResponse.json(
-        { error: 'Failed to fetch course' },
-        { status: 500 }
-      )
+      logPermanentFailure({
+        user_id: user?.id,
+        error_message: error.message || 'Failed to fetch course',
+        stack_trace: undefined,
+        severity: 'ERROR',
+        job_type: 'COURSE_GET',
+        metadata: {
+          route: '/api/courses/[slug]',
+          slug,
+          errorCode: 'FETCH_ERROR',
+        },
+      }).catch(() => {})
+      return NextResponse.json({ error: 'Failed to fetch course' }, { status: 500 })
     }
-    
+
     if (!course) {
-      return NextResponse.json(
-        { error: 'Course not found' },
-        { status: 404 }
-      )
+      return NextResponse.json({ error: 'Course not found' }, { status: 404 })
     }
-    
+
     return NextResponse.json(course)
   } catch (error) {
     logger.error('Error in GET /api/courses/[slug]:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    logPermanentFailure({
+      user_id: user?.id,
+      error_message: error instanceof Error ? error.message : 'Internal server error',
+      stack_trace: error instanceof Error ? error.stack : undefined,
+      severity: 'ERROR',
+      job_type: 'COURSE_GET',
+      metadata: {
+        route: '/api/courses/[slug]',
+        errorCode: 'INTERNAL_ERROR',
+      },
+    }).catch(() => {})
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
 
@@ -104,81 +126,102 @@ async function handleDeleteCourse(
 ) {
   const { slug } = await params
   logger.devLog('DELETE course request:', { slug, user })
-  
+
   // Use admin client for server-side operations
   const { data: courseData, error: fetchError } = await supabaseAdmin
     .from('courses')
     .select('id, user_id')
     .eq('slug', slug)
     .single()
-  
+
   logger.devLog('Course fetch result:', { courseData, fetchError })
-  
+
   if (fetchError || !courseData) {
     logger.error('Course not found for deletion:', { slug, error: fetchError })
+    logPermanentFailure({
+      user_id: user?.id,
+      error_message: fetchError?.message || 'Course not found for deletion',
+      stack_trace: undefined,
+      severity: 'ERROR',
+      job_type: 'COURSE_DELETE',
+      metadata: {
+        route: '/api/courses/[slug]',
+        slug,
+        errorCode: 'NOT_FOUND_ERROR',
+      },
+    }).catch(() => {})
     return NextResponse.json(
       { error: 'Course not found', details: fetchError?.message },
       { status: 404 }
     )
   }
-  
+
   // Check permissions for deletion
   // Allow if: dev bypass, super admin, owner, or no owner (n8n created)
   const isDevelopmentBypass = process.env.NODE_ENV === 'development' && user.id === 'dev-user'
   const isSuperAdmin = user.role === 'superadmin'
   const isNoOwnerCourse = courseData.user_id === null
   const isOwner = courseData.user_id === user.id
-  
+
   if (!isDevelopmentBypass && !isSuperAdmin && !isNoOwnerCourse && !isOwner) {
-    logger.warn('Unauthorized deletion attempt:', { 
-      courseId: courseData.id, 
-      courseOwnerId: courseData.user_id, 
+    logger.warn('Unauthorized deletion attempt:', {
+      courseId: courseData.id,
+      courseOwnerId: courseData.user_id,
       requestUserId: user.id,
-      userRole: user.role
+      userRole: user.role,
     })
     return NextResponse.json(
       { error: 'Unauthorized', message: 'You can only delete your own courses' },
       { status: 403 }
     )
   }
-  
-  logger.devLog('Ownership check passed:', { 
-    isDevelopmentBypass, 
-    isSuperAdmin, 
-    isNoOwnerCourse, 
+
+  logger.devLog('Ownership check passed:', {
+    isDevelopmentBypass,
+    isSuperAdmin,
+    isNoOwnerCourse,
     isOwner,
-    userRole: user.role 
+    userRole: user.role,
   })
-  
+
   const id = courseData.id
   logger.devLog('DELETE request for course:', slug, 'id:', id, 'by owner:', user.email)
-  
+
   try {
-    
     logger.devLog('Attempting to delete course:', id)
-    
+
     // Delete in correct order to avoid foreign key constraint violations
     // Note: Tests/questions tables will be added in future database schema updates
     // Currently these tables don't exist in the database: tests, questions, user_favorites
 
     // 1. Delete assets
-    const { error: assetsError } = await supabaseAdmin
-      .from('assets')
-      .delete()
-      .eq('course_id', id)
-    
+    const { error: assetsError } = await supabaseAdmin.from('assets').delete().eq('course_id', id)
+
     if (assetsError) {
       logger.error('Error deleting assets:', assetsError)
+      logPermanentFailure({
+        user_id: user?.id,
+        error_message: assetsError.message || 'Error deleting assets',
+        stack_trace: undefined,
+        severity: 'ERROR',
+        job_type: 'COURSE_DELETE',
+        metadata: {
+          route: '/api/courses/[slug]',
+          slug,
+          courseId: id,
+          errorCode: 'DELETE_ASSETS_ERROR',
+        },
+      }).catch(() => {})
     }
-    
+
     // 3. Delete lessons (must be before sections)
     const { data: sectionsData } = await supabaseAdmin
       .from('sections')
       .select('id')
       .eq('course_id', id)
-    
+
     if (sectionsData && sectionsData.length > 0) {
-      const sectionIds = sectionsData.map(s => s.id)
+      const sectionIds = sectionsData.map((s) => s.id)
       const { error: lessonsError } = await supabaseAdmin
         .from('lessons')
         .delete()
@@ -186,23 +229,49 @@ async function handleDeleteCourse(
 
       if (lessonsError) {
         logger.error('Error deleting lessons:', lessonsError)
+        logPermanentFailure({
+          user_id: user?.id,
+          error_message: lessonsError.message || 'Error deleting lessons',
+          stack_trace: undefined,
+          severity: 'ERROR',
+          job_type: 'COURSE_DELETE',
+          metadata: {
+            route: '/api/courses/[slug]',
+            slug,
+            courseId: id,
+            errorCode: 'DELETE_LESSONS_ERROR',
+          },
+        }).catch(() => {})
         // Note: lessons are now linked via section_id only, no course_id fallback
       }
     }
-    
+
     // 4. Delete sections
     const { error: sectionsError } = await supabaseAdmin
       .from('sections')
       .delete()
       .eq('course_id', id)
-    
+
     if (sectionsError) {
       logger.error('Error deleting sections:', sectionsError)
+      logPermanentFailure({
+        user_id: user?.id,
+        error_message: sectionsError.message || 'Error deleting sections',
+        stack_trace: undefined,
+        severity: 'ERROR',
+        job_type: 'COURSE_DELETE',
+        metadata: {
+          route: '/api/courses/[slug]',
+          slug,
+          courseId: id,
+          errorCode: 'DELETE_SECTIONS_ERROR',
+        },
+      }).catch(() => {})
     }
-    
+
     // Note: Document processing tables will be added in future database schema updates
     // Currently these tables don't exist in the database
-    
+
     // 8. Finally, delete the course
     const { error: courseError, data: deletedCourse } = await supabaseAdmin
       .from('courses')
@@ -210,41 +279,64 @@ async function handleDeleteCourse(
       .eq('id', id)
       .select()
       .single()
-    
+
     if (courseError) {
       logger.error('Error deleting course:', courseError)
+      logPermanentFailure({
+        user_id: user?.id,
+        error_message: courseError.message || 'Failed to delete course',
+        stack_trace: undefined,
+        severity: 'ERROR',
+        job_type: 'COURSE_DELETE',
+        metadata: {
+          route: '/api/courses/[slug]',
+          slug,
+          courseId: id,
+          errorCode: 'DELETE_COURSE_ERROR',
+          errorDetails: courseError.code,
+        },
+      }).catch(() => {})
       return NextResponse.json(
-        { 
+        {
           error: 'Failed to delete course',
           details: courseError.message,
-          code: courseError.code
+          code: courseError.code,
         },
         { status: 500 }
       )
     }
-    
+
     if (!deletedCourse) {
-      return NextResponse.json(
-        { error: 'Course not found' },
-        { status: 404 }
-      )
+      return NextResponse.json({ error: 'Course not found' }, { status: 404 })
     }
-    
+
     logger.devLog('Successfully deleted course:', deletedCourse.title)
-    
+
     return NextResponse.json(
-      { 
+      {
         message: 'Course deleted successfully',
-        deletedCourse: { id: deletedCourse.id, title: deletedCourse.title }
+        deletedCourse: { id: deletedCourse.id, title: deletedCourse.title },
       },
       { status: 200 }
     )
   } catch (error) {
     logger.error('Error in DELETE /api/courses/[slug]:', error)
+    logPermanentFailure({
+      user_id: user?.id,
+      error_message: error instanceof Error ? error.message : 'Internal server error',
+      stack_trace: error instanceof Error ? error.stack : undefined,
+      severity: 'ERROR',
+      job_type: 'COURSE_DELETE',
+      metadata: {
+        route: '/api/courses/[slug]',
+        slug,
+        errorCode: 'INTERNAL_ERROR',
+      },
+    }).catch(() => {})
     return NextResponse.json(
-      { 
+      {
         error: 'Internal server error',
-        details: error instanceof Error ? error.message : 'Unknown error'
+        details: error instanceof Error ? error.message : 'Unknown error',
       },
       { status: 500 }
     )
@@ -260,65 +352,80 @@ async function handleUpdateCourse(
     const { slug } = await params
     logger.devLog('PUT request for course:', slug, 'by user:', user.email)
     const body = await request.json()
-    
+
     // First get the course and check ownership
     const { data: courseData, error: fetchError } = await supabaseAdmin
       .from('courses')
       .select('id, user_id')
       .eq('slug', slug)
       .single()
-    
+
     if (fetchError || !courseData) {
-      return NextResponse.json(
-        { error: 'Course not found' },
-        { status: 404 }
-      )
+      return NextResponse.json({ error: 'Course not found' }, { status: 404 })
     }
-    
+
     // Check permissions for update
     // Allow if: dev bypass, super admin, owner, or no owner (n8n created)
     const isDevelopmentBypass = process.env.NODE_ENV === 'development' && user.id === 'dev-user'
     const isSuperAdmin = user.role === 'superadmin'
     const isNoOwnerCourse = courseData.user_id === null
     const isOwner = courseData.user_id === user.id
-    
+
     if (!isDevelopmentBypass && !isSuperAdmin && !isNoOwnerCourse && !isOwner) {
-      logger.warn('Unauthorized update attempt:', { 
-        courseId: courseData.id, 
-        courseOwnerId: courseData.user_id, 
+      logger.warn('Unauthorized update attempt:', {
+        courseId: courseData.id,
+        courseOwnerId: courseData.user_id,
         requestUserId: user.id,
-        userRole: user.role
+        userRole: user.role,
       })
       return NextResponse.json(
         { error: 'Unauthorized', message: 'You can only update your own courses' },
         { status: 403 }
       )
     }
-    
+
     const id = courseData.id
-    
+
     const { data: course, error } = await supabaseAdmin
       .from('courses')
       .update(body)
       .eq('id', id)
       .select()
       .single()
-    
+
     if (error) {
       logger.error('Error updating course:', error)
-      return NextResponse.json(
-        { error: 'Failed to update course' },
-        { status: 500 }
-      )
+      logPermanentFailure({
+        user_id: user?.id,
+        error_message: error.message || 'Failed to update course',
+        stack_trace: undefined,
+        severity: 'ERROR',
+        job_type: 'COURSE_UPDATE',
+        metadata: {
+          route: '/api/courses/[slug]',
+          slug,
+          courseId: id,
+          errorCode: 'UPDATE_ERROR',
+        },
+      }).catch(() => {})
+      return NextResponse.json({ error: 'Failed to update course' }, { status: 500 })
     }
-    
+
     return NextResponse.json(course)
   } catch (error) {
     logger.error('Error in PUT /api/courses/[slug]:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    logPermanentFailure({
+      user_id: user?.id,
+      error_message: error instanceof Error ? error.message : 'Internal server error',
+      stack_trace: error instanceof Error ? error.stack : undefined,
+      severity: 'ERROR',
+      job_type: 'COURSE_UPDATE',
+      metadata: {
+        route: '/api/courses/[slug]',
+        errorCode: 'INTERNAL_ERROR',
+      },
+    }).catch(() => {})
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
 
@@ -326,9 +433,8 @@ async function handleUpdateCourse(
 export const GET = withOptionalAuth(handleGetCourse)
 
 // Check if auth should be bypassed (dev mode OR explicit bypass flag)
-const shouldBypassAuth = process.env.NODE_ENV === 'development' || 
-                        process.env.BYPASS_AUTH === 'true'
-
+const shouldBypassAuth =
+  process.env.NODE_ENV === 'development' || process.env.BYPASS_AUTH === 'true'
 
 // For DELETE and PUT: use DevBypass in development/testing, proper auth in production
 export const DELETE = shouldBypassAuth

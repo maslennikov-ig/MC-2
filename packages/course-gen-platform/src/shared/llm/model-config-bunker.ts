@@ -50,9 +50,9 @@ import type {
  * Path to Last Known Good (LKG) configuration file
  *
  * In production (Docker): /app/data/lkg-config.json
- * In development: {projectRoot}/.tmp/data/lkg-config.json
+ * In development: {projectRoot}/.local/data/lkg-config.json
  *
- * @default /app/data/lkg-config.json (production) or .tmp/data/lkg-config.json (development)
+ * @default /app/data/lkg-config.json (production) or .local/data/lkg-config.json (development)
  */
 const LKG_PATH = (() => {
   // Explicit override takes precedence
@@ -60,9 +60,9 @@ const LKG_PATH = (() => {
     return process.env.LKG_CONFIG_PATH;
   }
 
-  // In development, use local .tmp directory (git-ignored)
+  // In development, use local .local directory (git-ignored)
   if (process.env.NODE_ENV !== 'production') {
-    return path.join(__dirname, '../../../../.tmp/data/lkg-config.json');
+    return path.join(__dirname, '../../../../.local/data/lkg-config.json');
   }
 
   // Production default (Docker)
@@ -74,8 +74,7 @@ const LKG_PATH = (() => {
  * @default {__dirname}/../../config/config-seed.json
  */
 const SEED_PATH =
-  process.env.SEED_CONFIG_PATH ||
-  path.join(__dirname, '../../config/config-seed.json');
+  process.env.SEED_CONFIG_PATH || path.join(__dirname, '../../config/config-seed.json');
 
 /**
  * Redis key for configuration snapshot
@@ -167,14 +166,14 @@ const ConfigRowSchema = z.object({
   fallback_model_id: z.string().nullable(),
   temperature: z
     .union([z.number(), z.string()])
-    .transform((v) => (typeof v === 'string' ? parseFloat(v) : v))
+    .transform(v => (typeof v === 'string' ? parseFloat(v) : v))
     .pipe(z.number().min(0).max(2))
     .nullable(),
   max_tokens: z.number().int().positive().max(200000).nullable(),
   max_context_tokens: z.number().int().positive().max(2000000).nullable(),
   quality_threshold: z
     .union([z.number(), z.string()])
-    .transform((v) => (typeof v === 'string' ? parseFloat(v) : v))
+    .transform(v => (typeof v === 'string' ? parseFloat(v) : v))
     .pipe(z.number().min(0).max(1))
     .nullable()
     .optional(),
@@ -185,7 +184,7 @@ const ConfigRowSchema = z.object({
   judge_role: z.enum(['primary', 'secondary', 'tiebreaker']).nullable().optional(),
   weight: z
     .union([z.number(), z.string()])
-    .transform((v) => (typeof v === 'string' ? parseFloat(v) : v))
+    .transform(v => (typeof v === 'string' ? parseFloat(v) : v))
     .pipe(z.number().min(0).max(1))
     .nullable()
     .optional(),
@@ -245,11 +244,7 @@ function buildKey(row: {
  * @param phaseName - Phase name for error context
  * @returns Parsed number or null if invalid/missing
  */
-function parseFloatSafe(
-  value: unknown,
-  fieldName: string,
-  phaseName: string
-): number | null {
+function parseFloatSafe(value: unknown, fieldName: string, phaseName: string): number | null {
   if (value === null || value === undefined) return null;
   const parsed = typeof value === 'string' ? parseFloat(value) : Number(value);
   if (isNaN(parsed)) {
@@ -424,18 +419,13 @@ export class ModelConfigBunker {
     try {
       // A. Ensure LKG exists. If not (fresh install), copy from Seed.
       if (!existsSync(LKG_PATH) && existsSync(SEED_PATH)) {
-        logger.info(
-          '[ModelConfigBunker] Cold Start: Initializing LKG from Build Seed.'
-        );
+        logger.info('[ModelConfigBunker] Cold Start: Initializing LKG from Build Seed.');
         try {
           const dir = path.dirname(LKG_PATH);
           await fs.mkdir(dir, { recursive: true });
           copyFileSync(SEED_PATH, LKG_PATH);
         } catch (e) {
-          logger.warn(
-            { error: e },
-            '[ModelConfigBunker] Could not copy seed to LKG path'
-          );
+          logger.warn({ error: e }, '[ModelConfigBunker] Could not copy seed to LKG path');
         }
       }
 
@@ -446,18 +436,14 @@ export class ModelConfigBunker {
       try {
         await this.loadFromRedis();
       } catch {
-        logger.warn(
-          '[ModelConfigBunker] Redis unavailable during startup, using disk cache'
-        );
+        logger.warn('[ModelConfigBunker] Redis unavailable during startup, using disk cache');
       }
 
       // D. Try to sync from DB (Best Effort)
       try {
         await this.syncFromDatabase();
       } catch {
-        logger.warn(
-          '[ModelConfigBunker] DB unreachable at startup. Running on LKG data.'
-        );
+        logger.warn('[ModelConfigBunker] DB unreachable at startup. Running on LKG data.');
       }
 
       // E. Validate we have minimum required configs
@@ -467,19 +453,13 @@ export class ModelConfigBunker {
 
       // F. Start Background Sync
       this.syncTimer = setInterval(() => {
-        this.syncFromDatabase().catch((err) => {
-          logger.error(
-            { error: err },
-            '[ModelConfigBunker] Background sync failed'
-          );
+        this.syncFromDatabase().catch(err => {
+          logger.error({ error: err }, '[ModelConfigBunker] Background sync failed');
         });
       }, SYNC_INTERVAL_MS);
 
       this.isReady = true;
-      logger.info(
-        { configCount: this.cache.size },
-        '[ModelConfigBunker] Ready'
-      );
+      logger.info({ configCount: this.cache.size }, '[ModelConfigBunker] Ready');
     } catch (err) {
       // Clean up timer if initialization fails to prevent memory leak
       if (this.syncTimer) {
@@ -533,7 +513,7 @@ export class ModelConfigBunker {
 
     this.syncRetries = 0;
     this.syncTimer = setInterval(() => {
-      this.syncFromDatabase().catch((err) => {
+      this.syncFromDatabase().catch(err => {
         logger.error({ error: err }, '[ModelConfigBunker] Background sync failed');
       });
     }, SYNC_INTERVAL_MS);
@@ -633,9 +613,7 @@ export class ModelConfigBunker {
    * }
    */
   getEmergency(): ActiveConfig {
-    const config =
-      this.cache.get('emergency:extended') ||
-      this.cache.get('emergency:standard');
+    const config = this.cache.get('emergency:extended') || this.cache.get('emergency:standard');
     if (!config) {
       throw new Error('CRITICAL: Emergency config missing.');
     }
@@ -645,9 +623,7 @@ export class ModelConfigBunker {
         source: 'memory_l1',
         resolution: 'exact',
         fetched_at: Date.now(),
-        config_age_sec: Math.floor(
-          (Date.now() - this.cacheUpdatedAt) / 1000
-        ),
+        config_age_sec: Math.floor((Date.now() - this.cacheUpdatedAt) / 1000),
       },
     };
   }
@@ -675,10 +651,7 @@ export class ModelConfigBunker {
       const supabase = getSupabaseAdmin();
 
       // Wrap query with timeout to prevent hanging if Supabase is unresponsive
-      const queryPromise = supabase
-        .from('llm_model_config')
-        .select('*')
-        .eq('is_active', true);
+      const queryPromise = supabase.from('llm_model_config').select('*').eq('is_active', true);
 
       const timeoutPromise = new Promise<never>((_, reject) =>
         setTimeout(
@@ -691,9 +664,7 @@ export class ModelConfigBunker {
 
       if (error) throw error;
       if (!data?.length) {
-        logger.warn(
-          '[ModelConfigBunker] DB returned empty config list, preserving cache'
-        );
+        logger.warn('[ModelConfigBunker] DB returned empty config list, preserving cache');
         return;
       }
 
@@ -716,11 +687,13 @@ export class ModelConfigBunker {
               model_id: row.model_id,
               tier: row.context_tier,
               language: row.language,
-              errors: result.error.errors.map((e: { path: (string | number)[]; message: string; code: string }) => ({
-                path: e.path.join('.'),
-                message: e.message,
-                code: e.code
-              }))
+              errors: result.error.errors.map(
+                (e: { path: (string | number)[]; message: string; code: string }) => ({
+                  path: e.path.join('.'),
+                  message: e.message,
+                  code: e.code,
+                })
+              ),
             },
             '[ModelConfigBunker] Config validation failed'
           );
@@ -737,10 +710,7 @@ export class ModelConfigBunker {
       }
 
       // Circuit Breaker: Prevent suspicious config drops
-      if (
-        this.cache.size > CACHE_SIZE_THRESHOLD &&
-        validCount < MIN_CONFIG_COUNT
-      ) {
+      if (this.cache.size > CACHE_SIZE_THRESHOLD && validCount < MIN_CONFIG_COUNT) {
         logger.error(
           {
             cacheSize: this.cache.size,
@@ -809,9 +779,7 @@ export class ModelConfigBunker {
    * @param snapshot Validated config snapshot
    * @private
    */
-  private async updateAllLayers(
-    snapshot: Record<string, PhaseModelConfig>
-  ): Promise<void> {
+  private async updateAllLayers(snapshot: Record<string, PhaseModelConfig>): Promise<void> {
     const now = Date.now();
 
     // L1: Update Memory
@@ -824,10 +792,7 @@ export class ModelConfigBunker {
     // L2: Update Redis (best effort)
     try {
       const redis = getRedisClient();
-      await redis.set(
-        REDIS_KEY,
-        JSON.stringify({ data: snapshot, updatedAt: now })
-      );
+      await redis.set(REDIS_KEY, JSON.stringify({ data: snapshot, updatedAt: now }));
       this.redisWriteFailures = 0; // Reset on success
     } catch (error) {
       this.redisWriteFailures++;
@@ -848,11 +813,7 @@ export class ModelConfigBunker {
     try {
       const dir = path.dirname(LKG_PATH);
       await fs.mkdir(dir, { recursive: true });
-      const content = JSON.stringify(
-        { data: snapshot, updatedAt: now },
-        null,
-        2
-      );
+      const content = JSON.stringify({ data: snapshot, updatedAt: now }, null, 2);
       const tmpPath = `${LKG_PATH}.tmp`;
 
       // Write to temp file
@@ -953,10 +914,7 @@ export class ModelConfigBunker {
         '[ModelConfigBunker] Loaded from Redis'
       );
     } catch (err) {
-      logger.error(
-        { error: err },
-        '[ModelConfigBunker] Failed to parse Redis snapshot'
-      );
+      logger.error({ error: err }, '[ModelConfigBunker] Failed to parse Redis snapshot');
     }
   }
 
@@ -982,9 +940,7 @@ export class ModelConfigBunker {
 
     try {
       const raw = readFileSync(diskPath, 'utf-8');
-      const parsed = JSON.parse(raw) as
-        | ConfigSnapshot
-        | Array<Record<string, unknown>>;
+      const parsed = JSON.parse(raw) as ConfigSnapshot | Array<Record<string, unknown>>;
 
       // Handle both formats: { data: {...} } and raw array
       if (Array.isArray(parsed)) {
@@ -1001,7 +957,7 @@ export class ModelConfigBunker {
           } else {
             invalidCount++;
             logger.warn(
-              { phase: (row as Record<string, unknown>).phase_name, errors: result.error.errors },
+              { phase: row.phase_name, errors: result.error.errors },
               '[ModelConfigBunker] Invalid config in disk file, skipping'
             );
           }
@@ -1031,7 +987,7 @@ export class ModelConfigBunker {
         for (const [key, configData] of Object.entries(parsed.data)) {
           const result = ConfigRowSchema.safeParse(configData);
           if (result.success) {
-            this.cache.set(key, configData as PhaseModelConfig);
+            this.cache.set(key, configData);
             validCount++;
           } else {
             invalidCount++;
@@ -1056,10 +1012,7 @@ export class ModelConfigBunker {
         );
       }
     } catch (error) {
-      logger.error(
-        { path: diskPath, error },
-        '[ModelConfigBunker] Failed to load disk cache'
-      );
+      logger.error({ path: diskPath, error }, '[ModelConfigBunker] Failed to load disk cache');
     }
   }
 
@@ -1207,7 +1160,7 @@ export async function initializeModelConfigBunker(): Promise<ModelConfigBunker> 
       initializationPromise = null; // Clear after success
       return bunker;
     })
-    .catch((err) => {
+    .catch(err => {
       initializationPromise = null; // Clear on error for retry
       throw err;
     });

@@ -270,5 +270,10 @@
   "header": {
     "missionProgress": "Прогресс миссии",
     "noConnection": "Нет связи"
+  },
+  "success": {
+    "title": "Курс создан!",
+    "message": "Ваш курс готов.",
+    "viewCourse": "Открыть курс"
   }
 }

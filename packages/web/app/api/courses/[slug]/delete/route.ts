@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAdminClient } from '@/lib/supabase/client-factory'
-import { logger } from '@/lib/logger'
+import { logger, logPermanentFailure } from '@/lib/logger'
 import { withDevBypass, withAuth, AuthUser } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 
@@ -8,14 +8,17 @@ import { createClient } from '@/lib/supabase/server'
  * Calls the tRPC cleanup endpoint to clean up external resources
  * (Qdrant vectors, Redis, RAG context, files) before database deletion
  */
-async function cleanupCourseResources(courseId: string, accessToken: string): Promise<{
-  success: boolean;
-  vectorsDeleted?: number;
-  filesDeleted?: number;
-  errors?: string[];
+async function cleanupCourseResources(
+  courseId: string,
+  accessToken: string
+): Promise<{
+  success: boolean
+  vectorsDeleted?: number
+  filesDeleted?: number
+  errors?: string[]
 }> {
-  const backendUrl = process.env.COURSEGEN_BACKEND_URL || 'http://localhost:3456';
-  const tRPCUrl = `${backendUrl}/trpc`;
+  const backendUrl = process.env.COURSEGEN_BACKEND_URL || 'http://localhost:3456'
+  const tRPCUrl = `${backendUrl}/trpc`
 
   try {
     const response = await fetch(`${tRPCUrl}/generation.cleanupCourse`, {
@@ -25,38 +28,38 @@ async function cleanupCourseResources(courseId: string, accessToken: string): Pr
         Authorization: `Bearer ${accessToken}`,
       },
       body: JSON.stringify({ courseId }),
-    });
+    })
 
-    const data = await response.json();
+    const data = await response.json()
 
     if (!response.ok) {
       logger.warn('Cleanup tRPC call failed', {
         courseId,
         status: response.status,
         error: data,
-      });
+      })
       return {
         success: false,
         errors: [data.error?.message || 'Cleanup request failed'],
-      };
+      }
     }
 
-    const result = data.result?.data;
+    const result = data.result?.data
     return {
       success: result?.success ?? false,
       vectorsDeleted: result?.qdrant?.vectorsDeleted,
       filesDeleted: result?.files?.filesDeleted,
       errors: result?.errors,
-    };
+    }
   } catch (error) {
     logger.error('Failed to call cleanup endpoint:', {
       courseId,
       error: error instanceof Error ? error.message : String(error),
-    });
+    })
     return {
       success: false,
       errors: [error instanceof Error ? error.message : 'Unknown cleanup error'],
-    };
+    }
   }
 }
 
@@ -77,9 +80,9 @@ async function handleDeleteCourse(
     .select('id, user_id')
     .eq('slug', slug)
     .single()
-  
+
   logger.devLog('Course fetch result:', { courseData, fetchError })
-  
+
   if (fetchError || !courseData) {
     logger.error('Course not found for deletion:', { slug, error: fetchError })
     return NextResponse.json(
@@ -87,44 +90,46 @@ async function handleDeleteCourse(
       { status: 404 }
     )
   }
-  
+
   // Check permissions for deletion
   // Allow if: super admin, owner, or no owner (n8n created)
   // Development bypass only if explicitly enabled and not in production
-  const isProductionEnv = process.env.NEXT_PUBLIC_SITE_URL?.includes('megacampus') || 
-                         process.env.VERCEL_ENV === 'production' ||
-                         process.env.RAILWAY_ENVIRONMENT === 'production'
-  
+  const isProductionEnv =
+    process.env.NEXT_PUBLIC_SITE_URL?.includes('megacampus') ||
+    process.env.VERCEL_ENV === 'production' ||
+    process.env.RAILWAY_ENVIRONMENT === 'production'
+
   const devBypassFlag = process.env.ENABLE_DEV_AUTH === 'true'
 
-  const isDevelopmentBypass = process.env.NODE_ENV === 'development' &&
-                              !isProductionEnv &&
-                              devBypassFlag &&
-                              user.id === 'dev-user'
-  
+  const isDevelopmentBypass =
+    process.env.NODE_ENV === 'development' &&
+    !isProductionEnv &&
+    devBypassFlag &&
+    user.id === 'dev-user'
+
   const isSuperAdmin = user.role === 'superadmin'
   const isNoOwnerCourse = courseData.user_id === null
   const isOwner = courseData.user_id === user.id
-  
+
   if (!isDevelopmentBypass && !isSuperAdmin && !isNoOwnerCourse && !isOwner) {
-    logger.warn('Unauthorized deletion attempt:', { 
-      courseId: courseData.id, 
-      courseOwnerId: courseData.user_id, 
+    logger.warn('Unauthorized deletion attempt:', {
+      courseId: courseData.id,
+      courseOwnerId: courseData.user_id,
       requestUserId: user.id,
-      userRole: user.role
+      userRole: user.role,
     })
     return NextResponse.json(
       { error: 'Unauthorized', message: 'You can only delete your own courses' },
       { status: 403 }
     )
   }
-  
+
   logger.devLog('Ownership check passed:', {
     isDevelopmentBypass,
     isSuperAdmin,
     isNoOwnerCourse,
     isOwner,
-    userRole: user.role
+    userRole: user.role,
   })
 
   const id = courseData.id
@@ -160,7 +165,9 @@ async function handleDeleteCourse(
       })
     }
   } else {
-    logger.warn('No access token available for cleanup, skipping external resource cleanup', { courseId: id })
+    logger.warn('No access token available for cleanup, skipping external resource cleanup', {
+      courseId: id,
+    })
   }
 
   // Step 2: Delete database records
@@ -170,30 +177,18 @@ async function handleDeleteCourse(
     // Currently these tables don't exist: tests, questions, documents, document_chunks, sources, user_favorites
 
     // 1. Delete assets
-    await supabase
-      .from('assets')
-      .delete()
-      .eq('course_id', id)
+    await supabase.from('assets').delete().eq('course_id', id)
 
     // 3. Delete lessons (must be before sections)
-    const { data: sectionsData } = await supabase
-      .from('sections')
-      .select('id')
-      .eq('course_id', id)
+    const { data: sectionsData } = await supabase.from('sections').select('id').eq('course_id', id)
 
     if (sectionsData && sectionsData.length > 0) {
-      const sectionIds = sectionsData.map(s => s.id)
-      await supabase
-        .from('lessons')
-        .delete()
-        .in('section_id', sectionIds)
+      const sectionIds = sectionsData.map((s) => s.id)
+      await supabase.from('lessons').delete().in('section_id', sectionIds)
     }
 
     // 4. Delete sections
-    await supabase
-      .from('sections')
-      .delete()
-      .eq('course_id', id)
+    await supabase.from('sections').delete().eq('course_id', id)
 
     // 5. Finally, delete the course
     const { error: courseError, data: deletedCourse } = await supabase
@@ -202,41 +197,67 @@ async function handleDeleteCourse(
       .eq('id', id)
       .select()
       .single()
-    
+
     if (courseError) {
       logger.error('Error deleting course:', courseError)
+
+      // Log to error_logs for admin visibility
+      logPermanentFailure({
+        user_id: user.id,
+        error_message: `Failed to delete course: ${courseError.message}`,
+        severity: 'ERROR',
+        job_type: 'COURSE_DELETE',
+        metadata: {
+          route: '/api/courses/[slug]/delete',
+          courseId: id,
+          errorCode: courseError.code,
+        },
+      }).catch(() => {})
+
       return NextResponse.json(
-        { 
+        {
           error: 'Failed to delete course',
           details: courseError.message,
-          code: courseError.code
+          code: courseError.code,
         },
         { status: 500 }
       )
     }
-    
+
     if (!deletedCourse) {
-      return NextResponse.json(
-        { error: 'Course not found' },
-        { status: 404 }
-      )
+      return NextResponse.json({ error: 'Course not found' }, { status: 404 })
     }
-    
+
     logger.devLog('Successfully deleted course:', deletedCourse.title)
-    
+
     return NextResponse.json(
-      { 
+      {
         message: 'Course deleted successfully',
-        deletedCourse: { id: deletedCourse.id, title: deletedCourse.title }
+        deletedCourse: { id: deletedCourse.id, title: deletedCourse.title },
       },
       { status: 200 }
     )
   } catch (error) {
     logger.error('Error in DELETE /api/courses/[slug]/delete:', error)
+
+    // Log to error_logs for admin visibility
+    logPermanentFailure({
+      user_id: user.id,
+      error_message: error instanceof Error ? error.message : 'Unknown error',
+      stack_trace: error instanceof Error ? error.stack : undefined,
+      severity: 'ERROR',
+      job_type: 'COURSE_DELETE',
+      metadata: {
+        route: '/api/courses/[slug]/delete',
+        courseId: id,
+        errorCode: 'INTERNAL_ERROR',
+      },
+    }).catch(() => {})
+
     return NextResponse.json(
-      { 
+      {
         error: 'Internal server error',
-        details: error instanceof Error ? error.message : 'Unknown error'
+        details: error instanceof Error ? error.message : 'Unknown error',
       },
       { status: 500 }
     )
@@ -245,15 +266,14 @@ async function handleDeleteCourse(
 
 // Production safeguard: NEVER bypass authentication in production
 // Additional check to prevent accidental bypass if NODE_ENV is misconfigured
-const isProductionUrl = process.env.NEXT_PUBLIC_SITE_URL?.includes('megacampus') || 
-                       process.env.VERCEL_ENV === 'production' ||
-                       process.env.RAILWAY_ENVIRONMENT === 'production'
+const isProductionUrl =
+  process.env.NEXT_PUBLIC_SITE_URL?.includes('megacampus') ||
+  process.env.VERCEL_ENV === 'production' ||
+  process.env.RAILWAY_ENVIRONMENT === 'production'
 
 const devBypassFlag = process.env.ENABLE_DEV_AUTH === 'true'
 
-const shouldBypassAuth = process.env.NODE_ENV === 'development' &&
-                        !isProductionUrl &&
-                        devBypassFlag // Explicit opt-in required
+const shouldBypassAuth = process.env.NODE_ENV === 'development' && !isProductionUrl && devBypassFlag // Explicit opt-in required
 
 // Always use authentication in production or when bypass is not explicitly allowed
 export const POST = shouldBypassAuth

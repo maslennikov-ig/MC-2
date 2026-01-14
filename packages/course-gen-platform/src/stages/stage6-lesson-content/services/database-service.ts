@@ -1,6 +1,7 @@
 import { getSupabaseAdmin } from '@/shared/supabase/admin';
 import { logger } from '@/shared/logger';
 import { resolveLessonUuid } from '@/shared/database/lesson-resolver';
+import { notifyCourseCompletion } from '@/shared/notifications/course-notifications';
 import type { Stage6Output } from '../orchestrator';
 import { extractContentMarkdown } from './content-utils';
 import type { SanityCheckResult } from '../utils/sanity-check';
@@ -24,13 +25,27 @@ export async function handlePartialSuccess(
   const supabaseAdmin = getSupabaseAdmin();
 
   try {
-    const { error } = await supabaseAdmin
-      .from('lessons')
-      .update({
-        content: extractContentMarkdown(result.lessonContent),
-        updated_at: new Date().toISOString(),
-      })
-      .eq('id', lessonUuid);
+    // Save partial content to lesson_contents table (not lessons table)
+    // Serialize content to convert Date objects to strings (LessonContent has Date fields)
+    const { error } = await supabaseAdmin.from('lesson_contents').upsert(
+      {
+        lesson_id: lessonUuid,
+        course_id: courseId,
+        content: JSON.parse(JSON.stringify(result.lessonContent)),
+        status: 'review_required', // Mark as partial success requiring review
+        metadata: JSON.parse(
+          JSON.stringify({
+            markdownContent: extractContentMarkdown(result.lessonContent),
+            partial: true,
+            errors: result.errors,
+            qualityScore: result.metrics.qualityScore,
+          })
+        ),
+      },
+      {
+        onConflict: 'lesson_id',
+      }
+    );
 
     if (error) {
       logger.warn(
@@ -41,7 +56,7 @@ export async function handlePartialSuccess(
           lessonLabel,
           error: error.message,
         },
-        'Failed to save partial content to database'
+        'Failed to save partial content to lesson_contents table'
       );
     } else {
       logger.warn(
@@ -55,7 +70,7 @@ export async function handlePartialSuccess(
           errors: result.errors,
           qualityScore: result.metrics.qualityScore,
         },
-        'Partial success - content saved for review'
+        'Partial success - content saved to lesson_contents for review'
       );
     }
   } catch (error) {
@@ -151,13 +166,12 @@ export async function saveLessonContent(
       return;
     }
 
-    const { error } = await supabaseAdmin
-      .from('lesson_contents')
-      .insert({
-        lesson_id: lessonUuid,
-        course_id: courseId,
-        content: JSON.parse(JSON.stringify(result.lessonContent)),
-        metadata: JSON.parse(JSON.stringify({
+    const { error } = await supabaseAdmin.from('lesson_contents').insert({
+      lesson_id: lessonUuid,
+      course_id: courseId,
+      content: JSON.parse(JSON.stringify(result.lessonContent)),
+      metadata: JSON.parse(
+        JSON.stringify({
           lessonLabel,
           tokensUsed: result.metrics.tokensUsed,
           modelUsed: result.metrics.modelUsed,
@@ -165,18 +179,21 @@ export async function saveLessonContent(
           durationMs: result.metrics.durationMs,
           generatedAt: new Date().toISOString(),
           markdownContent: extractContentMarkdown(result.lessonContent),
-          sanityCheck: sanityResult ? {
-            passed: sanityResult.ok,
-            reason: sanityResult.reason,
-            charCount: sanityResult.metrics?.charCount,
-            wordCount: sanityResult.metrics?.wordCount,
-          } : undefined,
+          sanityCheck: sanityResult
+            ? {
+                passed: sanityResult.ok,
+                reason: sanityResult.reason,
+                charCount: sanityResult.metrics?.charCount,
+                wordCount: sanityResult.metrics?.wordCount,
+              }
+            : undefined,
           // Human review info for UI warnings (only present if review needed)
           reviewInfo: result.reviewInfo ?? undefined,
-        })),
-        status: 'completed',
-        generation_attempt: 1,
-      });
+        })
+      ),
+      status: 'completed',
+      generation_attempt: 1,
+    });
 
     if (error) {
       logger.warn(
@@ -305,16 +322,14 @@ export async function saveRejectedContent(
       wordCount: generatedContent.split(/\s+/).filter(Boolean).length,
     };
 
-    const { error } = await supabaseAdmin
-      .from('lesson_contents')
-      .insert({
-        lesson_id: resolvedLessonUuid,
-        course_id: courseId,
-        content: contentObject,
-        metadata,
-        status: 'rejected',
-        generation_attempt: generationAttempt,
-      });
+    const { error } = await supabaseAdmin.from('lesson_contents').insert({
+      lesson_id: resolvedLessonUuid,
+      course_id: courseId,
+      content: contentObject,
+      metadata,
+      status: 'rejected',
+      generation_attempt: generationAttempt,
+    });
 
     if (error) {
       logger.warn(
@@ -394,26 +409,173 @@ export async function saveSourceDocuments(
       .eq('id', lessonUuid);
 
     if (error) {
-      logger.warn({
-        courseId,
-        lessonUuid,
-        error: error.message,
-        documentCount: sourceDocuments.length,
-      }, 'Failed to save source_documents to lessons table');
+      logger.warn(
+        {
+          courseId,
+          lessonUuid,
+          error: error.message,
+          documentCount: sourceDocuments.length,
+        },
+        'Failed to save source_documents to lessons table'
+      );
     } else {
-      logger.debug({
-        courseId,
-        lessonUuid,
-        documentCount: sourceDocuments.length,
-        coreCount: sourceDocuments.filter(d => d.document_priority === 'CORE').length,
-        importantCount: sourceDocuments.filter(d => d.document_priority === 'IMPORTANT').length,
-      }, 'Source documents saved to lesson');
+      logger.debug(
+        {
+          courseId,
+          lessonUuid,
+          documentCount: sourceDocuments.length,
+          coreCount: sourceDocuments.filter(d => d.document_priority === 'CORE').length,
+          importantCount: sourceDocuments.filter(d => d.document_priority === 'IMPORTANT').length,
+        },
+        'Source documents saved to lesson'
+      );
     }
   } catch (error) {
-    logger.warn({
-      courseId,
-      lessonUuid,
-      error: error instanceof Error ? error.message : String(error),
-    }, 'Exception while saving source_documents');
+    logger.warn(
+      {
+        courseId,
+        lessonUuid,
+        error: error instanceof Error ? error.message : String(error),
+      },
+      'Exception while saving source_documents'
+    );
+  }
+}
+
+/**
+ * Check if all lessons are generated and update course status to stage_6_complete
+ *
+ * This function is called after each successful lesson save to check if all lessons
+ * in the course have been generated. If so, it transitions the course from
+ * stage_6_generating to stage_6_complete.
+ *
+ * @param courseId - Course UUID
+ */
+export async function checkAndSetStage6Complete(courseId: string): Promise<void> {
+  const supabaseAdmin = getSupabaseAdmin();
+
+  try {
+    // Get current course status
+    const { data: course, error: courseError } = await supabaseAdmin
+      .from('courses')
+      .select('generation_status, course_structure')
+      .eq('id', courseId)
+      .single();
+
+    if (courseError || !course) {
+      logger.warn(
+        {
+          courseId,
+          error: courseError?.message,
+        },
+        'Failed to fetch course for Stage 6 completion check'
+      );
+      return;
+    }
+
+    // Only check if currently in stage_6_generating
+    if (course.generation_status !== 'stage_6_generating') {
+      return;
+    }
+
+    // Count expected lessons from course_structure
+    const structure = course.course_structure as {
+      sections: Array<{
+        section_number: number;
+        lessons: Array<{ lesson_number: number }>;
+      }>;
+    } | null;
+
+    if (!structure || !structure.sections) {
+      return;
+    }
+
+    const expectedLessonsCount = structure.sections.reduce(
+      (total, section) => total + (section.lessons?.length || 0),
+      0
+    );
+
+    if (expectedLessonsCount === 0) {
+      return;
+    }
+
+    // Count lessons with generated content
+    // Join through sections to get all lessons for this course
+    const { data: lessonsData, error: lessonsError } = await supabaseAdmin
+      .from('lessons')
+      .select('id, content, section_id!inner(course_id)')
+      .eq('section_id.course_id', courseId)
+      .not('content', 'is', null);
+
+    if (lessonsError) {
+      logger.warn(
+        {
+          courseId,
+          error: lessonsError.message,
+        },
+        'Failed to count generated lessons'
+      );
+      return;
+    }
+
+    const completedLessonsCount = lessonsData?.length || 0;
+
+    logger.debug(
+      {
+        courseId,
+        expectedLessonsCount,
+        completedLessonsCount,
+      },
+      'Checking Stage 6 completion'
+    );
+
+    // If all lessons are complete, transition to stage_6_complete
+    if (completedLessonsCount >= expectedLessonsCount) {
+      const { error: updateError } = await supabaseAdmin
+        .from('courses')
+        .update({ generation_status: 'stage_6_complete' })
+        .eq('id', courseId)
+        .eq('generation_status', 'stage_6_generating'); // Only update if still generating
+
+      if (updateError) {
+        logger.warn(
+          {
+            courseId,
+            error: updateError.message,
+          },
+          'Failed to update course status to stage_6_complete'
+        );
+      } else {
+        logger.info(
+          {
+            courseId,
+            expectedLessonsCount,
+            completedLessonsCount,
+          },
+          'All lessons generated - course status updated to stage_6_complete'
+        );
+
+        // Send completion notifications for automatic mode (non-blocking)
+        try {
+          await notifyCourseCompletion(courseId);
+        } catch (notifyError) {
+          logger.warn(
+            {
+              courseId,
+              error: notifyError instanceof Error ? notifyError.message : String(notifyError),
+            },
+            'Failed to send completion notifications (non-fatal)'
+          );
+        }
+      }
+    }
+  } catch (error) {
+    logger.warn(
+      {
+        courseId,
+        error: error instanceof Error ? error.message : String(error),
+      },
+      'Exception while checking Stage 6 completion'
+    );
   }
 }

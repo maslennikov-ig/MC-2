@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAdminClient } from '@/lib/supabase/client-factory'
-import { logger } from '@/lib/logger'
+import { logger, logPermanentFailure } from '@/lib/logger'
 import { authenticateRequest } from '@/lib/auth'
 import {
   createOrgInputSchema,
@@ -38,7 +38,6 @@ interface OrganizationRow {
   updated_at: string | null
 }
 
-
 /**
  * GET /api/organizations
  * List all organizations where the authenticated user is a member
@@ -48,10 +47,7 @@ export async function GET(request: NextRequest) {
     const user = await authenticateRequest(request)
 
     if (!user) {
-      return NextResponse.json(
-        { error: 'Authentication required' },
-        { status: 401 }
-      )
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
     }
 
     const supabase = getAdminClient()
@@ -59,7 +55,8 @@ export async function GET(request: NextRequest) {
     // Get organizations where user is a member, including their role and member count
     const { data: memberships, error: membershipsError } = await supabase
       .from('organization_members')
-      .select(`
+      .select(
+        `
         role,
         organization_id,
         organizations (
@@ -71,15 +68,24 @@ export async function GET(request: NextRequest) {
           created_at,
           updated_at
         )
-      `)
+      `
+      )
       .eq('user_id', user.id)
 
     if (membershipsError) {
       logger.error('Error fetching user memberships:', membershipsError)
-      return NextResponse.json(
-        { error: 'Failed to fetch organizations' },
-        { status: 500 }
-      )
+      logPermanentFailure({
+        user_id: user.id,
+        error_message: membershipsError.message || 'Error fetching user memberships',
+        stack_trace: undefined,
+        severity: 'ERROR',
+        job_type: 'ORG_LIST',
+        metadata: {
+          route: '/api/organizations',
+          errorCode: 'INTERNAL_ERROR',
+        },
+      }).catch(() => {})
+      return NextResponse.json({ error: 'Failed to fetch organizations' }, { status: 500 })
     }
 
     if (!memberships || memberships.length === 0) {
@@ -87,7 +93,7 @@ export async function GET(request: NextRequest) {
     }
 
     // Get member counts for all organizations
-    const orgIds = (memberships as Array<{ organization_id: string }>).map(m => m.organization_id)
+    const orgIds = (memberships as Array<{ organization_id: string }>).map((m) => m.organization_id)
     const { data: memberCounts, error: countError } = await supabase
       .from('organization_members')
       .select('organization_id')
@@ -95,11 +101,22 @@ export async function GET(request: NextRequest) {
 
     if (countError) {
       logger.error('Error fetching member counts:', countError)
+      logPermanentFailure({
+        user_id: user.id,
+        error_message: countError.message || 'Error fetching member counts',
+        stack_trace: undefined,
+        severity: 'ERROR',
+        job_type: 'ORG_LIST',
+        metadata: {
+          route: '/api/organizations',
+          errorCode: 'INTERNAL_ERROR',
+        },
+      }).catch(() => {})
     }
 
     // Count members per organization
     const countMap = new Map<string, number>()
-    ;(memberCounts as Array<{ organization_id: string }> | null)?.forEach(m => {
+    ;(memberCounts as Array<{ organization_id: string }> | null)?.forEach((m) => {
       const current = countMap.get(m.organization_id) || 0
       countMap.set(m.organization_id, current + 1)
     })
@@ -111,9 +128,11 @@ export async function GET(request: NextRequest) {
       organizations: OrganizationRow | null
     }
 
-    const organizations: OrganizationWithMembership[] = (memberships as unknown as MembershipWithOrg[])
-      .filter(m => m.organizations)
-      .map(m => {
+    const organizations: OrganizationWithMembership[] = (
+      memberships as unknown as MembershipWithOrg[]
+    )
+      .filter((m) => m.organizations)
+      .map((m) => {
         const org = m.organizations!
         return {
           id: org.id,
@@ -136,10 +155,19 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ organizations })
   } catch (error) {
     logger.error('Unexpected error in GET /api/organizations:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    logPermanentFailure({
+      user_id: undefined,
+      error_message:
+        error instanceof Error ? error.message : 'Unexpected error in GET /api/organizations',
+      stack_trace: error instanceof Error ? error.stack : undefined,
+      severity: 'ERROR',
+      job_type: 'ORG_LIST',
+      metadata: {
+        route: '/api/organizations',
+        errorCode: 'INTERNAL_ERROR',
+      },
+    }).catch(() => {})
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
 
@@ -152,10 +180,7 @@ export async function POST(request: NextRequest) {
     const user = await authenticateRequest(request)
 
     if (!user) {
-      return NextResponse.json(
-        { error: 'Authentication required' },
-        { status: 401 }
-      )
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
     }
 
     const body = await request.json()
@@ -183,10 +208,7 @@ export async function POST(request: NextRequest) {
       .single()
 
     if (existing) {
-      return NextResponse.json(
-        { error: 'Slug already taken', field: 'slug' },
-        { status: 409 }
-      )
+      return NextResponse.json({ error: 'Slug already taken', field: 'slug' }, { status: 409 })
     }
 
     // Create organization
@@ -203,31 +225,46 @@ export async function POST(request: NextRequest) {
 
     if (orgError || !organization) {
       logger.error('Error creating organization:', orgError)
-      return NextResponse.json(
-        { error: 'Failed to create organization' },
-        { status: 500 }
-      )
+      logPermanentFailure({
+        user_id: user.id,
+        error_message: orgError?.message || 'Error creating organization',
+        stack_trace: undefined,
+        severity: 'ERROR',
+        job_type: 'ORG_CREATE',
+        metadata: {
+          route: '/api/organizations',
+          errorCode: 'INTERNAL_ERROR',
+        },
+      }).catch(() => {})
+      return NextResponse.json({ error: 'Failed to create organization' }, { status: 500 })
     }
 
     const org = organization as OrganizationRow
 
     // Add user as owner
-    const { error: memberError } = await supabase
-      .from('organization_members')
-      .insert({
-        organization_id: org.id,
-        user_id: user.id,
-        role: 'owner',
-      })
+    const { error: memberError } = await supabase.from('organization_members').insert({
+      organization_id: org.id,
+      user_id: user.id,
+      role: 'owner',
+    })
 
     if (memberError) {
       logger.error('Error adding owner to organization:', memberError)
+      logPermanentFailure({
+        user_id: user.id,
+        organization_id: org.id,
+        error_message: memberError.message || 'Error adding owner to organization',
+        stack_trace: undefined,
+        severity: 'ERROR',
+        job_type: 'ORG_CREATE',
+        metadata: {
+          route: '/api/organizations',
+          errorCode: 'INTERNAL_ERROR',
+        },
+      }).catch(() => {})
       // Rollback organization creation
       await supabase.from('organizations').delete().eq('id', org.id)
-      return NextResponse.json(
-        { error: 'Failed to add owner to organization' },
-        { status: 500 }
-      )
+      return NextResponse.json({ error: 'Failed to add owner to organization' }, { status: 500 })
     }
 
     const result: OrganizationWithMembership = {
@@ -250,9 +287,18 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ organization: result }, { status: 201 })
   } catch (error) {
     logger.error('Unexpected error in POST /api/organizations:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    logPermanentFailure({
+      user_id: undefined,
+      error_message:
+        error instanceof Error ? error.message : 'Unexpected error in POST /api/organizations',
+      stack_trace: error instanceof Error ? error.stack : undefined,
+      severity: 'ERROR',
+      job_type: 'ORG_CREATE',
+      metadata: {
+        route: '/api/organizations',
+        errorCode: 'INTERNAL_ERROR',
+      },
+    }).catch(() => {})
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

@@ -60,6 +60,8 @@ export interface CreateErrorLogParams {
   user_id?: string;
   /** Organization ID (required for multi-tenancy) */
   organization_id: string;
+  /** Human-readable problem ID for grouping related errors (optional) */
+  problem_id?: string;
   /** Human-readable error message (required) */
   error_message: string;
   /** Stack trace for debugging (optional) */

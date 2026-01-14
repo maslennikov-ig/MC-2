@@ -27,11 +27,11 @@ interface CourseGridProps {
   hasMore: boolean
 }
 
-export function CourseGrid({ 
-  courses: initialCourses, 
+export function CourseGrid({
+  courses: initialCourses,
   user,
   currentPage,
-  hasMore
+  hasMore,
 }: CourseGridProps) {
   const router = useRouter()
   const searchParams = useSearchParams()
@@ -42,14 +42,14 @@ export function CourseGrid({
   const [currentLoadedPage, setCurrentLoadedPage] = useState(currentPage)
   const [hasMoreToLoad, setHasMoreToLoad] = useState(hasMore)
   const isSuperAdmin = user?.role === 'superadmin'
-  
+
   // Reset when initial courses change (e.g., due to filters)
   useEffect(() => {
     setDisplayedCourses(initialCourses)
     setCurrentLoadedPage(currentPage)
     setHasMoreToLoad(hasMore)
   }, [initialCourses, currentPage, hasMore])
-  
+
   const handleLoadMore = async () => {
     setLoadingMore(true)
     try {
@@ -59,22 +59,22 @@ export function CourseGrid({
         status: searchParams.get('status') || undefined,
         difficulty: searchParams.get('difficulty') || undefined,
         page: nextPage,
-        limit: 10
+        limit: 12,
       })
 
       if (result.courses.length > 0) {
         // Check favorites for new courses if user is authenticated
         let coursesWithFavorites = result.courses
         if (user) {
-          const courseIds = result.courses.map(c => c.id)
+          const courseIds = result.courses.map((c) => c.id)
           const favoritesMap = await checkFavorites(courseIds)
-          coursesWithFavorites = result.courses.map(course => ({
+          coursesWithFavorites = result.courses.map((course) => ({
             ...course,
-            isFavorited: favoritesMap[course.id] || false
+            isFavorited: favoritesMap[course.id] || false,
           }))
         }
 
-        setDisplayedCourses(prev => [...prev, ...coursesWithFavorites])
+        setDisplayedCourses((prev) => [...prev, ...coursesWithFavorites])
         setCurrentLoadedPage(nextPage)
         setHasMoreToLoad(result.hasMore || false)
       }
@@ -84,12 +84,11 @@ export function CourseGrid({
       setLoadingMore(false)
     }
   }
-  
-  
+
   return (
     <div>
       {/* Course grid - responsive with fewer columns for wider cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-6 mb-8 auto-rows-fr">
+      <div className="mb-8 grid auto-rows-fr grid-cols-1 gap-6 md:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
         <AnimatePresence mode="popLayout">
           {displayedCourses.map((course, index) => (
             <motion.div
@@ -97,37 +96,33 @@ export function CourseGrid({
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0, scale: 0.95 }}
-              transition={{ 
+              transition={{
                 duration: 0.3,
                 delay: index * 0.05,
-                ease: "easeOut"
+                ease: 'easeOut',
               }}
               layout
             >
               <CourseCard
                 course={course}
                 user={user || null}
-                canDelete={
-                  isSuperAdmin ||
-                  course.user_id === user?.id ||
-                  course.user_id === null
-                }
+                canDelete={isSuperAdmin || course.user_id === user?.id || course.user_id === null}
                 isFavorited={course.isFavorited}
               />
             </motion.div>
           ))}
         </AnimatePresence>
       </div>
-      
+
       {/* Load More Button */}
       {hasMoreToLoad && (
         <div className="flex justify-center gap-2">
           <Button
-            onClick={handleLoadMore}
+            onClick={() => void handleLoadMore()}
             disabled={loadingMore}
             variant="outline"
             size="lg"
-            className="bg-white dark:bg-slate-900/50 border-gray-300 dark:border-slate-700 text-gray-900 dark:text-white hover:bg-gray-50 dark:hover:bg-slate-800 transition-colors duration-200"
+            className="border-gray-300 bg-white text-gray-900 transition-colors duration-200 hover:bg-gray-50 dark:border-slate-700 dark:bg-slate-900/50 dark:text-white dark:hover:bg-slate-800"
           >
             {loadingMore ? (
               <>
@@ -140,18 +135,16 @@ export function CourseGrid({
           </Button>
         </div>
       )}
-      
+
       {/* Empty state */}
       {displayedCourses.length === 0 && (
-        <div className="text-center py-12">
-          <div className="bg-white dark:bg-slate-900/50 border border-gray-200 dark:border-slate-800 rounded-lg p-12 max-w-md mx-auto shadow-sm">
-            <p className="text-gray-600 dark:text-gray-400 text-lg mb-4">
-              Курсы не найдены
-            </p>
+        <div className="py-12 text-center">
+          <div className="mx-auto max-w-md rounded-lg border border-gray-200 bg-white p-12 shadow-sm dark:border-slate-800 dark:bg-slate-900/50">
+            <p className="mb-4 text-lg text-gray-600 dark:text-gray-400">Курсы не найдены</p>
             {user ? (
-              <Button 
+              <Button
                 onClick={() => router.push('/create')}
-                className="bg-purple-600 hover:bg-purple-700 text-white !rounded-full px-6"
+                className="!rounded-full bg-purple-600 px-6 text-white hover:bg-purple-700"
               >
                 Создать первый курс
               </Button>
@@ -160,18 +153,18 @@ export function CourseGrid({
                 <p className="text-sm text-gray-500 dark:text-gray-400">
                   Начните создавать курсы с помощью AI
                 </p>
-                <Button 
+                <Button
                   onClick={() => authModal.open('register', { returnTo: pathname })}
-                  className="bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 text-white shadow-lg hover:shadow-xl transition-all duration-200 !rounded-full px-6"
+                  className="!rounded-full bg-gradient-to-r from-purple-600 to-blue-600 px-6 text-white shadow-lg transition-all duration-200 hover:from-purple-700 hover:to-blue-700 hover:shadow-xl"
                 >
                   <Sparkles className="mr-2 h-4 w-4" />
                   Зарегистрироваться бесплатно
                 </Button>
-                <p className="text-xs text-gray-500 dark:text-gray-400 mt-2">
+                <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">
                   Уже есть аккаунт?{' '}
                   <button
                     onClick={() => authModal.open('login', { returnTo: pathname })}
-                    className="text-purple-600 dark:text-purple-400 hover:underline font-medium"
+                    className="font-medium text-purple-600 hover:underline dark:text-purple-400"
                   >
                     Войти
                   </button>

@@ -241,6 +241,35 @@
       "cover": "Обложка",
       "card": "Карточка",
       "banner": "Декоративный баннер"
+    },
+    "generationComplete": "Дополнение успешно создано",
+    "generationFailed": "Не удалось создать дополнение"
+  },
+  "placeholder": {
+    "quiz": {
+      "title": "Тест",
+      "description": "Проверьте свои знания",
+      "estimatedTime": "~45 сек"
+    },
+    "audio": {
+      "title": "Аудио",
+      "description": "Прослушайте урок",
+      "estimatedTime": "~30 сек"
+    },
+    "presentation": {
+      "title": "Презентация",
+      "description": "Ключевые слайды урока",
+      "estimatedTime": "~90 сек"
+    },
+    "video": {
+      "title": "Видео",
+      "description": "AI видеолекция",
+      "comingSoon": "Скоро"
     }
-  }
+  },
+  "generate": "Сгенерировать",
+  "generating": "Генерация...",
+  "options": "Опции",
+  "cancel": "Отменить",
+  "retry": "Повторить"
 }

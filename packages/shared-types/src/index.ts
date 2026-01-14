@@ -73,8 +73,18 @@ export * from './tier-settings';
 export * from './enrichment-content';
 export * from './lesson-enrichment';
 export * from './enrichment-settings';
+export * from './enrichment-on-demand';
 export * from './activity-limits';
 
 // Organization Management Types
 export * from './organization';
 export * from './invitation-constants';
+
+// Cost Preview (Automatic Generation Mode)
+export * from './cost-preview';
+
+// Stage Names (Localized)
+export * from './stage-names';
+
+// Course Size Presets (Advisory parameters for LLM)
+export * from './course-size';

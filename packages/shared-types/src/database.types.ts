@@ -360,6 +360,7 @@ export type Database = {
           completed_at: string | null
           content_strategy: string | null
           course_description: string | null
+          course_size: string | null
           course_structure: Json | null
           created_at: string | null
           difficulty: string | null
@@ -368,12 +369,16 @@ export type Database = {
           error_details: Json | null
           error_message: string | null
           estimated_completion_minutes: number | null
+          estimated_cost_usd: number | null
           estimated_lessons: number | null
           estimated_sections: number | null
           failed_at_stage: number | null
           generation_code: string | null
           generation_completed_at: string | null
           generation_metadata: Json | null
+          generation_mode: string | null
+          generation_paused_at: string | null
+          generation_paused_by: string | null
           generation_progress: Json | null
           generation_started_at: string | null
           generation_status:
@@ -385,6 +390,9 @@ export type Database = {
           language: string | null
           last_progress_update: string | null
           learning_outcomes: string | null
+          notify_on_completion: boolean | null
+          notify_on_error: boolean | null
+          notify_on_stage_complete: boolean | null
           organization_id: string
           output_formats: string[] | null
           pause_at_stage_5: boolean | null
@@ -412,6 +420,7 @@ export type Database = {
           completed_at?: string | null
           content_strategy?: string | null
           course_description?: string | null
+          course_size?: string | null
           course_structure?: Json | null
           created_at?: string | null
           difficulty?: string | null
@@ -420,12 +429,16 @@ export type Database = {
           error_details?: Json | null
           error_message?: string | null
           estimated_completion_minutes?: number | null
+          estimated_cost_usd?: number | null
           estimated_lessons?: number | null
           estimated_sections?: number | null
           failed_at_stage?: number | null
           generation_code?: string | null
           generation_completed_at?: string | null
           generation_metadata?: Json | null
+          generation_mode?: string | null
+          generation_paused_at?: string | null
+          generation_paused_by?: string | null
           generation_progress?: Json | null
           generation_started_at?: string | null
           generation_status?:
@@ -437,6 +450,9 @@ export type Database = {
           language?: string | null
           last_progress_update?: string | null
           learning_outcomes?: string | null
+          notify_on_completion?: boolean | null
+          notify_on_error?: boolean | null
+          notify_on_stage_complete?: boolean | null
           organization_id: string
           output_formats?: string[] | null
           pause_at_stage_5?: boolean | null
@@ -464,6 +480,7 @@ export type Database = {
           completed_at?: string | null
           content_strategy?: string | null
           course_description?: string | null
+          course_size?: string | null
           course_structure?: Json | null
           created_at?: string | null
           difficulty?: string | null
@@ -472,12 +489,16 @@ export type Database = {
           error_details?: Json | null
           error_message?: string | null
           estimated_completion_minutes?: number | null
+          estimated_cost_usd?: number | null
           estimated_lessons?: number | null
           estimated_sections?: number | null
           failed_at_stage?: number | null
           generation_code?: string | null
           generation_completed_at?: string | null
           generation_metadata?: Json | null
+          generation_mode?: string | null
+          generation_paused_at?: string | null
+          generation_paused_by?: string | null
           generation_progress?: Json | null
           generation_started_at?: string | null
           generation_status?:
@@ -489,6 +510,9 @@ export type Database = {
           language?: string | null
           last_progress_update?: string | null
           learning_outcomes?: string | null
+          notify_on_completion?: boolean | null
+          notify_on_error?: boolean | null
+          notify_on_stage_complete?: boolean | null
           organization_id?: string
           output_formats?: string[] | null
           pause_at_stage_5?: boolean | null
@@ -887,6 +911,77 @@ export type Database = {
           },
         ]
       }
+      generation_stats: {
+        Row: {
+          avg_quality_score: number | null
+          cached_traces: number
+          course_id: string
+          created_at: string
+          failed_traces: number
+          first_trace_at: string | null
+          id: string
+          last_trace_at: string | null
+          max_quality_score: number | null
+          min_quality_score: number | null
+          models_used: Json
+          successful_traces: number
+          total_cost_usd: number
+          total_duration_ms: number
+          total_tokens: number
+          total_traces: number
+          traces_by_stage: Json
+          updated_at: string
+        }
+        Insert: {
+          avg_quality_score?: number | null
+          cached_traces?: number
+          course_id: string
+          created_at?: string
+          failed_traces?: number
+          first_trace_at?: string | null
+          id?: string
+          last_trace_at?: string | null
+          max_quality_score?: number | null
+          min_quality_score?: number | null
+          models_used?: Json
+          successful_traces?: number
+          total_cost_usd?: number
+          total_duration_ms?: number
+          total_tokens?: number
+          total_traces?: number
+          traces_by_stage?: Json
+          updated_at?: string
+        }
+        Update: {
+          avg_quality_score?: number | null
+          cached_traces?: number
+          course_id?: string
+          created_at?: string
+          failed_traces?: number
+          first_trace_at?: string | null
+          id?: string
+          last_trace_at?: string | null
+          max_quality_score?: number | null
+          min_quality_score?: number | null
+          models_used?: Json
+          successful_traces?: number
+          total_cost_usd?: number
+          total_duration_ms?: number
+          total_tokens?: number
+          total_traces?: number
+          traces_by_stage?: Json
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "generation_stats_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: true
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       generation_status_history: {
         Row: {
           changed_at: string
@@ -1011,6 +1106,78 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
+      }
+      generation_trace_archive: {
+        Row: {
+          archived_at: string
+          completion_text: string | null
+          cost_usd: number | null
+          course_id: string
+          created_at: string
+          duration_ms: number | null
+          error_data: Json | null
+          id: string
+          input_data: Json
+          lesson_id: string | null
+          model_used: string | null
+          output_data: Json | null
+          phase: string
+          prompt_text: string | null
+          quality_score: number | null
+          retry_attempt: number | null
+          stage: string
+          step_name: string
+          temperature: number | null
+          tokens_used: number | null
+          was_cached: boolean | null
+        }
+        Insert: {
+          archived_at?: string
+          completion_text?: string | null
+          cost_usd?: number | null
+          course_id: string
+          created_at: string
+          duration_ms?: number | null
+          error_data?: Json | null
+          id: string
+          input_data?: Json
+          lesson_id?: string | null
+          model_used?: string | null
+          output_data?: Json | null
+          phase: string
+          prompt_text?: string | null
+          quality_score?: number | null
+          retry_attempt?: number | null
+          stage: string
+          step_name: string
+          temperature?: number | null
+          tokens_used?: number | null
+          was_cached?: boolean | null
+        }
+        Update: {
+          archived_at?: string
+          completion_text?: string | null
+          cost_usd?: number | null
+          course_id?: string
+          created_at?: string
+          duration_ms?: number | null
+          error_data?: Json | null
+          id?: string
+          input_data?: Json
+          lesson_id?: string | null
+          model_used?: string | null
+          output_data?: Json | null
+          phase?: string
+          prompt_text?: string | null
+          quality_score?: number | null
+          retry_attempt?: number | null
+          stage?: string
+          step_name?: string
+          temperature?: number | null
+          tokens_used?: number | null
+          was_cached?: boolean | null
+        }
+        Relationships: []
       }
       idempotency_keys: {
         Row: {
@@ -1192,41 +1359,6 @@ export type Database = {
             columns: ["user_id"]
             isOneToOne: false
             referencedRelation: "users"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      lesson_content: {
-        Row: {
-          interactive_elements: Json | null
-          lesson_id: string
-          media_urls: string[] | null
-          quiz_data: Json | null
-          text_content: string | null
-          updated_at: string | null
-        }
-        Insert: {
-          interactive_elements?: Json | null
-          lesson_id: string
-          media_urls?: string[] | null
-          quiz_data?: Json | null
-          text_content?: string | null
-          updated_at?: string | null
-        }
-        Update: {
-          interactive_elements?: Json | null
-          lesson_id?: string
-          media_urls?: string[] | null
-          quiz_data?: Json | null
-          text_content?: string | null
-          updated_at?: string | null
-        }
-        Relationships: [
-          {
-            foreignKeyName: "lesson_content_lesson_id_fkey"
-            columns: ["lesson_id"]
-            isOneToOne: true
-            referencedRelation: "lessons"
             referencedColumns: ["id"]
           },
         ]
@@ -1429,8 +1561,6 @@ export type Database = {
       }
       lessons: {
         Row: {
-          content: Json | null
-          content_text: string | null
           created_at: string | null
           duration_minutes: number | null
           id: string
@@ -1445,8 +1575,6 @@ export type Database = {
           updated_at: string | null
         }
         Insert: {
-          content?: Json | null
-          content_text?: string | null
           created_at?: string | null
           duration_minutes?: number | null
           id?: string
@@ -1461,8 +1589,6 @@ export type Database = {
           updated_at?: string | null
         }
         Update: {
-          content?: Json | null
-          content_text?: string | null
           created_at?: string | null
           duration_minutes?: number | null
           id?: string
@@ -2395,6 +2521,8 @@ export type Database = {
           is_active: boolean
           organization_id: string
           role: Database["public"]["Enums"]["role"]
+          telegram_chat_id: string | null
+          telegram_notifications_enabled: boolean | null
           updated_at: string | null
         }
         Insert: {
@@ -2407,6 +2535,8 @@ export type Database = {
           is_active?: boolean
           organization_id: string
           role?: Database["public"]["Enums"]["role"]
+          telegram_chat_id?: string | null
+          telegram_notifications_enabled?: boolean | null
           updated_at?: string | null
         }
         Update: {
@@ -2419,6 +2549,8 @@ export type Database = {
           is_active?: boolean
           organization_id?: string
           role?: Database["public"]["Enums"]["role"]
+          telegram_chat_id?: string | null
+          telegram_notifications_enabled?: boolean | null
           updated_at?: string | null
         }
         Relationships: [
@@ -2613,6 +2745,17 @@ export type Database = {
         }
         Relationships: []
       }
+      trace_storage_stats: {
+        Row: {
+          last_24h: number | null
+          newest: string | null
+          oldest: string | null
+          row_count: number | null
+          table_name: string | null
+          total_size: string | null
+        }
+        Relationships: []
+      }
       v_rls_policy_audit: {
         Row: {
           cmd: string | null
@@ -2639,6 +2782,42 @@ export type Database = {
           p_worker_id: string
         }
         Returns: boolean
+      }
+      archive_old_traces: {
+        Args: { p_age_days?: number }
+        Returns: {
+          archived_count: number
+          error_message: string
+        }[]
+      }
+      calculate_course_stats: {
+        Args: { p_course_id: string }
+        Returns: {
+          avg_quality_score: number | null
+          cached_traces: number
+          course_id: string
+          created_at: string
+          failed_traces: number
+          first_trace_at: string | null
+          id: string
+          last_trace_at: string | null
+          max_quality_score: number | null
+          min_quality_score: number | null
+          models_used: Json
+          successful_traces: number
+          total_cost_usd: number
+          total_duration_ms: number
+          total_tokens: number
+          total_traces: number
+          traces_by_stage: Json
+          updated_at: string
+        }
+        SetofOptions: {
+          from: "*"
+          to: "generation_stats"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       check_generation_lock: {
         Args: {
@@ -2671,6 +2850,13 @@ export type Database = {
           can_proceed: boolean
           completed_count: number
           total_count: number
+        }[]
+      }
+      check_trace_storage_health: {
+        Args: never
+        Returns: {
+          alert_level: string
+          message: string
         }[]
       }
       cleanup_expired_generation_locks: { Args: never; Returns: number }
@@ -2724,6 +2910,14 @@ export type Database = {
         }[]
       }
       expire_old_invitations: { Args: never; Returns: number }
+      export_archive_to_json: {
+        Args: { p_age_days?: number }
+        Returns: {
+          error_message: string
+          export_count: number
+          export_data: Json
+        }[]
+      }
       find_duplicate_file: {
         Args: { p_hash: string }
         Returns: {
@@ -2825,6 +3019,7 @@ export type Database = {
         Args: { p_section_id: string; p_user_id: string }
         Returns: boolean
       }
+      is_generation_paused: { Args: { p_course_id: string }; Returns: boolean }
       is_superadmin: { Args: { user_id: string }; Returns: boolean }
       is_user_active: { Args: { user_id: string }; Returns: boolean }
       lesson_belongs_to_user_course: {
@@ -2844,6 +3039,17 @@ export type Database = {
           p_user_agent?: string
         }
         Returns: string
+      }
+      pause_course_generation: {
+        Args: { p_course_id: string; p_user_id: string }
+        Returns: Json
+      }
+      purge_exported_archive: {
+        Args: { p_age_days?: number }
+        Returns: {
+          error_message: string
+          purged_count: number
+        }[]
       }
       refund_tenant_tokens: {
         Args: {
@@ -2873,6 +3079,10 @@ export type Database = {
         Returns: Json
       }
       restore_organization: { Args: { org_id: string }; Returns: boolean }
+      resume_course_generation: {
+        Args: { p_course_id: string; p_user_id: string }
+        Returns: Json
+      }
       section_belongs_to_user_course: {
         Args: { p_section_id: string; p_user_id: string }
         Returns: boolean
@@ -2932,6 +3142,13 @@ export type Database = {
         }
         Returns: undefined
       }
+      update_generation_stats: {
+        Args: { p_course_id?: string }
+        Returns: {
+          courses_updated: number
+          error_message: string
+        }[]
+      }
       validate_minimum_lessons: {
         Args: { course_structure: Json }
         Returns: boolean
@@ -2982,6 +3199,9 @@ export type Database = {
         | "stage_5_generating"
         | "stage_5_complete"
         | "stage_5_awaiting_approval"
+        | "stage_6_init"
+        | "stage_6_generating"
+        | "stage_6_complete"
         | "finalizing"
         | "completed"
         | "failed"
@@ -3199,6 +3419,9 @@ export const Constants = {
         "stage_5_generating",
         "stage_5_complete",
         "stage_5_awaiting_approval",
+        "stage_6_init",
+        "stage_6_generating",
+        "stage_6_complete",
         "finalizing",
         "completed",
         "failed",
@@ -3250,4 +3473,3 @@ export const Constants = {
     },
   },
 } as const
-

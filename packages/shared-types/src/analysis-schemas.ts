@@ -12,7 +12,15 @@ import { z } from 'zod';
  * Known visual types for generation guidance.
  * LLM may generate unknown values - they will be filtered with a warning.
  */
-export const KNOWN_VISUAL_TYPES = ['diagrams', 'flowcharts', 'code examples', 'screenshots', 'animations', 'plots', 'tables'] as const;
+export const KNOWN_VISUAL_TYPES = [
+  'diagrams',
+  'flowcharts',
+  'code examples',
+  'screenshots',
+  'animations',
+  'plots',
+  'tables',
+] as const;
 export type VisualType = (typeof KNOWN_VISUAL_TYPES)[number];
 
 /**
@@ -29,18 +37,37 @@ export type VisualType = (typeof KNOWN_VISUAL_TYPES)[number];
  */
 export const KNOWN_EXERCISE_TYPES = [
   // Technical (for programming/engineering courses)
-  'coding', 'derivation', 'debugging', 'refactoring',
+  'coding',
+  'derivation',
+  'debugging',
+  'refactoring',
   // Analytical (universal)
-  'analysis', 'interpretation', 'case-study', 'problem-solving',
+  'analysis',
+  'interpretation',
+  'case-study',
+  'problem-solving',
   // Interactive (for business/soft-skills courses)
-  'role-play', 'simulation', 'scenarios', 'discussion',
+  'role-play',
+  'simulation',
+  'scenarios',
+  'discussion',
   // Assessment (universal)
-  'quiz', 'practice', 'reflection', 'writing', 'presentation',
+  'quiz',
+  'practice',
+  'reflection',
+  'writing',
+  'presentation',
   // Visual/Structured (commonly returned by LLMs)
-  'tables', 'diagrams', 'flowcharts',
+  'tables',
+  'diagrams',
+  'flowcharts',
   // Standard exercise formats
-  'fill-in-the-blank', 'matching', 'multiple-choice', 'true-false',
-  'short-answer', 'essay',
+  'fill-in-the-blank',
+  'matching',
+  'multiple-choice',
+  'true-false',
+  'short-answer',
+  'essay',
 ] as const;
 export type ExerciseType = (typeof KNOWN_EXERCISE_TYPES)[number];
 
@@ -52,7 +79,7 @@ function createSoftEnumArraySchema<T extends string>(
   knownValues: readonly T[],
   fieldName: string
 ): z.ZodEffects<z.ZodArray<z.ZodString>, T[], string[]> {
-  return z.array(z.string()).transform((arr) => {
+  return z.array(z.string()).transform(arr => {
     const known: T[] = [];
     const unknown: string[] = [];
 
@@ -67,7 +94,7 @@ function createSoftEnumArraySchema<T extends string>(
     if (unknown.length > 0) {
       console.warn(
         `[GenerationGuidance] Unknown ${fieldName} values filtered: ${unknown.join(', ')}. ` +
-        `Known values: ${knownValues.join(', ')}`
+          `Known values: ${knownValues.join(', ')}`
       );
     }
 
@@ -86,12 +113,8 @@ export const SectionBreakdownSchema = z.object({
   learning_objectives: z
     .array(z.string().min(1))
     .min(2, 'Must have at least 2 learning objectives'), // Removed .max(5) - encourage comprehensive objectives
-  key_topics: z
-    .array(z.string().min(1))
-    .min(3, 'Must have at least 3 key topics'), // Removed .max(8) - allow extensive topic coverage
-  pedagogical_approach: z
-    .string()
-    .min(20, 'Pedagogical approach must be at least 20 characters'), // Removed .max(200) - encourage detailed approaches
+  key_topics: z.array(z.string().min(1)).min(3, 'Must have at least 3 key topics'), // Removed .max(8) - allow extensive topic coverage
+  pedagogical_approach: z.string().min(20, 'Pedagogical approach must be at least 20 characters'), // Removed .max(200) - encourage detailed approaches
   difficulty_progression: z.enum(['flat', 'gradual', 'steep']),
 
   // NEW: Analyze Enhancement fields (optional for backward compatibility)
@@ -113,7 +136,7 @@ export const SectionBreakdownSchema = z.object({
  * - This is a heuristic check; LLM may use synonyms or related concepts
  */
 export const SectionBreakdownSchemaWithAlignment = SectionBreakdownSchema.refine(
-  (data) => {
+  data => {
     const keyTopics = data.key_topics || [];
     const objectives = data.learning_objectives || [];
 
@@ -123,9 +146,27 @@ export const SectionBreakdownSchemaWithAlignment = SectionBreakdownSchema.refine
 
     // Common words to exclude (English and Russian verbs/connectors)
     const commonWords = new Set([
-      'that', 'this', 'with', 'from', 'have', 'will', 'able', 'about', 'which', 'their',
-      'использовать', 'применять', 'понимать', 'уметь', 'знать', 'научиться', 'освоить',
-      'применение', 'понимание', 'умение', 'знание',
+      'that',
+      'this',
+      'with',
+      'from',
+      'have',
+      'will',
+      'able',
+      'about',
+      'which',
+      'their',
+      'использовать',
+      'применять',
+      'понимать',
+      'уметь',
+      'знать',
+      'научиться',
+      'освоить',
+      'применение',
+      'понимание',
+      'умение',
+      'знание',
     ]);
 
     // Extract keywords from objectives (4+ char words, not common)
@@ -144,9 +185,7 @@ export const SectionBreakdownSchemaWithAlignment = SectionBreakdownSchema.refine
     let matchedTopics = 0;
     for (const topic of keyTopics) {
       const topicWords = topic.toLowerCase().match(/[a-zа-яё]{4,}/gi) || [];
-      const hasOverlap = topicWords.some(word =>
-        objectiveKeywords.has(word.toLowerCase())
-      );
+      const hasOverlap = topicWords.some(word => objectiveKeywords.has(word.toLowerCase()));
       if (hasOverlap) {
         matchedTopics++;
       }
@@ -173,12 +212,8 @@ export { SectionBreakdownSchemaWithAlignment as SectionBreakdownSchemaAligned };
  */
 export const Phase2OutputSchema = z.object({
   recommended_structure: z.object({
-    estimated_content_hours: z
-      .number()
-      .min(0.5, 'Minimum content hours: 0.5'), // Removed .max(200) - let LLM decide scope
-    scope_reasoning: z
-      .string()
-      .min(100, 'Scope reasoning must be at least 100 characters'), // Removed .max(500) - encourage detailed reasoning
+    estimated_content_hours: z.number().min(0.5, 'Minimum content hours: 0.5'), // Removed .max(200) - let LLM decide scope
+    scope_reasoning: z.string().min(100, 'Scope reasoning must be at least 100 characters'), // Removed .max(500) - encourage detailed reasoning
     lesson_duration_minutes: z
       .number()
       .int()
@@ -187,10 +222,7 @@ export const Phase2OutputSchema = z.object({
     calculation_explanation: z
       .string()
       .min(50, 'Calculation explanation must be at least 50 characters'), // Removed .max(300) - allow thorough explanations
-    total_lessons: z
-      .number()
-      .int()
-      .min(10, 'Minimum 10 lessons required (FR-015)'), // Removed .max(100) - let LLM decide optimal count
+    total_lessons: z.number().int().min(10, 'Minimum 10 lessons required (FR-015)'), // Removed .max(100) - let LLM decide optimal count
     total_sections: z.number().int().min(1, 'Minimum 1 section'), // Removed .max(30) - let LLM decide structure
     scope_warning: z.string().nullable(),
     sections_breakdown: z.array(SectionBreakdownSchema).min(1, 'Must have at least 1 section'),
@@ -273,15 +305,28 @@ export const Phase2InputSchema = z.object({
       retry_count: z.number().int().nonnegative(),
     }),
   }),
+  // Course size fields (advisory - LLM may deviate if needed)
+  course_size: z.enum(['mini', 'compact', 'standard', 'comprehensive']).optional(),
+  target_lessons: z.number().int().positive().optional(),
+  target_sections: z.number().int().positive().optional(),
+  size_guidance: z.string().min(1).optional(),
 });
 
 /**
  * NEW: Pedagogical patterns schema (Analyze Enhancement)
  */
 export const PedagogicalPatternsSchema = z.object({
-  primary_strategy: z.enum(['problem-based learning', 'lecture-based', 'inquiry-based', 'project-based', 'mixed']),
+  primary_strategy: z.enum([
+    'problem-based learning',
+    'lecture-based',
+    'inquiry-based',
+    'project-based',
+    'mixed',
+  ]),
   theory_practice_ratio: z.string().regex(/^\d+:\d+$/, 'Must be format "XX:YY" (e.g., "30:70")'),
-  assessment_types: z.array(z.enum(['coding', 'quizzes', 'projects', 'essays', 'presentations', 'peer-review'])),
+  assessment_types: z.array(
+    z.enum(['coding', 'quizzes', 'projects', 'essays', 'presentations', 'peer-review'])
+  ),
   key_patterns: z.array(z.string()), // e.g., ["build incrementally", "learn by refactoring"]
 });
 
@@ -339,7 +384,12 @@ export const Phase1OutputSchema = z.object({
  * - Allows LLM flexibility while maintaining type safety
  */
 export const GenerationGuidanceSchema = z.object({
-  tone: z.enum(['conversational but precise', 'formal academic', 'casual friendly', 'technical professional']),
+  tone: z.enum([
+    'conversational but precise',
+    'formal academic',
+    'casual friendly',
+    'technical professional',
+  ]),
   use_analogies: z.boolean(),
   specific_analogies: z.array(z.string()).optional(),
   avoid_jargon: z.array(z.string()),
@@ -434,10 +484,12 @@ export const SectionRAGPlanSchema = z.object({
   // Legacy field for backward compatibility (deprecated, use search_queries)
   key_search_terms: z.array(z.string()).optional(),
   // Legacy field for backward compatibility (deprecated)
-  document_processing_methods: z.record(
-    z.string(), // document_id
-    z.enum(['full_text', 'hierarchical'])
-  ).optional(),
+  document_processing_methods: z
+    .record(
+      z.string(), // document_id
+      z.enum(['full_text', 'hierarchical'])
+    )
+    .optional(),
 });
 
 /**
@@ -457,7 +509,10 @@ export const AnalysisResultSchema = z.object({
     primary: z.enum(['professional', 'personal', 'creative', 'hobby', 'spiritual', 'academic']),
     confidence: z.number().min(0).max(1), // Keep .max(1) - technical constraint (probability)
     reasoning: z.string().min(50), // Removed .max(200) - encourage detailed reasoning
-    secondary: z.enum(['professional', 'personal', 'creative', 'hobby', 'spiritual', 'academic']).optional().nullable(),
+    secondary: z
+      .enum(['professional', 'personal', 'creative', 'hobby', 'spiritual', 'academic'])
+      .optional()
+      .nullable(),
   }),
 
   contextual_language: z.object({

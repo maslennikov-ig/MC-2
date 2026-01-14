@@ -197,7 +197,7 @@ async function checkRedis(): Promise<ServiceStatus> {
       message: 'Could not determine Redis status',
       lastCheck,
     }
-  } catch (error) {
+  } catch (_error) {
     return {
       name: 'Redis',
       status: 'unknown',

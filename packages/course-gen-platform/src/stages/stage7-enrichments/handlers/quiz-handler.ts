@@ -28,6 +28,7 @@ import {
   quizOutputSchema,
   type QuizSettings,
 } from '../prompts/quiz-prompt';
+import { getLessonContent } from '../services/database-service';
 
 // ============================================================================
 // CONFIGURATION
@@ -160,6 +161,12 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
     'Quiz handler: generating quiz'
   );
 
+  // Fetch lesson content from lesson_contents table
+  const lessonContent = await getLessonContent(enrichmentContext.lesson.id);
+  if (!lessonContent) {
+    throw new Error(`No lesson content found for lesson ${enrichmentContext.lesson.id}`);
+  }
+
   // Build prompts
   const systemPrompt = buildQuizSystemPrompt();
 
@@ -173,13 +180,11 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
   };
 
   // Extract learning objectives from lesson content
-  const lessonObjectives = extractLearningObjectives(
-    enrichmentContext.lesson.content
-  );
+  const lessonObjectives = extractLearningObjectives(lessonContent);
 
   const userPrompt = buildQuizUserMessage({
     lessonTitle: enrichmentContext.lesson.title,
-    lessonContent: enrichmentContext.lesson.content || '',
+    lessonContent,
     lessonObjectives,
     language: (enrichmentContext.course.language || 'en') as 'en' | 'ru',
     settings: quizSettings,

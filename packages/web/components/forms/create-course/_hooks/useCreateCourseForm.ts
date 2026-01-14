@@ -1,20 +1,24 @@
-"use client"
+'use client'
 
-import { useState, useCallback, useEffect, useRef, useMemo } from "react"
+import { useState, useCallback, useEffect, useRef, useMemo } from 'react'
 import { createClient } from '@/lib/supabase/client'
-import { useForm } from "react-hook-form"
-import { zodResolver } from "@hookform/resolvers/zod"
-import { toast } from "sonner"
-import { logger } from "@/lib/client-logger"
-import { LEARNING_STYLES, reorderLearningStylesWithPreferred } from '@/lib/constants/learning-styles'
+import { useForm } from 'react-hook-form'
+import { zodResolver } from '@hookform/resolvers/zod'
+import { toast } from 'sonner'
+import { logger } from '@/lib/client-logger'
+import {
+  LEARNING_STYLES,
+  reorderLearningStylesWithPreferred,
+} from '@/lib/constants/learning-styles'
 import { loadUserPreferences } from '@/lib/user-preferences'
 import { canCreateCourses } from '@/app/actions/courses'
 import { createDraftSession } from '@/app/actions/draft-session'
-import { formSchema, type FormData } from "../_schemas/form-schema"
-import { useFileUpload } from "./useFileUpload"
-import { useAutoSave } from "./useAutoSave"
-import { useSubmitCourse } from "./useSubmitCourse"
-import { useWorkerReadiness } from "./useWorkerReadiness"
+import { formSchema, type FormData } from '../_schemas/form-schema'
+import { DEFAULT_COURSE_SIZE } from '@megacampus/shared-types'
+import { useFileUpload } from './useFileUpload'
+import { useAutoSave } from './useAutoSave'
+import { useSubmitCourse } from './useSubmitCourse'
+import { useWorkerReadiness } from './useWorkerReadiness'
 
 export function useCreateCourseForm() {
   const [mounted, setMounted] = useState(false)
@@ -24,7 +28,7 @@ export function useCreateCourseForm() {
   const [draftCourseId, setDraftCourseId] = useState<string | null>(null)
   const [canCreate, setCanCreate] = useState<boolean | null>(null)
   const [userRole, setUserRole] = useState<string>('unknown')
-  
+
   const validationTimeoutsRef = useRef<NodeJS.Timeout[]>([])
   const autoSubmitTimeoutRef = useRef<NodeJS.Timeout | null>(null)
 
@@ -41,12 +45,13 @@ export function useCreateCourseForm() {
 
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
-    mode: "onChange",
+    mode: 'onChange',
     defaultValues: {
-      writingStyle: userPreferredStyle || getSavedPreferences()?.writingStyle || "conversational",
-      language: getSavedPreferences()?.language || "ru",
-      contentStrategy: "auto",
-      formats: ["text"],
+      writingStyle: userPreferredStyle || getSavedPreferences()?.writingStyle || 'professional',
+      language: getSavedPreferences()?.language || 'ru',
+      contentStrategy: 'auto',
+      courseSize: DEFAULT_COURSE_SIZE,
+      formats: ['text'],
       lessonDuration: 5,
     },
   })
@@ -59,19 +64,14 @@ export function useCreateCourseForm() {
     getValues,
   } = form
 
-  const writingStyle = watch("writingStyle")
-  const language = watch("language")
-  const rawFormats = watch("formats")
+  const writingStyle = watch('writingStyle')
+  const language = watch('language')
+  const rawFormats = watch('formats')
   const formats = useMemo(() => rawFormats || [], [rawFormats])
 
   // Custom hooks
-  const { 
-    uploadedFiles, 
-    setUploadedFiles, 
-    isUploadingFiles, 
-    uploadSingleFile, 
-    uploadAllFiles 
-  } = useFileUpload()
+  const { uploadedFiles, setUploadedFiles, isUploadingFiles, uploadSingleFile, uploadAllFiles } =
+    useFileUpload()
 
   const { handleFormChange } = useAutoSave(sessionId, getValues)
 
@@ -88,7 +88,7 @@ export function useCreateCourseForm() {
     setDraftCourseId,
     uploadedFiles,
     uploadAllFiles,
-    getValues
+    getValues,
   })
 
   // Validate and scroll to error
@@ -101,32 +101,34 @@ export function useCreateCourseForm() {
         const rect = element.getBoundingClientRect()
         const scrollTop = window.pageYOffset || document.documentElement.scrollTop
         const targetPosition = rect.top + scrollTop - 120
-        
+
         window.scrollTo({
           top: targetPosition,
-          behavior: 'smooth'
+          behavior: 'smooth',
         })
-        
+
         validationTimeoutsRef.current.forEach(clearTimeout)
         validationTimeoutsRef.current = []
-        
+
         const focusTimeout = setTimeout(() => {
           element.focus()
           element.classList.add('animate-pulse', 'ring-2', 'ring-red-500', 'ring-offset-2')
           const removeTimeout = setTimeout(() => {
             element.classList.remove('animate-pulse', 'ring-2', 'ring-red-500', 'ring-offset-2')
-            validationTimeoutsRef.current = validationTimeoutsRef.current.filter(t => t !== removeTimeout)
+            validationTimeoutsRef.current = validationTimeoutsRef.current.filter(
+              (t) => t !== removeTimeout
+            )
           }, 3000)
           validationTimeoutsRef.current.push(removeTimeout)
         }, 500)
         validationTimeoutsRef.current.push(focusTimeout)
       }
-      
+
       const errorMessages: Record<string, string> = {
         topic: 'Пожалуйста, укажите тему курса',
-        email: 'Пожалуйста, укажите email для получения результатов'
+        email: 'Пожалуйста, укажите email для получения результатов',
       }
-      
+
       toast.error(errorMessages[firstErrorField] || 'Пожалуйста, заполните все обязательные поля')
       return false
     }
@@ -151,7 +153,9 @@ export function useCreateCourseForm() {
       if (sessionId || !mounted || canCreate !== true) return
 
       const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
       if (!user) return
 
       const { data: orgData } = await supabase
@@ -183,18 +187,20 @@ export function useCreateCourseForm() {
 
     const loadPreferences = async () => {
       const supabase = createClient()
-      const { data: { user } } = await supabase.auth.getUser()
+      const {
+        data: { user },
+      } = await supabase.auth.getUser()
 
       if (user) {
-        setValue("email", user.email || "")
+        setValue('email', user.email || '')
 
         try {
           const preferences = await loadUserPreferences(supabase, user.id)
           if (preferences.learning_style) {
             setUserPreferredStyle(preferences.learning_style)
-            const currentStyle = getValues("writingStyle")
-            if (!currentStyle || currentStyle === "conversational") {
-              setValue("writingStyle", preferences.learning_style as FormData['writingStyle'])
+            const currentStyle = getValues('writingStyle')
+            if (!currentStyle || currentStyle === 'professional') {
+              setValue('writingStyle', preferences.learning_style as FormData['writingStyle'])
             }
             const reordered = reorderLearningStylesWithPreferred(preferences.learning_style)
             setReorderedStyles(reordered)
@@ -216,7 +222,7 @@ export function useCreateCourseForm() {
         })
         localStorage.removeItem('pendingCourseData')
         toast.success('Данные формы восстановлены', {
-          description: 'Теперь вы можете продолжить создание курса'
+          description: 'Теперь вы можете продолжить создание курса',
         })
 
         const supabase = createClient()
@@ -247,7 +253,7 @@ export function useCreateCourseForm() {
       try {
         const preferences = {
           writingStyle,
-          language
+          language,
         }
         localStorage.setItem('courseFormPreferences', JSON.stringify(preferences))
       } catch {
@@ -257,15 +263,15 @@ export function useCreateCourseForm() {
   }, [writingStyle, language, mounted])
 
   useEffect(() => {
-    if (writingStyle === "microlearning") {
-      setValue("lessonDuration", 3)
+    if (writingStyle === 'microlearning') {
+      setValue('lessonDuration', 3)
     }
   }, [writingStyle, setValue])
 
   useEffect(() => {
-    const currentFormats = getValues("formats")
+    const currentFormats = getValues('formats')
     if (!currentFormats || currentFormats.length === 0) {
-      setValue("formats", ["text"], { shouldValidate: true })
+      setValue('formats', ['text'], { shouldValidate: true })
     }
   }, [getValues, setValue])
 
@@ -284,15 +290,22 @@ export function useCreateCourseForm() {
     }
   }, [])
 
-  const toggleFormat = useCallback((format: string, available: boolean, required?: boolean) => {
-    if (!available || required) return
-    const currentFormats = formats || []
-    if (currentFormats.includes(format)) {
-      setValue("formats", currentFormats.filter(f => f !== format), { shouldValidate: true })
-    } else {
-      setValue("formats", [...currentFormats, format], { shouldValidate: true })
-    }
-  }, [formats, setValue])
+  const toggleFormat = useCallback(
+    (format: string, available: boolean, required?: boolean) => {
+      if (!available || required) return
+      const currentFormats = formats || []
+      if (currentFormats.includes(format)) {
+        setValue(
+          'formats',
+          currentFormats.filter((f) => f !== format),
+          { shouldValidate: true }
+        )
+      } else {
+        setValue('formats', [...currentFormats, format], { shouldValidate: true })
+      }
+    },
+    [formats, setValue]
+  )
 
   const handleFormSubmit = handleSubmit(onSubmit, () => validateAndScrollToError())
 

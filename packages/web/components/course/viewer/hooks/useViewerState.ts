@@ -57,7 +57,7 @@ export function useViewerState(course: Course, rawSections: Section[], rawLesson
         const { completedLessons: saved } = JSON.parse(savedProgress)
         setCompletedLessons(new Set(saved))
       }
-    } catch (e) {
+    } catch (_e) {
       // Silent failure acceptable - progress persistence is a nice-to-have feature
       // localStorage may be unavailable or corrupted; user can continue without saved progress
     }

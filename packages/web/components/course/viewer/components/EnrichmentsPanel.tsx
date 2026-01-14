@@ -1,7 +1,8 @@
-"use client"
+'use client'
 
-import React, { useState } from "react"
-import { useTranslations } from "next-intl"
+import React, { useState, useCallback } from 'react'
+import { useTranslations } from 'next-intl'
+import { toast } from 'sonner'
 import {
   Video,
   Headphones,
@@ -13,19 +14,22 @@ import {
   ExternalLink,
   X,
   AlertTriangle,
-} from "lucide-react"
-import { AudioPlayer } from "../enrichments/AudioPlayer"
-import { QuizPlayer } from "../enrichments/QuizPlayer"
-import { EnrichmentErrorBoundary } from "../enrichments/EnrichmentErrorBoundary"
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import type { Database } from "@/types/database.generated"
+} from 'lucide-react'
+import { AudioPlayer } from '../enrichments/AudioPlayer'
+import { QuizPlayer } from '../enrichments/QuizPlayer'
+import { EnrichmentErrorBoundary } from '../enrichments/EnrichmentErrorBoundary'
+import { EnrichmentPlaceholderCard } from './EnrichmentPlaceholderCard'
+import { EnrichmentGeneratingCard } from './EnrichmentGeneratingCard'
+import { useEnrichmentGeneration } from '@/lib/hooks/useEnrichmentGeneration'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import type { Database } from '@/types/database.generated'
 import type {
   QuizEnrichmentContent,
   PresentationEnrichmentContent,
   AudioEnrichmentContent,
-} from "@megacampus/shared-types/enrichment-content"
+} from '@megacampus/shared-types/enrichment-content'
 
 type EnrichmentRow = Database['public']['Tables']['lesson_enrichments']['Row']
 
@@ -38,7 +42,7 @@ function isQuizContent(content: unknown): content is QuizEnrichmentContent {
     (content as Record<string, unknown>).type === 'quiz' &&
     'questions' in content &&
     Array.isArray((content as Record<string, unknown>).questions)
-  );
+  )
 }
 
 function isAudioContent(content: unknown): content is AudioEnrichmentContent {
@@ -47,7 +51,7 @@ function isAudioContent(content: unknown): content is AudioEnrichmentContent {
     content !== null &&
     'type' in content &&
     (content as Record<string, unknown>).type === 'audio'
-  );
+  )
 }
 
 function isPresentationContent(content: unknown): content is PresentationEnrichmentContent {
@@ -58,7 +62,7 @@ function isPresentationContent(content: unknown): content is PresentationEnrichm
     (content as Record<string, unknown>).type === 'presentation' &&
     'slides' in content &&
     Array.isArray((content as Record<string, unknown>).slides)
-  );
+  )
 }
 
 function isVideoContent(content: unknown): content is { type: 'video'; duration_seconds?: number } {
@@ -67,46 +71,56 @@ function isVideoContent(content: unknown): content is { type: 'video'; duration_
     content !== null &&
     'type' in content &&
     (content as Record<string, unknown>).type === 'video'
-  );
+  )
 }
 
 type EnrichmentType = 'video' | 'audio' | 'presentation' | 'quiz' | 'document'
 
-const ENRICHMENT_CONFIG: Record<EnrichmentType, {
-  icon: React.ElementType
-  color: string
-  bgColor: string
-  labelKey: string
-}> = {
+const PLACEHOLDER_TYPES: ('quiz' | 'audio' | 'presentation' | 'video')[] = [
+  'quiz',
+  'audio',
+  'presentation',
+  'video',
+]
+
+const ENRICHMENT_CONFIG: Record<
+  EnrichmentType,
+  {
+    icon: React.ElementType
+    color: string
+    bgColor: string
+    labelKey: string
+  }
+> = {
   video: {
     icon: Video,
     color: 'text-red-500 dark:text-red-400',
     bgColor: 'bg-red-100 dark:bg-red-900/30',
-    labelKey: 'viewer.videoLesson'
+    labelKey: 'viewer.videoLesson',
   },
   audio: {
     icon: Headphones,
     color: 'text-purple-500 dark:text-purple-400',
     bgColor: 'bg-purple-100 dark:bg-purple-900/30',
-    labelKey: 'viewer.audioLesson'
+    labelKey: 'viewer.audioLesson',
   },
   presentation: {
     icon: Presentation,
     color: 'text-orange-500 dark:text-orange-400',
     bgColor: 'bg-orange-100 dark:bg-orange-900/30',
-    labelKey: 'viewer.presentationLabel'
+    labelKey: 'viewer.presentationLabel',
   },
   quiz: {
     icon: HelpCircle,
     color: 'text-green-500 dark:text-green-400',
     bgColor: 'bg-green-100 dark:bg-green-900/30',
-    labelKey: 'viewer.quizLabel'
+    labelKey: 'viewer.quizLabel',
   },
   document: {
     icon: FileText,
     color: 'text-blue-500 dark:text-blue-400',
     bgColor: 'bg-blue-100 dark:bg-blue-900/30',
-    labelKey: 'viewer.documentLabel'
+    labelKey: 'viewer.documentLabel',
   },
 }
 
@@ -114,24 +128,59 @@ interface EnrichmentsPanelProps {
   enrichments: EnrichmentRow[]
   /** Error message if enrichments failed to load */
   enrichmentsLoadError?: string
+  /** Lesson UUID for generating new enrichments */
+  lessonId?: string
+  /** Course UUID for generating new enrichments */
+  courseId?: string
+  /** Callback when enrichments should be refreshed (after generation completes) */
+  onRefreshEnrichments?: () => void
 }
 
-export function EnrichmentsPanel({ enrichments, enrichmentsLoadError }: EnrichmentsPanelProps) {
+export function EnrichmentsPanel({
+  enrichments,
+  enrichmentsLoadError,
+  lessonId,
+  courseId,
+  onRefreshEnrichments,
+}: EnrichmentsPanelProps) {
   const t = useTranslations('enrichments')
   const [activeEnrichmentId, setActiveEnrichmentId] = useState<string | null>(null)
 
+  // Handle generation completion
+  const handleGenerationComplete = useCallback(
+    (_enrichmentId: string) => {
+      toast.success(t('viewer.generationComplete'))
+      onRefreshEnrichments?.()
+    },
+    [t, onRefreshEnrichments]
+  )
+
+  // Handle generation error
+  const handleGenerationError = useCallback(
+    (error: string) => {
+      toast.error(`${t('viewer.generationFailed')}: ${error}`)
+    },
+    [t]
+  )
+
+  // Use enrichment generation hook (only if lessonId and courseId are available)
+  const { startGeneration, cancelGeneration, isGenerating, getProgress } = useEnrichmentGeneration({
+    lessonId: lessonId || '',
+    courseId: courseId || '',
+    onComplete: handleGenerationComplete,
+    onError: handleGenerationError,
+  })
+
   // Filter out cover type - it's displayed as hero banner in lesson content
-  const filteredEnrichments = enrichments.filter(e => (e.enrichment_type as string) !== 'cover')
+  const filteredEnrichments = enrichments.filter((e) => (e.enrichment_type as string) !== 'cover')
 
   // Show error banner if there was a load error
   if (enrichmentsLoadError) {
     return (
       <div className="space-y-6">
-        <div className="p-4 bg-orange-50 dark:bg-orange-900/20 border border-orange-200 dark:border-orange-800/30 rounded-lg flex items-center gap-3">
-          <AlertTriangle className="w-5 h-5 text-orange-500 flex-shrink-0" />
-          <p className="text-sm text-orange-800 dark:text-orange-200">
-            {t('viewer.loadError')}
-          </p>
+        <div className="flex items-center gap-3 rounded-lg border border-orange-200 bg-orange-50 p-4 dark:border-orange-800/30 dark:bg-orange-900/20">
+          <AlertTriangle className="h-5 w-5 flex-shrink-0 text-orange-500" />
+          <p className="text-sm text-orange-800 dark:text-orange-200">{t('viewer.loadError')}</p>
         </div>
       </div>
     )
@@ -140,11 +189,11 @@ export function EnrichmentsPanel({ enrichments, enrichmentsLoadError }: Enrichme
   if (!filteredEnrichments || filteredEnrichments.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center">
-        <FileText className="w-12 h-12 text-gray-300 dark:text-gray-600 mb-4" />
+        <FileText className="mb-4 h-12 w-12 text-gray-300 dark:text-gray-600" />
         <h3 className="text-lg font-medium text-gray-500 dark:text-gray-400">
           {t('viewer.noMaterials')}
         </h3>
-        <p className="text-sm text-gray-400 dark:text-gray-500 mt-1">
+        <p className="mt-1 text-sm text-gray-400 dark:text-gray-500">
           {t('viewer.noMaterialsDescription')}
         </p>
       </div>
@@ -152,17 +201,20 @@ export function EnrichmentsPanel({ enrichments, enrichmentsLoadError }: Enrichme
   }
 
   // Group enrichments by type
-  const groupedEnrichments = filteredEnrichments.reduce((acc, e) => {
-    const type = e.enrichment_type as EnrichmentType
-    if (!acc[type]) acc[type] = []
-    acc[type].push(e)
-    return acc
-  }, {} as Record<EnrichmentType, EnrichmentRow[]>)
+  const groupedEnrichments = filteredEnrichments.reduce(
+    (acc, e) => {
+      const type = e.enrichment_type as EnrichmentType
+      if (!acc[type]) acc[type] = []
+      acc[type].push(e)
+      return acc
+    },
+    {} as Record<EnrichmentType, EnrichmentRow[]>
+  )
 
   return (
     <div className="space-y-6">
       {/* Video Section */}
-      {groupedEnrichments.video?.map(enrichment => (
+      {groupedEnrichments.video?.map((enrichment) => (
         <EnrichmentErrorBoundary
           key={enrichment.id}
           enrichmentType={t('viewer.enrichmentTypes.video')}
@@ -171,16 +223,16 @@ export function EnrichmentsPanel({ enrichments, enrichmentsLoadError }: Enrichme
           <EnrichmentCard
             enrichment={enrichment}
             isActive={activeEnrichmentId === enrichment.id}
-            onToggle={() => setActiveEnrichmentId(
-              activeEnrichmentId === enrichment.id ? null : enrichment.id
-            )}
+            onToggle={() =>
+              setActiveEnrichmentId(activeEnrichmentId === enrichment.id ? null : enrichment.id)
+            }
             t={t}
           />
         </EnrichmentErrorBoundary>
       ))}
 
       {/* Audio Section */}
-      {groupedEnrichments.audio?.map(enrichment => (
+      {groupedEnrichments.audio?.map((enrichment) => (
         <EnrichmentErrorBoundary
           key={enrichment.id}
           enrichmentType={t('viewer.enrichmentTypes.audio')}
@@ -189,16 +241,16 @@ export function EnrichmentsPanel({ enrichments, enrichmentsLoadError }: Enrichme
           <EnrichmentCard
             enrichment={enrichment}
             isActive={activeEnrichmentId === enrichment.id}
-            onToggle={() => setActiveEnrichmentId(
-              activeEnrichmentId === enrichment.id ? null : enrichment.id
-            )}
+            onToggle={() =>
+              setActiveEnrichmentId(activeEnrichmentId === enrichment.id ? null : enrichment.id)
+            }
             t={t}
           />
         </EnrichmentErrorBoundary>
       ))}
 
       {/* Presentation Section */}
-      {groupedEnrichments.presentation?.map(enrichment => (
+      {groupedEnrichments.presentation?.map((enrichment) => (
         <EnrichmentErrorBoundary
           key={enrichment.id}
           enrichmentType={t('viewer.enrichmentTypes.presentation')}
@@ -207,16 +259,16 @@ export function EnrichmentsPanel({ enrichments, enrichmentsLoadError }: Enrichme
           <EnrichmentCard
             enrichment={enrichment}
             isActive={activeEnrichmentId === enrichment.id}
-            onToggle={() => setActiveEnrichmentId(
-              activeEnrichmentId === enrichment.id ? null : enrichment.id
-            )}
+            onToggle={() =>
+              setActiveEnrichmentId(activeEnrichmentId === enrichment.id ? null : enrichment.id)
+            }
             t={t}
           />
         </EnrichmentErrorBoundary>
       ))}
 
       {/* Quiz Section */}
-      {groupedEnrichments.quiz?.map(enrichment => (
+      {groupedEnrichments.quiz?.map((enrichment) => (
         <EnrichmentErrorBoundary
           key={enrichment.id}
           enrichmentType={t('viewer.enrichmentTypes.quiz')}
@@ -225,16 +277,16 @@ export function EnrichmentsPanel({ enrichments, enrichmentsLoadError }: Enrichme
           <EnrichmentCard
             enrichment={enrichment}
             isActive={activeEnrichmentId === enrichment.id}
-            onToggle={() => setActiveEnrichmentId(
-              activeEnrichmentId === enrichment.id ? null : enrichment.id
-            )}
+            onToggle={() =>
+              setActiveEnrichmentId(activeEnrichmentId === enrichment.id ? null : enrichment.id)
+            }
             t={t}
           />
         </EnrichmentErrorBoundary>
       ))}
 
       {/* Document Section */}
-      {groupedEnrichments.document?.map(enrichment => (
+      {groupedEnrichments.document?.map((enrichment) => (
         <EnrichmentErrorBoundary
           key={enrichment.id}
           enrichmentType={t('viewer.enrichmentTypes.document')}
@@ -243,13 +295,64 @@ export function EnrichmentsPanel({ enrichments, enrichmentsLoadError }: Enrichme
           <EnrichmentCard
             enrichment={enrichment}
             isActive={activeEnrichmentId === enrichment.id}
-            onToggle={() => setActiveEnrichmentId(
-              activeEnrichmentId === enrichment.id ? null : enrichment.id
-            )}
+            onToggle={() =>
+              setActiveEnrichmentId(activeEnrichmentId === enrichment.id ? null : enrichment.id)
+            }
             t={t}
           />
         </EnrichmentErrorBoundary>
       ))}
+
+      {/* Placeholder Cards for Missing Types and Generating Cards */}
+      <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
+        {PLACEHOLDER_TYPES.filter((type) => !groupedEnrichments[type]).map((type) => {
+          // Check if this type is currently generating
+          const generatingProgress = getProgress(type)
+          const typeIsGenerating = isGenerating(type)
+
+          // Construct translation key dynamically - path exists in enrichments.json
+          type PlaceholderKey = `placeholder.${typeof type}.estimatedTime`;
+          const estimatedTimeKey = `placeholder.${type}.estimatedTime` as PlaceholderKey;
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Dynamic key not in strict types
+          const estimatedTime = t(estimatedTimeKey as Parameters<typeof t>[0])
+
+          // Show generating card if generation is in progress
+          if (typeIsGenerating && generatingProgress) {
+            return (
+              <EnrichmentGeneratingCard
+                key={type}
+                type={type}
+                progress={generatingProgress.progress}
+                currentStep={generatingProgress.currentStep || t('generating')}
+                onCancel={() => void cancelGeneration(type)}
+              />
+            )
+          }
+
+          // Show placeholder card otherwise
+          return (
+            <EnrichmentPlaceholderCard
+              key={type}
+              type={type}
+              onGenerate={(settings) => {
+                // Only allow generation if lessonId is available
+                if (!lessonId) {
+                  toast.error(t('viewer.noMaterials'))
+                  return
+                }
+                // Only generate on-demand types (quiz, audio, presentation)
+                if (type === 'video') {
+                  return
+                }
+                void startGeneration(type, settings)
+              }}
+              estimatedTime={estimatedTime}
+              disabled={type === 'video' || !lessonId}
+              isGenerating={typeIsGenerating}
+            />
+          )
+        })}
+      </div>
     </div>
   )
 }
@@ -267,8 +370,8 @@ function EnrichmentCard({ enrichment, isActive, onToggle, t }: EnrichmentCardPro
   const Icon = config.icon
 
   const getContentPreview = () => {
-    const content = enrichment.content;
-    if (!content) return null;
+    const content = enrichment.content
+    if (!content) return null
 
     try {
       switch (type) {
@@ -276,73 +379,85 @@ function EnrichmentCard({ enrichment, isActive, onToggle, t }: EnrichmentCardPro
           if (isQuizContent(content)) {
             return content.questions?.length
               ? t('viewer.questionsCount', { count: content.questions.length })
-              : null;
+              : null
           }
-          return null;
+          return null
         }
         case 'presentation': {
           if (isPresentationContent(content)) {
             return content.slides?.length
               ? t('viewer.slidesCount', { count: content.slides.length })
-              : null;
+              : null
           }
-          return null;
+          return null
         }
         case 'audio': {
           if (isAudioContent(content)) {
             return content.duration_seconds
               ? t('viewer.minutesShort', { count: Math.ceil(content.duration_seconds / 60) })
-              : null;
+              : null
           }
-          return null;
+          return null
         }
         case 'video': {
           if (isVideoContent(content)) {
             return content.duration_seconds
               ? t('viewer.minutesShort', { count: Math.ceil(content.duration_seconds / 60) })
-              : null;
+              : null
           }
-          return null;
+          return null
         }
         default:
-          return null;
+          return null
       }
     } catch (error) {
-      console.error('Failed to parse enrichment content preview:', error);
-      return null;
+      console.error('Failed to parse enrichment content preview:', error)
+      return null
     }
   }
 
   const getDescriptionKey = () => {
     switch (type) {
-      case 'quiz': return 'viewer.checkKnowledge';
-      case 'audio': return 'viewer.audioVersion';
-      case 'video': return 'viewer.videoVersion';
-      case 'presentation': return 'viewer.lessonPresentation';
-      case 'document': return 'viewer.additionalMaterials';
-      default: return 'viewer.additionalMaterials';
+      case 'quiz':
+        return 'viewer.checkKnowledge'
+      case 'audio':
+        return 'viewer.audioVersion'
+      case 'video':
+        return 'viewer.videoVersion'
+      case 'presentation':
+        return 'viewer.lessonPresentation'
+      case 'document':
+        return 'viewer.additionalMaterials'
+      default:
+        return 'viewer.additionalMaterials'
     }
   }
 
   const getLabel = () => {
     switch (type) {
-      case 'video': return t('viewer.videoLesson');
-      case 'audio': return t('viewer.audioLesson');
-      case 'presentation': return t('viewer.presentationLabel');
-      case 'quiz': return t('viewer.quizLabel');
-      case 'document': return t('viewer.documentLabel');
-      default: return t('viewer.additionalMaterials');
+      case 'video':
+        return t('viewer.videoLesson')
+      case 'audio':
+        return t('viewer.audioLesson')
+      case 'presentation':
+        return t('viewer.presentationLabel')
+      case 'quiz':
+        return t('viewer.quizLabel')
+      case 'document':
+        return t('viewer.documentLabel')
+      default:
+        return t('viewer.additionalMaterials')
     }
   }
 
   const preview = getContentPreview()
 
   return (
-    <Card className="overflow-hidden hover:shadow-md transition-shadow">
+    <Card className="overflow-hidden transition-shadow hover:shadow-md">
       <CardHeader className={`${config.bgColor} py-3`}>
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <Icon className={`w-5 h-5 ${config.color}`} />
+            <Icon className={`h-5 w-5 ${config.color}`} />
             <CardTitle className="text-base font-medium">
               {enrichment.title || getLabel()}
             </CardTitle>
@@ -362,7 +477,7 @@ function EnrichmentCard({ enrichment, isActive, onToggle, t }: EnrichmentCardPro
               content={enrichment.content}
               enrichmentId={enrichment.id}
               onComplete={(score, total, passed) => {
-                console.log('Quiz completed:', { score, total, passed });
+                console.log('Quiz completed:', { score, total, passed })
               }}
             />
           </div>
@@ -380,21 +495,19 @@ function EnrichmentCard({ enrichment, isActive, onToggle, t }: EnrichmentCardPro
 
         {/* Action row */}
         <div className="flex items-center justify-between">
-          <p className="text-sm text-gray-500 dark:text-gray-400">
-            {t(getDescriptionKey())}
-          </p>
+          <p className="text-sm text-gray-500 dark:text-gray-400">{t(getDescriptionKey())}</p>
           <div className="flex gap-2">
             {/* Audio/Video toggle */}
             {(type === 'audio' || type === 'video') && (
               <Button size="sm" className="gap-2" onClick={onToggle}>
                 {isActive ? (
                   <>
-                    <X className="w-4 h-4" />
+                    <X className="h-4 w-4" />
                     {t('viewer.close')}
                   </>
                 ) : (
                   <>
-                    <Play className="w-4 h-4" />
+                    <Play className="h-4 w-4" />
                     {t('viewer.play')}
                   </>
                 )}
@@ -405,12 +518,12 @@ function EnrichmentCard({ enrichment, isActive, onToggle, t }: EnrichmentCardPro
               <Button size="sm" className="gap-2" onClick={onToggle}>
                 {isActive ? (
                   <>
-                    <X className="w-4 h-4" />
+                    <X className="h-4 w-4" />
                     {t('viewer.close')}
                   </>
                 ) : (
                   <>
-                    <Play className="w-4 h-4" />
+                    <Play className="h-4 w-4" />
                     {t('viewer.startQuiz')}
                   </>
                 )}
@@ -418,13 +531,13 @@ function EnrichmentCard({ enrichment, isActive, onToggle, t }: EnrichmentCardPro
             )}
             {type === 'presentation' && (
               <Button size="sm" className="gap-2">
-                <ExternalLink className="w-4 h-4" />
+                <ExternalLink className="h-4 w-4" />
                 {t('viewer.open')}
               </Button>
             )}
             {type === 'document' && (
               <Button size="sm" variant="outline" className="gap-2">
-                <Download className="w-4 h-4" />
+                <Download className="h-4 w-4" />
                 {t('viewer.download')}
               </Button>
             )}

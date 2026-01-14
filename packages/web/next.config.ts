@@ -1,12 +1,13 @@
-import type { NextConfig } from "next";
-import webpack from 'webpack';
-import createNextIntlPlugin from 'next-intl/plugin';
+import type { NextConfig } from 'next'
+import webpack from 'webpack'
+import createNextIntlPlugin from 'next-intl/plugin'
+import withPWAInit from '@ducanh2912/next-pwa'
+import packageJson from './package.json'
 
 // Read version from package.json for cache invalidation
-const packageJson = require('./package.json');
-const APP_VERSION = packageJson.version;
+const APP_VERSION = packageJson.version
 
-const withPWA = require('@ducanh2912/next-pwa').default({
+const withPWA = withPWAInit({
   dest: 'public',
   register: true,
   // Disable in development to avoid conflicts with hot reload
@@ -18,14 +19,8 @@ const withPWA = require('@ducanh2912/next-pwa').default({
   // Both options required per @ducanh2912/next-pwa docs
   cacheStartUrl: false,
   dynamicStartUrl: false,
-  // Clean up outdated caches on deploy
-  cleanupOutdatedCaches: true,
-  // Version in cacheId for cache invalidation
-  cacheId: `megacampus-${APP_VERSION}`,
   // Do NOT use default runtimeCaching (uses CacheFirst for JS = 502 after deploy)
   extendDefaultRuntimeCaching: false,
-  // Exclude _next from precache - files change every build
-  buildExcludes: [/app-build-manifest\.json$/, /\.map$/],
   publicExcludes: ['!_next/**/*'],
   // CRITICAL: All caching config must be inside workboxOptions to truly override defaults
   // Top-level skipWaiting is IGNORED - must be in workboxOptions!
@@ -33,123 +28,125 @@ const withPWA = require('@ducanh2912/next-pwa').default({
     // CRITICAL: skipWaiting and clientsClaim MUST be inside workboxOptions
     // Top-level placement is silently ignored by Workbox
     // See: https://github.com/nicolo-ribaudo/next-pwa/issues/issues
-    skipWaiting: false,  // Don't take control mid-session
+    skipWaiting: false, // Don't take control mid-session
     clientsClaim: false, // Don't claim clients immediately
-    // Exclude JS/CSS/JSON from precache manifest
-    exclude: [/\.js$/, /\.css$/, /\.json$/],
+    // Clean up outdated caches on deploy
+    cleanupOutdatedCaches: true,
+    // Exclude JS/CSS/JSON and build manifests from precache manifest
+    exclude: [/\.js$/, /\.css$/, /\.json$/, /app-build-manifest\.json$/, /\.map$/],
     // MINIMAL runtime caching - ONLY fonts, images, and media
     // NO JS/CSS/JSON - these change on every deploy and cause 502 errors when cached
     // The SW will NOT intercept any code-related requests
     runtimeCaching: [
-    {
-      // Google Fonts webfonts (woff2 files) - safe to cache long-term
-      urlPattern: /^https:\/\/fonts\.(?:gstatic)\.com\/.*/i,
-      handler: 'CacheFirst',
-      options: {
-        cacheName: 'google-fonts-webfonts',
-        expiration: {
-          maxEntries: 4,
-          maxAgeSeconds: 365 * 24 * 60 * 60 // 1 year
+      {
+        // Google Fonts webfonts (woff2 files) - safe to cache long-term
+        urlPattern: /^https:\/\/fonts\.(?:gstatic)\.com\/.*/i,
+        handler: 'CacheFirst',
+        options: {
+          cacheName: 'google-fonts-webfonts',
+          expiration: {
+            maxEntries: 4,
+            maxAgeSeconds: 365 * 24 * 60 * 60, // 1 year
+          },
+          cacheableResponse: {
+            statuses: [0, 200],
+          },
         },
-        cacheableResponse: {
-          statuses: [0, 200]
-        }
-      }
-    },
-    {
-      // Google Fonts CSS - use StaleWhileRevalidate for font CSS
-      urlPattern: /^https:\/\/fonts\.(?:googleapis)\.com\/.*/i,
-      handler: 'StaleWhileRevalidate',
-      options: {
-        cacheName: 'google-fonts-stylesheets',
-        expiration: {
-          maxEntries: 4,
-          maxAgeSeconds: 7 * 24 * 60 * 60 // 1 week
+      },
+      {
+        // Google Fonts CSS - use StaleWhileRevalidate for font CSS
+        urlPattern: /^https:\/\/fonts\.(?:googleapis)\.com\/.*/i,
+        handler: 'StaleWhileRevalidate',
+        options: {
+          cacheName: 'google-fonts-stylesheets',
+          expiration: {
+            maxEntries: 4,
+            maxAgeSeconds: 7 * 24 * 60 * 60, // 1 week
+          },
+          cacheableResponse: {
+            statuses: [0, 200],
+          },
         },
-        cacheableResponse: {
-          statuses: [0, 200]
-        }
-      }
-    },
-    {
-      // Local font files (woff, woff2, etc.)
-      urlPattern: /\.(?:eot|otf|ttc|ttf|woff|woff2)$/i,
-      handler: 'CacheFirst',
-      options: {
-        cacheName: 'static-font-assets',
-        expiration: {
-          maxEntries: 8,
-          maxAgeSeconds: 365 * 24 * 60 * 60 // 1 year
+      },
+      {
+        // Local font files (woff, woff2, etc.)
+        urlPattern: /\.(?:eot|otf|ttc|ttf|woff|woff2)$/i,
+        handler: 'CacheFirst',
+        options: {
+          cacheName: 'static-font-assets',
+          expiration: {
+            maxEntries: 8,
+            maxAgeSeconds: 365 * 24 * 60 * 60, // 1 year
+          },
+          cacheableResponse: {
+            statuses: [0, 200],
+          },
         },
-        cacheableResponse: {
-          statuses: [0, 200]
-        }
-      }
-    },
-    {
-      // Images - safe to cache
-      urlPattern: /\.(?:jpg|jpeg|gif|png|svg|ico|webp|avif)$/i,
-      handler: 'StaleWhileRevalidate',
-      options: {
-        cacheName: 'static-image-assets',
-        expiration: {
-          maxEntries: 64,
-          maxAgeSeconds: 7 * 24 * 60 * 60 // 1 week
+      },
+      {
+        // Images - safe to cache
+        urlPattern: /\.(?:jpg|jpeg|gif|png|svg|ico|webp|avif)$/i,
+        handler: 'StaleWhileRevalidate',
+        options: {
+          cacheName: 'static-image-assets',
+          expiration: {
+            maxEntries: 64,
+            maxAgeSeconds: 7 * 24 * 60 * 60, // 1 week
+          },
+          cacheableResponse: {
+            statuses: [0, 200],
+          },
         },
-        cacheableResponse: {
-          statuses: [0, 200]
-        }
-      }
-    },
-    {
-      // Next.js optimized images
-      urlPattern: /\/_next\/image\?url=.+$/i,
-      handler: 'StaleWhileRevalidate',
-      options: {
-        cacheName: 'next-image',
-        expiration: {
-          maxEntries: 64,
-          maxAgeSeconds: 7 * 24 * 60 * 60 // 1 week
+      },
+      {
+        // Next.js optimized images
+        urlPattern: /\/_next\/image\?url=.+$/i,
+        handler: 'StaleWhileRevalidate',
+        options: {
+          cacheName: 'next-image',
+          expiration: {
+            maxEntries: 64,
+            maxAgeSeconds: 7 * 24 * 60 * 60, // 1 week
+          },
+          cacheableResponse: {
+            statuses: [0, 200],
+          },
         },
-        cacheableResponse: {
-          statuses: [0, 200]
-        }
-      }
-    },
-    {
-      // Audio files
-      urlPattern: /\.(?:mp3|wav|ogg|flac)$/i,
-      handler: 'CacheFirst',
-      options: {
-        cacheName: 'static-audio-assets',
-        expiration: {
-          maxEntries: 32,
-          maxAgeSeconds: 30 * 24 * 60 * 60 // 30 days
+      },
+      {
+        // Audio files
+        urlPattern: /\.(?:mp3|wav|ogg|flac)$/i,
+        handler: 'CacheFirst',
+        options: {
+          cacheName: 'static-audio-assets',
+          expiration: {
+            maxEntries: 32,
+            maxAgeSeconds: 30 * 24 * 60 * 60, // 30 days
+          },
+          cacheableResponse: {
+            statuses: [0, 200],
+          },
         },
-        cacheableResponse: {
-          statuses: [0, 200]
-        }
-      }
-    },
-    {
-      // Video files
-      urlPattern: /\.(?:mp4|webm|mov)$/i,
-      handler: 'CacheFirst',
-      options: {
-        cacheName: 'static-video-assets',
-        expiration: {
-          maxEntries: 16,
-          maxAgeSeconds: 30 * 24 * 60 * 60 // 30 days
+      },
+      {
+        // Video files
+        urlPattern: /\.(?:mp4|webm|mov)$/i,
+        handler: 'CacheFirst',
+        options: {
+          cacheName: 'static-video-assets',
+          expiration: {
+            maxEntries: 16,
+            maxAgeSeconds: 30 * 24 * 60 * 60, // 30 days
+          },
+          cacheableResponse: {
+            statuses: [0, 200],
+          },
         },
-        cacheableResponse: {
-          statuses: [0, 200]
-        }
-      }
-    }
-    // NO JS/CSS/JSON rules - let the browser handle these directly
-    // This prevents stale code from being served after deployments
-    ]
-  }
+      },
+      // NO JS/CSS/JSON rules - let the browser handle these directly
+      // This prevents stale code from being served after deployments
+    ],
+  },
   // Removed fallbacks to avoid babel-loader requirement
 })
 
@@ -209,7 +206,7 @@ const nextConfig: NextConfig = {
       {
         protocol: 'https',
         hostname: 'drive.google.com',
-      }
+      },
     ],
     loader: 'default',
     loaderFile: './lib/supabase-image-loader.ts',
@@ -228,27 +225,27 @@ const nextConfig: NextConfig = {
     // Pino uses thread-stream with worker threads that don't work when bundled.
     // Force pino and related packages to be loaded as external modules on server.
     if (isServer) {
-      const externals = config.externals || [];
+      const externals = config.externals || []
       config.externals = [
         ...externals,
         'pino',
         'pino-pretty',
         'thread-stream',
         '@megacampus/shared-logger',
-      ];
+      ]
     }
 
     // === ElkJS Web Worker suppression ===
     // ElkJS optionally requires 'web-worker' for Node.js environments.
     // In browser (Next.js client), this is unnecessary and causes build errors.
     // We use elk.bundled.js which doesn't need the worker.
-    config.plugins = config.plugins || [];
+    config.plugins = config.plugins || []
     config.plugins.push(
       new webpack.IgnorePlugin({
         resourceRegExp: /^web-worker$/,
         contextRegExp: /elkjs\/lib$/,
       })
-    );
+    )
 
     if (!isServer) {
       // Suppress specific warnings in client-side builds
@@ -261,20 +258,20 @@ const nextConfig: NextConfig = {
           module: /@supabase/,
           message: /.*process\.version.*/,
         },
-      ];
+      ]
 
-      config.resolve = config.resolve || {};
+      config.resolve = config.resolve || {}
       config.resolve.fallback = {
         ...config.resolve.fallback,
         fs: false,
-      };
+      }
     }
 
     // Exclude test files from production builds
     config.module.rules.push({
       test: /\.(test|spec)\.(ts|tsx|js|jsx)$/,
-      use: 'ignore-loader'
-    });
+      use: 'ignore-loader',
+    })
 
     // Exclude test directories from builds
     config.watchOptions = {
@@ -286,11 +283,11 @@ const nextConfig: NextConfig = {
         '**/__tests__/**',
         '**/*.test.*',
         '**/*.spec.*',
-        '**/scripts/test-*'
-      ]
-    };
+        '**/scripts/test-*',
+      ],
+    }
 
-    return config;
+    return config
   },
   async headers() {
     return [
@@ -301,37 +298,38 @@ const nextConfig: NextConfig = {
           // Security Headers
           {
             key: 'X-DNS-Prefetch-Control',
-            value: 'on'
+            value: 'on',
           },
           {
             key: 'Strict-Transport-Security',
-            value: 'max-age=63072000; includeSubDomains; preload'
+            value: 'max-age=63072000; includeSubDomains; preload',
           },
           {
             key: 'X-Frame-Options',
-            value: 'SAMEORIGIN'
+            value: 'SAMEORIGIN',
           },
           {
             key: 'X-Content-Type-Options',
-            value: 'nosniff'
+            value: 'nosniff',
           },
           {
             key: 'X-XSS-Protection',
-            value: '1; mode=block'
+            value: '1; mode=block',
           },
           {
             key: 'Referrer-Policy',
-            value: 'strict-origin-when-cross-origin'
+            value: 'strict-origin-when-cross-origin',
           },
           {
             key: 'Permissions-Policy',
-            value: 'camera=(), microphone=(), geolocation=()'
+            value: 'camera=(), microphone=(), geolocation=()',
           },
           // Content Security Policy - relaxed for development
           {
             key: 'Content-Security-Policy',
-            value: process.env.NODE_ENV === 'development'
-              ? `
+            value:
+              process.env.NODE_ENV === 'development'
+                ? `
                 default-src 'self';
                 script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net https://unpkg.com;
                 style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
@@ -343,9 +341,11 @@ const nextConfig: NextConfig = {
                 frame-ancestors 'none';
                 base-uri 'self';
                 form-action 'self';
-                worker-src 'self';
-              `.replace(/\s{2,}/g, ' ').trim()
-              : `
+                worker-src 'self' blob:;
+              `
+                    .replace(/\s{2,}/g, ' ')
+                    .trim()
+                : `
                 default-src 'self';
                 script-src 'self' 'unsafe-inline' 'unsafe-eval' https://cdn.jsdelivr.net;
                 style-src 'self' 'unsafe-inline' https://fonts.googleapis.com;
@@ -357,10 +357,12 @@ const nextConfig: NextConfig = {
                 frame-ancestors 'none';
                 base-uri 'self';
                 form-action 'self';
-                worker-src 'self';
-              `.replace(/\s{2,}/g, ' ').trim()
-          }
-        ]
+                worker-src 'self' blob:;
+              `
+                    .replace(/\s{2,}/g, ' ')
+                    .trim(),
+          },
+        ],
       },
       // Specific CORS rules for API routes
       {
@@ -368,27 +370,28 @@ const nextConfig: NextConfig = {
         headers: [
           {
             key: 'Access-Control-Allow-Origin',
-            value: process.env.NODE_ENV === 'development' 
-              ? 'http://localhost:3000' 
-              : 'https://megacampus.ai'
+            value:
+              process.env.NODE_ENV === 'development'
+                ? 'http://localhost:3000'
+                : 'https://megacampus.ai',
           },
           {
             key: 'Access-Control-Allow-Methods',
-            value: 'GET, POST, PUT, DELETE, OPTIONS'
+            value: 'GET, POST, PUT, DELETE, OPTIONS',
           },
           {
             key: 'Access-Control-Allow-Headers',
-            value: 'Content-Type, Authorization, X-API-Key'
+            value: 'Content-Type, Authorization, X-API-Key',
           },
           {
             key: 'Access-Control-Allow-Credentials',
-            value: 'true'
+            value: 'true',
           },
           {
             key: 'Access-Control-Max-Age',
-            value: '86400'
-          }
-        ]
+            value: '86400',
+          },
+        ],
       },
       // Strict CORS for sensitive endpoints
       {
@@ -396,32 +399,33 @@ const nextConfig: NextConfig = {
         headers: [
           {
             key: 'Access-Control-Allow-Origin',
-            value: process.env.NODE_ENV === 'development' 
-              ? 'http://localhost:3000' 
-              : 'https://megacampus.ai'
+            value:
+              process.env.NODE_ENV === 'development'
+                ? 'http://localhost:3000'
+                : 'https://megacampus.ai',
           },
           {
             key: 'Access-Control-Allow-Methods',
-            value: 'POST, OPTIONS'
+            value: 'POST, OPTIONS',
           },
           {
             key: 'Access-Control-Allow-Headers',
-            value: 'Content-Type, Authorization'
+            value: 'Content-Type, Authorization',
           },
           {
             key: 'Access-Control-Allow-Credentials',
-            value: 'true'
+            value: 'true',
           },
           {
             key: 'Access-Control-Max-Age',
-            value: '0' // No preflight caching for security
-          }
-        ]
-      }
+            value: '0', // No preflight caching for security
+          },
+        ],
+      },
     ]
-  }
-};
+  },
+}
 
-const withNextIntl = createNextIntlPlugin('./src/i18n/request.ts');
+const withNextIntl = createNextIntlPlugin('./src/i18n/request.ts')
 
-module.exports = withNextIntl(withPWA(nextConfig));
+module.exports = withNextIntl(withPWA(nextConfig))

@@ -32,6 +32,7 @@ import {
   type PresentationDraft,
   type PresentationOutput,
 } from '../prompts/presentation-prompt';
+import { getLessonContent } from '../services/database-service';
 
 // ============================================================================
 // CONFIGURATION
@@ -211,6 +212,12 @@ async function generateDraft(input: EnrichmentHandlerInput): Promise<DraftResult
     'Presentation handler: generating draft outline'
   );
 
+  // Fetch lesson content from lesson_contents table
+  const lessonContent = await getLessonContent(enrichmentContext.lesson.id);
+  if (!lessonContent) {
+    throw new Error(`No lesson content found for lesson ${enrichmentContext.lesson.id}`);
+  }
+
   // Build prompts
   const systemPrompt = buildPresentationDraftSystemPrompt();
 
@@ -223,13 +230,11 @@ async function generateDraft(input: EnrichmentHandlerInput): Promise<DraftResult
   };
 
   // Extract learning objectives from lesson content
-  const lessonObjectives = extractLearningObjectives(
-    enrichmentContext.lesson.content
-  );
+  const lessonObjectives = extractLearningObjectives(lessonContent);
 
   const userPrompt = buildPresentationDraftUserMessage({
     lessonTitle: enrichmentContext.lesson.title,
-    lessonContent: enrichmentContext.lesson.content || '',
+    lessonContent,
     lessonObjectives,
     language: (enrichmentContext.course.language || 'en') as 'en' | 'ru',
     settings: presentationSettings,
@@ -374,6 +379,12 @@ async function generateFinal(
     'Presentation handler: generating final slides from draft outline'
   );
 
+  // Fetch lesson content from lesson_contents table
+  const lessonContent = await getLessonContent(enrichmentContext.lesson.id);
+  if (!lessonContent) {
+    throw new Error(`No lesson content found for lesson ${enrichmentContext.lesson.id}`);
+  }
+
   // Extract draft outline
   const draftOutput = draft.draftContent as PresentationDraft;
 
@@ -388,14 +399,12 @@ async function generateFinal(
   };
 
   // Extract learning objectives from lesson content
-  const lessonObjectives = extractLearningObjectives(
-    enrichmentContext.lesson.content
-  );
+  const lessonObjectives = extractLearningObjectives(lessonContent);
 
   const userPrompt = buildPresentationFinalUserMessage(
     {
       lessonTitle: enrichmentContext.lesson.title,
-      lessonContent: enrichmentContext.lesson.content || '',
+      lessonContent,
       lessonObjectives,
       language: (enrichmentContext.course.language || 'en') as 'en' | 'ru',
       settings: presentationSettings,

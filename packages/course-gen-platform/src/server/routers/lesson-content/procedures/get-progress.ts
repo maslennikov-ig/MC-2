@@ -59,21 +59,24 @@ export const getProgress = protectedProcedure
       await verifyCourseAccess(courseId, currentUser.id, currentUser.organizationId, requestId);
 
       // Step 2: Query lesson status from database
-      // Note: Using lessons table until lesson_contents table is available
-      // Join through sections to filter by course_id (lessons -> sections -> course)
+      // Join lessons through sections and left join to lesson_contents for status
       const supabase = getSupabaseAdmin();
 
-      const { data: lessons, error } = await supabase
+      // Get all lessons for the course
+      const { data: lessons, error: lessonsError } = await supabase
         .from('lessons')
-        .select('id, content, updated_at, sections!inner(course_id)')
+        .select('id, updated_at, sections!inner(course_id)')
         .eq('sections.course_id', courseId);
 
-      if (error) {
-        logger.error({
-          requestId,
-          courseId,
-          error: error.message,
-        }, 'Failed to fetch lesson progress');
+      if (lessonsError) {
+        logger.error(
+          {
+            requestId,
+            courseId,
+            error: lessonsError.message,
+          },
+          'Failed to fetch lessons'
+        );
 
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
@@ -81,27 +84,79 @@ export const getProgress = protectedProcedure
         });
       }
 
-      // Step 3: Calculate progress metrics
-      // For now, a lesson is "completed" if it has content
-      const lessonsWithStatus = (lessons || []).map((lesson) => ({
-        lesson_id: lesson.id,
-        status: lesson.content ? 'completed' : 'pending',
-        generated_at: lesson.content ? lesson.updated_at : null,
-      }));
+      // Get content status from lesson_contents table
+      const { data: contents, error: contentsError } = await supabase
+        .from('lesson_contents')
+        .select('lesson_id, status, created_at')
+        .eq('course_id', courseId)
+        .order('created_at', { ascending: false });
+
+      if (contentsError) {
+        logger.error(
+          {
+            requestId,
+            courseId,
+            error: contentsError.message,
+          },
+          'Failed to fetch lesson contents'
+        );
+
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to fetch lesson progress',
+        });
+      }
+
+      // Build a map of lesson_id -> latest content status
+      const contentStatusMap = new Map<string, { status: string; created_at: string }>();
+      for (const content of contents || []) {
+        // Only keep the first (most recent) entry for each lesson
+        if (!contentStatusMap.has(content.lesson_id)) {
+          contentStatusMap.set(content.lesson_id, {
+            status: content.status,
+            created_at: content.created_at,
+          });
+        }
+      }
+
+      // Step 3: Calculate progress metrics based on lesson_contents status
+      const lessonsWithStatus = (lessons || []).map(lesson => {
+        const contentInfo = contentStatusMap.get(lesson.id);
+        let status: 'completed' | 'failed' | 'generating' | 'pending' = 'pending';
+
+        if (contentInfo) {
+          if (contentInfo.status === 'completed') {
+            status = 'completed';
+          } else if (contentInfo.status === 'failed') {
+            status = 'failed';
+          } else if (contentInfo.status === 'generating') {
+            status = 'generating';
+          }
+        }
+
+        return {
+          lesson_id: lesson.id,
+          status,
+          generated_at: contentInfo?.created_at ?? null,
+        };
+      });
 
       const total = lessonsWithStatus.length;
-      const completed = lessonsWithStatus.filter((l) => l.status === 'completed').length;
-      const failed = 0; // Will be tracked separately when lesson_contents table is available
-      const inProgress = total - completed - failed;
+      const completed = lessonsWithStatus.filter(l => l.status === 'completed').length;
+      const failed = lessonsWithStatus.filter(l => l.status === 'failed').length;
+      const inProgress = lessonsWithStatus.filter(l => l.status === 'generating').length;
 
-      logger.debug({
-        requestId,
-        courseId,
-        total,
-        completed,
-        failed,
-        inProgress,
-      }, 'Retrieved lesson progress');
+      logger.debug(
+        {
+          requestId,
+          courseId,
+          total,
+          completed,
+          failed,
+          inProgress,
+        },
+        'Retrieved lesson progress'
+      );
 
       return {
         total,
@@ -118,11 +173,14 @@ export const getProgress = protectedProcedure
       }
 
       // Log and wrap unexpected errors
-      logger.error({
-        requestId,
-        courseId,
-        error: error instanceof Error ? error.message : String(error),
-      }, 'Failed to get Stage 6 progress');
+      logger.error(
+        {
+          requestId,
+          courseId,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        'Failed to get Stage 6 progress'
+      );
 
       throw new TRPCError({
         code: 'INTERNAL_SERVER_ERROR',

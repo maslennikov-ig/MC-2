@@ -618,7 +618,7 @@ ${schemaDescription}
       }
     }
 
-    // DEBUG: Log coherence calculation details
+    // Log coherence calculation details for diagnostics
     if (coherencePenalties.length > 0) {
       logger.warn({
         msg: 'Coherence penalties applied',

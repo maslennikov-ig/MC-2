@@ -21,7 +21,9 @@ export const TRPC_URL = `${BACKEND_URL}/trpc`
  */
 export async function getBackendAuthHeaders(): Promise<Record<string, string>> {
   const supabase = await createClient()
-  const { data: { session } } = await supabase.auth.getSession()
+  const {
+    data: { session },
+  } = await supabase.auth.getSession()
 
   return {
     'Content-Type': 'application/json',
@@ -51,15 +53,19 @@ export async function authenticateRequest(_request: NextRequest): Promise<AuthUs
 
     // The server client automatically reads cookies from the request
     // No need for manual cookie parsing - it's handled by @supabase/ssr
-    const { data: { user }, error } = await supabase.auth.getUser()
+    const {
+      data: { user },
+      error,
+    } = await supabase.auth.getUser()
 
     if (error || !user) {
-      // Log detailed error info for debugging
-      if (error) {
-        logger.error('Auth error details:', {
+      // Only log unexpected auth errors, not missing sessions
+      // Missing session is normal for unauthenticated requests (health checks, public pages)
+      if (error && error.message !== 'Auth session missing!') {
+        logger.warn('Auth error details:', {
           message: error.message,
           status: error.status,
-          code: error.code
+          code: error.code,
         })
       }
       return null
@@ -72,23 +78,24 @@ export async function authenticateRequest(_request: NextRequest): Promise<AuthUs
       .eq('id', user.id)
       .single()
 
-    if (profileError && profileError.code !== 'PGRST116') { // PGRST116 = no rows returned
+    if (profileError && profileError.code !== 'PGRST116') {
+      // PGRST116 = no rows returned
       logger.warn('Failed to fetch user profile:', {
         userId: user.id,
-        error: profileError.message
+        error: profileError.message,
       })
     }
 
     return {
       id: user.id,
       email: user.email!,
-      role: userProfile?.role || 'student'
+      role: userProfile?.role || 'student',
     }
   } catch (error) {
     logger.error('Authentication error:', {
       error: error instanceof Error ? error.message : 'Unknown error',
       stack: error instanceof Error ? error.stack : undefined,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
     })
     return null
   }
@@ -103,12 +110,12 @@ export function withAuth<T extends unknown[]>(
 ) {
   return async (request: NextRequest, ...args: T): Promise<NextResponse> => {
     const user = await authenticateRequest(request)
-    
+
     if (!user) {
       return NextResponse.json(
-        { 
+        {
           error: 'Authentication required',
-          message: 'Please provide a valid authorization token'
+          message: 'Please provide a valid authorization token',
         },
         { status: 401 }
       )
@@ -126,22 +133,24 @@ export function withRole<T extends unknown[]>(
   requiredRole: string,
   handler: (request: NextRequest, user: AuthUser, ...args: T) => Promise<NextResponse>
 ) {
-  return withAuth(async (request: NextRequest, user: AuthUser, ...args: T): Promise<NextResponse> => {
-    // Superadmin and admin have access to everything
-    const isPrivilegedRole = user.role === 'superadmin' || user.role === 'admin'
+  return withAuth(
+    async (request: NextRequest, user: AuthUser, ...args: T): Promise<NextResponse> => {
+      // Superadmin and admin have access to everything
+      const isPrivilegedRole = user.role === 'superadmin' || user.role === 'admin'
 
-    if (user.role !== requiredRole && !isPrivilegedRole) {
-      return NextResponse.json(
-        {
-          error: 'Insufficient permissions',
-          message: `This action requires ${requiredRole} role`
-        },
-        { status: 403 }
-      )
+      if (user.role !== requiredRole && !isPrivilegedRole) {
+        return NextResponse.json(
+          {
+            error: 'Insufficient permissions',
+            message: `This action requires ${requiredRole} role`,
+          },
+          { status: 403 }
+        )
+      }
+
+      return handler(request, user, ...args)
     }
-
-    return handler(request, user, ...args)
-  })
+  )
 }
 
 /**
@@ -164,7 +173,10 @@ export function withOptionalAuth<T extends unknown[]>(
 export async function auth(): Promise<AuthSession | null> {
   try {
     const supabase = await createClient()
-    const { data: { user }, error } = await supabase.auth.getUser()
+    const {
+      data: { user },
+      error,
+    } = await supabase.auth.getUser()
 
     if (error || !user) {
       return null
@@ -181,8 +193,8 @@ export async function auth(): Promise<AuthSession | null> {
       user: {
         id: user.id,
         email: user.email!,
-        role: userProfile?.role ?? undefined
-      }
+        role: userProfile?.role ?? undefined,
+      },
     }
   } catch (error) {
     logger.error('Error in auth():', error)
@@ -196,19 +208,19 @@ export async function auth(): Promise<AuthSession | null> {
  */
 export async function authenticateApiKey(request: NextRequest): Promise<boolean> {
   const apiKey = request.headers.get('X-API-Key')
-  
+
   if (!apiKey) {
     return false
   }
 
   // Require API key to be set in environment variables - no fallbacks for security
   const validApiKey = process.env.API_KEY
-  
+
   if (!validApiKey) {
     logger.error('API_KEY environment variable is not set')
     return false
   }
-  
+
   return apiKey === validApiKey
 }
 
@@ -220,12 +232,12 @@ export function withApiKey<T extends unknown[]>(
 ) {
   return async (request: NextRequest, ...args: T): Promise<NextResponse> => {
     const isValidApiKey = await authenticateApiKey(request)
-    
+
     if (!isValidApiKey) {
       return NextResponse.json(
-        { 
+        {
           error: 'Invalid API key',
-          message: 'Please provide a valid X-API-Key header'
+          message: 'Please provide a valid X-API-Key header',
         },
         { status: 401 }
       )
@@ -240,9 +252,9 @@ export function withApiKey<T extends unknown[]>(
  * Combines authentication with existing rate limiting
  */
 interface RateLimitInfo {
-  limit: number;
-  remaining: number;
-  reset: number;
+  limit: number
+  remaining: number
+  reset: number
 }
 
 export function withAuthAndRateLimit<T extends unknown[]>(
@@ -252,34 +264,34 @@ export function withAuthAndRateLimit<T extends unknown[]>(
   return async (request: NextRequest, ...args: T): Promise<NextResponse> => {
     // Check rate limit first
     const rateLimit = rateLimitCheck(request)
-    
+
     if (!rateLimit.allowed) {
       return NextResponse.json(
-        { 
-          error: "Rate limit exceeded",
-          message: "Too many requests. Please wait before trying again.",
-          retryAfter: Math.ceil((rateLimit.info.reset - Date.now()) / 1000)
+        {
+          error: 'Rate limit exceeded',
+          message: 'Too many requests. Please wait before trying again.',
+          retryAfter: Math.ceil((rateLimit.info.reset - Date.now()) / 1000),
         },
-        { 
+        {
           status: 429,
           headers: {
             'X-RateLimit-Limit': rateLimit.info.limit.toString(),
             'X-RateLimit-Remaining': rateLimit.info.remaining.toString(),
             'X-RateLimit-Reset': Math.ceil(rateLimit.info.reset / 1000).toString(),
             'Retry-After': Math.ceil((rateLimit.info.reset - Date.now()) / 1000).toString(),
-          }
+          },
         }
       )
     }
 
     // Then check authentication
     const user = await authenticateRequest(request)
-    
+
     if (!user) {
       return NextResponse.json(
-        { 
+        {
           error: 'Authentication required',
-          message: 'Please provide a valid authorization token'
+          message: 'Please provide a valid authorization token',
         },
         { status: 401 }
       )
@@ -298,15 +310,17 @@ export function withDevBypass<T extends unknown[]>(
 ) {
   return async (request: NextRequest, ...args: T): Promise<NextResponse> => {
     // Additional production safeguard: Check for production indicators
-    const isProductionUrl = process.env.NEXT_PUBLIC_SITE_URL?.includes('megacampus') ||
-                          process.env.NEXT_PUBLIC_SITE_URL?.includes('vercel.app') ||
-                          process.env.VERCEL_ENV === 'production' ||
-                          process.env.RAILWAY_ENVIRONMENT === 'production'
+    const isProductionUrl =
+      process.env.NEXT_PUBLIC_SITE_URL?.includes('megacampus') ||
+      process.env.NEXT_PUBLIC_SITE_URL?.includes('vercel.app') ||
+      process.env.VERCEL_ENV === 'production' ||
+      process.env.RAILWAY_ENVIRONMENT === 'production'
 
     // CRITICAL: Never allow dev bypass in production, even if misconfigured
-    const canUseDevBypass = process.env.NODE_ENV === 'development' &&
-                           process.env.ENABLE_DEV_AUTH === 'true' &&
-                           !isProductionUrl // Additional safeguard
+    const canUseDevBypass =
+      process.env.NODE_ENV === 'development' &&
+      process.env.ENABLE_DEV_AUTH === 'true' &&
+      !isProductionUrl // Additional safeguard
 
     // In development mode with explicit bypass enabled and NOT in production
     if (canUseDevBypass) {
@@ -317,7 +331,7 @@ export function withDevBypass<T extends unknown[]>(
         user = {
           id: 'dev-user',
           email: 'dev@example.com',
-          role: 'user' // Limited to 'user' role for security
+          role: 'user', // Limited to 'user' role for security
         }
       }
 

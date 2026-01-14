@@ -87,6 +87,18 @@ export interface StructureAnalysisInput {
 
   /** Optional document summaries from Stage 3 */
   document_summaries?: DocumentSummary[];
+
+  /** User-selected course size preset (advisory) */
+  course_size?: 'mini' | 'compact' | 'standard' | 'comprehensive';
+
+  /** Target lessons count from size preset (advisory) */
+  target_lessons?: number;
+
+  /** Target sections count from size preset (advisory) */
+  target_sections?: number;
+
+  /** LLM guidance text for course size (advisory) */
+  size_guidance?: string;
 }
 
 /**

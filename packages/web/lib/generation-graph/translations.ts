@@ -1002,6 +1002,11 @@ export const GRAPH_TRANSLATIONS: GraphTranslations & {
     moduleWord: { ru: 'модуль', en: 'module' },
     modulesWord: { ru: 'модуля', en: 'modules' },
     modulesManyWord: { ru: 'модулей', en: 'modules' },
+    // Stage 6 generating/complete states
+    generatingLessons: { ru: 'Генерация уроков...', en: 'Generating lessons...' },
+    allLessonsGenerated: { ru: 'Все уроки сгенерированы', en: 'All lessons generated' },
+    finalizeCourse: { ru: 'Завершить курс', en: 'Finalize Course' },
+    finalizing: { ru: 'Завершение...', en: 'Finalizing...' },
   },
 
   stage6: {

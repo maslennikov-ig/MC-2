@@ -18,11 +18,8 @@ import { DEFAULT_MODEL_ID } from '@megacampus/shared-types';
 import type { CoverEnrichmentContent, EnrichmentMetadata } from '@megacampus/shared-types';
 import type { EnrichmentHandler } from '../services/enrichment-router';
 import type { EnrichmentHandlerInput, GenerateResult, DraftResult } from '../types';
-import {
-  generateImage,
-  base64ToBuffer,
-  convertToWebP,
-} from '../services/image-generation-service';
+import { generateImage, base64ToBuffer, convertToWebP } from '../services/image-generation-service';
+import { getLessonContent } from '../services/database-service';
 
 // ============================================================================
 // TYPES
@@ -141,15 +138,12 @@ async function retryWithBackoff<T>(
       }
 
       const delayMs = initialDelayMs * Math.pow(RETRY_CONFIG.BACKOFF_MULTIPLIER, attempt - 1);
-      logger.warn(
-        { attempt, delayMs, error: lastError.message },
-        'Upload failed, retrying...'
-      );
+      logger.warn({ attempt, delayMs, error: lastError.message }, 'Upload failed, retrying...');
       await new Promise(resolve => setTimeout(resolve, delayMs));
     }
   }
 
-  throw lastError;
+  throw lastError instanceof Error ? lastError : new Error(String(lastError));
 }
 
 /**
@@ -231,9 +225,7 @@ function extractKeywords(lessonContent: string | null): string[] {
     const topicsText = keyTopicsMatch[1];
     const bullets = topicsText.match(/[-*]\s+(.+)/g);
     if (bullets && bullets.length > 0) {
-      return bullets
-        .map((b) => b.replace(/^[-*]\s+/, '').trim())
-        .slice(0, 5);
+      return bullets.map(b => b.replace(/^[-*]\s+/, '').trim()).slice(0, 5);
     }
   }
 
@@ -241,8 +233,8 @@ function extractKeywords(lessonContent: string | null): string[] {
   const sections = lessonContent.match(/^## (.+)$/gm);
   if (sections && sections.length > 0) {
     return sections
-      .map((s) => s.replace(/^## /, '').trim())
-      .filter((s) => !s.match(/introduction|summary|conclusion|references/i))
+      .map(s => s.replace(/^## /, '').trim())
+      .filter(s => !s.match(/introduction|summary|conclusion|references/i))
       .slice(0, 5);
   }
 
@@ -361,9 +353,10 @@ function getDefaultImagePrompt(
  */
 function getVariantsSystemPrompt(language: 'en' | 'ru'): string {
   const descriptionLanguage = language === 'ru' ? 'Russian' : 'English';
-  const descriptionExample = language === 'ru'
-    ? 'Абстрактная визуализация с геометрическими формами'
-    : 'Abstract visualization with geometric shapes';
+  const descriptionExample =
+    language === 'ru'
+      ? 'Абстрактная визуализация с геометрическими формами'
+      : 'Abstract visualization with geometric shapes';
 
   return `# Role
 You are an expert prompt engineer specializing in AI image generation for educational content.
@@ -485,6 +478,9 @@ async function generateDraft(input: EnrichmentHandlerInput): Promise<DraftResult
   );
 
   try {
+    // Fetch lesson content from lesson_contents table (for fallback keywords)
+    const lessonContent = await getLessonContent(lesson.id);
+
     // Priority 1: Use objectives from Stage 5 (available immediately)
     // Priority 2: Fallback to content keywords from Stage 6 (if available)
     let keywords: string[];
@@ -502,8 +498,8 @@ async function generateDraft(input: EnrichmentHandlerInput): Promise<DraftResult
         },
         'Cover handler: using objectives for keyword extraction for draft generation'
       );
-    } else if (lesson.content) {
-      keywords = extractKeywords(lesson.content);
+    } else if (lessonContent) {
+      keywords = extractKeywords(lessonContent);
       keywordSource = 'content';
       logger.debug(
         {
@@ -521,7 +517,7 @@ async function generateDraft(input: EnrichmentHandlerInput): Promise<DraftResult
           enrichmentId: enrichment.id,
           lessonId: lesson.id,
           hasObjectives: !!lesson.objectives,
-          hasContent: !!lesson.content,
+          hasContent: !!lessonContent,
         },
         'Cover handler: no keyword sources available - using default prompt for draft generation'
       );
@@ -541,7 +537,11 @@ async function generateDraft(input: EnrichmentHandlerInput): Promise<DraftResult
     logger.debug(
       {
         enrichmentId: enrichment.id,
-        visualStyleSource: course.visual_style ? 'visual_style' : (course.settings?.visual_style ? 'settings' : 'default'),
+        visualStyleSource: course.visual_style
+          ? 'visual_style'
+          : course.settings?.visual_style
+            ? 'settings'
+            : 'default',
         colorScheme: visualStyle.colorScheme,
       },
       'Cover handler: using visual style for draft generation'
@@ -557,15 +557,12 @@ async function generateDraft(input: EnrichmentHandlerInput): Promise<DraftResult
     const userMessage = getVariantsUserMessage(promptParams);
 
     // Generate 3 variants via LLM
-    const llmResponse = await llmClient.generateCompletion(
-      userMessage,
-      {
-        model: PROMPT_MODEL,
-        systemPrompt,
-        maxTokens: MAX_PROMPT_TOKENS * 3, // More tokens for 3 variants
-        temperature: PROMPT_TEMPERATURE,
-      }
-    );
+    const llmResponse = await llmClient.generateCompletion(userMessage, {
+      model: PROMPT_MODEL,
+      systemPrompt,
+      maxTokens: MAX_PROMPT_TOKENS * 3, // More tokens for 3 variants
+      temperature: PROMPT_TEMPERATURE,
+    });
 
     inputTokens = llmResponse.inputTokens;
     outputTokens = llmResponse.outputTokens;
@@ -609,7 +606,11 @@ async function generateDraft(input: EnrichmentHandlerInput): Promise<DraftResult
             'Cover handler: prohibited content in variant, replacing'
           );
           // Replace with default prompt using course visual style
-          variant.prompt_en = getDefaultImagePrompt(lesson.title, course.title ?? 'Educational Content', visualStyle);
+          variant.prompt_en = getDefaultImagePrompt(
+            lesson.title,
+            course.title ?? 'Educational Content',
+            visualStyle
+          );
         }
       }
     } catch (error) {
@@ -622,30 +623,37 @@ async function generateDraft(input: EnrichmentHandlerInput): Promise<DraftResult
         'Cover handler: failed to parse variants, using fallback defaults'
       );
 
-      const defaultPrompt = getDefaultImagePrompt(lesson.title, course.title ?? 'Educational Content', visualStyle);
+      const defaultPrompt = getDefaultImagePrompt(
+        lesson.title,
+        course.title ?? 'Educational Content',
+        visualStyle
+      );
 
       // Create 3 simple variations using the course visual style
       variants = [
         {
           id: 1,
           prompt_en: defaultPrompt,
-          description_localized: promptParams.language === 'ru'
-            ? `Абстрактная визуализация с ${visualStyle.colorScheme}`
-            : `Abstract visualization with ${visualStyle.colorScheme}`,
+          description_localized:
+            promptParams.language === 'ru'
+              ? `Абстрактная визуализация с ${visualStyle.colorScheme}`
+              : `Abstract visualization with ${visualStyle.colorScheme}`,
         },
         {
           id: 2,
           prompt_en: defaultPrompt.replace('abstract visualization', 'metaphorical illustration'),
-          description_localized: promptParams.language === 'ru'
-            ? `Иллюстративный стиль: ${visualStyle.aesthetic}`
-            : `Illustrative style: ${visualStyle.aesthetic}`,
+          description_localized:
+            promptParams.language === 'ru'
+              ? `Иллюстративный стиль: ${visualStyle.aesthetic}`
+              : `Illustrative style: ${visualStyle.aesthetic}`,
         },
         {
           id: 3,
           prompt_en: defaultPrompt.replace('abstract visualization', 'minimalist design'),
-          description_localized: promptParams.language === 'ru'
-            ? `Минималистичный дизайн: ${visualStyle.mood}`
-            : `Minimalist design: ${visualStyle.mood}`,
+          description_localized:
+            promptParams.language === 'ru'
+              ? `Минималистичный дизайн: ${visualStyle.mood}`
+              : `Minimalist design: ${visualStyle.mood}`,
         },
       ];
     }
@@ -724,6 +732,9 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
   );
 
   try {
+    // Fetch lesson content from lesson_contents table (for fallback keywords)
+    const lessonContent = await getLessonContent(lesson.id);
+
     // Phase 1: Generate image prompt using LLM with DB prompts
     // Priority 1: Use objectives from Stage 5 (available immediately)
     // Priority 2: Fallback to content keywords from Stage 6 (if available)
@@ -742,8 +753,8 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
         },
         'Cover handler: using objectives for keyword extraction for generation'
       );
-    } else if (lesson.content) {
-      keywords = extractKeywords(lesson.content);
+    } else if (lessonContent) {
+      keywords = extractKeywords(lessonContent);
       keywordSource = 'content';
       logger.debug(
         {
@@ -761,7 +772,7 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
           enrichmentId: enrichment.id,
           lessonId: lesson.id,
           hasObjectives: !!lesson.objectives,
-          hasContent: !!lesson.content,
+          hasContent: !!lessonContent,
         },
         'Cover handler: no keyword sources available - using default prompt for generation'
       );
@@ -770,7 +781,8 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
     const promptService = createPromptService();
 
     const language = (course.language as 'en' | 'ru') || 'en';
-    const languageContext = language === 'ru' ? 'Russian educational content' : 'English educational content';
+    const languageContext =
+      language === 'ru' ? 'Russian educational content' : 'English educational content';
 
     // Get visual style from course for consistent styling
     const visualStyle = getVisualStyle(course);
@@ -778,7 +790,11 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
     logger.debug(
       {
         enrichmentId: enrichment.id,
-        visualStyleSource: course.visual_style ? 'visual_style' : (course.settings?.visual_style ? 'settings' : 'default'),
+        visualStyleSource: course.visual_style
+          ? 'visual_style'
+          : course.settings?.visual_style
+            ? 'settings'
+            : 'default',
         colorScheme: visualStyle.colorScheme,
       },
       'Cover handler: using visual style for generation'
@@ -808,7 +824,10 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
       });
     } catch (dbError) {
       logger.warn(
-        { enrichmentId: enrichment.id, error: dbError instanceof Error ? dbError.message : 'Unknown error' },
+        {
+          enrichmentId: enrichment.id,
+          error: dbError instanceof Error ? dbError.message : 'Unknown error',
+        },
         'Cover handler: DB prompt lookup failed, using hardcoded fallback'
       );
       systemPrompt = getDefaultCoverSystemPrompt();
@@ -817,15 +836,12 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
 
     // Step 2: Call LLM (separate error handling)
     try {
-      const llmResponse = await llmClient.generateCompletion(
-        userMessage,
-        {
-          model: PROMPT_MODEL,
-          systemPrompt,
-          maxTokens: MAX_PROMPT_TOKENS,
-          temperature: PROMPT_TEMPERATURE,
-        }
-      );
+      const llmResponse = await llmClient.generateCompletion(userMessage, {
+        model: PROMPT_MODEL,
+        systemPrompt,
+        maxTokens: MAX_PROMPT_TOKENS,
+        temperature: PROMPT_TEMPERATURE,
+      });
 
       imagePrompt = llmResponse.content.trim();
       inputTokens = llmResponse.inputTokens;
@@ -845,7 +861,11 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
           },
           'Cover handler: invalid prompt length, using default'
         );
-        imagePrompt = getDefaultImagePrompt(lesson.title, course.title ?? 'Educational Content', visualStyle);
+        imagePrompt = getDefaultImagePrompt(
+          lesson.title,
+          course.title ?? 'Educational Content',
+          visualStyle
+        );
       }
 
       // Check for prohibited content
@@ -854,7 +874,11 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
           { enrichmentId: enrichment.id },
           'Cover handler: prohibited content detected in LLM-generated prompt, using default'
         );
-        imagePrompt = getDefaultImagePrompt(lesson.title, course.title ?? 'Educational Content', visualStyle);
+        imagePrompt = getDefaultImagePrompt(
+          lesson.title,
+          course.title ?? 'Educational Content',
+          visualStyle
+        );
       }
 
       logger.info(
@@ -874,7 +898,11 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
         },
         'Cover handler: LLM generation failed, using default prompt'
       );
-      imagePrompt = getDefaultImagePrompt(lesson.title, course.title ?? 'Educational Content', visualStyle);
+      imagePrompt = getDefaultImagePrompt(
+        lesson.title,
+        course.title ?? 'Educational Content',
+        visualStyle
+      );
     }
 
     // Phase 2: Generate image
@@ -910,23 +938,25 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
     const storagePath = `${course.id}/${lesson.id}/${enrichment.id}.webp`;
 
     // Retry upload up to 3 times with exponential backoff
-    await retryWithBackoff(async () => {
-      const { error: uploadError } = await supabase.storage
-        .from(STORAGE_BUCKET)
-        .upload(storagePath, webpResult.buffer, {
-          contentType: 'image/webp',
-          upsert: true,
-        });
+    await retryWithBackoff(
+      async () => {
+        const { error: uploadError } = await supabase.storage
+          .from(STORAGE_BUCKET)
+          .upload(storagePath, webpResult.buffer, {
+            contentType: 'image/webp',
+            upsert: true,
+          });
 
-      if (uploadError) {
-        throw new Error(`Failed to upload image: ${uploadError.message}`);
-      }
-    }, 3, 1000);
+        if (uploadError) {
+          throw new Error(`Failed to upload image: ${uploadError.message}`);
+        }
+      },
+      3,
+      1000
+    );
 
     // Get public URL
-    const { data: publicUrlData } = supabase.storage
-      .from(STORAGE_BUCKET)
-      .getPublicUrl(storagePath);
+    const { data: publicUrlData } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(storagePath);
 
     const imageUrl = publicUrlData.publicUrl;
 
@@ -1037,14 +1067,10 @@ async function generateFinal(
     }
 
     // Find the selected variant
-    const selectedVariant = draftContent.variants.find(
-      (v) => v.id === draftContent.selected_variant
-    );
+    const selectedVariant = draftContent.variants.find(v => v.id === draftContent.selected_variant);
 
     if (!selectedVariant) {
-      throw new Error(
-        `Selected variant ${draftContent.selected_variant} not found in draft`
-      );
+      throw new Error(`Selected variant ${draftContent.selected_variant} not found in draft`);
     }
 
     const imagePrompt = selectedVariant.prompt_en;
@@ -1091,23 +1117,25 @@ async function generateFinal(
     const storagePath = `${course.id}/${lesson.id}/${enrichment.id}.webp`;
 
     // Retry upload up to 3 times with exponential backoff
-    await retryWithBackoff(async () => {
-      const { error: uploadError } = await supabase.storage
-        .from(STORAGE_BUCKET)
-        .upload(storagePath, webpResult.buffer, {
-          contentType: 'image/webp',
-          upsert: true,
-        });
+    await retryWithBackoff(
+      async () => {
+        const { error: uploadError } = await supabase.storage
+          .from(STORAGE_BUCKET)
+          .upload(storagePath, webpResult.buffer, {
+            contentType: 'image/webp',
+            upsert: true,
+          });
 
-      if (uploadError) {
-        throw new Error(`Failed to upload image: ${uploadError.message}`);
-      }
-    }, 3, 1000);
+        if (uploadError) {
+          throw new Error(`Failed to upload image: ${uploadError.message}`);
+        }
+      },
+      3,
+      1000
+    );
 
     // Get public URL
-    const { data: publicUrlData } = supabase.storage
-      .from(STORAGE_BUCKET)
-      .getPublicUrl(storagePath);
+    const { data: publicUrlData } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(storagePath);
 
     const imageUrl = publicUrlData.publicUrl;
 

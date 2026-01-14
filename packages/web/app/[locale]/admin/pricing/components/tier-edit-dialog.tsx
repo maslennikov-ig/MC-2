@@ -119,7 +119,7 @@ export function TierEditDialog({ tier, onClose, onTierUpdated }: TierEditDialogP
       if (featuresJson.trim()) {
         try {
           features = JSON.parse(featuresJson);
-        } catch (err) {
+        } catch (_err) {
           toast.error(t('errors.invalidJson'));
           setLoading(false);
           return;

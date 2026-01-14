@@ -1,67 +1,101 @@
 'use client'
 
-import { useState, memo, Suspense } from 'react'
+import { useState, memo, Suspense, useCallback } from 'react'
 import dynamic from 'next/dynamic'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
 import { useThemeSync } from '@/lib/hooks/use-theme-sync'
+import { useSupabase } from '@/lib/supabase/browser-client'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
-// import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group' // Replaced with custom buttons
 import { FormField } from '@/components/ui/form-field'
+import { Lock, Download, Trash2, Moon, Sun, Loader2, AlertTriangle, Send } from 'lucide-react'
 import {
-  Lock, Download, Trash2, Moon, Sun,
-  Loader2, AlertTriangle
-} from 'lucide-react'
+  TelegramLoginButton,
+  type TelegramAuthData,
+} from '@/components/telegram/telegram-login-button'
 import { passwordSchema, type PasswordFormData } from '../validation-schemas'
 import type { UserProfile } from '../page'
 import type { UserPreferences } from '@/lib/user-preferences'
 
+// Bot username - configured via @BotFather
+const TELEGRAM_BOT_USERNAME = process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME || 'ai_megacampus_bot'
+
 // Lazy load heavy components
-const Select = dynamic(() => import('@/components/ui/select').then(mod => ({
-  default: mod.Select
-})), { ssr: false })
-const SelectContent = dynamic(() => import('@/components/ui/select').then(mod => ({
-  default: mod.SelectContent
-})))
-const SelectItem = dynamic(() => import('@/components/ui/select').then(mod => ({
-  default: mod.SelectItem
-})))
-const SelectTrigger = dynamic(() => import('@/components/ui/select').then(mod => ({
-  default: mod.SelectTrigger
-})))
-const SelectValue = dynamic(() => import('@/components/ui/select').then(mod => ({
-  default: mod.SelectValue
-})))
+const Select = dynamic(
+  () =>
+    import('@/components/ui/select').then((mod) => ({
+      default: mod.Select,
+    })),
+  { ssr: false }
+)
+const SelectContent = dynamic(() =>
+  import('@/components/ui/select').then((mod) => ({
+    default: mod.SelectContent,
+  }))
+)
+const SelectItem = dynamic(() =>
+  import('@/components/ui/select').then((mod) => ({
+    default: mod.SelectItem,
+  }))
+)
+const SelectTrigger = dynamic(() =>
+  import('@/components/ui/select').then((mod) => ({
+    default: mod.SelectTrigger,
+  }))
+)
+const SelectValue = dynamic(() =>
+  import('@/components/ui/select').then((mod) => ({
+    default: mod.SelectValue,
+  }))
+)
 
-const Switch = dynamic(() => import('@/components/ui/switch').then(mod => ({
-  default: mod.Switch
-})), { ssr: false })
+const Switch = dynamic(
+  () =>
+    import('@/components/ui/switch').then((mod) => ({
+      default: mod.Switch,
+    })),
+  { ssr: false }
+)
 
-const Dialog = dynamic(() => import('@/components/ui/dialog').then(mod => ({
-  default: mod.Dialog
-})))
-const DialogContent = dynamic(() => import('@/components/ui/dialog').then(mod => ({
-  default: mod.DialogContent
-})))
-const DialogDescription = dynamic(() => import('@/components/ui/dialog').then(mod => ({
-  default: mod.DialogDescription
-})))
-const DialogFooter = dynamic(() => import('@/components/ui/dialog').then(mod => ({
-  default: mod.DialogFooter
-})))
-const DialogHeader = dynamic(() => import('@/components/ui/dialog').then(mod => ({
-  default: mod.DialogHeader
-})))
-const DialogTitle = dynamic(() => import('@/components/ui/dialog').then(mod => ({
-  default: mod.DialogTitle
-})))
-const DialogTrigger = dynamic(() => import('@/components/ui/dialog').then(mod => ({
-  default: mod.DialogTrigger
-})))
+const Dialog = dynamic(() =>
+  import('@/components/ui/dialog').then((mod) => ({
+    default: mod.Dialog,
+  }))
+)
+const DialogContent = dynamic(() =>
+  import('@/components/ui/dialog').then((mod) => ({
+    default: mod.DialogContent,
+  }))
+)
+const DialogDescription = dynamic(() =>
+  import('@/components/ui/dialog').then((mod) => ({
+    default: mod.DialogDescription,
+  }))
+)
+const DialogFooter = dynamic(() =>
+  import('@/components/ui/dialog').then((mod) => ({
+    default: mod.DialogFooter,
+  }))
+)
+const DialogHeader = dynamic(() =>
+  import('@/components/ui/dialog').then((mod) => ({
+    default: mod.DialogHeader,
+  }))
+)
+const DialogTitle = dynamic(() =>
+  import('@/components/ui/dialog').then((mod) => ({
+    default: mod.DialogTitle,
+  }))
+)
+const DialogTrigger = dynamic(() =>
+  import('@/components/ui/dialog').then((mod) => ({
+    default: mod.DialogTrigger,
+  }))
+)
 
 interface AccountSettingsSectionProps {
   profile: UserProfile | (UserProfile & UserPreferences)
@@ -76,23 +110,97 @@ const AccountSettingsSection = memo(function AccountSettingsSection({
   onUpdate,
   isSaving,
   onExportData,
-  onDeleteAccount
+  onDeleteAccount,
 }: AccountSettingsSectionProps) {
   const [showPasswordForm, setShowPasswordForm] = useState(false)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [deleteConfirmText, setDeleteConfirmText] = useState('')
   const { theme, setTheme } = useThemeSync()
+  const { session } = useSupabase()
+
+  // Telegram connection state
+  const isTelegramConnected = 'telegram_chat_id' in profile && !!profile.telegram_chat_id
+  const telegramUsername =
+    'telegram_username' in profile
+      ? ((profile as Record<string, unknown>).telegram_username as string)
+      : undefined
+
+  // Handle Telegram auth from widget
+  const handleTelegramAuth = useCallback(
+    async (data: TelegramAuthData) => {
+      if (!session?.access_token) {
+        toast.error('Необходима авторизация')
+        return
+      }
+
+      try {
+        const response = await fetch('/api/telegram/connect', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            Authorization: `Bearer ${session.access_token}`,
+          },
+          body: JSON.stringify(data),
+        })
+
+        if (!response.ok) {
+          const errorData = await response.json()
+          throw new Error(errorData.error || 'Ошибка подключения')
+        }
+
+        const result = await response.json()
+
+        // Update profile via parent
+        await onUpdate({
+          telegram_chat_id: result.telegram_chat_id,
+          telegram_notifications_enabled: true,
+        })
+
+        toast.success('Telegram успешно подключен!')
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : 'Не удалось подключить Telegram')
+      }
+    },
+    [session, onUpdate]
+  )
+
+  // Handle Telegram disconnect
+  const handleTelegramDisconnect = useCallback(async () => {
+    if (!session?.access_token) return
+
+    try {
+      const response = await fetch('/api/telegram/connect', {
+        method: 'DELETE',
+        headers: {
+          Authorization: `Bearer ${session.access_token}`,
+        },
+      })
+
+      if (!response.ok) {
+        throw new Error('Ошибка отключения')
+      }
+
+      await onUpdate({
+        telegram_chat_id: null,
+        telegram_notifications_enabled: false,
+      })
+
+      toast.success('Telegram отключен')
+    } catch {
+      toast.error('Не удалось отключить Telegram')
+    }
+  }, [session, onUpdate])
 
   const passwordForm = useForm<PasswordFormData>({
     resolver: zodResolver(passwordSchema),
     defaultValues: {
       current_password: '',
       new_password: '',
-      confirm_password: ''
-    }
+      confirm_password: '',
+    },
   })
 
-  const handlePasswordSubmit = async () => {
+  const handlePasswordSubmit = () => {
     // In production, this would call the backend API
     toast.success('Пароль успешно изменен')
     setShowPasswordForm(false)
@@ -102,22 +210,20 @@ const AccountSettingsSection = memo(function AccountSettingsSection({
   return (
     <div className="space-y-6">
       {/* Theme & Language Settings */}
-      <Card className="bg-card border rounded-xl p-6 shadow-sm hover:shadow-lg transition-shadow duration-300">
-        <h3 className="text-lg font-semibold mb-4 text-foreground">
-          Настройки интерфейса
-        </h3>
+      <Card className="bg-card rounded-xl border p-6 shadow-sm transition-shadow duration-300 hover:shadow-lg">
+        <h3 className="text-foreground mb-4 text-lg font-semibold">Настройки интерфейса</h3>
         <div className="space-y-4">
           <div>
             <Label>Тема оформления</Label>
             <div className="mt-2 flex gap-4">
               <button
                 type="button"
-                onClick={async () => {
+                onClick={() => {
                   setTheme('light')
                   // Also update in the database
-                  await onUpdate({ theme_preference: 'light' })
+                  void onUpdate({ theme_preference: 'light' })
                 }}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg border-2 transition-all ${
+                className={`flex items-center gap-2 rounded-lg border-2 px-4 py-2 transition-all ${
                   theme === 'light'
                     ? 'border-purple-600 bg-purple-50 text-purple-900 dark:bg-purple-900/20 dark:text-purple-100'
                     : 'border-gray-300 hover:border-gray-400 dark:border-gray-600 dark:hover:border-gray-500'
@@ -129,12 +235,12 @@ const AccountSettingsSection = memo(function AccountSettingsSection({
               </button>
               <button
                 type="button"
-                onClick={async () => {
+                onClick={() => {
                   setTheme('dark')
                   // Also update in the database
-                  await onUpdate({ theme_preference: 'dark' })
+                  void onUpdate({ theme_preference: 'dark' })
                 }}
-                className={`flex items-center gap-2 px-4 py-2 rounded-lg border-2 transition-all ${
+                className={`flex items-center gap-2 rounded-lg border-2 px-4 py-2 transition-all ${
                   theme === 'dark'
                     ? 'border-purple-600 bg-purple-50 text-purple-900 dark:bg-purple-900/20 dark:text-purple-100'
                     : 'border-gray-300 hover:border-gray-400 dark:border-gray-600 dark:hover:border-gray-500'
@@ -149,10 +255,12 @@ const AccountSettingsSection = memo(function AccountSettingsSection({
 
           <div>
             <Label htmlFor="language">Язык интерфейса</Label>
-            <Suspense fallback={<div className="h-10 w-full bg-muted animate-pulse rounded-md mt-2" />}>
+            <Suspense
+              fallback={<div className="bg-muted mt-2 h-10 w-full animate-pulse rounded-md" />}
+            >
               <Select
                 value={'language' in profile ? profile.language : 'ru'}
-                onValueChange={(value) => onUpdate({ language: value })}
+                onValueChange={(value) => void onUpdate({ language: value })}
                 aria-label="Выбор языка интерфейса"
               >
                 <SelectTrigger className="mt-2">
@@ -172,23 +280,29 @@ const AccountSettingsSection = memo(function AccountSettingsSection({
       </Card>
 
       {/* Notification Settings */}
-      <Card className="bg-card border rounded-xl p-6 shadow-sm hover:shadow-lg transition-shadow duration-300">
-        <h3 className="text-lg font-semibold mb-4 text-foreground">
-          Уведомления
-        </h3>
-        <div className="space-y-0 divide-y divide-border">
-          <Suspense fallback={<div className="space-y-4">{[1,2,3].map(i => <div key={i} className="h-12 bg-muted animate-pulse rounded" />)}</div>}>
+      <Card className="bg-card rounded-xl border p-6 shadow-sm transition-shadow duration-300 hover:shadow-lg">
+        <h3 className="text-foreground mb-4 text-lg font-semibold">Уведомления</h3>
+        <div className="divide-border space-y-0 divide-y">
+          <Suspense
+            fallback={
+              <div className="space-y-4">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="bg-muted h-12 animate-pulse rounded" />
+                ))}
+              </div>
+            }
+          >
             <div className="flex items-center justify-between py-4 first:pt-0">
               <div className="space-y-0.5">
                 <Label htmlFor="email-notifications">Email уведомления</Label>
-                <p className="text-sm text-muted-foreground" id="email-notifications-description">
+                <p className="text-muted-foreground text-sm" id="email-notifications-description">
                   Получать уведомления на email
                 </p>
               </div>
               <Switch
                 id="email-notifications"
                 checked={'email_notifications' in profile ? profile.email_notifications : true}
-                onCheckedChange={(checked) => onUpdate({ email_notifications: checked })}
+                onCheckedChange={(checked) => void onUpdate({ email_notifications: checked })}
                 aria-label="Получать уведомления на email"
                 aria-describedby="email-notifications-description"
               />
@@ -197,80 +311,101 @@ const AccountSettingsSection = memo(function AccountSettingsSection({
             <div className="flex items-center justify-between py-4">
               <div className="space-y-0.5">
                 <Label htmlFor="course-updates">Обновления курсов</Label>
-                <p className="text-sm text-muted-foreground">
-                  Обновления ваших курсов
-                </p>
+                <p className="text-muted-foreground text-sm">Обновления ваших курсов</p>
               </div>
               <Switch
                 id="course-updates"
                 checked={'email_course_updates' in profile ? profile.email_course_updates : true}
-                onCheckedChange={(checked) => onUpdate({ email_course_updates: checked })}
+                onCheckedChange={(checked) => void onUpdate({ email_course_updates: checked })}
               />
             </div>
 
             <div className="flex items-center justify-between py-4">
               <div className="space-y-0.5">
                 <Label htmlFor="push-notifications">Push уведомления</Label>
-                <p className="text-sm text-muted-foreground">
-                  Уведомления в браузере
-                </p>
+                <p className="text-muted-foreground text-sm">Уведомления в браузере</p>
               </div>
               <Switch
                 id="push-notifications"
                 checked={'push_notifications' in profile ? profile.push_notifications : false}
-                onCheckedChange={(checked) => onUpdate({ push_notifications: checked })}
+                onCheckedChange={(checked) => void onUpdate({ push_notifications: checked })}
               />
             </div>
           </Suspense>
         </div>
       </Card>
 
+      {/* Telegram Notifications - Simple one-click connection */}
+      <Card className="bg-card rounded-xl border p-6 shadow-sm transition-shadow duration-300 hover:shadow-lg">
+        <div className="mb-2 flex items-center gap-2">
+          <Send className="h-5 w-5 text-[#0088cc]" />
+          <h3 className="text-foreground text-lg font-semibold">Telegram уведомления</h3>
+        </div>
+        <p className="text-muted-foreground mb-4 text-sm">
+          Получайте уведомления о статусе генерации курсов в Telegram
+        </p>
+
+        <TelegramLoginButton
+          botUsername={TELEGRAM_BOT_USERNAME}
+          onAuth={handleTelegramAuth}
+          isConnected={isTelegramConnected}
+          connectedUsername={telegramUsername}
+          onDisconnect={handleTelegramDisconnect}
+        />
+      </Card>
+
       {/* Privacy Settings */}
-      <Card className="bg-card border rounded-xl p-6 shadow-sm hover:shadow-lg transition-shadow duration-300">
-        <h3 className="text-lg font-semibold mb-4 text-foreground">
-          Конфиденциальность
-        </h3>
-        <div className="space-y-0 divide-y divide-border">
-          <Suspense fallback={<div className="space-y-4">{[1,2,3].map(i => <div key={i} className="h-12 bg-muted animate-pulse rounded" />)}</div>}>
+      <Card className="bg-card rounded-xl border p-6 shadow-sm transition-shadow duration-300 hover:shadow-lg">
+        <h3 className="text-foreground mb-4 text-lg font-semibold">Конфиденциальность</h3>
+        <div className="divide-border space-y-0 divide-y">
+          <Suspense
+            fallback={
+              <div className="space-y-4">
+                {[1, 2, 3].map((i) => (
+                  <div key={i} className="bg-muted h-12 animate-pulse rounded" />
+                ))}
+              </div>
+            }
+          >
             <div className="flex items-center justify-between py-4 first:pt-0">
               <div className="space-y-0.5">
                 <Label htmlFor="profile-visibility">Публичный профиль</Label>
-                <p className="text-sm text-muted-foreground">
-                  Разрешить другим видеть ваш профиль
-                </p>
+                <p className="text-muted-foreground text-sm">Разрешить другим видеть ваш профиль</p>
               </div>
               <Switch
                 id="profile-visibility"
-                checked={'profile_visibility' in profile ? profile.profile_visibility === 'public' : true}
-                onCheckedChange={(checked) => onUpdate({ profile_visibility: checked ? 'public' : 'private' })}
+                checked={
+                  'profile_visibility' in profile ? profile.profile_visibility === 'public' : true
+                }
+                onCheckedChange={(checked) =>
+                  void onUpdate({ profile_visibility: checked ? 'public' : 'private' })
+                }
               />
             </div>
 
             <div className="flex items-center justify-between py-4">
               <div className="space-y-0.5">
                 <Label htmlFor="show-achievements">Показывать достижения</Label>
-                <p className="text-sm text-muted-foreground">
+                <p className="text-muted-foreground text-sm">
                   Отображать ваши достижения в профиле
                 </p>
               </div>
               <Switch
                 id="show-achievements"
                 checked={'show_achievements' in profile ? profile.show_achievements : true}
-                onCheckedChange={(checked) => onUpdate({ show_achievements: checked })}
+                onCheckedChange={(checked) => void onUpdate({ show_achievements: checked })}
               />
             </div>
 
             <div className="flex items-center justify-between py-4">
               <div className="space-y-0.5">
                 <Label htmlFor="data-collection">Сбор данных</Label>
-                <p className="text-sm text-muted-foreground">
-                  Помогать улучшать сервис
-                </p>
+                <p className="text-muted-foreground text-sm">Помогать улучшать сервис</p>
               </div>
               <Switch
                 id="data-collection"
                 checked={'data_collection' in profile ? profile.data_collection : true}
-                onCheckedChange={(checked) => onUpdate({ data_collection: checked })}
+                onCheckedChange={(checked) => void onUpdate({ data_collection: checked })}
               />
             </div>
           </Suspense>
@@ -278,14 +413,12 @@ const AccountSettingsSection = memo(function AccountSettingsSection({
       </Card>
 
       {/* Security Settings */}
-      <Card className="bg-card border rounded-xl p-6 shadow-sm hover:shadow-lg transition-shadow duration-300">
-        <h3 className="text-lg font-semibold mb-4 text-foreground">
-          Безопасность
-        </h3>
+      <Card className="bg-card rounded-xl border p-6 shadow-sm transition-shadow duration-300 hover:shadow-lg">
+        <h3 className="text-foreground mb-4 text-lg font-semibold">Безопасность</h3>
         <div className="space-y-4">
           <Button
             variant="outline"
-            className="w-full justify-start hover:bg-accent transition-colors"
+            className="hover:bg-accent w-full justify-start transition-colors"
             onClick={() => setShowPasswordForm(!showPasswordForm)}
           >
             <Lock className="mr-2 h-4 w-4" />
@@ -293,7 +426,10 @@ const AccountSettingsSection = memo(function AccountSettingsSection({
           </Button>
 
           {showPasswordForm && (
-            <form onSubmit={passwordForm.handleSubmit(handlePasswordSubmit)} className="space-y-4 p-4 border border-border rounded-lg">
+            <form
+              onSubmit={(e) => void passwordForm.handleSubmit(handlePasswordSubmit)(e)}
+              className="border-border space-y-4 rounded-lg border p-4"
+            >
               <FormField
                 label="Текущий пароль"
                 error={passwordForm.formState.errors.current_password?.message}
@@ -341,7 +477,7 @@ const AccountSettingsSection = memo(function AccountSettingsSection({
                 <Button
                   type="button"
                   variant="outline"
-                  className="active:scale-95 active:opacity-80 transition-all"
+                  className="transition-all active:scale-95 active:opacity-80"
                   onClick={() => {
                     setShowPasswordForm(false)
                     passwordForm.reset()
@@ -356,27 +492,33 @@ const AccountSettingsSection = memo(function AccountSettingsSection({
       </Card>
 
       {/* Danger Zone */}
-      <Card className="bg-destructive/5 border border-destructive/20 rounded-xl p-6 shadow-sm hover:shadow-lg transition-shadow duration-300">
-        <h3 className="text-lg font-semibold mb-4 text-destructive flex items-center gap-2">
+      <Card className="bg-destructive/5 border-destructive/20 rounded-xl border p-6 shadow-sm transition-shadow duration-300 hover:shadow-lg">
+        <h3 className="text-destructive mb-4 flex items-center gap-2 text-lg font-semibold">
           <AlertTriangle className="h-5 w-5" />
           Опасная зона
         </h3>
         <div className="space-y-4">
           <Button
             variant="outline"
-            className="w-full justify-start border-green-500 text-green-600 hover:bg-green-50/50 transition-colors"
+            className="w-full justify-start border-green-500 text-green-600 transition-colors hover:bg-green-50/50"
             onClick={onExportData}
           >
             <Download className="mr-2 h-4 w-4" />
             Экспортировать данные
           </Button>
 
-          <Suspense fallback={<Button variant="outline" disabled className="w-full justify-start">Загрузка...</Button>}>
+          <Suspense
+            fallback={
+              <Button variant="outline" disabled className="w-full justify-start">
+                Загрузка...
+              </Button>
+            }
+          >
             <Dialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
               <DialogTrigger asChild>
                 <Button
                   variant="outline"
-                  className="w-full justify-start border-destructive text-destructive hover:bg-destructive/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive focus-visible:ring-offset-2 transition-colors"
+                  className="border-destructive text-destructive hover:bg-destructive/10 focus-visible:ring-destructive w-full justify-start transition-colors focus-visible:ring-2 focus-visible:ring-offset-2 focus-visible:outline-none"
                   aria-label="Открыть диалог удаления аккаунта"
                 >
                   <Trash2 className="mr-2 h-4 w-4" aria-hidden="true" />
@@ -391,7 +533,7 @@ const AccountSettingsSection = memo(function AccountSettingsSection({
                   </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4">
-                  <p className="text-sm text-muted-foreground">
+                  <p className="text-muted-foreground text-sm">
                     Введите <span className="font-mono font-bold">УДАЛИТЬ</span> для подтверждения:
                   </p>
                   <Input
@@ -421,9 +563,8 @@ const AccountSettingsSection = memo(function AccountSettingsSection({
                     variant="destructive"
                     disabled={deleteConfirmText !== 'УДАЛИТЬ'}
                     className="transition-colors"
-                    onClick={async () => {
-                      await onDeleteAccount()
-                      setShowDeleteDialog(false)
+                    onClick={() => {
+                      void onDeleteAccount().then(() => setShowDeleteDialog(false))
                     }}
                   >
                     Удалить аккаунт

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getAdminClient } from '@/lib/supabase/client-factory'
-import { logger } from '@/lib/logger'
+import { logger, logPermanentFailure } from '@/lib/logger'
 import { authenticateRequest } from '@/lib/auth'
 import { isValidUUID } from '@/lib/validation-utils'
 import {
@@ -40,7 +40,6 @@ interface OrganizationRow {
   created_at: string
   updated_at: string | null
 }
-
 
 /**
  * Helper to get user's role in an organization
@@ -82,10 +81,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
     const user = await authenticateRequest(request)
 
     if (!user) {
-      return NextResponse.json(
-        { error: 'Authentication required' },
-        { status: 401 }
-      )
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
     }
 
     const { orgId } = await params
@@ -93,10 +89,7 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     // Validate UUID format
     if (!isValidUUID(orgId)) {
-      return NextResponse.json(
-        { error: 'Invalid organization ID format' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'Invalid organization ID format' }, { status: 400 })
     }
 
     // Check if user is a member of the organization
@@ -117,10 +110,19 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
 
     if (orgError || !organization) {
       logger.error('Error fetching organization:', orgError)
-      return NextResponse.json(
-        { error: 'Organization not found' },
-        { status: 404 }
-      )
+      logPermanentFailure({
+        user_id: user.id,
+        organization_id: orgId,
+        error_message: orgError?.message || 'Error fetching organization',
+        stack_trace: undefined,
+        severity: 'ERROR',
+        job_type: 'ORG_GET',
+        metadata: {
+          route: `/api/organizations/${orgId}`,
+          errorCode: 'INTERNAL_ERROR',
+        },
+      }).catch(() => {})
+      return NextResponse.json({ error: 'Organization not found' }, { status: 404 })
     }
 
     const org = organization as OrganizationRow
@@ -145,16 +147,27 @@ export async function GET(request: NextRequest, { params }: RouteParams) {
       createdAt: org.created_at,
       updatedAt: org.updated_at ?? undefined,
       memberRole: userRole,
-      memberCount: (count as number | null) ?? 0,
+      memberCount: count ?? 0,
     }
 
     return NextResponse.json({ organization: result })
   } catch (error) {
     logger.error('Unexpected error in GET /api/organizations/[orgId]:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    logPermanentFailure({
+      user_id: undefined,
+      error_message:
+        error instanceof Error
+          ? error.message
+          : 'Unexpected error in GET /api/organizations/[orgId]',
+      stack_trace: error instanceof Error ? error.stack : undefined,
+      severity: 'ERROR',
+      job_type: 'ORG_GET',
+      metadata: {
+        route: '/api/organizations/[orgId]',
+        errorCode: 'INTERNAL_ERROR',
+      },
+    }).catch(() => {})
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
 
@@ -167,10 +180,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     const user = await authenticateRequest(request)
 
     if (!user) {
-      return NextResponse.json(
-        { error: 'Authentication required' },
-        { status: 401 }
-      )
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
     }
 
     const { orgId } = await params
@@ -178,10 +188,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
     // Validate UUID format
     if (!isValidUUID(orgId)) {
-      return NextResponse.json(
-        { error: 'Invalid organization ID format' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'Invalid organization ID format' }, { status: 400 })
     }
 
     // Check if user is admin or owner
@@ -205,8 +212,10 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
     }
 
     // Sanitize inputs before use
-    const name = parseResult.data.name !== undefined ? sanitizeText(parseResult.data.name) : undefined
-    const slug = parseResult.data.slug !== undefined ? sanitizeSlug(parseResult.data.slug) : undefined
+    const name =
+      parseResult.data.name !== undefined ? sanitizeText(parseResult.data.name) : undefined
+    const slug =
+      parseResult.data.slug !== undefined ? sanitizeSlug(parseResult.data.slug) : undefined
     const { settings } = parseResult.data
 
     // If changing slug, check uniqueness
@@ -219,10 +228,7 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
         .single()
 
       if (existing) {
-        return NextResponse.json(
-          { error: 'Slug already taken', field: 'slug' },
-          { status: 409 }
-        )
+        return NextResponse.json({ error: 'Slug already taken', field: 'slug' }, { status: 409 })
       }
     }
 
@@ -242,10 +248,19 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
 
     if (updateError || !organization) {
       logger.error('Error updating organization:', updateError)
-      return NextResponse.json(
-        { error: 'Failed to update organization' },
-        { status: 500 }
-      )
+      logPermanentFailure({
+        user_id: user.id,
+        organization_id: orgId,
+        error_message: updateError?.message || 'Error updating organization',
+        stack_trace: undefined,
+        severity: 'ERROR',
+        job_type: 'ORG_UPDATE',
+        metadata: {
+          route: `/api/organizations/${orgId}`,
+          errorCode: 'INTERNAL_ERROR',
+        },
+      }).catch(() => {})
+      return NextResponse.json({ error: 'Failed to update organization' }, { status: 500 })
     }
 
     const org = organization as OrganizationRow
@@ -273,16 +288,27 @@ export async function PATCH(request: NextRequest, { params }: RouteParams) {
       createdAt: org.created_at,
       updatedAt: org.updated_at ?? undefined,
       memberRole: userRole ?? undefined,
-      memberCount: (count as number | null) ?? 0,
+      memberCount: count ?? 0,
     }
 
     return NextResponse.json({ organization: result })
   } catch (error) {
     logger.error('Unexpected error in PATCH /api/organizations/[orgId]:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    logPermanentFailure({
+      user_id: undefined,
+      error_message:
+        error instanceof Error
+          ? error.message
+          : 'Unexpected error in PATCH /api/organizations/[orgId]',
+      stack_trace: error instanceof Error ? error.stack : undefined,
+      severity: 'ERROR',
+      job_type: 'ORG_UPDATE',
+      metadata: {
+        route: '/api/organizations/[orgId]',
+        errorCode: 'INTERNAL_ERROR',
+      },
+    }).catch(() => {})
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
 
@@ -295,10 +321,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     const user = await authenticateRequest(request)
 
     if (!user) {
-      return NextResponse.json(
-        { error: 'Authentication required' },
-        { status: 401 }
-      )
+      return NextResponse.json({ error: 'Authentication required' }, { status: 401 })
     }
 
     const { orgId } = await params
@@ -306,10 +329,7 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
 
     // Validate UUID format
     if (!isValidUUID(orgId)) {
-      return NextResponse.json(
-        { error: 'Invalid organization ID format' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'Invalid organization ID format' }, { status: 400 })
     }
 
     // Check if user is owner (only owners can delete)
@@ -322,25 +342,42 @@ export async function DELETE(request: NextRequest, { params }: RouteParams) {
     }
 
     // Delete organization (CASCADE will handle members and invitations)
-    const { error: deleteError } = await supabase
-      .from('organizations')
-      .delete()
-      .eq('id', orgId)
+    const { error: deleteError } = await supabase.from('organizations').delete().eq('id', orgId)
 
     if (deleteError) {
       logger.error('Error deleting organization:', deleteError)
-      return NextResponse.json(
-        { error: 'Failed to delete organization' },
-        { status: 500 }
-      )
+      logPermanentFailure({
+        user_id: user.id,
+        organization_id: orgId,
+        error_message: deleteError.message || 'Error deleting organization',
+        stack_trace: undefined,
+        severity: 'ERROR',
+        job_type: 'ORG_DELETE',
+        metadata: {
+          route: `/api/organizations/${orgId}`,
+          errorCode: 'INTERNAL_ERROR',
+        },
+      }).catch(() => {})
+      return NextResponse.json({ error: 'Failed to delete organization' }, { status: 500 })
     }
 
     return new NextResponse(null, { status: 204 })
   } catch (error) {
     logger.error('Unexpected error in DELETE /api/organizations/[orgId]:', error)
-    return NextResponse.json(
-      { error: 'Internal server error' },
-      { status: 500 }
-    )
+    logPermanentFailure({
+      user_id: undefined,
+      error_message:
+        error instanceof Error
+          ? error.message
+          : 'Unexpected error in DELETE /api/organizations/[orgId]',
+      stack_trace: error instanceof Error ? error.stack : undefined,
+      severity: 'ERROR',
+      job_type: 'ORG_DELETE',
+      metadata: {
+        route: '/api/organizations/[orgId]',
+        errorCode: 'INTERNAL_ERROR',
+      },
+    }).catch(() => {})
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

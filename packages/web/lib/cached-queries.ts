@@ -138,8 +138,7 @@ export const getCachedLessons = unstable_cache(
       created_at: lesson.created_at || new Date().toISOString(),
       updated_at: lesson.updated_at || new Date().toISOString(),
       title: lesson.title || '',
-      content: lesson.content || undefined,
-      content_text: lesson.content_text || undefined
+      // Note: Lesson content is fetched separately from lesson_contents table when needed
     })) as Lesson[]
   },
   ['lessons-by-sections'],

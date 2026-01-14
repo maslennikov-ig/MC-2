@@ -1,6 +1,6 @@
 {
   "name": "@megacampus/trpc-client-sdk",
-  "version": "0.26.84",
+  "version": "0.27.11",
   "description": "Official TypeScript client SDK for MegaCampusAI tRPC API with full type safety, authentication, and error handling",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
@@ -38,11 +38,11 @@
   },
   "homepage": "https://github.com/megacampus/megacampus2/tree/main/packages/trpc-client-sdk#readme",
   "dependencies": {
-    "@trpc/client": "^11.0.0-rc.364",
-    "@trpc/server": "^11.6.0"
+    "@trpc/client": "^11.8.0",
+    "@trpc/server": "^11.8.0"
   },
   "peerDependencies": {
-    "@trpc/client": "^11.0.0-rc.364"
+    "@trpc/client": "^11.8.0"
   },
   "devDependencies": {
     "typescript": "^5.3.3"

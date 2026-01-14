@@ -11,20 +11,14 @@ import type {
   SelfReviewIssue,
   SelfReviewStatus,
 } from '@megacampus/shared-types/judge-types';
-import type {
-  LessonGraphStateType,
-  LessonGraphStateUpdate,
-} from '../../state';
+import type { LessonGraphStateType, LessonGraphStateUpdate } from '../../state';
 import {
   checkLanguageConsistency,
   checkContentTruncation,
   checkMermaidSyntax,
 } from '../../judge/heuristic-filter';
 import { locationToSectionId } from '../../utils/markdown-section-parser';
-import {
-  HEURISTIC_TOKENS_USED,
-  type HeuristicCheckDetails,
-} from './self-reviewer-constants';
+import { HEURISTIC_TOKENS_USED, type HeuristicCheckDetails } from './self-reviewer-constants';
 import { buildSelfReviewProgressSummary } from './self-reviewer-progress';
 
 // ============================================================================
@@ -62,7 +56,7 @@ export async function withRetry<T>(
     }
   }
 
-  throw lastError;
+  throw lastError ?? new Error('All retry attempts failed');
 }
 
 // ============================================================================
@@ -207,8 +201,8 @@ export function buildHeuristicOnlyResult(
   state: LessonGraphStateType,
   startTime: number
 ): LessonGraphStateUpdate {
-  const criticalIssues = issues.filter((i) => i.severity === 'CRITICAL');
-  const minorIssues = issues.filter((i) => i.severity !== 'CRITICAL');
+  const criticalIssues = issues.filter(i => i.severity === 'CRITICAL');
+  const minorIssues = issues.filter(i => i.severity !== 'CRITICAL');
   const durationMs = Date.now() - startTime;
   const finalStatus = determineFinalStatus(criticalIssues, minorIssues);
   const reasoning = buildReasoningMessage(finalStatus, criticalIssues.length, minorIssues.length);

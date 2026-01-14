@@ -82,17 +82,24 @@ export async function runPhase2Scope(input: Phase2Input): Promise<Phase2Output> 
       let preprocessedOutput = rawOutput;
       try {
         const parsedRaw = JSON.parse(rawOutput) as Record<string, unknown>;
-        const recommendedStructure = parsedRaw.recommended_structure as Record<string, unknown> | undefined;
+        const recommendedStructure = parsedRaw.recommended_structure as
+          | Record<string, unknown>
+          | undefined;
         // Check if recommended_structure exists and preprocess sections
-        if (recommendedStructure?.sections_breakdown && Array.isArray(recommendedStructure.sections_breakdown)) {
-          recommendedStructure.sections_breakdown = recommendedStructure.sections_breakdown.map((section: unknown) => {
-            return preprocessObject(section as Record<string, unknown>, {
-              importance: 'enum',
-              difficulty_progression: 'enum',
-              difficulty: 'enum',
-              // Phase 2 section-level enum fields
-            });
-          });
+        if (
+          recommendedStructure?.sections_breakdown &&
+          Array.isArray(recommendedStructure.sections_breakdown)
+        ) {
+          recommendedStructure.sections_breakdown = recommendedStructure.sections_breakdown.map(
+            (section: unknown) => {
+              return preprocessObject(section as Record<string, unknown>, {
+                importance: 'enum',
+                difficulty_progression: 'enum',
+                difficulty: 'enum',
+                // Phase 2 section-level enum fields
+              });
+            }
+          );
         }
         preprocessedOutput = JSON.stringify(parsedRaw);
       } catch (error) {
@@ -103,7 +110,14 @@ export async function runPhase2Scope(input: Phase2Input): Promise<Phase2Output> 
       // Parse JSON response with 5-layer repair cascade
       let parsedOutput: unknown;
       const repairMetadata: {
-        layer_used: 'none' | 'layer1_repair' | 'layer2_revise' | 'layer3_partial' | 'layer4_120b' | 'layer5_emergency' | 'warning_fallback';
+        layer_used:
+          | 'none'
+          | 'layer1_repair'
+          | 'layer2_revise'
+          | 'layer3_partial'
+          | 'layer4_120b'
+          | 'layer5_emergency'
+          | 'warning_fallback';
         repair_attempts: number;
         successful_fields: string[];
         regenerated_fields: string[];
@@ -125,7 +139,13 @@ export async function runPhase2Scope(input: Phase2Input): Promise<Phase2Output> 
 
         // Use UnifiedRegenerator with all 5 layers + warning fallback (Stage 4)
         const regenerator = new UnifiedRegenerator<Phase2Output>({
-          enabledLayers: ['auto-repair', 'critique-revise', 'partial-regen', 'model-escalation', 'emergency'],
+          enabledLayers: [
+            'auto-repair',
+            'critique-revise',
+            'partial-regen',
+            'model-escalation',
+            'emergency',
+          ],
           maxRetries: 2,
           schema: Phase2OutputSchema,
           model: model,
@@ -151,9 +171,9 @@ export async function runPhase2Scope(input: Phase2Input): Promise<Phase2Output> 
             'critique-revise': 'layer2_revise' as const,
             'partial-regen': 'layer3_partial' as const,
             'model-escalation': 'layer4_120b' as const,
-            'emergency': 'layer5_emergency' as const,
-            'warning_fallback': 'warning_fallback' as const,
-            'failed': 'none' as const,
+            emergency: 'layer5_emergency' as const,
+            warning_fallback: 'warning_fallback' as const,
+            failed: 'none' as const,
           };
 
           repairMetadata.layer_used = layerMapping[result.metadata.layerUsed] || 'none';
@@ -175,8 +195,9 @@ export async function runPhase2Scope(input: Phase2Input): Promise<Phase2Output> 
       const duration_ms = endTime - startTime;
 
       // Extract token usage from response metadata
-      const usage = (response as { usage_metadata?: { input_tokens?: number; output_tokens?: number } })
-        .usage_metadata;
+      const usage = (
+        response as { usage_metadata?: { input_tokens?: number; output_tokens?: number } }
+      ).usage_metadata;
       const inputTokens = usage?.input_tokens || 0;
       const outputTokens = usage?.output_tokens || 0;
 
@@ -198,7 +219,9 @@ export async function runPhase2Scope(input: Phase2Input): Promise<Phase2Output> 
 
         // Fix sections breakdown
         if (recStructure.sections_breakdown && Array.isArray(recStructure.sections_breakdown)) {
-          recStructure.sections_breakdown = postProcessSections(recStructure.sections_breakdown as unknown[]);
+          recStructure.sections_breakdown = postProcessSections(
+            recStructure.sections_breakdown as unknown[]
+          );
 
           // Post-processing validated sections with all required fields
         }
@@ -256,27 +279,36 @@ function postProcessSections(sections: unknown[]): Record<string, unknown>[] {
       area: sec.area || 'General Topic',
       estimated_lessons: sec.estimated_lessons || 1,
       // Validate importance against valid enum values (fallback to 'important' if invalid)
-      importance: (VALID_IMPORTANCE as readonly string[]).includes(sec.importance as string) ? sec.importance : 'important',
+      importance: (VALID_IMPORTANCE as readonly string[]).includes(sec.importance as string)
+        ? sec.importance
+        : 'important',
       // Ensure minimum 2 learning objectives (Zod schema requires .min(2))
-      learning_objectives: Array.isArray(sec.learning_objectives) && sec.learning_objectives.length >= 2
-        ? sec.learning_objectives
-        : ['Understand core concepts', 'Apply practical techniques'],
+      learning_objectives:
+        Array.isArray(sec.learning_objectives) && sec.learning_objectives.length >= 2
+          ? sec.learning_objectives
+          : ['Understand core concepts', 'Apply practical techniques'],
       // Ensure minimum 3 key topics (Zod schema requires .min(3))
-      key_topics: Array.isArray(sec.key_topics) && sec.key_topics.length >= 3
-        ? sec.key_topics
-        : ['General concepts', 'Fundamental principles', 'Core techniques'],
-      pedagogical_approach: typeof sec.pedagogical_approach === 'string' && sec.pedagogical_approach.length >= 50
-        ? sec.pedagogical_approach
-        : 'Hands-on practice with incremental complexity and real-world examples',
+      key_topics:
+        Array.isArray(sec.key_topics) && sec.key_topics.length >= 3
+          ? sec.key_topics
+          : ['General concepts', 'Fundamental principles', 'Core techniques'],
+      pedagogical_approach:
+        typeof sec.pedagogical_approach === 'string' && sec.pedagogical_approach.length >= 50
+          ? sec.pedagogical_approach
+          : 'Hands-on practice with incremental complexity and real-world examples',
       // Validate difficulty_progression against valid enum values
-      difficulty_progression: (VALID_PROGRESSION as readonly string[]).includes(sec.difficulty_progression as string) ? sec.difficulty_progression : 'gradual',
+      difficulty_progression: (VALID_PROGRESSION as readonly string[]).includes(
+        sec.difficulty_progression as string
+      )
+        ? sec.difficulty_progression
+        : 'gradual',
       section_id: sec.section_id || '1',
       estimated_duration_hours: Math.max((sec.estimated_duration_hours as number) || 0.5, 0.5),
       // Validate difficulty against valid enum values
-      difficulty: (VALID_DIFFICULTY as readonly string[]).includes(sec.difficulty as string) ? sec.difficulty : 'intermediate',
-      prerequisites: Array.isArray(sec.prerequisites)
-        ? sec.prerequisites
-        : [],
+      difficulty: (VALID_DIFFICULTY as readonly string[]).includes(sec.difficulty as string)
+        ? sec.difficulty
+        : 'intermediate',
+      prerequisites: Array.isArray(sec.prerequisites) ? sec.prerequisites : [],
     };
   });
 }
@@ -289,7 +321,7 @@ function postProcessSections(sections: unknown[]): Record<string, unknown>[] {
  */
 function buildPhase2PromptText(input: Phase2Input): string {
   const messages = buildPhase2Prompt(input);
-  return messages.map((m) => `${m.role.toUpperCase()}:\n${m.content}`).join('\n\n');
+  return messages.map(m => `${m.role.toUpperCase()}:\n${m.content}`).join('\n\n');
 }
 
 /**
@@ -324,6 +356,15 @@ function buildPhase2Prompt(input: Phase2Input): { role: string; content: string 
       ? `\n\nAvailable Documents: ${document_summaries.length} documents with processed content`
       : '';
 
+  // Build course size guidance section (advisory)
+  const sizeSection = input.size_guidance
+    ? `\n\n## User-Requested Course Size (ADVISORY)
+${input.size_guidance}
+
+**IMPORTANT**: This is a recommendation, not a constraint. If the topic genuinely requires more or fewer lessons for quality coverage, you may deviate from this target. Include your reasoning if you do.
+Target: ~${input.target_lessons} lessons in ~${input.target_sections} sections.`
+    : '';
+
   // Generate Zod schema description for LLM
   const schemaDescription = zodToPromptSchema(Phase2OutputSchema);
 
@@ -349,7 +390,7 @@ ${schemaDescription}
 **Category**: ${category}
 **Complexity**: ${complexity}
 **Target Audience**: ${targetAudience}
-**Key Concepts**: ${keyConcepts}${answersContext}${documentsContext}
+**Key Concepts**: ${keyConcepts}${answersContext}${documentsContext}${sizeSection}
 
 **Tasks**:
 1. **Estimate Total Content Hours** (0.5-200h):

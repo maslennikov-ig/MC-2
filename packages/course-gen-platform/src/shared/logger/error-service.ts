@@ -74,6 +74,7 @@ export async function logPermanentFailure(params: CreateErrorLogParams): Promise
   const { error } = await supabase.from('error_logs' as any).insert({
     user_id: params.user_id || null,
     organization_id: params.organization_id,
+    problem_id: params.problem_id || null,
     error_message: params.error_message,
     stack_trace: params.stack_trace || null,
     severity: params.severity,

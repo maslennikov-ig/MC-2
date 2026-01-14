@@ -28,6 +28,7 @@ import { logger } from '@/shared/logger';
 import { validatePriorityLevel } from '@/shared/constants/priority-weights';
 import { rerankDocuments, type RerankResult } from '../../../shared/jina';
 import { logTrace } from '../../../shared/trace-logger';
+import { checkCourseHasIndexedDocuments } from '@/shared/rag/document-availability';
 
 // ============================================================================
 // CONSTANTS
@@ -184,9 +185,7 @@ export interface LessonRAGParams {
  * }
  * ```
  */
-export async function retrieveLessonContext(
-  params: LessonRAGParams
-): Promise<LessonRAGResult> {
+export async function retrieveLessonContext(params: LessonRAGParams): Promise<LessonRAGResult> {
   const startTime = Date.now();
   const {
     courseId,
@@ -196,13 +195,31 @@ export async function retrieveLessonContext(
     enablePriorityBoost = true, // Default: boost CORE/IMPORTANT documents
   } = params;
 
-  logger.debug({
-    courseId,
-    lessonId: lessonSpec.lesson_id,
-    targetChunks,
-    useCache,
-    enablePriorityBoost,
-  }, '[Lesson RAG] Starting retrieval');
+  logger.debug(
+    {
+      courseId,
+      lessonId: lessonSpec.lesson_id,
+      targetChunks,
+      useCache,
+      enablePriorityBoost,
+    },
+    '[Lesson RAG] Starting retrieval'
+  );
+
+  // OPTIMIZATION: Check if course has any indexed documents before making Qdrant queries
+  // This prevents ~100s of wasted time when course has no uploaded documents
+  const hasIndexedDocuments = await checkCourseHasIndexedDocuments(courseId);
+  if (!hasIndexedDocuments) {
+    logger.info(
+      {
+        courseId,
+        lessonId: lessonSpec.lesson_id,
+      },
+      '[Lesson RAG] Course has no indexed documents, skipping RAG retrieval'
+    );
+
+    return createEmptyResult(lessonSpec.lesson_id, Date.now() - startTime);
+  }
 
   // Check cache first if enabled
   if (useCache && lessonSpec.rag_context) {
@@ -210,10 +227,13 @@ export async function retrieveLessonContext(
     const cached = await ragContextCache.get(ragContextId);
 
     if (cached) {
-      logger.debug({
-        lessonId: lessonSpec.lesson_id,
-        cachedChunks: cached.chunks.length,
-      }, '[Lesson RAG] Using cached context');
+      logger.debug(
+        {
+          lessonId: lessonSpec.lesson_id,
+          cachedChunks: cached.chunks.length,
+        },
+        '[Lesson RAG] Using cached context'
+      );
 
       // Convert cached chunks (section-rag format) to shared-types RAGChunk format
       const convertedChunks: RAGChunk[] = cached.chunks.map((chunk: SectionRAGChunk) => ({
@@ -244,9 +264,12 @@ export async function retrieveLessonContext(
   const queries = buildLessonQueries(lessonSpec);
 
   if (queries.length === 0) {
-    logger.warn({
-      lessonId: lessonSpec.lesson_id,
-    }, '[Lesson RAG] No search queries generated');
+    logger.warn(
+      {
+        lessonId: lessonSpec.lesson_id,
+      },
+      '[Lesson RAG] No search queries generated'
+    );
 
     return createEmptyResult(lessonSpec.lesson_id, Date.now() - startTime);
   }
@@ -268,13 +291,16 @@ export async function retrieveLessonContext(
 
       // Log primary_documents filtering status on first query only
       if (queries.indexOf(query) === 0) {
-        logger.debug({
-          lessonId: lessonSpec.lesson_id,
-          filteringByDocs,
-          documentCount: primaryDocIds?.length ?? 0,
-        }, filteringByDocs
-          ? `RAG filtering by ${primaryDocIds.length} documents`
-          : 'RAG searching all course documents');
+        logger.debug(
+          {
+            lessonId: lessonSpec.lesson_id,
+            filteringByDocs,
+            documentCount: primaryDocIds?.length ?? 0,
+          },
+          filteringByDocs
+            ? `RAG filtering by ${primaryDocIds.length} documents`
+            : 'RAG searching all course documents'
+        );
       }
 
       const searchOptions: SearchOptions = {
@@ -311,18 +337,24 @@ export async function retrieveLessonContext(
         }
       }
 
-      logger.debug({
-        lessonId: lessonSpec.lesson_id,
-        query: query.substring(0, 50),
-        resultsCount: response.results.length,
-        totalUnique: allChunks.length,
-      }, '[Lesson RAG] Query executed');
+      logger.debug(
+        {
+          lessonId: lessonSpec.lesson_id,
+          query: query.substring(0, 50),
+          resultsCount: response.results.length,
+          totalUnique: allChunks.length,
+        },
+        '[Lesson RAG] Query executed'
+      );
     } catch (error) {
-      logger.warn({
-        err: error instanceof Error ? error.message : String(error),
-        query: query.substring(0, 50),
-        lessonId: lessonSpec.lesson_id,
-      }, '[Lesson RAG] Query failed - continuing with remaining queries');
+      logger.warn(
+        {
+          err: error instanceof Error ? error.message : String(error),
+          query: query.substring(0, 50),
+          lessonId: lessonSpec.lesson_id,
+        },
+        '[Lesson RAG] Query failed - continuing with remaining queries'
+      );
     }
 
     // Stop if we have enough candidates
@@ -337,12 +369,7 @@ export async function retrieveLessonContext(
   let sortedChunks: LessonRAGChunk[];
   if (RERANKER_CONFIG.enabled && allChunks.length > 0) {
     const rerankStartTime = Date.now();
-    sortedChunks = await rerankChunks(
-      allChunks,
-      queries,
-      lessonSpec.lesson_id,
-      targetChunks
-    );
+    sortedChunks = await rerankChunks(allChunks, queries, lessonSpec.lesson_id, targetChunks);
     rerankDurationMs = Date.now() - rerankStartTime;
   } else {
     // Fallback to Qdrant score sorting
@@ -352,7 +379,7 @@ export async function retrieveLessonContext(
   }
 
   // Convert to RAGChunk format
-  const ragChunks: RAGChunk[] = sortedChunks.map((chunk) => ({
+  const ragChunks: RAGChunk[] = sortedChunks.map(chunk => ({
     chunk_id: chunk.chunk_id,
     document_id: chunk.document_id,
     document_name: chunk.document_name,
@@ -388,11 +415,14 @@ export async function retrieveLessonContext(
         candidatesCount: chunksBeforeRerank,
         rerankedCount: ragChunks.length,
         rerankerLatencyMs: rerankDurationMs,
-        scoreDistribution: ragChunks.length > 0 ? {
-          min: Math.min(...scores),
-          max: Math.max(...scores),
-          avg: scores.reduce((s, c) => s + c, 0) / scores.length,
-        } : { min: 0, max: 0, avg: 0 },
+        scoreDistribution:
+          ragChunks.length > 0
+            ? {
+                min: Math.min(...scores),
+                max: Math.max(...scores),
+                avg: scores.reduce((s, c) => s + c, 0) / scores.length,
+              }
+            : { min: 0, max: 0, avg: 0 },
         coverageScore,
         cached: false,
       },
@@ -400,10 +430,13 @@ export async function retrieveLessonContext(
     });
   } catch (traceError) {
     // Don't fail retrieval if trace logging fails
-    logger.warn({
-      err: traceError instanceof Error ? traceError.message : String(traceError),
-      lessonId: lessonSpec.lesson_id,
-    }, '[Lesson RAG] Failed to log trace');
+    logger.warn(
+      {
+        err: traceError instanceof Error ? traceError.message : String(traceError),
+        lessonId: lessonSpec.lesson_id,
+      },
+      '[Lesson RAG] Failed to log trace'
+    );
   }
 
   // Cache the result if enabled
@@ -411,7 +444,7 @@ export async function retrieveLessonContext(
     try {
       await ragContextCache.store(courseId, lessonSpec.lesson_id, {
         sectionId: lessonSpec.lesson_id,
-        chunks: sortedChunks.map((c) => ({
+        chunks: sortedChunks.map(c => ({
           chunkId: c.chunk_id,
           documentId: c.document_id,
           documentName: c.document_name,
@@ -426,20 +459,26 @@ export async function retrieveLessonContext(
         retrievalDurationMs,
       });
     } catch (cacheError) {
-      logger.warn({
-        err: cacheError instanceof Error ? cacheError.message : String(cacheError),
-        lessonId: lessonSpec.lesson_id,
-      }, '[Lesson RAG] Failed to cache result');
+      logger.warn(
+        {
+          err: cacheError instanceof Error ? cacheError.message : String(cacheError),
+          lessonId: lessonSpec.lesson_id,
+        },
+        '[Lesson RAG] Failed to cache result'
+      );
     }
   }
 
-  logger.info({
-    lessonId: lessonSpec.lesson_id,
-    chunksRetrieved: ragChunks.length,
-    queriesExecuted: queries.length,
-    coverageScore: coverageScore.toFixed(2),
-    durationMs: retrievalDurationMs,
-  }, '[Lesson RAG] Retrieval complete');
+  logger.info(
+    {
+      lessonId: lessonSpec.lesson_id,
+      chunksRetrieved: ragChunks.length,
+      queriesExecuted: queries.length,
+      coverageScore: coverageScore.toFixed(2),
+      durationMs: retrievalDurationMs,
+    },
+    '[Lesson RAG] Retrieval complete'
+  );
 
   return {
     lessonId: lessonSpec.lesson_id,
@@ -547,10 +586,10 @@ export function extractSourceDocuments(chunks: RAGChunk[]): SourceDocument[] {
       existing.chunk_count++;
     } else {
       // Extract and validate priority from metadata using shared utility
-      const priority = validatePriorityLevel(
-        chunk.metadata?.document_priority,
-        { chunkId: chunk.chunk_id, documentId: chunk.document_id }
-      );
+      const priority = validatePriorityLevel(chunk.metadata?.document_priority, {
+        chunkId: chunk.chunk_id,
+        documentId: chunk.document_id,
+      });
 
       docMap.set(chunk.document_id, {
         document_id: chunk.document_id,
@@ -592,7 +631,7 @@ export async function retrieveMultipleLessons(
 ): Promise<Map<string, LessonRAGResult>> {
   const results = new Map<string, LessonRAGResult>();
 
-  const promises = params.map(async (param) => {
+  const promises = params.map(async param => {
     const result = await retrieveLessonContext(param);
     return { lessonId: param.lessonSpec.lesson_id, result };
   });
@@ -603,9 +642,12 @@ export async function retrieveMultipleLessons(
     if (outcome.status === 'fulfilled') {
       results.set(outcome.value.lessonId, outcome.value.result);
     } else {
-      logger.error({
-        err: outcome.reason instanceof Error ? outcome.reason.message : String(outcome.reason),
-      }, '[Lesson RAG] Batch retrieval item failed');
+      logger.error(
+        {
+          err: outcome.reason instanceof Error ? outcome.reason.message : String(outcome.reason),
+        },
+        '[Lesson RAG] Batch retrieval item failed'
+      );
     }
   }
 
@@ -668,11 +710,14 @@ export async function preRetrieveSectionContexts(params: {
   let cacheHits = 0;
   let freshRetrievals = 0;
 
-  logger.info({
-    courseId,
-    lessonId: lessonSpec.lesson_id,
-    sectionCount: lessonSpec.sections.length,
-  }, '[Lesson RAG] Pre-retrieving section contexts');
+  logger.info(
+    {
+      courseId,
+      lessonId: lessonSpec.lesson_id,
+      sectionCount: lessonSpec.sections.length,
+    },
+    '[Lesson RAG] Pre-retrieving section contexts'
+  );
 
   // Process each section's rag_context_id
   for (const section of lessonSpec.sections) {
@@ -685,11 +730,14 @@ export async function preRetrieveSectionContexts(params: {
       contextMap.set(ragContextId, cached);
       cacheHits++;
 
-      logger.debug({
-        ragContextId,
-        sectionTitle: section.title,
-        cachedChunks: cached.length,
-      }, '[Lesson RAG] Section context cache hit');
+      logger.debug(
+        {
+          ragContextId,
+          sectionTitle: section.title,
+          cachedChunks: cached.length,
+        },
+        '[Lesson RAG] Section context cache hit'
+      );
     } else {
       // Retrieve fresh context for this section
       const freshChunks = await retrieveSectionContextFresh({
@@ -704,24 +752,30 @@ export async function preRetrieveSectionContexts(params: {
       contextMap.set(ragContextId, freshChunks);
       freshRetrievals++;
 
-      logger.debug({
-        ragContextId,
-        sectionTitle: section.title,
-        retrievedChunks: freshChunks.length,
-      }, '[Lesson RAG] Section context freshly retrieved and cached');
+      logger.debug(
+        {
+          ragContextId,
+          sectionTitle: section.title,
+          retrievedChunks: freshChunks.length,
+        },
+        '[Lesson RAG] Section context freshly retrieved and cached'
+      );
     }
   }
 
   const totalDurationMs = Date.now() - startTime;
 
-  logger.info({
-    courseId,
-    lessonId: lessonSpec.lesson_id,
-    totalSections: lessonSpec.sections.length,
-    cacheHits,
-    freshRetrievals,
-    totalDurationMs,
-  }, '[Lesson RAG] Section contexts pre-retrieval complete');
+  logger.info(
+    {
+      courseId,
+      lessonId: lessonSpec.lesson_id,
+      totalSections: lessonSpec.sections.length,
+      cacheHits,
+      freshRetrievals,
+      totalDurationMs,
+    },
+    '[Lesson RAG] Section contexts pre-retrieval complete'
+  );
 
   return {
     contextMap,
@@ -753,9 +807,7 @@ export async function preRetrieveSectionContexts(params: {
  * }
  * ```
  */
-export async function getCachedSectionContext(
-  ragContextId: string
-): Promise<RAGChunk[] | null> {
+export async function getCachedSectionContext(ragContextId: string): Promise<RAGChunk[] | null> {
   // Generate section-level cache key
   const cacheKey = generateSectionCacheKey(ragContextId);
 
@@ -763,11 +815,14 @@ export async function getCachedSectionContext(
   const cached = await ragContextCache.get(cacheKey);
 
   if (cached) {
-    logger.debug({
-      ragContextId,
-      cacheKey,
-      chunkCount: cached.chunks.length,
-    }, '[Lesson RAG] Section context cache hit');
+    logger.debug(
+      {
+        ragContextId,
+        cacheKey,
+        chunkCount: cached.chunks.length,
+      },
+      '[Lesson RAG] Section context cache hit'
+    );
 
     // Convert from SectionRAGChunk format to shared-types RAGChunk format
     return cached.chunks.map((chunk: SectionRAGChunk) => ({
@@ -784,10 +839,13 @@ export async function getCachedSectionContext(
     }));
   }
 
-  logger.debug({
-    ragContextId,
-    cacheKey,
-  }, '[Lesson RAG] Section context cache miss');
+  logger.debug(
+    {
+      ragContextId,
+      cacheKey,
+    },
+    '[Lesson RAG] Section context cache miss'
+  );
 
   return null;
 }
@@ -809,7 +867,7 @@ async function cacheSectionContext(
   const cacheKey = generateSectionCacheKey(ragContextId);
 
   // Convert to SectionRAGChunk format for cache storage
-  const sectionChunks: SectionRAGChunk[] = chunks.map((chunk) => ({
+  const sectionChunks: SectionRAGChunk[] = chunks.map(chunk => ({
     chunkId: chunk.chunk_id,
     documentId: chunk.document_id,
     documentName: chunk.document_name,
@@ -829,18 +887,24 @@ async function cacheSectionContext(
       retrievalDurationMs: 0, // Not tracked individually
     });
 
-    logger.debug({
-      ragContextId,
-      cacheKey,
-      sectionTitle,
-      chunkCount: chunks.length,
-    }, '[Lesson RAG] Section context cached');
+    logger.debug(
+      {
+        ragContextId,
+        cacheKey,
+        sectionTitle,
+        chunkCount: chunks.length,
+      },
+      '[Lesson RAG] Section context cached'
+    );
   } catch (error) {
-    logger.warn({
-      err: error instanceof Error ? error.message : String(error),
-      ragContextId,
-      sectionTitle,
-    }, '[Lesson RAG] Failed to cache section context');
+    logger.warn(
+      {
+        err: error instanceof Error ? error.message : String(error),
+        ragContextId,
+        sectionTitle,
+      },
+      '[Lesson RAG] Failed to cache section context'
+    );
   }
 }
 
@@ -858,10 +922,7 @@ async function retrieveSectionContextFresh(params: {
   const { courseId, lessonSpec, section } = params;
 
   // Build section-specific queries from key points
-  const queries = [
-    section.title,
-    ...section.key_points_to_cover,
-  ].slice(0, 5); // Limit to 5 queries per section
+  const queries = [section.title, ...section.key_points_to_cover].slice(0, 5); // Limit to 5 queries per section
 
   const allChunks: LessonRAGChunk[] = [];
   const seenChunkIds = new Set<string>();
@@ -873,14 +934,17 @@ async function retrieveSectionContextFresh(params: {
 
       // Log primary_documents filtering status on first query only
       if (queries.indexOf(query) === 0) {
-        logger.debug({
-          lessonId: lessonSpec.lesson_id,
-          sectionTitle: section.title,
-          filteringByDocs,
-          documentCount: primaryDocIds?.length ?? 0,
-        }, filteringByDocs
-          ? `Section RAG filtering by ${primaryDocIds.length} documents`
-          : 'Section RAG searching all course documents');
+        logger.debug(
+          {
+            lessonId: lessonSpec.lesson_id,
+            sectionTitle: section.title,
+            filteringByDocs,
+            documentCount: primaryDocIds?.length ?? 0,
+          },
+          filteringByDocs
+            ? `Section RAG filtering by ${primaryDocIds.length} documents`
+            : 'Section RAG searching all course documents'
+        );
       }
 
       const searchOptions: SearchOptions = {
@@ -913,11 +977,14 @@ async function retrieveSectionContextFresh(params: {
         }
       }
     } catch (error) {
-      logger.warn({
-        err: error instanceof Error ? error.message : String(error),
-        query: query.substring(0, 50),
-        sectionTitle: section.title,
-      }, '[Lesson RAG] Section query failed');
+      logger.warn(
+        {
+          err: error instanceof Error ? error.message : String(error),
+          query: query.substring(0, 50),
+          sectionTitle: section.title,
+        },
+        '[Lesson RAG] Section query failed'
+      );
     }
   }
 
@@ -927,7 +994,7 @@ async function retrieveSectionContextFresh(params: {
     .slice(0, 5); // 5 chunks per section
 
   // Convert to RAGChunk format with rag_context_id in metadata
-  return sortedChunks.map((chunk) => ({
+  return sortedChunks.map(chunk => ({
     chunk_id: chunk.chunk_id,
     document_id: chunk.document_id,
     document_name: chunk.document_name,
@@ -986,14 +1053,17 @@ async function rerankChunks(
     const combinedQuery = queries.slice(0, 3).join(' ');
 
     // Extract document texts for reranking
-    const documents = chunks.map((chunk) => chunk.content);
+    const documents = chunks.map(chunk => chunk.content);
 
-    logger.debug({
-      lessonId,
-      candidateCount: chunks.length,
-      topN,
-      combinedQueryLength: combinedQuery.length,
-    }, '[Lesson RAG] Starting reranking');
+    logger.debug(
+      {
+        lessonId,
+        candidateCount: chunks.length,
+        topN,
+        combinedQueryLength: combinedQuery.length,
+      },
+      '[Lesson RAG] Starting reranking'
+    );
 
     // Call Jina Reranker API
     const rerankResults: RerankResult[] = await rerankDocuments(
@@ -1005,7 +1075,7 @@ async function rerankChunks(
     const rerankDurationMs = Date.now() - rerankStartTime;
 
     // Map reranked scores back to chunks
-    const rerankedChunks = rerankResults.map((result) => {
+    const rerankedChunks = rerankResults.map(result => {
       const originalChunk = chunks[result.index];
       return {
         ...originalChunk,
@@ -1014,40 +1084,44 @@ async function rerankChunks(
     });
 
     // Calculate score statistics for logging
-    const scores = rerankedChunks.map((c) => c.similarity_score);
+    const scores = rerankedChunks.map(c => c.similarity_score);
     const minScore = Math.min(...scores);
     const maxScore = Math.max(...scores);
     const avgScore = scores.reduce((a, b) => a + b, 0) / scores.length;
 
-    logger.info({
-      lessonId,
-      candidatesReranked: chunks.length,
-      topChunksReturned: rerankedChunks.length,
-      scoreDistribution: {
-        min: minScore.toFixed(3),
-        max: maxScore.toFixed(3),
-        avg: avgScore.toFixed(3),
+    logger.info(
+      {
+        lessonId,
+        candidatesReranked: chunks.length,
+        topChunksReturned: rerankedChunks.length,
+        scoreDistribution: {
+          min: minScore.toFixed(3),
+          max: maxScore.toFixed(3),
+          avg: avgScore.toFixed(3),
+        },
+        rerankDurationMs,
       },
-      rerankDurationMs,
-    }, '[Lesson RAG] Reranking complete');
+      '[Lesson RAG] Reranking complete'
+    );
 
     return rerankedChunks;
   } catch (error) {
     const rerankDurationMs = Date.now() - rerankStartTime;
 
-    logger.warn({
-      err: error instanceof Error ? error.message : String(error),
-      lessonId,
-      candidateCount: chunks.length,
-      rerankDurationMs,
-      fallback: RERANKER_CONFIG.fallbackOnError,
-    }, '[Lesson RAG] Reranking failed - falling back to Qdrant scores');
+    logger.warn(
+      {
+        err: error instanceof Error ? error.message : String(error),
+        lessonId,
+        candidateCount: chunks.length,
+        rerankDurationMs,
+        fallback: RERANKER_CONFIG.fallbackOnError,
+      },
+      '[Lesson RAG] Reranking failed - falling back to Qdrant scores'
+    );
 
     // Fallback: use original Qdrant scores
     if (RERANKER_CONFIG.fallbackOnError) {
-      return chunks
-        .sort((a, b) => b.similarity_score - a.similarity_score)
-        .slice(0, topN);
+      return chunks.sort((a, b) => b.similarity_score - a.similarity_score).slice(0, topN);
     } else {
       // If fallback disabled, rethrow error
       throw error;
@@ -1239,10 +1313,7 @@ function termMatchesInContent(term: string, contentPool: string): boolean {
   return false;
 }
 
-function calculateLessonCoverage(
-  chunks: RAGChunk[],
-  lessonSpec: LessonSpecificationV2
-): number {
+function calculateLessonCoverage(chunks: RAGChunk[], lessonSpec: LessonSpecificationV2): number {
   if (!lessonSpec.learning_objectives || lessonSpec.learning_objectives.length === 0) {
     return 1.0; // No objectives = full coverage
   }
@@ -1252,16 +1323,14 @@ function calculateLessonCoverage(
   }
 
   // Combine all chunk content for searching
-  const contentPool = chunks.map((c) => c.content.toLowerCase()).join(' ');
-  const objectives = lessonSpec.learning_objectives.map((o) => o.objective.toLowerCase());
+  const contentPool = chunks.map(c => c.content.toLowerCase()).join(' ');
+  const objectives = lessonSpec.learning_objectives.map(o => o.objective.toLowerCase());
 
   let totalScore = 0;
   for (const obj of objectives) {
     // Extract key terms: either longer than 3 characters OR in technical whitelist
-    const words = obj.split(/\s+/).filter((t) => t.length > 0);
-    const keyTerms = words.filter(
-      (t) => t.length > 3 || TECHNICAL_SHORT_TERMS.has(t.toLowerCase())
-    );
+    const words = obj.split(/\s+/).filter(t => t.length > 0);
+    const keyTerms = words.filter(t => t.length > 3 || TECHNICAL_SHORT_TERMS.has(t.toLowerCase()));
 
     if (keyTerms.length === 0) {
       totalScore += 1.0; // No key terms = consider fully covered
@@ -1269,7 +1338,7 @@ function calculateLessonCoverage(
     }
 
     // Check term coverage with prefix matching (handles Russian morphology)
-    const termsCovered = keyTerms.filter((term) => termMatchesInContent(term, contentPool)).length;
+    const termsCovered = keyTerms.filter(term => termMatchesInContent(term, contentPool)).length;
     const coverageRatio = termsCovered / keyTerms.length;
 
     // Use sliding scale instead of hard threshold:

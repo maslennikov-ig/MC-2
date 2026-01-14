@@ -28,6 +28,7 @@ import {
   type VideoScriptOutput,
   type VideoScriptSettings,
 } from '../prompts/video-prompt';
+import { getLessonContent } from '../services/database-service';
 
 // ============================================================================
 // CONFIGURATION
@@ -160,6 +161,12 @@ async function generateDraft(input: EnrichmentHandlerInput): Promise<DraftResult
     'Video handler: generating script draft'
   );
 
+  // Fetch lesson content from lesson_contents table
+  const lessonContent = await getLessonContent(enrichmentContext.lesson.id);
+  if (!lessonContent) {
+    throw new Error(`No lesson content found for lesson ${enrichmentContext.lesson.id}`);
+  }
+
   // Build prompts
   const systemPrompt = buildVideoScriptSystemPrompt();
 
@@ -170,13 +177,11 @@ async function generateDraft(input: EnrichmentHandlerInput): Promise<DraftResult
   };
 
   // Extract learning objectives from lesson content
-  const lessonObjectives = extractLearningObjectives(
-    enrichmentContext.lesson.content
-  );
+  const lessonObjectives = extractLearningObjectives(lessonContent);
 
   const userPrompt = buildVideoScriptUserMessage({
     lessonTitle: enrichmentContext.lesson.title,
-    lessonContent: enrichmentContext.lesson.content || '',
+    lessonContent,
     lessonObjectives,
     language: (enrichmentContext.course.language || 'en') as 'en' | 'ru',
     settings: videoSettings,

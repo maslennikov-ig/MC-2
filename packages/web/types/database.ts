@@ -39,6 +39,8 @@ export interface Course {
   generation_started_at?: string | null
   generation_completed_at?: string | null
   generation_code?: string | null
+  generation_paused_at?: string | null
+  generation_paused_by?: string | null
   last_progress_update?: string | null
   error_message?: string | null
   error_details?: Record<string, unknown> | null
@@ -145,6 +147,8 @@ export interface Profile {
   full_name?: string
   avatar_url?: string
   role: UserRole
+  telegram_chat_id?: string | null
+  telegram_notifications_enabled?: boolean | null
   created_at?: string
   updated_at?: string
 }

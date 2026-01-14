@@ -32,8 +32,9 @@ export function useFallbackPolling(
           const data = await response.json();
           setPolledTraces(data.traces || []);
         }
-      } catch (_err) {
-        // Silently fail on polling errors
+      } catch (err) {
+        // Log polling errors for debugging - these are expected during network issues
+        console.debug('[useFallbackPolling] Polling failed:', err instanceof Error ? err.message : 'Unknown error');
       }
     };
 
