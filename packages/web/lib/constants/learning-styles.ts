@@ -4,20 +4,20 @@ import {
   BookOpen,
   Wrench,
   Rocket,
-  Palette,
   Gamepad2,
-  Zap,
   Microscope,
-  Heart,
   Briefcase,
-  HelpCircle,
   Target,
-  Users2,
   Code2,
-  Timer,
-  Star,
   MessageSquare,
   TrendingUp,
+  Sparkles,
+  Palette,
+  Zap,
+  Timer,
+  HelpCircle,
+  Users2,
+  Star,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { COURSE_STYLES, STYLE_PROMPTS, type CourseStyle } from '@megacampus/shared-types'
@@ -39,11 +39,30 @@ const STYLE_UI_METADATA: Record<
   CourseStyle,
   { icon: LucideIcon; title: string; description: string; example: string }
 > = {
-  academic: {
-    icon: GraduationCap,
-    title: 'Академический',
-    description: 'Строгий научный стиль с терминологией, ссылками и глубоким анализом',
-    example: 'Рассмотрим фундаментальные принципы...',
+  professional: {
+    icon: Briefcase,
+    title: 'Профессиональный',
+    description: 'Корпоративный тон с кейсами, метриками и бизнес-ценностью',
+    example:
+      'Эта методология увеличивает эффективность команды на 40%. Рассмотрим кейс компании X...',
+  },
+  practical: {
+    icon: Wrench,
+    title: 'Практический',
+    description: 'Фокус на применении, пошаговые инструкции, чек-листы',
+    example: 'Шаг 1: Откройте терминал и введите...',
+  },
+  problem_based: {
+    icon: Target,
+    title: 'Проблемно-ориентированный',
+    description: 'Case study формат: ситуация → анализ → решение → выводы',
+    example: 'Ситуация: конверсия упала на 30%. Анализируем причины и находим решение...',
+  },
+  analytical: {
+    icon: TrendingUp,
+    title: 'Аналитический',
+    description: 'Данные, бенчмарки, сравнительные таблицы и логический анализ',
+    example: 'Исследование показывает: компании с этим подходом на 73% эффективнее...',
   },
   conversational: {
     icon: MessageCircle,
@@ -57,11 +76,11 @@ const STYLE_UI_METADATA: Record<
     description: 'Обучение через истории, кейсы и практические ситуации',
     example: 'История начинается с молодого стартапа...',
   },
-  practical: {
-    icon: Wrench,
-    title: 'Практический',
-    description: 'Фокус на применении, пошаговые инструкции, чек-листы',
-    example: 'Шаг 1: Откройте терминал и введите...',
+  interactive: {
+    icon: MessageSquare,
+    title: 'Интерактивный',
+    description: 'Постоянное взаимодействие с читателем через упражнения',
+    example: 'Остановитесь и попробуйте это, прежде чем читать дальше...',
   },
   motivational: {
     icon: Rocket,
@@ -69,60 +88,11 @@ const STYLE_UI_METADATA: Record<
     description: 'Вдохновляющий тон, акцент на достижениях и возможностях',
     example: 'Вы способны освоить это! Каждый эксперт когда-то был новичком...',
   },
-  visual: {
-    icon: Palette,
-    title: 'Визуальный',
-    description: 'Образное изложение с яркими описаниями и метафорами',
-    example: 'Представьте данные как поток реки, где каждая капля...',
-  },
-  gamified: {
-    icon: Gamepad2,
-    title: 'Игровой',
-    description: 'Геймификация: квесты, уровни, достижения в обучении',
-    example: 'Уровень 1: Базовые навыки. Задание: освоить три ключевых принципа...',
-  },
-  minimalist: {
-    icon: Zap,
-    title: 'Минималистичный',
-    description: 'Лаконично, только суть, без лишних слов',
-    example: 'Факт. Объяснение. Применение. Результат.',
-  },
-  research: {
-    icon: Microscope,
-    title: 'Исследовательский',
-    description: 'Развитие критического мышления через вопросы и эксперименты',
-    example: 'А что если...? Давайте исследуем эту гипотезу...',
-  },
-  engaging: {
-    icon: Heart,
-    title: 'Вовлекающий',
-    description: 'Захватывающая подача с интригой и эмоциональной связью',
-    example: 'А вы знали, что 90% разработчиков делают эту ошибку?',
-  },
-  professional: {
-    icon: Briefcase,
-    title: 'Профессиональный',
-    description: 'Корпоративный тон с кейсами, метриками и бизнес-ценностью',
-    example:
-      'Эта методология увеличивает эффективность команды на 40%. Рассмотрим кейс компании X...',
-  },
-  socratic: {
-    icon: HelpCircle,
-    title: 'Сократический',
-    description: 'Обучение через наводящие вопросы и самостоятельные открытия',
-    example: 'Что вы замечаете в этом паттерне? Почему это работает именно так?',
-  },
-  problem_based: {
-    icon: Target,
-    title: 'Проблемно-ориентированный',
-    description: 'Case study формат: ситуация → анализ → решение → выводы',
-    example: 'Ситуация: конверсия упала на 30%. Анализируем причины и находим решение...',
-  },
-  collaborative: {
-    icon: Users2,
-    title: 'Коллаборативный',
-    description: 'Групповое обучение с упражнениями для команд',
-    example: 'Обсудите с коллегой: какой подход лучше и почему?',
+  academic: {
+    icon: GraduationCap,
+    title: 'Академический',
+    description: 'Строгий научный стиль с терминологией, ссылками и глубоким анализом',
+    example: 'Рассмотрим фундаментальные принципы...',
   },
   technical: {
     icon: Code2,
@@ -130,29 +100,59 @@ const STYLE_UI_METADATA: Record<
     description: 'Точность и детали: код, алгоритмы, архитектура',
     example: 'Алгоритм имеет сложность O(n log n). Рассмотрим реализацию...',
   },
+  research: {
+    icon: Microscope,
+    title: 'Исследовательский',
+    description: 'Развитие критического мышления через вопросы и эксперименты',
+    example: 'А что если...? Давайте исследуем эту гипотезу...',
+  },
+  gamified: {
+    icon: Gamepad2,
+    title: 'Игровой',
+    description: 'Геймификация: квесты, уровни, достижения в обучении',
+    example: 'Уровень 1: Базовые навыки. Задание: освоить три ключевых принципа...',
+  },
+  engaging: {
+    icon: Sparkles,
+    title: 'Увлекательный',
+    description: 'Яркая подача, вовлекающие примеры и интересные факты',
+    example: 'Знаете ли вы, что...? Это удивительно, но факт!',
+  },
+  visual: {
+    icon: Palette,
+    title: 'Визуальный',
+    description: 'Образное изложение с яркими описаниями и метафорами',
+    example: 'Представьте данные как поток реки, где каждая капля...',
+  },
+  minimalist: {
+    icon: Zap,
+    title: 'Минималистичный',
+    description: 'Лаконично, только суть, без лишних слов',
+    example: 'Факт. Объяснение. Применение. Результат.',
+  },
   microlearning: {
     icon: Timer,
-    title: 'Микро-обучение',
-    description: 'Ультракороткие уроки на 2-3 минуты чтения',
-    example: '1 концепция = 1 урок. Сегодня: только про замыкания.',
+    title: 'Микрообучение',
+    description: 'Короткие модули по 3-5 минут, легко усваиваемые порции знаний',
+    example: 'За 3 минуты вы узнаете главное о...',
+  },
+  socratic: {
+    icon: HelpCircle,
+    title: 'Сократический',
+    description: 'Обучение через наводящие вопросы и диалог',
+    example: 'А как вы думаете, почему это работает именно так?',
+  },
+  collaborative: {
+    icon: Users2,
+    title: 'Коллаборативный',
+    description: 'Акцент на командной работе и обмене опытом',
+    example: 'Обсудите с коллегой и найдите три возможных решения...',
   },
   inspirational: {
     icon: Star,
     title: 'Вдохновляющий',
-    description: 'Раскрытие потенциала через мечты и амбиции',
-    example: 'Представьте себя через год, владеющим этими навыками...',
-  },
-  interactive: {
-    icon: MessageSquare,
-    title: 'Интерактивный',
-    description: 'Постоянное взаимодействие с читателем через упражнения',
-    example: 'Остановитесь и попробуйте это, прежде чем читать дальше...',
-  },
-  analytical: {
-    icon: TrendingUp,
-    title: 'Аналитический',
-    description: 'Данные, бенчмарки, сравнительные таблицы и логический анализ',
-    example: 'Исследование показывает: компании с этим подходом на 73% эффективнее...',
+    description: 'Истории успеха, мотивирующие примеры и позитивный настрой',
+    example: 'Стив Джобс начинал в гараже, а создал Apple...',
   },
 }
 
