@@ -6,6 +6,7 @@ import {
   COURSE_SIZES,
   COURSE_SIZE_PRESETS,
   getAllCourseSizeLabels,
+  getCourseSizeUILabels,
   type CourseSize,
 } from '@megacampus/shared-types'
 import { type FormData } from '../_schemas/form-schema'
@@ -26,6 +27,7 @@ export function CourseSizeSelector() {
 
   // Get localized labels for current language
   const labels = getAllCourseSizeLabels(language)
+  const uiLabels = getCourseSizeUILabels(language)
 
   // Handle size selection - also set estimatedLessons and estimatedSections
   // For 'auto', we don't set these values - LLM decides
@@ -109,10 +111,12 @@ export function CourseSizeSelector() {
 
   return (
     <div className="mb-6">
-      <h3 className="mb-4 text-lg font-semibold text-slate-900 dark:text-white">Размер курса</h3>
+      <h3 className="mb-4 text-lg font-semibold text-slate-900 dark:text-white">
+        {uiLabels.sectionTitle}
+      </h3>
 
       <fieldset>
-        <legend className="sr-only">Выберите размер курса</legend>
+        <legend className="sr-only">{uiLabels.legendText}</legend>
 
         {/* Auto option - full width at top */}
         <div className="mb-3">{renderSizeCard(autoSize, true)}</div>
@@ -121,11 +125,7 @@ export function CourseSizeSelector() {
         {courseSize === 'auto' && (
           <div className="mb-3 flex items-start gap-2 rounded-lg bg-cyan-50 p-3 text-sm text-cyan-700 dark:bg-cyan-900/20 dark:text-cyan-300">
             <Info className="mt-0.5 h-4 w-4 flex-shrink-0" aria-hidden="true" />
-            <span>
-              {language === 'ru'
-                ? 'ИИ автоматически определит оптимальный размер курса на основе анализа темы и загруженных материалов.'
-                : 'AI will automatically determine optimal course size based on topic analysis and uploaded materials.'}
-            </span>
+            <span>{uiLabels.autoHelperText}</span>
           </div>
         )}
 
@@ -136,9 +136,7 @@ export function CourseSizeSelector() {
       </fieldset>
 
       {/* Advisory note */}
-      <p className="mt-3 text-xs text-slate-500 dark:text-white/50">
-        Это рекомендация - фактический размер может отличаться
-      </p>
+      <p className="mt-3 text-xs text-slate-500 dark:text-white/50">{uiLabels.advisoryNote}</p>
     </div>
   )
 }

@@ -14,7 +14,7 @@ import { Label } from '@/components/ui/label'
 import { FormField } from '@/components/ui/form-field'
 import {
   Lock, Download, Trash2, Moon, Sun,
-  Loader2, AlertTriangle
+  Loader2, AlertTriangle, Send, ExternalLink
 } from 'lucide-react'
 import { passwordSchema, type PasswordFormData } from '../validation-schemas'
 import type { UserProfile } from '../page'
@@ -82,6 +82,50 @@ const AccountSettingsSection = memo(function AccountSettingsSection({
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [deleteConfirmText, setDeleteConfirmText] = useState('')
   const { theme, setTheme } = useThemeSync()
+
+  // Telegram settings state
+  const [telegramChatId, setTelegramChatId] = useState(
+    'telegram_chat_id' in profile ? (profile.telegram_chat_id || '') : ''
+  )
+  const [telegramEnabled, setTelegramEnabled] = useState(
+    'telegram_notifications_enabled' in profile ? (profile.telegram_notifications_enabled || false) : false
+  )
+  const [telegramSaving, setTelegramSaving] = useState(false)
+  const [telegramError, setTelegramError] = useState<string | null>(null)
+
+  // Check if telegram settings have changed
+  const hasTelegramChanges =
+    telegramChatId !== ('telegram_chat_id' in profile ? (profile.telegram_chat_id || '') : '') ||
+    telegramEnabled !== ('telegram_notifications_enabled' in profile ? (profile.telegram_notifications_enabled || false) : false)
+
+  // Validate chat_id (only digits, optionally starting with -)
+  const validateChatId = (value: string): boolean => {
+    if (!value) return true // Empty is valid (will disable notifications)
+    return /^-?\d+$/.test(value)
+  }
+
+  // Handle telegram settings save
+  const handleTelegramSave = async () => {
+    if (!validateChatId(telegramChatId)) {
+      setTelegramError('Chat ID должен содержать только цифры')
+      return
+    }
+
+    setTelegramError(null)
+    setTelegramSaving(true)
+
+    try {
+      await onUpdate({
+        telegram_chat_id: telegramChatId || null,
+        telegram_notifications_enabled: telegramChatId ? telegramEnabled : false
+      })
+      toast.success('Настройки Telegram сохранены')
+    } catch {
+      toast.error('Не удалось сохранить настройки Telegram')
+    } finally {
+      setTelegramSaving(false)
+    }
+  }
 
   const passwordForm = useForm<PasswordFormData>({
     resolver: zodResolver(passwordSchema),
@@ -222,6 +266,91 @@ const AccountSettingsSection = memo(function AccountSettingsSection({
               />
             </div>
           </Suspense>
+        </div>
+      </Card>
+
+      {/* Telegram Notifications Settings */}
+      <Card className="bg-card border rounded-xl p-6 shadow-sm hover:shadow-lg transition-shadow duration-300">
+        <div className="flex items-center gap-2 mb-2">
+          <Send className="h-5 w-5 text-[#0088cc]" />
+          <h3 className="text-lg font-semibold text-foreground">
+            Telegram уведомления
+          </h3>
+        </div>
+        <p className="text-sm text-muted-foreground mb-4">
+          Получайте уведомления о статусе генерации курсов в Telegram
+        </p>
+
+        <div className="space-y-4">
+          {/* Chat ID Input */}
+          <div className="space-y-2">
+            <Label htmlFor="telegram-chat-id">Telegram Chat ID</Label>
+            <Input
+              id="telegram-chat-id"
+              type="text"
+              value={telegramChatId}
+              onChange={(e) => {
+                setTelegramChatId(e.target.value)
+                setTelegramError(null)
+              }}
+              placeholder="Введите ваш Chat ID"
+              className={telegramError ? 'border-destructive' : ''}
+            />
+            {telegramError && (
+              <p className="text-sm text-destructive">{telegramError}</p>
+            )}
+            <p className="text-xs text-muted-foreground flex items-center gap-1">
+              Напишите боту{' '}
+              <a
+                href="https://t.me/userinfobot"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="text-[#0088cc] hover:underline inline-flex items-center gap-0.5"
+              >
+                @userinfobot
+                <ExternalLink className="h-3 w-3" />
+              </a>
+              {' '}в Telegram, чтобы узнать свой Chat ID
+            </p>
+          </div>
+
+          {/* Enable/Disable Switch */}
+          <div className="flex items-center justify-between py-2">
+            <div className="space-y-0.5">
+              <Label htmlFor="telegram-enabled">Включить уведомления</Label>
+              <p className="text-sm text-muted-foreground">
+                Уведомления о завершении, ошибках и этапах генерации
+              </p>
+            </div>
+            <Switch
+              id="telegram-enabled"
+              checked={telegramEnabled}
+              onCheckedChange={setTelegramEnabled}
+              disabled={!telegramChatId}
+              aria-label="Включить Telegram уведомления"
+            />
+          </div>
+
+          {/* Save Button */}
+          {hasTelegramChanges && (
+            <Button
+              onClick={() => void handleTelegramSave()}
+              disabled={telegramSaving}
+              className="w-full sm:w-auto"
+            >
+              {telegramSaving ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Сохранение...
+                </>
+              ) : (
+                <>
+                  <Send className="mr-2 h-4 w-4" />
+                  Сохранить настройки Telegram
+                </>
+              )}
+            </Button>
+          )}
         </div>
       </Card>
 
