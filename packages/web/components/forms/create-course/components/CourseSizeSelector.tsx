@@ -1,13 +1,12 @@
 import React from 'react'
 import { useFormContext } from 'react-hook-form'
 import { motion } from 'framer-motion'
-import { Sparkles, Zap, BookOpen, Library, GraduationCap } from 'lucide-react'
+import { Sparkles, Zap, BookOpen, Library, GraduationCap, Info } from 'lucide-react'
 import {
   COURSE_SIZES,
   COURSE_SIZE_PRESETS,
   getAllCourseSizeLabels,
   type CourseSize,
-  type PresetCourseSize,
 } from '@megacampus/shared-types'
 import { type FormData } from '../_schemas/form-schema'
 
@@ -117,6 +116,18 @@ export function CourseSizeSelector() {
 
         {/* Auto option - full width at top */}
         <div className="mb-3">{renderSizeCard(autoSize, true)}</div>
+
+        {/* Helper text when 'auto' is selected */}
+        {courseSize === 'auto' && (
+          <div className="mb-3 flex items-start gap-2 rounded-lg bg-cyan-50 p-3 text-sm text-cyan-700 dark:bg-cyan-900/20 dark:text-cyan-300">
+            <Info className="mt-0.5 h-4 w-4 flex-shrink-0" aria-hidden="true" />
+            <span>
+              {language === 'ru'
+                ? 'ИИ автоматически определит оптимальный размер курса на основе анализа темы и загруженных материалов.'
+                : 'AI will automatically determine optimal course size based on topic analysis and uploaded materials.'}
+            </span>
+          </div>
+        )}
 
         {/* Preset sizes - 2x2 grid */}
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 md:gap-4">

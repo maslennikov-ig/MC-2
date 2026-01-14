@@ -384,6 +384,19 @@ class Stage4AnalysisHandler {
       const courseSize = courseForInput.course_size as CourseSize | null;
       const sizePreset = courseSize ? getCourseSizePreset(courseSize) : null;
 
+      // Log course size mode for analytics
+      if (courseSize === 'auto' || !courseSize) {
+        jobLogger.info(
+          { topic: courseForInput.title, documentCount: documentSummaries.length },
+          'Course size: AUTO mode - LLM will determine optimal size without preset guidance'
+        );
+      } else {
+        jobLogger.info(
+          { courseSize, targetLessons: sizePreset?.targetLessons },
+          `Course size: ${courseSize.toUpperCase()} preset selected`
+        );
+      }
+
       // Build StructureAnalysisInput for orchestrator
       // Note: for 'auto', sizePreset is undefined so all size fields will be undefined
       // (LLM decides optimal size without guidance)

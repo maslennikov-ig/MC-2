@@ -105,7 +105,9 @@ export default function CreateCourseForm() {
           <div className="xl:col-span-2">
             <CostPreviewCard
               documentCount={uploadedFiles.length}
-              estimatedLessons={form.watch('estimatedLessons') || 15}
+              estimatedLessons={
+                form.watch('estimatedLessons') || (form.watch('courseSize') === 'auto' ? 30 : 15)
+              }
               hasDocuments={uploadedFiles.length > 0}
               isVisible={form.watch('generationMode') === 'automatic'}
             />
