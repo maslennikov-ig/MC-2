@@ -147,6 +147,8 @@ export interface Profile {
   full_name?: string
   avatar_url?: string
   role: UserRole
+  telegram_chat_id?: string | null
+  telegram_notifications_enabled?: boolean | null
   created_at?: string
   updated_at?: string
 }
