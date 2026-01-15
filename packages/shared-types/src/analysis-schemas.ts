@@ -277,7 +277,7 @@ export const Phase2InputSchema = z.object({
     }),
     contextual_language: z.object({
       why_matters_context: z.string().min(50), // Removed .max(300) - allow rich context
-      motivators: z.string().min(100), // Removed .max(600) - encourage comprehensive motivators
+      motivators: z.string().min(50), // Reduced from 100 - realistic minimum for motivators text
       experience_prompt: z.string().min(100), // Removed .max(600) - allow detailed prompts
       problem_statement_context: z.string().min(50), // Removed .max(300) - encourage thorough problem statements
       knowledge_bridge: z.string().min(100), // Removed .max(600) - allow comprehensive bridging
@@ -346,7 +346,7 @@ export const Phase1OutputSchema = z.object({
   }),
   contextual_language: z.object({
     why_matters_context: z.string().min(50), // Removed .max(300) - allow rich context
-    motivators: z.string().min(100), // Removed .max(600) - encourage comprehensive motivators
+    motivators: z.string().min(50), // Reduced from 100 - realistic minimum for motivators text
     experience_prompt: z.string().min(100), // Removed .max(600) - allow detailed prompts
     problem_statement_context: z.string().min(50), // Removed .max(300) - encourage thorough problem statements
     knowledge_bridge: z.string().min(100), // Removed .max(600) - allow comprehensive bridging
@@ -517,7 +517,7 @@ export const AnalysisResultSchema = z.object({
 
   contextual_language: z.object({
     why_matters_context: z.string().min(50), // Removed .max(300) - allow rich context
-    motivators: z.string().min(100), // Removed .max(600) - encourage comprehensive motivators
+    motivators: z.string().min(50), // Reduced from 100 - realistic minimum for motivators text
     experience_prompt: z.string().min(100), // Removed .max(600) - allow detailed prompts
     problem_statement_context: z.string().min(50), // Removed .max(300) - encourage thorough problem statements
     knowledge_bridge: z.string().min(100), // Removed .max(600) - allow comprehensive bridging

@@ -356,14 +356,21 @@ function buildPhase2Prompt(input: Phase2Input): { role: string; content: string 
       ? `\n\nAvailable Documents: ${document_summaries.length} documents with processed content`
       : '';
 
-  // Build course size guidance section (advisory)
+  // Build course size guidance section
+  // - For specific sizes: MANDATORY constraint with ±20% tolerance
+  // - For auto: explicit guidance to determine optimal size
   const sizeSection = input.size_guidance
-    ? `\n\n## User-Requested Course Size (ADVISORY)
+    ? `\n\n## User-Requested Course Size (MANDATORY CONSTRAINT)
 ${input.size_guidance}
 
-**IMPORTANT**: This is a recommendation, not a constraint. If the topic genuinely requires more or fewer lessons for quality coverage, you may deviate from this target. Include your reasoning if you do.
-Target: ~${input.target_lessons} lessons in ~${input.target_sections} sections.`
-    : '';
+**CRITICAL CONSTRAINT**: The user has explicitly selected this course size. You MUST respect this choice.
+- Target: ${input.target_lessons} lessons in ${input.target_sections} sections
+- Allowed range: ${Math.round(input.target_lessons! * 0.8)}-${Math.round(input.target_lessons! * 1.2)} lessons (±20% tolerance)
+- If the topic seems too broad, REDUCE scope by focusing on essentials only
+- If the topic seems too narrow, ADD depth (advanced techniques, case studies, practical exercises)
+- DO NOT exceed the allowed range - adjust content depth, not lesson count`
+    : `\n\n## Course Size: AI-Determined (AUTO MODE)
+The user has selected **AUTO mode**. Analyze the topic thoroughly and determine the optimal course size yourself based on your expert judgment. No size constraints apply - create exactly as many lessons as the topic genuinely requires for quality coverage.`;
 
   // Generate Zod schema description for LLM
   const schemaDescription = zodToPromptSchema(Phase2OutputSchema);

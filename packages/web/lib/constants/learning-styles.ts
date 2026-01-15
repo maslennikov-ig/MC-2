@@ -11,13 +11,6 @@ import {
   Code2,
   MessageSquare,
   TrendingUp,
-  Sparkles,
-  Palette,
-  Zap,
-  Timer,
-  HelpCircle,
-  Users2,
-  Star,
 } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { COURSE_STYLES, STYLE_PROMPTS, type CourseStyle } from '@megacampus/shared-types'
@@ -111,48 +104,6 @@ const STYLE_UI_METADATA: Record<
     title: 'Игровой',
     description: 'Геймификация: квесты, уровни, достижения в обучении',
     example: 'Уровень 1: Базовые навыки. Задание: освоить три ключевых принципа...',
-  },
-  engaging: {
-    icon: Sparkles,
-    title: 'Увлекательный',
-    description: 'Яркая подача, вовлекающие примеры и интересные факты',
-    example: 'Знаете ли вы, что...? Это удивительно, но факт!',
-  },
-  visual: {
-    icon: Palette,
-    title: 'Визуальный',
-    description: 'Образное изложение с яркими описаниями и метафорами',
-    example: 'Представьте данные как поток реки, где каждая капля...',
-  },
-  minimalist: {
-    icon: Zap,
-    title: 'Минималистичный',
-    description: 'Лаконично, только суть, без лишних слов',
-    example: 'Факт. Объяснение. Применение. Результат.',
-  },
-  microlearning: {
-    icon: Timer,
-    title: 'Микрообучение',
-    description: 'Короткие модули по 3-5 минут, легко усваиваемые порции знаний',
-    example: 'За 3 минуты вы узнаете главное о...',
-  },
-  socratic: {
-    icon: HelpCircle,
-    title: 'Сократический',
-    description: 'Обучение через наводящие вопросы и диалог',
-    example: 'А как вы думаете, почему это работает именно так?',
-  },
-  collaborative: {
-    icon: Users2,
-    title: 'Коллаборативный',
-    description: 'Акцент на командной работе и обмене опытом',
-    example: 'Обсудите с коллегой и найдите три возможных решения...',
-  },
-  inspirational: {
-    icon: Star,
-    title: 'Вдохновляющий',
-    description: 'Истории успеха, мотивирующие примеры и позитивный настрой',
-    example: 'Стив Джобс начинал в гараже, а создал Apple...',
   },
 }
 

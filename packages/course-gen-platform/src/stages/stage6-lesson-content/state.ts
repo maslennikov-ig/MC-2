@@ -28,11 +28,7 @@ import type {
  * Graph node names for state tracking
  * Simplified pipeline: Generator -> SelfReviewer -> Judge
  */
-export type LessonGraphNode =
-  | 'generator'
-  | 'selfReviewer'
-  | 'sectionRegenerator'
-  | 'judge';
+export type LessonGraphNode = 'generator' | 'selfReviewer' | 'sectionRegenerator' | 'judge';
 
 /**
  * Cost record for a single node execution
@@ -141,6 +137,16 @@ export const LessonGraphState = Annotation.Root({
    * Used by handler's processWithFallback() to switch to fallback model
    */
   modelOverride: Annotation<string | null>({
+    reducer: (x, y) => y ?? x,
+    default: () => null,
+  }),
+
+  /**
+   * Course content style (e.g., 'gamified', 'professional', 'storytelling')
+   * Used by generator to apply style-specific prompts for content generation
+   * Defaults to 'professional' if not provided
+   */
+  style: Annotation<string | null>({
     reducer: (x, y) => y ?? x,
     default: () => null,
   }),

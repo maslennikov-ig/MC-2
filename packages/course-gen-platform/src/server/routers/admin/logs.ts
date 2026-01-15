@@ -575,12 +575,51 @@ async function buildErrorLogsQuery(
   limit: number,
   offset: number
 ): Promise<{ items: UnifiedLogItem[]; total: number }> {
+  // Status filter: pre-fetch log IDs with matching status
+  let statusFilteredIds: string[] | null = null;
+  let excludeIds: string[] | null = null;
+
+  if (filters?.status) {
+    if (filters.status === 'new') {
+      // "new" means logs WITHOUT any status record - get IDs to exclude
+      const allWithStatus = await supabase
+        .from('log_issue_status')
+        .select('log_id')
+        .eq('log_type', 'error_log');
+
+      excludeIds = (allWithStatus.data || []).map(row => row.log_id);
+    } else {
+      // Get IDs with specific status
+      const statusQuery = await supabase
+        .from('log_issue_status')
+        .select('log_id')
+        .eq('log_type', 'error_log')
+        .eq('status', filters.status);
+
+      if (statusQuery.error) {
+        logger.error({ error: statusQuery.error }, 'Error fetching status-filtered IDs');
+        return { items: [], total: 0 };
+      }
+
+      statusFilteredIds = (statusQuery.data || []).map(row => row.log_id);
+      if (statusFilteredIds.length === 0) {
+        return { items: [], total: 0 };
+      }
+    }
+  }
+
   let query = supabase
     .from('error_logs')
     .select(
       'id, created_at, severity, error_message, job_type, metadata, problem_id, environment',
       { count: 'exact' }
     );
+
+  // Apply status filter if we have specific IDs
+  if (statusFilteredIds !== null) {
+    query = query.in('id', statusFilteredIds);
+  }
+  // Note: For "new" status, we filter after fetching (excludeIds)
 
   // Apply filters
   if (filters?.level) {
@@ -622,11 +661,20 @@ async function buildErrorLogsQuery(
     return { items: [], total: 0 };
   }
 
+  // Filter out excluded IDs for "new" status (logs that have a status record)
+  let filteredData = data || [];
+  let adjustedCount = count || 0;
+  if (excludeIds && excludeIds.length > 0) {
+    const excludeSet = new Set(excludeIds);
+    filteredData = filteredData.filter(log => !excludeSet.has(log.id));
+    adjustedCount = filteredData.length; // Approximate - pagination affected
+  }
+
   // Fetch statuses for these logs
-  const logIds = (data || []).map(log => log.id);
+  const logIds = filteredData.map(log => log.id);
   const statuses = await fetchLogStatuses(supabase, 'error_log', logIds);
 
-  const items: UnifiedLogItem[] = (data || []).map(log => ({
+  const items: UnifiedLogItem[] = filteredData.map(log => ({
     id: log.id,
     logType: 'error_log' as LogType,
     createdAt: log.created_at,
@@ -644,7 +692,7 @@ async function buildErrorLogsQuery(
     courseName: null,
   }));
 
-  return { items, total: count || 0 };
+  return { items, total: adjustedCount };
 }
 
 /**
@@ -663,12 +711,52 @@ async function buildGenerationTraceQuery(
     return { items: [], total: 0 };
   }
 
+  // Status filter: pre-fetch log IDs with matching status
+  let statusFilteredIds: string[] | null = null;
+  let excludeIds: string[] | null = null;
+
+  if (filters?.status) {
+    if (filters.status === 'new') {
+      // "new" means logs WITHOUT any status record - get IDs to exclude
+      const allWithStatus = await supabase
+        .from('log_issue_status')
+        .select('log_id')
+        .eq('log_type', 'generation_trace');
+
+      excludeIds = (allWithStatus.data || []).map(row => row.log_id);
+    } else {
+      // Get IDs with specific status
+      const statusQuery = await supabase
+        .from('log_issue_status')
+        .select('log_id')
+        .eq('log_type', 'generation_trace')
+        .eq('status', filters.status);
+
+      if (statusQuery.error) {
+        logger.error({ error: statusQuery.error }, 'Error fetching status-filtered IDs');
+        return { items: [], total: 0 };
+      }
+
+      statusFilteredIds = (statusQuery.data || []).map(row => row.log_id);
+      if (statusFilteredIds.length === 0) {
+        return { items: [], total: 0 };
+      }
+    }
+  }
+
   let query = supabase
     .from('generation_trace')
     .select('id, created_at, stage, phase, step_name, course_id, lesson_id, error_data', {
       count: 'exact',
     })
     .not('error_data', 'is', null); // Only traces with errors
+
+  // Apply status filter
+  if (statusFilteredIds !== null) {
+    query = query.in('id', statusFilteredIds);
+  }
+  // Note: Supabase doesn't support NOT IN directly, so for "new" status
+  // we'll filter after fetching (less efficient but works)
 
   // Apply filters
   if (filters?.search && filters.search.length >= 2) {
@@ -702,11 +790,20 @@ async function buildGenerationTraceQuery(
     return { items: [], total: 0 };
   }
 
+  // Filter out excluded IDs for "new" status (logs that have a status record)
+  let filteredData = data || [];
+  let adjustedCount = count || 0;
+  if (excludeIds && excludeIds.length > 0) {
+    const excludeSet = new Set(excludeIds);
+    filteredData = filteredData.filter(log => !excludeSet.has(log.id));
+    adjustedCount = filteredData.length; // Approximate - pagination affected
+  }
+
   // Fetch statuses for these logs
-  const logIds = (data || []).map(log => log.id);
+  const logIds = filteredData.map(log => log.id);
   const statuses = await fetchLogStatuses(supabase, 'generation_trace', logIds);
 
-  const items: UnifiedLogItem[] = (data || []).map(log => {
+  const items: UnifiedLogItem[] = filteredData.map(log => {
     const errorData = log.error_data as Record<string, unknown> | null;
     return {
       id: log.id,
@@ -727,7 +824,7 @@ async function buildGenerationTraceQuery(
     };
   });
 
-  return { items, total: count || 0 };
+  return { items, total: adjustedCount };
 }
 
 /**
