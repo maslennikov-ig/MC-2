@@ -1,7 +1,7 @@
 ---
 name: process-logs
 description: Process error logs from admin panel - fetch new errors, analyze, create tasks, fix, and mark resolved
-version: 1.4.0
+version: 1.5.0
 ---
 
 # Process Error Logs
@@ -104,6 +104,33 @@ mcp__context7__resolve-library-id → mcp__context7__query-docs
 - `ESM import conflict. Renamed generator.ts to generator-node.ts.`
 - `Constraint missing 'approved'. Added via migration 20250115_fix_status.`
 - `Cloudflare 500. External issue, retry logic already exists. Monitoring.`
+
+### 6. SEARCH SIMILAR PROBLEMS FIRST
+
+**Before fixing, check if we solved this before:**
+
+```sql
+-- Search similar errors by message (use mcp__supabase__execute_sql)
+SELECT el.id, el.error_message, el.severity, lis.status, lis.notes, el.created_at
+FROM error_logs el
+LEFT JOIN log_issue_status lis ON lis.log_id = el.id AND lis.log_type = 'error_log'
+WHERE to_tsvector('english', el.error_message) @@ plainto_tsquery('english', '<keyword>')
+  AND lis.status = 'resolved'
+ORDER BY el.created_at DESC
+LIMIT 5;
+```
+
+**What to search for:**
+
+- Key error terms: `constraint`, `undefined`, `timeout`, `not found`
+- Function/module names from stack trace
+- Error codes or specific identifiers
+
+**If found similar resolved issue:**
+
+1. Read the `notes` field — contains root cause and fix
+2. Apply same solution pattern if applicable
+3. Reference in your notes: `Similar to <date>. Same fix applied.`
 
 ## Usage
 
