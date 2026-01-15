@@ -1,22 +1,51 @@
 ---
 name: process-logs
 description: Process error logs from admin panel - fetch new errors, analyze, create tasks, fix, and mark resolved
-version: 1.1.0
+version: 1.2.0
 ---
 
 # Process Error Logs
 
 Automated workflow for processing error logs from `/admin/logs`.
 
-## Orchestrator Role
+## CRITICAL REQUIREMENTS
 
-**YOU ARE THE ORCHESTRATOR.** Follow these rules:
+> **YOU MUST FOLLOW THESE RULES. NO EXCEPTIONS.**
 
-1. **Simple tasks** (config fixes, single-line changes) - execute directly
-2. **Complex tasks** (multi-file fixes, migrations, API changes) - delegate to subagents
-3. **ALWAYS verify** subagent results by reading modified files and running `pnpm type-check && pnpm build`
-4. **Use MCP tools**: `mcp__supabase__execute_sql` for DB queries, `mcp__context7__query-docs` for documentation
-5. **ALWAYS use context7** for documentation and examples before implementing
+### 1. BEADS IS MANDATORY
+
+**EVERY error MUST have a Beads task.** No direct fixes without tracking.
+
+```bash
+# ALWAYS run this FIRST for each error:
+bd create --type=bug --priority=<1-3> --title="Fix: <error_message>" --files "<relevant_files>"
+bd update <task_id> --status=in_progress
+```
+
+### 2. SUBAGENTS ARE MANDATORY FOR COMPLEX TASKS
+
+**Use Task tool to delegate.** You are the ORCHESTRATOR, not the implementer.
+
+**MUST delegate when:**
+
+- Error requires migration or DB changes → `database-architect`
+- Error in API/tRPC code → `fullstack-nextjs-specialist`
+- Error involves complex types → `typescript-types-specialist`
+- Error in UI components → `nextjs-ui-designer`
+
+**Execute directly ONLY when:**
+
+- Single-line config fix
+- Simple import correction
+- Trivial typo fix
+
+### 3. CONTEXT7 IS MANDATORY
+
+**ALWAYS query documentation before implementing:**
+
+```
+mcp__context7__resolve-library-id → mcp__context7__query-docs
+```
 
 ## Usage
 
@@ -24,9 +53,10 @@ Invoke via: `/process-logs` or "обработай логи ошибок"
 
 ## Workflow
 
-### 1. Fetch New Errors (use mcp**supabase**execute_sql)
+### Step 1: Fetch New Errors
 
 ```sql
+-- Use mcp__supabase__execute_sql
 SELECT el.id, el.severity, el.error_message, el.metadata, el.stack_trace,
        el.course_id, el.lesson_id, el.request_id, el.trpc_path, el.trpc_input, el.attempted_value
 FROM error_logs el
@@ -38,55 +68,40 @@ ORDER BY
 LIMIT 20;
 ```
 
-### 2. Categorize & Assign
+### Step 2: For EACH Error (Loop)
 
-| Pattern                | Category      | Subagent                      |
-| ---------------------- | ------------- | ----------------------------- |
-| `violates.*constraint` | DB constraint | `database-architect`          |
-| `tRPC error`           | API bug       | `fullstack-nextjs-specialist` |
-| `Type.*error`          | Type error    | `typescript-types-specialist` |
-| `Error querying`       | Query bug     | `database-architect`          |
-| Config missing         | Config issue  | **ask user** how to resolve   |
-| External service       | External      | mark `to_verify`, monitor     |
+```
+FOR each error:
+  1. CREATE BEADS TASK (MANDATORY):
+     bd create --type=bug --priority=<1-3> --title="Fix: <message>" --files "<files>"
+     bd update <id> --status=in_progress
 
-**IMPORTANT**: Never auto-ignore errors. Always fix or ask user.
+  2. ANALYZE error type and SELECT subagent:
+     - DB constraint → database-architect
+     - tRPC/API → fullstack-nextjs-specialist
+     - Types → typescript-types-specialist
+     - UI → nextjs-ui-designer
 
-### 3. For Each Error
+  3. QUERY context7 for relevant docs
 
-```bash
-# 1. Create Beads task
-bd create --type=bug --priority=<1-3> --title="Fix: <message>" --files "<files>"
-bd update <id> --status=in_progress
+  4. DELEGATE using Task tool:
+     Task(subagent_type="<selected>", prompt="Fix error: <details>...")
 
-# 2. Query context7 for relevant docs
-mcp__context7__resolve-library-id + mcp__context7__query-docs
+  5. VERIFY results (MANDATORY):
+     - Read tool: check modified files
+     - Bash: pnpm type-check && pnpm build
+     - If errors → re-delegate
 
-# 3. Delegate to subagent OR fix directly (simple cases only)
+  6. MARK resolved in DB:
+     INSERT INTO log_issue_status (log_type, log_id, status, notes, updated_at)
+     VALUES ('error_log', '<id>', 'resolved', 'Fixed: <desc>', NOW())
+     ON CONFLICT (log_type, log_id) DO UPDATE SET status = 'resolved', notes = EXCLUDED.notes, updated_at = NOW();
 
-# 4. VERIFY results (MANDATORY):
-# - Read modified files
-# - Run: pnpm type-check && pnpm build
-# - Re-delegate if errors
-
-# 5. Mark resolved
-INSERT INTO log_issue_status (log_type, log_id, status, notes, updated_at)
-VALUES ('error_log', '<id>', 'resolved', 'Fixed: <desc>', NOW())
-ON CONFLICT (log_type, log_id) DO UPDATE SET status = 'resolved', notes = EXCLUDED.notes, updated_at = NOW();
-
-# 6. Close task
-bd close <id> --reason="Fixed"
+  7. CLOSE Beads task:
+     bd close <id> --reason="Fixed"
 ```
 
-### 4. Verification Checklist
-
-Before marking resolved:
-
-- [ ] Files modified correctly (Read tool)
-- [ ] `pnpm type-check` passes
-- [ ] `pnpm build` passes
-- [ ] No new errors introduced
-
-## Output Summary
+### Step 3: Summary Report
 
 ```markdown
 ## Log Processing Summary
@@ -97,26 +112,83 @@ Before marking resolved:
 | ERROR    | X     | Y       | Z         |
 | WARNING  | X     | Y       | Z         |
 
-### Fixed:
+### Beads Tasks Created:
 
-- mc2-xxx: <description>
+- mc2-xxx: <description> → <status>
 
 ### Pending (need user input):
 
-- <id>: <reason>
+- <log_id>: <reason>
 ```
 
-## Subagent Selection
+## Subagent Delegation Examples
 
-| Error Type            | Subagent                      | When                |
-| --------------------- | ----------------------------- | ------------------- |
-| DB schema/constraints | `database-architect`          | Migrations, RLS     |
-| API/tRPC errors       | `fullstack-nextjs-specialist` | Backend logic       |
-| Type errors           | `typescript-types-specialist` | Complex types       |
-| UI errors             | `nextjs-ui-designer`          | Frontend components |
+### DB Constraint Error
+
+```
+Task(
+  subagent_type="database-architect",
+  prompt="Fix DB constraint violation in error_logs.
+  Error: <full_error_message>
+  Context: <stack_trace>
+  Course: <course_id>
+  Create migration to fix the constraint."
+)
+```
+
+### tRPC/API Error
+
+```
+Task(
+  subagent_type="fullstack-nextjs-specialist",
+  prompt="Fix tRPC error in <trpc_path>.
+  Error: <full_error_message>
+  Input: <trpc_input>
+  Stack: <stack_trace>
+  Fix the API endpoint."
+)
+```
+
+### Type Error
+
+```
+Task(
+  subagent_type="typescript-types-specialist",
+  prompt="Fix TypeScript type error.
+  Error: <full_error_message>
+  File: <file_path>
+  Fix types and ensure compatibility."
+)
+```
+
+## Verification Checklist
+
+Before marking ANY error as resolved:
+
+- [ ] Beads task exists for this error
+- [ ] Subagent was used (if not trivial fix)
+- [ ] Modified files reviewed with Read tool
+- [ ] `pnpm type-check` passes
+- [ ] `pnpm build` passes
+- [ ] No new errors introduced
+- [ ] Beads task closed with reason
+
+## Error Categories
+
+| Pattern                | Category      | Subagent                      | Priority |
+| ---------------------- | ------------- | ----------------------------- | -------- |
+| `violates.*constraint` | DB constraint | `database-architect`          | 1        |
+| `tRPC error`           | API bug       | `fullstack-nextjs-specialist` | 2        |
+| `Type.*error`          | Type error    | `typescript-types-specialist` | 2        |
+| `Error querying`       | Query bug     | `database-architect`          | 2        |
+| Config missing         | Config issue  | **ASK USER**                  | 3        |
+| External service       | External      | mark `to_verify`              | 3        |
+
+**NEVER auto-ignore errors. Always fix or ask user.**
 
 ## Reference Docs
 
 - Admin Logs Guide: `.claude/docs/admin-logs-guide.md`
 - Error Types: `packages/course-gen-platform/src/shared/logger/types.ts`
 - Logs Router: `packages/course-gen-platform/src/server/routers/admin/logs.ts`
+- CLAUDE.md: Main orchestration rules
