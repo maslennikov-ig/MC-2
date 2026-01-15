@@ -311,6 +311,59 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.28.0] - 2026-01-15
+
+### Added
+
+- **logging**: add generationCode to worker logs (7950f90)
+- **styles**: add 7 new course styles (9bae9b0)
+- **monitoring**: add Telegram bot health check to admin dashboard (6e479bb)
+
+### Changed
+
+- **stage6**: address code review findings for style propagation (4c80046)
+- **styles**: reduce course styles from 19 to 12 (d77aefb)
+
+### Fixed
+
+- **RT-007**: use word boundaries in hasNonMeasurableVerb (9cdae74)
+- **types**: cast course.style to CourseStyle type (b261250)
+- **stage4**: remove size hints from AUTO mode prompt (72869b5)
+- **stage4**: add explicit AUTO mode guidance for course size determination (f202b8e)
+- **stage4**: enforce course size as mandatory constraint with ±20% tolerance (a2aaff6)
+- **admin-logs**: implement status filter functionality (9a247a3)
+- **stage6**: improve style field validation and error handling (80d8421)
+- **stage4**: reduce motivators min length from 100 to 50 chars (ea7357f)
+- **stage5**: make TODO pattern case-sensitive (d6b82ce)
+- **styles**: add 'microlearning' course style (2731b96)
+- **stage6**: pass course style to lesson content generation (17bb9d8)
+
+### Other
+
+- update project files (1be6d48)
+- bd sync: 2026-01-15 10:36:02 (6c9d81e)
+- bd sync: 2026-01-15 10:29:51 (ed4527d)
+- bd sync: 2026-01-15 09:40:24 (0325eb6)
+- bd sync: 2026-01-15 09:39:21 (d33c967)
+- bd sync: 2026-01-15 09:35:32 (f67e305)
+- bd sync: 2026-01-15 09:32:52 (3e18b33)
+- bd sync: 2026-01-15 09:31:00 (5a40bef)
+- Revert "fix(styles): add 'microlearning' course style" (d3aac55)
+- bd sync: 2026-01-15 09:26:56 (1dc8ee6)
+- bd sync: 2026-01-15 09:19:18 (fc6b067)
+- bd sync: 2026-01-15 09:18:37 (84d8cc7)
+- bd sync: 2026-01-15 09:13:29 (59616f4)
+- bd sync: 2026-01-15 09:13:18 (d7019ec)
+- bd sync: 2026-01-15 09:04:16 (ff7f4a1)
+- bd sync: 2026-01-14 22:07:39 (455fc49)
+- bd sync: 2026-01-14 21:50:39 (4e75343)
+- merge develop into master (0d45f4f)
+- Merge branch 'develop' (e73fa0e)
+- Merge branch 'develop' (8cb2e60)
+- Merge branch 'develop' (fa4c463)
+- Merge remote-tracking branch 'origin/develop' (967e210)
+- .gitattributes for beads config protection (ac301a3)
+
 ## [0.27.11] - 2026-01-14
 
 ### Added
