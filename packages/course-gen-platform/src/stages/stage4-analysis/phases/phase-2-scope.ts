@@ -370,22 +370,7 @@ ${input.size_guidance}
 - If the topic seems too narrow, ADD depth (advanced techniques, case studies, practical exercises)
 - DO NOT exceed the allowed range - adjust content depth, not lesson count`
     : `\n\n## Course Size: AI-Determined (AUTO MODE)
-The user has selected **AUTO mode** - analyze the topic and determine the OPTIMAL course size yourself.
-
-Consider these factors:
-- **Topic breadth**: How many distinct areas need coverage?
-- **Topic depth**: How complex are the concepts?
-- **Target audience**: Beginners need more lessons, experts need fewer
-- **Available documents**: More materials may justify larger scope
-- **Industry standards**: What's typical for this subject?
-
-Size guidelines for reference:
-- Mini (~10 lessons): Narrow topics, quick introductions, single-skill courses
-- Compact (~20 lessons): Focused courses, moderate depth
-- Standard (~40 lessons): Comprehensive coverage, multiple skills
-- Large (~80 lessons): Extensive subjects, professional certifications
-
-**You decide** the optimal size. Justify your decision in \`scope_reasoning\`.`;
+The user has selected **AUTO mode**. Analyze the topic thoroughly and determine the optimal course size yourself based on your expert judgment. No size constraints apply - create exactly as many lessons as the topic genuinely requires for quality coverage.`;
 
   // Generate Zod schema description for LLM
   const schemaDescription = zodToPromptSchema(Phase2OutputSchema);
