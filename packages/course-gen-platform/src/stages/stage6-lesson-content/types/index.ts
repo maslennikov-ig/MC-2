@@ -1,5 +1,6 @@
 import type { LessonSpecificationV2 } from '@megacampus/shared-types/lesson-specification-v2';
 import type { LessonContent, RAGChunk } from '@megacampus/shared-types/lesson-content';
+import type { CourseStyle } from '@megacampus/shared-types/style-prompts';
 
 /**
  * Stage 6 job input structure
@@ -37,7 +38,7 @@ export interface Stage6JobInput {
    * @example 'professional' - Business formal, concise, authoritative
    * @default 'professional' (fallback in getStylePrompt when null/undefined)
    */
-  style?: string;
+  style?: CourseStyle;
 }
 
 /**

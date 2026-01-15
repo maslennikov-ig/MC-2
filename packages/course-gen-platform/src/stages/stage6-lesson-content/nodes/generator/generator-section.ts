@@ -14,7 +14,12 @@ import {
   type SectionSpecV2,
   type LessonSpecificationV2,
 } from '@megacampus/shared-types/lesson-specification-v2';
-import { getLanguageName, getTokenMultiplier, getStylePrompt } from '@megacampus/shared-types';
+import {
+  getLanguageName,
+  getTokenMultiplier,
+  getStylePrompt,
+  DEFAULT_COURSE_STYLE,
+} from '@megacampus/shared-types';
 import type { RAGChunk } from '@megacampus/shared-types/lesson-content';
 import { createPromptService } from '@/shared/prompts/prompt-service';
 import { formatRAGContextXML, filterChunksForSection } from '@/shared/prompts';
@@ -88,8 +93,17 @@ export async function generateSection(
   // Calculate maxTokens dynamically
   const maxTokens = calculateMaxTokensForSection(lessonSpec, section, language);
 
-  // Get style prompt for content generation
-  const stylePrompt = getStylePrompt(style);
+  // Get style prompt for content generation (with defensive fallback)
+  let stylePrompt: string;
+  try {
+    stylePrompt = getStylePrompt(style);
+  } catch (error) {
+    logger.warn(
+      { style, error: error instanceof Error ? error.message : String(error) },
+      'Failed to get style prompt, using default'
+    );
+    stylePrompt = getStylePrompt(DEFAULT_COURSE_STYLE);
+  }
 
   logger.debug(
     {

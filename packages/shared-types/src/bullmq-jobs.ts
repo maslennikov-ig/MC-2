@@ -11,6 +11,7 @@
 
 import { z } from 'zod';
 import { languageSchema } from './common-enums';
+import { CourseStyleSchema } from './style-prompts';
 
 // ============================================================================
 // Job Type Enum
@@ -290,7 +291,7 @@ export const LessonContentJobDataSchema = BaseJobDataSchema.extend({
    * @example 'professional' // Business formal, concise, authoritative
    * @default 'professional' (fallback in getStylePrompt)
    */
-  style: z.string().optional(),
+  style: CourseStyleSchema.optional(),
 });
 
 export type LessonContentJobData = z.infer<typeof LessonContentJobDataSchema>;
