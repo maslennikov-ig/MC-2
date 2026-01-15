@@ -28,6 +28,7 @@ import { DEFAULT_MODEL_ID, MODEL_DEFAULTS } from '@megacampus/shared-types';
 import { createModelConfigService } from './model-config-service';
 import logger from '../logger';
 import { getOpenRouterApiKey, getApiKeySync } from '../services/api-key-service';
+import type { LanguageCode } from '../utils/language-utils';
 
 /**
  * OpenRouter API base URL
@@ -376,6 +377,8 @@ export async function createOpenRouterModelAsync(
  *
  * @param phase - Analysis phase identifier
  * @param courseId - Optional course UUID for course-specific overrides
+ * @param tokenCount - Optional token count for tier selection
+ * @param language - Optional language code (LanguageCode: 'ru', 'en', or any ISO 639-1 code)
  * @returns Configured ChatOpenAI instance
  *
  * @throws Error if database lookup fails and no hardcoded fallback exists
@@ -395,7 +398,7 @@ export async function getModelForPhase(
   phase: PhaseName,
   courseId?: string,
   tokenCount?: number,
-  language?: string // Supports 'ru', 'en', or any other (uses 'any' reserve settings as fallback)
+  language?: LanguageCode
 ): Promise<ChatOpenAI> {
   try {
     const config = await modelConfigService.getModelForPhase(phase, courseId, tokenCount, language);

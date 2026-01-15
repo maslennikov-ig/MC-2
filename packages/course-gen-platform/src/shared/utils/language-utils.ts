@@ -11,6 +11,53 @@
 
 import { logger } from '../logger';
 
+// ============================================================================
+// TYPE DEFINITIONS
+// ============================================================================
+
+/**
+ * Language code type with known values + extensibility
+ *
+ * Known codes get autocomplete, but any 2-char string is valid.
+ * Uses branded type pattern for flexibility.
+ */
+export type SupportedLanguage =
+  | 'ru'
+  | 'en'
+  | 'zh'
+  | 'es'
+  | 'fr'
+  | 'de'
+  | 'ja'
+  | 'ko'
+  | 'ar'
+  | 'pt'
+  | 'it'
+  | 'tr'
+  | 'vi'
+  | 'th'
+  | 'id'
+  | 'ms'
+  | 'hi'
+  | 'bn'
+  | 'pl';
+
+/**
+ * Language code - known codes or any 2-char ISO 639-1 string
+ *
+ * The `string & {}` pattern allows TypeScript to accept any string while
+ * still providing autocomplete for known SupportedLanguage values.
+ */
+export type LanguageCode = SupportedLanguage | (string & {});
+
+/**
+ * Language for database lookups - only ru/en have specific configs
+ *
+ * Used in model config service for language-specific reserve percentages.
+ * The 'any' value is used as a universal fallback for other languages.
+ */
+export type ReserveLanguage = 'ru' | 'en' | 'any';
+
 /**
  * Language code normalization map (ISO 639-1)
  * Supports both 2-char codes and full names for backward compatibility
@@ -93,8 +140,8 @@ export const LANGUAGE_FALLBACK = 'any' as const;
  * ```
  */
 export function normalizeLanguageCode(
-  language: string | undefined,
-  defaultLang: string = 'en'
+  language: LanguageCode | undefined,
+  defaultLang: SupportedLanguage = 'en'
 ): string {
   if (!language) {
     return defaultLang;
@@ -172,7 +219,7 @@ export function normalizeLanguageCode(
  * normalizeLanguageForReserve(undefined)   // → 'en'
  * ```
  */
-export function normalizeLanguageForReserve(language: string | undefined): 'ru' | 'en' | 'any' {
+export function normalizeLanguageForReserve(language: LanguageCode | undefined): ReserveLanguage {
   const normalized = normalizeLanguageCode(language, 'en');
   if (normalized === 'ru' || normalized === 'en') {
     return normalized;
