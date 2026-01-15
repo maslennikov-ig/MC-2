@@ -378,14 +378,28 @@ export function LogTable({
                       </span>
                     </td>
                     {/* Course */}
-                    <td className="hidden p-4 align-middle lg:table-cell">
+                    <td
+                      className="hidden p-4 align-middle lg:table-cell"
+                      onClick={(e) => e.stopPropagation()}
+                    >
                       {item.courseId ? (
-                        <span
-                          className="text-muted-foreground font-mono text-xs"
-                          title={item.courseId}
-                        >
-                          {item.courseId.substring(0, 8)}...
-                        </span>
+                        <div className="flex flex-col gap-1">
+                          {/* Course name or ID */}
+                          <span className="text-sm font-medium" title={item.courseId}>
+                            {item.courseName || `Course ${item.courseId.substring(0, 8)}...`}
+                          </span>
+                          {/* Links */}
+                          <div className="flex gap-2">
+                            <a
+                              href={`/ru/workflow/${item.courseId}`}
+                              target="_blank"
+                              rel="noopener noreferrer"
+                              className="text-primary text-xs hover:underline"
+                            >
+                              Workflow →
+                            </a>
+                          </div>
+                        </div>
                       ) : (
                         <span className="text-muted-foreground">-</span>
                       )}
