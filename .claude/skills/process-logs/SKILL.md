@@ -1,7 +1,7 @@
 ---
 name: process-logs
 description: Process error logs from admin panel - fetch new errors, analyze, create tasks, fix, and mark resolved
-version: 1.2.0
+version: 1.3.0
 ---
 
 # Process Error Logs
@@ -53,6 +53,38 @@ bd update <task_id> --status=in_progress
 ```
 mcp__context7__resolve-library-id → mcp__context7__query-docs
 ```
+
+### 4. BUG FIXING PRINCIPLES
+
+> **This is PRODUCTION. Every bug matters.**
+
+**Fix fundamentally, not superficially:**
+
+- Find and fix the ROOT CAUSE, not just symptoms
+- If error happens in function X but cause is in function Y → fix Y
+- Don't add workarounds/hacks that mask the problem
+- Ask: "Why did this happen?" until you reach the actual cause
+
+**Never ignore errors:**
+
+- Every error indicates a real problem
+- "Works most of the time" is NOT acceptable
+- External service errors → add retry logic or graceful degradation
+- Config warnings → fix config or make truly optional
+
+**Propose improvements:**
+
+- If you see code that could be better → create separate Beads task
+- If fix reveals related issues → document them
+- If pattern repeats → suggest refactoring to prevent future bugs
+- Format: `bd create --type=chore --title="Improve: <description>"`
+
+**Quality over speed:**
+
+- Take time to understand the full context
+- Test the fix mentally: "What else could break?"
+- Check for similar patterns elsewhere in codebase
+- One good fix > multiple quick patches
 
 ## Usage
 
