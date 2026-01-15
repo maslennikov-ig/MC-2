@@ -22,22 +22,29 @@ bd create --type=bug --priority=<1-3> --title="Fix: <error_message>" --files "<r
 bd update <task_id> --status=in_progress
 ```
 
-### 2. SUBAGENTS ARE MANDATORY FOR COMPLEX TASKS
+### 2. TASK COMPLEXITY ROUTING
 
-**Use Task tool to delegate.** You are the ORCHESTRATOR, not the implementer.
+**Route tasks by complexity:**
 
-**MUST delegate when:**
+| Complexity  | Examples                              | Action                   |
+| ----------- | ------------------------------------- | ------------------------ |
+| **Simple**  | Typo fix, single import, config value | Execute directly         |
+| **Medium**  | Multi-file fix, migration, API change | **Delegate to subagent** |
+| **Complex** | Architecture change, new feature      | Ask user first           |
 
-- Error requires migration or DB changes → `database-architect`
-- Error in API/tRPC code → `fullstack-nextjs-specialist`
-- Error involves complex types → `typescript-types-specialist`
-- Error in UI components → `nextjs-ui-designer`
+**Subagent selection for MEDIUM tasks:**
 
-**Execute directly ONLY when:**
+- DB/migration → `database-architect`
+- API/tRPC → `fullstack-nextjs-specialist`
+- Types → `typescript-types-specialist`
+- UI → `nextjs-ui-designer`
 
-- Single-line config fix
-- Simple import correction
-- Trivial typo fix
+**Execute directly for SIMPLE tasks:**
+
+- Single-line fix (typo, wrong value)
+- Import path correction
+- Config constant change
+- Comment fix
 
 ### 3. CONTEXT7 IS MANDATORY
 
