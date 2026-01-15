@@ -30,9 +30,9 @@ import { courseLevelSchema, type CourseLevel } from './common-enums';
  * @see specs/008-generation-generation-json/research-decisions/rt-007-bloom-taxonomy-validation-improvements.md (lines 600-890)
  */
 export enum ValidationSeverity {
-  ERROR = "error",      // Blocks saving/progression
-  WARNING = "warning",  // Logs but allows progression
-  INFO = "info"         // Monitoring only, no blocking
+  ERROR = 'error', // Blocks saving/progression
+  WARNING = 'warning', // Logs but allows progression
+  INFO = 'info', // Monitoring only, no blocking
 }
 
 /**
@@ -42,19 +42,20 @@ export enum ValidationSeverity {
  * including quality scores, issues categorization, and LLM-friendly suggestions.
  */
 export interface ValidationResult {
-  passed: boolean;              // Overall pass/fail status
+  passed: boolean; // Overall pass/fail status
   severity: ValidationSeverity; // Severity level of this validation
-  score: number;                // Quality score 0.0-1.0
-  issues?: string[];            // ERROR-level issues (blocks progression)
-  warnings?: string[];          // WARNING-level issues (logs only)
-  info?: string[];              // INFO-level messages (monitoring)
-  suggestion?: string;          // LLM-friendly retry suggestion
-  metadata?: {                  // Optional metadata for debugging
-    rule?: string;              // Rule name that triggered this result
-    level?: string;             // Bloom's level (for taxonomy validation)
-    verb?: string;              // Extracted verb (for taxonomy validation)
+  score: number; // Quality score 0.0-1.0
+  issues?: string[]; // ERROR-level issues (blocks progression)
+  warnings?: string[]; // WARNING-level issues (logs only)
+  info?: string[]; // INFO-level messages (monitoring)
+  suggestion?: string; // LLM-friendly retry suggestion
+  metadata?: {
+    // Optional metadata for debugging
+    rule?: string; // Rule name that triggered this result
+    level?: string; // Bloom's level (for taxonomy validation)
+    verb?: string; // Extracted verb (for taxonomy validation)
     expected?: { min: number; max: number }; // Expected range (for duration validation)
-    actual?: number;            // Actual value (for duration validation)
+    actual?: number; // Actual value (for duration validation)
   };
 }
 
@@ -89,13 +90,29 @@ export interface ValidationResult {
  */
 const NON_MEASURABLE_VERBS_BLACKLIST = {
   en: [
-    'understand', 'know', 'learn', 'appreciate', 'be aware of',
-    'be familiar with', 'grasp', 'comprehend', 'realize',
-    'recognize', 'become acquainted with',
+    'understand',
+    'know',
+    'learn',
+    'appreciate',
+    'be aware of',
+    'be familiar with',
+    'grasp',
+    'comprehend',
+    'realize',
+    'recognize',
+    'become acquainted with',
   ],
   ru: [
-    'понимать', 'знать', 'изучать', 'осознавать', 'быть знакомым с',
-    'постигать', 'усваивать', 'разбираться', 'осмыслять', 'овладевать',
+    'понимать',
+    'знать',
+    'изучать',
+    'осознавать',
+    'быть знакомым с',
+    'постигать',
+    'усваивать',
+    'разбираться',
+    'осмыслять',
+    'овладевать',
   ],
 } as const;
 
@@ -104,20 +121,162 @@ const NON_MEASURABLE_VERBS_BLACKLIST = {
  */
 const BLOOMS_TAXONOMY_WHITELIST = {
   en: {
-    remember: ['define', 'list', 'recall', 'recognize', 'identify', 'name', 'state', 'describe', 'label', 'match', 'select', 'reproduce', 'cite', 'memorize'],
-    understand: ['explain', 'summarize', 'paraphrase', 'classify', 'compare', 'contrast', 'interpret', 'exemplify', 'illustrate', 'infer', 'predict', 'discuss'],
-    apply: ['execute', 'implement', 'solve', 'use', 'demonstrate', 'operate', 'calculate', 'complete', 'show', 'examine', 'modify'],
-    analyze: ['differentiate', 'organize', 'attribute', 'deconstruct', 'distinguish', 'examine', 'experiment', 'question', 'test', 'investigate'],
-    evaluate: ['check', 'critique', 'judge', 'hypothesize', 'argue', 'defend', 'support', 'assess', 'rate', 'recommend'],
-    create: ['design', 'construct', 'plan', 'produce', 'invent', 'develop', 'formulate', 'assemble', 'compose', 'devise'],
+    remember: [
+      'define',
+      'list',
+      'recall',
+      'recognize',
+      'identify',
+      'name',
+      'state',
+      'describe',
+      'label',
+      'match',
+      'select',
+      'reproduce',
+      'cite',
+      'memorize',
+    ],
+    understand: [
+      'explain',
+      'summarize',
+      'paraphrase',
+      'classify',
+      'compare',
+      'contrast',
+      'interpret',
+      'exemplify',
+      'illustrate',
+      'infer',
+      'predict',
+      'discuss',
+    ],
+    apply: [
+      'execute',
+      'implement',
+      'solve',
+      'use',
+      'demonstrate',
+      'operate',
+      'calculate',
+      'complete',
+      'show',
+      'examine',
+      'modify',
+    ],
+    analyze: [
+      'differentiate',
+      'organize',
+      'attribute',
+      'deconstruct',
+      'distinguish',
+      'examine',
+      'experiment',
+      'question',
+      'test',
+      'investigate',
+    ],
+    evaluate: [
+      'check',
+      'critique',
+      'judge',
+      'hypothesize',
+      'argue',
+      'defend',
+      'support',
+      'assess',
+      'rate',
+      'recommend',
+    ],
+    create: [
+      'design',
+      'construct',
+      'plan',
+      'produce',
+      'invent',
+      'develop',
+      'formulate',
+      'assemble',
+      'compose',
+      'devise',
+    ],
   },
   ru: {
-    remember: ['определить', 'перечислить', 'вспомнить', 'распознать', 'идентифицировать', 'назвать', 'утверждать', 'описать', 'обозначить', 'сопоставить', 'выбрать', 'воспроизвести', 'цитировать'],
-    understand: ['объяснить', 'резюмировать', 'перефразировать', 'классифицировать', 'сравнить', 'противопоставить', 'интерпретировать', 'проиллюстрировать', 'сделать вывод', 'предсказать', 'обсудить'],
-    apply: ['выполнить', 'реализовать', 'решить', 'использовать', 'продемонстрировать', 'оперировать', 'вычислить', 'завершить', 'показать', 'исследовать', 'модифицировать'],
-    analyze: ['дифференцировать', 'организовать', 'атрибутировать', 'деконструировать', 'различить', 'изучить', 'экспериментировать', 'задать вопрос', 'тестировать'],
-    evaluate: ['проверить', 'критиковать', 'судить', 'выдвинуть гипотезу', 'аргументировать', 'защитить', 'поддержать', 'оценить', 'рекомендовать'],
-    create: ['спроектировать', 'сконструировать', 'спланировать', 'произвести', 'изобрести', 'разработать', 'сформулировать', 'собрать', 'составить', 'придумать'],
+    remember: [
+      'определить',
+      'перечислить',
+      'вспомнить',
+      'распознать',
+      'идентифицировать',
+      'назвать',
+      'утверждать',
+      'описать',
+      'обозначить',
+      'сопоставить',
+      'выбрать',
+      'воспроизвести',
+      'цитировать',
+    ],
+    understand: [
+      'объяснить',
+      'резюмировать',
+      'перефразировать',
+      'классифицировать',
+      'сравнить',
+      'противопоставить',
+      'интерпретировать',
+      'проиллюстрировать',
+      'сделать вывод',
+      'предсказать',
+      'обсудить',
+    ],
+    apply: [
+      'выполнить',
+      'реализовать',
+      'решить',
+      'использовать',
+      'продемонстрировать',
+      'оперировать',
+      'вычислить',
+      'завершить',
+      'показать',
+      'исследовать',
+      'модифицировать',
+    ],
+    analyze: [
+      'дифференцировать',
+      'организовать',
+      'атрибутировать',
+      'деконструировать',
+      'различить',
+      'изучить',
+      'экспериментировать',
+      'задать вопрос',
+      'тестировать',
+    ],
+    evaluate: [
+      'проверить',
+      'критиковать',
+      'судить',
+      'выдвинуть гипотезу',
+      'аргументировать',
+      'защитить',
+      'поддержать',
+      'оценить',
+      'рекомендовать',
+    ],
+    create: [
+      'спроектировать',
+      'сконструировать',
+      'спланировать',
+      'произвести',
+      'изобрести',
+      'разработать',
+      'сформулировать',
+      'собрать',
+      'составить',
+      'придумать',
+    ],
   },
 } as const;
 
@@ -156,7 +315,7 @@ const PLACEHOLDER_PATTERNS = [
   /^\s*$/,
 
   // ✅ Numeric placeholders
-  /\b(N|X|Y|Z)\s+(students|hours|modules|студентов|часов|модулей)\b/i
+  /\b(N|X|Y|Z)\s+(students|hours|modules|студентов|часов|модулей)\b/i,
 ] as const;
 
 /**
@@ -215,7 +374,12 @@ function hasNonMeasurableVerb(text: string, language: string): boolean {
   // Only EN and RU have non-measurable verb blacklists
   if (language === 'en' || language === 'ru') {
     const blacklist = NON_MEASURABLE_VERBS_BLACKLIST[language];
-    return blacklist.some(verb => lowerText.includes(verb.toLowerCase()));
+    // RT-007 P6: Use word boundaries to avoid false positives
+    // e.g., "распознать" should NOT match "знать" (it contains "знать" as substring)
+    return blacklist.some(verb => {
+      const pattern = new RegExp(`\\b${verb.toLowerCase()}\\b`, 'u');
+      return pattern.test(lowerText);
+    });
   }
 
   // Other languages: no check (assume measurable)
@@ -230,13 +394,13 @@ function hasNonMeasurableVerb(text: string, language: string): boolean {
  */
 function isIntentionalTemplateVariable(text: string): boolean {
   const intentionalContextPatterns = [
-    /используйте\s+(переменн|шаблон|перемен)/i,     // Russian: "используйте переменные/шаблон"
-    /use\s+(variable|template|placeholder)/i,        // English: "use variables/template"
-    /подставьте\s+(значени|данн)/i,                 // Russian: "подставьте значения/данные"
-    /заполните\s+шаблон/i,                          // Russian: "заполните шаблон"
-    /fill\s+in\s+the\s+(template|placeholder)/i,    // English: "fill in the template"
-    /переменные:/i,                                  // Russian: "переменные:" (list follows)
-    /variables:/i,                                   // English: "variables:" (list follows)
+    /используйте\s+(переменн|шаблон|перемен)/i, // Russian: "используйте переменные/шаблон"
+    /use\s+(variable|template|placeholder)/i, // English: "use variables/template"
+    /подставьте\s+(значени|данн)/i, // Russian: "подставьте значения/данные"
+    /заполните\s+шаблон/i, // Russian: "заполните шаблон"
+    /fill\s+in\s+the\s+(template|placeholder)/i, // English: "fill in the template"
+    /переменные:/i, // Russian: "переменные:" (list follows)
+    /variables:/i, // English: "variables:" (list follows)
   ];
 
   return intentionalContextPatterns.some(pattern => pattern.test(text));
@@ -262,7 +426,7 @@ function getPlaceholderMatches(text: string): Array<{ pattern: RegExp; match: st
     if (match) {
       matches.push({
         pattern,
-        match: match[0] // The actual matched text
+        match: match[0], // The actual matched text
       });
     }
   }
@@ -306,7 +470,7 @@ function scanForPlaceholders(obj: unknown, path: string = ''): PlaceholderIssue[
         path,
         matchedText: match,
         matchedPattern: pattern.source,
-        patternIndex: PLACEHOLDER_PATTERNS.indexOf(pattern)
+        patternIndex: PLACEHOLDER_PATTERNS.indexOf(pattern),
       });
     }
   } else if (Array.isArray(obj)) {
@@ -330,7 +494,7 @@ function scanForPlaceholders(obj: unknown, path: string = ''): PlaceholderIssue[
  *
  * Reference: INV-2025-11-19-001-duration-fields-architecture.md (Section 4)
  */
- 
+
 function calculateExpectedDuration(
   topicCount: number,
   objectiveCount: number,
@@ -345,7 +509,7 @@ function calculateExpectedDuration(
 
   return {
     min: Math.ceil(baseMin), // Don't multiply minimum - allows flexibility for all difficulty levels
-    max: Math.ceil(baseMax * multiplier) // Only multiply maximum to account for advanced content depth
+    max: Math.ceil(baseMax * multiplier), // Only multiply maximum to account for advanced content depth
   };
 }
 
@@ -361,14 +525,12 @@ function calculateExpectedDuration(
  */
 // @ts-expect-error TS6133 - Kept for potential future use
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
-function validateDurationProportionality(
-  lesson: {
-    key_topics: string[];
-    lesson_objectives: unknown[];
-    estimated_duration_minutes: number;
-    difficulty_level?: 'beginner' | 'intermediate' | 'advanced';
-  }
-): { passed: boolean; issues?: string[]; warnings?: string[] } {
+function validateDurationProportionality(lesson: {
+  key_topics: string[];
+  lesson_objectives: unknown[];
+  estimated_duration_minutes: number;
+  difficulty_level?: 'beginner' | 'intermediate' | 'advanced';
+}): { passed: boolean; issues?: string[]; warnings?: string[] } {
   const topicCount = lesson.key_topics.length;
   const objectiveCount = lesson.lesson_objectives.length;
   const actualDuration = lesson.estimated_duration_minutes;
@@ -382,7 +544,9 @@ function validateDurationProportionality(
   if (actualDuration < expected.min) {
     return {
       passed: false,
-      issues: [`Duration too short: ${actualDuration} min (expected ${expected.min}-${expected.max} min for ${lesson.difficulty_level || 'intermediate'} level)`]
+      issues: [
+        `Duration too short: ${actualDuration} min (expected ${expected.min}-${expected.max} min for ${lesson.difficulty_level || 'intermediate'} level)`,
+      ],
     };
   }
 
@@ -390,12 +554,16 @@ function validateDurationProportionality(
 
   if (actualDuration > expected.max) {
     // Exceeding max is OK for complex topics - add informational warning
-    warnings.push(`Duration exceeds max: ${actualDuration} min (expected ${expected.min}-${expected.max} min). This is OK for complex topics.`);
+    warnings.push(
+      `Duration exceeds max: ${actualDuration} min (expected ${expected.min}-${expected.max} min). This is OK for complex topics.`
+    );
   }
 
   if (actualDuration > ENGAGEMENT_CAP) {
     // Exceeding engagement cap - add recommendation
-    warnings.push(`Duration exceeds engagement cap: ${actualDuration} min (cap: ${ENGAGEMENT_CAP} min). Consider adding breaks or splitting into shorter segments for better learner engagement.`);
+    warnings.push(
+      `Duration exceeds engagement cap: ${actualDuration} min (cap: ${ENGAGEMENT_CAP} min). Consider adding breaks or splitting into shorter segments for better learner engagement.`
+    );
   }
 
   return { passed: true, warnings: warnings.length > 0 ? warnings : undefined };
@@ -434,22 +602,25 @@ export const EXERCISE_TYPES_LEGACY = [
  * recommends TEXT with CHECK constraints over PostgreSQL ENUMs for LLM-generated fields.
  */
 export const PracticalExerciseSchema = z.object({
-  exercise_type: z.string()
+  exercise_type: z
+    .string()
     .min(3, 'Exercise type description too short (minimum 3 characters)')
     .describe(
       'Description of the exercise type and activities (minimum 3 characters). ' +
-      'For simple exercises, use brief labels (10-30 chars): "case study analysis", "role-play scenario", "hands-on lab". ' +
-      'For complex multi-step exercises, provide detailed instructions (50-150+ chars recommended): ' +
-      '"Watch video introduction, complete individual practice tasks, then participate in small group ' +
-      'discussion to compare solutions and approaches, followed by peer feedback session". ' +
-      'Be specific about format, interaction model, and learning activities. ' +
-      'Examples: "visual aids presentation", "group discussion with moderator", "interactive simulation", ' +
-      '"peer assessment activity", "reflective journal with guided questions".'
+        'For simple exercises, use brief labels (10-30 chars): "case study analysis", "role-play scenario", "hands-on lab". ' +
+        'For complex multi-step exercises, provide detailed instructions (50-150+ chars recommended): ' +
+        '"Watch video introduction, complete individual practice tasks, then participate in small group ' +
+        'discussion to compare solutions and approaches, followed by peer feedback session". ' +
+        'Be specific about format, interaction model, and learning activities. ' +
+        'Examples: "visual aids presentation", "group discussion with moderator", "interactive simulation", ' +
+        '"peer assessment activity", "reflective journal with guided questions".'
     ),
-  exercise_title: z.string()
+  exercise_title: z
+    .string()
     .min(5, 'Exercise title too short (min 5 chars)')
     .max(300, 'Exercise title too long (max 300 chars - FR-022)'),
-  exercise_description: z.string()
+  exercise_description: z
+    .string()
     .min(10, 'Exercise description too short (min 10 chars)')
     .max(1500, 'Exercise description too long (max 1500 chars - FR-022)'),
 });
@@ -465,12 +636,12 @@ export type PracticalExercise = z.infer<typeof PracticalExerciseSchema>;
  * Revised taxonomy (Anderson & Krathwohl, 2001)
  */
 export const BloomCognitiveLevelSchema = z.enum([
-  'remember',   // Level 1: Recall facts (list, name, identify)
+  'remember', // Level 1: Recall facts (list, name, identify)
   'understand', // Level 2: Explain ideas (explain, summarize, interpret)
-  'apply',      // Level 3: Use in new context (demonstrate, implement, execute)
-  'analyze',    // Level 4: Break into parts (compare, differentiate, examine)
-  'evaluate',   // Level 5: Make judgments (assess, critique, justify)
-  'create',     // Level 6: Produce new work (design, develop, construct)
+  'apply', // Level 3: Use in new context (demonstrate, implement, execute)
+  'analyze', // Level 4: Break into parts (compare, differentiate, examine)
+  'evaluate', // Level 5: Make judgments (assess, critique, justify)
+  'create', // Level 6: Produce new work (design, develop, construct)
 ]);
 
 export type BloomCognitiveLevel = z.infer<typeof BloomCognitiveLevelSchema>;
@@ -481,25 +652,25 @@ export type BloomCognitiveLevel = z.infer<typeof BloomCognitiveLevelSchema>;
  * Matches SUPPORTED_LANGUAGES from packages/web/lib/validation/course.ts
  */
 export const SupportedLanguageSchema = z.enum([
-  'ru',  // Russian (Русский)
-  'en',  // English (Английский)
-  'zh',  // Chinese Simplified (简体中文)
-  'es',  // Spanish (Español)
-  'fr',  // French (Français)
-  'de',  // German (Deutsch)
-  'ja',  // Japanese (日本語)
-  'ko',  // Korean (한국어)
-  'ar',  // Arabic (العربية)
-  'pt',  // Portuguese (Português)
-  'it',  // Italian (Italiano)
-  'tr',  // Turkish (Türkçe)
-  'vi',  // Vietnamese (Tiếng Việt)
-  'th',  // Thai (ไทย)
-  'id',  // Indonesian (Bahasa Indonesia)
-  'ms',  // Malay (Bahasa Melayu)
-  'hi',  // Hindi (हिन्दी)
-  'bn',  // Bengali (বাংলা)
-  'pl'   // Polish (Polski)
+  'ru', // Russian (Русский)
+  'en', // English (Английский)
+  'zh', // Chinese Simplified (简体中文)
+  'es', // Spanish (Español)
+  'fr', // French (Français)
+  'de', // German (Deutsch)
+  'ja', // Japanese (日本語)
+  'ko', // Korean (한국어)
+  'ar', // Arabic (العربية)
+  'pt', // Portuguese (Português)
+  'it', // Italian (Italiano)
+  'tr', // Turkish (Türkçe)
+  'vi', // Vietnamese (Tiếng Việt)
+  'th', // Thai (ไทย)
+  'id', // Indonesian (Bahasa Indonesia)
+  'ms', // Malay (Bahasa Melayu)
+  'hi', // Hindi (हिन्दी)
+  'bn', // Bengali (বাংলা)
+  'pl', // Polish (Polski)
 ]);
 
 export type SupportedLanguage = z.infer<typeof SupportedLanguageSchema>;
@@ -513,20 +684,25 @@ export type SupportedLanguage = z.infer<typeof SupportedLanguageSchema>;
  */
 const LearningObjectiveBaseSchema = z.object({
   id: z.string().uuid(),
-  text: z.string()
+  text: z
+    .string()
     .min(10, 'Learning objective too short (min 10 chars)')
     .max(500, 'Learning objective too long (max 500 chars)'),
-  language: SupportedLanguageSchema.describe('Language for Bloom\'s taxonomy validation (19 languages supported)'),
-  cognitiveLevel: BloomCognitiveLevelSchema
-    .optional()
-    .describe('Bloom\'s taxonomy cognitive level (auto-detected from action verb)'),
-  estimatedDuration: z.number()
+  language: SupportedLanguageSchema.describe(
+    "Language for Bloom's taxonomy validation (19 languages supported)"
+  ),
+  cognitiveLevel: BloomCognitiveLevelSchema.optional().describe(
+    "Bloom's taxonomy cognitive level (auto-detected from action verb)"
+  ),
+  estimatedDuration: z
+    .number()
     .int()
     .min(5, 'Objective duration too short (min 5 minutes per RT-006)')
     .max(15, 'Objective duration too long (max 15 minutes per RT-006)')
     .optional()
     .describe('Estimated time to achieve objective (5-15 min per RT-006 P1)'),
-  targetAudienceLevel: z.enum(['beginner', 'intermediate', 'advanced'])
+  targetAudienceLevel: z
+    .enum(['beginner', 'intermediate', 'advanced'])
     .optional()
     .describe('Target learner level for complexity validation'),
 });
@@ -547,13 +723,12 @@ const LearningObjectiveBaseSchema = z.object({
  * - research-decisions/rt-006-bloom-taxonomy-validation.md
  * - research-decisions/rt-007-bloom-taxonomy-validation-improvements.md
  */
-export const LearningObjectiveSchema = LearningObjectiveBaseSchema
-  .refine(
-    (obj) => !hasNonMeasurableVerb(obj.text, obj.language),
-    (obj) => ({
-      message: `Non-measurable verb detected in "${obj.text}". Cannot verify learning through assessment.`,
-    })
-  );
+export const LearningObjectiveSchema = LearningObjectiveBaseSchema.refine(
+  obj => !hasNonMeasurableVerb(obj.text, obj.language),
+  obj => ({
+    message: `Non-measurable verb detected in "${obj.text}". Cannot verify learning through assessment.`,
+  })
+);
 
 export type LearningObjective = z.infer<typeof LearningObjectiveSchema>;
 
@@ -575,7 +750,9 @@ export const LearningObjectiveWithoutInjectedFieldsSchema = LearningObjectiveBas
   language: true,
 });
 
-export type LearningObjectiveWithoutInjectedFields = z.infer<typeof LearningObjectiveWithoutInjectedFieldsSchema>;
+export type LearningObjectiveWithoutInjectedFields = z.infer<
+  typeof LearningObjectiveWithoutInjectedFieldsSchema
+>;
 
 // ============================================================================
 // LESSON SCHEMA (FR-011 - Technical Specifications)
@@ -593,34 +770,44 @@ export type LearningObjectiveWithoutInjectedFields = z.infer<typeof LearningObje
 const LessonBaseSchema = z.object({
   // Identification
   lesson_number: z.number().int().min(0).describe('Lesson number (start from 1)'),
-  lesson_title: z.string()
+  lesson_title: z
+    .string()
     .min(5, 'Lesson title too short (min 5 chars)')
     .max(500, 'Lesson title too long (max 500 chars - FR-022)'),
 
   // Technical specifications for Stage 6 lesson generation (FR-011)
-  lesson_objectives: z.array(z.string().min(10).max(600))
+  lesson_objectives: z
+    .array(z.string().min(10).max(600))
     .min(1, 'At least 1 learning objective required')
     .max(5, 'Maximum 5 learning objectives per lesson')
-    .describe('Specific learning objectives for this lesson (simple strings per spec data-model.md, min 10 chars, CRITICAL for Stage 6)'),
+    .describe(
+      'Specific learning objectives for this lesson (simple strings per spec data-model.md, min 10 chars, CRITICAL for Stage 6)'
+    ),
 
-  key_topics: z.array(z.string().min(5).max(300))
+  key_topics: z
+    .array(z.string().min(5).max(300))
     .min(2, 'At least 2 key topics required')
     .max(10, 'Maximum 10 key topics per lesson')
     .describe('Key topics covered in this lesson (CRITICAL for Stage 6)'),
 
-  estimated_duration_minutes: z.number()
+  estimated_duration_minutes: z
+    .number()
     .int()
     .min(3, 'Duration too short (min 3 minutes)')
     .max(45, 'Duration too long (max 45 minutes)')
     .describe('Estimated time to complete this lesson (3-45 minutes)'),
 
   // RT-007 P1: Difficulty level for duration multiplier
-  difficulty_level: z.enum(['beginner', 'intermediate', 'advanced'])
+  difficulty_level: z
+    .enum(['beginner', 'intermediate', 'advanced'])
     .optional()
-    .describe('Difficulty level affects duration expectations (beginner: 1.0x, intermediate: 1.5x, advanced: 2.0x)'),
+    .describe(
+      'Difficulty level affects duration expectations (beginner: 1.0x, intermediate: 1.5x, advanced: 2.0x)'
+    ),
 
   // Practical exercises (FR-010)
-  practical_exercises: z.array(PracticalExerciseSchema)
+  practical_exercises: z
+    .array(PracticalExerciseSchema)
     .min(3, 'At least 3 practical exercises required (FR-010)')
     .max(5, 'Maximum 5 practical exercises per lesson (FR-010)')
     .describe('3-5 practical exercises per lesson'),
@@ -670,21 +857,27 @@ export type Lesson = z.infer<typeof LessonSchema>;
 const SectionBaseSchemaForGeneration = z.object({
   // Identification
   section_number: z.number().int().min(0).describe('Section number (start from 1)'),
-  section_title: z.string()
+  section_title: z
+    .string()
     .min(10, 'Section title too short (min 10 chars)')
     .max(600, 'Section title too long (max 600 chars - FR-022)'),
-  section_description: z.string()
+  section_description: z
+    .string()
     .min(20, 'Section description too short (min 20 chars)')
     .max(2000, 'Section description too long (max 2000 chars - FR-022)'),
 
   // Pedagogical structure (FR-012)
-  learning_objectives: z.array(z.string().min(10).max(600))
+  learning_objectives: z
+    .array(z.string().min(10).max(600))
     .min(1, 'At least 1 section-level learning objective required')
     .max(5, 'Maximum 5 section-level learning objectives')
-    .describe('Section-level learning objectives (simple strings per spec data-model.md, min 10 chars, 1-5 items)'),
+    .describe(
+      'Section-level learning objectives (simple strings per spec data-model.md, min 10 chars, 1-5 items)'
+    ),
 
   // Nested lessons (WITHOUT duration - will be injected)
-  lessons: z.array(LessonWithoutInjectedFieldsSchema)
+  lessons: z
+    .array(LessonWithoutInjectedFieldsSchema)
     .min(1, 'At least 1 lesson required per section')
     .describe('Lessons within this section (minimum 1)'),
 });
@@ -710,26 +903,33 @@ export type SectionWithoutInjectedFields = z.infer<typeof SectionWithoutInjected
  *
  * Reference: INV-2025-11-19-001-duration-fields-architecture.md (Section 3)
  */
-export const SectionSchema = z.object({
-  section_number: z.number().int().positive(),
-  section_title: z.string()
-    .min(10, 'Section title too short (min 10 chars)')
-    .max(600, 'Section title too long (max 600 chars - FR-022)'),
-  section_description: z.string()
-    .min(20, 'Section description too short (min 20 chars)')
-    .max(2000, 'Section description too long (max 2000 chars - FR-022)'),
+export const SectionSchema = z
+  .object({
+    section_number: z.number().int().positive(),
+    section_title: z
+      .string()
+      .min(10, 'Section title too short (min 10 chars)')
+      .max(600, 'Section title too long (max 600 chars - FR-022)'),
+    section_description: z
+      .string()
+      .min(20, 'Section description too short (min 20 chars)')
+      .max(2000, 'Section description too long (max 2000 chars - FR-022)'),
 
-  learning_objectives: z.array(z.string().min(10).max(600))
-    .min(1, 'At least 1 section-level learning objective required')
-    .max(5, 'Maximum 5 section-level learning objectives')
-    .describe('Section-level learning objectives (simple strings per spec data-model.md, min 10 chars, 1-5 items)'),
+    learning_objectives: z
+      .array(z.string().min(10).max(600))
+      .min(1, 'At least 1 section-level learning objective required')
+      .max(5, 'Maximum 5 section-level learning objectives')
+      .describe(
+        'Section-level learning objectives (simple strings per spec data-model.md, min 10 chars, 1-5 items)'
+      ),
 
-  // Lessons with injected duration
-  lessons: z.array(LessonSchema)
-    .min(1, 'At least 1 lesson required per section')
-    .describe('Lessons within this section (minimum 1)'),
-})
-  .transform((section) => ({
+    // Lessons with injected duration
+    lessons: z
+      .array(LessonSchema)
+      .min(1, 'At least 1 lesson required per section')
+      .describe('Lessons within this section (minimum 1)'),
+  })
+  .transform(section => ({
     ...section,
     // Calculate section duration from lesson durations
     estimated_duration_minutes: section.lessons.reduce(
@@ -753,12 +953,9 @@ export type DifficultyLevel = CourseLevel;
 export const AssessmentStrategySchema = z.object({
   quiz_per_section: z.boolean().describe('Include quiz at end of each section'),
   final_exam: z.boolean().describe('Include comprehensive final exam'),
-  practical_projects: z.number()
-    .int()
-    .min(0)
-    .max(10)
-    .describe('Number of practical projects'),
-  assessment_description: z.string()
+  practical_projects: z.number().int().min(0).max(10).describe('Number of practical projects'),
+  assessment_description: z
+    .string()
     .min(10, 'Assessment description too short (min 10 chars)')
     .max(1500, 'Assessment description too long (max 1500 chars - FR-022)')
     .describe('Description of assessment approach (min 10 chars, spec recommends 50+)'),
@@ -777,68 +974,71 @@ export type AssessmentStrategy = z.infer<typeof AssessmentStrategySchema>;
  * - Minimum 10 lessons total across all sections
  * - Validation runs after structural checks pass
  */
-export const CourseStructureSchema = z.object({
-  // ========== METADATA ==========
+export const CourseStructureSchema = z
+  .object({
+    // ========== METADATA ==========
 
-  course_title: z.string()
-    .min(10, 'Course title too short (min 10 chars)')
-    .max(1000, 'Course title too long (max 1000 chars - FR-022)')
-    .describe('Course title (10-1000 characters)'),
+    course_title: z
+      .string()
+      .min(10, 'Course title too short (min 10 chars)')
+      .max(1000, 'Course title too long (max 1000 chars - FR-022)')
+      .describe('Course title (10-1000 characters)'),
 
-  course_description: z.string()
-    .min(20, 'Course description too short (min 20 chars)')
-    .max(3000, 'Course description too long (max 3000 chars - FR-022)')
-    .describe('Short course description, elevator pitch (20-3000 chars, spec recommends 50+)'),
+    course_description: z
+      .string()
+      .min(20, 'Course description too short (min 20 chars)')
+      .max(3000, 'Course description too long (max 3000 chars - FR-022)')
+      .describe('Short course description, elevator pitch (20-3000 chars, spec recommends 50+)'),
 
-  course_overview: z.string()
-    .min(30, 'Course overview too short (min 30 chars)')
-    .max(10000, 'Course overview too long (max 10000 chars - FR-022)')
-    .describe('Comprehensive course overview (30-10000 chars, spec recommends 100+)'),
+    course_overview: z
+      .string()
+      .min(30, 'Course overview too short (min 30 chars)')
+      .max(10000, 'Course overview too long (max 10000 chars - FR-022)')
+      .describe('Comprehensive course overview (30-10000 chars, spec recommends 100+)'),
 
-  target_audience: z.string()
-    .min(20, 'Target audience too short (min 20 chars)')
-    .max(1500, 'Target audience too long (max 1500 chars - FR-022)')
-    .describe('Description of target audience (20-1500 chars)'),
+    target_audience: z
+      .string()
+      .min(20, 'Target audience too short (min 20 chars)')
+      .max(1500, 'Target audience too long (max 1500 chars - FR-022)')
+      .describe('Description of target audience (20-1500 chars)'),
 
-  estimated_duration_hours: z.number()
-    .positive()
-    .describe('Total estimated duration in hours'),
+    estimated_duration_hours: z.number().positive().describe('Total estimated duration in hours'),
 
-  difficulty_level: DifficultyLevelSchema
-    .describe('Overall difficulty level'),
+    difficulty_level: DifficultyLevelSchema.describe('Overall difficulty level'),
 
-  prerequisites: z.array(z.string().min(10).max(600))
-    .min(0)
-    .max(10)
-    .describe('List of prerequisites (0-10 items, 10-600 chars each - FR-022)'),
+    prerequisites: z
+      .array(z.string().min(10).max(600))
+      .min(0)
+      .max(10)
+      .describe('List of prerequisites (0-10 items, 10-600 chars each - FR-022)'),
 
-  learning_outcomes: z.array(LearningObjectiveSchema)
-    .min(3, 'At least 3 course-level learning outcomes required')
-    .max(15, 'Maximum 15 course-level learning outcomes (FR-012)')
-    .describe('Course-level learning outcomes (3-15 items, RT-006 validated objects with cognitive levels)'),
+    learning_outcomes: z
+      .array(LearningObjectiveSchema)
+      .min(3, 'At least 3 course-level learning outcomes required')
+      .max(15, 'Maximum 15 course-level learning outcomes (FR-012)')
+      .describe(
+        'Course-level learning outcomes (3-15 items, RT-006 validated objects with cognitive levels)'
+      ),
 
-  assessment_strategy: AssessmentStrategySchema
-    .describe('Assessment approach and strategy'),
+    assessment_strategy: AssessmentStrategySchema.describe('Assessment approach and strategy'),
 
-  course_tags: z.array(z.string().min(3).max(150))
-    .min(5, 'At least 5 course tags required')
-    .max(20, 'Maximum 20 course tags')
-    .describe('Descriptive tags for course (5-20 tags, max 150 chars each - FR-022)'),
+    course_tags: z
+      .array(z.string().min(3).max(150))
+      .min(5, 'At least 5 course tags required')
+      .max(20, 'Maximum 20 course tags')
+      .describe('Descriptive tags for course (5-20 tags, max 150 chars each - FR-022)'),
 
-  // ========== HIERARCHY ==========
+    // ========== HIERARCHY ==========
 
-  sections: z.array(SectionSchema)
-    .min(1, 'At least 1 section required')
-    .describe('Course sections containing lessons'),
-
-})
+    sections: z
+      .array(SectionSchema)
+      .min(1, 'At least 1 section required')
+      .describe('Course sections containing lessons'),
+  })
   .refine(
-    (data) => {
+    data => {
       // FR-015: Validate minimum 10 lessons total across all sections
-      const totalLessons = data.sections.reduce(
-        (sum, section) => sum + section.lessons.length,
-        0
-      );
+      const totalLessons = data.sections.reduce((sum, section) => sum + section.lessons.length, 0);
       return totalLessons >= 10;
     },
     {
@@ -847,7 +1047,7 @@ export const CourseStructureSchema = z.object({
     }
   )
   .refine(
-    (structure) => {
+    structure => {
       // RT-006 P0: Validate no placeholders in course structure
       const issues = scanForPlaceholders(structure);
 
@@ -858,13 +1058,16 @@ export const CourseStructureSchema = z.object({
 
       return issues.length === 0;
     },
-    (structure) => {
+    structure => {
       const issues = scanForPlaceholders(structure);
 
       // Build detailed error message
-      const details = issues.map(issue =>
-        `${issue.path}: "${issue.matchedText}" (pattern #${issue.patternIndex}: ${issue.matchedPattern})`
-      ).join('; ');
+      const details = issues
+        .map(
+          issue =>
+            `${issue.path}: "${issue.matchedText}" (pattern #${issue.patternIndex}: ${issue.matchedPattern})`
+        )
+        .join('; ');
 
       return {
         message: `Placeholders detected: ${issues.length} issues. ${details}`,
@@ -884,52 +1087,59 @@ export type CourseStructure = z.infer<typeof CourseStructureSchema>;
  *
  * @see packages/course-gen-platform/src/services/stage5/metadata-generator.ts
  */
-export const CourseMetadataSchema = z.object({
-  course_title: z.string()
-    .min(10, 'Course title too short (min 10 chars)')
-    .max(1000, 'Course title too long (max 1000 chars - FR-022)')
-    .describe('Course title (10-1000 characters)'),
+export const CourseMetadataSchema = z
+  .object({
+    course_title: z
+      .string()
+      .min(10, 'Course title too short (min 10 chars)')
+      .max(1000, 'Course title too long (max 1000 chars - FR-022)')
+      .describe('Course title (10-1000 characters)'),
 
-  course_description: z.string()
-    .min(20, 'Course description too short (min 20 chars)')
-    .max(3000, 'Course description too long (max 3000 chars - FR-022)')
-    .describe('Short course description, elevator pitch (20-3000 chars, spec recommends 50+)'),
+    course_description: z
+      .string()
+      .min(20, 'Course description too short (min 20 chars)')
+      .max(3000, 'Course description too long (max 3000 chars - FR-022)')
+      .describe('Short course description, elevator pitch (20-3000 chars, spec recommends 50+)'),
 
-  course_overview: z.string()
-    .min(30, 'Course overview too short (min 30 chars)')
-    .max(10000, 'Course overview too long (max 10000 chars - FR-022)')
-    .describe('Comprehensive course overview (30-10000 chars, spec recommends 100+)'),
+    course_overview: z
+      .string()
+      .min(30, 'Course overview too short (min 30 chars)')
+      .max(10000, 'Course overview too long (max 10000 chars - FR-022)')
+      .describe('Comprehensive course overview (30-10000 chars, spec recommends 100+)'),
 
-  target_audience: z.string()
-    .min(20, 'Target audience too short (min 20 chars)')
-    .max(1500, 'Target audience too long (max 1500 chars - FR-022)')
-    .describe('Description of target audience (20-1500 chars)'),
+    target_audience: z
+      .string()
+      .min(20, 'Target audience too short (min 20 chars)')
+      .max(1500, 'Target audience too long (max 1500 chars - FR-022)')
+      .describe('Description of target audience (20-1500 chars)'),
 
-  estimated_duration_hours: z.number()
-    .positive()
-    .describe('Total estimated duration in hours'),
+    estimated_duration_hours: z.number().positive().describe('Total estimated duration in hours'),
 
-  difficulty_level: DifficultyLevelSchema
-    .describe('Overall difficulty level'),
+    difficulty_level: DifficultyLevelSchema.describe('Overall difficulty level'),
 
-  prerequisites: z.array(z.string().min(10).max(600))
-    .min(0)
-    .max(10)
-    .describe('List of prerequisites (0-10 items, 10-600 chars each - FR-022)'),
+    prerequisites: z
+      .array(z.string().min(10).max(600))
+      .min(0)
+      .max(10)
+      .describe('List of prerequisites (0-10 items, 10-600 chars each - FR-022)'),
 
-  learning_outcomes: z.array(LearningObjectiveSchema)
-    .min(3, 'At least 3 course-level learning outcomes required')
-    .max(15, 'Maximum 15 course-level learning outcomes (FR-012)')
-    .describe('Course-level learning outcomes (3-15 items, RT-006 validated objects with cognitive levels)'),
+    learning_outcomes: z
+      .array(LearningObjectiveSchema)
+      .min(3, 'At least 3 course-level learning outcomes required')
+      .max(15, 'Maximum 15 course-level learning outcomes (FR-012)')
+      .describe(
+        'Course-level learning outcomes (3-15 items, RT-006 validated objects with cognitive levels)'
+      ),
 
-  assessment_strategy: AssessmentStrategySchema
-    .describe('Assessment approach and strategy'),
+    assessment_strategy: AssessmentStrategySchema.describe('Assessment approach and strategy'),
 
-  course_tags: z.array(z.string().min(3).max(150))
-    .min(5, 'At least 5 course tags required')
-    .max(20, 'Maximum 20 course tags')
-    .describe('Descriptive tags for course (5-20 tags, max 150 chars each - FR-022)'),
-}).partial();
+    course_tags: z
+      .array(z.string().min(3).max(150))
+      .min(5, 'At least 5 course tags required')
+      .max(20, 'Maximum 20 course tags')
+      .describe('Descriptive tags for course (5-20 tags, max 150 chars each - FR-022)'),
+  })
+  .partial();
 
 export type CourseMetadata = z.infer<typeof CourseMetadataSchema>;
 
@@ -945,54 +1155,63 @@ export type CourseMetadata = z.infer<typeof CourseMetadataSchema>;
  * @see CourseMetadataSchema - Full schema with injected fields
  * @see LearningObjectiveWithoutInjectedFieldsSchema - Schema for individual outcomes without id/language
  */
-export const CourseMetadataWithoutInjectedFieldsSchema = z.object({
-  course_title: z.string()
-    .min(10, 'Course title too short (min 10 chars)')
-    .max(1000, 'Course title too long (max 1000 chars - FR-022)')
-    .describe('Course title (10-1000 characters)'),
+export const CourseMetadataWithoutInjectedFieldsSchema = z
+  .object({
+    course_title: z
+      .string()
+      .min(10, 'Course title too short (min 10 chars)')
+      .max(1000, 'Course title too long (max 1000 chars - FR-022)')
+      .describe('Course title (10-1000 characters)'),
 
-  course_description: z.string()
-    .min(20, 'Course description too short (min 20 chars)')
-    .max(3000, 'Course description too long (max 3000 chars - FR-022)')
-    .describe('Short course description, elevator pitch (20-3000 chars, spec recommends 50+)'),
+    course_description: z
+      .string()
+      .min(20, 'Course description too short (min 20 chars)')
+      .max(3000, 'Course description too long (max 3000 chars - FR-022)')
+      .describe('Short course description, elevator pitch (20-3000 chars, spec recommends 50+)'),
 
-  course_overview: z.string()
-    .min(30, 'Course overview too short (min 30 chars)')
-    .max(10000, 'Course overview too long (max 10000 chars - FR-022)')
-    .describe('Comprehensive course overview (30-10000 chars, spec recommends 100+)'),
+    course_overview: z
+      .string()
+      .min(30, 'Course overview too short (min 30 chars)')
+      .max(10000, 'Course overview too long (max 10000 chars - FR-022)')
+      .describe('Comprehensive course overview (30-10000 chars, spec recommends 100+)'),
 
-  target_audience: z.string()
-    .min(20, 'Target audience too short (min 20 chars)')
-    .max(1500, 'Target audience too long (max 1500 chars - FR-022)')
-    .describe('Description of target audience (20-1500 chars)'),
+    target_audience: z
+      .string()
+      .min(20, 'Target audience too short (min 20 chars)')
+      .max(1500, 'Target audience too long (max 1500 chars - FR-022)')
+      .describe('Description of target audience (20-1500 chars)'),
 
-  estimated_duration_hours: z.number()
-    .positive()
-    .describe('Total estimated duration in hours'),
+    estimated_duration_hours: z.number().positive().describe('Total estimated duration in hours'),
 
-  difficulty_level: DifficultyLevelSchema
-    .describe('Overall difficulty level'),
+    difficulty_level: DifficultyLevelSchema.describe('Overall difficulty level'),
 
-  prerequisites: z.array(z.string().min(10).max(600))
-    .min(0)
-    .max(10)
-    .describe('List of prerequisites (0-10 items, 10-600 chars each - FR-022)'),
+    prerequisites: z
+      .array(z.string().min(10).max(600))
+      .min(0)
+      .max(10)
+      .describe('List of prerequisites (0-10 items, 10-600 chars each - FR-022)'),
 
-  learning_outcomes: z.array(LearningObjectiveWithoutInjectedFieldsSchema)
-    .min(3, 'At least 3 course-level learning outcomes required')
-    .max(15, 'Maximum 15 course-level learning outcomes (FR-012)')
-    .describe('Course-level learning outcomes WITHOUT id/language (injected by code after validation)'),
+    learning_outcomes: z
+      .array(LearningObjectiveWithoutInjectedFieldsSchema)
+      .min(3, 'At least 3 course-level learning outcomes required')
+      .max(15, 'Maximum 15 course-level learning outcomes (FR-012)')
+      .describe(
+        'Course-level learning outcomes WITHOUT id/language (injected by code after validation)'
+      ),
 
-  assessment_strategy: AssessmentStrategySchema
-    .describe('Assessment approach and strategy'),
+    assessment_strategy: AssessmentStrategySchema.describe('Assessment approach and strategy'),
 
-  course_tags: z.array(z.string().min(3).max(150))
-    .min(5, 'At least 5 course tags required')
-    .max(20, 'Maximum 20 course tags')
-    .describe('Descriptive tags for course (5-20 tags, max 150 chars each - FR-022)'),
-}).partial();
+    course_tags: z
+      .array(z.string().min(3).max(150))
+      .min(5, 'At least 5 course tags required')
+      .max(20, 'Maximum 20 course tags')
+      .describe('Descriptive tags for course (5-20 tags, max 150 chars each - FR-022)'),
+  })
+  .partial();
 
-export type CourseMetadataWithoutInjectedFields = z.infer<typeof CourseMetadataWithoutInjectedFieldsSchema>;
+export type CourseMetadataWithoutInjectedFields = z.infer<
+  typeof CourseMetadataWithoutInjectedFieldsSchema
+>;
 
 // ============================================================================
 // GENERATION METADATA (FR-025)
@@ -1041,18 +1260,17 @@ export type Duration = z.infer<typeof DurationSchema>;
  * RT-004 validation thresholds for quality assurance
  */
 export const QualityScoresSchema = z.object({
-  metadata_similarity: z.number()
+  metadata_similarity: z
+    .number()
     .min(0)
     .max(1)
     .describe('Semantic similarity score for metadata (Jina-v3)'),
 
-  sections_similarity: z.array(z.number().min(0).max(1))
+  sections_similarity: z
+    .array(z.number().min(0).max(1))
     .describe('Semantic similarity scores per section batch'),
 
-  overall: z.number()
-    .min(0)
-    .max(1)
-    .describe('Overall quality score (weighted average)'),
+  overall: z.number().min(0).max(1).describe('Overall quality score (weighted average)'),
 });
 
 export type QualityScores = z.infer<typeof QualityScoresSchema>;
