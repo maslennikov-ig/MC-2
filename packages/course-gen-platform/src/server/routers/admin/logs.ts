@@ -148,6 +148,11 @@ export type LogDetails = UnifiedLogItem & {
   statusNotes: string | null;
   statusUpdatedBy: string | null;
   statusUpdatedAt: string | null;
+  // Enhanced context fields
+  requestId: string | null;
+  trpcPath: string | null;
+  trpcInput: Record<string, unknown> | null;
+  attemptedValue: string | null;
 };
 
 /**
@@ -313,8 +318,8 @@ export const logsRouter = router({
             severity: log.severity,
             message: log.error_message,
             source: log.job_type || null,
-            courseId: null, // error_logs doesn't have course_id
-            lessonId: null,
+            courseId: log.course_id || null,
+            lessonId: log.lesson_id || null,
             stage: null,
             phase: null,
             status: status?.status || 'new',
@@ -333,6 +338,11 @@ export const logsRouter = router({
             statusNotes: status?.notes || null,
             statusUpdatedBy: status?.updatedByEmail || null,
             statusUpdatedAt: status?.updated_at || null,
+            // Enhanced context fields
+            requestId: log.request_id || null,
+            trpcPath: log.trpc_path || null,
+            trpcInput: log.trpc_input as Record<string, unknown> | null,
+            attemptedValue: log.attempted_value || null,
           };
         } else {
           // generation_trace
@@ -386,6 +396,11 @@ export const logsRouter = router({
             statusNotes: status?.notes || null,
             statusUpdatedBy: status?.updatedByEmail || null,
             statusUpdatedAt: status?.updated_at || null,
+            // Enhanced context fields (not applicable for generation_trace)
+            requestId: null,
+            trpcPath: null,
+            trpcInput: null,
+            attemptedValue: null,
           };
         }
       } catch (error) {

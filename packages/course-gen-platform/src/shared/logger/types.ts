@@ -50,6 +50,117 @@ export interface ErrorLog {
   job_type: string | null;
   /** Additional metadata as JSONB (nullable) */
   metadata: Record<string, unknown> | null;
+  /** Course ID for course-related errors */
+  course_id: string | null;
+  /** Lesson ID for lesson-related errors */
+  lesson_id: string | null;
+  /** Request ID for tracing (nanoid) */
+  request_id: string | null;
+  /** tRPC procedure path */
+  trpc_path: string | null;
+  /** Sanitized tRPC input */
+  trpc_input: Record<string, unknown> | null;
+  /** Value that caused error (e.g. invalid status) */
+  attempted_value: string | null;
+}
+
+/**
+ * Standardized error context for logging
+ * Use this interface when calling logger.error() or logger.warn()
+ *
+ * @example
+ * ```typescript
+ * logger.error({
+ *   ...createErrorContext({
+ *     requestId: 'abc123',
+ *     courseId: course.id,
+ *     lessonId: lesson.id,
+ *     userId: ctx.user.id,
+ *     trpcPath: 'lessonContent.approveLesson',
+ *     trpcInput: { courseId, lessonId },
+ *     attemptedValue: 'approved',
+ *   }),
+ *   err: error.message,
+ * }, 'Failed to approve lesson');
+ * ```
+ */
+export interface ErrorContext {
+  /** Unique request ID for tracing */
+  requestId?: string;
+  /** Course ID if error is course-related */
+  courseId?: string;
+  /** Lesson ID if error is lesson-related */
+  lessonId?: string;
+  /** User ID who triggered the action */
+  userId?: string;
+  /** Organization ID */
+  organizationId?: string;
+  /** tRPC procedure path */
+  trpcPath?: string;
+  /** Sanitized tRPC input (remove sensitive fields) */
+  trpcInput?: Record<string, unknown>;
+  /** Value that was attempted (for constraint violations) */
+  attemptedValue?: string;
+  /** Current value before change attempt */
+  currentValue?: string;
+  /** BullMQ job ID */
+  jobId?: string;
+  /** Job type */
+  jobType?: string;
+  /** Error object or message */
+  err?: unknown;
+  /** Additional context */
+  [key: string]: unknown;
+}
+
+/**
+ * Helper to create standardized error context
+ * Ensures consistent field names across the codebase
+ */
+export function createErrorContext(ctx: ErrorContext): Record<string, unknown> {
+  const result: Record<string, unknown> = {};
+
+  if (ctx.requestId) result.requestId = ctx.requestId;
+  if (ctx.courseId) result.courseId = ctx.courseId;
+  if (ctx.lessonId) result.lessonId = ctx.lessonId;
+  if (ctx.userId) result.userId = ctx.userId;
+  if (ctx.organizationId) result.organizationId = ctx.organizationId;
+  if (ctx.trpcPath) result.trpcPath = ctx.trpcPath;
+  if (ctx.trpcInput) result.trpcInput = sanitizeTrpcInput(ctx.trpcInput);
+  if (ctx.attemptedValue) result.attemptedValue = ctx.attemptedValue;
+  if (ctx.currentValue) result.currentValue = ctx.currentValue;
+  if (ctx.jobId) result.jobId = ctx.jobId;
+  if (ctx.jobType) result.jobType = ctx.jobType;
+  if (ctx.err) result.err = ctx.err;
+
+  // Copy any additional fields
+  for (const [key, value] of Object.entries(ctx)) {
+    if (!(key in result) && value !== undefined) {
+      result[key] = value;
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Sanitize tRPC input by removing sensitive fields
+ */
+function sanitizeTrpcInput(input: Record<string, unknown>): Record<string, unknown> {
+  const sensitiveKeys = ['password', 'token', 'secret', 'apiKey', 'api_key', 'authorization'];
+  const result: Record<string, unknown> = {};
+
+  for (const [key, value] of Object.entries(input)) {
+    if (sensitiveKeys.some(k => key.toLowerCase().includes(k))) {
+      result[key] = '[REDACTED]';
+    } else if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
+      result[key] = sanitizeTrpcInput(value as Record<string, unknown>);
+    } else {
+      result[key] = value;
+    }
+  }
+
+  return result;
 }
 
 /**
@@ -82,4 +193,16 @@ export interface CreateErrorLogParams {
   job_type?: string;
   /** Additional metadata (optional) */
   metadata?: Record<string, unknown>;
+  /** Course ID for course-related errors */
+  course_id?: string;
+  /** Lesson ID for lesson-related errors */
+  lesson_id?: string;
+  /** Request ID for tracing */
+  request_id?: string;
+  /** tRPC procedure path */
+  trpc_path?: string;
+  /** Sanitized tRPC input */
+  trpc_input?: Record<string, unknown>;
+  /** Value that caused the error */
+  attempted_value?: string;
 }

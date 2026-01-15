@@ -647,6 +647,8 @@ export type Database = {
       }
       error_logs: {
         Row: {
+          attempted_value: string | null
+          course_id: string | null
           created_at: string
           environment: string | null
           error_message: string
@@ -656,14 +658,20 @@ export type Database = {
           id: string
           job_id: string | null
           job_type: string | null
+          lesson_id: string | null
           metadata: Json | null
           organization_id: string | null
           problem_id: string | null
+          request_id: string | null
           severity: string
           stack_trace: string | null
+          trpc_input: Json | null
+          trpc_path: string | null
           user_id: string | null
         }
         Insert: {
+          attempted_value?: string | null
+          course_id?: string | null
           created_at?: string
           environment?: string | null
           error_message: string
@@ -673,14 +681,20 @@ export type Database = {
           id?: string
           job_id?: string | null
           job_type?: string | null
+          lesson_id?: string | null
           metadata?: Json | null
           organization_id?: string | null
           problem_id?: string | null
+          request_id?: string | null
           severity: string
           stack_trace?: string | null
+          trpc_input?: Json | null
+          trpc_path?: string | null
           user_id?: string | null
         }
         Update: {
+          attempted_value?: string | null
+          course_id?: string | null
           created_at?: string
           environment?: string | null
           error_message?: string
@@ -690,14 +704,25 @@ export type Database = {
           id?: string
           job_id?: string | null
           job_type?: string | null
+          lesson_id?: string | null
           metadata?: Json | null
           organization_id?: string | null
           problem_id?: string | null
+          request_id?: string | null
           severity?: string
           stack_trace?: string | null
+          trpc_input?: Json | null
+          trpc_path?: string | null
           user_id?: string | null
         }
         Relationships: [
+          {
+            foreignKeyName: "error_logs_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
           {
             foreignKeyName: "error_logs_organization_id_fkey"
             columns: ["organization_id"]
@@ -3473,3 +3498,4 @@ export const Constants = {
     },
   },
 } as const
+
