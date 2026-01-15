@@ -89,7 +89,7 @@ export interface StructureAnalysisInput {
   document_summaries?: DocumentSummary[];
 
   /** User-selected course size preset (advisory) */
-  course_size?: 'mini' | 'compact' | 'standard' | 'comprehensive';
+  course_size?: 'micro' | 'mini' | 'compact' | 'standard' | 'comprehensive';
 
   /** Target lessons count from size preset (advisory) */
   target_lessons?: number;

@@ -63,6 +63,11 @@ export interface LogDetails extends UnifiedLogItem {
   statusNotes: string | null
   statusUpdatedBy: string | null
   statusUpdatedAt: string | null
+  // Enhanced context fields
+  requestId: string | null
+  trpcPath: string | null
+  trpcInput: Record<string, unknown> | null
+  attemptedValue: string | null
 }
 
 export interface LogListResponse {

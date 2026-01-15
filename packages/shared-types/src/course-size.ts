@@ -16,12 +16,20 @@ import type { Language } from './common-enums';
 /**
  * Course size options:
  * - auto: LLM decides optimal size based on topic (DEFAULT)
- * - mini: Quick overview, express introduction (~10 lessons)
- * - compact: Small focused course (~20 lessons)
- * - standard: Typical comprehensive course (~40 lessons)
- * - comprehensive: Large detailed course with advanced topics (~80 lessons)
+ * - micro: Minimal course for simple topics (1-5 lessons)
+ * - mini: Quick overview, express introduction (8-16 lessons)
+ * - compact: Small focused course (15-30 lessons)
+ * - standard: Typical comprehensive course (30-50 lessons)
+ * - comprehensive: Large detailed course with advanced topics (60-100 lessons)
  */
-export const COURSE_SIZES = ['auto', 'mini', 'compact', 'standard', 'comprehensive'] as const;
+export const COURSE_SIZES = [
+  'auto',
+  'micro',
+  'mini',
+  'compact',
+  'standard',
+  'comprehensive',
+] as const;
 
 /** Inferred CourseSize type from array */
 export type CourseSize = (typeof COURSE_SIZES)[number];
@@ -30,7 +38,13 @@ export type CourseSize = (typeof COURSE_SIZES)[number];
 export const courseSizeSchema = z.enum(COURSE_SIZES);
 
 /** Sizes that have explicit presets (excludes 'auto') */
-export const PRESET_COURSE_SIZES = ['mini', 'compact', 'standard', 'comprehensive'] as const;
+export const PRESET_COURSE_SIZES = [
+  'micro',
+  'mini',
+  'compact',
+  'standard',
+  'comprehensive',
+] as const;
 export type PresetCourseSize = (typeof PRESET_COURSE_SIZES)[number];
 
 // ============================================================================
@@ -58,6 +72,17 @@ export interface CourseSizePreset {
  * Note: 'auto' is not included - it means LLM decides without guidance
  */
 export const COURSE_SIZE_PRESETS: Record<PresetCourseSize, CourseSizePreset> = {
+  micro: {
+    size: 'micro',
+    targetLessons: 3,
+    targetSections: 1,
+    estimatedHoursMin: 0.25,
+    estimatedHoursMax: 1,
+    llmGuidance:
+      'Create a minimal micro-course with 1-5 lessons in 1 section. ' +
+      'This is for very simple topics that need only the absolute essentials. ' +
+      'Cover only the core concept - no background, no advanced topics, just the minimum viable knowledge.',
+  },
   mini: {
     size: 'mini',
     targetLessons: 10,
@@ -65,7 +90,7 @@ export const COURSE_SIZE_PRESETS: Record<PresetCourseSize, CourseSizePreset> = {
     estimatedHoursMin: 1,
     estimatedHoursMax: 3,
     llmGuidance:
-      'Create a quick overview course with approximately 10 lessons in 3 sections. ' +
+      'Create a quick overview course with 8-16 lessons in 3 sections. ' +
       'Focus on essential concepts only - this is an express introduction, not comprehensive coverage. ' +
       'Keep explanations concise and skip advanced topics.',
   },
@@ -76,7 +101,7 @@ export const COURSE_SIZE_PRESETS: Record<PresetCourseSize, CourseSizePreset> = {
     estimatedHoursMin: 3,
     estimatedHoursMax: 8,
     llmGuidance:
-      'Create a compact course with approximately 20 lessons in 5 sections. ' +
+      'Create a compact course with 15-30 lessons in 4-6 sections. ' +
       'Cover core concepts with moderate depth. Include practical examples but avoid extensive case studies. ' +
       'Skip very advanced or niche topics.',
   },
@@ -87,7 +112,7 @@ export const COURSE_SIZE_PRESETS: Record<PresetCourseSize, CourseSizePreset> = {
     estimatedHoursMin: 8,
     estimatedHoursMax: 20,
     llmGuidance:
-      'Create a standard-sized course with approximately 40 lessons in 8 sections. ' +
+      'Create a standard-sized course with 30-50 lessons in 6-10 sections. ' +
       'Provide thorough coverage with practical examples, exercises, and some advanced topics. ' +
       'Balance breadth and depth appropriately for the subject matter.',
   },
@@ -98,7 +123,7 @@ export const COURSE_SIZE_PRESETS: Record<PresetCourseSize, CourseSizePreset> = {
     estimatedHoursMin: 20,
     estimatedHoursMax: 50,
     llmGuidance:
-      'Create a comprehensive course with approximately 80 lessons in 15 sections. ' +
+      'Create a comprehensive course with 60-100 lessons in 12-18 sections. ' +
       'Provide in-depth coverage including advanced topics, extensive examples, case studies, and practical projects. ' +
       'Include edge cases, best practices, and expert-level insights.',
   },
@@ -128,20 +153,21 @@ export const COURSE_SIZE_LABELS: Record<Language, Record<CourseSize, CourseSizeL
       subtitle: 'ИИ-анализ',
       description: 'Размер на основе анализа темы',
     },
-    mini: { title: 'Экспресс', subtitle: '~10 уроков', description: 'Быстрый обзорный курс' },
+    micro: { title: 'Микро', subtitle: '1-5 уроков', description: 'Минимальный быстрый курс' },
+    mini: { title: 'Экспресс', subtitle: '8-16 уроков', description: 'Быстрый обзорный курс' },
     compact: {
       title: 'Компактный',
-      subtitle: '~20 уроков',
+      subtitle: '15-30 уроков',
       description: 'Небольшой фокусированный курс',
     },
     standard: {
       title: 'Стандартный',
-      subtitle: '~40 уроков',
+      subtitle: '30-50 уроков',
       description: 'Типичный полноценный курс',
     },
     comprehensive: {
       title: 'Полный',
-      subtitle: '~80 уроков',
+      subtitle: '60-100 уроков',
       description: 'Большой подробный курс',
     },
   },
@@ -151,25 +177,27 @@ export const COURSE_SIZE_LABELS: Record<Language, Record<CourseSize, CourseSizeL
       subtitle: 'AI Analysis',
       description: 'Size based on topic analysis',
     },
-    mini: { title: 'Express', subtitle: '~10 lessons', description: 'Quick overview course' },
-    compact: { title: 'Compact', subtitle: '~20 lessons', description: 'Small focused course' },
+    micro: { title: 'Micro', subtitle: '1-5 lessons', description: 'Minimal quick course' },
+    mini: { title: 'Express', subtitle: '8-16 lessons', description: 'Quick overview course' },
+    compact: { title: 'Compact', subtitle: '15-30 lessons', description: 'Small focused course' },
     standard: {
       title: 'Standard',
-      subtitle: '~40 lessons',
+      subtitle: '30-50 lessons',
       description: 'Typical comprehensive course',
     },
     comprehensive: {
       title: 'Comprehensive',
-      subtitle: '~80 lessons',
+      subtitle: '60-100 lessons',
       description: 'Large detailed course',
     },
   },
   zh: {
     auto: { title: '最优', subtitle: 'AI分析', description: '基于主题分析的大小' },
-    mini: { title: '速成', subtitle: '~10课', description: '快速概览课程' },
-    compact: { title: '精简', subtitle: '~20课', description: '小型专注课程' },
-    standard: { title: '标准', subtitle: '~40课', description: '典型完整课程' },
-    comprehensive: { title: '全面', subtitle: '~80课', description: '大型详细课程' },
+    micro: { title: '微型', subtitle: '1-5课', description: '最小快速课程' },
+    mini: { title: '速成', subtitle: '8-16课', description: '快速概览课程' },
+    compact: { title: '精简', subtitle: '15-30课', description: '小型专注课程' },
+    standard: { title: '标准', subtitle: '30-50课', description: '典型完整课程' },
+    comprehensive: { title: '全面', subtitle: '60-100课', description: '大型详细课程' },
   },
   es: {
     auto: {
@@ -177,20 +205,21 @@ export const COURSE_SIZE_LABELS: Record<Language, Record<CourseSize, CourseSizeL
       subtitle: 'Análisis IA',
       description: 'Tamaño basado en análisis del tema',
     },
-    mini: { title: 'Exprés', subtitle: '~10 lecciones', description: 'Curso de vista rápida' },
+    micro: { title: 'Micro', subtitle: '1-5 lecciones', description: 'Curso mínimo rápido' },
+    mini: { title: 'Exprés', subtitle: '8-16 lecciones', description: 'Curso de vista rápida' },
     compact: {
       title: 'Compacto',
-      subtitle: '~20 lecciones',
+      subtitle: '15-30 lecciones',
       description: 'Curso pequeño enfocado',
     },
     standard: {
       title: 'Estándar',
-      subtitle: '~40 lecciones',
+      subtitle: '30-50 lecciones',
       description: 'Curso completo típico',
     },
     comprehensive: {
       title: 'Completo',
-      subtitle: '~80 lecciones',
+      subtitle: '60-100 lecciones',
       description: 'Curso grande detallado',
     },
   },
@@ -200,12 +229,13 @@ export const COURSE_SIZE_LABELS: Record<Language, Record<CourseSize, CourseSizeL
       subtitle: 'Analyse IA',
       description: "Taille basée sur l'analyse du sujet",
     },
-    mini: { title: 'Express', subtitle: '~10 leçons', description: 'Cours aperçu rapide' },
-    compact: { title: 'Compact', subtitle: '~20 leçons', description: 'Petit cours ciblé' },
-    standard: { title: 'Standard', subtitle: '~40 leçons', description: 'Cours complet typique' },
+    micro: { title: 'Micro', subtitle: '1-5 leçons', description: 'Cours minimal rapide' },
+    mini: { title: 'Express', subtitle: '8-16 leçons', description: 'Cours aperçu rapide' },
+    compact: { title: 'Compact', subtitle: '15-30 leçons', description: 'Petit cours ciblé' },
+    standard: { title: 'Standard', subtitle: '30-50 leçons', description: 'Cours complet typique' },
     comprehensive: {
       title: 'Complet',
-      subtitle: '~80 leçons',
+      subtitle: '60-100 leçons',
       description: 'Grand cours détaillé',
     },
   },
@@ -215,43 +245,51 @@ export const COURSE_SIZE_LABELS: Record<Language, Record<CourseSize, CourseSizeL
       subtitle: 'KI-Analyse',
       description: 'Größe basierend auf Themenanalyse',
     },
-    mini: { title: 'Express', subtitle: '~10 Lektionen', description: 'Schneller Überblickskurs' },
+    micro: { title: 'Mikro', subtitle: '1-5 Lektionen', description: 'Minimaler Schnellkurs' },
+    mini: { title: 'Express', subtitle: '8-16 Lektionen', description: 'Schneller Überblickskurs' },
     compact: {
       title: 'Kompakt',
-      subtitle: '~20 Lektionen',
+      subtitle: '15-30 Lektionen',
       description: 'Kleiner fokussierter Kurs',
     },
     standard: {
       title: 'Standard',
-      subtitle: '~40 Lektionen',
+      subtitle: '30-50 Lektionen',
       description: 'Typischer umfassender Kurs',
     },
     comprehensive: {
       title: 'Umfassend',
-      subtitle: '~80 Lektionen',
+      subtitle: '60-100 Lektionen',
       description: 'Großer detaillierter Kurs',
     },
   },
   ja: {
     auto: { title: '最適', subtitle: 'AI分析', description: 'トピック分析に基づくサイズ' },
-    mini: { title: 'エクスプレス', subtitle: '~10レッスン', description: 'クイック概要コース' },
-    compact: { title: 'コンパクト', subtitle: '~20レッスン', description: '小規模集中コース' },
-    standard: { title: 'スタンダード', subtitle: '~40レッスン', description: '標準的な総合コース' },
-    comprehensive: { title: '総合', subtitle: '~80レッスン', description: '大規模詳細コース' },
+    micro: { title: 'マイクロ', subtitle: '1-5レッスン', description: '最小クイックコース' },
+    mini: { title: 'エクスプレス', subtitle: '8-16レッスン', description: 'クイック概要コース' },
+    compact: { title: 'コンパクト', subtitle: '15-30レッスン', description: '小規模集中コース' },
+    standard: {
+      title: 'スタンダード',
+      subtitle: '30-50レッスン',
+      description: '標準的な総合コース',
+    },
+    comprehensive: { title: '総合', subtitle: '60-100レッスン', description: '大規模詳細コース' },
   },
   ko: {
     auto: { title: '최적', subtitle: 'AI 분석', description: '주제 분석 기반 크기' },
-    mini: { title: '익스프레스', subtitle: '~10강', description: '빠른 개요 코스' },
-    compact: { title: '컴팩트', subtitle: '~20강', description: '소규모 집중 코스' },
-    standard: { title: '스탠다드', subtitle: '~40강', description: '일반 종합 코스' },
-    comprehensive: { title: '종합', subtitle: '~80강', description: '대규모 상세 코스' },
+    micro: { title: '마이크로', subtitle: '1-5강', description: '최소 빠른 코스' },
+    mini: { title: '익스프레스', subtitle: '8-16강', description: '빠른 개요 코스' },
+    compact: { title: '컴팩트', subtitle: '15-30강', description: '소규모 집중 코스' },
+    standard: { title: '스탠다드', subtitle: '30-50강', description: '일반 종합 코스' },
+    comprehensive: { title: '종합', subtitle: '60-100강', description: '대규모 상세 코스' },
   },
   ar: {
     auto: { title: 'الأمثل', subtitle: 'تحليل AI', description: 'الحجم بناءً على تحليل الموضوع' },
-    mini: { title: 'سريع', subtitle: '~10 دروس', description: 'دورة نظرة عامة سريعة' },
-    compact: { title: 'مختصر', subtitle: '~20 درس', description: 'دورة صغيرة مركزة' },
-    standard: { title: 'قياسي', subtitle: '~40 درس', description: 'دورة شاملة نموذجية' },
-    comprehensive: { title: 'شامل', subtitle: '~80 درس', description: 'دورة كبيرة مفصلة' },
+    micro: { title: 'مصغر', subtitle: '1-5 دروس', description: 'دورة سريعة بالحد الأدنى' },
+    mini: { title: 'سريع', subtitle: '8-16 درس', description: 'دورة نظرة عامة سريعة' },
+    compact: { title: 'مختصر', subtitle: '15-30 درس', description: 'دورة صغيرة مركزة' },
+    standard: { title: 'قياسي', subtitle: '30-50 درس', description: 'دورة شاملة نموذجية' },
+    comprehensive: { title: 'شامل', subtitle: '60-100 درس', description: 'دورة كبيرة مفصلة' },
   },
   pt: {
     auto: {
@@ -259,12 +297,13 @@ export const COURSE_SIZE_LABELS: Record<Language, Record<CourseSize, CourseSizeL
       subtitle: 'Análise IA',
       description: 'Tamanho baseado em análise do tema',
     },
-    mini: { title: 'Expresso', subtitle: '~10 aulas', description: 'Curso de visão geral rápida' },
-    compact: { title: 'Compacto', subtitle: '~20 aulas', description: 'Curso pequeno focado' },
-    standard: { title: 'Padrão', subtitle: '~40 aulas', description: 'Curso completo típico' },
+    micro: { title: 'Micro', subtitle: '1-5 aulas', description: 'Curso mínimo rápido' },
+    mini: { title: 'Expresso', subtitle: '8-16 aulas', description: 'Curso de visão geral rápida' },
+    compact: { title: 'Compacto', subtitle: '15-30 aulas', description: 'Curso pequeno focado' },
+    standard: { title: 'Padrão', subtitle: '30-50 aulas', description: 'Curso completo típico' },
     comprehensive: {
       title: 'Abrangente',
-      subtitle: '~80 aulas',
+      subtitle: '60-100 aulas',
       description: 'Curso grande detalhado',
     },
   },
@@ -274,25 +313,35 @@ export const COURSE_SIZE_LABELS: Record<Language, Record<CourseSize, CourseSizeL
       subtitle: 'Analisi IA',
       description: 'Dimensione basata su analisi del tema',
     },
-    mini: { title: 'Express', subtitle: '~10 lezioni', description: 'Corso panoramica rapida' },
+    micro: { title: 'Micro', subtitle: '1-5 lezioni', description: 'Corso minimo rapido' },
+    mini: { title: 'Express', subtitle: '8-16 lezioni', description: 'Corso panoramica rapida' },
     compact: {
       title: 'Compatto',
-      subtitle: '~20 lezioni',
+      subtitle: '15-30 lezioni',
       description: 'Piccolo corso focalizzato',
     },
-    standard: { title: 'Standard', subtitle: '~40 lezioni', description: 'Corso completo tipico' },
+    standard: {
+      title: 'Standard',
+      subtitle: '30-50 lezioni',
+      description: 'Corso completo tipico',
+    },
     comprehensive: {
       title: 'Completo',
-      subtitle: '~80 lezioni',
+      subtitle: '60-100 lezioni',
       description: 'Grande corso dettagliato',
     },
   },
   tr: {
     auto: { title: 'Optimal', subtitle: 'AI Analizi', description: 'Konu analizine dayalı boyut' },
-    mini: { title: 'Ekspres', subtitle: '~10 ders', description: 'Hızlı genel bakış kursu' },
-    compact: { title: 'Kompakt', subtitle: '~20 ders', description: 'Küçük odaklı kurs' },
-    standard: { title: 'Standart', subtitle: '~40 ders', description: 'Tipik kapsamlı kurs' },
-    comprehensive: { title: 'Kapsamlı', subtitle: '~80 ders', description: 'Büyük detaylı kurs' },
+    micro: { title: 'Mikro', subtitle: '1-5 ders', description: 'Minimum hızlı kurs' },
+    mini: { title: 'Ekspres', subtitle: '8-16 ders', description: 'Hızlı genel bakış kursu' },
+    compact: { title: 'Kompakt', subtitle: '15-30 ders', description: 'Küçük odaklı kurs' },
+    standard: { title: 'Standart', subtitle: '30-50 ders', description: 'Tipik kapsamlı kurs' },
+    comprehensive: {
+      title: 'Kapsamlı',
+      subtitle: '60-100 ders',
+      description: 'Büyük detaylı kurs',
+    },
   },
   vi: {
     auto: {
@@ -300,16 +349,17 @@ export const COURSE_SIZE_LABELS: Record<Language, Record<CourseSize, CourseSizeL
       subtitle: 'Phân tích AI',
       description: 'Kích thước dựa trên phân tích chủ đề',
     },
-    mini: { title: 'Tốc hành', subtitle: '~10 bài', description: 'Khóa học tổng quan nhanh' },
-    compact: { title: 'Gọn', subtitle: '~20 bài', description: 'Khóa học nhỏ tập trung' },
+    micro: { title: 'Siêu nhỏ', subtitle: '1-5 bài', description: 'Khóa học tối thiểu nhanh' },
+    mini: { title: 'Tốc hành', subtitle: '8-16 bài', description: 'Khóa học tổng quan nhanh' },
+    compact: { title: 'Gọn', subtitle: '15-30 bài', description: 'Khóa học nhỏ tập trung' },
     standard: {
       title: 'Tiêu chuẩn',
-      subtitle: '~40 bài',
+      subtitle: '30-50 bài',
       description: 'Khóa học toàn diện điển hình',
     },
     comprehensive: {
       title: 'Toàn diện',
-      subtitle: '~80 bài',
+      subtitle: '60-100 bài',
       description: 'Khóa học lớn chi tiết',
     },
   },
@@ -319,16 +369,17 @@ export const COURSE_SIZE_LABELS: Record<Language, Record<CourseSize, CourseSizeL
       subtitle: 'AI วิเคราะห์',
       description: 'ขนาดจากการวิเคราะห์หัวข้อ',
     },
-    mini: { title: 'ด่วน', subtitle: '~10 บทเรียน', description: 'หลักสูตรภาพรวมด่วน' },
+    micro: { title: 'ไมโคร', subtitle: '1-5 บทเรียน', description: 'หลักสูตรขั้นต่ำเร็ว' },
+    mini: { title: 'ด่วน', subtitle: '8-16 บทเรียน', description: 'หลักสูตรภาพรวมด่วน' },
     compact: {
       title: 'กะทัดรัด',
-      subtitle: '~20 บทเรียน',
+      subtitle: '15-30 บทเรียน',
       description: 'หลักสูตรขนาดเล็กเน้นเฉพาะ',
     },
-    standard: { title: 'มาตรฐาน', subtitle: '~40 บทเรียน', description: 'หลักสูตรครบถ้วนทั่วไป' },
+    standard: { title: 'มาตรฐาน', subtitle: '30-50 บทเรียน', description: 'หลักสูตรครบถ้วนทั่วไป' },
     comprehensive: {
       title: 'ครอบคลุม',
-      subtitle: '~80 บทเรียน',
+      subtitle: '60-100 บทเรียน',
       description: 'หลักสูตรใหญ่ละเอียด',
     },
   },
@@ -338,16 +389,21 @@ export const COURSE_SIZE_LABELS: Record<Language, Record<CourseSize, CourseSizeL
       subtitle: 'Analisis AI',
       description: 'Ukuran berdasarkan analisis topik',
     },
-    mini: { title: 'Kilat', subtitle: '~10 pelajaran', description: 'Kursus tinjauan cepat' },
-    compact: { title: 'Ringkas', subtitle: '~20 pelajaran', description: 'Kursus kecil terfokus' },
+    micro: { title: 'Mikro', subtitle: '1-5 pelajaran', description: 'Kursus cepat minimal' },
+    mini: { title: 'Kilat', subtitle: '8-16 pelajaran', description: 'Kursus tinjauan cepat' },
+    compact: {
+      title: 'Ringkas',
+      subtitle: '15-30 pelajaran',
+      description: 'Kursus kecil terfokus',
+    },
     standard: {
       title: 'Standar',
-      subtitle: '~40 pelajaran',
+      subtitle: '30-50 pelajaran',
       description: 'Kursus lengkap tipikal',
     },
     comprehensive: {
       title: 'Lengkap',
-      subtitle: '~80 pelajaran',
+      subtitle: '60-100 pelajaran',
       description: 'Kursus besar terperinci',
     },
   },
@@ -357,29 +413,35 @@ export const COURSE_SIZE_LABELS: Record<Language, Record<CourseSize, CourseSizeL
       subtitle: 'Analisis AI',
       description: 'Saiz berdasarkan analisis topik',
     },
+    micro: { title: 'Mikro', subtitle: '1-5 pelajaran', description: 'Kursus pantas minimum' },
     mini: {
       title: 'Ekspres',
-      subtitle: '~10 pelajaran',
+      subtitle: '8-16 pelajaran',
       description: 'Kursus gambaran keseluruhan pantas',
     },
-    compact: { title: 'Padat', subtitle: '~20 pelajaran', description: 'Kursus kecil berfokus' },
+    compact: { title: 'Padat', subtitle: '15-30 pelajaran', description: 'Kursus kecil berfokus' },
     standard: {
       title: 'Standard',
-      subtitle: '~40 pelajaran',
+      subtitle: '30-50 pelajaran',
       description: 'Kursus lengkap tipikal',
     },
     comprehensive: {
       title: 'Menyeluruh',
-      subtitle: '~80 pelajaran',
+      subtitle: '60-100 pelajaran',
       description: 'Kursus besar terperinci',
     },
   },
   hi: {
     auto: { title: 'इष्टतम', subtitle: 'AI विश्लेषण', description: 'विषय विश्लेषण पर आधारित आकार' },
-    mini: { title: 'एक्सप्रेस', subtitle: '~10 पाठ', description: 'त्वरित अवलोकन पाठ्यक्रम' },
-    compact: { title: 'संक्षिप्त', subtitle: '~20 पाठ', description: 'छोटा केंद्रित पाठ्यक्रम' },
-    standard: { title: 'मानक', subtitle: '~40 पाठ', description: 'विशिष्ट व्यापक पाठ्यक्रम' },
-    comprehensive: { title: 'व्यापक', subtitle: '~80 पाठ', description: 'बड़ा विस्तृत पाठ्यक्रम' },
+    micro: { title: 'माइक्रो', subtitle: '1-5 पाठ', description: 'न्यूनतम त्वरित पाठ्यक्रम' },
+    mini: { title: 'एक्सप्रेस', subtitle: '8-16 पाठ', description: 'त्वरित अवलोकन पाठ्यक्रम' },
+    compact: { title: 'संक्षिप्त', subtitle: '15-30 पाठ', description: 'छोटा केंद्रित पाठ्यक्रम' },
+    standard: { title: 'मानक', subtitle: '30-50 पाठ', description: 'विशिष्ट व्यापक पाठ्यक्रम' },
+    comprehensive: {
+      title: 'व्यापक',
+      subtitle: '60-100 पाठ',
+      description: 'बड़ा विस्तृत पाठ्यक्रम',
+    },
   },
   bn: {
     auto: {
@@ -387,10 +449,19 @@ export const COURSE_SIZE_LABELS: Record<Language, Record<CourseSize, CourseSizeL
       subtitle: 'AI বিশ্লেষণ',
       description: 'বিষয় বিশ্লেষণের উপর ভিত্তি করে আকার',
     },
-    mini: { title: 'এক্সপ্রেস', subtitle: '~১০ পাঠ', description: 'দ্রুত ওভারভিউ কোর্স' },
-    compact: { title: 'সংক্ষিপ্ত', subtitle: '~২০ পাঠ', description: 'ছোট ফোকাসড কোর্স' },
-    standard: { title: 'স্ট্যান্ডার্ড', subtitle: '~৪০ পাঠ', description: 'সাধারণ সম্পূর্ণ কোর্স' },
-    comprehensive: { title: 'বিস্তারিত', subtitle: '~৮০ পাঠ', description: 'বড় বিস্তারিত কোর্স' },
+    micro: { title: 'মাইক্রো', subtitle: '১-৫ পাঠ', description: 'ন্যূনতম দ্রুত কোর্স' },
+    mini: { title: 'এক্সপ্রেস', subtitle: '৮-১৬ পাঠ', description: 'দ্রুত ওভারভিউ কোর্স' },
+    compact: { title: 'সংক্ষিপ্ত', subtitle: '১৫-৩০ পাঠ', description: 'ছোট ফোকাসড কোর্স' },
+    standard: {
+      title: 'স্ট্যান্ডার্ড',
+      subtitle: '৩০-৫০ পাঠ',
+      description: 'সাধারণ সম্পূর্ণ কোর্স',
+    },
+    comprehensive: {
+      title: 'বিস্তারিত',
+      subtitle: '৬০-১০০ পাঠ',
+      description: 'বড় বিস্তারিত কোর্স',
+    },
   },
   pl: {
     auto: {
@@ -398,16 +469,17 @@ export const COURSE_SIZE_LABELS: Record<Language, Record<CourseSize, CourseSizeL
       subtitle: 'Analiza AI',
       description: 'Rozmiar oparty na analizie tematu',
     },
-    mini: { title: 'Ekspres', subtitle: '~10 lekcji', description: 'Szybki kurs przeglądowy' },
+    micro: { title: 'Mikro', subtitle: '1-5 lekcji', description: 'Minimalny szybki kurs' },
+    mini: { title: 'Ekspres', subtitle: '8-16 lekcji', description: 'Szybki kurs przeglądowy' },
     compact: {
       title: 'Kompaktowy',
-      subtitle: '~20 lekcji',
+      subtitle: '15-30 lekcji',
       description: 'Mały skoncentrowany kurs',
     },
-    standard: { title: 'Standardowy', subtitle: '~40 lekcji', description: 'Typowy pełny kurs' },
+    standard: { title: 'Standardowy', subtitle: '30-50 lekcji', description: 'Typowy pełny kurs' },
     comprehensive: {
       title: 'Kompleksowy',
-      subtitle: '~80 lekcji',
+      subtitle: '60-100 lekcji',
       description: 'Duży szczegółowy kurs',
     },
   },

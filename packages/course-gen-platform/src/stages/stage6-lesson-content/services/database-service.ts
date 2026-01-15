@@ -499,26 +499,28 @@ export async function checkAndSetStage6Complete(courseId: string): Promise<void>
       return;
     }
 
-    // Count lessons with generated content
-    // Join through sections to get all lessons for this course
-    const { data: lessonsData, error: lessonsError } = await supabaseAdmin
-      .from('lessons')
-      .select('id, content, section_id!inner(course_id)')
-      .eq('section_id.course_id', courseId)
+    // Count lessons with generated content from lesson_contents table
+    // lesson_contents has course_id directly, content stored as jsonb
+    const { data: contentsData, error: contentsError } = await supabaseAdmin
+      .from('lesson_contents')
+      .select('id, lesson_id')
+      .eq('course_id', courseId)
       .not('content', 'is', null);
 
-    if (lessonsError) {
+    if (contentsError) {
       logger.warn(
         {
           courseId,
-          error: lessonsError.message,
+          error: contentsError.message,
         },
         'Failed to count generated lessons'
       );
       return;
     }
 
-    const completedLessonsCount = lessonsData?.length || 0;
+    // Count unique lessons with content (there may be multiple content versions per lesson)
+    const uniqueLessonIds = new Set(contentsData?.map(c => c.lesson_id) || []);
+    const completedLessonsCount = uniqueLessonIds.size;
 
     logger.debug(
       {

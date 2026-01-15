@@ -17,14 +17,16 @@ import { logger } from '../../../../shared/logger/index.js';
  * Schema for lesson_contents.metadata JSONB column
  * Using passthrough() to preserve unknown fields
  */
-const LessonMetadataSchema = z.object({
-  cost_usd: z.number().optional(),
-  quality_score: z.number().optional(),
-  generation_duration_ms: z.number().optional(),
-  total_tokens: z.number().optional(),
-  approved_at: z.string().optional(),
-  approved_by: z.string().uuid().optional(),
-}).passthrough();
+const LessonMetadataSchema = z
+  .object({
+    cost_usd: z.number().optional(),
+    quality_score: z.number().optional(),
+    generation_duration_ms: z.number().optional(),
+    total_tokens: z.number().optional(),
+    approved_at: z.string().optional(),
+    approved_by: z.string().uuid().optional(),
+  })
+  .passthrough();
 
 /**
  * Safely parse metadata from Json type
@@ -170,7 +172,7 @@ export const approveLessons = protectedProcedure
           });
         }
 
-        lessonIds = lessons?.map((l) => l.id) || [];
+        lessonIds = lessons?.map(l => l.id) || [];
 
         if (lessonIds.length === 0) {
           logger.info({ requestId, courseId, moduleNumber }, 'No lessons found in module');
@@ -197,10 +199,7 @@ export const approveLessons = protectedProcedure
       const { count: skippedCount, error: countError } = await countQuery;
 
       if (countError) {
-        logger.error(
-          { requestId, error: countError.message },
-          'Failed to count skipped lessons'
-        );
+        logger.error({ requestId, error: countError.message }, 'Failed to count skipped lessons');
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
           message: 'Failed to count lessons',
@@ -236,20 +235,18 @@ export const approveLessons = protectedProcedure
         return { success: true, approvedCount: 0, skippedCount: skippedCount || 0 };
       }
 
-      // Step 5: Update all qualifying lessons with a single batch upsert
+      // Step 5: Update all qualifying lessons
       const now = new Date().toISOString();
 
-      // Build array of updates with pre-computed metadata (include required fields for upsert)
-      const updates = lessonsToApprove.map((lesson) => {
+      // Get IDs of lessons to approve
+      const lessonContentIds = lessonsToApprove.map(lesson => lesson.id);
+
+      // Build metadata updates for each lesson
+      const metadataUpdates = lessonsToApprove.map(lesson => {
         const currentMetadata = parseMetadata(lesson.metadata);
         const safeMetadata = getSafeMetadata(currentMetadata);
-
         return {
           id: lesson.id,
-          course_id: lesson.course_id,
-          lesson_id: lesson.lesson_id,
-          status: 'approved',
-          updated_at: now,
           metadata: {
             ...safeMetadata,
             approved_at: now,
@@ -258,15 +255,31 @@ export const approveLessons = protectedProcedure
         };
       });
 
-      // Single upsert for all lessons (O(1) instead of O(n) queries)
-      const { error: updateError, data: updatedLessons } = await supabase
-        .from('lesson_contents')
-        .upsert(updates, { onConflict: 'id' })
-        .select('id');
+      // Use raw SQL for efficient batch update with per-row metadata
+      // This is more efficient than N individual updates
+      const metadataJson = JSON.stringify(
+        metadataUpdates.reduce(
+          (acc, item) => {
+            acc[item.id] = item.metadata;
+            return acc;
+          },
+          {} as Record<string, unknown>
+        )
+      );
+
+      const { error: updateError, data: updatedLessons } = await supabase.rpc(
+        'batch_update_lesson_contents_status',
+        {
+          p_ids: lessonContentIds,
+          p_status: 'approved',
+          p_metadata_map: metadataJson,
+          p_updated_at: now,
+        }
+      );
 
       if (updateError) {
         logger.error(
-          { requestId, error: updateError.message, lessonCount: updates.length },
+          { requestId, error: updateError.message, lessonCount: lessonContentIds.length },
           'Failed to batch approve lessons'
         );
         throw new TRPCError({
@@ -275,7 +288,7 @@ export const approveLessons = protectedProcedure
         });
       }
 
-      const approvedCount = updatedLessons?.length ?? updates.length;
+      const approvedCount = updatedLessons ?? lessonContentIds.length;
 
       logger.info(
         {
