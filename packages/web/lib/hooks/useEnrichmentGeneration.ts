@@ -264,6 +264,11 @@ export function useEnrichmentGeneration({
 
   /**
    * Start generation for a specific enrichment type
+   *
+   * Uses optimistic UI update pattern:
+   * 1. Immediately shows loading state with temporary ID
+   * 2. Makes API request
+   * 3. Updates with real enrichmentId on success, or removes on failure
    */
   const startGeneration = useCallback(
     async (
@@ -274,6 +279,21 @@ export function useEnrichmentGeneration({
       if (generating.has(type)) {
         console.warn('[useEnrichmentGeneration] Generation already in progress for type:', type)
         return null
+      }
+
+      // OPTIMISTIC UPDATE: Immediately show loading state with temporary ID
+      const optimisticId = `optimistic-${type}-${Date.now()}`
+      if (mountedRef.current) {
+        setGenerating((prev) => {
+          const next = new Map(prev)
+          next.set(type, {
+            enrichmentId: optimisticId,
+            type,
+            progress: 0,
+            currentStep: 'queued',
+          })
+          return next
+        })
       }
 
       // Create AbortController for this request
@@ -300,6 +320,15 @@ export function useEnrichmentGeneration({
           const errorText = await response.text()
           console.error('[useEnrichmentGeneration] Generate failed:', errorText)
 
+          // ROLLBACK: Remove optimistic state on error
+          if (mountedRef.current) {
+            setGenerating((prev) => {
+              const next = new Map(prev)
+              next.delete(type)
+              return next
+            })
+          }
+
           // Try to parse error message from tRPC response
           let errorMessage = 'Failed to start generation'
           try {
@@ -319,11 +348,19 @@ export function useEnrichmentGeneration({
         const data = result.result?.data as GenerateOnDemandResponse | undefined
 
         if (!data?.enrichmentId) {
+          // ROLLBACK: Remove optimistic state on invalid response
+          if (mountedRef.current) {
+            setGenerating((prev) => {
+              const next = new Map(prev)
+              next.delete(type)
+              return next
+            })
+          }
           onError?.('Invalid response from server')
           return null
         }
 
-        // Add to generating map
+        // UPDATE: Replace optimistic ID with real enrichmentId
         if (mountedRef.current) {
           setGenerating((prev) => {
             const next = new Map(prev)
@@ -347,6 +384,15 @@ export function useEnrichmentGeneration({
         // Ignore abort errors
         if (error instanceof Error && error.name === 'AbortError') {
           return null
+        }
+
+        // ROLLBACK: Remove optimistic state on error
+        if (mountedRef.current) {
+          setGenerating((prev) => {
+            const next = new Map(prev)
+            next.delete(type)
+            return next
+          })
         }
 
         console.error('[useEnrichmentGeneration] Error:', error)

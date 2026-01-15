@@ -125,7 +125,7 @@ export const generateOnDemand = protectedProcedure
 
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
-          message: 'Failed to check existing enrichments',
+          message: 'Unable to verify existing enrichments. Please try again.',
         });
       }
 
@@ -184,7 +184,7 @@ export const generateOnDemand = protectedProcedure
 
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
-          message: 'Failed to create enrichment record',
+          message: 'Unable to create enrichment. Please try again later.',
         });
       }
 
@@ -242,7 +242,7 @@ export const generateOnDemand = protectedProcedure
 
       throw new TRPCError({
         code: 'INTERNAL_SERVER_ERROR',
-        message: 'Failed to generate enrichment',
+        message: 'Unable to start generation. Please try again later.',
       });
     }
   });

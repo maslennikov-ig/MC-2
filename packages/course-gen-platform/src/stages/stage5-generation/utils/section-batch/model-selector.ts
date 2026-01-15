@@ -6,6 +6,7 @@ import { getRagTokenBudget } from '../../../../services/global-settings-service'
 import logger from '@/shared/logger';
 import { ModelTier } from './types';
 import { MODELS, TOKEN_BUDGET, QUALITY_THRESHOLDS } from './constants';
+import { normalizeLanguageCode } from '@/shared/utils/language-utils';
 
 /**
  * Calculate complexity score for pre-routing (RT-001)
@@ -116,7 +117,7 @@ export async function selectModelTier(
     criticalityScore >= QUALITY_THRESHOLDS.criticality
   ) {
     try {
-      const langCode = language === 'ru' || language === 'russian' ? 'ru' : 'en';
+      const langCode = normalizeLanguageCode(language, 'en');
       const model = await getModelForPhase(
         'stage_5_sections',
         undefined,
@@ -149,7 +150,8 @@ export async function selectModelTier(
         error: error instanceof Error ? error.message : 'Unknown error',
       });
 
-      const isRussian = language === 'ru' || language === 'russian';
+      const langCode = normalizeLanguageCode(language, 'en');
+      const isRussian = langCode === 'ru';
       const model = isRussian ? MODELS.ru_lessons_primary : MODELS.en_lessons_primary;
       const tierName = isRussian ? 'tier2_ru_lessons' : 'tier2_en_lessons';
 

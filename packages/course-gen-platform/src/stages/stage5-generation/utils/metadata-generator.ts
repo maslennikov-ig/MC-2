@@ -28,6 +28,7 @@ import {
   getCategoryFromAnalysis,
   formatPedagogicalStrategyForPrompt,
 } from './analysis-formatters';
+import { normalizeLanguageCode } from '@/shared/utils/language-utils';
 import { validateQwen3MaxContext, estimateTokenCount } from '../../../shared/llm/cost-calculator';
 import { zodToPromptSchema } from '@/shared/utils/zod-to-prompt-schema';
 import { preprocessObject } from '@/shared/validation/preprocessing';
@@ -346,35 +347,9 @@ export class MetadataGenerator {
    * for backward compatibility with database records that store full names.
    */
   private extractLanguage(input: GenerationJobInput): string {
-    // Helper to convert language names to ISO 639-1 codes
-    // Same mapping as Stage 4 handler for consistency
-    const languageNameToCode: Record<string, string> = {
-      Russian: 'ru',
-      English: 'en',
-      Chinese: 'zh',
-      Spanish: 'es',
-      French: 'fr',
-      German: 'de',
-      Japanese: 'ja',
-      Korean: 'ko',
-      Arabic: 'ar',
-      Portuguese: 'pt',
-      Italian: 'it',
-      Turkish: 'tr',
-      Vietnamese: 'vi',
-      Thai: 'th',
-      Indonesian: 'id',
-      Malay: 'ms',
-      Hindi: 'hi',
-      Bengali: 'bn',
-      Polish: 'pl',
-    };
-
     // Priority 1: Explicit frontend parameter
     if (input.frontend_parameters.language) {
-      const rawLang = input.frontend_parameters.language;
-      // If it's already a 2-char ISO code, use it; otherwise convert from name
-      return rawLang.length === 2 ? rawLang : languageNameToCode[rawLang] || 'en';
+      return normalizeLanguageCode(input.frontend_parameters.language, 'en');
     }
 
     // Priority 2: Extract from contextual_language object (new schema)

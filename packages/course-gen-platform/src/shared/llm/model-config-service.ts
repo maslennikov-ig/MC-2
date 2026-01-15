@@ -28,6 +28,7 @@ import { getSupabaseAdmin } from '../supabase/admin';
 import logger from '../logger';
 import type { Database } from '@megacampus/shared-types';
 import { calculateContextThreshold, DEFAULT_CONTEXT_RESERVE } from '@megacampus/shared-types';
+import { normalizeLanguageForReserve } from '../utils/language-utils';
 import { DOCUMENT_SIZE_THRESHOLD, STAGE4_CONTEXT_THRESHOLD } from './model-selector';
 
 // ============================================================================
@@ -271,22 +272,6 @@ class StaleWhileRevalidateCache<T> {
 // ============================================================================
 // SERVICE IMPLEMENTATION
 // ============================================================================
-
-/**
- * Normalize language code for reserve percent lookup
- *
- * - Known languages ('ru', 'en') use their specific reserves
- * - Unknown languages fallback to 'any' reserve settings
- * - Undefined language defaults to 'en' (English)
- *
- * @param language - Language code or undefined
- * @returns Normalized language code for database lookup
- */
-function normalizeLanguageForReserve(language: string | undefined): string {
-  if (!language) return 'en'; // Default fallback to English
-  if (language === 'ru' || language === 'en') return language;
-  return 'any'; // Unknown language uses 'any' reserve
-}
 
 class ModelConfigServiceImpl {
   private stageCache = new StaleWhileRevalidateCache<ModelConfigResult>();
@@ -805,8 +790,9 @@ class ModelConfigServiceImpl {
     // This allows defining language-specific models while using 'any' as universal fallback
     const languagesToTry: Array<'ru' | 'en' | 'any'> = [language, 'any'];
 
-    for (const langToTry of languagesToTry) {
-      const { data, error } = await supabase
+    // Build parallel queries for all language variants (optimization: ~50-100ms saved per fallback)
+    const languageQueries = languagesToTry.map(langToTry =>
+      supabase
         .from('llm_model_config')
         .select()
         .eq('config_type', 'global')
@@ -814,7 +800,16 @@ class ModelConfigServiceImpl {
         .eq('language', langToTry)
         .eq('context_tier', tier)
         .eq('is_active', true)
-        .maybeSingle();
+        .maybeSingle()
+    );
+
+    // Execute all queries in parallel
+    const results = await Promise.all(languageQueries);
+
+    // Process results in priority order (first match wins)
+    for (let i = 0; i < results.length; i++) {
+      const { data, error } = results[i];
+      const langToTry = languagesToTry[i];
 
       if (error) {
         logger.warn(
@@ -879,58 +874,77 @@ class ModelConfigServiceImpl {
     // Cascading language lookup: specific language -> 'any' fallback
     const languagesToTry: Array<string> = language ? [language, 'any'] : ['any'];
 
-    // Priority 1: Course-specific override (with tier and language filter)
-    if (courseId) {
-      for (const langToTry of languagesToTry) {
-        const { data: courseOverride } = await supabase
-          .from('llm_model_config')
-          .select(
-            'model_id, fallback_model_id, temperature, max_tokens, max_context_tokens, quality_threshold, max_retries, timeout_ms, context_tier'
-          )
-          .eq('config_type', 'course_override')
-          .eq('course_id', courseId)
-          .eq('phase_name', phaseName)
-          .eq('language', langToTry)
-          .eq('context_tier', tier)
-          .eq('is_active', true)
-          .maybeSingle();
+    // Build all queries in parallel (optimization: ~50-100ms saved per sequential query)
+    // Priority order: course override (by language) > global config (by language)
+    const selectFields =
+      'model_id, fallback_model_id, temperature, max_tokens, max_context_tokens, quality_threshold, max_retries, timeout_ms, context_tier';
 
-        if (courseOverride) {
-          if (langToTry === 'any') {
-            logger.debug(
-              { phaseName, courseId, requestedLanguage: language, foundLanguage: 'any', tier },
-              'Using universal (any) language course override config as fallback'
-            );
-          }
-          return {
-            modelId: courseOverride.model_id,
-            fallbackModelId: courseOverride.fallback_model_id || null,
-            temperature: courseOverride.temperature || 0.7,
-            maxTokens: courseOverride.max_tokens || 4096,
-            maxContextTokens: courseOverride.max_context_tokens || null,
-            qualityThreshold: courseOverride.quality_threshold,
-            maxRetries: courseOverride.max_retries ?? 3,
-            timeoutMs: courseOverride.timeout_ms,
-            tier: (courseOverride.context_tier as 'standard' | 'extended') || tier,
-            source: 'database',
-          };
-        }
-      }
-    }
-
-    // Priority 2: Global default configuration (with tier and language filter)
-    for (const langToTry of languagesToTry) {
-      const { data: globalConfig, error } = await supabase
-        .from('llm_model_config')
-        .select(
-          'model_id, fallback_model_id, temperature, max_tokens, max_context_tokens, quality_threshold, max_retries, timeout_ms, context_tier'
+    // Build course override queries (if courseId provided)
+    const courseOverrideQueries = courseId
+      ? languagesToTry.map(langToTry =>
+          supabase
+            .from('llm_model_config')
+            .select(selectFields)
+            .eq('config_type', 'course_override')
+            .eq('course_id', courseId)
+            .eq('phase_name', phaseName)
+            .eq('language', langToTry)
+            .eq('context_tier', tier)
+            .eq('is_active', true)
+            .maybeSingle()
         )
+      : [];
+
+    // Build global config queries
+    const globalConfigQueries = languagesToTry.map(langToTry =>
+      supabase
+        .from('llm_model_config')
+        .select(selectFields)
         .eq('config_type', 'global')
         .eq('phase_name', phaseName)
         .eq('language', langToTry)
         .eq('context_tier', tier)
         .eq('is_active', true)
-        .maybeSingle();
+        .maybeSingle()
+    );
+
+    // Execute all queries in parallel
+    const [courseOverrideResults, globalConfigResults] = await Promise.all([
+      Promise.all(courseOverrideQueries),
+      Promise.all(globalConfigQueries),
+    ]);
+
+    // Priority 1: Process course override results in language priority order
+    for (let i = 0; i < courseOverrideResults.length; i++) {
+      const { data: courseOverride } = courseOverrideResults[i];
+      const langToTry = languagesToTry[i];
+
+      if (courseOverride) {
+        if (langToTry === 'any') {
+          logger.debug(
+            { phaseName, courseId, requestedLanguage: language, foundLanguage: 'any', tier },
+            'Using universal (any) language course override config as fallback'
+          );
+        }
+        return {
+          modelId: courseOverride.model_id,
+          fallbackModelId: courseOverride.fallback_model_id || null,
+          temperature: courseOverride.temperature || 0.7,
+          maxTokens: courseOverride.max_tokens || 4096,
+          maxContextTokens: courseOverride.max_context_tokens || null,
+          qualityThreshold: courseOverride.quality_threshold,
+          maxRetries: courseOverride.max_retries ?? 3,
+          timeoutMs: courseOverride.timeout_ms,
+          tier: (courseOverride.context_tier as 'standard' | 'extended') || tier,
+          source: 'database',
+        };
+      }
+    }
+
+    // Priority 2: Process global config results in language priority order
+    for (let i = 0; i < globalConfigResults.length; i++) {
+      const { data: globalConfig, error } = globalConfigResults[i];
+      const langToTry = languagesToTry[i];
 
       if (error) {
         logger.warn(
@@ -945,6 +959,11 @@ class ModelConfigServiceImpl {
           logger.debug(
             { phaseName, requestedLanguage: language, foundLanguage: 'any', tier },
             'Using universal (any) language config as fallback'
+          );
+        } else {
+          logger.debug(
+            { phaseName, requestedLanguage: language, foundLanguage: langToTry, tier },
+            'Using language-specific config (exact match)'
           );
         }
         return {
