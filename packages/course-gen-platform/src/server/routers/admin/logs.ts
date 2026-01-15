@@ -338,7 +338,7 @@ export const logsRouter = router({
           // generation_trace
           const { data: log, error } = await supabase
             .from('generation_trace')
-            .select('*')
+            .select('*, courses(title)')
             .eq('id', logId)
             .single();
 
@@ -356,6 +356,9 @@ export const logsRouter = router({
           const errorData = log.error_data as Record<string, unknown> | null;
           const severity = errorData ? 'ERROR' : 'WARNING';
 
+          // Get course name from JOIN
+          const courseData = log.courses as { title: string } | null;
+
           return {
             id: log.id,
             logType: 'generation_trace',
@@ -371,7 +374,7 @@ export const logsRouter = router({
             metadata: null,
             problemId: null,
             environment: null,
-            courseName: null,
+            courseName: courseData?.title || null,
             stackTrace: (errorData?.stack as string) || null,
             errorData,
             inputData: log.input_data as Record<string, unknown> | null,
@@ -746,9 +749,12 @@ async function buildGenerationTraceQuery(
 
   let query = supabase
     .from('generation_trace')
-    .select('id, created_at, stage, phase, step_name, course_id, lesson_id, error_data', {
-      count: 'exact',
-    })
+    .select(
+      'id, created_at, stage, phase, step_name, course_id, lesson_id, error_data, courses(title)',
+      {
+        count: 'exact',
+      }
+    )
     .not('error_data', 'is', null); // Only traces with errors
 
   // Apply status filter
@@ -805,6 +811,8 @@ async function buildGenerationTraceQuery(
 
   const items: UnifiedLogItem[] = filteredData.map(log => {
     const errorData = log.error_data as Record<string, unknown> | null;
+    // Get course name from JOIN
+    const courseData = log.courses as { title: string } | null;
     return {
       id: log.id,
       logType: 'generation_trace' as LogType,
@@ -820,7 +828,7 @@ async function buildGenerationTraceQuery(
       metadata: null,
       problemId: null,
       environment: null,
-      courseName: null,
+      courseName: courseData?.title || null,
     };
   });
 
