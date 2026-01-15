@@ -356,13 +356,17 @@ function buildPhase2Prompt(input: Phase2Input): { role: string; content: string 
       ? `\n\nAvailable Documents: ${document_summaries.length} documents with processed content`
       : '';
 
-  // Build course size guidance section (advisory)
+  // Build course size guidance section (MANDATORY constraint with ±20% tolerance)
   const sizeSection = input.size_guidance
-    ? `\n\n## User-Requested Course Size (ADVISORY)
+    ? `\n\n## User-Requested Course Size (MANDATORY CONSTRAINT)
 ${input.size_guidance}
 
-**IMPORTANT**: This is a recommendation, not a constraint. If the topic genuinely requires more or fewer lessons for quality coverage, you may deviate from this target. Include your reasoning if you do.
-Target: ~${input.target_lessons} lessons in ~${input.target_sections} sections.`
+**CRITICAL CONSTRAINT**: The user has explicitly selected this course size. You MUST respect this choice.
+- Target: ${input.target_lessons} lessons in ${input.target_sections} sections
+- Allowed range: ${Math.round(input.target_lessons! * 0.8)}-${Math.round(input.target_lessons! * 1.2)} lessons (±20% tolerance)
+- If the topic seems too broad, REDUCE scope by focusing on essentials only
+- If the topic seems too narrow, ADD depth (advanced techniques, case studies, practical exercises)
+- DO NOT exceed the allowed range - adjust content depth, not lesson count`
     : '';
 
   // Generate Zod schema description for LLM
