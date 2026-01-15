@@ -1,26 +1,26 @@
-import { GraphTranslations } from '@megacampus/shared-types';
+import { GraphTranslations } from '@megacampus/shared-types'
 
 // Extended with analysisResult section for Stage 4 UI Redesign and courseStructure for Stage 5
 export const GRAPH_TRANSLATIONS: GraphTranslations & {
-  analysisResult?: Record<string, { ru: string; en: string }>;
-  courseStructure?: Record<string, { ru: string; en: string }>;
-  restart?: Record<string, { ru: string; en: string }>;
-  stage1?: Record<string, { ru: string; en: string }>;
-  stage2?: Record<string, { ru: string; en: string }>;
-  stage3?: Record<string, { ru: string; en: string }>;
-  stage4?: Record<string, { ru: string; en: string }>;
-  stage5?: Record<string, { ru: string; en: string }>;
-  stage6?: Record<string, Record<string, { ru: string; en: string }>>;
-  stageDescriptions?: Record<string, { ru: string; en: string }>;
+  analysisResult?: Record<string, { ru: string; en: string }>
+  courseStructure?: Record<string, { ru: string; en: string }>
+  restart?: Record<string, { ru: string; en: string }>
+  stage1?: Record<string, { ru: string; en: string }>
+  stage2?: Record<string, { ru: string; en: string }>
+  stage3?: Record<string, { ru: string; en: string }>
+  stage4?: Record<string, { ru: string; en: string }>
+  stage5?: Record<string, { ru: string; en: string }>
+  stage6?: Record<string, Record<string, { ru: string; en: string }>>
+  stageDescriptions?: Record<string, { ru: string; en: string }>
   enrichments?: {
-    types: Record<string, { ru: string; en: string }>;
-    status: Record<string, { ru: string; en: string }>;
-    actions: Record<string, { ru: string; en: string }>;
-    assetDock: Record<string, { ru: string; en: string }>;
-  };
-  endNode?: Record<string, { ru: string; en: string }>;
-  selectionToolbar?: Record<string, { ru: string; en: string }>;
-  common?: Record<string, { ru: string; en: string }>;
+    types: Record<string, { ru: string; en: string }>
+    status: Record<string, { ru: string; en: string }>
+    actions: Record<string, { ru: string; en: string }>
+    assetDock: Record<string, { ru: string; en: string }>
+  }
+  endNode?: Record<string, { ru: string; en: string }>
+  selectionToolbar?: Record<string, { ru: string; en: string }>
+  common?: Record<string, { ru: string; en: string }>
 } = {
   // === COMMON TRANSLATIONS (shared across components) ===
   common: {
@@ -47,7 +47,10 @@ export const GRAPH_TRANSLATIONS: GraphTranslations & {
     error: { ru: 'Ошибка', en: 'Error' },
     awaiting: { ru: 'Ожидает подтверждения', en: 'Awaiting Approval' },
     skipped: { ru: 'Пропущено', en: 'Skipped' },
-    skippedDescription: { ru: 'Этот этап был пропущен, так как курс создан без загруженных документов.', en: 'This stage was skipped because the course was created without uploaded documents.' },
+    skippedDescription: {
+      ru: 'Этот этап был пропущен, так как курс создан без загруженных документов.',
+      en: 'This stage was skipped because the course was created without uploaded documents.',
+    },
   },
   actions: {
     approve: { ru: 'Подтвердить', en: 'Approve' },
@@ -68,17 +71,26 @@ export const GRAPH_TRANSLATIONS: GraphTranslations & {
     approvalError: { ru: 'Ошибка одобрения уроков', en: 'Lesson approval error' },
     approveAllLessonsTitle: { ru: 'Одобрить все уроки?', en: 'Approve all lessons?' },
     approveAllLessonsDescription: { ru: 'Будет одобрено', en: 'Will approve' },
-    approveAllLessonsWarning: { ru: 'Это действие нельзя отменить.', en: 'This action cannot be undone.' },
+    approveAllLessonsWarning: {
+      ru: 'Это действие нельзя отменить.',
+      en: 'This action cannot be undone.',
+    },
     cancel: { ru: 'Отмена', en: 'Cancel' },
     export: { ru: 'Экспорт', en: 'Export' },
     exporting: { ru: 'Экспорт...', en: 'Exporting...' },
     exportAll: { ru: 'Экспорт всех', en: 'Export All' },
-    noCompletedLessonsForExport: { ru: 'Нет завершенных уроков для экспорта', en: 'No completed lessons to export' },
+    noCompletedLessonsForExport: {
+      ru: 'Нет завершенных уроков для экспорта',
+      en: 'No completed lessons to export',
+    },
     retryErrors: { ru: 'Переделать ошибки', en: 'Retry Errors' },
     retrying: { ru: 'Переделываем...', en: 'Retrying...' },
     noLessonsWithErrors: { ru: 'Нет уроков с ошибками', en: 'No lessons with errors' },
     improveQuality: { ru: 'Улучшить качество', en: 'Improve Quality' },
-    noLowQualityLessons: { ru: 'Нет уроков с оценкой ниже 0.75', en: 'No lessons with score below 0.75' },
+    noLowQualityLessons: {
+      ru: 'Нет уроков с оценкой ниже 0.75',
+      en: 'No lessons with score below 0.75',
+    },
     regenerate: { ru: 'Перегенерировать', en: 'Regenerate' },
     regenerating: { ru: 'Перегенерация...', en: 'Regenerating...' },
     regenerationStarted: { ru: 'Перегенерация запущена', en: 'Regeneration started' },
@@ -89,7 +101,10 @@ export const GRAPH_TRANSLATIONS: GraphTranslations & {
     process: { ru: 'Процесс', en: 'Process' },
     output: { ru: 'Результат', en: 'Output' },
     attempts: { ru: 'Попытки', en: 'Attempts' },
-    awaitingMessage: { en: 'This stage is waiting for your approval', ru: 'Этот этап ожидает вашего подтверждения' },
+    awaitingMessage: {
+      en: 'This stage is waiting for your approval',
+      ru: 'Этот этап ожидает вашего подтверждения',
+    },
     activity: { en: 'Activity', ru: 'Активность' },
     expand: { en: 'Expand to full width', ru: 'Развернуть на всю ширину' },
     collapse: { en: 'Collapse to half width', ru: 'Свернуть до половины' },
@@ -127,7 +142,10 @@ export const GRAPH_TRANSLATIONS: GraphTranslations & {
   refinementChat: {
     buttonTooltip: { ru: 'Скорректировать результат', en: 'Adjust result' },
     panelTitle: { ru: 'Чат с ИИ', en: 'AI Chat' },
-    placeholder: { ru: 'Напишите, что изменить или улучшить...', en: 'Describe what to change or improve...' },
+    placeholder: {
+      ru: 'Напишите, что изменить или улучшить...',
+      en: 'Describe what to change or improve...',
+    },
     send: { ru: 'Отправить и перегенерировать', en: 'Send & Regenerate' },
     history: { en: 'Chat History', ru: 'История чата' },
     thinking: { en: 'Thinking...', ru: 'Обрабатываю...' },
@@ -146,7 +164,10 @@ export const GRAPH_TRANSLATIONS: GraphTranslations & {
   // New keys below
   retry: {
     confirmTitle: { en: 'Confirm Retry', ru: 'Подтвердить повтор' },
-    confirmDescription: { en: 'Are you sure you want to retry this item?', ru: 'Вы уверены, что хотите повторить этот элемент?' },
+    confirmDescription: {
+      en: 'Are you sure you want to retry this item?',
+      ru: 'Вы уверены, что хотите повторить этот элемент?',
+    },
     retryButton: { en: 'Retry', ru: 'Повторить' },
     cancelButton: { en: 'Cancel', ru: 'Отмена' },
   },
@@ -161,7 +182,10 @@ export const GRAPH_TRANSLATIONS: GraphTranslations & {
   },
   longRunning: {
     message: { en: 'Taking longer than usual...', ru: 'Занимает больше времени, чем обычно...' },
-    emailNotify: { en: 'Notify me by email when complete', ru: 'Уведомить по email, когда завершится' },
+    emailNotify: {
+      en: 'Notify me by email when complete',
+      ru: 'Уведомить по email, когда завершится',
+    },
     emailPlaceholder: { en: 'Enter your email', ru: 'Введите ваш email' },
     subscribe: { en: 'Subscribe', ru: 'Подписаться' },
   },
@@ -184,7 +208,10 @@ export const GRAPH_TRANSLATIONS: GraphTranslations & {
     classification: { ru: 'Классификация курса', en: 'Course Classification' },
     classificationDesc: { ru: 'Категория и контекст курса', en: 'Category and course context' },
     topicAnalysis: { ru: 'Анализ темы', en: 'Topic Analysis' },
-    topicAnalysisDesc: { ru: 'Детали темы и ключевые концепции', en: 'Topic details and key concepts' },
+    topicAnalysisDesc: {
+      ru: 'Детали темы и ключевые концепции',
+      en: 'Topic details and key concepts',
+    },
     structure: { ru: 'Рекомендуемая структура', en: 'Recommended Structure' },
     structureDesc: { ru: 'Объём и распределение уроков', en: 'Scope and lesson distribution' },
     pedagogy: { ru: 'Педагогическая стратегия', en: 'Pedagogical Strategy' },
@@ -209,7 +236,8 @@ export const GRAPH_TRANSLATIONS: GraphTranslations & {
     totalSections: { ru: 'Модулей', en: 'Modules' },
     lessonDuration: { ru: 'Длительность урока', en: 'Lesson Duration' },
     scopeReasoning: { ru: 'Обоснование объёма', en: 'Scope Reasoning' },
-    teachingStyle: { ru: 'Стиль', en: 'Style' },
+    teachingStyle: { ru: 'Стиль обучения', en: 'Teaching Style' },
+    contentStyle: { ru: 'Стиль контента', en: 'Content Style' },
     practicalFocus: { ru: 'Практический фокус', en: 'Practical Focus' },
     interactivity: { ru: 'Интерактивность', en: 'Interactivity' },
     assessmentApproach: { ru: 'Подход к оценке', en: 'Assessment Approach' },
@@ -225,7 +253,10 @@ export const GRAPH_TRANSLATIONS: GraphTranslations & {
   courseStructure: {
     // Main sections
     courseInfo: { ru: 'Информация о курсе', en: 'Course Information' },
-    courseInfoDesc: { ru: 'Название, описание и параметры курса', en: 'Title, description, and course parameters' },
+    courseInfoDesc: {
+      ru: 'Название, описание и параметры курса',
+      en: 'Title, description, and course parameters',
+    },
     structure: { ru: 'Структура курса', en: 'Course Structure' },
     structureDesc: { ru: 'Модули и уроки', en: 'Modules and lessons' },
 
@@ -295,7 +326,10 @@ export const GRAPH_TRANSLATIONS: GraphTranslations & {
     cancelButton: { ru: 'Отмена', en: 'Cancel' },
     buttonTooltip: { ru: 'Перезапустить с этого этапа', en: 'Restart from this stage' },
     restartFromError: { ru: 'Перезапустить', en: 'Restart' },
-    errorDescription: { ru: 'Произошла ошибка на этом этапе', en: 'An error occurred at this stage' },
+    errorDescription: {
+      ru: 'Произошла ошибка на этом этапе',
+      en: 'An error occurred at this stage',
+    },
   },
   stage1: {
     // Input Tab - Identity Card
@@ -357,7 +391,10 @@ export const GRAPH_TRANSLATIONS: GraphTranslations & {
     copyToClipboard: { ru: 'Копировать в буфер', en: 'Copy to clipboard' },
     copyFailed: { ru: 'Ошибка копирования', en: 'Failed to copy' },
     dateUnknown: { ru: 'Дата неизвестна', en: 'Date unknown' },
-    outputEmptyState: { ru: 'Паспорт курса появится здесь после завершения инициализации', en: 'Course passport will appear here after initialization completes' },
+    outputEmptyState: {
+      ru: 'Паспорт курса появится здесь после завершения инициализации',
+      en: 'Course passport will appear here after initialization completes',
+    },
 
     // Output Tab - Asset Map
     assetMap: { ru: 'Карта файлов', en: 'Asset Map' },
@@ -390,7 +427,10 @@ export const GRAPH_TRANSLATIONS: GraphTranslations & {
     fileType: { ru: 'Тип', en: 'Type' },
     pageCount: { ru: 'Страниц', en: 'Pages' },
     heavyPayload: { ru: 'Большой файл', en: 'Heavy Payload' },
-    heavyPayloadHint: { ru: 'Обработка может занять больше времени', en: 'Processing may take longer' },
+    heavyPayloadHint: {
+      ru: 'Обработка может занять больше времени',
+      en: 'Processing may take longer',
+    },
 
     // Tier Card
     tierCapabilities: { ru: 'Возможности обработки', en: 'Processing Capabilities' },
@@ -414,19 +454,31 @@ export const GRAPH_TRANSLATIONS: GraphTranslations & {
     // === PROCESS TAB ===
     // Pipeline Header
     pipeline: { ru: 'Конвейер обработки', en: 'Processing Pipeline' },
-    pipelineDesc: { ru: 'Превращаем документ в знания', en: 'Transforming document into knowledge' },
+    pipelineDesc: {
+      ru: 'Превращаем документ в знания',
+      en: 'Transforming document into knowledge',
+    },
 
     // Phase Names (User-friendly translations)
     phaseDocling: { ru: 'Оцифровка', en: 'Digitization' },
-    phaseDoclingDesc: { ru: 'Умное чтение структуры документа', en: 'Smart document structure reading' },
+    phaseDoclingDesc: {
+      ru: 'Умное чтение структуры документа',
+      en: 'Smart document structure reading',
+    },
     phaseMarkdown: { ru: 'Очистка', en: 'Cleanup' },
     phaseMarkdownDesc: { ru: 'Форматирование и очистка текста', en: 'Text formatting and cleanup' },
     phaseImages: { ru: 'Анализ медиа', en: 'Visual Analysis' },
-    phaseImagesDesc: { ru: 'Распознавание изображений и таблиц', en: 'Image and table recognition' },
+    phaseImagesDesc: {
+      ru: 'Распознавание изображений и таблиц',
+      en: 'Image and table recognition',
+    },
     phaseChunking: { ru: 'Сегментация', en: 'Segmentation' },
     phaseChunkingDesc: { ru: 'Разбиение на смысловые блоки', en: 'Splitting into semantic blocks' },
     phaseEmbedding: { ru: 'Векторизация', en: 'AI Encoding' },
-    phaseEmbeddingDesc: { ru: 'Создание цифровых отпечатков смысла', en: 'Creating semantic fingerprints' },
+    phaseEmbeddingDesc: {
+      ru: 'Создание цифровых отпечатков смысла',
+      en: 'Creating semantic fingerprints',
+    },
     phaseQdrant: { ru: 'Индексация', en: 'Knowledge Save' },
     phaseQdrantDesc: { ru: 'Сохранение в базу знаний', en: 'Saving to knowledge base' },
     phaseSummarization: { ru: 'Синтез', en: 'Insight Generation' },
@@ -445,7 +497,10 @@ export const GRAPH_TRANSLATIONS: GraphTranslations & {
     // === OUTPUT TAB ===
     // Summary Section
     executiveSummary: { ru: 'Краткое резюме', en: 'Executive Summary' },
-    summaryEmpty: { ru: 'Файл успешно индексирован (слишком короткий для резюме)', en: 'File successfully indexed (too short for summary)' },
+    summaryEmpty: {
+      ru: 'Файл успешно индексирован (слишком короткий для резюме)',
+      en: 'File successfully indexed (too short for summary)',
+    },
 
     // Knowledge Atoms Grid
     knowledgeAtoms: { ru: 'Извлечённые знания', en: 'Knowledge Atoms' },
@@ -461,7 +516,10 @@ export const GRAPH_TRANSLATIONS: GraphTranslations & {
     qualityMedium: { ru: 'Хорошее качество', en: 'Good fidelity' },
     qualityMediumDesc: { ru: 'Подходит для поиска', en: 'Suitable for search' },
     qualityLow: { ru: 'Низкое качество', en: 'Low fidelity' },
-    qualityLowDesc: { ru: 'Рекомендуется загрузить более чёткий файл', en: 'Consider uploading a clearer file' },
+    qualityLowDesc: {
+      ru: 'Рекомендуется загрузить более чёткий файл',
+      en: 'Consider uploading a clearer file',
+    },
 
     // Actions
     inspectMarkdown: { ru: 'Просмотреть текст', en: 'Inspect Markdown' },
@@ -480,12 +538,24 @@ export const GRAPH_TRANSLATIONS: GraphTranslations & {
     noActivity: { ru: 'Нет событий', en: 'No events recorded' },
 
     // Tooltips for technical terms
-    tooltipChunks: { ru: 'Смысловые кусочки текста. Мы нарезаем документ, чтобы ИИ находил точный ответ, а не читал всю книгу целиком.', en: 'Semantic text fragments. We slice the document so AI finds precise answers instead of reading the whole book.' },
-    tooltipEmbeddings: { ru: 'Цифровой отпечаток смысла. Позволяет искать информацию не по ключевым словам, а по смыслу.', en: 'Semantic fingerprint. Enables searching by meaning, not just keywords.' },
-    tooltipDocling: { ru: 'Технология умного чтения, которая понимает не только буквы, но и структуру (таблицы, заголовки).', en: 'Smart reading technology that understands not just text, but structure (tables, headings).' },
+    tooltipChunks: {
+      ru: 'Смысловые кусочки текста. Мы нарезаем документ, чтобы ИИ находил точный ответ, а не читал всю книгу целиком.',
+      en: 'Semantic text fragments. We slice the document so AI finds precise answers instead of reading the whole book.',
+    },
+    tooltipEmbeddings: {
+      ru: 'Цифровой отпечаток смысла. Позволяет искать информацию не по ключевым словам, а по смыслу.',
+      en: 'Semantic fingerprint. Enables searching by meaning, not just keywords.',
+    },
+    tooltipDocling: {
+      ru: 'Технология умного чтения, которая понимает не только буквы, но и структуру (таблицы, заголовки).',
+      en: 'Smart reading technology that understands not just text, but structure (tables, headings).',
+    },
 
     // Missing i18n keys for Stage 2 UI
-    contentTruncated: { ru: 'Содержимое обрезано (превышает 100KB)', en: 'Content truncated (exceeds 100KB)' },
+    contentTruncated: {
+      ru: 'Содержимое обрезано (превышает 100KB)',
+      en: 'Content truncated (exceeds 100KB)',
+    },
     dbConnectionError: { ru: 'Ошибка подключения к базе', en: 'Database connection failed' },
     noDataAvailable: { ru: 'Данные недоступны', en: 'No data available' },
     processingEvent: { ru: 'Обработка события', en: 'Processing event' },
@@ -495,7 +565,10 @@ export const GRAPH_TRANSLATIONS: GraphTranslations & {
 
     // === STAGE 2 DASHBOARD (container) ===
     dashboardTitle: { ru: 'Обработка документов', en: 'Document Processing' },
-    dashboardDesc: { ru: 'Обзор загруженных файлов и их обработки', en: 'Overview of uploaded files and their processing' },
+    dashboardDesc: {
+      ru: 'Обзор загруженных файлов и их обработки',
+      en: 'Overview of uploaded files and their processing',
+    },
     totalDocs: { ru: 'Всего файлов', en: 'Total Files' },
     completed: { ru: 'Обработано', en: 'Completed' },
     processing: { ru: 'Обрабатывается', en: 'Processing' },
@@ -547,9 +620,15 @@ export const GRAPH_TRANSLATIONS: GraphTranslations & {
     displayError: { ru: 'Ошибка отображения документов', en: 'Display error' },
     loadingError: { ru: 'Ошибка загрузки', en: 'Loading error' },
     documentsNotFound: { ru: 'Документы не найдены', en: 'Documents not found' },
-    documentsNotFoundHint: { ru: 'Загрузите документы на Этапе 1, чтобы начать обработку', en: 'Upload documents in Stage 1 to start processing' },
+    documentsNotFoundHint: {
+      ru: 'Загрузите документы на Этапе 1, чтобы начать обработку',
+      en: 'Upload documents in Stage 1 to start processing',
+    },
     noDocumentsToProcess: { ru: 'Нет документов для обработки', en: 'No documents to process' },
-    noDocumentsHint: { ru: 'Этот курс был создан без загруженных документов. Вернитесь к Этапу 1, чтобы добавить файлы.', en: 'This course was created without uploaded documents. Return to Stage 1 to add files.' },
+    noDocumentsHint: {
+      ru: 'Этот курс был создан без загруженных документов. Вернитесь к Этапу 1, чтобы добавить файлы.',
+      en: 'This course was created without uploaded documents. Return to Stage 1 to add files.',
+    },
     loadingDocuments: { ru: 'Загрузка данных документов...', en: 'Loading document data...' },
     tryAgain: { ru: 'Попробовать снова', en: 'Try again' },
     headerLoadError: { ru: 'Ошибка загрузки заголовка', en: 'Header load error' },
@@ -569,9 +648,18 @@ export const GRAPH_TRANSLATIONS: GraphTranslations & {
     documentsCount: { ru: 'документов', en: 'documents' },
     documentsCountShort: { ru: 'док', en: 'docs' },
     documentsWithErrors: { ru: 'документ(ов) с ошибками', en: 'document(s) with errors' },
-    documentProcessingExpanded: { ru: 'Обработка документов развернуто', en: 'Document processing expanded' },
-    clickToExpand: { ru: 'Клик: развернуть/свернуть, двойной клик: открыть детали', en: 'Click: expand/collapse, double click: open details' },
-    clickToCollapse: { ru: 'Клик: свернуть, двойной клик: открыть детали', en: 'Click: collapse, double click: open details' },
+    documentProcessingExpanded: {
+      ru: 'Обработка документов развернуто',
+      en: 'Document processing expanded',
+    },
+    clickToExpand: {
+      ru: 'Клик: развернуть/свернуть, двойной клик: открыть детали',
+      en: 'Click: expand/collapse, double click: open details',
+    },
+    clickToCollapse: {
+      ru: 'Клик: свернуть, двойной клик: открыть детали',
+      en: 'Click: collapse, double click: open details',
+    },
     statusReady: { ru: 'Готово', en: 'Ready' },
     statusProcessing: { ru: 'Обработка', en: 'Processing' },
     unknownError: { ru: 'Неизвестная ошибка', en: 'Unknown error' },
@@ -585,33 +673,63 @@ export const GRAPH_TRANSLATIONS: GraphTranslations & {
 
     // Input Tab - Course Context
     courseContext: { ru: 'Критерии курса', en: 'Course Criteria' },
-    courseContextDesc: { ru: 'Цель и направление определяют приоритеты', en: 'Goal and direction determine priorities' },
+    courseContextDesc: {
+      ru: 'Цель и направление определяют приоритеты',
+      en: 'Goal and direction determine priorities',
+    },
     candidates: { ru: 'Кандидаты на оценку', en: 'Candidates' },
     candidatesCount: { ru: 'документов', en: 'documents' },
     strategyEngine: { ru: 'Режим оценки', en: 'Evaluation Mode' },
     tokenBudget: { ru: 'Бюджет токенов', en: 'Token Budget' },
     strategySinglePass: { ru: 'Единый проход', en: 'Single Pass' },
-    strategySinglePassDesc: { ru: 'Все документы оцениваются за один вызов', en: 'All documents evaluated in one call' },
+    strategySinglePassDesc: {
+      ru: 'Все документы оцениваются за один вызов',
+      en: 'All documents evaluated in one call',
+    },
     strategyTournament: { ru: 'Турнирный режим', en: 'Tournament Mode' },
-    strategyTournamentDesc: { ru: 'Документы сравниваются попарно', en: 'Documents compared pairwise' },
+    strategyTournamentDesc: {
+      ru: 'Документы сравниваются попарно',
+      en: 'Documents compared pairwise',
+    },
     summaryPreview: { ru: 'Резюме', en: 'Summary' },
     heavyDocument: { ru: 'Большой документ', en: 'Heavy Document' },
     sortedByTokens: { ru: 'Сортировка по весу (токенам)', en: 'Sorted by weight (tokens)' },
 
     // Process Tab - Execution Audit
     executionAudit: { ru: 'Аудит выполнения', en: 'Execution Audit' },
-    executionAuditDesc: { ru: 'Проверка установленных приоритетов', en: 'Verifying assigned priorities' },
+    executionAuditDesc: {
+      ru: 'Проверка установленных приоритетов',
+      en: 'Verifying assigned priorities',
+    },
     phaseContextLoading: { ru: 'Загрузка контекста', en: 'Context Loading' },
-    phaseContextLoadingDesc: { ru: 'Загрузка темы и целей курса', en: 'Loading course topic and objectives' },
+    phaseContextLoadingDesc: {
+      ru: 'Загрузка темы и целей курса',
+      en: 'Loading course topic and objectives',
+    },
     phaseStrategySelection: { ru: 'Проверка приоритетов', en: 'Priority Validation' },
-    phaseStrategySelectionDesc: { ru: 'Использование приоритетов из каталога файлов', en: 'Using priorities from file catalog' },
+    phaseStrategySelectionDesc: {
+      ru: 'Использование приоритетов из каталога файлов',
+      en: 'Using priorities from file catalog',
+    },
     phaseComparativeAnalysis: { ru: 'Валидация иерархии', en: 'Hierarchy Validation' },
-    phaseComparativeAnalysisDesc: { ru: 'Проверка правила единственного CORE', en: 'Validating single CORE rule' },
+    phaseComparativeAnalysisDesc: {
+      ru: 'Проверка правила единственного CORE',
+      en: 'Validating single CORE rule',
+    },
     phaseRationaleGeneration: { ru: 'Сохранение результатов', en: 'Saving Results' },
-    phaseRationaleGenerationDesc: { ru: 'Сохранение приоритетов для следующих этапов', en: 'Persisting priorities for next stages' },
+    phaseRationaleGenerationDesc: {
+      ru: 'Сохранение приоритетов для следующих этапов',
+      en: 'Persisting priorities for next stages',
+    },
     phaseHierarchyFinalization: { ru: 'Финализация', en: 'Finalization' },
-    phaseHierarchyFinalizationDesc: { ru: 'Приоритеты подтверждены и готовы к использованию', en: 'Priorities confirmed and ready for use' },
-    passThroughNote: { ru: 'Приоритеты устанавливаются пользователем перед генерацией', en: 'Priorities are set by user before generation' },
+    phaseHierarchyFinalizationDesc: {
+      ru: 'Приоритеты подтверждены и готовы к использованию',
+      en: 'Priorities confirmed and ready for use',
+    },
+    passThroughNote: {
+      ru: 'Приоритеты устанавливаются пользователем перед генерацией',
+      en: 'Priorities are set by user before generation',
+    },
     telemetry: { ru: 'Телеметрия', en: 'Telemetry' },
     processingTime: { ru: 'Время', en: 'Time' },
     tokenLoad: { ru: 'Токены', en: 'Tokens' },
@@ -627,15 +745,27 @@ export const GRAPH_TRANSLATIONS: GraphTranslations & {
     showRationale: { ru: 'Показать обоснование', en: 'Show rationale' },
     hideRationale: { ru: 'Скрыть', en: 'Hide' },
     coreDocument: { ru: 'Ключевой', en: 'Core' },
-    coreDocumentDesc: { ru: 'Самый важный документ курса (только 1)', en: 'Most important course document (only 1)' },
+    coreDocumentDesc: {
+      ru: 'Самый важный документ курса (только 1)',
+      en: 'Most important course document (only 1)',
+    },
     importantDocument: { ru: 'Важный', en: 'Important' },
-    importantDocumentDesc: { ru: 'Основные материалы курса (до 30%)', en: 'Key course materials (up to 30%)' },
+    importantDocumentDesc: {
+      ru: 'Основные материалы курса (до 30%)',
+      en: 'Key course materials (up to 30%)',
+    },
     supplementaryDocument: { ru: 'Дополнительный', en: 'Supplementary' },
     supplementaryDocumentDesc: { ru: 'Вспомогательные материалы', en: 'Supporting materials' },
-    validationError: { ru: 'Выберите ровно 1 ключевой документ', en: 'Select exactly 1 CORE document' },
+    validationError: {
+      ru: 'Выберите ровно 1 ключевой документ',
+      en: 'Select exactly 1 CORE document',
+    },
     approveStructure: { ru: 'Подтвердить структуру', en: 'Approve Structure' },
     changeCoreWarning: { ru: 'Сделать этот документ ключевым?', en: 'Make this document CORE?' },
-    changeCoreDesc: { ru: 'Текущий ключевой документ будет понижен до "Важный"', en: 'Current CORE document will be demoted to IMPORTANT' },
+    changeCoreDesc: {
+      ru: 'Текущий ключевой документ будет понижен до "Важный"',
+      en: 'Current CORE document will be demoted to IMPORTANT',
+    },
 
     // Activity Tab - Decision Protocol
     decisionProtocol: { ru: 'Протокол решений', en: 'Decision Protocol' },
@@ -656,13 +786,19 @@ export const GRAPH_TRANSLATIONS: GraphTranslations & {
     // Empty states
     emptyInput: { ru: 'Ожидание документов из Этапа 2...', en: 'Waiting for Stage 2 documents...' },
     emptyProcess: { ru: 'Классификация ещё не начата', en: 'Classification not started yet' },
-    emptyOutput: { ru: 'Результаты классификации появятся здесь', en: 'Classification results will appear here' },
+    emptyOutput: {
+      ru: 'Результаты классификации появятся здесь',
+      en: 'Classification results will appear here',
+    },
     emptyActivity: { ru: 'Решения ещё не записаны', en: 'No decisions recorded yet' },
 
     // Error states
     errorClassification: { ru: 'Ошибка классификации', en: 'Classification Error' },
     errorTokenLimit: { ru: 'Превышен лимит токенов', en: 'Token Limit Exceeded' },
-    noDocumentsToClassify: { ru: 'Нет документов для классификации', en: 'No documents to classify' },
+    noDocumentsToClassify: {
+      ru: 'Нет документов для классификации',
+      en: 'No documents to classify',
+    },
 
     // Output Tab - Hierarchy Distribution (missing from code review)
     hierarchyDistribution: { ru: 'Распределение документов', en: 'Document Hierarchy' },
@@ -671,9 +807,15 @@ export const GRAPH_TRANSLATIONS: GraphTranslations & {
     // Activity Tab - Event messages (missing from code review)
     noEventsInPhase: { ru: 'Нет событий в этой фазе', en: 'No events in this phase' },
     eventContextLoaded: { ru: 'Контекст курса загружен', en: 'Course context loaded' },
-    eventStrategySelected: { ru: 'Стратегия классификации: единый проход', en: 'Classification strategy: single pass' },
+    eventStrategySelected: {
+      ru: 'Стратегия классификации: единый проход',
+      en: 'Classification strategy: single pass',
+    },
     eventClassificationComplete: { ru: 'Документы классифицированы', en: 'Documents classified' },
-    eventRationalesGenerated: { ru: 'Обоснования сгенерированы для всех документов', en: 'Rationales generated for all documents' },
+    eventRationalesGenerated: {
+      ru: 'Обоснования сгенерированы для всех документов',
+      en: 'Rationales generated for all documents',
+    },
   },
   stage4: {
     // Tab names (consistent with other stages)
@@ -694,13 +836,22 @@ export const GRAPH_TRANSLATIONS: GraphTranslations & {
 
     // Card B: Knowledge Foundation
     knowledgeFoundation: { ru: 'Фундамент знаний', en: 'Knowledge Foundation' },
-    knowledgeFoundationDesc: { ru: 'Отобранные материалы из Stage 3', en: 'Selected materials from Stage 3' },
+    knowledgeFoundationDesc: {
+      ru: 'Отобранные материалы из Stage 3',
+      en: 'Selected materials from Stage 3',
+    },
     coreSource: { ru: 'Ядро курса', en: 'Core Source' },
-    coreSourceHint: { ru: 'Главный документ, определяющий курс', en: 'Main document defining the course' },
+    coreSourceHint: {
+      ru: 'Главный документ, определяющий курс',
+      en: 'Main document defining the course',
+    },
     importantSources: { ru: 'Ключевые материалы', en: 'Key Materials' },
     supplementarySources: { ru: 'Дополнительные', en: 'Supporting' },
     moreFiles: { ru: 'ещё файлов', en: 'more files' },
-    noDocumentsClassified: { ru: 'Нет классифицированных документов', en: 'No classified documents' },
+    noDocumentsClassified: {
+      ru: 'Нет классифицированных документов',
+      en: 'No classified documents',
+    },
 
     // Card C: Technical Constraints
     technicalConstraints: { ru: 'Технические параметры', en: 'Technical Parameters' },
@@ -710,23 +861,38 @@ export const GRAPH_TRANSLATIONS: GraphTranslations & {
     // === PROCESS TAB ===
     // Pipeline header
     analysisPipeline: { ru: 'Конвейер анализа', en: 'Analysis Pipeline' },
-    analysisPipelineDesc: { ru: 'Превращаем материалы в чертёж курса', en: 'Transforming materials into course blueprint' },
+    analysisPipelineDesc: {
+      ru: 'Превращаем материалы в чертёж курса',
+      en: 'Transforming materials into course blueprint',
+    },
 
     // Phase names (7 phases)
     phaseAudit: { ru: 'Аудит данных', en: 'Data Audit' },
     phaseAuditDesc: { ru: 'Проверка целостности входных данных', en: 'Input data integrity check' },
     phaseClassify: { ru: 'Классификация', en: 'Classification' },
-    phaseClassifyDesc: { ru: 'Определение домена и категории курса', en: 'Determining course domain and category' },
+    phaseClassifyDesc: {
+      ru: 'Определение домена и категории курса',
+      en: 'Determining course domain and category',
+    },
     phaseScoping: { ru: 'Планирование объёма', en: 'Scope Planning' },
-    phaseScopingDesc: { ru: 'Расчёт оптимального количества уроков', en: 'Calculating optimal lesson count' },
+    phaseScopingDesc: {
+      ru: 'Расчёт оптимального количества уроков',
+      en: 'Calculating optimal lesson count',
+    },
     phaseStrategy: { ru: 'Педагогическая стратегия', en: 'Pedagogical Strategy' },
-    phaseStrategyDesc: { ru: 'Выбор стиля обучения и методов', en: 'Selecting teaching style and methods' },
+    phaseStrategyDesc: {
+      ru: 'Выбор стиля обучения и методов',
+      en: 'Selecting teaching style and methods',
+    },
     phaseSynthesis: { ru: 'Синтез контента', en: 'Content Synthesis' },
     phaseSynthesisDesc: { ru: 'Извлечение ключевых концепций', en: 'Extracting key concepts' },
     phaseBlueprint: { ru: 'Сборка плана', en: 'Blueprint Assembly' },
     phaseBlueprintDesc: { ru: 'Формирование итогового результата', en: 'Assembling final result' },
     phaseMapping: { ru: 'RAG-планирование', en: 'RAG Mapping' },
-    phaseMappingDesc: { ru: 'Связывание документов с модулями', en: 'Mapping documents to modules' },
+    phaseMappingDesc: {
+      ru: 'Связывание документов с модулями',
+      en: 'Mapping documents to modules',
+    },
 
     // Telemetry
     telemetry: { ru: 'Телеметрия', en: 'Telemetry' },
@@ -778,16 +944,34 @@ export const GRAPH_TRANSLATIONS: GraphTranslations & {
     noEventsInPhase: { ru: 'Нет событий', en: 'No events' },
 
     // Synthetic insight messages (templates)
-    insightDetectedTone: { ru: 'Обнаружен {tone} тон. Адаптирую стиль.', en: 'Detected {tone} tone. Adapting style.' },
-    insightContentDensity: { ru: 'Высокая плотность контента. Увеличиваю количество уроков до {count}.', en: 'High content density. Increasing lesson count to {count}.' },
-    insightCategorySelected: { ru: 'Определена категория: {category} (уверенность {confidence}%)', en: 'Category determined: {category} (confidence {confidence}%)' },
-    insightStrategySelected: { ru: 'Выбрана стратегия: {strategy}', en: 'Strategy selected: {strategy}' },
-    insightStructureRecommended: { ru: 'Рекомендована структура: {sections} модулей, {lessons} уроков', en: 'Recommended structure: {sections} modules, {lessons} lessons' },
+    insightDetectedTone: {
+      ru: 'Обнаружен {tone} тон. Адаптирую стиль.',
+      en: 'Detected {tone} tone. Adapting style.',
+    },
+    insightContentDensity: {
+      ru: 'Высокая плотность контента. Увеличиваю количество уроков до {count}.',
+      en: 'High content density. Increasing lesson count to {count}.',
+    },
+    insightCategorySelected: {
+      ru: 'Определена категория: {category} (уверенность {confidence}%)',
+      en: 'Category determined: {category} (confidence {confidence}%)',
+    },
+    insightStrategySelected: {
+      ru: 'Выбрана стратегия: {strategy}',
+      en: 'Strategy selected: {strategy}',
+    },
+    insightStructureRecommended: {
+      ru: 'Рекомендована структура: {sections} модулей, {lessons} уроков',
+      en: 'Recommended structure: {sections} modules, {lessons} lessons',
+    },
 
     // Empty states
     emptyInput: { ru: 'Ожидание данных из Stage 3...', en: 'Waiting for Stage 3 data...' },
     emptyProcess: { ru: 'Анализ ещё не начат', en: 'Analysis not started yet' },
-    emptyOutput: { ru: 'Результаты анализа появятся здесь', en: 'Analysis results will appear here' },
+    emptyOutput: {
+      ru: 'Результаты анализа появятся здесь',
+      en: 'Analysis results will appear here',
+    },
     emptyActivity: { ru: 'События ещё не записаны', en: 'No events recorded yet' },
 
     // Error states
@@ -796,7 +980,10 @@ export const GRAPH_TRANSLATIONS: GraphTranslations & {
 
     // Visual Style Preview
     visualStyleTitle: { ru: 'Визуальный стиль курса', en: 'Course Visual Style' },
-    visualStyleDescription: { ru: 'Рекомендации для обложек и карточек', en: 'Recommendations for covers and cards' },
+    visualStyleDescription: {
+      ru: 'Рекомендации для обложек и карточек',
+      en: 'Recommendations for covers and cards',
+    },
     visualStyleColorScheme: { ru: 'Цветовая палитра', en: 'Color Scheme' },
     visualStyleAesthetic: { ru: 'Эстетика', en: 'Aesthetic' },
     visualStyleVisualElements: { ru: 'Визуальные элементы', en: 'Visual Elements' },
@@ -833,15 +1020,24 @@ export const GRAPH_TRANSLATIONS: GraphTranslations & {
 
     // === PROCESS TAB ===
     forgePipeline: { ru: 'Конвейер сборки', en: 'Assembly Pipeline' },
-    forgePipelineDesc: { ru: 'Превращаем чертёж в структуру курса', en: 'Transforming blueprint into course structure' },
+    forgePipelineDesc: {
+      ru: 'Превращаем чертёж в структуру курса',
+      en: 'Transforming blueprint into course structure',
+    },
 
     // Phase names (5 phases)
     phaseValidateInput: { ru: 'Валидация входных данных', en: 'Input Validation' },
     phaseValidateInputDesc: { ru: 'Проверка схемы данных', en: 'Schema validation' },
     phaseGenerateMetadata: { ru: 'Генерация метаданных', en: 'Metadata Generation' },
-    phaseGenerateMetadataDesc: { ru: 'Название, описание, цели обучения', en: 'Title, description, learning outcomes' },
+    phaseGenerateMetadataDesc: {
+      ru: 'Название, описание, цели обучения',
+      en: 'Title, description, learning outcomes',
+    },
     phaseGenerateSections: { ru: 'Генерация секций', en: 'Section Generation' },
-    phaseGenerateSectionsDesc: { ru: 'Модули и уроки (параллельно)', en: 'Modules and lessons (parallel)' },
+    phaseGenerateSectionsDesc: {
+      ru: 'Модули и уроки (параллельно)',
+      en: 'Modules and lessons (parallel)',
+    },
     phaseValidateQuality: { ru: 'Проверка качества', en: 'Quality Validation' },
     phaseValidateQualityDesc: { ru: 'Семантическое сходство', en: 'Semantic similarity check' },
     phaseValidateLessons: { ru: 'Проверка уроков', en: 'Lesson Validation' },
@@ -864,7 +1060,10 @@ export const GRAPH_TRANSLATIONS: GraphTranslations & {
 
     // === OUTPUT TAB ===
     structurePreview: { ru: 'Структура курса', en: 'Course Structure' },
-    structurePreviewDesc: { ru: 'Сгенерированные модули и уроки', en: 'Generated modules and lessons' },
+    structurePreviewDesc: {
+      ru: 'Сгенерированные модули и уроки',
+      en: 'Generated modules and lessons',
+    },
     structureDesc: { ru: 'Модули и уроки', en: 'Modules and lessons' },
 
     // Difficulty levels (for OutputTab)
@@ -904,11 +1103,26 @@ export const GRAPH_TRANSLATIONS: GraphTranslations & {
 
     // Synthetic insight messages
     insightValidationPassed: { ru: 'Валидация пройдена', en: 'Validation passed' },
-    insightMetadataGenerated: { ru: 'Метаданные сгенерированы: {outcomes} целей обучения', en: 'Metadata generated: {outcomes} learning outcomes' },
-    insightBatchStarted: { ru: 'Запущен батч {batch}: {sections} секций', en: 'Batch {batch} started: {sections} sections' },
-    insightBatchCompleted: { ru: 'Батч {batch} завершён за {time}с', en: 'Batch {batch} completed in {time}s' },
-    insightQualityScore: { ru: 'Оценка качества: {score}% (порог: {threshold}%)', en: 'Quality score: {score}% (threshold: {threshold}%)' },
-    insightLessonsValidated: { ru: 'Проверено {count} уроков (минимум: {min})', en: 'Validated {count} lessons (minimum: {min})' },
+    insightMetadataGenerated: {
+      ru: 'Метаданные сгенерированы: {outcomes} целей обучения',
+      en: 'Metadata generated: {outcomes} learning outcomes',
+    },
+    insightBatchStarted: {
+      ru: 'Запущен батч {batch}: {sections} секций',
+      en: 'Batch {batch} started: {sections} sections',
+    },
+    insightBatchCompleted: {
+      ru: 'Батч {batch} завершён за {time}с',
+      en: 'Batch {batch} completed in {time}s',
+    },
+    insightQualityScore: {
+      ru: 'Оценка качества: {score}% (порог: {threshold}%)',
+      en: 'Quality score: {score}% (threshold: {threshold}%)',
+    },
+    insightLessonsValidated: {
+      ru: 'Проверено {count} уроков (минимум: {min})',
+      en: 'Validated {count} lessons (minimum: {min})',
+    },
 
     // Empty states
     emptyInput: { ru: 'Ожидание данных из Stage 4...', en: 'Waiting for Stage 4 data...' },
@@ -958,7 +1172,10 @@ export const GRAPH_TRANSLATIONS: GraphTranslations & {
     finish: { ru: 'Финиш', en: 'Finish' },
     courseReady: { ru: 'Курс готов!', en: 'Course Ready!' },
     waiting: { ru: 'Ожидание...', en: 'Waiting...' },
-    waitingForGeneration: { ru: 'Ожидание завершения генерации...', en: 'Waiting for generation to complete...' },
+    waitingForGeneration: {
+      ru: 'Ожидание завершения генерации...',
+      en: 'Waiting for generation to complete...',
+    },
     openCourse: { ru: 'Открыть курс', en: 'Open Course' },
     moduleWord: { ru: 'модуль', en: 'module' },
     modulesWord: { ru: 'модуля', en: 'modules' },
@@ -968,7 +1185,10 @@ export const GRAPH_TRANSLATIONS: GraphTranslations & {
     lessonsManyWord: { ru: 'уроков', en: 'lessons' },
     // Drawer panel translations
     drawerTitle: { ru: 'Завершение курса', en: 'Course Completion' },
-    drawerDescription: { ru: 'Статус генерации и ссылка на готовый курс', en: 'Generation status and link to completed course' },
+    drawerDescription: {
+      ru: 'Статус генерации и ссылка на готовый курс',
+      en: 'Generation status and link to completed course',
+    },
     completionStatus: { ru: 'Статус завершения', en: 'Completion Status' },
     generationComplete: { ru: 'Генерация завершена', en: 'Generation Complete' },
     generationPending: { ru: 'Генерация в процессе', en: 'Generation in Progress' },
@@ -976,8 +1196,14 @@ export const GRAPH_TRANSLATIONS: GraphTranslations & {
     modules: { ru: 'Модулей', en: 'Modules' },
     lessons: { ru: 'Уроков', en: 'Lessons' },
     viewCourse: { ru: 'Перейти к курсу', en: 'View Course' },
-    congratulations: { ru: 'Поздравляем! Ваш курс успешно создан.', en: 'Congratulations! Your course has been successfully created.' },
-    pendingMessage: { ru: 'Пожалуйста, дождитесь завершения генерации всех уроков.', en: 'Please wait for all lessons to finish generating.' },
+    congratulations: {
+      ru: 'Поздравляем! Ваш курс успешно создан.',
+      en: 'Congratulations! Your course has been successfully created.',
+    },
+    pendingMessage: {
+      ru: 'Пожалуйста, дождитесь завершения генерации всех уроков.',
+      en: 'Please wait for all lessons to finish generating.',
+    },
     loadingLink: { ru: 'Загрузка...', en: 'Loading...' },
   },
 
@@ -1110,4 +1336,4 @@ export const GRAPH_TRANSLATIONS: GraphTranslations & {
       failed: { ru: 'ошибка', en: 'failed' },
     },
   },
-};
+}
