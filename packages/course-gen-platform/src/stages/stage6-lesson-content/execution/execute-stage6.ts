@@ -1,5 +1,5 @@
 import { logger } from '@/shared/logger';
-import { getGraph } from '../orchestrator';
+import { getGraph } from '../graph';
 import type { Stage6Input, Stage6Output } from '../types';
 import type { LessonGraphStateType } from '../state';
 
