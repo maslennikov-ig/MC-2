@@ -2815,6 +2815,15 @@ export type Database = {
           error_message: string
         }[]
       }
+      batch_update_lesson_contents_status: {
+        Args: {
+          p_ids: string[]
+          p_metadata_map: Json
+          p_status: string
+          p_updated_at: string
+        }
+        Returns: number
+      }
       calculate_course_stats: {
         Args: { p_course_id: string }
         Returns: {

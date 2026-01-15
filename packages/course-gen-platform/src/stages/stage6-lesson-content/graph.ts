@@ -1,6 +1,6 @@
 import { StateGraph, START, END } from '@langchain/langgraph';
 import { LessonGraphState } from './state';
-import { generatorNode } from './nodes/generator';
+import { generatorNode } from './nodes/generator-node';
 import { selfReviewerNode } from './nodes/self-reviewer-node';
 import { judgeNode } from './nodes/judge-node';
 import { sectionRegeneratorNode } from './nodes/section-regenerator';
