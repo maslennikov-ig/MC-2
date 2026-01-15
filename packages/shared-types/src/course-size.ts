@@ -16,12 +16,20 @@ import type { Language } from './common-enums';
 /**
  * Course size options:
  * - auto: LLM decides optimal size based on topic (DEFAULT)
- * - mini: Quick overview, express introduction (~10 lessons)
- * - compact: Small focused course (~20 lessons)
- * - standard: Typical comprehensive course (~40 lessons)
- * - comprehensive: Large detailed course with advanced topics (~80 lessons)
+ * - micro: Minimal course for simple topics (1-5 lessons)
+ * - mini: Quick overview, express introduction (8-12 lessons)
+ * - compact: Small focused course (15-25 lessons)
+ * - standard: Typical comprehensive course (30-50 lessons)
+ * - comprehensive: Large detailed course with advanced topics (60-100 lessons)
  */
-export const COURSE_SIZES = ['auto', 'mini', 'compact', 'standard', 'comprehensive'] as const;
+export const COURSE_SIZES = [
+  'auto',
+  'micro',
+  'mini',
+  'compact',
+  'standard',
+  'comprehensive',
+] as const;
 
 /** Inferred CourseSize type from array */
 export type CourseSize = (typeof COURSE_SIZES)[number];
@@ -30,7 +38,13 @@ export type CourseSize = (typeof COURSE_SIZES)[number];
 export const courseSizeSchema = z.enum(COURSE_SIZES);
 
 /** Sizes that have explicit presets (excludes 'auto') */
-export const PRESET_COURSE_SIZES = ['mini', 'compact', 'standard', 'comprehensive'] as const;
+export const PRESET_COURSE_SIZES = [
+  'micro',
+  'mini',
+  'compact',
+  'standard',
+  'comprehensive',
+] as const;
 export type PresetCourseSize = (typeof PRESET_COURSE_SIZES)[number];
 
 // ============================================================================
@@ -58,6 +72,17 @@ export interface CourseSizePreset {
  * Note: 'auto' is not included - it means LLM decides without guidance
  */
 export const COURSE_SIZE_PRESETS: Record<PresetCourseSize, CourseSizePreset> = {
+  micro: {
+    size: 'micro',
+    targetLessons: 3,
+    targetSections: 1,
+    estimatedHoursMin: 0.25,
+    estimatedHoursMax: 1,
+    llmGuidance:
+      'Create a minimal micro-course with 1-5 lessons in 1 section. ' +
+      'This is for very simple topics that need only the absolute essentials. ' +
+      'Cover only the core concept - no background, no advanced topics, just the minimum viable knowledge.',
+  },
   mini: {
     size: 'mini',
     targetLessons: 10,
@@ -65,7 +90,7 @@ export const COURSE_SIZE_PRESETS: Record<PresetCourseSize, CourseSizePreset> = {
     estimatedHoursMin: 1,
     estimatedHoursMax: 3,
     llmGuidance:
-      'Create a quick overview course with approximately 10 lessons in 3 sections. ' +
+      'Create a quick overview course with 8-12 lessons in 3 sections. ' +
       'Focus on essential concepts only - this is an express introduction, not comprehensive coverage. ' +
       'Keep explanations concise and skip advanced topics.',
   },
