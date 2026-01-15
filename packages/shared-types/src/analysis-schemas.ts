@@ -306,7 +306,7 @@ export const Phase2InputSchema = z.object({
     }),
   }),
   // Course size fields (advisory - LLM may deviate if needed)
-  course_size: z.enum(['mini', 'compact', 'standard', 'comprehensive']).optional(),
+  course_size: z.enum(['micro', 'mini', 'compact', 'standard', 'comprehensive']).optional(),
   target_lessons: z.number().int().positive().optional(),
   target_sections: z.number().int().positive().optional(),
   size_guidance: z.string().min(1).optional(),
