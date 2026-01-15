@@ -356,7 +356,9 @@ function buildPhase2Prompt(input: Phase2Input): { role: string; content: string 
       ? `\n\nAvailable Documents: ${document_summaries.length} documents with processed content`
       : '';
 
-  // Build course size guidance section (MANDATORY constraint with ±20% tolerance)
+  // Build course size guidance section
+  // - For specific sizes: MANDATORY constraint with ±20% tolerance
+  // - For auto: explicit guidance to determine optimal size
   const sizeSection = input.size_guidance
     ? `\n\n## User-Requested Course Size (MANDATORY CONSTRAINT)
 ${input.size_guidance}
@@ -367,7 +369,23 @@ ${input.size_guidance}
 - If the topic seems too broad, REDUCE scope by focusing on essentials only
 - If the topic seems too narrow, ADD depth (advanced techniques, case studies, practical exercises)
 - DO NOT exceed the allowed range - adjust content depth, not lesson count`
-    : '';
+    : `\n\n## Course Size: AI-Determined (AUTO MODE)
+The user has selected **AUTO mode** - analyze the topic and determine the OPTIMAL course size yourself.
+
+Consider these factors:
+- **Topic breadth**: How many distinct areas need coverage?
+- **Topic depth**: How complex are the concepts?
+- **Target audience**: Beginners need more lessons, experts need fewer
+- **Available documents**: More materials may justify larger scope
+- **Industry standards**: What's typical for this subject?
+
+Size guidelines for reference:
+- Mini (~10 lessons): Narrow topics, quick introductions, single-skill courses
+- Compact (~20 lessons): Focused courses, moderate depth
+- Standard (~40 lessons): Comprehensive coverage, multiple skills
+- Large (~80 lessons): Extensive subjects, professional certifications
+
+**You decide** the optimal size. Justify your decision in \`scope_reasoning\`.`;
 
   // Generate Zod schema description for LLM
   const schemaDescription = zodToPromptSchema(Phase2OutputSchema);
