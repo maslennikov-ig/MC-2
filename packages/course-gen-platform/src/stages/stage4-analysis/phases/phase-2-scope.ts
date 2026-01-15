@@ -51,7 +51,12 @@ export async function runPhase2Scope(input: Phase2Input): Promise<Phase2Output> 
   const validatedInput = Phase2InputSchema.parse(input);
 
   // Get model for Phase 2 from database config
-  const model = await getModelForPhase('stage_4_scope', validatedInput.course_id);
+  const model = await getModelForPhase(
+    'stage_4_scope',
+    validatedInput.course_id,
+    undefined,
+    validatedInput.language
+  );
   const modelId = model.model || 'unknown';
 
   // Build prompt
