@@ -11,7 +11,7 @@ import { startStage6InputSchema } from '../schemas';
 import { verifyCourseAccess } from '../helpers';
 import { addJob } from '../../../../orchestrator/queue';
 import { JobType } from '@megacampus/shared-types';
-import type { LessonContentJobData } from '@megacampus/shared-types';
+import type { LessonContentJobData, CourseStyle } from '@megacampus/shared-types';
 import { logger } from '../../../../shared/logger/index.js';
 import { validateLocale } from '@/shared/validation';
 
@@ -99,7 +99,7 @@ export const startStage6 = protectedProcedure
             ragContextId: null,
             language: course.language, // Pass course language for content generation
             locale: validateLocale(course.language),
-            style: course.style ?? undefined, // Pass course style for content generation
+            style: (course.style as CourseStyle | null) ?? undefined, // Pass course style for content generation
           };
 
           // Deterministic job ID for deduplication
