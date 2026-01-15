@@ -28,7 +28,7 @@ import { getSupabaseAdmin } from '../supabase/admin';
 import logger from '../logger';
 import type { Database } from '@megacampus/shared-types';
 import { calculateContextThreshold, DEFAULT_CONTEXT_RESERVE } from '@megacampus/shared-types';
-import { normalizeLanguageForReserve } from '../utils/language-utils';
+import { normalizeLanguageForReserve, type LanguageCode } from '../utils/language-utils';
 import { DOCUMENT_SIZE_THRESHOLD, STAGE4_CONTEXT_THRESHOLD } from './model-selector';
 
 // ============================================================================
@@ -66,6 +66,8 @@ export interface ModelConfigResult {
   tier: 'standard' | 'extended';
   /** Source of configuration (database or hardcoded fallback) */
   source: 'database' | 'hardcoded';
+  /** The language that was actually found in DB ('ru', 'en', or 'any') */
+  actualLanguage?: string;
 }
 
 /**
@@ -92,6 +94,8 @@ export interface PhaseModelConfig {
   tier: 'standard' | 'extended';
   /** Source of configuration */
   source: 'database' | 'hardcoded';
+  /** The language that was actually found in DB ('ru', 'en', or 'any') */
+  actualLanguage?: string;
 }
 
 /**
@@ -294,14 +298,14 @@ class ModelConfigServiceImpl {
    * 5. DB failure + no cache → throw explicit error
    *
    * @param stageNumber - Stage number (3, 4, 5, 6)
-   * @param language - Content language ('ru' or 'en')
+   * @param language - Content language (LanguageCode: 'ru', 'en', or any ISO 639-1 code)
    * @param tokenCount - Total token count for tier selection
    * @returns Model configuration with primary/fallback models
    * @throws Error if database unavailable and no cached data exists
    */
   async getModelForStage(
     stageNumber: number,
-    language: 'ru' | 'en',
+    language: LanguageCode,
     tokenCount: number
   ): Promise<ModelConfigResult> {
     // Determine tier based on token count and stage-specific thresholds
@@ -311,7 +315,20 @@ class ModelConfigServiceImpl {
     // Step 1: Check cache - return fresh data immediately
     const cached = this.stageCache.get(cacheKey);
     if (cached && !cached.isStale) {
-      logger.debug({ cacheKey, age: cached.age }, 'Stage config cache hit (fresh)');
+      // Log extra info when cached data used fallback language
+      if (cached.data.actualLanguage && cached.data.actualLanguage !== language) {
+        logger.debug(
+          {
+            cacheKey,
+            age: cached.age,
+            requestedLanguage: language,
+            actualLanguage: cached.data.actualLanguage,
+          },
+          'Stage config cache hit with fallback language'
+        );
+      } else {
+        logger.debug({ cacheKey, age: cached.age }, 'Stage config cache hit (fresh)');
+      }
       return cached.data;
     }
 
@@ -367,6 +384,8 @@ class ModelConfigServiceImpl {
    * @param tokenCount - Optional token count for tier selection. If provided, selects
    *                     'extended' tier when > STAGE4_CONTEXT_THRESHOLD (260K), otherwise 'standard'.
    *                     If not provided, defaults to 'standard' tier.
+   * @param language - Optional language code (LanguageCode: 'ru', 'en', or any ISO 639-1 code).
+   *                   Falls back to 'any' for reserve calculation if not supported.
    * @returns Phase model configuration
    * @throws Error if database unavailable and no cached data exists
    */
@@ -374,7 +393,7 @@ class ModelConfigServiceImpl {
     phaseName: string,
     courseId?: string,
     tokenCount?: number,
-    language?: string // Supports 'ru', 'en', or any other language (falls back to 'any' for reserve calculation)
+    language?: LanguageCode
   ): Promise<PhaseModelConfig> {
     // Step 0: Determine tier using dynamic threshold calculation
     // First, we need to get the standard tier config to know the primary model's max_context
@@ -441,7 +460,21 @@ class ModelConfigServiceImpl {
     // Step 1: Check cache - return fresh data immediately
     const cached = this.phaseCache.get(cacheKey);
     if (cached && !cached.isStale) {
-      logger.debug({ cacheKey, age: cached.age, tier }, 'Phase config cache hit (fresh)');
+      // Log extra info when cached data used fallback language
+      if (cached.data.actualLanguage && cached.data.actualLanguage !== language) {
+        logger.debug(
+          {
+            cacheKey,
+            age: cached.age,
+            tier,
+            requestedLanguage: language,
+            actualLanguage: cached.data.actualLanguage,
+          },
+          'Phase config cache hit with fallback language'
+        );
+      } else {
+        logger.debug({ cacheKey, age: cached.age, tier }, 'Phase config cache hit (fresh)');
+      }
       return cached.data;
     }
 
@@ -486,11 +519,11 @@ class ModelConfigServiceImpl {
    * 4. DB failure + stale cache → return stale with WARNING
    * 5. DB failure + no cache → throw explicit error
    *
-   * @param language - Content language ('ru', 'en', or other)
+   * @param language - Content language (LanguageCode: 'ru', 'en', or any ISO 639-1 code)
    * @returns Judge models with primary, secondary, and tiebreaker
    * @throws Error if database unavailable and no cached data exists
    */
-  async getJudgeModels(language: string): Promise<JudgeModelsResult> {
+  async getJudgeModels(language: LanguageCode): Promise<JudgeModelsResult> {
     const cacheKey = `judges:${language}`;
 
     // Step 1: Check cache - return fresh data immediately
@@ -555,10 +588,10 @@ class ModelConfigServiceImpl {
    * 4. DB failure + stale cache → return stale with WARNING
    * 5. DB failure + no cache → use DEFAULT_CONTEXT_RESERVE fallback
    *
-   * @param language - Content language ('en', 'ru', or other)
+   * @param language - Content language (LanguageCode: 'ru', 'en', or any ISO 639-1 code)
    * @returns Reserve percentage (0-1)
    */
-  async getContextReservePercent(language: string): Promise<number> {
+  async getContextReservePercent(language: LanguageCode): Promise<number> {
     const cacheKey = 'context_reserve_settings';
 
     // Step 1: Check cache - return fresh data immediately
@@ -655,10 +688,13 @@ class ModelConfigServiceImpl {
    * - 200K model, EN (15% reserve) → 170K threshold
    *
    * @param maxContextTokens - Maximum context tokens supported by the model
-   * @param language - Content language ('en', 'ru', or other)
+   * @param language - Content language (LanguageCode: 'ru', 'en', or any ISO 639-1 code)
    * @returns Dynamic threshold in tokens
    */
-  async calculateDynamicThreshold(maxContextTokens: number, language: string): Promise<number> {
+  async calculateDynamicThreshold(
+    maxContextTokens: number,
+    language: LanguageCode
+  ): Promise<number> {
     const reservePercent = await this.getContextReservePercent(language);
     const threshold = calculateContextThreshold(maxContextTokens, reservePercent);
 
@@ -711,13 +747,13 @@ class ModelConfigServiceImpl {
    *
    * @param stageNumber - Stage number (3, 4, 5, 6)
    * @param tokenCount - Total token count
-   * @param language - Content language ('ru' or 'en')
+   * @param language - Content language (LanguageCode: 'ru', 'en', or any ISO 639-1 code)
    * @returns Tier ('standard' or 'extended')
    */
   private async determineTierAsync(
     stageNumber: number,
     tokenCount: number,
-    language: 'ru' | 'en'
+    language: LanguageCode
   ): Promise<'standard' | 'extended'> {
     // Stage 4 uses analysis models with larger context (200K)
     // Other stages use standard models (128K)
@@ -747,7 +783,8 @@ class ModelConfigServiceImpl {
 
       // Step 1: Try language-aware fallback using DEFAULT_CONTEXT_RESERVE
       try {
-        const reservePercent = DEFAULT_CONTEXT_RESERVE[language] ?? DEFAULT_CONTEXT_RESERVE.any;
+        const reserveLang = normalizeLanguageForReserve(language);
+        const reservePercent = DEFAULT_CONTEXT_RESERVE[reserveLang];
         const fallbackThreshold = calculateContextThreshold(maxContext, reservePercent);
 
         logger.info(
@@ -781,14 +818,18 @@ class ModelConfigServiceImpl {
 
   private async fetchStageConfigFromDb(
     stageNumber: number,
-    language: 'ru' | 'en',
+    language: LanguageCode,
     tier: 'standard' | 'extended'
   ): Promise<ModelConfigResult | null> {
     const supabase = getSupabaseAdmin();
 
     // Cascading language lookup: specific language -> 'any' fallback
     // This allows defining language-specific models while using 'any' as universal fallback
-    const languagesToTry: Array<'ru' | 'en' | 'any'> = [language, 'any'];
+    // First normalize to reserve language (ru/en/any), then always try 'any' as fallback
+    const reserveLang = normalizeLanguageForReserve(language);
+    // Only try language-specific config if it's ru or en, otherwise directly use 'any'
+    const languagesToTry: Array<'ru' | 'en' | 'any'> =
+      reserveLang === 'any' ? ['any'] : [reserveLang, 'any'];
 
     // Build parallel queries for all language variants (optimization: ~50-100ms saved per fallback)
     const languageQueries = languagesToTry.map(langToTry =>
@@ -855,6 +896,7 @@ class ModelConfigServiceImpl {
           cacheReadEnabled: config.cache_read_enabled || false,
           tier,
           source: 'database',
+          actualLanguage: langToTry,
         };
       }
     }
@@ -867,7 +909,7 @@ class ModelConfigServiceImpl {
     phaseName: string,
     courseId?: string,
     tier: 'standard' | 'extended' = 'standard',
-    language?: string
+    language?: LanguageCode
   ): Promise<PhaseModelConfig | null> {
     const supabase = getSupabaseAdmin();
 
@@ -937,6 +979,7 @@ class ModelConfigServiceImpl {
           timeoutMs: courseOverride.timeout_ms,
           tier: (courseOverride.context_tier as 'standard' | 'extended') || tier,
           source: 'database',
+          actualLanguage: langToTry,
         };
       }
     }
@@ -977,6 +1020,7 @@ class ModelConfigServiceImpl {
           timeoutMs: globalConfig.timeout_ms,
           tier: (globalConfig.context_tier as 'standard' | 'extended') || tier,
           source: 'database',
+          actualLanguage: langToTry,
         };
       }
     }
@@ -984,7 +1028,7 @@ class ModelConfigServiceImpl {
     return null;
   }
 
-  private async fetchJudgeConfigsFromDb(language: string): Promise<JudgeModelsResult | null> {
+  private async fetchJudgeConfigsFromDb(language: LanguageCode): Promise<JudgeModelsResult | null> {
     const supabase = getSupabaseAdmin();
 
     // Try exact language match first

@@ -338,10 +338,10 @@ export class MetadataGenerator {
 
   /**
    * Extract language from input (FR-027)
-   * Priority: frontend_parameters.language > analysis_result contextual language > 'en'
+   * Priority: frontend_parameters.language > analysis_result detection > 'en'
    *
    * Note: contextual_language is now an object with 6 fields (why_matters_context, motivators, etc.)
-   * We use the 'summary' strategy to extract language hints if needed
+   * We use simple heuristics to detect language from analysis content (Cyrillic vs Latin)
    *
    * Supports both ISO 639-1 codes (ru, en) and full language names (Russian, English)
    * for backward compatibility with database records that store full names.
@@ -352,11 +352,81 @@ export class MetadataGenerator {
       return normalizeLanguageCode(input.frontend_parameters.language, 'en');
     }
 
-    // Priority 2: Extract from contextual_language object (new schema)
-    // For now, we default to 'en' since contextual_language provides context, not language code
-    // TODO: Consider adding language detection from contextual_language content if needed
+    // Priority 2: Detect from analysis_result content
+    if (input.analysis_result) {
+      const detectedLang = this.detectLanguageFromAnalysis(input.analysis_result);
+      if (detectedLang) {
+        logger.info(
+          {
+            detectedLang,
+            courseId: input.course_id,
+            source: 'analysis_result',
+          },
+          'Detected language from analysis content'
+        );
+        return detectedLang;
+      }
+    }
 
+    // Priority 3: Default to English with warning
+    logger.warn(
+      {
+        courseId: input.course_id,
+        hasAnalysis: !!input.analysis_result,
+        reason: 'No language in frontend_parameters, detection failed',
+      },
+      'Defaulting to "en" language'
+    );
     return 'en';
+  }
+
+  /**
+   * Detect language from analysis_result using simple heuristics
+   * Checks for Cyrillic characters (Russian) vs Latin (English)
+   *
+   * @param analysis - Analysis result from Stage 4
+   * @returns Detected language code ('ru' or 'en') or null if detection fails
+   */
+  private detectLanguageFromAnalysis(
+    analysis: NonNullable<GenerationJobInput['analysis_result']>
+  ): string | null {
+    // Collect text from analysis fields
+    const textSamples: string[] = [];
+
+    if (analysis.topic_analysis?.determined_topic) {
+      textSamples.push(analysis.topic_analysis.determined_topic);
+    }
+    if (analysis.topic_analysis?.key_concepts) {
+      textSamples.push(...analysis.topic_analysis.key_concepts);
+    }
+    if (analysis.contextual_language) {
+      // contextual_language has fields like why_matters_context, motivators, etc.
+      const contextualValues = Object.values(analysis.contextual_language).filter(
+        (v): v is string => typeof v === 'string'
+      );
+      textSamples.push(...contextualValues);
+    }
+
+    const combinedText = textSamples.join(' ');
+    if (!combinedText || combinedText.length < 10) {
+      return null;
+    }
+
+    // Simple heuristic: check for Cyrillic characters
+    const cyrillicCount = (combinedText.match(/[\u0400-\u04FF]/g) || []).length;
+    const latinCount = (combinedText.match(/[a-zA-Z]/g) || []).length;
+
+    // If >30% Cyrillic, it's Russian
+    const totalLetters = cyrillicCount + latinCount;
+    if (totalLetters > 0) {
+      const cyrillicRatio = cyrillicCount / totalLetters;
+      if (cyrillicRatio > 0.3) {
+        return 'ru';
+      }
+    }
+
+    // Default to null (let caller decide)
+    return null;
   }
 
   /**
