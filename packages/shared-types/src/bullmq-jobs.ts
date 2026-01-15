@@ -283,7 +283,13 @@ export const LessonContentJobDataSchema = BaseJobDataSchema.extend({
   language: languageSchema.default('en'),
   /** Optional model override for fallback retry */
   modelOverride: z.string().optional(),
-  /** Course content style (e.g., 'gamified', 'professional', 'storytelling') */
+  /**
+   * Course content style for lesson generation
+   * Controls vocabulary, phrasing, and narrative approach
+   * @example 'gamified' // Quest-based, achievement-oriented narrative
+   * @example 'professional' // Business formal, concise, authoritative
+   * @default 'professional' (fallback in getStylePrompt)
+   */
   style: z.string().optional(),
 });
 

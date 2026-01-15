@@ -302,8 +302,14 @@ export async function processStage6Job(
   job: Job<Stage6JobInput, Stage6JobResult>,
   token?: string
 ): Promise<Stage6JobResult> {
-  // Note: style flows through job.data spread in processWithFallback -> executeStage6
-  const { lessonSpec, courseId, language, userRefinementPrompt: _userRefinementPrompt } = job.data;
+  // Style parameter flows through job.data spread to executeStage6 via processWithFallback
+  const {
+    lessonSpec,
+    courseId,
+    language,
+    style,
+    userRefinementPrompt: _userRefinementPrompt,
+  } = job.data;
   const startTime = Date.now();
 
   // Check if course generation is paused - if so, delay this job
@@ -409,6 +415,7 @@ export async function processStage6Job(
     courseId,
     attempt: job.attemptsMade + 1,
     language,
+    style: style ?? 'default',
     primaryModel: modelConfig.primary,
     isPaused: pauseStatusForLogging,
   });

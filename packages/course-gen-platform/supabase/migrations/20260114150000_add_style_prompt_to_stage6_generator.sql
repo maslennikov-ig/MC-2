@@ -3,6 +3,11 @@
 -- Date: 2026-01-14
 -- Related: Fix for style selection not affecting generated content
 -- Issue: Stage 6 only used tone (formal/conversational) but not full style prompt
+--
+-- TypeScript Usage:
+--   Used by: packages/course-gen-platform/src/stages/stage6-lesson-content/nodes/generator/generator-section.ts
+--   Variable: {{stylePrompt}} is populated by getStylePrompt(style)
+--   Source: @megacampus/shared-types/src/style-prompts.ts
 
 -- ============================================================================
 -- UPDATE STAGE 6 SERIAL GENERATOR PROMPT WITH STYLE PROMPT
