@@ -1,12 +1,22 @@
 ---
 name: process-logs
 description: Process error logs from admin panel - fetch new errors, analyze, create tasks, fix, and mark resolved
-version: 1.0.0
+version: 1.1.0
 ---
 
 # Process Error Logs
 
 Automated workflow for processing error logs from `/admin/logs`.
+
+## Orchestrator Role
+
+**YOU ARE THE ORCHESTRATOR.** Follow these rules:
+
+1. **Simple tasks** (config fixes, single-line changes) - execute directly
+2. **Complex tasks** (multi-file fixes, migrations, API changes) - delegate to subagents
+3. **ALWAYS verify** subagent results by reading modified files and running `pnpm type-check && pnpm build`
+4. **Use MCP tools**: `mcp__supabase__execute_sql` for DB queries, `mcp__context7__query-docs` for documentation
+5. **ALWAYS use context7** for documentation and examples before implementing
 
 ## Usage
 
@@ -14,7 +24,7 @@ Invoke via: `/process-logs` or "обработай логи ошибок"
 
 ## Workflow
 
-### 1. Fetch New Errors
+### 1. Fetch New Errors (use mcp**supabase**execute_sql)
 
 ```sql
 SELECT el.id, el.severity, el.error_message, el.metadata, el.stack_trace,
@@ -28,67 +38,82 @@ ORDER BY
 LIMIT 20;
 ```
 
-### 2. Categorize Each Error
+### 2. Categorize & Assign
 
-| Pattern                      | Category       | Action            |
-| ---------------------------- | -------------- | ----------------- |
-| `violates.*constraint`       | DB constraint  | Fix via migration |
-| `tRPC error`                 | API bug        | Fix code          |
-| `ENRICHMENTS_STORAGE_BUCKET` | Config warning | Ignore            |
-| `Cloudflare 500`             | External       | Ignore            |
-| `Error querying`             | Query bug      | Fix code          |
+| Pattern                | Category      | Subagent                      |
+| ---------------------- | ------------- | ----------------------------- |
+| `violates.*constraint` | DB constraint | `database-architect`          |
+| `tRPC error`           | API bug       | `fullstack-nextjs-specialist` |
+| `Type.*error`          | Type error    | `typescript-types-specialist` |
+| `Error querying`       | Query bug     | `database-architect`          |
+| Config missing         | Config issue  | **ask user** how to resolve   |
+| External service       | External      | mark `to_verify`, monitor     |
 
-### 3. For Fixable Errors
+**IMPORTANT**: Never auto-ignore errors. Always fix or ask user.
+
+### 3. For Each Error
 
 ```bash
-# Create Beads task
+# 1. Create Beads task
 bd create --type=bug --priority=<1-3> --title="Fix: <message>" --files "<files>"
 bd update <id> --status=in_progress
 
-# Delegate to subagent based on type:
-# - database-architect: DB errors
-# - fullstack-nextjs-specialist: API errors
-# - typescript-types-specialist: Type errors
+# 2. Query context7 for relevant docs
+mcp__context7__resolve-library-id + mcp__context7__query-docs
 
-# After fix
-pnpm type-check && pnpm build
+# 3. Delegate to subagent OR fix directly (simple cases only)
 
-# Mark resolved
+# 4. VERIFY results (MANDATORY):
+# - Read modified files
+# - Run: pnpm type-check && pnpm build
+# - Re-delegate if errors
+
+# 5. Mark resolved
 INSERT INTO log_issue_status (log_type, log_id, status, notes, updated_at)
 VALUES ('error_log', '<id>', 'resolved', 'Fixed: <desc>', NOW())
 ON CONFLICT (log_type, log_id) DO UPDATE SET status = 'resolved', notes = EXCLUDED.notes, updated_at = NOW();
 
-# Close task
+# 6. Close task
 bd close <id> --reason="Fixed"
 ```
 
-### 4. For Ignorable Errors
+### 4. Verification Checklist
 
-```sql
-INSERT INTO log_issue_status (log_type, log_id, status, notes, updated_at)
-VALUES ('error_log', '<id>', 'ignored', '<reason>', NOW())
-ON CONFLICT (log_type, log_id) DO UPDATE SET status = 'ignored', notes = EXCLUDED.notes, updated_at = NOW();
-```
+Before marking resolved:
+
+- [ ] Files modified correctly (Read tool)
+- [ ] `pnpm type-check` passes
+- [ ] `pnpm build` passes
+- [ ] No new errors introduced
 
 ## Output Summary
 
 ```markdown
 ## Log Processing Summary
 
-| Severity | Fixed | Ignored | Remaining |
+| Severity | Fixed | Pending | To Verify |
 | -------- | ----- | ------- | --------- |
-| CRITICAL | X     | 0       | Y         |
+| CRITICAL | X     | Y       | Z         |
 | ERROR    | X     | Y       | Z         |
-| WARNING  | 0     | X       | 0         |
+| WARNING  | X     | Y       | Z         |
 
 ### Fixed:
 
 - mc2-xxx: <description>
 
-### Ignored:
+### Pending (need user input):
 
 - <id>: <reason>
 ```
+
+## Subagent Selection
+
+| Error Type            | Subagent                      | When                |
+| --------------------- | ----------------------------- | ------------------- |
+| DB schema/constraints | `database-architect`          | Migrations, RLS     |
+| API/tRPC errors       | `fullstack-nextjs-specialist` | Backend logic       |
+| Type errors           | `typescript-types-specialist` | Complex types       |
+| UI errors             | `nextjs-ui-designer`          | Frontend components |
 
 ## Reference Docs
 
