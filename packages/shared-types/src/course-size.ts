@@ -101,7 +101,7 @@ export const COURSE_SIZE_PRESETS: Record<PresetCourseSize, CourseSizePreset> = {
     estimatedHoursMin: 3,
     estimatedHoursMax: 8,
     llmGuidance:
-      'Create a compact course with approximately 20 lessons in 5 sections. ' +
+      'Create a compact course with 15-25 lessons in 4-6 sections. ' +
       'Cover core concepts with moderate depth. Include practical examples but avoid extensive case studies. ' +
       'Skip very advanced or niche topics.',
   },
@@ -112,7 +112,7 @@ export const COURSE_SIZE_PRESETS: Record<PresetCourseSize, CourseSizePreset> = {
     estimatedHoursMin: 8,
     estimatedHoursMax: 20,
     llmGuidance:
-      'Create a standard-sized course with approximately 40 lessons in 8 sections. ' +
+      'Create a standard-sized course with 30-50 lessons in 6-10 sections. ' +
       'Provide thorough coverage with practical examples, exercises, and some advanced topics. ' +
       'Balance breadth and depth appropriately for the subject matter.',
   },
@@ -123,7 +123,7 @@ export const COURSE_SIZE_PRESETS: Record<PresetCourseSize, CourseSizePreset> = {
     estimatedHoursMin: 20,
     estimatedHoursMax: 50,
     llmGuidance:
-      'Create a comprehensive course with approximately 80 lessons in 15 sections. ' +
+      'Create a comprehensive course with 60-100 lessons in 12-18 sections. ' +
       'Provide in-depth coverage including advanced topics, extensive examples, case studies, and practical projects. ' +
       'Include edge cases, best practices, and expert-level insights.',
   },

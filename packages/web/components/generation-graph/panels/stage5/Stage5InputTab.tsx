@@ -83,10 +83,10 @@ export const Stage5InputTab = memo<Stage5InputTabProps>(function Stage5InputTab(
       try {
         const supabase = getSupabaseClient()
 
-        // Fetch course data: analysis_result, title, language, settings
+        // Fetch course data: analysis_result, title, settings, style (user-selected)
         const { data: courseData, error: courseError } = await supabase
           .from('courses')
-          .select('analysis_result, title, settings')
+          .select('analysis_result, title, settings, style')
           .eq('id', courseId)
           .single()
 
@@ -123,8 +123,11 @@ export const Stage5InputTab = memo<Stage5InputTabProps>(function Stage5InputTab(
               totalLessons,
               // Don't show range on Stage 5 - we already know the exact number from Stage 4
               lessonsRange: undefined,
-              // Use 'pedagogical_strategy.teaching_style' - real path
-              teachingStyle: (pedagogicalStrategy?.teaching_style as string) || 'mixed',
+              // Use user-selected style from courses.style, fallback to LLM analysis
+              teachingStyle:
+                (courseData.style as string) ||
+                (pedagogicalStrategy?.teaching_style as string) ||
+                'mixed',
               topicAnalysis: topicAnalysis
                 ? {
                     complexity: (topicAnalysis.complexity as string) || 'intermediate',
