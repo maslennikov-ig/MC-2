@@ -123,11 +123,10 @@ export const Stage5InputTab = memo<Stage5InputTabProps>(function Stage5InputTab(
               totalLessons,
               // Don't show range on Stage 5 - we already know the exact number from Stage 4
               lessonsRange: undefined,
-              // Use user-selected style from courses.style, fallback to LLM analysis
-              teachingStyle:
-                (courseData.style as string) ||
-                (pedagogicalStrategy?.teaching_style as string) ||
-                'mixed',
+              // Content style - user selected (affects tone: practical, conversational, academic)
+              contentStyle: (courseData.style as string) || undefined,
+              // Teaching style - from LLM analysis (affects structure: hands-on, theory-first)
+              teachingStyle: (pedagogicalStrategy?.teaching_style as string) || 'mixed',
               topicAnalysis: topicAnalysis
                 ? {
                     complexity: (topicAnalysis.complexity as string) || 'intermediate',
