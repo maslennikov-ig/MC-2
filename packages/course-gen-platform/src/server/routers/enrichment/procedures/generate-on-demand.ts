@@ -19,7 +19,12 @@ import { nanoid } from 'nanoid';
 import { protectedProcedure } from '../../../middleware/auth';
 import { createRateLimiter } from '../../../middleware/rate-limit.js';
 import { generateOnDemandInputSchema, isOnDemandType } from '@megacampus/shared-types';
-import { verifyLessonAccess, getNextOrderIndex, isTwoStageType } from '../helpers';
+import {
+  verifyLessonAccess,
+  getNextOrderIndex,
+  isTwoStageType,
+  checkExistingEnrichment,
+} from '../helpers';
 import { getSupabaseAdmin } from '../../../../shared/supabase/admin';
 import { createStage7Queue, addEnrichmentJob } from '../../../../stages/stage7-enrichments/factory';
 import type { Stage7JobInput } from '../../../../stages/stage7-enrichments/types';
@@ -104,39 +109,15 @@ export const generateOnDemand = protectedProcedure
       );
 
       // Step 3: Check if enrichment of this type already exists for lesson
-      const supabase = getSupabaseAdmin();
-      const { data: existingEnrichments, error: checkError } = await supabase
-        .from('lesson_enrichments')
-        .select('id, status')
-        .eq('lesson_id', lessonId)
-        .eq('enrichment_type', enrichmentType)
-        .not('status', 'in', '("failed","cancelled")');
+      const existing = await checkExistingEnrichment(lessonId, enrichmentType, requestId);
 
-      if (checkError) {
-        logger.error(
-          {
-            requestId,
-            lessonId,
-            enrichmentType,
-            error: checkError.message,
-          },
-          'Failed to check existing enrichments'
-        );
-
-        throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'Unable to verify existing enrichments. Please try again.',
-        });
-      }
-
-      if (existingEnrichments && existingEnrichments.length > 0) {
-        const existing = existingEnrichments[0];
+      if (existing.exists) {
         logger.warn(
           {
             requestId,
             lessonId,
             enrichmentType,
-            existingId: existing.id,
+            existingId: existing.enrichmentId,
             existingStatus: existing.status,
           },
           'Enrichment of this type already exists'
@@ -144,11 +125,12 @@ export const generateOnDemand = protectedProcedure
 
         throw new TRPCError({
           code: 'CONFLICT',
-          message: `An ${enrichmentType} enrichment already exists for this lesson`,
+          message: `An ${enrichmentType} enrichment already exists for this lesson.`,
         });
       }
 
       // Step 4: Get next order index
+      const supabase = getSupabaseAdmin();
       const orderIndex = await getNextOrderIndex(lessonId);
 
       // Step 5: Determine initial status (two-stage types start with draft generation)
