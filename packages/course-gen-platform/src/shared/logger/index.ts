@@ -57,7 +57,7 @@ async function writeToErrorLogs(
     const supabase = getSupabaseAdmin();
     const environment = detectEnvironment();
 
-    // Extract known fields from context
+    // Extract known fields from context (support both camelCase and snake_case)
     const {
       organizationId,
       organization_id,
@@ -69,16 +69,57 @@ async function writeToErrorLogs(
       job_type,
       courseId,
       course_id,
+      lessonId,
+      lesson_id,
+      requestId,
+      request_id,
+      trpcPath,
+      trpc_path,
+      trpcInput,
+      trpc_input,
+      attemptedValue,
+      attempted_value,
+      currentValue,
+      current_value,
       err,
       error,
+      stack,
       ...restMetadata
     } = context;
 
     // Build metadata with remaining context
     const metadata: Record<string, unknown> = { ...restMetadata };
-    if (courseId || course_id) metadata.courseId = courseId || course_id;
-    if (err) metadata.errorDetails = typeof err === 'object' ? err : { message: err };
-    if (error) metadata.errorDetails = typeof error === 'object' ? error : { message: error };
+
+    // Extract error details safely
+    const errorObj = err || error;
+    if (errorObj) {
+      if (typeof errorObj === 'object' && errorObj !== null) {
+        const errAny = errorObj as Record<string, unknown>;
+        metadata.errorDetails = {
+          message: errAny.message || String(errorObj),
+          code: errAny.code,
+          name: errAny.name,
+        };
+      } else {
+        metadata.errorDetails = { message: String(errorObj) };
+      }
+    }
+
+    // Include current value in metadata for context
+    const currentVal = currentValue || current_value;
+    if (currentVal) metadata.currentValue = currentVal;
+
+    // Safely serialize trpcInput
+    const inputData = trpcInput || trpc_input;
+    let sanitizedInput: Record<string, unknown> | null = null;
+    if (inputData && typeof inputData === 'object') {
+      try {
+        // Sanitize and limit size
+        sanitizedInput = JSON.parse(JSON.stringify(inputData));
+      } catch {
+        sanitizedInput = { _error: 'Failed to serialize input' };
+      }
+    }
 
     await supabase.from('error_logs' as any).insert({
       error_message: message,
@@ -88,6 +129,13 @@ async function writeToErrorLogs(
       user_id: (userId || user_id || null) as string | null,
       job_id: (jobId || job_id || null) as string | null,
       job_type: (jobType || job_type || null) as string | null,
+      course_id: (courseId || course_id || null) as string | null,
+      lesson_id: (lessonId || lesson_id || null) as string | null,
+      request_id: (requestId || request_id || null) as string | null,
+      trpc_path: (trpcPath || trpc_path || null) as string | null,
+      trpc_input: sanitizedInput,
+      attempted_value: (attemptedValue || attempted_value || null) as string | null,
+      stack_trace: (stack || null) as string | null,
       metadata: Object.keys(metadata).length > 0 ? metadata : null,
     });
   } catch (dbError) {
