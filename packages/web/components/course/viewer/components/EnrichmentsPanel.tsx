@@ -196,7 +196,6 @@ export function EnrichmentsPanel({
           const typeIsGenerating = isGenerating(type)
 
           // Construct translation key dynamically - path exists in enrichments.json
-          type PlaceholderKey = `placeholder.${typeof type}.estimatedTime`
           const estimatedTimeKey = `placeholder.${type}.estimatedTime`
 
           const estimatedTime = t(estimatedTimeKey as Parameters<typeof t>[0])

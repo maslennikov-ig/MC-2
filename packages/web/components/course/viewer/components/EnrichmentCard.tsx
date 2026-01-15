@@ -121,7 +121,6 @@ export function EnrichmentCard({ enrichment, isActive, onToggle }: EnrichmentCar
             <QuizPlayer
               content={enrichment.content}
               enrichmentId={enrichment.id}
-              // Removed console.log
               onComplete={() => {}}
             />
           </div>
