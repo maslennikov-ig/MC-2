@@ -311,6 +311,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.28.2] - 2026-01-15
+
+### Added
+
+- **skills**: add process-logs skill for automated error log processing (e379384)
+- **logging**: enhance error logging with full diagnostic context (52f3003)
+
+### Fixed
+
+- **stage6**: rename generator.ts to avoid ESM directory conflict (59fcab5)
+
+### Other
+
+- **skills**: add bug fixing principles to process-logs v1.3.0 (5cff6ab)
+- **skills**: clarify task complexity routing in process-logs (5dc35eb)
+- **skills**: make process-logs instructions mandatory (340debc)
+- **skills**: update process-logs with orchestrator instructions (dee78e6)
+- bd sync: 2026-01-15 17:10:33 (5ebf671)
+- bd sync: 2026-01-15 16:56:50 (de1bf06)
+
 ## [0.28.1] - 2026-01-15
 
 ### Added
