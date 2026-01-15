@@ -104,3 +104,71 @@ export interface ModelConfig {
   /** Fallback model if primary fails */
   fallback: string;
 }
+
+/**
+ * Stage 6 orchestrator input
+ *
+ * Contains all required inputs for lesson content generation.
+ */
+export interface Stage6Input {
+  /** Lesson specification from Stage 5 */
+  lessonSpec: LessonSpecificationV2;
+  /** Course UUID for context */
+  courseId: string;
+  /** Target language for content generation (ISO 639-1 code, e.g., 'ru', 'en') */
+  language: string;
+  /** Lesson UUID resolved from lesson_id (optional, for trace logging) */
+  lessonUuid?: string | null;
+  /** Pre-retrieved RAG chunks (optional) */
+  ragChunks?: RAGChunk[];
+  /** RAG context cache ID for tracking (optional) */
+  ragContextId?: string;
+  /** User instructions for refinement (optional) */
+  userRefinementPrompt?: string;
+  /** Model override for fallback retry (optional) */
+  modelOverride?: string;
+  /**
+   * Course content style for lesson generation
+   * Controls vocabulary, phrasing, and narrative approach
+   * @example 'gamified' - Quest-based, achievement-oriented narrative
+   * @example 'professional' - Business formal, concise, authoritative
+   * @default 'professional' (fallback in getStylePrompt when null/undefined)
+   */
+  style?: string;
+}
+
+/**
+ * Stage 6 orchestrator output
+ *
+ * Contains generated content and execution metrics.
+ */
+export interface Stage6Output {
+  /** Generated lesson content (null if failed) */
+  lessonContent: LessonContent | null;
+  /** Whether generation succeeded */
+  success: boolean;
+  /** Accumulated errors during generation */
+  errors: string[];
+  /** Execution metrics */
+  metrics: {
+    /** Total tokens used across all nodes */
+    tokensUsed: number;
+    /** Total duration in milliseconds */
+    durationMs: number;
+    /** Model used for generation */
+    modelUsed: string | null;
+    /** Quality score from judge (0-1, or 0 if not evaluated) */
+    qualityScore: number;
+  };
+  /** Human review metadata (for UI warnings) */
+  reviewInfo?: {
+    /** Whether content needs human review */
+    needsReview: boolean;
+    /** Reasons for review requirement */
+    reasons: string[];
+    /** Factual verification accuracy score (0-1) */
+    factualAccuracyScore?: number;
+    /** Number of unverified claims */
+    unverifiedClaims?: number;
+  };
+}
