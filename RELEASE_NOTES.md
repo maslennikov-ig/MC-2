@@ -2,6 +2,23 @@
 
 _Released on 2025-12-26_
 
+## v0.28.2
+
+_Released on 2026-01-15_
+
+### ✨ New Features
+
+- **Skills**: Add process-logs skill for automated error log processing
+- **logging**: Enhance error logging with full diagnostic context
+
+### 🐛 Bug Fixes
+
+- **stage6**: Rename generator.ts to avoid ESM directory conflict
+
+---
+
+_This release was automatically generated from 9 commits._
+
 ## v0.28.1
 
 _Released on 2026-01-15_
