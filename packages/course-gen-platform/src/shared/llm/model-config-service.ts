@@ -192,7 +192,10 @@ class StaleWhileRevalidateCache<T> {
     // Evict entries older than maxAge (24h) to prevent unbounded memory growth
     if (age > this.maxAge) {
       this.cache.delete(key);
-      logger.info({ key, ageHours: Math.round(age / 3600000) }, 'Cache entry evicted (exceeded 24h max age)');
+      logger.info(
+        { key, ageHours: Math.round(age / 3600000) },
+        'Cache entry evicted (exceeded 24h max age)'
+      );
       return null;
     }
 
@@ -386,7 +389,7 @@ class ModelConfigServiceImpl {
     phaseName: string,
     courseId?: string,
     tokenCount?: number,
-    language?: string  // Supports 'ru', 'en', or any other language (falls back to 'any' for reserve calculation)
+    language?: string // Supports 'ru', 'en', or any other language (falls back to 'any' for reserve calculation)
   ): Promise<PhaseModelConfig> {
     // Step 0: Determine tier using dynamic threshold calculation
     // First, we need to get the standard tier config to know the primary model's max_context
@@ -396,11 +399,15 @@ class ModelConfigServiceImpl {
     if (tokenCount !== undefined) {
       // Parallel fetch both tiers to avoid N+1 query
       const [standardConfig, extendedConfig] = await Promise.all([
-        this.fetchPhaseConfigFromDb(phaseName, courseId, 'standard'),
-        this.fetchPhaseConfigFromDb(phaseName, courseId, 'extended'),
+        this.fetchPhaseConfigFromDb(phaseName, courseId, 'standard', language),
+        this.fetchPhaseConfigFromDb(phaseName, courseId, 'extended', language),
       ]);
 
-      if (standardConfig && standardConfig.maxContextTokens !== null && standardConfig.maxContextTokens > 0) {
+      if (
+        standardConfig &&
+        standardConfig.maxContextTokens !== null &&
+        standardConfig.maxContextTokens > 0
+      ) {
         // Calculate dynamic threshold using language-specific reserve
         const lang = normalizeLanguageForReserve(language);
         const dynamicThreshold = await this.calculateDynamicThreshold(
@@ -410,14 +417,17 @@ class ModelConfigServiceImpl {
 
         tier = tokenCount > dynamicThreshold ? 'extended' : 'standard';
 
-        logger.debug({
-          phaseName,
-          tokenCount,
-          language: lang,
-          maxContext: standardConfig.maxContextTokens,
-          dynamicThreshold,
-          selectedTier: tier,
-        }, 'Dynamic tier determination for phase');
+        logger.debug(
+          {
+            phaseName,
+            tokenCount,
+            language: lang,
+            maxContext: standardConfig.maxContextTokens,
+            dynamicThreshold,
+            selectedTier: tier,
+          },
+          'Dynamic tier determination for phase'
+        );
 
         // Use pre-fetched config - avoid second DB query
         const selectedConfig = tier === 'extended' ? extendedConfig : standardConfig;
@@ -429,12 +439,15 @@ class ModelConfigServiceImpl {
       } else {
         // Fallback to hardcoded threshold if no standard config found
         tier = tokenCount > STAGE4_CONTEXT_THRESHOLD ? 'extended' : 'standard';
-        logger.warn({
-          phaseName,
-          tokenCount,
-          fallbackThreshold: STAGE4_CONTEXT_THRESHOLD,
-          selectedTier: tier,
-        }, 'Using hardcoded threshold fallback - no standard tier config found');
+        logger.warn(
+          {
+            phaseName,
+            tokenCount,
+            fallbackThreshold: STAGE4_CONTEXT_THRESHOLD,
+            selectedTier: tier,
+          },
+          'Using hardcoded threshold fallback - no standard tier config found'
+        );
       }
     }
 
@@ -449,7 +462,7 @@ class ModelConfigServiceImpl {
 
     // Step 2: Try database lookup
     try {
-      const dbConfig = await this.fetchPhaseConfigFromDb(phaseName, courseId, tier);
+      const dbConfig = await this.fetchPhaseConfigFromDb(phaseName, courseId, tier, language);
       if (dbConfig) {
         logger.info(
           { phaseName, courseId, tier, tokenCount, modelId: dbConfig.modelId, source: 'database' },
@@ -566,8 +579,12 @@ class ModelConfigServiceImpl {
     // Step 1: Check cache - return fresh data immediately
     const cached = this.reserveSettingsCache.get(cacheKey);
     if (cached && !cached.isStale) {
-      const reservePercent = cached.data.get(language) ?? cached.data.get('any') ?? DEFAULT_CONTEXT_RESERVE.any;
-      logger.debug({ language, reservePercent, source: 'cache' }, 'Context reserve percent (fresh cache)');
+      const reservePercent =
+        cached.data.get(language) ?? cached.data.get('any') ?? DEFAULT_CONTEXT_RESERVE.any;
+      logger.debug(
+        { language, reservePercent, source: 'cache' },
+        'Context reserve percent (fresh cache)'
+      );
       return reservePercent;
     }
 
@@ -584,7 +601,8 @@ class ModelConfigServiceImpl {
         // Step 3: Use stale cache if available
         if (cached) {
           const ageMinutes = Math.round(cached.age / 60000);
-          const reservePercent = cached.data.get(language) ?? cached.data.get('any') ?? DEFAULT_CONTEXT_RESERVE.any;
+          const reservePercent =
+            cached.data.get(language) ?? cached.data.get('any') ?? DEFAULT_CONTEXT_RESERVE.any;
           logger.warn(
             { language, reservePercent, ageMinutes },
             'Using STALE context reserve settings - DATA MAY BE OUTDATED'
@@ -593,7 +611,9 @@ class ModelConfigServiceImpl {
         }
 
         // Step 4: No cache, no database - use hardcoded fallback
-        const fallbackPercent = DEFAULT_CONTEXT_RESERVE[language as keyof typeof DEFAULT_CONTEXT_RESERVE] ?? DEFAULT_CONTEXT_RESERVE.any;
+        const fallbackPercent =
+          DEFAULT_CONTEXT_RESERVE[language as keyof typeof DEFAULT_CONTEXT_RESERVE] ??
+          DEFAULT_CONTEXT_RESERVE.any;
         logger.warn(
           { language, fallbackPercent },
           'Using hardcoded DEFAULT_CONTEXT_RESERVE fallback'
@@ -608,8 +628,12 @@ class ModelConfigServiceImpl {
       }
 
       this.reserveSettingsCache.set(cacheKey, settingsMap);
-      const reservePercent = settingsMap.get(language) ?? settingsMap.get('any') ?? DEFAULT_CONTEXT_RESERVE.any;
-      logger.debug({ language, reservePercent, source: 'database' }, 'Context reserve percent (fresh database)');
+      const reservePercent =
+        settingsMap.get(language) ?? settingsMap.get('any') ?? DEFAULT_CONTEXT_RESERVE.any;
+      logger.debug(
+        { language, reservePercent, source: 'database' },
+        'Context reserve percent (fresh database)'
+      );
       return reservePercent;
     } catch (err) {
       logger.error({ err, language }, 'Error fetching context reserve settings');
@@ -617,7 +641,8 @@ class ModelConfigServiceImpl {
       // Use stale cache if available
       if (cached) {
         const ageMinutes = Math.round(cached.age / 60000);
-        const reservePercent = cached.data.get(language) ?? cached.data.get('any') ?? DEFAULT_CONTEXT_RESERVE.any;
+        const reservePercent =
+          cached.data.get(language) ?? cached.data.get('any') ?? DEFAULT_CONTEXT_RESERVE.any;
         logger.warn(
           { language, reservePercent, ageMinutes },
           'Using STALE context reserve settings after error'
@@ -626,11 +651,10 @@ class ModelConfigServiceImpl {
       }
 
       // No cache - use hardcoded fallback
-      const fallbackPercent = DEFAULT_CONTEXT_RESERVE[language as keyof typeof DEFAULT_CONTEXT_RESERVE] ?? DEFAULT_CONTEXT_RESERVE.any;
-      logger.warn(
-        { language, fallbackPercent },
-        'Using hardcoded fallback after error'
-      );
+      const fallbackPercent =
+        DEFAULT_CONTEXT_RESERVE[language as keyof typeof DEFAULT_CONTEXT_RESERVE] ??
+        DEFAULT_CONTEXT_RESERVE.any;
+      logger.warn({ language, fallbackPercent }, 'Using hardcoded fallback after error');
       return fallbackPercent;
     }
   }
@@ -649,19 +673,19 @@ class ModelConfigServiceImpl {
    * @param language - Content language ('en', 'ru', or other)
    * @returns Dynamic threshold in tokens
    */
-  async calculateDynamicThreshold(
-    maxContextTokens: number,
-    language: string
-  ): Promise<number> {
+  async calculateDynamicThreshold(maxContextTokens: number, language: string): Promise<number> {
     const reservePercent = await this.getContextReservePercent(language);
     const threshold = calculateContextThreshold(maxContextTokens, reservePercent);
 
-    logger.debug({
-      maxContextTokens,
-      language,
-      reservePercent,
-      threshold,
-    }, 'Dynamic threshold calculated');
+    logger.debug(
+      {
+        maxContextTokens,
+        language,
+        reservePercent,
+        threshold,
+      },
+      'Dynamic threshold calculated'
+    );
 
     return threshold;
   }
@@ -717,14 +741,17 @@ class ModelConfigServiceImpl {
     try {
       const dynamicThreshold = await this.calculateDynamicThreshold(maxContext, language);
 
-      logger.debug({
-        stageNumber,
-        tokenCount,
-        language,
-        maxContext,
-        dynamicThreshold,
-        tier: tokenCount > dynamicThreshold ? 'extended' : 'standard',
-      }, 'Dynamic tier determination');
+      logger.debug(
+        {
+          stageNumber,
+          tokenCount,
+          language,
+          maxContext,
+          dynamicThreshold,
+          tier: tokenCount > dynamicThreshold ? 'extended' : 'standard',
+        },
+        'Dynamic tier determination'
+      );
 
       return tokenCount > dynamicThreshold ? 'extended' : 'standard';
     } catch (err) {
@@ -738,15 +765,18 @@ class ModelConfigServiceImpl {
         const reservePercent = DEFAULT_CONTEXT_RESERVE[language] ?? DEFAULT_CONTEXT_RESERVE.any;
         const fallbackThreshold = calculateContextThreshold(maxContext, reservePercent);
 
-        logger.info({
-          stageNumber,
-          tokenCount,
-          language,
-          maxContext,
-          reservePercent,
-          fallbackThreshold,
-          tier: tokenCount > fallbackThreshold ? 'extended' : 'standard',
-        }, 'Using DEFAULT_CONTEXT_RESERVE for tier determination');
+        logger.info(
+          {
+            stageNumber,
+            tokenCount,
+            language,
+            maxContext,
+            reservePercent,
+            fallbackThreshold,
+            tier: tokenCount > fallbackThreshold ? 'extended' : 'standard',
+          },
+          'Using DEFAULT_CONTEXT_RESERVE for tier determination'
+        );
 
         return tokenCount > fallbackThreshold ? 'extended' : 'standard';
       } catch (fallbackErr) {
@@ -787,7 +817,10 @@ class ModelConfigServiceImpl {
         .maybeSingle();
 
       if (error) {
-        logger.warn({ stageNumber, language: langToTry, tier, error }, 'Error fetching stage config from DB');
+        logger.warn(
+          { stageNumber, language: langToTry, tier, error },
+          'Error fetching stage config from DB'
+        );
         continue; // Try next language variant
       }
 
@@ -804,13 +837,19 @@ class ModelConfigServiceImpl {
         // Validate required fields - fail fast on incomplete data
         if (!config.fallback_model_id) {
           const errorMsg = `Incomplete stage config in database: missing fallback_model_id for stage ${stageNumber}, language "${langToTry}", tier "${tier}"`;
-          logger.error({ stageNumber, language: langToTry, tier, modelId: config.model_id }, errorMsg);
+          logger.error(
+            { stageNumber, language: langToTry, tier, modelId: config.model_id },
+            errorMsg
+          );
           throw new Error(errorMsg);
         }
 
         if (!config.max_context_tokens) {
           const errorMsg = `Incomplete stage config in database: missing max_context_tokens for stage ${stageNumber}, language "${langToTry}", tier "${tier}"`;
-          logger.error({ stageNumber, language: langToTry, tier, modelId: config.model_id }, errorMsg);
+          logger.error(
+            { stageNumber, language: langToTry, tier, modelId: config.model_id },
+            errorMsg
+          );
           throw new Error(errorMsg);
         }
 
@@ -832,69 +871,98 @@ class ModelConfigServiceImpl {
   private async fetchPhaseConfigFromDb(
     phaseName: string,
     courseId?: string,
-    tier: 'standard' | 'extended' = 'standard'
+    tier: 'standard' | 'extended' = 'standard',
+    language?: string
   ): Promise<PhaseModelConfig | null> {
     const supabase = getSupabaseAdmin();
 
-    // Priority 1: Course-specific override (with tier filter)
+    // Cascading language lookup: specific language -> 'any' fallback
+    const languagesToTry: Array<string> = language ? [language, 'any'] : ['any'];
+
+    // Priority 1: Course-specific override (with tier and language filter)
     if (courseId) {
-      const { data: courseOverride } = await supabase
+      for (const langToTry of languagesToTry) {
+        const { data: courseOverride } = await supabase
+          .from('llm_model_config')
+          .select(
+            'model_id, fallback_model_id, temperature, max_tokens, max_context_tokens, quality_threshold, max_retries, timeout_ms, context_tier'
+          )
+          .eq('config_type', 'course_override')
+          .eq('course_id', courseId)
+          .eq('phase_name', phaseName)
+          .eq('language', langToTry)
+          .eq('context_tier', tier)
+          .eq('is_active', true)
+          .maybeSingle();
+
+        if (courseOverride) {
+          if (langToTry === 'any') {
+            logger.debug(
+              { phaseName, courseId, requestedLanguage: language, foundLanguage: 'any', tier },
+              'Using universal (any) language course override config as fallback'
+            );
+          }
+          return {
+            modelId: courseOverride.model_id,
+            fallbackModelId: courseOverride.fallback_model_id || null,
+            temperature: courseOverride.temperature || 0.7,
+            maxTokens: courseOverride.max_tokens || 4096,
+            maxContextTokens: courseOverride.max_context_tokens || null,
+            qualityThreshold: courseOverride.quality_threshold,
+            maxRetries: courseOverride.max_retries ?? 3,
+            timeoutMs: courseOverride.timeout_ms,
+            tier: (courseOverride.context_tier as 'standard' | 'extended') || tier,
+            source: 'database',
+          };
+        }
+      }
+    }
+
+    // Priority 2: Global default configuration (with tier and language filter)
+    for (const langToTry of languagesToTry) {
+      const { data: globalConfig, error } = await supabase
         .from('llm_model_config')
-        .select('model_id, fallback_model_id, temperature, max_tokens, max_context_tokens, quality_threshold, max_retries, timeout_ms, context_tier')
-        .eq('config_type', 'course_override')
-        .eq('course_id', courseId)
+        .select(
+          'model_id, fallback_model_id, temperature, max_tokens, max_context_tokens, quality_threshold, max_retries, timeout_ms, context_tier'
+        )
+        .eq('config_type', 'global')
         .eq('phase_name', phaseName)
+        .eq('language', langToTry)
         .eq('context_tier', tier)
         .eq('is_active', true)
         .maybeSingle();
 
-      if (courseOverride) {
+      if (error) {
+        logger.warn(
+          { phaseName, language: langToTry, tier, error },
+          'Error fetching phase config from DB'
+        );
+        continue;
+      }
+
+      if (globalConfig) {
+        if (langToTry === 'any') {
+          logger.debug(
+            { phaseName, requestedLanguage: language, foundLanguage: 'any', tier },
+            'Using universal (any) language config as fallback'
+          );
+        }
         return {
-          modelId: courseOverride.model_id,
-          fallbackModelId: courseOverride.fallback_model_id || null,
-          temperature: courseOverride.temperature || 0.7,
-          maxTokens: courseOverride.max_tokens || 4096,
-          maxContextTokens: courseOverride.max_context_tokens || null,
-          qualityThreshold: courseOverride.quality_threshold,
-          maxRetries: courseOverride.max_retries ?? 3,
-          timeoutMs: courseOverride.timeout_ms,
-          tier: (courseOverride.context_tier as 'standard' | 'extended') || tier,
+          modelId: globalConfig.model_id,
+          fallbackModelId: globalConfig.fallback_model_id || null,
+          temperature: globalConfig.temperature || 0.7,
+          maxTokens: globalConfig.max_tokens || 4096,
+          maxContextTokens: globalConfig.max_context_tokens || null,
+          qualityThreshold: globalConfig.quality_threshold,
+          maxRetries: globalConfig.max_retries ?? 3,
+          timeoutMs: globalConfig.timeout_ms,
+          tier: (globalConfig.context_tier as 'standard' | 'extended') || tier,
           source: 'database',
         };
       }
     }
 
-    // Priority 2: Global default configuration (with tier filter)
-    const { data: globalConfig, error } = await supabase
-      .from('llm_model_config')
-      .select('model_id, fallback_model_id, temperature, max_tokens, max_context_tokens, quality_threshold, max_retries, timeout_ms, context_tier')
-      .eq('config_type', 'global')
-      .eq('phase_name', phaseName)
-      .eq('context_tier', tier)
-      .eq('is_active', true)
-      .maybeSingle();
-
-    if (error) {
-      logger.warn({ phaseName, tier, error }, 'Error fetching phase config from DB');
-      return null;
-    }
-
-    if (!globalConfig) {
-      return null;
-    }
-
-    return {
-      modelId: globalConfig.model_id,
-      fallbackModelId: globalConfig.fallback_model_id || null,
-      temperature: globalConfig.temperature || 0.7,
-      maxTokens: globalConfig.max_tokens || 4096,
-      maxContextTokens: globalConfig.max_context_tokens || null,
-      qualityThreshold: globalConfig.quality_threshold,
-      maxRetries: globalConfig.max_retries ?? 3,
-      timeoutMs: globalConfig.timeout_ms,
-      tier: (globalConfig.context_tier as 'standard' | 'extended') || tier,
-      source: 'database',
-    };
+    return null;
   }
 
   private async fetchJudgeConfigsFromDb(language: string): Promise<JudgeModelsResult | null> {
@@ -935,16 +1003,16 @@ class ModelConfigServiceImpl {
     const configs = judgeConfigs as LLMModelConfigRow[];
 
     // Map configs by judge_role
-    const primary = configs.find((c) => c.judge_role === 'primary');
-    const secondary = configs.find((c) => c.judge_role === 'secondary');
-    const tiebreaker = configs.find((c) => c.judge_role === 'tiebreaker');
+    const primary = configs.find(c => c.judge_role === 'primary');
+    const secondary = configs.find(c => c.judge_role === 'secondary');
+    const tiebreaker = configs.find(c => c.judge_role === 'tiebreaker');
 
     // Validate all roles exist
     if (!primary || !secondary || !tiebreaker) {
       logger.warn(
         {
           language,
-          foundRoles: configs.map((c) => c.judge_role),
+          foundRoles: configs.map(c => c.judge_role),
         },
         'Missing judge roles in database'
       );
@@ -969,7 +1037,6 @@ class ModelConfigServiceImpl {
       fallbackModelId: config.fallback_model_id || 'openai/gpt-oss-120b',
     };
   }
-
 }
 
 // ============================================================================

@@ -15,10 +15,7 @@
  */
 
 import { ChatOpenAI } from '@langchain/openai';
-import type {
-  GenerationJobInput,
-  CourseStructure,
-} from '@megacampus/shared-types';
+import type { GenerationJobInput, CourseStructure } from '@megacampus/shared-types';
 import {
   CourseMetadataSchema,
   CourseMetadataWithoutInjectedFieldsSchema,
@@ -35,7 +32,7 @@ import { validateQwen3MaxContext, estimateTokenCount } from '../../../shared/llm
 import { zodToPromptSchema } from '@/shared/utils/zod-to-prompt-schema';
 import { preprocessObject } from '@/shared/validation/preprocessing';
 import logger from '@/shared/logger';
-import { createModelConfigService } from '../../../shared/llm/model-config-service';
+import { getModelForPhase } from '@/shared/llm/langchain-models';
 
 // ============================================================================
 // CONSTANTS
@@ -52,12 +49,12 @@ const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
 const QUALITY_THRESHOLDS = {
   critical: {
     completeness: 0.85,
-    coherence: 0.90,
+    coherence: 0.9,
     alignment: 0.85,
   },
   nonCritical: {
     completeness: 0.75,
-    coherence: 0.80,
+    coherence: 0.8,
   },
 } as const;
 
@@ -198,7 +195,13 @@ export class MetadataGenerator {
     // Use UnifiedRegenerator with all 5 layers for maximum reliability
     // CRITICAL: Validate with CourseMetadataWithoutInjectedFieldsSchema BEFORE UUID/language injection
     const regenerator = new UnifiedRegenerator<Partial<CourseStructure>>({
-      enabledLayers: ['auto-repair', 'critique-revise', 'partial-regen', 'model-escalation', 'emergency'],
+      enabledLayers: [
+        'auto-repair',
+        'critique-revise',
+        'partial-regen',
+        'model-escalation',
+        'emergency',
+      ],
       maxRetries: 3, // Increased to allow Layer 4 (escalation) + Layer 5 (fallback)
       schema: CourseMetadataWithoutInjectedFieldsSchema, // Validate WITHOUT id/language fields
       qualityValidator: (data, _input) => {
@@ -250,9 +253,12 @@ export class MetadataGenerator {
       }
       // Preprocess pedagogical_strategy if present
       if (parsedRaw.pedagogical_strategy) {
-        parsedRaw.pedagogical_strategy = preprocessObject(parsedRaw.pedagogical_strategy as Record<string, unknown>, {
-          primary_strategy: 'enum',
-        });
+        parsedRaw.pedagogical_strategy = preprocessObject(
+          parsedRaw.pedagogical_strategy as Record<string, unknown>,
+          {
+            primary_strategy: 'enum',
+          }
+        );
       }
       preprocessedContent = JSON.stringify(parsedRaw);
     } catch (error) {
@@ -270,7 +276,7 @@ export class MetadataGenerator {
       // CRITICAL: LLM should NOT generate these fields - they are architectural data
       // Frontend MUST provide language in ISO 639-1 format (ru, en, etc.)
       if (result.data.learning_outcomes && Array.isArray(result.data.learning_outcomes)) {
-        result.data.learning_outcomes = result.data.learning_outcomes.map((outcome) => ({
+        result.data.learning_outcomes = result.data.learning_outcomes.map(outcome => ({
           ...outcome,
           id: crypto.randomUUID(), // Generate proper UUID
           language: language as CourseStructure['learning_outcomes'][number]['language'], // Inject language from frontend_parameters (ISO 639-1)
@@ -325,9 +331,7 @@ export class MetadataGenerator {
         tokensUsed: this.estimateTokens(prompt, rawContent),
       };
     } else {
-      throw new Error(
-        `Failed to generate metadata: ${result.error || 'Unknown error'}`
-      );
+      throw new Error(`Failed to generate metadata: ${result.error || 'Unknown error'}`);
     }
   }
 
@@ -345,18 +349,32 @@ export class MetadataGenerator {
     // Helper to convert language names to ISO 639-1 codes
     // Same mapping as Stage 4 handler for consistency
     const languageNameToCode: Record<string, string> = {
-      'Russian': 'ru', 'English': 'en', 'Chinese': 'zh', 'Spanish': 'es',
-      'French': 'fr', 'German': 'de', 'Japanese': 'ja', 'Korean': 'ko',
-      'Arabic': 'ar', 'Portuguese': 'pt', 'Italian': 'it', 'Turkish': 'tr',
-      'Vietnamese': 'vi', 'Thai': 'th', 'Indonesian': 'id', 'Malay': 'ms',
-      'Hindi': 'hi', 'Bengali': 'bn', 'Polish': 'pl',
+      Russian: 'ru',
+      English: 'en',
+      Chinese: 'zh',
+      Spanish: 'es',
+      French: 'fr',
+      German: 'de',
+      Japanese: 'ja',
+      Korean: 'ko',
+      Arabic: 'ar',
+      Portuguese: 'pt',
+      Italian: 'it',
+      Turkish: 'tr',
+      Vietnamese: 'vi',
+      Thai: 'th',
+      Indonesian: 'id',
+      Malay: 'ms',
+      Hindi: 'hi',
+      Bengali: 'bn',
+      Polish: 'pl',
     };
 
     // Priority 1: Explicit frontend parameter
     if (input.frontend_parameters.language) {
       const rawLang = input.frontend_parameters.language;
       // If it's already a 2-char ISO code, use it; otherwise convert from name
-      return rawLang.length === 2 ? rawLang : (languageNameToCode[rawLang] || 'en');
+      return rawLang.length === 2 ? rawLang : languageNameToCode[rawLang] || 'en';
     }
 
     // Priority 2: Extract from contextual_language object (new schema)
@@ -389,24 +407,28 @@ export class MetadataGenerator {
       return MODELS.metadata_fallback; // Kimi K2-0905 (Gold for both)
     }
 
-    // Try ModelConfigService first (database + hardcoded fallback)
+    // Use getModelForPhase for phase-specific model selection
     try {
-      const service = createModelConfigService();
-      const langCode = (language === 'ru' || language === 'russian') ? 'ru' : 'en';
-      const config = await service.getModelForStage(5, langCode, estimatedTokens);
+      const langCode = language === 'ru' || language === 'russian' ? 'ru' : 'en';
+      const model = await getModelForPhase(
+        'stage_5_metadata',
+        undefined,
+        estimatedTokens,
+        langCode
+      );
+      const modelId = model.model || MODELS.metadata_fallback;
 
       logger.info({
-        msg: 'Model selection via ModelConfigService',
+        msg: 'Model selection via getModelForPhase',
         language: langCode,
-        primary: config.primary,
-        source: config.source,
-        tier: config.tier,
+        modelId,
+        phase: 'stage_5_metadata',
       });
 
-      return config.primary;
+      return modelId;
     } catch (error) {
       logger.warn({
-        msg: 'ModelConfigService failed, using hardcoded fallback',
+        msg: 'getModelForPhase failed, using hardcoded fallback',
         language,
         error: error instanceof Error ? error.message : 'Unknown error',
       });
@@ -614,7 +636,9 @@ ${schemaDescription}
       const maxOutcomes = Math.max(50, hours * 2);
       if (outcomeCount < minOutcomes || outcomeCount > maxOutcomes) {
         coherenceScore -= 0.1;
-        coherencePenalties.push(`${outcomeCount} outcomes for ${hours}h course, expected ${minOutcomes}-${maxOutcomes} (-0.1)`);
+        coherencePenalties.push(
+          `${outcomeCount} outcomes for ${hours}h course, expected ${minOutcomes}-${maxOutcomes} (-0.1)`
+        );
       }
     }
 
@@ -643,9 +667,9 @@ ${schemaDescription}
       language === 'en' &&
       metadata.course_title &&
       input.frontend_parameters.course_title &&
-      !metadata.course_title.toLowerCase().includes(
-        input.frontend_parameters.course_title.toLowerCase().substring(0, 10)
-      )
+      !metadata.course_title
+        .toLowerCase()
+        .includes(input.frontend_parameters.course_title.toLowerCase().substring(0, 10))
     ) {
       alignmentScore -= 0.3;
     }
@@ -722,9 +746,9 @@ ${schemaDescription}
       configuration: {
         baseURL: OPENROUTER_BASE_URL,
       },
-      apiKey: apiKey,  // Updated for @langchain/openai v1.x (openAIApiKey deprecated)
+      apiKey: apiKey, // Updated for @langchain/openai v1.x (openAIApiKey deprecated)
       temperature, // From ModelConfigService or default
-      maxTokens,   // From ModelConfigService or default
+      maxTokens, // From ModelConfigService or default
     });
   }
 

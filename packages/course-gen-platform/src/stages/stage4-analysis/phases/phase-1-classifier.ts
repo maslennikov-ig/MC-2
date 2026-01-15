@@ -166,7 +166,12 @@ export async function runPhase1Classification(input: Phase1Input): Promise<Phase
   const startTime = Date.now();
 
   // Get model from database config
-  const model = await getModelForPhase('stage_4_classification');
+  const model = await getModelForPhase(
+    'stage_4_classification',
+    input.course_id,
+    undefined,
+    input.language
+  );
   const modelId = model.model || 'unknown';
 
   // Build prompt
