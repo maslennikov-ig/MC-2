@@ -28,7 +28,6 @@ export const COURSE_STYLES = [
   'technical',
   'research',
   'gamified',
-  'microlearning',
 ] as const;
 
 export type CourseStyle = (typeof COURSE_STYLES)[number];
@@ -81,9 +80,6 @@ export const STYLE_PROMPTS: Record<CourseStyle, string> = {
 
   gamified:
     "Transform learning into an adventure game. Frame content as quests, missions, and challenges to complete. Use gaming language: 'Level up your skills', 'Achievement unlocked', 'Boss battle ahead'. Create sense of progression with experience points and skill trees. Make failure fun with 'Game Over - Try Again!' attitude.",
-
-  microlearning:
-    'Create ultra-concise learning modules focused on single concepts or skills. Each section should be completable in 3-5 minutes. Use bullet points, numbered lists, and visual separators for easy scanning. Lead with the most critical information first. Include one clear takeaway per module. Minimize cognitive load with simple vocabulary and short sentences. Add quick knowledge checks between concepts. Perfect for mobile consumption and busy schedules.',
 };
 
 // ============================================================================
