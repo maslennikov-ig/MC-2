@@ -29,11 +29,8 @@ import { getLessonContent } from '../services/database-service';
 // CONFIGURATION
 // ============================================================================
 
-/** Supabase Storage bucket for card images */
+/** Supabase Storage bucket for card images (defaults to 'course-enrichments') */
 const STORAGE_BUCKET = process.env.ENRICHMENTS_STORAGE_BUCKET ?? 'course-enrichments';
-if (!process.env.ENRICHMENTS_STORAGE_BUCKET) {
-  logger.warn('ENRICHMENTS_STORAGE_BUCKET not set, using default: course-enrichments');
-}
 
 /**
  * Retry configuration for card generation operations
