@@ -280,21 +280,16 @@ describe('useEnrichmentGeneration', () => {
         await result.current.startGeneration('quiz')
       })
 
-      const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
-
-      // Try to start again - should return null
+      // Try to start again - should return null (race condition protection)
       let secondResult: string | null = null
       await act(async () => {
         secondResult = await result.current.startGeneration('quiz')
       })
 
       expect(secondResult).toBeNull()
-      expect(consoleWarnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Generation already in progress'),
-        'quiz'
-      )
+      // First generation should still be in progress
+      expect(result.current.isGenerating('quiz')).toBe(true)
 
-      consoleWarnSpy.mockRestore()
       unmount()
     })
 
@@ -678,8 +673,6 @@ describe('useEnrichmentGeneration', () => {
         .mockRejectedValueOnce(new Error('Network error'))
         .mockResolvedValueOnce(createMockResponse(mockStatusPending))
 
-      const consoleErrorSpy = vi.spyOn(console, 'error').mockImplementation(() => {})
-
       const { result, unmount } = renderHook(() =>
         useEnrichmentGeneration({
           lessonId: 'lesson-123',
@@ -692,16 +685,14 @@ describe('useEnrichmentGeneration', () => {
         await result.current.startGeneration('quiz')
       })
 
-      // Wait for polls
+      // Wait for polls (including error recovery)
       await act(async () => {
         await new Promise((resolve) => setTimeout(resolve, 500))
       })
 
-      // Should still be generating (not stopped after single error)
+      // Should still be generating (not stopped after single error - backoff recovery)
       expect(result.current.generating.has('quiz')).toBe(true)
-      expect(consoleErrorSpy).toHaveBeenCalled()
 
-      consoleErrorSpy.mockRestore()
       unmount()
     })
   })
@@ -769,18 +760,13 @@ describe('useEnrichmentGeneration', () => {
       mockFetch.mockClear()
       mockFetch.mockResolvedValueOnce(createMockResponse({ error: 'Not found' }, 404))
 
-      const consoleWarnSpy = vi.spyOn(console, 'warn').mockImplementation(() => {})
-
       await act(async () => {
         await result.current.cancelGeneration('quiz')
       })
 
-      expect(consoleWarnSpy).toHaveBeenCalledWith(
-        expect.stringContaining('Cancel endpoint not implemented')
-      )
+      // Should still clean up UI state even when cancel endpoint returns 404
       expect(result.current.generating.has('quiz')).toBe(false)
 
-      consoleWarnSpy.mockRestore()
       unmount()
     })
 
