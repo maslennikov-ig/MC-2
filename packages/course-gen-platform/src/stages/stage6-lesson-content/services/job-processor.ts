@@ -64,9 +64,7 @@ async function isCoursePaused(courseId: string): Promise<boolean> {
     }
 
     // Course is paused if generation_paused_at is not null
-    // Type assertion needed as Supabase client doesn't narrow the select
-    type PauseStatus = { generation_paused_at: string | null };
-    return (data as PauseStatus)?.generation_paused_at !== null;
+    return data?.generation_paused_at !== null;
   } catch (err) {
     logger.warn(
       { courseId, error: err instanceof Error ? err.message : String(err) },
