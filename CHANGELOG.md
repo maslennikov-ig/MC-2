@@ -311,6 +311,59 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.28.2] - 2026-01-15
+
+### Added
+
+- **skills**: add process-logs skill for automated error log processing (e379384)
+- **logging**: enhance error logging with full diagnostic context (52f3003)
+
+### Fixed
+
+- **stage6**: rename generator.ts to avoid ESM directory conflict (59fcab5)
+
+### Other
+
+- **skills**: add bug fixing principles to process-logs v1.3.0 (5cff6ab)
+- **skills**: clarify task complexity routing in process-logs (5dc35eb)
+- **skills**: make process-logs instructions mandatory (340debc)
+- **skills**: update process-logs with orchestrator instructions (dee78e6)
+- bd sync: 2026-01-15 17:10:33 (5ebf671)
+- bd sync: 2026-01-15 16:56:50 (de1bf06)
+
+## [0.28.1] - 2026-01-15
+
+### Added
+
+- **admin-logs**: show course name and workflow link in logs table (8a9e641)
+- **course-size**: add 'micro' size option and show lesson ranges (fa807d4)
+
+### Changed
+
+- **stage6**: modularize lesson-rag-retriever.ts (bbd8a74)
+- **stage6**: modularize orchestrator.ts into nodes and helpers (cc46c43)
+- **ui**: move generation mode to advanced settings section (54ab2bd)
+
+### Fixed
+
+- **stage6**: resolve circular dependency in orchestrator (7e2aee7)
+- remove unused LessonGraphNode import in judge-node.ts (66c29f7)
+- **stage5**: show both content and teaching styles in blueprint preview (cfc1eb0)
+- **stage5**: show user-selected style instead of LLM analysis style (14a2356)
+- **stage5**: show exact lesson count instead of fake range (5749578)
+- **stage6**: fix lessons.content query and add warn/error DB logging (f4b1a95)
+
+### Other
+
+- update project files (098788b)
+- bd sync: 2026-01-15 16:50:38 (92ab001)
+- **stage6**: remove type assertion in isCoursePaused (3f0417b)
+- bd sync: 2026-01-15 16:01:05 (77bf140)
+- bd sync: 2026-01-15 16:00:08 (91a0b98)
+- **gemini**: add project context and hooks for Gemini CLI (8251819)
+- bd sync: 2026-01-15 14:54:38 (e3c2af9)
+- bd sync: 2026-01-15 14:37:49 (f1f4334)
+
 ## [0.28.0] - 2026-01-15
 
 ### Added

@@ -2,6 +2,51 @@
 
 _Released on 2025-12-26_
 
+## v0.28.2
+
+_Released on 2026-01-15_
+
+### ✨ New Features
+
+- **Skills**: Add process-logs skill for automated error log processing
+- **logging**: Enhance error logging with full diagnostic context
+
+### 🐛 Bug Fixes
+
+- **stage6**: Rename generator.ts to avoid ESM directory conflict
+
+---
+
+_This release was automatically generated from 9 commits._
+
+## v0.28.1
+
+_Released on 2026-01-15_
+
+### ✨ New Features
+
+- **admin-logs**: Show course name and workflow link in logs table
+- **course-size**: Add 'micro' size option and show lesson ranges
+
+### 🔧 Improvements
+
+- **stage6**: Modularize lesson-rag-retriever.ts
+- **stage6**: Modularize orchestrator.ts into nodes and helpers
+- **Interface**: Move generation mode to advanced settings section
+
+### 🐛 Bug Fixes
+
+- **stage6**: Resolve circular dependency in orchestrator
+- Remove unused LessonGraphNode import in judge-node.ts
+- **stage5**: Show both content and teaching styles in blueprint preview
+- **stage5**: Show user-selected style instead of LLM analysis style
+- **stage5**: Show exact lesson count instead of fake range
+- **stage6**: Fix lessons.content query and add warn/error DB logging
+
+---
+
+_This release was automatically generated from 19 commits._
+
 ## v0.28.0
 
 _Released on 2026-01-15_

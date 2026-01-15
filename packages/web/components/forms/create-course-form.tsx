@@ -9,7 +9,6 @@ import { FormatsSection } from './create-course/components/FormatsSection'
 import { StyleSection } from './create-course/components/StyleSection'
 import { UploadSection } from './create-course/components/UploadSection'
 import { AdvancedSettingsSection } from './create-course/components/AdvancedSettingsSection'
-import { GenerationModeSection } from './create-course/components/GenerationModeSection'
 import { CostPreviewCard } from './create-course/components/CostPreviewCard'
 import { SubmitSection } from './create-course/components/SubmitSection'
 import { AuthRequiredState, PermissionDeniedState } from '@/components/common/error-states'
@@ -99,8 +98,6 @@ export default function CreateCourseForm() {
           />
 
           <AdvancedSettingsSection />
-
-          <GenerationModeSection />
 
           <div className="xl:col-span-2">
             <CostPreviewCard

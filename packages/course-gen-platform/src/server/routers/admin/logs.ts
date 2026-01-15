@@ -148,6 +148,11 @@ export type LogDetails = UnifiedLogItem & {
   statusNotes: string | null;
   statusUpdatedBy: string | null;
   statusUpdatedAt: string | null;
+  // Enhanced context fields
+  requestId: string | null;
+  trpcPath: string | null;
+  trpcInput: Record<string, unknown> | null;
+  attemptedValue: string | null;
 };
 
 /**
@@ -313,8 +318,8 @@ export const logsRouter = router({
             severity: log.severity,
             message: log.error_message,
             source: log.job_type || null,
-            courseId: null, // error_logs doesn't have course_id
-            lessonId: null,
+            courseId: log.course_id || null,
+            lessonId: log.lesson_id || null,
             stage: null,
             phase: null,
             status: status?.status || 'new',
@@ -333,12 +338,17 @@ export const logsRouter = router({
             statusNotes: status?.notes || null,
             statusUpdatedBy: status?.updatedByEmail || null,
             statusUpdatedAt: status?.updated_at || null,
+            // Enhanced context fields
+            requestId: log.request_id || null,
+            trpcPath: log.trpc_path || null,
+            trpcInput: log.trpc_input as Record<string, unknown> | null,
+            attemptedValue: log.attempted_value || null,
           };
         } else {
           // generation_trace
           const { data: log, error } = await supabase
             .from('generation_trace')
-            .select('*')
+            .select('*, courses(title)')
             .eq('id', logId)
             .single();
 
@@ -356,6 +366,9 @@ export const logsRouter = router({
           const errorData = log.error_data as Record<string, unknown> | null;
           const severity = errorData ? 'ERROR' : 'WARNING';
 
+          // Get course name from JOIN
+          const courseData = log.courses as { title: string } | null;
+
           return {
             id: log.id,
             logType: 'generation_trace',
@@ -371,7 +384,7 @@ export const logsRouter = router({
             metadata: null,
             problemId: null,
             environment: null,
-            courseName: null,
+            courseName: courseData?.title || null,
             stackTrace: (errorData?.stack as string) || null,
             errorData,
             inputData: log.input_data as Record<string, unknown> | null,
@@ -383,6 +396,11 @@ export const logsRouter = router({
             statusNotes: status?.notes || null,
             statusUpdatedBy: status?.updatedByEmail || null,
             statusUpdatedAt: status?.updated_at || null,
+            // Enhanced context fields (not applicable for generation_trace)
+            requestId: null,
+            trpcPath: null,
+            trpcInput: null,
+            attemptedValue: null,
           };
         }
       } catch (error) {
@@ -746,9 +764,12 @@ async function buildGenerationTraceQuery(
 
   let query = supabase
     .from('generation_trace')
-    .select('id, created_at, stage, phase, step_name, course_id, lesson_id, error_data', {
-      count: 'exact',
-    })
+    .select(
+      'id, created_at, stage, phase, step_name, course_id, lesson_id, error_data, courses(title)',
+      {
+        count: 'exact',
+      }
+    )
     .not('error_data', 'is', null); // Only traces with errors
 
   // Apply status filter
@@ -805,6 +826,8 @@ async function buildGenerationTraceQuery(
 
   const items: UnifiedLogItem[] = filteredData.map(log => {
     const errorData = log.error_data as Record<string, unknown> | null;
+    // Get course name from JOIN
+    const courseData = log.courses as { title: string } | null;
     return {
       id: log.id,
       logType: 'generation_trace' as LogType,
@@ -820,7 +843,7 @@ async function buildGenerationTraceQuery(
       metadata: null,
       problemId: null,
       environment: null,
-      courseName: null,
+      courseName: courseData?.title || null,
     };
   });
 

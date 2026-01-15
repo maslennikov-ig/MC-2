@@ -1,7 +1,7 @@
 import React from 'react'
 import { useFormContext } from 'react-hook-form'
 import { motion } from 'framer-motion'
-import { Sparkles, Zap, BookOpen, Library, GraduationCap, Info } from 'lucide-react'
+import { Sparkles, Target, Zap, BookOpen, Library, GraduationCap, Info } from 'lucide-react'
 import {
   COURSE_SIZES,
   COURSE_SIZE_PRESETS,
@@ -14,6 +14,7 @@ import { type FormData } from '../_schemas/form-schema'
 // Map course sizes to icons
 const COURSE_SIZE_ICONS: Record<CourseSize, React.ComponentType<{ className?: string }>> = {
   auto: Sparkles,
+  micro: Target,
   mini: Zap,
   compact: BookOpen,
   standard: Library,

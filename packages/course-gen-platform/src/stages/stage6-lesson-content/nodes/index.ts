@@ -15,7 +15,7 @@
  */
 
 // Active nodes
-export { generatorNode } from './generator';
+export { generatorNode } from './generator-node';
 export { selfReviewerNode } from './self-reviewer-node';
 
 // Note: Deprecated nodes (planner, expander, assembler, smoother) have been removed.

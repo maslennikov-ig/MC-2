@@ -232,6 +232,76 @@ Course: ${details.courseName || 'N/A'}${details.courseId ? ` (${details.courseId
               <p className="bg-muted rounded-md p-3 text-sm break-words">{details.message}</p>
             </section>
 
+            {/* Context - new enhanced fields */}
+            {(details.requestId ||
+              details.courseId ||
+              details.lessonId ||
+              details.trpcPath ||
+              details.attemptedValue) && (
+              <section className="space-y-3">
+                <h3 className="text-sm font-medium">Context</h3>
+                <div className="bg-muted space-y-2 rounded-md p-3 text-sm">
+                  {details.requestId && (
+                    <div className="flex gap-2">
+                      <span className="text-muted-foreground min-w-[100px] font-medium">
+                        Request ID:
+                      </span>
+                      <code className="font-mono text-xs">{details.requestId}</code>
+                    </div>
+                  )}
+                  {details.courseId && (
+                    <div className="flex gap-2">
+                      <span className="text-muted-foreground min-w-[100px] font-medium">
+                        Course:
+                      </span>
+                      <span>{details.courseName || details.courseId}</span>
+                      {details.courseName && (
+                        <code className="text-muted-foreground font-mono text-xs">
+                          ({details.courseId})
+                        </code>
+                      )}
+                    </div>
+                  )}
+                  {details.lessonId && (
+                    <div className="flex gap-2">
+                      <span className="text-muted-foreground min-w-[100px] font-medium">
+                        Lesson ID:
+                      </span>
+                      <code className="font-mono text-xs">{details.lessonId}</code>
+                    </div>
+                  )}
+                  {details.trpcPath && (
+                    <div className="flex gap-2">
+                      <span className="text-muted-foreground min-w-[100px] font-medium">
+                        tRPC Path:
+                      </span>
+                      <code className="font-mono text-xs">{details.trpcPath}</code>
+                    </div>
+                  )}
+                  {details.attemptedValue && (
+                    <div className="flex gap-2">
+                      <span className="text-muted-foreground min-w-[100px] font-medium">
+                        Attempted:
+                      </span>
+                      <code className="font-mono text-xs text-red-600">
+                        {details.attemptedValue}
+                      </code>
+                    </div>
+                  )}
+                </div>
+              </section>
+            )}
+
+            {/* tRPC Input */}
+            {details.trpcInput && (
+              <section className="space-y-2">
+                <h3 className="text-sm font-medium">tRPC Input</h3>
+                <pre className="bg-muted max-h-48 overflow-x-auto overflow-y-auto rounded-md p-3 font-mono text-xs">
+                  {formatJson(details.trpcInput)}
+                </pre>
+              </section>
+            )}
+
             {/* Generation trace info */}
             {details.logType === 'generation_trace' && (
               <section className="space-y-3">

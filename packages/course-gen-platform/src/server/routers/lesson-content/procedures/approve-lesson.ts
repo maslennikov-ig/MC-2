@@ -50,7 +50,10 @@ export const approveLesson = protectedProcedure
     const requestId = nanoid();
     const currentUser = ctx.user;
 
-    logger.info({ requestId, courseId, lessonId, userId: currentUser.id }, 'Approve lesson request');
+    logger.info(
+      { requestId, courseId, lessonId, userId: currentUser.id },
+      'Approve lesson request'
+    );
 
     try {
       // Step 1: Verify course access
@@ -80,7 +83,7 @@ export const approveLesson = protectedProcedure
 
       // Step 4: Update lesson_contents status to approved
       const updatedMetadata = {
-        ...(currentLesson?.metadata as object || {}),
+        ...((currentLesson?.metadata as object) || {}),
         approved_at: new Date().toISOString(),
         approved_by: currentUser.id,
       };
@@ -96,7 +99,19 @@ export const approveLesson = protectedProcedure
         .eq('lesson_id', lessonUuid);
 
       if (error) {
-        logger.error({ requestId, error: error.message }, 'Failed to approve lesson');
+        logger.error(
+          {
+            requestId,
+            courseId,
+            lessonId: lessonUuid,
+            userId: currentUser.id,
+            trpcPath: 'lessonContent.approveLesson',
+            trpcInput: { courseId, lessonId },
+            attemptedValue: 'approved',
+            err: error.message,
+          },
+          'Failed to approve lesson'
+        );
         throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Failed to approve lesson' });
       }
 
@@ -104,7 +119,10 @@ export const approveLesson = protectedProcedure
       return { success: true };
     } catch (error) {
       if (error instanceof TRPCError) throw error;
-      logger.error({ requestId, error: error instanceof Error ? error.message : String(error) }, 'Approve lesson failed');
+      logger.error(
+        { requestId, error: error instanceof Error ? error.message : String(error) },
+        'Approve lesson failed'
+      );
       throw new TRPCError({ code: 'INTERNAL_SERVER_ERROR', message: 'Failed to approve lesson' });
     }
   });

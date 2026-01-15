@@ -1,23 +1,15 @@
-'use client';
+'use client'
 
-import React, { memo, useMemo, useState, useEffect } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
-import {
-  FileText,
-  Cpu,
-  Users,
-  Palette,
-  BookOpen,
-  AlertCircle,
-  Loader2,
-} from 'lucide-react';
-import { GRAPH_TRANSLATIONS } from '@/lib/generation-graph/translations';
-import { getTierModelName } from '@/lib/generation-graph/constants';
-import { getSupabaseClient } from '@/lib/supabase/browser-client';
-import type { Stage5InputTabProps, Stage5InputData } from './types';
-import { BlueprintPreview } from './components/BlueprintPreview';
+import React, { memo, useMemo, useState, useEffect } from 'react'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { ScrollArea } from '@/components/ui/scroll-area'
+import { FileText, Cpu, Users, Palette, BookOpen, AlertCircle, Loader2 } from 'lucide-react'
+import { GRAPH_TRANSLATIONS } from '@/lib/generation-graph/translations'
+import { getTierModelName } from '@/lib/generation-graph/constants'
+import { getSupabaseClient } from '@/lib/supabase/browser-client'
+import type { Stage5InputTabProps, Stage5InputData } from './types'
+import { BlueprintPreview } from './components/BlueprintPreview'
 
 // ============================================================================
 // TYPE GUARDS
@@ -27,9 +19,9 @@ import { BlueprintPreview } from './components/BlueprintPreview';
  * Runtime type guard for Stage5InputData
  */
 function isStage5InputData(data: unknown): data is Stage5InputData {
-  if (!data || typeof data !== 'object') return false;
-  const d = data as Record<string, unknown>;
-  return d.analysisResult !== undefined && d.frontendParameters !== undefined;
+  if (!data || typeof data !== 'object') return false
+  const d = data as Record<string, unknown>
+  return d.analysisResult !== undefined && d.frontendParameters !== undefined
 }
 
 // ============================================================================
@@ -41,99 +33,99 @@ export const Stage5InputTab = memo<Stage5InputTabProps>(function Stage5InputTab(
   inputData,
   locale = 'ru',
 }) {
-  const t = GRAPH_TRANSLATIONS.stage5;
+  const t = GRAPH_TRANSLATIONS.stage5
 
   // State for fetched data
   const [analysisResult, setAnalysisResult] = useState<Stage5InputData['analysisResult'] | null>(
     null
-  );
+  )
   const [frontendParams, setFrontendParams] = useState<
     Stage5InputData['frontendParameters'] | null
-  >(null);
+  >(null)
   const [generationParams, setGenerationParams] = useState<{
-    batchSize?: number;
-    qualityThreshold?: number;
-    minLessons?: number;
-    tier?: string;
-  } | null>(null);
-  const [isLoading, setIsLoading] = useState(false);
-  const [fetchError, setFetchError] = useState<string | null>(null);
-  const [retryCount, setRetryCount] = useState(0);
+    batchSize?: number
+    qualityThreshold?: number
+    minLessons?: number
+    tier?: string
+  } | null>(null)
+  const [isLoading, setIsLoading] = useState(false)
+  const [fetchError, setFetchError] = useState<string | null>(null)
+  const [retryCount, setRetryCount] = useState(0)
 
   // Parse inputData if valid
   const parsedInputData = useMemo(() => {
     if (isStage5InputData(inputData)) {
-      return inputData;
+      return inputData
     }
-    return null;
-  }, [inputData]);
+    return null
+  }, [inputData])
 
   // Fetch data from Supabase
   useEffect(() => {
     // If we have valid inputData, use it directly
     if (parsedInputData) {
-      setAnalysisResult(parsedInputData.analysisResult);
-      setFrontendParams(parsedInputData.frontendParameters);
-      setGenerationParams(parsedInputData.generationParams || null);
-      return;
+      setAnalysisResult(parsedInputData.analysisResult)
+      setFrontendParams(parsedInputData.frontendParameters)
+      setGenerationParams(parsedInputData.generationParams || null)
+      return
     }
 
     // Otherwise fetch from database
-    if (!courseId) return;
+    if (!courseId) return
 
     // Cancelled flag pattern for cleanup
-    let cancelled = false;
+    let cancelled = false
 
     const fetchData = async () => {
-      setIsLoading(true);
-      setFetchError(null);
+      setIsLoading(true)
+      setFetchError(null)
 
       try {
-        const supabase = getSupabaseClient();
+        const supabase = getSupabaseClient()
 
-        // Fetch course data: analysis_result, title, language, settings
+        // Fetch course data: analysis_result, title, settings, style (user-selected)
         const { data: courseData, error: courseError } = await supabase
           .from('courses')
-          .select('analysis_result, title, settings')
+          .select('analysis_result, title, settings, style')
           .eq('id', courseId)
-          .single();
+          .single()
 
-        if (cancelled) return;
+        if (cancelled) return
 
         if (courseError) {
-          console.error('[Stage5InputTab] Error fetching course:', courseError);
-          setFetchError(
-            locale === 'ru' ? 'Ошибка загрузки курса' : 'Failed to load course'
-          );
-          return;
+          console.error('[Stage5InputTab] Error fetching course:', courseError)
+          setFetchError(locale === 'ru' ? 'Ошибка загрузки курса' : 'Failed to load course')
+          return
         }
 
         if (courseData) {
           // Parse analysis_result from Stage 4 (uses snake_case from AnalysisResult type)
-          let parsedAnalysisResult: Stage5InputData['analysisResult'] | null = null;
+          let parsedAnalysisResult: Stage5InputData['analysisResult'] | null = null
           if (courseData.analysis_result && typeof courseData.analysis_result === 'object') {
-            const ar = courseData.analysis_result as Record<string, unknown>;
+            const ar = courseData.analysis_result as Record<string, unknown>
             // Real paths from AnalysisResult type (shared-types)
-            const courseCategory = ar.course_category as Record<string, unknown> | undefined;
-            const recommendedStructure = ar.recommended_structure as Record<string, unknown> | undefined;
-            const pedagogicalStrategy = ar.pedagogical_strategy as Record<string, unknown> | undefined;
-            const topicAnalysis = ar.topic_analysis as Record<string, unknown> | undefined;
+            const courseCategory = ar.course_category as Record<string, unknown> | undefined
+            const recommendedStructure = ar.recommended_structure as
+              | Record<string, unknown>
+              | undefined
+            const pedagogicalStrategy = ar.pedagogical_strategy as
+              | Record<string, unknown>
+              | undefined
+            const topicAnalysis = ar.topic_analysis as Record<string, unknown> | undefined
 
-            // Get total_lessons from recommended_structure
-            const totalLessons = (recommendedStructure?.total_lessons as number) || 10;
-            const totalSections = (recommendedStructure?.total_sections as number) || 1;
+            // Get total_lessons from recommended_structure (Stage 4 output)
+            const totalLessons = (recommendedStructure?.total_lessons as number) || 10
 
             parsedAnalysisResult = {
               // Use 'primary' not 'category' - real AnalysisResult structure
               courseCategory: (courseCategory?.primary as string) || 'professional',
               confidence: (courseCategory?.confidence as number) || 0,
               totalLessons,
-              lessonsRange: {
-                // Calculate approximate min/max based on sections
-                min: Math.max(10, totalLessons - totalSections * 2),
-                max: totalLessons + totalSections * 2,
-              },
-              // Use 'pedagogical_strategy.teaching_style' - real path
+              // Don't show range on Stage 5 - we already know the exact number from Stage 4
+              lessonsRange: undefined,
+              // Content style - user selected (affects tone: practical, conversational, academic)
+              contentStyle: (courseData.style as string) || undefined,
+              // Teaching style - from LLM analysis (affects structure: hands-on, theory-first)
               teachingStyle: (pedagogicalStrategy?.teaching_style as string) || 'mixed',
               topicAnalysis: topicAnalysis
                 ? {
@@ -141,19 +133,19 @@ export const Stage5InputTab = memo<Stage5InputTabProps>(function Stage5InputTab(
                     prerequisites: (topicAnalysis.prerequisites as string[]) || [],
                   }
                 : undefined,
-            };
+            }
           }
 
           // Parse frontend parameters
-          const settings = courseData.settings as Record<string, unknown> | null;
+          const settings = courseData.settings as Record<string, unknown> | null
           const frontendParameters: Stage5InputData['frontendParameters'] = {
             courseTitle: courseData.title || '',
             language: (settings?.language as string) || 'ru',
             userInstructions: (settings?.userInstructions as string) || undefined,
-          };
+          }
 
-          setAnalysisResult(parsedAnalysisResult);
-          setFrontendParams(frontendParameters);
+          setAnalysisResult(parsedAnalysisResult)
+          setFrontendParams(frontendParameters)
         }
 
         // Fetch organization tier for tier-based model naming
@@ -161,14 +153,14 @@ export const Stage5InputTab = memo<Stage5InputTabProps>(function Stage5InputTab(
           .from('courses')
           .select('organization_id, organizations!inner(tier)')
           .eq('id', courseId)
-          .single();
+          .single()
 
-        if (cancelled) return;
+        if (cancelled) return
 
-        let tier = 'standard'; // default tier
+        let tier = 'standard' // default tier
         if (!orgError && orgData) {
-          const org = orgData.organizations as { tier?: string } | null;
-          tier = org?.tier || 'standard';
+          const org = orgData.organizations as { tier?: string } | null
+          tier = org?.tier || 'standard'
         }
 
         // Set generation parameters
@@ -177,73 +169,71 @@ export const Stage5InputTab = memo<Stage5InputTabProps>(function Stage5InputTab(
           qualityThreshold: 0.7,
           minLessons: 10,
           tier,
-        });
+        })
       } catch (err) {
-        if (cancelled) return;
-        console.error('[Stage5InputTab] Fetch error:', err);
-        setFetchError(
-          locale === 'ru' ? 'Ошибка загрузки данных' : 'Failed to load data'
-        );
+        if (cancelled) return
+        console.error('[Stage5InputTab] Fetch error:', err)
+        setFetchError(locale === 'ru' ? 'Ошибка загрузки данных' : 'Failed to load data')
       } finally {
         if (!cancelled) {
-          setIsLoading(false);
+          setIsLoading(false)
         }
       }
-    };
+    }
 
-    fetchData();
+    fetchData()
 
     // Cleanup: prevent state updates on unmounted component
     return () => {
-      cancelled = true;
-    };
-  }, [courseId, parsedInputData, locale, retryCount]);
+      cancelled = true
+    }
+  }, [courseId, parsedInputData, locale, retryCount])
 
   // Retry handler
   const handleRetry = () => {
-    setRetryCount((prev) => prev + 1);
-  };
+    setRetryCount((prev) => prev + 1)
+  }
 
   // Loading state
   if (isLoading) {
     return (
       <div className="flex flex-col items-center justify-center p-8">
-        <Loader2 className="h-8 w-8 animate-spin text-orange-500 mb-4" />
-        <p className="text-sm text-muted-foreground">
+        <Loader2 className="mb-4 h-8 w-8 animate-spin text-orange-500" />
+        <p className="text-muted-foreground text-sm">
           {locale === 'ru' ? 'Загрузка данных...' : 'Loading data...'}
         </p>
       </div>
-    );
+    )
   }
 
   // Error state
   if (fetchError) {
     return (
       <div className="p-4 text-center" role="alert" aria-live="polite">
-        <AlertCircle className="h-8 w-8 text-destructive mx-auto mb-2" />
+        <AlertCircle className="text-destructive mx-auto mb-2 h-8 w-8" />
         <p className="text-destructive mb-2">{fetchError}</p>
         <button
           type="button"
           onClick={handleRetry}
-          className="text-sm text-muted-foreground hover:text-foreground underline focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 rounded"
+          className="text-muted-foreground hover:text-foreground focus-visible:ring-primary rounded text-sm underline focus-visible:ring-2 focus-visible:ring-offset-2"
           aria-label={locale === 'ru' ? 'Повторить загрузку данных' : 'Retry loading data'}
         >
           {locale === 'ru' ? 'Попробовать снова' : 'Try again'}
         </button>
       </div>
-    );
+    )
   }
 
   // Empty state
   if (!analysisResult || !frontendParams) {
     return (
       <div className="flex flex-col items-center justify-center p-8 text-center">
-        <BookOpen className="h-12 w-12 text-muted-foreground/30 mb-4" />
-        <p className="text-sm text-muted-foreground">
+        <BookOpen className="text-muted-foreground/30 mb-4 h-12 w-12" />
+        <p className="text-muted-foreground text-sm">
           {t?.emptyInput?.[locale] || 'Waiting for Stage 4 data...'}
         </p>
       </div>
-    );
+    )
   }
 
   return (
@@ -253,10 +243,10 @@ export const Stage5InputTab = memo<Stage5InputTabProps>(function Stage5InputTab(
           ============================================================ */}
       <Card className="col-span-5 border-l-4 border-l-orange-500">
         <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-medium text-muted-foreground">
+          <CardTitle className="text-muted-foreground text-sm font-medium">
             {t?.blueprintReview?.[locale] || 'Blueprint Review'}
           </CardTitle>
-          <p className="text-xs text-muted-foreground mt-1">
+          <p className="text-muted-foreground mt-1 text-xs">
             {t?.blueprintReviewDesc?.[locale] || 'Source data from Stage 4'}
           </p>
         </CardHeader>
@@ -274,7 +264,7 @@ export const Stage5InputTab = memo<Stage5InputTabProps>(function Stage5InputTab(
           ============================================================ */}
       <Card className="col-span-3">
         <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-medium text-muted-foreground">
+          <CardTitle className="text-muted-foreground text-sm font-medium">
             {t?.frontendParams?.[locale] || 'Course Parameters'}
           </CardTitle>
         </CardHeader>
@@ -283,18 +273,18 @@ export const Stage5InputTab = memo<Stage5InputTabProps>(function Stage5InputTab(
           <div className="space-y-2">
             <div className="flex items-center gap-2">
               <FileText className="h-4 w-4 text-orange-500" aria-hidden="true" />
-              <span className="text-xs text-muted-foreground">
+              <span className="text-muted-foreground text-xs">
                 {t?.courseTitle?.[locale] || 'Course Title'}
               </span>
             </div>
-            <p className="text-sm font-medium pl-6">{frontendParams.courseTitle}</p>
+            <p className="pl-6 text-sm font-medium">{frontendParams.courseTitle}</p>
           </div>
 
           {/* Language */}
           <div className="space-y-2">
             <div className="flex items-center gap-2">
               <Palette className="h-4 w-4 text-orange-500" aria-hidden="true" />
-              <span className="text-xs text-muted-foreground">
+              <span className="text-muted-foreground text-xs">
                 {t?.courseLanguage?.[locale] || 'Language'}
               </span>
             </div>
@@ -308,12 +298,12 @@ export const Stage5InputTab = memo<Stage5InputTabProps>(function Stage5InputTab(
             <div className="space-y-2">
               <div className="flex items-center gap-2">
                 <Users className="h-4 w-4 text-orange-500" aria-hidden="true" />
-                <span className="text-xs text-muted-foreground">
+                <span className="text-muted-foreground text-xs">
                   {t?.userInstructions?.[locale] || 'Instructions'}
                 </span>
               </div>
-              <ScrollArea className="h-[80px] rounded-md border p-2 ml-6">
-                <p className="text-xs text-muted-foreground">{frontendParams.userInstructions}</p>
+              <ScrollArea className="ml-6 h-[80px] rounded-md border p-2">
+                <p className="text-muted-foreground text-xs">{frontendParams.userInstructions}</p>
               </ScrollArea>
             </div>
           )}
@@ -325,20 +315,20 @@ export const Stage5InputTab = memo<Stage5InputTabProps>(function Stage5InputTab(
           ============================================================ */}
       <Card className="col-span-2">
         <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-medium text-muted-foreground">
+          <CardTitle className="text-muted-foreground text-sm font-medium">
             {t?.modelInfo?.[locale] || 'Model'}
           </CardTitle>
         </CardHeader>
         <CardContent>
           {/* Model (tier-based naming) */}
-          <div className="flex items-center justify-between p-3 rounded-lg bg-orange-50/50 dark:bg-orange-950/20">
+          <div className="flex items-center justify-between rounded-lg bg-orange-50/50 p-3 dark:bg-orange-950/20">
             <div className="flex items-center gap-2">
               <Cpu className="h-4 w-4 text-orange-500" aria-hidden="true" />
               <span className="text-sm">{t?.modelTier?.[locale] || 'AI Model'}</span>
             </div>
             <Badge
               variant="outline"
-              className="font-mono bg-orange-100 text-orange-700 border-orange-300 dark:bg-orange-900/40 dark:text-orange-400 dark:border-orange-700"
+              className="border-orange-300 bg-orange-100 font-mono text-orange-700 dark:border-orange-700 dark:bg-orange-900/40 dark:text-orange-400"
             >
               {getTierModelName(generationParams?.tier, locale)}
             </Badge>
@@ -346,7 +336,7 @@ export const Stage5InputTab = memo<Stage5InputTabProps>(function Stage5InputTab(
         </CardContent>
       </Card>
     </div>
-  );
-});
+  )
+})
 
-export default Stage5InputTab;
+export default Stage5InputTab
