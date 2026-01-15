@@ -1,7 +1,7 @@
 ---
 name: process-logs
 description: Process error logs from admin panel - fetch new errors, analyze, create tasks, fix, and mark resolved
-version: 1.3.0
+version: 1.4.0
 ---
 
 # Process Error Logs
@@ -85,6 +85,25 @@ mcp__context7__resolve-library-id → mcp__context7__query-docs
 - Test the fix mentally: "What else could break?"
 - Check for similar patterns elsewhere in codebase
 - One good fix > multiple quick patches
+
+### 5. LOG NOTES (MANDATORY)
+
+**Always write notes when updating log status.** Keep it brief, in English.
+
+| Status        | What to write in notes                                                                           |
+| ------------- | ------------------------------------------------------------------------------------------------ |
+| `resolved`    | Root cause + fix applied. Example: `Missing constraint. Added 'approved' to enum via migration.` |
+| `ignored`     | **Never use.** Fix or ask user.                                                                  |
+| `to_verify`   | Why pending + what to check. Example: `External API timeout. Monitor for 24h.`                   |
+| `in_progress` | Beads task ID. Example: `Working on mc2-5ch`                                                     |
+
+**Format:** `<root_cause>. <action_taken>.` — Max 100 chars.
+
+**Examples:**
+
+- `ESM import conflict. Renamed generator.ts to generator-node.ts.`
+- `Constraint missing 'approved'. Added via migration 20250115_fix_status.`
+- `Cloudflare 500. External issue, retry logic already exists. Monitoring.`
 
 ## Usage
 
