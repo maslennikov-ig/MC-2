@@ -3,126 +3,16 @@
 import React, { useState, useCallback } from 'react'
 import { useTranslations } from 'next-intl'
 import { toast } from 'sonner'
-import {
-  Video,
-  Headphones,
-  Presentation,
-  HelpCircle,
-  FileText,
-  Play,
-  Download,
-  ExternalLink,
-  X,
-  AlertTriangle,
-} from 'lucide-react'
-import { AudioPlayer } from '../enrichments/AudioPlayer'
-import { QuizPlayer } from '../enrichments/QuizPlayer'
+import { FileText, AlertTriangle } from 'lucide-react'
 import { EnrichmentErrorBoundary } from '../enrichments/EnrichmentErrorBoundary'
 import { EnrichmentPlaceholderCard } from './EnrichmentPlaceholderCard'
 import { EnrichmentGeneratingCard } from './EnrichmentGeneratingCard'
 import { useEnrichmentGeneration } from '@/lib/hooks/useEnrichmentGeneration'
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Button } from '@/components/ui/button'
-import { Badge } from '@/components/ui/badge'
 import type { Database } from '@/types/database.generated'
-import type {
-  QuizEnrichmentContent,
-  PresentationEnrichmentContent,
-  AudioEnrichmentContent,
-} from '@megacampus/shared-types/enrichment-content'
+import { EnrichmentCard } from './EnrichmentCard'
+import { PLACEHOLDER_TYPES, type EnrichmentType } from './enrichment-config'
 
 type EnrichmentRow = Database['public']['Tables']['lesson_enrichments']['Row']
-
-// Type guards for safe content parsing
-function isQuizContent(content: unknown): content is QuizEnrichmentContent {
-  return (
-    typeof content === 'object' &&
-    content !== null &&
-    'type' in content &&
-    (content as Record<string, unknown>).type === 'quiz' &&
-    'questions' in content &&
-    Array.isArray((content as Record<string, unknown>).questions)
-  )
-}
-
-function isAudioContent(content: unknown): content is AudioEnrichmentContent {
-  return (
-    typeof content === 'object' &&
-    content !== null &&
-    'type' in content &&
-    (content as Record<string, unknown>).type === 'audio'
-  )
-}
-
-function isPresentationContent(content: unknown): content is PresentationEnrichmentContent {
-  return (
-    typeof content === 'object' &&
-    content !== null &&
-    'type' in content &&
-    (content as Record<string, unknown>).type === 'presentation' &&
-    'slides' in content &&
-    Array.isArray((content as Record<string, unknown>).slides)
-  )
-}
-
-function isVideoContent(content: unknown): content is { type: 'video'; duration_seconds?: number } {
-  return (
-    typeof content === 'object' &&
-    content !== null &&
-    'type' in content &&
-    (content as Record<string, unknown>).type === 'video'
-  )
-}
-
-type EnrichmentType = 'video' | 'audio' | 'presentation' | 'quiz' | 'document'
-
-const PLACEHOLDER_TYPES: ('quiz' | 'audio' | 'presentation' | 'video')[] = [
-  'quiz',
-  'audio',
-  'presentation',
-  'video',
-]
-
-const ENRICHMENT_CONFIG: Record<
-  EnrichmentType,
-  {
-    icon: React.ElementType
-    color: string
-    bgColor: string
-    labelKey: string
-  }
-> = {
-  video: {
-    icon: Video,
-    color: 'text-red-500 dark:text-red-400',
-    bgColor: 'bg-red-100 dark:bg-red-900/30',
-    labelKey: 'viewer.videoLesson',
-  },
-  audio: {
-    icon: Headphones,
-    color: 'text-purple-500 dark:text-purple-400',
-    bgColor: 'bg-purple-100 dark:bg-purple-900/30',
-    labelKey: 'viewer.audioLesson',
-  },
-  presentation: {
-    icon: Presentation,
-    color: 'text-orange-500 dark:text-orange-400',
-    bgColor: 'bg-orange-100 dark:bg-orange-900/30',
-    labelKey: 'viewer.presentationLabel',
-  },
-  quiz: {
-    icon: HelpCircle,
-    color: 'text-green-500 dark:text-green-400',
-    bgColor: 'bg-green-100 dark:bg-green-900/30',
-    labelKey: 'viewer.quizLabel',
-  },
-  document: {
-    icon: FileText,
-    color: 'text-blue-500 dark:text-blue-400',
-    bgColor: 'bg-blue-100 dark:bg-blue-900/30',
-    labelKey: 'viewer.documentLabel',
-  },
-}
 
 interface EnrichmentsPanelProps {
   enrichments: EnrichmentRow[]
@@ -226,7 +116,6 @@ export function EnrichmentsPanel({
             onToggle={() =>
               setActiveEnrichmentId(activeEnrichmentId === enrichment.id ? null : enrichment.id)
             }
-            t={t}
           />
         </EnrichmentErrorBoundary>
       ))}
@@ -244,7 +133,6 @@ export function EnrichmentsPanel({
             onToggle={() =>
               setActiveEnrichmentId(activeEnrichmentId === enrichment.id ? null : enrichment.id)
             }
-            t={t}
           />
         </EnrichmentErrorBoundary>
       ))}
@@ -262,7 +150,6 @@ export function EnrichmentsPanel({
             onToggle={() =>
               setActiveEnrichmentId(activeEnrichmentId === enrichment.id ? null : enrichment.id)
             }
-            t={t}
           />
         </EnrichmentErrorBoundary>
       ))}
@@ -280,7 +167,6 @@ export function EnrichmentsPanel({
             onToggle={() =>
               setActiveEnrichmentId(activeEnrichmentId === enrichment.id ? null : enrichment.id)
             }
-            t={t}
           />
         </EnrichmentErrorBoundary>
       ))}
@@ -298,7 +184,6 @@ export function EnrichmentsPanel({
             onToggle={() =>
               setActiveEnrichmentId(activeEnrichmentId === enrichment.id ? null : enrichment.id)
             }
-            t={t}
           />
         </EnrichmentErrorBoundary>
       ))}
@@ -311,9 +196,9 @@ export function EnrichmentsPanel({
           const typeIsGenerating = isGenerating(type)
 
           // Construct translation key dynamically - path exists in enrichments.json
-          type PlaceholderKey = `placeholder.${typeof type}.estimatedTime`;
-          const estimatedTimeKey = `placeholder.${type}.estimatedTime` as PlaceholderKey;
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Dynamic key not in strict types
+          type PlaceholderKey = `placeholder.${typeof type}.estimatedTime`
+          const estimatedTimeKey = `placeholder.${type}.estimatedTime`
+
           const estimatedTime = t(estimatedTimeKey as Parameters<typeof t>[0])
 
           // Show generating card if generation is in progress
@@ -354,196 +239,5 @@ export function EnrichmentsPanel({
         })}
       </div>
     </div>
-  )
-}
-
-interface EnrichmentCardProps {
-  enrichment: EnrichmentRow
-  isActive: boolean
-  onToggle: () => void
-  t: ReturnType<typeof useTranslations<'enrichments'>>
-}
-
-function EnrichmentCard({ enrichment, isActive, onToggle, t }: EnrichmentCardProps) {
-  const type = enrichment.enrichment_type as EnrichmentType
-  const config = ENRICHMENT_CONFIG[type]
-  const Icon = config.icon
-
-  const getContentPreview = () => {
-    const content = enrichment.content
-    if (!content) return null
-
-    try {
-      switch (type) {
-        case 'quiz': {
-          if (isQuizContent(content)) {
-            return content.questions?.length
-              ? t('viewer.questionsCount', { count: content.questions.length })
-              : null
-          }
-          return null
-        }
-        case 'presentation': {
-          if (isPresentationContent(content)) {
-            return content.slides?.length
-              ? t('viewer.slidesCount', { count: content.slides.length })
-              : null
-          }
-          return null
-        }
-        case 'audio': {
-          if (isAudioContent(content)) {
-            return content.duration_seconds
-              ? t('viewer.minutesShort', { count: Math.ceil(content.duration_seconds / 60) })
-              : null
-          }
-          return null
-        }
-        case 'video': {
-          if (isVideoContent(content)) {
-            return content.duration_seconds
-              ? t('viewer.minutesShort', { count: Math.ceil(content.duration_seconds / 60) })
-              : null
-          }
-          return null
-        }
-        default:
-          return null
-      }
-    } catch (error) {
-      console.error('Failed to parse enrichment content preview:', error)
-      return null
-    }
-  }
-
-  const getDescriptionKey = () => {
-    switch (type) {
-      case 'quiz':
-        return 'viewer.checkKnowledge'
-      case 'audio':
-        return 'viewer.audioVersion'
-      case 'video':
-        return 'viewer.videoVersion'
-      case 'presentation':
-        return 'viewer.lessonPresentation'
-      case 'document':
-        return 'viewer.additionalMaterials'
-      default:
-        return 'viewer.additionalMaterials'
-    }
-  }
-
-  const getLabel = () => {
-    switch (type) {
-      case 'video':
-        return t('viewer.videoLesson')
-      case 'audio':
-        return t('viewer.audioLesson')
-      case 'presentation':
-        return t('viewer.presentationLabel')
-      case 'quiz':
-        return t('viewer.quizLabel')
-      case 'document':
-        return t('viewer.documentLabel')
-      default:
-        return t('viewer.additionalMaterials')
-    }
-  }
-
-  const preview = getContentPreview()
-
-  return (
-    <Card className="overflow-hidden transition-shadow hover:shadow-md">
-      <CardHeader className={`${config.bgColor} py-3`}>
-        <div className="flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <Icon className={`h-5 w-5 ${config.color}`} />
-            <CardTitle className="text-base font-medium">
-              {enrichment.title || getLabel()}
-            </CardTitle>
-          </div>
-          {preview && (
-            <Badge variant="secondary" className="text-xs">
-              {preview}
-            </Badge>
-          )}
-        </div>
-      </CardHeader>
-      <CardContent className="py-4">
-        {/* Show QuizPlayer when active */}
-        {isActive && type === 'quiz' && isQuizContent(enrichment.content) && (
-          <div className="mb-4">
-            <QuizPlayer
-              content={enrichment.content}
-              enrichmentId={enrichment.id}
-              onComplete={(score, total, passed) => {
-                console.log('Quiz completed:', { score, total, passed })
-              }}
-            />
-          </div>
-        )}
-
-        {/* Show AudioPlayer when active */}
-        {isActive && type === 'audio' && (
-          <div className="mb-4">
-            <AudioPlayer
-              enrichment={enrichment}
-              playbackUrl={undefined /* TODO: will be implemented with storage helper */}
-            />
-          </div>
-        )}
-
-        {/* Action row */}
-        <div className="flex items-center justify-between">
-          <p className="text-sm text-gray-500 dark:text-gray-400">{t(getDescriptionKey())}</p>
-          <div className="flex gap-2">
-            {/* Audio/Video toggle */}
-            {(type === 'audio' || type === 'video') && (
-              <Button size="sm" className="gap-2" onClick={onToggle}>
-                {isActive ? (
-                  <>
-                    <X className="h-4 w-4" />
-                    {t('viewer.close')}
-                  </>
-                ) : (
-                  <>
-                    <Play className="h-4 w-4" />
-                    {t('viewer.play')}
-                  </>
-                )}
-              </Button>
-            )}
-            {/* Quiz toggle */}
-            {type === 'quiz' && (
-              <Button size="sm" className="gap-2" onClick={onToggle}>
-                {isActive ? (
-                  <>
-                    <X className="h-4 w-4" />
-                    {t('viewer.close')}
-                  </>
-                ) : (
-                  <>
-                    <Play className="h-4 w-4" />
-                    {t('viewer.startQuiz')}
-                  </>
-                )}
-              </Button>
-            )}
-            {type === 'presentation' && (
-              <Button size="sm" className="gap-2">
-                <ExternalLink className="h-4 w-4" />
-                {t('viewer.open')}
-              </Button>
-            )}
-            {type === 'document' && (
-              <Button size="sm" variant="outline" className="gap-2">
-                <Download className="h-4 w-4" />
-                {t('viewer.download')}
-              </Button>
-            )}
-          </div>
-        </div>
-      </CardContent>
-    </Card>
   )
 }
