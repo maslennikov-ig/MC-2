@@ -13,6 +13,9 @@ const DEFAULT_POLLING_INTERVAL = 2000 // 2 seconds
 const MAX_POLL_FAILURES = 5
 const MAX_BACKOFF_INTERVAL = 10000 // 10 seconds
 
+// Optimistic UI prefix for temporary IDs before API response
+const OPTIMISTIC_ID_PREFIX = 'optimistic-'
+
 interface UseEnrichmentGenerationOptions {
   lessonId: string
   courseId: string
@@ -126,10 +129,18 @@ export function useEnrichmentGeneration({
       pollingIntervalsRef.current.delete(type)
     }
 
+    // Clean up polling-phase controller
     const controller = abortControllersRef.current.get(type)
     if (controller) {
       controller.abort()
       abortControllersRef.current.delete(type)
+    }
+
+    // Clean up generate-phase controller (prevents memory leak in optimistic phase)
+    const generateController = abortControllersRef.current.get(`generate-${type}`)
+    if (generateController) {
+      generateController.abort()
+      abortControllersRef.current.delete(`generate-${type}`)
     }
 
     pollFailuresRef.current.delete(type)
@@ -282,7 +293,7 @@ export function useEnrichmentGeneration({
       }
 
       // OPTIMISTIC UPDATE: Immediately show loading state with temporary ID
-      const optimisticId = `optimistic-${type}-${Date.now()}`
+      const optimisticId = `${OPTIMISTIC_ID_PREFIX}${type}-${Date.now()}`
       if (mountedRef.current) {
         setGenerating((prev) => {
           const next = new Map(prev)
@@ -405,6 +416,9 @@ export function useEnrichmentGeneration({
 
   /**
    * Cancel generation for a specific enrichment type
+   *
+   * Handles both optimistic phase (before API response) and active generation.
+   * In optimistic phase, only cleans up frontend state without backend call.
    */
   const cancelGeneration = useCallback(
     async (type: string) => {
@@ -414,6 +428,20 @@ export function useEnrichmentGeneration({
       // Stop polling immediately
       stopPolling(type)
 
+      // Check if still in optimistic phase (no backend job exists yet)
+      if (gen.enrichmentId.startsWith(OPTIMISTIC_ID_PREFIX)) {
+        // Only clean up frontend state - no backend call needed
+        if (mountedRef.current) {
+          setGenerating((prev) => {
+            const next = new Map(prev)
+            next.delete(type)
+            return next
+          })
+        }
+        return
+      }
+
+      // Backend job exists - send cancel request
       try {
         const headers = getAuthHeaders()
 

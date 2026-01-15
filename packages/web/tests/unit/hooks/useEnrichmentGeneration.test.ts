@@ -814,6 +814,78 @@ describe('useEnrichmentGeneration', () => {
       unmount()
     })
 
+    it('should skip backend call when cancelling during optimistic phase', async () => {
+      // Create a deferred promise to control when fetch resolves
+      let resolveFetch: (value: Response) => void
+      const fetchPromise = new Promise<Response>((resolve) => {
+        resolveFetch = resolve
+      })
+      mockFetch.mockReturnValueOnce(fetchPromise)
+
+      const { result, unmount } = renderHook(() =>
+        useEnrichmentGeneration({
+          lessonId: 'lesson-123',
+          courseId: 'course-123',
+        })
+      )
+
+      // Start generation but don't await
+      act(() => {
+        result.current.startGeneration('quiz')
+      })
+
+      // Should be in optimistic phase with optimistic ID
+      expect(result.current.isGenerating('quiz')).toBe(true)
+      const optimisticEnrichment = result.current.generating.get('quiz')
+      expect(optimisticEnrichment!.enrichmentId).toMatch(/^optimistic-quiz-/)
+
+      // Clear mock to track new calls
+      mockFetch.mockClear()
+
+      // Cancel during optimistic phase
+      await act(async () => {
+        await result.current.cancelGeneration('quiz')
+      })
+
+      // Should NOT have called backend cancel endpoint (optimistic ID doesn't exist on backend)
+      expect(mockFetch).not.toHaveBeenCalled()
+
+      // Should have cleaned up frontend state
+      expect(result.current.isGenerating('quiz')).toBe(false)
+      expect(result.current.generating.has('quiz')).toBe(false)
+
+      // Clean up: resolve the pending fetch to avoid unhandled promise
+      resolveFetch!(createMockResponse(mockGenerateResponse))
+
+      unmount()
+    })
+
+    it('should clean up optimistic state on unmount', async () => {
+      // Create a promise that never resolves (simulates slow network)
+      const fetchPromise = new Promise<Response>(() => {})
+      mockFetch.mockReturnValueOnce(fetchPromise)
+
+      const { result, unmount } = renderHook(() =>
+        useEnrichmentGeneration({
+          lessonId: 'lesson-123',
+          courseId: 'course-123',
+        })
+      )
+
+      // Start generation but don't await
+      act(() => {
+        result.current.startGeneration('quiz')
+      })
+
+      // Should be in optimistic phase
+      expect(result.current.isGenerating('quiz')).toBe(true)
+
+      // Unmount should clean up without errors
+      unmount()
+
+      // No assertion needed - test passes if unmount doesn't throw
+    })
+
     it('should do nothing if enrichment not in generating map', async () => {
       const { result, unmount } = renderHook(() =>
         useEnrichmentGeneration({
