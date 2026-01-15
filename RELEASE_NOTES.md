@@ -2,6 +2,39 @@
 
 _Released on 2025-12-26_
 
+## v0.28.0
+
+_Released on 2026-01-15_
+
+### ✨ New Features
+
+- **logging**: Add generationCode to worker logs
+- **styles**: Add 7 new course styles
+- **monitoring**: Add Telegram bot health check to admin dashboard
+
+### 🔧 Improvements
+
+- **stage6**: Address code review findings for style propagation
+- **styles**: Reduce course styles from 19 to 12
+
+### 🐛 Bug Fixes
+
+- **RT-007**: Use word boundaries in hasNonMeasurableVerb
+- **types**: Cast course.style to CourseStyle type
+- **stage4**: Remove size hints from AUTO mode prompt
+- **stage4**: Add explicit AUTO mode guidance for course size determination
+- **stage4**: Enforce course size as mandatory constraint with ±20% tolerance
+- **admin-logs**: Implement status filter functionality
+- **stage6**: Improve style field validation and error handling
+- **stage4**: Reduce motivators min length from 100 to 50 chars
+- **stage5**: Make TODO pattern case-sensitive
+- **styles**: Add 'microlearning' course style
+- **stage6**: Pass course style to lesson content generation
+
+---
+
+_This release was automatically generated from 39 commits._
+
 ## v0.27.11
 
 _Released on 2026-01-14_

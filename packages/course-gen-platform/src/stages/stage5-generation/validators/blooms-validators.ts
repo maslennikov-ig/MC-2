@@ -25,13 +25,29 @@ import { ValidationSeverity, type ValidationResult } from '@megacampus/shared-ty
  */
 export const NON_MEASURABLE_VERBS_BLACKLIST = {
   en: [
-    'understand', 'know', 'learn', 'appreciate', 'be aware of',
-    'be familiar with', 'grasp', 'comprehend', 'realize',
-    'recognize', 'become acquainted with',
+    'understand',
+    'know',
+    'learn',
+    'appreciate',
+    'be aware of',
+    'be familiar with',
+    'grasp',
+    'comprehend',
+    'realize',
+    'recognize',
+    'become acquainted with',
   ],
   ru: [
-    'понимать', 'знать', 'изучать', 'осознавать', 'быть знакомым с',
-    'постигать', 'усваивать', 'разбираться', 'осмыслять', 'овладевать',
+    'понимать',
+    'знать',
+    'изучать',
+    'осознавать',
+    'быть знакомым с',
+    'постигать',
+    'усваивать',
+    'разбираться',
+    'осмыслять',
+    'овладевать',
   ],
 } as const;
 
@@ -40,20 +56,162 @@ export const NON_MEASURABLE_VERBS_BLACKLIST = {
  */
 export const BLOOMS_TAXONOMY_WHITELIST = {
   en: {
-    remember: ['define', 'list', 'recall', 'recognize', 'identify', 'name', 'state', 'describe', 'label', 'match', 'select', 'reproduce', 'cite', 'memorize'],
-    understand: ['explain', 'summarize', 'paraphrase', 'classify', 'compare', 'contrast', 'interpret', 'exemplify', 'illustrate', 'infer', 'predict', 'discuss'],
-    apply: ['execute', 'implement', 'solve', 'use', 'demonstrate', 'operate', 'calculate', 'complete', 'show', 'examine', 'modify'],
-    analyze: ['differentiate', 'organize', 'attribute', 'deconstruct', 'distinguish', 'examine', 'experiment', 'question', 'test', 'investigate'],
-    evaluate: ['check', 'critique', 'judge', 'hypothesize', 'argue', 'defend', 'support', 'assess', 'rate', 'recommend'],
-    create: ['design', 'construct', 'plan', 'produce', 'invent', 'develop', 'formulate', 'assemble', 'compose', 'devise'],
+    remember: [
+      'define',
+      'list',
+      'recall',
+      'recognize',
+      'identify',
+      'name',
+      'state',
+      'describe',
+      'label',
+      'match',
+      'select',
+      'reproduce',
+      'cite',
+      'memorize',
+    ],
+    understand: [
+      'explain',
+      'summarize',
+      'paraphrase',
+      'classify',
+      'compare',
+      'contrast',
+      'interpret',
+      'exemplify',
+      'illustrate',
+      'infer',
+      'predict',
+      'discuss',
+    ],
+    apply: [
+      'execute',
+      'implement',
+      'solve',
+      'use',
+      'demonstrate',
+      'operate',
+      'calculate',
+      'complete',
+      'show',
+      'examine',
+      'modify',
+    ],
+    analyze: [
+      'differentiate',
+      'organize',
+      'attribute',
+      'deconstruct',
+      'distinguish',
+      'examine',
+      'experiment',
+      'question',
+      'test',
+      'investigate',
+    ],
+    evaluate: [
+      'check',
+      'critique',
+      'judge',
+      'hypothesize',
+      'argue',
+      'defend',
+      'support',
+      'assess',
+      'rate',
+      'recommend',
+    ],
+    create: [
+      'design',
+      'construct',
+      'plan',
+      'produce',
+      'invent',
+      'develop',
+      'formulate',
+      'assemble',
+      'compose',
+      'devise',
+    ],
   },
   ru: {
-    remember: ['определить', 'перечислить', 'вспомнить', 'распознать', 'идентифицировать', 'назвать', 'утверждать', 'описать', 'обозначить', 'сопоставить', 'выбрать', 'воспроизвести', 'цитировать'],
-    understand: ['объяснить', 'резюмировать', 'перефразировать', 'классифицировать', 'сравнить', 'противопоставить', 'интерпретировать', 'проиллюстрировать', 'сделать вывод', 'предсказать', 'обсудить'],
-    apply: ['выполнить', 'реализовать', 'решить', 'использовать', 'продемонстрировать', 'оперировать', 'вычислить', 'завершить', 'показать', 'исследовать', 'модифицировать'],
-    analyze: ['дифференцировать', 'организовать', 'атрибутировать', 'деконструировать', 'различить', 'изучить', 'экспериментировать', 'задать вопрос', 'тестировать'],
-    evaluate: ['проверить', 'критиковать', 'судить', 'выдвинуть гипотезу', 'аргументировать', 'защитить', 'поддержать', 'оценить', 'рекомендовать'],
-    create: ['спроектировать', 'сконструировать', 'спланировать', 'произвести', 'изобрести', 'разработать', 'сформулировать', 'собрать', 'составить', 'придумать'],
+    remember: [
+      'определить',
+      'перечислить',
+      'вспомнить',
+      'распознать',
+      'идентифицировать',
+      'назвать',
+      'утверждать',
+      'описать',
+      'обозначить',
+      'сопоставить',
+      'выбрать',
+      'воспроизвести',
+      'цитировать',
+    ],
+    understand: [
+      'объяснить',
+      'резюмировать',
+      'перефразировать',
+      'классифицировать',
+      'сравнить',
+      'противопоставить',
+      'интерпретировать',
+      'проиллюстрировать',
+      'сделать вывод',
+      'предсказать',
+      'обсудить',
+    ],
+    apply: [
+      'выполнить',
+      'реализовать',
+      'решить',
+      'использовать',
+      'продемонстрировать',
+      'оперировать',
+      'вычислить',
+      'завершить',
+      'показать',
+      'исследовать',
+      'модифицировать',
+    ],
+    analyze: [
+      'дифференцировать',
+      'организовать',
+      'атрибутировать',
+      'деконструировать',
+      'различить',
+      'изучить',
+      'экспериментировать',
+      'задать вопрос',
+      'тестировать',
+    ],
+    evaluate: [
+      'проверить',
+      'критиковать',
+      'судить',
+      'выдвинуть гипотезу',
+      'аргументировать',
+      'защитить',
+      'поддержать',
+      'оценить',
+      'рекомендовать',
+    ],
+    create: [
+      'спроектировать',
+      'сконструировать',
+      'спланировать',
+      'произвести',
+      'изобрести',
+      'разработать',
+      'сформулировать',
+      'собрать',
+      'составить',
+      'придумать',
+    ],
   },
 } as const;
 
@@ -206,7 +364,12 @@ export function hasNonMeasurableVerb(text: string, language: string): boolean {
   // Only EN and RU have non-measurable verb blacklists
   if (language === 'en' || language === 'ru') {
     const blacklist = NON_MEASURABLE_VERBS_BLACKLIST[language];
-    return blacklist.some(verb => lowerText.includes(verb.toLowerCase()));
+    // RT-007 P6: Use word boundaries to avoid false positives
+    // e.g., "распознать" should NOT match "знать" (it contains "знать" as substring)
+    return blacklist.some(verb => {
+      const pattern = new RegExp(`\\b${verb.toLowerCase()}\\b`, 'u');
+      return pattern.test(lowerText);
+    });
   }
 
   // Other languages: no check (assume measurable)
@@ -246,10 +409,7 @@ export function isBloomsVerb(verb: string, language: 'en' | 'ru'): boolean {
  * @param language - ISO 639-1 language code
  * @returns Validation result with severity WARNING on whitelist failure
  */
-export function validateBloomsTaxonomy(
-  objective: string,
-  language: string
-): ValidationResult {
+export function validateBloomsTaxonomy(objective: string, language: string): ValidationResult {
   const verb = extractActionVerb(objective, language);
   const whitelist = getBloomsWhitelist(language);
 
@@ -260,12 +420,14 @@ export function validateBloomsTaxonomy(
         passed: true,
         severity: ValidationSeverity.INFO,
         score: 1.0,
-        info: [`Action verb "${verb}" validated at Bloom's level "${level}" for language ${language}`],
+        info: [
+          `Action verb "${verb}" validated at Bloom's level "${level}" for language ${language}`,
+        ],
         metadata: {
           rule: 'blooms_taxonomy_whitelist',
           level: level,
           verb: verb,
-        }
+        },
       };
     }
   }
@@ -281,6 +443,6 @@ export function validateBloomsTaxonomy(
     metadata: {
       rule: 'blooms_taxonomy_whitelist',
       verb: verb,
-    }
+    },
   };
 }

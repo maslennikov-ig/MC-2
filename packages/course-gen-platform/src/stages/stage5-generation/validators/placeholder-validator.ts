@@ -32,32 +32,33 @@ import { ValidationSeverity, type ValidationResult } from '@megacampus/shared-ty
  * - Added: Language-specific patterns (Russian: [название], [описание])
  */
 const PLACEHOLDER_PATTERNS = [
-  // ✅ TODO/FIXME markers (block always)
-  // RT-007 P4: Removed NOTE - legitimate word in educational content ("Note: important info")
-  /\b(TODO|FIXME|XXX|HACK)\b/i,
+  // ✅ TODO/FIXME markers (block always) - CASE SENSITIVE
+  // RT-007 P5: Made case-sensitive to avoid false positives (e.g., "todo list", "todo app")
+  // Developers use UPPERCASE for markers, lowercase "todo" is often legitimate content
+  /\b(TODO|FIXME|XXX|HACK)\b/,
 
   // ✅ Only explicit bracketed placeholders
   /\[TODO\]/i,
   /\[TBD\]/i,
   /\[FIXME\]/i,
-  /\[insert[^\]]*\]/i,      // [insert ...], [insert topic]
-  /\[add[^\]]*\]/i,         // [add content]
-  /\[replace[^\]]*\]/i,     // [replace ...]
-  /\[название[^\]]*\]/i,    // Russian: [название ...]
-  /\[описание[^\]]*\]/i,    // Russian: [описание ...]
-  /\[введите[^\]]*\]/i,     // Russian: [введите ...]
-  /\[добавьте[^\]]*\]/i,    // Russian: [добавьте ...]
+  /\[insert[^\]]*\]/i, // [insert ...], [insert topic]
+  /\[add[^\]]*\]/i, // [add content]
+  /\[replace[^\]]*\]/i, // [replace ...]
+  /\[название[^\]]*\]/i, // Russian: [название ...]
+  /\[описание[^\]]*\]/i, // Russian: [описание ...]
+  /\[введите[^\]]*\]/i, // Russian: [введите ...]
+  /\[добавьте[^\]]*\]/i, // Russian: [добавьте ...]
 
   // ❌ REMOVED: /\[.*?\]/ (too aggressive)
   // ❌ REMOVED: /<.*?>/ (catches TypeScript generics)
 
   // ✅ Template variables (only double braces)
-  /\{\{[^}]+\}\}/,          // {{variable}} - explicit template
-  /\$\{[^}]+\}/,            // ${variable} - explicit template
+  /\{\{[^}]+\}\}/, // {{variable}} - explicit template
+  /\$\{[^}]+\}/, // ${variable} - explicit template
 
   // ✅ Ellipsis indicators (only at start or isolated)
-  /^\.\.\.$|^\.\.\.\s/,     // "..." at line start only
-  /…$/,                      // Unicode ellipsis at end
+  /^\.\.\.$|^\.\.\.\s/, // "..." at line start only
+  /…$/, // Unicode ellipsis at end
 
   // ✅ Generic placeholders (only with context)
   /\b(example|sample|placeholder|пример|образец)\s+(title|name|description|text|название|текст)\b/i,
@@ -66,7 +67,7 @@ const PLACEHOLDER_PATTERNS = [
   /^\s*$/,
 
   // ✅ Numeric placeholders (with context)
-  /\b(N|X|Y|Z)\s+(students|hours|modules|студентов|часов|модулей)\b/i
+  /\b(N|X|Y|Z)\s+(students|hours|modules|студентов|часов|модулей)\b/i,
 ] as const;
 
 /**
@@ -91,8 +92,8 @@ export function hasPlaceholders(text: string): boolean {
  */
 function determineSeverity(match: string): ValidationSeverity {
   // TODO/FIXME/XXX/HACK markers → ERROR (explicitly incomplete)
-  // RT-007 P4: Removed NOTE - legitimate word in educational content
-  if (/\b(TODO|FIXME|XXX|HACK)\b/i.test(match)) {
+  // RT-007 P5: Case-sensitive to avoid false positives with lowercase "todo"
+  if (/\b(TODO|FIXME|XXX|HACK)\b/.test(match)) {
     return ValidationSeverity.ERROR;
   }
 
@@ -125,12 +126,13 @@ export function validatePlaceholders(text: string): ValidationResult {
         score: severity === ValidationSeverity.ERROR ? 0.0 : 0.8,
         issues: severity === ValidationSeverity.ERROR ? [match] : undefined,
         warnings: severity === ValidationSeverity.WARNING ? [match] : undefined,
-        suggestion: severity === ValidationSeverity.ERROR
-          ? 'Remove TODO/FIXME markers and complete all placeholder content'
-          : 'Review bracketed content to ensure it is not a placeholder',
+        suggestion:
+          severity === ValidationSeverity.ERROR
+            ? 'Remove TODO/FIXME markers and complete all placeholder content'
+            : 'Review bracketed content to ensure it is not a placeholder',
         metadata: {
           rule: 'placeholder_detection',
-        }
+        },
       };
     }
   }
@@ -142,7 +144,7 @@ export function validatePlaceholders(text: string): ValidationResult {
     info: ['No placeholders detected'],
     metadata: {
       rule: 'placeholder_detection',
-    }
+    },
   };
 }
 

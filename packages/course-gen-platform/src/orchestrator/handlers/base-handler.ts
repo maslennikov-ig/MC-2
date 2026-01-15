@@ -26,6 +26,13 @@ import { getTranslator, type Locale, type TranslatorFn } from '../../shared/i18n
 const translatorCache = new Map<Locale, TranslatorFn>();
 
 /**
+ * Cached generation codes per courseId
+ * Used by log() method to include human-readable course identifier.
+ * Cache is populated in process() and accessed in log().
+ */
+const generationCodeCache = new Map<string, string>();
+
+/**
  * Get cached translator instance for the specified locale
  */
 function getCachedTranslator(locale: Locale): TranslatorFn {
@@ -121,11 +128,33 @@ export abstract class BaseJobHandler<T extends JobData = JobData> {
   async process(job: Job<T>): Promise<JobResult> {
     const startTime = Date.now();
     const { courseId, userId, locale = 'ru' } = job.data;
+
+    // Fetch generation_code for human-readable log identification
+    // Check cache first to avoid duplicate DB queries for same course
+    let generationCode: string | undefined = generationCodeCache.get(courseId);
+    if (!generationCode) {
+      try {
+        const supabase = getSupabaseAdmin();
+        const { data: course } = await supabase
+          .from('courses')
+          .select('generation_code')
+          .eq('id', courseId)
+          .single();
+        generationCode = course?.generation_code ?? undefined;
+        if (generationCode) {
+          generationCodeCache.set(courseId, generationCode);
+        }
+      } catch {
+        // Ignore fetch errors - generationCode is optional enhancement
+      }
+    }
+
     const jobLogger = logger.child({
       jobId: job.id,
       jobType: this.jobType,
       organizationId: job.data.organizationId,
       courseId,
+      generationCode, // Human-readable course identifier (e.g., XQH-1203)
       userId,
     });
 
@@ -329,11 +358,15 @@ export abstract class BaseJobHandler<T extends JobData = JobData> {
     message: string,
     meta?: Record<string, unknown>
   ): void {
+    const { courseId, organizationId } = job.data;
+    const generationCode = generationCodeCache.get(courseId);
+
     const jobLogger = logger.child({
       jobId: job.id,
       jobType: this.jobType,
-      organizationId: job.data.organizationId,
-      courseId: job.data.courseId,
+      organizationId,
+      courseId,
+      generationCode, // Human-readable course identifier (e.g., XQH-1203)
     });
 
     jobLogger[level](meta || {}, message);
