@@ -87,6 +87,7 @@ export async function generatorNode(state: LessonGraphStateType): Promise<Lesson
       sectionCount: lessonSpec.sections.length,
       ragChunksCount: ragChunks.length,
       language,
+      style: style ?? 'default',
     },
     durationMs: 0,
   });

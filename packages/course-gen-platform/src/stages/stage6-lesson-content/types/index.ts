@@ -30,7 +30,13 @@ export interface Stage6JobInput {
   /** Optional user instructions for refinement */
   userRefinementPrompt?: string;
 
-  /** Course content style (e.g., 'gamified', 'professional', 'storytelling') */
+  /**
+   * Course content style for lesson generation
+   * Controls vocabulary, phrasing, and narrative approach
+   * @example 'gamified' - Quest-based, achievement-oriented narrative
+   * @example 'professional' - Business formal, concise, authoritative
+   * @default 'professional' (fallback in getStylePrompt when null/undefined)
+   */
   style?: string;
 }
 

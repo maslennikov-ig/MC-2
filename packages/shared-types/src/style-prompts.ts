@@ -34,6 +34,12 @@ export type CourseStyle = (typeof COURSE_STYLES)[number];
 
 export const CourseStyleSchema = z.enum(COURSE_STYLES);
 
+/**
+ * Default course style used when none specified
+ * Used as fallback in Stage 6 content generation
+ */
+export const DEFAULT_COURSE_STYLE: CourseStyle = 'professional';
+
 // ============================================================================
 // STYLE PROMPT DEFINITIONS (ported from workflows n8n/style.js)
 // ============================================================================
