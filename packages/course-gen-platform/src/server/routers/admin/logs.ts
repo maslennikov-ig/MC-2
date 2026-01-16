@@ -675,7 +675,15 @@ async function buildErrorLogsQuery(
   const { data, count, error } = await query;
 
   if (error) {
-    logger.error({ error }, 'Error querying error_logs');
+    // Extract all PostgrestError fields for better debugging
+    const errorDetails = {
+      message: error.message || 'Unknown error',
+      code: error.code || null,
+      details: error.details || null,
+      hint: error.hint || null,
+      isTruncated: error.message?.startsWith('{') && !error.message?.endsWith('}'),
+    };
+    logger.error({ errorDetails, rawError: String(error) }, 'Error querying error_logs');
     return { items: [], total: 0 };
   }
 
@@ -807,7 +815,16 @@ async function buildGenerationTraceQuery(
   const { data, count, error } = await query;
 
   if (error) {
-    logger.error({ error }, 'Error querying generation_trace');
+    // Extract all PostgrestError fields for better debugging
+    const errorDetails = {
+      message: error.message || 'Unknown error',
+      code: error.code || null,
+      details: error.details || null,
+      hint: error.hint || null,
+      // Detect truncated/malformed error messages
+      isTruncated: error.message?.startsWith('{') && !error.message?.endsWith('}'),
+    };
+    logger.error({ errorDetails, rawError: String(error) }, 'Error querying generation_trace');
     return { items: [], total: 0 };
   }
 
