@@ -2,6 +2,43 @@
 
 _Released on 2025-12-26_
 
+## v0.28.3
+
+_Released on 2026-01-16_
+
+### ✨ New Features
+
+- **logging**: Add auto_muted status for expected errors
+- **lesson-approval**: Add migration and tests for batch approval RPC
+- **stage4**: Add course_description and learning_outcomes to analysis input
+- **admin**: Add error log grouping by fingerprint
+- **generation**: добавить difficulty в Stage 5 FrontendParameters
+- **enrichments**: Add optimistic UI + improve error messages
+- **pipeline**: Add language support to Stage 4-5 model selection
+- **logs**: Add full-text search for similar problems v1.5.0
+
+### 🔧 Improvements
+
+- **stage4**: Remove unused answers field
+- **target_audience**: Unify data source to courses.target_audience column
+- **llm**: Add actualLanguage tracking, LanguageCode type, language detection
+
+### 🐛 Bug Fixes
+
+- **shared-types**: Update 4 source file(s), update 1 agent(s), +2 more
+- **logs**: Implement server-side grouping with RPC + code review fixes
+- **stage4**: Use actual target_audience from DB instead of hardcoded value
+- **generation**: передавать course_size и description в Input стадии 5
+- **logs**: Improve PostgrestError logging with full error details
+- **web**: Navigation sheet not working in fullscreen mode
+- **enrichment**: Address code review issues #5-#7
+- **enrichments**: Address code review findings
+- **web**: Cleanup unused type and debug comment in EnrichmentsPanel refactoring
+
+---
+
+_This release was automatically generated from 49 commits._
+
 ## v0.28.2
 
 _Released on 2026-01-15_
