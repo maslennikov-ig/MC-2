@@ -19,6 +19,7 @@ import { nanoid } from 'nanoid';
 import { addJob, removeJobsByCourseId } from '../../../orchestrator/queue';
 import { JobType } from '@megacampus/shared-types';
 import type { Database, JobData } from '@megacampus/shared-types';
+import { isValidStyle, DEFAULT_COURSE_STYLE } from '@megacampus/shared-types/style-prompts';
 import { initiateGenerationInputSchema } from './_shared/schemas';
 import { TIER_PRIORITY } from './_shared/constants';
 import type { ConcurrencyCheckResult, CourseSettings } from './_shared/types';
@@ -676,8 +677,9 @@ export const lifecycleRouter = router({
           frontend_parameters: {
             course_title: course.title, // ONLY guaranteed field
             language: course.language,
-            style: course.style,
+            style: course.style && isValidStyle(course.style) ? course.style : DEFAULT_COURSE_STYLE,
             target_audience: course.target_audience,
+            difficulty: course.difficulty,
             desired_lessons_count: (course.settings as unknown as CourseSettings)
               ?.desired_lessons_count,
             desired_modules_count: (course.settings as unknown as CourseSettings)
