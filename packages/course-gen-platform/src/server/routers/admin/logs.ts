@@ -108,6 +108,33 @@ export const bulkUpdateStatusInputSchema = z.object({
   status: logStatusSchema,
 });
 
+/**
+ * Input schema for listGrouped procedure - list errors grouped by fingerprint
+ */
+export const listGroupedInputSchema = z.object({
+  page: z.number().int().positive().default(1),
+  limit: z.number().int().positive().max(100).default(20),
+  filters: logFiltersSchema.optional(),
+});
+
+/**
+ * Input schema for getGroupLogs procedure - get individual logs within a fingerprint group
+ */
+export const getGroupLogsInputSchema = z.object({
+  fingerprint: z.string().length(32), // MD5 hash
+  page: z.number().int().positive().default(1),
+  limit: z.number().int().positive().max(50).default(10),
+});
+
+/**
+ * Input schema for updateGroupStatus procedure - update status for all logs in a fingerprint group
+ */
+export const updateGroupStatusInputSchema = z.object({
+  fingerprint: z.string().length(32), // MD5 hash
+  status: logStatusSchema,
+  notes: z.string().max(2000).optional(),
+});
+
 // ============================================================================
 // Response Types
 // ============================================================================
@@ -160,6 +187,34 @@ export type LogDetails = UnifiedLogItem & {
  */
 export type LogListResponse = {
   items: UnifiedLogItem[];
+  total: number;
+  page: number;
+};
+
+/**
+ * Grouped error item for listGrouped response
+ * Represents a single fingerprint group with aggregated data
+ */
+export type ErrorGroupItem = {
+  fingerprint: string;
+  count: number;
+  firstSeen: string;
+  lastSeen: string;
+  severity: string;
+  message: string;
+  source: string | null; // 'error_log' | 'generation_trace' - job_type for error_logs
+  status: LogStatus; // from log_issue_status by fingerprint
+  environments: string[]; // unique environments in group
+  latestLogId: string;
+  latestProblemId: string | null;
+  jobType: string | null;
+};
+
+/**
+ * List grouped response shape
+ */
+export type GroupedLogListResponse = {
+  items: ErrorGroupItem[];
   total: number;
   page: number;
 };
@@ -577,6 +632,243 @@ export const logsRouter = router({
         });
       }
     }),
+
+  /**
+   * List grouped errors by fingerprint
+   *
+   * Aggregates error_logs by fingerprint, showing count, first/last seen,
+   * and worst severity for each group. Only includes logs that have a fingerprint.
+   *
+   * Authorization: admin or superadmin only
+   */
+  listGrouped: adminProcedure
+    .input(listGroupedInputSchema)
+    .query(async ({ input }): Promise<GroupedLogListResponse> => {
+      try {
+        const supabase = getSupabaseAdmin();
+        const { page, limit, filters } = input;
+        const offset = (page - 1) * limit;
+
+        // Build and execute the grouped query
+        const result = await buildGroupedErrorLogsQuery(supabase, filters, limit, offset);
+
+        return {
+          items: result.items,
+          total: result.total,
+          page,
+        };
+      } catch (error) {
+        if (error instanceof TRPCError) throw error;
+
+        logger.error(
+          {
+            err: error instanceof Error ? error.message : String(error),
+            input,
+          },
+          'Unexpected error in admin logs listGrouped'
+        );
+
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: ErrorMessages.internalError(
+            'Grouped log listing',
+            error instanceof Error ? error.message : undefined
+          ),
+        });
+      }
+    }),
+
+  /**
+   * Get individual logs within a fingerprint group
+   *
+   * Returns paginated list of error_logs that share the same fingerprint.
+   *
+   * Authorization: admin or superadmin only
+   */
+  getGroupLogs: adminProcedure
+    .input(getGroupLogsInputSchema)
+    .query(async ({ input }): Promise<LogListResponse> => {
+      try {
+        const supabase = getSupabaseAdmin();
+        const { fingerprint, page, limit } = input;
+        const offset = (page - 1) * limit;
+
+        // Query error_logs with matching fingerprint
+        const { data, count, error } = await supabase
+          .from('error_logs')
+          .select(
+            'id, created_at, severity, error_message, job_type, metadata, problem_id, environment',
+            { count: 'exact' }
+          )
+          .eq('fingerprint', fingerprint)
+          .order('created_at', { ascending: false })
+          .range(offset, offset + limit - 1);
+
+        if (error) {
+          logger.error({ error }, 'Error querying error_logs by fingerprint');
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: ErrorMessages.databaseError('Group logs query', error.message),
+          });
+        }
+
+        if (!data || data.length === 0) {
+          return { items: [], total: 0, page };
+        }
+
+        // Fetch statuses for these logs
+        const logIds = data.map(log => log.id);
+        const statuses = await fetchLogStatuses(supabase, 'error_log', logIds);
+
+        const items: UnifiedLogItem[] = data.map(log => ({
+          id: log.id,
+          logType: 'error_log' as LogType,
+          createdAt: log.created_at,
+          severity: log.severity,
+          message: log.error_message,
+          source: log.job_type || null,
+          courseId: null,
+          lessonId: null,
+          stage: null,
+          phase: null,
+          status: statuses.get(log.id) || 'new',
+          metadata: log.metadata as Record<string, unknown> | null,
+          problemId: log.problem_id || null,
+          environment: log.environment || null,
+          courseName: null,
+        }));
+
+        return {
+          items,
+          total: count || 0,
+          page,
+        };
+      } catch (error) {
+        if (error instanceof TRPCError) throw error;
+
+        logger.error(
+          {
+            err: error instanceof Error ? error.message : String(error),
+            input,
+          },
+          'Unexpected error in admin logs getGroupLogs'
+        );
+
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: ErrorMessages.internalError(
+            'Group logs retrieval',
+            error instanceof Error ? error.message : undefined
+          ),
+        });
+      }
+    }),
+
+  /**
+   * Update status for all logs in a fingerprint group
+   *
+   * Upserts a status record keyed by fingerprint. This allows tracking
+   * group-level status without updating each individual log.
+   *
+   * Authorization: admin or superadmin only
+   */
+  updateGroupStatus: adminProcedure
+    .input(updateGroupStatusInputSchema)
+    .mutation(async ({ ctx, input }) => {
+      try {
+        const supabase = getSupabaseAdmin();
+        const { fingerprint, status, notes } = input;
+
+        // ctx.user is guaranteed non-null by adminProcedure
+        const userId = ctx.user!.id;
+
+        // Verify at least one log exists with this fingerprint
+        const { count, error: countError } = await supabase
+          .from('error_logs')
+          .select('id', { count: 'exact', head: true })
+          .eq('fingerprint', fingerprint);
+
+        if (countError) {
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: ErrorMessages.databaseError('Fingerprint verification', countError.message),
+          });
+        }
+
+        if (!count || count === 0) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: `No error logs found with fingerprint: ${fingerprint}`,
+          });
+        }
+
+        // Get the latest log ID for this fingerprint (for reference)
+        const { data: latestLog } = await supabase
+          .from('error_logs')
+          .select('id')
+          .eq('fingerprint', fingerprint)
+          .order('created_at', { ascending: false })
+          .limit(1)
+          .single();
+
+        // Upsert status using fingerprint as the key
+        // We use log_type='error_log' and set fingerprint for group-level status
+        const { error } = await supabase.from('log_issue_status').upsert(
+          {
+            log_type: 'error_log',
+            log_id: latestLog?.id || fingerprint, // Use latest log ID if available
+            fingerprint,
+            status,
+            notes: notes || null,
+            updated_by: userId,
+            updated_at: new Date().toISOString(),
+          },
+          {
+            onConflict: 'fingerprint',
+          }
+        );
+
+        if (error) {
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: ErrorMessages.databaseError('Group status update', error.message),
+          });
+        }
+
+        logger.info(
+          {
+            fingerprint,
+            status,
+            logsCount: count,
+            updatedBy: userId,
+          },
+          'Group log status updated'
+        );
+
+        return {
+          success: true,
+          updatedCount: count,
+        };
+      } catch (error) {
+        if (error instanceof TRPCError) throw error;
+
+        logger.error(
+          {
+            err: error instanceof Error ? error.message : String(error),
+            input,
+          },
+          'Unexpected error in admin logs updateGroupStatus'
+        );
+
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: ErrorMessages.internalError(
+            'Group status update',
+            error instanceof Error ? error.message : undefined
+          ),
+        });
+      }
+    }),
 });
 
 // ============================================================================
@@ -865,6 +1157,205 @@ async function buildGenerationTraceQuery(
   });
 
   return { items, total: adjustedCount };
+}
+
+/**
+ * Build and execute grouped query for error_logs by fingerprint
+ *
+ * Groups error_logs by fingerprint, returning aggregated data for each group.
+ * Uses in-memory grouping since Supabase JS client doesn't support GROUP BY directly.
+ */
+async function buildGroupedErrorLogsQuery(
+  supabase: ReturnType<typeof getSupabaseAdmin>,
+  filters: z.infer<typeof logFiltersSchema> | undefined,
+  limit: number,
+  offset: number
+): Promise<{ items: ErrorGroupItem[]; total: number }> {
+  // Type for error log with fingerprint column (added by migration)
+  // TODO: Remove this type after regenerating database types
+  type ErrorLogWithFingerprint = {
+    id: string;
+    created_at: string;
+    severity: string;
+    error_message: string;
+    job_type: string | null;
+    problem_id: string | null;
+    environment: string | null;
+    fingerprint: string | null;
+  };
+
+  // First, get all logs with fingerprints (with filters applied)
+  // Note: fingerprint column is added by migration, using type assertion until types are regenerated
+  let query = supabase
+    .from('error_logs')
+    .select(
+      'id, created_at, severity, error_message, job_type, problem_id, environment, fingerprint'
+    )
+    .not('fingerprint', 'is', null);
+
+  if (filters?.level) {
+    query = query.eq('severity', filters.level);
+  }
+
+  if (filters?.search && filters.search.length >= 2) {
+    const sanitized = sanitizeSearchInput(filters.search);
+    query = query.ilike('error_message', `%${sanitized}%`);
+  }
+
+  if (filters?.dateFrom) {
+    query = query.gte('created_at', filters.dateFrom);
+  }
+
+  if (filters?.dateTo) {
+    query = query.lte('created_at', filters.dateTo);
+  }
+
+  if (filters?.environment) {
+    query = query.eq('environment', filters.environment);
+  }
+
+  query = query.order('created_at', { ascending: false });
+
+  const result = await query;
+  // Cast to expected type since fingerprint column exists but types not regenerated
+  const { data, error } = result as unknown as {
+    data: ErrorLogWithFingerprint[] | null;
+    error: typeof result.error;
+  };
+
+  if (error) {
+    logger.error({ error }, 'Error in grouped logs query');
+    return { items: [], total: 0 };
+  }
+
+  if (!data || data.length === 0) {
+    return { items: [], total: 0 };
+  }
+
+  // Group by fingerprint in memory
+  const groupMap = new Map<
+    string,
+    {
+      fingerprint: string;
+      count: number;
+      firstSeen: string;
+      lastSeen: string;
+      severity: string;
+      message: string;
+      environments: Set<string>;
+      latestLogId: string;
+      latestProblemId: string | null;
+      jobType: string | null;
+    }
+  >();
+
+  for (const log of data) {
+    const fp = log.fingerprint!;
+    const existing = groupMap.get(fp);
+
+    if (!existing) {
+      groupMap.set(fp, {
+        fingerprint: fp,
+        count: 1,
+        firstSeen: log.created_at,
+        lastSeen: log.created_at,
+        severity: log.severity,
+        message: log.error_message,
+        environments: new Set(log.environment ? [log.environment] : []),
+        latestLogId: log.id,
+        latestProblemId: log.problem_id || null,
+        jobType: log.job_type || null,
+      });
+    } else {
+      existing.count++;
+      if (log.created_at < existing.firstSeen) {
+        existing.firstSeen = log.created_at;
+      }
+      if (log.created_at > existing.lastSeen) {
+        existing.lastSeen = log.created_at;
+        existing.message = log.error_message;
+        existing.latestLogId = log.id;
+        existing.latestProblemId = log.problem_id || null;
+        existing.jobType = log.job_type || null;
+      }
+      // Update to worst severity
+      const severityOrder = { CRITICAL: 3, ERROR: 2, WARNING: 1 };
+      const currentSev = severityOrder[existing.severity as keyof typeof severityOrder] || 0;
+      const newSev = severityOrder[log.severity as keyof typeof severityOrder] || 0;
+      if (newSev > currentSev) {
+        existing.severity = log.severity;
+      }
+      if (log.environment) {
+        existing.environments.add(log.environment);
+      }
+    }
+  }
+
+  // Convert to array and sort by lastSeen desc
+  const groups = Array.from(groupMap.values()).sort(
+    (a, b) => new Date(b.lastSeen).getTime() - new Date(a.lastSeen).getTime()
+  );
+
+  const total = groups.length;
+
+  // Apply pagination
+  const paginatedGroups = groups.slice(offset, offset + limit);
+
+  // Fetch statuses for these fingerprints
+  const fingerprints = paginatedGroups.map(g => g.fingerprint);
+  const statusMap = await fetchGroupStatuses(supabase, fingerprints);
+
+  const items: ErrorGroupItem[] = paginatedGroups.map(group => ({
+    fingerprint: group.fingerprint,
+    count: group.count,
+    firstSeen: group.firstSeen,
+    lastSeen: group.lastSeen,
+    severity: group.severity,
+    message: group.message,
+    source: 'error_log',
+    status: statusMap.get(group.fingerprint) || 'new',
+    environments: Array.from(group.environments),
+    latestLogId: group.latestLogId,
+    latestProblemId: group.latestProblemId,
+    jobType: group.jobType,
+  }));
+
+  return { items, total };
+}
+
+/**
+ * Fetch statuses for fingerprint groups
+ * Note: fingerprint column added by migration, using type assertion until types regenerated
+ */
+async function fetchGroupStatuses(
+  supabase: ReturnType<typeof getSupabaseAdmin>,
+  fingerprints: string[]
+): Promise<Map<string, LogStatus>> {
+  if (fingerprints.length === 0) return new Map();
+
+  // Type for status with fingerprint column (added by migration)
+  // TODO: Remove after regenerating database types
+  type StatusWithFingerprint = {
+    fingerprint: string | null;
+    status: string;
+  };
+
+  const result = await supabase
+    .from('log_issue_status')
+    .select('fingerprint, status')
+    .in('fingerprint', fingerprints);
+
+  // Cast to expected type since fingerprint column exists but types not regenerated
+  const { data } = result as unknown as { data: StatusWithFingerprint[] | null };
+
+  const statusMap = new Map<string, LogStatus>();
+  (data || []).forEach(row => {
+    if (row.fingerprint) {
+      statusMap.set(row.fingerprint, row.status as LogStatus);
+    }
+  });
+
+  return statusMap;
 }
 
 /**

@@ -361,6 +361,22 @@
       "markIgnored": "Mark Ignored",
       "clearSelection": "Clear Selection"
     },
+    "viewMode": {
+      "grouped": "Grouped",
+      "flat": "Flat"
+    },
+    "grouped": {
+      "count": "Count",
+      "occurrences": "occurrences",
+      "firstSeen": "First seen",
+      "lastSeen": "Last seen",
+      "groupDetails": "Group Details",
+      "summary": "Summary",
+      "recentOccurrences": "Recent Occurrences",
+      "bulkStatusUpdate": "Bulk Status Update",
+      "updateAll": "Update All",
+      "logs": "logs"
+    },
     "empty": "No logs found"
   },
   "analytics": {

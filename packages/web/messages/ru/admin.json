@@ -361,6 +361,22 @@
       "markIgnored": "Игнорировать",
       "clearSelection": "Снять выделение"
     },
+    "viewMode": {
+      "grouped": "Группировка",
+      "flat": "Список"
+    },
+    "grouped": {
+      "count": "Количество",
+      "occurrences": "повторений",
+      "firstSeen": "Первое появление",
+      "lastSeen": "Последнее появление",
+      "groupDetails": "Детали группы",
+      "summary": "Сводка",
+      "recentOccurrences": "Последние повторения",
+      "bulkStatusUpdate": "Массовое обновление статуса",
+      "updateAll": "Обновить все",
+      "logs": "логов"
+    },
     "empty": "Логи не найдены"
   },
   "analytics": {

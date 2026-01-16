@@ -2,7 +2,7 @@
 
 import { useCallback } from 'react'
 import { useTranslations } from 'next-intl'
-import { Search, X, Calendar } from 'lucide-react'
+import { Search, X, Calendar, Layers, List } from 'lucide-react'
 import { Input } from '@/components/ui/input'
 import { Button } from '@/components/ui/button'
 import {
@@ -12,6 +12,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import type {
   LogFilters,
   LogLevel,
@@ -20,16 +21,26 @@ import type {
   LogEnvironment,
 } from '@/app/actions/admin-logs'
 
+export type ViewMode = 'grouped' | 'flat'
+
 interface FilterBarProps {
   filters: LogFilters
   onFilterChange: (filters: LogFilters) => void
+  viewMode?: ViewMode
+  onViewModeChange?: (mode: ViewMode) => void
   actions?: React.ReactNode
 }
 
 /**
  * Filter controls for log monitoring dashboard
  */
-export function FilterBar({ filters, onFilterChange, actions }: FilterBarProps) {
+export function FilterBar({
+  filters,
+  onFilterChange,
+  viewMode = 'grouped',
+  onViewModeChange,
+  actions,
+}: FilterBarProps) {
   const t = useTranslations('admin.logs')
 
   const handleLevelChange = useCallback(
@@ -140,8 +151,26 @@ export function FilterBar({ filters, onFilterChange, actions }: FilterBarProps) 
           />
         </div>
 
-        {/* Filter dropdowns and actions */}
+        {/* View mode toggle and filter dropdowns */}
         <div className="flex w-full flex-wrap items-center gap-2 sm:w-auto">
+          {/* View mode toggle */}
+          {onViewModeChange && (
+            <ToggleGroup
+              type="single"
+              value={viewMode}
+              onValueChange={(value) => value && onViewModeChange(value as ViewMode)}
+            >
+              <ToggleGroupItem value="grouped" aria-label="Grouped view" className="gap-1">
+                <Layers className="h-4 w-4" />
+                <span className="hidden sm:inline">{t('viewMode.grouped')}</span>
+              </ToggleGroupItem>
+              <ToggleGroupItem value="flat" aria-label="Flat view" className="gap-1">
+                <List className="h-4 w-4" />
+                <span className="hidden sm:inline">{t('viewMode.flat')}</span>
+              </ToggleGroupItem>
+            </ToggleGroup>
+          )}
+
           {/* Level filter */}
           <Select value={filters.level || 'all'} onValueChange={handleLevelChange}>
             <SelectTrigger className="w-[130px]" aria-label={t('filters.level')}>

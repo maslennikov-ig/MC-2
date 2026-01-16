@@ -89,6 +89,49 @@ export interface BulkUpdateStatusParams {
 }
 
 // ============================================================================
+// Grouped Logs Types
+// ============================================================================
+
+export interface ErrorGroupItem {
+  fingerprint: string
+  count: number
+  firstSeen: string
+  lastSeen: string
+  severity: string
+  message: string
+  source: string | null
+  status: LogStatus
+  environments: string[]
+  latestLogId: string
+  latestProblemId: string | null
+  jobType: string | null
+}
+
+export interface GroupedLogListResponse {
+  items: ErrorGroupItem[]
+  total: number
+  page: number
+}
+
+export interface ListGroupedParams {
+  page?: number
+  limit?: number
+  filters?: LogFilters
+}
+
+export interface GetGroupLogsParams {
+  fingerprint: string
+  page?: number
+  limit?: number
+}
+
+export interface UpdateGroupStatusParams {
+  fingerprint: string
+  status: LogStatus
+  notes?: string
+}
+
+// ============================================================================
 // Server Actions
 // ============================================================================
 
@@ -238,6 +281,127 @@ export async function bulkUpdateLogStatusAction(
     return json.result.data as { success: boolean; updatedCount: number }
   } catch (error) {
     console.error('Bulk Update Log Status Server Action Error:', error)
+    throw error
+  }
+}
+
+// ============================================================================
+// Grouped Logs Server Actions
+// ============================================================================
+
+/**
+ * List grouped logs by fingerprint with filters and pagination
+ */
+export async function listGroupedLogsAction(
+  params: ListGroupedParams
+): Promise<GroupedLogListResponse> {
+  const headers = await getBackendAuthHeaders()
+
+  const queryInput: Record<string, unknown> = {
+    page: params.page ?? 1,
+    limit: params.limit ?? 20,
+  }
+
+  if (params.filters) {
+    queryInput.filters = params.filters
+  }
+
+  const query = encodeURIComponent(JSON.stringify(queryInput))
+
+  try {
+    const res = await fetch(`${TRPC_URL}/admin.logs.listGrouped?input=${query}`, {
+      headers,
+      cache: 'no-store',
+    })
+
+    if (!res.ok) {
+      const text = await res.text()
+      console.error('List grouped logs fetch failed:', text)
+      throw new Error(`Failed to fetch grouped logs: ${res.statusText}`)
+    }
+
+    const json = await res.json()
+
+    if (json.error) {
+      throw new Error(json.error.message)
+    }
+
+    return json.result.data as GroupedLogListResponse
+  } catch (error) {
+    console.error('List Grouped Logs Server Action Error:', error)
+    throw error
+  }
+}
+
+/**
+ * Get individual logs within a fingerprint group
+ */
+export async function getGroupLogsAction(params: GetGroupLogsParams): Promise<LogListResponse> {
+  const headers = await getBackendAuthHeaders()
+
+  const queryInput = {
+    fingerprint: params.fingerprint,
+    page: params.page ?? 1,
+    limit: params.limit ?? 10,
+  }
+
+  const query = encodeURIComponent(JSON.stringify(queryInput))
+
+  try {
+    const res = await fetch(`${TRPC_URL}/admin.logs.getGroupLogs?input=${query}`, {
+      headers,
+      cache: 'no-store',
+    })
+
+    if (!res.ok) {
+      const text = await res.text()
+      console.error('Get group logs fetch failed:', text)
+      throw new Error(`Failed to fetch group logs: ${res.statusText}`)
+    }
+
+    const json = await res.json()
+
+    if (json.error) {
+      throw new Error(json.error.message)
+    }
+
+    return json.result.data as LogListResponse
+  } catch (error) {
+    console.error('Get Group Logs Server Action Error:', error)
+    throw error
+  }
+}
+
+/**
+ * Update status for all logs in a fingerprint group
+ */
+export async function updateGroupStatusAction(
+  params: UpdateGroupStatusParams
+): Promise<{ success: boolean; updatedCount: number }> {
+  const headers = await getBackendAuthHeaders()
+
+  try {
+    const res = await fetch(`${TRPC_URL}/admin.logs.updateGroupStatus`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(params),
+    })
+
+    if (!res.ok) {
+      const text = await res.text()
+      console.error('Update group status failed:', text)
+      throw new Error(`Failed to update group status: ${res.statusText}`)
+    }
+
+    const json = await res.json()
+
+    if (json.error) {
+      throw new Error(json.error.message)
+    }
+
+    return json.result.data as { success: boolean; updatedCount: number }
+  } catch (error) {
+    console.error('Update Group Status Server Action Error:', error)
     throw error
   }
 }
