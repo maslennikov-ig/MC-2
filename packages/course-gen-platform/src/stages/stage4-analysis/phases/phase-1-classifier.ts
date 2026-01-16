@@ -38,8 +38,6 @@ export interface Phase1Input {
   language: string;
   /** Course topic (3-200 chars) */
   topic: string;
-  /** Optional detailed requirements from user */
-  answers?: string | null;
   /** Optional document summaries from Stage 3 */
   document_summaries?: Array<{
     document_id: string;
@@ -139,7 +137,7 @@ Topic: ${input.topic}
 Target Language: ${outputLanguage} (ALL OUTPUT MUST BE IN ${outputLanguage.toUpperCase()})
 Target Audience: ${input.target_audience || 'mixed'}
 Lesson Duration: ${input.lesson_duration_minutes || 15} minutes
-${input.answers ? `\nUser Requirements:\n${input.answers}` : ''}${documentContext}
+${documentContext}
 
 TASK:
 1. Classify this course into the most appropriate category
