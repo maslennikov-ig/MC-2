@@ -28,6 +28,7 @@ import { DEFAULT_MODEL_ID, MODEL_DEFAULTS } from '@megacampus/shared-types';
 import { createModelConfigService } from './model-config-service';
 import logger from '../logger';
 import { getOpenRouterApiKey, getApiKeySync } from '../services/api-key-service';
+import type { LanguageCode } from '../utils/language-utils';
 
 /**
  * OpenRouter API base URL
@@ -60,7 +61,7 @@ const PHASE_FALLBACK_CONFIG: Record<
   // Stage 3: Classification
   stage_3_classification: {
     modelId: DEFAULT_MODEL_ID,
-    temperature: 0.0,                    // Deterministic for classification
+    temperature: 0.0, // Deterministic for classification
     maxTokens: 2048,
   },
   // Stage 4: Analysis phases
@@ -95,12 +96,12 @@ const PHASE_FALLBACK_CONFIG: Record<
     maxTokens: MODEL_DEFAULTS.maxTokens,
   },
   stage_4_extended_ru: {
-    modelId: 'google/gemini-2.5-flash',  // Extended context
+    modelId: 'google/gemini-2.5-flash', // Extended context
     temperature: 0.7,
     maxTokens: 15000,
   },
   stage_4_extended_en: {
-    modelId: 'google/gemini-2.5-flash',  // Extended context
+    modelId: 'google/gemini-2.5-flash', // Extended context
     temperature: 0.7,
     maxTokens: 15000,
   },
@@ -126,12 +127,12 @@ const PHASE_FALLBACK_CONFIG: Record<
     maxTokens: MODEL_DEFAULTS.maxTokens,
   },
   stage_5_extended_ru: {
-    modelId: 'google/gemini-2.5-flash',  // Extended context
+    modelId: 'google/gemini-2.5-flash', // Extended context
     temperature: 0.7,
     maxTokens: 15000,
   },
   stage_5_extended_en: {
-    modelId: 'google/gemini-2.5-flash',  // Extended context
+    modelId: 'google/gemini-2.5-flash', // Extended context
     temperature: 0.7,
     maxTokens: 15000,
   },
@@ -152,12 +153,12 @@ const PHASE_FALLBACK_CONFIG: Record<
     maxTokens: 10000,
   },
   stage_2_extended_ru: {
-    modelId: 'google/gemini-2.5-flash',  // Extended context
+    modelId: 'google/gemini-2.5-flash', // Extended context
     temperature: 0.7,
     maxTokens: 15000,
   },
   stage_2_extended_en: {
-    modelId: 'google/gemini-2.5-flash',  // Extended context
+    modelId: 'google/gemini-2.5-flash', // Extended context
     temperature: 0.7,
     maxTokens: 15000,
   },
@@ -179,23 +180,23 @@ const PHASE_FALLBACK_CONFIG: Record<
   },
   stage_6_arbiter: {
     modelId: DEFAULT_MODEL_ID,
-    temperature: 0.0,                       // Deterministic for agreement scoring
+    temperature: 0.0, // Deterministic for agreement scoring
     maxTokens: 2048,
   },
   stage_6_patcher: {
     modelId: DEFAULT_MODEL_ID,
-    temperature: 0.1,                       // Low temp for precise editing
-    maxTokens: 1000,                        // Small output for patches
+    temperature: 0.1, // Low temp for precise editing
+    maxTokens: 1000, // Small output for patches
   },
   stage_6_section_expander: {
     modelId: DEFAULT_MODEL_ID,
-    temperature: 0.7,                       // Moderate creativity
-    maxTokens: 2000,                        // Larger output for full sections
+    temperature: 0.7, // Moderate creativity
+    maxTokens: 2000, // Larger output for full sections
   },
   stage_6_delta_judge: {
     modelId: DEFAULT_MODEL_ID,
-    temperature: 0.0,                       // Deterministic for validation
-    maxTokens: 512,                         // Small focused output
+    temperature: 0.0, // Deterministic for validation
+    maxTokens: 512, // Small focused output
   },
   stage_6_standard_ru: {
     modelId: DEFAULT_MODEL_ID,
@@ -208,12 +209,12 @@ const PHASE_FALLBACK_CONFIG: Record<
     maxTokens: MODEL_DEFAULTS.maxTokens,
   },
   stage_6_extended_ru: {
-    modelId: 'google/gemini-2.5-flash',  // Extended context
+    modelId: 'google/gemini-2.5-flash', // Extended context
     temperature: 0.7,
     maxTokens: 15000,
   },
   stage_6_extended_en: {
-    modelId: 'x-ai/grok-4.1-fast',       // Extended context, Grok for EN
+    modelId: 'x-ai/grok-4.1-fast', // Extended context, Grok for EN
     temperature: 0.7,
     maxTokens: 15000,
   },
@@ -256,12 +257,12 @@ const PHASE_FALLBACK_CONFIG: Record<
   },
   // Special phases (keep specific models)
   emergency: {
-    modelId: 'x-ai/grok-4-fast',         // Large context (2M tokens)
+    modelId: 'x-ai/grok-4-fast', // Large context (2M tokens)
     temperature: 0.7,
     maxTokens: 30000,
   },
   quality_fallback: {
-    modelId: DEFAULT_MODEL_ID,           // Updated: use MiMo for quality fallback too
+    modelId: DEFAULT_MODEL_ID, // Updated: use MiMo for quality fallback too
     temperature: 0.3,
     maxTokens: 16000,
   },
@@ -302,7 +303,7 @@ export function createOpenRouterModel(
   if (!apiKey) {
     throw new Error(
       'OPENROUTER_API_KEY environment variable is required for LangChain integration. ' +
-      'For database-first key resolution, use createOpenRouterModelAsync() instead.'
+        'For database-first key resolution, use createOpenRouterModelAsync() instead.'
     );
   }
 
@@ -376,6 +377,8 @@ export async function createOpenRouterModelAsync(
  *
  * @param phase - Analysis phase identifier
  * @param courseId - Optional course UUID for course-specific overrides
+ * @param tokenCount - Optional token count for tier selection
+ * @param language - Optional language code (LanguageCode: 'ru', 'en', or any ISO 639-1 code)
  * @returns Configured ChatOpenAI instance
  *
  * @throws Error if database lookup fails and no hardcoded fallback exists
@@ -395,28 +398,37 @@ export async function getModelForPhase(
   phase: PhaseName,
   courseId?: string,
   tokenCount?: number,
-  language?: string  // Supports 'ru', 'en', or any other (uses 'any' reserve settings as fallback)
+  language?: LanguageCode
 ): Promise<ChatOpenAI> {
   try {
     const config = await modelConfigService.getModelForPhase(phase, courseId, tokenCount, language);
 
     if (config.source === 'database') {
-      logger.info({
-        phase,
-        modelId: config.modelId,
-        tier: config.tier,
-        tokenCount,
-        language,
-        source: 'database'
-      }, 'Using database model config');
+      logger.info(
+        {
+          phase,
+          modelId: config.modelId,
+          tier: config.tier,
+          tokenCount,
+          language,
+          source: 'database',
+        },
+        'Using database model config'
+      );
     } else {
-      logger.info({ phase, modelId: config.modelId, source: 'hardcoded' }, 'Using hardcoded fallback model config');
+      logger.info(
+        { phase, modelId: config.modelId, language, source: 'hardcoded' },
+        'Using hardcoded fallback model config'
+      );
     }
 
     // Use async version for database-first API key resolution
     return await createOpenRouterModelAsync(config.modelId, config.temperature, config.maxTokens);
   } catch (err) {
-    logger.warn({ phase, error: err }, 'ModelConfigService lookup failed, using hardcoded fallback');
+    logger.warn(
+      { phase, error: err },
+      'ModelConfigService lookup failed, using hardcoded fallback'
+    );
     return await getHardcodedFallbackModelAsync(phase);
   }
 }
@@ -435,16 +447,10 @@ export function getHardcodedFallbackModel(phase: PhaseName): ChatOpenAI {
   const config = PHASE_FALLBACK_CONFIG[phase];
 
   if (!config) {
-    throw new Error(
-      `Unknown phase: ${phase}. Cannot determine hardcoded fallback.`
-    );
+    throw new Error(`Unknown phase: ${phase}. Cannot determine hardcoded fallback.`);
   }
 
-  return createOpenRouterModel(
-    config.modelId,
-    config.temperature,
-    config.maxTokens
-  );
+  return createOpenRouterModel(config.modelId, config.temperature, config.maxTokens);
 }
 
 /**
@@ -461,14 +467,8 @@ async function getHardcodedFallbackModelAsync(phase: PhaseName): Promise<ChatOpe
   const config = PHASE_FALLBACK_CONFIG[phase];
 
   if (!config) {
-    throw new Error(
-      `Unknown phase: ${phase}. Cannot determine hardcoded fallback.`
-    );
+    throw new Error(`Unknown phase: ${phase}. Cannot determine hardcoded fallback.`);
   }
 
-  return await createOpenRouterModelAsync(
-    config.modelId,
-    config.temperature,
-    config.maxTokens
-  );
+  return await createOpenRouterModelAsync(config.modelId, config.temperature, config.maxTokens);
 }

@@ -20,6 +20,7 @@
 
 import type { ContentArchetype } from '@megacampus/shared-types';
 import { CONTENT_ARCHETYPE_TEMPERATURES_V2 } from '@megacampus/shared-types';
+import { normalizeLanguageCode } from '../utils/language-utils';
 
 // ============================================================================
 // TYPE DEFINITIONS
@@ -386,7 +387,8 @@ export function selectModelByDocumentSize(
   language: TierLanguage = 'en'
 ): string {
   const tier: ModelTier = totalTokens > DOCUMENT_SIZE_THRESHOLD ? 'extended' : 'standard';
-  const lang: 'ru' | 'en' = language === 'ru' ? 'ru' : 'en';
+  const normalized = normalizeLanguageCode(language, 'en');
+  const lang: 'ru' | 'en' = normalized === 'ru' ? 'ru' : 'en';
   return MODEL_TIERS[tier][lang];
 }
 
@@ -479,7 +481,8 @@ export function selectModelForGeneration(
   archetype: ContentArchetype
 ): GenerationModelSelection {
   // Language-aware model selection
-  const model = language === 'ru' ? MODELS['qwen3-max'] : MODELS['deepseek-terminus'];
+  const normalized = normalizeLanguageCode(language, 'en');
+  const model = normalized === 'ru' ? MODELS['qwen3-max'] : MODELS['deepseek-terminus'];
 
   // Archetype-based temperature selection
   const temperatureRange = ARCHETYPE_TEMPERATURES[archetype];
@@ -599,7 +602,7 @@ export function selectModelForLargeContext(): ModelConfig {
  * ```
  */
 export function getModelsWithCapability(capability: ModelCapability): ModelConfig[] {
-  return Object.values(MODELS).filter((model) => model.capabilities.includes(capability));
+  return Object.values(MODELS).filter(model => model.capabilities.includes(capability));
 }
 
 /**
@@ -617,7 +620,11 @@ export function getModelsWithCapability(capability: ModelCapability): ModelConfi
  * // cost === 0.0011 + 0.0012 = 0.0023 USD
  * ```
  */
-export function estimateModelCost(model: ModelConfig, inputTokens: number, outputTokens: number): number {
+export function estimateModelCost(
+  model: ModelConfig,
+  inputTokens: number,
+  outputTokens: number
+): number {
   const inputCost = (inputTokens / 1000) * model.costPer1kInput;
   const outputCost = (outputTokens / 1000) * model.costPer1kOutput;
   return inputCost + outputCost;
