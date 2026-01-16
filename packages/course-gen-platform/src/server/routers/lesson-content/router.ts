@@ -35,6 +35,7 @@ import { approveLesson } from './procedures/approve-lesson';
 import { approveLessons } from './procedures/approve-lessons';
 import { updateLessonContent } from './procedures/update-content';
 import { deleteLesson } from './procedures/delete-lesson';
+import { exportLessons } from './procedures/export-lessons';
 
 /**
  * Lesson content router
@@ -50,6 +51,7 @@ import { deleteLesson } from './procedures/delete-lesson';
  * - approveLessons: Batch approve lessons for a course or module
  * - updateLessonContent: Update lesson content with manual edits
  * - deleteLesson: Delete a lesson and all related data (cascading)
+ * - exportLessons: Export lessons in a module as Markdown
  */
 export const lessonContentRouter = router({
   startStage6,
@@ -62,6 +64,7 @@ export const lessonContentRouter = router({
   approveLessons,
   updateLessonContent,
   deleteLesson,
+  exportLessons,
 });
 
 /**

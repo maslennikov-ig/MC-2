@@ -46,6 +46,7 @@ import {
   retryLessonGeneration,
   deleteLesson,
   approveLessons,
+  exportModuleLessons,
 } from '@/app/actions/lesson-actions';
 // Stage 6 "Glass Factory" UI components
 import { ModuleDashboard } from './module/ModuleDashboard';
@@ -104,6 +105,7 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
   const [showRestartDialog, setShowRestartDialog] = useState(false);
   const [isApproving, setIsApproving] = useState(false);
   const [isApprovingAll, setIsApprovingAll] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const [isRetrying, setIsRetrying] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -366,6 +368,45 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
       setIsApprovingAll(false);
     }
   }, [moduleIdForDashboard, courseInfo.id, refetchModuleDashboard, t]);
+
+  // Handler for exporting all lessons in a module as Markdown
+  const handleExportAll = useCallback(async () => {
+    if (!moduleIdForDashboard) return;
+
+    // Extract module number from moduleId (e.g., "module_1" -> 1)
+    const match = moduleIdForDashboard.match(/^module_(\d+)$/);
+    const moduleNumber = match ? parseInt(match[1], 10) : undefined;
+
+    if (!moduleNumber) {
+      toast.error('Invalid module ID');
+      return;
+    }
+
+    setIsExporting(true);
+    try {
+      const result = await exportModuleLessons(courseInfo.id, moduleNumber);
+      if (result.content) {
+        // Create and trigger download
+        const blob = new Blob([result.content], { type: 'text/markdown;charset=utf-8' });
+        const url = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = url;
+        link.download = result.filename;
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        URL.revokeObjectURL(url);
+
+        toast.success(`${t('actions.exported') || 'Exported'}: ${result.lessonsCount} ${t('actions.lessons') || 'lessons'}`);
+      } else {
+        toast.error(t('actions.noContentToExport') || 'No content to export');
+      }
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : (t('actions.exportError') || 'Export failed'));
+    } finally {
+      setIsExporting(false);
+    }
+  }, [moduleIdForDashboard, courseInfo.id, t]);
 
   // Reset phase and attempt selection when node changes
   useEffect(() => {
@@ -704,11 +745,12 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
               data={moduleDashboardData}
               isLoading={isLoadingModuleDashboard}
               error={moduleDashboardError}
-              onExportAll={() => {/* TODO: Implement export */}}
+              onExportAll={() => void handleExportAll()}
               onRegenerateFailed={() => {/* TODO: Implement regenerate failed */}}
               onImproveQuality={() => {/* TODO: Implement improve quality */}}
-              onApproveAll={handleApproveAllLessons}
+              onApproveAll={() => void handleApproveAllLessons()}
               isApproving={isApprovingAll}
+              isExporting={isExporting}
               className="h-full"
             />
           ) : isStage6Lesson ? (

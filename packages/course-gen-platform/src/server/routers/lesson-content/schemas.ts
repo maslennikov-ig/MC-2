@@ -159,3 +159,14 @@ export const approveLessonsInputSchema = z.object({
   /** Optional module number (1-based) - if provided, approve only lessons in this module */
   moduleNumber: z.number().int().min(1, 'Module number must be at least 1').optional(),
 });
+
+/**
+ * Input schema for exportLessons procedure
+ */
+export const exportLessonsInputSchema = z.object({
+  /** Course ID to export lessons from */
+  courseId: z.string().uuid('Invalid course ID'),
+
+  /** Module number (1-based section order_index) */
+  moduleNumber: z.number().int().min(1, 'Module number must be at least 1'),
+});
