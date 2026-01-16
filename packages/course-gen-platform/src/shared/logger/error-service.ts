@@ -9,6 +9,7 @@
 import { getSupabaseAdmin } from '../supabase/admin';
 import { logger } from './index.js';
 import type { ErrorLog, ErrorSeverity, CreateErrorLogParams, LogEnvironment } from './types';
+import { shouldAutoMute } from './auto-classification';
 
 /**
  * Detect environment from APP_URL or NEXT_PUBLIC_APP_URL
@@ -70,22 +71,26 @@ export async function logPermanentFailure(params: CreateErrorLogParams): Promise
   // Auto-detect environment if not provided
   const environment = params.environment || detectEnvironment();
 
-  // Insert error log entry
-  const { error } = await supabase.from('error_logs' as any).insert({
-    user_id: params.user_id || null,
-    organization_id: params.organization_id,
-    problem_id: params.problem_id || null,
-    error_message: params.error_message,
-    stack_trace: params.stack_trace || null,
-    severity: params.severity,
-    environment: environment,
-    file_name: params.file_name || null,
-    file_size: params.file_size || null,
-    file_format: params.file_format || null,
-    job_id: params.job_id || null,
-    job_type: params.job_type || null,
-    metadata: params.metadata || null,
-  });
+  // Insert error log entry and get the inserted ID
+  const { data: insertedLog, error } = await supabase
+    .from('error_logs' as any)
+    .insert({
+      user_id: params.user_id || null,
+      organization_id: params.organization_id,
+      problem_id: params.problem_id || null,
+      error_message: params.error_message,
+      stack_trace: params.stack_trace || null,
+      severity: params.severity,
+      environment: environment,
+      file_name: params.file_name || null,
+      file_size: params.file_size || null,
+      file_format: params.file_format || null,
+      job_id: params.job_id || null,
+      job_type: params.job_type || null,
+      metadata: params.metadata || null,
+    })
+    .select('id')
+    .single();
 
   if (error) {
     // Fallback to Pino logger if database insert fails
@@ -99,12 +104,26 @@ export async function logPermanentFailure(params: CreateErrorLogParams): Promise
     throw new Error(`Failed to log permanent failure: ${error.message}`);
   }
 
+  // Check if this error should be auto-muted
+  const autoMuteResult = shouldAutoMute(params.error_message);
+  const logId = (insertedLog as unknown as { id: string } | null)?.id;
+  if (autoMuteResult.mute && logId) {
+    await supabase.from('log_issue_status' as any).insert({
+      log_type: 'error_log',
+      log_id: logId,
+      status: 'auto_muted',
+      notes: `Auto-muted: ${autoMuteResult.reason}. ${autoMuteResult.description}`,
+      updated_at: new Date().toISOString(),
+    });
+  }
+
   // Log successful insert
   logger.info(
     {
       organization_id: params.organization_id,
       severity: params.severity,
       job_id: params.job_id,
+      auto_muted: autoMuteResult.mute,
     },
     'Permanent failure logged to error_logs table'
   );

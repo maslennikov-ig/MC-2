@@ -93,6 +93,7 @@ mcp__context7__resolve-library-id → mcp__context7__query-docs
 | Status        | What to write in notes                                                                           |
 | ------------- | ------------------------------------------------------------------------------------------------ |
 | `resolved`    | Root cause + fix applied. Example: `Missing constraint. Added 'approved' to enum via migration.` |
+| `auto_muted`  | **System-assigned.** Don't change. Skip these errors in processing.                              |
 | `ignored`     | **Never use.** Fix or ask user.                                                                  |
 | `to_verify`   | Why pending + what to check. Example: `External API timeout. Monitor for 24h.`                   |
 | `in_progress` | Beads task ID. Example: `Working on mc2-5ch`                                                     |
@@ -105,7 +106,46 @@ mcp__context7__resolve-library-id → mcp__context7__query-docs
 - `Constraint missing 'approved'. Added via migration 20250115_fix_status.`
 - `Cloudflare 500. External issue, retry logic already exists. Monitoring.`
 
-### 6. SEARCH SIMILAR PROBLEMS FIRST
+### 6. AUTO-MUTED ERRORS
+
+Some errors are **automatically ignored** by the system with status `auto_muted`. These are expected events, NOT bugs.
+
+**Current auto-mute rules** (from `src/shared/logger/auto-classification.ts`):
+
+| Pattern                            | Reason            | Description                           |
+| ---------------------------------- | ----------------- | ------------------------------------- |
+| `Redis connection (ended\|closed)` | graceful_shutdown | Redis disconnects during app restart  |
+| `graceful.*shutdown`               | graceful_shutdown | Server shutdown events during deploys |
+| `/health.*404`                     | monitoring_probe  | Health probes from monitoring tools   |
+| `Cloudflare.*5xx`                  | external_service  | Cloudflare edge errors                |
+| `ECONNRESET.*external`             | external_service  | External API connection resets        |
+
+**When you see `auto_muted` errors:**
+
+- Skip them in processing — they don't need fixes
+- If you see a pattern that should be auto-muted, add it to `auto-classification.ts`
+
+**How to add a new auto-mute rule:**
+
+1. Edit `packages/course-gen-platform/src/shared/logger/auto-classification.ts`:
+
+   ```typescript
+   {
+     pattern: /your-pattern/i,
+     reason: 'category',  // graceful_shutdown | monitoring_probe | external_service
+     description: 'Why this is expected',
+   }
+   ```
+
+2. Update this SKILL.md with the new pattern
+
+**When NOT to auto-mute:**
+
+- Errors that SOMETIMES indicate real problems
+- New error types (analyze first, then decide)
+- Anything affecting user experience
+
+### 7. SEARCH SIMILAR PROBLEMS FIRST
 
 **Before fixing, check if we solved this before:**
 
@@ -142,11 +182,12 @@ Invoke via: `/process-logs` or "обработай логи ошибок"
 
 ```sql
 -- Use mcp__supabase__execute_sql
+-- NOTE: This excludes auto_muted errors (they are handled automatically)
 SELECT el.id, el.severity, el.error_message, el.metadata, el.stack_trace,
        el.course_id, el.lesson_id, el.request_id, el.trpc_path, el.trpc_input, el.attempted_value
 FROM error_logs el
 LEFT JOIN log_issue_status lis ON lis.log_id = el.id AND lis.log_type = 'error_log'
-WHERE lis.id IS NULL
+WHERE lis.id IS NULL OR (lis.status NOT IN ('resolved', 'ignored', 'auto_muted'))
 ORDER BY
   CASE el.severity WHEN 'CRITICAL' THEN 1 WHEN 'ERROR' THEN 2 ELSE 3 END,
   el.created_at DESC
@@ -268,8 +309,10 @@ Before marking ANY error as resolved:
 | `Error querying`       | Query bug     | `database-architect`          | 2        |
 | Config missing         | Config issue  | **ASK USER**                  | 3        |
 | External service       | External      | mark `to_verify`              | 3        |
+| Redis shutdown         | Expected      | **SKIP** (auto_muted)         | -        |
+| Health probe 404       | Expected      | **SKIP** (auto_muted)         | -        |
 
-**NEVER auto-ignore errors. Always fix or ask user.**
+**Errors with status `auto_muted` are automatically ignored by the system. Skip them.**
 
 ## Reference Docs
 

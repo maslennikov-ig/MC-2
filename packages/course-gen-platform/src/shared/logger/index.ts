@@ -15,6 +15,7 @@ import {
 } from '@megacampus/shared-logger';
 import type { Logger } from 'pino';
 import { getSupabaseAdmin } from '../supabase/admin';
+import { shouldAutoMute } from './auto-classification';
 
 export type { Logger } from 'pino';
 
@@ -121,23 +122,40 @@ async function writeToErrorLogs(
       }
     }
 
-    await supabase.from('error_logs' as any).insert({
-      error_message: message,
-      severity: level,
-      environment: environment,
-      organization_id: (organizationId || organization_id || null) as string | null,
-      user_id: (userId || user_id || null) as string | null,
-      job_id: (jobId || job_id || null) as string | null,
-      job_type: (jobType || job_type || null) as string | null,
-      course_id: (courseId || course_id || null) as string | null,
-      lesson_id: (lessonId || lesson_id || null) as string | null,
-      request_id: (requestId || request_id || null) as string | null,
-      trpc_path: (trpcPath || trpc_path || null) as string | null,
-      trpc_input: sanitizedInput,
-      attempted_value: (attemptedValue || attempted_value || null) as string | null,
-      stack_trace: (stack || null) as string | null,
-      metadata: Object.keys(metadata).length > 0 ? metadata : null,
-    });
+    const { data: insertedLog } = await supabase
+      .from('error_logs' as any)
+      .insert({
+        error_message: message,
+        severity: level,
+        environment: environment,
+        organization_id: (organizationId || organization_id || null) as string | null,
+        user_id: (userId || user_id || null) as string | null,
+        job_id: (jobId || job_id || null) as string | null,
+        job_type: (jobType || job_type || null) as string | null,
+        course_id: (courseId || course_id || null) as string | null,
+        lesson_id: (lessonId || lesson_id || null) as string | null,
+        request_id: (requestId || request_id || null) as string | null,
+        trpc_path: (trpcPath || trpc_path || null) as string | null,
+        trpc_input: sanitizedInput,
+        attempted_value: (attemptedValue || attempted_value || null) as string | null,
+        stack_trace: (stack || null) as string | null,
+        metadata: Object.keys(metadata).length > 0 ? metadata : null,
+      })
+      .select('id')
+      .single();
+
+    // Check if this error should be auto-muted
+    const autoMuteResult = shouldAutoMute(message);
+    const logId = (insertedLog as unknown as { id: string } | null)?.id;
+    if (autoMuteResult.mute && logId) {
+      await supabase.from('log_issue_status' as any).insert({
+        log_type: 'error_log',
+        log_id: logId,
+        status: 'auto_muted',
+        notes: `Auto-muted: ${autoMuteResult.reason}. ${autoMuteResult.description}`,
+        updated_at: new Date().toISOString(),
+      });
+    }
   } catch (dbError) {
     // Silently fail - don't break the app if DB write fails
     // The original log to console/Axiom will still work

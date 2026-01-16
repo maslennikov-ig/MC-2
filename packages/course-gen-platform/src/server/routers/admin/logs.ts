@@ -39,7 +39,14 @@ export type LogType = z.infer<typeof logTypeSchema>;
 /**
  * Log issue status enum
  */
-export const logStatusSchema = z.enum(['new', 'in_progress', 'to_verify', 'resolved', 'ignored']);
+export const logStatusSchema = z.enum([
+  'new',
+  'in_progress',
+  'to_verify',
+  'resolved',
+  'ignored',
+  'auto_muted',
+]);
 export type LogStatus = z.infer<typeof logStatusSchema>;
 
 /**
