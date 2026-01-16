@@ -25,6 +25,8 @@ interface CourseForAutoApproval {
   style: string | null;
   target_audience: string | null;
   difficulty: string | null;
+  course_description: string | null;
+  course_size: string | null;
   analysis_result: unknown;
   organization: { tier: string | null } | { tier: string | null }[] | null;
 }
@@ -50,7 +52,7 @@ export async function handleStageCompletion(
   const { data: course, error } = await db
     .from('courses')
     .select(
-      'generation_mode, user_id, organization_id, title, settings, language, style, target_audience, difficulty, analysis_result, organization:organizations(tier)'
+      'generation_mode, user_id, organization_id, title, settings, language, style, target_audience, difficulty, course_description, course_size, analysis_result, organization:organizations(tier)'
     )
     .eq('id', courseId)
     .single();
@@ -247,6 +249,8 @@ async function queueNextStageJob(
           language: course.language,
           style: course.style,
           target_audience: settings.target_audience,
+          description: course.course_description,
+          course_size: course.course_size,
           desired_lessons_count: settings.desired_lessons_count,
           desired_modules_count: settings.desired_modules_count,
           lesson_duration_minutes: settings.lesson_duration_minutes,
