@@ -373,6 +373,9 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
   const handleExportAll = useCallback(async () => {
     if (!moduleIdForDashboard) return;
 
+    // Prevent multiple simultaneous exports (double-click protection)
+    if (isExporting) return;
+
     // Extract module number from moduleId (e.g., "module_1" -> 1)
     const match = moduleIdForDashboard.match(/^module_(\d+)$/);
     const moduleNumber = match ? parseInt(match[1], 10) : undefined;
@@ -383,30 +386,47 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
     }
 
     setIsExporting(true);
+    const abortController = new AbortController();
+    let blobUrl: string | null = null;
+
     try {
-      const result = await exportModuleLessons(courseInfo.id, moduleNumber);
+      const result = await exportModuleLessons(courseInfo.id, moduleNumber, abortController.signal);
+
+      // Check if request was aborted
+      if (abortController.signal.aborted) return;
+
       if (result.content) {
         // Create and trigger download
         const blob = new Blob([result.content], { type: 'text/markdown;charset=utf-8' });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement('a');
-        link.href = url;
-        link.download = result.filename;
-        document.body.appendChild(link);
-        link.click();
-        document.body.removeChild(link);
-        URL.revokeObjectURL(url);
+        blobUrl = URL.createObjectURL(blob);
+
+        try {
+          const link = document.createElement('a');
+          link.href = blobUrl;
+          link.download = result.filename;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+        } finally {
+          // Always cleanup blob URL to prevent memory leak
+          URL.revokeObjectURL(blobUrl);
+          blobUrl = null;
+        }
 
         toast.success(`${t('actions.exported') || 'Exported'}: ${result.lessonsCount} ${t('actions.lessons') || 'lessons'}`);
       } else {
         toast.error(t('actions.noContentToExport') || 'No content to export');
       }
     } catch (error) {
+      // Silent abort handling (user navigated away or cancelled)
+      if (error instanceof Error && error.name === 'AbortError') return;
       toast.error(error instanceof Error ? error.message : (t('actions.exportError') || 'Export failed'));
     } finally {
+      // Cleanup blob URL if not already done
+      if (blobUrl) URL.revokeObjectURL(blobUrl);
       setIsExporting(false);
     }
-  }, [moduleIdForDashboard, courseInfo.id, t]);
+  }, [moduleIdForDashboard, courseInfo.id, isExporting, t]);
 
   // Reset phase and attempt selection when node changes
   useEffect(() => {

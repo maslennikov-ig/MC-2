@@ -1,4 +1,4 @@
-import React, { memo, useRef, useEffect } from 'react'
+import React, { memo, useRef, useEffect, useCallback } from 'react'
 import {
   Handle,
   Position,
@@ -149,51 +149,59 @@ const ModuleGroup = ({ id, data, selected }: NodeProps<RFModuleNode>) => {
   // Count failed lessons for error tooltip
   const errorCount = data.childIds?.length || 0
 
+  // Handle header click - only toggle collapse/expand
+  // useCallback to prevent unnecessary re-renders (memo optimization)
+  const handleHeaderClick = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation()
+
+      const newCollapsed = !data.isCollapsed
+
+      // CRITICAL: Preserve viewport BEFORE setNodes to prevent scroll jump
+      // This captures the current viewport state before React Flow processes node changes
+      preserveViewport()
+
+      // Update module collapse state and child visibility
+      // This triggers nodes change → GraphView useEffect → layoutNodes
+      // Two-Phase Layout will recalculate module dimensions and lesson positions
+      setNodes((nodes) =>
+        nodes.map((n) => {
+          if (n.id === id) {
+            // Update isCollapsed state - this triggers relayout with new module dimensions
+            return {
+              ...n,
+              data: { ...n.data, isCollapsed: newCollapsed },
+              // Force new object reference to trigger React Flow re-render
+              style: { ...n.style },
+            }
+          }
+          // Toggle visibility of children (lessons inside module)
+          if (data.childIds && data.childIds.includes(n.id)) {
+            return { ...n, hidden: newCollapsed }
+          }
+          return n
+        })
+      )
+    },
+    [id, data.isCollapsed, data.childIds, setNodes, preserveViewport]
+  )
+
+  // Handle opening details panel via dedicated button
+  // useCallback to prevent unnecessary re-renders (memo optimization)
+  const handleOpenPanel = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation()
+      selectNode(id)
+    },
+    [id, selectNode]
+  )
+
   // Semantic Zoom - switch to smaller representations at lower zoom levels
   if (zoom < 0.3) {
     return <MinimalModuleNode id={id} data={data} />
   }
   if (zoom < 0.5) {
     return <MediumModuleNode id={id} data={data} selected={selected} />
-  }
-
-  // Handle header click - only toggle collapse/expand
-  const handleHeaderClick = (e: React.MouseEvent) => {
-    e.stopPropagation()
-
-    const newCollapsed = !data.isCollapsed
-
-    // CRITICAL: Preserve viewport BEFORE setNodes to prevent scroll jump
-    // This captures the current viewport state before React Flow processes node changes
-    preserveViewport()
-
-    // Update module collapse state and child visibility
-    // This triggers nodes change → GraphView useEffect → layoutNodes
-    // Two-Phase Layout will recalculate module dimensions and lesson positions
-    setNodes((nodes) =>
-      nodes.map((n) => {
-        if (n.id === id) {
-          // Update isCollapsed state - this triggers relayout with new module dimensions
-          return {
-            ...n,
-            data: { ...n.data, isCollapsed: newCollapsed },
-            // Force new object reference to trigger React Flow re-render
-            style: { ...n.style },
-          }
-        }
-        // Toggle visibility of children (lessons inside module)
-        if (data.childIds && data.childIds.includes(n.id)) {
-          return { ...n, hidden: newCollapsed }
-        }
-        return n
-      })
-    )
-  }
-
-  // Handle opening details panel via dedicated button
-  const handleOpenPanel = (e: React.MouseEvent) => {
-    e.stopPropagation()
-    selectNode(id)
   }
 
   // Calculate progress percentage
