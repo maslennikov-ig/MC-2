@@ -311,6 +311,69 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.28.3] - 2026-01-16
+
+### Added
+
+- **logging**: add auto_muted status for expected errors (922ec20)
+- **lesson-approval**: add migration and tests for batch approval RPC (20dd213)
+- **stage4**: add course_description and learning_outcomes to analysis input (16d9817)
+- **admin**: add error log grouping by fingerprint (1eced9b)
+- **generation**: добавить difficulty в Stage 5 FrontendParameters (36c7766)
+- **enrichments**: add optimistic UI + improve error messages (5068594)
+- **pipeline**: add language support to Stage 4-5 model selection (aba14e4)
+- **logs**: add full-text search for similar problems v1.5.0 (38a894e)
+
+### Changed
+
+- **stage4**: remove unused answers field (afff891)
+- **target_audience**: unify data source to courses.target_audience column (84cc1f5)
+- **llm**: add actualLanguage tracking, LanguageCode type, language detection (7db570d)
+
+### Fixed
+
+- **shared-types**: update 4 source file(s), update 1 agent(s), +2 more (5e3b89c)
+- **logs**: implement server-side grouping with RPC + code review fixes (d8125d7)
+- **stage4**: use actual target_audience from DB instead of hardcoded value (4235f29)
+- **generation**: передавать course_size и description в Input стадии 5 (782482a)
+- **logs**: improve PostgrestError logging with full error details (b647a80)
+- **web**: navigation sheet not working in fullscreen mode (c906dfb)
+- **enrichment**: address code review issues #5-#7 (91ac950)
+- **enrichments**: address code review findings (1af32e4)
+- **web**: cleanup unused type and debug comment in EnrichmentsPanel refactoring (55be3e3)
+
+### Other
+
+- bd sync: 2026-01-16 15:56:44 (1b6e087)
+- bd sync: 2026-01-16 15:54:13 (5ed0655)
+- **logging**: verify auto_muted implementation end-to-end (7755348)
+- bd sync: 2026-01-16 15:45:39 (e9462e0)
+- bd sync: 2026-01-16 15:43:00 (b586e58)
+- bd sync: 2026-01-16 15:41:33 (55317b9)
+- bd sync: 2026-01-16 15:26:36 (1b40f56)
+- bd sync: 2026-01-16 13:23:26 (13f1de7)
+- bd sync: 2026-01-16 13:21:42 (4c7c9ea)
+- bd sync: 2026-01-16 13:18:38 (485538e)
+- bd sync: 2026-01-16 13:17:59 (b64e009)
+- bd sync: 2026-01-16 13:02:42 (d86e8a0)
+- bd sync: 2026-01-16 12:54:53 (17890f3)
+- bd sync: 2026-01-16 12:45:54 (cf165d8)
+- bd sync: 2026-01-16 12:29:13 (2d6399e)
+- bd sync: 2026-01-16 12:28:16 (6c9ee6c)
+- merge develop into master (d8f962d)
+- bd sync: 2026-01-16 11:42:59 (615a9e0)
+- bd sync: 2026-01-15 21:23:56 (97c4702)
+- bd sync: 2026-01-15 20:43:31 (77c55b9)
+- bd sync: 2026-01-15 20:42:27 (01f0503)
+- bd sync: 2026-01-15 19:59:47 (15bce39)
+- bd sync: 2026-01-15 19:59:42 (45f5c94)
+- bd sync: 2026-01-15 19:57:21 (f75692f)
+- **web**: split EnrichmentsPanel into smaller modules (06d68dd)
+- merge develop into master (0bc0cc5)
+- **skills**: add log notes requirements to process-logs v1.4.0 (2e8dd60)
+- merge develop into master (de354d6)
+- merge develop into master (48b5614)
+
 ## [0.28.2] - 2026-01-15
 
 ### Added
