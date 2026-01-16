@@ -2,15 +2,30 @@
 
 import { useState, useCallback } from 'react'
 import { RefreshCw } from 'lucide-react'
-import { FilterBar } from './filter-bar'
+import { FilterBar, type ViewMode } from './filter-bar'
 import { LogTable } from './log-table'
+import { GroupedLogTable } from './grouped-log-table'
 import { LogDetailDrawer } from './log-detail-drawer'
+import { GroupDetailDrawer } from './group-detail-drawer'
 import { BulkActionBar } from './bulk-action-bar'
 import { LogsErrorBoundary } from './error-boundary'
 import { LogsRealtimeProvider, useLogsRealtime } from './logs-realtime-provider'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import type { UnifiedLogItem, LogFilters, LogType, LogStatus } from '@/app/actions/admin-logs'
+
+// Placeholder type for grouped items
+interface GroupedLogItem {
+  fingerprint: string
+  problemId: string | null
+  count: number
+  lastSeen: string
+  firstSeen: string
+  severity: string
+  message: string
+  environments: string[]
+  status: LogStatus
+}
 
 /**
  * Client-side logs page with interactive filtering, selection, and detail view
@@ -74,12 +89,19 @@ function LogsPageContent() {
   // Filter state
   const [filters, setFilters] = useState<LogFilters>({})
 
+  // View mode state (default to grouped)
+  const [viewMode, setViewMode] = useState<ViewMode>('grouped')
+
   // Selected rows state
   const [selectedItems, setSelectedItems] = useState<Array<{ logType: LogType; logId: string }>>([])
 
-  // Drawer state
+  // Drawer state for flat view
   const [selectedLog, setSelectedLog] = useState<UnifiedLogItem | null>(null)
   const [drawerOpen, setDrawerOpen] = useState(false)
+
+  // Drawer state for grouped view
+  const [selectedGroup, setSelectedGroup] = useState<GroupedLogItem | null>(null)
+  const [groupDrawerOpen, setGroupDrawerOpen] = useState(false)
 
   // Internal refresh key for bulk actions and status updates
   const [internalRefreshKey, setInternalRefreshKey] = useState(0)
@@ -119,6 +141,16 @@ function LogsPageContent() {
     setSelectedLog(null)
   }, [])
 
+  const handleGroupSelect = useCallback((group: GroupedLogItem) => {
+    setSelectedGroup(group)
+    setGroupDrawerOpen(true)
+  }, [])
+
+  const handleGroupDrawerClose = useCallback(() => {
+    setGroupDrawerOpen(false)
+    setSelectedGroup(null)
+  }, [])
+
   const handleStatusUpdate = useCallback(() => {
     // Trigger table refresh
     setInternalRefreshKey((k) => k + 1)
@@ -146,7 +178,12 @@ function LogsPageContent() {
       </div>
 
       {/* Filters */}
-      <FilterBar filters={filters} onFilterChange={handleFilterChange} />
+      <FilterBar
+        filters={filters}
+        onFilterChange={handleFilterChange}
+        viewMode={viewMode}
+        onViewModeChange={setViewMode}
+      />
 
       {/* New logs notification */}
       <NewLogsBanner />
@@ -158,23 +195,37 @@ function LogsPageContent() {
         onClearSelection={handleClearSelection}
       />
 
-      {/* Table */}
+      {/* Table - conditional rendering based on view mode */}
       <div className="min-h-0 flex-1">
-        <LogTable
-          filters={filters}
-          selectedItems={selectedItems}
-          onRowSelect={handleRowSelect}
-          onSelectAll={handleSelectAll}
-          onRowClick={handleRowClick}
-          triggerRefresh={combinedTrigger}
-        />
+        {viewMode === 'grouped' ? (
+          <GroupedLogTable
+            filters={filters}
+            onGroupSelect={handleGroupSelect}
+            triggerRefresh={combinedTrigger}
+          />
+        ) : (
+          <LogTable
+            filters={filters}
+            selectedItems={selectedItems}
+            onRowSelect={handleRowSelect}
+            onSelectAll={handleSelectAll}
+            onRowClick={handleRowClick}
+            triggerRefresh={combinedTrigger}
+          />
+        )}
       </div>
 
-      {/* Detail drawer */}
+      {/* Detail drawers */}
       <LogDetailDrawer
         logItem={selectedLog}
         open={drawerOpen}
         onClose={handleDrawerClose}
+        onStatusUpdate={handleStatusUpdate}
+      />
+      <GroupDetailDrawer
+        groupItem={selectedGroup}
+        open={groupDrawerOpen}
+        onClose={handleGroupDrawerClose}
         onStatusUpdate={handleStatusUpdate}
       />
     </div>
