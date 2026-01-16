@@ -13,6 +13,39 @@ import { getSupabaseAdmin } from '../../../../shared/supabase/admin';
 import { logger } from '../../../../shared/logger/index.js';
 
 /**
+ * Escape markdown special characters and HTML to prevent XSS
+ * @param text - Raw text to escape
+ * @returns Escaped text safe for markdown output
+ */
+function escapeMarkdown(text: string): string {
+  if (!text) return '';
+  return text
+    .replace(/\\/g, '\\\\')
+    .replace(/\*/g, '\\*')
+    .replace(/_/g, '\\_')
+    .replace(/\[/g, '\\[')
+    .replace(/\]/g, '\\]')
+    .replace(/\(/g, '\\(')
+    .replace(/\)/g, '\\)')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/`/g, '\\`');
+}
+
+/**
+ * Escape only HTML tags for content that should preserve markdown formatting
+ * (e.g., lesson content that's already markdown)
+ * @param text - Raw text to escape
+ * @returns Text with HTML escaped but markdown preserved
+ */
+function escapeHtml(text: string): string {
+  if (!text) return '';
+  return text
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;');
+}
+
+/**
  * Type for lesson content structure
  */
 interface LessonContentData {
@@ -69,7 +102,12 @@ interface LessonContentData {
  * ```
  */
 export const exportLessons = protectedProcedure
-  .use(createRateLimiter({ requests: 10, window: 60 })) // 10 exports per minute
+  // Rate limiter is per-user (uses ctx.user.id), so abuse only affects the attacker themselves.
+  // This runs before verifyCourseAccess but the security impact is minimal:
+  // - Invalid courseIds still count toward rate limit, but only for that user
+  // - Other users are unaffected (separate rate limit buckets)
+  // TODO: Consider course-scoped rate limiting if export abuse becomes an issue
+  .use(createRateLimiter({ requests: 10, window: 60 }))
   .input(exportLessonsInputSchema)
   .query(async ({ ctx, input }) => {
     const { courseId, moduleNumber } = input;
@@ -113,6 +151,15 @@ export const exportLessons = protectedProcedure
       }
 
       // Step 4: Get all lessons in module with their content
+      // Note: Supabase doesn't support LIMIT on foreign tables in select().
+      // This query may return multiple content versions per lesson.
+      // We filter to completed status and take the first (most recent) in application code.
+      // TODO: Consider creating a database view 'latest_lesson_contents' for better performance:
+      //   CREATE VIEW latest_lesson_contents AS
+      //   SELECT DISTINCT ON (lesson_id) *
+      //   FROM lesson_contents
+      //   WHERE status = 'completed'
+      //   ORDER BY lesson_id, created_at DESC;
       const { data: lessons, error: lessonsError } = await supabase
         .from('lessons')
         .select(`
@@ -122,7 +169,8 @@ export const exportLessons = protectedProcedure
           lesson_contents(
             content,
             status,
-            metadata
+            metadata,
+            created_at
           )
         `)
         .eq('section_id', section.id)
@@ -137,17 +185,25 @@ export const exportLessons = protectedProcedure
         throw new TRPCError({ code: 'NOT_FOUND', message: 'No lessons found in this module' });
       }
 
-      // Step 5: Format as Markdown
-      const sectionTitle = section.title || `Module ${moduleNumber}`;
+      // Step 5: Format as Markdown (with XSS protection)
+      const sectionTitle = escapeMarkdown(section.title || `Module ${moduleNumber}`);
       let markdown = `# ${sectionTitle}\n\n`;
-      markdown += `*Exported from course: ${course?.title || 'Unknown'}*\n\n`;
+      markdown += `*Exported from course: ${escapeMarkdown(course?.title || 'Unknown')}*\n\n`;
       markdown += `---\n\n`;
 
       let exportedCount = 0;
 
       for (const lesson of lessons) {
-        // Get the latest content (first in array since ordered by created_at desc by default)
-        const lessonContent = lesson.lesson_contents?.[0];
+        // Get the latest completed content
+        // Filter to completed status and sort by created_at (newest first)
+        const completedContents = (lesson.lesson_contents || [])
+          .filter((lc: { status?: string }) => lc.status === 'completed')
+          .sort((a: { created_at?: string }, b: { created_at?: string }) => {
+            const dateA = a.created_at ? new Date(a.created_at).getTime() : 0;
+            const dateB = b.created_at ? new Date(b.created_at).getTime() : 0;
+            return dateB - dateA; // Newest first
+          });
+        const lessonContent = completedContents[0];
 
         // Extract the actual content from the nested structure
         // The content can be directly in lesson_contents.content or in lesson_contents.content.content
@@ -166,19 +222,20 @@ export const exportLessons = protectedProcedure
 
         if (!contentData) continue;
 
-        markdown += `## ${lesson.order_index}. ${lesson.title}\n\n`;
+        // Escape lesson title (user-generated)
+        markdown += `## ${lesson.order_index}. ${escapeMarkdown(lesson.title)}\n\n`;
         exportedCount++;
 
-        // Intro
+        // Intro - escape HTML only to preserve markdown formatting
         if (contentData.intro) {
-          markdown += `${contentData.intro}\n\n`;
+          markdown += `${escapeHtml(contentData.intro)}\n\n`;
         }
 
         // Sections
         if (contentData.sections && Array.isArray(contentData.sections)) {
           for (const contentSection of contentData.sections) {
-            markdown += `### ${contentSection.title}\n\n`;
-            markdown += `${contentSection.content}\n\n`;
+            markdown += `### ${escapeMarkdown(contentSection.title)}\n\n`;
+            markdown += `${escapeHtml(contentSection.content)}\n\n`;
           }
         }
 
@@ -186,10 +243,11 @@ export const exportLessons = protectedProcedure
         if (contentData.examples && Array.isArray(contentData.examples) && contentData.examples.length > 0) {
           markdown += `### Examples\n\n`;
           for (const example of contentData.examples) {
-            markdown += `**${example.title}**\n\n`;
-            markdown += `${example.content}\n\n`;
+            markdown += `**${escapeMarkdown(example.title)}**\n\n`;
+            markdown += `${escapeHtml(example.content)}\n\n`;
             if (example.code) {
-              markdown += `\`\`\`\n${example.code}\n\`\`\`\n\n`;
+              // Code blocks - escape HTML but preserve code formatting
+              markdown += `\`\`\`\n${escapeHtml(example.code)}\n\`\`\`\n\n`;
             }
           }
         }
@@ -199,9 +257,9 @@ export const exportLessons = protectedProcedure
           markdown += `### Exercises\n\n`;
           for (let i = 0; i < contentData.exercises.length; i++) {
             const ex = contentData.exercises[i];
-            markdown += `**Exercise ${i + 1}:** ${ex.question}\n\n`;
+            markdown += `**Exercise ${i + 1}:** ${escapeHtml(ex.question)}\n\n`;
             if (ex.hints && ex.hints.length > 0) {
-              markdown += `*Hints:* ${ex.hints.join(', ')}\n\n`;
+              markdown += `*Hints:* ${ex.hints.map(h => escapeHtml(h)).join(', ')}\n\n`;
             }
           }
         }
@@ -209,7 +267,7 @@ export const exportLessons = protectedProcedure
         // Summary
         if (contentData.summary) {
           markdown += `### Summary\n\n`;
-          markdown += `${contentData.summary}\n\n`;
+          markdown += `${escapeHtml(contentData.summary)}\n\n`;
         }
 
         markdown += `---\n\n`;
