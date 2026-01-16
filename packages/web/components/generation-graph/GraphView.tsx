@@ -1,7 +1,7 @@
-'use client';
+'use client'
 
-import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { useDebouncedCallback } from 'use-debounce';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react'
+import { useDebouncedCallback } from 'use-debounce'
 import {
   ReactFlow,
   ReactFlowProvider,
@@ -11,64 +11,69 @@ import {
   EdgeTypes,
   useNodesInitialized,
   useReactFlow,
-} from '@xyflow/react';
-import '@xyflow/react/dist/style.css';
+} from '@xyflow/react'
+import '@xyflow/react/dist/style.css'
 
-import { useGraphData } from './hooks/useGraphData';
-import { useGraphLayout } from './hooks/useGraphLayout';
-import StageNode from './nodes/StageNode';
-import MergeNode from './nodes/MergeNode';
-import EndNode from './nodes/EndNode';
-import DocumentNode from './nodes/DocumentNode';
-import LessonNode from './nodes/LessonNode';
-import ModuleGroup from './nodes/ModuleGroup';
-import Stage2Group from './nodes/Stage2Group';
-import AnimatedEdge from './edges/AnimatedEdge';
-import DataFlowEdge from './edges/DataFlowEdge';
-import { StaticGraphProvider } from './contexts/StaticGraphContext';
-import { RealtimeStatusProvider } from './contexts/RealtimeStatusContext';
-import { FullscreenProvider } from './contexts/FullscreenContext';
-import { GraphOperationsProvider } from './contexts/GraphOperationsContext';
-import { GRAPH_STAGE_CONFIG, NODE_STYLES, ACTIVE_STATUSES } from '@/lib/generation-graph/constants';
-import { GRAPH_TRANSLATIONS } from '@/lib/generation-graph/translations';
-import { useGenerationRealtime } from '@/components/generation-monitoring/realtime-provider';
-import { RealtimeStatusData, NodeStatusEntry, VisualStyle } from '@megacampus/shared-types';
-import { GenerationProgress, CourseStatus } from '@/types/course-generation';
-import { mapStatusToNodeStatus, getStageFromStatus, isAwaitingApproval, calculateProgress } from '@/lib/generation-graph/utils';
-import { GraphControls } from './controls/GraphControls';
-import { GraphMinimap } from './controls/GraphMinimap';
-import { GraphHeader } from './GraphHeader';
-import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
-import { useTouchGestures } from './hooks/useTouchGestures';
-import { NodeDetailsDrawer } from './panels/NodeDetailsDrawer';
-import { AdminPanel } from './panels/AdminPanel';
-import { useNodeSelection } from './hooks/useNodeSelection';
-import { MissionControlBanner } from '@/components/generation-celestial/MissionControlBanner';
-import { startGeneration, cancelGeneration, approveStage } from '@/app/actions/admin-generation';
-import { toast } from 'sonner';
+import { useGraphData } from './hooks/useGraphData'
+import { useGraphLayout } from './hooks/useGraphLayout'
+import StageNode from './nodes/StageNode'
+import MergeNode from './nodes/MergeNode'
+import EndNode from './nodes/EndNode'
+import DocumentNode from './nodes/DocumentNode'
+import LessonNode from './nodes/LessonNode'
+import ModuleGroup from './nodes/ModuleGroup'
+import Stage2Group from './nodes/Stage2Group'
+import AnimatedEdge from './edges/AnimatedEdge'
+import DataFlowEdge from './edges/DataFlowEdge'
+import { StaticGraphProvider } from './contexts/StaticGraphContext'
+import { RealtimeStatusProvider } from './contexts/RealtimeStatusContext'
+import { FullscreenProvider } from './contexts/FullscreenContext'
+import { GraphOperationsProvider } from './contexts/GraphOperationsContext'
+import { GRAPH_STAGE_CONFIG, NODE_STYLES, ACTIVE_STATUSES } from '@/lib/generation-graph/constants'
+import { GRAPH_TRANSLATIONS } from '@/lib/generation-graph/translations'
+import { useGenerationRealtime } from '@/components/generation-monitoring/realtime-provider'
+import { RealtimeStatusData, NodeStatusEntry, VisualStyle } from '@megacampus/shared-types'
+import { GenerationProgress, CourseStatus } from '@/types/course-generation'
+import {
+  mapStatusToNodeStatus,
+  getStageFromStatus,
+  isAwaitingApproval,
+  calculateProgress,
+} from '@/lib/generation-graph/utils'
+import { GraphControls } from './controls/GraphControls'
+import { GraphMinimap } from './controls/GraphMinimap'
+import { GraphHeader } from './GraphHeader'
+import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts'
+import { useTouchGestures } from './hooks/useTouchGestures'
+import { NodeDetailsDrawer } from './panels/NodeDetailsDrawer'
+import { AdminPanel } from './panels/AdminPanel'
+import { useNodeSelection } from './hooks/useNodeSelection'
+import { MissionControlBanner } from '@/components/generation-celestial/MissionControlBanner'
+import { startGeneration, cancelGeneration, approveStage } from '@/app/actions/admin-generation'
+import { toast } from 'sonner'
 // MobileProgressList removed - maintaining two view modes adds complexity
-import { useBreakpoint } from './hooks/useBreakpoint';
-import { useThemeSync } from '@/lib/hooks/use-theme-sync';
-import { logger } from '@/lib/client-logger';
-import { useFallbackPolling } from './hooks/useFallbackPolling';
-import { useViewportPreservation } from './hooks/useViewportPreservation';
-import { useGracefulDegradation } from './hooks/useGracefulDegradation';
-import { LongRunningIndicator } from './controls/LongRunningIndicator';
-import { useBackgroundTab } from './hooks/useBackgroundTab';
-import { useSessionRecovery } from './hooks/useSessionRecovery';
-import { useKeyboardNavigation } from './hooks/useKeyboardNavigation';
+import { useBreakpoint } from './hooks/useBreakpoint'
+import { useThemeSync } from '@/lib/hooks/use-theme-sync'
+import { logger } from '@/lib/client-logger'
+import { useFallbackPolling } from './hooks/useFallbackPolling'
+import { useViewportPreservation } from './hooks/useViewportPreservation'
+import { useGracefulDegradation } from './hooks/useGracefulDegradation'
+import { LongRunningIndicator } from './controls/LongRunningIndicator'
+import { useBackgroundTab } from './hooks/useBackgroundTab'
+import { useSessionRecovery } from './hooks/useSessionRecovery'
+import { useKeyboardNavigation } from './hooks/useKeyboardNavigation'
 // ViewToggle removed - maintaining two view modes adds complexity without significant benefit
-import { useUserRole } from './hooks/useUserRole';
-import { useDocumentsWithStatus } from './hooks/useDocumentsWithStatus';
-import { createClient } from '@/lib/supabase/client';
-import { useLocale } from 'next-intl';
-import { useParams } from 'next/navigation';
-import { setTranslationLocale } from './hooks/use-graph-data/utils/step-translations';
-import type { CourseStructure } from '@megacampus/shared-types';
-import { PartialGenerationProvider } from './contexts/PartialGenerationContext';
-import { SelectionToolbar } from './components/SelectionToolbar';
-import { useGenerationStore } from '@/stores/useGenerationStore';
-import { AppNode, AppEdge } from './types';
+import { useUserRole } from './hooks/useUserRole'
+import { useDocumentsWithStatus } from './hooks/useDocumentsWithStatus'
+import { createClient } from '@/lib/supabase/client'
+import { useLocale } from 'next-intl'
+import { useParams } from 'next/navigation'
+import { setTranslationLocale } from './hooks/use-graph-data/utils/step-translations'
+import type { CourseStructure } from '@megacampus/shared-types'
+import { PartialGenerationProvider } from './contexts/PartialGenerationContext'
+import { SelectionToolbar } from './components/SelectionToolbar'
+import { useGenerationStore } from '@/stores/useGenerationStore'
+import { AppNode, AppEdge } from './types'
 
 // Define node and edge types OUTSIDE component to prevent re-creation on each render
 const nodeTypes: NodeTypes = {
@@ -79,26 +84,26 @@ const nodeTypes: NodeTypes = {
   lesson: LessonNode,
   module: ModuleGroup,
   stage2group: Stage2Group,
-};
+}
 
 const edgeTypes: EdgeTypes = {
   animated: AnimatedEdge,
   dataflow: DataFlowEdge,
-};
+}
 
 /**
  * Type guard for validating VisualStyle data from database JSON.
  * Ensures all 4 required string fields are present before use.
  */
 function isVisualStyle(data: unknown): data is VisualStyle {
-  if (!data || typeof data !== 'object') return false;
-  const d = data as Record<string, unknown>;
+  if (!data || typeof data !== 'object') return false
+  const d = data as Record<string, unknown>
   return (
     typeof d.colorScheme === 'string' &&
     typeof d.aesthetic === 'string' &&
     typeof d.visualElements === 'string' &&
     typeof d.mood === 'string'
-  );
+  )
 }
 
 /**
@@ -106,60 +111,60 @@ function isVisualStyle(data: unknown): data is VisualStyle {
  */
 export interface GraphViewProps {
   /** Unique identifier for the course being generated */
-  courseId: string;
+  courseId: string
   /** Optional display title for the course (defaults to 'Course Generation') */
-  courseTitle?: string;
+  courseTitle?: string
   /**
    * Whether the course has documents.
    * When false, Stage 2 (Document Processing) and Stage 3 (Classification)
    * are marked as 'skipped' in the graph visualization.
    * @default true
    */
-  hasDocuments?: boolean;
+  hasDocuments?: boolean
   /** Stage number where generation failed (from courses.failed_at_stage) */
-  failedAtStage?: number | null;
+  failedAtStage?: number | null
   /**
    * Actual progress percentage from the database (0-100).
    * When provided, this is used instead of calculating from status.
    * Ensures consistency with CelestialHeader progress display.
    */
-  progressPercentage?: number;
+  progressPercentage?: number
   /** Human-readable generation code (e.g., "ABC-1234") for debugging */
-  generationCode?: string | null;
+  generationCode?: string | null
   /**
    * Pre-loaded Stage 1 course data.
    * When provided, Stage 1 node displays this data immediately
    * instead of waiting for traces from generation.
    */
   stage1CourseData?: {
-    inputData: Record<string, unknown>;
-    outputData: Record<string, unknown>;
-  };
+    inputData: Record<string, unknown>
+    outputData: Record<string, unknown>
+  }
   /**
    * User subscription tier for model display.
    * Determines which model name is shown (e.g., "Premium Model" for 'premium').
    * @default 'standard'
    */
-  tier?: 'trial' | 'free' | 'basic' | 'standard' | 'premium';
+  tier?: 'trial' | 'free' | 'basic' | 'standard' | 'premium'
   /**
    * Full generation progress data for header stats display.
    * Contains started_at, modules_total, lessons_total, lessons_completed, etc.
    */
-  generationProgress?: GenerationProgress;
+  generationProgress?: GenerationProgress
   /**
    * Current generation status for header stats display.
    */
-  generationStatus?: CourseStatus;
+  generationStatus?: CourseStatus
   /**
    * Whether realtime connection is active.
    * Used for connection indicator in header.
    */
-  isRealtimeConnected?: boolean;
+  isRealtimeConnected?: boolean
   /**
    * Read-only mode for automatic generation.
    * Hides edit, regenerate, and approve buttons.
    */
-  readOnly?: boolean;
+  readOnly?: boolean
 }
 
 /**
@@ -167,7 +172,7 @@ export interface GraphViewProps {
  */
 interface GraphInteractionsProps {
   /** Callback to update panning mode state */
-  setIsPanning: (isPanning: boolean) => void;
+  setIsPanning: (isPanning: boolean) => void
 }
 
 /**
@@ -177,9 +182,9 @@ interface GraphInteractionsProps {
  * @param props - Component props
  */
 function GraphInteractions({ setIsPanning }: GraphInteractionsProps) {
-  useKeyboardShortcuts(setIsPanning);
-  useTouchGestures();
-  return null;
+  useKeyboardShortcuts(setIsPanning)
+  useTouchGestures()
+  return null
 }
 
 /**
@@ -200,164 +205,194 @@ function GraphInteractions({ setIsPanning }: GraphInteractionsProps) {
  *
  * @param props - Component props
  */
-function GraphViewInner({ courseId, courseTitle, hasDocuments = true, failedAtStage, progressPercentage, generationCode, stage1CourseData, tier = 'standard', generationProgress, generationStatus, isRealtimeConnected, readOnly }: GraphViewProps) {
-  const { isTablet } = useBreakpoint(768);
-  const nodesInitialized = useNodesInitialized();
-  const { fitView, getNodes, setCenter } = useReactFlow();
-  const initialFitDone = useRef(false);
+function GraphViewInner({
+  courseId,
+  courseTitle,
+  hasDocuments = true,
+  failedAtStage,
+  progressPercentage,
+  generationCode,
+  stage1CourseData,
+  tier = 'standard',
+  generationProgress,
+  generationStatus,
+  isRealtimeConnected,
+  readOnly,
+}: GraphViewProps) {
+  const { isTablet } = useBreakpoint(768)
+  const nodesInitialized = useNodesInitialized()
+  const { fitView, getNodes, setCenter } = useReactFlow()
+  const initialFitDone = useRef(false)
 
   // Get courseSlug from URL params for navigation
-  const params = useParams();
-  const courseSlug = params?.slug as string | undefined;
+  const params = useParams()
+  const courseSlug = params?.slug as string | undefined
 
   // Sync locale for step name translations
-  const locale = useLocale();
+  const locale = useLocale()
   useEffect(() => {
-    setTranslationLocale(locale);
-  }, [locale]);
+    setTranslationLocale(locale)
+  }, [locale])
 
   // Admin
-  const { isAdmin } = useUserRole();
-  const [isAdminPanelOpen, setIsAdminPanelOpen] = useState(false);
+  const { isAdmin } = useUserRole()
+  const [isAdminPanelOpen, setIsAdminPanelOpen] = useState(false)
 
   // Banner processing state
-  const [isProcessingBanner, setIsProcessingBanner] = useState(false);
+  const [isProcessingBanner, setIsProcessingBanner] = useState(false)
 
   // Fullscreen mode
-  const containerRef = useRef<HTMLDivElement>(null);
-  const portalContainerRef = useRef<HTMLDivElement>(null);
-  const [isFullscreen, setIsFullscreen] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null)
+  const portalContainerRef = useRef<HTMLDivElement>(null)
+  const [isFullscreen, setIsFullscreen] = useState(false)
 
   const toggleFullscreen = useCallback(() => {
-    if (!containerRef.current) return;
+    if (!containerRef.current) return
 
     if (!document.fullscreenElement) {
       containerRef.current.requestFullscreen().catch((err) => {
-        console.error('Error attempting to enable fullscreen:', err);
-      });
+        console.error('Error attempting to enable fullscreen:', err)
+      })
     } else {
-      document.exitFullscreen();
+      document.exitFullscreen()
     }
-  }, []);
+  }, [])
 
   // Sync fullscreen state with browser
   useEffect(() => {
     const handleFullscreenChange = () => {
-      setIsFullscreen(!!document.fullscreenElement);
-    };
+      setIsFullscreen(!!document.fullscreenElement)
+    }
 
-    document.addEventListener('fullscreenchange', handleFullscreenChange);
+    document.addEventListener('fullscreenchange', handleFullscreenChange)
     return () => {
-      document.removeEventListener('fullscreenchange', handleFullscreenChange);
-    };
-  }, []);
+      document.removeEventListener('fullscreenchange', handleFullscreenChange)
+    }
+  }, [])
 
   // View mode toggle removed (T096) - maintaining two views adds complexity without significant benefit
 
   // Pan/Selection state (FIX-018)
   // Default to Pan Mode (n8n style), Space to Select
-  const [isPanning, setIsPanning] = useState(true);
+  const [isPanning, setIsPanning] = useState(true)
 
   // Visual style for course imagery (fetched from courses.visual_style)
-  const [visualStyle, setVisualStyle] = useState<VisualStyle | null>(null);
+  const [visualStyle, setVisualStyle] = useState<VisualStyle | null>(null)
+
+  // Course writing style (fetched from courses.style) - used in Stage 4 Hero Card via StaticGraphContext
+  const [courseStyle, setCourseStyle] = useState<string | null>(null)
 
   // Theme support
-  const { resolvedTheme, mounted } = useThemeSync();
-  const isDark = mounted && resolvedTheme === 'dark';
+  const { resolvedTheme, mounted } = useThemeSync()
+  const isDark = mounted && resolvedTheme === 'dark'
 
   // Tablet optimizations (FIX-021)
-  const flowProps = isTablet ? {
-      minZoom: 0.3,
-      maxZoom: 1.5,
-      panOnDrag: true, // Force pan on tablet for touch interaction
-      selectionOnDrag: false,
-      zoomOnScroll: false, // Disable zoom on scroll for tablet
-      zoomOnPinch: true,
-      panOnScroll: false,
-  } : {
-      minZoom: 0.1,
-      maxZoom: 2,
-      panOnDrag: isPanning,
-      selectionOnDrag: !isPanning,
-  };
+  const flowProps = isTablet
+    ? {
+        minZoom: 0.3,
+        maxZoom: 1.5,
+        panOnDrag: true, // Force pan on tablet for touch interaction
+        selectionOnDrag: false,
+        zoomOnScroll: false, // Disable zoom on scroll for tablet
+        zoomOnPinch: true,
+        panOnScroll: false,
+      }
+    : {
+        minZoom: 0.1,
+        maxZoom: 2,
+        panOnDrag: isPanning,
+        selectionOnDrag: !isPanning,
+      }
 
   // Realtime Data
-  const { traces, status: pipelineStatus, isConnected } = useGenerationRealtime();
+  const { traces, status: pipelineStatus, isConnected } = useGenerationRealtime()
 
   // Graceful degradation
-  const {
-    degradationMode,
-    handleRealtimeFailure,
-    statusMessage
-  } = useGracefulDegradation();
+  const { degradationMode, handleRealtimeFailure, statusMessage } = useGracefulDegradation()
 
   // Auto-focus on error (T122)
   useEffect(() => {
     if (pipelineStatus === 'failed') {
-        const nodes = getNodes();
-        const errorNode = nodes.find(n => n.data.status === 'error');
-        
-        if (errorNode && errorNode.position) {
-            // Assume default dimensions if not set
-            const width = errorNode.measured?.width || 180;
-            const height = errorNode.measured?.height || 80;
-            
-            setCenter(
-                errorNode.position.x + width / 2, 
-                errorNode.position.y + height / 2, 
-                { zoom: 1.2, duration: 800 }
-            );
-        }
+      const nodes = getNodes()
+      const errorNode = nodes.find((n) => n.data.status === 'error')
+
+      if (errorNode && errorNode.position) {
+        // Assume default dimensions if not set
+        const width = errorNode.measured?.width || 180
+        const height = errorNode.measured?.height || 80
+
+        setCenter(errorNode.position.x + width / 2, errorNode.position.y + height / 2, {
+          zoom: 1.2,
+          duration: 800,
+        })
+      }
     }
-  }, [pipelineStatus, getNodes, setCenter]);
+  }, [pipelineStatus, getNodes, setCenter])
 
   // Fallback polling when realtime disconnects
-  const polledTraces = useFallbackPolling(courseId, isConnected);
+  const polledTraces = useFallbackPolling(courseId, isConnected)
 
   // Use realtime traces when connected, polled traces when not
-  const effectiveTraces = isConnected ? traces : polledTraces;
+  const effectiveTraces = isConnected ? traces : polledTraces
 
   // Viewport preservation
-  const { preserveViewport, restoreViewport } = useViewportPreservation();
-  
+  const { preserveViewport, restoreViewport } = useViewportPreservation()
+
   // T104 [PERF] Queue updates during viewport animation
-  const [isInteracting, setIsInteracting] = useState(false);
+  const [isInteracting, setIsInteracting] = useState(false)
 
   // File catalog for document filename lookup (T014: Fix UUID display)
   // Also loads document statuses for Stage 2 graph initialization
-  const { documents: documentsWithStatus, getFilename, isLoading: isCatalogLoading } = useDocumentsWithStatus(courseId);
-  const initializeDocumentsWithStatus = useGenerationStore(state => state.initializeDocumentsWithStatus);
-  const areAllDocumentsComplete = useGenerationStore(state => state.areAllDocumentsComplete);
-  const setStageStatusOptimistic = useGenerationStore(state => state.setStageStatusOptimistic);
+  const {
+    documents: documentsWithStatus,
+    getFilename,
+    isLoading: isCatalogLoading,
+  } = useDocumentsWithStatus(courseId)
+  const initializeDocumentsWithStatus = useGenerationStore(
+    (state) => state.initializeDocumentsWithStatus
+  )
+  const areAllDocumentsComplete = useGenerationStore((state) => state.areAllDocumentsComplete)
+  const setStageStatusOptimistic = useGenerationStore((state) => state.setStageStatusOptimistic)
 
   // Graph State
-  const { nodes, edges, onNodesChange, onEdgesChange, processTraces, initializeFromCourseStructure, initializeDocumentsFromDb, removeLesson, setNodes, nodePositionsRef } = useGraphData({ getFilename, hasDocuments, stage1CourseData });
-  const { layoutNodes, layoutError: _layoutError } = useGraphLayout();
+  const {
+    nodes,
+    edges,
+    onNodesChange,
+    onEdgesChange,
+    processTraces,
+    initializeFromCourseStructure,
+    initializeDocumentsFromDb,
+    removeLesson,
+    setNodes,
+    nodePositionsRef,
+  } = useGraphData({ getFilename, hasDocuments, stage1CourseData })
+  const { layoutNodes, layoutError: _layoutError } = useGraphLayout()
   // Layout generation counter to prevent stale layout results (Fix #6: Race condition)
-  const layoutGenerationRef = useRef(0);
+  const layoutGenerationRef = useRef(0)
 
   // Ref to access latest nodes without adding to effect dependencies
-  const nodesRef = useRef(nodes);
+  const nodesRef = useRef(nodes)
   useEffect(() => {
-    nodesRef.current = nodes;
-  }, [nodes]);
+    nodesRef.current = nodes
+  }, [nodes])
 
   // Fetch course structure on mount to initialize modules/lessons (Task 1: Stage 6 UI/UX)
   // This ensures the structure appears immediately even on page refresh
-  const courseStructureInitialized = useRef(false);
+  const courseStructureInitialized = useRef(false)
   useEffect(() => {
     // Prevent double-fetch in strict mode
-    if (courseStructureInitialized.current) return;
-    courseStructureInitialized.current = true;
+    if (courseStructureInitialized.current) return
+    courseStructureInitialized.current = true
 
     const fetchCourseStructure = async () => {
-      const supabase = createClient();
+      const supabase = createClient()
 
-      // Fetch course structure, visual_style, and completed lessons in parallel
+      // Fetch course structure, visual_style, style, and completed lessons in parallel
       const [courseResult, lessonsResult] = await Promise.all([
         supabase
           .from('courses')
-          .select('course_structure, visual_style')
+          .select('course_structure, visual_style, style')
           .eq('id', courseId)
           .single(),
         supabase
@@ -366,145 +401,175 @@ function GraphViewInner({ courseId, courseTitle, hasDocuments = true, failedAtSt
           .eq('course_id', courseId)
           .eq('stage', 'stage_6')
           .eq('step_name', 'finish')
-          .not('input_data->lessonLabel', 'is', null)
-      ]);
+          .not('input_data->lessonLabel', 'is', null),
+      ])
 
       if (courseResult.error) {
-        console.error('[GraphView] Failed to fetch course structure:', courseResult.error);
+        console.error('[GraphView] Failed to fetch course structure:', courseResult.error)
         // Reset flag on error to allow retry on remount
-        courseStructureInitialized.current = false;
-        return;
+        courseStructureInitialized.current = false
+        return
       }
 
       // Store visual_style if available (generated in Stage 4)
       if (courseResult.data?.visual_style && isVisualStyle(courseResult.data.visual_style)) {
-        setVisualStyle(courseResult.data.visual_style);
+        setVisualStyle(courseResult.data.visual_style)
+      }
+
+      // Store course writing style if available
+      if (courseResult.data?.style) {
+        setCourseStyle(courseResult.data.style)
       }
 
       if (courseResult.data?.course_structure) {
         // Extract unique lessonLabels from completed traces
-        const completedLabels = lessonsResult.data && lessonsResult.data.length > 0
-          ? [...new Set(
-              lessonsResult.data
-                .map(t => (t.input_data as Record<string, unknown>)?.lessonLabel as string)
-                .filter(Boolean)
-            )]
-          : [];
+        const completedLabels =
+          lessonsResult.data && lessonsResult.data.length > 0
+            ? [
+                ...new Set(
+                  lessonsResult.data
+                    .map((t) => (t.input_data as Record<string, unknown>)?.lessonLabel as string)
+                    .filter(Boolean)
+                ),
+              ]
+            : []
 
         // Initialize structure with completed statuses in one call
-        initializeFromCourseStructure(courseResult.data.course_structure as CourseStructure, completedLabels);
+        initializeFromCourseStructure(
+          courseResult.data.course_structure as CourseStructure,
+          completedLabels
+        )
       } else {
         // Reset flag if no structure found (might be added later)
-        courseStructureInitialized.current = false;
+        courseStructureInitialized.current = false
       }
-    };
+    }
 
-    fetchCourseStructure();
-  }, [courseId, initializeFromCourseStructure]);
+    fetchCourseStructure()
+  }, [courseId, initializeFromCourseStructure])
 
   // Re-fetch course structure when Stage 5 becomes complete
   // This ensures lesson nodes appear immediately after Stage 5 approval
-  const prevPipelineStatus = useRef<string | null>(null);
-  const isInitialMount = useRef(true);
+  const prevPipelineStatus = useRef<string | null>(null)
+  const isInitialMount = useRef(true)
   useEffect(() => {
     // Skip the initial mount - first useEffect already handles initial load with completedLabels
     if (isInitialMount.current) {
-      isInitialMount.current = false;
-      prevPipelineStatus.current = pipelineStatus ?? null;
-      return;
+      isInitialMount.current = false
+      prevPipelineStatus.current = pipelineStatus ?? null
+      return
     }
 
     // Only trigger on actual transition TO stage_5_complete (not initial load)
-    const wasNotComplete = prevPipelineStatus.current !== 'stage_5_complete';
-    const isNowComplete = pipelineStatus === 'stage_5_complete';
-    prevPipelineStatus.current = pipelineStatus ?? null;
+    const wasNotComplete = prevPipelineStatus.current !== 'stage_5_complete'
+    const isNowComplete = pipelineStatus === 'stage_5_complete'
+    prevPipelineStatus.current = pipelineStatus ?? null
 
     if (wasNotComplete && isNowComplete) {
       // Reset the initialization flag to allow re-fetch
-      courseStructureInitialized.current = false;
+      courseStructureInitialized.current = false
 
       // Fetch fresh course structure WITH completed lessons
       const fetchCourseStructure = async () => {
-        const supabase = createClient();
+        const supabase = createClient()
 
         // Fetch course structure and completed lessons in parallel
         const [courseResult, lessonsResult] = await Promise.all([
-          supabase
-            .from('courses')
-            .select('course_structure')
-            .eq('id', courseId)
-            .single(),
+          supabase.from('courses').select('course_structure').eq('id', courseId).single(),
           supabase
             .from('generation_trace')
             .select('input_data')
             .eq('course_id', courseId)
             .eq('stage', 'stage_6')
             .eq('step_name', 'finish')
-            .not('input_data->lessonLabel', 'is', null)
-        ]);
+            .not('input_data->lessonLabel', 'is', null),
+        ])
 
         if (courseResult.error) {
-          console.error('[GraphView] Failed to fetch course structure after Stage 5:', courseResult.error);
-          return;
+          console.error(
+            '[GraphView] Failed to fetch course structure after Stage 5:',
+            courseResult.error
+          )
+          return
         }
 
         if (courseResult.data?.course_structure) {
           // Extract unique lessonLabels from completed traces
-          const completedLabels = lessonsResult.data && lessonsResult.data.length > 0
-            ? [...new Set(
-                lessonsResult.data
-                  .map(t => (t.input_data as Record<string, unknown>)?.lessonLabel as string)
-                  .filter(Boolean)
-              )]
-            : [];
+          const completedLabels =
+            lessonsResult.data && lessonsResult.data.length > 0
+              ? [
+                  ...new Set(
+                    lessonsResult.data
+                      .map((t) => (t.input_data as Record<string, unknown>)?.lessonLabel as string)
+                      .filter(Boolean)
+                  ),
+                ]
+              : []
 
-          initializeFromCourseStructure(courseResult.data.course_structure as CourseStructure, completedLabels);
-          courseStructureInitialized.current = true;
+          initializeFromCourseStructure(
+            courseResult.data.course_structure as CourseStructure,
+            completedLabels
+          )
+          courseStructureInitialized.current = true
         }
-      };
+      }
 
-      fetchCourseStructure();
+      fetchCourseStructure()
     }
-  }, [pipelineStatus, courseId, initializeFromCourseStructure]);
+  }, [pipelineStatus, courseId, initializeFromCourseStructure])
 
   // Initialize Stage 2 documents from database with proper statuses
   // This ensures documents appear in the graph on page load (before realtime traces arrive)
   // and have correct completion status for Stage2Group display
   // Note: We check store state instead of using ref because Zustand store can reset on HMR
-  const storeDocumentsCount = useGenerationStore(state => state.documents.size);
+  const storeDocumentsCount = useGenerationStore((state) => state.documents.size)
   useEffect(() => {
-    if (isCatalogLoading || !hasDocuments) return;
-    if (documentsWithStatus.length === 0) return;
+    if (isCatalogLoading || !hasDocuments) return
+    if (documentsWithStatus.length === 0) return
 
     // Only initialize if store is empty (handles HMR reset)
-    if (storeDocumentsCount > 0) return;
+    if (storeDocumentsCount > 0) return
 
     // Initialize Zustand store with proper statuses (for Stage2Group counters)
-    initializeDocumentsWithStatus(documentsWithStatus);
+    initializeDocumentsWithStatus(documentsWithStatus)
 
     // Initialize useGraphData documentSteps (for graph node creation)
-    initializeDocumentsFromDb(documentsWithStatus);
-  }, [documentsWithStatus, isCatalogLoading, hasDocuments, storeDocumentsCount, initializeDocumentsWithStatus, initializeDocumentsFromDb]);
+    initializeDocumentsFromDb(documentsWithStatus)
+  }, [
+    documentsWithStatus,
+    isCatalogLoading,
+    hasDocuments,
+    storeDocumentsCount,
+    initializeDocumentsWithStatus,
+    initializeDocumentsFromDb,
+  ])
 
   // Track module and stage2group collapse states for relayout trigger
-  const collapseSignature = useMemo(() =>
-    nodes
-      .filter(n => n.type === 'module' || n.type === 'stage2group')
-      .map(n => `${n.id}:${n.data?.isCollapsed}`)
-      .join(','),
+  const collapseSignature = useMemo(
+    () =>
+      nodes
+        .filter((n) => n.type === 'module' || n.type === 'stage2group')
+        .map((n) => `${n.id}:${n.data?.isCollapsed}`)
+        .join(','),
     [nodes]
-  );
+  )
 
   // Create stable layout trigger based on structure, not content
   // This prevents the effect from running on every node status update
-  const layoutTrigger = useMemo(() => ({
-    nodeCount: nodes.length,
-    containerIds: nodes.filter(n => n.type === 'module' || n.type === 'stage2group').map(n => n.id).join(','),
-    collapseSignature
-  }), [nodes, collapseSignature]);
+  const layoutTrigger = useMemo(
+    () => ({
+      nodeCount: nodes.length,
+      containerIds: nodes
+        .filter((n) => n.type === 'module' || n.type === 'stage2group')
+        .map((n) => n.id)
+        .join(','),
+      collapseSignature,
+    }),
+    [nodes, collapseSignature]
+  )
 
   // Use ref to track previous trigger for comparison
-  const prevLayoutTrigger = useRef(layoutTrigger);
+  const prevLayoutTrigger = useRef(layoutTrigger)
 
   // Debounced layout function to prevent rapid layout calculations
   const debouncedLayout = useDebouncedCallback(
@@ -515,14 +580,14 @@ function GraphViewInner({ courseId, courseTitle, hasDocuments = true, failedAtSt
       wasCollapseChange: boolean
     ) => {
       if (layoutGenerationRef.current !== generation) {
-        return; // Stale request
+        return // Stale request
       }
 
       try {
-        const layoutedNodes = await layoutNodes(nodesToLayout, edgesToLayout);
+        const layoutedNodes = await layoutNodes(nodesToLayout, edgesToLayout)
 
         if (layoutGenerationRef.current !== generation) {
-          return; // Another layout started
+          return // Another layout started
         }
 
         // CRITICAL: Save positions BEFORE setNodes to prevent race condition
@@ -531,117 +596,117 @@ function GraphViewInner({ courseId, courseTitle, hasDocuments = true, failedAtSt
         // Lessons need their positions saved because graph rebuild in useGraphData
         // uses nodePositionsRef to restore positions, and without saved positions
         // lessons would get {x: 0, y: 0} on every rebuild
-        layoutedNodes.forEach(n => {
+        layoutedNodes.forEach((n) => {
           if (n.position) {
-            nodePositionsRef.current.set(n.id, n.position);
+            nodePositionsRef.current.set(n.id, n.position)
           }
-        });
+        })
 
-        setNodes(layoutedNodes);
+        setNodes(layoutedNodes)
 
         // Fit view after layout - comfortable zoom to see all nodes
         if (!initialFitDone.current) {
-          initialFitDone.current = true;
+          initialFitDone.current = true
           requestAnimationFrame(() => {
-            fitView({ padding: 0.15, minZoom: 0.6, maxZoom: 1.2, duration: 400 });
-          });
+            fitView({ padding: 0.15, minZoom: 0.6, maxZoom: 1.2, duration: 400 })
+          })
         } else if (wasCollapseChange) {
           // Restore viewport after layout when collapse changed
-          restoreViewport();
+          restoreViewport()
         }
       } catch (error) {
-        console.error('[GraphView] Layout calculation failed:', error);
+        console.error('[GraphView] Layout calculation failed:', error)
         // Layout failed, but don't crash - nodes will stay at current positions
       }
     },
     50, // 50ms debounce
     { leading: true, trailing: true }
-  );
+  )
 
   // Auto-layout when structure changes (node count, container IDs, or collapse state)
   useEffect(() => {
-      const structureChanged =
-          layoutTrigger.nodeCount !== prevLayoutTrigger.current.nodeCount ||
-          layoutTrigger.containerIds !== prevLayoutTrigger.current.containerIds;
-      const collapseChanged =
-          layoutTrigger.collapseSignature !== prevLayoutTrigger.current.collapseSignature;
-      const isInitialLoad = !initialFitDone.current;
+    const structureChanged =
+      layoutTrigger.nodeCount !== prevLayoutTrigger.current.nodeCount ||
+      layoutTrigger.containerIds !== prevLayoutTrigger.current.containerIds
+    const collapseChanged =
+      layoutTrigger.collapseSignature !== prevLayoutTrigger.current.collapseSignature
+    const isInitialLoad = !initialFitDone.current
 
-      // Update ref for next comparison
-      prevLayoutTrigger.current = layoutTrigger;
+    // Update ref for next comparison
+    prevLayoutTrigger.current = layoutTrigger
 
-      // Only layout if structure changes, collapse state changes, or initial load
-      if (nodesRef.current.length > 0 && (structureChanged || isInitialLoad || collapseChanged)) {
-          // Note: preserveViewport() is now called BEFORE setNodes() in ModuleGroup/Stage2Group
-          // to capture viewport state before any React Flow processing occurs.
-          // This prevents the race condition where viewport would shift between setNodes and this useEffect.
+    // Only layout if structure changes, collapse state changes, or initial load
+    if (nodesRef.current.length > 0 && (structureChanged || isInitialLoad || collapseChanged)) {
+      // Note: preserveViewport() is now called BEFORE setNodes() in ModuleGroup/Stage2Group
+      // to capture viewport state before any React Flow processing occurs.
+      // This prevents the race condition where viewport would shift between setNodes and this useEffect.
 
-          // Increment generation to track this layout request
-          const currentGeneration = ++layoutGenerationRef.current;
+      // Increment generation to track this layout request
+      const currentGeneration = ++layoutGenerationRef.current
 
-          // Use debounced layout to prevent rapid layout calculations
-          debouncedLayout(nodesRef.current, edges, currentGeneration, collapseChanged && !isInitialLoad);
-      }
+      // Use debounced layout to prevent rapid layout calculations
+      debouncedLayout(nodesRef.current, edges, currentGeneration, collapseChanged && !isInitialLoad)
+    }
 
-      // Cleanup: cancel pending debounced calls on unmount or re-run
-      return () => {
-        debouncedLayout.cancel();
-      };
-  }, [layoutTrigger, edges, debouncedLayout]);
-  
+    // Cleanup: cancel pending debounced calls on unmount or re-run
+    return () => {
+      debouncedLayout.cancel()
+    }
+  }, [layoutTrigger, edges, debouncedLayout])
+
   // Selection
-  const { selectNode, deselectNode, selectedNodeId } = useNodeSelection();
+  const { selectNode, deselectNode, selectedNodeId } = useNodeSelection()
 
   // Background Tab Handling (T110)
-  useBackgroundTab();
+  useBackgroundTab()
 
   // Persist graph position to localStorage (T120)
-  useSessionRecovery(courseId);
+  useSessionRecovery(courseId)
 
   // Keyboard navigation for accessibility (T092)
-  useKeyboardNavigation();
+  useKeyboardNavigation()
 
   // Handle realtime disconnection
   useEffect(() => {
-    let timeout: NodeJS.Timeout;
+    let timeout: NodeJS.Timeout
 
     if (!isConnected && degradationMode === 'full') {
       // Give 5s grace period for initial connection or reconnection
       timeout = setTimeout(() => {
-        handleRealtimeFailure();
-      }, 5000);
+        handleRealtimeFailure()
+      }, 5000)
     }
 
-    return () => clearTimeout(timeout);
-  }, [isConnected, degradationMode, handleRealtimeFailure]);
+    return () => clearTimeout(timeout)
+  }, [isConnected, degradationMode, handleRealtimeFailure])
 
   // Process traces with viewport preservation (T104: Only when not interacting)
   useEffect(() => {
-    if (isInteracting) return;
+    if (isInteracting) return
 
     if (effectiveTraces.length > 0) {
-      preserveViewport();
-      processTraces(effectiveTraces);
-      restoreViewport();
+      preserveViewport()
+      processTraces(effectiveTraces)
+      restoreViewport()
     }
-  }, [effectiveTraces, processTraces, preserveViewport, restoreViewport, isInteracting]);
+  }, [effectiveTraces, processTraces, preserveViewport, restoreViewport, isInteracting])
 
   // Initial Fit View - show all nodes with comfortable zoom level
   useEffect(() => {
     if (nodesInitialized && !initialFitDone.current && nodes.length > 0) {
-      initialFitDone.current = true;
+      initialFitDone.current = true
       requestAnimationFrame(() => {
-        fitView({ padding: 0.15, minZoom: 0.6, maxZoom: 1.2, duration: 300 });
-      });
+        fitView({ padding: 0.15, minZoom: 0.6, maxZoom: 1.2, duration: 300 })
+      })
     }
-  }, [nodesInitialized, nodes.length, fitView]);
+  }, [nodesInitialized, nodes.length, fitView])
 
   // Prepare Realtime Context
   const realtimeData: RealtimeStatusData = useMemo(() => {
-    const nodeStatuses = new Map<string, NodeStatusEntry>();
-    const currentStage = getStageFromStatus(pipelineStatus || '');
-    const awaitingStage = isAwaitingApproval(pipelineStatus || '');
-    const hasError = pipelineStatus === 'failed';
+    const nodeStatuses = new Map<string, NodeStatusEntry>()
+    const currentStage = getStageFromStatus(pipelineStatus || '')
+    const awaitingStage = isAwaitingApproval(pipelineStatus || '')
+    const hasError = pipelineStatus === 'failed'
 
     Object.values(GRAPH_STAGE_CONFIG).forEach((stage) => {
       const status = mapStatusToNodeStatus(
@@ -650,31 +715,30 @@ function GraphViewInner({ courseId, courseTitle, hasDocuments = true, failedAtSt
         pipelineStatus || 'draft',
         hasError,
         awaitingStage,
-        failedAtStage,  // Pass failedAtStage from props
-        hasDocuments    // Pass hasDocuments to mark stages 2,3 as skipped when no documents
-      );
+        failedAtStage, // Pass failedAtStage from props
+        hasDocuments // Pass hasDocuments to mark stages 2,3 as skipped when no documents
+      )
 
       nodeStatuses.set(stage.id, {
         status,
         lastUpdated: new Date(),
-      });
-    });
+      })
+    })
 
     // Calculate Stage 6 progress from lesson completion
-    const stage6Nodes = nodes.filter(n => n.type === 'lesson' || n.type === 'module');
-    const stage6Lessons = stage6Nodes.filter(n => n.type === 'lesson');
-    const stage6Completed = stage6Lessons.filter(l => l.data.status === 'completed').length;
-    const stage6Progress = stage6Lessons.length > 0
-      ? Math.round((stage6Completed / stage6Lessons.length) * 100)
-      : 0;
+    const stage6Nodes = nodes.filter((n) => n.type === 'lesson' || n.type === 'module')
+    const stage6Lessons = stage6Nodes.filter((n) => n.type === 'lesson')
+    const stage6Completed = stage6Lessons.filter((l) => l.data.status === 'completed').length
+    const stage6Progress =
+      stage6Lessons.length > 0 ? Math.round((stage6Completed / stage6Lessons.length) * 100) : 0
 
     // Update Stage 6 status entry with progress
-    const stage6Status = nodeStatuses.get('stage_6');
+    const stage6Status = nodeStatuses.get('stage_6')
     if (stage6Status) {
       nodeStatuses.set('stage_6', {
         ...stage6Status,
         progress: stage6Progress,
-      });
+      })
     }
 
     // Set End node status based on pipeline completion
@@ -682,26 +746,27 @@ function GraphViewInner({ courseId, courseTitle, hasDocuments = true, failedAtSt
     nodeStatuses.set('end', {
       status: pipelineStatus === 'completed' ? 'completed' : 'pending',
       lastUpdated: new Date(),
-    });
+    })
 
-    let mappedStatus: 'idle' | 'running' | 'completed' | 'failed' | 'paused' = 'idle';
+    let mappedStatus: 'idle' | 'running' | 'completed' | 'failed' | 'paused' = 'idle'
     if (pipelineStatus && ACTIVE_STATUSES.includes(pipelineStatus)) {
-      mappedStatus = 'running';
+      mappedStatus = 'running'
     } else if (pipelineStatus === 'completed') {
-      mappedStatus = 'completed';
+      mappedStatus = 'completed'
     } else if (pipelineStatus === 'failed') {
-      mappedStatus = 'failed';
+      mappedStatus = 'failed'
     }
 
     // Use progressPercentage from database when available (ensures consistency with CelestialHeader)
     // Fall back to calculated progress from status for backward compatibility
     // Pass lesson counts for Stage 6 progress interpolation
-    const overallProgress = progressPercentage !== undefined
-      ? progressPercentage
-      : calculateProgress(pipelineStatus, hasDocuments, {
-          lessonsCompleted: generationProgress?.lessons_completed,
-          lessonsTotal: generationProgress?.lessons_total,
-        });
+    const overallProgress =
+      progressPercentage !== undefined
+        ? progressPercentage
+        : calculateProgress(pipelineStatus, hasDocuments, {
+            lessonsCompleted: generationProgress?.lessons_completed,
+            lessonsTotal: generationProgress?.lessons_total,
+          })
 
     return {
       nodeStatuses,
@@ -712,278 +777,299 @@ function GraphViewInner({ courseId, courseTitle, hasDocuments = true, failedAtSt
       totalCost: 0,
       isConnected,
       lastUpdated: new Date(),
-    };
-  }, [pipelineStatus, isConnected, hasDocuments, failedAtStage, nodes, progressPercentage, generationProgress?.lessons_completed, generationProgress?.lessons_total]);
+    }
+  }, [
+    pipelineStatus,
+    isConnected,
+    hasDocuments,
+    failedAtStage,
+    nodes,
+    progressPercentage,
+    generationProgress?.lessons_completed,
+    generationProgress?.lessons_total,
+  ])
 
   // Static Data (includes dynamic counts for EndNode display)
-  const staticData = useMemo(
-    () => {
-      // Count modules and lessons from nodes for EndNode display
-      const moduleCount = nodes.filter(n => n.type === 'module').length;
-      const lessonCount = nodes.filter(n => n.type === 'lesson').length;
-      const documentCount = nodes.filter(n => n.type === 'document').length;
+  const staticData = useMemo(() => {
+    // Count modules and lessons from nodes for EndNode display
+    const moduleCount = nodes.filter((n) => n.type === 'module').length
+    const lessonCount = nodes.filter((n) => n.type === 'lesson').length
+    const documentCount = nodes.filter((n) => n.type === 'document').length
 
-      return {
-        stageConfig: GRAPH_STAGE_CONFIG,
-        translations: GRAPH_TRANSLATIONS,
-        nodeStyles: NODE_STYLES,
-        courseInfo: {
-          id: courseId,
-          title: courseTitle || 'Course Generation',
-          documentCount,
-          moduleCount,
-          lessonCount,
-          tier,
-          visualStyle,
-          readOnly,
-        },
-      };
-    },
-    [courseId, courseTitle, tier, nodes, visualStyle, readOnly]
-  );
+    return {
+      stageConfig: GRAPH_STAGE_CONFIG,
+      translations: GRAPH_TRANSLATIONS,
+      nodeStyles: NODE_STYLES,
+      courseInfo: {
+        id: courseId,
+        title: courseTitle || 'Course Generation',
+        documentCount,
+        moduleCount,
+        lessonCount,
+        tier,
+        visualStyle,
+        courseStyle,
+        readOnly,
+      },
+    }
+  }, [courseId, courseTitle, tier, nodes, visualStyle, courseStyle, readOnly])
 
   // Mobile view - show simplified graph (no separate list view)
   // Graph view works on mobile with touch gestures enabled
 
-  const awaitingStage = isAwaitingApproval(pipelineStatus || '');
+  const awaitingStage = isAwaitingApproval(pipelineStatus || '')
 
   // Track which stages have been auto-opened to prevent reopening on page reload
   const getAutoOpenedKey = useCallback(
     (stage: string) => `graphview_auto_opened_${courseId}_${stage}`,
     [courseId]
-  );
+  )
 
   const hasBeenAutoOpened = useCallback(
     (stage: string) => {
-      if (typeof window === 'undefined') return false;
-      return sessionStorage.getItem(getAutoOpenedKey(stage)) === 'true';
+      if (typeof window === 'undefined') return false
+      return sessionStorage.getItem(getAutoOpenedKey(stage)) === 'true'
     },
     [getAutoOpenedKey]
-  );
+  )
 
   const markAsAutoOpened = useCallback(
     (stage: string) => {
-      if (typeof window === 'undefined') return;
-      sessionStorage.setItem(getAutoOpenedKey(stage), 'true');
+      if (typeof window === 'undefined') return
+      sessionStorage.setItem(getAutoOpenedKey(stage), 'true')
     },
     [getAutoOpenedKey]
-  );
+  )
 
   // Auto-select Stage 3, 4, or 5 node when awaiting approval (always) or completed (only once per session)
   useEffect(() => {
-    let selectedStage: string | null = null;
-    let isAwaitingState = false;
+    let selectedStage: string | null = null
+    let isAwaitingState = false
 
     // Check awaiting approval states - ALWAYS open for awaiting (user needs to take action)
     if (awaitingStage === 3) {
-      selectedStage = 'stage_3';
-      isAwaitingState = true;
+      selectedStage = 'stage_3'
+      isAwaitingState = true
     } else if (awaitingStage === 4) {
-      selectedStage = 'stage_4';
-      isAwaitingState = true;
+      selectedStage = 'stage_4'
+      isAwaitingState = true
     } else if (awaitingStage === 5) {
-      selectedStage = 'stage_5';
-      isAwaitingState = true;
+      selectedStage = 'stage_5'
+      isAwaitingState = true
     }
     // Check completion states - only open ONCE per session (not on reload)
     else if (pipelineStatus === 'stage_4_complete' && !hasBeenAutoOpened('stage_4_complete')) {
-      selectedStage = 'stage_4';
+      selectedStage = 'stage_4'
     } else if (pipelineStatus === 'stage_5_complete' && !hasBeenAutoOpened('stage_5_complete')) {
-      selectedStage = 'stage_5';
+      selectedStage = 'stage_5'
     }
 
     // Select the node if a stage is determined (mark as auto-opened)
     if (selectedStage) {
-      selectNode(selectedStage, { autoOpened: true });
+      selectNode(selectedStage, { autoOpened: true })
       // Mark completion states as opened (awaiting states always reopen)
       if (!isAwaitingState && pipelineStatus) {
-        markAsAutoOpened(pipelineStatus);
+        markAsAutoOpened(pipelineStatus)
       }
     }
 
     // Cleanup: deselect when stage changes
     return () => {
       if (selectedStage) {
-        deselectNode();
+        deselectNode()
       }
-    };
-  }, [awaitingStage, pipelineStatus, selectNode, deselectNode, hasBeenAutoOpened, markAsAutoOpened]);
+    }
+  }, [awaitingStage, pipelineStatus, selectNode, deselectNode, hasBeenAutoOpened, markAsAutoOpened])
 
   return (
     <RealtimeStatusProvider value={realtimeData}>
       <StaticGraphProvider {...staticData}>
         <GraphOperationsProvider removeLesson={removeLesson}>
-        <FullscreenProvider portalContainerRef={portalContainerRef} isFullscreen={isFullscreen}>
-        <div ref={containerRef} className={`h-full w-full relative flex flex-col ${isDark ? 'bg-slate-900' : 'bg-slate-50'}`}>
-          {/* Portal container for dialogs in fullscreen mode */}
-          <div ref={portalContainerRef} id="graph-portal-container" />
-          <GraphHeader
-             title={courseTitle || 'Course Generation'}
-             progress={realtimeData.overallProgress}
-             courseId={courseId}
-             isAdmin={isAdmin}
-             onOpenAdminPanel={() => setIsAdminPanelOpen(true)}
-             isDark={isDark}
-             isFullscreen={isFullscreen}
-             onToggleFullscreen={toggleFullscreen}
-             generationCode={generationCode}
-             generationProgress={generationProgress}
-             generationStatus={generationStatus}
-             isConnected={isRealtimeConnected ?? isConnected}
-          />
-          <div className="relative flex-1 w-full overflow-hidden">
-            {/* Degradation Mode Indicator */}
-            {statusMessage && (
-                <div
-                className={`absolute top-2 left-1/2 -translate-x-1/2 z-50 px-3 py-1.5 rounded-full text-sm font-medium shadow-md ${
-                  isDark ? 'bg-yellow-900/50 text-yellow-200' : 'bg-yellow-100 text-yellow-800'
-                }`}
-                role="alert"
-                data-testid="degradation-indicator"
-                >
-                {statusMessage}
-                </div>
-            )}
-
-            <ReactFlow
-                nodes={nodes}
-                edges={edges}
-                onNodesChange={onNodesChange}
-                onEdgesChange={onEdgesChange}
-                nodeTypes={nodeTypes}
-                edgeTypes={edgeTypes}
-                fitView
-                defaultViewport={{ x: 0, y: 0, zoom: 1 }}
-                onNodeDoubleClick={(_, node) => {
-                  logger.devLog('[GraphView] onNodeDoubleClick', { nodeId: node.id, nodeType: node.type });
-                  selectNode(node.id);
-                }}
-                onPaneClick={() => {
-                  // Close node details panel when clicking on empty canvas area
-                  deselectNode();
-                }}
-                onMoveStart={() => setIsInteracting(true)}
-                onMoveEnd={() => setIsInteracting(false)}
-                aria-label="Course generation pipeline graph"
-                role="region"
-                nodesDraggable={true}
-                nodesConnectable={false}
-                elementsSelectable={true}
-                proOptions={{ hideAttribution: true }}
-                colorMode={isDark ? 'dark' : 'light'}
-                {...flowProps}
+          <FullscreenProvider portalContainerRef={portalContainerRef} isFullscreen={isFullscreen}>
+            <div
+              ref={containerRef}
+              className={`relative flex h-full w-full flex-col ${isDark ? 'bg-slate-900' : 'bg-slate-50'}`}
             >
-                <Background color={isDark ? '#475569' : '#94a3b8'} gap={20} size={1} />
-                <GraphControls isDark={isDark} />
-                <GraphMinimap isDark={isDark} />
-                <GraphInteractions setIsPanning={setIsPanning} />
-                <LongRunningIndicator />
-                {/* Custom Attribution */}
-                <Panel position="bottom-right" className="!mb-0 !mr-1">
-                  <span className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
-                    MegaCampus AI
-                  </span>
-                </Panel>
-            </ReactFlow>
-
-            {/* Show banner when awaiting approval, but for Stage 2 also require all documents to be complete */}
-            {awaitingStage !== null && (awaitingStage !== 2 || areAllDocumentsComplete()) && (
-              <MissionControlBanner
+              {/* Portal container for dialogs in fullscreen mode */}
+              <div ref={portalContainerRef} id="graph-portal-container" />
+              <GraphHeader
+                title={courseTitle || 'Course Generation'}
+                progress={realtimeData.overallProgress}
                 courseId={courseId}
-                awaitingStage={awaitingStage}
-                isNodePanelOpen={!!selectedNodeId}
-                onApprove={async () => {
-                  // Stage 0: Start generation
-                  if (awaitingStage === 0) {
-                    setIsProcessingBanner(true);
-                    // Optimistic update: immediately show Stage 1 as active
-                    // This provides instant visual feedback before backend responds
-                    setStageStatusOptimistic('stage_1', 'active');
-                    try {
-                      await startGeneration(courseId);
-                      toast.success('Генерация запущена!');
-                    } catch (error) {
-                      // Rollback optimistic update on error
-                      setStageStatusOptimistic('stage_1', 'pending');
-                      toast.error('Не удалось запустить генерацию', {
-                        description: error instanceof Error ? error.message : 'Неизвестная ошибка'
-                      });
-                    } finally {
-                      setIsProcessingBanner(false);
-                    }
-                    return;
-                  }
-                  // For stage 3, open Stage 3 node modal for prioritization
-                  if (awaitingStage === 3) {
-                    selectNode('stage_3');
-                    return;
-                  }
-                  // For stage 5, open Stage 5 node modal for structure approval
-                  if (awaitingStage === 5) {
-                    selectNode('stage_5');
-                    return;
-                  }
-                  // For other stages (2, 4, 6): approve and continue
-                  setIsProcessingBanner(true);
-                  try {
-                    await approveStage(courseId, awaitingStage);
-                    toast.success(`Стадия ${awaitingStage} подтверждена!`);
-                  } catch (error) {
-                    toast.error('Не удалось подтвердить стадию', {
-                      description: error instanceof Error ? error.message : 'Неизвестная ошибка'
-                    });
-                  } finally {
-                    setIsProcessingBanner(false);
-                  }
-                }}
-                onCancel={async () => {
-                  // Stage 0: Just ignore cancel (no generation started)
-                  if (awaitingStage === 0) return;
-
-                  setIsProcessingBanner(true);
-                  try {
-                    await cancelGeneration(courseId);
-                    toast.info('Генерация отменена');
-                  } catch (error) {
-                    toast.error('Не удалось отменить генерацию', {
-                      description: error instanceof Error ? error.message : 'Неизвестная ошибка'
-                    });
-                  } finally {
-                    setIsProcessingBanner(false);
-                  }
-                }}
-                onViewResults={() => {
-                  // For stage 3, open Stage 3 node modal
-                  if (awaitingStage === 3) {
-                    selectNode('stage_3');
-                  }
-                }}
-                isProcessing={isProcessingBanner}
+                isAdmin={isAdmin}
+                onOpenAdminPanel={() => setIsAdminPanelOpen(true)}
                 isDark={isDark}
+                isFullscreen={isFullscreen}
+                onToggleFullscreen={toggleFullscreen}
+                generationCode={generationCode}
+                generationProgress={generationProgress}
+                generationStatus={generationStatus}
+                isConnected={isRealtimeConnected ?? isConnected}
               />
-            )}
+              <div className="relative w-full flex-1 overflow-hidden">
+                {/* Degradation Mode Indicator */}
+                {statusMessage && (
+                  <div
+                    className={`absolute top-2 left-1/2 z-50 -translate-x-1/2 rounded-full px-3 py-1.5 text-sm font-medium shadow-md ${
+                      isDark ? 'bg-yellow-900/50 text-yellow-200' : 'bg-yellow-100 text-yellow-800'
+                    }`}
+                    role="alert"
+                    data-testid="degradation-indicator"
+                  >
+                    {statusMessage}
+                  </div>
+                )}
 
-            <NodeDetailsDrawer />
-            {isAdmin && <AdminPanel isOpen={isAdminPanelOpen} onClose={() => setIsAdminPanelOpen(false)} />}
+                <ReactFlow
+                  nodes={nodes}
+                  edges={edges}
+                  onNodesChange={onNodesChange}
+                  onEdgesChange={onEdgesChange}
+                  nodeTypes={nodeTypes}
+                  edgeTypes={edgeTypes}
+                  fitView
+                  defaultViewport={{ x: 0, y: 0, zoom: 1 }}
+                  onNodeDoubleClick={(_, node) => {
+                    logger.devLog('[GraphView] onNodeDoubleClick', {
+                      nodeId: node.id,
+                      nodeType: node.type,
+                    })
+                    selectNode(node.id)
+                  }}
+                  onPaneClick={() => {
+                    // Close node details panel when clicking on empty canvas area
+                    deselectNode()
+                  }}
+                  onMoveStart={() => setIsInteracting(true)}
+                  onMoveEnd={() => setIsInteracting(false)}
+                  aria-label="Course generation pipeline graph"
+                  role="region"
+                  nodesDraggable={true}
+                  nodesConnectable={false}
+                  elementsSelectable={true}
+                  proOptions={{ hideAttribution: true }}
+                  colorMode={isDark ? 'dark' : 'light'}
+                  {...flowProps}
+                >
+                  <Background color={isDark ? '#475569' : '#94a3b8'} gap={20} size={1} />
+                  <GraphControls isDark={isDark} />
+                  <GraphMinimap isDark={isDark} />
+                  <GraphInteractions setIsPanning={setIsPanning} />
+                  <LongRunningIndicator />
+                  {/* Custom Attribution */}
+                  <Panel position="bottom-right" className="!mr-1 !mb-0">
+                    <span className={`text-[10px] ${isDark ? 'text-slate-500' : 'text-slate-400'}`}>
+                      MegaCampus AI
+                    </span>
+                  </Panel>
+                </ReactFlow>
 
-            {/* Selection toolbar for Stage 6 partial generation - show when lessons exist AND Stage 5 is approved */}
-            {nodes.some(n => n.type === 'lesson') && awaitingStage !== 5 && (
-              <SelectionToolbar
-                courseId={courseId}
-                isCompleted={pipelineStatus === 'completed'}
-                courseSlug={courseSlug}
-                moduleCount={staticData.courseInfo.moduleCount}
-                lessonCount={staticData.courseInfo.lessonCount}
-                generationStatus={pipelineStatus ?? undefined}
-              />
-            )}
-          </div>
-        </div>
-        </FullscreenProvider>
+                {/* Show banner when awaiting approval, but for Stage 2 also require all documents to be complete */}
+                {awaitingStage !== null && (awaitingStage !== 2 || areAllDocumentsComplete()) && (
+                  <MissionControlBanner
+                    courseId={courseId}
+                    awaitingStage={awaitingStage}
+                    isNodePanelOpen={!!selectedNodeId}
+                    onApprove={async () => {
+                      // Stage 0: Start generation
+                      if (awaitingStage === 0) {
+                        setIsProcessingBanner(true)
+                        // Optimistic update: immediately show Stage 1 as active
+                        // This provides instant visual feedback before backend responds
+                        setStageStatusOptimistic('stage_1', 'active')
+                        try {
+                          await startGeneration(courseId)
+                          toast.success('Генерация запущена!')
+                        } catch (error) {
+                          // Rollback optimistic update on error
+                          setStageStatusOptimistic('stage_1', 'pending')
+                          toast.error('Не удалось запустить генерацию', {
+                            description:
+                              error instanceof Error ? error.message : 'Неизвестная ошибка',
+                          })
+                        } finally {
+                          setIsProcessingBanner(false)
+                        }
+                        return
+                      }
+                      // For stage 3, open Stage 3 node modal for prioritization
+                      if (awaitingStage === 3) {
+                        selectNode('stage_3')
+                        return
+                      }
+                      // For stage 5, open Stage 5 node modal for structure approval
+                      if (awaitingStage === 5) {
+                        selectNode('stage_5')
+                        return
+                      }
+                      // For other stages (2, 4, 6): approve and continue
+                      setIsProcessingBanner(true)
+                      try {
+                        await approveStage(courseId, awaitingStage)
+                        toast.success(`Стадия ${awaitingStage} подтверждена!`)
+                      } catch (error) {
+                        toast.error('Не удалось подтвердить стадию', {
+                          description:
+                            error instanceof Error ? error.message : 'Неизвестная ошибка',
+                        })
+                      } finally {
+                        setIsProcessingBanner(false)
+                      }
+                    }}
+                    onCancel={async () => {
+                      // Stage 0: Just ignore cancel (no generation started)
+                      if (awaitingStage === 0) return
+
+                      setIsProcessingBanner(true)
+                      try {
+                        await cancelGeneration(courseId)
+                        toast.info('Генерация отменена')
+                      } catch (error) {
+                        toast.error('Не удалось отменить генерацию', {
+                          description:
+                            error instanceof Error ? error.message : 'Неизвестная ошибка',
+                        })
+                      } finally {
+                        setIsProcessingBanner(false)
+                      }
+                    }}
+                    onViewResults={() => {
+                      // For stage 3, open Stage 3 node modal
+                      if (awaitingStage === 3) {
+                        selectNode('stage_3')
+                      }
+                    }}
+                    isProcessing={isProcessingBanner}
+                    isDark={isDark}
+                  />
+                )}
+
+                <NodeDetailsDrawer />
+                {isAdmin && (
+                  <AdminPanel
+                    isOpen={isAdminPanelOpen}
+                    onClose={() => setIsAdminPanelOpen(false)}
+                  />
+                )}
+
+                {/* Selection toolbar for Stage 6 partial generation - show when lessons exist AND Stage 5 is approved */}
+                {nodes.some((n) => n.type === 'lesson') && awaitingStage !== 5 && (
+                  <SelectionToolbar
+                    courseId={courseId}
+                    isCompleted={pipelineStatus === 'completed'}
+                    courseSlug={courseSlug}
+                    moduleCount={staticData.courseInfo.moduleCount}
+                    lessonCount={staticData.courseInfo.lessonCount}
+                    generationStatus={pipelineStatus ?? undefined}
+                  />
+                )}
+              </div>
+            </div>
+          </FullscreenProvider>
         </GraphOperationsProvider>
       </StaticGraphProvider>
     </RealtimeStatusProvider>
-  );
+  )
 }
 
 /**
@@ -1025,5 +1111,5 @@ export function GraphView(props: GraphViewProps) {
         <GraphViewInner {...props} />
       </PartialGenerationProvider>
     </ReactFlowProvider>
-  );
+  )
 }

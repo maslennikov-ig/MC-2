@@ -110,6 +110,12 @@ export function useSubmitCourse({
         formData.append('lesson_duration_minutes', String(data.lessonDuration || 5))
         formData.append('learning_outcomes', data.learningOutcomes || '')
 
+        // Generation mode fields
+        formData.append('generation_mode', data.generationMode)
+        formData.append('notify_on_completion', String(data.notifyOnCompletion ?? true))
+        formData.append('notify_on_error', String(data.notifyOnError ?? true))
+        formData.append('notify_on_stage_complete', String(data.notifyOnStageComplete ?? false))
+
         if (data.formats && data.formats.length > 0) {
           data.formats.forEach((format) => formData.append('output_formats', format))
         }
