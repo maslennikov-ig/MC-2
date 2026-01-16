@@ -377,6 +377,10 @@
       "updateAll": "Update All",
       "logs": "logs"
     },
+    "a11y": {
+      "expandRow": "Expand row details",
+      "collapseRow": "Collapse row details"
+    },
     "empty": "No logs found"
   },
   "analytics": {
