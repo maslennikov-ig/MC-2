@@ -1,7 +1,7 @@
 ---
 name: process-logs
 description: Process error logs from admin panel - fetch new errors, analyze, create tasks, fix, and mark resolved
-version: 1.6.0
+version: 1.7.0
 ---
 
 # Process Error Logs
@@ -382,3 +382,18 @@ The `/admin/logs` page aggregates errors from **two sources**:
 Status is tracked in `log_issue_status` table with composite key `(log_type, log_id)`.
 
 **UI Logic:** If no `log_issue_status` record exists → status shows as "Новый" (new).
+
+### Grouped View (fingerprint)
+
+The UI has two views:
+
+1. **List view** — individual logs, status by `log_id`
+2. **Grouped view** — errors grouped by `fingerprint`, status by `fingerprint`
+
+**Auto-sync trigger** (`trg_sync_log_status_fingerprint`):
+
+- When you INSERT/UPDATE `log_issue_status` for an `error_log`
+- The trigger automatically copies `fingerprint` from `error_logs`
+- This ensures grouped view shows correct status
+
+**IMPORTANT:** You don't need to manually handle fingerprint — the trigger does it automatically. Just use the standard `INSERT INTO log_issue_status` by `log_id`.
