@@ -1251,6 +1251,7 @@ export type Database = {
           outbox_id: string
           processed_at: string | null
           queue_name: string
+          target_queue: string
         }
         Insert: {
           attempts?: number
@@ -1263,6 +1264,7 @@ export type Database = {
           outbox_id?: string
           processed_at?: string | null
           queue_name: string
+          target_queue: string
         }
         Update: {
           attempts?: number
@@ -1275,6 +1277,7 @@ export type Database = {
           outbox_id?: string
           processed_at?: string | null
           queue_name?: string
+          target_queue?: string
         }
         Relationships: [
           {

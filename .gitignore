@@ -53,6 +53,7 @@ coverage/
 # Ignore generated MCP configs (specific to local paths)
 .mcp.json
 .mcp.local.json
+mcp/
 
 # --- Uploads/Binary Data ---
 packages/course-gen-platform/tests/test-data/*.pdf

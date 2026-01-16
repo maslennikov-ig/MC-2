@@ -15,7 +15,7 @@
  */
 
 import { getSupabaseAdmin } from '@/shared/supabase/admin';
-import { getQueue } from './queue';
+import { getQueue, QUEUE_NAME } from './queue';
 import logger from '@/shared/logger';
 import type { JobOutboxEntry } from '@megacampus/shared-types/transactional-outbox';
 import type { JobData } from '@megacampus/shared-types';
@@ -108,10 +108,7 @@ export class OutboxProcessor {
           );
         } else {
           this.pollInterval = this.minPollInterval;
-          logger.trace(
-            { jobsProcessed: processed },
-            'Jobs processed, reset to min poll interval'
-          );
+          logger.trace({ jobsProcessed: processed }, 'Jobs processed, reset to min poll interval');
         }
 
         await this.sleep(this.pollInterval);
@@ -169,12 +166,14 @@ export class OutboxProcessor {
     const startTime = Date.now();
 
     try {
-      // Fetch pending jobs (processed_at IS NULL)
+      // Fetch pending jobs (processed_at IS NULL) filtered by target_queue
+      // This ensures DEV and Production environments process only their own outbox entries
       // Note: job_outbox table may not be in generated types yet, using 'any' cast for table name
       const { data, error } = await this.supabase
         .from('job_outbox' as any)
         .select('*')
         .is('processed_at', null)
+        .eq('target_queue', QUEUE_NAME)
         .order('created_at', { ascending: true })
         .limit(this.batchSize);
 
@@ -206,9 +205,7 @@ export class OutboxProcessor {
 
       for (let i = 0; i < pendingJobs.length; i += this.parallelSize) {
         const batch = pendingJobs.slice(i, i + this.parallelSize);
-        const results = await Promise.allSettled(
-          batch.map(job => this.processJob(job))
-        );
+        const results = await Promise.allSettled(batch.map(job => this.processJob(job)));
 
         // Count successes and failures
         successCount += results.filter(r => r.status === 'fulfilled').length;
@@ -264,7 +261,7 @@ export class OutboxProcessor {
           job.queue_name,
           job.job_data as unknown as JobData, // Job data is JSONB, cast to JobData union
           {
-            ...(job.job_options as Record<string, unknown> || {}),
+            ...((job.job_options as Record<string, unknown>) || {}),
             jobId: job.outbox_id, // Idempotency: use outbox ID as job ID
           }
         );
