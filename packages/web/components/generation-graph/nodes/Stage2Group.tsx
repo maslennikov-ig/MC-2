@@ -63,7 +63,13 @@ const MediumStage2Node = ({
       <Handle type="target" position={Position.Left} className="!h-1.5 !w-1.5 !bg-slate-400" />
 
       <div className="flex items-center gap-1.5">
-        <div className="flex h-5 w-5 items-center justify-center rounded-full bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400">
+        <div
+          className={`flex h-5 w-5 items-center justify-center rounded-full ${
+            currentStatus === 'skipped'
+              ? 'bg-slate-200 text-slate-400 dark:bg-slate-600 dark:text-slate-500'
+              : 'bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400'
+          }`}
+        >
           <FileStack size={10} />
         </div>
         <span
@@ -300,10 +306,19 @@ const Stage2Group = ({ id, data, selected }: NodeProps<RFStage2GroupNode>) => {
               className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full ${
                 currentStatus === 'active'
                   ? 'bg-white shadow-sm dark:bg-slate-700'
-                  : 'bg-indigo-100 dark:bg-indigo-900/30'
+                  : currentStatus === 'skipped'
+                    ? 'bg-slate-200 dark:bg-slate-600'
+                    : 'bg-indigo-100 dark:bg-indigo-900/30'
               } `}
             >
-              <FileStack size={18} className="text-indigo-600 dark:text-indigo-400" />
+              <FileStack
+                size={18}
+                className={
+                  currentStatus === 'skipped'
+                    ? 'text-slate-400 dark:text-slate-500'
+                    : 'text-indigo-600 dark:text-indigo-400'
+                }
+              />
             </div>
 
             <div className="flex min-w-0 flex-1 flex-col">
@@ -367,7 +382,8 @@ const Stage2Group = ({ id, data, selected }: NodeProps<RFStage2GroupNode>) => {
           {/* Metrics Footer */}
           {(currentStatus === 'active' ||
             currentStatus === 'completed' ||
-            currentStatus === 'error') && (
+            currentStatus === 'error' ||
+            currentStatus === 'skipped') && (
             <div className="border-t border-black/5 bg-slate-50/50 px-2.5 py-1.5 text-[10px] text-slate-500 dark:border-white/10 dark:bg-slate-900/30 dark:text-slate-400">
               <div className="flex items-center justify-between">
                 <span>
@@ -387,6 +403,10 @@ const Stage2Group = ({ id, data, selected }: NodeProps<RFStage2GroupNode>) => {
                 ) : currentStatus === 'error' ? (
                   <span className="font-medium text-red-600 dark:text-red-400">
                     {t('stage2.statusError')}
+                  </span>
+                ) : currentStatus === 'skipped' ? (
+                  <span className="text-slate-400 italic dark:text-slate-500">
+                    {t('status.skipped')}
                   </span>
                 ) : null}
               </div>
@@ -438,9 +458,20 @@ const Stage2Group = ({ id, data, selected }: NodeProps<RFStage2GroupNode>) => {
 
             {/* Content (above progress background) */}
             <div
-              className={`relative z-10 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full bg-indigo-100 dark:bg-indigo-900/30`}
+              className={`relative z-10 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full ${
+                currentStatus === 'skipped'
+                  ? 'bg-slate-200 dark:bg-slate-600'
+                  : 'bg-indigo-100 dark:bg-indigo-900/30'
+              }`}
             >
-              <FileStack size={18} className="text-indigo-600 dark:text-indigo-400" />
+              <FileStack
+                size={18}
+                className={
+                  currentStatus === 'skipped'
+                    ? 'text-slate-400 dark:text-slate-500'
+                    : 'text-indigo-600 dark:text-indigo-400'
+                }
+              />
             </div>
 
             <div className="relative z-10 flex min-w-0 flex-1 flex-col">
