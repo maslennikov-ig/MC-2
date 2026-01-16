@@ -989,6 +989,7 @@ export const GRAPH_TRANSLATIONS: GraphTranslations & {
     visualStyleVisualElements: { ru: 'Визуальные элементы', en: 'Visual Elements' },
     visualStyleMood: { ru: 'Настроение', en: 'Mood' },
     teachingStyle: { ru: 'Стиль', en: 'Style' },
+    writingStyleLabel: { ru: 'Стиль текста', en: 'Writing Style' },
   },
   stage5: {
     // Tab names

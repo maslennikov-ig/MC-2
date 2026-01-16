@@ -7,25 +7,25 @@
  * Node type enumeration
  */
 export type GraphNodeType =
-  | 'stage'       // Main pipeline stage (1-6)
-  | 'document'    // Parallel document in Stage 2
-  | 'lesson'      // Parallel lesson in Stage 6
-  | 'module'      // Collapsible module group for Stage 6
+  | 'stage' // Main pipeline stage (1-6)
+  | 'document' // Parallel document in Stage 2
+  | 'lesson' // Parallel lesson in Stage 6
+  | 'module' // Collapsible module group for Stage 6
   | 'stage2group' // Collapsible document group for Stage 2
-  | 'merge'       // Convergence point after parallel
-  | 'end';        // Pipeline completion node
+  | 'merge' // Convergence point after parallel
+  | 'end'; // Pipeline completion node
 
 /**
  * Node status enumeration
  */
 export type NodeStatus =
-  | 'pending'   // Not yet started
-  | 'active'    // Currently processing
+  | 'pending' // Not yet started
+  | 'active' // Currently processing
   | 'completed' // Successfully finished (not yet reviewed)
-  | 'approved'  // Reviewed and approved (ready for publication)
-  | 'error'     // Failed with error
-  | 'awaiting'  // Waiting for user approval
-  | 'skipped';  // Optional step was skipped (FR-SS01)
+  | 'approved' // Reviewed and approved (ready for publication)
+  | 'error' // Failed with error
+  | 'awaiting' // Waiting for user approval
+  | 'skipped'; // Optional step was skipped (FR-SS01)
 
 /**
  * Stage number type (1-6 for current stages, null for utility nodes)
@@ -181,7 +181,14 @@ export interface DocumentNode extends GraphNode {
  */
 export interface EnrichmentSummaryForNode {
   type: 'video' | 'audio' | 'presentation' | 'quiz' | 'document';
-  status: 'pending' | 'draft_generating' | 'draft_ready' | 'generating' | 'completed' | 'failed' | 'cancelled';
+  status:
+    | 'pending'
+    | 'draft_generating'
+    | 'draft_ready'
+    | 'generating'
+    | 'completed'
+    | 'failed'
+    | 'cancelled';
   count: number;
   hasError: boolean;
 }
@@ -313,10 +320,10 @@ export interface EndNode extends GraphNode {
  * Edge status enumeration
  */
 export type EdgeStatus =
-  | 'idle'      // No activity
-  | 'active'    // Data flowing
+  | 'idle' // No activity
+  | 'active' // Data flowing
   | 'completed' // Transfer complete
-  | 'error';    // Error occurred
+  | 'error'; // Error occurred
 
 /**
  * Graph edge interface
@@ -439,13 +446,13 @@ export interface ProcessMetrics {
  * Stage type classification
  */
 export type StageType =
-  | 'trigger'     // Start nodes (Stage 1)
-  | 'document'    // File processing (Stage 2)
-  | 'ai'          // LLM operations (Stage 4)
-  | 'structure'   // Structure generation (Stage 5)
-  | 'content'     // Content output (Stage 6)
-  | 'assessment'  // Quiz/homework (FUTURE)
-  | 'media';      // Video/audio (FUTURE)
+  | 'trigger' // Start nodes (Stage 1)
+  | 'document' // File processing (Stage 2)
+  | 'ai' // LLM operations (Stage 4)
+  | 'structure' // Structure generation (Stage 5)
+  | 'content' // Content output (Stage 6)
+  | 'assessment' // Quiz/homework (FUTURE)
+  | 'media'; // Video/audio (FUTURE)
 
 /**
  * Stage configuration entry
@@ -710,6 +717,8 @@ export interface StaticGraphData {
     tier?: 'trial' | 'free' | 'basic' | 'standard' | 'premium';
     /** Visual style for course imagery (generated in Stage 4) */
     visualStyle?: VisualStyle | null;
+    /** Course writing style (from courses.style) */
+    courseStyle?: string | null;
     /** Read-only mode for automatic generation (hides edit/regenerate/approve buttons) */
     readOnly?: boolean;
   };
@@ -914,7 +923,7 @@ export const NODE_STYLES: NodeStyles = {
   },
   approved: {
     background: '#C7F9E2', // Slightly more saturated green than completed
-    border: '#059669',     // Darker green for approved
+    border: '#059669', // Darker green for approved
     text: '#064E3B',
     header: '#059669',
   },
