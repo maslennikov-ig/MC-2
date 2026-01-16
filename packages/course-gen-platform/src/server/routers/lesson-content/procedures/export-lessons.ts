@@ -5,6 +5,7 @@
 
 import { TRPCError } from '@trpc/server';
 import { nanoid } from 'nanoid';
+import { z } from 'zod';
 import { protectedProcedure } from '../../../middleware/auth';
 import { createRateLimiter } from '../../../middleware/rate-limit.js';
 import { exportLessonsInputSchema } from '../schemas';
@@ -46,26 +47,32 @@ function escapeHtml(text: string): string {
 }
 
 /**
- * Type for lesson content structure
+ * Zod schema for runtime validation of lesson content structure
+ * This provides type-safe parsing with proper error handling
  */
-interface LessonContentData {
-  intro?: string;
-  sections?: Array<{
-    title: string;
-    content: string;
-  }>;
-  examples?: Array<{
-    title: string;
-    content: string;
-    code?: string;
-  }>;
-  exercises?: Array<{
-    question: string;
-    hints?: string[];
-    solution?: string;
-  }>;
-  summary?: string;
-}
+const LessonContentDataSchema = z.object({
+  intro: z.string().optional(),
+  sections: z.array(z.object({
+    title: z.string(),
+    content: z.string(),
+  })).optional(),
+  examples: z.array(z.object({
+    title: z.string(),
+    content: z.string(),
+    code: z.string().optional(),
+  })).optional(),
+  exercises: z.array(z.object({
+    question: z.string(),
+    hints: z.array(z.string()).optional(),
+    solution: z.string().optional(),
+  })).optional(),
+  summary: z.string().optional(),
+});
+
+/**
+ * Type for lesson content structure (inferred from Zod schema)
+ */
+type LessonContentData = z.infer<typeof LessonContentDataSchema>;
 
 /**
  * Export lessons for a module as Markdown
@@ -205,18 +212,27 @@ export const exportLessons = protectedProcedure
           });
         const lessonContent = completedContents[0];
 
-        // Extract the actual content from the nested structure
+        // Extract and validate the actual content from the nested structure
         // The content can be directly in lesson_contents.content or in lesson_contents.content.content
         let contentData: LessonContentData | null = null;
 
         if (lessonContent?.content) {
           const rawContent = lessonContent.content as Record<string, unknown>;
           // Check if content has nested structure (status, content, metadata at top level)
-          if (rawContent.content && typeof rawContent.content === 'object') {
-            contentData = rawContent.content as LessonContentData;
+          const nestedContent = rawContent.content && typeof rawContent.content === 'object'
+            ? rawContent.content
+            : rawContent;
+
+          // Use Zod safeParse for type-safe validation
+          const parsed = LessonContentDataSchema.safeParse(nestedContent);
+          if (parsed.success) {
+            contentData = parsed.data;
           } else {
-            // Direct content structure
-            contentData = rawContent as unknown as LessonContentData;
+            logger.warn(
+              { lessonId: lesson.id, requestId, errors: parsed.error.flatten() },
+              'Invalid lesson content structure, skipping lesson'
+            );
+            // Continue to next lesson instead of crashing
           }
         }
 
@@ -273,10 +289,17 @@ export const exportLessons = protectedProcedure
         markdown += `---\n\n`;
       }
 
-      // Generate safe filename
+      // Generate safe filename with improved sanitization
+      // - Keep alphanumeric, Cyrillic, spaces, and hyphens
+      // - Collapse multiple spaces/underscores
+      // - Trim leading/trailing underscores
       const safeCourseName = (course?.title || 'export')
-        .replace(/[^a-zA-Z0-9\u0400-\u04FF]/g, '_')
-        .substring(0, 50);
+        .replace(/[^a-zA-Z0-9\u0400-\u04FF\s-]/g, '') // Remove invalid chars but keep spaces and hyphens
+        .replace(/\s+/g, '_') // Replace spaces with single underscore
+        .replace(/-+/g, '-') // Collapse multiple hyphens
+        .replace(/_+/g, '_') // Collapse multiple underscores
+        .replace(/^[_-]+|[_-]+$/g, '') // Trim underscores/hyphens from start/end
+        .substring(0, 50) || 'export'; // Fallback if empty after sanitization
       const filename = `module_${moduleNumber}_${safeCourseName}.md`;
 
       logger.info(
