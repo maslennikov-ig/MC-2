@@ -288,8 +288,12 @@ export async function removeJobsByCourseId(
       }
     }
 
-    // Phase 3: Clean up related Redis keys (lesson UUID mappings, etc.)
-    const relatedPatterns = [`lesson:uuid:${courseId}:*`, `rag:${courseId}:*`];
+    // Phase 3: Clean up related Redis keys (lesson UUID mappings, generation locks, etc.)
+    const relatedPatterns = [
+      `lesson:uuid:${courseId}:*`,
+      `rag:${courseId}:*`,
+      `generation:lock:${courseId}`,
+    ];
 
     for (const pattern of relatedPatterns) {
       let relatedCursor = '0';

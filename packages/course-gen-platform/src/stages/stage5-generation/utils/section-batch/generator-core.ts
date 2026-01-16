@@ -22,9 +22,7 @@ function createModel(
   const apiKey = process.env.OPENROUTER_API_KEY;
 
   if (!apiKey) {
-    throw new Error(
-      'OPENROUTER_API_KEY environment variable is required for section generation'
-    );
+    throw new Error('OPENROUTER_API_KEY environment variable is required for section generation');
   }
 
   return new ChatOpenAI({
@@ -46,7 +44,7 @@ function preprocessResponse(rawContent: string): string {
   try {
     const parsedRaw = JSON.parse(rawContent) as Record<string, unknown> | Record<string, unknown>[];
     let sectionsArray: Record<string, unknown>[] | undefined;
-    
+
     if (Array.isArray(parsedRaw)) {
       sectionsArray = parsedRaw;
     } else if ('sections' in parsedRaw && Array.isArray(parsedRaw.sections)) {
@@ -54,19 +52,26 @@ function preprocessResponse(rawContent: string): string {
     }
 
     if (sectionsArray) {
-      sectionsArray = sectionsArray.map((section) => {
+      sectionsArray = sectionsArray.map(section => {
         const preprocessedSection = preprocessObject(section, {
           difficulty_level: 'enum',
         });
 
         if (preprocessedSection.lessons && Array.isArray(preprocessedSection.lessons)) {
-          preprocessedSection.lessons = (preprocessedSection.lessons as Record<string, unknown>[]).map((lesson) => {
+          preprocessedSection.lessons = (
+            preprocessedSection.lessons as Record<string, unknown>[]
+          ).map(lesson => {
             const preprocessedLesson = preprocessObject(lesson, {
               difficulty_level: 'enum',
             });
 
-            if (preprocessedLesson.practical_exercises && Array.isArray(preprocessedLesson.practical_exercises)) {
-              preprocessedLesson.practical_exercises = (preprocessedLesson.practical_exercises as Record<string, unknown>[]).map((exercise) =>
+            if (
+              preprocessedLesson.practical_exercises &&
+              Array.isArray(preprocessedLesson.practical_exercises)
+            ) {
+              preprocessedLesson.practical_exercises = (
+                preprocessedLesson.practical_exercises as Record<string, unknown>[]
+              ).map(exercise =>
                 preprocessObject(exercise, {
                   difficulty_level: 'enum',
                 })
@@ -93,16 +98,21 @@ function preprocessResponse(rawContent: string): string {
  * Validate sections and inject duration
  */
 function validateAndInjectDuration(
-  data: { sections: Section[] } | Section | Section[], 
+  data: { sections: Section[] } | Section | Section[],
   input: GenerationJobInput,
-  batchNum: number, 
+  batchNum: number,
   sectionIndex: number
 ): Section[] {
   let sectionsToValidate: unknown[];
-  
+
   if (Array.isArray(data)) {
     sectionsToValidate = data as unknown[];
-  } else if (typeof data === 'object' && data !== null && 'sections' in data && Array.isArray((data as { sections: Section[] }).sections)) {
+  } else if (
+    typeof data === 'object' &&
+    data !== null &&
+    'sections' in data &&
+    Array.isArray((data as { sections: Section[] }).sections)
+  ) {
     sectionsToValidate = (data as { sections: Section[] }).sections as unknown[];
   } else {
     sectionsToValidate = [data];
@@ -118,12 +128,12 @@ function validateAndInjectDuration(
     courseId: input.course_id,
   });
 
-  sectionsToValidate = sectionsToValidate.map((section) => {
+  sectionsToValidate = sectionsToValidate.map(section => {
     const sectionObj = section as Record<string, unknown>;
     if (sectionObj.lessons && Array.isArray(sectionObj.lessons)) {
       return {
         ...sectionObj,
-        lessons: sectionObj.lessons.map((lesson) => {
+        lessons: sectionObj.lessons.map(lesson => {
           const lessonObj = lesson as Record<string, unknown>;
           return {
             ...lessonObj,
@@ -174,16 +184,11 @@ export async function generateWithRetry(
 
   while (retryCount < maxAttempts) {
     try {
-      const prompt = buildBatchPrompt(
-        input,
-        sectionIndex,
-        qdrantClient,
-        retryCount + 1
-      );
+      const prompt = buildBatchPrompt(input, sectionIndex, qdrantClient, retryCount + 1);
 
       const model = createModel(currentModelTier.model);
       const response = await model.invoke(prompt);
-      
+
       let rawContent: string;
       if (typeof response.content === 'string') {
         rawContent = response.content;
@@ -196,10 +201,11 @@ export async function generateWithRetry(
       const preprocessedContent = preprocessResponse(rawContent);
 
       const regenerator = new UnifiedRegenerator<{ sections: Section[] } | Section | Section[]>({
-        enabledLayers: ['auto-repair', 'critique-revise', 'partial-regen', 'model-escalation', 'emergency'],
+        // Note: 'partial-regen' removed - requires typed Zod schema which is complex for Section union type
+        enabledLayers: ['auto-repair', 'critique-revise', 'model-escalation', 'emergency'],
         maxRetries: 3,
         model: model,
-        qualityValidator: (data) => {
+        qualityValidator: data => {
           if (Array.isArray(data)) {
             return data.length > 0;
           }
@@ -232,9 +238,10 @@ export async function generateWithRetry(
       const regenerationMetrics = {
         layerUsed: result.metadata.layerUsed,
         repairSuccessRate: result.metadata.layerUsed === 'failed' ? 0 : 1,
-        tokensSaved: result.metadata.layerUsed === 'auto-repair'
-          ? estimateTokens(prompt, rawContent) * 0.3
-          : 0,
+        tokensSaved:
+          result.metadata.layerUsed === 'auto-repair'
+            ? estimateTokens(prompt, rawContent) * 0.3
+            : 0,
         qualityPassed: result.metadata.qualityPassed || false,
       };
 
@@ -261,10 +268,7 @@ export async function generateWithRetry(
     } catch (error) {
       retryCount++;
 
-      if (
-        currentModelTier.tier === 'tier1_oss120b' &&
-        retryCount < maxAttempts
-      ) {
+      if (currentModelTier.tier === 'tier1_oss120b' && retryCount < maxAttempts) {
         console.warn(
           JSON.stringify({
             msg: 'Tier 1 (OSS 120B) failed, attempting escalation to Tier 2',
@@ -277,9 +281,7 @@ export async function generateWithRetry(
         );
 
         const isRussian = language === 'ru' || language === 'russian';
-        const escalationModel = isRussian
-          ? MODELS.ru_lessons_primary
-          : MODELS.en_lessons_primary;
+        const escalationModel = isRussian ? MODELS.ru_lessons_primary : MODELS.en_lessons_primary;
 
         currentModelTier = {
           model: escalationModel,
@@ -312,7 +314,7 @@ export async function generateWithRetry(
         );
 
         const delay = 1000 * retryCount;
-        await new Promise((resolve) => setTimeout(resolve, delay));
+        await new Promise(resolve => setTimeout(resolve, delay));
       } else {
         throw new Error(
           `Failed to generate section batch ${batchNum} (section ${sectionIndex}) after ${maxAttempts} attempts: ${error instanceof Error ? error.message : 'Unknown error'}`
