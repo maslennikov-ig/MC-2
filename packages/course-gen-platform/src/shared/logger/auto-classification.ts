@@ -88,6 +88,11 @@ export interface AutoMuteResult {
  * ```
  */
 export function shouldAutoMute(errorMessage: string): AutoMuteResult {
+  // Guard against null/undefined/non-string input
+  if (!errorMessage || typeof errorMessage !== 'string') {
+    return { mute: false };
+  }
+
   for (const rule of AUTO_MUTE_RULES) {
     if (rule.pattern.test(errorMessage)) {
       return {

@@ -8,31 +8,10 @@
 
 import { getSupabaseAdmin } from '../supabase/admin';
 import { logger } from './index.js';
-import type { ErrorLog, ErrorSeverity, CreateErrorLogParams, LogEnvironment } from './types';
+import type { ErrorLog, ErrorSeverity, CreateErrorLogParams } from './types';
+import { detectEnvironment } from './utils';
+import { applyAutoMuteStatus } from './auto-mute-service';
 import { shouldAutoMute } from './auto-classification';
-
-/**
- * Detect environment from APP_URL or NEXT_PUBLIC_APP_URL
- * @returns 'dev' | 'stage' | null
- */
-function detectEnvironment(): LogEnvironment | null {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || '';
-
-  // Use URL.hostname for precise matching
-  try {
-    const url = new URL(appUrl);
-    const hostname = url.hostname;
-
-    if (hostname === 'dev.ai.megacampus.ru') return 'dev';
-    if (hostname === 'ai.megacampus.ru') return 'stage';
-  } catch {
-    // Fallback for invalid URLs
-    if (appUrl.includes('dev.ai.megacampus.ru')) return 'dev';
-    if (appUrl.includes('ai.megacampus.ru') && !appUrl.includes('dev.')) return 'stage';
-  }
-
-  return null;
-}
 
 /**
  * Log a permanent failure to the error_logs table
@@ -105,16 +84,10 @@ export async function logPermanentFailure(params: CreateErrorLogParams): Promise
   }
 
   // Check if this error should be auto-muted
-  const autoMuteResult = shouldAutoMute(params.error_message);
   const logId = (insertedLog as unknown as { id: string } | null)?.id;
-  if (autoMuteResult.mute && logId) {
-    await supabase.from('log_issue_status' as any).insert({
-      log_type: 'error_log',
-      log_id: logId,
-      status: 'auto_muted',
-      notes: `Auto-muted: ${autoMuteResult.reason}. ${autoMuteResult.description}`,
-      updated_at: new Date().toISOString(),
-    });
+  const autoMuteResult = shouldAutoMute(params.error_message);
+  if (logId) {
+    await applyAutoMuteStatus(logId, params.error_message);
   }
 
   // Log successful insert

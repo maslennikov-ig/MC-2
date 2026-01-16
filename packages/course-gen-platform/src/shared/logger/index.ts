@@ -15,7 +15,8 @@ import {
 } from '@megacampus/shared-logger';
 import type { Logger } from 'pino';
 import { getSupabaseAdmin } from '../supabase/admin';
-import { shouldAutoMute } from './auto-classification';
+import { detectEnvironment } from './utils';
+import { applyAutoMuteStatus } from './auto-mute-service';
 
 export type { Logger } from 'pino';
 
@@ -25,26 +26,6 @@ export * from './error-service';
 
 // Re-export unchanged functions
 export { createModuleLogger, createRequestLogger };
-
-/**
- * Detect environment from APP_URL or NEXT_PUBLIC_APP_URL
- */
-function detectEnvironment(): 'dev' | 'stage' | null {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || '';
-
-  try {
-    const url = new URL(appUrl);
-    const hostname = url.hostname;
-
-    if (hostname === 'dev.ai.megacampus.ru') return 'dev';
-    if (hostname === 'ai.megacampus.ru') return 'stage';
-  } catch {
-    if (appUrl.includes('dev.ai.megacampus.ru')) return 'dev';
-    if (appUrl.includes('ai.megacampus.ru') && !appUrl.includes('dev.')) return 'stage';
-  }
-
-  return null;
-}
 
 /**
  * Write log entry to error_logs table (fire-and-forget)
@@ -145,21 +126,19 @@ async function writeToErrorLogs(
       .single();
 
     // Check if this error should be auto-muted
-    const autoMuteResult = shouldAutoMute(message);
     const logId = (insertedLog as unknown as { id: string } | null)?.id;
-    if (autoMuteResult.mute && logId) {
-      await supabase.from('log_issue_status' as any).insert({
-        log_type: 'error_log',
-        log_id: logId,
-        status: 'auto_muted',
-        notes: `Auto-muted: ${autoMuteResult.reason}. ${autoMuteResult.description}`,
-        updated_at: new Date().toISOString(),
-      });
+    if (logId) {
+      await applyAutoMuteStatus(logId, message);
     }
   } catch (dbError) {
-    // Silently fail - don't break the app if DB write fails
-    // The original log to console/Axiom will still work
-    baseLogger.debug({ dbError }, 'Failed to write log to error_logs table');
+    // Don't break the app if DB write fails, but log at WARN level for visibility
+    baseLogger.warn(
+      {
+        dbError,
+        errorType: dbError instanceof Error ? dbError.constructor.name : typeof dbError,
+      },
+      'Failed to write log to error_logs table - check database connection'
+    );
   }
 }
 
