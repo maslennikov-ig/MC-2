@@ -66,6 +66,18 @@ type JobStatusDbUpdate = Database['public']['Tables']['job_status']['Update'];
  */
 export async function createJobStatus(job: Job<JobData>): Promise<void> {
   try {
+    // Validate job.name is defined to prevent NOT NULL constraint violation
+    if (!job.name) {
+      logger.warn(
+        {
+          jobId: job.id,
+          jobData: job.data,
+        },
+        'Skipping job status creation: job.name is undefined (corrupted or test job)'
+      );
+      return;
+    }
+
     const supabase = getSupabaseAdmin();
 
     // Handle both camelCase and snake_case organization_id

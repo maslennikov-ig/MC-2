@@ -7,10 +7,9 @@
  * @module orchestrator/worker
  */
 
- 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 /* eslint-disable @typescript-eslint/no-unsafe-member-access */
- 
+
 /* eslint-disable @typescript-eslint/no-misused-promises */
 /* eslint-disable @typescript-eslint/require-await */
 
@@ -59,7 +58,10 @@ let circuitBreakerInterval: NodeJS.Timeout | null = null;
  * Maps job types to their corresponding handlers.
  * New handlers should be registered here as they are implemented.
  */
-const jobHandlers: Record<string, BaseJobHandler<JobData> | { process: (job: Job<any>) => Promise<any> }> = {
+const jobHandlers: Record<
+  string,
+  BaseJobHandler<JobData> | { process: (job: Job<any>) => Promise<any> }
+> = {
   [JobType.TEST_JOB]: testJobHandler,
   [JobType.INITIALIZE]: initializeJobHandler,
   [JobType.DOCUMENT_PROCESSING]: documentProcessingHandler,
@@ -82,15 +84,33 @@ const jobHandlers: Record<string, BaseJobHandler<JobData> | { process: (job: Job
  */
 async function processJob(job: Job<JobData>): Promise<JobResult> {
   const jobType = job.name;
+
+  // Validate job has a name - this can happen with corrupted jobs or test data
+  if (!jobType) {
+    const error = 'Job has undefined name - likely corrupted or created without proper job type';
+    logger.error(
+      {
+        jobId: job.id,
+        jobData: job.data,
+        availableHandlers: Object.keys(jobHandlers),
+      },
+      'Job handler not found: job.name is undefined'
+    );
+    throw new Error(error);
+  }
+
   const handler = jobHandlers[jobType];
 
   if (!handler) {
     const error = `No handler registered for job type: ${jobType}`;
-    logger.error({
-      jobId: job.id,
-      jobType,
-      availableHandlers: Object.keys(jobHandlers),
-    }, 'Job handler not found');
+    logger.error(
+      {
+        jobId: job.id,
+        jobType,
+        availableHandlers: Object.keys(jobHandlers),
+      },
+      'Job handler not found'
+    );
     throw new Error(error);
   }
 
@@ -113,8 +133,10 @@ function startCircuitBreaker(workerInstance: Worker<JobData, JobResult>): void {
     const heapMB = Math.round(process.memoryUsage().heapUsed / 1024 / 1024);
 
     if (!isWorkerPaused && heapMB >= CIRCUIT_BREAKER.pauseThresholdMB) {
-      logger.warn({ heapMB, threshold: CIRCUIT_BREAKER.pauseThresholdMB },
-        'Circuit breaker: Pausing worker due to memory pressure');
+      logger.warn(
+        { heapMB, threshold: CIRCUIT_BREAKER.pauseThresholdMB },
+        'Circuit breaker: Pausing worker due to memory pressure'
+      );
 
       try {
         await workerInstance.pause();
@@ -128,8 +150,10 @@ function startCircuitBreaker(workerInstance: Worker<JobData, JobResult>): void {
         logger.error({ error }, 'Circuit breaker: Failed to pause worker');
       }
     } else if (isWorkerPaused && heapMB < CIRCUIT_BREAKER.resumeThresholdMB) {
-      logger.info({ heapMB, threshold: CIRCUIT_BREAKER.resumeThresholdMB },
-        'Circuit breaker: Resuming worker, memory recovered');
+      logger.info(
+        { heapMB, threshold: CIRCUIT_BREAKER.resumeThresholdMB },
+        'Circuit breaker: Resuming worker, memory recovered'
+      );
 
       try {
         workerInstance.resume();
@@ -195,11 +219,14 @@ export function getWorker(concurrency: number = 5): Worker<JobData, JobResult> {
     // Event: Job completed successfully
     worker.on('completed', async (job: Job<JobData, JobResult>, result: JobResult) => {
       try {
-        logger.info({
-          jobId: job.id,
-          jobType: job.name,
-          success: result.success,
-        }, 'Job completed');
+        logger.info(
+          {
+            jobId: job.id,
+            jobType: job.name,
+            success: result.success,
+          },
+          'Job completed'
+        );
 
         // For test jobs and initialize jobs, await to ensure DB write completes before test checks status
         // This prevents race conditions in tests where we check DB before write finishes
@@ -212,10 +239,13 @@ export function getWorker(concurrency: number = 5): Worker<JobData, JobResult> {
         } else {
           // Fire-and-forget for production jobs (non-blocking)
           markJobCompleted(job).catch(err => {
-            logger.error({
-              jobId: job.id,
-              err: err.message,
-            }, 'Failed to mark job as completed (non-fatal)');
+            logger.error(
+              {
+                jobId: job.id,
+                err: err.message,
+              },
+              'Failed to mark job as completed (non-fatal)'
+            );
           });
         }
       } catch (error: any) {
@@ -242,10 +272,13 @@ export function getWorker(concurrency: number = 5): Worker<JobData, JobResult> {
           error.name === 'JobCancelledError' ||
           error.message?.includes('cancelled')
         ) {
-          logger.info({
-            jobId: job.id,
-            cancelledBy: (error as JobCancelledError).cancelledBy,
-          }, 'Job was cancelled');
+          logger.info(
+            {
+              jobId: job.id,
+              cancelledBy: (error as JobCancelledError).cancelledBy,
+            },
+            'Job was cancelled'
+          );
 
           if (isTestEnvironment) {
             // Await for test/init jobs
@@ -253,10 +286,13 @@ export function getWorker(concurrency: number = 5): Worker<JobData, JobResult> {
           } else {
             // Fire-and-forget for production jobs
             markJobCancelled(job.id!, (error as JobCancelledError).cancelledBy).catch(err => {
-              logger.error({
-                jobId: job.id,
-                err: err.message,
-              }, 'Failed to mark job as cancelled (non-fatal)');
+              logger.error(
+                {
+                  jobId: job.id,
+                  err: err.message,
+                },
+                'Failed to mark job as cancelled (non-fatal)'
+              );
             });
           }
 
@@ -272,26 +308,35 @@ export function getWorker(concurrency: number = 5): Worker<JobData, JobResult> {
         } else {
           // Fire-and-forget for production jobs
           markJobFailed(job, error).catch(err => {
-            logger.error({
-              jobId: job.id,
-              err: err.message,
-            }, 'Failed to mark job as failed (non-fatal)');
+            logger.error(
+              {
+                jobId: job.id,
+                err: err.message,
+              },
+              'Failed to mark job as failed (non-fatal)'
+            );
           });
         }
       } catch (dbError: any) {
-        logger.error({
-          jobId: job?.id,
-          err: dbError.message,
-        }, 'Error in failed handler');
+        logger.error(
+          {
+            jobId: job?.id,
+            err: dbError.message,
+          },
+          'Error in failed handler'
+        );
       }
     });
 
     // Event: Job stalled (worker crashed or timed out)
     worker.on('stalled', (jobId: string) => {
-      logger.warn({
-        jobId,
-        queueName: QUEUE_NAME,
-      }, 'Job stalled');
+      logger.warn(
+        {
+          jobId,
+          queueName: QUEUE_NAME,
+        },
+        'Job stalled'
+      );
       // Note: We don't know the job type here, so we can't call handleJobStalled with JobType
       // This could be enhanced by fetching the job from Redis
     });
@@ -299,13 +344,16 @@ export function getWorker(concurrency: number = 5): Worker<JobData, JobResult> {
     // Event: Worker active (started processing jobs)
     worker.on('active', async (job: Job<JobData>) => {
       try {
-        logger.info({
-          jobId: job.id,
-          jobType: job.name,
-          // organizationId may not exist for all job types (e.g., LESSON_CONTENT)
-          organizationId: 'organizationId' in job.data ? job.data.organizationId : undefined,
-          courseId: job.data.courseId,
-        }, 'Worker picked up job');
+        logger.info(
+          {
+            jobId: job.id,
+            jobType: job.name,
+            // organizationId may not exist for all job types (e.g., LESSON_CONTENT)
+            organizationId: 'organizationId' in job.data ? job.data.organizationId : undefined,
+            courseId: job.data.courseId,
+          },
+          'Worker picked up job'
+        );
 
         // Create job status on first attempt, mark active on retries
         const attemptsMade = job.attemptsMade;
@@ -318,17 +366,23 @@ export function getWorker(concurrency: number = 5): Worker<JobData, JobResult> {
           if (isTestEnvironment) {
             // Await for test/init jobs to ensure DB consistency
             await createJobStatus(job);
-            logger.debug({
-              jobId: job.id,
-              jobType: job.name,
-            }, 'Job status created (awaited for test job)');
+            logger.debug(
+              {
+                jobId: job.id,
+                jobType: job.name,
+              },
+              'Job status created (awaited for test job)'
+            );
           } else {
             // Fire-and-forget for production jobs (non-blocking)
             createJobStatus(job).catch(err => {
-              logger.error({
-                jobId: job.id,
-                err: err.message,
-              }, 'Failed to create job status (non-fatal)');
+              logger.error(
+                {
+                  jobId: job.id,
+                  err: err.message,
+                },
+                'Failed to create job status (non-fatal)'
+              );
             });
           }
         }
@@ -336,16 +390,22 @@ export function getWorker(concurrency: number = 5): Worker<JobData, JobResult> {
         // Fire-and-forget: Mark job as active in database
         // Note: markJobActive has delay logic to prevent timestamp constraint violations
         markJobActive(job).catch(err => {
-          logger.error({
-            jobId: job.id,
-            err: err.message,
-          }, 'Failed to update job active state in database (non-fatal)');
+          logger.error(
+            {
+              jobId: job.id,
+              err: err.message,
+            },
+            'Failed to update job active state in database (non-fatal)'
+          );
         });
       } catch (error: any) {
-        logger.error({
-          jobId: job.id,
-          err: error.message,
-        }, 'Error in active handler');
+        logger.error(
+          {
+            jobId: job.id,
+            err: error.message,
+          },
+          'Error in active handler'
+        );
       }
     });
 
@@ -354,11 +414,14 @@ export function getWorker(concurrency: number = 5): Worker<JobData, JobResult> {
       logger.error({ err: error }, 'Worker error');
     });
 
-    logger.info({
-      queueName: QUEUE_NAME,
-      concurrency,
-      registeredHandlers: Object.keys(jobHandlers),
-    }, 'BullMQ worker initialized');
+    logger.info(
+      {
+        queueName: QUEUE_NAME,
+        concurrency,
+        registeredHandlers: Object.keys(jobHandlers),
+      },
+      'BullMQ worker initialized'
+    );
 
     // Start circuit breaker after worker is created
     startCircuitBreaker(worker);
