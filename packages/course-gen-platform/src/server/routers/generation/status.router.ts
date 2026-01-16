@@ -356,6 +356,7 @@ export const statusRouter = router({
             language: course.language,
             style: course.style,
             target_audience: (course.settings as unknown as CourseSettings)?.target_audience,
+            difficulty: course.difficulty,
             description: course.course_description,
             course_size: course.course_size,
             desired_lessons_count: (course.settings as unknown as CourseSettings)

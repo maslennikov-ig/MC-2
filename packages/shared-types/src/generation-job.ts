@@ -40,6 +40,13 @@ export const FrontendParametersSchema = z.object({
     .describe('Target language (defaults to contextual_language from Analyze)'),
   style: CourseStyleSchema.optional().describe('Content style (defaults to conversational)'),
   target_audience: z.string().optional().describe('Target audience description'),
+
+  /**
+   * Difficulty level from analysis or default value
+   * Not directly user-provided (comes from courses.difficulty column)
+   */
+  difficulty: z.enum(['beginner', 'intermediate', 'advanced']).optional(),
+
   description: z.string().optional().describe('Course description (user-provided context)'),
 
   // Guidance parameters (NOT constraints per spec.md clarifications)
