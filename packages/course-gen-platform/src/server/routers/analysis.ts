@@ -175,10 +175,12 @@ export const analysisRouter = router({
         // Step 1: Fetch course with organization tier
         const { data } = await supabase
           .from('courses')
-          .select(`
+          .select(
+            `
             *,
             organization:organizations(tier)
-          `)
+          `
+          )
           .eq('id', courseId)
           .eq('organization_id', organizationId)
           .single();
@@ -186,13 +188,16 @@ export const analysisRouter = router({
         const course = data as unknown as CourseRow;
 
         if (!course) {
-          logger.warn({
-            requestId,
-            userId,
-            courseId,
-            organizationId,
-            // error: courseError, // Removed as we use safe data access
-          }, 'Course not found or access denied');
+          logger.warn(
+            {
+              requestId,
+              userId,
+              courseId,
+              organizationId,
+              // error: courseError, // Removed as we use safe data access
+            },
+            'Course not found or access denied'
+          );
 
           throw new TRPCError({
             code: 'NOT_FOUND',
@@ -203,29 +208,39 @@ export const analysisRouter = router({
         // Extract tier from organization (type-safe access)
         const tier = course.organization?.tier || 'free';
 
-        logger.info({
-          requestId,
-          userId,
-          courseId,
-          organizationId,
-          tier,
-          forceRestart,
-        }, 'Analysis start request');
+        logger.info(
+          {
+            requestId,
+            userId,
+            courseId,
+            organizationId,
+            tier,
+            forceRestart,
+          },
+          'Analysis start request'
+        );
 
         // Step 2: Check if analysis already in progress
         // IMPORTANT: After Stage 3 (document summarization), course status is 'stage_3_complete'
         // This is VALID and analysis.start should accept it.
         // Only block if already in stage 4 (analysis actually running)
         const validPreAnalysisStatuses = ['stage_2_complete', 'stage_3_complete'];
-        const analysisInProgress = ['stage_4_init', 'stage_4_analyzing', 'stage_4_complete'].includes(course.generation_status);
+        const analysisInProgress = [
+          'stage_4_init',
+          'stage_4_analyzing',
+          'stage_4_complete',
+        ].includes(course.generation_status);
 
         if (analysisInProgress && !forceRestart) {
-          logger.warn({
-            requestId,
-            userId,
-            courseId,
-            currentStatus: course.generation_status,
-          }, 'Analysis already in progress');
+          logger.warn(
+            {
+              requestId,
+              userId,
+              courseId,
+              currentStatus: course.generation_status,
+            },
+            'Analysis already in progress'
+          );
 
           throw new TRPCError({
             code: 'BAD_REQUEST',
@@ -235,13 +250,16 @@ export const analysisRouter = router({
 
         // Validate status is valid for starting analysis
         if (!validPreAnalysisStatuses.includes(course.generation_status) && !forceRestart) {
-          logger.warn({
-            requestId,
-            userId,
-            courseId,
-            currentStatus: course.generation_status,
-            validStatuses: validPreAnalysisStatuses,
-          }, 'Invalid status for starting analysis');
+          logger.warn(
+            {
+              requestId,
+              userId,
+              courseId,
+              currentStatus: course.generation_status,
+              validStatuses: validPreAnalysisStatuses,
+            },
+            'Invalid status for starting analysis'
+          );
 
           throw new TRPCError({
             code: 'BAD_REQUEST',
@@ -266,11 +284,14 @@ export const analysisRouter = router({
           .eq('organization_id', organizationId);
 
         if (updateError) {
-          logger.error({
-            requestId,
-            courseId,
-            error: updateError.message,
-          }, 'Failed to update course status');
+          logger.error(
+            {
+              requestId,
+              courseId,
+              error: updateError.message,
+            },
+            'Failed to update course status'
+          );
 
           throw new TRPCError({
             code: 'INTERNAL_SERVER_ERROR',
@@ -288,27 +309,37 @@ export const analysisRouter = router({
               .eq('id', courseId)
               .eq('organization_id', organizationId);
 
-            logger.info({
-              requestId,
-              courseId,
-              previousStatus,
-              currentStatus: 'stage_4_init',
-            }, 'Successfully rolled back course status after job creation failure');
+            logger.info(
+              {
+                requestId,
+                courseId,
+                previousStatus,
+                currentStatus: 'stage_4_init',
+              },
+              'Successfully rolled back course status after job creation failure'
+            );
           } catch (rollbackError) {
-            logger.error({
-              requestId,
-              courseId,
-              previousStatus,
-              error: rollbackError instanceof Error ? rollbackError.message : String(rollbackError),
-            }, 'Failed to rollback course status');
+            logger.error(
+              {
+                requestId,
+                courseId,
+                previousStatus,
+                error:
+                  rollbackError instanceof Error ? rollbackError.message : String(rollbackError),
+              },
+              'Failed to rollback course status'
+            );
           }
         };
 
-        logger.info({
-          requestId,
-          courseId,
-          status: 'stage_4_init',
-        }, 'Course status updated before job creation');
+        logger.info(
+          {
+            requestId,
+            courseId,
+            status: 'stage_4_init',
+          },
+          'Course status updated before job creation'
+        );
 
         // Step 3: Fetch completed document summaries from file_catalog
         // Only include documents that have been processed (processed_content NOT NULL)
@@ -321,12 +352,15 @@ export const analysisRouter = router({
           .not('processing_method', 'is', null); // Ensure processing_method is set
 
         if (documentsError) {
-          logger.error({
-            requestId,
-            userId,
-            courseId,
-            error: documentsError,
-          }, 'Failed to fetch document summaries');
+          logger.error(
+            {
+              requestId,
+              userId,
+              courseId,
+              error: documentsError,
+            },
+            'Failed to fetch document summaries'
+          );
 
           // Rollback status before throwing
           await rollbackStatus();
@@ -346,16 +380,18 @@ export const analysisRouter = router({
           summary_metadata: doc.summary_metadata,
         }));
 
-        logger.info({
-          requestId,
-          courseId,
-          documentCount: document_summaries.length,
-        }, 'Document summaries fetched');
+        logger.info(
+          {
+            requestId,
+            courseId,
+            documentCount: document_summaries.length,
+          },
+          'Document summaries fetched'
+        );
 
         // Extract settings for analysis input (type-safe JSONB access)
         const settings = (course.settings as Record<string, unknown>) || {};
         const topic = (settings.topic as string) || course.title || course.course_description || '';
-        const answers = (settings.answers as string) || null;
         const lessonDuration = (settings.lesson_duration_minutes as number) || 30;
 
         // Step 4: Create BullMQ job with complete payload
@@ -374,7 +410,6 @@ export const analysisRouter = router({
             topic,
             language: course.language || 'en',
             style: course.style || 'formal',
-            answers,
             target_audience: course.target_audience || '',
             difficulty: course.difficulty || 'intermediate',
             lesson_duration_minutes: lessonDuration,
@@ -390,13 +425,16 @@ export const analysisRouter = router({
         const job = await addJob(JobType.STRUCTURE_ANALYSIS, jobData as any, { priority });
         const jobId = job.id as string;
 
-        logger.info({
-          requestId,
-          jobId,
-          courseId,
-          priority,
-          documentCount: document_summaries.length,
-        }, 'Analysis job created');
+        logger.info(
+          {
+            requestId,
+            jobId,
+            courseId,
+            priority,
+            documentCount: document_summaries.length,
+          },
+          'Analysis job created'
+        );
 
         // Return success response
         return {
@@ -410,13 +448,16 @@ export const analysisRouter = router({
         }
 
         // Log unexpected error
-        logger.error({
-          requestId,
-          error: error instanceof Error ? error.message : String(error),
-          courseId,
-          userId,
-          organizationId,
-        }, 'Unexpected error in analysis.start');
+        logger.error(
+          {
+            requestId,
+            error: error instanceof Error ? error.message : String(error),
+            courseId,
+            userId,
+            organizationId,
+          },
+          'Unexpected error in analysis.start'
+        );
 
         // Rollback status for unexpected errors (addJob failure, network issues, etc.)
         if (previousStatus) {
@@ -428,17 +469,24 @@ export const analysisRouter = router({
               .eq('id', courseId)
               .eq('organization_id', organizationId);
 
-            logger.info({
-              requestId,
-              courseId,
-              rolledBackTo: previousStatus,
-            }, 'Rolled back course status after unexpected error');
+            logger.info(
+              {
+                requestId,
+                courseId,
+                rolledBackTo: previousStatus,
+              },
+              'Rolled back course status after unexpected error'
+            );
           } catch (rollbackError) {
-            logger.error({
-              requestId,
-              courseId,
-              error: rollbackError instanceof Error ? rollbackError.message : String(rollbackError),
-            }, 'Failed to rollback course status after unexpected error');
+            logger.error(
+              {
+                requestId,
+                courseId,
+                error:
+                  rollbackError instanceof Error ? rollbackError.message : String(rollbackError),
+              },
+              'Failed to rollback course status after unexpected error'
+            );
           }
         }
 
@@ -497,11 +545,14 @@ export const analysisRouter = router({
           .single();
 
         if (!data) {
-           logger.warn({
-            userId,
-            courseId: input.courseId,
-            organizationId,
-          }, 'Course not found for status query');
+          logger.warn(
+            {
+              userId,
+              courseId: input.courseId,
+              organizationId,
+            },
+            'Course not found for status query'
+          );
 
           throw new TRPCError({
             code: 'NOT_FOUND',
@@ -510,7 +561,10 @@ export const analysisRouter = router({
         }
 
         // Use explicit type compatible with unknown from DB
-        const course = data as unknown as { generation_status: string; generation_progress: number };
+        const course = data as unknown as {
+          generation_status: string;
+          generation_progress: number;
+        };
 
         return {
           status: course.generation_status,
@@ -523,12 +577,15 @@ export const analysisRouter = router({
         }
 
         // Log and wrap unexpected errors
-        logger.error({
-          error: error instanceof Error ? error.message : String(error),
-          courseId: input.courseId,
-          userId,
-          organizationId,
-        }, 'Unexpected error in analysis.getStatus');
+        logger.error(
+          {
+            error: error instanceof Error ? error.message : String(error),
+            courseId: input.courseId,
+            userId,
+            organizationId,
+          },
+          'Unexpected error in analysis.getStatus'
+        );
 
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
@@ -586,11 +643,14 @@ export const analysisRouter = router({
           .single();
 
         if (!data) {
-          logger.warn({
-            userId,
-            courseId: input.courseId,
-            organizationId,
-          }, 'Course not found for result query');
+          logger.warn(
+            {
+              userId,
+              courseId: input.courseId,
+              organizationId,
+            },
+            'Course not found for result query'
+          );
 
           throw new TRPCError({
             code: 'NOT_FOUND',
@@ -611,12 +671,15 @@ export const analysisRouter = router({
         }
 
         // Log and wrap unexpected errors
-        logger.error({
-          error: error instanceof Error ? error.message : String(error),
-          courseId: input.courseId,
-          userId,
-          organizationId,
-        }, 'Unexpected error in analysis.getResult');
+        logger.error(
+          {
+            error: error instanceof Error ? error.message : String(error),
+            courseId: input.courseId,
+            userId,
+            organizationId,
+          },
+          'Unexpected error in analysis.getResult'
+        );
 
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',

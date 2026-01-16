@@ -263,7 +263,6 @@ export const Phase2InputSchema = z.object({
   course_id: z.string().uuid('Invalid course ID'),
   language: z.string().min(2).max(10, 'Language code must be 2-10 characters'),
   topic: z.string().min(1, 'Topic is required').max(5000, 'Topic too long'),
-  answers: z.string().nullable().optional(),
   document_summaries: z.array(z.string()).nullable().optional(),
   phase1_output: z.object({
     course_category: z.object({

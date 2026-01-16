@@ -8,8 +8,6 @@
 export interface CourseSettings {
   /** Main topic of the course */
   topic?: string;
-  /** User-provided answers to questionnaire */
-  answers?: Record<string, unknown>;
   /** Duration of each lesson in minutes */
   lesson_duration_minutes?: number;
   /**

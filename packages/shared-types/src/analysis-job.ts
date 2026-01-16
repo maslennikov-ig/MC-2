@@ -73,9 +73,6 @@ export interface StructureAnalysisInput {
   /** Content style (e.g., 'professional', 'conversational') */
   style: string;
 
-  /** Optional user requirements (from courses.answers) */
-  answers?: string;
-
   /** Target audience level */
   target_audience: TargetAudience;
 

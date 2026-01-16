@@ -41,7 +41,6 @@ import { preprocessObject } from '@/shared/validation/preprocessing';
  *   course_id: '550e8400-e29b-41d4-a716-446655440000',
  *   language: 'ru',
  *   topic: 'Procurement law fundamentals',
- *   answers: 'Target audience: government procurement specialists',
  *   document_summaries: null,
  *   phase1_output: { ... }
  * });
@@ -343,7 +342,7 @@ function buildPhase2PromptText(input: Phase2Input): string {
  * @returns Formatted prompt messages
  */
 function buildPhase2Prompt(input: Phase2Input): { role: string; content: string }[] {
-  const { phase1_output, topic, answers, document_summaries, language } = input;
+  const { phase1_output, topic, document_summaries, language } = input;
 
   // Determine output language based on course language
   const outputLanguage = language === 'en' ? 'English' : language === 'ru' ? 'Russian' : language;
@@ -355,7 +354,6 @@ function buildPhase2Prompt(input: Phase2Input): { role: string; content: string 
   const keyConcepts = phase1_output.topic_analysis.key_concepts.join(', ');
 
   // Build optional context
-  const answersContext = answers ? `\n\nUser Requirements:\n${answers}` : '';
   const documentsContext =
     document_summaries && document_summaries.length > 0
       ? `\n\nAvailable Documents: ${document_summaries.length} documents with processed content`
@@ -402,7 +400,7 @@ ${schemaDescription}
 **Category**: ${category}
 **Complexity**: ${complexity}
 **Target Audience**: ${targetAudience}
-**Key Concepts**: ${keyConcepts}${answersContext}${documentsContext}${sizeSection}
+**Key Concepts**: ${keyConcepts}${documentsContext}${sizeSection}
 
 **Tasks**:
 1. **Estimate Total Content Hours** (0.5-200h):

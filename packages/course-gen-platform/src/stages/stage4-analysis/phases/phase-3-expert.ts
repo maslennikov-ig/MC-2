@@ -19,7 +19,11 @@
 import { getModelForPhase } from '@/shared/llm/langchain-models';
 import { trackPhaseExecution, storeTraceData } from '../utils/observability';
 import { detectResearchFlags } from '../utils/research-flag-detector';
-import type { Phase3Output, Phase1Output, Phase2Output } from '@megacampus/shared-types/analysis-result';
+import type {
+  Phase3Output,
+  Phase1Output,
+  Phase2Output,
+} from '@megacampus/shared-types/analysis-result';
 import { estimateTokenCount } from '@megacampus/shared-types';
 import { z } from 'zod';
 import { UnifiedRegenerator } from '@/shared/regeneration';
@@ -34,7 +38,6 @@ export interface Phase3Input {
   course_id: string;
   language: string;
   topic: string;
-  answers?: string | null;
   document_summaries?: string[] | null;
   phase1_output: Phase1Output;
   phase2_output: Phase2Output;
@@ -59,17 +62,16 @@ const Phase3OutputSchema = z.object({
     progression_logic: z.string().min(100), // Removed .max(500) - allow detailed logic
     interactivity_level: z.enum(['high', 'medium', 'low']),
   }),
-  expansion_areas:
-    z
-      .array(
-        z.object({
-          area: z.string().min(3),
-          priority: z.enum(['critical', 'important', 'nice-to-have']),
-          specific_requirements: z.array(z.string()).min(1), // Removed .max(5) - encourage comprehensive requirements
-          estimated_lessons: z.number().min(1), // Removed .max(10) - let LLM decide optimal count
-        })
-      )
-      .nullable(),
+  expansion_areas: z
+    .array(
+      z.object({
+        area: z.string().min(3),
+        priority: z.enum(['critical', 'important', 'nice-to-have']),
+        specific_requirements: z.array(z.string()).min(1), // Removed .max(5) - encourage comprehensive requirements
+        estimated_lessons: z.number().min(1), // Removed .max(10) - let LLM decide optimal count
+      })
+    )
+    .nullable(),
 });
 
 /**
@@ -101,7 +103,7 @@ function truncateSummary(summary: string, maxTokens: number): string {
  * @returns LLM prompt string with token-aware truncation
  */
 function buildPhase3Prompt(input: Phase3Input): string {
-  const { topic, language, answers, document_summaries, phase1_output, phase2_output } = input;
+  const { topic, language, document_summaries, phase1_output, phase2_output } = input;
 
   // Determine output language based on course language
   const outputLanguage = language === 'en' ? 'English' : language === 'ru' ? 'Russian' : language;
@@ -112,12 +114,10 @@ function buildPhase3Prompt(input: Phase3Input): string {
   const documentCount = document_summaries?.length || 0;
   const tokensPerDocument = documentCount > 0 ? Math.floor(25000 / documentCount) : 0;
 
-  const documentContext = 
+  const documentContext =
     document_summaries && document_summaries.length > 0
       ? `\n\nDOCUMENT SUMMARIES (${documentCount} documents, truncated for context):\n${document_summaries.map((summary, idx) => `\n[Document ${idx + 1}]\n${truncateSummary(summary, tokensPerDocument)}`).join('\n\n')}`
       : '';
-
-  const userRequirements = answers ? `\n\nUSER REQUIREMENTS:\n${answers}` : '';
 
   // Generate Zod schema description for LLM
   const schemaDescription = zodToPromptSchema(Phase3OutputSchema);
@@ -144,7 +144,7 @@ SCOPE:
 - Total lessons: ${phase2_output.recommended_structure.total_lessons}
 - Estimated hours: ${phase2_output.recommended_structure.estimated_content_hours}h
 - Lesson duration: ${phase2_output.recommended_structure.lesson_duration_minutes} minutes
-- Total sections: ${phase2_output.recommended_structure.total_sections}${userRequirements}${documentContext}
+- Total sections: ${phase2_output.recommended_structure.total_sections}${documentContext}
 
 ===== YOUR TASKS =====
 
@@ -253,14 +253,19 @@ export async function runPhase3Expert(input: Phase3Input): Promise<Phase3Output>
       try {
         const parsedRaw = JSON.parse(content) as RawPhase3Output;
         if (parsedRaw.pedagogical_strategy) {
-          parsedRaw.pedagogical_strategy = preprocessObject(parsedRaw.pedagogical_strategy as Record<string, unknown>, {
-            teaching_style: 'enum',
-            practical_focus: 'enum',
-          });
+          parsedRaw.pedagogical_strategy = preprocessObject(
+            parsedRaw.pedagogical_strategy as Record<string, unknown>,
+            {
+              teaching_style: 'enum',
+              practical_focus: 'enum',
+            }
+          );
         }
         if (parsedRaw.exercise_types && Array.isArray(parsedRaw.exercise_types)) {
           parsedRaw.exercise_types = parsedRaw.exercise_types.map((ex: unknown) =>
-            typeof ex === 'string' ? ex : preprocessObject(ex as Record<string, unknown>, { type: 'enum' })
+            typeof ex === 'string'
+              ? ex
+              : preprocessObject(ex as Record<string, unknown>, { type: 'enum' })
           );
         }
         preprocessedContent = JSON.stringify(parsedRaw);
@@ -274,7 +279,13 @@ export async function runPhase3Expert(input: Phase3Input): Promise<Phase3Output>
       } catch (parseError) {
         // Direct parse failed, using UnifiedRegenerator (All 5 layers)
         const regenerator = new UnifiedRegenerator<unknown>({
-          enabledLayers: ['auto-repair', 'critique-revise', 'partial-regen', 'model-escalation', 'emergency'],
+          enabledLayers: [
+            'auto-repair',
+            'critique-revise',
+            'partial-regen',
+            'model-escalation',
+            'emergency',
+          ],
           maxRetries: 3,
           schema: Phase3OutputSchema,
           model: model,
@@ -323,7 +334,7 @@ export async function runPhase3Expert(input: Phase3Input): Promise<Phase3Output>
       topic,
       course_category: phase1_output.course_category.primary,
       document_summaries: document_summaries || undefined,
-      language: (language === 'ru' || language === 'en') ? language : undefined,
+      language: language === 'ru' || language === 'en' ? language : undefined,
     },
     course_id
   );
@@ -334,7 +345,11 @@ export async function runPhase3Expert(input: Phase3Input): Promise<Phase3Output>
     phase_metadata: {
       duration_ms: totalDurationMs,
       model_used: modelId,
-      tokens: { input: totalInputTokens, output: totalOutputTokens, total: totalInputTokens + totalOutputTokens },
+      tokens: {
+        input: totalInputTokens,
+        output: totalOutputTokens,
+        total: totalInputTokens + totalOutputTokens,
+      },
       quality_score: 0,
       retry_count: 0,
     },

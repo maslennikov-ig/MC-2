@@ -3,6 +3,52 @@
 import { getBackendAuthHeaders, TRPC_URL } from '@/lib/auth'
 
 // ============================================================================
+// Error Handling Helpers
+// ============================================================================
+
+/**
+ * Wraps raw errors into user-friendly messages.
+ * Differentiates network errors, auth errors, and generic failures.
+ */
+function wrapError(error: unknown, context: string): Error {
+  const message = error instanceof Error ? error.message : String(error)
+  const lowerMessage = message.toLowerCase()
+
+  // Network/connection errors
+  if (
+    lowerMessage.includes('fetch') ||
+    lowerMessage.includes('network') ||
+    lowerMessage.includes('econnrefused') ||
+    lowerMessage.includes('timeout')
+  ) {
+    return new Error(`Unable to connect to server. Please check your connection and try again.`)
+  }
+
+  // Authentication/authorization errors
+  if (
+    lowerMessage.includes('unauthorized') ||
+    lowerMessage.includes('401') ||
+    lowerMessage.includes('forbidden') ||
+    lowerMessage.includes('403')
+  ) {
+    return new Error(`Session expired or insufficient permissions. Please refresh the page.`)
+  }
+
+  // Not found errors
+  if (lowerMessage.includes('not found') || lowerMessage.includes('404')) {
+    return new Error(`The requested ${context} was not found.`)
+  }
+
+  // Validation errors - pass through as they're usually already user-friendly
+  if (lowerMessage.includes('invalid') || lowerMessage.includes('validation')) {
+    return new Error(message)
+  }
+
+  // Generic fallback with context
+  return new Error(`Failed to ${context}. Please try again.`)
+}
+
+// ============================================================================
 // Types (matching backend types)
 // ============================================================================
 
@@ -177,7 +223,7 @@ export async function listLogsAction(params: ListLogsParams): Promise<LogListRes
     return json.result.data as LogListResponse
   } catch (error) {
     console.error('List Logs Server Action Error:', error)
-    throw error
+    throw wrapError(error, 'load logs')
   }
 }
 
@@ -213,7 +259,7 @@ export async function getLogByIdAction(params: {
     return json.result.data as LogDetails
   } catch (error) {
     console.error('Get Log By ID Server Action Error:', error)
-    throw error
+    throw wrapError(error, 'load log details')
   }
 }
 
@@ -247,7 +293,7 @@ export async function updateLogStatusAction(
     return json.result.data as { success: boolean }
   } catch (error) {
     console.error('Update Log Status Server Action Error:', error)
-    throw error
+    throw wrapError(error, 'update log status')
   }
 }
 
@@ -281,7 +327,7 @@ export async function bulkUpdateLogStatusAction(
     return json.result.data as { success: boolean; updatedCount: number }
   } catch (error) {
     console.error('Bulk Update Log Status Server Action Error:', error)
-    throw error
+    throw wrapError(error, 'update log statuses')
   }
 }
 
@@ -329,7 +375,7 @@ export async function listGroupedLogsAction(
     return json.result.data as GroupedLogListResponse
   } catch (error) {
     console.error('List Grouped Logs Server Action Error:', error)
-    throw error
+    throw wrapError(error, 'load grouped logs')
   }
 }
 
@@ -368,7 +414,7 @@ export async function getGroupLogsAction(params: GetGroupLogsParams): Promise<Lo
     return json.result.data as LogListResponse
   } catch (error) {
     console.error('Get Group Logs Server Action Error:', error)
-    throw error
+    throw wrapError(error, 'load group logs')
   }
 }
 
@@ -402,6 +448,6 @@ export async function updateGroupStatusAction(
     return json.result.data as { success: boolean; updatedCount: number }
   } catch (error) {
     console.error('Update Group Status Server Action Error:', error)
-    throw error
+    throw wrapError(error, 'update group status')
   }
 }

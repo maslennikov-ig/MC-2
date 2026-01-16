@@ -296,7 +296,6 @@ export const statusRouter = router({
             topic: settings.topic || course.title || '',
             language: course.language || 'en',
             style: course.style || 'formal',
-            answers: settings.answers || null,
             target_audience: course.target_audience || '',
             difficulty: course.difficulty || 'intermediate',
             lesson_duration_minutes: settings.lesson_duration_minutes || 30,
