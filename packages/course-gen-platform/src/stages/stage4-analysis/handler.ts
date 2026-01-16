@@ -308,7 +308,9 @@ class Stage4AnalysisHandler {
       // Fetch course metadata (including course_size for size preset guidance)
       const { data: courseForInput, error: courseInputError } = await supabaseForValidation
         .from('courses')
-        .select('title, language, style, difficulty, target_audience, settings, course_size')
+        .select(
+          'title, language, style, difficulty, target_audience, course_description, learning_outcomes, settings, course_size'
+        )
         .eq('id', course_id)
         .single();
 
@@ -415,6 +417,10 @@ class Stage4AnalysisHandler {
         target_lessons: sizePreset?.targetLessons,
         target_sections: sizePreset?.targetSections,
         size_guidance: sizePreset?.llmGuidance,
+
+        // Additional context fields (user-provided)
+        course_description: courseForInput.course_description || undefined,
+        learning_outcomes: courseForInput.learning_outcomes || undefined,
       };
 
       // Log target audience configuration for debugging
@@ -424,6 +430,15 @@ class Stage4AnalysisHandler {
           fallback_used: !courseForInput.target_audience,
         },
         'Target audience configuration for Stage 4'
+      );
+
+      // Log additional context availability
+      jobLogger.info(
+        {
+          has_description: !!courseForInput.course_description,
+          has_outcomes: !!courseForInput.learning_outcomes,
+        },
+        'Additional context availability for Stage 4'
       );
 
       jobLogger.info(

@@ -99,6 +99,12 @@ export interface StructureAnalysisInput {
 
   /** LLM guidance text for course size (advisory) */
   size_guidance?: string;
+
+  /** Course description (user-provided context) */
+  course_description?: string;
+
+  /** Learning outcomes (user-specified goals) */
+  learning_outcomes?: string | string[];
 }
 
 /**

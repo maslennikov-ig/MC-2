@@ -310,6 +310,12 @@ export const Phase2InputSchema = z.object({
   target_lessons: z.number().int().positive().optional(),
   target_sections: z.number().int().positive().optional(),
   size_guidance: z.string().min(1).optional(),
+
+  /** Course description (user-provided context) */
+  course_description: z.string().optional(),
+
+  /** Learning outcomes (user-specified goals) */
+  learning_outcomes: z.union([z.string(), z.array(z.string())]).optional(),
 });
 
 /**
