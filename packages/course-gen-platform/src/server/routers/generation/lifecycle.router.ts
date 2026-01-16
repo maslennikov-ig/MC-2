@@ -677,7 +677,7 @@ export const lifecycleRouter = router({
             course_title: course.title, // ONLY guaranteed field
             language: course.language,
             style: course.style,
-            target_audience: (course.settings as unknown as CourseSettings)?.target_audience,
+            target_audience: course.target_audience,
             desired_lessons_count: (course.settings as unknown as CourseSettings)
               ?.desired_lessons_count,
             desired_modules_count: (course.settings as unknown as CourseSettings)
@@ -999,7 +999,9 @@ export const lifecycleRouter = router({
           // Fetch full course data for job payload
           const { data: fullCourse, error: fullCourseError } = await supabase
             .from('courses')
-            .select('title, settings, language, style, analysis_result, organization_id')
+            .select(
+              'title, settings, language, style, target_audience, analysis_result, organization_id'
+            )
             .eq('id', courseId)
             .single();
 
@@ -1066,7 +1068,7 @@ export const lifecycleRouter = router({
               course_title: fullCourse.title,
               language: fullCourse.language,
               style: fullCourse.style,
-              target_audience: (fullCourse.settings as unknown as CourseSettings)?.target_audience,
+              target_audience: fullCourse.target_audience,
               desired_lessons_count: (fullCourse.settings as unknown as CourseSettings)
                 ?.desired_lessons_count,
               desired_modules_count: (fullCourse.settings as unknown as CourseSettings)

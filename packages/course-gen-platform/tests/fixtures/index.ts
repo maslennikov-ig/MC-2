@@ -70,10 +70,7 @@ export interface TestAuthUser {
  */
 export function getTestFixtures(testFileName: string) {
   // Generate unique 12-character ID from filename hash
-  const uniqueId = createHash('md5')
-    .update(testFileName)
-    .digest('hex')
-    .slice(0, 12);
+  const uniqueId = createHash('md5').update(testFileName).digest('hex').slice(0, 12);
 
   // Base organization (shared across all tests)
   const TEST_ORGS = {
@@ -85,28 +82,28 @@ export function getTestFixtures(testFileName: string) {
   };
 
   const users = {
-      instructor1: {
-        id: `00000000-0000-0000-0000-${uniqueId.substring(0, 12)}`,
-        email: `test-instructor1-${testFileName.replace(/\.test\.ts$/, '')}@megacampus.com`,
-        password: 'TestPassword123!',
-        role: 'instructor' as const,
-        organizationId: TEST_ORGS.premium.id,
-      },
-      instructor2: {
-        id: `11111111-1111-1111-1111-${uniqueId.substring(0, 12)}`,
-        email: `test-instructor2-${testFileName.replace(/\.test\.ts$/, '')}@megacampus.com`,
-        password: 'TestPassword123!',
-        role: 'instructor' as const,
-        organizationId: TEST_ORGS.premium.id,
-      },
-      student: {
-        id: `22222222-2222-2222-2222-${uniqueId.substring(0, 12)}`,
-        email: `test-student-${testFileName.replace(/\.test\.ts$/, '')}@megacampus.com`,
-        password: 'TestPassword123!',
-        role: 'student' as const,
-        organizationId: TEST_ORGS.premium.id,
-      },
-    };
+    instructor1: {
+      id: `00000000-0000-0000-0000-${uniqueId.substring(0, 12)}`,
+      email: `test-instructor1-${testFileName.replace(/\.test\.ts$/, '')}@megacampus.com`,
+      password: 'TestPassword123!',
+      role: 'instructor' as const,
+      organizationId: TEST_ORGS.premium.id,
+    },
+    instructor2: {
+      id: `11111111-1111-1111-1111-${uniqueId.substring(0, 12)}`,
+      email: `test-instructor2-${testFileName.replace(/\.test\.ts$/, '')}@megacampus.com`,
+      password: 'TestPassword123!',
+      role: 'instructor' as const,
+      organizationId: TEST_ORGS.premium.id,
+    },
+    student: {
+      id: `22222222-2222-2222-2222-${uniqueId.substring(0, 12)}`,
+      email: `test-student-${testFileName.replace(/\.test\.ts$/, '')}@megacampus.com`,
+      password: 'TestPassword123!',
+      role: 'student' as const,
+      organizationId: TEST_ORGS.premium.id,
+    },
+  };
 
   return {
     TEST_ORGS,
@@ -253,7 +250,12 @@ export const TEST_AUTH_USERS: Record<string, TestAuthUser> = {
  * @param role - User role (admin, instructor, student) - for JWT claims
  * @throws Error if auth user creation fails
  */
-export async function createAuthUser(email: string, password: string, userId: string, role: string): Promise<void> {
+export async function createAuthUser(
+  email: string,
+  password: string,
+  userId: string,
+  role: string
+): Promise<void> {
   const supabase = getSupabaseAdmin();
 
   try {
@@ -303,11 +305,17 @@ export async function createAuthUser(email: string, password: string, userId: st
       .select('*')
       .eq('id', userId);
 
-    console.log(`🔍 [createAuthUser] public.users for ${email}:`, usersAfterRPC?.length || 0, 'entries');
+    console.log(
+      `🔍 [createAuthUser] public.users for ${email}:`,
+      usersAfterRPC?.length || 0,
+      'entries'
+    );
     if (usersAfterRPC && usersAfterRPC.length > 0) {
       console.log(`🔍 [createAuthUser] public.users data:`, JSON.stringify(usersAfterRPC[0]));
     } else {
-      console.error(`❌ [createAuthUser] WARNING: public.users entry NOT found for ${email} (ID: ${userId})`);
+      console.error(
+        `❌ [createAuthUser] WARNING: public.users entry NOT found for ${email} (ID: ${userId})`
+      );
     }
   } catch (error) {
     // Enhanced error handling
@@ -337,10 +345,12 @@ export async function createAuthUser(email: string, password: string, userId: st
  * @param options.customFixtures - Custom fixtures to use (optional, defaults to global TEST_USERS/TEST_ORGS)
  * @throws Error if database operations fail
  */
-export async function setupTestFixtures(options: {
-  skipAuthUsers?: boolean;
-  customFixtures?: ReturnType<typeof getTestFixtures>;
-} = {}): Promise<void> {
+export async function setupTestFixtures(
+  options: {
+    skipAuthUsers?: boolean;
+    customFixtures?: ReturnType<typeof getTestFixtures>;
+  } = {}
+): Promise<void> {
   const supabase = getSupabaseAdmin();
 
   console.log('🔍 [FIXTURE SETUP] Starting at:', new Date().toISOString());
@@ -400,6 +410,7 @@ export async function setupTestFixtures(options: {
       {
         id: org.id,
         name: org.name,
+        slug: org.name.toLowerCase().replace(/\s+/g, '-'),
         tier: org.tier,
         storage_quota_bytes: storageQuota,
         storage_used_bytes: 0,
@@ -432,9 +443,15 @@ export async function setupTestFixtures(options: {
     const { data: usersBeforeUpdate, error: checkError } = await supabase
       .from('users')
       .select('*')
-      .in('email', Object.values(fixtureAuthUsers).map(u => u.email));
+      .in(
+        'email',
+        Object.values(fixtureAuthUsers).map(u => u.email)
+      );
 
-    console.log('🔍 [FIXTURE SETUP] public.users count BEFORE update:', usersBeforeUpdate?.length || 0);
+    console.log(
+      '🔍 [FIXTURE SETUP] public.users count BEFORE update:',
+      usersBeforeUpdate?.length || 0
+    );
     console.log('🔍 [FIXTURE SETUP] public.users data:', JSON.stringify(usersBeforeUpdate));
 
     // 3. Update public.users entries created by trigger with correct org and role
@@ -442,17 +459,15 @@ export async function setupTestFixtures(options: {
       // Skip admin user (no auth account)
       if (user.role === 'admin') continue;
 
-      const { error } = await supabase
-        .from('users')
-        .upsert(
-          {
-            id: user.id,
-            email: user.email,
-            organization_id: user.organizationId,
-            role: user.role,
-          },
-          { onConflict: 'id' }
-        );
+      const { error } = await supabase.from('users').upsert(
+        {
+          id: user.id,
+          email: user.email,
+          organization_id: user.organizationId,
+          role: user.role,
+        },
+        { onConflict: 'id' }
+      );
 
       if (error) {
         throw new Error(`Failed to update user ${user.email}: ${error.message}`);
@@ -523,7 +538,10 @@ export async function setupTestFixtures(options: {
   const { data: finalUsers } = await supabase
     .from('users')
     .select('*')
-    .in('email', Object.values(fixtureAuthUsers).map(u => u.email));
+    .in(
+      'email',
+      Object.values(fixtureAuthUsers).map(u => u.email)
+    );
 
   console.log('🔍 [FIXTURE SETUP] FINAL public.users count:', finalUsers?.length || 0);
   console.log('🔍 [FIXTURE SETUP] FINAL public.users data:', JSON.stringify(finalUsers));
@@ -714,7 +732,8 @@ export async function getAuthContext(client: SupabaseClient): Promise<unknown> {
 const DEFAULT_LESSON_SPEC_V2: LessonSpecificationV2 = {
   lesson_id: '1.1',
   title: 'Introduction to TypeScript',
-  description: 'Learn the fundamentals of TypeScript type system and how to apply static typing to your JavaScript code.',
+  description:
+    'Learn the fundamentals of TypeScript type system and how to apply static typing to your JavaScript code.',
   metadata: {
     target_audience: 'practitioner',
     tone: 'conversational-professional',
@@ -776,7 +795,8 @@ const DEFAULT_LESSON_SPEC_V2: LessonSpecificationV2 = {
       type: 'coding',
       difficulty: 'easy',
       learning_objective_id: 'LO-1.1.2',
-      structure_template: 'Given a JavaScript function [scenario], add TypeScript type annotations [requirement] that [acceptance criteria]',
+      structure_template:
+        'Given a JavaScript function [scenario], add TypeScript type annotations [requirement] that [acceptance criteria]',
       rubric_criteria: [
         { criteria: ['Correct parameter types', 'Correct return type'], weight: 60 },
         { criteria: ['Code compiles without errors'], weight: 40 },
@@ -802,7 +822,8 @@ const DEFAULT_RAG_CHUNKS: RAGChunk[] = [
     chunk_id: 'chunk-ts-001',
     document_id: '00000000-0000-0000-0000-000000000100',
     document_name: 'typescript-handbook.pdf',
-    content: 'TypeScript is a strongly typed programming language that builds on JavaScript, giving you better tooling at any scale.',
+    content:
+      'TypeScript is a strongly typed programming language that builds on JavaScript, giving you better tooling at any scale.',
     page_or_section: 'Chapter 1, Page 1',
     relevance_score: 0.95,
     metadata: { source: 'handbook', topic: 'introduction' },
@@ -811,7 +832,8 @@ const DEFAULT_RAG_CHUNKS: RAGChunk[] = [
     chunk_id: 'chunk-ts-002',
     document_id: '00000000-0000-0000-0000-000000000100',
     document_name: 'typescript-handbook.pdf',
-    content: 'TypeScript adds optional static typing and class-based object-oriented programming to the language.',
+    content:
+      'TypeScript adds optional static typing and class-based object-oriented programming to the language.',
     page_or_section: 'Chapter 1, Page 2',
     relevance_score: 0.92,
     metadata: { source: 'handbook', topic: 'features' },
@@ -820,7 +842,8 @@ const DEFAULT_RAG_CHUNKS: RAGChunk[] = [
     chunk_id: 'chunk-ts-003',
     document_id: '00000000-0000-0000-0000-000000000101',
     document_name: 'typescript-basics.md',
-    content: 'The basic types in TypeScript include boolean, number, string, array, tuple, enum, any, void, null, and undefined.',
+    content:
+      'The basic types in TypeScript include boolean, number, string, array, tuple, enum, any, void, null, and undefined.',
     page_or_section: 'Basic Types',
     relevance_score: 0.88,
     metadata: { source: 'tutorial', topic: 'types' },
@@ -829,7 +852,8 @@ const DEFAULT_RAG_CHUNKS: RAGChunk[] = [
     chunk_id: 'chunk-ts-004',
     document_id: '00000000-0000-0000-0000-000000000101',
     document_name: 'typescript-basics.md',
-    content: 'Type inference allows TypeScript to automatically determine types based on values, reducing the need for explicit annotations.',
+    content:
+      'Type inference allows TypeScript to automatically determine types based on values, reducing the need for explicit annotations.',
     page_or_section: 'Type Inference',
     relevance_score: 0.85,
     metadata: { source: 'tutorial', topic: 'inference' },
@@ -999,7 +1023,9 @@ export async function setupStage6TestCourse(options?: {
     });
 
     if (contentError) {
-      throw new Error(`Failed to create lesson_contents for ${lessonNumber}: ${contentError.message}`);
+      throw new Error(
+        `Failed to create lesson_contents for ${lessonNumber}: ${contentError.message}`
+      );
     }
 
     lessonSpecs.push(lessonSpec);
@@ -1049,7 +1075,10 @@ export async function cleanupStage6TestData(
     .eq('course_id', courseId);
 
   if (contentsError) {
-    console.warn(`Failed to cleanup lesson_contents for course ${courseId}:`, contentsError.message);
+    console.warn(
+      `Failed to cleanup lesson_contents for course ${courseId}:`,
+      contentsError.message
+    );
   }
 
   // 2. rag_context_cache (depends on lessons and courses)
@@ -1063,10 +1092,7 @@ export async function cleanupStage6TestData(
   }
 
   // 3. Get section IDs for this course before deleting lessons
-  const { data: sections } = await supabase
-    .from('sections')
-    .select('id')
-    .eq('course_id', courseId);
+  const { data: sections } = await supabase.from('sections').select('id').eq('course_id', courseId);
 
   const sectionIds = sections?.map(s => s.id) ?? [];
 
@@ -1094,10 +1120,7 @@ export async function cleanupStage6TestData(
 
   // 6. Optionally delete the course itself
   if (options?.deleteCourse) {
-    const { error: courseError } = await supabase
-      .from('courses')
-      .delete()
-      .eq('id', courseId);
+    const { error: courseError } = await supabase.from('courses').delete().eq('id', courseId);
 
     if (courseError) {
       console.warn(`Failed to delete course ${courseId}:`, courseError.message);
@@ -1165,7 +1188,9 @@ export async function waitForStage6Completion(
     const completed = statuses.filter(c => c.status === 'completed').length;
     const failed = statuses.filter(c => c.status === 'failed').length;
     const reviewRequired = statuses.filter(c => c.status === 'review_required').length;
-    const pending = statuses.filter(c => c.status === 'pending' || c.status === 'generating').length;
+    const pending = statuses.filter(
+      c => c.status === 'pending' || c.status === 'generating'
+    ).length;
 
     // All lessons reached terminal state
     if (pending === 0 && statuses.length > 0) {

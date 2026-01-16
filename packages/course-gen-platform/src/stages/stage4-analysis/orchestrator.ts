@@ -95,31 +95,40 @@ async function executePhaseWithRetry<T>(
   for (let attempt = 1; attempt <= RETRY_CONFIG.MAX_ATTEMPTS; attempt++) {
     try {
       if (attempt > 1) {
-        phaseLogger.info({
-          phase: phaseName,
-          attempt,
-          maxAttempts: RETRY_CONFIG.MAX_ATTEMPTS,
-        }, `Retry attempt ${attempt} for ${phaseName}`);
+        phaseLogger.info(
+          {
+            phase: phaseName,
+            attempt,
+            maxAttempts: RETRY_CONFIG.MAX_ATTEMPTS,
+          },
+          `Retry attempt ${attempt} for ${phaseName}`
+        );
       }
 
       return await phaseFunc();
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error));
 
-      phaseLogger.warn({
-        phase: phaseName,
-        attempt,
-        maxAttempts: RETRY_CONFIG.MAX_ATTEMPTS,
-        error: lastError.message,
-      }, `Phase ${phaseName} attempt ${attempt} failed`);
+      phaseLogger.warn(
+        {
+          phase: phaseName,
+          attempt,
+          maxAttempts: RETRY_CONFIG.MAX_ATTEMPTS,
+          error: lastError.message,
+        },
+        `Phase ${phaseName} attempt ${attempt} failed`
+      );
 
       if (attempt < RETRY_CONFIG.MAX_ATTEMPTS) {
         const delayMs = RETRY_CONFIG.BASE_DELAY_MS * Math.pow(2, attempt - 1);
-        phaseLogger.debug({
-          phase: phaseName,
-          delayMs,
-          nextAttempt: attempt + 1,
-        }, `Waiting ${delayMs}ms before retry`);
+        phaseLogger.debug(
+          {
+            phase: phaseName,
+            delayMs,
+            nextAttempt: attempt + 1,
+          },
+          `Waiting ${delayMs}ms before retry`
+        );
         await new Promise(r => setTimeout(r, delayMs));
       }
     }
@@ -170,7 +179,6 @@ async function executePhaseWithRetry<T>(
  *     topic: 'Procurement law fundamentals',
  *     language: 'ru',
  *     style: 'professional',
- *     answers: 'Target audience: government procurement specialists',
  *     target_audience: 'intermediate',
  *     difficulty: 'intermediate',
  *     lesson_duration_minutes: 15,
@@ -181,9 +189,7 @@ async function executePhaseWithRetry<T>(
  *   created_at: '2025-11-01T12:00:00Z'
  * });
  */
-export async function runAnalysisOrchestration(
-  job: StructureAnalysisJob
-): Promise<AnalysisResult> {
+export async function runAnalysisOrchestration(job: StructureAnalysisJob): Promise<AnalysisResult> {
   const { course_id: courseId, input } = job;
   const startTime = Date.now();
   const supabase = getSupabaseAdmin();
@@ -214,7 +220,7 @@ export async function runAnalysisOrchestration(
       language: input.language,
       documentCount: input.document_summaries?.length || 0,
     },
-    durationMs: 0
+    durationMs: 0,
   });
 
   try {
@@ -308,19 +314,20 @@ export async function runAnalysisOrchestration(
 
     const phase1Output: Phase1Output = await executePhaseWithRetry(
       'phase1_classification',
-      () => runPhase1Classification({
-        course_id: courseId,
-        language: input.language,
-        topic: input.topic,
-        answers: input.answers || null,
-        document_summaries: input.document_summaries?.map(ds => ({
-          document_id: ds.document_id,
-          file_name: ds.file_name,
-          processed_content: ds.processed_content,
-        })) || null,
-        target_audience: input.target_audience,
-        lesson_duration_minutes: input.lesson_duration_minutes,
-      }),
+      () =>
+        runPhase1Classification({
+          course_id: courseId,
+          language: input.language,
+          topic: input.topic,
+          document_summaries:
+            input.document_summaries?.map(ds => ({
+              document_id: ds.document_id,
+              file_name: ds.file_name,
+              processed_content: ds.processed_content,
+            })) || null,
+          target_audience: input.target_audience,
+          lesson_duration_minutes: input.lesson_duration_minutes,
+        }),
       orchestrationLogger
     );
 
@@ -344,9 +351,10 @@ export async function runAnalysisOrchestration(
       outputData: phase1Output, // Full phase output for complete visibility
       promptText: phase1TraceData?.promptText,
       completionText: phase1TraceData?.completionText,
-      tokensUsed: phase1Output.phase_metadata.tokens.input + phase1Output.phase_metadata.tokens.output,
+      tokensUsed:
+        phase1Output.phase_metadata.tokens.input + phase1Output.phase_metadata.tokens.output,
       modelUsed: phase1Output.phase_metadata.model_used,
-      durationMs: phase1Output.phase_metadata.duration_ms
+      durationMs: phase1Output.phase_metadata.duration_ms,
     });
 
     // Log pedagogical_patterns if present (Analyze Enhancement A20)
@@ -369,14 +377,14 @@ export async function runAnalysisOrchestration(
 
     const phase2Output: Phase2Output = await executePhaseWithRetry(
       'phase2_scope',
-      () => runPhase2Scope({
-        course_id: courseId,
-        language: input.language,
-        topic: input.topic,
-        answers: input.answers || null,
-        document_summaries: input.document_summaries?.map(ds => ds.processed_content) || null,
-        phase1_output: phase1Output,
-      }),
+      () =>
+        runPhase2Scope({
+          course_id: courseId,
+          language: input.language,
+          topic: input.topic,
+          document_summaries: input.document_summaries?.map(ds => ds.processed_content) || null,
+          phase1_output: phase1Output,
+        }),
       orchestrationLogger
     );
 
@@ -402,9 +410,10 @@ export async function runAnalysisOrchestration(
       outputData: phase2Output, // Full phase output for complete visibility
       promptText: phase2TraceData?.promptText,
       completionText: phase2TraceData?.completionText,
-      tokensUsed: phase2Output.phase_metadata.tokens.input + phase2Output.phase_metadata.tokens.output,
+      tokensUsed:
+        phase2Output.phase_metadata.tokens.input + phase2Output.phase_metadata.tokens.output,
       modelUsed: phase2Output.phase_metadata.model_used,
-      durationMs: phase2Output.phase_metadata.duration_ms
+      durationMs: phase2Output.phase_metadata.duration_ms,
     });
 
     // =================================================================
@@ -416,15 +425,15 @@ export async function runAnalysisOrchestration(
 
     const phase3Output: Phase3Output = await executePhaseWithRetry(
       'phase3_expert',
-      () => runPhase3Expert({
-        course_id: courseId,
-        language: input.language,
-        topic: input.topic,
-        answers: input.answers || null,
-        document_summaries: documentSummariesText,
-        phase1_output: phase1Output,
-        phase2_output: phase2Output,
-      }),
+      () =>
+        runPhase3Expert({
+          course_id: courseId,
+          language: input.language,
+          topic: input.topic,
+          document_summaries: documentSummariesText,
+          phase1_output: phase1Output,
+          phase2_output: phase2Output,
+        }),
       orchestrationLogger
     );
 
@@ -448,9 +457,10 @@ export async function runAnalysisOrchestration(
       outputData: phase3Output, // Full phase output for complete visibility
       promptText: phase3TraceData?.promptText,
       completionText: phase3TraceData?.completionText,
-      tokensUsed: phase3Output.phase_metadata.tokens.input + phase3Output.phase_metadata.tokens.output,
+      tokensUsed:
+        phase3Output.phase_metadata.tokens.input + phase3Output.phase_metadata.tokens.output,
       modelUsed: phase3Output.phase_metadata.model_used,
-      durationMs: phase3Output.phase_metadata.duration_ms
+      durationMs: phase3Output.phase_metadata.duration_ms,
     });
 
     // =================================================================
@@ -460,16 +470,16 @@ export async function runAnalysisOrchestration(
 
     const phase4Output: Phase4Output = await executePhaseWithRetry(
       'phase4_synthesis',
-      () => runPhase4Synthesis({
-        course_id: courseId,
-        language: input.language,
-        topic: input.topic,
-        answers: input.answers || null,
-        document_summaries: input.document_summaries || null,
-        phase1_output: phase1Output,
-        phase2_output: phase2Output,
-        phase3_output: phase3Output,
-      }),
+      () =>
+        runPhase4Synthesis({
+          course_id: courseId,
+          language: input.language,
+          topic: input.topic,
+          document_summaries: input.document_summaries || null,
+          phase1_output: phase1Output,
+          phase2_output: phase2Output,
+          phase3_output: phase3Output,
+        }),
       orchestrationLogger
     );
 
@@ -493,9 +503,10 @@ export async function runAnalysisOrchestration(
       outputData: phase4Output, // Full phase output for complete visibility
       promptText: phase4TraceData?.promptText,
       completionText: phase4TraceData?.completionText,
-      tokensUsed: phase4Output.phase_metadata.tokens.input + phase4Output.phase_metadata.tokens.output,
+      tokensUsed:
+        phase4Output.phase_metadata.tokens.input + phase4Output.phase_metadata.tokens.output,
       modelUsed: phase4Output.phase_metadata.model_used,
-      durationMs: phase4Output.phase_metadata.duration_ms
+      durationMs: phase4Output.phase_metadata.duration_ms,
     });
 
     // Log generation_guidance if present (Analyze Enhancement A20)
@@ -524,24 +535,29 @@ export async function runAnalysisOrchestration(
       try {
         phase6Output = await executePhaseWithRetry(
           'phase6_rag_planning',
-          () => runPhase6RagPlanning({
-            course_id: courseId,
-            language: input.language,
-            sections_breakdown: phase2Output.recommended_structure.sections_breakdown,
-            document_summaries: input.document_summaries!.map(ds => ({
-              document_id: ds.document_id,
-              file_name: ds.file_name,
-              processed_content: ds.processed_content,
-            })),
-          }),
+          () =>
+            runPhase6RagPlanning({
+              course_id: courseId,
+              language: input.language,
+              sections_breakdown: phase2Output.recommended_structure.sections_breakdown,
+              document_summaries: input.document_summaries!.map(ds => ({
+                document_id: ds.document_id,
+                file_name: ds.file_name,
+                processed_content: ds.processed_content,
+              })),
+            }),
           orchestrationLogger
         );
 
         // Calculate aggregate stats for logging (Analyze Enhancement A20)
-        const totalSearchTerms = Object.values(phase6Output.document_relevance_mapping)
-          .reduce((sum, mapping) => sum + (mapping.key_search_terms?.length ?? 0), 0);
-        const totalTopics = Object.values(phase6Output.document_relevance_mapping)
-          .reduce((sum, mapping) => sum + (mapping.expected_topics?.length ?? 0), 0);
+        const totalSearchTerms = Object.values(phase6Output.document_relevance_mapping).reduce(
+          (sum, mapping) => sum + (mapping.key_search_terms?.length ?? 0),
+          0
+        );
+        const totalTopics = Object.values(phase6Output.document_relevance_mapping).reduce(
+          (sum, mapping) => sum + (mapping.expected_topics?.length ?? 0),
+          0
+        );
 
         await completePhase(6, courseId, supabase, orchestrationLogger, {
           sections_mapped: Object.keys(phase6Output.document_relevance_mapping).length,
@@ -564,11 +580,11 @@ export async function runAnalysisOrchestration(
           outputData: phase6Output, // Full phase output for complete visibility
           promptText: phase6TraceData?.promptText,
           completionText: phase6TraceData?.completionText,
-          tokensUsed: phase6Output.phase_metadata.tokens.input + phase6Output.phase_metadata.tokens.output,
+          tokensUsed:
+            phase6Output.phase_metadata.tokens.input + phase6Output.phase_metadata.tokens.output,
           modelUsed: phase6Output.phase_metadata.model_used,
-          durationMs: phase6Output.phase_metadata.duration_ms
+          durationMs: phase6Output.phase_metadata.duration_ms,
         });
-
       } catch (phase6Error) {
         // Phase 6 failed - log warning and continue with degraded functionality (Analyze Enhancement A19)
         orchestrationLogger.warn(
@@ -585,8 +601,10 @@ export async function runAnalysisOrchestration(
           phase: 'rag_planning',
           stepName: 'rag_planning',
           inputData: { documentsTotal: input.document_summaries.length },
-          errorData: { error: phase6Error instanceof Error ? phase6Error.message : String(phase6Error) },
-          durationMs: 0
+          errorData: {
+            error: phase6Error instanceof Error ? phase6Error.message : String(phase6Error),
+          },
+          durationMs: 0,
         });
 
         // Set to null to indicate Phase 6 was attempted but failed
@@ -635,7 +653,6 @@ export async function runAnalysisOrchestration(
       course_id: courseId,
       language: input.language,
       topic: input.topic,
-      answers: input.answers || null,
       document_summaries: documentSummariesText,
       phase1_output: phase1Output,
       phase2_output: phase2Output,
@@ -676,11 +693,10 @@ export async function runAnalysisOrchestration(
       outputData: analysisResult, // Full AnalysisResult for UI display
       costUsd: analysisResult.metadata.total_cost_usd,
       tokensUsed: analysisResult.metadata.total_tokens.total,
-      durationMs: totalDurationMs
+      durationMs: totalDurationMs,
     });
 
     return analysisResult;
-
   } catch (error) {
     // =================================================================
     // ERROR HANDLING (FR-013)
@@ -700,7 +716,7 @@ export async function runAnalysisOrchestration(
       phase: 'complete',
       stepName: 'failed',
       errorData: { error: error instanceof Error ? error.message : String(error) },
-      durationMs: Date.now() - startTime
+      durationMs: Date.now() - startTime,
     });
 
     // Update course progress to failed state

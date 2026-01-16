@@ -31,8 +31,6 @@ export interface Phase4Input {
   language: string;
   /** Course topic */
   topic: string;
-  /** Optional user requirements */
-  answers?: string | null;
   /** Optional document summaries from Stage 3 */
   document_summaries?: DocumentSummary[] | null;
   /** Phase 1 output (course categorization) */
@@ -91,19 +89,18 @@ interface RawPhase4Output {
  *   phase3_output: { ... },
  * });
  */
-export async function runPhase4Synthesis(
-  input: Phase4Input
-): Promise<Phase4Output> {
+export async function runPhase4Synthesis(input: Phase4Input): Promise<Phase4Output> {
   const startTime = Date.now();
   const documentCount = input.document_summaries?.length || 0;
 
   // Calculate total tokens from document summaries for dynamic tier selection
   // Phase 4 uses accurate summary_metadata.summary_tokens from Stage 3
   // (Unlike Phase 3 which uses character-based estimation for raw strings)
-  const totalTokens = input.document_summaries?.reduce(
-    (sum, doc) => sum + (doc.summary_metadata?.summary_tokens || 0),
-    0
-  ) || 0;
+  const totalTokens =
+    input.document_summaries?.reduce(
+      (sum, doc) => sum + (doc.summary_metadata?.summary_tokens || 0),
+      0
+    ) || 0;
 
   // Model selection from database based on phase and tier
   // Language is passed to service which handles 'any' fallback for unknown languages
@@ -120,23 +117,26 @@ export async function runPhase4Synthesis(
     input.course_id,
     modelId,
     async () => {
-      const messages = [
-        new SystemMessage(getPhase4SystemPrompt()),
-        new HumanMessage(prompt),
-      ];
+      const messages = [new SystemMessage(getPhase4SystemPrompt()), new HumanMessage(prompt)];
       const response = await model.invoke(messages);
 
       const content = response.content as string;
 
       // Store trace data for orchestrator to log
-      const promptText = messages.map(m => `${m._getType().toUpperCase()}:
-${m.content}`).join('\n\n');
+      const promptText = messages
+        .map(
+          m => `${m._getType().toUpperCase()}:
+${m.content}`
+        )
+        .join('\n\n');
       storeTraceData(input.course_id, 'stage_4_synthesis', {
         promptText,
         completionText: content,
       });
 
-      const usage = response.response_metadata?.usage as { prompt_tokens?: number; completion_tokens?: number } | undefined;
+      const usage = response.response_metadata?.usage as
+        | { prompt_tokens?: number; completion_tokens?: number }
+        | undefined;
 
       return {
         result: {
@@ -173,11 +173,14 @@ ${m.content}`).join('\n\n');
     const parsedRaw = JSON.parse(rawOutput) as RawPhase4Output;
     // Preprocess generation instructions enum fields
     if (parsedRaw.generation_instructions) {
-      parsedRaw.generation_instructions = preprocessObject(parsedRaw.generation_instructions as Record<string, unknown>, {
-        target_audience: 'enum',
-        difficulty_level: 'enum',
-        primary_strategy: 'enum',
-      });
+      parsedRaw.generation_instructions = preprocessObject(
+        parsedRaw.generation_instructions as Record<string, unknown>,
+        {
+          target_audience: 'enum',
+          difficulty_level: 'enum',
+          primary_strategy: 'enum',
+        }
+      );
     }
     preprocessedOutput = JSON.stringify(parsedRaw);
   } catch (error) {
@@ -194,7 +197,13 @@ ${m.content}`).join('\n\n');
 
     // Use UnifiedRegenerator with all 5 layers + warning fallback (Stage 4)
     const regenerator = new UnifiedRegenerator<Phase4Output>({
-      enabledLayers: ['auto-repair', 'critique-revise', 'partial-regen', 'model-escalation', 'emergency'],
+      enabledLayers: [
+        'auto-repair',
+        'critique-revise',
+        'partial-regen',
+        'model-escalation',
+        'emergency',
+      ],
       maxRetries: 2,
       schema: Phase4OutputSchema,
       model: model,
@@ -215,14 +224,23 @@ ${m.content}`).join('\n\n');
       parsedOutput = regenerationResult.data as unknown as RawPhase4Output; // Phase4Output matches RawPhase4Output structurally but typed strictly
 
       // Map layer names for backward compatibility
-      const layerMapping: Record<string, 'layer1_repair' | 'layer2_revise' | 'layer3_partial' | 'layer4_120b' | 'layer5_emergency' | 'warning_fallback' | 'none'> = {
+      const layerMapping: Record<
+        string,
+        | 'layer1_repair'
+        | 'layer2_revise'
+        | 'layer3_partial'
+        | 'layer4_120b'
+        | 'layer5_emergency'
+        | 'warning_fallback'
+        | 'none'
+      > = {
         'auto-repair': 'layer1_repair',
         'critique-revise': 'layer2_revise',
         'partial-regen': 'layer3_partial',
         'model-escalation': 'layer4_120b',
-        'emergency': 'layer5_emergency',
-        'warning_fallback': 'warning_fallback',
-        'failed': 'none',
+        emergency: 'layer5_emergency',
+        warning_fallback: 'warning_fallback',
+        failed: 'none',
       };
 
       repairMetadata.layer_used = layerMapping[regenerationResult.metadata.layerUsed] || 'none';
@@ -234,7 +252,9 @@ ${m.content}`).join('\n\n');
       // UnifiedRegenerator succeeded - observability tracked by metrics
     } else {
       console.error('[Phase 4] ALL REPAIR LAYERS EXHAUSTED');
-      throw new Error(`Failed to parse Phase 4 JSON after all 5 repair layers. Error: ${regenerationResult.error}`);
+      throw new Error(
+        `Failed to parse Phase 4 JSON after all 5 repair layers. Error: ${regenerationResult.error}`
+      );
     }
   }
 
@@ -322,7 +342,7 @@ function buildPhase4Prompt(input: Phase4Input, documentCount: number): string {
   // Build research flags section
   const researchFlagsSection =
     researchFlagsCount > 0
-      ? `\n\nRESEARCH FLAGS (${researchFlagsCount} topics requiring up-to-date information):\n${phase3_output.research_flags.map((flag) => `- ${flag.topic}: ${flag.context} [${flag.reason}]`).join('\n')}`
+      ? `\n\nRESEARCH FLAGS (${researchFlagsCount} topics requiring up-to-date information):\n${phase3_output.research_flags.map(flag => `- ${flag.topic}: ${flag.context} [${flag.reason}]`).join('\n')}`
       : '';
 
   // Generate Zod schema description for LLM
@@ -356,7 +376,7 @@ Phase 1 - Key Concepts:
 ${phase1_output.topic_analysis.key_concepts.join(', ')}
 
 Phase 2 - Sections Breakdown:
-${phase2_output.recommended_structure.sections_breakdown.map((section) => `- ${section.area}: ${section.estimated_lessons} lessons (${section.importance})`).join('\n')}
+${phase2_output.recommended_structure.sections_breakdown.map(section => `- ${section.area}: ${section.estimated_lessons} lessons (${section.importance})`).join('\n')}
 
 Phase 3 - Pedagogical Approach:
 ${phase3_output.pedagogical_strategy.progression_logic}

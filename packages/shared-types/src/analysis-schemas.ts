@@ -263,7 +263,6 @@ export const Phase2InputSchema = z.object({
   course_id: z.string().uuid('Invalid course ID'),
   language: z.string().min(2).max(10, 'Language code must be 2-10 characters'),
   topic: z.string().min(1, 'Topic is required').max(5000, 'Topic too long'),
-  answers: z.string().nullable().optional(),
   document_summaries: z.array(z.string()).nullable().optional(),
   phase1_output: z.object({
     course_category: z.object({
@@ -310,6 +309,12 @@ export const Phase2InputSchema = z.object({
   target_lessons: z.number().int().positive().optional(),
   target_sections: z.number().int().positive().optional(),
   size_guidance: z.string().min(1).optional(),
+
+  /** Course description (user-provided context) */
+  course_description: z.string().optional(),
+
+  /** Learning outcomes (user-specified goals) */
+  learning_outcomes: z.union([z.string(), z.array(z.string())]).optional(),
 });
 
 /**
