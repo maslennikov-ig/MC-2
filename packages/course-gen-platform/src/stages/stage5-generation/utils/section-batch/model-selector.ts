@@ -1,11 +1,12 @@
 import type { QdrantClient } from '@qdrant/js-client-rest';
 import type { GenerationJobInput } from '@megacampus/shared-types';
 import type { SectionBreakdown } from '@megacampus/shared-types/analysis-schemas';
-import { createModelConfigService } from '../../../../shared/llm/model-config-service';
+import { getModelForPhase } from '../../../../shared/llm/langchain-models';
 import { getRagTokenBudget } from '../../../../services/global-settings-service';
 import logger from '@/shared/logger';
 import { ModelTier } from './types';
 import { MODELS, TOKEN_BUDGET, QUALITY_THRESHOLDS } from './constants';
+import { normalizeLanguageCode } from '@/shared/utils/language-utils';
 
 /**
  * Calculate complexity score for pre-routing (RT-001)
@@ -81,9 +82,7 @@ export async function estimateContextLength(
   qdrantClient?: QdrantClient
 ): Promise<number> {
   let estimatedTokens =
-    TOKEN_BUDGET.BASE_PROMPT +
-    TOKEN_BUDGET.STYLE_PROMPT +
-    TOKEN_BUDGET.SECTION_CONTEXT;
+    TOKEN_BUDGET.BASE_PROMPT + TOKEN_BUDGET.STYLE_PROMPT + TOKEN_BUDGET.SECTION_CONTEXT;
 
   if (qdrantClient && input.vectorized_documents) {
     const ragMaxTokens = await getRagTokenBudget();
@@ -118,36 +117,41 @@ export async function selectModelTier(
     criticalityScore >= QUALITY_THRESHOLDS.criticality
   ) {
     try {
-      const service = createModelConfigService();
-      const langCode = (language === 'ru' || language === 'russian') ? 'ru' : 'en';
-      const config = await service.getModelForStage(5, langCode, estimatedContextLength);
+      const langCode = normalizeLanguageCode(language, 'en');
+      const model = await getModelForPhase(
+        'stage_5_sections',
+        undefined,
+        estimatedContextLength,
+        langCode
+      );
+      const modelId = model.model || MODELS.lessons_fallback;
 
       const isRussian = langCode === 'ru';
       const tierName = isRussian ? 'tier2_ru_lessons' : 'tier2_en_lessons';
 
       logger.info({
-        msg: 'Tier 2 model selection via ModelConfigService',
+        msg: 'Tier 2 model selection via getModelForPhase',
         language: langCode,
-        primary: config.primary,
-        source: config.source,
-        tier: config.tier,
+        modelId,
+        phase: 'stage_5_sections',
         complexityScore,
         criticalityScore,
       });
 
       return {
-        model: config.primary,
+        model: modelId,
         tier: tierName,
-        reason: `High complexity (${complexityScore.toFixed(2)}) or criticality (${criticalityScore.toFixed(2)}) - using ${language}-optimized model (${config.primary}, source: ${config.source})`,
+        reason: `High complexity (${complexityScore.toFixed(2)}) or criticality (${criticalityScore.toFixed(2)}) - using ${language}-optimized model (${modelId})`,
       };
     } catch (error) {
       logger.warn({
-        msg: 'ModelConfigService failed for tier2, using hardcoded fallback',
+        msg: 'getModelForPhase failed for tier2, using hardcoded fallback',
         language,
         error: error instanceof Error ? error.message : 'Unknown error',
       });
 
-      const isRussian = language === 'ru' || language === 'russian';
+      const langCode = normalizeLanguageCode(language, 'en');
+      const isRussian = langCode === 'ru';
       const model = isRussian ? MODELS.ru_lessons_primary : MODELS.en_lessons_primary;
       const tierName = isRussian ? 'tier2_ru_lessons' : 'tier2_en_lessons';
 

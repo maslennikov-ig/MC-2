@@ -13,6 +13,23 @@ const DEFAULT_POLLING_INTERVAL = 2000 // 2 seconds
 const MAX_POLL_FAILURES = 5
 const MAX_BACKOFF_INTERVAL = 10000 // 10 seconds
 
+// Optimistic UI prefix for temporary IDs before API response
+const OPTIMISTIC_ID_PREFIX = 'optimistic-'
+
+// Development-only logger to avoid exposing internal logic in production
+const devLog = {
+  warn: (...args: unknown[]) => {
+    if (process.env.NODE_ENV === 'development') {
+      console.warn('[useEnrichmentGeneration]', ...args)
+    }
+  },
+  error: (...args: unknown[]) => {
+    if (process.env.NODE_ENV === 'development') {
+      console.error('[useEnrichmentGeneration]', ...args)
+    }
+  },
+}
+
 interface UseEnrichmentGenerationOptions {
   lessonId: string
   courseId: string
@@ -126,10 +143,18 @@ export function useEnrichmentGeneration({
       pollingIntervalsRef.current.delete(type)
     }
 
+    // Clean up polling-phase controller
     const controller = abortControllersRef.current.get(type)
     if (controller) {
       controller.abort()
       abortControllersRef.current.delete(type)
+    }
+
+    // Clean up generate-phase controller (prevents memory leak in optimistic phase)
+    const generateController = abortControllersRef.current.get(`generate-${type}`)
+    if (generateController) {
+      generateController.abort()
+      abortControllersRef.current.delete(`generate-${type}`)
     }
 
     pollFailuresRef.current.delete(type)
@@ -142,7 +167,7 @@ export function useEnrichmentGeneration({
     (type: OnDemandEnrichmentType, enrichmentId: string) => {
       // Guard: Don't start polling if unmounted
       if (!mountedRef.current) {
-        console.warn('[useEnrichmentGeneration] Attempted to start polling after unmount')
+        devLog.warn('Attempted to start polling after unmount')
         return
       }
 
@@ -231,7 +256,7 @@ export function useEnrichmentGeneration({
             return
           }
 
-          console.error('[useEnrichmentGeneration] Poll error:', error)
+          devLog.error('Poll error:', error)
 
           const failures = (pollFailuresRef.current.get(type) || 0) + 1
           pollFailuresRef.current.set(type, failures)
@@ -264,6 +289,11 @@ export function useEnrichmentGeneration({
 
   /**
    * Start generation for a specific enrichment type
+   *
+   * Uses optimistic UI update pattern:
+   * 1. Immediately shows loading state with temporary ID
+   * 2. Makes API request
+   * 3. Updates with real enrichmentId on success, or removes on failure
    */
   const startGeneration = useCallback(
     async (
@@ -272,8 +302,23 @@ export function useEnrichmentGeneration({
     ): Promise<string | null> => {
       // Guard: Prevent concurrent generation for same type
       if (generating.has(type)) {
-        console.warn('[useEnrichmentGeneration] Generation already in progress for type:', type)
+        devLog.warn('Generation already in progress for type:', type)
         return null
+      }
+
+      // OPTIMISTIC UPDATE: Immediately show loading state with temporary ID
+      const optimisticId = `${OPTIMISTIC_ID_PREFIX}${type}-${Date.now()}`
+      if (mountedRef.current) {
+        setGenerating((prev) => {
+          const next = new Map(prev)
+          next.set(type, {
+            enrichmentId: optimisticId,
+            type,
+            progress: 0,
+            currentStep: 'queued',
+          })
+          return next
+        })
       }
 
       // Create AbortController for this request
@@ -298,7 +343,16 @@ export function useEnrichmentGeneration({
 
         if (!response.ok) {
           const errorText = await response.text()
-          console.error('[useEnrichmentGeneration] Generate failed:', errorText)
+          devLog.error('Generate failed:', errorText)
+
+          // ROLLBACK: Remove optimistic state on error
+          if (mountedRef.current) {
+            setGenerating((prev) => {
+              const next = new Map(prev)
+              next.delete(type)
+              return next
+            })
+          }
 
           // Try to parse error message from tRPC response
           let errorMessage = 'Failed to start generation'
@@ -319,11 +373,19 @@ export function useEnrichmentGeneration({
         const data = result.result?.data as GenerateOnDemandResponse | undefined
 
         if (!data?.enrichmentId) {
+          // ROLLBACK: Remove optimistic state on invalid response
+          if (mountedRef.current) {
+            setGenerating((prev) => {
+              const next = new Map(prev)
+              next.delete(type)
+              return next
+            })
+          }
           onError?.('Invalid response from server')
           return null
         }
 
-        // Add to generating map
+        // UPDATE: Replace optimistic ID with real enrichmentId
         if (mountedRef.current) {
           setGenerating((prev) => {
             const next = new Map(prev)
@@ -349,7 +411,16 @@ export function useEnrichmentGeneration({
           return null
         }
 
-        console.error('[useEnrichmentGeneration] Error:', error)
+        // ROLLBACK: Remove optimistic state on error
+        if (mountedRef.current) {
+          setGenerating((prev) => {
+            const next = new Map(prev)
+            next.delete(type)
+            return next
+          })
+        }
+
+        devLog.error('Error:', error)
         onError?.(error instanceof Error ? error.message : 'Failed to start generation')
         return null
       }
@@ -359,6 +430,9 @@ export function useEnrichmentGeneration({
 
   /**
    * Cancel generation for a specific enrichment type
+   *
+   * Handles both optimistic phase (before API response) and active generation.
+   * In optimistic phase, only cleans up frontend state without backend call.
    */
   const cancelGeneration = useCallback(
     async (type: string) => {
@@ -368,6 +442,20 @@ export function useEnrichmentGeneration({
       // Stop polling immediately
       stopPolling(type)
 
+      // Check if still in optimistic phase (no backend job exists yet)
+      if (gen.enrichmentId.startsWith(OPTIMISTIC_ID_PREFIX)) {
+        // Only clean up frontend state - no backend call needed
+        if (mountedRef.current) {
+          setGenerating((prev) => {
+            const next = new Map(prev)
+            next.delete(type)
+            return next
+          })
+        }
+        return
+      }
+
+      // Backend job exists - send cancel request
       try {
         const headers = getAuthHeaders()
 
@@ -383,11 +471,11 @@ export function useEnrichmentGeneration({
         if (!response.ok) {
           if (response.status === 404) {
             // Cancel endpoint not implemented - that's OK, we already stopped polling
-            console.warn('[useEnrichmentGeneration] Cancel endpoint not implemented')
+            devLog.warn('Cancel endpoint not implemented')
           } else if (response.status === 403) {
             onError?.('You do not have permission to cancel this generation')
           } else {
-            console.error('[useEnrichmentGeneration] Cancel failed:', response.status)
+            devLog.error('Cancel failed:', response.status)
           }
         }
 
@@ -400,7 +488,7 @@ export function useEnrichmentGeneration({
           })
         }
       } catch (error) {
-        console.error('[useEnrichmentGeneration] Cancel error:', error)
+        devLog.error('Cancel error:', error)
         // Still remove from UI even if cancel fails
         if (mountedRef.current) {
           setGenerating((prev) => {

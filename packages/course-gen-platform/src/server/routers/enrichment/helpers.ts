@@ -9,7 +9,7 @@
 import { TRPCError } from '@trpc/server';
 import { getSupabaseAdmin } from '../../../shared/supabase/admin';
 import { logger } from '../../../shared/logger/index.js';
-import type { EnrichmentStatus } from '@megacampus/shared-types';
+import type { EnrichmentStatus, EnrichmentType } from '@megacampus/shared-types';
 
 /**
  * Verify user has access to an enrichment
@@ -322,6 +322,60 @@ export async function getNextOrderIndex(lessonId: string): Promise<number> {
   }
 
   return data[0].order_index + 1;
+}
+
+/**
+ * Check if an active enrichment of given type exists for a lesson
+ *
+ * Excludes failed and cancelled enrichments (can be retried).
+ * Used to prevent duplicate enrichment creation.
+ *
+ * @param lessonId - Lesson UUID
+ * @param enrichmentType - Type of enrichment to check
+ * @param requestId - Request ID for logging
+ * @returns Object with exists flag and existing enrichment ID if found
+ * @throws TRPCError on database error
+ */
+export async function checkExistingEnrichment(
+  lessonId: string,
+  enrichmentType: EnrichmentType,
+  requestId: string
+): Promise<{ exists: boolean; enrichmentId?: string; status?: string }> {
+  const supabase = getSupabaseAdmin();
+
+  const { data, error } = await supabase
+    .from('lesson_enrichments')
+    .select('id, status')
+    .eq('lesson_id', lessonId)
+    .eq('enrichment_type', enrichmentType)
+    .not('status', 'in', '("failed","cancelled")');
+
+  if (error) {
+    logger.error(
+      {
+        requestId,
+        lessonId,
+        enrichmentType,
+        error: error.message,
+      },
+      'Failed to check existing enrichments'
+    );
+
+    throw new TRPCError({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: 'Unable to verify existing enrichments. Please try again.',
+    });
+  }
+
+  if (data && data.length > 0) {
+    return {
+      exists: true,
+      enrichmentId: data[0].id,
+      status: data[0].status,
+    };
+  }
+
+  return { exists: false };
 }
 
 /**

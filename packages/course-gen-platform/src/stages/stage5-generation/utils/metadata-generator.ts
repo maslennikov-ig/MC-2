@@ -15,10 +15,7 @@
  */
 
 import { ChatOpenAI } from '@langchain/openai';
-import type {
-  GenerationJobInput,
-  CourseStructure,
-} from '@megacampus/shared-types';
+import type { GenerationJobInput, CourseStructure } from '@megacampus/shared-types';
 import {
   CourseMetadataSchema,
   CourseMetadataWithoutInjectedFieldsSchema,
@@ -31,11 +28,12 @@ import {
   getCategoryFromAnalysis,
   formatPedagogicalStrategyForPrompt,
 } from './analysis-formatters';
+import { normalizeLanguageCode } from '@/shared/utils/language-utils';
 import { validateQwen3MaxContext, estimateTokenCount } from '../../../shared/llm/cost-calculator';
 import { zodToPromptSchema } from '@/shared/utils/zod-to-prompt-schema';
 import { preprocessObject } from '@/shared/validation/preprocessing';
 import logger from '@/shared/logger';
-import { createModelConfigService } from '../../../shared/llm/model-config-service';
+import { getModelForPhase } from '@/shared/llm/langchain-models';
 
 // ============================================================================
 // CONSTANTS
@@ -52,12 +50,12 @@ const OPENROUTER_BASE_URL = 'https://openrouter.ai/api/v1';
 const QUALITY_THRESHOLDS = {
   critical: {
     completeness: 0.85,
-    coherence: 0.90,
+    coherence: 0.9,
     alignment: 0.85,
   },
   nonCritical: {
     completeness: 0.75,
-    coherence: 0.80,
+    coherence: 0.8,
   },
 } as const;
 
@@ -198,7 +196,13 @@ export class MetadataGenerator {
     // Use UnifiedRegenerator with all 5 layers for maximum reliability
     // CRITICAL: Validate with CourseMetadataWithoutInjectedFieldsSchema BEFORE UUID/language injection
     const regenerator = new UnifiedRegenerator<Partial<CourseStructure>>({
-      enabledLayers: ['auto-repair', 'critique-revise', 'partial-regen', 'model-escalation', 'emergency'],
+      enabledLayers: [
+        'auto-repair',
+        'critique-revise',
+        'partial-regen',
+        'model-escalation',
+        'emergency',
+      ],
       maxRetries: 3, // Increased to allow Layer 4 (escalation) + Layer 5 (fallback)
       schema: CourseMetadataWithoutInjectedFieldsSchema, // Validate WITHOUT id/language fields
       qualityValidator: (data, _input) => {
@@ -250,9 +254,12 @@ export class MetadataGenerator {
       }
       // Preprocess pedagogical_strategy if present
       if (parsedRaw.pedagogical_strategy) {
-        parsedRaw.pedagogical_strategy = preprocessObject(parsedRaw.pedagogical_strategy as Record<string, unknown>, {
-          primary_strategy: 'enum',
-        });
+        parsedRaw.pedagogical_strategy = preprocessObject(
+          parsedRaw.pedagogical_strategy as Record<string, unknown>,
+          {
+            primary_strategy: 'enum',
+          }
+        );
       }
       preprocessedContent = JSON.stringify(parsedRaw);
     } catch (error) {
@@ -270,7 +277,7 @@ export class MetadataGenerator {
       // CRITICAL: LLM should NOT generate these fields - they are architectural data
       // Frontend MUST provide language in ISO 639-1 format (ru, en, etc.)
       if (result.data.learning_outcomes && Array.isArray(result.data.learning_outcomes)) {
-        result.data.learning_outcomes = result.data.learning_outcomes.map((outcome) => ({
+        result.data.learning_outcomes = result.data.learning_outcomes.map(outcome => ({
           ...outcome,
           id: crypto.randomUUID(), // Generate proper UUID
           language: language as CourseStructure['learning_outcomes'][number]['language'], // Inject language from frontend_parameters (ISO 639-1)
@@ -325,45 +332,101 @@ export class MetadataGenerator {
         tokensUsed: this.estimateTokens(prompt, rawContent),
       };
     } else {
-      throw new Error(
-        `Failed to generate metadata: ${result.error || 'Unknown error'}`
-      );
+      throw new Error(`Failed to generate metadata: ${result.error || 'Unknown error'}`);
     }
   }
 
   /**
    * Extract language from input (FR-027)
-   * Priority: frontend_parameters.language > analysis_result contextual language > 'en'
+   * Priority: frontend_parameters.language > analysis_result detection > 'en'
    *
    * Note: contextual_language is now an object with 6 fields (why_matters_context, motivators, etc.)
-   * We use the 'summary' strategy to extract language hints if needed
+   * We use simple heuristics to detect language from analysis content (Cyrillic vs Latin)
    *
    * Supports both ISO 639-1 codes (ru, en) and full language names (Russian, English)
    * for backward compatibility with database records that store full names.
    */
   private extractLanguage(input: GenerationJobInput): string {
-    // Helper to convert language names to ISO 639-1 codes
-    // Same mapping as Stage 4 handler for consistency
-    const languageNameToCode: Record<string, string> = {
-      'Russian': 'ru', 'English': 'en', 'Chinese': 'zh', 'Spanish': 'es',
-      'French': 'fr', 'German': 'de', 'Japanese': 'ja', 'Korean': 'ko',
-      'Arabic': 'ar', 'Portuguese': 'pt', 'Italian': 'it', 'Turkish': 'tr',
-      'Vietnamese': 'vi', 'Thai': 'th', 'Indonesian': 'id', 'Malay': 'ms',
-      'Hindi': 'hi', 'Bengali': 'bn', 'Polish': 'pl',
-    };
-
     // Priority 1: Explicit frontend parameter
     if (input.frontend_parameters.language) {
-      const rawLang = input.frontend_parameters.language;
-      // If it's already a 2-char ISO code, use it; otherwise convert from name
-      return rawLang.length === 2 ? rawLang : (languageNameToCode[rawLang] || 'en');
+      return normalizeLanguageCode(input.frontend_parameters.language, 'en');
     }
 
-    // Priority 2: Extract from contextual_language object (new schema)
-    // For now, we default to 'en' since contextual_language provides context, not language code
-    // TODO: Consider adding language detection from contextual_language content if needed
+    // Priority 2: Detect from analysis_result content
+    if (input.analysis_result) {
+      const detectedLang = this.detectLanguageFromAnalysis(input.analysis_result);
+      if (detectedLang) {
+        logger.info(
+          {
+            detectedLang,
+            courseId: input.course_id,
+            source: 'analysis_result',
+          },
+          'Detected language from analysis content'
+        );
+        return detectedLang;
+      }
+    }
 
+    // Priority 3: Default to English with warning
+    logger.warn(
+      {
+        courseId: input.course_id,
+        hasAnalysis: !!input.analysis_result,
+        reason: 'No language in frontend_parameters, detection failed',
+      },
+      'Defaulting to "en" language'
+    );
     return 'en';
+  }
+
+  /**
+   * Detect language from analysis_result using simple heuristics
+   * Checks for Cyrillic characters (Russian) vs Latin (English)
+   *
+   * @param analysis - Analysis result from Stage 4
+   * @returns Detected language code ('ru' or 'en') or null if detection fails
+   */
+  private detectLanguageFromAnalysis(
+    analysis: NonNullable<GenerationJobInput['analysis_result']>
+  ): string | null {
+    // Collect text from analysis fields
+    const textSamples: string[] = [];
+
+    if (analysis.topic_analysis?.determined_topic) {
+      textSamples.push(analysis.topic_analysis.determined_topic);
+    }
+    if (analysis.topic_analysis?.key_concepts) {
+      textSamples.push(...analysis.topic_analysis.key_concepts);
+    }
+    if (analysis.contextual_language) {
+      // contextual_language has fields like why_matters_context, motivators, etc.
+      const contextualValues = Object.values(analysis.contextual_language).filter(
+        (v): v is string => typeof v === 'string'
+      );
+      textSamples.push(...contextualValues);
+    }
+
+    const combinedText = textSamples.join(' ');
+    if (!combinedText || combinedText.length < 10) {
+      return null;
+    }
+
+    // Simple heuristic: check for Cyrillic characters
+    const cyrillicCount = (combinedText.match(/[\u0400-\u04FF]/g) || []).length;
+    const latinCount = (combinedText.match(/[a-zA-Z]/g) || []).length;
+
+    // If >30% Cyrillic, it's Russian
+    const totalLetters = cyrillicCount + latinCount;
+    if (totalLetters > 0) {
+      const cyrillicRatio = cyrillicCount / totalLetters;
+      if (cyrillicRatio > 0.3) {
+        return 'ru';
+      }
+    }
+
+    // Default to null (let caller decide)
+    return null;
   }
 
   /**
@@ -389,24 +452,28 @@ export class MetadataGenerator {
       return MODELS.metadata_fallback; // Kimi K2-0905 (Gold for both)
     }
 
-    // Try ModelConfigService first (database + hardcoded fallback)
+    // Use getModelForPhase for phase-specific model selection
     try {
-      const service = createModelConfigService();
-      const langCode = (language === 'ru' || language === 'russian') ? 'ru' : 'en';
-      const config = await service.getModelForStage(5, langCode, estimatedTokens);
+      const langCode = language === 'ru' || language === 'russian' ? 'ru' : 'en';
+      const model = await getModelForPhase(
+        'stage_5_metadata',
+        undefined,
+        estimatedTokens,
+        langCode
+      );
+      const modelId = model.model || MODELS.metadata_fallback;
 
       logger.info({
-        msg: 'Model selection via ModelConfigService',
+        msg: 'Model selection via getModelForPhase',
         language: langCode,
-        primary: config.primary,
-        source: config.source,
-        tier: config.tier,
+        modelId,
+        phase: 'stage_5_metadata',
       });
 
-      return config.primary;
+      return modelId;
     } catch (error) {
       logger.warn({
-        msg: 'ModelConfigService failed, using hardcoded fallback',
+        msg: 'getModelForPhase failed, using hardcoded fallback',
         language,
         error: error instanceof Error ? error.message : 'Unknown error',
       });
@@ -614,7 +681,9 @@ ${schemaDescription}
       const maxOutcomes = Math.max(50, hours * 2);
       if (outcomeCount < minOutcomes || outcomeCount > maxOutcomes) {
         coherenceScore -= 0.1;
-        coherencePenalties.push(`${outcomeCount} outcomes for ${hours}h course, expected ${minOutcomes}-${maxOutcomes} (-0.1)`);
+        coherencePenalties.push(
+          `${outcomeCount} outcomes for ${hours}h course, expected ${minOutcomes}-${maxOutcomes} (-0.1)`
+        );
       }
     }
 
@@ -643,9 +712,9 @@ ${schemaDescription}
       language === 'en' &&
       metadata.course_title &&
       input.frontend_parameters.course_title &&
-      !metadata.course_title.toLowerCase().includes(
-        input.frontend_parameters.course_title.toLowerCase().substring(0, 10)
-      )
+      !metadata.course_title
+        .toLowerCase()
+        .includes(input.frontend_parameters.course_title.toLowerCase().substring(0, 10))
     ) {
       alignmentScore -= 0.3;
     }
@@ -722,9 +791,9 @@ ${schemaDescription}
       configuration: {
         baseURL: OPENROUTER_BASE_URL,
       },
-      apiKey: apiKey,  // Updated for @langchain/openai v1.x (openAIApiKey deprecated)
+      apiKey: apiKey, // Updated for @langchain/openai v1.x (openAIApiKey deprecated)
       temperature, // From ModelConfigService or default
-      maxTokens,   // From ModelConfigService or default
+      maxTokens, // From ModelConfigService or default
     });
   }
 
