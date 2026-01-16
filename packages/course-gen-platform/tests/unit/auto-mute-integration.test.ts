@@ -163,5 +163,51 @@ describe('auto-mute integration', () => {
       const entries = statusEntries as Array<{ status: string }> | null;
       expect(entries?.length ?? 0).toBe(0);
     });
+
+    it('should handle multiple logs with same error message', async () => {
+      const errorMessage = 'Redis connection ended - test duplicate';
+
+      // Call twice with same error
+      await logPermanentFailure({
+        organization_id: testOrgId,
+        error_message: errorMessage,
+        severity: 'ERROR',
+      });
+
+      await logPermanentFailure({
+        organization_id: testOrgId,
+        error_message: errorMessage,
+        severity: 'ERROR',
+      });
+
+      // Find both log entries
+      const { data: logs } = await supabase
+        .from('error_logs' as never)
+        .select('id')
+        .eq('organization_id', testOrgId)
+        .eq('error_message', errorMessage)
+        .order('created_at', { ascending: false })
+        .limit(2);
+
+      const entries = logs as Array<{ id: string }> | null;
+      expect(entries).toHaveLength(2);
+
+      // Track for cleanup
+      if (entries) {
+        testLogIds.push(...entries.map(e => e.id));
+      }
+
+      // Both should have auto_muted status
+      for (const log of entries || []) {
+        const { data: statusEntries } = await supabase
+          .from('log_issue_status' as never)
+          .select('status')
+          .eq('log_id', log.id)
+          .eq('log_type', 'error_log');
+
+        const status = (statusEntries as Array<{ status: string }> | null)?.[0];
+        expect(status?.status).toBe('auto_muted');
+      }
+    });
   });
 });

@@ -176,6 +176,42 @@ describe('shouldAutoMute', () => {
       expect(result.mute).toBe(true);
       expect(result.reason).toBe('graceful_shutdown');
     });
+
+    it('should not mute whitespace-only messages', () => {
+      const result1 = shouldAutoMute('   ');
+      const result2 = shouldAutoMute('\n\t\r');
+
+      expect(result1.mute).toBe(false);
+      expect(result2.mute).toBe(false);
+    });
+
+    it('should handle null input gracefully', () => {
+      const result = shouldAutoMute(null as unknown as string);
+      expect(result.mute).toBe(false);
+    });
+
+    it('should handle undefined input gracefully', () => {
+      const result = shouldAutoMute(undefined as unknown as string);
+      expect(result.mute).toBe(false);
+    });
+
+    it('should handle very long error messages efficiently', () => {
+      const longMessage = 'Redis connection ended' + ' extra data'.repeat(10000);
+      const result = shouldAutoMute(longMessage);
+
+      expect(result.mute).toBe(true);
+      expect(result.reason).toBe('graceful_shutdown');
+    });
+
+    it('should not mute messages that almost match patterns', () => {
+      // Missing "connection" keyword
+      const result1 = shouldAutoMute('Redis ended');
+      // Missing "ended" or "closed"
+      const result2 = shouldAutoMute('Redis connection lost');
+
+      expect(result1.mute).toBe(false);
+      expect(result2.mute).toBe(false);
+    });
   });
 
   describe('AUTO_MUTE_RULES configuration', () => {
