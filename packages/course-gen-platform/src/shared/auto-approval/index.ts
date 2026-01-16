@@ -248,7 +248,7 @@ async function queueNextStageJob(
           course_title: course.title,
           language: course.language,
           style: course.style,
-          target_audience: settings.target_audience,
+          target_audience: course.target_audience,
           difficulty: course.difficulty,
           description: course.course_description,
           course_size: course.course_size,
