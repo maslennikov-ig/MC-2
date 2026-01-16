@@ -11,7 +11,12 @@ import { RFStage2GroupNode } from '../types'
 import { ChevronDown, ChevronRight, FileStack } from 'lucide-react'
 import { useViewportPreservation } from '../hooks/useViewportPreservation'
 import { motion } from 'framer-motion'
-import { getNodeStatusStyles, getStatusColor } from '../hooks/useNodeStatusStyles'
+import {
+  getNodeStatusStyles,
+  getStatusColor,
+  getTextStatusClass,
+  getIconContainerClass,
+} from '../hooks/useNodeStatusStyles'
 import { useNodeStatus } from '../hooks/useNodeStatus'
 import { useNodeSelection } from '../hooks/useNodeSelection'
 import { NodeErrorTooltip, RetryBadge, NodeProgressBar, StatusBadge } from '../components/shared'
@@ -64,20 +69,12 @@ const MediumStage2Node = ({
 
       <div className="flex items-center gap-1.5">
         <div
-          className={`flex h-5 w-5 items-center justify-center rounded-full ${
-            currentStatus === 'skipped'
-              ? 'bg-slate-200 text-slate-400 dark:bg-slate-600 dark:text-slate-500'
-              : 'bg-indigo-100 text-indigo-600 dark:bg-indigo-900/30 dark:text-indigo-400'
-          }`}
+          className={`flex h-5 w-5 items-center justify-center rounded-full ${getIconContainerClass(currentStatus, 'indigo')}`}
         >
           <FileStack size={10} />
         </div>
         <span
-          className={`flex-1 truncate text-[10px] font-semibold ${
-            currentStatus === 'skipped'
-              ? 'text-slate-500 line-through dark:text-slate-400'
-              : 'text-slate-700 dark:text-slate-300'
-          }`}
+          className={`flex-1 truncate text-[10px] font-semibold ${getTextStatusClass(currentStatus, 'name', 'slate')}`}
         >
           {t('stage2.documentsLabel')}
         </span>
@@ -303,41 +300,28 @@ const Stage2Group = ({ id, data, selected }: NodeProps<RFStage2GroupNode>) => {
             aria-label={t('stage2.clickToExpand')}
           >
             <div
-              className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full ${
-                currentStatus === 'active'
-                  ? 'bg-white shadow-sm dark:bg-slate-700'
-                  : currentStatus === 'skipped'
-                    ? 'bg-slate-200 dark:bg-slate-600'
-                    : 'bg-indigo-100 dark:bg-indigo-900/30'
-              } `}
+              className={`flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full ${getIconContainerClass(currentStatus, 'indigo', currentStatus === 'active')}`}
             >
               <FileStack
                 size={18}
-                className={
-                  currentStatus === 'skipped'
-                    ? 'text-slate-400 dark:text-slate-500'
-                    : 'text-indigo-600 dark:text-indigo-400'
-                }
+                className={getTextStatusClass(currentStatus, 'icon', 'indigo')}
               />
             </div>
 
             <div className="flex min-w-0 flex-1 flex-col">
               <span
-                className={`text-[10px] font-medium tracking-wider uppercase ${
-                  currentStatus === 'skipped'
-                    ? 'text-slate-400 dark:text-slate-500'
-                    : 'text-slate-500 dark:text-slate-400'
-                }`}
+                className={`text-[10px] font-medium tracking-wider uppercase ${getTextStatusClass(currentStatus, 'label', 'slate')}`}
               >
                 {t('stage2.stageLabel')}
               </span>
               <span
-                className={`truncate text-sm font-semibold ${
-                  currentStatus === 'skipped'
-                    ? 'text-slate-500 line-through dark:text-slate-400'
-                    : 'text-slate-900 dark:text-slate-100'
-                }`}
+                className={`truncate text-sm font-semibold ${getTextStatusClass(currentStatus, 'name', 'slate')}`}
                 title={t('stage2.groupTitle')}
+                aria-label={
+                  currentStatus === 'skipped'
+                    ? `${t('stage2.groupTitle')} (${t('status.skipped')})`
+                    : undefined
+                }
               >
                 {t('stage2.groupTitle')}
               </span>
@@ -458,38 +442,27 @@ const Stage2Group = ({ id, data, selected }: NodeProps<RFStage2GroupNode>) => {
 
             {/* Content (above progress background) */}
             <div
-              className={`relative z-10 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full ${
-                currentStatus === 'skipped'
-                  ? 'bg-slate-200 dark:bg-slate-600'
-                  : 'bg-indigo-100 dark:bg-indigo-900/30'
-              }`}
+              className={`relative z-10 flex h-9 w-9 flex-shrink-0 items-center justify-center rounded-full ${getIconContainerClass(currentStatus, 'indigo')}`}
             >
               <FileStack
                 size={18}
-                className={
-                  currentStatus === 'skipped'
-                    ? 'text-slate-400 dark:text-slate-500'
-                    : 'text-indigo-600 dark:text-indigo-400'
-                }
+                className={getTextStatusClass(currentStatus, 'icon', 'indigo')}
               />
             </div>
 
             <div className="relative z-10 flex min-w-0 flex-1 flex-col">
               <span
-                className={`text-[10px] font-medium tracking-wider uppercase ${
-                  currentStatus === 'skipped'
-                    ? 'text-slate-400 dark:text-slate-500'
-                    : 'text-indigo-500 dark:text-indigo-400'
-                }`}
+                className={`text-[10px] font-medium tracking-wider uppercase ${getTextStatusClass(currentStatus, 'label', 'slate')}`}
               >
                 {t('stage2.stageLabel')}
               </span>
               <span
-                className={`truncate text-sm font-semibold ${
+                className={`truncate text-sm font-semibold ${getTextStatusClass(currentStatus, 'name', 'slate')}`}
+                aria-label={
                   currentStatus === 'skipped'
-                    ? 'text-slate-500 line-through dark:text-slate-400'
-                    : 'text-slate-900 dark:text-slate-100'
-                }`}
+                    ? `${t('stage2.groupTitle')} (${t('status.skipped')})`
+                    : undefined
+                }
               >
                 {t('stage2.groupTitle')}
               </span>
