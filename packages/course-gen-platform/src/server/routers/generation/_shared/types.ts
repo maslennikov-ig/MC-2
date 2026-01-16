@@ -12,7 +12,10 @@ export interface CourseSettings {
   answers?: Record<string, unknown>;
   /** Duration of each lesson in minutes */
   lesson_duration_minutes?: number;
-  /** Target audience description */
+  /**
+   * @deprecated Use courses.target_audience column instead
+   * This field exists for backward compatibility only
+   */
   target_audience?: string;
   /** Desired number of lessons in the course */
   desired_lessons_count?: number;
