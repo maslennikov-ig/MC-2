@@ -20,6 +20,13 @@ import { logger } from '../../../shared/logger/index.js';
 import { ErrorMessages } from '../../utils/error-messages.js';
 
 // ============================================================================
+// Constants
+// ============================================================================
+
+/** MD5 fingerprint length (32 hex characters) */
+const FINGERPRINT_LENGTH = 32;
+
+// ============================================================================
 // Zod Schemas
 // ============================================================================
 
@@ -121,7 +128,7 @@ export const listGroupedInputSchema = z.object({
  * Input schema for getGroupLogs procedure - get individual logs within a fingerprint group
  */
 export const getGroupLogsInputSchema = z.object({
-  fingerprint: z.string().length(32), // MD5 hash
+  fingerprint: z.string().length(FINGERPRINT_LENGTH), // MD5 hash
   page: z.number().int().positive().default(1),
   limit: z.number().int().positive().max(50).default(10),
 });
@@ -130,7 +137,7 @@ export const getGroupLogsInputSchema = z.object({
  * Input schema for updateGroupStatus procedure - update status for all logs in a fingerprint group
  */
 export const updateGroupStatusInputSchema = z.object({
-  fingerprint: z.string().length(32), // MD5 hash
+  fingerprint: z.string().length(FINGERPRINT_LENGTH), // MD5 hash
   status: logStatusSchema,
   notes: z.string().max(2000).optional(),
 });
@@ -1163,7 +1170,7 @@ async function buildGenerationTraceQuery(
  * Build and execute grouped query for error_logs by fingerprint
  *
  * Groups error_logs by fingerprint, returning aggregated data for each group.
- * Uses in-memory grouping since Supabase JS client doesn't support GROUP BY directly.
+ * Uses PostgreSQL RPC function for efficient server-side grouping.
  */
 async function buildGroupedErrorLogsQuery(
   supabase: ReturnType<typeof getSupabaseAdmin>,
@@ -1171,153 +1178,84 @@ async function buildGroupedErrorLogsQuery(
   limit: number,
   offset: number
 ): Promise<{ items: ErrorGroupItem[]; total: number }> {
-  // Type for error log with fingerprint column (added by migration)
-  // TODO: Remove this type after regenerating database types
-  type ErrorLogWithFingerprint = {
-    id: string;
-    created_at: string;
+  // Type for RPC function result
+  type GroupedErrorLogRow = {
+    fingerprint: string;
+    count: number;
+    first_seen: string;
+    last_seen: string;
     severity: string;
-    error_message: string;
+    message: string;
+    environments: string[] | null;
+    latest_log_id: string;
+    latest_problem_id: string | null;
     job_type: string | null;
-    problem_id: string | null;
-    environment: string | null;
-    fingerprint: string | null;
   };
 
-  // First, get all logs with fingerprints (with filters applied)
-  // Note: fingerprint column is added by migration, using type assertion until types are regenerated
-  let query = supabase
-    .from('error_logs')
-    .select(
-      'id, created_at, severity, error_message, job_type, problem_id, environment, fingerprint'
-    )
-    .not('fingerprint', 'is', null);
+  // Prepare filter parameters (use undefined for omitted values, as Supabase types expect)
+  const searchParam = filters?.search ? sanitizeSearchInput(filters.search) : undefined;
 
-  if (filters?.level) {
-    query = query.eq('severity', filters.level);
-  }
-
-  if (filters?.search && filters.search.length >= 2) {
-    const sanitized = sanitizeSearchInput(filters.search);
-    query = query.ilike('error_message', `%${sanitized}%`);
-  }
-
-  if (filters?.dateFrom) {
-    query = query.gte('created_at', filters.dateFrom);
-  }
-
-  if (filters?.dateTo) {
-    query = query.lte('created_at', filters.dateTo);
-  }
-
-  if (filters?.environment) {
-    query = query.eq('environment', filters.environment);
-  }
-
-  query = query.order('created_at', { ascending: false });
-
-  const result = await query;
-  // Cast to expected type since fingerprint column exists but types not regenerated
-  const { data, error } = result as unknown as {
-    data: ErrorLogWithFingerprint[] | null;
-    error: typeof result.error;
-  };
+  // Call RPC function for grouped data
+  const { data: groupedData, error } = (await supabase.rpc('get_grouped_error_logs', {
+    p_limit: limit,
+    p_offset: offset,
+    p_severity: filters?.level ?? undefined,
+    p_environment: filters?.environment ?? undefined,
+    p_search: searchParam,
+    p_date_from: filters?.dateFrom ?? undefined,
+    p_date_to: filters?.dateTo ?? undefined,
+    p_status: filters?.status ?? undefined,
+  })) as { data: GroupedErrorLogRow[] | null; error: Error | null };
 
   if (error) {
-    logger.error({ error }, 'Error in grouped logs query');
-    return { items: [], total: 0 };
+    logger.error({ error }, 'Error calling get_grouped_error_logs RPC');
+    throw new TRPCError({
+      code: 'INTERNAL_SERVER_ERROR',
+      message: ErrorMessages.databaseError('Grouped logs query', error.message),
+    });
   }
 
-  if (!data || data.length === 0) {
-    return { items: [], total: 0 };
-  }
-
-  // Group by fingerprint in memory
-  const groupMap = new Map<
-    string,
+  // Get total count for pagination
+  const { data: countData, error: countError } = (await supabase.rpc(
+    'get_grouped_error_logs_count',
     {
-      fingerprint: string;
-      count: number;
-      firstSeen: string;
-      lastSeen: string;
-      severity: string;
-      message: string;
-      environments: Set<string>;
-      latestLogId: string;
-      latestProblemId: string | null;
-      jobType: string | null;
+      p_severity: filters?.level ?? undefined,
+      p_environment: filters?.environment ?? undefined,
+      p_search: searchParam,
+      p_date_from: filters?.dateFrom ?? undefined,
+      p_date_to: filters?.dateTo ?? undefined,
+      p_status: filters?.status ?? undefined,
     }
-  >();
+  )) as { data: number | null; error: Error | null };
 
-  for (const log of data) {
-    const fp = log.fingerprint!;
-    const existing = groupMap.get(fp);
-
-    if (!existing) {
-      groupMap.set(fp, {
-        fingerprint: fp,
-        count: 1,
-        firstSeen: log.created_at,
-        lastSeen: log.created_at,
-        severity: log.severity,
-        message: log.error_message,
-        environments: new Set(log.environment ? [log.environment] : []),
-        latestLogId: log.id,
-        latestProblemId: log.problem_id || null,
-        jobType: log.job_type || null,
-      });
-    } else {
-      existing.count++;
-      if (log.created_at < existing.firstSeen) {
-        existing.firstSeen = log.created_at;
-      }
-      if (log.created_at > existing.lastSeen) {
-        existing.lastSeen = log.created_at;
-        existing.message = log.error_message;
-        existing.latestLogId = log.id;
-        existing.latestProblemId = log.problem_id || null;
-        existing.jobType = log.job_type || null;
-      }
-      // Update to worst severity
-      const severityOrder = { CRITICAL: 3, ERROR: 2, WARNING: 1 };
-      const currentSev = severityOrder[existing.severity as keyof typeof severityOrder] || 0;
-      const newSev = severityOrder[log.severity as keyof typeof severityOrder] || 0;
-      if (newSev > currentSev) {
-        existing.severity = log.severity;
-      }
-      if (log.environment) {
-        existing.environments.add(log.environment);
-      }
-    }
+  if (countError) {
+    logger.error({ error: countError }, 'Error calling get_grouped_error_logs_count RPC');
   }
 
-  // Convert to array and sort by lastSeen desc
-  const groups = Array.from(groupMap.values()).sort(
-    (a, b) => new Date(b.lastSeen).getTime() - new Date(a.lastSeen).getTime()
-  );
+  const total = countData ?? 0;
 
-  const total = groups.length;
+  if (!groupedData || groupedData.length === 0) {
+    return { items: [], total: 0 };
+  }
 
-  // Apply pagination
-  const paginatedGroups = groups.slice(offset, offset + limit);
-
-  // Fetch statuses for these fingerprints
-  const fingerprints = paginatedGroups.map(g => g.fingerprint);
+  // Fetch statuses for fingerprints (RPC already joins but we keep this for consistency)
+  const fingerprints = groupedData.map(g => g.fingerprint);
   const statusMap = await fetchGroupStatuses(supabase, fingerprints);
 
-  const items: ErrorGroupItem[] = paginatedGroups.map(group => ({
-    fingerprint: group.fingerprint,
-    count: group.count,
-    firstSeen: group.firstSeen,
-    lastSeen: group.lastSeen,
-    severity: group.severity,
-    message: group.message,
+  // Map RPC result to ErrorGroupItem
+  const items: ErrorGroupItem[] = groupedData.map(g => ({
+    fingerprint: g.fingerprint,
+    count: g.count,
+    firstSeen: g.first_seen,
+    lastSeen: g.last_seen,
+    severity: g.severity,
+    message: g.message,
     source: 'error_log',
-    status: statusMap.get(group.fingerprint) || 'new',
-    environments: Array.from(group.environments),
-    latestLogId: group.latestLogId,
-    latestProblemId: group.latestProblemId,
-    jobType: group.jobType,
+    status: statusMap.get(g.fingerprint) || 'new',
+    environments: g.environments || [],
+    latestLogId: g.latest_log_id,
+    latestProblemId: g.latest_problem_id,
+    jobType: g.job_type,
   }));
 
   return { items, total };

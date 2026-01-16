@@ -353,6 +353,8 @@ export function GroupedLogTable({ filters, onGroupSelect, triggerRefresh }: Grou
                           size="sm"
                           className="h-8 w-8 p-0"
                           onClick={() => toggleRowExpansion(group.fingerprint)}
+                          aria-label={isExpanded ? t('a11y.collapseRow') : t('a11y.expandRow')}
+                          aria-expanded={isExpanded}
                         >
                           {isExpanded ? (
                             <ChevronDown className="h-4 w-4" />
