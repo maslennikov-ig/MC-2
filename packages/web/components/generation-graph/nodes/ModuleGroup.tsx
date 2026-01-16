@@ -30,7 +30,42 @@ import { useNodeSelection } from '../hooks/useNodeSelection'
 import { NodeErrorTooltip, RetryBadge, NodeProgressBar, StatusBadge } from '../components/shared'
 import { useOptionalPartialGenerationContext } from '../contexts/PartialGenerationContext'
 
-// Minimal Node for very low zoom (<0.3)
+/**
+ * Zoom thresholds for semantic zoom (P3.2: extracted magic numbers)
+ * - MINIMAL: Show dot representation
+ * - MEDIUM: Show compact card
+ * - Above MEDIUM: Show full module node
+ */
+const ZOOM_THRESHOLDS = {
+  MINIMAL: 0.3,
+  MEDIUM: 0.5,
+} as const
+
+/**
+ * Reusable button component for opening details panel (P3.6: DRY)
+ * Prevents duplicate code in collapsed/expanded states
+ */
+const OpenPanelButton = memo(function OpenPanelButton({
+  onClick,
+  className = '',
+}: {
+  onClick: (e: React.MouseEvent) => void
+  className?: string
+}) {
+  return (
+    <button
+      onClick={onClick}
+      className={`nopan nodrag rounded p-1 transition-colors hover:bg-slate-100 dark:hover:bg-slate-700 ${className}`}
+      title="Открыть панель результатов"
+      aria-label="Открыть панель результатов"
+    >
+      <PanelRight size={18} className="text-slate-500 dark:text-slate-400" />
+      <span className="sr-only">Открыть панель результатов</span>
+    </button>
+  )
+})
+
+// Minimal Node for very low zoom (<ZOOM_THRESHOLDS.MINIMAL)
 const MinimalModuleNode = ({ id, data }: { id: string; data: RFModuleNode['data'] }) => {
   const statusEntry = useNodeStatus(id)
   const currentStatus = statusEntry?.status || data.status || 'pending'
@@ -113,7 +148,11 @@ const ModuleGroup = ({ id, data, selected }: NodeProps<RFModuleNode>) => {
   // Track zoom mode for semantic zoom - notify React Flow when node dimensions change
   // This ensures edges are recalculated when crossing zoom thresholds
   const prevZoomModeRef = useRef<'minimal' | 'medium' | 'full'>('full')
-  const currentZoomMode = zoom < 0.3 ? 'minimal' : zoom < 0.5 ? 'medium' : 'full'
+  const currentZoomMode = zoom < ZOOM_THRESHOLDS.MINIMAL
+    ? 'minimal'
+    : zoom < ZOOM_THRESHOLDS.MEDIUM
+      ? 'medium'
+      : 'full'
 
   useEffect(() => {
     if (prevZoomModeRef.current !== currentZoomMode) {
@@ -197,10 +236,10 @@ const ModuleGroup = ({ id, data, selected }: NodeProps<RFModuleNode>) => {
   )
 
   // Semantic Zoom - switch to smaller representations at lower zoom levels
-  if (zoom < 0.3) {
+  if (zoom < ZOOM_THRESHOLDS.MINIMAL) {
     return <MinimalModuleNode id={id} data={data} />
   }
-  if (zoom < 0.5) {
+  if (zoom < ZOOM_THRESHOLDS.MEDIUM) {
     return <MediumModuleNode id={id} data={data} selected={selected} />
   }
 
@@ -369,14 +408,7 @@ const ModuleGroup = ({ id, data, selected }: NodeProps<RFModuleNode>) => {
             {/* Right side controls */}
             <div className="flex items-center gap-1">
               {/* Open details panel button */}
-              <button
-                onClick={handleOpenPanel}
-                className="nopan nodrag rounded p-1 transition-colors hover:bg-slate-100 dark:hover:bg-slate-700"
-                title="Открыть панель результатов"
-                aria-label="Открыть панель результатов"
-              >
-                <PanelRight size={18} className="text-slate-500 dark:text-slate-400" />
-              </button>
+              <OpenPanelButton onClick={handleOpenPanel} />
               {/* Chevron indicates expandable */}
               <ChevronRight
                 size={20}
@@ -491,14 +523,10 @@ const ModuleGroup = ({ id, data, selected }: NodeProps<RFModuleNode>) => {
             {/* Right side controls */}
             <div className="relative z-10 flex items-center gap-1">
               {/* Open details panel button */}
-              <button
+              <OpenPanelButton
                 onClick={handleOpenPanel}
-                className="nopan nodrag rounded p-1 transition-colors hover:bg-purple-100 dark:hover:bg-purple-800"
-                title="Открыть панель результатов"
-                aria-label="Открыть панель результатов"
-              >
-                <PanelRight size={18} className="text-slate-500 dark:text-slate-400" />
-              </button>
+                className="hover:bg-purple-100 dark:hover:bg-purple-800"
+              />
               {/* Chevron pointing down when expanded */}
               <ChevronDown
                 size={20}
