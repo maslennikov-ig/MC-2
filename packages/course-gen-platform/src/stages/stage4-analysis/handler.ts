@@ -308,7 +308,7 @@ class Stage4AnalysisHandler {
       // Fetch course metadata (including course_size for size preset guidance)
       const { data: courseForInput, error: courseInputError } = await supabaseForValidation
         .from('courses')
-        .select('title, language, style, difficulty, settings, course_size')
+        .select('title, language, style, difficulty, target_audience, settings, course_size')
         .eq('id', course_id)
         .single();
 
@@ -404,7 +404,8 @@ class Stage4AnalysisHandler {
         topic: courseForInput.title || 'Course Topic',
         language,
         style: courseForInput.style || 'practical',
-        target_audience: 'mixed',
+        target_audience: (courseForInput.target_audience ||
+          'mixed') as import('@megacampus/shared-types').TargetAudience,
         difficulty: courseForInput.difficulty || 'intermediate',
         lesson_duration_minutes: lessonDuration,
         document_summaries: documentSummaries,
@@ -415,6 +416,15 @@ class Stage4AnalysisHandler {
         target_sections: sizePreset?.targetSections,
         size_guidance: sizePreset?.llmGuidance,
       };
+
+      // Log target audience configuration for debugging
+      jobLogger.info(
+        {
+          target_audience: courseForInput.target_audience,
+          fallback_used: !courseForInput.target_audience,
+        },
+        'Target audience configuration for Stage 4'
+      );
 
       jobLogger.info(
         {
