@@ -112,13 +112,16 @@ Some errors are **automatically ignored** by the system with status `auto_muted`
 
 **Current auto-mute rules** (from `src/shared/logger/auto-classification.ts`):
 
-| Pattern                            | Reason            | Description                           |
-| ---------------------------------- | ----------------- | ------------------------------------- |
-| `Redis connection (ended\|closed)` | graceful_shutdown | Redis disconnects during app restart  |
-| `graceful.*shutdown`               | graceful_shutdown | Server shutdown events during deploys |
-| `/health.*404`                     | monitoring_probe  | Health probes from monitoring tools   |
-| `Cloudflare.*5xx`                  | external_service  | Cloudflare edge errors                |
-| `ECONNRESET.*external`             | external_service  | External API connection resets        |
+| Pattern                            | Reason            | Description                               |
+| ---------------------------------- | ----------------- | ----------------------------------------- |
+| `Redis connection (ended\|closed)` | graceful_shutdown | Redis disconnects during app restart      |
+| `graceful.*shutdown`               | graceful_shutdown | Server shutdown events during deploys     |
+| `/api/trpc/health.*404`            | monitoring_probe  | tRPC health endpoint probes (Uptime Kuma) |
+| `/health.*404`                     | monitoring_probe  | Generic health check probes               |
+| `Cloudflare.*5\d{2}`               | external_service  | Cloudflare edge errors (502, 503, 521)    |
+| `ECONNRESET.*external`             | external_service  | External API connection resets            |
+
+**Total rules: 6** (test validates sync with code)
 
 **When you see `auto_muted` errors:**
 
