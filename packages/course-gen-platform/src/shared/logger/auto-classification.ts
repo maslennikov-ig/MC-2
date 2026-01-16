@@ -6,6 +6,34 @@
  * not actual bugs. Add new patterns here when you identify recurring non-issues.
  *
  * IMPORTANT: Also update .claude/skills/process-logs/SKILL.md when adding rules!
+ *
+ * ## Performance Considerations
+ *
+ * Current implementation uses O(n) linear scan through all rules.
+ * With 6 rules, this is negligible (<1ms per call).
+ *
+ * ### If rules grow to 50+, consider these optimizations:
+ *
+ * 1. **Pre-filtering by keyword** - Check for common substrings first:
+ *    ```typescript
+ *    if (msg.includes('Redis')) return checkShutdownRules(msg);
+ *    if (msg.includes('health')) return checkProbeRules(msg);
+ *    ```
+ *
+ * 2. **Compiled regex union** - Combine patterns into single regex:
+ *    ```typescript
+ *    const COMBINED = /(Redis connection (ended|closed))|(graceful.*shutdown)/i;
+ *    ```
+ *
+ * 3. **LRU cache** - Memoize results for repeated errors:
+ *    ```typescript
+ *    const cache = new Map<string, AutoMuteResult>();
+ *    ```
+ *
+ * 4. **Trie-based matching** - For prefix-heavy patterns
+ *
+ * Current rule count: 6 (no optimization needed)
+ * Review threshold: 30+ rules
  */
 
 export interface AutoMuteRule {
