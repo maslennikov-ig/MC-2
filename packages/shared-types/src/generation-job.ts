@@ -8,6 +8,7 @@
 
 import { z } from 'zod';
 import { CourseStyleSchema } from './style-prompts';
+import { courseSizeSchema } from './course-size';
 // Import unified schemas from analysis-schemas (Single Source of Truth)
 // AnalysisResultSchema and AnalysisResult are now defined in analysis-schemas.ts
 // to avoid duplication and ensure consistency across Stage 4 and Stage 5
@@ -33,22 +34,45 @@ export const FrontendParametersSchema = z.object({
   course_title: z.string().min(1).describe('Course title (ONLY guaranteed field per spec)'),
 
   // Optional (may be null/undefined)
-  language: z.string().optional().describe('Target language (defaults to contextual_language from Analyze)'),
+  language: z
+    .string()
+    .optional()
+    .describe('Target language (defaults to contextual_language from Analyze)'),
   style: CourseStyleSchema.optional().describe('Content style (defaults to conversational)'),
   target_audience: z.string().optional().describe('Target audience description'),
+  description: z.string().optional().describe('Course description (user-provided context)'),
 
   // Guidance parameters (NOT constraints per spec.md clarifications)
-  desired_lessons_count: z.number().int().positive().optional()
+  course_size: courseSizeSchema
+    .optional()
+    .describe('Desired course size preset (micro/mini/compact/standard/comprehensive/auto)'),
+
+  desired_lessons_count: z
+    .number()
+    .int()
+    .positive()
+    .optional()
     .describe('User preference for lesson count (guidance, not constraint)'),
 
-  desired_modules_count: z.number().int().positive().optional()
+  desired_modules_count: z
+    .number()
+    .int()
+    .positive()
+    .optional()
     .describe('User preference for module/section count (guidance, not constraint)'),
 
-  lesson_duration_minutes: z.number().int().min(3).max(45).optional()
+  lesson_duration_minutes: z
+    .number()
+    .int()
+    .min(3)
+    .max(45)
+    .optional()
     .describe('Target duration per lesson (defaults to 5 minutes)'),
 
   // Constraints (MUST be satisfied)
-  learning_outcomes: z.array(z.string()).optional()
+  learning_outcomes: z
+    .array(z.string())
+    .optional()
     .describe('User-specified learning outcomes (constraints, not guidance)'),
 });
 
@@ -100,17 +124,21 @@ export const GenerationJobInputSchema = z.object({
   user_id: z.string().uuid().describe('User UUID (for audit trail)'),
 
   // Input data (FR-001, FR-002)
-  analysis_result: AnalysisResultSchema.nullable()
-    .describe('Results from Stage 4 analysis (nullable for title-only scenario)'),
+  analysis_result: AnalysisResultSchema.nullable().describe(
+    'Results from Stage 4 analysis (nullable for title-only scenario)'
+  ),
 
-  frontend_parameters: FrontendParametersSchema
-    .describe('Parameters from courses table'),
+  frontend_parameters: FrontendParametersSchema.describe('Parameters from courses table'),
 
   // Optional RAG context (FR-004)
-  vectorized_documents: z.boolean().default(false)
+  vectorized_documents: z
+    .boolean()
+    .default(false)
     .describe('Whether to use RAG context from uploaded documents'),
 
-  document_summaries: z.array(GenerationDocumentSummarySchema).optional()
+  document_summaries: z
+    .array(GenerationDocumentSummarySchema)
+    .optional()
     .describe('Document summaries from file_catalog (if vectorized)'),
 });
 

@@ -55,7 +55,9 @@ export const statusRouter = router({
         // Step 1: Fetch course with generation metadata
         const { data: course, error: courseError } = await supabase
           .from('courses')
-          .select('id, organization_id, generation_status, generation_metadata, created_at, updated_at')
+          .select(
+            'id, organization_id, generation_status, generation_metadata, created_at, updated_at'
+          )
           .eq('id', courseId)
           .single();
 
@@ -82,15 +84,16 @@ export const statusRouter = router({
           last_phase?: string;
           error_message?: string;
         };
-        const generationMetadata = course.generation_metadata as unknown as GenerationMetadataWithError | null;
+        const generationMetadata =
+          course.generation_metadata as unknown as GenerationMetadataWithError | null;
 
         // Phase weights for progress calculation
         const phaseWeights = {
-          validate_input: 5,      // 0-5%
-          generate_metadata: 20,  // 5-25%
-          generate_sections: 60,  // 25-85%
-          validate_quality: 10,   // 85-95%
-          validate_lessons: 5,    // 95-100%
+          validate_input: 5, // 0-5%
+          generate_metadata: 20, // 5-25%
+          generate_sections: 60, // 25-85%
+          validate_quality: 10, // 85-95%
+          validate_lessons: 5, // 95-100%
         };
 
         let progress = 0;
@@ -110,14 +113,14 @@ export const statusRouter = router({
 
             if (duration_ms.validation > 0) {
               currentPhase = 'validate_lessons';
-              progress = 95 + (phaseWeights.validate_lessons * 0.5);
+              progress = 95 + phaseWeights.validate_lessons * 0.5;
             } else if (duration_ms.sections > 0) {
               currentPhase = 'generate_sections';
               const batchProgress = (generationMetadata.batch_count || 0) / 8; // 8 batches assumed
-              progress = 25 + (phaseWeights.generate_sections * batchProgress);
+              progress = 25 + phaseWeights.generate_sections * batchProgress;
             } else if (duration_ms.metadata > 0) {
               currentPhase = 'generate_metadata';
-              progress = 5 + (phaseWeights.generate_metadata * 0.5);
+              progress = 5 + phaseWeights.generate_metadata * 0.5;
             } else {
               currentPhase = 'validate_input';
               progress = 2.5;
@@ -156,10 +159,13 @@ export const statusRouter = router({
       } catch (error) {
         if (error instanceof TRPCError) throw error;
 
-        logger.error({
-          courseId,
-          error: error instanceof Error ? error.message : String(error),
-        }, 'Unexpected error in generation.getStatus');
+        logger.error(
+          {
+            courseId,
+            error: error instanceof Error ? error.message : String(error),
+          },
+          'Unexpected error in generation.getStatus'
+        );
 
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
@@ -177,10 +183,12 @@ export const statusRouter = router({
    * - Stage 5 -> Stage 5 Complete (Ready for Manual Stage 6)
    */
   approveStage: instructorProcedure
-    .input(z.object({
-      courseId: z.string().uuid(),
-      currentStage: z.number().int().min(2).max(5),
-    }))
+    .input(
+      z.object({
+        courseId: z.string().uuid(),
+        currentStage: z.number().int().min(2).max(5),
+      })
+    )
     .mutation(async ({ ctx, input }) => {
       const { courseId, currentStage } = input;
       const supabase = getSupabaseAdmin();
@@ -203,7 +211,11 @@ export const statusRouter = router({
       const currentStatus = course.generation_status as string;
       const expectedStatus = `stage_${currentStage}_awaiting_approval`;
 
-      if (currentStatus !== expectedStatus && currentStatus !== 'failed' && currentStatus !== 'cancelled') {
+      if (
+        currentStatus !== expectedStatus &&
+        currentStatus !== 'failed' &&
+        currentStatus !== 'cancelled'
+      ) {
         throw new TRPCError({
           code: 'BAD_REQUEST',
           message: `Invalid status for approval. Expected ${expectedStatus}, got ${currentStatus}`,
@@ -211,14 +223,20 @@ export const statusRouter = router({
       }
 
       const courseWithOrg = course as unknown as Course & { organization: Organization | null };
-      const tier = (courseWithOrg.organization?.tier || 'free');
-      const priority = tier === 'premium' ? 10 : (tier === 'standard' ? 5 : 1);
+      const tier = courseWithOrg.organization?.tier || 'free';
+      const priority = tier === 'premium' ? 10 : tier === 'standard' ? 5 : 1;
 
       // Transition Logic
       if (currentStage === 2) {
         // Stage 2 -> Stage 3 (Classification)
         // Note: Summarization is now part of Stage 2, so we go directly to Classification
-        await supabase.from('courses').update({ generation_status: 'stage_3_init' as unknown as Database['public']['Enums']['generation_status'] }).eq('id', courseId);
+        await supabase
+          .from('courses')
+          .update({
+            generation_status:
+              'stage_3_init' as unknown as Database['public']['Enums']['generation_status'],
+          })
+          .eq('id', courseId);
 
         // Queue a single DOCUMENT_CLASSIFICATION job for the course
         // The classification orchestrator will load all documents and classify them
@@ -230,14 +248,25 @@ export const statusRouter = router({
           createdAt: new Date().toISOString(),
         };
 
-        await addJob(JobType.DOCUMENT_CLASSIFICATION, classificationJobData as unknown as JobData, { priority });
-        logger.info({ courseId, userId }, 'Stage 2 approved, queued DOCUMENT_CLASSIFICATION job for Stage 3');
+        await addJob(JobType.DOCUMENT_CLASSIFICATION, classificationJobData as unknown as JobData, {
+          priority,
+        });
+        logger.info(
+          { courseId, userId },
+          'Stage 2 approved, queued DOCUMENT_CLASSIFICATION job for Stage 3'
+        );
 
         return { success: true, nextStage: 3 };
       }
 
       if (currentStage === 3) {
-        await supabase.from('courses').update({ generation_status: 'stage_4_init' as unknown as Database['public']['Enums']['generation_status'] }).eq('id', courseId);
+        await supabase
+          .from('courses')
+          .update({
+            generation_status:
+              'stage_4_init' as unknown as Database['public']['Enums']['generation_status'],
+          })
+          .eq('id', courseId);
 
         const { data: documents } = await supabase
           .from('file_catalog')
@@ -283,22 +312,33 @@ export const statusRouter = router({
       }
 
       if (currentStage === 4) {
-        await supabase.from('courses').update({ generation_status: 'stage_5_init' as unknown as Database['public']['Enums']['generation_status'] }).eq('id', courseId);
+        await supabase
+          .from('courses')
+          .update({
+            generation_status:
+              'stage_5_init' as unknown as Database['public']['Enums']['generation_status'],
+          })
+          .eq('id', courseId);
 
         const analysisResult = course.analysis_result;
         const { data: vectorizedFiles } = await supabase
           .from('file_catalog')
           .select('id, filename, processed_content')
           .eq('course_id', courseId)
-          .eq('vector_status', 'indexed' as unknown as Database['public']['Enums']['vector_status']);
+          .eq(
+            'vector_status',
+            'indexed' as unknown as Database['public']['Enums']['vector_status']
+          );
 
         const hasVectorizedDocs = vectorizedFiles && vectorizedFiles.length > 0;
         const documentSummaries = hasVectorizedDocs
-          ? (vectorizedFiles as Array<{
-              id: string;
-              filename: string;
-              processed_content: string | null;
-            }>).map((file) => ({
+          ? (
+              vectorizedFiles as Array<{
+                id: string;
+                filename: string;
+                processed_content: string | null;
+              }>
+            ).map(file => ({
               file_id: file.id,
               file_name: file.filename,
               summary: file.processed_content || '',
@@ -316,9 +356,14 @@ export const statusRouter = router({
             language: course.language,
             style: course.style,
             target_audience: (course.settings as unknown as CourseSettings)?.target_audience,
-            desired_lessons_count: (course.settings as unknown as CourseSettings)?.desired_lessons_count,
-            desired_modules_count: (course.settings as unknown as CourseSettings)?.desired_modules_count,
-            lesson_duration_minutes: (course.settings as unknown as CourseSettings)?.lesson_duration_minutes,
+            description: course.course_description,
+            course_size: course.course_size,
+            desired_lessons_count: (course.settings as unknown as CourseSettings)
+              ?.desired_lessons_count,
+            desired_modules_count: (course.settings as unknown as CourseSettings)
+              ?.desired_modules_count,
+            lesson_duration_minutes: (course.settings as unknown as CourseSettings)
+              ?.lesson_duration_minutes,
             learning_outcomes: (course.settings as unknown as CourseSettings)?.learning_outcomes,
           },
           vectorized_documents: hasVectorizedDocs,
@@ -332,7 +377,13 @@ export const statusRouter = router({
       if (currentStage === 5) {
         // Stage 5 -> Stage 5 Complete (Ready for Manual Stage 6)
         // Note: We transition to stage_5_complete to trigger the ManualStage6Panel in the UI
-        await supabase.from('courses').update({ generation_status: 'stage_5_complete' as unknown as Database['public']['Enums']['generation_status'] }).eq('id', courseId);
+        await supabase
+          .from('courses')
+          .update({
+            generation_status:
+              'stage_5_complete' as unknown as Database['public']['Enums']['generation_status'],
+          })
+          .eq('id', courseId);
         return { success: true, nextStage: 6 };
       }
 
