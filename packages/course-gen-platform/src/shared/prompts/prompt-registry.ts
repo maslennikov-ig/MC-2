@@ -143,8 +143,7 @@ Each classification must have: id (UUID), priority (CORE/IMPORTANT/SUPPLEMENTARY
         description:
           'Formatted list of documents with ID, filename, file type, size, and content preview',
         required: true,
-        example:
-          '[Document 1]\nID: uuid\nFilename: syllabus.pdf\n...',
+        example: '[Document 1]\nID: uuid\nFilename: syllabus.pdf\n...',
       },
     ],
   },
@@ -285,12 +284,6 @@ Analyze this topic and provide comprehensive classification and topic analysis.`
         description: 'Course topic to analyze',
         required: true,
         example: 'React Hooks fundamentals',
-      },
-      {
-        name: 'userRequirements',
-        description: 'Optional user requirements/answers',
-        required: false,
-        example: '\n\nUSER REQUIREMENTS:\nTarget audience: intermediate developers',
       },
       {
         name: 'documentContext',
@@ -847,7 +840,8 @@ Output markdown content for this section only (no header needed).
       },
       {
         name: 'previousContext',
-        description: 'Previous section content (3000-8000 chars, dynamic based on lesson duration/language) for transition smoothing',
+        description:
+          'Previous section content (3000-8000 chars, dynamic based on lesson duration/language) for transition smoothing',
         required: true,
       },
       {
@@ -858,7 +852,8 @@ Output markdown content for this section only (no header needed).
       },
       {
         name: 'interLessonContext',
-        description: 'Inter-lesson context XML with previous/next lesson info and covered concepts (pre-rendered)',
+        description:
+          'Inter-lesson context XML with previous/next lesson info and covered concepts (pre-rendered)',
         required: false,
       },
     ],
@@ -1557,7 +1552,11 @@ Remember: ABSOLUTELY NO TEXT, NO LETTERS, NO WORDS, NO TYPOGRAPHY, TEXT-FREE IMA
     variables: [
       { name: 'courseTitle', description: 'Course title', required: true },
       { name: 'courseTopic', description: 'Course subject area', required: true },
-      { name: 'languageContext', description: 'Language context description (e.g., "Russian educational content")', required: true },
+      {
+        name: 'languageContext',
+        description: 'Language context description (e.g., "Russian educational content")',
+        required: true,
+      },
       { name: 'colorScheme', description: 'Visual style color scheme', required: true },
       { name: 'aesthetic', description: 'Visual style aesthetic', required: true },
       { name: 'visualElements', description: 'Visual style elements', required: true },
@@ -1621,7 +1620,11 @@ A polished, professional square thumbnail that visually represents "{{lessonTitl
 Remember: ABSOLUTELY NO TEXT, NO LETTERS, NO WORDS, NO TYPOGRAPHY, TEXT-FREE IMAGE.`,
     variables: [
       { name: 'lessonTitle', description: 'Lesson title', required: true },
-      { name: 'objectivesSummary', description: 'Lesson objectives summary (semicolon-separated)', required: true },
+      {
+        name: 'objectivesSummary',
+        description: 'Lesson objectives summary (semicolon-separated)',
+        required: true,
+      },
       { name: 'courseTitle', description: 'Parent course title', required: true },
       { name: 'courseTopic', description: 'Parent course topic', required: true },
       { name: 'colorScheme', description: 'Visual style color scheme', required: true },
@@ -1685,8 +1688,16 @@ Create a prompt for a 16:9 hero banner image that visually represents this lesso
       { name: 'lessonTitle', description: 'Lesson title', required: true },
       { name: 'courseSubject', description: 'Course subject area', required: true },
       { name: 'keywords', description: 'Lesson keywords (comma-separated)', required: true },
-      { name: 'languageContext', description: 'Language context (e.g., "Russian educational content")', required: true },
-      { name: 'styleHint', description: 'Optional style preference line (e.g., "Style Preference: minimalist")', required: false },
+      {
+        name: 'languageContext',
+        description: 'Language context (e.g., "Russian educational content")',
+        required: true,
+      },
+      {
+        name: 'styleHint',
+        description: 'Optional style preference line (e.g., "Style Preference: minimalist")',
+        required: false,
+      },
     ],
   },
 ];
@@ -1701,11 +1712,11 @@ Create a prompt for a 16:9 hero banner image that visually represents this lesso
  * All 22 prompts indexed by promptKey for fast lookup.
  */
 export const PROMPT_REGISTRY = new Map<string, HardcodedPrompt>([
-  ...stage3Prompts.map((p) => [p.promptKey, p] as [string, HardcodedPrompt]),
-  ...stage4Prompts.map((p) => [p.promptKey, p] as [string, HardcodedPrompt]),
-  ...stage5Prompts.map((p) => [p.promptKey, p] as [string, HardcodedPrompt]),
-  ...stage6Prompts.map((p) => [p.promptKey, p] as [string, HardcodedPrompt]),
-  ...stage7Prompts.map((p) => [p.promptKey, p] as [string, HardcodedPrompt]),
+  ...stage3Prompts.map(p => [p.promptKey, p] as [string, HardcodedPrompt]),
+  ...stage4Prompts.map(p => [p.promptKey, p] as [string, HardcodedPrompt]),
+  ...stage5Prompts.map(p => [p.promptKey, p] as [string, HardcodedPrompt]),
+  ...stage6Prompts.map(p => [p.promptKey, p] as [string, HardcodedPrompt]),
+  ...stage7Prompts.map(p => [p.promptKey, p] as [string, HardcodedPrompt]),
 ]);
 
 /**
@@ -1715,7 +1726,7 @@ export const PROMPT_REGISTRY = new Map<string, HardcodedPrompt>([
  * @returns Array of prompts for that stage
  */
 export function getPromptsByStage(stage: PromptStage): HardcodedPrompt[] {
-  return Array.from(PROMPT_REGISTRY.values()).filter((p) => p.stage === stage);
+  return Array.from(PROMPT_REGISTRY.values()).filter(p => p.stage === stage);
 }
 
 /**

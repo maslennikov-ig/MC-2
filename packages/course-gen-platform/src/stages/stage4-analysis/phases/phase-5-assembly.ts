@@ -62,9 +62,6 @@ export interface Phase5Input {
   /** Course topic */
   topic: string;
 
-  /** Optional user-provided answers/requirements */
-  answers?: string | null;
-
   /** Optional document summaries from Stage 3 */
   document_summaries?: string[] | null;
 
@@ -109,9 +106,7 @@ export interface Phase5Input {
  * @throws Error if any required phase output is missing
  * @throws Error if total_lessons < 10 (defensive validation)
  */
-export async function assembleAnalysisResult(
-  input: Phase5Input
-): Promise<AnalysisResult> {
+export async function assembleAnalysisResult(input: Phase5Input): Promise<AnalysisResult> {
   const startTime = Date.now();
 
   // Defensive validation: Ensure all phase outputs present
@@ -198,15 +193,11 @@ export async function assembleAnalysisResult(
       input.phase1_output.contextual_language.why_matters_context
     ),
     motivators: sanitizeLLMOutput(input.phase1_output.contextual_language.motivators),
-    experience_prompt: sanitizeLLMOutput(
-      input.phase1_output.contextual_language.experience_prompt
-    ),
+    experience_prompt: sanitizeLLMOutput(input.phase1_output.contextual_language.experience_prompt),
     problem_statement_context: sanitizeLLMOutput(
       input.phase1_output.contextual_language.problem_statement_context
     ),
-    knowledge_bridge: sanitizeLLMOutput(
-      input.phase1_output.contextual_language.knowledge_bridge
-    ),
+    knowledge_bridge: sanitizeLLMOutput(input.phase1_output.contextual_language.knowledge_bridge),
     practical_benefit_focus: sanitizeLLMOutput(
       input.phase1_output.contextual_language.practical_benefit_focus
     ),
@@ -217,11 +208,17 @@ export async function assembleAnalysisResult(
     tone: input.phase4_output.generation_guidance.tone,
     use_analogies: input.phase4_output.generation_guidance.use_analogies,
     specific_analogies: input.phase4_output.generation_guidance.specific_analogies,
-    avoid_jargon: input.phase4_output.generation_guidance.avoid_jargon.map(term => sanitizeLLMOutput(term)),
+    avoid_jargon: input.phase4_output.generation_guidance.avoid_jargon.map(term =>
+      sanitizeLLMOutput(term)
+    ),
     include_visuals: input.phase4_output.generation_guidance.include_visuals,
     exercise_types: input.phase4_output.generation_guidance.exercise_types,
-    contextual_language_hints: sanitizeLLMOutput(input.phase4_output.generation_guidance.contextual_language_hints),
-    real_world_examples: input.phase4_output.generation_guidance.real_world_examples?.map(ex => sanitizeLLMOutput(ex)),
+    contextual_language_hints: sanitizeLLMOutput(
+      input.phase4_output.generation_guidance.contextual_language_hints
+    ),
+    real_world_examples: input.phase4_output.generation_guidance.real_world_examples?.map(ex =>
+      sanitizeLLMOutput(ex)
+    ),
   };
 
   // Assemble complete AnalysisResult structure
@@ -328,9 +325,7 @@ function validateAnalysisResult(result: AnalysisResult): void {
 
   // expansion_areas can be null but must be defined
   if (result.expansion_areas !== null && !Array.isArray(result.expansion_areas)) {
-    throw new Error(
-      'Validation error: expansion_areas must be null or an array'
-    );
+    throw new Error('Validation error: expansion_areas must be null or an array');
   }
 
   // Validate metadata structure
@@ -397,7 +392,9 @@ function validateAnalysisResult(result: AnalysisResult): void {
  * @param patterns - PedagogicalPatterns to validate
  * @throws Error if structure is invalid
  */
-function validatePedagogicalPatterns(patterns: NonNullable<AnalysisResult['pedagogical_patterns']>): void {
+function validatePedagogicalPatterns(
+  patterns: NonNullable<AnalysisResult['pedagogical_patterns']>
+): void {
   if (!patterns.primary_strategy) {
     throw new Error('Validation error: pedagogical_patterns.primary_strategy is missing');
   }
@@ -421,7 +418,9 @@ function validatePedagogicalPatterns(patterns: NonNullable<AnalysisResult['pedag
 
   // Validate assessment_types is non-empty array
   if (!Array.isArray(patterns.assessment_types) || patterns.assessment_types.length === 0) {
-    throw new Error('Validation error: pedagogical_patterns.assessment_types must be a non-empty array');
+    throw new Error(
+      'Validation error: pedagogical_patterns.assessment_types must be a non-empty array'
+    );
   }
 
   // Validate key_patterns has 2-10 items (gracefully truncate if more)
@@ -450,8 +449,15 @@ function validatePedagogicalPatterns(patterns: NonNullable<AnalysisResult['pedag
  * @param guidance - GenerationGuidance to validate
  * @throws Error if structure is invalid
  */
-function validateGenerationGuidance(guidance: NonNullable<AnalysisResult['generation_guidance']>): void {
-  const validTones = ['conversational but precise', 'formal academic', 'casual friendly', 'technical professional'];
+function validateGenerationGuidance(
+  guidance: NonNullable<AnalysisResult['generation_guidance']>
+): void {
+  const validTones = [
+    'conversational but precise',
+    'formal academic',
+    'casual friendly',
+    'technical professional',
+  ];
   if (!validTones.includes(guidance.tone)) {
     throw new Error(
       `Validation error: generation_guidance.tone must be one of: ${validTones.join(', ')}. Got: "${guidance.tone}"`
@@ -460,22 +466,28 @@ function validateGenerationGuidance(guidance: NonNullable<AnalysisResult['genera
 
   // Validate include_visuals - use fallback if empty (advisory field, non-blocking)
   if (!Array.isArray(guidance.include_visuals) || guidance.include_visuals.length === 0) {
-    logger.warn({
-      field: 'include_visuals',
-      fallback: FALLBACK_VISUAL_TYPES,
-      reason: 'LLM generated values were filtered out or array was empty',
-    }, '[Phase5Assembly] Using fallback for include_visuals');
+    logger.warn(
+      {
+        field: 'include_visuals',
+        fallback: FALLBACK_VISUAL_TYPES,
+        reason: 'LLM generated values were filtered out or array was empty',
+      },
+      '[Phase5Assembly] Using fallback for include_visuals'
+    );
     // Mutate to apply fallback (guidance is mutable reference)
     (guidance as { include_visuals: string[] }).include_visuals = [...FALLBACK_VISUAL_TYPES];
   }
 
   // Validate exercise_types - use fallback if empty (advisory field, non-blocking)
   if (!Array.isArray(guidance.exercise_types) || guidance.exercise_types.length === 0) {
-    logger.warn({
-      field: 'exercise_types',
-      fallback: FALLBACK_EXERCISE_TYPES,
-      reason: 'LLM generated values were filtered out or array was empty',
-    }, '[Phase5Assembly] Using fallback for exercise_types');
+    logger.warn(
+      {
+        field: 'exercise_types',
+        fallback: FALLBACK_EXERCISE_TYPES,
+        reason: 'LLM generated values were filtered out or array was empty',
+      },
+      '[Phase5Assembly] Using fallback for exercise_types'
+    );
     // Mutate to apply fallback (guidance is mutable reference)
     (guidance as { exercise_types: string[] }).exercise_types = [...FALLBACK_EXERCISE_TYPES];
   }
@@ -500,7 +512,9 @@ function validateGenerationGuidance(guidance: NonNullable<AnalysisResult['genera
  * @param mapping - DocumentRelevanceMapping to validate
  * @throws Error if structure is invalid
  */
-function validateDocumentRelevanceMapping(mapping: NonNullable<AnalysisResult['document_relevance_mapping']>): void {
+function validateDocumentRelevanceMapping(
+  mapping: NonNullable<AnalysisResult['document_relevance_mapping']>
+): void {
   if (typeof mapping !== 'object' || mapping === null) {
     throw new Error('Validation error: document_relevance_mapping must be an object');
   }
@@ -515,7 +529,10 @@ function validateDocumentRelevanceMapping(mapping: NonNullable<AnalysisResult['d
     }
 
     // Validate primary_documents is array
-    if (!('primary_documents' in sectionMapping) || !Array.isArray(sectionMapping.primary_documents)) {
+    if (
+      !('primary_documents' in sectionMapping) ||
+      !Array.isArray(sectionMapping.primary_documents)
+    ) {
       throw new Error(
         `Validation error: document_relevance_mapping.${sectionId}.primary_documents must be an array`
       );
@@ -588,7 +605,9 @@ function validateDocumentRelevanceMapping(mapping: NonNullable<AnalysisResult['d
  * @param sections - Array of SectionBreakdown to validate
  * @throws Error if circular dependency detected
  */
-function validatePrerequisitesChain(sections: AnalysisResult['recommended_structure']['sections_breakdown']): void {
+function validatePrerequisitesChain(
+  sections: AnalysisResult['recommended_structure']['sections_breakdown']
+): void {
   // Build adjacency list: section_id -> prerequisites[]
   const graph = new Map<string, string[]>();
 

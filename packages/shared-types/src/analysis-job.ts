@@ -73,9 +73,6 @@ export interface StructureAnalysisInput {
   /** Content style (e.g., 'professional', 'conversational') */
   style: string;
 
-  /** Optional user requirements (from courses.answers) */
-  answers?: string;
-
   /** Target audience level */
   target_audience: TargetAudience;
 
@@ -99,6 +96,12 @@ export interface StructureAnalysisInput {
 
   /** LLM guidance text for course size (advisory) */
   size_guidance?: string;
+
+  /** Course description (user-provided context) */
+  course_description?: string;
+
+  /** Learning outcomes (user-specified goals) */
+  learning_outcomes?: string | string[];
 }
 
 /**

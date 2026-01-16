@@ -655,6 +655,7 @@ export type Database = {
           file_format: string | null
           file_name: string | null
           file_size: number | null
+          fingerprint: string | null
           id: string
           job_id: string | null
           job_type: string | null
@@ -678,6 +679,7 @@ export type Database = {
           file_format?: string | null
           file_name?: string | null
           file_size?: number | null
+          fingerprint?: string | null
           id?: string
           job_id?: string | null
           job_type?: string | null
@@ -701,6 +703,7 @@ export type Database = {
           file_format?: string | null
           file_name?: string | null
           file_size?: number | null
+          fingerprint?: string | null
           id?: string
           job_id?: string | null
           job_type?: string | null
@@ -1887,6 +1890,7 @@ export type Database = {
         Row: {
           assigned_to: string | null
           created_at: string
+          fingerprint: string | null
           id: string
           log_id: string
           log_type: string
@@ -1898,6 +1902,7 @@ export type Database = {
         Insert: {
           assigned_to?: string | null
           created_at?: string
+          fingerprint?: string | null
           id?: string
           log_id: string
           log_type: string
@@ -1909,6 +1914,7 @@ export type Database = {
         Update: {
           assigned_to?: string | null
           created_at?: string
+          fingerprint?: string | null
           id?: string
           log_id?: string
           log_type?: string
@@ -2970,8 +2976,47 @@ export type Database = {
           vector_status: string
         }[]
       }
+      generate_error_fingerprint: {
+        Args: { p_job_type: string; p_message: string; p_stack: string }
+        Returns: string
+      }
       generate_problem_id: { Args: never; Returns: string }
       get_current_auth_context: { Args: never; Returns: Json }
+      get_grouped_error_logs: {
+        Args: {
+          p_date_from?: string
+          p_date_to?: string
+          p_environment?: string
+          p_limit?: number
+          p_offset?: number
+          p_search?: string
+          p_severity?: string
+          p_status?: string
+        }
+        Returns: {
+          count: number
+          environments: string[]
+          fingerprint: string
+          first_seen: string
+          job_type: string
+          last_seen: string
+          latest_log_id: string
+          latest_problem_id: string
+          message: string
+          severity: string
+        }[]
+      }
+      get_grouped_error_logs_count: {
+        Args: {
+          p_date_from?: string
+          p_date_to?: string
+          p_environment?: string
+          p_search?: string
+          p_severity?: string
+          p_status?: string
+        }
+        Returns: number
+      }
       get_organization_from_api_key: {
         Args: { key_prefix_param: string }
         Returns: string
@@ -3074,6 +3119,7 @@ export type Database = {
         }
         Returns: string
       }
+      normalize_stack_trace: { Args: { stack: string }; Returns: string }
       pause_course_generation: {
         Args: { p_course_id: string; p_user_id: string }
         Returns: Json
