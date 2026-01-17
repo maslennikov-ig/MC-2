@@ -905,28 +905,57 @@ async function buildErrorLogsQuery(
 
   if (filters?.status) {
     if (filters.status === 'new') {
-      // "new" means logs WITHOUT any status record - get IDs to exclude
-      const allWithStatus = await supabase
-        .from('log_issue_status')
-        .select('log_id')
-        .eq('log_type', 'error_log');
+      // "new" means logs WITHOUT any status record (individual OR fingerprint-based)
+      // Use raw SQL to get IDs to exclude - logs that have status via log_id OR fingerprint
+      const { data: excludeData, error: excludeError } = await supabase.rpc(
+        'get_error_logs_with_status' as any
+      );
 
-      excludeIds = (allWithStatus.data || []).map(row => row.log_id);
+      if (excludeError) {
+        // Fallback to simple query if RPC doesn't exist
+        logger.warn(
+          { error: excludeError },
+          'RPC get_error_logs_with_status not available, falling back to simple query'
+        );
+        const allWithStatus = await supabase
+          .from('log_issue_status')
+          .select('log_id')
+          .eq('log_type', 'error_log');
+
+        excludeIds = (allWithStatus.data || []).map(row => row.log_id);
+      } else {
+        excludeIds = (excludeData || []).map((row: { id: string }) => row.id);
+      }
     } else {
-      // Get IDs with specific status
-      const statusQuery = await supabase
-        .from('log_issue_status')
-        .select('log_id')
-        .eq('log_type', 'error_log')
-        .eq('status', filters.status);
+      // Get IDs with specific status (via individual log_id OR fingerprint)
+      const { data: statusData, error: statusError } = await supabase.rpc(
+        'get_error_logs_by_status' as any,
+        { p_status: filters.status }
+      );
 
-      if (statusQuery.error) {
-        logger.error({ error: statusQuery.error }, 'Error fetching status-filtered IDs');
-        return { items: [], total: 0 };
+      if (statusError) {
+        // Fallback to simple query if RPC doesn't exist
+        logger.warn(
+          { error: statusError },
+          'RPC get_error_logs_by_status not available, falling back to simple query'
+        );
+        const statusQuery = await supabase
+          .from('log_issue_status')
+          .select('log_id')
+          .eq('log_type', 'error_log')
+          .eq('status', filters.status);
+
+        if (statusQuery.error) {
+          logger.error({ error: statusQuery.error }, 'Error fetching status-filtered IDs');
+          return { items: [], total: 0 };
+        }
+
+        statusFilteredIds = (statusQuery.data || []).map(row => row.log_id);
+      } else {
+        statusFilteredIds = (statusData || []).map((row: { id: string }) => row.id);
       }
 
-      statusFilteredIds = (statusQuery.data || []).map(row => row.log_id);
-      if (statusFilteredIds.length === 0) {
+      if (!statusFilteredIds || statusFilteredIds.length === 0) {
         return { items: [], total: 0 };
       }
     }
@@ -935,7 +964,7 @@ async function buildErrorLogsQuery(
   let query = supabase
     .from('error_logs')
     .select(
-      'id, created_at, severity, error_message, job_type, metadata, problem_id, environment',
+      'id, created_at, severity, error_message, job_type, metadata, problem_id, environment, fingerprint',
       { count: 'exact' }
     );
 
@@ -1002,27 +1031,38 @@ async function buildErrorLogsQuery(
     adjustedCount = filteredData.length; // Approximate - pagination affected
   }
 
-  // Fetch statuses for these logs
+  // Fetch statuses for these logs (individual status by log_id)
   const logIds = filteredData.map(log => log.id);
   const statuses = await fetchLogStatuses(supabase, 'error_log', logIds);
 
-  const items: UnifiedLogItem[] = filteredData.map(log => ({
-    id: log.id,
-    logType: 'error_log' as LogType,
-    createdAt: log.created_at,
-    severity: log.severity,
-    message: log.error_message,
-    source: log.job_type || null,
-    courseId: null,
-    lessonId: null,
-    stage: null,
-    phase: null,
-    status: statuses.get(log.id) || 'new',
-    metadata: log.metadata as Record<string, unknown> | null,
-    problemId: log.problem_id || null,
-    environment: log.environment || null,
-    courseName: null,
-  }));
+  // Fetch fingerprint-based statuses as fallback
+  const fingerprints = filteredData
+    .map(log => (log as { fingerprint?: string }).fingerprint)
+    .filter((fp): fp is string => !!fp);
+  const fingerprintStatuses = await fetchGroupStatuses(supabase, fingerprints);
+
+  const items: UnifiedLogItem[] = filteredData.map(log => {
+    const fp = (log as { fingerprint?: string }).fingerprint;
+    // Priority: individual status > fingerprint status > 'new'
+    const status = statuses.get(log.id) || (fp ? fingerprintStatuses.get(fp) : undefined) || 'new';
+    return {
+      id: log.id,
+      logType: 'error_log' as LogType,
+      createdAt: log.created_at,
+      severity: log.severity,
+      message: log.error_message,
+      source: log.job_type || null,
+      courseId: null,
+      lessonId: null,
+      stage: null,
+      phase: null,
+      status,
+      metadata: log.metadata as Record<string, unknown> | null,
+      problemId: log.problem_id || null,
+      environment: log.environment || null,
+      courseName: null,
+    };
+  });
 
   return { items, total: adjustedCount };
 }
