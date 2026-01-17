@@ -25,8 +25,9 @@ const courseSchema = z.object({
     .array(z.enum(['text', 'audio', 'video', 'presentation', 'test']))
     .optional()
     .default(['text']),
-  estimated_lessons: z.number().min(10).max(100).optional(),
-  estimated_sections: z.number().min(3).max(30).optional(),
+  // Minimum values based on course size presets (micro: 1-5 lessons, 1 section)
+  estimated_lessons: z.number().min(1).max(100).optional(),
+  estimated_sections: z.number().min(1).max(30).optional(),
   course_size: courseSizeSchema.optional(),
   lesson_duration_minutes: z.number().min(3).max(45).optional().default(15),
   content_strategy: z
