@@ -12,6 +12,12 @@
     "lessonsCount": "Уроков",
     "duration": "Длительность",
     "completed": "Завершено",
-    "level": "Уровень"
+    "level": "Уровень",
+    "breadcrumb": {
+      "courses": "Курсы",
+      "section": "Раздел",
+      "lesson": "Урок",
+      "backToCourses": "К списку курсов"
+    }
   }
 }

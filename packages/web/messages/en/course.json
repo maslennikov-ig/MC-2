@@ -12,6 +12,12 @@
     "lessonsCount": "Lessons",
     "duration": "Duration",
     "completed": "Completed",
-    "level": "Level"
+    "level": "Level",
+    "breadcrumb": {
+      "courses": "Courses",
+      "section": "Section",
+      "lesson": "Lesson",
+      "backToCourses": "Back to courses"
+    }
   }
 }
