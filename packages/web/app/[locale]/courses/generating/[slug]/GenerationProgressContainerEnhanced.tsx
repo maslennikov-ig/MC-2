@@ -21,7 +21,6 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 // DISABLED: MissionControlBanner handlers moved to GraphView
 // import { approveStage, cancelGeneration, startGeneration } from '@/app/actions/admin-generation';
 import { GraphViewWrapper } from '@/components/generation-graph'
-import { AutomaticModeControlPanel } from '@/components/generation'
 import { cancelGeneration, switchToManualMode } from '@/app/actions/admin-generation'
 
 // Celestial Design Imports - SpaceBackground REMOVED: GraphView takes full screen now
@@ -862,20 +861,6 @@ export default function GenerationProgressContainerEnhanced({
         )}
       </AnimatePresence>
 
-      {/* Automatic Mode Control Panel - shown above graph when in automatic mode */}
-      {generationMode === 'automatic' && (
-        <div className="absolute top-4 left-1/2 z-50 w-full max-w-3xl -translate-x-1/2 px-4">
-          <AutomaticModeControlPanel
-            status={state.status as string}
-            isPaused={!!generationPausedAt}
-            onPause={handlePause}
-            onResume={handleResume}
-            onCancel={handleCancel}
-            onSwitchToManual={handleSwitchToManual}
-          />
-        </div>
-      )}
-
       {/* GraphView - Full screen */}
       <GraphViewWrapper
         courseId={courseId}
@@ -889,6 +874,11 @@ export default function GenerationProgressContainerEnhanced({
         generationStatus={state.status}
         isRealtimeConnected={state.isConnected}
         readOnly={generationMode === 'automatic'}
+        isPaused={!!generationPausedAt}
+        onPause={handlePause}
+        onResume={handleResume}
+        onCancelGeneration={handleCancel}
+        onSwitchToManual={handleSwitchToManual}
       />
 
       {/* Success Overlay Animation */}

@@ -165,6 +165,14 @@ export interface GraphViewProps {
    * Hides edit, regenerate, and approve buttons.
    */
   readOnly?: boolean
+  /**
+   * NEW: Automatic mode handlers for MissionControlBanner
+   */
+  isPaused?: boolean
+  onPause?: () => Promise<void>
+  onResume?: () => Promise<void>
+  onCancelGeneration?: () => Promise<void>
+  onSwitchToManual?: () => Promise<void>
 }
 
 /**
@@ -218,6 +226,11 @@ function GraphViewInner({
   generationStatus,
   isRealtimeConnected,
   readOnly,
+  isPaused,
+  onPause,
+  onResume,
+  onCancelGeneration,
+  onSwitchToManual,
 }: GraphViewProps) {
   const { isTablet } = useBreakpoint(768)
   const nodesInitialized = useNodesInitialized()
@@ -964,85 +977,103 @@ function GraphViewInner({
                   </Panel>
                 </ReactFlow>
 
-                {/* Show banner when awaiting approval, but for Stage 2 also require all documents to be complete */}
-                {awaitingStage !== null && (awaitingStage !== 2 || areAllDocumentsComplete()) && (
-                  <MissionControlBanner
-                    courseId={courseId}
-                    awaitingStage={awaitingStage}
-                    isNodePanelOpen={!!selectedNodeId}
-                    onApprove={async () => {
-                      // Stage 0: Start generation
-                      if (awaitingStage === 0) {
+                {/* Show banner when:
+                    - In automatic mode (readOnly=true) and not in terminal state
+                    - OR awaiting approval in semi-automatic mode */}
+                {(() => {
+                  const terminalStatuses = ['completed', 'failed', 'cancelled']
+                  const showBanner = readOnly
+                    ? !terminalStatuses.includes(pipelineStatus || '')
+                    : awaitingStage !== null && (awaitingStage !== 2 || areAllDocumentsComplete())
+                  return showBanner ? (
+                    <MissionControlBanner
+                      courseId={courseId}
+                      awaitingStage={awaitingStage ?? 0}
+                      isNodePanelOpen={!!selectedNodeId}
+                      isAutomaticMode={readOnly}
+                      isPaused={isPaused}
+                      onPause={onPause}
+                      onResume={onResume}
+                      onSwitchToManual={onSwitchToManual}
+                      onApprove={async () => {
+                        // Stage 0: Start generation
+                        if (awaitingStage === 0) {
+                          setIsProcessingBanner(true)
+                          // Optimistic update: immediately show Stage 1 as active
+                          // This provides instant visual feedback before backend responds
+                          setStageStatusOptimistic('stage_1', 'active')
+                          try {
+                            await startGeneration(courseId)
+                            toast.success('Генерация запущена!')
+                          } catch (error) {
+                            // Rollback optimistic update on error
+                            setStageStatusOptimistic('stage_1', 'pending')
+                            toast.error('Не удалось запустить генерацию', {
+                              description:
+                                error instanceof Error ? error.message : 'Неизвестная ошибка',
+                            })
+                          } finally {
+                            setIsProcessingBanner(false)
+                          }
+                          return
+                        }
+                        // For stage 3, open Stage 3 node modal for prioritization
+                        if (awaitingStage === 3) {
+                          selectNode('stage_3')
+                          return
+                        }
+                        // For stage 5, open Stage 5 node modal for structure approval
+                        if (awaitingStage === 5) {
+                          selectNode('stage_5')
+                          return
+                        }
+                        // For other stages (2, 4, 6): approve and continue
+                        if (awaitingStage === null) return
                         setIsProcessingBanner(true)
-                        // Optimistic update: immediately show Stage 1 as active
-                        // This provides instant visual feedback before backend responds
-                        setStageStatusOptimistic('stage_1', 'active')
                         try {
-                          await startGeneration(courseId)
-                          toast.success('Генерация запущена!')
+                          await approveStage(courseId, awaitingStage)
+                          toast.success(`Стадия ${awaitingStage} подтверждена!`)
                         } catch (error) {
-                          // Rollback optimistic update on error
-                          setStageStatusOptimistic('stage_1', 'pending')
-                          toast.error('Не удалось запустить генерацию', {
+                          toast.error('Не удалось подтвердить стадию', {
                             description:
                               error instanceof Error ? error.message : 'Неизвестная ошибка',
                           })
                         } finally {
                           setIsProcessingBanner(false)
                         }
-                        return
-                      }
-                      // For stage 3, open Stage 3 node modal for prioritization
-                      if (awaitingStage === 3) {
-                        selectNode('stage_3')
-                        return
-                      }
-                      // For stage 5, open Stage 5 node modal for structure approval
-                      if (awaitingStage === 5) {
-                        selectNode('stage_5')
-                        return
-                      }
-                      // For other stages (2, 4, 6): approve and continue
-                      setIsProcessingBanner(true)
-                      try {
-                        await approveStage(courseId, awaitingStage)
-                        toast.success(`Стадия ${awaitingStage} подтверждена!`)
-                      } catch (error) {
-                        toast.error('Не удалось подтвердить стадию', {
-                          description:
-                            error instanceof Error ? error.message : 'Неизвестная ошибка',
-                        })
-                      } finally {
-                        setIsProcessingBanner(false)
-                      }
-                    }}
-                    onCancel={async () => {
-                      // Stage 0: Just ignore cancel (no generation started)
-                      if (awaitingStage === 0) return
+                      }}
+                      onCancel={
+                        readOnly && onCancelGeneration
+                          ? onCancelGeneration
+                          : async () => {
+                              // Stage 0: Just ignore cancel (no generation started)
+                              if (awaitingStage === 0) return
 
-                      setIsProcessingBanner(true)
-                      try {
-                        await cancelGeneration(courseId)
-                        toast.info('Генерация отменена')
-                      } catch (error) {
-                        toast.error('Не удалось отменить генерацию', {
-                          description:
-                            error instanceof Error ? error.message : 'Неизвестная ошибка',
-                        })
-                      } finally {
-                        setIsProcessingBanner(false)
+                              setIsProcessingBanner(true)
+                              try {
+                                await cancelGeneration(courseId)
+                                toast.info('Генерация отменена')
+                              } catch (error) {
+                                toast.error('Не удалось отменить генерацию', {
+                                  description:
+                                    error instanceof Error ? error.message : 'Неизвестная ошибка',
+                                })
+                              } finally {
+                                setIsProcessingBanner(false)
+                              }
+                            }
                       }
-                    }}
-                    onViewResults={() => {
-                      // For stage 3, open Stage 3 node modal
-                      if (awaitingStage === 3) {
-                        selectNode('stage_3')
-                      }
-                    }}
-                    isProcessing={isProcessingBanner}
-                    isDark={isDark}
-                  />
-                )}
+                      onViewResults={() => {
+                        // For stage 3, open Stage 3 node modal
+                        if (awaitingStage === 3) {
+                          selectNode('stage_3')
+                        }
+                      }}
+                      isProcessing={isProcessingBanner}
+                      isDark={isDark}
+                    />
+                  ) : null
+                })()}
 
                 <NodeDetailsDrawer />
                 {isAdmin && (
