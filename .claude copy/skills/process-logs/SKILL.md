@@ -1,7 +1,7 @@
 ---
 name: process-logs
 description: Process error logs from admin panel - fetch new errors, analyze, create tasks, fix, and mark resolved
-version: 1.7.0
+version: 1.5.0
 ---
 
 # Process Error Logs
@@ -112,20 +112,13 @@ Some errors are **automatically ignored** by the system with status `auto_muted`
 
 **Current auto-mute rules** (from `src/shared/logger/auto-classification.ts`):
 
-| Pattern                            | Reason            | Description                                |
-| ---------------------------------- | ----------------- | ------------------------------------------ |
-| `Redis connection (ended\|closed)` | graceful_shutdown | Redis disconnects during app restart       |
-| `graceful.*shutdown`               | graceful_shutdown | Server shutdown events during deploys      |
-| `/api/trpc/health.*404`            | monitoring_probe  | tRPC health endpoint probes (Uptime Kuma)  |
-| `/health.*404`                     | monitoring_probe  | Generic health check probes                |
-| `Cloudflare.*5\d{2}`               | external_service  | Cloudflare edge errors (502, 503, 521)     |
-| `ECONNRESET.*external`             | external_service  | External API connection resets             |
-| `Layer failed, trying next`        | cascading_repair  | Repair layer failed, trying next layer     |
-| `Critique-revise attempt failed`   | cascading_repair  | Layer 2 retry attempt failed               |
-| `Zod.*validation failed.*Layer`    | cascading_repair  | Layer 1 validation failed, escalating      |
-| `Job stalled`                      | job_lifecycle     | BullMQ job restarted (long LLM operations) |
-
-**Total rules: 10** (test validates sync with code)
+| Pattern                            | Reason            | Description                           |
+| ---------------------------------- | ----------------- | ------------------------------------- |
+| `Redis connection (ended\|closed)` | graceful_shutdown | Redis disconnects during app restart  |
+| `graceful.*shutdown`               | graceful_shutdown | Server shutdown events during deploys |
+| `/health.*404`                     | monitoring_probe  | Health probes from monitoring tools   |
+| `Cloudflare.*5xx`                  | external_service  | Cloudflare edge errors                |
+| `ECONNRESET.*external`             | external_service  | External API connection resets        |
 
 **When you see `auto_muted` errors:**
 
@@ -187,15 +180,6 @@ Invoke via: `/process-logs` or "обработай логи ошибок"
 
 ### Step 1: Fetch New Errors
 
-**IMPORTANT:** The `/admin/logs` UI shows errors from **TWO tables**:
-
-1. `error_logs` — system errors, validation failures, worker errors
-2. `generation_trace` (where `error_data IS NOT NULL`) — LLM generation errors
-
-**Both tables must be checked.** Logs without a `log_issue_status` record show as "Новый" (new) in the UI.
-
-#### 1a. Check error_logs
-
 ```sql
 -- Use mcp__supabase__execute_sql
 -- NOTE: This excludes auto_muted errors (they are handled automatically)
@@ -208,37 +192,6 @@ ORDER BY
   CASE el.severity WHEN 'CRITICAL' THEN 1 WHEN 'ERROR' THEN 2 ELSE 3 END,
   el.created_at DESC
 LIMIT 20;
-```
-
-#### 1b. Check generation_trace (LLM errors)
-
-```sql
--- generation_trace with error_data shows as ERROR in UI
-SELECT gt.id, gt.created_at, gt.stage, gt.phase, gt.step_name, gt.course_id,
-       (gt.error_data->>'message')::text as error_message
-FROM generation_trace gt
-LEFT JOIN log_issue_status lis ON gt.id = lis.log_id AND lis.log_type = 'generation_trace'
-WHERE gt.error_data IS NOT NULL
-  AND (lis.id IS NULL OR lis.status NOT IN ('resolved', 'ignored', 'auto_muted'))
-ORDER BY gt.created_at DESC
-LIMIT 20;
-```
-
-#### 1c. Quick count check
-
-```sql
--- Quick check: how many "new" errors in each table?
-SELECT
-  'error_logs' as source,
-  (SELECT COUNT(*) FROM error_logs el
-   LEFT JOIN log_issue_status lis ON el.id = lis.log_id AND lis.log_type = 'error_log'
-   WHERE lis.id IS NULL) as new_count
-UNION ALL
-SELECT
-  'generation_trace' as source,
-  (SELECT COUNT(*) FROM generation_trace gt
-   LEFT JOIN log_issue_status lis ON gt.id = lis.log_id AND lis.log_type = 'generation_trace'
-   WHERE gt.error_data IS NOT NULL AND lis.id IS NULL) as new_count;
 ```
 
 ### Step 2: For EACH Error (Loop)
@@ -266,14 +219,8 @@ FOR each error:
      - If errors → re-delegate
 
   6. MARK resolved in DB:
-     -- For error_logs:
      INSERT INTO log_issue_status (log_type, log_id, status, notes, updated_at)
      VALUES ('error_log', '<id>', 'resolved', 'Fixed: <desc>', NOW())
-     ON CONFLICT (log_type, log_id) DO UPDATE SET status = 'resolved', notes = EXCLUDED.notes, updated_at = NOW();
-
-     -- For generation_trace:
-     INSERT INTO log_issue_status (log_type, log_id, status, notes, updated_at)
-     VALUES ('generation_trace', '<id>', 'resolved', 'Fixed: <desc>', NOW())
      ON CONFLICT (log_type, log_id) DO UPDATE SET status = 'resolved', notes = EXCLUDED.notes, updated_at = NOW();
 
   7. CLOSE Beads task:
@@ -373,31 +320,3 @@ Before marking ANY error as resolved:
 - Error Types: `packages/course-gen-platform/src/shared/logger/types.ts`
 - Logs Router: `packages/course-gen-platform/src/server/routers/admin/logs.ts`
 - CLAUDE.md: Main orchestration rules
-
-## Architecture Note
-
-The `/admin/logs` page aggregates errors from **two sources**:
-
-| Table              | log_type             | What it contains                            |
-| ------------------ | -------------------- | ------------------------------------------- |
-| `error_logs`       | `'error_log'`        | System errors, validation, worker failures  |
-| `generation_trace` | `'generation_trace'` | LLM errors (where `error_data IS NOT NULL`) |
-
-Status is tracked in `log_issue_status` table with composite key `(log_type, log_id)`.
-
-**UI Logic:** If no `log_issue_status` record exists → status shows as "Новый" (new).
-
-### Grouped View (fingerprint)
-
-The UI has two views:
-
-1. **List view** — individual logs, status by `log_id`
-2. **Grouped view** — errors grouped by `fingerprint`, status by `fingerprint`
-
-**Auto-sync trigger** (`trg_sync_log_status_fingerprint`):
-
-- When you INSERT/UPDATE `log_issue_status` for an `error_log`
-- The trigger automatically copies `fingerprint` from `error_logs`
-- This ensures grouped view shows correct status
-
-**IMPORTANT:** You don't need to manually handle fingerprint — the trigger does it automatically. Just use the standard `INSERT INTO log_issue_status` by `log_id`.

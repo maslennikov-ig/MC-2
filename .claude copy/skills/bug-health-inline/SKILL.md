@@ -1,7 +1,7 @@
 ---
 name: bug-health-inline
-description: Inline orchestration workflow for automated bug detection and fixing. Provides step-by-step phases for bug-hunter detection, priority-based fixing with bug-fixer, and verification cycles.
-version: 2.0.0
+description: Inline orchestration workflow for automated bug detection and fixing with Beads integration. Provides step-by-step phases for bug-hunter detection, priority-based fixing with bug-fixer, and verification cycles.
+version: 3.0.0
 ---
 
 # Bug Health Check (Inline Orchestration)
@@ -11,17 +11,19 @@ You ARE the orchestrator. Execute this workflow directly without spawning a sepa
 ## Workflow Overview
 
 ```
-Detection → Validate → Fix by Priority → Verify → Repeat if needed
+Beads Init → Detection → Create Issues → Fix by Priority → Close Issues → Verify → Beads Complete
 ```
 
 **Max iterations**: 3
 **Priorities**: critical → high → medium → low
+**Beads integration**: Automatic issue tracking
 
 ---
 
-## Phase 1: Pre-flight
+## Phase 1: Pre-flight & Beads Init
 
 1. **Setup directories**:
+
    ```bash
    mkdir -p .tmp/current/{plans,changes,backups}
    ```
@@ -30,15 +32,29 @@ Detection → Validate → Fix by Priority → Verify → Repeat if needed
    - Check `package.json` exists
    - Check `type-check` and `build` scripts exist
 
-3. **Initialize TodoWrite**:
+3. **Create Beads wisp**:
+
+   ```bash
+   bd mol wisp healthcheck
+   ```
+
+   **IMPORTANT**: Save the wisp ID (e.g., `mc2-xxx`) for later use.
+
+4. **Initialize TodoWrite**:
    ```json
    [
-     {"content": "Bug detection", "status": "in_progress", "activeForm": "Detecting bugs"},
-     {"content": "Fix critical bugs", "status": "pending", "activeForm": "Fixing critical bugs"},
-     {"content": "Fix high priority bugs", "status": "pending", "activeForm": "Fixing high bugs"},
-     {"content": "Fix medium priority bugs", "status": "pending", "activeForm": "Fixing medium bugs"},
-     {"content": "Fix low priority bugs", "status": "pending", "activeForm": "Fixing low bugs"},
-     {"content": "Verification scan", "status": "pending", "activeForm": "Verifying fixes"}
+     { "content": "Bug detection", "status": "in_progress", "activeForm": "Detecting bugs" },
+     { "content": "Create Beads issues", "status": "pending", "activeForm": "Creating issues" },
+     { "content": "Fix critical bugs", "status": "pending", "activeForm": "Fixing critical bugs" },
+     { "content": "Fix high priority bugs", "status": "pending", "activeForm": "Fixing high bugs" },
+     {
+       "content": "Fix medium priority bugs",
+       "status": "pending",
+       "activeForm": "Fixing medium bugs"
+     },
+     { "content": "Fix low priority bugs", "status": "pending", "activeForm": "Fixing low bugs" },
+     { "content": "Verification scan", "status": "pending", "activeForm": "Verifying fixes" },
+     { "content": "Complete Beads wisp", "status": "pending", "activeForm": "Completing wisp" }
    ]
    ```
 
@@ -64,14 +80,49 @@ prompt: |
 ```
 
 **After bug-hunter returns**:
+
 1. Read `bug-hunting-report.md`
 2. Parse bug counts by priority
-3. If zero bugs → skip to Final Summary
+3. If zero bugs → skip to Phase 7 (Final Summary)
 4. Update TodoWrite: mark detection complete
 
 ---
 
-## Phase 3: Quality Gate (Detection)
+## Phase 3: Create Beads Issues
+
+**For each bug found**, create a Beads issue:
+
+```bash
+# Critical bugs (P1)
+bd create "BUG: {bug_title}" -t bug -p 1 -d "{description}" \
+  --deps discovered-from:{wisp_id}
+
+# High bugs (P2)
+bd create "BUG: {bug_title}" -t bug -p 2 -d "{description}" \
+  --deps discovered-from:{wisp_id}
+
+# Medium bugs (P3)
+bd create "BUG: {bug_title}" -t bug -p 3 -d "{description}" \
+  --deps discovered-from:{wisp_id}
+
+# Low bugs (P4)
+bd create "BUG: {bug_title}" -t bug -p 4 -d "{description}" \
+  --deps discovered-from:{wisp_id}
+```
+
+**Track issue IDs** in a mapping:
+
+```
+bug_1 → mc2-aaa
+bug_2 → mc2-bbb
+...
+```
+
+Update TodoWrite: mark "Create Beads issues" complete.
+
+---
+
+## Phase 4: Quality Gate (Pre-fix)
 
 Run inline validation:
 
@@ -85,7 +136,7 @@ pnpm build
 
 ---
 
-## Phase 4: Fixing Loop
+## Phase 5: Fixing Loop
 
 **For each priority** (critical → high → medium → low):
 
@@ -94,7 +145,14 @@ pnpm build
 
 2. **Update TodoWrite**: mark current priority in_progress
 
-3. **Invoke bug-fixer** via Task tool:
+3. **Claim issues in Beads**:
+
+   ```bash
+   bd update {issue_id} --status in_progress
+   ```
+
+4. **Invoke bug-fixer** via Task tool:
+
    ```
    subagent_type: "bug-fixer"
    description: "Fix {priority} bugs"
@@ -108,10 +166,11 @@ pnpm build
 
      Generate/update: bug-fixes-implemented.md
 
-     Return: count of fixed bugs, count of failed fixes.
+     Return: count of fixed bugs, count of failed fixes, list of fixed bug IDs.
    ```
 
-4. **Quality Gate** (inline):
+5. **Quality Gate** (inline):
+
    ```bash
    pnpm type-check
    pnpm build
@@ -120,19 +179,26 @@ pnpm build
    - If FAIL → report error, suggest rollback, exit
    - If PASS → continue
 
-5. **Update TodoWrite**: mark priority complete
+6. **Close fixed issues in Beads**:
 
-6. **Repeat** for next priority
+   ```bash
+   bd close {issue_id_1} {issue_id_2} ... --reason "Fixed in health check"
+   ```
+
+7. **Update TodoWrite**: mark priority complete
+
+8. **Repeat** for next priority
 
 ---
 
-## Phase 5: Verification
+## Phase 6: Verification
 
 After all priorities fixed:
 
 1. **Update TodoWrite**: mark verification in_progress
 
 2. **Invoke bug-hunter** (verification mode):
+
    ```
    subagent_type: "bug-hunter"
    description: "Verification scan"
@@ -147,47 +213,88 @@ After all priorities fixed:
    ```
 
 3. **Decision**:
-   - If bugs_remaining == 0 → Final Summary
+   - If bugs_remaining == 0 → Phase 7
    - If iteration < 3 AND bugs_remaining > 0 → Go to Phase 2
-   - If iteration >= 3 → Final Summary with remaining bugs
+   - If iteration >= 3 → Phase 7 with remaining bugs
 
 ---
 
-## Phase 6: Final Summary
+## Phase 7: Final Summary & Beads Complete
 
-Generate summary for user:
+1. **Complete Beads wisp**:
+
+   ```bash
+   # If all bugs fixed
+   bd mol squash {wisp_id}
+
+   # If no bugs found (nothing to do)
+   bd mol burn {wisp_id}
+   ```
+
+2. **Create issues for remaining bugs** (if any):
+
+   ```bash
+   bd create "REMAINING: {bug_title}" -t bug -p {priority} \
+     -d "Not fixed in health check. See bug-hunting-report.md"
+   ```
+
+3. **Generate summary for user**:
 
 ```markdown
 ## Bug Health Check Complete
 
+**Wisp ID**: {wisp_id}
 **Iterations**: {count}/3
 **Status**: {SUCCESS/PARTIAL}
 
 ### Results
+
 - Found: {total} bugs
 - Fixed: {fixed} ({percentage}%)
 - Remaining: {remaining}
 
 ### By Priority
+
 - Critical: {fixed}/{total}
 - High: {fixed}/{total}
 - Medium: {fixed}/{total}
 - Low: {fixed}/{total}
 
+### Beads Issues
+
+- Created: {count}
+- Closed: {count}
+- Remaining: {count} (issues created for follow-up)
+
 ### Validation
+
 - Type Check: {status}
 - Build: {status}
 
 ### Artifacts
+
 - Detection: `bug-hunting-report.md`
 - Fixes: `bug-fixes-implemented.md`
 ```
+
+4. **Update TodoWrite**: mark wisp complete
+
+5. **SESSION CLOSE PROTOCOL**:
+   ```bash
+   git status
+   git add .
+   bd sync
+   git commit -m "fix: health check - {fixed} bugs fixed ({wisp_id})"
+   bd sync
+   git push
+   ```
 
 ---
 
 ## Error Handling
 
 **If quality gate fails**:
+
 ```
 Rollback available: .tmp/current/changes/bug-changes.json
 
@@ -198,21 +305,29 @@ To rollback:
 ```
 
 **If worker fails**:
+
 - Report error to user
+- Keep Beads wisp open for manual completion
 - Suggest manual intervention
 - Exit workflow
 
+**If Beads command fails**:
+
+- Log error but continue workflow
+- Beads tracking is enhancement, not blocker
+
 ---
 
-## Key Differences from Old Approach
+## Quick Reference
 
-| Old (Orchestrator Agent) | New (Inline Skill) |
-|--------------------------|-------------------|
-| 9+ orchestrator calls | 0 orchestrator calls |
-| ~1400 lines (cmd + agent) | ~150 lines |
-| Context reload each call | Single session context |
-| Plan files for each phase | Direct execution |
-| ~10,000+ tokens overhead | ~500 tokens |
+| Phase              | Beads Action                     |
+| ------------------ | -------------------------------- |
+| 1. Pre-flight      | `bd mol wisp healthcheck`        |
+| 3. After detection | `bd create` for each bug         |
+| 5. Before fix      | `bd update --status in_progress` |
+| 5. After fix       | `bd close --reason "Fixed"`      |
+| 7. Complete        | `bd mol squash/burn`             |
+| 7. Remaining       | `bd create` for unfixed bugs     |
 
 ---
 

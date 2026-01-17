@@ -212,6 +212,17 @@ ${m.content}`
       courseId: input.course_id,
       phaseId: 'stage_4_synthesis',
       allowWarningFallback: true, // Stage 4 advisory fields
+      // Quality validator: ensure arrays not emptied by soft-filter (consistent with Stage 5 pattern)
+      qualityValidator: data => {
+        const guidance = (data as Phase4Output)?.generation_guidance;
+        // After Zod soft-validation, arrays may be empty if all LLM values were unknown
+        // Return false to trigger retry instead of silent fallback in Phase5 assembly
+        const hasVisuals =
+          Array.isArray(guidance?.include_visuals) && guidance.include_visuals.length > 0;
+        const hasExercises =
+          Array.isArray(guidance?.exercise_types) && guidance.exercise_types.length > 0;
+        return hasVisuals && hasExercises;
+      },
     });
 
     const regenerationResult = await regenerator.regenerate({

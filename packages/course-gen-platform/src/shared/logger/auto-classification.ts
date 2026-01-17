@@ -32,7 +32,7 @@
  *
  * 4. **Trie-based matching** - For prefix-heavy patterns
  *
- * Current rule count: 6 (no optimization needed)
+ * Current rule count: 10 (no optimization needed)
  * Review threshold: 30+ rules
  */
 
@@ -52,6 +52,8 @@ export interface AutoMuteRule {
  * - graceful_shutdown: Normal app lifecycle events
  * - monitoring_probe: Health checks from external tools
  * - external_service: Third-party service issues (not our bug)
+ * - cascading_repair: Repair layers working as expected (Layer 1/2/3)
+ * - job_lifecycle: BullMQ job management events
  */
 export const AUTO_MUTE_RULES: AutoMuteRule[] = [
   // === Graceful Shutdown Events ===
@@ -88,6 +90,31 @@ export const AUTO_MUTE_RULES: AutoMuteRule[] = [
     pattern: /ECONNRESET.*external/i,
     reason: 'external_service',
     description: 'External API connection resets - transient network issues',
+  },
+
+  // === Cascading Repair System ===
+  {
+    pattern: /Layer failed, trying next/i,
+    reason: 'cascading_repair',
+    description: 'Repair layer failed, system trying next layer - expected cascading behavior',
+  },
+  {
+    pattern: /Critique-revise attempt failed/i,
+    reason: 'cascading_repair',
+    description: 'Layer 2 retry attempt failed - expected when LLM output needs repair',
+  },
+  {
+    pattern: /Zod.*validation failed.*Layer/i,
+    reason: 'cascading_repair',
+    description: 'Layer 1 validation failed, escalating to Layer 2/3 - expected repair flow',
+  },
+
+  // === Job Lifecycle Events ===
+  {
+    pattern: /Job stalled/i,
+    reason: 'job_lifecycle',
+    description:
+      'BullMQ job exceeded lock duration and was restarted - expected for long LLM operations',
   },
 ];
 
