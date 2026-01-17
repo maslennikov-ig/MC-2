@@ -21,12 +21,14 @@ import { OutputTab } from './OutputTab';
 import { ActivityTab } from './ActivityTab';
 // Stage 1 "Course Passport" UI components
 import { Stage1InputTab, Stage1ProcessTab, Stage1OutputTab, Stage1ActivityTab } from './stage1';
+import type { Stage1InputData, Stage1OutputData } from './stage1/types';
 // Stage 2 "Document Processing" UI components
 import { Stage2InputTab, Stage2ProcessTab, Stage2OutputTab, Stage2ActivityTab, Stage2Dashboard } from './stage2';
 // Stage 3 "Document Classification" UI components
 import { Stage3InputTab, Stage3ProcessTab, Stage3OutputTab, Stage3ActivityTab } from './stage3';
 // Stage 4 "Deep Analysis" UI components
 import { Stage4InputTab, Stage4ProcessTab, Stage4OutputTab, Stage4ActivityTab } from './stage4';
+import type { Stage4InputData } from './stage4/types';
 // Stage 5 "Generation" UI components
 import { Stage5InputTab, Stage5ProcessTab, Stage5OutputTab, Stage5ActivityTab } from './stage5';
 import { useStage2DashboardData } from '../hooks/useStage2DashboardData';
@@ -953,7 +955,7 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
 
                 <TabsContent value="input" className="mt-4 space-y-4" data-testid="content-input">
                   {data?.stageNumber === 1 ? (
-                    <Stage1InputTab inputData={displayData?.inputData} />
+                    <Stage1InputTab inputData={displayData?.inputData as Stage1InputData | undefined} />
                   ) : isDocumentNode ? (
                     <Stage2InputTab
                       documentId={documentId}
@@ -967,7 +969,7 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
                   ) : data?.stageNumber === 4 ? (
                     <Stage4InputTab
                       courseId={courseInfo.id}
-                      inputData={displayData?.inputData}
+                      inputData={displayData?.inputData as Stage4InputData | undefined}
                     />
                   ) : data?.stageNumber === 5 ? (
                     <Stage5InputTab
@@ -1025,7 +1027,7 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
                 <TabsContent value="output" className="mt-4 space-y-4" data-testid="content-output">
                   {data?.stageNumber === 1 ? (
                     <Stage1OutputTab
-                      outputData={displayData?.outputData}
+                      outputData={displayData?.outputData as Stage1OutputData | undefined}
                       courseId={courseInfo.id}
                     />
                   ) : isDocumentNode ? (
@@ -1076,8 +1078,8 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
                     <Stage1ActivityTab
                       nodeId={selectedNodeId}
                       courseId={courseInfo.id}
-                      inputData={data?.inputData}
-                      outputData={data?.outputData}
+                      inputData={data?.inputData as Stage1InputData | undefined}
+                      outputData={data?.outputData as Stage1OutputData | undefined}
                     />
                   ) : isDocumentNode ? (
                     <Stage2ActivityTab
