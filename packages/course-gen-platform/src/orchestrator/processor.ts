@@ -15,8 +15,12 @@
  * @module orchestrator/processor
  */
 
-import { SandboxedJob } from 'bullmq';
+import { SandboxedJob, Job } from 'bullmq';
 import { JobData, JobType } from '@megacampus/shared-types';
+/**
+ * Logger is thread-safe (Pino writes to stdout/stderr atomically)
+ * Safe to use in sandboxed processor (worker thread context)
+ */
 import logger from '../shared/logger';
 import { testJobHandler } from './handlers/test-handler';
 import { initializeJobHandler } from './handlers/initialize';
@@ -42,10 +46,52 @@ type JobHandler = {
 };
 
 /**
+ * Adapts a BaseJobHandler to work with SandboxedJob
+ *
+ * SandboxedJob and Job are structurally compatible for the methods our handlers use:
+ * - data, id, name, opts, attemptsMade (all readonly properties)
+ * - updateProgress(), log() (methods with identical signatures)
+ *
+ * This adapter provides a single, documented type assertion instead of multiple
+ * unsafe casts scattered throughout the handler registry. The cast is safe because:
+ *
+ * 1. Both types share the same core interface for job metadata
+ * 2. BaseJobHandler only uses the common subset of methods
+ * 3. BullMQ guarantees SandboxedJob provides all required functionality
+ * 4. The structural compatibility is verified at runtime by BullMQ's worker
+ *
+ * By centralizing the cast here, we maintain type safety while acknowledging
+ * the intentional API overlap between Job and SandboxedJob.
+ *
+ * The handler parameter uses `any` for the Job type to accommodate different
+ * job data types (e.g., GenerationJobData, StructureAnalysisJobData). At runtime,
+ * job routing ensures the correct handler receives the correct job data type.
+ *
+ * The return type is intentionally widened to JobResult to accommodate handlers
+ * that return extended result types (e.g., StructureAnalysisJobResult).
+ * All handler result types extend the base JobResult interface.
+ *
+ * @param handler - A handler with a process method that accepts Job<T>
+ * @returns A JobHandler that accepts SandboxedJob<JobData>
+ */
+function adaptHandler(handler: { process: (job: any) => Promise<unknown> }): JobHandler {
+  return {
+    process: async (job: SandboxedJob<JobData>) => {
+      // Single documented cast: SandboxedJob is structurally compatible with Job
+      // for the methods our handlers actually use (data, id, name, updateProgress)
+      const result = await handler.process(job as unknown as Job<any>);
+      // Result is guaranteed to have at least the JobResult interface
+      // (all handler results extend JobResult with { success, message?, data?, error? })
+      return result as JobResult;
+    },
+  };
+}
+
+/**
  * Job handler registry
  *
  * Maps job types to their corresponding handlers.
- * Handlers must be compatible with SandboxedJob interface.
+ * Handlers are adapted to work with SandboxedJob via adaptHandler().
  *
  * Note: In sandboxed mode, the Job type is replaced with SandboxedJob
  * which has a similar but reduced API. Our handlers are designed to
@@ -58,16 +104,18 @@ type JobHandler = {
  * - job.opts (available in both)
  */
 const jobHandlers: Record<string, JobHandler> = {
-  [JobType.TEST_JOB]: testJobHandler as unknown as JobHandler,
-  [JobType.INITIALIZE]: initializeJobHandler as unknown as JobHandler,
-  [JobType.DOCUMENT_PROCESSING]: documentProcessingHandler as unknown as JobHandler,
-  [JobType.DOCUMENT_CLASSIFICATION]: stage3ClassificationHandler as unknown as JobHandler,
-  [JobType.STRUCTURE_ANALYSIS]: stage4AnalysisHandler as unknown as JobHandler,
-  [JobType.STRUCTURE_GENERATION]: stage5GenerationHandler as unknown as JobHandler,
+  [JobType.TEST_JOB]: adaptHandler(testJobHandler),
+  [JobType.INITIALIZE]: adaptHandler(initializeJobHandler),
+  [JobType.DOCUMENT_PROCESSING]: adaptHandler(documentProcessingHandler),
+  [JobType.DOCUMENT_CLASSIFICATION]: adaptHandler(stage3ClassificationHandler),
+  [JobType.STRUCTURE_ANALYSIS]: adaptHandler(stage4AnalysisHandler),
+  [JobType.STRUCTURE_GENERATION]: adaptHandler(stage5GenerationHandler),
   [JobType.LESSON_CONTENT]: {
     process: async (job: SandboxedJob<JobData>) => {
-      // Stage 6 handler expects token for pause/delay functionality
-      // In sandboxed mode, the token is passed via job.token if available
+      // Stage 6 handler expects token for pause/delay functionality (job.moveToDelayed)
+      // In sandboxed mode, BullMQ passes token via job.token property for lock management.
+      // If token is undefined, pause/delay operations will throw - this is expected
+      // behavior documented in job-processor.ts:checkPauseAndDelay()
       const token = (job as SandboxedJob<JobData> & { token?: string }).token;
       const result = await processStage6Job(job as any, token);
       return {
@@ -122,6 +170,8 @@ async function processJob(job: SandboxedJob<JobData>): Promise<JobResult> {
     throw new Error(error);
   }
 
+  const startTime = Date.now();
+
   logger.debug(
     {
       jobId: job.id,
@@ -131,19 +181,42 @@ async function processJob(job: SandboxedJob<JobData>): Promise<JobResult> {
     'Sandboxed processor: Starting job processing'
   );
 
-  // Process the job using the handler
-  const result = await handler.process(job);
+  try {
+    // Process the job using the handler
+    const result = await handler.process(job);
+    const durationMs = Date.now() - startTime;
 
-  logger.debug(
-    {
-      jobId: job.id,
-      jobType,
-      success: result.success,
-    },
-    'Sandboxed processor: Job processing completed'
-  );
+    logger.debug(
+      {
+        jobId: job.id,
+        jobType,
+        success: result.success,
+        durationMs,
+      },
+      'Sandboxed processor: Job processing completed'
+    );
 
-  return result;
+    return result;
+  } catch (error) {
+    const durationMs = Date.now() - startTime;
+
+    // Log error in processor context (worker thread) for better debugging
+    // Error is then re-thrown so BullMQ can handle retry logic
+    logger.error(
+      {
+        jobId: job.id,
+        jobType,
+        error: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+        attemptsMade: job.attemptsMade,
+        durationMs,
+      },
+      'Sandboxed processor: Job processing failed'
+    );
+
+    // Re-throw so BullMQ marks job as failed and handles retries
+    throw error;
+  }
 }
 
 /**
@@ -151,6 +224,10 @@ async function processJob(job: SandboxedJob<JobData>): Promise<JobResult> {
  *
  * This is the default export that BullMQ will call for each job.
  * The function receives a SandboxedJob and must return the job result.
+ *
+ * Note: BullMQ documentation shows `module.exports` (CommonJS) pattern, but we use
+ * ES module `export default` because this codebase uses ES modules throughout.
+ * Both patterns are supported by BullMQ's worker thread loader.
  *
  * Important notes for sandboxed processors:
  * 1. Each job runs in a separate process/thread
