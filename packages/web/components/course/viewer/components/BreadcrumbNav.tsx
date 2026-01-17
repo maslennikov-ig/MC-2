@@ -24,7 +24,10 @@ export function BreadcrumbNav({
   if (focusMode) return null
 
   return (
-    <nav className="border-b border-gray-100 bg-gray-50/50 px-6 py-3 dark:border-gray-800/50 dark:bg-gray-900/30">
+    <nav
+      aria-label={t('breadcrumb.navigation')}
+      className="border-b border-gray-100 bg-gray-50/50 px-6 py-3 dark:border-gray-800/50 dark:bg-gray-900/30"
+    >
       {/* Desktop breadcrumbs */}
       <ol className="hidden items-center gap-2 text-sm text-gray-600 md:flex dark:text-gray-400">
         <li>
@@ -32,12 +35,14 @@ export function BreadcrumbNav({
             href="/courses"
             className="flex items-center gap-1 transition-colors hover:text-purple-600 dark:hover:text-purple-400"
           >
-            <BookOpen className="h-4 w-4" />
+            <BookOpen className="h-4 w-4" aria-hidden="true" />
             {t('breadcrumb.courses')}
           </Link>
         </li>
 
-        <ChevronRight className="h-4 w-4 flex-shrink-0 text-gray-400 dark:text-gray-600" />
+        <li aria-hidden="true">
+          <ChevronRight className="h-4 w-4 flex-shrink-0 text-gray-400 dark:text-gray-600" />
+        </li>
 
         <li>
           <Link
@@ -49,19 +54,24 @@ export function BreadcrumbNav({
           </Link>
         </li>
 
-        {currentSection && (
+        {currentSection && currentSection.section_number && (
           <>
-            <ChevronRight className="h-4 w-4 flex-shrink-0 text-gray-400 dark:text-gray-600" />
+            <li aria-hidden="true">
+              <ChevronRight className="h-4 w-4 flex-shrink-0 text-gray-400 dark:text-gray-600" />
+            </li>
             <li className="max-w-[200px] truncate" title={currentSection.title}>
               {t('breadcrumb.section')} {currentSection.section_number}: {currentSection.title}
             </li>
           </>
         )}
 
-        {currentLesson && (
+        {currentLesson && currentLesson.lesson_number && (
           <>
-            <ChevronRight className="h-4 w-4 flex-shrink-0 text-gray-400 dark:text-gray-600" />
+            <li aria-hidden="true">
+              <ChevronRight className="h-4 w-4 flex-shrink-0 text-gray-400 dark:text-gray-600" />
+            </li>
             <li
+              aria-current="page"
               className="max-w-[250px] truncate font-medium text-gray-800 dark:text-gray-200"
               title={currentLesson.title}
             >
@@ -77,7 +87,7 @@ export function BreadcrumbNav({
           href="/courses"
           className="inline-flex items-center gap-2 text-sm text-gray-600 transition-colors hover:text-purple-600 dark:text-gray-400 dark:hover:text-purple-400"
         >
-          <ArrowLeft className="h-4 w-4" />
+          <ArrowLeft className="h-4 w-4" aria-hidden="true" />
           {t('breadcrumb.backToCourses')}
         </Link>
       </div>

@@ -17,7 +17,8 @@
       "courses": "Courses",
       "section": "Section",
       "lesson": "Lesson",
-      "backToCourses": "Back to courses"
+      "backToCourses": "Back to courses",
+      "navigation": "Course navigation"
     }
   }
 }

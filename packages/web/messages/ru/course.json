@@ -17,7 +17,8 @@
       "courses": "Курсы",
       "section": "Раздел",
       "lesson": "Урок",
-      "backToCourses": "К списку курсов"
+      "backToCourses": "К списку курсов",
+      "navigation": "Навигация по курсу"
     }
   }
 }
