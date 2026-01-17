@@ -250,6 +250,12 @@
       "manualMode": "Manual Mode",
       "manualModeHint": "In manual mode you can review and modify results at each stage."
     },
+    "aria": {
+      "expand": "Expand control panel",
+      "collapse": "Collapse panel",
+      "collapseHint": "Collapse (or swipe left)",
+      "swipeHint": "Swipe left to collapse"
+    },
     "cancel": "Cancel",
     "view": "View",
     "confirming": "Confirming...",
