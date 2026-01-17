@@ -180,8 +180,23 @@ export function findLessonIdByLabel(
   return lesson?.id || null
 }
 
+/**
+ * Gets the label for a lesson (e.g., "1.2")
+ * @param lesson - Lesson object
+ * @param sections - Array of course sections
+ * @returns Lesson label in format "sectionNumber.lessonNumber", or null if not found
+ */
 export function getLessonLabel(lesson: Lesson, sections: Section[]): string | null {
   const section = sections.find((s) => s.id === lesson.section_id)
-  if (!section || !section.section_number || !lesson.lesson_number) return null
+  // Check for both null/undefined and empty strings
+  if (
+    !section ||
+    !section.section_number ||
+    section.section_number === '' ||
+    !lesson.lesson_number ||
+    lesson.lesson_number === ''
+  ) {
+    return null
+  }
   return `${section.section_number}.${lesson.lesson_number}`
 }

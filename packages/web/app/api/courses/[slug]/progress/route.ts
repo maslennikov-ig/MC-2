@@ -9,6 +9,12 @@ const UpdateProgressSchema = z.object({
   action: z.enum(['mark_complete', 'mark_incomplete', 'access']),
 })
 
+const ProgressResponseSchema = z.object({
+  lessons_completed: z.array(z.string()),
+  last_accessed: z.string().nullable(),
+  last_accessed_lesson_id: z.string().nullable(),
+})
+
 type UpdateProgressInput = z.infer<typeof UpdateProgressSchema>
 
 interface RouteParams {
@@ -64,7 +70,28 @@ async function handleGetProgress(_request: NextRequest, user: AuthUser, { params
       return NextResponse.json({ error: 'Failed to get progress' }, { status: 500 })
     }
 
-    return NextResponse.json(progress)
+    // Validate response - check for null
+    if (!progress) {
+      logger.error('RPC returned null progress for GET', {
+        userId: dbUser.id,
+        courseId: course.id,
+      })
+      return NextResponse.json({ error: 'No progress data returned' }, { status: 500 })
+    }
+
+    // Validate response schema
+    const validationResult = ProgressResponseSchema.safeParse(progress)
+    if (!validationResult.success) {
+      logger.error('Invalid progress response from GET RPC', {
+        userId: dbUser.id,
+        courseId: course.id,
+        progress,
+        errors: validationResult.error.errors,
+      })
+      return NextResponse.json({ error: 'Invalid server response' }, { status: 500 })
+    }
+
+    return NextResponse.json(validationResult.data)
   } catch (error) {
     logger.error('Unexpected error in GET /api/courses/[slug]/progress', { error })
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
@@ -78,10 +105,29 @@ async function handleUpdateProgress(request: NextRequest, user: AuthUser, { para
 
     // Parse and validate body
     let body: UpdateProgressInput
+    let rawBody: unknown
     try {
-      const rawBody = await request.json()
+      rawBody = await request.json()
       body = UpdateProgressSchema.parse(rawBody)
-    } catch {
+    } catch (error) {
+      if (error instanceof z.ZodError) {
+        logger.warn('Progress update validation failed', {
+          slug,
+          userId: user.id,
+          errors: error.errors,
+          body: rawBody,
+        })
+        return NextResponse.json(
+          { error: 'Validation failed', details: error.errors },
+          { status: 400 }
+        )
+      }
+
+      logger.warn('Invalid JSON in progress update request', {
+        slug,
+        userId: user.id,
+        error: error instanceof Error ? error.message : 'Unknown',
+      })
       return NextResponse.json({ error: 'Invalid request body' }, { status: 400 })
     }
 
@@ -126,7 +172,29 @@ async function handleUpdateProgress(request: NextRequest, user: AuthUser, { para
       return NextResponse.json({ error: 'Failed to update progress' }, { status: 500 })
     }
 
-    return NextResponse.json(progress)
+    // Validate response - check for null
+    if (!progress) {
+      logger.error('RPC returned null progress', {
+        userId: dbUser.id,
+        courseId: course.id,
+        lessonId: body.lesson_id,
+      })
+      return NextResponse.json({ error: 'No progress data returned' }, { status: 500 })
+    }
+
+    // Validate response schema
+    const validationResult = ProgressResponseSchema.safeParse(progress)
+    if (!validationResult.success) {
+      logger.error('Invalid progress response from RPC', {
+        userId: dbUser.id,
+        courseId: course.id,
+        progress,
+        errors: validationResult.error.errors,
+      })
+      return NextResponse.json({ error: 'Invalid server response' }, { status: 500 })
+    }
+
+    return NextResponse.json(validationResult.data)
   } catch (error) {
     logger.error('Unexpected error in POST /api/courses/[slug]/progress', { error })
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
