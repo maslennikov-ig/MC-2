@@ -21,7 +21,7 @@ import { JobData, JobType } from '@megacampus/shared-types';
  * Logger is thread-safe (Pino writes to stdout/stderr atomically)
  * Safe to use in sandboxed processor (worker thread context)
  */
-import logger from '../shared/logger';
+import logger from '../shared/logger/index.js';
 import { testJobHandler } from './handlers/test-handler';
 import { initializeJobHandler } from './handlers/initialize';
 import { documentProcessingHandler } from '../stages/stage2-document-processing/handler';

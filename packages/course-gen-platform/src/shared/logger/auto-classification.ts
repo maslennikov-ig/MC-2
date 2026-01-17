@@ -32,7 +32,7 @@
  *
  * 4. **Trie-based matching** - For prefix-heavy patterns
  *
- * Current rule count: 10 (no optimization needed)
+ * Current rule count: 13 (no optimization needed)
  * Review threshold: 30+ rules
  */
 
@@ -115,6 +115,24 @@ export const AUTO_MUTE_RULES: AutoMuteRule[] = [
     reason: 'job_lifecycle',
     description:
       'BullMQ job exceeded lock duration and was restarted - expected for long LLM operations',
+  },
+
+  // === Layer/Schema Fallbacks ===
+  {
+    pattern: /Layer \d+ \(partial-regen\) requires schema.*will be skipped/i,
+    reason: 'cascading_repair',
+    description: 'Layer 3 partial regeneration skipped - schema not available, expected fallback',
+  },
+  {
+    pattern: /Using fallback.*for include_visuals/i,
+    reason: 'cascading_repair',
+    description:
+      'Visual generation disabled due to config - expected when courseStyle lacks visuals',
+  },
+  {
+    pattern: /Visual style validation failed.*using fallback/i,
+    reason: 'cascading_repair',
+    description: 'Visual style config invalid - falling back to no visuals, expected behavior',
   },
 ];
 
