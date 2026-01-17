@@ -19,6 +19,7 @@
 /* eslint-disable @typescript-eslint/require-await */
 
 import path from 'path';
+import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { Worker, Job } from 'bullmq';
 import { getRedisClient } from '../shared/cache/redis';
@@ -48,14 +49,30 @@ const processorFile = path.join(__dirname, 'processor.js');
 
 /**
  * Circuit breaker configuration for memory-based worker control
+ *
+ * Thresholds tuned for 1GB container (typical Docker/K8s pod):
+ * - Pause at 768 MB (75% of 1GB) to leave headroom for GC
+ * - Resume at 512 MB (50% of 1GB) to avoid thrashing (pause/resume cycles)
+ * - 256 MB hysteresis gap prevents rapid pause/resume toggling
+ *
+ * Check interval of 2s balances responsiveness vs overhead.
+ *
+ * For different container sizes, adjust proportionally:
+ * - 2GB container: pauseThresholdMB = 1536, resumeThresholdMB = 1024
+ * - 512MB container: pauseThresholdMB = 384, resumeThresholdMB = 256
+ *
+ * Override via environment variables:
+ * - WORKER_PAUSE_THRESHOLD_MB
+ * - WORKER_RESUME_THRESHOLD_MB
+ * - WORKER_MEMORY_CHECK_INTERVAL_MS
  */
 const CIRCUIT_BREAKER = {
   /** Pause worker when heap exceeds this threshold (MB) */
-  pauseThresholdMB: 768,
+  pauseThresholdMB: parseInt(process.env.WORKER_PAUSE_THRESHOLD_MB || '768'),
   /** Resume worker when heap drops below this threshold (MB) */
-  resumeThresholdMB: 512,
+  resumeThresholdMB: parseInt(process.env.WORKER_RESUME_THRESHOLD_MB || '512'),
   /** Check interval (ms) */
-  checkIntervalMs: 2000,
+  checkIntervalMs: parseInt(process.env.WORKER_MEMORY_CHECK_INTERVAL_MS || '2000'),
 } as const;
 
 /** Circuit breaker state */
@@ -161,6 +178,21 @@ function stopCircuitBreaker(): void {
 export function getWorker(concurrency: number = 5): Worker<JobData, JobResult> {
   if (!worker) {
     const redisClient = getRedisClient();
+
+    // Validate processor file exists before creating worker (fail-fast)
+    // This prevents cryptic "Cannot find module" errors at runtime
+    if (!fs.existsSync(processorFile)) {
+      const error = `Sandboxed processor file not found: ${processorFile}. This indicates a build issue - run 'pnpm build' first.`;
+      logger.error(
+        {
+          processorFile,
+          dirname: __dirname,
+          cwd: process.cwd(),
+        },
+        'BullMQ worker initialization failed: processor file missing'
+      );
+      throw new Error(error);
+    }
 
     logger.info(
       {
