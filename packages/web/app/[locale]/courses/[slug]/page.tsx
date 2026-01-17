@@ -1,4 +1,4 @@
-// Этап 10: CourseViewerEnhanced (финальная версия)
+// Stage 10: CourseViewerEnhanced (final version)
 import { notFound } from 'next/navigation'
 import { setRequestLocale } from 'next-intl/server'
 import { Locale } from '@/src/i18n/config'
@@ -15,6 +15,14 @@ import {
 import type { Course } from '@/types/database'
 import { PostgrestError } from '@supabase/supabase-js'
 import { Database } from '@/types/database.generated'
+import { z } from 'zod'
+
+/** Minimal schema for Course validation - validates critical fields only */
+const CourseSchema = z.object({
+  id: z.string().uuid(),
+  title: z.string().min(1),
+  slug: z.string().min(1),
+})
 
 // Force dynamic rendering to ensure auth state is fresh
 export const dynamic = 'force-dynamic'
@@ -42,21 +50,33 @@ export default async function CoursePage({ params, searchParams }: CoursePagePro
   const { lesson: initialLessonLabel } = await searchParams
   setRequestLocale(locale) // Enable static rendering
 
-  // Используем getUserClient для автоматического применения RLS
+  // Use getUserClient for automatic RLS enforcement
   const supabase = await getUserClient()
 
-  const { data: course, error } = (await supabase
+  const { data: rawCourse, error } = await supabase
     .from('courses')
     .select('*')
     .eq('slug', slug)
-    .single()) as { data: Course | null; error: PostgrestError | null }
+    .single()
 
-  // Проверяем наличие курса
-  if (error || !course) {
+  if (error || !rawCourse) {
     notFound()
   }
 
-  // Этап 4: Получаем секции и уроки
+  // Validate critical fields at runtime
+  const validationResult = CourseSchema.safeParse(rawCourse)
+  if (!validationResult.success) {
+    logger.error('Invalid course data from database', {
+      slug,
+      errors: validationResult.error.errors,
+    })
+    notFound()
+  }
+
+  // Type assertion is now safe - we validated the structure
+  const course = rawCourse as Course
+
+  // Stage 4: Fetch sections and lessons
   const { data: sections, error: sectionsError } = (await supabase
     .from('sections')
     .select('*')

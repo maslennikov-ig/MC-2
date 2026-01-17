@@ -6,6 +6,16 @@ import { useTranslations } from 'next-intl'
 import { ChevronRight, ArrowLeft, BookOpen } from 'lucide-react'
 import type { Course, Section, Lesson } from '@/types/database'
 
+/** Sanitizes text for safe use in HTML attributes (defense-in-depth) */
+function sanitizeText(text: string | null | undefined): string {
+  if (!text) return ''
+  return text
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#x27;')
+}
+
 interface BreadcrumbNavProps {
   course: Course
   currentSection?: Section
@@ -48,7 +58,7 @@ export function BreadcrumbNav({
           <Link
             href={`/courses/${course.slug}`}
             className="max-w-[200px] truncate transition-colors hover:text-purple-600 dark:hover:text-purple-400"
-            title={course.title}
+            title={sanitizeText(course.title)}
           >
             {course.title}
           </Link>
@@ -59,7 +69,7 @@ export function BreadcrumbNav({
             <li aria-hidden="true">
               <ChevronRight className="h-4 w-4 flex-shrink-0 text-gray-400 dark:text-gray-600" />
             </li>
-            <li className="max-w-[200px] truncate" title={currentSection.title}>
+            <li className="max-w-[200px] truncate" title={sanitizeText(currentSection.title)}>
               {t('breadcrumb.section')} {currentSection.section_number}: {currentSection.title}
             </li>
           </>
@@ -73,7 +83,7 @@ export function BreadcrumbNav({
             <li
               aria-current="page"
               className="max-w-[250px] truncate font-medium text-gray-800 dark:text-gray-200"
-              title={currentLesson.title}
+              title={sanitizeText(currentLesson.title)}
             >
               {t('breadcrumb.lesson')} {currentLesson.lesson_number}: {currentLesson.title}
             </li>

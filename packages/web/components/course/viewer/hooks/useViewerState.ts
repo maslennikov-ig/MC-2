@@ -3,7 +3,14 @@
 import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useRouter, usePathname } from 'next/navigation'
 import type { Course, Section, Lesson } from '@/types/database'
-import { findLessonIdByLabel, getLessonLabel } from '@/lib/course-data-utils'
+import { getLessonLabel } from '@/lib/course-data-utils'
+import { BREAKPOINTS } from '@/lib/constants/breakpoints'
+
+/** Structure for localStorage progress with timestamps (CR-005) */
+interface LocalProgressData {
+  completedLessons: string[]
+  lastUpdated: string
+}
 
 export function useViewerState(
   course: Course,
@@ -22,6 +29,8 @@ export function useViewerState(
   const [lastScrollY, setLastScrollY] = useState(0)
   const [isMobile, setIsMobile] = useState(false)
   const [userId, setUserId] = useState<string | null>(null)
+  // CR-019: Loading state for sync
+  const [isSyncingProgress, setIsSyncingProgress] = useState(false)
 
   // Refs for preventing race conditions
   const hasInitializedRef = useRef(false)
@@ -62,9 +71,24 @@ export function useViewerState(
     )
   }, [sections, lessons])
 
-  // Mobile detection
+  // CR-011: Memoized lookup map for O(1) label-to-lessonId resolution
+  const lessonLabelMap = useMemo(() => {
+    const map = new Map<string, string>() // label -> lessonId
+    for (const section of sections) {
+      const sectionLessons = lessonsBySection[section.id] || []
+      for (const lesson of sectionLessons) {
+        const label = getLessonLabel(lesson, sections)
+        if (label) {
+          map.set(label, lesson.id)
+        }
+      }
+    }
+    return map
+  }, [sections, lessonsBySection])
+
+  // Mobile detection (CR-015: use constant instead of magic number)
   useEffect(() => {
-    const checkIsMobile = () => setIsMobile(window.innerWidth < 1024)
+    const checkIsMobile = () => setIsMobile(window.innerWidth < BREAKPOINTS.lg)
     checkIsMobile()
     window.addEventListener('resize', checkIsMobile)
     return () => window.removeEventListener('resize', checkIsMobile)
@@ -86,14 +110,18 @@ export function useViewerState(
     getUserId()
   }, [])
 
-  // Progress persistence
+  // CR-005: Ref to track local progress timestamp for conflict resolution
+  const localProgressTimestampRef = useRef<string | null>(null)
+
+  // Progress persistence - load from localStorage
   useEffect(() => {
     const storageKey = `course-progress-${course.id}`
     try {
       const savedProgress = localStorage.getItem(storageKey)
       if (savedProgress) {
-        const { completedLessons: saved } = JSON.parse(savedProgress)
-        setCompletedLessons(new Set(saved))
+        const parsed: LocalProgressData = JSON.parse(savedProgress)
+        setCompletedLessons(new Set(parsed.completedLessons || []))
+        localProgressTimestampRef.current = parsed.lastUpdated || null
       }
     } catch (_e) {
       // Silent failure acceptable - progress persistence is a nice-to-have feature
@@ -101,12 +129,15 @@ export function useViewerState(
     }
   }, [course.id])
 
+  // Progress persistence - save to localStorage
   useEffect(() => {
     const storageKey = `course-progress-${course.id}`
-    const progressData = {
+    const now = new Date().toISOString()
+    const progressData: LocalProgressData = {
       completedLessons: Array.from(completedLessons),
-      lastUpdated: new Date().toISOString(),
+      lastUpdated: now,
     }
+    localProgressTimestampRef.current = now
     localStorage.setItem(storageKey, JSON.stringify(progressData))
   }, [course.id, completedLessons])
 
@@ -128,26 +159,44 @@ export function useViewerState(
     [userId, course.slug]
   )
 
-  // Fetch server progress and merge with localStorage
+  // Fetch server progress with conflict resolution (CR-005) and sync loading state (CR-019)
   useEffect(() => {
     if (!userId || !course.slug) return
 
     let cancelled = false
 
     const fetchServerProgress = async () => {
+      setIsSyncingProgress(true)
       try {
         const response = await fetch(`/api/courses/${course.slug}/progress`)
         if (response.ok && !cancelled) {
           const data = await response.json()
           if (data.lessons_completed && Array.isArray(data.lessons_completed)) {
-            setCompletedLessons((prev) => {
-              const merged = new Set([...prev, ...data.lessons_completed])
-              return merged
-            })
+            // CR-005: Conflict resolution using "last-write-wins" with timestamps
+            // Compare server's last_accessed with local timestamp
+            const serverTimestamp = data.last_accessed ? new Date(data.last_accessed).getTime() : 0
+            const localTimestamp = localProgressTimestampRef.current
+              ? new Date(localProgressTimestampRef.current).getTime()
+              : 0
+
+            if (serverTimestamp > localTimestamp) {
+              // Server is newer - use server data (handles mark_incomplete from other device)
+              setCompletedLessons(new Set(data.lessons_completed))
+            } else {
+              // Local is newer or equal - merge (add-only for local changes)
+              setCompletedLessons((prev) => {
+                const merged = new Set([...prev, ...data.lessons_completed])
+                return merged
+              })
+            }
           }
         }
       } catch {
         // Offline - use localStorage only
+      } finally {
+        if (!cancelled) {
+          setIsSyncingProgress(false)
+        }
       }
     }
 
@@ -159,6 +208,7 @@ export function useViewerState(
   }, [userId, course.slug])
 
   // Initial lesson selection from URL or first lesson
+  // CR-011: Uses memoized lessonLabelMap for O(1) lookup instead of O(n+m) findLessonIdByLabel
   useEffect(() => {
     if (hasInitializedRef.current || currentLessonId) return
 
@@ -167,7 +217,8 @@ export function useViewerState(
     let initialLessonId: string | null = null
 
     if (initialLessonLabel) {
-      initialLessonId = findLessonIdByLabel(sections, lessons, initialLessonLabel)
+      // CR-011: O(1) lookup using memoized map
+      initialLessonId = lessonLabelMap.get(initialLessonLabel) || null
     }
 
     if (!initialLessonId && sections[0] && lessonsBySection[sections[0].id]?.length > 0) {
@@ -182,7 +233,7 @@ export function useViewerState(
       }
       hasInitializedRef.current = true
     }
-  }, [sections, lessonsBySection, lessons, initialLessonLabel])
+  }, [sections, lessonsBySection, lessons, initialLessonLabel, lessonLabelMap])
 
   // Sync URL when lesson changes
   useEffect(() => {
@@ -290,6 +341,8 @@ export function useViewerState(
     sections,
     lessons,
     lessonsBySection,
+    // CR-011: Memoized label-to-lessonId map for O(1) lookups
+    lessonLabelMap,
     currentLessonId,
     setCurrentLessonId,
     currentLesson,
@@ -310,6 +363,8 @@ export function useViewerState(
     setFocusMode,
     showFab,
     isMobile,
+    // CR-019: Loading state for progress sync
+    isSyncingProgress,
     totalLessons,
     completedCount,
     progressPercentage,
