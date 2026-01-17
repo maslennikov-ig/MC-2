@@ -17,10 +17,15 @@ import {
   Zap,
   Pause,
   Settings,
+  Loader2,
 } from 'lucide-react'
 import { STAGE_CONFIG } from './utils'
 
 const getStorageKey = (courseId: string) => `mission-control-banner-minimized-${courseId}`
+
+// Swipe gesture thresholds
+const SWIPE_VELOCITY_THRESHOLD = -500 // px/s
+const SWIPE_DISTANCE_THRESHOLD = -100 // px
 
 interface MissionControlBannerProps {
   courseId: string
@@ -95,7 +100,7 @@ export function MissionControlBanner({
   const handleDragEnd = useCallback(
     (_: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
       // Swipe left to minimize (velocity or distance threshold)
-      if (info.velocity.x < -500 || info.offset.x < -100) {
+      if (info.velocity.x < SWIPE_VELOCITY_THRESHOLD || info.offset.x < SWIPE_DISTANCE_THRESHOLD) {
         toggleMinimized(true)
       }
       // Reset position
@@ -149,6 +154,8 @@ export function MissionControlBanner({
     setActionLoading(action)
     try {
       await fn()
+    } catch (error) {
+      console.error('[MissionControlBanner] Action failed:', action, error)
     } finally {
       setActionLoading(null)
     }
@@ -179,7 +186,7 @@ export function MissionControlBanner({
                 ? 'border border-r-0 border-amber-500/30 bg-gray-900/95 hover:border-amber-400/50 hover:bg-gray-800/95'
                 : 'border border-r-0 border-amber-200/50 bg-white/95 hover:border-amber-300/70 hover:bg-gray-50/95'
             }`}
-            aria-label="Развернуть панель подтверждения"
+            aria-label={t('aria.expand')}
           >
             <div
               className={`shrink-0 rounded-full border p-1 ${
@@ -220,7 +227,7 @@ export function MissionControlBanner({
             onDragEnd={handleDragEnd}
             style={{ x, opacity }}
             className="pointer-events-auto w-full max-w-3xl touch-pan-y"
-            title="Смахните влево, чтобы свернуть"
+            title={t('aria.swipeHint')}
           >
             <div
               className={`overflow-hidden rounded-xl shadow-lg backdrop-blur-md ${
@@ -295,7 +302,7 @@ export function MissionControlBanner({
                             await onCancel()
                           })
                         }}
-                        disabled={actionLoading !== null}
+                        disabled={actionLoading === 'cancel'}
                         className={`h-9 text-xs ${
                           isDark
                             ? 'text-gray-400 hover:bg-red-950/30 hover:text-red-400'
@@ -382,8 +389,8 @@ export function MissionControlBanner({
                         ? 'text-gray-400 hover:bg-white/5 hover:text-gray-200'
                         : 'text-gray-500 hover:bg-slate-100 hover:text-gray-700'
                     }`}
-                    aria-label="Свернуть панель"
-                    title="Свернуть (или смахните влево)"
+                    aria-label={t('aria.collapse')}
+                    title={t('aria.collapseHint')}
                   >
                     <ChevronRight className="h-4 w-4" />
                   </button>
@@ -413,7 +420,7 @@ export function MissionControlBanner({
                               <p className="mt-2 text-xs italic">{t('automatic.manualModeHint')}</p>
                             )}
                             <p className="mt-2 text-xs text-gray-500 italic">
-                              Смахните влево, чтобы свернуть
+                              {t('aria.swipeHint')}
                             </p>
                           </div>
 
@@ -427,7 +434,7 @@ export function MissionControlBanner({
                                     await onCancel()
                                   })
                                 }
-                                disabled={actionLoading !== null}
+                                disabled={actionLoading === 'cancel'}
                                 className={`h-8 text-xs ${
                                   isDark
                                     ? 'text-gray-400 hover:bg-red-950/30 hover:text-red-400'
@@ -497,7 +504,7 @@ export function MissionControlBanner({
                           >
                             <p>{getDescription()}</p>
                             <p className="mt-2 text-xs text-gray-500 italic">
-                              Смахните влево, чтобы свернуть
+                              {t('aria.swipeHint')}
                             </p>
                           </div>
 
@@ -562,24 +569,5 @@ export function MissionControlBanner({
         </motion.div>
       )}
     </AnimatePresence>
-  )
-}
-
-function Loader2({ className }: { className?: string }) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={className}
-    >
-      <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-    </svg>
   )
 }
