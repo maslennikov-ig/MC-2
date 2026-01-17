@@ -163,8 +163,8 @@ export const Stage1InputTab = memo<Stage1InputTabProps>(function Stage1InputTab(
 }) {
   const t = GRAPH_TRANSLATIONS.stage1
 
-  // Parse inputData safely
-  const data = inputData
+  // Parse inputData safely - cast to expected type
+  const data: Stage1InputData | undefined = inputData as Stage1InputData | undefined
 
   // Memoized computed values
   const learningStyle = useMemo(
