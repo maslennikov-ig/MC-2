@@ -4,6 +4,11 @@
  * This module initializes and manages the BullMQ worker for processing course
  * generation jobs. It handles job routing, error handling, and graceful shutdown.
  *
+ * Uses sandboxed processor mode (useWorkerThreads: true) to prevent job stalling
+ * issues when processing long-running LLM operations. Each job runs in a separate
+ * worker thread, providing better isolation and preventing lock timeout issues.
+ *
+ * @see https://docs.bullmq.io/guide/workers/sandboxed-processors
  * @module orchestrator/worker
  */
 
@@ -13,20 +18,15 @@
 /* eslint-disable @typescript-eslint/no-misused-promises */
 /* eslint-disable @typescript-eslint/require-await */
 
+import path from 'path';
+import { fileURLToPath } from 'url';
 import { Worker, Job } from 'bullmq';
 import { getRedisClient } from '../shared/cache/redis';
 import { JobData, JobType } from '@megacampus/shared-types';
 import logger from '../shared/logger';
 import { QUEUE_NAME } from './queue';
-import { testJobHandler } from './handlers/test-handler';
-import { initializeJobHandler } from './handlers/initialize';
-import { documentProcessingHandler } from '../stages/stage2-document-processing/handler';
-import { stage3ClassificationHandler } from '../stages/stage3-classification/handler';
-import { stage4AnalysisHandler } from '../stages/stage4-analysis/handler';
-import { stage5GenerationHandler } from '../stages/stage5-generation/handler';
-import { processStage6Job } from '../stages/stage6-lesson-content/handler';
 import { handleJobFailure } from './handlers/error-handler';
-import { BaseJobHandler, JobResult } from './handlers/base-handler';
+import { JobResult } from './handlers/base-handler';
 import {
   createJobStatus,
   markJobActive,
@@ -35,6 +35,16 @@ import {
   markJobCancelled,
 } from './job-status-tracker';
 import { JobCancelledError } from '../server/errors/typed-errors';
+
+/**
+ * Get the processor file path for sandboxed processing
+ *
+ * In ES modules, __dirname is not available, so we derive it from import.meta.url
+ * The processor file is compiled to .js in the dist directory
+ */
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
+const processorFile = path.join(__dirname, 'processor.js');
 
 /**
  * Circuit breaker configuration for memory-based worker control
@@ -53,70 +63,22 @@ let isWorkerPaused = false;
 let circuitBreakerInterval: NodeJS.Timeout | null = null;
 
 /**
- * Job handler registry
- *
- * Maps job types to their corresponding handlers.
- * New handlers should be registered here as they are implemented.
+ * Registered job types for status reporting
+ * The actual handlers are defined in processor.ts (sandboxed processor)
  */
-const jobHandlers: Record<
-  string,
-  BaseJobHandler<JobData> | { process: (job: Job<any>) => Promise<any> }
-> = {
-  [JobType.TEST_JOB]: testJobHandler,
-  [JobType.INITIALIZE]: initializeJobHandler,
-  [JobType.DOCUMENT_PROCESSING]: documentProcessingHandler,
-  [JobType.DOCUMENT_CLASSIFICATION]: stage3ClassificationHandler,
-  [JobType.STRUCTURE_ANALYSIS]: stage4AnalysisHandler,
-  [JobType.STRUCTURE_GENERATION]: stage5GenerationHandler,
-  [JobType.LESSON_CONTENT]: { process: processStage6Job },
+const registeredJobTypes = [
+  JobType.TEST_JOB,
+  JobType.INITIALIZE,
+  JobType.DOCUMENT_PROCESSING,
+  JobType.DOCUMENT_CLASSIFICATION,
+  JobType.STRUCTURE_ANALYSIS,
+  JobType.STRUCTURE_GENERATION,
+  JobType.LESSON_CONTENT,
   // TODO (Stage 1+): Register additional handlers
-  // [JobType.SUMMARY_GENERATION]: summaryGenerationHandler,
-  // [JobType.TEXT_GENERATION]: textGenerationHandler,
-  // [JobType.FINALIZATION]: finalizationHandler,
-};
-
-/**
- * Process a job by routing it to the appropriate handler
- *
- * @param {Job<JobData>} job - The BullMQ job to process
- * @returns {Promise<JobResult>} The job execution result
- * @throws {Error} If no handler is found for the job type
- */
-async function processJob(job: Job<JobData>): Promise<JobResult> {
-  const jobType = job.name;
-
-  // Validate job has a name - this can happen with corrupted jobs or test data
-  if (!jobType) {
-    const error = 'Job has undefined name - likely corrupted or created without proper job type';
-    logger.error(
-      {
-        jobId: job.id,
-        jobData: job.data,
-        availableHandlers: Object.keys(jobHandlers),
-      },
-      'Job handler not found: job.name is undefined'
-    );
-    throw new Error(error);
-  }
-
-  const handler = jobHandlers[jobType];
-
-  if (!handler) {
-    const error = `No handler registered for job type: ${jobType}`;
-    logger.error(
-      {
-        jobId: job.id,
-        jobType,
-        availableHandlers: Object.keys(jobHandlers),
-      },
-      'Job handler not found'
-    );
-    throw new Error(error);
-  }
-
-  // Process the job using the handler
-  return await handler.process(job);
-}
+  // JobType.SUMMARY_GENERATION,
+  // JobType.TEXT_GENERATION,
+  // JobType.FINALIZATION,
+];
 
 /**
  * BullMQ Worker instance
@@ -180,11 +142,18 @@ function stopCircuitBreaker(): void {
  * Get or create the BullMQ worker instance
  *
  * The worker is configured with:
+ * - Sandboxed processor mode (useWorkerThreads: true) for process isolation
  * - Redis connection from REDIS_URL environment variable
  * - Exponential backoff retry strategy: 2^attempt * 1000ms
  * - Job cancellation support
  * - Structured logging with job context
  * - Concurrent job processing (default: 5)
+ *
+ * Benefits of sandboxed processing:
+ * - Jobs run in separate worker threads, preventing main process blocking
+ * - Stalled jobs are significantly reduced for long-running LLM operations
+ * - Better isolation - if a job crashes, it doesn't affect other jobs
+ * - Independent memory management per job
  *
  * @param {number} [concurrency=5] - Number of jobs to process concurrently
  * @returns {Worker<JobData, JobResult>} The BullMQ worker instance
@@ -193,18 +162,29 @@ export function getWorker(concurrency: number = 5): Worker<JobData, JobResult> {
   if (!worker) {
     const redisClient = getRedisClient();
 
+    logger.info(
+      {
+        processorFile,
+        concurrency,
+        useWorkerThreads: true,
+      },
+      'Creating BullMQ worker with sandboxed processor'
+    );
+
+    // Use sandboxed processor - jobs run in separate worker threads
+    // This prevents stalled jobs when processing long-running LLM operations
     worker = new Worker<JobData, JobResult>(
       QUEUE_NAME,
-      async (job: Job<JobData>) => {
-        // Process the job - if cancelled, handler will throw JobCancelledError
-        // which will be caught by BullMQ's 'failed' event
-        return await processJob(job);
-      },
+      processorFile, // Path to compiled processor.js file
       {
         connection: redisClient,
         concurrency,
+        // Enable worker threads for better performance (vs spawning processes)
+        // Worker threads share memory with main process but execute independently
+        useWorkerThreads: true,
         // Lock duration for long-running jobs (document processing can take several minutes)
         // Default is 30s, but we need more for PDF processing, embedding generation, etc.
+        // With sandboxed processors, lock renewal is handled automatically by the thread
         lockDuration: 600000, // 10 minutes (same as Stage 3 summarization worker)
         // Exponential backoff: 2^attempt * 1000ms
         // Attempt 1: 2s, Attempt 2: 4s, Attempt 3: 8s, etc.
@@ -418,9 +398,11 @@ export function getWorker(concurrency: number = 5): Worker<JobData, JobResult> {
       {
         queueName: QUEUE_NAME,
         concurrency,
-        registeredHandlers: Object.keys(jobHandlers),
+        useWorkerThreads: true,
+        processorFile,
+        registeredHandlers: registeredJobTypes,
       },
-      'BullMQ worker initialized'
+      'BullMQ worker initialized with sandboxed processor'
     );
 
     // Start circuit breaker after worker is created
@@ -491,7 +473,8 @@ export function getWorkerStatus(): object | null {
     isRunning: isWorkerRunning(),
     isPaused: isWorkerPaused,
     queueName: QUEUE_NAME,
-    registeredHandlers: Object.keys(jobHandlers),
+    useWorkerThreads: true,
+    registeredHandlers: registeredJobTypes,
   };
 }
 
