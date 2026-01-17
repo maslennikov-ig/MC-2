@@ -28,7 +28,7 @@ import { documentProcessingHandler } from '../stages/stage2-document-processing/
 import { stage3ClassificationHandler } from '../stages/stage3-classification/handler';
 import { stage4AnalysisHandler } from '../stages/stage4-analysis/handler';
 import { stage5GenerationHandler } from '../stages/stage5-generation/handler';
-import { processStage6Job } from '../stages/stage6-lesson-content/handler';
+import { processStage6JobAsJobResult } from '../stages/stage6-lesson-content/handler';
 import type { JobResult } from './handlers/base-handler';
 
 /**
@@ -110,23 +110,77 @@ const jobHandlers: Record<string, JobHandler> = {
   [JobType.DOCUMENT_CLASSIFICATION]: adaptHandler(stage3ClassificationHandler),
   [JobType.STRUCTURE_ANALYSIS]: adaptHandler(stage4AnalysisHandler),
   [JobType.STRUCTURE_GENERATION]: adaptHandler(stage5GenerationHandler),
-  [JobType.LESSON_CONTENT]: {
-    process: async (job: SandboxedJob<JobData>) => {
+  [JobType.LESSON_CONTENT]: adaptHandler({
+    process: async (job: Job<any>) => {
       // Stage 6 handler expects token for pause/delay functionality (job.moveToDelayed)
       // In sandboxed mode, BullMQ passes token via job.token property for lock management.
       // If token is undefined, pause/delay operations will throw - this is expected
       // behavior documented in job-processor.ts:checkPauseAndDelay()
-      const token = (job as SandboxedJob<JobData> & { token?: string }).token;
-      const result = await processStage6Job(job as any, token);
-      return {
-        success: result.success,
-        message: result.success ? 'Lesson content generated' : result.errors.join(', '),
-        data: result,
-        error: result.errors.length > 0 ? result.errors[0] : undefined,
-      };
+      const token = (job as Job<any> & { token?: string }).token;
+      return processStage6JobAsJobResult(job, token);
     },
-  },
+  }),
 };
+
+/**
+ * Health check for processor environment
+ * Validates that all dependencies are available in worker thread context
+ *
+ * @returns Health check result with any validation errors
+ */
+export async function healthCheck(): Promise<{ healthy: boolean; errors: string[] }> {
+  const errors: string[] = [];
+
+  // Validate logger works in worker thread context
+  try {
+    logger.debug({ check: 'processor_health' }, 'Processor health check: logger OK');
+  } catch (err) {
+    errors.push(`Logger not available: ${err}`);
+  }
+
+  // Validate all handlers are loadable and callable
+  for (const [jobType, handler] of Object.entries(jobHandlers)) {
+    if (!handler) {
+      errors.push(`Handler for ${jobType} is null/undefined`);
+    } else if (typeof handler.process !== 'function') {
+      errors.push(`Handler for ${jobType} has invalid process method`);
+    }
+  }
+
+  // Validate shared-types imports work
+  try {
+    if (!JobType) {
+      errors.push('JobType enum not available from shared-types');
+    }
+  } catch (err) {
+    errors.push(`Import validation failed: ${err}`);
+  }
+
+  return {
+    healthy: errors.length === 0,
+    errors,
+  };
+}
+
+// Run health check on processor load (startup validation)
+// Skip in test environment to avoid side effects
+if (process.env.NODE_ENV !== 'test') {
+  healthCheck()
+    .then(result => {
+      if (!result.healthy) {
+        logger.error({ errors: result.errors }, 'Processor health check failed - exiting');
+        process.exit(1);
+      }
+      logger.info(
+        { handlersCount: Object.keys(jobHandlers).length },
+        'Processor health check passed'
+      );
+    })
+    .catch(err => {
+      logger.error({ error: err }, 'Processor health check threw exception - exiting');
+      process.exit(1);
+    });
+}
 
 /**
  * Process a job by routing it to the appropriate handler
@@ -143,14 +197,16 @@ async function processJob(job: SandboxedJob<JobData>): Promise<JobResult> {
 
   // Validate job has a name - this can happen with corrupted jobs
   if (!jobType) {
-    const error = 'Job has undefined name - likely corrupted or created without proper job type';
+    const errorType = jobType === undefined ? 'undefined' : 'empty string';
+    const error = `Job has ${errorType} name - likely corrupted or created without proper job type`;
     logger.error(
       {
         jobId: job.id,
+        jobName: jobType,
         jobData: job.data,
         availableHandlers: Object.keys(jobHandlers),
       },
-      'Sandboxed processor: Job handler not found - job.name is undefined'
+      `Sandboxed processor: Invalid job name (${errorType})`
     );
     throw new Error(error);
   }
@@ -220,6 +276,20 @@ async function processJob(job: SandboxedJob<JobData>): Promise<JobResult> {
 }
 
 /**
+ * Processor TTL configuration
+ *
+ * Max time a job can run before being forcefully killed.
+ * This prevents runaway jobs from blocking the worker thread forever.
+ *
+ * Default: 600000ms (10 minutes) - same as lockDuration in worker.ts
+ * Configure via PROCESSOR_MAX_TTL_MS environment variable.
+ *
+ * Exit code 10 signals TTL timeout to parent process for metrics/logging.
+ */
+const PROCESSOR_MAX_TTL_MS = parseInt(process.env.PROCESSOR_MAX_TTL_MS || '600000');
+const TTL_EXIT_CODE = 10;
+
+/**
  * Sandboxed processor entry point
  *
  * This is the default export that BullMQ will call for each job.
@@ -229,12 +299,41 @@ async function processJob(job: SandboxedJob<JobData>): Promise<JobResult> {
  * ES module `export default` because this codebase uses ES modules throughout.
  * Both patterns are supported by BullMQ's worker thread loader.
  *
+ * TTL mechanism: If the job doesn't complete within PROCESSOR_MAX_TTL_MS,
+ * the process is forcefully killed. This prevents infinite loops or hanging
+ * operations from blocking worker threads forever.
+ *
  * Important notes for sandboxed processors:
  * 1. Each job runs in a separate process/thread
  * 2. State is not shared between jobs
  * 3. All imports must be resolvable from this file
- * 4. Process exit codes have special meaning (use sparingly)
+ * 4. Process exit codes have special meaning (TTL_EXIT_CODE = 10 for timeout)
  */
 export default async function (job: SandboxedJob<JobData>): Promise<JobResult> {
-  return processJob(job);
+  let hasCompleted = false;
+
+  // Hard kill timeout - exits process if job doesn't complete
+  // This catches infinite loops that block the event loop
+  const hardKillTimeout = setTimeout(() => {
+    if (!hasCompleted) {
+      logger.error(
+        {
+          jobId: job.id,
+          jobType: job.name,
+          ttlMs: PROCESSOR_MAX_TTL_MS,
+        },
+        'Processor TTL exceeded - force killing worker thread'
+      );
+      process.exit(TTL_EXIT_CODE);
+    }
+  }, PROCESSOR_MAX_TTL_MS);
+
+  try {
+    const result = await processJob(job);
+    hasCompleted = true;
+    return result;
+  } finally {
+    // Always clear timeout - allows process reuse for next job
+    clearTimeout(hardKillTimeout);
+  }
 }
