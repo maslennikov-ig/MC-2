@@ -198,10 +198,8 @@ export function useCreateCourseForm() {
           const preferences = await loadUserPreferences(supabase, user.id)
           if (preferences.learning_style) {
             setUserPreferredStyle(preferences.learning_style)
-            const currentStyle = getValues('writingStyle')
-            if (!currentStyle || currentStyle === 'professional') {
-              setValue('writingStyle', preferences.learning_style as FormData['writingStyle'])
-            }
+            // Только переупорядочиваем UI, НЕ меняем значение формы
+            // Приоритет: localStorage > 'professional' (defaultValues)
             const reordered = reorderLearningStylesWithPreferred(preferences.learning_style)
             setReorderedStyles(reordered)
           }
