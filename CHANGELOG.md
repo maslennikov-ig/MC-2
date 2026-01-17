@@ -311,6 +311,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.28.7] - 2026-01-17
+
+### Fixed
+
+- **admin-logs**: list view now considers fingerprint-based status (1a9aa88)
+- **web**: prevent profile learning_style from overriding user's form selection (6aecc35)
+
+### Other
+
+- update project files (9e559b3)
+- bd sync: 2026-01-17 18:12:35 (d526e32)
+
 ## [0.28.6] - 2026-01-17
 
 ### Added

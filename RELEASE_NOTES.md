@@ -2,6 +2,19 @@
 
 _Released on 2025-12-26_
 
+## v0.28.7
+
+_Released on 2026-01-17_
+
+### 🐛 Bug Fixes
+
+- **admin-logs**: List view now considers fingerprint-based status
+- **web**: Prevent profile learning_style from overriding user's form selection
+
+---
+
+_This release was automatically generated from 4 commits._
+
 ## v0.28.6
 
 _Released on 2026-01-17_
