@@ -12,7 +12,7 @@ import {
   prepareSectionsForViewer,
   prepareLessonsForViewer,
 } from '@/lib/course-data-utils'
-import type { Course, Asset } from '@/types/database'
+import type { Course } from '@/types/database'
 import { PostgrestError } from '@supabase/supabase-js'
 import { Database } from '@/types/database.generated'
 

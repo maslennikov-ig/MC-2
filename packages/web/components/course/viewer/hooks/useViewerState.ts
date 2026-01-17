@@ -1,7 +1,7 @@
 'use client'
 
-import { useState, useEffect, useMemo, useCallback } from 'react'
-import { useRouter, useSearchParams, usePathname } from 'next/navigation'
+import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
+import { useRouter, usePathname } from 'next/navigation'
 import type { Course, Section, Lesson } from '@/types/database'
 import { findLessonIdByLabel, getLessonLabel } from '@/lib/course-data-utils'
 
@@ -23,9 +23,12 @@ export function useViewerState(
   const [isMobile, setIsMobile] = useState(false)
   const [userId, setUserId] = useState<string | null>(null)
 
+  // Refs for preventing race conditions
+  const hasInitializedRef = useRef(false)
+  const lastSyncedLabelRef = useRef<string | null>(null)
+
   const router = useRouter()
   const pathname = usePathname()
-  const searchParams = useSearchParams()
 
   // Sort sections and lessons
   const sections = useMemo(() => {
@@ -129,10 +132,12 @@ export function useViewerState(
   useEffect(() => {
     if (!userId || !course.slug) return
 
+    let cancelled = false
+
     const fetchServerProgress = async () => {
       try {
         const response = await fetch(`/api/courses/${course.slug}/progress`)
-        if (response.ok) {
+        if (response.ok && !cancelled) {
           const data = await response.json()
           if (data.lessons_completed && Array.isArray(data.lessons_completed)) {
             setCompletedLessons((prev) => {
@@ -147,11 +152,15 @@ export function useViewerState(
     }
 
     fetchServerProgress()
+
+    return () => {
+      cancelled = true
+    }
   }, [userId, course.slug])
 
   // Initial lesson selection from URL or first lesson
   useEffect(() => {
-    if (currentLessonId) return
+    if (hasInitializedRef.current || currentLessonId) return
 
     if (sections.length === 0 || Object.keys(lessonsBySection).length === 0) return
 
@@ -171,6 +180,7 @@ export function useViewerState(
       if (lesson?.section_id) {
         setExpandedSections(new Set([lesson.section_id]))
       }
+      hasInitializedRef.current = true
     }
   }, [sections, lessonsBySection, lessons, initialLessonLabel])
 
@@ -184,13 +194,14 @@ export function useViewerState(
     const label = getLessonLabel(currentLesson, sections)
     if (!label) return
 
-    const currentParam = searchParams.get('lesson')
-    if (currentParam !== label) {
-      const params = new URLSearchParams(searchParams.toString())
+    // Only sync if different from last synced value (prevents infinite loop)
+    if (lastSyncedLabelRef.current !== label) {
+      const params = new URLSearchParams(window.location.search)
       params.set('lesson', label)
       router.replace(`${pathname}?${params.toString()}`, { scroll: false })
+      lastSyncedLabelRef.current = label
     }
-  }, [currentLessonId, lessons, sections, pathname, router, searchParams])
+  }, [currentLessonId, lessons, sections, pathname])
 
   const currentLesson = useMemo(
     () => lessons.find((l) => l.id === currentLessonId),
