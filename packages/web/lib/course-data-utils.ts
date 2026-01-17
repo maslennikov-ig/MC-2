@@ -155,6 +155,14 @@ export function sanitizeTokenForLog(token: string): string {
   return token.slice(0, 10) + '***'
 }
 
+/**
+ * Parses a lesson label string (e.g., "1.2") into section and lesson numbers
+ * @param label - Lesson label in format "sectionNumber.lessonNumber"
+ * @returns Object with sectionNumber and lessonNumber, or null if invalid
+ * @example
+ * parseLessonLabel("1.2") // { sectionNumber: "1", lessonNumber: "2" }
+ * parseLessonLabel("invalid") // null
+ */
 export function parseLessonLabel(
   label: string
 ): { sectionNumber: string; lessonNumber: string } | null {
@@ -163,6 +171,13 @@ export function parseLessonLabel(
   return { sectionNumber: match[1], lessonNumber: match[2] }
 }
 
+/**
+ * Finds a lesson ID by its label (e.g., "1.2")
+ * @param sections - Array of course sections
+ * @param lessons - Array of course lessons
+ * @param label - Lesson label to search for
+ * @returns Lesson ID if found, null otherwise
+ */
 export function findLessonIdByLabel(
   sections: Section[],
   lessons: Lesson[],
