@@ -2,6 +2,29 @@
 
 _Released on 2025-12-26_
 
+## v0.28.6
+
+_Released on 2026-01-17_
+
+### ✨ New Features
+
+- **course-viewer**: Add deep-linking, breadcrumbs, and server progress sync
+- **orchestrator**: Add processor health check, TTL timeout, and Stage 6 JobResult wrapper
+
+### 🐛 Bug Fixes
+
+- **web**: Update 2 source file(s)
+- **logger**: Use upsert for duplicate problem_id in error logging
+- **processor**: Resolve ESM directory import error in sandboxed processor
+- **course-viewer**: Complete remaining code review fixes CR-005 through CR-022
+- **course-viewer**: Address code review issues CR-001 through CR-018
+- **a11y**: Add ARIA labels and null checks to BreadcrumbNav
+- **orchestrator**: Improve sandboxed processor type safety and reliability
+
+---
+
+_This release was automatically generated from 20 commits._
+
 ## v0.28.5
 
 _Released on 2026-01-17_
