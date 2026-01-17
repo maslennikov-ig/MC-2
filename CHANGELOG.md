@@ -311,6 +311,58 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.28.4] - 2026-01-17
+
+### Added
+
+- **ui**: add missing user settings to Stage 1 Input Tab (6c24b97)
+- **export**: implement module lessons export as Markdown (2c36776)
+- **db**: add trigger to auto-sync fingerprint in log_issue_status (0a7679e)
+
+### Changed
+
+- **ui**: DRY Stage2Group with utility functions + accessibility (ed1a1d4)
+- code quality improvements from review (P2.4, P3.2-P3.6) (0e2bec4)
+- **logging**: address code review findings for auto_muted (fb0d96d)
+
+### Fixed
+
+- **course-gen-platform**: update 3 source file(s), update 1 agent(s), +3 more (bccdfb4)
+- **types**: add type casts in NodeDetailsDrawer for Stage props (0498f9b)
+- **generation**: save generation_mode from form + display writing style on Stage 4 (b5d695d)
+- **ui**: complete Stage2Group skipped styling from code review (65f4e64)
+- **ui**: add strikethrough style to Stage2Group when skipped (722faa5)
+- **export**: security and performance improvements from code review (c9c1cba)
+- **ui**: resolve single-click/double-click UX conflict in ModuleGroup (4eeab94)
+- add concurrency limiter for Jina API and job.name validation (087fbda)
+- **stage5**: remove partial-regen layer and add lock cleanup (b2b1a77)
+- **stage5**: prevent infinite retry loop and fix validation errors (5cbfccc)
+
+### Other
+
+- bd sync: 2026-01-17 08:24:06 (089dce5)
+- bd sync: 2026-01-17 08:15:57 (3887e14)
+- bd sync: 2026-01-17 08:06:39 (d01e493)
+- bd sync: 2026-01-17 08:00:58 (ff4b0fb)
+- bd sync: 2026-01-17 07:50:09 (34455ad)
+- bd sync: 2026-01-16 21:49:24 (694cff0)
+- bd sync: 2026-01-16 21:46:31 (b4505a8)
+- bd sync: 2026-01-16 21:33:15 (e9f715f)
+- bd sync: 2026-01-16 20:39:35 (a34c7d1)
+- bd sync: 2026-01-16 18:52:14 (6af452c)
+- bd sync: 2026-01-16 18:07:11 (367abf2)
+- **skill**: update process-logs to check both error_logs and generation_trace (42598fd)
+- bd sync: 2026-01-16 17:21:03 (bda4576)
+- bd sync: 2026-01-16 17:18:32 (735fbef)
+- bd sync: 2026-01-16 17:05:15 (9111962)
+- bd sync: 2026-01-16 16:45:52 (481e8de)
+- bd sync: 2026-01-16 16:45:07 (e03e2bd)
+- bd sync: 2026-01-16 16:42:38 (2036092)
+- **skill**: sync process-logs SKILL.md with auto-mute rules (e769af1)
+- bd sync: 2026-01-16 16:24:08 (1d4a657)
+- bd sync: 2026-01-16 16:22:55 (49cd4e2)
+- **logging**: add performance optimization strategy and docs sync test (6dea902)
+
 ## [0.28.3] - 2026-01-16
 
 ### Added
