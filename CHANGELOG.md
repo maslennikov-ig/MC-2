@@ -311,6 +311,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.28.6] - 2026-01-17
+
+### Added
+
+- **course-viewer**: add deep-linking, breadcrumbs, and server progress sync (585d07d)
+- **orchestrator**: add processor health check, TTL timeout, and Stage 6 JobResult wrapper (deb6c0e)
+
+### Fixed
+
+- **web**: update 2 source file(s) (5f9543c)
+- **logger**: use upsert for duplicate problem_id in error logging (d4591fa)
+- **processor**: resolve ESM directory import error in sandboxed processor (53666ca)
+- **course-viewer**: complete remaining code review fixes CR-005 through CR-022 (60c1f29)
+- **course-viewer**: address code review issues CR-001 through CR-018 (7495849)
+- **a11y**: add ARIA labels and null checks to BreadcrumbNav (67111bb)
+- **orchestrator**: improve sandboxed processor type safety and reliability (70a796c)
+
+### Other
+
+- bd sync: 2026-01-17 17:23:56 (ea31f03)
+- bd sync: 2026-01-17 16:43:04 (2c9eb02)
+- bd sync: 2026-01-17 13:22:01 (d358125)
+- bd sync: 2026-01-17 11:24:30 (a0094e1)
+- bd sync: 2026-01-17 11:21:28 (3dad75d)
+- bd sync: close CR-005 through CR-022 tasks (68f9435)
+- add code review report for course-viewer improvements (82f7a45)
+- bd sync: 2026-01-17 09:47:58 (0b26b11)
+- bd sync: 2026-01-17 09:33:22 (b0a1f8d)
+- bd sync: 2026-01-17 09:25:41 (811b69b)
+- bd sync: 2026-01-17 09:11:46 (c816e58)
+
 ## [0.28.5] - 2026-01-17
 
 ### Added
