@@ -311,6 +311,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.28.5] - 2026-01-17
+
+### Added
+
+- **course-gen-platform**: add 1 source file(s), update 1 source file(s) (15359e4)
+
+### Fixed
+
+- **web**: allow micro course size in validation schema (c930e76)
+
+### Other
+
+- bd sync: 2026-01-17 09:09:53 (855c505)
+
 ## [0.28.4] - 2026-01-17
 
 ### Added

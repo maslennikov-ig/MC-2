@@ -2,6 +2,22 @@
 
 _Released on 2025-12-26_
 
+## v0.28.5
+
+_Released on 2026-01-17_
+
+### ✨ New Features
+
+- **course-gen-platform**: Add 1 source file(s), update 1 source file(s)
+
+### 🐛 Bug Fixes
+
+- **web**: Allow micro course size in validation schema
+
+---
+
+_This release was automatically generated from 3 commits._
+
 ## v0.28.4
 
 _Released on 2026-01-17_
