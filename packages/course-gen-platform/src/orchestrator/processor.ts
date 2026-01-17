@@ -22,6 +22,7 @@ import { JobData, JobType } from '@megacampus/shared-types';
  * Safe to use in sandboxed processor (worker thread context)
  */
 import logger from '../shared/logger/index.js';
+import { logPermanentFailure } from '../shared/logger/error-service';
 import { testJobHandler } from './handlers/test-handler';
 import { initializeJobHandler } from './handlers/initialize';
 import { documentProcessingHandler } from '../stages/stage2-document-processing/handler';
@@ -255,6 +256,8 @@ async function processJob(job: SandboxedJob<JobData>): Promise<JobResult> {
     return result;
   } catch (error) {
     const durationMs = Date.now() - startTime;
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorStack = error instanceof Error ? error.stack : undefined;
 
     // Log error in processor context (worker thread) for better debugging
     // Error is then re-thrown so BullMQ can handle retry logic
@@ -262,13 +265,47 @@ async function processJob(job: SandboxedJob<JobData>): Promise<JobResult> {
       {
         jobId: job.id,
         jobType,
-        error: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined,
+        error: errorMessage,
+        stack: errorStack,
         attemptsMade: job.attemptsMade,
         durationMs,
+        // Include job data for debugging (courseId, organizationId, etc.)
+        courseId: job.data?.courseId,
+        organizationId: job.data?.organizationId,
+        userId: job.data?.userId,
       },
       'Sandboxed processor: Job processing failed'
     );
+
+    // CRITICAL: Log to error_logs table INSIDE sandbox while we have full stack trace
+    // BullMQ sandbox strips stack trace when passing error to main process
+    // This ensures we always have complete error details in the database
+    try {
+      await logPermanentFailure({
+        organization_id: job.data?.organizationId,
+        user_id: job.data?.userId,
+        problem_id: job.id,
+        error_message: `[Sandbox] ${errorMessage}`,
+        stack_trace: errorStack,
+        severity: 'ERROR',
+        job_id: job.id,
+        job_type: jobType,
+        metadata: {
+          courseId: job.data?.courseId,
+          attemptsMade: job.attemptsMade,
+          durationMs,
+          source: 'sandbox_processor',
+          // Include input data keys for debugging (not full data to avoid PII)
+          inputDataKeys: job.data ? Object.keys(job.data) : [],
+        },
+      });
+    } catch (logError) {
+      // Don't fail the job if logging fails - just warn
+      logger.warn(
+        { err: logError, jobId: job.id },
+        'Sandboxed processor: Failed to log error to database'
+      );
+    }
 
     // Re-throw so BullMQ marks job as failed and handles retries
     throw error;
