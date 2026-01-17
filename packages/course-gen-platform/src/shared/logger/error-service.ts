@@ -50,26 +50,47 @@ export async function logPermanentFailure(params: CreateErrorLogParams): Promise
   // Auto-detect environment if not provided
   const environment = params.environment || detectEnvironment();
 
-  // Insert error log entry and get the inserted ID
-  const { data: insertedLog, error } = await supabase
-    .from('error_logs' as any)
-    .insert({
-      user_id: params.user_id || null,
-      organization_id: params.organization_id,
-      problem_id: params.problem_id || null,
-      error_message: params.error_message,
-      stack_trace: params.stack_trace || null,
-      severity: params.severity,
-      environment: environment,
-      file_name: params.file_name || null,
-      file_size: params.file_size || null,
-      file_format: params.file_format || null,
-      job_id: params.job_id || null,
-      job_type: params.job_type || null,
-      metadata: params.metadata || null,
-    })
-    .select('id')
-    .single();
+  const logData = {
+    user_id: params.user_id || null,
+    organization_id: params.organization_id,
+    problem_id: params.problem_id || null,
+    error_message: params.error_message,
+    stack_trace: params.stack_trace || null,
+    severity: params.severity,
+    environment: environment,
+    file_name: params.file_name || null,
+    file_size: params.file_size || null,
+    file_format: params.file_format || null,
+    job_id: params.job_id || null,
+    job_type: params.job_type || null,
+    metadata: params.metadata || null,
+  };
+
+  // Use upsert when problem_id is provided to handle duplicate logging attempts
+  // (e.g., during BullMQ retries where the same error is logged multiple times)
+  // Otherwise use regular insert for unique errors
+  let insertedLog: { id: string } | null = null;
+  let error: Error | null = null;
+
+  if (params.problem_id) {
+    // Upsert: update existing record if problem_id already exists
+    const result = await supabase
+      .from('error_logs' as any)
+      .upsert(logData, { onConflict: 'problem_id', ignoreDuplicates: false })
+      .select('id')
+      .single();
+    insertedLog = result.data as { id: string } | null;
+    error = result.error;
+  } else {
+    // Regular insert for errors without problem_id
+    const result = await supabase
+      .from('error_logs' as any)
+      .insert(logData)
+      .select('id')
+      .single();
+    insertedLog = result.data as { id: string } | null;
+    error = result.error;
+  }
 
   if (error) {
     // Fallback to Pino logger if database insert fails
