@@ -2,6 +2,39 @@
 
 _Released on 2025-12-26_
 
+## v0.28.4
+
+_Released on 2026-01-17_
+
+### ✨ New Features
+
+- **Interface**: Add missing user settings to Stage 1 Input Tab
+- **export**: Implement module lessons export as Markdown
+- **Database**: Add trigger to auto-sync fingerprint in log_issue_status
+
+### 🔧 Improvements
+
+- **Interface**: DRY Stage2Group with utility functions + accessibility
+- Code quality improvements from review (P2.4, P3.2-P3.6)
+- **logging**: Address code review findings for auto_muted
+
+### 🐛 Bug Fixes
+
+- **course-gen-platform**: Update 3 source file(s), update 1 agent(s), +3 more
+- **types**: Add type casts in NodeDetailsDrawer for Stage props
+- **generation**: Save generation_mode from form + display writing style on Stage 4
+- **Interface**: Complete Stage2Group skipped styling from code review
+- **Interface**: Add strikethrough style to Stage2Group when skipped
+- **export**: Security and performance improvements from code review
+- **Interface**: Resolve single-click/double-click UX conflict in ModuleGroup
+- Add concurrency limiter for Jina API and job.name validation
+- **stage5**: Remove partial-regen layer and add lock cleanup
+- **stage5**: Prevent infinite retry loop and fix validation errors
+
+---
+
+_This release was automatically generated from 38 commits._
+
 ## v0.28.3
 
 _Released on 2026-01-16_
