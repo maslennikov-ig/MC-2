@@ -1,9 +1,16 @@
-"use client"
+'use client'
 
-import { useState, useEffect, useMemo, useCallback } from "react"
-import type { Course, Section, Lesson } from "@/types/database"
+import { useState, useEffect, useMemo, useCallback } from 'react'
+import { useRouter, useSearchParams, usePathname } from 'next/navigation'
+import type { Course, Section, Lesson } from '@/types/database'
+import { findLessonIdByLabel, getLessonLabel } from '@/lib/course-data-utils'
 
-export function useViewerState(course: Course, rawSections: Section[], rawLessons: Lesson[]) {
+export function useViewerState(
+  course: Course,
+  rawSections: Section[],
+  rawLessons: Lesson[],
+  initialLessonLabel?: string
+) {
   const [currentLessonId, setCurrentLessonId] = useState<string | null>(null)
   const [sidebarOpen, setSidebarOpen] = useState(true)
   const [mobileSidebarOpen, setMobileSidebarOpen] = useState(false)
@@ -14,30 +21,42 @@ export function useViewerState(course: Course, rawSections: Section[], rawLesson
   const [showFab, setShowFab] = useState(true)
   const [lastScrollY, setLastScrollY] = useState(0)
   const [isMobile, setIsMobile] = useState(false)
+  const [userId, setUserId] = useState<string | null>(null)
+
+  const router = useRouter()
+  const pathname = usePathname()
+  const searchParams = useSearchParams()
 
   // Sort sections and lessons
   const sections = useMemo(() => {
     const safeSections = rawSections || []
-    return safeSections.length > 0 
-      ? [...safeSections].sort((a, b) => Number(a?.section_number || 0) - Number(b?.section_number || 0))
+    return safeSections.length > 0
+      ? [...safeSections].sort(
+          (a, b) => Number(a?.section_number || 0) - Number(b?.section_number || 0)
+        )
       : []
   }, [rawSections])
-  
+
   const lessons = useMemo(() => {
     const safeLessons = rawLessons || []
     return safeLessons.length > 0
-      ? [...safeLessons].sort((a, b) => Number(a?.lesson_number || 0) - Number(b?.lesson_number || 0))
+      ? [...safeLessons].sort(
+          (a, b) => Number(a?.lesson_number || 0) - Number(b?.lesson_number || 0)
+        )
       : []
   }, [rawLessons])
 
   // Group lessons by section
   const lessonsBySection = useMemo(() => {
-    return sections.reduce((acc, section) => {
-      acc[section.id] = lessons
-        .filter(lesson => lesson.section_id === section.id)
-        .sort((a, b) => Number(a.lesson_number) - Number(b.lesson_number))
-      return acc
-    }, {} as Record<string, Lesson[]>)
+    return sections.reduce(
+      (acc, section) => {
+        acc[section.id] = lessons
+          .filter((lesson) => lesson.section_id === section.id)
+          .sort((a, b) => Number(a.lesson_number) - Number(b.lesson_number))
+        return acc
+      },
+      {} as Record<string, Lesson[]>
+    )
   }, [sections, lessons])
 
   // Mobile detection
@@ -46,6 +65,22 @@ export function useViewerState(course: Course, rawSections: Section[], rawLesson
     checkIsMobile()
     window.addEventListener('resize', checkIsMobile)
     return () => window.removeEventListener('resize', checkIsMobile)
+  }, [])
+
+  // Get current user for server sync
+  useEffect(() => {
+    const getUserId = async () => {
+      try {
+        const response = await fetch('/api/auth/me')
+        if (response.ok) {
+          const data = await response.json()
+          setUserId(data.user?.id || null)
+        }
+      } catch {
+        // Offline or error - continue with localStorage only
+      }
+    }
+    getUserId()
   }, [])
 
   // Progress persistence
@@ -67,26 +102,116 @@ export function useViewerState(course: Course, rawSections: Section[], rawLesson
     const storageKey = `course-progress-${course.id}`
     const progressData = {
       completedLessons: Array.from(completedLessons),
-      lastUpdated: new Date().toISOString()
+      lastUpdated: new Date().toISOString(),
     }
     localStorage.setItem(storageKey, JSON.stringify(progressData))
   }, [course.id, completedLessons])
 
-  // Initial lesson selection
+  // Sync progress to server (fire and forget)
+  const syncProgressToServer = useCallback(
+    async (lessonId: string, action: 'mark_complete' | 'mark_incomplete') => {
+      if (!userId) return
+
+      try {
+        await fetch(`/api/courses/${course.slug}/progress`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ lesson_id: lessonId, action }),
+        })
+      } catch {
+        // Offline - progress already saved to localStorage
+      }
+    },
+    [userId, course.slug]
+  )
+
+  // Fetch server progress and merge with localStorage
   useEffect(() => {
-    if (!currentLessonId && sections.length > 0 && lessonsBySection[sections[0].id]?.length > 0) {
-      setCurrentLessonId(lessonsBySection[sections[0].id][0].id)
-      setExpandedSections(new Set([sections[0].id]))
+    if (!userId || !course.slug) return
+
+    const fetchServerProgress = async () => {
+      try {
+        const response = await fetch(`/api/courses/${course.slug}/progress`)
+        if (response.ok) {
+          const data = await response.json()
+          if (data.lessons_completed && Array.isArray(data.lessons_completed)) {
+            setCompletedLessons((prev) => {
+              const merged = new Set([...prev, ...data.lessons_completed])
+              return merged
+            })
+          }
+        }
+      } catch {
+        // Offline - use localStorage only
+      }
     }
-  }, [sections, lessonsBySection, currentLessonId])
 
-  const currentLesson = useMemo(() => lessons.find(l => l.id === currentLessonId), [lessons, currentLessonId])
-  const currentSection = useMemo(() => sections.find(s => s.id === currentLesson?.section_id), [sections, currentLesson])
+    fetchServerProgress()
+  }, [userId, course.slug])
 
-  const allLessonsOrdered = useMemo(() => sections.flatMap(section => lessonsBySection[section.id] || []), [sections, lessonsBySection])
-  const currentIndex = useMemo(() => allLessonsOrdered.findIndex(l => l.id === currentLessonId), [allLessonsOrdered, currentLessonId])
+  // Initial lesson selection from URL or first lesson
+  useEffect(() => {
+    if (currentLessonId) return
+
+    if (sections.length === 0 || Object.keys(lessonsBySection).length === 0) return
+
+    let initialLessonId: string | null = null
+
+    if (initialLessonLabel) {
+      initialLessonId = findLessonIdByLabel(sections, lessons, initialLessonLabel)
+    }
+
+    if (!initialLessonId && sections[0] && lessonsBySection[sections[0].id]?.length > 0) {
+      initialLessonId = lessonsBySection[sections[0].id][0].id
+    }
+
+    if (initialLessonId) {
+      setCurrentLessonId(initialLessonId)
+      const lesson = lessons.find((l) => l.id === initialLessonId)
+      if (lesson?.section_id) {
+        setExpandedSections(new Set([lesson.section_id]))
+      }
+    }
+  }, [sections, lessonsBySection, lessons, initialLessonLabel])
+
+  // Sync URL when lesson changes
+  useEffect(() => {
+    if (!currentLessonId) return
+
+    const currentLesson = lessons.find((l) => l.id === currentLessonId)
+    if (!currentLesson) return
+
+    const label = getLessonLabel(currentLesson, sections)
+    if (!label) return
+
+    const currentParam = searchParams.get('lesson')
+    if (currentParam !== label) {
+      const params = new URLSearchParams(searchParams.toString())
+      params.set('lesson', label)
+      router.replace(`${pathname}?${params.toString()}`, { scroll: false })
+    }
+  }, [currentLessonId, lessons, sections, pathname, router, searchParams])
+
+  const currentLesson = useMemo(
+    () => lessons.find((l) => l.id === currentLessonId),
+    [lessons, currentLessonId]
+  )
+  const currentSection = useMemo(
+    () => sections.find((s) => s.id === currentLesson?.section_id),
+    [sections, currentLesson]
+  )
+
+  const allLessonsOrdered = useMemo(
+    () => sections.flatMap((section) => lessonsBySection[section.id] || []),
+    [sections, lessonsBySection]
+  )
+  const currentIndex = useMemo(
+    () => allLessonsOrdered.findIndex((l) => l.id === currentLessonId),
+    [allLessonsOrdered, currentLessonId]
+  )
   const prevLesson = currentIndex > 0 ? allLessonsOrdered[currentIndex - 1] : null
-  const nextLesson = currentIndex < allLessonsOrdered.length - 1 ? allLessonsOrdered[currentIndex + 1] : null
+  const nextLesson =
+    currentIndex < allLessonsOrdered.length - 1 ? allLessonsOrdered[currentIndex + 1] : null
 
   // FAB visibility
   useEffect(() => {
@@ -106,16 +231,23 @@ export function useViewerState(course: Course, rawSections: Section[], rawLesson
   const totalLessons = lessons.length
   const completedCount = completedLessons.size
   const progressPercentage = totalLessons > 0 ? (completedCount / totalLessons) * 100 : 0
-  const totalMinutes = useMemo(() => lessons.reduce((sum, lesson) => sum + (lesson.duration_minutes || 5), 0), [lessons])
-  const completedMinutes = useMemo(() => Array.from(completedLessons).reduce((sum, lessonId) => {
-    const lesson = lessons.find(l => l.id === lessonId)
-    return sum + (lesson?.duration_minutes || 5)
-  }, 0), [completedLessons, lessons])
+  const totalMinutes = useMemo(
+    () => lessons.reduce((sum, lesson) => sum + (lesson.duration_minutes || 5), 0),
+    [lessons]
+  )
+  const completedMinutes = useMemo(
+    () =>
+      Array.from(completedLessons).reduce((sum, lessonId) => {
+        const lesson = lessons.find((l) => l.id === lessonId)
+        return sum + (lesson?.duration_minutes || 5)
+      }, 0),
+    [completedLessons, lessons]
+  )
   const remainingMinutes = totalMinutes - completedMinutes
 
   // Handlers
   const toggleSection = useCallback((sectionId: string) => {
-    setExpandedSections(prev => {
+    setExpandedSections((prev) => {
       const next = new Set(prev)
       if (next.has(sectionId)) next.delete(sectionId)
       else next.add(sectionId)
@@ -123,14 +255,25 @@ export function useViewerState(course: Course, rawSections: Section[], rawLesson
     })
   }, [])
 
-  const markLessonComplete = useCallback((lessonId: string) => {
-    setCompletedLessons(prev => {
-      const next = new Set(prev)
-      if (next.has(lessonId)) next.delete(lessonId)
-      else next.add(lessonId)
-      return next
-    })
-  }, [])
+  const markLessonComplete = useCallback(
+    (lessonId: string) => {
+      setCompletedLessons((prev) => {
+        const next = new Set(prev)
+        const isCompleting = !next.has(lessonId)
+        if (isCompleting) {
+          next.add(lessonId)
+        } else {
+          next.delete(lessonId)
+        }
+
+        // Async sync to server (fire and forget)
+        syncProgressToServer(lessonId, isCompleting ? 'mark_complete' : 'mark_incomplete')
+
+        return next
+      })
+    },
+    [syncProgressToServer]
+  )
 
   return {
     sections,
@@ -162,6 +305,6 @@ export function useViewerState(course: Course, rawSections: Section[], rawLesson
     totalMinutes,
     remainingMinutes,
     toggleSection,
-    markLessonComplete
+    markLessonComplete,
   }
 }

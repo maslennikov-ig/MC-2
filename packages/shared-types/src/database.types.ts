@@ -1264,7 +1264,7 @@ export type Database = {
           outbox_id?: string
           processed_at?: string | null
           queue_name: string
-          target_queue: string
+          target_queue?: string
         }
         Update: {
           attempts?: number
@@ -3020,6 +3020,10 @@ export type Database = {
         }
         Returns: number
       }
+      get_lesson_progress: {
+        Args: { p_course_id: string; p_user_id: string }
+        Returns: Json
+      }
       get_organization_from_api_key: {
         Args: { key_prefix_param: string }
         Returns: string
@@ -3084,6 +3088,7 @@ export type Database = {
           p_job_data: Json
           p_metadata?: Json
           p_organization_id: string
+          p_target_queue?: string
           p_user_id: string
         }
         Returns: Json
@@ -3231,6 +3236,15 @@ export type Database = {
           courses_updated: number
           error_message: string
         }[]
+      }
+      update_lesson_progress: {
+        Args: {
+          p_action: string
+          p_course_id: string
+          p_lesson_id: string
+          p_user_id: string
+        }
+        Returns: Json
       }
       validate_minimum_lessons: {
         Args: { course_structure: Json }
