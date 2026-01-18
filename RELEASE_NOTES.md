@@ -2,6 +2,23 @@
 
 _Released on 2025-12-26_
 
+## v0.28.9
+
+_Released on 2026-01-18_
+
+### ✨ New Features
+
+- Add 1 agent(s)
+
+### 🐛 Bug Fixes
+
+- **Stage5**: Validate style against enum before Zod validation
+- **Stage5**: Handle null DB fields in frontend_parameters validation
+
+---
+
+_This release was automatically generated from 10 commits._
+
 ## v0.28.8
 
 _Released on 2026-01-18_
