@@ -273,6 +273,9 @@ jobs:
       - name: Build course-gen-platform
         run: pnpm --filter @megacampus/course-gen-platform build
 
+      - name: Analyze processor bundle size
+        run: pnpm --filter @megacampus/course-gen-platform analyze:bundle
+
       - name: Build web
         run: pnpm --filter @megacampus/web build
         env:
