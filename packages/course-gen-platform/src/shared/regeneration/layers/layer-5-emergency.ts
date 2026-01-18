@@ -18,6 +18,7 @@
 
 import { getModelForPhase } from '@/shared/llm/langchain-models';
 import logger from '@/shared/logger';
+import { extractJSON } from '@/shared/utils/json-repair';
 
 /**
  * Quality fallback result
@@ -71,16 +72,16 @@ export async function qualityFallback(
     const response = await fallbackModel.invoke(prompt);
     const output = response.content as string;
 
-    // Verify output is parseable JSON
-    JSON.parse(output);
+    // Clean markdown wrappers and extract JSON
+    const cleanedOutput = extractJSON(output);
 
-    logger.info(
-      { fallbackModelId },
-      'Layer 5: Quality fallback succeeded'
-    );
+    // Verify output is parseable JSON
+    JSON.parse(cleanedOutput);
+
+    logger.info({ fallbackModelId }, 'Layer 5: Quality fallback succeeded');
 
     return {
-      output,
+      output: cleanedOutput,
       modelUsed: fallbackModelId,
     };
   } catch (error) {
