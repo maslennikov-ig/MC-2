@@ -19,6 +19,16 @@ import { concurrencyTracker } from '../../shared/concurrency';
 import { getTranslator, type Locale, type TranslatorFn } from '../../shared/i18n';
 
 /**
+ * Type guard to check if job has getState() method
+ * SandboxedJob doesn't have this method, but regular Job does
+ */
+type JobWithGetState = { getState: () => Promise<string> };
+
+function hasGetState(job: unknown): job is JobWithGetState {
+  return typeof (job as JobWithGetState).getState === 'function';
+}
+
+/**
  * Cached translator instances per locale
  * Since we only have 2 locales, this is more efficient than creating
  * a new translator function for every progress update.
@@ -381,9 +391,8 @@ export abstract class BaseJobHandler<T extends JobData = JobData> {
    * @returns {Promise<boolean>} True if the job is cancelled
    */
   protected async isCancelled(job: Job<T>): Promise<boolean> {
-    // SandboxedJob doesn't have getState() method
-    // Check if method exists before calling
-    if (typeof (job as unknown as { getState?: unknown }).getState !== 'function') {
+    // SandboxedJob doesn't have getState() method - use type guard
+    if (!hasGetState(job)) {
       // For SandboxedJob, return false - use checkCancellation() for DB-based cancellation
       return false;
     }

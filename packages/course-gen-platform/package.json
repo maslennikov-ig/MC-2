@@ -33,7 +33,8 @@
     "qdrant:create-collection": "tsx src/shared/qdrant/create-collection.ts",
     "cleanup:docling-cache": "tsx tools/maintenance/cleanup-docling-cache.ts",
     "lint": "eslint src --max-warnings=300",
-    "type-check": "tsc --noEmit"
+    "type-check": "tsc --noEmit",
+    "analyze:bundle": "tsx scripts/analyze-processor-bundle.ts"
   },
   "dependencies": {
     "@bull-board/api": "^5.14.0",
