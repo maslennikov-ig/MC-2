@@ -40,6 +40,16 @@ export async function applyAutoMuteStatus(logId: string, errorMessage: string): 
     });
 
     if (error) {
+      // Handle race condition: fingerprint already has status (code 23505)
+      // This is expected behavior when parallel errors share the same fingerprint
+      if (error.code === '23505') {
+        baseLogger.debug(
+          { fingerprint: autoMuteResult.reason, logId },
+          'Auto-mute status already exists for fingerprint group (race condition handled)'
+        );
+        return; // Success - status already set for this error group
+      }
+
       baseLogger.warn(
         { error, logId, reason: autoMuteResult.reason },
         'Failed to apply auto-mute status'

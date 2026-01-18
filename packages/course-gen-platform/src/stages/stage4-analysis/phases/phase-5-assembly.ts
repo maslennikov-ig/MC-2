@@ -46,6 +46,7 @@ import { logger } from '../../../shared/logger';
  */
 const FALLBACK_EXERCISE_TYPES = ['quiz', 'practice', 'reflection'] as const;
 const FALLBACK_VISUAL_TYPES = ['diagrams', 'tables'] as const;
+const FALLBACK_INTERACTIVITY_LEVEL = 'medium' as const;
 
 /**
  * Input structure for Phase 5 assembly
@@ -221,6 +222,25 @@ export async function assembleAnalysisResult(input: Phase5Input): Promise<Analys
     ),
   };
 
+  // Defensive defaults for Phase 3 fields that LLM may omit
+  const interactivityLevel = input.phase3_output.pedagogical_strategy?.interactivity_level;
+  if (!interactivityLevel) {
+    logger.warn(
+      {
+        field: 'pedagogical_strategy.interactivity_level',
+        fallback: FALLBACK_INTERACTIVITY_LEVEL,
+        reason: 'LLM did not return required field',
+      },
+      '[Phase5Assembly] Using fallback for interactivity_level'
+    );
+  }
+
+  // Create pedagogical_strategy with fallback for interactivity_level
+  const pedagogicalStrategy = {
+    ...input.phase3_output.pedagogical_strategy,
+    interactivity_level: interactivityLevel ?? FALLBACK_INTERACTIVITY_LEVEL,
+  };
+
   // Assemble complete AnalysisResult structure
   const result: AnalysisResult = {
     // From Phase 1: Classification and contextual language
@@ -233,8 +253,8 @@ export async function assembleAnalysisResult(input: Phase5Input): Promise<Analys
     recommended_structure: input.phase2_output.recommended_structure,
 
     // From Phase 3: Pedagogical strategy and analysis
-    pedagogical_strategy: input.phase3_output.pedagogical_strategy,
-    expansion_areas: input.phase3_output.expansion_areas,
+    pedagogical_strategy: pedagogicalStrategy, // With fallback for interactivity_level
+    expansion_areas: input.phase3_output.expansion_areas ?? null, // Fallback to null if undefined
     research_flags: input.phase3_output.research_flags,
 
     // From Phase 4: Document synthesis
