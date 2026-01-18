@@ -12,6 +12,7 @@ import { JobType, JobData } from '@megacampus/shared-types';
 import { logger } from '../logger/index.js';
 import type { Database } from '@megacampus/shared-types';
 import type { CourseSettings } from '../../server/routers/generation/_shared/types';
+import { isValidStyle, DEFAULT_COURSE_STYLE } from '@megacampus/shared-types/style-prompts';
 
 type GenerationStatus = Database['public']['Enums']['generation_status'];
 
@@ -195,8 +196,9 @@ async function queueNextStageJob(
         input: {
           topic: settings.topic || course.title || '',
           // Convert null to sensible defaults (null from DB fails Zod validation)
+          // Validate style against enum to prevent invalid values from breaking Zod
           language: course.language ?? 'ru',
-          style: course.style ?? 'conversational',
+          style: course.style && isValidStyle(course.style) ? course.style : DEFAULT_COURSE_STYLE,
           target_audience: course.target_audience ?? '',
           difficulty: course.difficulty ?? 'intermediate',
           lesson_duration_minutes: settings.lesson_duration_minutes || 30,
@@ -247,8 +249,9 @@ async function queueNextStageJob(
         frontend_parameters: {
           course_title: course.title,
           // Convert null to undefined for cleaner optional fields (nullish schema accepts both)
+          // Validate style against enum to prevent invalid values from breaking Zod
           language: course.language ?? undefined,
-          style: course.style ?? undefined,
+          style: course.style && isValidStyle(course.style) ? course.style : undefined,
           target_audience: course.target_audience ?? undefined,
           difficulty: course.difficulty ?? undefined,
           description: course.course_description ?? undefined,

@@ -1070,8 +1070,10 @@ export const lifecycleRouter = router({
             frontend_parameters: {
               course_title: fullCourse.title,
               // Convert null to undefined for cleaner optional fields (nullish schema accepts both)
+              // Validate style against enum to prevent invalid values from breaking Zod
               language: fullCourse.language ?? undefined,
-              style: fullCourse.style ?? undefined,
+              style:
+                fullCourse.style && isValidStyle(fullCourse.style) ? fullCourse.style : undefined,
               target_audience: fullCourse.target_audience ?? undefined,
               difficulty: fullCourse.difficulty ?? undefined,
               desired_lessons_count: (fullCourse.settings as unknown as CourseSettings)
