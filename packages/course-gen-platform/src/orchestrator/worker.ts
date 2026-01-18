@@ -62,12 +62,18 @@ function resolveProcessorPath(): string {
   }
 
   // Dev mode: tsx runs from src/, but processor.js is in dist/
-  // Convert: .../src/orchestrator → .../dist/orchestrator
-  const distPath = __dirname.replace(/\/src\//, '/dist/');
-  const distProcessorPath = path.join(distPath, 'processor.js');
+  // More robust: calculate from project root instead of string replacement
+  const projectRoot = path.resolve(__dirname, '../..');
+  const distProcessorPath = path.join(projectRoot, 'dist/orchestrator/processor.js');
   if (fs.existsSync(distProcessorPath)) {
     return distProcessorPath;
   }
+
+  // Log warning for debugging - path resolution failed
+  logger.warn(
+    { __dirname, sameDirPath, distProcessorPath },
+    'Processor not found at expected paths, using fallback'
+  );
 
   // Fallback to original path (will fail with helpful error message later)
   return sameDirPath;
