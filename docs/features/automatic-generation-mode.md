@@ -14,7 +14,7 @@ Automatic generation mode allows users to create courses without manual approval
 
 | Feature           | Description                                           |
 | ----------------- | ----------------------------------------------------- |
-| **Auto-Approval** | Stages 2, 3, 4 auto-approve when mode is automatic    |
+| **Auto-Approval** | Stages 2, 3, 4, 5 auto-approve when mode is automatic |
 | **Notifications** | Push, Email, Telegram on completion/error/stage       |
 | **Pause/Resume**  | Pause generation and optionally switch to manual mode |
 | **Cost Preview**  | Show estimated cost before starting                   |
@@ -126,6 +126,7 @@ All stage handlers now call auto-approval and notification services:
 | 2     | `stage2-document-processing/orchestrator.ts:660-666`     | `handleStageCompletion()` + `notifyStageComplete()` |
 | 3     | `stage3-classification/handler.ts:91-100`                | `handleStageCompletion()` + `notifyStageComplete()` |
 | 4     | `stage4-analysis/handler.ts:600-609`                     | `handleStageCompletion()` + `notifyStageComplete()` |
+| 5     | `stage5-generation/handler.ts:664`                       | `handleStageCompletion()` (auto-queues Stage 6)     |
 | 6     | `stage6-lesson-content/services/database-service.ts:559` | `notifyCourseCompletion()`                          |
 
 ### API Changes

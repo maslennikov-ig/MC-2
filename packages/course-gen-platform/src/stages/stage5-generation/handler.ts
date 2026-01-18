@@ -42,6 +42,7 @@ import {
   triggerCourseCard,
   triggerAllLessonCovers,
 } from '../stage7-enrichments/services/auto-card-trigger';
+import { handleStageCompletion } from '@/shared/auto-approval';
 
 /**
  * Model fallback configuration for Stage 5
@@ -642,28 +643,29 @@ class Stage5GenerationHandler {
           'Committing course structure to database (atomic commit)'
         );
 
-        // Step 1: Mark stage 5 awaiting approval and save structure
-        // Stage Gates: Wait for user approval before proceeding to Stage 6
-        jobLogger.info('Setting course status to stage_5_awaiting_approval (Stage Gates)');
-        const { error: completeError } = await supabaseAdmin
+        // Step 1: Save structure first (before auto-approval check)
+        jobLogger.info('Saving course structure to database');
+        const { error: structureError } = await supabaseAdmin
           .from('courses')
           .update({
-            generation_status: 'stage_5_awaiting_approval' as const, // Stage Gates: Wait for approval
-            course_structure: sanitizedStructure, // Save structure here
+            course_structure: sanitizedStructure,
             generation_metadata: result.generation_metadata,
             updated_at: new Date().toISOString(),
           })
           .eq('id', course_id);
 
-        if (completeError) {
-          throw new Error(
-            `Failed to update status to stage_5_awaiting_approval: ${completeError.message}`
-          );
+        if (structureError) {
+          throw new Error(`Failed to save structure: ${structureError.message}`);
         }
 
-        // Stage Gates: Stop here and wait for user approval
-        // After approval, ManualStage6Panel will be shown for selective lesson generation (FR-007)
-        jobLogger.info('Stage 5 complete - awaiting user approval before Stage 6');
+        // Step 2: Handle stage completion (checks generation_mode)
+        // If automatic: auto-approves and queues Stage 6
+        // If semi_automatic: sets status to stage_5_awaiting_approval
+        const { autoApproved } = await handleStageCompletion(course_id, 5);
+        jobLogger.info(
+          { courseId: course_id, autoApproved },
+          autoApproved ? 'Stage 5 auto-approved → Stage 6 queued' : 'Stage 5 awaiting approval'
+        );
 
         jobLogger.info(
           {
