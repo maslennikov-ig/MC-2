@@ -27,7 +27,7 @@ import { JobData, JobType } from '@megacampus/shared-types';
 import logger from '../shared/logger';
 import { QUEUE_NAME } from './queue';
 import { handleJobFailure } from './handlers/error-handler';
-import { JobResult } from './handlers/base-handler';
+import type { JobResult } from './handlers/base-handler';
 import {
   createJobStatus,
   markJobActive,
@@ -42,10 +42,38 @@ import { JobCancelledError } from '../server/errors/typed-errors';
  *
  * In ES modules, __dirname is not available, so we derive it from import.meta.url
  * The processor file is compiled to .js in the dist directory
+ *
+ * In dev mode (tsx), __dirname points to src/, but processor.js is in dist/
+ * We detect this and adjust the path accordingly
  */
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
-const processorFile = path.join(__dirname, 'processor.js');
+
+/**
+ * Resolve processor.js path for both dev (tsx) and production modes
+ * - Dev mode: __dirname is src/orchestrator, processor.js is in dist/orchestrator
+ * - Prod mode: __dirname is dist/orchestrator, processor.js is in same directory
+ */
+function resolveProcessorPath(): string {
+  // First try same directory (production mode - running from dist/)
+  const sameDirPath = path.join(__dirname, 'processor.js');
+  if (fs.existsSync(sameDirPath)) {
+    return sameDirPath;
+  }
+
+  // Dev mode: tsx runs from src/, but processor.js is in dist/
+  // Convert: .../src/orchestrator → .../dist/orchestrator
+  const distPath = __dirname.replace(/\/src\//, '/dist/');
+  const distProcessorPath = path.join(distPath, 'processor.js');
+  if (fs.existsSync(distProcessorPath)) {
+    return distProcessorPath;
+  }
+
+  // Fallback to original path (will fail with helpful error message later)
+  return sameDirPath;
+}
+
+const processorFile = resolveProcessorPath();
 
 /**
  * Circuit breaker configuration for memory-based worker control

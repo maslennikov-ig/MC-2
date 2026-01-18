@@ -23,14 +23,14 @@ import { JobData, JobType } from '@megacampus/shared-types';
  */
 import logger from '../shared/logger/index.js';
 import { logPermanentFailure } from '../shared/logger/error-service.js';
-import { testJobHandler } from './handlers/test-handler';
-import { initializeJobHandler } from './handlers/initialize';
-import { documentProcessingHandler } from '../stages/stage2-document-processing/handler';
-import { stage3ClassificationHandler } from '../stages/stage3-classification/handler';
-import { stage4AnalysisHandler } from '../stages/stage4-analysis/handler';
-import { stage5GenerationHandler } from '../stages/stage5-generation/handler';
-import { processStage6JobAsJobResult } from '../stages/stage6-lesson-content/handler';
-import type { JobResult } from './handlers/base-handler';
+import { testJobHandler } from './handlers/test-handler.js';
+import { initializeJobHandler } from './handlers/initialize.js';
+import { documentProcessingHandler } from '../stages/stage2-document-processing/handler.js';
+import { stage3ClassificationHandler } from '../stages/stage3-classification/handler.js';
+import { stage4AnalysisHandler } from '../stages/stage4-analysis/handler.js';
+import { stage5GenerationHandler } from '../stages/stage5-generation/handler.js';
+import { processStage6JobAsJobResult } from '../stages/stage6-lesson-content/handler.js';
+import type { JobResult } from './handlers/base-handler.js';
 
 /**
  * Type for handler that can process either Job or SandboxedJob
