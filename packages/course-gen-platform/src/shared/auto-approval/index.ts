@@ -88,9 +88,22 @@ export async function handleStageCompletion(
   logger.info({ courseId, currentStage }, 'Auto-approving stage (automatic mode)');
 
   const nextStage = currentStage + 1;
+  const completeStatus = `stage_${currentStage}_complete` as GenerationStatus;
   const nextStatus = `stage_${nextStage}_init` as GenerationStatus;
 
-  // Update status to next stage
+  // FSM requires two-step transition: analyzing -> complete -> next_init
+  // First: Set current stage to complete (required by FSM validation)
+  await db
+    .from('courses')
+    .update({
+      generation_status: completeStatus,
+      updated_at: new Date().toISOString(),
+    })
+    .eq('id', courseId);
+
+  logger.debug({ courseId, status: completeStatus }, 'Stage marked complete');
+
+  // Second: Transition to next stage init
   await db
     .from('courses')
     .update({
