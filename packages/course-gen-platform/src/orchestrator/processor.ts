@@ -16,7 +16,7 @@
  */
 
 import { SandboxedJob, Job } from 'bullmq';
-import { JobData, JobType } from '@megacampus/shared-types';
+import { JobData, JobType, JobStatus } from '@megacampus/shared-types';
 /**
  * Logger is thread-safe (Pino writes to stdout/stderr atomically)
  * Safe to use in sandboxed processor (worker thread context)
@@ -126,6 +126,7 @@ const jobHandlers: Record<string, JobHandler> = {
 /**
  * Health check for processor environment
  * Validates that all dependencies are available in worker thread context
+ * and that workspace packages are bundled correctly.
  *
  * @returns Health check result with any validation errors
  */
@@ -148,13 +149,67 @@ export async function healthCheck(): Promise<{ healthy: boolean; errors: string[
     }
   }
 
-  // Validate shared-types imports work
+  // ============================================================================
+  // Bundle Integrity Validation
+  // Validates that workspace packages are bundled correctly via tsup
+  // ============================================================================
+
+  // Validate @megacampus/shared-types is bundled correctly
   try {
+    // Check JobType enum is available and has expected values
     if (!JobType) {
-      errors.push('JobType enum not available from shared-types');
+      errors.push('JobType enum not available from @megacampus/shared-types');
+    } else if (Object.keys(JobType).length === 0) {
+      errors.push('JobType enum is empty - workspace package may not be bundled correctly');
+    } else {
+      // Verify at least one known enum value exists
+      if (!JobType.TEST_JOB || !JobType.INITIALIZE) {
+        errors.push('JobType enum missing expected values (TEST_JOB, INITIALIZE)');
+      }
+    }
+
+    // Check JobStatus enum is available and has expected values
+    if (!JobStatus) {
+      errors.push('JobStatus enum not available from @megacampus/shared-types');
+    } else if (Object.keys(JobStatus).length === 0) {
+      errors.push('JobStatus enum is empty - workspace package may not be bundled correctly');
+    } else {
+      // Verify at least one known enum value exists
+      if (!JobStatus.PENDING || !JobStatus.COMPLETED) {
+        errors.push('JobStatus enum missing expected values (PENDING, COMPLETED)');
+      }
+    }
+
+    // Verify that handler registry uses correct JobType values
+    // This catches issues where enums are bundled but with different values
+    const registeredTypes = Object.keys(jobHandlers);
+    if (!registeredTypes.includes(JobType.TEST_JOB)) {
+      errors.push(`JobType.TEST_JOB value "${JobType.TEST_JOB}" not found in handler registry`);
     }
   } catch (err) {
-    errors.push(`Import validation failed: ${err}`);
+    errors.push(`@megacampus/shared-types bundle validation failed: ${err}`);
+  }
+
+  // Validate @megacampus/shared-logger is bundled correctly
+  try {
+    // Check logger object has required methods
+    if (!logger || typeof logger.info !== 'function') {
+      errors.push('Logger not available from @megacampus/shared-logger');
+    }
+    if (!logger || typeof logger.error !== 'function') {
+      errors.push('Logger missing error method');
+    }
+    if (!logger || typeof logger.debug !== 'function') {
+      errors.push('Logger missing debug method');
+    }
+
+    // Validate logPermanentFailure function is available
+    // This is critical for error logging in sandboxed context
+    if (typeof logPermanentFailure !== 'function') {
+      errors.push('logPermanentFailure not available from shared-logger/error-service');
+    }
+  } catch (err) {
+    errors.push(`@megacampus/shared-logger bundle validation failed: ${err}`);
   }
 
   return {
