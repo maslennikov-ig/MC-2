@@ -17,7 +17,8 @@
 import { Job } from 'bullmq';
 import { access, constants } from 'fs/promises';
 import { JobType, DocumentProcessingJobData } from '@megacampus/shared-types';
-import { BaseJobHandler, JobResult } from '../../orchestrator/handlers/base-handler';
+import { BaseJobHandler } from '../../orchestrator/handlers/base-handler';
+import type { JobResult } from '../../orchestrator/handlers/base-handler';
 import { DocumentProcessingOrchestrator } from './orchestrator';
 import { getSupabaseAdmin } from '../../shared/supabase/admin';
 import { logger } from '../../shared/logger/index.js';
@@ -186,8 +187,8 @@ export class DocumentProcessingHandler extends BaseJobHandler<DocumentProcessing
 
     throw new Error(
       `File not accessible after ${attempt} retries: ${filePath}. ` +
-      `Error: ${lastError?.message}. ` +
-      `This may indicate a Docker volume mount issue.`
+        `Error: ${lastError?.message}. ` +
+        `This may indicate a Docker volume mount issue.`
     );
   }
 
@@ -214,10 +215,7 @@ export class DocumentProcessingHandler extends BaseJobHandler<DocumentProcessing
     // Fallback to message matching for non-standard errors
     if (error instanceof Error) {
       const message = error.message.toLowerCase();
-      return (
-        message.includes('enoent') ||
-        message.includes('no such file or directory')
-      );
+      return message.includes('enoent') || message.includes('no such file or directory');
     }
 
     return false;
@@ -227,7 +225,7 @@ export class DocumentProcessingHandler extends BaseJobHandler<DocumentProcessing
    * Sleep helper
    */
   private sleep(ms: number): Promise<void> {
-    return new Promise((resolve) => setTimeout(resolve, ms));
+    return new Promise(resolve => setTimeout(resolve, ms));
   }
 
   /**
@@ -260,7 +258,9 @@ export class DocumentProcessingHandler extends BaseJobHandler<DocumentProcessing
       });
 
       try {
-        const { InitializeFSMCommandHandler } = await import('../../shared/fsm/fsm-initialization-command-handler');
+        const { InitializeFSMCommandHandler } = await import(
+          '../../shared/fsm/fsm-initialization-command-handler'
+        );
         const { metricsStore } = await import('../../orchestrator/metrics');
 
         const commandHandler = new InitializeFSMCommandHandler();

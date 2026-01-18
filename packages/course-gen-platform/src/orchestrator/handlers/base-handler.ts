@@ -381,6 +381,12 @@ export abstract class BaseJobHandler<T extends JobData = JobData> {
    * @returns {Promise<boolean>} True if the job is cancelled
    */
   protected async isCancelled(job: Job<T>): Promise<boolean> {
+    // SandboxedJob doesn't have getState() method
+    // Check if method exists before calling
+    if (typeof (job as unknown as { getState?: unknown }).getState !== 'function') {
+      // For SandboxedJob, return false - use checkCancellation() for DB-based cancellation
+      return false;
+    }
     const state = await job.getState();
     return state === 'failed' || state === 'completed';
   }

@@ -10,7 +10,8 @@
 
 import { Job } from 'bullmq';
 import { InitializeJobData, JobType } from '@megacampus/shared-types';
-import { BaseJobHandler, JobResult } from './base-handler';
+import { BaseJobHandler } from './base-handler';
+import type { JobResult } from './base-handler';
 
 /**
  * Initialize job handler
