@@ -1237,6 +1237,7 @@ async function buildGroupedErrorLogsQuery(
     latest_log_id: string;
     latest_problem_id: string | null;
     job_type: string | null;
+    issue_status: string | null; // Status returned from RPC (matches filter)
   };
 
   // Prepare filter parameters (use undefined for omitted values, as Supabase types expect)
@@ -1285,11 +1286,9 @@ async function buildGroupedErrorLogsQuery(
     return { items: [], total: 0 };
   }
 
-  // Fetch statuses for fingerprints (RPC already joins but we keep this for consistency)
-  const fingerprints = groupedData.map(g => g.fingerprint);
-  const statusMap = await fetchGroupStatuses(supabase, fingerprints);
-
   // Map RPC result to ErrorGroupItem
+  // NOTE: Use issue_status from RPC directly to ensure consistency with filtering
+  // Previously we fetched statuses separately which caused mismatch when status changed
   const items: ErrorGroupItem[] = groupedData.map(g => ({
     fingerprint: g.fingerprint,
     count: g.count,
@@ -1298,7 +1297,7 @@ async function buildGroupedErrorLogsQuery(
     severity: g.severity,
     message: g.message,
     source: 'error_log',
-    status: statusMap.get(g.fingerprint) || 'new',
+    status: (g.issue_status as LogStatus) || 'new', // Use status from RPC
     environments: g.environments || [],
     latestLogId: g.latest_log_id,
     latestProblemId: g.latest_problem_id,
