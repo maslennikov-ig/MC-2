@@ -311,6 +311,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.28.9] - 2026-01-18
+
+### Added
+
+- add 1 agent(s) (2151956)
+
+### Fixed
+
+- **Stage5**: validate style against enum before Zod validation (ce21433)
+- **Stage5**: handle null DB fields in frontend_parameters validation (e8b79c6)
+
+### Other
+
+- bd sync: 2026-01-18 12:46:32 (b37edb2)
+- bd sync: 2026-01-18 12:44:51 (e3dd93f)
+- bd sync: 2026-01-18 12:05:33 (1284709)
+- **deploy**: increase deploy-dev timeout to 20 minutes (382b0dc)
+- bd sync: 2026-01-18 11:19:44 (6a0795e)
+- bd sync: 2026-01-18 11:18:17 (d712f16)
+- bd sync: 2026-01-18 11:17:08 (c6e78b3)
+
 ## [0.28.8] - 2026-01-18
 
 ### Added
