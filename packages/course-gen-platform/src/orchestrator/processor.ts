@@ -22,7 +22,7 @@ import { JobData, JobType } from '@megacampus/shared-types';
  * Safe to use in sandboxed processor (worker thread context)
  */
 import logger from '../shared/logger/index.js';
-import { logPermanentFailure } from '../shared/logger/error-service';
+import { logPermanentFailure } from '../shared/logger/error-service.js';
 import { testJobHandler } from './handlers/test-handler';
 import { initializeJobHandler } from './handlers/initialize';
 import { documentProcessingHandler } from '../stages/stage2-document-processing/handler';

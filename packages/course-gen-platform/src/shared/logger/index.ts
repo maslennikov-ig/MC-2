@@ -22,7 +22,7 @@ export type { Logger } from 'pino';
 
 // Re-export error logging types and services (these are local)
 export * from './types';
-export * from './error-service';
+export * from './error-service.js';
 
 // Re-export unchanged functions
 export { createModuleLogger, createRequestLogger };
