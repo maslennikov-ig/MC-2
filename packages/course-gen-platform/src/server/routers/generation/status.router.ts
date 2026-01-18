@@ -352,12 +352,13 @@ export const statusRouter = router({
           analysis_result: analysisResult,
           frontend_parameters: {
             course_title: course.title,
-            language: course.language,
-            style: course.style,
-            target_audience: course.target_audience,
-            difficulty: course.difficulty,
-            description: course.course_description,
-            course_size: course.course_size,
+            // Convert null to undefined for cleaner optional fields (nullish schema accepts both)
+            language: course.language ?? undefined,
+            style: course.style ?? undefined,
+            target_audience: course.target_audience ?? undefined,
+            difficulty: course.difficulty ?? undefined,
+            description: course.course_description ?? undefined,
+            course_size: course.course_size ?? undefined,
             desired_lessons_count: (course.settings as unknown as CourseSettings)
               ?.desired_lessons_count,
             desired_modules_count: (course.settings as unknown as CourseSettings)

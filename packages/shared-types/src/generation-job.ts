@@ -33,25 +33,26 @@ export const FrontendParametersSchema = z.object({
   // Required
   course_title: z.string().min(1).describe('Course title (ONLY guaranteed field per spec)'),
 
-  // Optional (may be null/undefined)
+  // Optional (may be null/undefined from DB)
+  // Using .nullish() to accept both null and undefined since DB fields can be null
   language: z
     .string()
-    .optional()
+    .nullish()
     .describe('Target language (defaults to contextual_language from Analyze)'),
-  style: CourseStyleSchema.optional().describe('Content style (defaults to conversational)'),
-  target_audience: z.string().optional().describe('Target audience description'),
+  style: CourseStyleSchema.nullish().describe('Content style (defaults to conversational)'),
+  target_audience: z.string().nullish().describe('Target audience description'),
 
   /**
    * Difficulty level from analysis or default value
    * Not directly user-provided (comes from courses.difficulty column)
    */
-  difficulty: z.enum(['beginner', 'intermediate', 'advanced']).optional(),
+  difficulty: z.enum(['beginner', 'intermediate', 'advanced']).nullish(),
 
-  description: z.string().optional().describe('Course description (user-provided context)'),
+  description: z.string().nullish().describe('Course description (user-provided context)'),
 
   // Guidance parameters (NOT constraints per spec.md clarifications)
   course_size: courseSizeSchema
-    .optional()
+    .nullish()
     .describe('Desired course size preset (micro/mini/compact/standard/comprehensive/auto)'),
 
   desired_lessons_count: z
