@@ -21,7 +21,11 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 // DISABLED: MissionControlBanner handlers moved to GraphView
 // import { approveStage, cancelGeneration, startGeneration } from '@/app/actions/admin-generation';
 import { GraphViewWrapper } from '@/components/generation-graph'
-import { cancelGeneration, switchToManualMode } from '@/app/actions/admin-generation'
+import {
+  cancelGeneration,
+  switchToManualMode,
+  startGeneration,
+} from '@/app/actions/admin-generation'
 
 // Celestial Design Imports - SpaceBackground REMOVED: GraphView takes full screen now
 // MissionControlBanner - DISABLED: Now rendered inside GraphView
@@ -349,6 +353,32 @@ export default function GenerationProgressContainerEnhanced({
       setSupabase(createClient())
     }
   }, [])
+
+  // Auto-start generation in automatic mode
+  // When course is in automatic mode and status is 'pending', start generation automatically
+  const autoStartTriggered = useRef(false)
+  useEffect(() => {
+    // Only auto-start once
+    if (autoStartTriggered.current) return
+
+    // Check conditions for auto-start
+    const shouldAutoStart =
+      generationMode === 'automatic' && initialStatus === 'pending' && !generationPausedAt
+
+    if (shouldAutoStart) {
+      autoStartTriggered.current = true
+      // Start generation automatically
+      startGeneration(courseId)
+        .then(() => {
+          console.log('[AutoStart] Generation started automatically in automatic mode')
+        })
+        .catch((error) => {
+          console.error('[AutoStart] Failed to auto-start generation:', error)
+          // Reset flag to allow retry on error
+          autoStartTriggered.current = false
+        })
+    }
+  }, [courseId, generationMode, initialStatus, generationPausedAt])
 
   // Save state to session storage
   const saveStateToStorage = useCallback(() => {
