@@ -311,6 +311,31 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.28.8] - 2026-01-18
+
+### Added
+
+- **GenerationProgress**: auto-start generation in automatic mode (e574d05)
+- **generation**: merge automatic and semi-automatic control panels into unified MissionControlBanner (d0b5d19)
+
+### Fixed
+
+- **GenerationProgress**: pause/resume now updates UI in real-time (00fe5fd)
+- **GraphHeader**: show fingerprint button with courseId fallback when generationCode is null (f94e667)
+- **MissionControlBanner**: address code review P1-P2 issues (2721e94)
+- **worker**: log errors to DB inside sandbox before stack trace is lost (6ee2a5d)
+
+### Other
+
+- update project files (e7a3c0f)
+- bd sync: 2026-01-18 10:13:47 (0a61c99)
+- bd sync: 2026-01-18 09:56:01 (f02d043)
+- bd sync: 2026-01-18 09:55:42 (967e274)
+- bd sync: 2026-01-17 21:17:32 (bbca538)
+- bd sync: 2026-01-17 21:14:33 (e8eff22)
+- bd sync: 2026-01-17 21:01:40 (af48ca0)
+- bd sync: 2026-01-17 20:52:37 (024ec73)
+
 ## [0.28.7] - 2026-01-17
 
 ### Fixed
