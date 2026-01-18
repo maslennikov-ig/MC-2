@@ -676,10 +676,11 @@ export const lifecycleRouter = router({
           analysis_result: analysisResult, // May be null for title-only
           frontend_parameters: {
             course_title: course.title, // ONLY guaranteed field
-            language: course.language,
+            // Convert null to undefined for cleaner optional fields (nullish schema accepts both)
+            language: course.language ?? undefined,
             style: course.style && isValidStyle(course.style) ? course.style : DEFAULT_COURSE_STYLE,
-            target_audience: course.target_audience,
-            difficulty: course.difficulty,
+            target_audience: course.target_audience ?? undefined,
+            difficulty: course.difficulty ?? undefined,
             desired_lessons_count: (course.settings as unknown as CourseSettings)
               ?.desired_lessons_count,
             desired_modules_count: (course.settings as unknown as CourseSettings)
@@ -1002,7 +1003,7 @@ export const lifecycleRouter = router({
           const { data: fullCourse, error: fullCourseError } = await supabase
             .from('courses')
             .select(
-              'title, settings, language, style, target_audience, analysis_result, organization_id'
+              'title, settings, language, style, target_audience, difficulty, analysis_result, organization_id'
             )
             .eq('id', courseId)
             .single();
@@ -1068,9 +1069,11 @@ export const lifecycleRouter = router({
             analysis_result: fullCourse.analysis_result,
             frontend_parameters: {
               course_title: fullCourse.title,
-              language: fullCourse.language,
-              style: fullCourse.style,
-              target_audience: fullCourse.target_audience,
+              // Convert null to undefined for cleaner optional fields (nullish schema accepts both)
+              language: fullCourse.language ?? undefined,
+              style: fullCourse.style ?? undefined,
+              target_audience: fullCourse.target_audience ?? undefined,
+              difficulty: fullCourse.difficulty ?? undefined,
               desired_lessons_count: (fullCourse.settings as unknown as CourseSettings)
                 ?.desired_lessons_count,
               desired_modules_count: (fullCourse.settings as unknown as CourseSettings)
