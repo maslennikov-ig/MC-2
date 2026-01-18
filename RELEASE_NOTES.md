@@ -2,6 +2,26 @@
 
 _Released on 2025-12-26_
 
+## v0.28.8
+
+_Released on 2026-01-18_
+
+### ✨ New Features
+
+- **GenerationProgress**: Auto-start generation in automatic mode
+- **generation**: Merge automatic and semi-automatic control panels into unified MissionControlBanner
+
+### 🐛 Bug Fixes
+
+- **GenerationProgress**: Pause/resume now updates UI in real-time
+- **GraphHeader**: Show fingerprint button with courseId fallback when generationCode is null
+- **MissionControlBanner**: Address code review P1-P2 issues
+- **worker**: Log errors to DB inside sandbox before stack trace is lost
+
+---
+
+_This release was automatically generated from 14 commits._
+
 ## v0.28.7
 
 _Released on 2026-01-17_
