@@ -283,6 +283,76 @@ async function queueNextStageJob(
       break;
     }
 
+    case 6: {
+      // Stage 6: Lesson Content Generation
+      // Fetch course structure to get lesson specs
+      const supabase = getSupabaseAdmin();
+      const { data: courseData, error: fetchError } = await supabase
+        .from('courses')
+        .select('course_structure, language, style')
+        .eq('id', courseId)
+        .single();
+
+      if (fetchError || !courseData?.course_structure) {
+        throw new Error(
+          `Course structure not found for Stage 6: ${fetchError?.message || 'no data'}`
+        );
+      }
+
+      // Parse course structure to get all lessons
+      interface LessonSpec {
+        lesson_id: string;
+        title: string;
+        objectives: string[];
+        topics: string[];
+        duration_minutes: number;
+      }
+      interface Section {
+        section_id: string;
+        title: string;
+        lessons: LessonSpec[];
+      }
+      interface CourseStructure {
+        sections: Section[];
+      }
+
+      const structure = courseData.course_structure as unknown as CourseStructure;
+      const allLessons: LessonSpec[] = structure.sections.flatMap(s => s.lessons);
+
+      if (allLessons.length === 0) {
+        throw new Error('No lessons found in course structure for Stage 6');
+      }
+
+      // Determine language and style
+      const language = courseData.language || 'ru';
+      const style =
+        courseData.style && isValidStyle(courseData.style)
+          ? courseData.style
+          : DEFAULT_COURSE_STYLE;
+
+      // Queue LESSON_CONTENT job for each lesson
+      for (const lesson of allLessons) {
+        const lessonJobData = {
+          ...baseJobData,
+          jobType: JobType.LESSON_CONTENT,
+          lessonSpec: lesson,
+          courseId,
+          language,
+          style,
+        };
+
+        await addJob(JobType.LESSON_CONTENT, lessonJobData as unknown as JobData, {
+          priority,
+        });
+      }
+
+      logger.info(
+        { courseId, nextStage: 6, lessonCount: allLessons.length },
+        'Queued LESSON_CONTENT jobs for all lessons'
+      );
+      break;
+    }
+
     default:
       logger.warn({ courseId, nextStage }, 'Unknown next stage for auto-queue');
   }
