@@ -18,21 +18,25 @@ if [ -n "$GITHUB_TOKEN" ]; then
     echo "$GITHUB_TOKEN" | docker login ghcr.io -u "${GITHUB_ACTOR:-maslennikov-ig}" --password-stdin
 fi
 
-# 2. Ensure infrastructure is running (shared with staging)
+# 2. Clean up any conflicting containers from previous failed deploys
+echo "Cleaning up orphan dev containers..."
+docker container ls -a --filter "name=megacampus-.*-dev" --format "{{.ID}}" | xargs -r docker rm -f 2>/dev/null || true
+
+# 3. Ensure infrastructure is running (shared with staging)
 echo "Ensuring infrastructure is running..."
 docker compose -f "$BASE_PATH/docker-compose.infra.yml" up -d
 echo "   Infrastructure ready."
 echo ""
 
-# 3. Pull latest images
+# 4. Pull latest images
 echo "Pulling latest develop images..."
 docker compose -f "$BASE_PATH/docker-compose.dev.yml" --env-file "$BASE_PATH/.env.dev" pull
 
-# 4. Deploy dev containers (do NOT use --remove-orphans, it kills shared infra!)
+# 5. Deploy dev containers (do NOT use --remove-orphans, it kills shared infra!)
 echo "Deploying dev containers..."
-docker compose -f "$BASE_PATH/docker-compose.dev.yml" --env-file "$BASE_PATH/.env.dev" up -d
+docker compose -f "$BASE_PATH/docker-compose.dev.yml" --env-file "$BASE_PATH/.env.dev" up -d --force-recreate
 
-# 5. Health Check
+# 6. Health Check
 echo "Performing Health Checks..."
 
 # Check API health
