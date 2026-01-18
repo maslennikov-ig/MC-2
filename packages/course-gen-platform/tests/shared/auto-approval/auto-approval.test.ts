@@ -89,7 +89,7 @@ describe('handleStageCompletion', () => {
     };
 
     // Mock getSupabaseAdmin to return our mock client
-    vi.mocked(getSupabaseAdmin).mockReturnValue(mockSupabase as any);
+    vi.mocked(getSupabaseAdmin).mockReturnValue(mockSupabase);
   });
 
   afterEach(() => {
@@ -317,20 +317,18 @@ describe('handleStageCompletion', () => {
 
       // Second call: get vectorized files
       mockSelect.mockReturnValueOnce({
-        eq: vi
-          .fn()
-          .mockReturnValue({
-            eq: vi.fn().mockResolvedValue({
-              data: [
-                {
-                  id: 'file_1',
-                  filename: 'doc.pdf',
-                  processed_content: 'Content',
-                },
-              ],
-              error: null,
-            }),
+        eq: vi.fn().mockReturnValue({
+          eq: vi.fn().mockResolvedValue({
+            data: [
+              {
+                id: 'file_1',
+                filename: 'doc.pdf',
+                processed_content: 'Content',
+              },
+            ],
+            error: null,
           }),
+        }),
       });
 
       const mockUpdate = vi.fn().mockReturnValue({
@@ -446,14 +444,20 @@ describe('handleStageCompletion', () => {
         'Failed to queue stage 3: Queue connection failed'
       );
 
-      // Assert: Should have attempted to update to stage_3_init
+      // Assert: FSM two-step transition - first to complete
       expect(mockUpdate).toHaveBeenNthCalledWith(1, {
+        generation_status: 'stage_2_complete',
+        updated_at: expect.any(String),
+      });
+
+      // Assert: Then to next stage init
+      expect(mockUpdate).toHaveBeenNthCalledWith(2, {
         generation_status: 'stage_3_init',
         updated_at: expect.any(String),
       });
 
-      // Assert: Should have rolled back to stage_2_complete
-      expect(mockUpdate).toHaveBeenNthCalledWith(2, {
+      // Assert: Should have rolled back to stage_2_complete on queue failure
+      expect(mockUpdate).toHaveBeenNthCalledWith(3, {
         generation_status: 'stage_2_complete',
         updated_at: expect.any(String),
       });
@@ -469,9 +473,13 @@ describe('handleStageCompletion', () => {
         }),
       });
 
-      // First update succeeds (stage_3_init), second update fails (rollback)
+      // FSM now does 3 updates: complete, init, rollback
+      // First two succeed, third (rollback) fails
       const mockUpdate = vi
         .fn()
+        .mockReturnValueOnce({
+          eq: vi.fn().mockResolvedValue({ data: {}, error: null }),
+        })
         .mockReturnValueOnce({
           eq: vi.fn().mockResolvedValue({ data: {}, error: null }),
         })
@@ -551,11 +559,7 @@ describe('handleStageCompletion', () => {
         }),
       };
 
-      await handleStageCompletion(
-        'course_123',
-        2,
-        customSupabase as unknown as SupabaseClient
-      );
+      await handleStageCompletion('course_123', 2, customSupabase as unknown as SupabaseClient);
 
       // Should use custom client
       expect(customSupabase.from).toHaveBeenCalled();
