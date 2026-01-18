@@ -32,7 +32,7 @@
  *
  * 4. **Trie-based matching** - For prefix-heavy patterns
  *
- * Current rule count: 13 (no optimization needed)
+ * Current rule count: 16 (no optimization needed)
  * Review threshold: 30+ rules
  */
 
@@ -115,6 +115,21 @@ export const AUTO_MUTE_RULES: AutoMuteRule[] = [
     reason: 'job_lifecycle',
     description:
       'BullMQ job exceeded lock duration and was restarted - expected for long LLM operations',
+  },
+  {
+    pattern: /Failed to acquire generation lock/i,
+    reason: 'job_lifecycle',
+    description: 'Lock contention during concurrent processing - expected behavior',
+  },
+  {
+    pattern: /already being processed.*Lock held by/i,
+    reason: 'job_lifecycle',
+    description: 'Course locked by another worker - prevents duplicate processing',
+  },
+  {
+    pattern: /Worker fallback initialization failed.*continuing/i,
+    reason: 'job_lifecycle',
+    description: 'Worker fallback init failed but processing continues - non-critical warning',
   },
 
   // === Layer/Schema Fallbacks ===
