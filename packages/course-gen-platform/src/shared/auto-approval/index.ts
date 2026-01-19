@@ -236,10 +236,19 @@ export async function handleStageCompletion(
   const nextStatus = `stage_${nextStage}_init` as GenerationStatus;
 
   // Different stages use different status suffixes:
+  // - Stage 2: stage_2_processing
+  // - Stage 3: stage_3_classifying
   // - Stage 4: stage_4_analyzing
   // - Stage 5: stage_5_generating
   // - Stage 6: stage_6_generating
-  const statusSuffix = currentStage === 4 ? 'analyzing' : 'generating';
+  const statusSuffixMap: Record<number, string> = {
+    2: 'processing',
+    3: 'classifying',
+    4: 'analyzing',
+    5: 'generating',
+    6: 'generating',
+  };
+  const statusSuffix = statusSuffixMap[currentStage] || 'generating';
   const expectedCurrentStatus = `stage_${currentStage}_${statusSuffix}` as GenerationStatus;
 
   // IDEMPOTENCY CHECK: Only proceed if course is in expected state
