@@ -38,6 +38,90 @@ function createModel(
 }
 
 /**
+ * Cleanup placeholder patterns in generated content
+ * This is a safety net for LLMs that occasionally generate placeholder text
+ */
+function cleanupPlaceholders(
+  obj: Record<string, unknown>,
+  context: { lessonTitle?: string; topicHint?: string } = {}
+): Record<string, unknown> {
+  const placeholderPatterns = [
+    /\[название[^\]]*\]/gi,
+    /\[описание[^\]]*\]/gi,
+    /\[текст[^\]]*\]/gi,
+    /\[insert[^\]]*\]/gi,
+    /\[TBD[^\]]*\]/gi,
+    /\[TODO[^\]]*\]/gi,
+    /\[placeholder[^\]]*\]/gi,
+    /\[пример[^\]]*\]/gi,
+    /\[добавить[^\]]*\]/gi,
+  ];
+
+  const result: Record<string, unknown> = {};
+
+  for (const [key, value] of Object.entries(obj)) {
+    if (typeof value === 'string') {
+      let cleaned = value;
+      let hasPlaceholder = false;
+
+      for (const pattern of placeholderPatterns) {
+        if (pattern.test(cleaned)) {
+          hasPlaceholder = true;
+          // Generate replacement based on field type and context
+          const replacement = generatePlaceholderReplacement(key, context);
+          cleaned = cleaned.replace(pattern, replacement);
+        }
+      }
+
+      if (hasPlaceholder) {
+        logger.warn({
+          msg: 'Cleaned placeholder in field',
+          field: key,
+          original: value.substring(0, 100),
+          cleaned: cleaned.substring(0, 100),
+        });
+      }
+
+      result[key] = cleaned;
+    } else if (Array.isArray(value)) {
+      result[key] = value.map(item => {
+        if (typeof item === 'object' && item !== null) {
+          return cleanupPlaceholders(item as Record<string, unknown>, context);
+        }
+        return item;
+      });
+    } else if (typeof value === 'object' && value !== null) {
+      result[key] = cleanupPlaceholders(value as Record<string, unknown>, context);
+    } else {
+      result[key] = value;
+    }
+  }
+
+  return result;
+}
+
+/**
+ * Generate contextual replacement for placeholder text
+ */
+function generatePlaceholderReplacement(
+  fieldName: string,
+  context: { lessonTitle?: string; topicHint?: string }
+): string {
+  const lessonTitle = context.lessonTitle || 'this topic';
+  const topicHint = context.topicHint || 'the material';
+
+  const replacements: Record<string, string> = {
+    exercise_title: `Practice activity for ${lessonTitle}`,
+    exercise_description: `Apply the concepts learned in this lesson by working through a hands-on activity. Focus on understanding ${topicHint} through practical application. Complete the exercise step by step, reflecting on your approach and the results achieved.`,
+    exercise_type: 'practical exercise',
+    lesson_title: `Understanding ${lessonTitle}`,
+    lesson_description: `In this lesson, we explore ${topicHint} in detail, building practical skills and theoretical understanding.`,
+  };
+
+  return replacements[fieldName] || `Content for ${fieldName.replace(/_/g, ' ')}`;
+}
+
+/**
  * Preprocess response content
  */
 function preprocessResponse(rawContent: string): string {
@@ -57,13 +141,18 @@ function preprocessResponse(rawContent: string): string {
           difficulty_level: 'enum',
         });
 
+        const sectionTitle = (preprocessedSection.section_title as string) || '';
+
         if (preprocessedSection.lessons && Array.isArray(preprocessedSection.lessons)) {
           preprocessedSection.lessons = (
             preprocessedSection.lessons as Record<string, unknown>[]
           ).map(lesson => {
-            const preprocessedLesson = preprocessObject(lesson, {
+            let preprocessedLesson = preprocessObject(lesson, {
               difficulty_level: 'enum',
             });
+
+            const lessonTitle = (preprocessedLesson.lesson_title as string) || sectionTitle;
+            const context = { lessonTitle, topicHint: sectionTitle };
 
             if (
               preprocessedLesson.practical_exercises &&
@@ -71,13 +160,18 @@ function preprocessResponse(rawContent: string): string {
             ) {
               preprocessedLesson.practical_exercises = (
                 preprocessedLesson.practical_exercises as Record<string, unknown>[]
-              ).map(exercise =>
-                preprocessObject(exercise, {
+              ).map(exercise => {
+                let preprocessedExercise = preprocessObject(exercise, {
                   difficulty_level: 'enum',
-                })
-              );
+                });
+                // Cleanup placeholders in exercises (most common issue)
+                preprocessedExercise = cleanupPlaceholders(preprocessedExercise, context);
+                return preprocessedExercise;
+              });
             }
 
+            // Cleanup placeholders in lesson fields
+            preprocessedLesson = cleanupPlaceholders(preprocessedLesson, context);
             return preprocessedLesson;
           });
         }

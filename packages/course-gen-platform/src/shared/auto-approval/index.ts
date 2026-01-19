@@ -45,6 +45,121 @@ function isValidDifficulty(value: unknown): value is ValidDifficulty {
 
 type GenerationStatus = Database['public']['Enums']['generation_status'];
 
+/**
+ * Convert simplified lesson data from course_structure to full LessonSpecificationV2
+ * Required for Stage 6 generator which expects detailed section specifications
+ *
+ * LessonSpecificationV2 schema requires:
+ * - lesson_id: "section.lesson" format (e.g., "1.1")
+ * - title, description
+ * - metadata: { target_audience, tone, compliance_level, content_archetype }
+ * - learning_objectives: [{ id, objective, bloom_level }]
+ * - intro_blueprint: { hook_strategy, hook_topic, key_learning_objectives }
+ * - sections: [{ title, content_archetype, rag_context_id, constraints, key_points_to_cover }]
+ * - exercises: []
+ * - rag_context: { primary_documents, search_queries, expected_chunks }
+ * - estimated_duration_minutes
+ * - difficulty_level
+ */
+function convertToLessonSpecV2(
+  lesson: {
+    lesson_id: string;
+    title: string;
+    objectives: string[];
+    topics: string[];
+    duration_minutes: number;
+  },
+  _courseTitle: string // Reserved for future use (e.g., course context in intro)
+): LessonSpecificationV2 {
+  // Create learning objectives with required V2 structure: id, objective, bloom_level
+  const learningObjectives = lesson.objectives.map((objective, index) => ({
+    id: `LO-${lesson.lesson_id}.${index + 1}`,
+    objective: objective.length >= 10 ? objective : `Understand and apply: ${objective}`,
+    bloom_level: 'understand' as const,
+  }));
+
+  // Ensure at least one learning objective
+  if (learningObjectives.length === 0) {
+    learningObjectives.push({
+      id: `LO-${lesson.lesson_id}.1`,
+      objective: `Understand the key concepts of ${lesson.title}`,
+      bloom_level: 'understand' as const,
+    });
+  }
+
+  // Create sections from topics with V2 structure
+  const sections = lesson.topics.map((topic, index) => ({
+    title: topic,
+    content_archetype: 'concept_explainer' as const,
+    rag_context_id: `auto-section-${index + 1}`,
+    constraints: {
+      depth: 'detailed_analysis' as const,
+      required_keywords: [] as string[],
+      prohibited_terms: [] as string[],
+    },
+    key_points_to_cover: [topic.length >= 5 ? topic : `Key concepts of ${topic}`],
+  }));
+
+  // Ensure at least one section exists
+  if (sections.length === 0) {
+    const keyPoint =
+      lesson.objectives.length > 0
+        ? lesson.objectives[0].length >= 5
+          ? lesson.objectives[0]
+          : `Key concepts of ${lesson.objectives[0]}`
+        : `Key concepts of ${lesson.title}`;
+    sections.push({
+      title: lesson.title,
+      content_archetype: 'concept_explainer' as const,
+      rag_context_id: 'auto-section-1',
+      constraints: {
+        depth: 'detailed_analysis' as const,
+        required_keywords: [] as string[],
+        prohibited_terms: [] as string[],
+      },
+      key_points_to_cover: [keyPoint],
+    });
+  }
+
+  // Build key learning objectives string for intro (min 10 chars required)
+  const keyLearningObjectivesStr =
+    learningObjectives.map(lo => lo.objective).join('; ') ||
+    `Learn key concepts of ${lesson.title}`;
+
+  return {
+    lesson_id: lesson.lesson_id,
+    title: lesson.title,
+    description:
+      lesson.topics.length > 0
+        ? `Lesson covering: ${lesson.topics.join(', ')}`
+        : `Comprehensive coverage of ${lesson.title}`,
+    metadata: {
+      target_audience: 'practitioner' as const,
+      tone: 'conversational-professional' as const,
+      compliance_level: 'standard' as const,
+      content_archetype: 'concept_explainer' as const,
+    },
+    learning_objectives: learningObjectives,
+    intro_blueprint: {
+      hook_strategy: 'question' as const,
+      hook_topic: lesson.title,
+      key_learning_objectives:
+        keyLearningObjectivesStr.length >= 10
+          ? keyLearningObjectivesStr
+          : `Learn and understand ${lesson.title}`,
+    },
+    sections,
+    exercises: [],
+    rag_context: {
+      primary_documents: ['auto-generated'],
+      search_queries: [lesson.title, ...lesson.topics.slice(0, 2)].filter(Boolean),
+      expected_chunks: 5,
+    },
+    estimated_duration_minutes: Math.min(Math.max(lesson.duration_minutes, 3), 45),
+    difficulty_level: 'intermediate' as const,
+  };
+}
+
 // Minimal course interface for auto-approval
 interface CourseForAutoApproval {
   user_id: string | null;
@@ -119,7 +234,13 @@ export async function handleStageCompletion(
   const nextStage = currentStage + 1;
   const completeStatus = `stage_${currentStage}_complete` as GenerationStatus;
   const nextStatus = `stage_${nextStage}_init` as GenerationStatus;
-  const expectedCurrentStatus = `stage_${currentStage}_analyzing` as GenerationStatus;
+
+  // Different stages use different status suffixes:
+  // - Stage 4: stage_4_analyzing
+  // - Stage 5: stage_5_generating
+  // - Stage 6: stage_6_generating
+  const statusSuffix = currentStage === 4 ? 'analyzing' : 'generating';
+  const expectedCurrentStatus = `stage_${currentStage}_${statusSuffix}` as GenerationStatus;
 
   // IDEMPOTENCY CHECK: Only proceed if course is in expected state
   // This prevents duplicate job creation on retry or race conditions
@@ -378,7 +499,7 @@ async function queueNextStageJob(
       const supabase = getSupabaseAdmin();
       const { data: courseData, error: fetchError } = await supabase
         .from('courses')
-        .select('course_structure, language, style')
+        .select('course_structure, language, style, title')
         .eq('id', courseId)
         .single();
 
@@ -389,24 +510,48 @@ async function queueNextStageJob(
       }
 
       // Parse course structure to get all lessons
-      interface LessonSpec {
+      // Note: Stage 5 generates structure with different field names than LessonSpecificationV2
+      interface RawLesson {
+        lesson_title: string;
+        lesson_number: number;
+        lesson_objectives?: string[];
+        key_topics?: string[];
+        estimated_duration_minutes?: number;
+      }
+      interface RawSection {
+        section_title: string;
+        section_number: number;
+        lessons: RawLesson[];
+      }
+      interface CourseStructure {
+        sections: RawSection[];
+      }
+
+      const structure = courseData.course_structure as unknown as CourseStructure;
+
+      // Map raw lessons to include generated lesson_id based on section and lesson numbers
+      interface MappedLesson {
         lesson_id: string;
         title: string;
         objectives: string[];
         topics: string[];
         duration_minutes: number;
-      }
-      interface Section {
-        section_id: string;
-        title: string;
-        lessons: LessonSpec[];
-      }
-      interface CourseStructure {
-        sections: Section[];
+        section_number: number;
+        lesson_number: number;
       }
 
-      const structure = courseData.course_structure as unknown as CourseStructure;
-      const allLessons: LessonSpec[] = structure.sections.flatMap(s => s.lessons);
+      const allLessons: MappedLesson[] = structure.sections.flatMap((section, sectionIndex) =>
+        section.lessons.map((lesson, lessonIndex) => ({
+          // Use "section.lesson" format (e.g., "1.1") for compatibility with lesson-resolver
+          lesson_id: `${section.section_number ?? sectionIndex + 1}.${lesson.lesson_number ?? lessonIndex + 1}`,
+          title: lesson.lesson_title,
+          objectives: lesson.lesson_objectives || [],
+          topics: lesson.key_topics || [],
+          duration_minutes: lesson.estimated_duration_minutes || 15,
+          section_number: section.section_number ?? sectionIndex + 1,
+          lesson_number: lesson.lesson_number ?? lessonIndex + 1,
+        }))
+      );
 
       if (allLessons.length === 0) {
         throw new Error('No lessons found in course structure for Stage 6');
@@ -421,14 +566,18 @@ async function queueNextStageJob(
 
       // CR-002 FIX: Wrap job queueing in try-catch to handle partial failures
       // Note: BullMQ idempotent jobIds prevent duplicate jobs on retry
+      const courseTitle = courseData.title || 'Untitled Course';
       try {
         let queuedCount = 0;
         for (const lesson of allLessons) {
           const lessonJobId = `auto-${courseId}-stage6-lesson-${lesson.lesson_id}`;
+          // Convert simplified lesson data to full LessonSpecificationV2 format
+          // Stage 6 generator requires detailed section specifications
+          const fullLessonSpec = convertToLessonSpecV2(lesson, courseTitle);
           const lessonJobData: JobData = {
             ...baseJobData,
             jobType: JobType.LESSON_CONTENT,
-            lessonSpec: lesson as unknown as LessonSpecificationV2,
+            lessonSpec: fullLessonSpec,
             ragChunks: [], // Handler fetches RAG chunks via retrieveLessonContext()
             ragContextId: null, // Handler manages context cache
             language,
@@ -442,6 +591,20 @@ async function queueNextStageJob(
           queuedCount++;
         }
 
+        // Update status to stage_6_generating so checkAndSetStage6Complete can track completion
+        const { error: statusError } = await supabase
+          .from('courses')
+          .update({ generation_status: 'stage_6_generating' })
+          .eq('id', courseId)
+          .eq('generation_status', 'stage_6_init'); // Only update if still in init state
+
+        if (statusError) {
+          logger.warn(
+            { courseId, error: statusError.message },
+            'Failed to update status to stage_6_generating (non-fatal)'
+          );
+        }
+
         logger.info(
           {
             courseId,
@@ -449,6 +612,7 @@ async function queueNextStageJob(
             lessonCount: allLessons.length,
             queuedCount,
             jobIdPrefix: `auto-${courseId}-stage6-lesson-`,
+            statusUpdated: !statusError,
           },
           'Queued LESSON_CONTENT jobs for all lessons'
         );

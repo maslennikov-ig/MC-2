@@ -781,26 +781,58 @@ class Stage4AnalysisHandler {
         }
 
         // Update course status with failure details (failed_at_stage and error_code)
-        try {
-          const { error: statusUpdateError } = await supabaseAdmin
-            .from('courses')
-            .update({
-              generation_status: 'failed',
-              failed_at_stage: 4, // Stage 4
-              error_code: errorCode as any, // Map to stage_error_code enum
-              updated_at: new Date().toISOString(),
-            })
-            .eq('id', course_id)
-            .eq('organization_id', organization_id);
+        // IMPORTANT: Only mark as failed if: permanent error OR last retry attempt
+        // to allow BullMQ retries to work for transient errors
+        const isPermanentError =
+          errorCode === 'BARRIER_FAILED' || errorCode === 'MINIMUM_LESSONS_NOT_MET';
+        const maxAttempts = job.opts.attempts || 3;
+        const isLastAttempt = job.attemptsMade >= maxAttempts - 1;
 
-          if (statusUpdateError) {
-            jobLogger.error(
-              { error: statusUpdateError },
-              'Failed to update course status with failure details'
-            );
+        if (isPermanentError || isLastAttempt) {
+          jobLogger.info(
+            {
+              courseId: course_id,
+              errorCode,
+              isPermanentError,
+              isLastAttempt,
+              attemptsMade: job.attemptsMade,
+              maxAttempts,
+            },
+            'Marking course as failed (permanent error or last attempt)'
+          );
+
+          try {
+            const { error: statusUpdateError } = await supabaseAdmin
+              .from('courses')
+              .update({
+                generation_status: 'failed',
+                failed_at_stage: 4, // Stage 4
+                error_code: errorCode as any, // Map to stage_error_code enum
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', course_id)
+              .eq('organization_id', organization_id);
+
+            if (statusUpdateError) {
+              jobLogger.error(
+                { error: statusUpdateError },
+                'Failed to update course status with failure details'
+              );
+            }
+          } catch (statusError) {
+            jobLogger.error({ error: statusError }, 'Exception updating course status');
           }
-        } catch (statusError) {
-          jobLogger.error({ error: statusError }, 'Exception updating course status');
+        } else {
+          jobLogger.info(
+            {
+              courseId: course_id,
+              errorCode,
+              attemptsMade: job.attemptsMade,
+              maxAttempts,
+              remainingAttempts: maxAttempts - job.attemptsMade - 1,
+            },
+            'Not last attempt - Keeping status for BullMQ retry'
+          );
         }
 
         // Re-throw error to let BullMQ handle retries
