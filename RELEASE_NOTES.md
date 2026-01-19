@@ -2,6 +2,25 @@
 
 _Released on 2025-12-26_
 
+## v0.28.13
+
+_Released on 2026-01-19_
+
+### ✨ New Features
+
+- **stage6**: Route auto-approval jobs to dedicated queue
+- **stage6**: Activate dedicated queue with 30 concurrent workers
+
+### 🐛 Bug Fixes
+
+- **orchestrator**: Support snake_case in job cleanup logic
+- **orchestrator**: Support snake_case job data fields in queue-events-backup
+- **orchestrator**: Prevent attempts exceeding max_attempts constraint violation
+
+---
+
+_This release was automatically generated from 10 commits._
+
 ## v0.28.12
 
 _Released on 2026-01-19_
