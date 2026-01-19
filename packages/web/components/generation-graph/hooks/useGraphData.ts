@@ -48,11 +48,11 @@ export function useGraphData(options: UseGraphDataOptions = {}) {
       }
       // Preserve module collapsed state
       if (n.type === 'module' && n.data?.isCollapsed !== undefined) {
-        moduleCollapsedRef.current.set(n.id, n.data.isCollapsed as boolean);
+        moduleCollapsedRef.current.set(n.id, n.data.isCollapsed);
       }
       // Preserve stage2group collapsed state
       if (n.type === 'stage2group' && n.data?.isCollapsed !== undefined) {
-        stage2CollapsedRef.current = n.data.isCollapsed as boolean;
+        stage2CollapsedRef.current = n.data.isCollapsed;
       }
     });
   }, [nodes]);
@@ -94,14 +94,14 @@ export function useGraphData(options: UseGraphDataOptions = {}) {
 
       const stage6Items: ParallelItem[] = [];
 
-      courseStructure.sections.forEach((section: { section_number: number; section_title: string; lessons?: Array<{ lesson_number: number; lesson_title: string }> }, idx: number) => {
+      courseStructure.sections.forEach((section: { section_number?: number; section_title: string; lessons?: Array<{ lesson_number?: number; lesson_title: string }> }, idx: number) => {
         const moduleIndex = idx + 1;
         const modId = `module_${moduleIndex}`;
         const sectionIndex = idx + 1;
 
         let completedLessonsCount = 0;
 
-        section.lessons?.forEach((lesson: { lesson_number: number; lesson_title: string }, lessonIdx: number) => {
+        section.lessons?.forEach((lesson: { lesson_number?: number; lesson_title: string }, lessonIdx: number) => {
           const lessonIndex = lessonIdx + 1;
           const lessonId = `lesson_${sectionIndex}_${lessonIndex}`;
           const isCompleted = completedIds.has(lessonId);

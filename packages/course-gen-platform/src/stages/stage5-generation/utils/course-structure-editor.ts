@@ -499,7 +499,7 @@ export function addElement(
   const recalculated: PatchResult['recalculated'] = {};
 
   // Determine if we're adding a lesson or section
-  const isLesson = 'lesson_number' in element;
+  const isLesson = 'lesson_title' in element;
 
   if (isLesson && sectionIndex !== undefined) {
     // Add lesson to section
@@ -508,13 +508,14 @@ export function addElement(
       sections: updatedStructure.sections.map((section, idx) => {
         if (idx === sectionIndex) {
           const newLessons = [...section.lessons];
+          const lessonElement = element;
 
           if (position === 'start') {
-            newLessons.unshift(element);
+            newLessons.unshift(lessonElement);
           } else if (position === 'end') {
-            newLessons.push(element);
+            newLessons.push(lessonElement);
           } else {
-            newLessons.splice(position, 0, element);
+            newLessons.splice(position, 0, lessonElement);
           }
 
           return { ...section, lessons: newLessons };
@@ -544,13 +545,14 @@ export function addElement(
   } else if (!isLesson) {
     // Add section
     const newSections = [...updatedStructure.sections];
+    const sectionElement = element;
 
     if (position === 'start') {
-      newSections.unshift(element);
+      newSections.unshift(sectionElement);
     } else if (position === 'end') {
-      newSections.push(element);
+      newSections.push(sectionElement);
     } else {
-      newSections.splice(position, 0, element);
+      newSections.splice(position, 0, sectionElement);
     }
 
     updatedStructure = {
