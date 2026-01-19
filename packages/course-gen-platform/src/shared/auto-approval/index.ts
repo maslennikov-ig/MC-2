@@ -8,6 +8,8 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import { getSupabaseAdmin } from '../supabase/admin';
 import { addJob } from '../../orchestrator/queue';
+import { createStage6Queue } from '../../stages/stage6-lesson-content/factory';
+import type { Stage6JobInput } from '../../stages/stage6-lesson-content/types';
 import {
   JobType,
   JobData,
@@ -610,7 +612,11 @@ async function queueNextStageJob(
 
       // CR-002 FIX: Wrap job queueing in try-catch to handle partial failures
       // Note: BullMQ idempotent jobIds prevent duplicate jobs on retry
+      // Use dedicated Stage 6 queue with 30 concurrent workers
+      // @see docs/plans/sprightly-wondering-widget.md
       const courseTitle = courseData.title || 'Untitled Course';
+      const stage6Queue = createStage6Queue();
+
       try {
         let queuedCount = 0;
         for (const lesson of allLessons) {
@@ -618,19 +624,20 @@ async function queueNextStageJob(
           // Convert simplified lesson data to full LessonSpecificationV2 format
           // Stage 6 generator requires detailed section specifications
           const fullLessonSpec = convertToLessonSpecV2(lesson, courseTitle);
-          const lessonJobData: JobData = {
-            ...baseJobData,
-            jobType: JobType.LESSON_CONTENT,
+
+          // Use Stage6JobInput for dedicated queue (not JobData)
+          const lessonJobData: Stage6JobInput = {
             lessonSpec: fullLessonSpec,
-            ragChunks: [], // Handler fetches RAG chunks via retrieveLessonContext()
-            ragContextId: null, // Handler manages context cache
+            courseId,
             language,
             style,
+            ragChunks: [], // Handler fetches RAG chunks via retrieveLessonContext()
+            ragContextId: null, // Handler manages context cache
           };
 
-          await addJob(JobType.LESSON_CONTENT, lessonJobData, {
+          await stage6Queue.add(`lesson:${lesson.lesson_id}`, lessonJobData, {
             priority,
-            jobId: lessonJobId,
+            jobId: lessonJobId, // BullMQ uses jobId for deduplication
           });
           queuedCount++;
         }
@@ -657,8 +664,9 @@ async function queueNextStageJob(
             queuedCount,
             jobIdPrefix: `auto-${courseId}-stage6-lesson-`,
             statusUpdated: !statusError,
+            queue: 'stage6-lesson-content', // Dedicated queue with 30 concurrent
           },
-          'Queued LESSON_CONTENT jobs for all lessons'
+          'Queued LESSON_CONTENT jobs to dedicated Stage 6 queue'
         );
       } catch (queueError) {
         // CR-002: Log error with partial progress info
