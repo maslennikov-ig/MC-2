@@ -311,6 +311,10 @@ export const Phase2InputSchema = z.object({
   target_lessons: z.number().int().positive().optional(),
   target_sections: z.number().int().positive().optional(),
   size_guidance: z.string().min(1).optional(),
+  /** Minimum lessons count (hard constraint from size preset) */
+  min_lessons: z.number().int().positive().optional(),
+  /** Maximum lessons count (soft constraint from size preset) */
+  max_lessons: z.number().int().positive().optional(),
 
   /** Course description (user-provided context) */
   course_description: z.string().optional(),

@@ -97,6 +97,12 @@ export interface StructureAnalysisInput {
   /** LLM guidance text for course size (advisory) */
   size_guidance?: string;
 
+  /** Minimum lessons count (hard constraint from size preset) */
+  min_lessons?: number;
+
+  /** Maximum lessons count (soft constraint from size preset) */
+  max_lessons?: number;
+
   /** Course description (user-provided context) */
   course_description?: string;
 

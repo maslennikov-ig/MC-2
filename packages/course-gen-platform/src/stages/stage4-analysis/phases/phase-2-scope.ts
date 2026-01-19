@@ -260,10 +260,13 @@ export async function runPhase2Scope(input: Phase2Input): Promise<Phase2Output> 
         },
       });
 
-      // CRITICAL: Enforce minimum 10 lessons constraint (FR-015)
-      if (validated.recommended_structure.total_lessons < 10) {
+      // CRITICAL: Enforce minimum lessons constraint based on course_size preset
+      // For 'auto' mode (no preset), default minimum is 10 (FR-015)
+      // For specific presets: micro=1, mini=8, compact=15, standard=30, comprehensive=60
+      const minLessonsRequired = validatedInput.min_lessons ?? 10;
+      if (validated.recommended_structure.total_lessons < minLessonsRequired) {
         throw new Error(
-          `Insufficient scope for minimum 10 lessons (estimated: ${validated.recommended_structure.total_lessons}). ` +
+          `Insufficient scope for minimum ${minLessonsRequired} lessons (estimated: ${validated.recommended_structure.total_lessons}). ` +
             `Please expand topic or provide additional requirements.`
         );
       }
@@ -373,20 +376,24 @@ function buildPhase2Prompt(input: Phase2Input): { role: string; content: string 
       : '';
 
   // Build course size guidance section
-  // - For specific sizes: MANDATORY constraint with ±20% tolerance
-  // - For auto: explicit guidance to determine optimal size
+  // - For specific sizes: MANDATORY constraint with exact min/max from preset
+  // - For auto: explicit guidance to determine optimal size (min 10 default)
   const sizeSection = input.size_guidance
     ? `\n\n## User-Requested Course Size (MANDATORY CONSTRAINT)
 ${input.size_guidance}
 
 **CRITICAL CONSTRAINT**: The user has explicitly selected this course size. You MUST respect this choice.
-- Target: ${input.target_lessons} lessons in ${input.target_sections} sections
-- Allowed range: ${Math.round(input.target_lessons! * 0.8)}-${Math.round(input.target_lessons! * 1.2)} lessons (±20% tolerance)
+- Target: ${input.target_lessons} lessons in ${input.target_sections} section(s)
+- **HARD MINIMUM**: ${input.min_lessons} lessons (course WILL FAIL validation if below this)
+- **HARD MAXIMUM**: ${input.max_lessons} lessons (DO NOT exceed this)
+- Allowed range: ${input.min_lessons}-${input.max_lessons} lessons
 - If the topic seems too broad, REDUCE scope by focusing on essentials only
 - If the topic seems too narrow, ADD depth (advanced techniques, case studies, practical exercises)
 - DO NOT exceed the allowed range - adjust content depth, not lesson count`
     : `\n\n## Course Size: AI-Determined (AUTO MODE)
-The user has selected **AUTO mode**. Analyze the topic thoroughly and determine the optimal course size yourself based on your expert judgment. No size constraints apply - create exactly as many lessons as the topic genuinely requires for quality coverage.`;
+The user has selected **AUTO mode**. Analyze the topic thoroughly and determine the optimal course size yourself based on your expert judgment.
+- **HARD MINIMUM**: 10 lessons (course WILL FAIL validation if below this)
+- No maximum constraint - create as many lessons as the topic genuinely requires for quality coverage.`;
 
   // Generate Zod schema description for LLM
   const schemaDescription = zodToPromptSchema(Phase2OutputSchema);
