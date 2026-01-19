@@ -2,6 +2,43 @@
 
 _Released on 2025-12-26_
 
+## v0.28.10
+
+_Released on 2026-01-19_
+
+### ✨ New Features
+
+- **course-gen-platform**: Add 1 source file(s), update 8 source file(s), +3 more
+- **stage5**: Remove redundant fields to save ~10K-15K tokens per course
+- **stage5**: Add auto-approval support for automatic generation mode
+- **course-gen**: Add E2E test for automatic mode express generation
+- **auto-approval**: Add case 6 for Stage 6 lesson content generation
+- **processor**: Add bundle monitoring, health check, and docs
+- **logger**: Add auto-mute rules for job lifecycle warnings
+
+### 🔧 Improvements
+
+- **stage4**: Parallelize Phase 3 and Phase 6 execution
+- **stage4**: Remove conflicting pedagogical_strategy fields
+- **stage4-5**: Eliminate over-engineering and fix bugs
+
+### 🐛 Bug Fixes
+
+- **stage5**: Update JSDoc and fix test import path
+- **stage4**: Remove conflicting pedagogical_strategy fields from Phase 3
+- **auto-approval**: Address code review issues CR-001 through CR-015
+- **course-gen**: Repair JSON parsing and validation failures
+- **auto-approval**: Add two-step FSM transition for automatic mode
+- **web**: Image loader width param and logo aspect ratio
+- **processor**: Bundle with tsup for BullMQ ESM compatibility
+- **deploy**: Add orphan container cleanup before dev deploy
+- **logs**: Return status from RPC to fix filter mismatch
+- **processor**: Add missing .js extension to error-service import
+
+---
+
+_This release was automatically generated from 46 commits._
+
 ## v0.28.9
 
 _Released on 2026-01-18_
