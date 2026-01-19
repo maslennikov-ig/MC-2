@@ -39,6 +39,22 @@ export function classifyError(error: Error | unknown): ErrorType {
 
   const message = error.message.toLowerCase();
 
+  // LLM-specific retriable errors (check FIRST before permanent patterns)
+  // These are errors from LLM generation that may succeed on retry with different output
+  const llmRetriablePatterns = [
+    'placeholders detected', // LLM generated placeholder text instead of actual content
+    'placeholder', // Generic placeholder detection
+    'model fallback', // Model fallback needed
+    'generation failed', // Generic generation failure
+    'content generation', // Content generation issues
+  ];
+
+  for (const pattern of llmRetriablePatterns) {
+    if (message.includes(pattern)) {
+      return ErrorType.TRANSIENT;
+    }
+  }
+
   // Transient errors that should be retried
   const transientPatterns = [
     'timeout',

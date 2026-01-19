@@ -84,11 +84,18 @@ ${schemaDescription}
    - FR-030: Apply ${style} style to objectives (e.g., storytelling: "explore", "discover"; academic: "analyze", "evaluate")
 3. **Key Topics** (FR-011): Each lesson must have 2-10 specific key topics
    - FR-030: Frame topics in ${style} style (e.g., conversational: "Let's learn about...", professional: "Core competency:")
-4. **Practical Exercises** (FR-010): Each lesson must have 3-5 exercises with descriptive exercise_type text
-   - Use brief labels (10-30 chars) or detailed multi-step instructions (50-150+ chars)
-   - Examples: "case study analysis", "role-play scenario", "hands-on lab", "group discussion with peer feedback"
+4. **Practical Exercises** (FR-010): Each lesson must have 3-5 exercises:
+   - **exercise_type**: Brief labels (10-30 chars) - e.g., "case study analysis", "role-play scenario"
+   - **exercise_title**: Specific title (min 5 chars) - e.g., "Create a Personal Daily Schedule"
+   - **exercise_description**: DETAILED instructions (min 50 chars) explaining WHAT to do, HOW to do it, and expected outcome
+     Example: "Create a detailed daily schedule for tomorrow. Include all tasks, meetings, and breaks. Use time-blocking technique to allocate specific hours for each activity."
 5. **Coherence**: Lessons must follow logical progression, build on prerequisites
 6. **Language**: All content in ${language}
+
+**CRITICAL - FORBIDDEN PATTERNS** (will cause automatic rejection):
+- NO placeholders like [название], [описание], [текст], [insert X here], [TBD]
+- NO incomplete text or TODO markers
+- ALL fields must contain REAL, COMPLETE content in ${language}
 
 **NOTE**: Duration fields are managed by the system and not part of the schema you need to generate.
 
