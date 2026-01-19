@@ -296,17 +296,62 @@ export class DocumentProcessingOrchestrator {
         qualityScore: summarizationResult.metadata.qualityScore,
       };
     } catch (summarizationError) {
-      // Summarization failure is non-fatal - Stage 3 classification can use markdown_content
+      // Summarization failure is non-fatal - write fallback to prevent Stage 4 blocking
+      const errorMessage =
+        summarizationError instanceof Error
+          ? summarizationError.message
+          : String(summarizationError);
+
       logger.warn(
-        {
-          fileId,
-          error:
-            summarizationError instanceof Error
-              ? summarizationError.message
-              : String(summarizationError),
-        },
-        'Document summarization failed (non-fatal), Stage 3 classification will use markdown_content'
+        { fileId, error: errorMessage },
+        'Document summarization failed (non-fatal), writing markdown_content as fallback'
       );
+
+      // CRITICAL FIX: Fallback to markdown_content to prevent Stage 4 barrier blocking
+      // Stage 4 requires processed_content IS NOT NULL for all documents
+      try {
+        const supabase = getSupabaseAdmin();
+        const { data: fileData } = await supabase
+          .from('file_catalog')
+          .select('markdown_content')
+          .eq('id', fileId)
+          .single();
+
+        if (fileData?.markdown_content) {
+          const { error: updateError } = await supabase
+            .from('file_catalog')
+            .update({
+              processed_content: fileData.markdown_content,
+              processing_method: 'fallback_error',
+              summary_metadata: {
+                error: errorMessage,
+                fallback_reason: 'summarization_failed',
+                quality_score: 0,
+              },
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', fileId);
+
+          if (updateError) {
+            logger.error(
+              { fileId, error: updateError.message },
+              'Failed to store fallback processed_content'
+            );
+          } else {
+            logger.info({ fileId }, 'Stored markdown_content as fallback processed_content');
+          }
+        } else {
+          logger.warn({ fileId }, 'No markdown_content available for fallback');
+        }
+      } catch (fallbackError) {
+        logger.error(
+          {
+            fileId,
+            error: fallbackError instanceof Error ? fallbackError.message : String(fallbackError),
+          },
+          'Failed to write fallback processed_content'
+        );
+      }
 
       await logTrace({
         courseId,
@@ -314,12 +359,7 @@ export class DocumentProcessingOrchestrator {
         phase: 'summarization',
         stepName: 'generate_summary',
         inputData: { fileId },
-        errorData: {
-          error:
-            summarizationError instanceof Error
-              ? summarizationError.message
-              : String(summarizationError),
-        },
+        errorData: { error: errorMessage, fallback: 'attempted' },
         durationMs: Date.now() - summarizationStartTime,
       });
     }
