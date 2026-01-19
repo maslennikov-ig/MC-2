@@ -44,6 +44,7 @@ import {
 } from '../../../shared/llm/model-config-service';
 import logger from '../../../shared/logger';
 import { validateLocale } from '@/shared/validation';
+import { DEFAULT_MODEL_ID, DEFAULT_FALLBACK_MODEL_ID } from '@megacampus/shared-types';
 
 /**
  * Default threshold for small document bypass (tokens)
@@ -332,8 +333,8 @@ export async function executePhase6Summarization(
       .from('file_catalog')
       .update({
         processed_content: '[NO CONTENT]',
-        processing_method: 'fallback_empty',
-        summary_metadata: emptyFallbackMetadata,
+        processing_method: 'full_text', // Use 'full_text' to satisfy check constraint
+        summary_metadata: { ...emptyFallbackMetadata, is_fallback: true },
         updated_at: new Date().toISOString(),
       })
       .eq('id', fileId);
@@ -1114,14 +1115,54 @@ async function getModelConfigForSummarization(
     '[Phase 6] Determining model configuration'
   );
 
-  // Fetch config from database with fallback to hardcoded
-  const config = await modelConfigService.getModelForPhase(finalPhaseName);
+  // Fetch config from database with fallback to hardcoded defaults
+  // This handles cases where DB is unavailable (e.g., sandboxed processor startup)
+  try {
+    const config = await modelConfigService.getModelForPhase(finalPhaseName);
 
-  // Also fetch fallback model from emergency config if needed
-  const emergencyConfig = await modelConfigService.getModelForPhase('emergency');
+    // Also fetch fallback model from emergency config if needed
+    let fallbackModelId = DEFAULT_FALLBACK_MODEL_ID;
+    try {
+      const emergencyConfig = await modelConfigService.getModelForPhase('emergency');
+      fallbackModelId = emergencyConfig.modelId;
+    } catch (emergencyError) {
+      logger.warn(
+        {
+          error: emergencyError instanceof Error ? emergencyError.message : String(emergencyError),
+        },
+        '[Phase 6] Failed to get emergency config, using hardcoded fallback'
+      );
+    }
 
-  return {
-    ...config,
-    fallbackModelId: emergencyConfig.modelId,
-  };
+    return {
+      ...config,
+      fallbackModelId,
+    };
+  } catch (configError) {
+    // Database unavailable or config not found - use hardcoded defaults
+    // This is critical for sandboxed processor where DB cache may be empty
+    logger.warn(
+      {
+        phaseName: finalPhaseName,
+        tier,
+        language: langCode,
+        error: configError instanceof Error ? configError.message : String(configError),
+      },
+      '[Phase 6] Failed to get model config from database, using hardcoded defaults'
+    );
+
+    // Return hardcoded fallback config
+    return {
+      modelId: DEFAULT_MODEL_ID,
+      fallbackModelId: DEFAULT_FALLBACK_MODEL_ID,
+      temperature: 0.7,
+      maxTokens: 8192,
+      maxContextTokens: tier === 'extended' ? 200000 : 128000,
+      qualityThreshold: 0.75,
+      maxRetries: 3,
+      timeoutMs: null,
+      tier,
+      source: 'hardcoded' as const,
+    };
+  }
 }

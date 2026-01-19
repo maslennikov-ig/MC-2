@@ -322,11 +322,12 @@ export class DocumentProcessingOrchestrator {
             .from('file_catalog')
             .update({
               processed_content: fileData.markdown_content,
-              processing_method: 'fallback_error',
+              processing_method: 'full_text', // Use 'full_text' to satisfy check constraint
               summary_metadata: {
                 error: errorMessage,
                 fallback_reason: 'summarization_failed',
                 quality_score: 0,
+                is_fallback: true,
               },
               updated_at: new Date().toISOString(),
             })
