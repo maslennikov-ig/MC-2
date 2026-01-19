@@ -27,7 +27,7 @@ import {
   formatGenerationGuidanceForPrompt,
   getDifficultyFromAnalysis,
   getCategoryFromAnalysis,
-} from '../../../src/stages/stage5-generation/utils/analysis-formatters';
+} from '../../../../src/stages/stage5-generation/utils/analysis-formatters';
 import type { AnalysisResult } from '@megacampus/shared-types/analysis-result';
 
 /**
