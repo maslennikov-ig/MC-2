@@ -20,6 +20,39 @@ import {
 import { logger } from '../../../shared/logger/index.js';
 
 /**
+ * Transform local file path to Docker container path
+ * Local:     /home/user/code/mc2/packages/course-gen-platform/uploads/org/course/file.pdf
+ * Container: /app/uploads/org/course/file.pdf
+ */
+function transformPathForContainer(localPath: string): string {
+  const uploadsBasePath = process.env.DOCLING_UPLOADS_BASE_PATH;
+  const containerUploadsPath = process.env.DOCLING_CONTAINER_UPLOADS_PATH || '/app/uploads';
+
+  // If DOCLING_UPLOADS_BASE_PATH is set and path contains uploads/, transform it
+  if (uploadsBasePath && localPath.startsWith(uploadsBasePath)) {
+    // Extract the relative path after the base
+    const relativePath = localPath.slice(uploadsBasePath.length);
+    // Find /uploads/ in the path and replace everything before it
+    const uploadsIndex = relativePath.indexOf('/uploads/');
+    if (uploadsIndex !== -1) {
+      const pathAfterUploads = relativePath.slice(uploadsIndex + '/uploads/'.length);
+      const containerPath = `${containerUploadsPath}/${pathAfterUploads}`;
+      logger.debug(
+        {
+          original: localPath,
+          transformed: containerPath,
+        },
+        'Transformed path for Docker container'
+      );
+      return containerPath;
+    }
+  }
+
+  // Fallback: if path already starts with /app/ or no transformation needed
+  return localPath;
+}
+
+/**
  * Docling MCP Client
  * High-level interface for document processing operations
  */
@@ -71,30 +104,28 @@ export class DoclingClient {
         // Create transport based on URL path
         // SSE transport is simpler and avoids DNS rebinding/session issues in Docker
         if (this.useSSE) {
-          this.transport = new SSEClientTransport(
-            new URL(this.config.serverUrl)
-          );
+          this.transport = new SSEClientTransport(new URL(this.config.serverUrl));
           logger.info({ serverUrl: this.config.serverUrl }, 'Using SSE transport');
         } else {
-          this.transport = new StreamableHTTPClientTransport(
-            new URL(this.config.serverUrl),
-            {
-              requestInit: {
-                headers: {
-                  'Accept': 'application/json, text/event-stream',
-                },
+          this.transport = new StreamableHTTPClientTransport(new URL(this.config.serverUrl), {
+            requestInit: {
+              headers: {
+                Accept: 'application/json, text/event-stream',
               },
-            }
-          );
+            },
+          });
           logger.info({ serverUrl: this.config.serverUrl }, 'Using Streamable HTTP transport');
         }
 
         await this.client.connect(this.transport);
         this.isConnected = true;
-        logger.info({
-          serverUrl: this.config.serverUrl,
-          transport: this.useSSE ? 'SSE' : 'StreamableHTTP',
-        }, 'Connected to Docling MCP server');
+        logger.info(
+          {
+            serverUrl: this.config.serverUrl,
+            transport: this.useSSE ? 'SSE' : 'StreamableHTTP',
+          },
+          'Connected to Docling MCP server'
+        );
       } catch (error) {
         this.connectionPromise = null; // Reset so retry is possible
         this.transport = null;
@@ -209,11 +240,10 @@ export class DoclingClient {
         errorText.includes('[Errno 2]') ||
         errorText.includes('ENOENT')
       ) {
-        throw new DoclingError(
-          DoclingErrorCode.FILE_NOT_FOUND,
-          `File not found: ${errorText}`,
-          { tool: toolName, responseText: text }
-        );
+        throw new DoclingError(DoclingErrorCode.FILE_NOT_FOUND, `File not found: ${errorText}`, {
+          tool: toolName,
+          responseText: text,
+        });
       }
 
       // Generic processing error
@@ -243,9 +273,7 @@ export class DoclingClient {
    * @param request - Document conversion request
    * @returns Conversion response with DoclingDocument or content string
    */
-  async convertDocument(
-    request: ConvertDocumentRequest
-  ): Promise<ConvertDocumentResponse> {
+  async convertDocument(request: ConvertDocumentRequest): Promise<ConvertDocumentResponse> {
     // Validate file format FIRST - before connecting to server
     const extension = getFileExtension(request.file_path);
     if (!isSupportedFormat(extension)) {
@@ -265,18 +293,22 @@ export class DoclingClient {
 
         const startTime = Date.now();
 
-        logger.info({
-          file_path: request.file_path,
-          output_format: request.output_format,
-        }, 'Converting document');
+        logger.info(
+          {
+            file_path: request.file_path,
+            output_format: request.output_format,
+          },
+          'Converting document'
+        );
 
         // Call the MCP tool with retry logic
         // Docling MCP server provides tool: convert_document_into_docling_document
+        const containerPath = transformPathForContainer(request.file_path);
         const result = await this.callWithRetry(async () => {
           return await this.client.callTool({
             name: 'convert_document_into_docling_document',
             arguments: {
-              source: request.file_path,
+              source: containerPath,
             },
           });
         });
@@ -286,7 +318,7 @@ export class DoclingClient {
         // Parse convert_document_into_docling_document response
         // Response format: {from_cache: boolean, document_key: string}
         const content = result.content as Array<{ type: string; text?: string }>;
-        const textContent = content.find((c) => c.type === 'text');
+        const textContent = content.find(c => c.type === 'text');
         if (!textContent || !textContent.text) {
           throw new DoclingError(
             DoclingErrorCode.PROCESSING_ERROR,
@@ -299,10 +331,13 @@ export class DoclingClient {
           document_key: string;
         }>(textContent.text, 'convert_document_into_docling_document');
 
-        logger.info({
-          document_key: conversionResult.document_key,
-          from_cache: conversionResult.from_cache,
-        }, 'Document converted to Docling format');
+        logger.info(
+          {
+            document_key: conversionResult.document_key,
+            from_cache: conversionResult.from_cache,
+          },
+          'Document converted to Docling format'
+        );
 
         // Export to requested format
         if (request.output_format === 'docling_document') {
@@ -327,7 +362,7 @@ export class DoclingClient {
           });
 
           const exportContent = exportResult.content as Array<{ type: string; text?: string }>;
-          const exportTextContent = exportContent.find((c) => c.type === 'text');
+          const exportTextContent = exportContent.find(c => c.type === 'text');
           if (!exportTextContent || !exportTextContent.text) {
             throw new DoclingError(
               DoclingErrorCode.PROCESSING_ERROR,
@@ -335,21 +370,27 @@ export class DoclingClient {
             );
           }
 
-          logger.info({
-            raw_export_text_length: exportTextContent.text.length,
-            raw_export_preview: exportTextContent.text.substring(0, 500),
-          }, 'Raw export response from Docling MCP');
+          logger.info(
+            {
+              raw_export_text_length: exportTextContent.text.length,
+              raw_export_preview: exportTextContent.text.substring(0, 500),
+            },
+            'Raw export response from Docling MCP'
+          );
 
           const markdownResult = this.parseToolResponse<{
             document_key: string;
             markdown: string;
           }>(exportTextContent.text, 'export_docling_document_to_markdown');
 
-          logger.info({
-            has_markdown: !!markdownResult.markdown,
-            markdown_length: markdownResult.markdown?.length || 0,
-            result_keys: Object.keys(markdownResult),
-          }, 'Markdown export result parsed');
+          logger.info(
+            {
+              has_markdown: !!markdownResult.markdown,
+              markdown_length: markdownResult.markdown?.length || 0,
+              result_keys: Object.keys(markdownResult),
+            },
+            'Markdown export result parsed'
+          );
 
           return {
             success: true,
@@ -382,19 +423,11 @@ export class DoclingClient {
 
         // Map common errors to DoclingErrorCode
         if (errorMessage.includes('not found') || errorMessage.includes('ENOENT')) {
-          throw new DoclingError(
-            DoclingErrorCode.FILE_NOT_FOUND,
-            'Document file not found',
-            error
-          );
+          throw new DoclingError(DoclingErrorCode.FILE_NOT_FOUND, 'Document file not found', error);
         }
 
         if (errorMessage.includes('timeout') || errorMessage.includes('ETIMEDOUT')) {
-          throw new DoclingError(
-            DoclingErrorCode.TIMEOUT,
-            'Document processing timed out',
-            error
-          );
+          throw new DoclingError(DoclingErrorCode.TIMEOUT, 'Document processing timed out', error);
         }
 
         if (errorMessage.includes('memory') || errorMessage.includes('OOM')) {
@@ -444,10 +477,7 @@ export class DoclingClient {
     });
 
     if (!response.document) {
-      throw new DoclingError(
-        DoclingErrorCode.PROCESSING_ERROR,
-        'No document in response'
-      );
+      throw new DoclingError(DoclingErrorCode.PROCESSING_ERROR, 'No document in response');
     }
 
     return response.document;
@@ -466,10 +496,7 @@ export class DoclingClient {
     });
 
     if (!response.content) {
-      throw new DoclingError(
-        DoclingErrorCode.PROCESSING_ERROR,
-        'No content in response'
-      );
+      throw new DoclingError(DoclingErrorCode.PROCESSING_ERROR, 'No content in response');
     }
 
     return response.content;
@@ -494,17 +521,18 @@ export class DoclingClient {
 
     try {
       // Step 1: Convert document to get document_key
+      const containerPath = transformPathForContainer(filePath);
       const convertResult = await this.callWithRetry(async () => {
         return await this.client.callTool({
           name: 'convert_document_into_docling_document',
           arguments: {
-            source: filePath,
+            source: containerPath,
           },
         });
       });
 
       const content = convertResult.content as Array<{ type: string; text?: string }>;
-      const textContent = content.find((c) => c.type === 'text');
+      const textContent = content.find(c => c.type === 'text');
       if (!textContent || !textContent.text) {
         throw new DoclingError(
           DoclingErrorCode.PROCESSING_ERROR,
@@ -517,10 +545,13 @@ export class DoclingClient {
         document_key: string;
       }>(textContent.text, 'convert_document_into_docling_document');
 
-      logger.info({
-        document_key: conversionResult.document_key,
-        from_cache: conversionResult.from_cache,
-      }, 'Document converted, fetching JSON');
+      logger.info(
+        {
+          document_key: conversionResult.document_key,
+          from_cache: conversionResult.from_cache,
+        },
+        'Document converted, fetching JSON'
+      );
 
       // Step 2: Save document to JSON file
       const saveResult = await this.callWithRetry(async () => {
@@ -533,7 +564,7 @@ export class DoclingClient {
       });
 
       const saveContent = saveResult.content as Array<{ type: string; text?: string }>;
-      const saveTextContent = saveContent.find((c) => c.type === 'text');
+      const saveTextContent = saveContent.find(c => c.type === 'text');
       if (!saveTextContent || !saveTextContent.text) {
         throw new DoclingError(
           DoclingErrorCode.PROCESSING_ERROR,
@@ -546,9 +577,12 @@ export class DoclingClient {
         md_file: string;
       }>(saveTextContent.text, 'save_docling_document');
 
-      logger.info({
-        json_file: saveResponse.json_file,
-      }, 'Document saved to JSON file');
+      logger.info(
+        {
+          json_file: saveResponse.json_file,
+        },
+        'Document saved to JSON file'
+      );
 
       // Step 3: Read JSON file from volume mount
       // The cache directory is mounted to .tmp/docling-cache via docker-compose.yml
@@ -572,12 +606,15 @@ export class DoclingClient {
         const jsonContent = await fs.readFile(localPath, 'utf-8');
         const doclingDocument = JSON.parse(jsonContent) as DoclingDocument;
 
-        logger.info({
-          texts_count: doclingDocument.texts?.length || 0,
-          tables_count: doclingDocument.tables?.length || 0,
-          pictures_count: doclingDocument.pictures?.length || 0,
-          pages_count: Object.keys(doclingDocument.pages || {}).length,
-        }, 'DoclingDocument JSON loaded successfully');
+        logger.info(
+          {
+            texts_count: doclingDocument.texts?.length || 0,
+            tables_count: doclingDocument.tables?.length || 0,
+            pictures_count: doclingDocument.pictures?.length || 0,
+            pages_count: Object.keys(doclingDocument.pages || {}).length,
+          },
+          'DoclingDocument JSON loaded successfully'
+        );
 
         return doclingDocument;
       } catch (readError) {
@@ -616,11 +653,7 @@ export class DoclingClient {
       return result.tools;
     } catch (error) {
       logger.error({ err: error }, 'Failed to list tools');
-      throw new DoclingError(
-        DoclingErrorCode.NETWORK_ERROR,
-        'Failed to list tools',
-        error
-      );
+      throw new DoclingError(DoclingErrorCode.NETWORK_ERROR, 'Failed to list tools', error);
     }
   }
 
@@ -628,10 +661,7 @@ export class DoclingClient {
    * Execute function with retry logic
    * Handles reconnection for "Not connected" and "terminated" errors
    */
-  private async callWithRetry<T>(
-    fn: () => Promise<T>,
-    attempt: number = 1
-  ): Promise<T> {
+  private async callWithRetry<T>(fn: () => Promise<T>, attempt: number = 1): Promise<T> {
     try {
       return await fn();
     } catch (error) {
@@ -670,11 +700,14 @@ export class DoclingClient {
 
       // Exponential backoff
       const delay = this.config.retryDelay * Math.pow(2, attempt - 1);
-      logger.warn({
-        err: errorMessage,
-      }, `Retrying after ${delay}ms (attempt ${attempt}/${this.config.maxRetries})`);
+      logger.warn(
+        {
+          err: errorMessage,
+        },
+        `Retrying after ${delay}ms (attempt ${attempt}/${this.config.maxRetries})`
+      );
 
-      await new Promise((resolve) => setTimeout(resolve, delay));
+      await new Promise(resolve => setTimeout(resolve, delay));
       return this.callWithRetry(fn, attempt + 1);
     }
   }
