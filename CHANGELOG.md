@@ -311,6 +311,27 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.28.13] - 2026-01-19
+
+### Added
+
+- **stage6**: route auto-approval jobs to dedicated queue (08c5bdc)
+- **stage6**: activate dedicated queue with 30 concurrent workers (46ac12d)
+
+### Fixed
+
+- **orchestrator**: support snake_case in job cleanup logic (ddc663e)
+- **orchestrator**: support snake_case job data fields in queue-events-backup (f6e7383)
+- **orchestrator**: prevent attempts exceeding max_attempts constraint violation (7b66da1)
+
+### Other
+
+- bd sync: 2026-01-19 20:55:33 (3482258)
+- bd sync: 2026-01-19 20:16:44 (1f81652)
+- bd sync: 2026-01-19 20:00:55 (3469b3c)
+- bd sync: 2026-01-19 20:00:36 (01699f2)
+- bd sync: 2026-01-19 19:57:57 (5ff6918)
+
 ## [0.28.12] - 2026-01-19
 
 ### Added
