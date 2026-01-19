@@ -26,6 +26,7 @@ import { UnifiedRegenerator } from '@/shared/regeneration';
 import { preprocessObject } from '@/shared/validation/preprocessing';
 import { extractJSON } from '@/shared/utils/json-repair';
 import { normalizePhase1Output } from '@/shared/utils/structure-normalizer';
+import { logger } from '@/shared/logger';
 
 /**
  * Input data for Phase 1 Classification
@@ -204,14 +205,15 @@ export async function runPhase1Classification(input: Phase1Input): Promise<Phase
         });
         preprocessedOutput = JSON.stringify(preprocessed);
       } catch (error) {
+        // CR-007: Use structured logger instead of console.*
         // If preprocessing fails, continue with stripped output (UnifiedRegenerator will handle)
-        console.warn(
-          '[Phase 1] Preprocessing JSON parse failed, continuing with stripped output:',
-          error
-        );
-        console.warn(
-          '[Phase 1] Stripped output preview (first 1000 chars):',
-          preprocessedOutput.substring(0, 1000)
+        logger.warn(
+          {
+            phase: 'phase-1-classifier',
+            error: error instanceof Error ? error.message : String(error),
+            preview: preprocessedOutput.substring(0, 500),
+          },
+          'Preprocessing JSON parse failed, continuing with stripped output'
         );
       }
 
@@ -261,8 +263,15 @@ export async function runPhase1Classification(input: Phase1Input): Promise<Phase
 
       // Final safety check (should never fail after normalization + Zod validation)
       if (!data.course_category?.primary) {
-        console.error('[Phase 1] CRITICAL: course_category.primary missing after normalization!');
-        console.error('[Phase 1] Data:', JSON.stringify(data, null, 2).substring(0, 2000));
+        // CR-007: Use structured logger instead of console.*
+        logger.error(
+          {
+            phase: 'phase-1-classifier',
+            courseId,
+            dataPreview: JSON.stringify(data, null, 2).substring(0, 1000),
+          },
+          'CRITICAL: course_category.primary missing after normalization!'
+        );
         throw new Error(
           'Phase 1 classification failed: Missing required field course_category.primary'
         );

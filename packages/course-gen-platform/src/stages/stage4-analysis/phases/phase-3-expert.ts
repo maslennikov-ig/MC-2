@@ -31,6 +31,7 @@ import { zodToPromptSchema } from '@/shared/utils/zod-to-prompt-schema';
 import { preprocessObject } from '@/shared/validation/preprocessing';
 import { extractJSON } from '@/shared/utils/json-repair';
 import type { AIMessage } from '@langchain/core/messages';
+import { logger } from '@/shared/logger';
 
 /**
  * Input data for Phase 3 Expert Analysis
@@ -272,7 +273,14 @@ export async function runPhase3Expert(input: Phase3Input): Promise<Phase3Output>
         }
         preprocessedContent = JSON.stringify(parsedRaw);
       } catch (error) {
-        console.warn('[Phase 3] Preprocessing failed, using raw output:', error);
+        // CR-007: Use structured logger instead of console.*
+        logger.warn(
+          {
+            phase: 'phase-3-expert',
+            error: error instanceof Error ? error.message : String(error),
+          },
+          'Preprocessing failed, using raw output'
+        );
       }
       let parsedOutput: unknown;
       try {

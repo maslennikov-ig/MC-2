@@ -8,11 +8,40 @@
 import { SupabaseClient } from '@supabase/supabase-js';
 import { getSupabaseAdmin } from '../supabase/admin';
 import { addJob } from '../../orchestrator/queue';
-import { JobType, JobData } from '@megacampus/shared-types';
+import {
+  JobType,
+  JobData,
+  type GenerationJobInput,
+  type LessonSpecificationV2,
+  type AnalysisResult,
+  type CourseStyle,
+  type Language,
+} from '@megacampus/shared-types';
 import { logger } from '../logger/index.js';
 import type { Database } from '@megacampus/shared-types';
 import type { CourseSettings } from '../../server/routers/generation/_shared/types';
 import { isValidStyle, DEFAULT_COURSE_STYLE } from '@megacampus/shared-types/style-prompts';
+
+// CR-008: Valid enum values for input validation
+const VALID_TARGET_AUDIENCES = ['beginner', 'intermediate', 'advanced', 'mixed'] as const;
+const VALID_DIFFICULTIES = ['beginner', 'intermediate', 'advanced'] as const;
+type ValidDifficulty = (typeof VALID_DIFFICULTIES)[number];
+
+/** Check if value is a valid target audience enum */
+function isValidTargetAudience(value: unknown): value is (typeof VALID_TARGET_AUDIENCES)[number] {
+  return (
+    typeof value === 'string' &&
+    VALID_TARGET_AUDIENCES.includes(value as (typeof VALID_TARGET_AUDIENCES)[number])
+  );
+}
+
+/** Check if value is a valid difficulty enum */
+function isValidDifficulty(value: unknown): value is ValidDifficulty {
+  return (
+    typeof value === 'string' &&
+    VALID_DIFFICULTIES.includes(value as (typeof VALID_DIFFICULTIES)[number])
+  );
+}
 
 type GenerationStatus = Database['public']['Enums']['generation_status'];
 
@@ -130,17 +159,23 @@ export async function handleStageCompletion(
   // FSM requires two-step transition: analyzing -> complete -> next_init
   // First: Set current stage to complete (required by FSM validation)
   // Use conditional update to prevent race conditions
-  const { error: updateError } = await db
+  // CR-001 FIX: Check both error AND row count to detect silent failures
+  const { data: updateResult, error: updateError } = await db
     .from('courses')
     .update({
       generation_status: completeStatus,
       updated_at: new Date().toISOString(),
     })
     .eq('id', courseId)
-    .eq('generation_status', expectedCurrentStatus); // Only update if still in expected state
+    .eq('generation_status', expectedCurrentStatus) // Only update if still in expected state
+    .select('id');
 
-  if (updateError) {
-    logger.warn({ courseId, error: updateError }, 'Failed to update status (race condition?)');
+  // CR-001: Check if update actually affected a row (empty result = race condition)
+  if (updateError || !updateResult || updateResult.length === 0) {
+    logger.warn(
+      { courseId, error: updateError, rowsUpdated: updateResult?.length ?? 0 },
+      'Failed to update status (race condition or status changed)'
+    );
     return { autoApproved: false };
   }
 
@@ -208,6 +243,7 @@ async function queueNextStageJob(
     courseId,
     userId,
     createdAt: new Date().toISOString(),
+    locale: course.language === 'en' ? 'en' : 'ru',
   };
 
   // IDEMPOTENCY: Use deterministic jobId to prevent duplicate jobs
@@ -217,12 +253,12 @@ async function queueNextStageJob(
   switch (nextStage) {
     case 3: {
       // Stage 3: Document Classification
-      const classificationJobData = {
+      const classificationJobData: JobData = {
         ...baseJobData,
         jobType: JobType.DOCUMENT_CLASSIFICATION,
       };
 
-      await addJob(JobType.DOCUMENT_CLASSIFICATION, classificationJobData as unknown as JobData, {
+      await addJob(JobType.DOCUMENT_CLASSIFICATION, classificationJobData, {
         priority,
         jobId: idempotentJobId,
       });
@@ -235,45 +271,17 @@ async function queueNextStageJob(
 
     case 4: {
       // Stage 4: Structure Analysis
-      const supabase = getSupabaseAdmin();
-      const { data: documents } = await supabase
-        .from('file_catalog')
-        .select('id, filename, processed_content, processing_method, summary_metadata')
-        .eq('course_id', courseId)
-        .not('processed_content', 'is', null);
-
-      const document_summaries = (documents || []).map(doc => ({
-        document_id: doc.id,
-        file_name: doc.filename,
-        processed_content: doc.processed_content,
-        processing_method: doc.processing_method,
-        summary_metadata: doc.summary_metadata,
-      }));
-
+      // Note: Handler fetches documents from DB, no need to pass them
       const settings = (course.settings as CourseSettings) || {};
-      const jobData = {
+      // Use simplified StructureAnalysisJobData schema (handler fetches from DB)
+      const jobData: JobData = {
         ...baseJobData,
         jobType: JobType.STRUCTURE_ANALYSIS,
-        course_id: courseId,
-        organization_id: organizationId,
-        user_id: userId,
-        input: {
-          topic: settings.topic || course.title || '',
-          // Convert null to sensible defaults (null from DB fails Zod validation)
-          // Validate style against enum to prevent invalid values from breaking Zod
-          language: course.language ?? 'ru',
-          style: course.style && isValidStyle(course.style) ? course.style : DEFAULT_COURSE_STYLE,
-          target_audience: course.target_audience ?? '',
-          difficulty: course.difficulty ?? 'intermediate',
-          lesson_duration_minutes: settings.lesson_duration_minutes || 30,
-          document_summaries,
-        },
-        priority,
-        attempt_count: 0,
-        created_at: new Date().toISOString(),
+        title: course.title || undefined,
+        settings: settings as Record<string, unknown>,
       };
 
-      await addJob(JobType.STRUCTURE_ANALYSIS, jobData as unknown as JobData, {
+      await addJob(JobType.STRUCTURE_ANALYSIS, jobData, {
         priority,
         jobId: idempotentJobId,
       });
@@ -294,7 +302,7 @@ async function queueNextStageJob(
         .eq('course_id', courseId)
         .eq('vector_status', 'indexed' as unknown as Database['public']['Enums']['vector_status']);
 
-      const hasVectorizedDocs = vectorizedFiles && vectorizedFiles.length > 0;
+      const hasVectorizedDocs = Boolean(vectorizedFiles && vectorizedFiles.length > 0);
       const documentSummaries = hasVectorizedDocs
         ? (
             vectorizedFiles as Array<{
@@ -311,21 +319,34 @@ async function queueNextStageJob(
         : [];
 
       const settings = (course.settings as CourseSettings) || {};
-      const jobInput = {
+      const jobInput: GenerationJobInput = {
         course_id: courseId,
         organization_id: organizationId,
         user_id: userId,
-        analysis_result: analysisResult,
+        analysis_result: analysisResult as AnalysisResult | null,
         frontend_parameters: {
-          course_title: course.title,
+          course_title: course.title || '',
           // Convert null to undefined for cleaner optional fields (nullish schema accepts both)
-          // Validate style against enum to prevent invalid values from breaking Zod
+          // CR-008: Validate enums to prevent invalid values from breaking Zod
           language: course.language ?? undefined,
-          style: course.style && isValidStyle(course.style) ? course.style : undefined,
-          target_audience: course.target_audience ?? undefined,
-          difficulty: course.difficulty ?? undefined,
+          style: (course.style && isValidStyle(course.style) ? course.style : undefined) as
+            | CourseStyle
+            | null
+            | undefined,
+          target_audience: isValidTargetAudience(course.target_audience)
+            ? course.target_audience
+            : undefined,
+          difficulty: isValidDifficulty(course.difficulty) ? course.difficulty : undefined,
           description: course.course_description ?? undefined,
-          course_size: course.course_size ?? undefined,
+          course_size: course.course_size as
+            | 'micro'
+            | 'mini'
+            | 'compact'
+            | 'standard'
+            | 'comprehensive'
+            | 'auto'
+            | null
+            | undefined,
           desired_lessons_count: settings.desired_lessons_count,
           desired_modules_count: settings.desired_modules_count,
           lesson_duration_minutes: settings.lesson_duration_minutes,
@@ -335,6 +356,8 @@ async function queueNextStageJob(
         document_summaries: documentSummaries,
       };
 
+      // Note: Stage 5 handler expects GenerationJobInput which is not part of JobData union
+      // This is a known architectural mismatch - using type assertion with explicit typing
       await addJob(JobType.STRUCTURE_GENERATION, jobInput as unknown as JobData, {
         priority,
         jobId: idempotentJobId,
@@ -387,39 +410,61 @@ async function queueNextStageJob(
       }
 
       // Determine language and style
-      const language = courseData.language || 'ru';
+      const language = (courseData.language || 'ru') as Language;
       const style =
         courseData.style && isValidStyle(courseData.style)
           ? courseData.style
           : DEFAULT_COURSE_STYLE;
 
-      // Queue LESSON_CONTENT job for each lesson with idempotent jobId
-      for (const lesson of allLessons) {
-        const lessonJobId = `auto-${courseId}-stage6-lesson-${lesson.lesson_id}`;
-        const lessonJobData = {
-          ...baseJobData,
-          jobType: JobType.LESSON_CONTENT,
-          lessonSpec: lesson,
-          courseId,
-          language,
-          style,
-        };
+      // CR-002 FIX: Wrap job queueing in try-catch to handle partial failures
+      // Note: BullMQ idempotent jobIds prevent duplicate jobs on retry
+      try {
+        let queuedCount = 0;
+        for (const lesson of allLessons) {
+          const lessonJobId = `auto-${courseId}-stage6-lesson-${lesson.lesson_id}`;
+          const lessonJobData: JobData = {
+            ...baseJobData,
+            jobType: JobType.LESSON_CONTENT,
+            lessonSpec: lesson as unknown as LessonSpecificationV2,
+            ragChunks: [], // Handler fetches RAG chunks via retrieveLessonContext()
+            ragContextId: null, // Handler manages context cache
+            language,
+            style,
+          };
 
-        await addJob(JobType.LESSON_CONTENT, lessonJobData as unknown as JobData, {
-          priority,
-          jobId: lessonJobId,
-        });
+          await addJob(JobType.LESSON_CONTENT, lessonJobData, {
+            priority,
+            jobId: lessonJobId,
+          });
+          queuedCount++;
+        }
+
+        logger.info(
+          {
+            courseId,
+            nextStage: 6,
+            lessonCount: allLessons.length,
+            queuedCount,
+            jobIdPrefix: `auto-${courseId}-stage6-lesson-`,
+          },
+          'Queued LESSON_CONTENT jobs for all lessons'
+        );
+      } catch (queueError) {
+        // CR-002: Log error with partial progress info
+        // Note: Already queued jobs are idempotent, safe to retry entire operation
+        logger.error(
+          {
+            courseId,
+            nextStage: 6,
+            totalLessons: allLessons.length,
+            error: queueError instanceof Error ? queueError.message : String(queueError),
+          },
+          'Failed to queue Stage 6 jobs (partial jobs may exist, safe to retry due to idempotent jobIds)'
+        );
+        throw new Error(
+          `Failed to queue Stage 6 jobs: ${queueError instanceof Error ? queueError.message : String(queueError)}`
+        );
       }
-
-      logger.info(
-        {
-          courseId,
-          nextStage: 6,
-          lessonCount: allLessons.length,
-          jobIdPrefix: `auto-${courseId}-stage6-lesson-`,
-        },
-        'Queued LESSON_CONTENT jobs for all lessons'
-      );
       break;
     }
 

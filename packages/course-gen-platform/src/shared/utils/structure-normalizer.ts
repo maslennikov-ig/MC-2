@@ -257,14 +257,19 @@ function normalizeContextualLanguage(data: Record<string, unknown>): Record<stri
     }
   }
 
-  // If legacy data is incomplete, remove it
+  // CR-005 FIX: Preserve partial contextual_language data with defaults instead of deleting
   if (!hasAllFields) {
-    logger.info('Legacy contextual_language incomplete, removing field');
-    delete data.contextual_language;
+    logger.info('Legacy contextual_language incomplete, filling missing fields with defaults');
+    // Fill missing fields instead of deleting
+    for (const field of requiredFields) {
+      if (typeof langObj[field] !== 'string' || langObj[field].length < 10) {
+        langObj[field] = `[Content for ${field} not available]`;
+      }
+    }
   } else {
-    logger.debug('Preserving legacy contextual_language data');
-    data.contextual_language = langObj;
+    logger.debug('Preserving complete legacy contextual_language data');
   }
+  data.contextual_language = langObj;
 
   return data;
 }
@@ -469,7 +474,8 @@ export function normalizePhase1Output(
   data = normalizeTopicAnalysis(data, context?.topic);
   data = normalizePedagogicalPatterns(data);
 
-  logger.info(
+  // CR-014: Use debug level for verbose success logs
+  logger.debug(
     {
       normalizedKeys: Object.keys(data),
       hasCourseCategory: !!data.course_category,
