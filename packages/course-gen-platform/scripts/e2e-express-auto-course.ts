@@ -51,9 +51,9 @@ const TEST_CONFIG = {
   POLL_INTERVAL: 5_000, // 5 seconds
 };
 
-// Test organization and user IDs (from seed data)
-const TEST_ORG_ID = process.env.TEST_ORG_ID || '00000000-0000-0000-0000-000000000001';
-const TEST_USER_ID = process.env.TEST_USER_ID || '00000000-0000-0000-0000-000000000001';
+// Test organization and user IDs (from production data - Default Organization)
+const TEST_ORG_ID = process.env.TEST_ORG_ID || '9b98a7d5-27ea-4441-81dc-de79d488e5db';
+const TEST_USER_ID = process.env.TEST_USER_ID || 'ca704da8-5522-4a39-9691-23f36b85d0ce';
 
 // ============================================================================
 // Helpers

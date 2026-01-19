@@ -22,10 +22,7 @@ import {
   LLMIssueSchema,
   calculateSelfReviewerMaxTokens,
 } from './self-reviewer-constants';
-import {
-  withRetry,
-  extractSectionsToRegenerate,
-} from './self-reviewer-helpers';
+import { withRetry, extractSectionsToRegenerate } from './self-reviewer-helpers';
 import { parseSelfReviewerResponse } from './self-reviewer-json';
 import { removeChatbotArtifacts } from './self-reviewer-heuristics';
 
@@ -64,9 +61,7 @@ export interface LLMReviewOptions {
  * @param options - Review options including lesson spec and content
  * @returns LLM review result with parsed response or error
  */
-export async function runLLMReview(
-  options: LLMReviewOptions
-): Promise<LLMReviewResult> {
+export async function runLLMReview(options: LLMReviewOptions): Promise<LLMReviewResult> {
   const { lessonSpec, ragChunks, generatedContent, language } = options;
   const nodeLogger = logger.child({ phase: 'llmReview' });
 
@@ -122,15 +117,17 @@ export async function runLLMReview(
         maxAttempts: 3,
         delayMs: 1000,
         backoffMultiplier: 2,
-        retryOn: (error) => {
+        retryOn: error => {
           const message = error.message.toLowerCase();
-          return message.includes('timeout') ||
-                 message.includes('rate limit') ||
-                 message.includes('network') ||
-                 message.includes('503') ||
-                 message.includes('429') ||
-                 message.includes('econnreset') ||
-                 message.includes('socket');
+          return (
+            message.includes('timeout') ||
+            message.includes('rate limit') ||
+            message.includes('network') ||
+            message.includes('503') ||
+            message.includes('429') ||
+            message.includes('econnreset') ||
+            message.includes('socket')
+          );
         },
       }
     );
@@ -153,12 +150,12 @@ export async function runLLMReview(
         success: false,
         parsed: null,
         tokensUsed: llmResponse.totalTokens,
-        error: 'Invalid response format',
+        error: 'invalid response format',
       };
     }
 
     // Validate and map LLM issues
-    const validatedIssues: SelfReviewIssue[] = parsed.issues.map((issue) => {
+    const validatedIssues: SelfReviewIssue[] = parsed.issues.map(issue => {
       const validated = LLMIssueSchema.safeParse(issue);
       if (!validated.success) {
         nodeLogger.warn({
@@ -252,13 +249,111 @@ export function buildLLMReviewResult(
 }
 
 // ============================================================================
+// GRAMMAR INLINE FIXES
+// ============================================================================
+
+/**
+ * Apply simple inline fix for grammar issues
+ * Zero-token replacement using exact string matching.
+ *
+ * @param content - Content to fix
+ * @param quotedText - Exact text to find
+ * @param replacement - Text to replace with
+ * @returns Object with success flag and modified content
+ */
+function applySimpleInlineFix(
+  content: string,
+  quotedText: string,
+  replacement: string
+): { success: boolean; content: string; reason?: string } {
+  // Must have both quotedText and replacement
+  if (!quotedText || !replacement) {
+    return { success: false, content, reason: 'missing_replacement' };
+  }
+
+  // Check exact match exists
+  const index = content.indexOf(quotedText);
+  if (index === -1) {
+    return { success: false, content, reason: 'text_not_found' };
+  }
+
+  // Check uniqueness: must be exactly 1 occurrence
+  const occurrences = content.split(quotedText).length - 1;
+  if (occurrences > 1) {
+    return { success: false, content, reason: 'multiple_occurrences' };
+  }
+
+  // Apply replacement
+  const newContent = content.replace(quotedText, replacement);
+  return { success: true, content: newContent };
+}
+
+/**
+ * Apply all grammar fixes to content
+ *
+ * @param content - Original content
+ * @param issues - Grammar issues with quotedText and inlineReplacement
+ * @returns Object with modified content and fix statistics
+ */
+function applyGrammarFixes(
+  content: string,
+  issues: SelfReviewIssue[]
+): { content: string; appliedCount: number; failedCount: number } {
+  const nodeLogger = logger.child({ phase: 'grammarFixes' });
+  let currentContent = content;
+  let appliedCount = 0;
+  let failedCount = 0;
+
+  const grammarIssues = issues.filter(
+    i => i.type === 'GRAMMAR' && i.quotedText && i.inlineReplacement
+  );
+
+  for (const issue of grammarIssues) {
+    const result = applySimpleInlineFix(
+      currentContent,
+      issue.quotedText!,
+      issue.inlineReplacement!
+    );
+
+    if (result.success) {
+      currentContent = result.content;
+      appliedCount++;
+      nodeLogger.debug({
+        msg: 'Grammar fix applied',
+        quotedText: issue.quotedText?.slice(0, 30),
+        location: issue.location,
+      });
+    } else {
+      failedCount++;
+      nodeLogger.debug({
+        msg: 'Grammar fix failed',
+        reason: result.reason,
+        quotedText: issue.quotedText?.slice(0, 30),
+        location: issue.location,
+      });
+    }
+  }
+
+  if (appliedCount > 0) {
+    nodeLogger.info({
+      msg: 'Grammar fixes completed',
+      appliedCount,
+      failedCount,
+      tokensSaved: appliedCount * 1500, // Estimate: ~1500 tokens saved per fix
+    });
+  }
+
+  return { content: currentContent, appliedCount, failedCount };
+}
+
+// ============================================================================
 // PATCHING
 // ============================================================================
 
 /**
  * Apply programmatic fixes or validate LLM patches
  *
- * Handles FIXED status with programmatic patching for HYGIENE issues,
+ * Handles FIXED status with programmatic patching for HYGIENE and GRAMMAR issues,
  * and validates LLM-provided patches against schema.
  *
  * @param result - Current SelfReviewResult
@@ -271,43 +366,66 @@ export function applyPatching(
 ): { result: SelfReviewResult; patchedContent: string | null } {
   const nodeLogger = logger.child({ phase: 'patching' });
   let patchedContent: string | null = null;
+  let workingContent = generatedContent;
   const updatedResult = { ...result };
 
-  // PROGRAMMATIC PATCHING for HYGIENE issues
-  if (result.status === 'FIXED' && !result.patchedContent) {
+  // STEP 1: Apply GRAMMAR fixes (Phase 2.5) - zero-token inline fixes
+  const grammarIssues = result.issues.filter(
+    i => i.type === 'GRAMMAR' && i.severity === 'FIXABLE' && i.quotedText && i.inlineReplacement
+  );
+
+  if (grammarIssues.length > 0) {
+    const grammarResult = applyGrammarFixes(workingContent, grammarIssues);
+    if (grammarResult.appliedCount > 0) {
+      workingContent = grammarResult.content;
+      patchedContent = workingContent;
+      updatedResult.status = 'FIXED';
+      updatedResult.reasoning += ` (${grammarResult.appliedCount} grammar fix(es) applied)`;
+    }
+  }
+
+  // STEP 2: PROGRAMMATIC PATCHING for HYGIENE issues
+  if ((result.status === 'FIXED' || grammarIssues.length > 0) && !result.patchedContent) {
     const hygieneIssues = result.issues.filter(
       i => i.type === 'HYGIENE' && i.severity === 'FIXABLE'
     );
-    const onlyHygieneIssues = hygieneIssues.length === result.issues.length && hygieneIssues.length > 0;
+    const fixableIssues = [...grammarIssues, ...hygieneIssues];
+    const allIssuesAreFixable =
+      fixableIssues.length === result.issues.length && fixableIssues.length > 0;
 
-    if (onlyHygieneIssues) {
+    if (hygieneIssues.length > 0) {
       nodeLogger.info({
         msg: 'Applying programmatic fix for HYGIENE issues',
         issuesCount: hygieneIssues.length,
       });
 
-      const cleanedContent = removeChatbotArtifacts(generatedContent);
+      const cleanedContent = removeChatbotArtifacts(workingContent);
 
-      if (cleanedContent.length < generatedContent.length) {
-        patchedContent = cleanedContent;
-        updatedResult.reasoning += ' (Fixed programmatically)';
+      if (cleanedContent.length < workingContent.length) {
+        workingContent = cleanedContent;
+        patchedContent = workingContent;
+        updatedResult.status = 'FIXED';
+        updatedResult.reasoning += ' (HYGIENE fixed programmatically)';
         nodeLogger.info({
           msg: 'Chatbot artifacts removed programmatically',
           originalLength: generatedContent.length,
           cleanedLength: cleanedContent.length,
           removedChars: generatedContent.length - cleanedContent.length,
         });
-      } else {
-        updatedResult.status = 'PASS_WITH_FLAGS';
+      }
+    }
+
+    // If we have patches applied, keep FIXED status
+    // If no patches were applied, downgrade to PASS_WITH_FLAGS
+    if (patchedContent === null && result.status === 'FIXED') {
+      updatedResult.status = allIssuesAreFixable ? 'PASS_WITH_FLAGS' : result.status;
+      if (!allIssuesAreFixable) {
         updatedResult.reasoning += ' (No programmatic fix applied)';
       }
-    } else {
-      updatedResult.status = 'PASS_WITH_FLAGS';
-      updatedResult.reasoning += ' (FIXED status without patch, downgraded)';
     }
   }
 
-  // Validate LLM-provided patches
+  // STEP 3: Validate LLM-provided patches (if any)
   if (result.patchedContent) {
     const validation = LessonContentBodySchema.safeParse(result.patchedContent);
 
@@ -318,13 +436,18 @@ export function applyPatching(
       });
 
       updatedResult.patchedContent = null;
-      const hasCriticalIssues = result.issues.some(i => i.severity === 'CRITICAL');
-      const hasMinorIssues = result.issues.some(i => i.severity === 'INFO' || i.severity === 'FIXABLE');
-      updatedResult.status = hasCriticalIssues
-        ? 'REGENERATE'
-        : hasMinorIssues
-          ? 'PASS_WITH_FLAGS'
-          : 'PASS';
+      // Keep our programmatic patches if we have them
+      if (patchedContent === null) {
+        const hasCriticalIssues = result.issues.some(i => i.severity === 'CRITICAL');
+        const hasMinorIssues = result.issues.some(
+          i => i.severity === 'INFO' || i.severity === 'FIXABLE'
+        );
+        updatedResult.status = hasCriticalIssues
+          ? 'REGENERATE'
+          : hasMinorIssues
+            ? 'PASS_WITH_FLAGS'
+            : 'PASS';
+      }
       updatedResult.reasoning += ' (LLM patch rejected: invalid schema)';
     } else {
       patchedContent = JSON.stringify(result.patchedContent, null, 2);

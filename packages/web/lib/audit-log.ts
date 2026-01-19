@@ -1,5 +1,5 @@
-import { getAdminClient } from '@/lib/supabase/client-factory';
-import { logger } from '@/lib/logger';
+import { getAdminClient } from '@/lib/supabase/client-factory'
+import { logger } from '@/lib/logger'
 
 /**
  * Audit action types for organization management
@@ -15,30 +15,27 @@ export type AuditAction =
   | 'invitation.created'
   | 'invitation.accepted'
   | 'invitation.revoked'
-  | 'ownership.transferred';
+  | 'ownership.transferred'
 
 /**
  * Entity types for audit logging
  */
-export type AuditEntityType =
-  | 'organization'
-  | 'organization_member'
-  | 'organization_invitation';
+export type AuditEntityType = 'organization' | 'organization_member' | 'organization_invitation'
 
 /**
  * Audit log entry structure
  */
 export interface AuditLogEntry {
-  organizationId: string;
-  userId: string;
-  action: AuditAction;
-  entityType: AuditEntityType;
-  entityId?: string;
-  oldValues?: Record<string, unknown>;
-  newValues?: Record<string, unknown>;
-  ipAddress?: string | null;
-  userAgent?: string | null;
-  requestId?: string;
+  organizationId: string
+  userId: string
+  action: AuditAction
+  entityType: AuditEntityType
+  entityId?: string
+  oldValues?: Record<string, unknown>
+  newValues?: Record<string, unknown>
+  ipAddress?: string | null
+  userAgent?: string | null
+  requestId?: string
 }
 
 /**
@@ -59,12 +56,11 @@ export async function logAudit(entry: AuditLogEntry): Promise<void> {
     organizationId: entry.organizationId,
     userId: entry.userId,
     requestId: entry.requestId,
-  });
+  })
 
   try {
-    const adminClient = getAdminClient();
+    const adminClient = getAdminClient()
 
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     // Note: Type assertion needed due to TypeScript project reference caching issue.
     // The audit_log table schema includes organization_id in database.types.ts
     const { error } = await (adminClient as any).from('audit_log').insert({
@@ -78,21 +74,21 @@ export async function logAudit(entry: AuditLogEntry): Promise<void> {
       ip_address: entry.ipAddress || null,
       user_agent: entry.userAgent || null,
       request_id: entry.requestId || null,
-    });
+    })
 
     if (error) {
       logger.error('Failed to write audit log to database', {
         error: error.message,
         action: entry.action,
         organizationId: entry.organizationId,
-      });
+      })
     }
   } catch (error) {
     // Log but don't throw - audit logging should not break main operations
     logger.error('Audit logging database error', {
       error: error instanceof Error ? error.message : 'Unknown error',
       action: entry.action,
-    });
+    })
   }
 }
 
@@ -109,9 +105,9 @@ export function createAuditLogger(
       action: AuditAction,
       entityType: AuditEntityType,
       options?: {
-        entityId?: string;
-        oldValues?: Record<string, unknown>;
-        newValues?: Record<string, unknown>;
+        entityId?: string
+        oldValues?: Record<string, unknown>
+        newValues?: Record<string, unknown>
       }
     ) =>
       logAudit({
@@ -124,5 +120,5 @@ export function createAuditLogger(
         newValues: options?.newValues,
         ...requestContext,
       }),
-  };
+  }
 }
