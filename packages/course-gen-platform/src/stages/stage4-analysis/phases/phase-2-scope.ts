@@ -271,6 +271,22 @@ export async function runPhase2Scope(input: Phase2Input): Promise<Phase2Output> 
         );
       }
 
+      // Log if LLM exceeded constraints (non-blocking, for analytics)
+      const maxLessonsAllowed = validatedInput.max_lessons;
+      if (maxLessonsAllowed && validated.recommended_structure.total_lessons > maxLessonsAllowed) {
+        logger.warn(
+          {
+            phase: 'phase-2-scope',
+            courseSize: validatedInput.course_size,
+            generated: validated.recommended_structure.total_lessons,
+            max: maxLessonsAllowed,
+            targetSections: validatedInput.target_sections,
+            generatedSections: validated.recommended_structure.total_sections,
+          },
+          'LLM exceeded max_lessons constraint (non-blocking warning)'
+        );
+      }
+
       return {
         result: validated,
         usage: {
@@ -379,17 +395,28 @@ function buildPhase2Prompt(input: Phase2Input): { role: string; content: string 
   // - For specific sizes: MANDATORY constraint with exact min/max from preset
   // - For auto: explicit guidance to determine optimal size (min 10 default)
   const sizeSection = input.size_guidance
-    ? `\n\n## User-Requested Course Size (MANDATORY CONSTRAINT)
+    ? `\n\n## ⚠️ MANDATORY COURSE SIZE CONSTRAINT ⚠️
 ${input.size_guidance}
 
-**CRITICAL CONSTRAINT**: The user has explicitly selected this course size. You MUST respect this choice.
-- Target: ${input.target_lessons} lessons in ${input.target_sections} section(s)
-- **HARD MINIMUM**: ${input.min_lessons} lessons (course WILL FAIL validation if below this)
-- **HARD MAXIMUM**: ${input.max_lessons} lessons (DO NOT exceed this)
-- Allowed range: ${input.min_lessons}-${input.max_lessons} lessons
-- If the topic seems too broad, REDUCE scope by focusing on essentials only
-- If the topic seems too narrow, ADD depth (advanced techniques, case studies, practical exercises)
-- DO NOT exceed the allowed range - adjust content depth, not lesson count`
+**ABSOLUTE REQUIREMENT - READ CAREFULLY:**
+The user has explicitly selected course size: ${input.course_size?.toUpperCase()}
+
+YOU MUST GENERATE EXACTLY:
+- **LESSONS**: ${input.min_lessons} to ${input.max_lessons} (target: ${input.target_lessons})
+- **SECTIONS**: ${input.target_sections} section(s) ONLY
+
+**HARD LIMITS (WILL CAUSE VALIDATION FAILURE IF VIOLATED):**
+- Minimum lessons: ${input.min_lessons}
+- Maximum lessons: ${input.max_lessons}
+- Maximum sections: ${input.target_sections}
+
+**STRICT RULES:**
+1. DO NOT generate more than ${input.max_lessons} lessons under ANY circumstances
+2. DO NOT generate more than ${input.target_sections} section(s) - merge topics if needed
+3. For ${input.course_size} size, focus ONLY on absolute essentials
+4. If topic is broad, REDUCE scope ruthlessly - cover core concepts only
+5. If topic is narrow, add depth but STAY within lesson limit
+6. The output will be REJECTED if it exceeds these limits`
     : `\n\n## Course Size: AI-Determined (AUTO MODE)
 The user has selected **AUTO mode**. Analyze the topic thoroughly and determine the optimal course size yourself based on your expert judgment.
 - **HARD MINIMUM**: 10 lessons (course WILL FAIL validation if below this)
@@ -397,6 +424,11 @@ The user has selected **AUTO mode**. Analyze the topic thoroughly and determine 
 
   // Generate Zod schema description for LLM
   const schemaDescription = zodToPromptSchema(Phase2OutputSchema);
+
+  // Build dynamic minimum lesson rule based on course size
+  const minLessonsRule = input.size_guidance
+    ? `3. COURSE SIZE PRESET ACTIVE: ${input.course_size?.toUpperCase()} - Generate ${input.min_lessons}-${input.max_lessons} lessons in ${input.target_sections} section(s). DO NOT default to 10 lessons!`
+    : `3. Minimum 10 lessons REQUIRED (FR-015) - if scope is insufficient, recommend more content`;
 
   const systemPrompt = `You are an expert course designer specializing in scope estimation and structure planning.
 
@@ -408,7 +440,7 @@ CRITICAL RULES:
 
 ${schemaDescription}
 
-3. Minimum 10 lessons REQUIRED (FR-015) - if scope is insufficient, recommend more content
+${minLessonsRule}
 4. Lesson duration: typically 15 minutes (can vary 3-45 min based on content type)
 5. Sections: 1-30 sections, each with 1+ lessons
 6. Provide detailed breakdown for each section (learning objectives, key topics, pedagogy)`;
@@ -431,9 +463,13 @@ ${schemaDescription}
 2. **Calculate Lesson Count**:
    - Determine appropriate lesson duration (3-45 min, typically 15 min)
    - Formula: total_lessons = ceil((estimated_hours * 60) / lesson_duration_minutes)
-   - CRITICAL: Result MUST be ≥ 10 lessons (FR-015)
+${
+  input.size_guidance
+    ? `   - FOR THIS ${input.course_size?.toUpperCase()} COURSE: Generate ${input.min_lessons}-${input.max_lessons} lessons ONLY`
+    : `   - CRITICAL: Result MUST be ≥ 10 lessons (FR-015)`
+}
 
-3. **Generate Sections Breakdown** (1-30 sections):
+3. **Generate Sections Breakdown** (${input.size_guidance ? `${input.target_sections} section(s) for ${input.course_size} size` : '1-30 sections'}):
 
    **CRITICAL: Complete Section Fields**
    EVERY section in sections_breakdown MUST include ALL required fields:
@@ -449,7 +485,7 @@ ${schemaDescription}
    - difficulty (beginner/intermediate/advanced)
    - prerequisites (array of section_ids, empty [] if none)
 
-   If you generate 8 sections, ALL 8 MUST have ALL 11 fields above.
+   ALL sections MUST have ALL 11 fields above. ${input.size_guidance ? `For ${input.course_size} size: generate ${input.target_sections} section(s) only.` : ''}
 
    - Break course into logical sections
    - For each section:
@@ -495,16 +531,22 @@ Each item in \`key_topics\` MUST directly correspond to a \`learning_objective\`
 IMPORTANT:
 - Output ONLY valid JSON (no markdown, no comments)
 - ALL text fields (area, learning_objectives, key_topics, pedagogical_approach, scope_reasoning, calculation_explanation, scope_warning) MUST be in ${outputLanguage.toUpperCase()}
-- total_lessons MUST be >= 10 (expand scope creatively if needed to surprise the learner)
+${
+  input.size_guidance
+    ? `- RESPECT THE SIZE PRESET: Generate ${input.min_lessons}-${input.max_lessons} lessons in ${input.target_sections} section(s) - DO NOT default to 10!
+- For ${input.course_size} size: Focus on essentials ONLY, reduce scope if topic is too broad
+- STAY WITHIN LIMITS: The user explicitly chose ${input.course_size} size, respect their choice`
+    : `- total_lessons MUST be >= 10 (expand scope creatively if needed to surprise the learner)
 - For seemingly narrow topics, think broadly: add context, history, applications, best practices
-- Aim for comprehensive coverage that provides maximum value
+- Aim for comprehensive coverage that provides maximum value`
+}
 - The ONLY hard constraint is lesson_duration_minutes - respect it strictly
 - sections_breakdown array MUST match total_sections count
 
 **New Fields in sections_breakdown (MANDATORY)**:
 1. **section_id**: MUST be sequential strings starting from "1" (not numbers)
    - Format: "1", "2", "3", ..., "N" (where N = total_sections)
-   - Example: For 8 sections, use "1" through "8"
+   - Example: For ${input.target_sections || 3} sections, use "1" through "${input.target_sections || 3}"
 
 2. **estimated_duration_hours**: Calculate for each section
    - Formula: (estimated_lessons × lesson_duration_minutes) ÷ 60

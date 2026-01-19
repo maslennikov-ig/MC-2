@@ -222,7 +222,7 @@ export const Phase2OutputSchema = z.object({
     calculation_explanation: z
       .string()
       .min(50, 'Calculation explanation must be at least 50 characters'), // Removed .max(300) - allow thorough explanations
-    total_lessons: z.number().int().min(10, 'Minimum 10 lessons required (FR-015)'), // Removed .max(100) - let LLM decide optimal count
+    total_lessons: z.number().int().min(1, 'Minimum 1 lesson required'), // Dynamic min based on course_size preset (FR-015 applies only to AUTO mode)
     total_sections: z.number().int().min(1, 'Minimum 1 section'), // Removed .max(30) - let LLM decide structure
     scope_warning: z.string().nullable(),
     sections_breakdown: z.array(SectionBreakdownSchema).min(1, 'Must have at least 1 section'),
@@ -553,7 +553,7 @@ export const AnalysisResultSchema = z.object({
     scope_reasoning: z.string().min(100), // Removed .max(500) - encourage detailed reasoning
     lesson_duration_minutes: z.number().int().min(3).max(45), // Keep .max(45) - pedagogical constraint per FR-014
     calculation_explanation: z.string().min(20), // Removed .max(300) - allow thorough explanations
-    total_lessons: z.number().int().min(10), // Removed .max(100) - let LLM decide optimal count per FR-015
+    total_lessons: z.number().int().min(1), // Dynamic min based on course_size preset (FR-015 applies only to AUTO mode)
     total_sections: z.number().int().min(1), // Removed .max(30) - let LLM decide structure
     scope_warning: z.string().nullable(),
     sections_breakdown: z.array(SectionBreakdownSchema),
