@@ -713,8 +713,14 @@ export class DocumentProcessingOrchestrator {
 
   /**
    * Check if job has been cancelled
+   * Note: SandboxedJob doesn't have getState() method, only regular Job does
    */
   private async checkCancellation(job: Job<DocumentProcessingJobData>): Promise<void> {
+    // Type guard: SandboxedJob doesn't have getState() - skip check in sandboxed mode
+    if (typeof (job as { getState?: unknown }).getState !== 'function') {
+      // In sandboxed mode, we rely on BullMQ's built-in cancellation handling
+      return;
+    }
     // Note: BullMQ doesn't have isDiscarded() - check if job state is 'failed' or 'completed'
     const state = await job.getState();
     if (state === 'failed' || state === 'completed') {
