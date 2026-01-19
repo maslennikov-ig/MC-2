@@ -180,8 +180,11 @@ export async function removeJobsByCourseId(
       if (!job) continue;
 
       // Check if job has no data (orphaned/corrupted) or belongs to our course
-      const isOrphanedJob = !job.data || !job.data.courseId;
-      const belongsToCourse = job.data?.courseId === courseId;
+      // Support both camelCase and snake_case (some jobs use snake_case internally)
+      const jobData = job.data as Record<string, unknown> | undefined;
+      const jobCourseId = (jobData?.courseId || jobData?.course_id) as string | undefined;
+      const isOrphanedJob = !jobData || !jobCourseId;
+      const belongsToCourse = jobCourseId === courseId;
 
       if (isOrphanedJob || belongsToCourse) {
         try {
