@@ -73,7 +73,14 @@ export const RUSSIAN_RULES: GrammarRuleSet = {
 4. **Numeral agreement** (согласование с числительными):
    - 2-4 + genitive singular: "два файла", "три студента"
    - 5-20 + genitive plural: "пять файлов", "десять студентов"
-   - 21-24 same as 1-4: "двадцать один файл"`,
+   - 21-24 same as 1-4: "двадцать один файл"
+
+5. **Person agreement** (согласование в лице):
+   - "вы" requires 2nd person plural verb: "вы станете" ✓, "вы станет" ✗
+   - "вы научитесь" ✓, "вы научится" ✗
+
+6. **Adjective-noun case agreement** (падеж прилагательного):
+   - Adjective must match noun case: "простые рассылки" ✓, "простые рассылок" ✗`,
   examples: [
     {
       error: 'о принцип работы',
@@ -94,6 +101,16 @@ export const RUSSIAN_RULES: GrammarRuleSet = {
       error: 'два студент',
       fix: 'два студента',
       explanation: 'Numerals 2-4 require genitive singular',
+    },
+    {
+      error: 'вы станет',
+      fix: 'вы станете',
+      explanation: '"вы" requires 2nd person plural verb ending',
+    },
+    {
+      error: 'простые рассылок',
+      fix: 'простые рассылки',
+      explanation: 'Adjective and noun must agree in case',
     },
   ],
 };
