@@ -188,21 +188,28 @@ export async function assembleAnalysisResult(input: Phase5Input): Promise<Analys
   // Sanitize LLM-generated text fields to prevent XSS attacks
   // Apply DOMPurify sanitization to all user-facing text that came from LLM outputs
 
-  // Sanitize contextual_language object fields (all are LLM-generated)
-  const sanitizedContextualLanguage = {
-    why_matters_context: sanitizeLLMOutput(
-      input.phase1_output.contextual_language.why_matters_context
-    ),
-    motivators: sanitizeLLMOutput(input.phase1_output.contextual_language.motivators),
-    experience_prompt: sanitizeLLMOutput(input.phase1_output.contextual_language.experience_prompt),
-    problem_statement_context: sanitizeLLMOutput(
-      input.phase1_output.contextual_language.problem_statement_context
-    ),
-    knowledge_bridge: sanitizeLLMOutput(input.phase1_output.contextual_language.knowledge_bridge),
-    practical_benefit_focus: sanitizeLLMOutput(
-      input.phase1_output.contextual_language.practical_benefit_focus
-    ),
-  };
+  // Sanitize contextual_language object fields (DEPRECATED - field is now optional)
+  // Only sanitize if present (for legacy data compatibility)
+  const sanitizedContextualLanguage = input.phase1_output.contextual_language
+    ? {
+        why_matters_context: sanitizeLLMOutput(
+          input.phase1_output.contextual_language.why_matters_context
+        ),
+        motivators: sanitizeLLMOutput(input.phase1_output.contextual_language.motivators),
+        experience_prompt: sanitizeLLMOutput(
+          input.phase1_output.contextual_language.experience_prompt
+        ),
+        problem_statement_context: sanitizeLLMOutput(
+          input.phase1_output.contextual_language.problem_statement_context
+        ),
+        knowledge_bridge: sanitizeLLMOutput(
+          input.phase1_output.contextual_language.knowledge_bridge
+        ),
+        practical_benefit_focus: sanitizeLLMOutput(
+          input.phase1_output.contextual_language.practical_benefit_focus
+        ),
+      }
+    : undefined;
 
   // Sanitize generation_guidance fields (REQUIRED)
   const sanitizedGenerationGuidance: AnalysisResult['generation_guidance'] = {
@@ -245,7 +252,8 @@ export async function assembleAnalysisResult(input: Phase5Input): Promise<Analys
   const result: AnalysisResult = {
     // From Phase 1: Classification and contextual language
     course_category: input.phase1_output.course_category,
-    contextual_language: sanitizedContextualLanguage, // SANITIZED for XSS protection
+    // contextual_language is now optional (DEPRECATED - only for legacy data)
+    ...(sanitizedContextualLanguage && { contextual_language: sanitizedContextualLanguage }),
     topic_analysis: input.phase1_output.topic_analysis,
     pedagogical_patterns: input.phase1_output.pedagogical_patterns, // Optional - from Analyze Enhancement
 

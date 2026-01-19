@@ -274,14 +274,16 @@ export const Phase2InputSchema = z.object({
         .nullable()
         .optional(),
     }),
-    contextual_language: z.object({
-      why_matters_context: z.string().min(50), // Removed .max(300) - allow rich context
-      motivators: z.string().min(50), // Reduced from 100 - realistic minimum for motivators text
-      experience_prompt: z.string().min(100), // Removed .max(600) - allow detailed prompts
-      problem_statement_context: z.string().min(50), // Removed .max(300) - encourage thorough problem statements
-      knowledge_bridge: z.string().min(100), // Removed .max(600) - allow comprehensive bridging
-      practical_benefit_focus: z.string().min(100), // Removed .max(600) - encourage detailed benefits
-    }),
+    contextual_language: z
+      .object({
+        why_matters_context: z.string().min(50), // Removed .max(300) - allow rich context
+        motivators: z.string().min(50), // Reduced from 100 - realistic minimum for motivators text
+        experience_prompt: z.string().min(100), // Removed .max(600) - allow detailed prompts
+        problem_statement_context: z.string().min(50), // Removed .max(300) - encourage thorough problem statements
+        knowledge_bridge: z.string().min(100), // Removed .max(600) - allow comprehensive bridging
+        practical_benefit_focus: z.string().min(100), // Removed .max(600) - encourage detailed benefits
+      })
+      .optional(),
     topic_analysis: z.object({
       determined_topic: z.string().min(3), // Removed .max(200) - allow detailed topic descriptions
       information_completeness: z.number().min(0).max(100), // Keep .max(100) - technical constraint (percentage)
@@ -349,14 +351,16 @@ export const Phase1OutputSchema = z.object({
       .nullable()
       .optional(),
   }),
-  contextual_language: z.object({
-    why_matters_context: z.string().min(50), // Removed .max(300) - allow rich context
-    motivators: z.string().min(50), // Reduced from 100 - realistic minimum for motivators text
-    experience_prompt: z.string().min(100), // Removed .max(600) - allow detailed prompts
-    problem_statement_context: z.string().min(50), // Removed .max(300) - encourage thorough problem statements
-    knowledge_bridge: z.string().min(100), // Removed .max(600) - allow comprehensive bridging
-    practical_benefit_focus: z.string().min(100), // Removed .max(600) - encourage detailed benefits
-  }),
+  contextual_language: z
+    .object({
+      why_matters_context: z.string().min(50), // Removed .max(300) - allow rich context
+      motivators: z.string().min(50), // Reduced from 100 - realistic minimum for motivators text
+      experience_prompt: z.string().min(100), // Removed .max(600) - allow detailed prompts
+      problem_statement_context: z.string().min(50), // Removed .max(300) - encourage thorough problem statements
+      knowledge_bridge: z.string().min(100), // Removed .max(600) - allow comprehensive bridging
+      practical_benefit_focus: z.string().min(100), // Removed .max(600) - encourage detailed benefits
+    })
+    .optional(),
   topic_analysis: z.object({
     determined_topic: z.string().min(3), // Removed .max(200) - allow detailed topic descriptions
     information_completeness: z.number().min(0).max(100), // Keep .max(100) - technical constraint (percentage)
@@ -520,14 +524,16 @@ export const AnalysisResultSchema = z.object({
       .nullable(),
   }),
 
-  contextual_language: z.object({
-    why_matters_context: z.string().min(50), // Removed .max(300) - allow rich context
-    motivators: z.string().min(50), // Reduced from 100 - realistic minimum for motivators text
-    experience_prompt: z.string().min(100), // Removed .max(600) - allow detailed prompts
-    problem_statement_context: z.string().min(50), // Removed .max(300) - encourage thorough problem statements
-    knowledge_bridge: z.string().min(100), // Removed .max(600) - allow comprehensive bridging
-    practical_benefit_focus: z.string().min(100), // Removed .max(600) - encourage detailed benefits
-  }),
+  contextual_language: z
+    .object({
+      why_matters_context: z.string().min(50), // Removed .max(300) - allow rich context
+      motivators: z.string().min(50), // Reduced from 100 - realistic minimum for motivators text
+      experience_prompt: z.string().min(100), // Removed .max(600) - allow detailed prompts
+      problem_statement_context: z.string().min(50), // Removed .max(300) - encourage thorough problem statements
+      knowledge_bridge: z.string().min(100), // Removed .max(600) - allow comprehensive bridging
+      practical_benefit_focus: z.string().min(100), // Removed .max(600) - encourage detailed benefits
+    })
+    .optional(),
 
   topic_analysis: z.object({
     determined_topic: z.string().min(3), // Removed .max(200) - allow detailed topic descriptions

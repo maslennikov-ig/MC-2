@@ -20,6 +20,7 @@ import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { UnifiedRegenerator } from '@/shared/regeneration';
 import { zodToPromptSchema } from '@/shared/utils/zod-to-prompt-schema';
 import { preprocessObject } from '@/shared/validation/preprocessing';
+import { extractJSON } from '@/shared/utils/json-repair';
 
 /**
  * Input data for Phase 4 Document Synthesis
@@ -168,9 +169,10 @@ ${m.content}`
   };
 
   // TIER 1: PREPROCESSING (before UnifiedRegenerator)
-  let preprocessedOutput = rawOutput;
+  // Extract JSON from markdown code blocks + strip thinking tags
+  let preprocessedOutput = extractJSON(rawOutput);
   try {
-    const parsedRaw = JSON.parse(rawOutput) as RawPhase4Output;
+    const parsedRaw = JSON.parse(preprocessedOutput) as RawPhase4Output;
     // Preprocess generation instructions enum fields
     if (parsedRaw.generation_instructions) {
       parsedRaw.generation_instructions = preprocessObject(

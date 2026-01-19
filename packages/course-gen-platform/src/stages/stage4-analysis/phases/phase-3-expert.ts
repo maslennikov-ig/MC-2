@@ -29,6 +29,7 @@ import { z } from 'zod';
 import { UnifiedRegenerator } from '@/shared/regeneration';
 import { zodToPromptSchema } from '@/shared/utils/zod-to-prompt-schema';
 import { preprocessObject } from '@/shared/validation/preprocessing';
+import { extractJSON } from '@/shared/utils/json-repair';
 import type { AIMessage } from '@langchain/core/messages';
 
 /**
@@ -249,9 +250,10 @@ export async function runPhase3Expert(input: Phase3Input): Promise<Phase3Output>
       const response = await model.invoke(prompt);
       const content = response.content as string;
       storeTraceData(course_id, 'stage_4_expert', { promptText: prompt, completionText: content });
-      let preprocessedContent = content;
+      // Extract JSON from markdown code blocks + strip thinking tags
+      let preprocessedContent = extractJSON(content);
       try {
-        const parsedRaw = JSON.parse(content) as RawPhase3Output;
+        const parsedRaw = JSON.parse(preprocessedContent) as RawPhase3Output;
         if (parsedRaw.pedagogical_strategy) {
           parsedRaw.pedagogical_strategy = preprocessObject(
             parsedRaw.pedagogical_strategy as Record<string, unknown>,

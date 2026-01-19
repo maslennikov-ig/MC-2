@@ -2,14 +2,16 @@
  * Stage 5 Generation Handler
  * @module orchestrator/handlers/stage5-generation
  *
- * Handles STRUCTURE_GENERATION jobs using 5-phase LangGraph orchestration.
- * Executes all 5 generation phases (validate_input, generate_metadata, generate_sections,
- * validate_quality, validate_lessons) and stores the result in courses.course_structure
+ * Handles STRUCTURE_GENERATION jobs using 4-phase LangGraph orchestration.
+ * Executes all 4 generation phases (validate_input, generate_metadata, generate_sections,
+ * validate_quality) and stores the result in courses.course_structure
  * and courses.generation_metadata JSONB columns.
+ *
+ * Lesson validation (≥10 lessons) performed in performPostGenerationQualityGate after StateGraph.
  *
  * Features:
  * - BullMQ handler for job type: STRUCTURE_GENERATION
- * - 5-phase LangGraph orchestration with RT-001 model routing
+ * - 4-phase LangGraph orchestration with RT-001 model routing
  * - Zod schema validation with CourseStructureSchema
  * - XSS sanitization with DOMPurify (FR-008)
  * - Atomic database commit (FR-023)
@@ -222,9 +224,8 @@ function determinePhaseFromError(error: Error | string): string | undefined {
     return 'step_3_generate_sections';
   } else if (message.includes('validate_quality') || message.includes('Phase 4')) {
     return 'step_4_validate_quality';
-  } else if (message.includes('validate_lessons') || message.includes('Phase 5')) {
-    return 'step_5_validate_lessons';
   }
+  // Phase 5 removed - lesson validation in performPostGenerationQualityGate
 
   return undefined;
 }

@@ -8,7 +8,9 @@
  * - Phase 2: generate_metadata (MetadataGenerator with RT-001 hybrid routing)
  * - Phase 3: generate_sections (SectionBatchGenerator with tiered routing)
  * - Phase 4: validate_quality (QualityValidator with 0.75 threshold)
- * - Phase 5: validate_lessons (MinimumLessonsValidator with ≥10 lessons)
+ *
+ * Note: Phase 5 (validate_lessons) has been removed as redundant.
+ * Lesson count validation is performed in the orchestrator's performPostGenerationQualityGate.
  *
  * Each phase method:
  * - Calls appropriate service (MetadataGenerator, SectionBatchGenerator, QualityValidator)
@@ -45,7 +47,10 @@ import { formatPedagogicalStrategyForPrompt } from '../utils/analysis-formatters
 import { V2LessonSpecGenerator } from './phase3-v2-spec-generator';
 import type { LessonSpecificationV2 } from '@megacampus/shared-types/lesson-specification-v2';
 import pLimit from 'p-limit';
-import { createModelConfigService, getEffectiveStageConfig } from '../../../shared/llm/model-config-service';
+import {
+  createModelConfigService,
+  getEffectiveStageConfig,
+} from '../../../shared/llm/model-config-service';
 import { logTrace } from '../../../shared/trace-logger';
 
 // ============================================================================
@@ -83,8 +88,8 @@ const PARALLEL_CONFIG = {
  * RT-001 Quality thresholds
  */
 const QUALITY_CONFIG = {
-  MIN_SIMILARITY: 0.75,     // Overall quality threshold
-  MIN_LESSONS: 10,          // FR-015: Minimum 10 lessons total
+  MIN_SIMILARITY: 0.75, // Overall quality threshold
+  MIN_LESSONS: 10, // FR-015: Minimum 10 lessons total
 } as const;
 
 // ============================================================================
@@ -118,8 +123,7 @@ const QUALITY_CONFIG = {
  * // Phase 4: Validate quality
  * state = await phases.validateQuality(state);
  *
- * // Phase 5: Validate lessons
- * state = await phases.validateLessons(state);
+ * // Note: Phase 5 (validateLessons) removed - lesson validation done in orchestrator
  * ```
  */
 export class GenerationPhases {
@@ -182,15 +186,10 @@ export class GenerationPhases {
       const result = GenerationJobInputSchema.safeParse(state.input);
 
       if (!result.success) {
-        const errors = result.error.errors.map(
-          (err) => `${err.path.join('.')}: ${err.message}`
-        );
+        const errors = result.error.errors.map(err => `${err.path.join('.')}: ${err.message}`);
         const errorMessage = `Input validation failed: ${errors.join('; ')}`;
 
-        this.logger.error(
-          { phase: 'validate_input', errors },
-          'Input validation failed'
-        );
+        this.logger.error({ phase: 'validate_input', errors }, 'Input validation failed');
 
         await logTrace({
           courseId,
@@ -379,7 +378,7 @@ export class GenerationPhases {
 
         // RT-004: Exponential backoff
         const delay = RETRY_CONFIG.BASE_DELAY_MS * Math.pow(2, attempt - 1);
-        await new Promise((resolve) => setTimeout(resolve, delay));
+        await new Promise(resolve => setTimeout(resolve, delay));
       }
     }
 
@@ -457,16 +456,22 @@ export class GenerationPhases {
         const effectiveConfig = getEffectiveStageConfig(phaseConfig);
         retryAttemptsPerSection = effectiveConfig.maxRetries;
 
-        this.logger.info({
-          phase: 'generate_sections',
-          retryAttemptsPerSection,
-          source: phaseConfig.source,
-        }, 'Using database-driven retry attempts config');
+        this.logger.info(
+          {
+            phase: 'generate_sections',
+            retryAttemptsPerSection,
+            source: phaseConfig.source,
+          },
+          'Using database-driven retry attempts config'
+        );
       } catch (error) {
-        this.logger.warn({
-          phase: 'generate_sections',
-          error: error instanceof Error ? error.message : String(error),
-        }, 'Failed to load retry config, using default: 3');
+        this.logger.warn(
+          {
+            phase: 'generate_sections',
+            error: error instanceof Error ? error.message : String(error),
+          },
+          'Failed to load retry config, using default: 3'
+        );
         // Keep default: retryAttemptsPerSection = 3
       }
 
@@ -487,13 +492,15 @@ export class GenerationPhases {
       const sectionIndices = Array.from({ length: totalSections }, (_, i) => i);
 
       // Launch all sections in parallel with concurrency control
-      const sectionPromises = sectionIndices.map((sectionIndex) =>
-        limit(() => this.generateSingleSectionWithRetry(
-          sectionIndex,
-          state.input,
-          this.qdrantClient,
-          state.input.course_id
-        ))
+      const sectionPromises = sectionIndices.map(sectionIndex =>
+        limit(() =>
+          this.generateSingleSectionWithRetry(
+            sectionIndex,
+            state.input,
+            this.qdrantClient,
+            state.input.course_id
+          )
+        )
       );
 
       this.logger.info(
@@ -554,9 +561,10 @@ export class GenerationPhases {
       // Aggregate metrics
       const totalTokensUsed = successfulResults.reduce((sum, r) => sum + r.result.tokensUsed, 0);
       const aggregatedRetryCounts = successfulResults.map(r => r.result.retryCount);
-      const lastModelUsed = successfulResults.length > 0
-        ? successfulResults[successfulResults.length - 1].result.modelUsed
-        : '';
+      const lastModelUsed =
+        successfulResults.length > 0
+          ? successfulResults[successfulResults.length - 1].result.modelUsed
+          : '';
 
       const duration = Date.now() - startTime;
 
@@ -566,7 +574,8 @@ export class GenerationPhases {
           totalSections: allSections.length,
           totalTokens: totalTokensUsed,
           duration,
-          durationPerSection: allSections.length > 0 ? Math.round(duration / allSections.length) : 0,
+          durationPerSection:
+            allSections.length > 0 ? Math.round(duration / allSections.length) : 0,
           failedSections: finalFailures.length,
         },
         `Section generation completed in ${Math.round(duration / 1000)}s (${allSections.length}/${totalSections} sections)`
@@ -577,7 +586,11 @@ export class GenerationPhases {
         stage: 'stage_5',
         phase: 'generate_sections',
         stepName: 'phase_complete',
-        outputData: { totalSections: allSections.length, successCount: successfulResults.length, failureCount: finalFailures.length },
+        outputData: {
+          totalSections: allSections.length,
+          successCount: successfulResults.length,
+          failureCount: finalFailures.length,
+        },
         tokensUsed: totalTokensUsed,
         durationMs: duration,
       });
@@ -609,7 +622,8 @@ export class GenerationPhases {
       // Add errors for any final failures
       if (finalFailures.length > 0) {
         const errorMessages = finalFailures.map(
-          f => `Section ${f.index + 1} generation failed after ${retryAttemptsPerSection} retries: ${f.error}`
+          f =>
+            `Section ${f.index + 1} generation failed after ${retryAttemptsPerSection} retries: ${f.error}`
         );
         updatedState = {
           ...updatedState,
@@ -619,10 +633,7 @@ export class GenerationPhases {
 
       return updatedState;
     } catch (error) {
-      this.logger.error(
-        { error, phase: 'generate_sections' },
-        'Section generation failed'
-      );
+      this.logger.error({ error, phase: 'generate_sections' }, 'Section generation failed');
       return {
         ...state,
         errors: [
@@ -675,7 +686,7 @@ export class GenerationPhases {
 
     const result = await this.sectionBatchGenerator.generateBatch(
       sectionIndex + 1, // batchNum (1-indexed for logging)
-      sectionIndex,     // startSection (0-indexed)
+      sectionIndex, // startSection (0-indexed)
       sectionIndex + 1, // endSection (exclusive, 1 section per batch)
       input,
       qdrantClient
@@ -892,9 +903,7 @@ export class GenerationPhases {
 
       // Extract language for threshold adjustment
       // Note: contextual_language is a pedagogical context object, not a language code
-      const language =
-        state.input.frontend_parameters.language ||
-        'en';
+      const language = state.input.frontend_parameters.language || 'en';
 
       // 1. Validate metadata similarity (if analysis_result provided)
       let metadataSimilarity: number | undefined;
@@ -926,7 +935,7 @@ export class GenerationPhases {
       // 2. Validate section similarities
       const expectedTopics =
         state.input.analysis_result?.recommended_structure.sections_breakdown.map(
-          (section) => section.area || 'Untitled Section'
+          section => section.area || 'Untitled Section'
         ) || [];
 
       const sectionResults = await this.qualityValidator.validateSections(
@@ -935,13 +944,13 @@ export class GenerationPhases {
         language
       );
 
-      const sectionsSimilarity = sectionResults.map((result) => result.score);
+      const sectionsSimilarity = sectionResults.map(result => result.score);
 
       this.logger.info(
         {
           phase: 'validate_quality',
-          sectionsSimilarity: sectionsSimilarity.map((s) => s.toFixed(4)),
-          allPassed: sectionResults.every((r) => r.passed),
+          sectionsSimilarity: sectionsSimilarity.map(s => s.toFixed(4)),
+          allPassed: sectionResults.every(r => r.passed),
         },
         'Sections quality validation complete'
       );
@@ -952,14 +961,11 @@ export class GenerationPhases {
 
       if (metadataSimilarity !== undefined) {
         const sectionsAvg =
-          sectionsSimilarity.reduce((sum, s) => sum + s, 0) /
-          sectionsSimilarity.length;
+          sectionsSimilarity.reduce((sum, s) => sum + s, 0) / sectionsSimilarity.length;
         overall = metadataSimilarity * 0.4 + sectionsAvg * 0.6;
       } else {
         // Title-only scenario: only sections contribute
-        overall =
-          sectionsSimilarity.reduce((sum, s) => sum + s, 0) /
-          sectionsSimilarity.length;
+        overall = sectionsSimilarity.reduce((sum, s) => sum + s, 0) / sectionsSimilarity.length;
       }
 
       const duration = Date.now() - startTime;
@@ -1016,13 +1022,10 @@ export class GenerationPhases {
           ...state.phaseDurations,
           validate_quality: duration,
         },
-        currentPhase: 'validate_lessons',
+        // Phase 5 removed - quality validation is now the final phase
       };
     } catch (error) {
-      this.logger.error(
-        { error, phase: 'validate_quality' },
-        'Quality validation failed'
-      );
+      this.logger.error({ error, phase: 'validate_quality' }, 'Quality validation failed');
       return {
         ...state,
         errors: [
@@ -1034,109 +1037,27 @@ export class GenerationPhases {
   }
 
   // ==========================================================================
-  // PHASE 5: VALIDATE LESSONS
+  // VALIDATION LAYER DOCUMENTATION
   // ==========================================================================
 
   /**
-   * Phase 5: Validate minimum lessons count (FR-015)
+   * REMOVED: Phase 5 validate_lessons (REDUNDANT)
    *
-   * Simple count-based validation: total lessons across all sections must be ≥10.
-   * No LLM invocation required.
+   * Lesson count validation (≥10 lessons) is now performed in the orchestrator's
+   * performPostGenerationQualityGate method after StateGraph execution.
    *
-   * If validation fails (<10 lessons):
-   * - Retry generateSections with explicit "minimum 10 lessons" constraint
+   * This eliminates duplicate validation and simplifies the state machine.
    *
-   * @param state - Current generation state (must have sections)
-   * @returns Updated state with lesson validation results
+   * Remaining Validation Layers:
+   * 1. Phase 1 validateInput - STRUCTURAL ENTRY validation (Zod schema)
+   * 2. Phase 4 validateQuality - QUALITY CHECK (embeddings, similarity)
+   * 3. Orchestrator performPostGenerationQualityGate - LESSON COUNT + STRUCTURAL QUALITY
+   * 4. Handler safeParse - STRUCTURAL EXIT validation (Zod schema)
+   * 5. XSS sanitization - SECURITY LAYER (content sanitization)
    *
-   * @example
-   * ```typescript
-   * const state = await phases.validateLessons(previousState);
-   * const totalLessons = state.sections.reduce((sum, s) => sum + s.lessons.length, 0);
-   * if (totalLessons < 10) {
-   *   console.log('Lesson count validation failed - retry needed');
-   * }
-   * ```
+   * @see orchestrator.performPostGenerationQualityGate for lesson count validation
+   * @see handler safeParse for output validation
    */
-  async validateLessons(state: GenerationState): Promise<GenerationState> {
-    const startTime = Date.now();
-    const courseId = state.input.course_id;
-
-    await logTrace({
-      courseId,
-      stage: 'stage_5',
-      phase: 'validate_lessons',
-      stepName: 'phase_start',
-      inputData: { minimumRequired: QUALITY_CONFIG.MIN_LESSONS },
-      durationMs: 0,
-    });
-
-    try {
-      this.logger.info({ phase: 'validate_lessons' }, 'Starting lesson count validation');
-
-      if (state.sections.length === 0) {
-        throw new Error('Cannot validate lessons: no sections generated');
-      }
-
-      // Count total lessons across all sections
-      const totalLessons = state.sections.reduce(
-        (sum, section) => sum + section.lessons.length,
-        0
-      );
-
-      const duration = Date.now() - startTime;
-
-      this.logger.info(
-        {
-          phase: 'validate_lessons',
-          totalLessons,
-          minimumRequired: QUALITY_CONFIG.MIN_LESSONS,
-          passed: totalLessons >= QUALITY_CONFIG.MIN_LESSONS,
-          duration,
-        },
-        'Lesson count validation complete'
-      );
-
-      await logTrace({
-        courseId,
-        stage: 'stage_5',
-        phase: 'validate_lessons',
-        stepName: 'phase_complete',
-        outputData: { totalLessons, passed: totalLessons >= QUALITY_CONFIG.MIN_LESSONS },
-        durationMs: duration,
-      });
-
-      // Check if lesson count passed
-      if (totalLessons < QUALITY_CONFIG.MIN_LESSONS) {
-        const errorMessage = `Lesson count validation failed: only ${totalLessons} lessons, minimum ${QUALITY_CONFIG.MIN_LESSONS} required (FR-015)`;
-        this.logger.warn({ phase: 'validate_lessons' }, errorMessage);
-        return {
-          ...state,
-          errors: [...state.errors, errorMessage],
-        };
-      }
-
-      return {
-        ...state,
-        phaseDurations: {
-          ...state.phaseDurations,
-          validate_lessons: duration,
-        },
-      };
-    } catch (error) {
-      this.logger.error(
-        { error, phase: 'validate_lessons' },
-        'Lesson count validation failed'
-      );
-      return {
-        ...state,
-        errors: [
-          ...state.errors,
-          `Lesson count validation failed: ${error instanceof Error ? error.message : 'Unknown error'}`,
-        ],
-      };
-    }
-  }
 
   // ==========================================================================
   // PHASE 3 V2: GENERATE V2 LESSON SPECIFICATIONS
@@ -1187,7 +1108,8 @@ export class GenerationPhases {
       const v2Specs = await this.v2SpecGenerator.generateV2Specs(state);
 
       const duration = Date.now() - startTime;
-      const totalSections = state.input.analysis_result.recommended_structure.sections_breakdown.length;
+      const totalSections =
+        state.input.analysis_result.recommended_structure.sections_breakdown.length;
 
       this.logger.info(
         {

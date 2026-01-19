@@ -90,16 +90,59 @@ export async function handleStageCompletion(
   const nextStage = currentStage + 1;
   const completeStatus = `stage_${currentStage}_complete` as GenerationStatus;
   const nextStatus = `stage_${nextStage}_init` as GenerationStatus;
+  const expectedCurrentStatus = `stage_${currentStage}_analyzing` as GenerationStatus;
+
+  // IDEMPOTENCY CHECK: Only proceed if course is in expected state
+  // This prevents duplicate job creation on retry or race conditions
+  const { data: currentCourse, error: statusError } = await db
+    .from('courses')
+    .select('generation_status')
+    .eq('id', courseId)
+    .single();
+
+  if (statusError || !currentCourse) {
+    logger.warn({ courseId, error: statusError }, 'Failed to check course status for idempotency');
+  } else {
+    const currentStatus = currentCourse.generation_status as GenerationStatus;
+    // Already processed - skip duplicate processing
+    if (currentStatus === nextStatus || currentStatus === completeStatus) {
+      logger.info(
+        { courseId, currentStage, currentStatus },
+        'Stage already transitioned (idempotent skip)'
+      );
+      return { autoApproved: true, nextStage };
+    }
+    // Not in expected state - something is wrong
+    if (currentStatus !== expectedCurrentStatus) {
+      logger.warn(
+        {
+          courseId,
+          currentStage,
+          expectedStatus: expectedCurrentStatus,
+          actualStatus: currentStatus,
+        },
+        'Course not in expected state for auto-approval, skipping'
+      );
+      return { autoApproved: false };
+    }
+  }
 
   // FSM requires two-step transition: analyzing -> complete -> next_init
   // First: Set current stage to complete (required by FSM validation)
-  await db
+  // Use conditional update to prevent race conditions
+  const { error: updateError } = await db
     .from('courses')
     .update({
       generation_status: completeStatus,
       updated_at: new Date().toISOString(),
     })
-    .eq('id', courseId);
+    .eq('id', courseId)
+    .eq('generation_status', expectedCurrentStatus); // Only update if still in expected state
+
+  if (updateError) {
+    logger.warn({ courseId, error: updateError }, 'Failed to update status (race condition?)');
+    return { autoApproved: false };
+  }
 
   logger.debug({ courseId, status: completeStatus }, 'Stage marked complete');
 
@@ -167,6 +210,10 @@ async function queueNextStageJob(
     createdAt: new Date().toISOString(),
   };
 
+  // IDEMPOTENCY: Use deterministic jobId to prevent duplicate jobs
+  // BullMQ will reject job if one with same ID already exists
+  const idempotentJobId = `auto-${courseId}-stage${nextStage}`;
+
   switch (nextStage) {
     case 3: {
       // Stage 3: Document Classification
@@ -177,8 +224,12 @@ async function queueNextStageJob(
 
       await addJob(JobType.DOCUMENT_CLASSIFICATION, classificationJobData as unknown as JobData, {
         priority,
+        jobId: idempotentJobId,
       });
-      logger.info({ courseId, nextStage: 3 }, 'Queued DOCUMENT_CLASSIFICATION job');
+      logger.info(
+        { courseId, nextStage: 3, jobId: idempotentJobId },
+        'Queued DOCUMENT_CLASSIFICATION job'
+      );
       break;
     }
 
@@ -222,8 +273,14 @@ async function queueNextStageJob(
         created_at: new Date().toISOString(),
       };
 
-      await addJob(JobType.STRUCTURE_ANALYSIS, jobData as unknown as JobData, { priority });
-      logger.info({ courseId, nextStage: 4 }, 'Queued STRUCTURE_ANALYSIS job');
+      await addJob(JobType.STRUCTURE_ANALYSIS, jobData as unknown as JobData, {
+        priority,
+        jobId: idempotentJobId,
+      });
+      logger.info(
+        { courseId, nextStage: 4, jobId: idempotentJobId },
+        'Queued STRUCTURE_ANALYSIS job'
+      );
       break;
     }
 
@@ -278,8 +335,14 @@ async function queueNextStageJob(
         document_summaries: documentSummaries,
       };
 
-      await addJob(JobType.STRUCTURE_GENERATION, jobInput as unknown as JobData, { priority });
-      logger.info({ courseId, nextStage: 5 }, 'Queued STRUCTURE_GENERATION job');
+      await addJob(JobType.STRUCTURE_GENERATION, jobInput as unknown as JobData, {
+        priority,
+        jobId: idempotentJobId,
+      });
+      logger.info(
+        { courseId, nextStage: 5, jobId: idempotentJobId },
+        'Queued STRUCTURE_GENERATION job'
+      );
       break;
     }
 
@@ -330,8 +393,9 @@ async function queueNextStageJob(
           ? courseData.style
           : DEFAULT_COURSE_STYLE;
 
-      // Queue LESSON_CONTENT job for each lesson
+      // Queue LESSON_CONTENT job for each lesson with idempotent jobId
       for (const lesson of allLessons) {
+        const lessonJobId = `auto-${courseId}-stage6-lesson-${lesson.lesson_id}`;
         const lessonJobData = {
           ...baseJobData,
           jobType: JobType.LESSON_CONTENT,
@@ -343,11 +407,17 @@ async function queueNextStageJob(
 
         await addJob(JobType.LESSON_CONTENT, lessonJobData as unknown as JobData, {
           priority,
+          jobId: lessonJobId,
         });
       }
 
       logger.info(
-        { courseId, nextStage: 6, lessonCount: allLessons.length },
+        {
+          courseId,
+          nextStage: 6,
+          lessonCount: allLessons.length,
+          jobIdPrefix: `auto-${courseId}-stage6-lesson-`,
+        },
         'Queued LESSON_CONTENT jobs for all lessons'
       );
       break;

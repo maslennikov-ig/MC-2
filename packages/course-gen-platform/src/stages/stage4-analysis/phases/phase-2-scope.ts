@@ -24,6 +24,7 @@ import {
 import { UnifiedRegenerator } from '@/shared/regeneration';
 import { zodToPromptSchema } from '@/shared/utils/zod-to-prompt-schema';
 import { preprocessObject } from '@/shared/validation/preprocessing';
+import { extractJSON } from '@/shared/utils/json-repair';
 
 /**
  * Main Phase 2 execution function: Scope Analysis
@@ -83,9 +84,10 @@ export async function runPhase2Scope(input: Phase2Input): Promise<Phase2Output> 
       // Debug logging removed - use observability tracing via storeTraceData instead
 
       // TIER 1: PREPROCESSING (before UnifiedRegenerator)
-      let preprocessedOutput = rawOutput;
+      // Extract JSON from markdown code blocks + strip thinking tags
+      let preprocessedOutput = extractJSON(rawOutput);
       try {
-        const parsedRaw = JSON.parse(rawOutput) as Record<string, unknown>;
+        const parsedRaw = JSON.parse(preprocessedOutput) as Record<string, unknown>;
         const recommendedStructure = parsedRaw.recommended_structure as
           | Record<string, unknown>
           | undefined;

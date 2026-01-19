@@ -216,45 +216,30 @@ function normalizeCourseCategory(data: Record<string, unknown>): Record<string, 
 }
 
 /**
- * Normalize contextual_language structure
+ * Normalize contextual_language structure (DEPRECATED - no longer generated)
+ *
+ * This field is now optional and will be omitted from new analysis results.
+ * Legacy data may still have this field, which we preserve if present.
  */
 function normalizeContextualLanguage(data: Record<string, unknown>): Record<string, unknown> {
-  let langData = data.contextual_language;
+  const langData = data.contextual_language;
 
-  if (!langData || typeof langData !== 'object' || Array.isArray(langData)) {
-    // Try to construct from flat fields
-    langData = {
-      why_matters_context:
-        data.why_matters_context ||
-        data.why_matters ||
-        'This knowledge will transform your approach and open new possibilities.',
-      motivators:
-        data.motivators ||
-        data.motivation ||
-        'Master practical skills that create immediate value in your work and life.',
-      experience_prompt:
-        data.experience_prompt ||
-        data.experience ||
-        'Think about situations where this knowledge would have helped you succeed.',
-      problem_statement_context:
-        data.problem_statement_context ||
-        data.problem_statement ||
-        'Many people struggle with this topic without proper guidance.',
-      knowledge_bridge:
-        data.knowledge_bridge ||
-        data.bridge ||
-        'Build on what you already know to achieve deeper understanding.',
-      practical_benefit_focus:
-        data.practical_benefit_focus ||
-        data.practical_benefit ||
-        'Apply these concepts immediately to see tangible results.',
-    };
-    logger.info('Constructed contextual_language from flat fields or defaults');
+  // If contextual_language is missing, skip it (it's now optional)
+  if (!langData) {
+    logger.debug('contextual_language not present (expected - field is deprecated)');
+    return data;
+  }
+
+  // If present but not an object, skip it (invalid structure)
+  if (typeof langData !== 'object' || Array.isArray(langData)) {
+    logger.warn('contextual_language present but invalid structure, removing it');
+    delete data.contextual_language;
+    return data;
   }
 
   const langObj = langData as Record<string, unknown>;
 
-  // Ensure all required fields exist with minimum content
+  // Validate existing structure (for legacy data)
   const requiredFields = [
     'why_matters_context',
     'motivators',
@@ -264,22 +249,23 @@ function normalizeContextualLanguage(data: Record<string, unknown>): Record<stri
     'practical_benefit_focus',
   ];
 
-  const defaultMessages: Record<string, string> = {
-    why_matters_context: 'This knowledge will transform your approach and open new possibilities.',
-    motivators: 'Master practical skills that create immediate value in your work and life.',
-    experience_prompt: 'Think about situations where this knowledge would have helped you succeed.',
-    problem_statement_context: 'Many people struggle with this topic without proper guidance.',
-    knowledge_bridge: 'Build on what you already know to achieve deeper understanding.',
-    practical_benefit_focus: 'Apply these concepts immediately to see tangible results.',
-  };
-
+  let hasAllFields = true;
   for (const field of requiredFields) {
-    if (typeof langObj[field] !== 'string' || langObj[field].length < 50) {
-      langObj[field] = defaultMessages[field];
+    if (typeof langObj[field] !== 'string' || langObj[field].length < 10) {
+      hasAllFields = false;
+      break;
     }
   }
 
-  data.contextual_language = langObj;
+  // If legacy data is incomplete, remove it
+  if (!hasAllFields) {
+    logger.info('Legacy contextual_language incomplete, removing field');
+    delete data.contextual_language;
+  } else {
+    logger.debug('Preserving legacy contextual_language data');
+    data.contextual_language = langObj;
+  }
+
   return data;
 }
 
@@ -523,9 +509,8 @@ export function quickValidatePhase1Structure(data: Record<string, unknown>): str
     if (!topic.determined_topic) errors.push('Missing topic_analysis.determined_topic');
   }
 
-  if (!data.contextual_language || typeof data.contextual_language !== 'object') {
-    errors.push('Missing or invalid contextual_language');
-  }
+  // contextual_language is now optional (deprecated field)
+  // Skip validation for this field
 
   if (!data.pedagogical_patterns || typeof data.pedagogical_patterns !== 'object') {
     errors.push('Missing or invalid pedagogical_patterns');
