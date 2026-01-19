@@ -311,6 +311,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.28.11] - 2026-01-19
+
+### Added
+
+- **course-gen-platform**: add 1 source file(s), update 2 source file(s) (4a72f07)
+
+### Fixed
+
+- **stage4**: respect course_size constraints for MICRO/MINI/COMPACT (mc2-usg3) (299c5b3)
+- **pipeline**: comprehensive Stage 5 retry and placeholder handling (9ced45b)
+
+### Other
+
+- bd sync: 2026-01-19 13:38:09 (e61aa86)
+- bd sync: 2026-01-19 13:35:18 (0bafd9a)
+- bd sync: 2026-01-19 13:25:26 (9f3a586)
+- bd sync: 2026-01-19 13:21:02 (0c4388c)
+
 ## [0.28.10] - 2026-01-19
 
 ### Added

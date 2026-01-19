@@ -2,6 +2,23 @@
 
 _Released on 2025-12-26_
 
+## v0.28.11
+
+_Released on 2026-01-19_
+
+### ✨ New Features
+
+- **course-gen-platform**: Add 1 source file(s), update 2 source file(s)
+
+### 🐛 Bug Fixes
+
+- **stage4**: Respect course_size constraints for MICRO/MINI/COMPACT (mc2-usg3)
+- **pipeline**: Comprehensive Stage 5 retry and placeholder handling
+
+---
+
+_This release was automatically generated from 7 commits._
+
 ## v0.28.10
 
 _Released on 2026-01-19_
