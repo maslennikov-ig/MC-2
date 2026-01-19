@@ -9,11 +9,10 @@ import { protectedProcedure } from '../../../middleware/auth';
 import { createRateLimiter } from '../../../middleware/rate-limit.js';
 import { startStage6InputSchema } from '../schemas';
 import { verifyCourseAccess } from '../helpers';
-import { addJob } from '../../../../orchestrator/queue';
-import { JobType } from '@megacampus/shared-types';
-import type { LessonContentJobData, CourseStyle } from '@megacampus/shared-types';
+import { createStage6Queue } from '../../../../stages/stage6-lesson-content/factory';
+import type { Stage6JobInput } from '../../../../stages/stage6-lesson-content/types';
+import type { CourseStyle } from '@megacampus/shared-types';
 import { logger } from '../../../../shared/logger/index.js';
-import { validateLocale } from '@/shared/validation';
 
 /**
  * Start Stage 6 generation for a course
@@ -85,33 +84,30 @@ export const startStage6 = protectedProcedure
         requestId
       );
 
-      // Step 2: Enqueue all lessons using addJob with deduplication
+      // Step 2: Enqueue all lessons using dedicated Stage 6 queue (30 concurrent workers)
+      // @see docs/plans/sprightly-wondering-widget.md for architecture details
+      const stage6Queue = createStage6Queue();
+
       const jobs = await Promise.all(
         lessonSpecs.map(spec => {
-          const jobData: LessonContentJobData = {
-            organizationId: currentUser.organizationId,
-            courseId,
-            userId: currentUser.id,
-            jobType: JobType.LESSON_CONTENT,
-            createdAt: new Date().toISOString(),
+          const jobData: Stage6JobInput = {
             lessonSpec: spec,
-            ragChunks: [], // Deprecated: RAG chunks are now fetched by handler via retrieveLessonContext()
+            courseId,
+            language: course.language,
+            style: (course.style as CourseStyle | null) ?? undefined,
+            // RAG chunks fetched by handler via retrieveLessonContext()
+            ragChunks: [],
             ragContextId: null,
-            language: course.language, // Pass course language for content generation
-            locale: validateLocale(course.language),
-            style: (course.style as CourseStyle | null) ?? undefined, // Pass course style for content generation
           };
 
           // Deterministic job ID for deduplication
           // Format: stage6:{courseId}:{lessonId}
+          const jobName = `lesson:${spec.lesson_id}`;
           const deduplicationId = `stage6:${courseId}:${spec.lesson_id}`;
 
-          return addJob(JobType.LESSON_CONTENT, jobData, {
+          return stage6Queue.add(jobName, jobData, {
             priority,
-            deduplication: {
-              id: deduplicationId,
-              ttl: 150000, // 2.5 minutes - half of job timeout to allow faster retries
-            },
+            jobId: deduplicationId, // BullMQ uses jobId for deduplication
           });
         })
       );
