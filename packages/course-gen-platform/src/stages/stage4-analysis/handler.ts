@@ -690,7 +690,6 @@ class Stage4AnalysisHandler {
             total_sections: analysisResult.recommended_structure.total_sections,
             estimated_hours: analysisResult.recommended_structure.estimated_content_hours,
             category: analysisResult.course_category.primary,
-            teaching_style: analysisResult.pedagogical_strategy.teaching_style,
             research_flags: analysisResult.research_flags.length,
             expansion_areas: analysisResult.expansion_areas?.length || 0,
             total_cost_usd: analysisResult.metadata.total_cost_usd,

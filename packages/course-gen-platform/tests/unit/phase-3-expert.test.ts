@@ -6,7 +6,10 @@
  */
 
 import { describe, it, expect, vi } from 'vitest';
-import type { Phase3Input, Phase3Output } from '../../src/orchestrator/services/analysis/phase-3-expert';
+import type {
+  Phase3Input,
+  Phase3Output,
+} from '../../src/orchestrator/services/analysis/phase-3-expert';
 
 describe('Phase 3: Deep Expert Analysis', () => {
   // Mock inputs for testing
@@ -79,12 +82,9 @@ describe('Phase 3: Deep Expert Analysis', () => {
       // This is a structural test - actual LLM call would be mocked in integration tests
       const mockOutput: Phase3Output = {
         pedagogical_strategy: {
-          teaching_style: 'hands-on',
           assessment_approach: 'Progressive exercises after each hook introduction',
-          practical_focus: 'high',
           progression_logic:
             'Start with simple hooks (useState), progress to complex patterns (custom hooks), end with optimization',
-          interactivity_level: 'high',
         },
         expansion_areas: [
           {
@@ -104,24 +104,16 @@ describe('Phase 3: Deep Expert Analysis', () => {
         },
       };
 
-      expect(mockOutput.pedagogical_strategy.teaching_style).toBe('hands-on');
-      expect(mockOutput.pedagogical_strategy.assessment_approach.length).toBeGreaterThanOrEqual(
-        50
-      );
-      expect(mockOutput.pedagogical_strategy.progression_logic.length).toBeGreaterThanOrEqual(
-        100
-      );
+      expect(mockOutput.pedagogical_strategy.assessment_approach.length).toBeGreaterThanOrEqual(50);
+      expect(mockOutput.pedagogical_strategy.progression_logic.length).toBeGreaterThanOrEqual(100);
     });
 
     it('should allow null expansion_areas when completeness is high', () => {
       const mockOutput: Phase3Output = {
         pedagogical_strategy: {
-          teaching_style: 'mixed',
-          assessment_approach: 'Quizzes and final project',
-          practical_focus: 'medium',
+          assessment_approach: 'Quizzes and final project with continuous reinforcement',
           progression_logic:
             'Balanced progression from fundamentals to advanced topics with continuous reinforcement',
-          interactivity_level: 'medium',
         },
         expansion_areas: null, // High completeness (≥80%)
         research_flags: [],
@@ -140,11 +132,8 @@ describe('Phase 3: Deep Expert Analysis', () => {
     it('should support research flags with required fields', () => {
       const mockOutput: Phase3Output = {
         pedagogical_strategy: {
-          teaching_style: 'theory-first',
-          assessment_approach: 'Written tests and code reviews',
-          practical_focus: 'low',
+          assessment_approach: 'Written tests and code reviews with deep conceptual understanding',
           progression_logic: 'Deep conceptual understanding before practical application',
-          interactivity_level: 'low',
         },
         expansion_areas: null,
         research_flags: [
@@ -178,12 +167,9 @@ describe('Phase 3: Deep Expert Analysis', () => {
 
       const mockOutput: Phase3Output = {
         pedagogical_strategy: {
-          teaching_style: 'project-based',
-          assessment_approach: 'Build complete application as final project',
-          practical_focus: 'high',
-          progression_logic:
-            'Learn by building - each lesson adds new feature to growing project',
-          interactivity_level: 'high',
+          assessment_approach:
+            'Build complete application as final project with incremental features',
+          progression_logic: 'Learn by building - each lesson adds new feature to growing project',
         },
         expansion_areas: null,
         research_flags: [],
@@ -205,7 +191,8 @@ describe('Phase 3: Deep Expert Analysis', () => {
       const legalFlag = {
         topic: 'Постановление 1875',
         reason: 'regulation_updates',
-        context: 'Russian procurement law subject to frequent amendments and requires current version',
+        context:
+          'Russian procurement law subject to frequent amendments and requires current version',
       };
 
       expect(legalFlag.context.length).toBeGreaterThanOrEqual(50);
@@ -222,7 +209,7 @@ describe('Phase 3: Deep Expert Analysis', () => {
       ];
 
       // These should result in research_flags: []
-      timelessTopics.forEach((topic) => {
+      timelessTopics.forEach(topic => {
         expect(topic).toBeTruthy(); // Just verify topics exist
         // In actual implementation, LLM would return [] for these
       });

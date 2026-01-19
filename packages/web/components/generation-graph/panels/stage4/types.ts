@@ -179,7 +179,6 @@ export interface AnalysisHeroProps {
   totalLessons: number
   totalSections: number
   lessonDuration: number
-  teachingStyle: string
   writingStyle?: string | null
   locale?: 'ru' | 'en'
 }

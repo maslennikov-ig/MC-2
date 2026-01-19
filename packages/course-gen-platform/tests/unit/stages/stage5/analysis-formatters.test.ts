@@ -70,11 +70,8 @@ function createMockAnalysisResult(overrides?: Partial<AnalysisResult>): Analysis
       sections_breakdown: [],
     },
     pedagogical_strategy: {
-      teaching_style: 'hands-on',
       assessment_approach: 'Project-based assessments with practical coding exercises',
-      practical_focus: 'high',
       progression_logic: 'Start with fundamentals and build incrementally to complex patterns',
-      interactivity_level: 'high',
     },
     pedagogical_patterns: {
       primary_strategy: 'problem-based learning',
@@ -172,7 +169,7 @@ describe('formatCourseCategoryForPrompt', () => {
   it('should handle hobby category', () => {
     const category = {
       primary: 'hobby' as const,
-      confidence: 0.90,
+      confidence: 0.9,
       reasoning: 'Leisure activity learning',
       secondary: null,
     };
@@ -267,7 +264,7 @@ describe('formatCourseCategoryForPrompt', () => {
   it('should capitalize first letter of category', () => {
     const category = {
       primary: 'hobby' as const,
-      confidence: 0.90,
+      confidence: 0.9,
       reasoning: 'Test',
       secondary: 'creative' as const,
     };
@@ -472,143 +469,28 @@ describe('formatContextualLanguageForPrompt', () => {
 // ===========================
 
 describe('formatPedagogicalStrategyForPrompt', () => {
-  it('should format all 5 fields with headers', () => {
+  it('should format all 2 fields with headers', () => {
     const strategy: AnalysisResult['pedagogical_strategy'] = {
-      teaching_style: 'hands-on',
       assessment_approach: 'Project-based with coding challenges',
-      practical_focus: 'high',
       progression_logic: 'Start simple and build complexity',
-      interactivity_level: 'high',
     };
 
     const result = formatPedagogicalStrategyForPrompt(strategy);
 
-    expect(result).toContain('Teaching Style: hands-on');
     expect(result).toContain('Assessment Approach: Project-based with coding challenges');
-    expect(result).toContain('Practical Focus: high');
     expect(result).toContain('Progression Logic: Start simple and build complexity');
-    expect(result).toContain('Interactivity Level: high');
-  });
-
-  it('should handle hands-on teaching style', () => {
-    const strategy: AnalysisResult['pedagogical_strategy'] = {
-      teaching_style: 'hands-on',
-      assessment_approach: 'Test',
-      practical_focus: 'high',
-      progression_logic: 'Test',
-      interactivity_level: 'high',
-    };
-
-    const result = formatPedagogicalStrategyForPrompt(strategy);
-    expect(result).toContain('Teaching Style: hands-on');
-  });
-
-  it('should handle theory-first teaching style', () => {
-    const strategy: AnalysisResult['pedagogical_strategy'] = {
-      teaching_style: 'theory-first',
-      assessment_approach: 'Test',
-      practical_focus: 'low',
-      progression_logic: 'Test',
-      interactivity_level: 'medium',
-    };
-
-    const result = formatPedagogicalStrategyForPrompt(strategy);
-    expect(result).toContain('Teaching Style: theory-first');
-  });
-
-  it('should handle project-based teaching style', () => {
-    const strategy: AnalysisResult['pedagogical_strategy'] = {
-      teaching_style: 'project-based',
-      assessment_approach: 'Test',
-      practical_focus: 'high',
-      progression_logic: 'Test',
-      interactivity_level: 'high',
-    };
-
-    const result = formatPedagogicalStrategyForPrompt(strategy);
-    expect(result).toContain('Teaching Style: project-based');
-  });
-
-  it('should handle mixed teaching style', () => {
-    const strategy: AnalysisResult['pedagogical_strategy'] = {
-      teaching_style: 'mixed',
-      assessment_approach: 'Test',
-      practical_focus: 'medium',
-      progression_logic: 'Test',
-      interactivity_level: 'medium',
-    };
-
-    const result = formatPedagogicalStrategyForPrompt(strategy);
-    expect(result).toContain('Teaching Style: mixed');
-  });
-
-  it('should format practical focus levels (high/medium/low)', () => {
-    const highFocus: AnalysisResult['pedagogical_strategy'] = {
-      teaching_style: 'hands-on',
-      assessment_approach: 'Test',
-      practical_focus: 'high',
-      progression_logic: 'Test',
-      interactivity_level: 'high',
-    };
-
-    const mediumFocus: AnalysisResult['pedagogical_strategy'] = {
-      ...highFocus,
-      practical_focus: 'medium',
-    };
-
-    const lowFocus: AnalysisResult['pedagogical_strategy'] = {
-      ...highFocus,
-      practical_focus: 'low',
-    };
-
-    expect(formatPedagogicalStrategyForPrompt(highFocus)).toContain('Practical Focus: high');
-    expect(formatPedagogicalStrategyForPrompt(mediumFocus)).toContain('Practical Focus: medium');
-    expect(formatPedagogicalStrategyForPrompt(lowFocus)).toContain('Practical Focus: low');
-  });
-
-  it('should format interactivity levels (high/medium/low)', () => {
-    const highInteractivity: AnalysisResult['pedagogical_strategy'] = {
-      teaching_style: 'hands-on',
-      assessment_approach: 'Test',
-      practical_focus: 'high',
-      progression_logic: 'Test',
-      interactivity_level: 'high',
-    };
-
-    const mediumInteractivity: AnalysisResult['pedagogical_strategy'] = {
-      ...highInteractivity,
-      interactivity_level: 'medium',
-    };
-
-    const lowInteractivity: AnalysisResult['pedagogical_strategy'] = {
-      ...highInteractivity,
-      interactivity_level: 'low',
-    };
-
-    expect(formatPedagogicalStrategyForPrompt(highInteractivity)).toContain(
-      'Interactivity Level: high'
-    );
-    expect(formatPedagogicalStrategyForPrompt(mediumInteractivity)).toContain(
-      'Interactivity Level: medium'
-    );
-    expect(formatPedagogicalStrategyForPrompt(lowInteractivity)).toContain(
-      'Interactivity Level: low'
-    );
   });
 
   it('should preserve line breaks between fields', () => {
     const strategy: AnalysisResult['pedagogical_strategy'] = {
-      teaching_style: 'hands-on',
-      assessment_approach: 'Test',
-      practical_focus: 'high',
-      progression_logic: 'Test',
-      interactivity_level: 'high',
+      assessment_approach: 'Test assessment approach',
+      progression_logic: 'Test progression logic',
     };
 
     const result = formatPedagogicalStrategyForPrompt(strategy);
     const lines = result.split('\n');
 
-    expect(lines).toHaveLength(5);
+    expect(lines).toHaveLength(2);
   });
 });
 

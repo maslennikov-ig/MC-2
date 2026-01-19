@@ -13,7 +13,6 @@ import {
   GraduationCap,
   BookOpen,
   Clock,
-  Layers,
   Loader2,
   Pen,
 } from 'lucide-react'
@@ -79,7 +78,6 @@ const AnalysisHero = memo<AnalysisHeroProps>(function AnalysisHero({
   totalLessons,
   totalSections: _totalSections, // Available for future use (e.g., modules count display)
   lessonDuration,
-  teachingStyle,
   writingStyle,
   locale = 'ru',
 }) {
@@ -92,13 +90,6 @@ const AnalysisHero = memo<AnalysisHeroProps>(function AnalysisHero({
   // Get translated category name
   const categoryTranslationKey = `category${category.charAt(0).toUpperCase()}${category.slice(1)}`
   const categoryName = t[categoryTranslationKey]?.[locale] ?? category
-
-  // Get translated teaching style
-  const styleKey = `style${teachingStyle
-    .split('-')
-    .map((s) => s.charAt(0).toUpperCase() + s.slice(1))
-    .join('')}`
-  const styleName = t[styleKey]?.[locale] ?? teachingStyle
 
   // Calculate approximate total duration in hours
   const totalMinutes = totalLessons * lessonDuration
@@ -149,7 +140,7 @@ const AnalysisHero = memo<AnalysisHeroProps>(function AnalysisHero({
           </div>
 
           {/* Right: Stats Grid */}
-          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4 sm:gap-6">
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 sm:gap-6">
             {/* Lessons */}
             <div className="flex items-center gap-2">
               <BookOpen className="h-4 w-4 shrink-0 text-violet-500 dark:text-violet-400" />
@@ -172,22 +163,6 @@ const AnalysisHero = memo<AnalysisHeroProps>(function AnalysisHero({
                 </div>
                 <div className="truncate text-xs text-slate-500 dark:text-slate-400">
                   {t.durationLabel?.[locale] ?? 'Duration'}
-                </div>
-              </div>
-            </div>
-
-            {/* Teaching Style */}
-            <div className="flex items-center gap-2">
-              <Layers className="h-4 w-4 shrink-0 text-violet-500 dark:text-violet-400" />
-              <div className="min-w-0">
-                <div
-                  className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100"
-                  title={styleName}
-                >
-                  {styleName}
-                </div>
-                <div className="truncate text-xs text-slate-500 dark:text-slate-400">
-                  {t.teachingStyle?.[locale] ?? 'Стиль'}
                 </div>
               </div>
             </div>
@@ -264,8 +239,7 @@ export const Stage4OutputTab = memo<Stage4OutputTabProps>(function Stage4OutputT
       typeof analysisResult.course_category?.confidence !== 'number' ||
       !analysisResult.recommended_structure?.total_lessons ||
       !analysisResult.recommended_structure?.total_sections ||
-      !analysisResult.recommended_structure?.lesson_duration_minutes ||
-      !analysisResult.pedagogical_strategy?.teaching_style
+      !analysisResult.recommended_structure?.lesson_duration_minutes
     ) {
       return null
     }
@@ -276,7 +250,6 @@ export const Stage4OutputTab = memo<Stage4OutputTabProps>(function Stage4OutputT
       totalLessons: analysisResult.recommended_structure.total_lessons,
       totalSections: analysisResult.recommended_structure.total_sections,
       lessonDuration: analysisResult.recommended_structure.lesson_duration_minutes,
-      teachingStyle: analysisResult.pedagogical_strategy.teaching_style,
     }
   }, [analysisResult])
 
@@ -302,7 +275,6 @@ export const Stage4OutputTab = memo<Stage4OutputTabProps>(function Stage4OutputT
           totalLessons={heroData.totalLessons}
           totalSections={heroData.totalSections}
           lessonDuration={heroData.lessonDuration}
-          teachingStyle={heroData.teachingStyle}
           writingStyle={writingStyle}
           locale={locale}
         />

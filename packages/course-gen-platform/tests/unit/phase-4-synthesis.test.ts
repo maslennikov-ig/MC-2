@@ -67,13 +67,7 @@ describe('Phase 4: Document Synthesis', () => {
             reasoning: 'Well-defined topic with clear scope and learning path',
             target_audience: 'intermediate',
             missing_elements: null,
-            key_concepts: [
-              'useState',
-              'useEffect',
-              'useContext',
-              'custom hooks',
-              'hook rules',
-            ],
+            key_concepts: ['useState', 'useEffect', 'useContext', 'custom hooks', 'hook rules'],
             domain_keywords: [
               'React',
               'hooks',
@@ -108,27 +102,16 @@ describe('Phase 4: Document Synthesis', () => {
                 area: 'Introduction to Hooks',
                 estimated_lessons: 10,
                 importance: 'core',
-                learning_objectives: [
-                  'Understand Hooks motivation',
-                  'Learn Hook rules',
-                ],
-                key_topics: [
-                  'Class vs functional components',
-                  'Hook rules',
-                  'useState basics',
-                ],
-                pedagogical_approach:
-                  'Start with theory, then hands-on examples',
+                learning_objectives: ['Understand Hooks motivation', 'Learn Hook rules'],
+                key_topics: ['Class vs functional components', 'Hook rules', 'useState basics'],
+                pedagogical_approach: 'Start with theory, then hands-on examples',
                 difficulty_progression: 'gradual',
               },
               {
                 area: 'State Management with Hooks',
                 estimated_lessons: 20,
                 importance: 'core',
-                learning_objectives: [
-                  'Master useState',
-                  'Handle complex state',
-                ],
+                learning_objectives: ['Master useState', 'Handle complex state'],
                 key_topics: [
                   'useState',
                   'state updates',
@@ -142,10 +125,7 @@ describe('Phase 4: Document Synthesis', () => {
                 area: 'Side Effects with useEffect',
                 estimated_lessons: 20,
                 importance: 'core',
-                learning_objectives: [
-                  'Understand useEffect',
-                  'Handle cleanup',
-                ],
+                learning_objectives: ['Understand useEffect', 'Handle cleanup'],
                 key_topics: [
                   'useEffect basics',
                   'dependency arrays',
@@ -167,13 +147,9 @@ describe('Phase 4: Document Synthesis', () => {
         },
         phase3_output: {
           pedagogical_strategy: {
-            teaching_style: 'hands-on',
-            assessment_approach:
-              'Code exercises after each concept, mini-projects at section ends',
-            practical_focus: 'high',
+            assessment_approach: 'Code exercises after each concept, mini-projects at section ends',
             progression_logic:
               'Start with simple useState, build to complex useEffect patterns, culminate in custom hooks',
-            interactivity_level: 'high',
           },
           expansion_areas: null,
           research_flags: [],
@@ -189,15 +165,11 @@ describe('Phase 4: Document Synthesis', () => {
 
       // Type checking should pass
       expect(validInput.course_id).toBeDefined();
-      expect(validInput.phase1_output.course_category.primary).toBe(
-        'professional'
+      expect(validInput.phase1_output.course_category.primary).toBe('professional');
+      expect(validInput.phase2_output.recommended_structure.total_lessons).toBe(96);
+      expect(validInput.phase3_output.pedagogical_strategy.assessment_approach).toContain(
+        'Code exercises'
       );
-      expect(validInput.phase2_output.recommended_structure.total_lessons).toBe(
-        96
-      );
-      expect(
-        validInput.phase3_output.pedagogical_strategy.teaching_style
-      ).toBe('hands-on');
     });
   });
 });

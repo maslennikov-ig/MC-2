@@ -121,11 +121,8 @@ Practical Benefit Focus: ${contextual.practical_benefit_focus}`;
 export function formatPedagogicalStrategyForPrompt(
   strategy: AnalysisResult['pedagogical_strategy']
 ): string {
-  return `Teaching Style: ${strategy.teaching_style}
-Assessment Approach: ${strategy.assessment_approach}
-Practical Focus: ${strategy.practical_focus}
-Progression Logic: ${strategy.progression_logic}
-Interactivity Level: ${strategy.interactivity_level}`;
+  return `Assessment Approach: ${strategy.assessment_approach}
+Progression Logic: ${strategy.progression_logic}`;
 }
 
 /**

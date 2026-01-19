@@ -64,12 +64,10 @@ export interface AnalysisResult {
   };
 
   // Pedagogical strategy (Phase 3)
+  // Note: teaching_style, practical_focus, interactivity_level removed to avoid conflict with user-selected style
   pedagogical_strategy: {
-    teaching_style: 'hands-on' | 'theory-first' | 'project-based' | 'mixed';
-    assessment_approach: string; // 50-200 chars
-    practical_focus: 'high' | 'medium' | 'low';
-    progression_logic: string; // 100-500 chars
-    interactivity_level: 'high' | 'medium' | 'low';
+    assessment_approach: string; // 50+ chars - how learners demonstrate understanding
+    progression_logic: string; // 100+ chars - how difficulty increases across lessons
   };
 
   // NEW: Pedagogical patterns for Generation quality (Analyze Enhancement) - REQUIRED
@@ -287,11 +285,8 @@ export interface Phase2Output {
  */
 export interface Phase3Output {
   pedagogical_strategy: {
-    teaching_style: 'hands-on' | 'theory-first' | 'project-based' | 'mixed';
-    assessment_approach: string;
-    practical_focus: 'high' | 'medium' | 'low';
-    progression_logic: string;
-    interactivity_level: 'high' | 'medium' | 'low';
+    assessment_approach: string; // 50+ chars
+    progression_logic: string; // 100+ chars
   };
   expansion_areas: ExpansionArea[] | null;
   research_flags: ResearchFlag[];

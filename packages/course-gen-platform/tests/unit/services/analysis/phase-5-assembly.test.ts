@@ -94,11 +94,9 @@ function createMockPhase2Output(): Phase2Output {
 function createMockPhase3Output(): Phase3Output {
   return {
     pedagogical_strategy: {
-      teaching_style: 'mixed',
-      assessment_approach: 'Test assessment approach',
-      practical_focus: 'high',
-      progression_logic: 'Test progression logic explanation',
-      interactivity_level: 'high',
+      assessment_approach: 'Test assessment approach with multiple methods',
+      progression_logic:
+        'Test progression logic explanation with detailed steps for building knowledge incrementally',
     },
     expansion_areas: [
       {
@@ -137,7 +135,7 @@ function createMockPhase4Output(): Phase4Output {
       duration_ms: 7000,
       model_used: 'openai/gpt-oss-20b',
       tokens: { input: 700, output: 500, total: 1200 },
-      quality_score: 0.80,
+      quality_score: 0.8,
       retry_count: 0,
       document_count: 2,
     },
@@ -165,9 +163,7 @@ describe('Phase 5 Assembly Service', () => {
 
     // Validate structure from Phase 1
     expect(result.course_category.primary).toBe('professional');
-    expect(result.contextual_language.why_matters_context).toBe(
-      'Test why matters context'
-    );
+    expect(result.contextual_language.why_matters_context).toBe('Test why matters context');
     expect(result.topic_analysis.determined_topic).toBe('Test Topic');
 
     // Validate structure from Phase 2
@@ -175,7 +171,7 @@ describe('Phase 5 Assembly Service', () => {
     expect(result.recommended_structure.total_sections).toBe(4);
 
     // Validate structure from Phase 3
-    expect(result.pedagogical_strategy.teaching_style).toBe('mixed');
+    expect(result.pedagogical_strategy.assessment_approach).toContain('assessment approach');
     expect(result.expansion_areas).toHaveLength(1);
     expect(result.research_flags).toHaveLength(1);
 
@@ -219,9 +215,7 @@ describe('Phase 5 Assembly Service', () => {
       total_cost_usd: 0.12,
     };
 
-    await expect(assembleAnalysisResult(input)).rejects.toThrow(
-      'Phase 1 output is missing'
-    );
+    await expect(assembleAnalysisResult(input)).rejects.toThrow('Phase 1 output is missing');
   });
 
   it('should throw error if total_lessons < 10 (defensive validation)', async () => {
@@ -267,9 +261,7 @@ describe('Phase 5 Assembly Service', () => {
       total_cost_usd: 0.15,
     };
 
-    await expect(assembleAnalysisResult(input)).rejects.toThrow(
-      'scope_instructions too short'
-    );
+    await expect(assembleAnalysisResult(input)).rejects.toThrow('scope_instructions too short');
   });
 
   it('should handle empty research_flags array', async () => {
