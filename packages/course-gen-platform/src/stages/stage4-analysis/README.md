@@ -47,12 +47,14 @@ AnalysisResult -> courses.analysis_result
 ## Phases
 
 ### Phase 1: Classifier
+
 **File:** `phases/phase-1-classifier.ts`
 **Model:** Configured via database (llm_model_config table)
 
 **Purpose:** Categorize course and generate contextual language elements.
 
 **Output:**
+
 - `course_category`: Primary/secondary categories (e.g., "programming/theory")
 - `contextual_language`: Pedagogical context elements:
   - `why_matters_context`: Motivation framing
@@ -67,12 +69,14 @@ AnalysisResult -> courses.analysis_result
 ---
 
 ### Phase 2: Scope
+
 **File:** `phases/phase-2-scope.ts`
 **Model:** Configured via database (llm_model_config table)
 
 **Purpose:** Define course structure and content distribution.
 
 **Output:**
+
 - `recommended_structure`:
   - `total_lessons`: Number of lessons (minimum 10, enforced)
   - `total_sections`: Number of sections
@@ -86,22 +90,24 @@ AnalysisResult -> courses.analysis_result
     - `prerequisites`: Dependency chain
 
 **Validation:**
+
 - Minimum 10 total lessons (FR-015)
 - Circular dependency detection in prerequisites
 
 ---
 
 ### Phase 3: Expert
+
 **File:** `phases/phase-3-expert.ts`
 **Model:** Configured via database (llm_model_config table)
 
 **Purpose:** Generate pedagogical strategy and identify knowledge gaps.
 
 **Output:**
+
 - `pedagogical_strategy`:
-  - `teaching_style`: "hands_on" | "conceptual" | "project_based" | "lecture_based"
-  - `practical_focus`: "high" | "medium" | "low"
-  - `progression_logic`: Learning path rationale
+  - `assessment_approach`: How learners demonstrate understanding (min 50 chars)
+  - `progression_logic`: Learning path rationale (min 100 chars)
 - `expansion_areas`: Topics for optional deep-dives
 - `research_flags[]`: Topics requiring external research
   - `topic`: Research topic
@@ -111,12 +117,14 @@ AnalysisResult -> courses.analysis_result
 ---
 
 ### Phase 4: Synthesis
+
 **File:** `phases/phase-4-synthesis.ts`
 **Model:** Configured via database (supports tier-based selection)
 
 **Purpose:** Synthesize all analysis into generation instructions.
 
 **Output:**
+
 - `generation_guidance`:
   - `tone`: "conversational but precise" | "formal academic" | "casual friendly" | "technical professional"
   - `use_analogies`: Boolean flag
@@ -129,6 +137,7 @@ AnalysisResult -> courses.analysis_result
 - `content_strategy`: "create_from_scratch" | "expand_and_enhance" | "optimize_existing"
 
 **Strategy Selection:**
+
 - <3 documents: "create_from_scratch"
 - 3-10 documents: "expand_and_enhance"
 - 10+ documents: "optimize_existing"
@@ -136,12 +145,14 @@ AnalysisResult -> courses.analysis_result
 ---
 
 ### Phase 5: Assembly
+
 **File:** `phases/phase-5-assembly.ts`
 **Model:** None (pure logic, no LLM)
 
 **Purpose:** Combine all phase outputs into validated `AnalysisResult`.
 
 **Operations:**
+
 1. Validate all required phase outputs present
 2. Sanitize LLM-generated text (XSS prevention with DOMPurify)
 3. Calculate cumulative metadata (tokens, cost, duration)
@@ -149,12 +160,14 @@ AnalysisResult -> courses.analysis_result
 5. Validate optional fields (pedagogical_patterns, generation_guidance)
 
 **Security:**
+
 - All LLM-generated text sanitized before storage
 - Prevents XSS attacks in frontend display
 
 ---
 
 ### Phase 6: RAG Planning
+
 **File:** `phases/phase-6-rag-planning.ts`
 **Model:** Configured via database (llm_model_config table)
 **Condition:** Only runs if documents exist
@@ -162,6 +175,7 @@ AnalysisResult -> courses.analysis_result
 **Purpose:** Pre-map documents to sections for efficient RAG in Stage 5.
 
 **Output:**
+
 - `document_relevance_mapping`:
   - Per section:
     - `primary_documents`: Relevant document IDs
@@ -170,6 +184,7 @@ AnalysisResult -> courses.analysis_result
     - `document_processing_methods`: "full_text" | "hierarchical" per doc
 
 **Cost Optimization:**
+
 - Enables SMART mode in Stage 5 (45x cost savings)
 - Pre-computed mapping eliminates runtime Planning LLM calls
 - Targeted RAG queries only relevant documents per section
@@ -180,13 +195,14 @@ AnalysisResult -> courses.analysis_result
 
 ```typescript
 interface AnalysisJobInput {
-  course_id: string;              // UUID
-  organization_id: string;        // UUID
-  user_id: string;                // UUID
-  topic: string;                  // Course topic
-  language: string;               // ISO 639-1 code
-  answers?: string | null;        // User requirements
-  document_summaries?: Array<{    // From Stage 3
+  course_id: string; // UUID
+  organization_id: string; // UUID
+  user_id: string; // UUID
+  topic: string; // Course topic
+  language: string; // ISO 639-1 code
+  answers?: string | null; // User requirements
+  document_summaries?: Array<{
+    // From Stage 3
     document_id: string;
     file_name: string;
     processed_content: string;
@@ -248,10 +264,12 @@ interface AnalysisResult {
 ## Dependencies
 
 ### External Services
+
 - **OpenRouter API:** LLM completion (models configured via database)
 - **Jina Embeddings:** Semantic validation (optional, Phase 6)
 
 ### Internal Modules
+
 - `shared/llm/langchain-models` - Model factory
 - `shared/regeneration/` - 5-layer JSON repair cascade
 - `shared/validation/preprocessing` - Enum field normalization
@@ -300,6 +318,7 @@ ANALYSIS_QUALITY_THRESHOLD=0.75
 
 All models are configured via database (`llm_model_config` table).
 Admin panel allows per-phase model selection with fallback hierarchy:
+
 1. Phase-specific config
 2. Global default config
 3. Hardcoded emergency fallback
@@ -309,9 +328,11 @@ Admin panel allows per-phase model selection with fallback hierarchy:
 ## Testing
 
 ### Unit Tests
+
 **Location:** `tests/unit/stages/stage4/`
 
 **Coverage:**
+
 - Each phase in isolation
 - JSON parsing and repair
 - Schema validation
@@ -319,20 +340,24 @@ Admin panel allows per-phase model selection with fallback hierarchy:
 - Field name fixes
 
 **Run:**
+
 ```bash
 pnpm test tests/unit/stages/stage4/
 ```
 
 ### Integration Tests
+
 **Location:** `tests/integration/`
 
 **Scenarios:**
+
 - Full 6-phase pipeline
 - Document count variations
 - Language handling
 - Error recovery paths
 
 **Run:**
+
 ```bash
 pnpm test tests/integration/stage4-*
 ```
@@ -342,24 +367,30 @@ pnpm test tests/integration/stage4-*
 ## Utility Functions
 
 ### Field Name Fix
+
 **File:** `utils/field-name-fix.ts`
 
 Normalizes common LLM field name variations:
-- `teaching-style` -> `teaching_style`
-- `practicalFocus` -> `practical_focus`
+
+- `assessmentApproach` -> `assessment_approach`
+- `progressionLogic` -> `progression_logic`
 
 ### Research Flag Detector
+
 **File:** `utils/research-flag-detector.ts`
 
 Detects topics requiring external research:
+
 - Rapidly evolving technologies (AI, blockchain)
 - Version-specific content (React 19, Python 3.12)
 - Current events and statistics
 
 ### Observability
+
 **File:** `utils/observability.ts`
 
 Tracks phase execution metrics:
+
 - Duration per phase
 - Token usage
 - Model selection
@@ -370,6 +401,7 @@ Tracks phase execution metrics:
 ## Output Language
 
 **Critical:** All analysis output is in **English only**, regardless of input language.
+
 - Target language stored separately in `courses.language`
 - Stage 5 reads language from database for final generation
 - Avoids duplication and ensures single source of truth
@@ -380,18 +412,19 @@ Tracks phase execution metrics:
 
 ### Average Analysis Costs
 
-| Document Count | Total Cost |
-|----------------|------------|
-| 0 docs | ~$0.02-0.05 |
-| 1-2 docs | ~$0.05-0.10 |
-| 3-10 docs | ~$0.10-0.25 |
-| 10+ docs | ~$0.25-0.50 |
+| Document Count | Total Cost  |
+| -------------- | ----------- |
+| 0 docs         | ~$0.02-0.05 |
+| 1-2 docs       | ~$0.05-0.10 |
+| 3-10 docs      | ~$0.10-0.25 |
+| 10+ docs       | ~$0.25-0.50 |
 
 ---
 
 ## Stage Completion
 
 On successful completion:
+
 1. `AnalysisResult` stored in `courses.analysis_result`
 2. Course status updated to `stage_4_complete`
 3. Stage 5 Generation job enqueued automatically

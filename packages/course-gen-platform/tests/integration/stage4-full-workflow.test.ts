@@ -103,8 +103,8 @@ async function waitForJobStateDB(
 
   throw new Error(
     `Timeout waiting for job ${jobId} to reach DB state(s): ${targetStates.join(', ')}. ` +
-    `Current state: ${actualState}. ` +
-    `This may indicate LLM processing is slow or worker is not running.`
+      `Current state: ${actualState}. ` +
+      `This may indicate LLM processing is slow or worker is not running.`
   );
 }
 
@@ -118,10 +118,7 @@ async function waitForJobStateDB(
  * @param timeout - Maximum wait time in milliseconds
  * @returns Course record with analysis_result
  */
-async function waitForAnalysisResult(
-  courseId: string,
-  timeout: number = 600000
-): Promise<any> {
+async function waitForAnalysisResult(courseId: string, timeout: number = 600000): Promise<any> {
   const supabase = getSupabaseAdmin();
   const startTime = Date.now();
 
@@ -147,7 +144,7 @@ async function waitForAnalysisResult(
 
   throw new Error(
     `Timeout waiting for analysis_result to be populated in course ${courseId}. ` +
-    `This may indicate Stage 4 analysis failed or worker is not running.`
+      `This may indicate Stage 4 analysis failed or worker is not running.`
   );
 }
 
@@ -364,7 +361,9 @@ describe('Stage 4: Full 5-Phase Analysis Workflow (Integration)', () => {
       console.log(`   Total Lessons: ${validated.recommended_structure.total_lessons}`);
       console.log(`   Total Sections: ${validated.recommended_structure.total_sections}`);
       console.log(`   Estimated Hours: ${validated.recommended_structure.estimated_content_hours}`);
-      console.log(`   Teaching Style: ${validated.pedagogical_strategy.teaching_style}`);
+      console.log(
+        `   Assessment: ${validated.pedagogical_strategy.assessment_approach.substring(0, 50)}...`
+      );
       console.log(`   Content Strategy: ${validated.content_strategy}`);
       console.log(`   Research Flags: ${validated.research_flags.length}`);
       console.log(`   Total Duration: ${validated.metadata.total_duration_ms}ms`);

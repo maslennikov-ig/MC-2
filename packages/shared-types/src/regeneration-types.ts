@@ -7,7 +7,10 @@ import { z } from 'zod';
 export const contextTierSchema = z.enum(['atomic', 'local', 'structural', 'global']);
 export type ContextTier = z.infer<typeof contextTierSchema>;
 
-export const TIER_TOKEN_BUDGETS: Record<ContextTier, { target: number; context: number; total: number }> = {
+export const TIER_TOKEN_BUDGETS: Record<
+  ContextTier,
+  { target: number; context: number; total: number }
+> = {
   atomic: { target: 200, context: 100, total: 300 },
   local: { target: 500, context: 500, total: 1000 },
   structural: { target: 1000, context: 1500, total: 2500 },
@@ -65,7 +68,8 @@ export const STAGE4_EDITABLE_FIELDS = [
   'topic_analysis.key_concepts',
   'recommended_structure.total_lessons',
   'recommended_structure.total_sections',
-  'pedagogical_strategy.teaching_style',
+  'pedagogical_strategy.assessment_approach',
+  'pedagogical_strategy.progression_logic',
   'pedagogical_patterns.assessment_types',
   'generation_guidance.use_analogies',
   'generation_guidance.specific_analogies',
@@ -206,13 +210,13 @@ export const addElementInputSchema = z.object({
   parentPath: z.string().min(1, 'Parent path is required'),
 
   /** Position to insert: start, end, or numeric index */
-  position: z.union([
-    z.enum(['start', 'end']),
-    z.number().int().min(0)
-  ]),
+  position: z.union([z.enum(['start', 'end']), z.number().int().min(0)]),
 
   /** AI instruction for content generation (10-1000 chars) */
-  userInstruction: z.string().min(10, 'Instruction too short (min 10 chars)').max(1000, 'Instruction too long (max 1000 chars)'),
+  userInstruction: z
+    .string()
+    .min(10, 'Instruction too short (min 10 chars)')
+    .max(1000, 'Instruction too long (max 1000 chars)'),
 });
 
 export type AddElementInput = z.infer<typeof addElementInputSchema>;

@@ -133,12 +133,6 @@ async function initializeServices() {
       // cognitiveLevel (Bloom's taxonomy)
       cognitiveLevel: ['remember', 'understand', 'apply', 'analyze', 'evaluate', 'create'],
 
-      // teaching_style
-      teaching_style: ['hands-on', 'theory-first', 'project-based', 'mixed'],
-
-      // practical_focus
-      practical_focus: ['high', 'medium', 'low'],
-
       // importance
       importance: ['core', 'important', 'supplementary', 'optional'],
 

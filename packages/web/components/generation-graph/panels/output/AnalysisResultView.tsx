@@ -83,10 +83,8 @@ const translations = {
     scopeReasoning: 'Обоснование объёма',
     pedagogy: 'Педагогическая стратегия',
     pedagogyDesc: 'Стиль обучения и подход',
-    teachingStyle: 'Стиль',
-    practicalFocus: 'Практический фокус',
-    interactivity: 'Интерактивность',
     assessmentApproach: 'Подход к оценке',
+    progressionLogic: 'Логика прогресса',
     assessmentTypes: 'Типы заданий',
     guidance: 'Рекомендации для генерации',
     guidanceDesc: 'Тон, примеры и упражнения',
@@ -123,10 +121,8 @@ const translations = {
     scopeReasoning: 'Scope Reasoning',
     pedagogy: 'Pedagogical Strategy',
     pedagogyDesc: 'Teaching style and approach',
-    teachingStyle: 'Style',
-    practicalFocus: 'Practical Focus',
-    interactivity: 'Interactivity',
     assessmentApproach: 'Assessment Approach',
+    progressionLogic: 'Progression Logic',
     assessmentTypes: 'Assessment Types',
     guidance: 'Generation Guidance',
     guidanceDesc: 'Tone, examples, and exercises',
@@ -488,39 +484,42 @@ export const AnalysisResultView = ({
         {/* 4. Pedagogical Strategy */}
         <AccordionItem value="pedagogy" title={t.pedagogy} description={t.pedagogyDesc}>
           <div className="space-y-4">
-            <div className="grid grid-cols-3 gap-4">
-              {canEdit ? (
-                <EditableField
-                  config={{
-                    path: 'pedagogical_strategy.teaching_style',
-                    label: t.teachingStyle,
-                    type: 'select',
-                    options: ['hands-on', 'theory-first', 'project-based', 'mixed'],
-                  }}
-                  value={data.pedagogical_strategy.teaching_style}
-                  onChange={(v) => save('pedagogical_strategy.teaching_style', v)}
-                  onBlur={flush}
-                  status={status}
-                />
-              ) : (
-                <LabeledValue
-                  label={t.teachingStyle}
-                  value={data.pedagogical_strategy.teaching_style}
-                />
-              )}
-              <LabeledValue
-                label={t.practicalFocus}
-                value={data.pedagogical_strategy.practical_focus}
+            {canEdit ? (
+              <EditableField
+                config={{
+                  path: 'pedagogical_strategy.assessment_approach',
+                  label: t.assessmentApproach,
+                  type: 'textarea',
+                }}
+                value={data.pedagogical_strategy.assessment_approach}
+                onChange={(v) => save('pedagogical_strategy.assessment_approach', v)}
+                onBlur={flush}
+                status={status}
               />
+            ) : (
               <LabeledValue
-                label={t.interactivity}
-                value={data.pedagogical_strategy.interactivity_level}
+                label={t.assessmentApproach}
+                value={data.pedagogical_strategy.assessment_approach}
               />
-            </div>
-            <LabeledValue
-              label={t.assessmentApproach}
-              value={data.pedagogical_strategy.assessment_approach}
-            />
+            )}
+            {canEdit ? (
+              <EditableField
+                config={{
+                  path: 'pedagogical_strategy.progression_logic',
+                  label: t.progressionLogic,
+                  type: 'textarea',
+                }}
+                value={data.pedagogical_strategy.progression_logic}
+                onChange={(v) => save('pedagogical_strategy.progression_logic', v)}
+                onBlur={flush}
+                status={status}
+              />
+            ) : (
+              <LabeledValue
+                label={t.progressionLogic}
+                value={data.pedagogical_strategy.progression_logic}
+              />
+            )}
             {canEdit ? (
               <EditableChips
                 label={t.assessmentTypes}

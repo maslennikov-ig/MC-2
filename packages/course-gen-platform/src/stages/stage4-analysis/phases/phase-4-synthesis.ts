@@ -349,8 +349,6 @@ function buildPhase4Prompt(input: Phase4Input, documentCount: number): string {
   const category = phase1_output.course_category.primary;
   const totalLessons = phase2_output.recommended_structure.total_lessons;
   const totalSections = phase2_output.recommended_structure.total_sections;
-  const teachingStyle = phase3_output.pedagogical_strategy.teaching_style;
-  const practicalFocus = phase3_output.pedagogical_strategy.practical_focus;
   const researchFlagsCount = phase3_output.research_flags.length;
 
   // Build document summaries section with token-aware truncation
@@ -388,7 +386,6 @@ Course Topic: ${input.topic}
 Target Language: ${input.language} (for final course output)
 Category: ${category}
 Scope: ${totalLessons} lessons, ${totalSections} sections
-Pedagogy: ${teachingStyle}, ${practicalFocus} practical focus
 Document Count: ${documentCount}
 ${researchFlagsSection}
 

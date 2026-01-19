@@ -35,19 +35,26 @@ export function createFullAnalysisResult(title: string): AnalysisResult {
     },
 
     contextual_language: {
-      why_matters_context: 'Understanding this topic is crucial for modern development and practical application',
-      motivators: 'Gain practical skills applicable to real-world projects. Master techniques used by industry professionals and build confidence in your abilities.',
-      experience_prompt: 'You will learn through hands-on examples and exercises that reinforce key concepts. Each lesson builds on the previous one to create a comprehensive learning journey.',
-      problem_statement_context: 'Many developers struggle with this concept initially due to its complexity',
-      knowledge_bridge: 'We will connect theoretical concepts to practical implementations through clear examples. You will see how abstract ideas translate into working code.',
-      practical_benefit_focus: 'Master techniques used by industry professionals. Apply these skills immediately in your projects to solve real-world problems.',
+      why_matters_context:
+        'Understanding this topic is crucial for modern development and practical application',
+      motivators:
+        'Gain practical skills applicable to real-world projects. Master techniques used by industry professionals and build confidence in your abilities.',
+      experience_prompt:
+        'You will learn through hands-on examples and exercises that reinforce key concepts. Each lesson builds on the previous one to create a comprehensive learning journey.',
+      problem_statement_context:
+        'Many developers struggle with this concept initially due to its complexity',
+      knowledge_bridge:
+        'We will connect theoretical concepts to practical implementations through clear examples. You will see how abstract ideas translate into working code.',
+      practical_benefit_focus:
+        'Master techniques used by industry professionals. Apply these skills immediately in your projects to solve real-world problems.',
     },
 
     topic_analysis: {
       determined_topic: title,
       information_completeness: 80,
       complexity: 'medium' as const,
-      reasoning: 'Topic has clear structure with moderate depth, suitable for comprehensive course development',
+      reasoning:
+        'Topic has clear structure with moderate depth, suitable for comprehensive course development',
       target_audience: 'intermediate' as const,
       missing_elements: null,
       key_concepts: ['concept1', 'concept2', 'concept3'],
@@ -57,7 +64,8 @@ export function createFullAnalysisResult(title: string): AnalysisResult {
     // Phase 2: Scope
     recommended_structure: {
       estimated_content_hours: 10,
-      scope_reasoning: 'Balanced scope covering fundamentals and practical applications. The structure allows for gradual skill building while maintaining engagement.',
+      scope_reasoning:
+        'Balanced scope covering fundamentals and practical applications. The structure allows for gradual skill building while maintaining engagement.',
       lesson_duration_minutes: 30,
       calculation_explanation: '20 lessons × 30 minutes = 10 hours total estimated learning time',
       total_lessons: 20,
@@ -85,7 +93,8 @@ export function createFullAnalysisResult(title: string): AnalysisResult {
             'Apply knowledge to real-world scenarios',
           ],
           key_topics: ['topic4', 'topic5', 'topic6'],
-          pedagogical_approach: 'project-based learning with real-world scenarios and practical exercises',
+          pedagogical_approach:
+            'project-based learning with real-world scenarios and practical exercises',
           difficulty_progression: 'gradual' as const,
         },
       ],
@@ -93,15 +102,15 @@ export function createFullAnalysisResult(title: string): AnalysisResult {
 
     // Phase 3: Expert Analysis
     pedagogical_strategy: {
-      teaching_style: 'mixed' as const,
-      assessment_approach: 'Combination of quizzes, coding exercises, and practical projects to reinforce learning',
-      practical_focus: 'medium' as const,
-      progression_logic: 'Start with fundamentals, build to advanced topics incrementally. Each section reinforces previous concepts while introducing new material.',
-      interactivity_level: 'medium' as const,
+      assessment_approach:
+        'Combination of quizzes, coding exercises, and practical projects to reinforce learning',
+      progression_logic:
+        'Start with fundamentals, build to advanced topics incrementally. Each section reinforces previous concepts while introducing new material.',
     },
 
     // Phase 4: Synthesis
-    scope_instructions: 'Focus on practical implementation with clear examples. Balance theory and practice to ensure comprehensive understanding.',
+    scope_instructions:
+      'Focus on practical implementation with clear examples. Balance theory and practice to ensure comprehensive understanding.',
     content_strategy: 'create_from_scratch' as const,
     expansion_areas: null,
     research_flags: [],
@@ -133,19 +142,16 @@ export function createFullAnalysisResult(title: string): AnalysisResult {
       avoid_jargon: ['complex technical terms without explanation'],
       include_visuals: ['diagrams', 'code examples', 'flowcharts'],
       exercise_types: ['coding', 'interpretation', 'debugging', 'refactoring'],
-      contextual_language_hints: 'Use clear language with practical examples for intermediate learners. Assume basic programming knowledge.',
-      real_world_examples: [
-        'industry use cases',
-        'production scenarios',
-        'practical applications',
-      ],
+      contextual_language_hints:
+        'Use clear language with practical examples for intermediate learners. Assume basic programming knowledge.',
+      real_world_examples: ['industry use cases', 'production scenarios', 'practical applications'],
     },
 
     // Empty object for title-only test scenarios (no documents uploaded)
     document_relevance_mapping: {},
 
     document_analysis: {
-      source_materials: ['title', 'description'],  // Title-only scenario
+      source_materials: ['title', 'description'], // Title-only scenario
       main_themes: [
         {
           theme: `${title} fundamentals and applications`,

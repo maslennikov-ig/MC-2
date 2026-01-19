@@ -438,7 +438,6 @@ export async function runAnalysisOrchestration(job: StructureAnalysisJob): Promi
     );
 
     await completePhase(3, courseId, supabase, orchestrationLogger, {
-      teaching_style: phase3Output.pedagogical_strategy.teaching_style,
       research_flags_count: phase3Output.research_flags.length,
       expansion_areas_count: phase3Output.expansion_areas?.length || 0,
       duration_ms: phase3Output.phase_metadata.duration_ms,

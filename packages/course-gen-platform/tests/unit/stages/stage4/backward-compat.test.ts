@@ -38,12 +38,18 @@ function createOldSchemaAnalysisResult(): AnalysisResult {
 
     // Phase 1: Contextual language
     contextual_language: {
-      why_matters_context: 'Understanding this topic is critical for professional development and career growth',
-      motivators: 'Gain practical skills that will immediately improve your workflow and productivity, making you more valuable to employers',
-      experience_prompt: 'Learn through hands-on exercises and real-world scenarios that mirror actual workplace challenges',
-      problem_statement_context: 'Many professionals struggle with this due to lack of structured guidance',
-      knowledge_bridge: 'Build on your existing foundation by connecting new concepts to familiar workflows and tools',
-      practical_benefit_focus: 'Apply these techniques immediately in your daily work to see measurable improvements in efficiency',
+      why_matters_context:
+        'Understanding this topic is critical for professional development and career growth',
+      motivators:
+        'Gain practical skills that will immediately improve your workflow and productivity, making you more valuable to employers',
+      experience_prompt:
+        'Learn through hands-on exercises and real-world scenarios that mirror actual workplace challenges',
+      problem_statement_context:
+        'Many professionals struggle with this due to lack of structured guidance',
+      knowledge_bridge:
+        'Build on your existing foundation by connecting new concepts to familiar workflows and tools',
+      practical_benefit_focus:
+        'Apply these techniques immediately in your daily work to see measurable improvements in efficiency',
     },
 
     // Phase 1-2: Topic analysis
@@ -55,13 +61,23 @@ function createOldSchemaAnalysisResult(): AnalysisResult {
       target_audience: 'intermediate',
       missing_elements: ['deployment strategies', 'performance optimization'],
       key_concepts: ['type safety', 'generics', 'decorators', 'async patterns', 'error handling'],
-      domain_keywords: ['typescript', 'backend', 'node.js', 'api', 'express', 'database', 'orm', 'testing'],
+      domain_keywords: [
+        'typescript',
+        'backend',
+        'node.js',
+        'api',
+        'express',
+        'database',
+        'orm',
+        'testing',
+      ],
     },
 
     // Phase 2: Scope and structure
     recommended_structure: {
       estimated_content_hours: 12.0,
-      scope_reasoning: 'Based on topic complexity and target audience, 12 hours provides adequate depth for intermediate learners',
+      scope_reasoning:
+        'Based on topic complexity and target audience, 12 hours provides adequate depth for intermediate learners',
       lesson_duration_minutes: 15,
       calculation_explanation: '12 hours * 60 minutes / 15 minutes per lesson = 48 lessons',
       total_lessons: 48,
@@ -77,7 +93,8 @@ function createOldSchemaAnalysisResult(): AnalysisResult {
             'Understand type inference and type annotations',
           ],
           key_topics: ['types', 'interfaces', 'type inference'],
-          pedagogical_approach: 'Quick refresher with hands-on examples to ensure baseline knowledge',
+          pedagogical_approach:
+            'Quick refresher with hands-on examples to ensure baseline knowledge',
           difficulty_progression: 'flat',
         },
         {
@@ -90,7 +107,8 @@ function createOldSchemaAnalysisResult(): AnalysisResult {
             'Debug complex type errors',
           ],
           key_topics: ['generics', 'conditional types', 'mapped types', 'utility types'],
-          pedagogical_approach: 'Theory-first with progressive complexity, followed by practical exercises',
+          pedagogical_approach:
+            'Theory-first with progressive complexity, followed by practical exercises',
           difficulty_progression: 'gradual',
         },
         {
@@ -147,15 +165,15 @@ function createOldSchemaAnalysisResult(): AnalysisResult {
 
     // Phase 3: Pedagogical strategy
     pedagogical_strategy: {
-      teaching_style: 'project-based',
-      assessment_approach: 'Progressive coding challenges with automated tests and peer code review',
-      practical_focus: 'high',
-      progression_logic: 'Start with fundamentals, build complexity through real-world project scenarios, culminating in production-ready application',
-      interactivity_level: 'high',
+      assessment_approach:
+        'Progressive coding challenges with automated tests and peer code review',
+      progression_logic:
+        'Start with fundamentals, build complexity through real-world project scenarios, culminating in production-ready application',
     },
 
     // Phase 4: Generation prompt (OLD FIELD - deprecated but still required)
-    scope_instructions: 'Create comprehensive, production-focused content for intermediate developers. Use TypeScript code examples extensively. Include common pitfalls and debugging strategies. Reference real-world use cases from backend development. Maintain conversational but precise tone.',
+    scope_instructions:
+      'Create comprehensive, production-focused content for intermediate developers. Use TypeScript code examples extensively. Include common pitfalls and debugging strategies. Reference real-world use cases from backend development. Maintain conversational but precise tone.',
 
     // Phase 5: Content strategy
     content_strategy: 'create_from_scratch',
@@ -204,7 +222,7 @@ function createOldSchemaAnalysisResult(): AnalysisResult {
         phase_1: 0.92,
         phase_2: 0.88,
         phase_3: 0.95,
-        phase_4: 0.90,
+        phase_4: 0.9,
       },
       created_at: '2025-01-15T10:30:00.000Z',
     },
@@ -249,7 +267,8 @@ function createNewSchemaAnalysisResult(): AnalysisResult {
       avoid_jargon: ['reification', 'covariance', 'contravariance'],
       include_visuals: ['code examples', 'diagrams', 'flowcharts'],
       exercise_types: ['coding', 'debugging', 'refactoring'],
-      contextual_language_hints: 'Assume familiarity with JavaScript and basic TypeScript. Explain advanced concepts in context of backend development.',
+      contextual_language_hints:
+        'Assume familiarity with JavaScript and basic TypeScript. Explain advanced concepts in context of backend development.',
       real_world_examples: [
         'Express.js API with type-safe routing',
         'TypeORM entity relationships',
@@ -270,7 +289,13 @@ function createNewSchemaAnalysisResult(): AnalysisResult {
       },
       '2': {
         primary_documents: ['doc_789', 'doc_101'],
-        key_search_terms: ['generics', 'conditional types', 'mapped types', 'utility types', 'advanced patterns'],
+        key_search_terms: [
+          'generics',
+          'conditional types',
+          'mapped types',
+          'utility types',
+          'advanced patterns',
+        ],
         expected_topics: ['Generic programming', 'Type constraints', 'Advanced type patterns'],
         document_processing_methods: {
           doc_789: 'hierarchical',
@@ -279,7 +304,13 @@ function createNewSchemaAnalysisResult(): AnalysisResult {
       },
       '3': {
         primary_documents: ['doc_202', 'doc_303'],
-        key_search_terms: ['express', 'routing', 'middleware', 'decorators', 'dependency injection'],
+        key_search_terms: [
+          'express',
+          'routing',
+          'middleware',
+          'decorators',
+          'dependency injection',
+        ],
         expected_topics: ['Express.js architecture', 'Decorators', 'DI patterns'],
         document_processing_methods: {
           doc_202: 'full_text',
@@ -315,7 +346,8 @@ function createHybridSchemaAnalysisResult(): AnalysisResult {
   return {
     ...newSchema,
     // Keep both scope_instructions (old) and generation_guidance (new)
-    scope_instructions: 'Create comprehensive, production-focused content for intermediate developers. Use TypeScript code examples extensively.',
+    scope_instructions:
+      'Create comprehensive, production-focused content for intermediate developers. Use TypeScript code examples extensively.',
     generation_guidance: newSchema.generation_guidance,
   };
 }
@@ -377,7 +409,11 @@ describe('Backward Compatibility: Stage 4 Analyze Enhancement', () => {
         }
 
         // Validate content_strategy enum
-        if (!['create_from_scratch', 'expand_and_enhance', 'optimize_existing'].includes(oldResult.content_strategy)) {
+        if (
+          !['create_from_scratch', 'expand_and_enhance', 'optimize_existing'].includes(
+            oldResult.content_strategy
+          )
+        ) {
           throw new Error('Invalid content_strategy');
         }
 
@@ -607,7 +643,9 @@ describe('Backward Compatibility: Stage 4 Analyze Enhancement', () => {
       };
 
       // Validation should pass with only one new field
-      const patternsResult = PedagogicalPatternsSchema.safeParse(partialResult.pedagogical_patterns);
+      const patternsResult = PedagogicalPatternsSchema.safeParse(
+        partialResult.pedagogical_patterns
+      );
       expect(patternsResult.success).toBe(true);
 
       // Other new fields should still be undefined

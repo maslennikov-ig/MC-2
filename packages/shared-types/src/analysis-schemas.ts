@@ -432,12 +432,10 @@ export const ExpansionAreaSchema = z.object({
  * Phase 3 output schema: Expert pedagogical analysis
  */
 export const Phase3OutputSchema = z.object({
+  // Note: teaching_style, practical_focus, interactivity_level removed to avoid conflict with user-selected style
   pedagogical_strategy: z.object({
-    teaching_style: z.enum(['hands-on', 'theory-first', 'project-based', 'mixed']),
-    assessment_approach: z.string().min(50), // Removed .max(300) - encourage comprehensive approaches
-    practical_focus: z.enum(['high', 'medium', 'low']),
-    progression_logic: z.string().min(100), // Removed .max(500) - allow detailed logic
-    interactivity_level: z.enum(['high', 'medium', 'low']),
+    assessment_approach: z.string().min(50), // How learners demonstrate understanding
+    progression_logic: z.string().min(100), // How difficulty increases across lessons
   }),
   expansion_areas: z.array(ExpansionAreaSchema).nullable(),
   research_flags: z.array(ResearchFlagSchema),
@@ -557,12 +555,10 @@ export const AnalysisResultSchema = z.object({
     sections_breakdown: z.array(SectionBreakdownSchema),
   }),
 
+  // Note: teaching_style, practical_focus, interactivity_level removed to avoid conflict with user-selected style
   pedagogical_strategy: z.object({
-    teaching_style: z.enum(['hands-on', 'theory-first', 'project-based', 'mixed']),
-    assessment_approach: z.string().min(50), // Removed .max(300) - encourage comprehensive approaches
-    practical_focus: z.enum(['high', 'medium', 'low']),
-    progression_logic: z.string().min(100), // Removed .max(500) - allow detailed logic
-    interactivity_level: z.enum(['high', 'medium', 'low']),
+    assessment_approach: z.string().min(50), // How learners demonstrate understanding
+    progression_logic: z.string().min(100), // How difficulty increases across lessons
   }),
 
   content_strategy: z.enum(['create_from_scratch', 'expand_and_enhance', 'optimize_existing']),

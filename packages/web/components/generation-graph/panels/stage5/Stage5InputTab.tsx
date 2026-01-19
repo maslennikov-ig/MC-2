@@ -108,9 +108,6 @@ export const Stage5InputTab = memo<Stage5InputTabProps>(function Stage5InputTab(
             const recommendedStructure = ar.recommended_structure as
               | Record<string, unknown>
               | undefined
-            const pedagogicalStrategy = ar.pedagogical_strategy as
-              | Record<string, unknown>
-              | undefined
             const topicAnalysis = ar.topic_analysis as Record<string, unknown> | undefined
 
             // Get total_lessons from recommended_structure (Stage 4 output)
@@ -125,8 +122,6 @@ export const Stage5InputTab = memo<Stage5InputTabProps>(function Stage5InputTab(
               lessonsRange: undefined,
               // Content style - user selected (affects tone: practical, conversational, academic)
               contentStyle: (courseData.style as string) || undefined,
-              // Teaching style - from LLM analysis (affects structure: hands-on, theory-first)
-              teachingStyle: (pedagogicalStrategy?.teaching_style as string) || 'mixed',
               topicAnalysis: topicAnalysis
                 ? {
                     complexity: (topicAnalysis.complexity as string) || 'intermediate',
