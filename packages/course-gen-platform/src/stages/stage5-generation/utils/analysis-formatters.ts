@@ -109,13 +109,16 @@ Practical Benefit Focus: ${contextual.practical_benefit_focus}`;
 /**
  * Format pedagogical_strategy object for LLM prompt
  *
+ * Note: teaching_style, practical_focus, interactivity_level removed to avoid
+ * conflict with user-selected style from frontend.
+ *
  * @param strategy - Pedagogical strategy object from AnalysisResult
- * @returns Formatted string with all 5 strategy fields
+ * @returns Formatted string with 2 strategy fields (assessment_approach, progression_logic)
  *
  * @example
  * ```typescript
  * const formatted = formatPedagogicalStrategyForPrompt(analysis.pedagogical_strategy);
- * // Output: "Teaching Style: hands-on\nAssessment Approach: ..."
+ * // Output: "Assessment Approach: ...\nProgression Logic: ..."
  * ```
  */
 export function formatPedagogicalStrategyForPrompt(
