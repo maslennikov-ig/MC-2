@@ -5,7 +5,7 @@
  * Designs pedagogical strategy, identifies expansion areas, and detects research flags.
  *
  * Key responsibilities:
- * - Pedagogical strategy design (teaching_style, assessment_approach, progression_logic)
+ * - Pedagogical strategy design (assessment_approach, progression_logic)
  * - Expansion areas identification (if information_completeness < 80%)
  * - Research flag detection (CONSERVATIVE - minimize false positives)
  *
@@ -58,11 +58,8 @@ interface RawPhase3Output {
  */
 const Phase3OutputSchema = z.object({
   pedagogical_strategy: z.object({
-    teaching_style: z.enum(['hands-on', 'theory-first', 'project-based', 'mixed']),
-    assessment_approach: z.string().min(50), // Removed .max(200) - encourage comprehensive approaches
-    practical_focus: z.enum(['high', 'medium', 'low']),
-    progression_logic: z.string().min(100), // Removed .max(500) - allow detailed logic
-    interactivity_level: z.enum(['high', 'medium', 'low']),
+    assessment_approach: z.string().min(50), // How learners demonstrate understanding
+    progression_logic: z.string().min(100), // How difficulty increases across lessons
   }),
   expansion_areas: z
     .array(
@@ -154,30 +151,14 @@ TASK 1: DESIGN PEDAGOGICAL STRATEGY
 
 Design a comprehensive pedagogical strategy for this course:
 
-1. teaching_style: Choose ONE:
-   - "hands-on": Practice-first approach (coding, exercises, labs)
-   - "theory-first": Conceptual understanding before application
-   - "project-based": Learning through building complete projects
-   - "mixed": Balanced theory + practice
-
-2. assessment_approach (min 50 chars): How learners demonstrate understanding
+1. assessment_approach (min 50 chars): How learners demonstrate understanding
    - Examples: "Progressive quizzes after each section", "Final capstone project", "Peer review exercises"
    - Provide comprehensive detail - no upper limit
 
-3. practical_focus: Choose ONE based on topic nature:
-   - "high": 70%+ hands-on exercises (e.g., programming, design)
-   - "medium": 50-70% practical content
-   - "low": 30-50% practical (theory-heavy topics)
-
-4. progression_logic (min 100 chars): How difficulty increases across lessons
+2. progression_logic (min 100 chars): How difficulty increases across lessons
    - Explain the learning arc from beginner to mastery
    - Describe scaffolding strategy
    - Provide comprehensive detail - no upper limit
-
-5. interactivity_level: Choose ONE:
-   - "high": Interactive exercises every 5-10 minutes
-   - "medium": Interactive elements every 15-20 minutes
-   - "low": Mostly passive consumption with occasional exercises
 
 TASK 2: IDENTIFY EXPANSION AREAS (CONDITIONAL)
 
@@ -209,11 +190,8 @@ Respond ONLY with valid JSON (no markdown, no code blocks, no explanations):
 
 {
   "pedagogical_strategy": {
-    "teaching_style": "hands-on" | "theory-first" | "project-based" | "mixed",
     "assessment_approach": "string (min 50 chars, comprehensive detail encouraged)",
-    "practical_focus": "high" | "medium" | "low",
-    "progression_logic": "string (min 100 chars, comprehensive detail encouraged)",
-    "interactivity_level": "high" | "medium" | "low"
+    "progression_logic": "string (min 100 chars, comprehensive detail encouraged)"
   },
   "expansion_areas": [
     {
@@ -255,15 +233,7 @@ export async function runPhase3Expert(input: Phase3Input): Promise<Phase3Output>
       let preprocessedContent = extractJSON(content);
       try {
         const parsedRaw = JSON.parse(preprocessedContent) as RawPhase3Output;
-        if (parsedRaw.pedagogical_strategy) {
-          parsedRaw.pedagogical_strategy = preprocessObject(
-            parsedRaw.pedagogical_strategy as Record<string, unknown>,
-            {
-              teaching_style: 'enum',
-              practical_focus: 'enum',
-            }
-          );
-        }
+        // No enum preprocessing needed for pedagogical_strategy (only has string fields)
         if (parsedRaw.exercise_types && Array.isArray(parsedRaw.exercise_types)) {
           parsedRaw.exercise_types = parsedRaw.exercise_types.map((ex: unknown) =>
             typeof ex === 'string'
