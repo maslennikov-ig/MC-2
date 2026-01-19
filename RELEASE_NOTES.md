@@ -2,6 +2,30 @@
 
 _Released on 2025-12-26_
 
+## v0.28.12
+
+_Released on 2026-01-19_
+
+### ✨ New Features
+
+- **course-gen-platform**: Add 1 source file(s), update docs
+- **stage5**: Dynamic min/max lessons validation from course_size presets
+
+### 🐛 Bug Fixes
+
+- **stage2**: Add hardcoded fallback for model config in Phase 6
+- **stage2**: Store fallback processed_content on summarization failure
+- **auto-approval**: Correct FSM transitions for automatic mode
+- **course-size**: Remove hardcoded min 10 lessons from CourseStructureSchema
+- **auto-approval**: Correct status suffix for all stages + release locks early
+- **stage2**: Handle SandboxedJob missing getState() method
+- **phase-2**: Respect course_size preset constraints (MICRO/MINI/COMPACT)
+- **docling**: Transform local paths to container paths for Docker
+
+---
+
+_This release was automatically generated from 19 commits._
+
 ## v0.28.11
 
 _Released on 2026-01-19_
