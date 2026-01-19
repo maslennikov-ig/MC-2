@@ -25,6 +25,7 @@ import { UnifiedRegenerator } from '@/shared/regeneration';
 import { zodToPromptSchema } from '@/shared/utils/zod-to-prompt-schema';
 import { preprocessObject } from '@/shared/validation/preprocessing';
 import { extractJSON } from '@/shared/utils/json-repair';
+import { logger } from '@/shared/logger';
 
 /**
  * Main Phase 2 execution function: Scope Analysis
@@ -109,8 +110,14 @@ export async function runPhase2Scope(input: Phase2Input): Promise<Phase2Output> 
         }
         preprocessedOutput = JSON.stringify(parsedRaw);
       } catch (error) {
-        // If preprocessing fails, continue with raw output
-        console.warn('[Phase 2] Preprocessing failed, using raw output:', error);
+        // CR-007: Use structured logger instead of console.*
+        logger.warn(
+          {
+            phase: 'phase-2-scope',
+            error: error instanceof Error ? error.message : String(error),
+          },
+          'Preprocessing failed, using raw output'
+        );
       }
 
       // Parse JSON response with 5-layer repair cascade
@@ -190,7 +197,11 @@ export async function runPhase2Scope(input: Phase2Input): Promise<Phase2Output> 
 
           // UnifiedRegenerator succeeded via layer: ${result.metadata.layerUsed}
         } else {
-          console.error('[Phase 2] ALL REPAIR LAYERS EXHAUSTED');
+          // CR-007: Use structured logger instead of console.*
+          logger.error(
+            { phase: 'phase-2-scope', error: result.error },
+            'ALL REPAIR LAYERS EXHAUSTED'
+          );
           throw new Error(
             `Failed to parse Phase 2 JSON after all 5 repair layers. Error: ${result.error}`
           );

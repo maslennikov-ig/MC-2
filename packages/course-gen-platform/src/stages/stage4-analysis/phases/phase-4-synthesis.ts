@@ -21,6 +21,7 @@ import { UnifiedRegenerator } from '@/shared/regeneration';
 import { zodToPromptSchema } from '@/shared/utils/zod-to-prompt-schema';
 import { preprocessObject } from '@/shared/validation/preprocessing';
 import { extractJSON } from '@/shared/utils/json-repair';
+import { logger } from '@/shared/logger';
 
 /**
  * Input data for Phase 4 Document Synthesis
@@ -186,8 +187,14 @@ ${m.content}`
     }
     preprocessedOutput = JSON.stringify(parsedRaw);
   } catch (error) {
-    // If preprocessing fails, continue with raw output
-    console.warn('[Phase 4] Preprocessing failed, using raw output:', error);
+    // CR-007: Use structured logger instead of console.*
+    logger.warn(
+      {
+        phase: 'phase-4-synthesis',
+        error: error instanceof Error ? error.message : String(error),
+      },
+      'Preprocessing failed, using raw output'
+    );
   }
 
   try {
@@ -264,7 +271,11 @@ ${m.content}`
 
       // UnifiedRegenerator succeeded - observability tracked by metrics
     } else {
-      console.error('[Phase 4] ALL REPAIR LAYERS EXHAUSTED');
+      // CR-007: Use structured logger instead of console.*
+      logger.error(
+        { phase: 'phase-4-synthesis', error: regenerationResult.error },
+        'ALL REPAIR LAYERS EXHAUSTED'
+      );
       throw new Error(
         `Failed to parse Phase 4 JSON after all 5 repair layers. Error: ${regenerationResult.error}`
       );
