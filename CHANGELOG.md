@@ -311,6 +311,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.28.12] - 2026-01-19
+
+### Added
+
+- **course-gen-platform**: add 1 source file(s), update docs (12d1b16)
+- **stage5**: dynamic min/max lessons validation from course_size presets (eb47b3a)
+
+### Fixed
+
+- **stage2**: add hardcoded fallback for model config in Phase 6 (3eee06f)
+- **stage2**: store fallback processed_content on summarization failure (7c1edf4)
+- **auto-approval**: correct FSM transitions for automatic mode (ded56e3)
+- **course-size**: remove hardcoded min 10 lessons from CourseStructureSchema (eadb0c8)
+- **auto-approval**: correct status suffix for all stages + release locks early (21e7f2b)
+- **stage2**: handle SandboxedJob missing getState() method (1fe074f)
+- **phase-2**: respect course_size preset constraints (MICRO/MINI/COMPACT) (e1efdc1)
+- **docling**: transform local paths to container paths for Docker (aa647dc)
+
+### Other
+
+- bd sync: 2026-01-19 19:53:34 (865e208)
+- bd sync: 2026-01-19 19:53:08 (765989c)
+- bd sync: 2026-01-19 16:58:41 (99a56aa)
+- bd sync: 2026-01-19 16:53:56 (eead28b)
+- **stage5**: add unit tests for MinimumLessonsValidator (70875b9)
+- bd sync: 2026-01-19 16:34:15 (be14505)
+- bd sync: 2026-01-19 16:33:38 (d017d79)
+- bd sync: 2026-01-19 14:41:24 (4710644)
+- bd sync: 2026-01-19 14:41:08 (01c7a53)
+
 ## [0.28.11] - 2026-01-19
 
 ### Added
