@@ -47,6 +47,7 @@ import type {
   CourseMetadata,
   Section,
 } from '@megacampus/shared-types';
+import { getCourseSizePreset } from '@megacampus/shared-types/course-size';
 import pino from 'pino';
 import { MinimumLessonsValidator } from './validators/minimum-lessons-validator';
 import { logTrace } from '../../shared/trace-logger';
@@ -748,17 +749,41 @@ export class GenerationOrchestrator {
     }
 
     // T037: Minimum lessons validation (FR-015)
-    const lessonsValidator = new MinimumLessonsValidator();
+    // Use dynamic min_lessons from course_size preset, fallback to 10 for AUTO mode
+    const courseSize = input.frontend_parameters?.course_size ?? 'auto';
+    const sizePreset = courseSize !== 'auto' ? getCourseSizePreset(courseSize) : undefined;
+    const minLessons = sizePreset?.minLessons ?? 10;
+    const maxLessons = sizePreset?.maxLessons;
+
+    const lessonsValidator = new MinimumLessonsValidator({
+      minimumLessons: minLessons,
+      maxLessons: maxLessons,
+      maxLessonsTolerancePercent: 20, // Warning when exceeding by >20%
+    });
     const lessonsResult = lessonsValidator.validateSections(sections);
 
     if (!lessonsResult.passed) {
       this.logger.warn(
         {
           totalLessons: lessonsResult.totalLessons,
-          required: 10,
+          required: minLessons,
+          courseSize,
           deficit: lessonsResult.deficit,
         },
-        'Course does not meet minimum 10 lessons requirement'
+        `Course does not meet minimum ${minLessons} lessons requirement for ${courseSize} preset`
+      );
+    }
+
+    // Log warning if max_lessons exceeded by >20% (non-blocking)
+    if (lessonsResult.maxExceeded) {
+      this.logger.warn(
+        {
+          totalLessons: lessonsResult.totalLessons,
+          maxLessons,
+          courseSize,
+          excessPercentage: lessonsResult.excessPercentage,
+        },
+        `Course exceeds maximum ${maxLessons} lessons by ${lessonsResult.excessPercentage?.toFixed(1)}% for ${courseSize} preset`
       );
     }
 

@@ -26,7 +26,7 @@ export interface SectionBreakdown {
 }
 
 /**
- * Validation result for minimum lessons check
+ * Validation result for minimum/maximum lessons check
  */
 export interface MinimumLessonsValidationResult {
   /** Whether validation passed (totalLessons >= minimumRequired) */
@@ -41,6 +41,12 @@ export interface MinimumLessonsValidationResult {
   sectionBreakdown: SectionBreakdown[];
   /** Recommendations if validation failed */
   recommendations?: string[];
+  /** Whether max_lessons exceeded by more than tolerance (non-blocking warning) */
+  maxExceeded?: boolean;
+  /** Percentage by which max_lessons was exceeded */
+  excessPercentage?: number;
+  /** Maximum lessons allowed (from course_size preset) */
+  maximumAllowed?: number;
 }
 
 /**
@@ -49,6 +55,10 @@ export interface MinimumLessonsValidationResult {
 export interface MinimumLessonsValidatorConfig {
   /** Minimum number of lessons required (default: 10 per FR-015) */
   minimumLessons?: number;
+  /** Maximum number of lessons allowed (from course_size preset, optional) */
+  maxLessons?: number;
+  /** Tolerance percentage for max_lessons (default: 20, meaning warn if >120% of max) */
+  maxLessonsTolerancePercent?: number;
   /** If true, throw error on failure; if false, return result (default: false) */
   strictMode?: boolean;
 }
@@ -57,8 +67,11 @@ export interface MinimumLessonsValidatorConfig {
 // CONSTANTS
 // ============================================================================
 
-/** FR-015: Minimum lessons requirement */
+/** FR-015: Minimum lessons requirement (default for AUTO mode) */
 const DEFAULT_MINIMUM_LESSONS = 10;
+
+/** Default tolerance for max_lessons (20% = warn if totalLessons > maxLessons * 1.2) */
+const DEFAULT_MAX_LESSONS_TOLERANCE_PERCENT = 20;
 
 /** Threshold for low lesson count per section */
 const LOW_LESSON_SECTION_THRESHOLD = 3;
@@ -88,11 +101,16 @@ const LOW_LESSON_SECTION_THRESHOLD = 3;
  * ```
  */
 export class MinimumLessonsValidator {
-  private config: Required<MinimumLessonsValidatorConfig>;
+  private config: Required<Omit<MinimumLessonsValidatorConfig, 'maxLessons'>> & {
+    maxLessons?: number;
+  };
 
   constructor(config?: MinimumLessonsValidatorConfig) {
     this.config = {
       minimumLessons: config?.minimumLessons ?? DEFAULT_MINIMUM_LESSONS,
+      maxLessons: config?.maxLessons, // undefined means no max check
+      maxLessonsTolerancePercent:
+        config?.maxLessonsTolerancePercent ?? DEFAULT_MAX_LESSONS_TOLERANCE_PERCENT,
       strictMode: config?.strictMode ?? false,
     };
   }
@@ -120,10 +138,7 @@ export class MinimumLessonsValidator {
     }));
 
     // Calculate total lessons
-    const totalLessons = sectionBreakdown.reduce(
-      (sum, section) => sum + section.lessonCount,
-      0
-    );
+    const totalLessons = sectionBreakdown.reduce((sum, section) => sum + section.lessonCount, 0);
 
     // Determine pass/fail
     const passed = totalLessons >= this.config.minimumLessons;
@@ -137,6 +152,29 @@ export class MinimumLessonsValidator {
       deficit,
       sectionBreakdown,
     };
+
+    // Check max_lessons with tolerance (non-blocking warning)
+    if (this.config.maxLessons) {
+      const toleranceMultiplier = 1 + this.config.maxLessonsTolerancePercent / 100;
+      const maxWithTolerance = this.config.maxLessons * toleranceMultiplier;
+      result.maximumAllowed = this.config.maxLessons;
+
+      if (totalLessons > maxWithTolerance) {
+        result.maxExceeded = true;
+        result.excessPercentage =
+          ((totalLessons - this.config.maxLessons) / this.config.maxLessons) * 100;
+
+        logger.warn(
+          {
+            totalLessons,
+            maxLessons: this.config.maxLessons,
+            tolerancePercent: this.config.maxLessonsTolerancePercent,
+            excessPercentage: result.excessPercentage,
+          },
+          `Max lessons exceeded by ${result.excessPercentage.toFixed(1)}% (tolerance: ${this.config.maxLessonsTolerancePercent}%)`
+        );
+      }
+    }
 
     // Add recommendations if failed
     if (!passed) {
@@ -234,6 +272,29 @@ export class MinimumLessonsValidator {
       sectionBreakdown,
     };
 
+    // Check max_lessons with tolerance (non-blocking warning)
+    if (this.config.maxLessons) {
+      const toleranceMultiplier = 1 + this.config.maxLessonsTolerancePercent / 100;
+      const maxWithTolerance = this.config.maxLessons * toleranceMultiplier;
+      result.maximumAllowed = this.config.maxLessons;
+
+      if (totalLessons > maxWithTolerance) {
+        result.maxExceeded = true;
+        result.excessPercentage =
+          ((totalLessons - this.config.maxLessons) / this.config.maxLessons) * 100;
+
+        logger.warn(
+          {
+            totalLessons,
+            maxLessons: this.config.maxLessons,
+            tolerancePercent: this.config.maxLessonsTolerancePercent,
+            excessPercentage: result.excessPercentage,
+          },
+          `Max lessons exceeded (V2) by ${result.excessPercentage.toFixed(1)}% (tolerance: ${this.config.maxLessonsTolerancePercent}%)`
+        );
+      }
+    }
+
     // Add recommendations if failed
     if (!passed) {
       result.recommendations = this.getRecommendations(result);
@@ -289,7 +350,7 @@ export class MinimumLessonsValidator {
 
     // Find sections with low lesson counts
     const lowLessonSections = result.sectionBreakdown.filter(
-      (section) => section.lessonCount < LOW_LESSON_SECTION_THRESHOLD
+      section => section.lessonCount < LOW_LESSON_SECTION_THRESHOLD
     );
 
     if (lowLessonSections.length > 0) {
@@ -305,9 +366,7 @@ export class MinimumLessonsValidator {
     }
 
     // Check for empty sections
-    const emptySections = result.sectionBreakdown.filter(
-      (section) => section.lessonCount === 0
-    );
+    const emptySections = result.sectionBreakdown.filter(section => section.lessonCount === 0);
 
     if (emptySections.length > 0) {
       recommendations.push(
