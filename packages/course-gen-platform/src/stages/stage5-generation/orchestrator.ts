@@ -606,7 +606,7 @@ export class GenerationOrchestrator {
     let passedChecks = 0;
 
     for (const section of sections) {
-      const sectionNumber = section.section_number;
+      const sectionNumber = section.section_number ?? 0;
       const reasons: string[] = [];
 
       // Check 1: Minimum lessons per section (min 3)

@@ -598,8 +598,8 @@ ${schemaDescription}
     const requiredFields = [
       'course_title',
       'course_description',
-      'course_overview',
-      'target_audience',
+      // 'course_overview' REMOVED - redundant with course_description
+      // 'target_audience' REMOVED - optional, derive from difficulty_level
       'estimated_duration_hours',
       'difficulty_level',
       'learning_outcomes',
@@ -754,8 +754,8 @@ ${schemaDescription}
     return {
       course_title: parsed.course_title,
       course_description: parsed.course_description,
-      course_overview: parsed.course_overview,
-      target_audience: parsed.target_audience,
+      // course_overview: REMOVED - redundant with course_description (~10K tokens saved)
+      // target_audience: REMOVED - can derive from difficulty_level
       estimated_duration_hours: parsed.estimated_duration_hours,
       difficulty_level: parsed.difficulty_level,
       prerequisites: parsed.prerequisites,

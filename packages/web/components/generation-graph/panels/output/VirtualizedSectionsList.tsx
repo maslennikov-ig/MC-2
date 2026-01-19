@@ -342,9 +342,9 @@ export const VirtualizedSectionsList = forwardRef<
         return (
           <div className="border border-slate-100 rounded-md overflow-hidden mb-1 mx-4">
             <LessonRow
-              key={`lesson-${section.section_number}-${lesson.lesson_number}`}
+              key={`lesson-${section.section_number ?? sectionIndex}-${lesson.lesson_number ?? lessonIndexWithinSection}`}
               lesson={lesson}
-              sectionNumber={section.section_number}
+              sectionNumber={section.section_number ?? sectionIndex + 1}
               sectionIndex={sectionIndex}
               lessonIndex={lessonIndexWithinSection}
               locale={locale}

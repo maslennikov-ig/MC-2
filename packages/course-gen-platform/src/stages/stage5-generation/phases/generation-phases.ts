@@ -549,7 +549,7 @@ export class GenerationPhases {
       // Sort sections by section_number to maintain correct order
       const allSections: Section[] = successfulResults
         .flatMap(r => r.result.sections)
-        .sort((a, b) => a.section_number - b.section_number);
+        .sort((a, b) => (a.section_number ?? 0) - (b.section_number ?? 0));
 
       // Aggregate metrics
       const totalTokensUsed = successfulResults.reduce((sum, r) => sum + r.result.tokensUsed, 0);
