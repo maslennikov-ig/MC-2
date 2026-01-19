@@ -3,12 +3,14 @@
  *
  * @module services/stage5/generation-orchestrator
  *
- * Implements RT-002 5-Phase Generation Architecture with LangGraph StateGraph:
+ * Implements RT-002 4-Phase Generation Architecture with LangGraph StateGraph:
  * - Phase 1: validate_input (schema validation)
  * - Phase 2: generate_metadata (MetadataGenerator with RT-001 hybrid routing)
  * - Phase 3: generate_sections (SectionBatchGenerator with tiered routing)
  * - Phase 4: validate_quality (QualityValidator with 0.75 threshold)
- * - Phase 5: validate_lessons (MinimumLessonsValidator with ≥10 lessons)
+ *
+ * Note: Phase 5 (validate_lessons) removed - lesson validation performed in
+ * performPostGenerationQualityGate after StateGraph execution.
  *
  * Linear workflow with no conditional edges or branching.
  * Each phase updates state immutably and transitions to next phase.
@@ -148,13 +150,14 @@ const GenerationStateAnnotation = Annotation.Root({
   }>,
 
   // Phase execution metadata
-  currentPhase: Annotation<'validate_input' | 'generate_metadata' | 'generate_sections' | 'validate_quality' | 'validate_lessons'>,
+  currentPhase: Annotation<
+    'validate_input' | 'generate_metadata' | 'generate_sections' | 'validate_quality'
+  >,
   phaseDurations: Annotation<{
     validate_input?: number;
     generate_metadata?: number;
     generate_sections?: number;
     validate_quality?: number;
-    validate_lessons?: number;
   }>,
 
   // Error handling
@@ -177,15 +180,18 @@ type GenerationStateType = typeof GenerationStateAnnotation.State;
 // ============================================================================
 
 /**
- * GenerationOrchestrator - Main entry point for 5-phase generation pipeline
+ * GenerationOrchestrator - Main entry point for 4-phase generation pipeline
  *
  * Builds and executes LangGraph StateGraph workflow with dependency-injected services.
- * Coordinates MetadataGenerator, SectionBatchGenerator, QualityValidator, and
- * MinimumLessonsValidator across 5 phases.
+ * Coordinates MetadataGenerator, SectionBatchGenerator, and QualityValidator across 4 phases.
+ * MinimumLessonsValidator is used in performPostGenerationQualityGate after StateGraph execution.
  *
  * RT-002 Linear Workflow (no branching):
  * 1. validate_input → 2. generate_metadata → 3. generate_sections →
- * 4. validate_quality → 5. validate_lessons → END
+ * 4. validate_quality → END
+ *
+ * Lesson validation (≥10 lessons) performed in performPostGenerationQualityGate
+ * after StateGraph execution completes.
  *
  * @example
  * ```typescript
@@ -243,47 +249,47 @@ export class GenerationOrchestrator {
    *
    * RT-002 Graph Structure:
    * START → validate_input → generate_metadata → generate_sections →
-   *         validate_quality → validate_lessons → END
+   *         validate_quality → END
    *
    * Linear flow with no conditional edges or branching.
+   * Lesson validation performed in performPostGenerationQualityGate after graph execution.
    *
    * @returns Compiled StateGraph application
    * @private
    */
   private buildGraph() {
-    this.logger.info('Building 5-phase StateGraph workflow');
+    this.logger.info('Building 4-phase StateGraph workflow');
 
     const graph = new StateGraph(GenerationStateAnnotation)
-      // Add 5 phase nodes
+      // Add 4 phase nodes (Phase 5 removed - lesson validation in performPostGenerationQualityGate)
       .addNode('validate_input', this.phases.validateInput.bind(this.phases))
       .addNode('generate_metadata', this.phases.generateMetadata.bind(this.phases))
       .addNode('generate_sections', this.phases.generateSections.bind(this.phases))
       .addNode('validate_quality', this.phases.validateQuality.bind(this.phases))
-      .addNode('validate_lessons', this.phases.validateLessons.bind(this.phases))
 
       // Define linear edges (RT-002 sequential flow)
       .setEntryPoint('validate_input')
       .addEdge('validate_input', 'generate_metadata')
       .addEdge('generate_metadata', 'generate_sections')
       .addEdge('generate_sections', 'validate_quality')
-      .addEdge('validate_quality', 'validate_lessons')
-      .addEdge('validate_lessons', END);
+      .addEdge('validate_quality', END);
 
     const compiled = graph.compile();
 
-    this.logger.info('StateGraph compiled successfully with 5 phases');
+    this.logger.info('StateGraph compiled successfully with 4 phases');
 
     return compiled;
   }
 
   /**
-   * Execute the 5-phase generation pipeline
+   * Execute the 4-phase generation pipeline
    *
    * Workflow:
    * 1. Initialize state from GenerationJobInput
-   * 2. Invoke LangGraph StateGraph (5 phases execute sequentially)
-   * 3. Validate final state for errors
-   * 4. Assemble GenerationResult from finalState
+   * 2. Invoke LangGraph StateGraph (4 phases execute sequentially)
+   * 3. Perform post-generation quality gate (lesson count + structural quality)
+   * 4. Validate final state for errors
+   * 5. Assemble GenerationResult from finalState
    *
    * Model Routing:
    * - All models configured via database (llm_model_config table)
@@ -319,10 +325,7 @@ export class GenerationOrchestrator {
    * console.log(result.generation_metadata.total_tokens.total); // 8500 tokens
    * ```
    */
-  async execute(
-    input: GenerationJobInput,
-    modelOverride?: string
-  ): Promise<GenerationResult> {
+  async execute(input: GenerationJobInput, modelOverride?: string): Promise<GenerationResult> {
     // Log model override if provided (fallback strategy from handler)
     if (modelOverride) {
       this.logger.info(
@@ -331,13 +334,10 @@ export class GenerationOrchestrator {
           modelOverride,
           source: 'handler_fallback',
         },
-        'Starting 5-phase generation pipeline with model override'
+        'Starting 4-phase generation pipeline with model override'
       );
     } else {
-      this.logger.info(
-        { course_id: input.course_id },
-        'Starting 5-phase generation pipeline'
-      );
+      this.logger.info({ course_id: input.course_id }, 'Starting 4-phase generation pipeline');
     }
 
     const startTime = Date.now();
@@ -352,7 +352,7 @@ export class GenerationOrchestrator {
         topic: input.analysis_result?.course_category?.primary,
         ...(modelOverride && { modelOverride, source: 'handler_fallback' }),
       },
-      durationMs: 0
+      durationMs: 0,
     });
 
     // ========== STEP 1: Initialize state ==========
@@ -400,7 +400,7 @@ export class GenerationOrchestrator {
         phase: 'complete',
         stepName: 'failed',
         errorData: { error: errorMessage },
-        durationMs: Date.now() - startTime
+        durationMs: Date.now() - startTime,
       });
 
       throw new Error(errorMessage);
@@ -431,7 +431,7 @@ export class GenerationOrchestrator {
         phase: 'complete',
         stepName: 'failed',
         errorData: { error: errorSummary },
-        durationMs: totalDuration
+        durationMs: totalDuration,
       });
 
       throw new Error(`Generation failed: ${errorSummary}`);
@@ -538,10 +538,7 @@ export class GenerationOrchestrator {
       generation_metadata: generationMetadata,
     };
 
-    this.logger.info(
-      { course_id: input.course_id },
-      'GenerationResult assembled successfully'
-    );
+    this.logger.info({ course_id: input.course_id }, 'GenerationResult assembled successfully');
 
     await logTrace({
       courseId: input.course_id,
@@ -552,7 +549,7 @@ export class GenerationOrchestrator {
       outputData: courseStructure, // Full CourseStructure for UI display
       costUsd: generationMetadata.cost_usd,
       tokensUsed: generationMetadata.total_tokens.total,
-      durationMs: totalDuration
+      durationMs: totalDuration,
     });
 
     return result;
@@ -647,7 +644,7 @@ export class GenerationOrchestrator {
 
       // If any reasons, this section failed
       if (reasons.length > 0) {
-        const sectionScore = reasons.length === 0 ? 1.0 : Math.max(0, 1 - (reasons.length * 0.2));
+        const sectionScore = reasons.length === 0 ? 1.0 : Math.max(0, 1 - reasons.length * 0.2);
         failedSections.push({
           sectionNumber,
           score: sectionScore,
@@ -696,6 +693,34 @@ export class GenerationOrchestrator {
    *
    * T037: Integrates structural quality checks and minimum lessons validation.
    * Called after StateGraph execution to provide additional validation layer.
+   *
+   * VALIDATION LAYER ARCHITECTURE:
+   *
+   * 1. Phase 1 validateInput (STRUCTURAL ENTRY)
+   *    - Zod schema validation of GenerationJobInput
+   *    - Ensures required fields present before processing
+   *    - Validates data types and structure
+   *
+   * 2. Phase 4 validateQuality (QUALITY CHECK)
+   *    - Jina-v3 embeddings + cosine similarity
+   *    - Validates generated content matches input requirements
+   *    - Non-blocking informational check at Stage 5
+   *
+   * 3. performPostGenerationQualityGate (LESSON COUNT + STRUCTURAL QUALITY)
+   *    - MinimumLessonsValidator: ≥10 lessons (FR-015)
+   *    - Structural quality checks: lesson objectives, key topics
+   *    - Called AFTER StateGraph execution
+   *    - Phase 5 removed to eliminate redundancy
+   *
+   * 4. Handler safeParse (STRUCTURAL EXIT)
+   *    - Zod schema validation of GenerationResult output
+   *    - Validates CourseStructure conforms to schema
+   *    - Final structural integrity check before database storage
+   *
+   * 5. XSS Sanitization (SECURITY LAYER)
+   *    - Content sanitization for user-facing text
+   *    - Prevents XSS attacks in generated content
+   *    - Applied before frontend rendering
    *
    * @param sections - Generated sections from StateGraph
    * @param input - Original generation job input

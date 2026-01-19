@@ -49,6 +49,14 @@ export const ENUM_SYNONYMS: Record<string, Record<string, string>> = {
     expert: 'advanced',
   },
 
+  // difficulty (alias for difficulty_level - used in sections_breakdown)
+  difficulty: {
+    easy: 'beginner',
+    medium: 'intermediate',
+    hard: 'advanced',
+    expert: 'advanced',
+  },
+
   // importance (sections_breakdown.importance: 'core' | 'important' | 'optional')
   // LLMs often confuse this with difficulty enum values
   importance: {
