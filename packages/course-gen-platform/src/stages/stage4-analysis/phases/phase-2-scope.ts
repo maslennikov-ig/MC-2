@@ -271,7 +271,8 @@ export async function runPhase2Scope(input: Phase2Input): Promise<Phase2Output> 
         );
       }
 
-      // Log if LLM exceeded constraints (non-blocking, for analytics)
+      // Log if LLM exceeded max_lessons constraint (non-blocking, for analytics)
+      // Note: Root cause fix is in orchestrator.ts - now passing course_size fields to prompt
       const maxLessonsAllowed = validatedInput.max_lessons;
       if (maxLessonsAllowed && validated.recommended_structure.total_lessons > maxLessonsAllowed) {
         logger.warn(
@@ -283,7 +284,7 @@ export async function runPhase2Scope(input: Phase2Input): Promise<Phase2Output> 
             targetSections: validatedInput.target_sections,
             generatedSections: validated.recommended_structure.total_sections,
           },
-          'LLM exceeded max_lessons constraint (non-blocking warning)'
+          'LLM exceeded max_lessons constraint despite prompt guidance'
         );
       }
 

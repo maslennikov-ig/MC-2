@@ -391,6 +391,13 @@ export async function runAnalysisOrchestration(job: StructureAnalysisJob): Promi
           topic: input.topic,
           document_summaries: input.document_summaries?.map(ds => ds.processed_content) || null,
           phase1_output: phase1Output,
+          // Course size constraint fields (critical for MICRO/MINI/COMPACT presets)
+          course_size: input.course_size,
+          target_lessons: input.target_lessons,
+          target_sections: input.target_sections,
+          size_guidance: input.size_guidance,
+          min_lessons: input.min_lessons,
+          max_lessons: input.max_lessons,
         }),
       orchestrationLogger
     );
@@ -687,6 +694,8 @@ export async function runAnalysisOrchestration(job: StructureAnalysisJob): Promi
       phase3_output: phase3Output,
       phase4_output: phase4Output,
       phase6_output: phase6Output,
+      // Pass min_lessons from course_size preset (default 10 for AUTO mode)
+      min_lessons: input.min_lessons,
       total_duration_ms: totalDurationMs,
       total_tokens: totalTokens,
       total_cost_usd: totalCostUsd,
