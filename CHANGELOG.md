@@ -311,6 +311,66 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.28.10] - 2026-01-19
+
+### Added
+
+- **course-gen-platform**: add 1 source file(s), update 8 source file(s), +3 more (8dc939b)
+- **stage5**: remove redundant fields to save ~10K-15K tokens per course (4988cee)
+- **stage5**: add auto-approval support for automatic generation mode (e437736)
+- **course-gen**: add E2E test for automatic mode express generation (ba506e4)
+- **auto-approval**: add case 6 for Stage 6 lesson content generation (7a8c844)
+- **processor**: add bundle monitoring, health check, and docs (615e266)
+- **logger**: add auto-mute rules for job lifecycle warnings (3b584f8)
+
+### Changed
+
+- **stage4**: remove conflicting pedagogical_strategy fields (162feab)
+- **stage4-5**: eliminate over-engineering and fix bugs (9d91a7b)
+- **stage4**: parallelize Phase 3 and Phase 6 execution (4bdc25e)
+
+### Fixed
+
+- **stage5**: update JSDoc and fix test import path (4246db8)
+- **stage4**: remove conflicting pedagogical_strategy fields from Phase 3 (aa8cfe1)
+- **auto-approval**: address code review issues CR-001 through CR-015 (5631bf7)
+- **course-gen**: repair JSON parsing and validation failures (f848f29)
+- **auto-approval**: add two-step FSM transition for automatic mode (b833f2f)
+- **web**: image loader width param and logo aspect ratio (4ebd5a1)
+- **processor**: bundle with tsup for BullMQ ESM compatibility (59527e4)
+- **deploy**: add orphan container cleanup before dev deploy (5c8bdf7)
+- **logs**: return status from RPC to fix filter mismatch (7fa1955)
+- **processor**: add missing .js extension to error-service import (5bc28ab)
+
+### Other
+
+- bd sync: 2026-01-19 09:37:34 (28ac21a)
+- bd sync: 2026-01-19 09:35:00 (808bb5e)
+- bd sync: 2026-01-19 09:09:45 (f53fd5e)
+- bd sync: 2026-01-19 08:41:34 (030e2e6)
+- bd sync: 2026-01-19 08:41:20 (8d5a16b)
+- bd sync: 2026-01-19 08:33:04 (3b1f048)
+- bd sync: 2026-01-19 08:21:31 (cbe291e)
+- bd sync: 2026-01-19 08:16:15 (addc1f3)
+- bd sync: 2026-01-19 08:01:04 (af782cb)
+- bd sync: 2026-01-18 22:36:49 (620ea79)
+- bd sync: 2026-01-18 22:36:31 (bd4c3ce)
+- bd sync: 2026-01-18 21:43:28 (20ecdf0)
+- bd sync: 2026-01-18 21:36:25 (949b4c9)
+- bd sync: 2026-01-18 21:05:54 (f5d8896)
+- bd sync: 2026-01-18 20:55:42 (7dfe20e)
+- bd sync: 2026-01-18 20:45:56 (ef1cad8)
+- **processor**: add integration tests and bundle analysis (a029d20)
+- bd sync: 2026-01-18 20:39:24 (7855416)
+- bd sync: 2026-01-18 20:12:34 (917a07b)
+- bd sync: 2026-01-18 20:11:24 (886cde6)
+- trigger deploy after Docker cleanup (118fd17)
+- bd sync: 2026-01-18 19:15:59 (4631701)
+- bd sync: 2026-01-18 19:03:12 (1a56b1a)
+- bd sync: 2026-01-18 19:00:34 (828f49a)
+- bd sync: 2026-01-18 18:58:16 (d3b5ac4)
+- bd sync: 2026-01-18 18:54:18 (aeba136)
+
 ## [0.28.9] - 2026-01-18
 
 ### Added
