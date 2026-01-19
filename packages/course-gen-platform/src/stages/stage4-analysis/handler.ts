@@ -417,6 +417,9 @@ class Stage4AnalysisHandler {
         target_lessons: sizePreset?.targetLessons,
         target_sections: sizePreset?.targetSections,
         size_guidance: sizePreset?.llmGuidance,
+        // Dynamic min/max constraints based on course_size preset
+        min_lessons: sizePreset?.minLessons,
+        max_lessons: sizePreset?.maxLessons,
 
         // Additional context fields (user-provided)
         course_description: courseForInput.course_description || undefined,
