@@ -237,19 +237,22 @@ export async function handleStageCompletion(
 
   // Different stages use different status suffixes:
   // - Stage 2: stage_2_processing
-  // - Stage 3: stage_3_classifying
+  // - Stage 3: stage_3_summarizing (document summarization, not classification)
   // - Stage 4: stage_4_analyzing
   // - Stage 5: stage_5_generating
   // - Stage 6: stage_6_generating
   const statusSuffixMap: Record<number, string> = {
     2: 'processing',
-    3: 'classifying',
+    3: 'summarizing',
     4: 'analyzing',
     5: 'generating',
     6: 'generating',
   };
   const statusSuffix = statusSuffixMap[currentStage] || 'generating';
   const expectedCurrentStatus = `stage_${currentStage}_${statusSuffix}` as GenerationStatus;
+  // Also accept init and awaiting_approval statuses (handler may be called before status transition)
+  const initStatus = `stage_${currentStage}_init` as GenerationStatus;
+  const awaitingApprovalStatus = `stage_${currentStage}_awaiting_approval` as GenerationStatus;
 
   // IDEMPOTENCY CHECK: Only proceed if course is in expected state
   // This prevents duplicate job creation on retry or race conditions
@@ -271,13 +274,15 @@ export async function handleStageCompletion(
       );
       return { autoApproved: true, nextStage };
     }
-    // Not in expected state - something is wrong
-    if (currentStatus !== expectedCurrentStatus) {
+    // Accept processing, init, and awaiting_approval statuses
+    // (handler may be called before/after RPC status transitions)
+    const validStatuses = [expectedCurrentStatus, initStatus, awaitingApprovalStatus];
+    if (!validStatuses.includes(currentStatus)) {
       logger.warn(
         {
           courseId,
           currentStage,
-          expectedStatus: expectedCurrentStatus,
+          expectedStatuses: validStatuses,
           actualStatus: currentStatus,
         },
         'Course not in expected state for auto-approval, skipping'
@@ -286,39 +291,69 @@ export async function handleStageCompletion(
     }
   }
 
-  // FSM requires two-step transition: analyzing -> complete -> next_init
-  // First: Set current stage to complete (required by FSM validation)
-  // Use conditional update to prevent race conditions
-  // CR-001 FIX: Check both error AND row count to detect silent failures
-  const { data: updateResult, error: updateError } = await db
-    .from('courses')
-    .update({
-      generation_status: completeStatus,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', courseId)
-    .eq('generation_status', expectedCurrentStatus) // Only update if still in expected state
-    .select('id');
+  // FSM transition logic depends on current status:
+  // - From processing/init: requires two-step (stage_X_processing -> stage_X_complete -> stage_{X+1}_init)
+  // - From awaiting_approval: direct transition allowed (stage_X_awaiting_approval -> stage_{X+1}_init)
+  const actualStatus = currentCourse?.generation_status as GenerationStatus;
+  const isFromAwaitingApproval = actualStatus === awaitingApprovalStatus;
 
-  // CR-001: Check if update actually affected a row (empty result = race condition)
-  if (updateError || !updateResult || updateResult.length === 0) {
-    logger.warn(
-      { courseId, error: updateError, rowsUpdated: updateResult?.length ?? 0 },
-      'Failed to update status (race condition or status changed)'
+  if (isFromAwaitingApproval) {
+    // Direct transition from awaiting_approval to next stage init (FSM allows this)
+    const { data: updateResult, error: updateError } = await db
+      .from('courses')
+      .update({
+        generation_status: nextStatus,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', courseId)
+      .eq('generation_status', awaitingApprovalStatus)
+      .select('id');
+
+    if (updateError || !updateResult || updateResult.length === 0) {
+      logger.warn(
+        { courseId, error: updateError, rowsUpdated: updateResult?.length ?? 0 },
+        'Failed to update status from awaiting_approval (race condition)'
+      );
+      return { autoApproved: false };
+    }
+
+    logger.debug(
+      { courseId, fromStatus: awaitingApprovalStatus, toStatus: nextStatus },
+      'Direct transition from awaiting_approval to next stage'
     );
-    return { autoApproved: false };
+  } else {
+    // Two-step transition: processing/init -> complete -> next_init
+    // CR-001 FIX: Check both error AND row count to detect silent failures
+    const { data: updateResult, error: updateError } = await db
+      .from('courses')
+      .update({
+        generation_status: completeStatus,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', courseId)
+      .in('generation_status', [expectedCurrentStatus, initStatus])
+      .select('id');
+
+    // CR-001: Check if update actually affected a row (empty result = race condition)
+    if (updateError || !updateResult || updateResult.length === 0) {
+      logger.warn(
+        { courseId, error: updateError, rowsUpdated: updateResult?.length ?? 0 },
+        'Failed to update status (race condition or status changed)'
+      );
+      return { autoApproved: false };
+    }
+
+    logger.debug({ courseId, status: completeStatus }, 'Stage marked complete');
+
+    // Second step: Transition to next stage init
+    await db
+      .from('courses')
+      .update({
+        generation_status: nextStatus,
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', courseId);
   }
-
-  logger.debug({ courseId, status: completeStatus }, 'Stage marked complete');
-
-  // Second: Transition to next stage init
-  await db
-    .from('courses')
-    .update({
-      generation_status: nextStatus,
-      updated_at: new Date().toISOString(),
-    })
-    .eq('id', courseId);
 
   // Queue next stage job based on stage number
   try {

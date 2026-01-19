@@ -537,7 +537,7 @@ export class DocumentProcessingOrchestrator {
       // If the course has already moved past Stage 2, don't try to update
       const { data: course, error: courseError } = await supabaseAdmin
         .from('courses')
-        .select('generation_status')
+        .select('generation_status, generation_mode')
         .eq('id', courseId)
         .single();
 
@@ -550,6 +550,7 @@ export class DocumentProcessingOrchestrator {
       }
 
       const currentStatus = course.generation_status as string;
+      const generationMode = course.generation_mode as string;
 
       // Only update if we're still in early Stage 2 states
       // If already in awaiting_approval or complete, don't try to regress to processing
@@ -561,6 +562,17 @@ export class DocumentProcessingOrchestrator {
           { courseId, currentStatus },
           'Course already in terminal Stage 2 state, skipping progress update (normal parallel processing race condition)'
         );
+        // For automatic mode stuck in awaiting_approval, try auto-approve
+        if (currentStatus === 'stage_2_awaiting_approval' && generationMode === 'automatic') {
+          try {
+            const { autoApproved } = await handleStageCompletion(courseId, 2);
+            if (autoApproved) {
+              logger.info({ courseId }, 'Stage 2 auto-approved from awaiting_approval state');
+            }
+          } catch (err) {
+            logger.warn({ courseId, error: err }, 'Failed to auto-approve from awaiting_approval');
+          }
+        }
         return;
       }
 
