@@ -19,7 +19,7 @@ const TEST_CONFIG = {
   LANGUAGE: 'ru',
   STYLE: 'storytelling',
   LESSON_DURATION: 10,
-  MAX_WAIT_TIME: 600_000, // 10 minutes (micro is faster)
+  MAX_WAIT_TIME: 900_000, // 15 minutes (Stage 6 LLM calls take time)
   POLL_INTERVAL: 5_000,
 };
 
