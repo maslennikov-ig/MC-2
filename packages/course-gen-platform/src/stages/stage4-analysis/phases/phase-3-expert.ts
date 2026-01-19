@@ -61,6 +61,8 @@ const Phase3OutputSchema = z.object({
     assessment_approach: z.string().min(50), // How learners demonstrate understanding
     progression_logic: z.string().min(100), // How difficulty increases across lessons
   }),
+  // expansion_areas can be: array of areas, null (explicit no areas), or undefined (LLM omitted field)
+  // All cases are valid - default to null if undefined
   expansion_areas: z
     .array(
       z.object({
@@ -70,7 +72,8 @@ const Phase3OutputSchema = z.object({
         estimated_lessons: z.number().min(1), // Removed .max(10) - let LLM decide optimal count
       })
     )
-    .nullable(),
+    .nullable()
+    .optional(), // Allow undefined - LLM may omit field entirely
 });
 
 /**
@@ -320,7 +323,8 @@ export async function runPhase3Expert(input: Phase3Input): Promise<Phase3Output>
   );
   const phase3Output: Phase3Output = {
     pedagogical_strategy: mainPhaseOutput.pedagogical_strategy,
-    expansion_areas: mainPhaseOutput.expansion_areas,
+    // Default to null if LLM omitted expansion_areas field entirely
+    expansion_areas: mainPhaseOutput.expansion_areas ?? null,
     research_flags,
     phase_metadata: {
       duration_ms: totalDurationMs,

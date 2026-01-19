@@ -80,6 +80,9 @@ export interface Phase5Input {
   /** Phase 6 output: RAG planning (optional - only if documents exist) */
   phase6_output?: Phase6Output | null;
 
+  /** Minimum lessons constraint from course_size preset (default 10 for AUTO mode) */
+  min_lessons?: number;
+
   /** Total duration across all phases (ms) */
   total_duration_ms: number;
 
@@ -123,11 +126,13 @@ export async function assembleAnalysisResult(input: Phase5Input): Promise<Analys
     throw new Error('Phase 4 output is missing - cannot assemble result');
   }
 
-  // Defensive validation: Minimum 10 lessons (should already be validated in Phase 2)
+  // Defensive validation: Minimum lessons based on course_size preset
+  // Default to 10 for AUTO mode (FR-015), but respect preset min for MICRO/MINI/etc.
+  const minLessonsRequired = input.min_lessons ?? 10;
   const totalLessons = input.phase2_output.recommended_structure.total_lessons;
-  if (totalLessons < 10) {
+  if (totalLessons < minLessonsRequired) {
     throw new Error(
-      `Phase 2 validation failure: total_lessons (${totalLessons}) is less than minimum required (10). ` +
+      `Phase 2 validation failure: total_lessons (${totalLessons}) is less than minimum required (${minLessonsRequired}). ` +
         'This should have been caught in Phase 2 validation.'
     );
   }
@@ -365,12 +370,8 @@ function validateAnalysisResult(result: AnalysisResult): void {
     throw new Error('Validation error: metadata.created_at is missing');
   }
 
-  // Validate minimum lessons requirement (defensive check)
-  if (result.recommended_structure.total_lessons < 10) {
-    throw new Error(
-      `Validation error: total_lessons (${result.recommended_structure.total_lessons}) is less than minimum required (10)`
-    );
-  }
+  // Note: Minimum lessons validation is done in assembleAnalysisResult
+  // using dynamic min_lessons from course_size preset (not hardcoded 10)
 
   // Validate optional pedagogical_patterns field (when present)
   if (result.pedagogical_patterns) {
