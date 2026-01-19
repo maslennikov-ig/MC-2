@@ -1,7 +1,7 @@
 #!/usr/bin/env tsx
 /**
- * E2E Test: Micro Auto Course Generation
- * Tests automatic generation mode with micro course size (2-4 lessons)
+ * E2E Test: Mini Auto Course Generation
+ * Tests automatic generation mode with mini course size (8-16 lessons)
  */
 
 import { config } from 'dotenv';
@@ -13,13 +13,13 @@ import type { Database } from '@megacampus/shared-types';
 config();
 
 const TEST_CONFIG = {
-  TOPIC: 'Основы тайм-менеджмента',
-  COURSE_SIZE: 'micro' as const,
+  TOPIC: 'Основы цифрового маркетинга',
+  COURSE_SIZE: 'mini' as const,
   GENERATION_MODE: 'automatic' as const,
   LANGUAGE: 'ru',
-  STYLE: 'storytelling',
-  LESSON_DURATION: 10,
-  MAX_WAIT_TIME: 600_000, // 10 minutes (micro is faster)
+  STYLE: 'academic',
+  LESSON_DURATION: 15,
+  MAX_WAIT_TIME: 1_200_000, // 20 minutes (mini takes longer)
   POLL_INTERVAL: 5_000,
 };
 
@@ -38,16 +38,16 @@ function delay(ms: number): Promise<void> {
 
 async function main() {
   console.log('═'.repeat(50));
-  console.log('  E2E Test: MICRO Auto Course Generation');
+  console.log('  E2E Test: MINI Auto Course Generation');
   console.log('═'.repeat(50));
   console.log(`  Тема: ${TEST_CONFIG.TOPIC}`);
-  console.log('  Формат: micro (2-4 урока)');
+  console.log('  Формат: mini (8-16 уроков, 2-4 секции)');
   console.log('  Режим: automatic');
   console.log('═'.repeat(50));
   console.log('');
 
   const supabase = getSupabaseAdmin();
-  const slug = `micro-auto-${Date.now()}`;
+  const slug = `mini-auto-${Date.now()}`;
 
   // Create course
   console.log('[00:00] Создание курса...');
@@ -66,7 +66,7 @@ async function main() {
       target_audience: 'beginner',
       difficulty: 'beginner',
       generation_status: 'pending' as Database['public']['Enums']['generation_status'],
-      course_description: 'Краткое введение в тайм-менеджмент',
+      course_description: 'Практический курс по основам цифрового маркетинга для начинающих',
       settings: {
         topic: TEST_CONFIG.TOPIC,
         lesson_duration_minutes: TEST_CONFIG.LESSON_DURATION,
@@ -111,6 +111,7 @@ async function main() {
   console.log('\n--- Мониторинг прогресса ---');
   const startTime = Date.now();
   let lastStatus = '';
+  let lastLessonProgress = '';
 
   while (Date.now() - startTime < TEST_CONFIG.MAX_WAIT_TIME) {
     const { data: c, error: e } = await supabase
@@ -133,16 +134,45 @@ async function main() {
       lastStatus = status;
     }
 
+    // Show lesson generation progress for Stage 6
+    if (status === 'stage_6_generating') {
+      const { data: lessons } = await supabase
+        .from('course_lessons')
+        .select('id, generation_status')
+        .eq('course_id', course.id);
+
+      if (lessons) {
+        const completed = lessons.filter(l => l.generation_status === 'completed').length;
+        const total = lessons.length;
+        const progressStr = `${completed}/${total}`;
+        if (progressStr !== lastLessonProgress) {
+          console.log(`[${formatTime(elapsed)}]   Уроки: ${progressStr}`);
+          lastLessonProgress = progressStr;
+        }
+      }
+    }
+
     if (status === 'stage_6_complete' || status === 'completed') {
-      console.log('\n✅ MICRO Test PASSED!');
+      console.log('\n✅ MINI Test PASSED!');
       const structure = c.course_structure as { sections: { lessons: unknown[] }[] } | null;
+      const sectionCount = structure?.sections?.length || 0;
       const lessonCount = structure?.sections?.reduce((sum, s) => sum + s.lessons.length, 0) || 0;
-      console.log(`   Уроков: ${lessonCount} (ожидалось 2-4 для micro)`);
+      console.log(`   Секций: ${sectionCount} (ожидалось 2-4 для mini)`);
+      console.log(`   Уроков: ${lessonCount} (ожидалось 8-16 для mini)`);
+
+      // Validate constraints
+      if (lessonCount < 8 || lessonCount > 16) {
+        console.log(`\n⚠️  WARNING: Lesson count ${lessonCount} is outside mini range [8-16]`);
+      }
+      if (sectionCount < 2 || sectionCount > 4) {
+        console.log(`\n⚠️  WARNING: Section count ${sectionCount} is outside mini range [2-4]`);
+      }
+
       process.exit(0);
     }
 
     if (status === 'failed') {
-      console.log('\n❌ MICRO Test FAILED');
+      console.log('\n❌ MINI Test FAILED');
       process.exit(1);
     }
 

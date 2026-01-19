@@ -488,64 +488,9 @@ Each item in \`key_topics\` MUST directly correspond to a \`learning_objective\`
 
 4. **Scope Warning** (if applicable):
    - Warn if scope is very narrow or very broad
-   - Warn if total_lessons is exactly 10 (borderline minimum)
 
-**Critical JSON Structure** (fill with real data):
-{"recommended_structure":{"estimated_content_hours":10.0,"scope_reasoning":"str","lesson_duration_minutes":15,"calculation_explanation":"str","total_lessons":40,"total_sections":2,"scope_warning":null,"sections_breakdown":[{"area":"str","estimated_lessons":5,"importance":"core","learning_objectives":["str"],"key_topics":["str"],"pedagogical_approach":"str","difficulty_progression":"gradual","section_id":"1","estimated_duration_hours":1.25,"difficulty":"beginner","prerequisites":[]}]},"phase_metadata":{"duration_ms":0,"model_used":"str","tokens":{"input":0,"output":0,"total":0},"quality_score":0.0,"retry_count":0}}
-
-**Output Format** (DETAILED JSON with complete data):
-{
-  "recommended_structure": {
-    "estimated_content_hours": 10.0,
-    "scope_reasoning": "Reasoning for 10 hours estimate based on topic complexity...",
-    "lesson_duration_minutes": 15,
-    "calculation_explanation": "10 hours × 60 min/hour ÷ 15 min/lesson = 40 lessons",
-    "total_lessons": 40,
-    "total_sections": 8,
-    "scope_warning": null,
-    "sections_breakdown": [
-      {
-        "area": "Introduction to Fundamentals",
-        "estimated_lessons": 5,
-        "importance": "core",
-        "learning_objectives": [
-          "Understand basic concepts",
-          "Identify key terminology"
-        ],
-        "key_topics": ["Topic A", "Topic B", "Topic C"],
-        "pedagogical_approach": "Start with theory, move to examples, include practice exercises",
-        "difficulty_progression": "gradual",
-        "section_id": "1",
-        "estimated_duration_hours": 1.25,
-        "difficulty": "beginner",
-        "prerequisites": []
-      },
-      {
-        "area": "Advanced Topics",
-        "estimated_lessons": 8,
-        "importance": "important",
-        "learning_objectives": [
-          "Master complex concepts",
-          "Apply advanced techniques"
-        ],
-        "key_topics": ["Topic X", "Topic Y", "Topic Z"],
-        "pedagogical_approach": "Build on fundamentals with challenging exercises",
-        "difficulty_progression": "steep",
-        "section_id": "2",
-        "estimated_duration_hours": 2.0,
-        "difficulty": "advanced",
-        "prerequisites": ["1"]
-      }
-    ]
-  },
-  "phase_metadata": {
-    "duration_ms": 0,
-    "model_used": "openai/gpt-oss-20b",
-    "tokens": { "input": 0, "output": 0, "total": 0 },
-    "quality_score": 0.0,
-    "retry_count": 0
-  }
-}
+**JSON Schema** (fields only, calculate values based on constraints above):
+{"recommended_structure":{"estimated_content_hours":<number>,"scope_reasoning":"<string>","lesson_duration_minutes":<number>,"calculation_explanation":"<string>","total_lessons":<number>,"total_sections":<number>,"scope_warning":<string|null>,"sections_breakdown":[{"area":"<string>","estimated_lessons":<number>,"importance":"<core|important|optional>","learning_objectives":["<string>"],"key_topics":["<string>"],"pedagogical_approach":"<string>","difficulty_progression":"<flat|gradual|steep>","section_id":"<string>","estimated_duration_hours":<number>,"difficulty":"<beginner|intermediate|advanced>","prerequisites":["<section_id>"]}]},"phase_metadata":{"duration_ms":0,"model_used":"","tokens":{"input":0,"output":0,"total":0},"quality_score":0.0,"retry_count":0}}
 
 IMPORTANT:
 - Output ONLY valid JSON (no markdown, no comments)
