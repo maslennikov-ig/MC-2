@@ -3,12 +3,18 @@
  *
  * Coordinates all 7 phases of Stage 4 Analysis workflow:
  * - Phase 0 (Pre-Flight): Stage 3 barrier validation, input validation (0-10%)
- * - Phase 1: Basic Classification (10-20%)
- * - Phase 2: Scope Analysis (20-35%) - includes minimum 10 lessons check
- * - Phase 3: Deep Expert Analysis (35-60%)
- * - Phase 4: Document Synthesis (60-75%)
- * - Phase 6: RAG Planning (75-85%) - document-to-section mapping for Generation
+ * - Phase 1: Basic Classification (10-25%)
+ * - Phase 2: Scope Analysis (25-40%) - includes minimum 10 lessons check
+ * - Phase 3 + Phase 6: PARALLEL EXECUTION (40-70%)
+ *   - Phase 3: Deep Expert Analysis (depends on Phase 1+2)
+ *   - Phase 6: RAG Planning (depends only on Phase 2) - runs in parallel
+ * - Phase 4: Document Synthesis (70-85%)
  * - Phase 5: Final Assembly (85-100%)
+ *
+ * Parallel Optimization:
+ * Phase 6 (RAG Planning) depends only on Phase 2 (sections_breakdown),
+ * NOT on Phase 3 or Phase 4. Running Phase 3 and Phase 6 in parallel
+ * saves 5-10 seconds per course generation.
  *
  * Key Features:
  * - Real-time progress updates (Russian messages)
@@ -18,6 +24,7 @@
  * - Extended observability metrics (FR-014)
  * - Multi-model orchestration (FR-017)
  * - RAG planning for 45x cost savings in Generation (Analyze Enhancement)
+ * - Parallel Phase 3 + Phase 6 execution for faster processing
  *
  * Split from original 555-line file to comply with 300-line constitution principle.
  * Validation logic extracted to analysis-validators.ts.
@@ -417,11 +424,62 @@ export async function runAnalysisOrchestration(job: StructureAnalysisJob): Promi
     });
 
     // =================================================================
-    // PHASE 3: Deep Expert Analysis (45-75%)
+    // PARALLEL EXECUTION: Phase 3 + Phase 6 run concurrently
     // =================================================================
-    await startPhase(3, courseId, supabase, orchestrationLogger);
+    // Phase 6 (RAG Planning) depends only on Phase 2 (sections_breakdown),
+    // NOT on Phase 3 or Phase 4. Running them in parallel saves 5-10 seconds.
+    //
+    // Dependency graph after Phase 2:
+    //   ├── Phase 3 (Expert) → Phase 4 (Synthesis) ──┐
+    //   │                                            │
+    //   └── Phase 6 (RAG Planning) ──────────────────┘ → Phase 5 (Assembly)
 
     const documentSummariesText = input.document_summaries?.map(ds => ds.processed_content) || null;
+
+    // Start Phase 6 in parallel (non-blocking) if documents exist
+    let phase6Promise: Promise<Phase6Output | null> | null = null;
+    const phase6StartTime = Date.now();
+
+    if (input.document_summaries && input.document_summaries.length > 0) {
+      orchestrationLogger.info(
+        { documentCount: input.document_summaries.length },
+        'Starting Phase 6 (RAG Planning) in parallel with Phase 3'
+      );
+
+      phase6Promise = executePhaseWithRetry(
+        'phase6_rag_planning',
+        () =>
+          runPhase6RagPlanning({
+            course_id: courseId,
+            language: input.language,
+            sections_breakdown: phase2Output.recommended_structure.sections_breakdown,
+            document_summaries: input.document_summaries!.map(ds => ({
+              document_id: ds.document_id,
+              file_name: ds.file_name,
+              processed_content: ds.processed_content,
+            })),
+          }),
+        orchestrationLogger
+      ).catch((phase6Error: Error) => {
+        // Phase 6 failed - log warning and return null (graceful degradation)
+        orchestrationLogger.warn(
+          {
+            error: phase6Error.message,
+            phase: 'stage_6_rag_planning',
+            durationMs: Date.now() - phase6StartTime,
+          },
+          'Phase 6 (RAG Planning) failed in parallel - Generation will use NAIVE mode instead of SMART mode'
+        );
+        return null;
+      });
+    } else {
+      orchestrationLogger.info('Skipping Phase 6 (RAG Planning): No documents available');
+    }
+
+    // =================================================================
+    // PHASE 3: Deep Expert Analysis (45-70%)
+    // =================================================================
+    await startPhase(3, courseId, supabase, orchestrationLogger);
 
     const phase3Output: Phase3Output = await executePhaseWithRetry(
       'phase3_expert',
@@ -463,7 +521,7 @@ export async function runAnalysisOrchestration(job: StructureAnalysisJob): Promi
     });
 
     // =================================================================
-    // PHASE 4: Document Synthesis (75-90%)
+    // PHASE 4: Document Synthesis (70-85%)
     // =================================================================
     await startPhase(4, courseId, supabase, orchestrationLogger);
 
@@ -523,32 +581,16 @@ export async function runAnalysisOrchestration(job: StructureAnalysisJob): Promi
     }
 
     // =================================================================
-    // PHASE 6: RAG Planning (75-85%) - CONDITIONAL
+    // AWAIT PHASE 6: Collect parallel result before Assembly
     // =================================================================
-    // Only run if documents exist (required for RAG mapping)
     let phase6Output: Phase6Output | null = null;
 
-    if (input.document_summaries && input.document_summaries.length > 0) {
-      await startPhase(6, courseId, supabase, orchestrationLogger);
+    if (phase6Promise) {
+      orchestrationLogger.info('Awaiting Phase 6 (RAG Planning) parallel result...');
+      phase6Output = await phase6Promise;
 
-      try {
-        phase6Output = await executePhaseWithRetry(
-          'phase6_rag_planning',
-          () =>
-            runPhase6RagPlanning({
-              course_id: courseId,
-              language: input.language,
-              sections_breakdown: phase2Output.recommended_structure.sections_breakdown,
-              document_summaries: input.document_summaries!.map(ds => ({
-                document_id: ds.document_id,
-                file_name: ds.file_name,
-                processed_content: ds.processed_content,
-              })),
-            }),
-          orchestrationLogger
-        );
-
-        // Calculate aggregate stats for logging (Analyze Enhancement A20)
+      if (phase6Output) {
+        // Phase 6 completed successfully - log results
         const totalSearchTerms = Object.values(phase6Output.document_relevance_mapping).reduce(
           (sum, mapping) => sum + (mapping.key_search_terms?.length ?? 0),
           0
@@ -558,14 +600,18 @@ export async function runAnalysisOrchestration(job: StructureAnalysisJob): Promi
           0
         );
 
-        await completePhase(6, courseId, supabase, orchestrationLogger, {
-          sections_mapped: Object.keys(phase6Output.document_relevance_mapping).length,
-          documents_total: input.document_summaries.length,
-          duration_ms: phase6Output.phase_metadata.duration_ms,
-          model_used: phase6Output.phase_metadata.model_used,
-          total_search_terms: totalSearchTerms,
-          total_topics: totalTopics,
-        });
+        orchestrationLogger.info(
+          {
+            sections_mapped: Object.keys(phase6Output.document_relevance_mapping).length,
+            documents_total: input.document_summaries?.length || 0,
+            duration_ms: phase6Output.phase_metadata.duration_ms,
+            model_used: phase6Output.phase_metadata.model_used,
+            total_search_terms: totalSearchTerms,
+            total_topics: totalTopics,
+            parallel_execution: true,
+          },
+          'Phase 6 (RAG Planning) completed successfully (parallel)'
+        );
 
         // Get trace data (raw prompt/completion) stored by phase function
         const phase6TraceData = getAndClearTraceData(courseId, 'stage_6_rag_planning');
@@ -575,8 +621,8 @@ export async function runAnalysisOrchestration(job: StructureAnalysisJob): Promi
           stage: 'stage_4',
           phase: 'rag_planning',
           stepName: 'rag_planning',
-          inputData: { documentsTotal: input.document_summaries.length },
-          outputData: phase6Output, // Full phase output for complete visibility
+          inputData: { documentsTotal: input.document_summaries?.length || 0 },
+          outputData: phase6Output,
           promptText: phase6TraceData?.promptText,
           completionText: phase6TraceData?.completionText,
           tokensUsed:
@@ -584,14 +630,11 @@ export async function runAnalysisOrchestration(job: StructureAnalysisJob): Promi
           modelUsed: phase6Output.phase_metadata.model_used,
           durationMs: phase6Output.phase_metadata.duration_ms,
         });
-      } catch (phase6Error) {
-        // Phase 6 failed - log warning and continue with degraded functionality (Analyze Enhancement A19)
+      } else {
+        // Phase 6 failed (null returned from catch block)
         orchestrationLogger.warn(
-          {
-            error: phase6Error instanceof Error ? phase6Error.message : String(phase6Error),
-            phase: 'stage_6_rag_planning',
-          },
-          'Phase 6 (RAG Planning) failed - continuing without document_relevance_mapping. Generation will use NAIVE mode instead of SMART mode.'
+          { documentsTotal: input.document_summaries?.length || 0 },
+          'Phase 6 (RAG Planning) failed - continuing without document_relevance_mapping'
         );
 
         await logTrace({
@@ -599,25 +642,11 @@ export async function runAnalysisOrchestration(job: StructureAnalysisJob): Promi
           stage: 'stage_4',
           phase: 'rag_planning',
           stepName: 'rag_planning',
-          inputData: { documentsTotal: input.document_summaries.length },
-          errorData: {
-            error: phase6Error instanceof Error ? phase6Error.message : String(phase6Error),
-          },
-          durationMs: 0,
-        });
-
-        // Set to null to indicate Phase 6 was attempted but failed
-        // (undefined means Phase 6 was skipped due to no documents)
-        phase6Output = null;
-
-        // Complete phase with error status
-        await completePhase(6, courseId, supabase, orchestrationLogger, {
-          error: phase6Error instanceof Error ? phase6Error.message : String(phase6Error),
-          fallback_mode: 'NAIVE',
+          inputData: { documentsTotal: input.document_summaries?.length || 0 },
+          errorData: { error: 'Phase 6 failed during parallel execution' },
+          durationMs: Date.now() - phase6StartTime,
         });
       }
-    } else {
-      orchestrationLogger.info('Skipping Phase 6 (RAG Planning): No documents available');
     }
 
     // =================================================================

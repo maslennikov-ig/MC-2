@@ -238,12 +238,15 @@ async function queueNextStageJob(
   const tier = orgData?.tier || 'free';
   const priority = tier === 'premium' ? 10 : tier === 'standard' ? 5 : 1;
 
+  // Locale must be explicitly typed for JobData compatibility
+  const locale: 'en' | 'ru' = course.language === 'en' ? 'en' : 'ru';
+
   const baseJobData = {
     organizationId,
     courseId,
     userId,
     createdAt: new Date().toISOString(),
-    locale: course.language === 'en' ? 'en' : 'ru',
+    locale,
   };
 
   // IDEMPOTENCY: Use deterministic jobId to prevent duplicate jobs
