@@ -18,7 +18,10 @@
  */
 
 import { describe, it, expect, vi } from 'vitest';
-import { selfReviewerNode, SELF_REVIEW_CONFIG } from '@/stages/stage6-lesson-content/nodes/self-reviewer-node';
+import {
+  selfReviewerNode,
+  SELF_REVIEW_CONFIG,
+} from '@/stages/stage6-lesson-content/nodes/self-reviewer-node';
 import type { LessonGraphStateType } from '@/stages/stage6-lesson-content/state';
 import { MODEL_FALLBACK } from '@/stages/stage6-lesson-content/config';
 import type { SelfReviewResult } from '@megacampus/shared-types/judge-types';
@@ -35,14 +38,16 @@ vi.mock('@/shared/logger', () => {
     error: vi.fn(),
     debug: vi.fn(),
   };
+  const mockLogger = {
+    info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
+    child: vi.fn(() => mockChild),
+  };
   return {
-    logger: {
-      info: vi.fn(),
-      warn: vi.fn(),
-      error: vi.fn(),
-      debug: vi.fn(),
-      child: vi.fn(() => mockChild),
-    },
+    logger: mockLogger,
+    default: mockLogger,
   };
 });
 
@@ -87,6 +92,13 @@ vi.mock('@/shared/llm/model-config-service', () => ({
       temperature: 0.7,
     }),
   }),
+}));
+
+// Mock database-service to prevent actual Supabase calls
+vi.mock('@/stages/stage6-lesson-content/services/database-service', () => ({
+  saveRejectedContent: vi.fn().mockResolvedValue(undefined),
+  saveLessonContent: vi.fn().mockResolvedValue(undefined),
+  updateCourseProgress: vi.fn().mockResolvedValue(undefined),
 }));
 
 // ============================================================================
@@ -282,7 +294,8 @@ describe('findSectionsWithForeignCharacters (unit)', () => {
     const state = createMockState({ generatedContent: cleanContent });
     const result = await selfReviewerNode(state);
 
-    const languageIssues = result.selfReviewResult?.issues?.filter(i => i.type === 'LANGUAGE') ?? [];
+    const languageIssues =
+      result.selfReviewResult?.issues?.filter(i => i.type === 'LANGUAGE') ?? [];
     expect(languageIssues).toHaveLength(0);
   });
 
@@ -290,7 +303,8 @@ describe('findSectionsWithForeignCharacters (unit)', () => {
     const state = createMockState({ generatedContent: singleSectionCJK });
     const result = await selfReviewerNode(state);
 
-    const languageIssues = result.selfReviewResult?.issues?.filter(i => i.type === 'LANGUAGE') ?? [];
+    const languageIssues =
+      result.selfReviewResult?.issues?.filter(i => i.type === 'LANGUAGE') ?? [];
 
     // Should have COMPLEX severity issues (partial regeneration)
     expect(languageIssues.length).toBeGreaterThan(0);
@@ -308,7 +322,8 @@ describe('findSectionsWithForeignCharacters (unit)', () => {
     const state = createMockState({ generatedContent: cjkInCodeOnly });
     const result = await selfReviewerNode(state);
 
-    const languageIssues = result.selfReviewResult?.issues?.filter(i => i.type === 'LANGUAGE') ?? [];
+    const languageIssues =
+      result.selfReviewResult?.issues?.filter(i => i.type === 'LANGUAGE') ?? [];
 
     // Should NOT flag CJK in code blocks
     expect(languageIssues).toHaveLength(0);
@@ -350,7 +365,8 @@ describe('findSectionsWithForeignCharacters (unit)', () => {
 
     const result = await selfReviewerNode(state);
 
-    const languageIssues = result.selfReviewResult?.issues?.filter(i => i.type === 'LANGUAGE') ?? [];
+    const languageIssues =
+      result.selfReviewResult?.issues?.filter(i => i.type === 'LANGUAGE') ?? [];
 
     // 2 sections with CJK (intro + summary) out of 4 total = 50% -> triggers CRITICAL global
     // So we check for global issue containing both affected areas
@@ -374,7 +390,8 @@ describe('Scenario 1: First Attempt - Partial Regeneration', () => {
     const result = await selfReviewerNode(state);
 
     // Should have COMPLEX severity issues (one per affected section)
-    const languageIssues = result.selfReviewResult?.issues?.filter(i => i.type === 'LANGUAGE') ?? [];
+    const languageIssues =
+      result.selfReviewResult?.issues?.filter(i => i.type === 'LANGUAGE') ?? [];
     const complexIssues = languageIssues.filter(i => i.severity === 'COMPLEX');
 
     expect(complexIssues.length).toBeGreaterThan(0);
@@ -437,9 +454,10 @@ describe('Scenario 1: First Attempt - Partial Regeneration', () => {
 
     const result = await selfReviewerNode(state);
 
-    const complexIssues = result.selfReviewResult?.issues?.filter(
-      i => i.type === 'LANGUAGE' && i.severity === 'COMPLEX'
-    ) ?? [];
+    const complexIssues =
+      result.selfReviewResult?.issues?.filter(
+        i => i.type === 'LANGUAGE' && i.severity === 'COMPLEX'
+      ) ?? [];
 
     // Should have 2 COMPLEX issues (one per affected section)
     // Note: 2 sections with CJK out of 6 total (intro + 4 spec + summary) = 33% < 50%
@@ -464,7 +482,8 @@ describe('Scenario 2: First Attempt - Full Regeneration', () => {
 
     const result = await selfReviewerNode(state);
 
-    const languageIssues = result.selfReviewResult?.issues?.filter(i => i.type === 'LANGUAGE') ?? [];
+    const languageIssues =
+      result.selfReviewResult?.issues?.filter(i => i.type === 'LANGUAGE') ?? [];
 
     // Should have at least one CRITICAL issue with location='global'
     const criticalGlobal = languageIssues.find(
@@ -492,7 +511,8 @@ describe('Scenario 2: First Attempt - Full Regeneration', () => {
 
     const result = await selfReviewerNode(state);
 
-    const languageIssues = result.selfReviewResult?.issues?.filter(i => i.type === 'LANGUAGE') ?? [];
+    const languageIssues =
+      result.selfReviewResult?.issues?.filter(i => i.type === 'LANGUAGE') ?? [];
 
     // Should trigger full regeneration (>= 50%)
     const criticalGlobal = languageIssues.find(
@@ -523,7 +543,8 @@ describe('Scenario 3: Retry Attempt - Model Fallback', () => {
       });
       const result = await selfReviewerNode(state);
 
-      const languageIssues = result.selfReviewResult?.issues?.filter(i => i.type === 'LANGUAGE') || [];
+      const languageIssues =
+        result.selfReviewResult?.issues?.filter(i => i.type === 'LANGUAGE') || [];
       const hasCritical = languageIssues.some(i => i.severity === 'CRITICAL');
       const hasComplex = languageIssues.some(i => i.severity === 'COMPLEX');
 
@@ -553,7 +574,8 @@ describe('Scenario 3: Retry Attempt - Model Fallback', () => {
     expect(result.modelOverride).toBeUndefined();
 
     // Should have COMPLEX issues for partial regeneration (not CRITICAL for fallback)
-    const languageIssues = result.selfReviewResult?.issues?.filter(i => i.type === 'LANGUAGE') ?? [];
+    const languageIssues =
+      result.selfReviewResult?.issues?.filter(i => i.type === 'LANGUAGE') ?? [];
     const complexIssues = languageIssues.filter(i => i.severity === 'COMPLEX');
     expect(complexIssues.length).toBeGreaterThan(0);
   });
@@ -567,7 +589,8 @@ describe('Scenario 3: Retry Attempt - Model Fallback', () => {
     const result = await selfReviewerNode(state);
 
     // Should have CRITICAL issue with persistent CJK message
-    const languageIssues = result.selfReviewResult?.issues?.filter(i => i.type === 'LANGUAGE') ?? [];
+    const languageIssues =
+      result.selfReviewResult?.issues?.filter(i => i.type === 'LANGUAGE') ?? [];
     const criticalIssue = languageIssues.find(i => i.severity === 'CRITICAL');
 
     expect(criticalIssue).toBeDefined();
@@ -606,7 +629,8 @@ describe('Scenario 3: Retry Attempt - Model Fallback', () => {
     const result = await selfReviewerNode(state);
 
     // The fallback model info should be in the CRITICAL issue description
-    const languageIssues = result.selfReviewResult?.issues?.filter(i => i.type === 'LANGUAGE') ?? [];
+    const languageIssues =
+      result.selfReviewResult?.issues?.filter(i => i.type === 'LANGUAGE') ?? [];
     const criticalIssue = languageIssues.find(i => i.severity === 'CRITICAL');
 
     expect(criticalIssue).toBeDefined();
@@ -628,7 +652,8 @@ describe('Scenario 4: No CJK - Normal Flow', () => {
 
     const result = await selfReviewerNode(state);
 
-    const languageIssues = result.selfReviewResult?.issues?.filter(i => i.type === 'LANGUAGE') ?? [];
+    const languageIssues =
+      result.selfReviewResult?.issues?.filter(i => i.type === 'LANGUAGE') ?? [];
 
     // Should have NO language issues
     expect(languageIssues).toHaveLength(0);
@@ -662,10 +687,14 @@ describe('Scenario 4: No CJK - Normal Flow', () => {
 
     const result = await selfReviewerNode(state);
 
-    const languageIssues = result.selfReviewResult?.issues?.filter(i => i.type === 'LANGUAGE') ?? [];
+    const criticalLanguageIssues =
+      result.selfReviewResult?.issues?.filter(
+        i => i.type === 'LANGUAGE' && i.severity === 'CRITICAL'
+      ) ?? [];
 
     // Should have NO critical language issues (below threshold)
-    expect(languageIssues).toHaveLength(0);
+    // Minor INFO-level issues may still be present
+    expect(criticalLanguageIssues).toHaveLength(0);
   });
 });
 
@@ -682,7 +711,8 @@ describe('Scenario 5: CJK in Code Blocks Only', () => {
 
     const result = await selfReviewerNode(state);
 
-    const languageIssues = result.selfReviewResult?.issues?.filter(i => i.type === 'LANGUAGE') ?? [];
+    const languageIssues =
+      result.selfReviewResult?.issues?.filter(i => i.type === 'LANGUAGE') ?? [];
 
     // Should have NO language issues (CJK in code blocks excluded)
     expect(languageIssues).toHaveLength(0);
@@ -715,7 +745,8 @@ describe('Scenario 5: CJK in Code Blocks Only', () => {
 
     const result = await selfReviewerNode(state);
 
-    const languageIssues = result.selfReviewResult?.issues?.filter(i => i.type === 'LANGUAGE') ?? [];
+    const languageIssues =
+      result.selfReviewResult?.issues?.filter(i => i.type === 'LANGUAGE') ?? [];
 
     // Should have NO language issues
     expect(languageIssues).toHaveLength(0);
@@ -763,7 +794,8 @@ print("稀缺性资源分配")
 
     const result = await selfReviewerNode(state);
 
-    const languageIssues = result.selfReviewResult?.issues?.filter(i => i.type === 'LANGUAGE') ?? [];
+    const languageIssues =
+      result.selfReviewResult?.issues?.filter(i => i.type === 'LANGUAGE') ?? [];
 
     // Should detect CJK in prose (not in code blocks)
     // CJK in section_1 prose, 1 out of 4 = 25% < 50% = partial regeneration
@@ -837,7 +869,8 @@ describe('Edge Cases', () => {
 
     const result = await selfReviewerNode(state);
 
-    const languageIssues = result.selfReviewResult?.issues?.filter(i => i.type === 'LANGUAGE') ?? [];
+    const languageIssues =
+      result.selfReviewResult?.issues?.filter(i => i.type === 'LANGUAGE') ?? [];
 
     // Should detect CJK - 1 section out of 4 = 25% < 50% = partial regeneration (COMPLEX)
     expect(languageIssues.length).toBeGreaterThan(0);
@@ -879,7 +912,8 @@ describe('Edge Cases', () => {
 
     const result = await selfReviewerNode(state);
 
-    const languageIssues = result.selfReviewResult?.issues?.filter(i => i.type === 'LANGUAGE') ?? [];
+    const languageIssues =
+      result.selfReviewResult?.issues?.filter(i => i.type === 'LANGUAGE') ?? [];
 
     // Should have unique section IDs (introduction counted once)
     const locations = languageIssues.map(i => i.location);
@@ -924,7 +958,8 @@ describe('Edge Cases', () => {
 
     const result = await selfReviewerNode(state);
 
-    const languageIssues = result.selfReviewResult?.issues?.filter(i => i.type === 'LANGUAGE') ?? [];
+    const languageIssues =
+      result.selfReviewResult?.issues?.filter(i => i.type === 'LANGUAGE') ?? [];
 
     // Should detect foreign scripts - CJK + Arabic in intro = 1 section out of 4 = 25% = partial
     expect(languageIssues.length).toBeGreaterThan(0);
@@ -969,7 +1004,8 @@ describe('Integration: CJK with Other Issues', () => {
     const result = await selfReviewerNode(state);
 
     // Should have LANGUAGE issues (CJK detected)
-    const languageIssues = result.selfReviewResult?.issues?.filter(i => i.type === 'LANGUAGE') ?? [];
+    const languageIssues =
+      result.selfReviewResult?.issues?.filter(i => i.type === 'LANGUAGE') ?? [];
 
     // CJK in intro, 1 section out of 3 (intro + section_1 + summary) = 33% < 50%
     // This triggers COMPLEX issues (partial regeneration) not CRITICAL (full regeneration)
@@ -1041,10 +1077,11 @@ describe('Error Handling', () => {
     // Falls back to heuristic-only result - clean content returns PASS
     expect(result.selfReviewResult?.status).toBe('PASS');
 
-    // Should indicate LLM review was skipped
-    expect(result.selfReviewResult?.reasoning).toContain('LLM review skipped');
+    // Should indicate LLM review failed with timeout error
+    expect(result.selfReviewResult?.reasoning).toContain('LLM review failed');
+    expect(result.selfReviewResult?.reasoning).toContain('timeout');
 
-    // Should use 0 tokens (heuristic-only)
+    // Should use 0 tokens (timeout = no tokens consumed)
     expect(result.selfReviewResult?.tokensUsed).toBe(0);
 
     // Restore default mock for other tests
