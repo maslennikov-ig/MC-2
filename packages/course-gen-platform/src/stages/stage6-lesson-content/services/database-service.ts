@@ -449,16 +449,19 @@ export async function saveSourceDocuments(
  * in the course have been generated. If so, it transitions the course from
  * stage_6_generating to stage_6_complete.
  *
+ * If auto_finalize_after_stage6 is enabled, it also transitions to 'completed'
+ * and sets generation_completed_at.
+ *
  * @param courseId - Course UUID
  */
 export async function checkAndSetStage6Complete(courseId: string): Promise<void> {
   const supabaseAdmin = getSupabaseAdmin();
 
   try {
-    // Get current course status
+    // Get current course status and auto_finalize flag
     const { data: course, error: courseError } = await supabaseAdmin
       .from('courses')
-      .select('generation_status, course_structure')
+      .select('generation_status, course_structure, auto_finalize_after_stage6')
       .eq('id', courseId)
       .single();
 
@@ -527,15 +530,25 @@ export async function checkAndSetStage6Complete(courseId: string): Promise<void>
         courseId,
         expectedLessonsCount,
         completedLessonsCount,
+        autoFinalize: course.auto_finalize_after_stage6,
       },
       'Checking Stage 6 completion'
     );
 
     // If all lessons are complete, transition to stage_6_complete
     if (completedLessonsCount >= expectedLessonsCount) {
+      // Determine target status based on auto_finalize flag
+      const shouldAutoFinalize = course.auto_finalize_after_stage6 === true;
+
+      // Set generation_completed_at when finalizing
+      const completedAt = shouldAutoFinalize ? new Date().toISOString() : undefined;
+
       const { error: updateError } = await supabaseAdmin
         .from('courses')
-        .update({ generation_status: 'stage_6_complete' })
+        .update({
+          generation_status: shouldAutoFinalize ? 'completed' : 'stage_6_complete',
+          ...(completedAt && { generation_completed_at: completedAt }),
+        })
         .eq('id', courseId)
         .eq('generation_status', 'stage_6_generating'); // Only update if still generating
 
@@ -543,9 +556,10 @@ export async function checkAndSetStage6Complete(courseId: string): Promise<void>
         logger.warn(
           {
             courseId,
+            targetStatus: shouldAutoFinalize ? 'completed' : 'stage_6_complete',
             error: updateError.message,
           },
-          'Failed to update course status to stage_6_complete'
+          `Failed to update course status to ${shouldAutoFinalize ? 'completed' : 'stage_6_complete'}`
         );
       } else {
         logger.info(
@@ -553,11 +567,14 @@ export async function checkAndSetStage6Complete(courseId: string): Promise<void>
             courseId,
             expectedLessonsCount,
             completedLessonsCount,
+            autoFinalize: shouldAutoFinalize,
           },
-          'All lessons generated - course status updated to stage_6_complete'
+          shouldAutoFinalize
+            ? 'All lessons generated - course auto-finalized to completed'
+            : 'All lessons generated - course status updated to stage_6_complete'
         );
 
-        // Send completion notifications for automatic mode (non-blocking)
+        // Send completion notifications (non-blocking)
         try {
           await notifyCourseCompletion(courseId);
         } catch (notifyError) {

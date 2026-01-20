@@ -101,15 +101,26 @@ export function UploadProgressOverlay({ uploadedFiles, isVisible }: UploadProgre
                 {Math.round(overallProgress)}%
               </p>
 
-              {/* Current file */}
-              {uploadingFile && (
-                <div className="mb-4 flex items-center justify-center gap-2 rounded-lg bg-slate-50 px-4 py-2 dark:bg-slate-800">
-                  <Loader2 className="h-4 w-4 animate-spin text-purple-500" />
-                  <span className="max-w-[200px] truncate text-sm text-slate-600 dark:text-white/70">
-                    {uploadingFile.file.name}
-                  </span>
-                </div>
-              )}
+              {/* Current file - fixed height container to prevent layout shift */}
+              <div className="mb-4 h-10">
+                <AnimatePresence mode="wait">
+                  {uploadingFile && (
+                    <motion.div
+                      key={uploadingFile.file.name}
+                      initial={{ opacity: 0, y: 10 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      exit={{ opacity: 0, y: -10 }}
+                      transition={{ duration: 0.15 }}
+                      className="flex h-10 items-center justify-center gap-2 rounded-lg bg-slate-50 px-4 py-2 dark:bg-slate-800"
+                    >
+                      <Loader2 className="h-4 w-4 flex-shrink-0 animate-spin text-purple-500" />
+                      <span className="max-w-[200px] truncate text-sm text-slate-600 dark:text-white/70">
+                        {uploadingFile.file.name}
+                      </span>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </div>
 
               {/* Warning */}
               <p

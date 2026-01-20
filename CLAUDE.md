@@ -39,6 +39,11 @@
 
 **8. TYPESCRIPT ERRORS** — Re-delegate to same agent OR `typescript-types-specialist`
 
+**9. /push — NEVER DISCARD CHANGES**
+
+- **FORBIDDEN**: `git reset`, `git checkout --`, `git stash` during `/push`
+- **ALWAYS** commit all uncommitted changes or ASK user first
+
 ---
 
 ## Task Management with Beads

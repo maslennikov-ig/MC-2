@@ -2,6 +2,98 @@
 
 _Released on 2025-12-26_
 
+## v0.28.20
+
+_Released on 2026-01-20_
+
+### ✨ New Features
+
+- **llm**: Add hardcoded fallback for Model Config Service
+
+### 🐛 Bug Fixes
+
+- **web**: Use i18n Link for correct SPA navigation
+- **stage2**: Add courseId to Phase 6 summarization error logs
+
+---
+
+_This release was automatically generated from 6 commits._
+
+## v0.28.19
+
+_Released on 2026-01-20_
+
+### ✨ New Features
+
+- **logger**: Add auto-mute rules for deploy-related errors
+
+### 🐛 Bug Fixes
+
+- **stage7**: Use || instead of ?? for empty string handling in card prompts
+- **web**: Fix Link+Button nesting issues across generation-graph
+- **web**: Fix navigation in EndNodePanel "Open Course" button
+- **stage6**: Fix TypeScript types in checkAndSetStage6Complete
+
+---
+
+_This release was automatically generated from 7 commits._
+
+## v0.28.18
+
+_Released on 2026-01-20_
+
+### 🐛 Bug Fixes
+
+- **course-gen-platform**: Update 1 source file(s), update docs
+- **generation-graph**: Correct course_size and notifications display on progress page
+- **docker**: Add BULLMQ_STAGE7_QUEUE_NAME to worker-dev for Stage 7 queue isolation
+
+---
+
+_This release was automatically generated from 6 commits._
+
+## v0.28.17
+
+_Released on 2026-01-20_
+
+### 🐛 Bug Fixes
+
+- **web**: Update 1 source file(s), update docs
+- **docker**: Add BULLMQ_STAGE6_QUEUE_NAME to worker-dev for Stage 6 queue isolation
+
+---
+
+_This release was automatically generated from 5 commits._
+
+## v0.28.16
+
+_Released on 2026-01-20_
+
+### ✨ New Features
+
+- **web**: Persist all form settings to localStorage
+- **web**: Replace upload progress bar with fullscreen overlay modal
+- **web**: Add file upload progress bar on course creation
+
+### 🔧 Improvements
+
+- **stage4**: Remove Phase 6 RAG Planning
+- **web**: Unify toast notifications to use Sonner
+- **create-course**: Reorganize form with GenerationSettingsSection
+
+### 🐛 Bug Fixes
+
+- **upload-overlay**: Prevent layout shift when switching files
+- **model-config**: Update stage_number Zod constraint from max(6) to max(7)
+- **i18n**: Persist selected language in user settings
+- **deploy**: Remove redundant env var from docker-compose
+- **deploy**: Add NEXT_SERVER_ACTIONS_ENCRYPTION_KEY for persistent Server Actions
+- **docker**: Add uploads-dev mount to docling-mcp for dev environment
+
+---
+
+_This release was automatically generated from 33 commits._
+
 ## v0.28.15
 
 _Released on 2026-01-20_
