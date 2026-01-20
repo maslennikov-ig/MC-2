@@ -5,6 +5,8 @@
  * UI must be authoritative, static, and "contractual".
  */
 
+import type { CourseSize } from '@megacampus/shared-types'
+
 // ============================================================================
 // INPUT DATA
 // ============================================================================
@@ -38,14 +40,18 @@ export interface Stage1InputData {
   files?: Stage1FileMetadata[]
   /** Course language */
   language?: string
-  /** Course size preset (small, medium, large) */
-  course_size?: string
+  /** Course size preset (auto, micro, mini, compact, standard, comprehensive) */
+  course_size?: CourseSize
   /** Lesson duration in minutes */
   lesson_duration_minutes?: number
   /** Expected number of sections/modules */
   estimated_sections?: number
   /** Generation mode */
   generation_mode?: 'automatic' | 'semi_automatic'
+  /** Notification preferences */
+  notify_on_completion?: boolean
+  notify_on_error?: boolean
+  notify_on_stage_complete?: boolean
 }
 
 /**

@@ -7,7 +7,7 @@ import GenerationProgressContainerEnhanced from './GenerationProgressContainerEn
 import GenerationErrorBoundary from './GenerationErrorBoundary'
 import { GenerationRealtimeProvider } from '@/components/generation-monitoring/realtime-provider'
 import { NextIntlClientProvider } from 'next-intl'
-import type { Stage1CourseData } from '@/components/generation-graph'
+import { mapCourseToStage1Data } from '@/lib/generation-graph/mappers'
 
 /** Default fallback when lessons count is unknown (before Stage 4 analysis completes) */
 const DEFAULT_LESSONS_COUNT = 5
@@ -173,38 +173,7 @@ export default async function CourseGeneratingPage({ params, searchParams }: Pag
   const generationStatus = (course.generation_status || 'pending') as CourseStatus
 
   // Construct Stage 1 course data for immediate display (before generation starts)
-  const stage1CourseData: Stage1CourseData = {
-    inputData: {
-      topic: course.title || '',
-      course_description: course.course_description || '',
-      target_audience: course.target_audience || undefined,
-      style: course.style || undefined,
-      output_formats: (course.output_formats as Array<
-        'text' | 'audio' | 'video' | 'presentation' | 'test'
-      >) || ['text'],
-      estimated_lessons: course.estimated_lessons || undefined,
-      content_strategy:
-        (course.content_strategy as 'auto' | 'create_from_scratch' | 'expand_and_enhance') ||
-        'auto',
-      prerequisites: course.prerequisites || undefined,
-      learning_outcomes: course.learning_outcomes || undefined,
-      has_files: course.has_files || false,
-      language: course.language || 'ru',
-      course_size: course.course_size || undefined,
-      lesson_duration_minutes:
-        (course.settings as { lesson_duration_minutes?: number })?.lesson_duration_minutes ||
-        undefined,
-      estimated_sections: course.estimated_sections || undefined,
-      generation_mode:
-        (course.generation_mode as 'automatic' | 'semi_automatic') || 'semi_automatic',
-    },
-    outputData: {
-      courseId: course.id,
-      ownerId: course.user_id || '',
-      createdAt: course.created_at || new Date().toISOString(),
-      status: 'ready' as const,
-    },
-  }
+  const stage1CourseData = mapCourseToStage1Data(course)
 
   // Get messages for client components
   const messages = await getMessages()

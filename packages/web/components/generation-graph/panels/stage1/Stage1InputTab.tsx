@@ -20,9 +20,11 @@ import {
   Layers,
   Zap,
   Hand,
+  Bell,
 } from 'lucide-react'
 import { getLearningStyleByValue } from '@/lib/constants/learning-styles'
 import { GRAPH_TRANSLATIONS } from '@/lib/generation-graph/translations'
+import { getCourseSizeLabels } from '@megacampus/shared-types'
 import type { Stage1InputTabProps, Stage1InputData } from './types'
 
 // ============================================================================
@@ -164,7 +166,7 @@ export const Stage1InputTab = memo<Stage1InputTabProps>(function Stage1InputTab(
   const t = GRAPH_TRANSLATIONS.stage1
 
   // Parse inputData safely - cast to expected type
-  const data: Stage1InputData | undefined = inputData as Stage1InputData | undefined
+  const data: Stage1InputData | undefined = inputData
 
   // Memoized computed values
   const learningStyle = useMemo(
@@ -312,11 +314,10 @@ export const Stage1InputTab = memo<Stage1InputTabProps>(function Stage1InputTab(
           {data.course_size && (
             <div className="flex items-center gap-2">
               <Layers className="text-muted-foreground h-4 w-4" />
-              <Badge variant="outline">
-                {data.course_size === 'small' && (t?.sizeSmall?.[locale] || 'Small')}
-                {data.course_size === 'medium' && (t?.sizeMedium?.[locale] || 'Medium')}
-                {data.course_size === 'large' && (t?.sizeLarge?.[locale] || 'Large')}
-              </Badge>
+              <span className="text-muted-foreground text-xs">
+                {t?.courseSize?.[locale] || 'Size:'}
+              </span>
+              <Badge variant="outline">{getCourseSizeLabels(locale, data.course_size).title}</Badge>
             </div>
           )}
 
@@ -339,6 +340,28 @@ export const Stage1InputTab = memo<Stage1InputTabProps>(function Stage1InputTab(
                   </>
                 )}
               </Badge>
+            </div>
+          )}
+
+          {/* Notification Preferences */}
+          {(data.notify_on_completion || data.notify_on_error || data.notify_on_stage_complete) && (
+            <div className="flex flex-wrap items-center gap-2">
+              <Bell className="text-muted-foreground h-4 w-4" />
+              {data.notify_on_completion && (
+                <Badge variant="secondary" className="text-xs">
+                  {t?.notifyCompletion?.[locale] || 'On completion'}
+                </Badge>
+              )}
+              {data.notify_on_error && (
+                <Badge variant="secondary" className="text-xs">
+                  {t?.notifyError?.[locale] || 'On error'}
+                </Badge>
+              )}
+              {data.notify_on_stage_complete && (
+                <Badge variant="secondary" className="text-xs">
+                  {t?.notifyStage?.[locale] || 'On stage'}
+                </Badge>
+              )}
             </div>
           )}
 
