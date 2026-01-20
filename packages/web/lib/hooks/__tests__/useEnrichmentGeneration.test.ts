@@ -2,8 +2,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { renderHook, act } from '@testing-library/react'
 import { useEnrichmentGeneration } from '@/lib/hooks/useEnrichmentGeneration'
-import type { OnDemandEnrichmentType } from '@megacampus/shared-types'
-import React from 'react'
 
 /**
  * Unit tests for useEnrichmentGeneration hook
@@ -23,7 +21,6 @@ import React from 'react'
 
 const BACKEND_URL = 'http://localhost:3456'
 const TRPC_URL = `${BACKEND_URL}/trpc`
-const DEFAULT_POLLING_INTERVAL = 2000
 
 // =============================================================================
 // Mock Setup
