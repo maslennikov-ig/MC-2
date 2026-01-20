@@ -128,3 +128,121 @@ export function estimateCost(input: EstimateCostInput): CostEstimate {
 export function formatCostRange(estimate: CostEstimate): string {
   return `~$${estimate.minUsd.toFixed(2)} - $${estimate.maxUsd.toFixed(2)}`;
 }
+
+// ============================================================================
+// Token Estimation (alternative to USD-based cost estimation)
+// ============================================================================
+
+export interface TokenBreakdown {
+  stage2_tokens: number; // Embeddings
+  stage4_tokens: number; // Analysis
+  stage5_tokens: number; // Structure
+  stage6_tokens: number; // Lessons
+}
+
+export interface TokenEstimate {
+  totalTokens: number;
+  minTokens: number;
+  maxTokens: number;
+  breakdown: TokenBreakdown;
+}
+
+/**
+ * Token coefficients based on real-world usage data
+ * Tokens per lesson: min 2000, avg 6000, max 10000
+ */
+export const TOKEN_COEFFICIENTS = {
+  // Stage 2: Document embeddings (~1000 tokens per document)
+  STAGE2_PER_DOC: 1000,
+
+  // Stage 4: Analysis tokens
+  STAGE4_WITH_DOCS: 10000,
+  STAGE4_NO_DOCS: 5000,
+
+  // Stage 5: Structure generation (base + per lesson)
+  STAGE5_BASE: 5000,
+  STAGE5_PER_LESSON: 500,
+
+  // Stage 6: Lesson content generation per lesson
+  STAGE6_PER_LESSON_MIN: 2000,
+  STAGE6_PER_LESSON_AVG: 6000,
+  STAGE6_PER_LESSON_MAX: 10000,
+} as const;
+
+/**
+ * Estimate token usage for course generation
+ *
+ * @param input - Document count, estimated lessons, and whether documents are present
+ * @returns Token estimate with breakdown
+ *
+ * @example
+ * ```typescript
+ * const estimate = estimateTokens({
+ *   documentCount: 5,
+ *   estimatedLessons: 15,
+ *   hasDocuments: true
+ * });
+ * // { totalTokens: 110000, minTokens: 50000, maxTokens: 170000, ... }
+ * ```
+ */
+export function estimateTokens(input: EstimateCostInput): TokenEstimate {
+  const { documentCount, estimatedLessons, hasDocuments } = input;
+
+  // Calculate individual stage tokens
+  const stage2Tokens = hasDocuments ? documentCount * TOKEN_COEFFICIENTS.STAGE2_PER_DOC : 0;
+
+  const stage4Tokens = hasDocuments
+    ? TOKEN_COEFFICIENTS.STAGE4_WITH_DOCS
+    : TOKEN_COEFFICIENTS.STAGE4_NO_DOCS;
+
+  const stage5Tokens =
+    TOKEN_COEFFICIENTS.STAGE5_BASE + estimatedLessons * TOKEN_COEFFICIENTS.STAGE5_PER_LESSON;
+
+  const stage6TokensAvg = estimatedLessons * TOKEN_COEFFICIENTS.STAGE6_PER_LESSON_AVG;
+  const stage6TokensMin = estimatedLessons * TOKEN_COEFFICIENTS.STAGE6_PER_LESSON_MIN;
+  const stage6TokensMax = estimatedLessons * TOKEN_COEFFICIENTS.STAGE6_PER_LESSON_MAX;
+
+  // Calculate totals
+  const baseTotal = stage2Tokens + stage4Tokens + stage5Tokens + stage6TokensAvg;
+  const minTotal = stage2Tokens + stage4Tokens + stage5Tokens + stage6TokensMin;
+  const maxTotal = stage2Tokens + stage4Tokens + stage5Tokens + stage6TokensMax;
+
+  return {
+    totalTokens: baseTotal,
+    minTokens: minTotal,
+    maxTokens: maxTotal,
+    breakdown: {
+      stage2_tokens: stage2Tokens,
+      stage4_tokens: stage4Tokens,
+      stage5_tokens: stage5Tokens,
+      stage6_tokens: stage6TokensAvg,
+    },
+  };
+}
+
+/**
+ * Format tokens for display (123456 → "~124K")
+ * Rounds up to be conservative
+ *
+ * @param tokens - Number of tokens
+ * @returns Formatted string like "~124K" or "~1.5M"
+ */
+export function formatTokens(tokens: number): string {
+  if (tokens >= 1000000) {
+    return `~${(Math.ceil(tokens / 100000) / 10).toFixed(1)}M`;
+  }
+  if (tokens >= 1000) {
+    return `~${Math.ceil(tokens / 1000)}K`;
+  }
+  return `~${Math.ceil(tokens)}`;
+}
+
+/**
+ * Format token range for display
+ *
+ * @param estimate - Token estimate from estimateTokens()
+ * @returns Formatted string like "~50K - ~170K"
+ */
+export function formatTokenRange(estimate: TokenEstimate): string {
+  return `${formatTokens(estimate.minTokens)} - ${formatTokens(estimate.maxTokens)}`;
+}

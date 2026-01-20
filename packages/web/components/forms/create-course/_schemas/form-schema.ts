@@ -77,7 +77,7 @@ export const formSchema = z
     formats: z.array(z.string()).optional(),
 
     // Generation mode fields
-    generationMode: z.enum(['automatic', 'semi_automatic']).default('semi_automatic'),
+    generationMode: z.enum(['automatic', 'semi_automatic']).default('automatic'),
     notifyOnCompletion: z.boolean().default(true),
     notifyOnError: z.boolean().default(true),
     notifyOnStageComplete: z.boolean().default(false),
