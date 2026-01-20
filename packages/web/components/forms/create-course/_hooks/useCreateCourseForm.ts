@@ -43,16 +43,22 @@ export function useCreateCourseForm() {
     }
   }
 
+  const savedPrefs = getSavedPreferences()
+
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     mode: 'onChange',
     defaultValues: {
-      writingStyle: userPreferredStyle || getSavedPreferences()?.writingStyle || 'professional',
-      language: getSavedPreferences()?.language || 'ru',
+      writingStyle: userPreferredStyle || savedPrefs?.writingStyle || 'professional',
+      language: savedPrefs?.language || 'ru',
       contentStrategy: 'auto',
-      courseSize: DEFAULT_COURSE_SIZE,
-      formats: ['text'],
+      courseSize: savedPrefs?.courseSize || DEFAULT_COURSE_SIZE,
+      formats: savedPrefs?.formats || ['text'],
       lessonDuration: 5,
+      generationMode: savedPrefs?.generationMode || 'automatic',
+      notifyOnCompletion: savedPrefs?.notifyOnCompletion ?? true,
+      notifyOnError: savedPrefs?.notifyOnError ?? true,
+      notifyOnStageComplete: savedPrefs?.notifyOnStageComplete ?? false,
     },
   })
 
@@ -68,6 +74,11 @@ export function useCreateCourseForm() {
   const language = watch('language')
   const rawFormats = watch('formats')
   const formats = useMemo(() => rawFormats || [], [rawFormats])
+  const courseSize = watch('courseSize')
+  const generationMode = watch('generationMode')
+  const notifyOnCompletion = watch('notifyOnCompletion')
+  const notifyOnError = watch('notifyOnError')
+  const notifyOnStageComplete = watch('notifyOnStageComplete')
 
   // Custom hooks
   const { uploadedFiles, setUploadedFiles, isUploadingFiles, uploadSingleFile, uploadAllFiles } =
@@ -252,13 +263,29 @@ export function useCreateCourseForm() {
         const preferences = {
           writingStyle,
           language,
+          courseSize,
+          formats,
+          generationMode,
+          notifyOnCompletion,
+          notifyOnError,
+          notifyOnStageComplete,
         }
         localStorage.setItem('courseFormPreferences', JSON.stringify(preferences))
       } catch {
         // Silently fail
       }
     }
-  }, [writingStyle, language, mounted])
+  }, [
+    writingStyle,
+    language,
+    courseSize,
+    formats,
+    generationMode,
+    notifyOnCompletion,
+    notifyOnError,
+    notifyOnStageComplete,
+    mounted,
+  ])
 
   useEffect(() => {
     if (writingStyle === 'microlearning') {
