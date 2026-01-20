@@ -539,24 +539,16 @@ export async function checkAndSetStage6Complete(courseId: string): Promise<void>
     if (completedLessonsCount >= expectedLessonsCount) {
       // Determine target status based on auto_finalize flag
       const shouldAutoFinalize = course.auto_finalize_after_stage6 === true;
-      const targetStatus = shouldAutoFinalize ? 'completed' : 'stage_6_complete';
-
-      // Build update payload
-      const updatePayload: {
-        generation_status: string;
-        generation_completed_at?: string;
-      } = {
-        generation_status: targetStatus,
-      };
 
       // Set generation_completed_at when finalizing
-      if (shouldAutoFinalize) {
-        updatePayload.generation_completed_at = new Date().toISOString();
-      }
+      const completedAt = shouldAutoFinalize ? new Date().toISOString() : undefined;
 
       const { error: updateError } = await supabaseAdmin
         .from('courses')
-        .update(updatePayload)
+        .update({
+          generation_status: shouldAutoFinalize ? 'completed' : 'stage_6_complete',
+          ...(completedAt && { generation_completed_at: completedAt }),
+        })
         .eq('id', courseId)
         .eq('generation_status', 'stage_6_generating'); // Only update if still generating
 
@@ -564,10 +556,10 @@ export async function checkAndSetStage6Complete(courseId: string): Promise<void>
         logger.warn(
           {
             courseId,
-            targetStatus,
+            targetStatus: shouldAutoFinalize ? 'completed' : 'stage_6_complete',
             error: updateError.message,
           },
-          `Failed to update course status to ${targetStatus}`
+          `Failed to update course status to ${shouldAutoFinalize ? 'completed' : 'stage_6_complete'}`
         );
       } else {
         logger.info(
@@ -576,7 +568,6 @@ export async function checkAndSetStage6Complete(courseId: string): Promise<void>
             expectedLessonsCount,
             completedLessonsCount,
             autoFinalize: shouldAutoFinalize,
-            targetStatus,
           },
           shouldAutoFinalize
             ? 'All lessons generated - course auto-finalized to completed'
