@@ -305,8 +305,8 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
       // Course card prompt from database
       try {
         imagePrompt = await promptService.renderPrompt('stage7_card_course', {
-          courseTitle: course.title ?? 'Educational Course',
-          courseTopic: course.course_description ?? course.title ?? 'Education',
+          courseTitle: course.title || 'Educational Course',
+          courseTopic: course.course_description || course.title || 'Education',
           languageContext,
           colorScheme: visualStyle.colorScheme,
           aesthetic: visualStyle.aesthetic,
@@ -333,8 +333,8 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
         imagePrompt = await promptService.renderPrompt('stage7_card_lesson', {
           lessonTitle: lesson.title,
           objectivesSummary,
-          courseTitle: course.title ?? 'Educational Course',
-          courseTopic: course.course_description ?? course.title ?? 'Education',
+          courseTitle: course.title || 'Educational Course',
+          courseTopic: course.course_description || course.title || 'Education',
           colorScheme: visualStyle.colorScheme,
           aesthetic: visualStyle.aesthetic,
           visualElements: visualStyle.visualElements,
