@@ -311,6 +311,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.28.15] - 2026-01-20
+
+### Added
+
+- **web**: add 5 source file(s), update 8 source file(s), +1 more (5d225ae)
+- **create-course**: reorganize UI/UX for course creation form (f4d27e9)
+- **i18n**: add image generation translations for enrichments (19701aa)
+
+### Fixed
+
+- **docker**: add DOCLING_UPLOADS_BASE_PATH override for document processing (36e7af1)
+- **web**: fix type-check by excluding tests from tsconfig (85086bb)
+- **stage6**: add dedicated worker service and queue isolation for dev (2a87bc4)
+
+### Other
+
+- bd sync: 2026-01-20 11:33:31 (a352c32)
+- bd sync: 2026-01-20 11:32:59 (e6c89a8)
+- bd sync: 2026-01-20 11:30:47 (eb7c108)
+
 ## [0.28.14] - 2026-01-20
 
 ### Added

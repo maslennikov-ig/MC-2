@@ -2,6 +2,26 @@
 
 _Released on 2025-12-26_
 
+## v0.28.15
+
+_Released on 2026-01-20_
+
+### ✨ New Features
+
+- **web**: Add 5 source file(s), update 8 source file(s), +1 more
+- **create-course**: Reorganize UI/UX for course creation form
+- **i18n**: Add image generation translations for enrichments
+
+### 🐛 Bug Fixes
+
+- **docker**: Add DOCLING_UPLOADS_BASE_PATH override for document processing
+- **web**: Fix type-check by excluding tests from tsconfig
+- **stage6**: Add dedicated worker service and queue isolation for dev
+
+---
+
+_This release was automatically generated from 9 commits._
+
 ## v0.28.14
 
 _Released on 2026-01-20_
