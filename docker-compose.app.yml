@@ -21,8 +21,6 @@ services:
       - PORT=3000
       - NEXT_PUBLIC_SITE_URL=${NEXT_PUBLIC_SITE_URL:-https://megacampus.ai}
       - NEXT_PUBLIC_API_URL=http://megacampus-api-${COLOR:-blue}:4000
-      # Persistent Server Action IDs across builds (fixes "Server Action not found" error)
-      - NEXT_SERVER_ACTIONS_ENCRYPTION_KEY=${NEXT_SERVER_ACTIONS_ENCRYPTION_KEY}
     healthcheck:
       test:
         [
