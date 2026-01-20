@@ -311,6 +311,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.28.18] - 2026-01-20
+
+### Fixed
+
+- **course-gen-platform**: update 1 source file(s), update docs (31d410f)
+- **generation-graph**: correct course_size and notifications display on progress page (a559628)
+- **docker**: add BULLMQ_STAGE7_QUEUE_NAME to worker-dev for Stage 7 queue isolation (053927a)
+
+### Other
+
+- bd sync: 2026-01-20 16:45:52 (92b2a8f)
+- bd sync: 2026-01-20 16:23:35 (bdc239d)
+- **form**: add debug logging for form preferences (49d401f)
+
 ## [0.28.17] - 2026-01-20
 
 ### Fixed
