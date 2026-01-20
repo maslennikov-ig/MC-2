@@ -2,7 +2,7 @@ import React from 'react'
 import { motion } from 'framer-motion'
 import { Loader2, Sparkles, AlertCircle, CheckCircle2 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { UploadProgressBar } from './UploadProgressBar'
+import { UploadProgressOverlay } from './UploadProgressOverlay'
 import type { UploadedFile } from '@/components/forms/file-upload'
 
 interface SubmitSectionProps {
@@ -96,8 +96,8 @@ export function SubmitSection({
         </div>
       )}
 
-      {/* Upload Progress (visible when uploading files during submission) */}
-      <UploadProgressBar
+      {/* Upload Progress Overlay (visible when uploading files during submission) */}
+      <UploadProgressOverlay
         uploadedFiles={uploadedFiles}
         isVisible={isSubmitting && isUploadingFiles && uploadedFiles.length > 0}
       />
