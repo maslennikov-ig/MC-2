@@ -1083,8 +1083,8 @@ function GraphViewInner({
                   />
                 )}
 
-                {/* Selection toolbar for Stage 6 partial generation - show when lessons exist AND Stage 5 is approved */}
-                {nodes.some((n) => n.type === 'lesson') && awaitingStage !== 5 && (
+                {/* Selection toolbar for Stage 6 partial generation - show when lessons exist AND Stage 5 is approved AND NOT in automatic mode */}
+                {nodes.some((n) => n.type === 'lesson') && awaitingStage !== 5 && !readOnly && (
                   <SelectionToolbar
                     courseId={courseId}
                     isCompleted={pipelineStatus === 'completed'}
