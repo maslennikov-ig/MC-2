@@ -680,7 +680,7 @@ export const lifecycleRouter = router({
             language: course.language ?? undefined,
             style: course.style && isValidStyle(course.style) ? course.style : DEFAULT_COURSE_STYLE,
             target_audience: course.target_audience ?? undefined,
-            difficulty: course.difficulty ?? undefined,
+            difficulty: course.difficulty ?? 'intermediate',
             desired_lessons_count: (course.settings as unknown as CourseSettings)
               ?.desired_lessons_count,
             desired_modules_count: (course.settings as unknown as CourseSettings)
@@ -1075,7 +1075,7 @@ export const lifecycleRouter = router({
               style:
                 fullCourse.style && isValidStyle(fullCourse.style) ? fullCourse.style : undefined,
               target_audience: fullCourse.target_audience ?? undefined,
-              difficulty: fullCourse.difficulty ?? undefined,
+              difficulty: fullCourse.difficulty ?? 'intermediate',
               desired_lessons_count: (fullCourse.settings as unknown as CourseSettings)
                 ?.desired_lessons_count,
               desired_modules_count: (fullCourse.settings as unknown as CourseSettings)

@@ -358,7 +358,7 @@ export const statusRouter = router({
             language: course.language ?? undefined,
             style: course.style && isValidStyle(course.style) ? course.style : undefined,
             target_audience: course.target_audience ?? undefined,
-            difficulty: course.difficulty ?? undefined,
+            difficulty: course.difficulty ?? 'intermediate',
             description: course.course_description ?? undefined,
             course_size: course.course_size ?? undefined,
             desired_lessons_count: (course.settings as unknown as CourseSettings)
