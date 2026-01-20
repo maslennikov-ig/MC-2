@@ -32,7 +32,7 @@
  *
  * 4. **Trie-based matching** - For prefix-heavy patterns
  *
- * Current rule count: 16 (no optimization needed)
+ * Current rule count: 20 (no optimization needed)
  * Review threshold: 30+ rules
  */
 
@@ -107,6 +107,28 @@ export const AUTO_MUTE_RULES: AutoMuteRule[] = [
     pattern: /Zod.*validation failed.*Layer/i,
     reason: 'cascading_repair',
     description: 'Layer 1 validation failed, escalating to Layer 2/3 - expected repair flow',
+  },
+
+  // === Deploy & Startup Events ===
+  {
+    pattern: /Queue error.*getaddrinfo.*redis/i,
+    reason: 'graceful_shutdown',
+    description: 'Redis DNS resolution during container startup - expected during deploys',
+  },
+  {
+    pattern: /Health check failed.*Connection.*closed/i,
+    reason: 'graceful_shutdown',
+    description: 'Health check failed due to Redis connection closed - expected during deploys',
+  },
+  {
+    pattern: /QueueEvents error.*non-fatal/i,
+    reason: 'graceful_shutdown',
+    description: 'BullMQ QueueEvents error during startup - explicitly non-fatal',
+  },
+  {
+    pattern: /GET \/health 503/i,
+    reason: 'monitoring_probe',
+    description: 'Health endpoint returning 503 during startup - expected during deploys',
   },
 
   // === Job Lifecycle Events ===
