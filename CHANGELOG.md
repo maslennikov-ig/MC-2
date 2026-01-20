@@ -311,6 +311,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.28.19] - 2026-01-20
+
+### Added
+
+- **logger**: Add auto-mute rules for deploy-related errors (cdf7107)
+
+### Fixed
+
+- **stage7**: Use || instead of ?? for empty string handling in card prompts (705c3fb)
+- **web**: Fix Link+Button nesting issues across generation-graph (5ac8d5f)
+- **web**: Fix navigation in EndNodePanel "Open Course" button (ca96b58)
+- **stage6**: fix TypeScript types in checkAndSetStage6Complete (afbb457)
+
+### Other
+
+- update project files (456d039)
+- bd sync: 2026-01-20 17:48:04 (da436e8)
+
 ## [0.28.18] - 2026-01-20
 
 ### Fixed

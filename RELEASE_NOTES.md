@@ -2,6 +2,25 @@
 
 _Released on 2025-12-26_
 
+## v0.28.19
+
+_Released on 2026-01-20_
+
+### ✨ New Features
+
+- **logger**: Add auto-mute rules for deploy-related errors
+
+### 🐛 Bug Fixes
+
+- **stage7**: Use || instead of ?? for empty string handling in card prompts
+- **web**: Fix Link+Button nesting issues across generation-graph
+- **web**: Fix navigation in EndNodePanel "Open Course" button
+- **stage6**: Fix TypeScript types in checkAndSetStage6Complete
+
+---
+
+_This release was automatically generated from 7 commits._
+
 ## v0.28.18
 
 _Released on 2026-01-20_
