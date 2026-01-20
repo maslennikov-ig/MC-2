@@ -313,13 +313,16 @@ export async function executePhase6Summarization(
     .single();
 
   if (fetchError || !fileData) {
-    logger.error({ fileId, error: fetchError }, '[Phase 6] Failed to load document');
+    logger.error({ courseId, fileId, error: fetchError }, '[Phase 6] Failed to load document');
     throw new Error(`Failed to load document: ${fetchError?.message || 'File not found'}`);
   }
 
   const extractedText = fileData.markdown_content || '';
   if (!extractedText) {
-    logger.warn({ fileId }, '[Phase 6] Document has no markdown content, storing empty fallback');
+    logger.warn(
+      { courseId, fileId },
+      '[Phase 6] Document has no markdown content, storing empty fallback'
+    );
 
     // CRITICAL FIX: Store empty fallback to prevent Stage 4 barrier blocking
     // Stage 4 requires processed_content IS NOT NULL for all documents
@@ -341,11 +344,14 @@ export async function executePhase6Summarization(
 
     if (updateError) {
       logger.error(
-        { fileId, error: updateError.message },
+        { courseId, fileId, error: updateError.message },
         '[Phase 6] Failed to store empty fallback'
       );
     } else {
-      logger.info({ fileId }, '[Phase 6] Stored empty fallback for document without content');
+      logger.info(
+        { courseId, fileId },
+        '[Phase 6] Stored empty fallback for document without content'
+      );
     }
 
     return buildEmptyResult(fileId);
@@ -451,6 +457,7 @@ export async function executePhase6Summarization(
   );
 
   const result = await executeSummarizationWithRetry(
+    courseId,
     fileId,
     extractedText,
     language,
@@ -473,6 +480,7 @@ export async function executePhase6Summarization(
  * @param titleLanguage - Language for title generation (course language, not document language)
  */
 async function executeSummarizationWithRetry(
+  courseId: string,
   fileId: string,
   extractedText: string,
   language: string,
@@ -635,6 +643,7 @@ async function executeSummarizationWithRetry(
       if (currentAttempt >= maxRetries) {
         logger.warn(
           {
+            courseId,
             fileId,
             qualityScore: qualityCheck.quality_score,
             attempts: currentAttempt + 1,
@@ -669,6 +678,7 @@ async function executeSummarizationWithRetry(
       // Apply escalation and retry
       logger.warn(
         {
+          courseId,
           fileId,
           qualityScore: qualityCheck.quality_score,
           currentAttempt,
