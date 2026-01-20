@@ -62,6 +62,7 @@ services:
       - DOCLING_MCP_URL=http://megacampus-docling-mcp:8000/mcp
       # Fix file path for document processing (override .env from image)
       - DOCLING_UPLOADS_BASE_PATH=/app
+      - DOCLING_CONTAINER_UPLOADS_PATH=/app/uploads-dev
       # DEV queue isolation - prevents DEV jobs from being picked up by production workers
       - BULLMQ_QUEUE_NAME=course-generation-dev
       - BULLMQ_STAGE6_QUEUE_NAME=stage6-lesson-content-dev
@@ -111,6 +112,7 @@ services:
       - LKG_CONFIG_PATH=/app/data/lkg-config.json
       # Fix file path for document processing (override .env from image)
       - DOCLING_UPLOADS_BASE_PATH=/app
+      - DOCLING_CONTAINER_UPLOADS_PATH=/app/uploads-dev
       # DEV queue isolation - listens to DEV-only queue
       - BULLMQ_QUEUE_NAME=course-generation-dev
       - ENRICHMENTS_STORAGE_BUCKET=course-enrichments
@@ -155,6 +157,7 @@ services:
       - LKG_CONFIG_PATH=/app/data/lkg-config.json
       # Fix file path for document processing (override .env from image)
       - DOCLING_UPLOADS_BASE_PATH=/app
+      - DOCLING_CONTAINER_UPLOADS_PATH=/app/uploads-dev
     volumes:
       - ./data/uploads-dev:/app/uploads
       - docling-json-cache:/app/docling-cache
@@ -193,6 +196,7 @@ services:
       - BULLMQ_STAGE7_QUEUE_NAME=stage7-enrichments-dev
       # Fix file path for document processing (override .env from image)
       - DOCLING_UPLOADS_BASE_PATH=/app
+      - DOCLING_CONTAINER_UPLOADS_PATH=/app/uploads-dev
     volumes:
       - ./data/uploads-dev:/app/uploads
     networks:

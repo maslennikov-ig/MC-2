@@ -45,6 +45,8 @@ services:
     # No external ports - only accessible via nginx proxy
     volumes:
       - ./data/uploads:/app/uploads:ro
+      # Dev environment uploads (needed when running both envs on same server)
+      - ./data/uploads-dev:/app/uploads-dev:ro
       - docling-models:/app/models
       - docling-cache:/app/cache
       # Shared JSON cache - worker reads from here
