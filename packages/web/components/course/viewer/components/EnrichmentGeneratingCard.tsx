@@ -2,12 +2,12 @@
 
 import React from 'react'
 import { useTranslations } from 'next-intl'
-import { Video, Headphones, Presentation, HelpCircle } from 'lucide-react'
+import { Video, Headphones, Presentation, HelpCircle, Image } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
 
-type EnrichmentType = 'quiz' | 'audio' | 'presentation' | 'video'
+type EnrichmentType = 'quiz' | 'audio' | 'presentation' | 'video' | 'cover' | 'card'
 
 const ENRICHMENT_CONFIG: Record<
   EnrichmentType,
@@ -36,6 +36,16 @@ const ENRICHMENT_CONFIG: Record<
     icon: HelpCircle,
     color: 'text-green-500 dark:text-green-400',
     bgColor: 'bg-green-100 dark:bg-green-900/30',
+  },
+  cover: {
+    icon: Image,
+    color: 'text-cyan-500 dark:text-cyan-400',
+    bgColor: 'bg-cyan-100 dark:bg-cyan-900/30',
+  },
+  card: {
+    icon: Image,
+    color: 'text-indigo-500 dark:text-indigo-400',
+    bgColor: 'bg-indigo-100 dark:bg-indigo-900/30',
   },
 }
 
@@ -66,6 +76,10 @@ export function EnrichmentGeneratingCard({
         return t('placeholder.presentation.title')
       case 'video':
         return t('placeholder.video.title')
+      case 'cover':
+        return t('images.cover.title')
+      case 'card':
+        return t('images.card.title')
     }
   }
 

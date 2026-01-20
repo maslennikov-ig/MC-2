@@ -295,7 +295,9 @@
     },
     "estimatedCost": "Примерная стоимость",
     "batchGenerate": "Сгенерировать недостающие",
-    "batchProgress": "Генерация {current} из {total}..."
+    "batchProgress": "Генерация {current} из {total}...",
+    "batchComplete": "Запущена генерация для {count} обложек",
+    "allGenerated": "Все обложки уже сгенерированы"
   },
   "generate": "Сгенерировать",
   "generating": "Генерация...",

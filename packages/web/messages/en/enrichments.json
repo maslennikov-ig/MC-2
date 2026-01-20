@@ -295,7 +295,9 @@
     },
     "estimatedCost": "Estimated cost",
     "batchGenerate": "Generate Missing",
-    "batchProgress": "Generating {current} of {total}..."
+    "batchProgress": "Generating {current} of {total}...",
+    "batchComplete": "Started generation for {count} covers",
+    "allGenerated": "All covers already generated"
   },
   "generate": "Generate",
   "generating": "Generating...",

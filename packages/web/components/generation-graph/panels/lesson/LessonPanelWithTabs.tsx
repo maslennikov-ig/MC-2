@@ -1,70 +1,78 @@
-'use client';
+'use client'
 
-import React, { useState, useMemo } from 'react';
-import { useTranslations } from 'next-intl';
-import { ErrorBoundary } from 'react-error-boundary';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Button } from '@/components/ui/button';
-import { ArrowLeft, X, Maximize2, Minimize2, FileText, Layers, AlertCircle } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { LessonInspector } from './LessonInspector';
-import { EnrichmentInspectorPanel } from '../stage7/EnrichmentInspectorPanel';
-import type { LessonInspectorData, LessonInspectorDataRefinementExtension } from '@megacampus/shared-types';
+import React, { useState, useMemo } from 'react'
+import { useTranslations } from 'next-intl'
+import { ErrorBoundary } from 'react-error-boundary'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { Button } from '@/components/ui/button'
+import { ArrowLeft, X, Maximize2, Minimize2, FileText, AlertCircle } from 'lucide-react'
+// DISABLED: Layers icon for Enrichments tab (now via Course Viewer)
+// import { Layers } from 'lucide-react';
+import { cn } from '@/lib/utils'
+import { LessonInspector } from './LessonInspector'
+// DISABLED: Enrichments tab (now managed via Course Viewer, not Workflow)
+// import { EnrichmentInspectorPanel } from '../stage7/EnrichmentInspectorPanel';
+import type {
+  LessonInspectorData,
+  LessonInspectorDataRefinementExtension,
+} from '@megacampus/shared-types'
 
 /**
  * Extended data type that includes refinement fields
  */
-type LessonInspectorDataWithRefinement = LessonInspectorData & Partial<LessonInspectorDataRefinementExtension>;
+type LessonInspectorDataWithRefinement = LessonInspectorData &
+  Partial<LessonInspectorDataRefinementExtension>
 
 interface LessonPanelWithTabsProps {
   /** Lesson ID in format "module.lesson" (e.g., "1.2") */
-  lessonId: string;
+  lessonId: string
   /** Course UUID - required for AutoCardPreview */
-  courseId?: string;
+  courseId?: string
   /** Lesson inspector data */
-  data: LessonInspectorDataWithRefinement | null;
-  isLoading?: boolean;
-  error?: Error | null;
-  onBack: () => void;
-  onClose: () => void;
-  onApprove?: () => void;
-  onEdit?: () => void;
-  onRegenerate?: () => void;
-  onDelete?: () => void;
-  onRetryNode?: (node: string) => void;
-  isApproving?: boolean;
-  isRegenerating?: boolean;
-  isDeleting?: boolean;
-  isMaximized?: boolean;
-  onToggleMaximize?: () => void;
-  className?: string;
+  data: LessonInspectorDataWithRefinement | null
+  isLoading?: boolean
+  error?: Error | null
+  onBack: () => void
+  onClose: () => void
+  onApprove?: () => void
+  onEdit?: () => void
+  onRegenerate?: () => void
+  onDelete?: () => void
+  onRetryNode?: (node: string) => void
+  isApproving?: boolean
+  isRegenerating?: boolean
+  isDeleting?: boolean
+  isMaximized?: boolean
+  onToggleMaximize?: () => void
+  className?: string
   /** User subscription tier */
-  tier?: 'trial' | 'free' | 'basic' | 'standard' | 'premium';
+  tier?: 'trial' | 'free' | 'basic' | 'standard' | 'premium'
   /** Default tab to show */
-  defaultTab?: 'content' | 'enrichments';
+  defaultTab?: 'content' | 'enrichments'
 }
 
 /**
  * Error fallback component
  */
-function TabErrorFallback({ error, resetErrorBoundary }: {
-  error: Error;
-  resetErrorBoundary: () => void;
+function TabErrorFallback({
+  error,
+  resetErrorBoundary,
+}: {
+  error: Error
+  resetErrorBoundary: () => void
 }) {
   return (
-    <div className="flex flex-col items-center justify-center h-full py-12 text-center">
-      <AlertCircle className="h-12 w-12 text-red-500 mb-4" />
-      <h3 className="text-lg font-semibold text-red-600 dark:text-red-400 mb-2">
+    <div className="flex h-full flex-col items-center justify-center py-12 text-center">
+      <AlertCircle className="mb-4 h-12 w-12 text-red-500" />
+      <h3 className="mb-2 text-lg font-semibold text-red-600 dark:text-red-400">
         Ошибка отображения
       </h3>
-      <p className="text-sm text-slate-600 dark:text-slate-400 mb-4 max-w-sm">
-        {error.message}
-      </p>
+      <p className="mb-4 max-w-sm text-sm text-slate-600 dark:text-slate-400">{error.message}</p>
       <Button onClick={resetErrorBoundary} variant="default" size="sm">
         Попробовать снова
       </Button>
     </div>
-  );
+  )
 }
 
 /**
@@ -105,67 +113,70 @@ export function LessonPanelWithTabs({
   tier = 'standard',
   defaultTab = 'content',
 }: LessonPanelWithTabsProps) {
-  const t = useTranslations('enrichments');
-  const [activeTab, setActiveTab] = useState<string>(defaultTab);
+  const t = useTranslations('enrichments')
+  const [activeTab, setActiveTab] = useState<string>(defaultTab)
 
   // Extract module/lesson numbers from lessonId (format: "1.2")
   const { moduleNumber, lessonNumber } = useMemo(() => {
-    const parts = lessonId.split('.');
+    const parts = lessonId.split('.')
     return {
       moduleNumber: parseInt(parts[0] || '1', 10),
       lessonNumber: parseInt(parts[1] || '1', 10),
-    };
-  }, [lessonId]);
+    }
+  }, [lessonId])
 
-  const lessonTitle = data?.title || 'Загрузка...';
+  const lessonTitle = data?.title || 'Загрузка...'
 
   return (
-    <div className={cn('flex flex-col h-full w-full bg-white dark:bg-slate-900', className)}>
-      <Tabs
-        value={activeTab}
-        onValueChange={setActiveTab}
-        className="flex flex-col h-full"
-      >
+    <div className={cn('flex h-full w-full flex-col bg-white dark:bg-slate-900', className)}>
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="flex h-full flex-col">
         {/* Unified Header - single line on desktop, compact on mobile */}
-        <header className="shrink-0 border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800">
-          <div className="flex items-center justify-between px-3 py-2 gap-2">
+        <header className="shrink-0 border-b border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-800">
+          <div className="flex items-center justify-between gap-2 px-3 py-2">
             {/* Left: Back button + Title (compact) */}
-            <div className="flex items-center gap-2 min-w-0 flex-1">
+            <div className="flex min-w-0 flex-1 items-center gap-2">
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={onBack}
-                className="h-8 w-8 shrink-0 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-100"
+                className="h-8 w-8 shrink-0 text-slate-600 hover:text-slate-900 dark:text-slate-400 dark:hover:text-slate-100"
                 aria-label="Назад"
               >
                 <ArrowLeft className="h-4 w-4" />
               </Button>
-              <div className="flex items-center gap-1.5 text-sm min-w-0">
-                <span className="text-slate-500 dark:text-slate-400 shrink-0 hidden sm:inline">
+              <div className="flex min-w-0 items-center gap-1.5 text-sm">
+                <span className="hidden shrink-0 text-slate-500 sm:inline dark:text-slate-400">
                   М{moduleNumber}
                 </span>
-                <span className="text-slate-400 dark:text-slate-600 shrink-0 hidden sm:inline">/</span>
-                <span className="font-medium text-slate-900 dark:text-slate-100 truncate">
-                  <span className="sm:hidden">М{moduleNumber}.{lessonNumber}</span>
-                  <span className="hidden sm:inline">У{lessonNumber}: {lessonTitle}</span>
+                <span className="hidden shrink-0 text-slate-400 sm:inline dark:text-slate-600">
+                  /
+                </span>
+                <span className="truncate font-medium text-slate-900 dark:text-slate-100">
+                  <span className="sm:hidden">
+                    М{moduleNumber}.{lessonNumber}
+                  </span>
+                  <span className="hidden sm:inline">
+                    У{lessonNumber}: {lessonTitle}
+                  </span>
                 </span>
               </div>
             </div>
 
             {/* Center: Tabs (inline) */}
-            <TabsList className="h-8 bg-slate-100 dark:bg-slate-800 p-0.5 gap-0.5 shrink-0">
+            <TabsList className="h-8 shrink-0 gap-0.5 bg-slate-100 p-0.5 dark:bg-slate-800">
               <TabsTrigger
                 value="content"
                 className={cn(
-                  'h-7 px-2.5 text-xs rounded-sm',
+                  'h-7 rounded-sm px-2.5 text-xs',
                   'data-[state=active]:bg-white dark:data-[state=active]:bg-slate-700',
                   'data-[state=active]:shadow-sm'
                 )}
               >
-                <FileText className="w-3.5 h-3.5 sm:mr-1.5" />
+                <FileText className="h-3.5 w-3.5 sm:mr-1.5" />
                 <span className="hidden sm:inline">{t('tabs.content')}</span>
               </TabsTrigger>
-              <TabsTrigger
+              {/* DISABLED: Enrichments tab - now managed via Course Viewer, not Workflow */}
+              {/* <TabsTrigger
                 value="enrichments"
                 className={cn(
                   'h-7 px-2.5 text-xs rounded-sm',
@@ -175,11 +186,11 @@ export function LessonPanelWithTabs({
               >
                 <Layers className="w-3.5 h-3.5 sm:mr-1.5" />
                 <span className="hidden sm:inline">{t('tabs.enrichments')}</span>
-              </TabsTrigger>
+              </TabsTrigger> */}
             </TabsList>
 
             {/* Right: Action buttons */}
-            <div className="flex items-center gap-0.5 shrink-0">
+            <div className="flex shrink-0 items-center gap-0.5">
               {onToggleMaximize && (
                 <Button
                   variant="ghost"
@@ -188,7 +199,11 @@ export function LessonPanelWithTabs({
                   className="h-8 w-8 text-slate-600 dark:text-slate-400"
                   aria-label={isMaximized ? 'Свернуть' : 'Развернуть'}
                 >
-                  {isMaximized ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+                  {isMaximized ? (
+                    <Minimize2 className="h-4 w-4" />
+                  ) : (
+                    <Maximize2 className="h-4 w-4" />
+                  )}
                 </Button>
               )}
               <Button
@@ -206,7 +221,10 @@ export function LessonPanelWithTabs({
 
         {/* Tab content - fills remaining space */}
         <ErrorBoundary FallbackComponent={TabErrorFallback}>
-          <TabsContent value="content" className="flex-1 m-0 overflow-hidden data-[state=inactive]:hidden">
+          <TabsContent
+            value="content"
+            className="m-0 flex-1 overflow-hidden data-[state=inactive]:hidden"
+          >
             <LessonInspector
               data={data}
               isLoading={isLoading}
@@ -230,16 +248,17 @@ export function LessonPanelWithTabs({
             />
           </TabsContent>
 
-          <TabsContent value="enrichments" className="flex-1 m-0 overflow-hidden data-[state=inactive]:hidden">
+          {/* DISABLED: Enrichments tab content - now managed via Course Viewer, not Workflow */}
+          {/* <TabsContent value="enrichments" className="flex-1 m-0 overflow-hidden data-[state=inactive]:hidden">
             <EnrichmentInspectorPanel
               lessonId={lessonId}
               className="h-full"
             />
-          </TabsContent>
+          </TabsContent> */}
         </ErrorBoundary>
       </Tabs>
     </div>
-  );
+  )
 }
 
-export default LessonPanelWithTabs;
+export default LessonPanelWithTabs
