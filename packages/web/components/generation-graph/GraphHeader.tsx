@@ -215,15 +215,16 @@ export const GraphHeader = ({
         <motion.div layout className="flex items-center gap-2 px-3 py-1.5">
           {/* Left section: Back + Title (shrink-0) */}
           <div className="flex shrink-0 items-center gap-2">
-            <Link href="/courses" className="shrink-0">
-              <Button
-                variant="ghost"
-                size="icon"
-                className={`h-7 w-7 ${isDark ? 'text-slate-400 hover:text-slate-100' : 'text-slate-500 hover:text-slate-900'}`}
-              >
+            <Button
+              asChild
+              variant="ghost"
+              size="icon"
+              className={`h-7 w-7 shrink-0 ${isDark ? 'text-slate-400 hover:text-slate-100' : 'text-slate-500 hover:text-slate-900'}`}
+            >
+              <Link href="/courses">
                 <ArrowLeft size={16} />
-              </Button>
-            </Link>
+              </Link>
+            </Button>
 
             {/* Rocket icon with connection indicator */}
             <div className="relative flex-shrink-0">

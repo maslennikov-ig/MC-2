@@ -359,15 +359,16 @@ export function SelectionToolbar({
                   <div className="flex shrink-0 items-center gap-2">
                     {/* Open Course Button */}
                     {courseSlug && (
-                      <Link href={`/courses/${courseSlug}`}>
-                        <Button
-                          size="compact"
-                          className="border-0 bg-emerald-500 text-white shadow-md shadow-emerald-500/25 transition-all hover:bg-emerald-600 dark:bg-emerald-600 dark:hover:bg-emerald-500"
-                        >
+                      <Button
+                        asChild
+                        size="compact"
+                        className="border-0 bg-emerald-500 text-white shadow-md shadow-emerald-500/25 transition-all hover:bg-emerald-600 dark:bg-emerald-600 dark:hover:bg-emerald-500"
+                      >
+                        <Link href={`/courses/${courseSlug}`}>
                           <span>{t('selectionToolbar.openCourse')}</span>
                           <ExternalLink size={14} className="ml-1.5" />
-                        </Button>
-                      </Link>
+                        </Link>
+                      </Button>
                     )}
 
                     {/* Minimize button */}
