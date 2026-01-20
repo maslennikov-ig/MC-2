@@ -117,6 +117,8 @@ services:
       - BULLMQ_QUEUE_NAME=course-generation-dev
       # Stage 6 queue name - needed for auto-approval to queue Stage 6 jobs correctly
       - BULLMQ_STAGE6_QUEUE_NAME=stage6-lesson-content-dev
+      # Stage 7 queue name - needed for triggerCourseCard() after Stage 5
+      - BULLMQ_STAGE7_QUEUE_NAME=stage7-enrichments-dev
       - ENRICHMENTS_STORAGE_BUCKET=course-enrichments
     volumes:
       - ./data/uploads-dev:/app/uploads
