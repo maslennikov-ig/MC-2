@@ -245,11 +245,11 @@ SELECT
 
 The `error_logs` table has an `environment` column that indicates where the error occurred:
 
-| Value     | Environment    | Action                                   |
-| --------- | -------------- | ---------------------------------------- |
-| `NULL`    | Local dev      | **Bulk resolve** — testing/development   |
-| `'dev'`   | Dev server     | **Bulk resolve** — testing on dev server |
-| `'stage'` | Staging (prod) | **Investigate** — real production errors |
+| Value     | Environment    | Action                                       |
+| --------- | -------------- | -------------------------------------------- |
+| `NULL`    | Local dev      | **Bulk resolve** — local testing/development |
+| `'dev'`   | Dev server     | **Investigate** — real errors on dev server  |
+| `'stage'` | Staging (prod) | **Investigate** — real production errors     |
 
 **Always check environment distribution first:**
 
@@ -282,11 +282,12 @@ FROM local_fingerprints lf
 ON CONFLICT (log_type, log_id) DO UPDATE SET status = 'resolved', notes = EXCLUDED.notes, updated_at = NOW();
 ```
 
-**Focus on production (stage) errors only:**
+**Focus on server errors (dev + stage):**
 
 ```sql
--- Get only PRODUCTION errors (stage environment)
+-- Get only SERVER errors (dev and stage environments)
 SELECT
+  el.environment,
   el.fingerprint,
   el.severity,
   MIN(el.error_message) as error_message,
@@ -296,8 +297,8 @@ FROM error_logs el
 LEFT JOIN log_issue_status lis ON lis.fingerprint = el.fingerprint
 WHERE lis.id IS NULL
   AND el.fingerprint IS NOT NULL
-  AND el.environment = 'stage'  -- Only production!
-GROUP BY el.fingerprint, el.severity
+  AND el.environment IS NOT NULL  -- Exclude local (NULL)
+GROUP BY el.environment, el.fingerprint, el.severity
 ORDER BY
   CASE el.severity WHEN 'CRITICAL' THEN 1 WHEN 'ERROR' THEN 2 ELSE 3 END,
   COUNT(*) DESC
@@ -307,9 +308,8 @@ LIMIT 20;
 **Why this matters:**
 
 - Local testing generates thousands of errors (incomplete data, experiments)
-- Dev server also has test data
-- Only `stage` environment reflects real user issues
-- Bulk resolving local/dev errors saves significant time
+- Dev and stage servers have real errors that need investigation
+- Bulk resolving only local (NULL) errors saves time without missing real bugs
 
 ### Step 2: For EACH Error (Loop)
 
