@@ -311,6 +311,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.28.17] - 2026-01-20
+
+### Fixed
+
+- **web**: update 1 source file(s), update docs (d2a15ec)
+- **docker**: add BULLMQ_STAGE6_QUEUE_NAME to worker-dev for Stage 6 queue isolation (a3eee0f)
+
+### Other
+
+- bd sync: 2026-01-20 16:13:30 (bacd526)
+- bd sync: 2026-01-20 16:13:06 (4c0d004)
+- **claude**: add rule to never discard uncommitted changes on /push (3f49637)
+
 ## [0.28.16] - 2026-01-20
 
 ### Added
