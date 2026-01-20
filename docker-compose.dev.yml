@@ -115,6 +115,8 @@ services:
       - DOCLING_CONTAINER_UPLOADS_PATH=/app/uploads-dev
       # DEV queue isolation - listens to DEV-only queue
       - BULLMQ_QUEUE_NAME=course-generation-dev
+      # Stage 6 queue name - needed for auto-approval to queue Stage 6 jobs correctly
+      - BULLMQ_STAGE6_QUEUE_NAME=stage6-lesson-content-dev
       - ENRICHMENTS_STORAGE_BUCKET=course-enrichments
     volumes:
       - ./data/uploads-dev:/app/uploads
