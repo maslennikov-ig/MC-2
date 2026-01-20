@@ -1,46 +1,39 @@
-'use client';
+'use client'
 
-import { useLocale, useTranslations } from 'next-intl';
-import { useRouter, usePathname } from '@/src/i18n/navigation';
-import { useTransition } from 'react';
-import { Button } from '@/components/ui/button';
+import { useLocale, useTranslations } from 'next-intl'
+import { useRouter, usePathname } from '@/src/i18n/navigation'
+import { useTransition } from 'react'
+import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import { Check, ChevronDown, Loader2 } from 'lucide-react';
-import { setLocale } from '@/app/actions/i18n';
-import { locales, type Locale } from '@/src/i18n/config';
-import { cn } from '@/lib/utils';
+} from '@/components/ui/dropdown-menu'
+import { Check, ChevronDown, Loader2 } from 'lucide-react'
+import { setLocale } from '@/app/actions/i18n'
+import { locales, type Locale } from '@/src/i18n/config'
+import { cn } from '@/lib/utils'
+import { getLocalPreferences, saveLocalPreferences } from '@/lib/user-preferences'
 
 /**
  * Flag components for supported locales
  */
 function RussianFlag({ className }: { className?: string }) {
   return (
-    <svg
-      className={cn('h-4 w-5 rounded-sm', className)}
-      viewBox="0 0 640 480"
-      aria-hidden="true"
-    >
+    <svg className={cn('h-4 w-5 rounded-sm', className)} viewBox="0 0 640 480" aria-hidden="true">
       <g fillRule="evenodd" strokeWidth="1pt">
         <path fill="#fff" d="M0 0h640v480H0z" />
         <path fill="#0039a6" d="M0 160h640v320H0z" />
         <path fill="#d52b1e" d="M0 320h640v160H0z" />
       </g>
     </svg>
-  );
+  )
 }
 
 function BritishFlag({ className }: { className?: string }) {
   return (
-    <svg
-      className={cn('h-4 w-5 rounded-sm', className)}
-      viewBox="0 0 640 480"
-      aria-hidden="true"
-    >
+    <svg className={cn('h-4 w-5 rounded-sm', className)} viewBox="0 0 640 480" aria-hidden="true">
       <path fill="#012169" d="M0 0h640v480H0z" />
       <path
         fill="#FFF"
@@ -53,30 +46,30 @@ function BritishFlag({ className }: { className?: string }) {
       <path fill="#FFF" d="M241 0v480h160V0H241zM0 160v160h640V160H0z" />
       <path fill="#C8102E" d="M0 193v96h640v-96H0zM273 0v480h96V0h-96z" />
     </svg>
-  );
+  )
 }
 
 const FLAGS: Record<Locale, React.ComponentType<{ className?: string }>> = {
   ru: RussianFlag,
   en: BritishFlag,
-};
+}
 
 const LANGUAGE_NAMES: Record<Locale, { native: string; english: string }> = {
   ru: { native: 'Русский', english: 'Russian' },
   en: { native: 'English', english: 'English' },
-};
+}
 
 interface LanguageSwitcherProps {
   /** Variant: 'button' for header, 'menu-item' for use inside ProfileMenu */
-  variant?: 'button' | 'menu-item';
+  variant?: 'button' | 'menu-item'
   /** Additional class name */
-  className?: string;
+  className?: string
   /** Force dark mode styling */
-  darkMode?: boolean;
+  darkMode?: boolean
   /** Show chevron indicator */
-  showChevron?: boolean;
+  showChevron?: boolean
   /** Compact mode - only flag, no text */
-  compact?: boolean;
+  compact?: boolean
 }
 
 /**
@@ -101,22 +94,31 @@ export function LanguageSwitcher({
   showChevron = true,
   compact = false,
 }: LanguageSwitcherProps) {
-  const locale = useLocale() as Locale;
-  const router = useRouter();
-  const pathname = usePathname();
-  const [isPending, startTransition] = useTransition();
-  const t = useTranslations('common');
+  const locale = useLocale()
+  const router = useRouter()
+  const pathname = usePathname()
+  const [isPending, startTransition] = useTransition()
+  const t = useTranslations('common')
 
-  const CurrentFlag = FLAGS[locale];
+  const CurrentFlag = FLAGS[locale]
 
   const handleLocaleChange = (newLocale: Locale) => {
-    if (newLocale === locale) return;
+    if (newLocale === locale) return
 
     startTransition(async () => {
-      await setLocale(newLocale);
-      router.replace(pathname, { locale: newLocale });
-    });
-  };
+      // 1. Save to userPreferences in localStorage
+      const currentPrefs = getLocalPreferences()
+      if (currentPrefs) {
+        saveLocalPreferences({ ...currentPrefs, language: newLocale })
+      }
+
+      // 2. Set locale cookie
+      await setLocale(newLocale)
+
+      // 3. Navigate to new locale
+      router.replace(pathname, { locale: newLocale })
+    })
+  }
 
   // For menu-item variant, render a simpler trigger for embedding
   if (variant === 'menu-item') {
@@ -125,7 +127,7 @@ export function LanguageSwitcher({
         <DropdownMenuTrigger asChild>
           <div
             className={cn(
-              'flex items-center justify-between w-full px-3 py-2 cursor-pointer rounded-sm',
+              'flex w-full cursor-pointer items-center justify-between rounded-sm px-3 py-2',
               'hover:bg-accent focus:bg-accent',
               darkMode && 'hover:bg-slate-700 focus:bg-slate-700',
               className
@@ -134,7 +136,7 @@ export function LanguageSwitcher({
             tabIndex={0}
           >
             <div className="flex items-center gap-3">
-              <div className="w-4 h-4 flex items-center justify-center">
+              <div className="flex h-4 w-4 items-center justify-center">
                 {isPending ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
                 ) : (
@@ -148,26 +150,23 @@ export function LanguageSwitcher({
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="min-w-[160px]">
           {locales.map((loc) => {
-            const Flag = FLAGS[loc];
-            const isSelected = loc === locale;
+            const Flag = FLAGS[loc]
+            const isSelected = loc === locale
             return (
               <DropdownMenuItem
                 key={loc}
                 onClick={() => handleLocaleChange(loc)}
-                className={cn(
-                  'flex items-center gap-3 cursor-pointer',
-                  isSelected && 'bg-accent'
-                )}
+                className={cn('flex cursor-pointer items-center gap-3', isSelected && 'bg-accent')}
               >
                 <Flag className="h-4 w-5" />
                 <span className="flex-1">{LANGUAGE_NAMES[loc].native}</span>
-                {isSelected && <Check className="h-4 w-4 text-primary" />}
+                {isSelected && <Check className="text-primary h-4 w-4" />}
               </DropdownMenuItem>
-            );
+            )
           })}
         </DropdownMenuContent>
       </DropdownMenu>
-    );
+    )
   }
 
   // Button variant for header
@@ -179,33 +178,27 @@ export function LanguageSwitcher({
           size="sm"
           disabled={isPending}
           className={cn(
-            'gap-2 min-h-[44px] min-w-[44px]',
-            darkMode && 'text-white/90 hover:text-white hover:bg-white/10',
+            'min-h-[44px] min-w-[44px] gap-2',
+            darkMode && 'text-white/90 hover:bg-white/10 hover:text-white',
             className
           )}
           aria-label={t('metadata.title')} // Using existing translation as fallback
         >
-          {isPending ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <CurrentFlag />
-          )}
-          {!compact && (
-            <span className="uppercase text-xs font-medium">{locale}</span>
-          )}
+          {isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <CurrentFlag />}
+          {!compact && <span className="text-xs font-medium uppercase">{locale}</span>}
           {showChevron && <ChevronDown className="h-3 w-3 opacity-50" />}
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="min-w-[180px]">
         {locales.map((loc) => {
-          const Flag = FLAGS[loc];
-          const isSelected = loc === locale;
+          const Flag = FLAGS[loc]
+          const isSelected = loc === locale
           return (
             <DropdownMenuItem
               key={loc}
               onClick={() => handleLocaleChange(loc)}
               className={cn(
-                'flex items-center gap-3 cursor-pointer py-2.5',
+                'flex cursor-pointer items-center gap-3 py-2.5',
                 isSelected && 'bg-accent'
               )}
             >
@@ -213,19 +206,17 @@ export function LanguageSwitcher({
               <div className="flex-1">
                 <div className="font-medium">{LANGUAGE_NAMES[loc].native}</div>
                 {loc !== locale && (
-                  <div className="text-xs text-muted-foreground">
-                    {LANGUAGE_NAMES[loc].english}
-                  </div>
+                  <div className="text-muted-foreground text-xs">{LANGUAGE_NAMES[loc].english}</div>
                 )}
               </div>
-              {isSelected && <Check className="h-4 w-4 text-primary" />}
+              {isSelected && <Check className="text-primary h-4 w-4" />}
             </DropdownMenuItem>
-          );
+          )
         })}
       </DropdownMenuContent>
     </DropdownMenu>
-  );
+  )
 }
 
 // Re-export for backward compatibility
-export default LanguageSwitcher;
+export default LanguageSwitcher

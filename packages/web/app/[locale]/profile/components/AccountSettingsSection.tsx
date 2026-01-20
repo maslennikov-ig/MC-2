@@ -1,10 +1,12 @@
 'use client'
 
-import { useState, memo, Suspense, useCallback } from 'react'
+import { useState, memo, Suspense, useCallback, useTransition } from 'react'
 import dynamic from 'next/dynamic'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { toast } from 'sonner'
+import { useLocale } from 'next-intl'
+import { useRouter, usePathname } from '@/src/i18n/navigation'
 import { useThemeSync } from '@/lib/hooks/use-theme-sync'
 import { useSupabase } from '@/lib/supabase/browser-client'
 import { Card } from '@/components/ui/card'
@@ -17,6 +19,8 @@ import {
   TelegramLoginButton,
   type TelegramAuthData,
 } from '@/components/telegram/telegram-login-button'
+import { setLocale } from '@/app/actions/i18n'
+import { locales, type Locale } from '@/src/i18n/config'
 import { passwordSchema, type PasswordFormData } from '../validation-schemas'
 import type { UserProfile } from '../page'
 import type { UserPreferences } from '@/lib/user-preferences'
@@ -105,6 +109,12 @@ interface AccountSettingsSectionProps {
   onDeleteAccount: () => Promise<void>
 }
 
+// Language names for display
+const LANGUAGE_NAMES: Record<Locale, { native: string; english: string }> = {
+  ru: { native: 'Русский', english: 'Russian' },
+  en: { native: 'English', english: 'English' },
+}
+
 const AccountSettingsSection = memo(function AccountSettingsSection({
   profile,
   onUpdate,
@@ -115,8 +125,40 @@ const AccountSettingsSection = memo(function AccountSettingsSection({
   const [showPasswordForm, setShowPasswordForm] = useState(false)
   const [showDeleteDialog, setShowDeleteDialog] = useState(false)
   const [deleteConfirmText, setDeleteConfirmText] = useState('')
+  const [isLocaleChanging, startLocaleTransition] = useTransition()
   const { theme, setTheme } = useThemeSync()
   const { session } = useSupabase()
+  const currentLocale = useLocale()
+  const router = useRouter()
+  const pathname = usePathname()
+
+  // Handle locale change - update both cookie and userPreferences
+  const handleLocaleChange = useCallback(
+    (newLocale: string) => {
+      // Validate locale
+      if (!locales.includes(newLocale as Locale)) {
+        toast.error('Неподдерживаемый язык')
+        return
+      }
+
+      const locale = newLocale as Locale
+      if (locale === currentLocale) return
+
+      startLocaleTransition(async () => {
+        // 1. Update userPreferences via parent
+        await onUpdate({ language: locale })
+
+        // 2. Set locale cookie
+        await setLocale(locale)
+
+        // 3. Navigate to new locale
+        router.replace(pathname, { locale })
+
+        toast.success(locale === 'ru' ? 'Язык изменён на русский' : 'Language changed to English')
+      })
+    },
+    [currentLocale, onUpdate, pathname, router]
+  )
 
   // Telegram connection state
   const isTelegramConnected = 'telegram_chat_id' in profile && !!profile.telegram_chat_id
@@ -259,19 +301,27 @@ const AccountSettingsSection = memo(function AccountSettingsSection({
               fallback={<div className="bg-muted mt-2 h-10 w-full animate-pulse rounded-md" />}
             >
               <Select
-                value={'language' in profile ? profile.language : 'ru'}
-                onValueChange={(value) => void onUpdate({ language: value })}
+                value={currentLocale}
+                onValueChange={handleLocaleChange}
+                disabled={isLocaleChanging}
                 aria-label="Выбор языка интерфейса"
               >
                 <SelectTrigger className="mt-2">
-                  <SelectValue />
+                  {isLocaleChanging ? (
+                    <div className="flex items-center gap-2">
+                      <Loader2 className="h-4 w-4 animate-spin" />
+                      <span>Смена языка...</span>
+                    </div>
+                  ) : (
+                    <SelectValue />
+                  )}
                 </SelectTrigger>
                 <SelectContent>
-                  <SelectItem value="ru">Русский</SelectItem>
-                  <SelectItem value="en">English</SelectItem>
-                  <SelectItem value="es">Español</SelectItem>
-                  <SelectItem value="de">Deutsch</SelectItem>
-                  <SelectItem value="fr">Français</SelectItem>
+                  {locales.map((locale) => (
+                    <SelectItem key={locale} value={locale}>
+                      {LANGUAGE_NAMES[locale].native}
+                    </SelectItem>
+                  ))}
                 </SelectContent>
               </Select>
             </Suspense>
