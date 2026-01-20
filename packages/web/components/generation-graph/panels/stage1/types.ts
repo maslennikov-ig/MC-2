@@ -15,27 +15,37 @@
  */
 export interface Stage1InputData {
   /** Course topic/title */
-  topic: string;
+  topic: string
   /** Detailed course description */
-  course_description: string;
+  course_description: string
   /** Target audience description */
-  target_audience?: string;
+  target_audience?: string
   /** Learning style (academic, conversational, etc.) */
-  style?: string;
+  style?: string
   /** Output formats for course content */
-  output_formats: Array<'text' | 'audio' | 'video' | 'presentation' | 'test'>;
+  output_formats: Array<'text' | 'audio' | 'video' | 'presentation' | 'test'>
   /** Expected number of lessons */
-  estimated_lessons?: number;
+  estimated_lessons?: number
   /** Content generation strategy */
-  content_strategy: 'auto' | 'create_from_scratch' | 'expand_and_enhance';
+  content_strategy: 'auto' | 'create_from_scratch' | 'expand_and_enhance'
   /** Prerequisites for the course */
-  prerequisites?: string;
+  prerequisites?: string
   /** Expected learning outcomes */
-  learning_outcomes?: string;
+  learning_outcomes?: string
   /** Whether files were uploaded */
-  has_files?: boolean;
+  has_files?: boolean
   /** Uploaded documents metadata */
-  files?: Stage1FileMetadata[];
+  files?: Stage1FileMetadata[]
+  /** Course language */
+  language?: string
+  /** Course size preset (small, medium, large) */
+  course_size?: string
+  /** Lesson duration in minutes */
+  lesson_duration_minutes?: number
+  /** Expected number of sections/modules */
+  estimated_sections?: number
+  /** Generation mode */
+  generation_mode?: 'automatic' | 'semi_automatic'
 }
 
 /**
@@ -43,13 +53,13 @@ export interface Stage1InputData {
  */
 export interface Stage1FileMetadata {
   /** File UUID */
-  id: string;
+  id: string
   /** Original filename */
-  name: string;
+  name: string
   /** File size in bytes */
-  size: number;
+  size: number
   /** MIME type */
-  type: string;
+  type: string
 }
 
 // ============================================================================
@@ -62,17 +72,17 @@ export interface Stage1FileMetadata {
  */
 export interface Stage1OutputData {
   /** Course UUID (e.g., crs_88291-ab) */
-  courseId: string;
+  courseId: string
   /** Owner user ID */
-  ownerId: string;
+  ownerId: string
   /** Creation timestamp (ISO string) */
-  createdAt: string;
+  createdAt: string
   /** Initialization status */
-  status: 'ready' | 'error';
+  status: 'ready' | 'error'
   /** Error message if status is 'error' */
-  errorMessage?: string;
+  errorMessage?: string
   /** S3/MinIO file storage paths */
-  storagePaths?: StoragePath[];
+  storagePaths?: StoragePath[]
 }
 
 /**
@@ -80,11 +90,11 @@ export interface Stage1OutputData {
  */
 export interface StoragePath {
   /** Original file ID */
-  fileId: string;
+  fileId: string
   /** S3/MinIO path (e.g., s3://bucket/crs_XXX/source/file.pdf) */
-  path: string;
+  path: string
   /** File size in bytes */
-  size?: number;
+  size?: number
 }
 
 // ============================================================================
@@ -94,22 +104,22 @@ export interface StoragePath {
 /**
  * Validation step status
  */
-export type ValidationStepStatus = 'pending' | 'success' | 'warning' | 'error';
+export type ValidationStepStatus = 'pending' | 'success' | 'warning' | 'error'
 
 /**
  * Single validation step in the checklist
  */
 export interface ValidationStep {
   /** Step identifier */
-  id: 'validation' | 'security' | 'storage' | 'registry';
+  id: 'validation' | 'security' | 'storage' | 'registry'
   /** Step name (translated) */
-  name: string;
+  name: string
   /** Step status */
-  status: ValidationStepStatus;
+  status: ValidationStepStatus
   /** Execution time in milliseconds */
-  durationMs?: number;
+  durationMs?: number
   /** Error or warning message */
-  message?: string;
+  message?: string
 }
 
 // ============================================================================
@@ -119,24 +129,24 @@ export interface ValidationStep {
 /**
  * Actor type for activity events
  */
-export type ActivityActor = 'user' | 'system';
+export type ActivityActor = 'user' | 'system'
 
 /**
  * Activity event for the timeline
  */
 export interface ActivityEvent {
   /** Event UUID */
-  id: string;
+  id: string
   /** Event timestamp */
-  timestamp: Date;
+  timestamp: Date
   /** Who performed the action */
-  actor: ActivityActor;
+  actor: ActivityActor
   /** Event type for styling */
-  type: 'info' | 'success' | 'warning' | 'error';
+  type: 'info' | 'success' | 'warning' | 'error'
   /** Event description */
-  message: string;
+  message: string
   /** Additional details */
-  details?: Record<string, unknown>;
+  details?: Record<string, unknown>
 }
 
 // ============================================================================
@@ -144,35 +154,35 @@ export interface ActivityEvent {
 // ============================================================================
 
 export interface Stage1InputTabProps {
-  inputData?: Stage1InputData | unknown;
-  locale?: 'ru' | 'en';
+  inputData?: Stage1InputData
+  locale?: 'ru' | 'en'
 }
 
 export interface Stage1ProcessTabProps {
   /** Pre-calculated validation steps (if available) */
-  steps?: ValidationStep[];
+  steps?: ValidationStep[]
   /** Total duration in milliseconds */
-  totalDurationMs?: number;
+  totalDurationMs?: number
   /** Current status */
-  status?: 'pending' | 'completed' | 'error';
-  locale?: 'ru' | 'en';
+  status?: 'pending' | 'completed' | 'error'
+  locale?: 'ru' | 'en'
 }
 
 export interface Stage1OutputTabProps {
-  outputData?: Stage1OutputData | unknown;
+  outputData?: Stage1OutputData
   /** Course ID for copy functionality */
-  courseId?: string;
-  locale?: 'ru' | 'en';
+  courseId?: string
+  locale?: 'ru' | 'en'
 }
 
 export interface Stage1ActivityTabProps {
   /** Node ID for filtering traces */
-  nodeId: string | null;
+  nodeId: string | null
   /** Course ID for context */
-  courseId?: string;
-  locale?: 'ru' | 'en';
+  courseId?: string
+  locale?: 'ru' | 'en'
   /** Stage 1 input data for generating synthetic activity events */
-  inputData?: Stage1InputData | unknown;
+  inputData?: Stage1InputData
   /** Stage 1 output data for generating synthetic activity events */
-  outputData?: Stage1OutputData | unknown;
+  outputData?: Stage1OutputData
 }

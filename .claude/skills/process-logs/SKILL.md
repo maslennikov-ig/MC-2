@@ -1,7 +1,7 @@
 ---
 name: process-logs
 description: Process error logs from admin panel - fetch new errors, analyze, create tasks, fix, and mark resolved
-version: 1.5.0
+version: 1.7.0
 ---
 
 # Process Error Logs
@@ -93,6 +93,7 @@ mcp__context7__resolve-library-id → mcp__context7__query-docs
 | Status        | What to write in notes                                                                           |
 | ------------- | ------------------------------------------------------------------------------------------------ |
 | `resolved`    | Root cause + fix applied. Example: `Missing constraint. Added 'approved' to enum via migration.` |
+| `auto_muted`  | **System-assigned.** Don't change. Skip these errors in processing.                              |
 | `ignored`     | **Never use.** Fix or ask user.                                                                  |
 | `to_verify`   | Why pending + what to check. Example: `External API timeout. Monitor for 24h.`                   |
 | `in_progress` | Beads task ID. Example: `Working on mc2-5ch`                                                     |
@@ -105,7 +106,53 @@ mcp__context7__resolve-library-id → mcp__context7__query-docs
 - `Constraint missing 'approved'. Added via migration 20250115_fix_status.`
 - `Cloudflare 500. External issue, retry logic already exists. Monitoring.`
 
-### 6. SEARCH SIMILAR PROBLEMS FIRST
+### 6. AUTO-MUTED ERRORS
+
+Some errors are **automatically ignored** by the system with status `auto_muted`. These are expected events, NOT bugs.
+
+**Current auto-mute rules** (from `src/shared/logger/auto-classification.ts`):
+
+| Pattern                            | Reason            | Description                                |
+| ---------------------------------- | ----------------- | ------------------------------------------ |
+| `Redis connection (ended\|closed)` | graceful_shutdown | Redis disconnects during app restart       |
+| `graceful.*shutdown`               | graceful_shutdown | Server shutdown events during deploys      |
+| `/api/trpc/health.*404`            | monitoring_probe  | tRPC health endpoint probes (Uptime Kuma)  |
+| `/health.*404`                     | monitoring_probe  | Generic health check probes                |
+| `Cloudflare.*5\d{2}`               | external_service  | Cloudflare edge errors (502, 503, 521)     |
+| `ECONNRESET.*external`             | external_service  | External API connection resets             |
+| `Layer failed, trying next`        | cascading_repair  | Repair layer failed, trying next layer     |
+| `Critique-revise attempt failed`   | cascading_repair  | Layer 2 retry attempt failed               |
+| `Zod.*validation failed.*Layer`    | cascading_repair  | Layer 1 validation failed, escalating      |
+| `Job stalled`                      | job_lifecycle     | BullMQ job restarted (long LLM operations) |
+
+**Total rules: 10** (test validates sync with code)
+
+**When you see `auto_muted` errors:**
+
+- Skip them in processing — they don't need fixes
+- If you see a pattern that should be auto-muted, add it to `auto-classification.ts`
+
+**How to add a new auto-mute rule:**
+
+1. Edit `packages/course-gen-platform/src/shared/logger/auto-classification.ts`:
+
+   ```typescript
+   {
+     pattern: /your-pattern/i,
+     reason: 'category',  // graceful_shutdown | monitoring_probe | external_service
+     description: 'Why this is expected',
+   }
+   ```
+
+2. Update this SKILL.md with the new pattern
+
+**When NOT to auto-mute:**
+
+- Errors that SOMETIMES indicate real problems
+- New error types (analyze first, then decide)
+- Anything affecting user experience
+
+### 7. SEARCH SIMILAR PROBLEMS FIRST
 
 **Before fixing, check if we solved this before:**
 
@@ -140,18 +187,129 @@ Invoke via: `/process-logs` or "обработай логи ошибок"
 
 ### Step 1: Fetch New Errors
 
+**IMPORTANT:** The `/admin/logs` UI shows errors from **TWO tables**:
+
+1. `error_logs` — system errors, validation failures, worker errors
+2. `generation_trace` (where `error_data IS NOT NULL`) — LLM generation errors
+
+**Both tables must be checked.** Logs without a `log_issue_status` record show as "Новый" (new) in the UI.
+
+#### 1a. Check error_logs
+
 ```sql
 -- Use mcp__supabase__execute_sql
+-- NOTE: This excludes auto_muted errors (they are handled automatically)
 SELECT el.id, el.severity, el.error_message, el.metadata, el.stack_trace,
        el.course_id, el.lesson_id, el.request_id, el.trpc_path, el.trpc_input, el.attempted_value
 FROM error_logs el
 LEFT JOIN log_issue_status lis ON lis.log_id = el.id AND lis.log_type = 'error_log'
-WHERE lis.id IS NULL
+WHERE lis.id IS NULL OR (lis.status NOT IN ('resolved', 'ignored', 'auto_muted'))
 ORDER BY
   CASE el.severity WHEN 'CRITICAL' THEN 1 WHEN 'ERROR' THEN 2 ELSE 3 END,
   el.created_at DESC
 LIMIT 20;
 ```
+
+#### 1b. Check generation_trace (LLM errors)
+
+```sql
+-- generation_trace with error_data shows as ERROR in UI
+SELECT gt.id, gt.created_at, gt.stage, gt.phase, gt.step_name, gt.course_id,
+       (gt.error_data->>'message')::text as error_message
+FROM generation_trace gt
+LEFT JOIN log_issue_status lis ON gt.id = lis.log_id AND lis.log_type = 'generation_trace'
+WHERE gt.error_data IS NOT NULL
+  AND (lis.id IS NULL OR lis.status NOT IN ('resolved', 'ignored', 'auto_muted'))
+ORDER BY gt.created_at DESC
+LIMIT 20;
+```
+
+#### 1c. Quick count check
+
+```sql
+-- Quick check: how many "new" errors in each table?
+SELECT
+  'error_logs' as source,
+  (SELECT COUNT(*) FROM error_logs el
+   LEFT JOIN log_issue_status lis ON el.id = lis.log_id AND lis.log_type = 'error_log'
+   WHERE lis.id IS NULL) as new_count
+UNION ALL
+SELECT
+  'generation_trace' as source,
+  (SELECT COUNT(*) FROM generation_trace gt
+   LEFT JOIN log_issue_status lis ON gt.id = lis.log_id AND lis.log_type = 'generation_trace'
+   WHERE gt.error_data IS NOT NULL AND lis.id IS NULL) as new_count;
+```
+
+### Step 1.5: Filter by Environment (IMPORTANT)
+
+The `error_logs` table has an `environment` column that indicates where the error occurred:
+
+| Value     | Environment    | Action                                       |
+| --------- | -------------- | -------------------------------------------- |
+| `NULL`    | Local dev      | **Bulk resolve** — local testing/development |
+| `'dev'`   | Dev server     | **Investigate** — real errors on dev server  |
+| `'stage'` | Staging (prod) | **Investigate** — real production errors     |
+
+**Always check environment distribution first:**
+
+```sql
+-- Check how many errors per environment
+SELECT environment, COUNT(*) as count
+FROM error_logs el
+LEFT JOIN log_issue_status lis ON lis.fingerprint = el.fingerprint
+WHERE lis.id IS NULL
+GROUP BY environment
+ORDER BY count DESC;
+```
+
+**Bulk resolve local/dev errors:**
+
+```sql
+-- Bulk resolve ALL local environment errors (environment IS NULL)
+WITH local_fingerprints AS (
+  SELECT DISTINCT ON (el.fingerprint) el.id, el.fingerprint
+  FROM error_logs el
+  LEFT JOIN log_issue_status lis ON lis.fingerprint = el.fingerprint
+  WHERE lis.id IS NULL
+    AND el.environment IS NULL
+    AND el.fingerprint IS NOT NULL
+  ORDER BY el.fingerprint, el.created_at DESC
+)
+INSERT INTO log_issue_status (log_type, log_id, status, notes, fingerprint, updated_at)
+SELECT 'error_log', lf.id, 'resolved', 'Local environment: Testing/development errors', lf.fingerprint, NOW()
+FROM local_fingerprints lf
+ON CONFLICT (log_type, log_id) DO UPDATE SET status = 'resolved', notes = EXCLUDED.notes, updated_at = NOW();
+```
+
+**Focus on server errors (dev + stage):**
+
+```sql
+-- Get only SERVER errors (dev and stage environments)
+SELECT
+  el.environment,
+  el.fingerprint,
+  el.severity,
+  MIN(el.error_message) as error_message,
+  COUNT(*) as count,
+  MAX(el.created_at) as last_seen
+FROM error_logs el
+LEFT JOIN log_issue_status lis ON lis.fingerprint = el.fingerprint
+WHERE lis.id IS NULL
+  AND el.fingerprint IS NOT NULL
+  AND el.environment IS NOT NULL  -- Exclude local (NULL)
+GROUP BY el.environment, el.fingerprint, el.severity
+ORDER BY
+  CASE el.severity WHEN 'CRITICAL' THEN 1 WHEN 'ERROR' THEN 2 ELSE 3 END,
+  COUNT(*) DESC
+LIMIT 20;
+```
+
+**Why this matters:**
+
+- Local testing generates thousands of errors (incomplete data, experiments)
+- Dev and stage servers have real errors that need investigation
+- Bulk resolving only local (NULL) errors saves time without missing real bugs
 
 ### Step 2: For EACH Error (Loop)
 
@@ -178,8 +336,14 @@ FOR each error:
      - If errors → re-delegate
 
   6. MARK resolved in DB:
+     -- For error_logs:
      INSERT INTO log_issue_status (log_type, log_id, status, notes, updated_at)
      VALUES ('error_log', '<id>', 'resolved', 'Fixed: <desc>', NOW())
+     ON CONFLICT (log_type, log_id) DO UPDATE SET status = 'resolved', notes = EXCLUDED.notes, updated_at = NOW();
+
+     -- For generation_trace:
+     INSERT INTO log_issue_status (log_type, log_id, status, notes, updated_at)
+     VALUES ('generation_trace', '<id>', 'resolved', 'Fixed: <desc>', NOW())
      ON CONFLICT (log_type, log_id) DO UPDATE SET status = 'resolved', notes = EXCLUDED.notes, updated_at = NOW();
 
   7. CLOSE Beads task:
@@ -268,8 +432,10 @@ Before marking ANY error as resolved:
 | `Error querying`       | Query bug     | `database-architect`          | 2        |
 | Config missing         | Config issue  | **ASK USER**                  | 3        |
 | External service       | External      | mark `to_verify`              | 3        |
+| Redis shutdown         | Expected      | **SKIP** (auto_muted)         | -        |
+| Health probe 404       | Expected      | **SKIP** (auto_muted)         | -        |
 
-**NEVER auto-ignore errors. Always fix or ask user.**
+**Errors with status `auto_muted` are automatically ignored by the system. Skip them.**
 
 ## Reference Docs
 
@@ -277,3 +443,31 @@ Before marking ANY error as resolved:
 - Error Types: `packages/course-gen-platform/src/shared/logger/types.ts`
 - Logs Router: `packages/course-gen-platform/src/server/routers/admin/logs.ts`
 - CLAUDE.md: Main orchestration rules
+
+## Architecture Note
+
+The `/admin/logs` page aggregates errors from **two sources**:
+
+| Table              | log_type             | What it contains                            |
+| ------------------ | -------------------- | ------------------------------------------- |
+| `error_logs`       | `'error_log'`        | System errors, validation, worker failures  |
+| `generation_trace` | `'generation_trace'` | LLM errors (where `error_data IS NOT NULL`) |
+
+Status is tracked in `log_issue_status` table with composite key `(log_type, log_id)`.
+
+**UI Logic:** If no `log_issue_status` record exists → status shows as "Новый" (new).
+
+### Grouped View (fingerprint)
+
+The UI has two views:
+
+1. **List view** — individual logs, status by `log_id`
+2. **Grouped view** — errors grouped by `fingerprint`, status by `fingerprint`
+
+**Auto-sync trigger** (`trg_sync_log_status_fingerprint`):
+
+- When you INSERT/UPDATE `log_issue_status` for an `error_log`
+- The trigger automatically copies `fingerprint` from `error_logs`
+- This ensures grouped view shows correct status
+
+**IMPORTANT:** You don't need to manually handle fingerprint — the trigger does it automatically. Just use the standard `INSERT INTO log_issue_status` by `log_id`.

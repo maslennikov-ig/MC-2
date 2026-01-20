@@ -33,12 +33,31 @@ export const LLM_PER_ATTEMPT_TIMEOUT_MS = 30000;
 /**
  * Zod schema for validating LLM issue response
  * Validates type and severity against allowed values, with fallback for unknown types
+ *
+ * GRAMMAR issues (Phase 2.5) include quotedText and inlineReplacement
+ * for zero-token fixes via InlineFixer.
  */
 export const LLMIssueSchema = z.object({
-  type: z.enum(['LANGUAGE', 'TRUNCATION', 'ALIGNMENT', 'HALLUCINATION', 'HYGIENE', 'EMPTY', 'SHORT_SECTION', 'LOGIC']).catch('HYGIENE'),
+  type: z
+    .enum([
+      'LANGUAGE',
+      'TRUNCATION',
+      'ALIGNMENT',
+      'HALLUCINATION',
+      'HYGIENE',
+      'EMPTY',
+      'SHORT_SECTION',
+      'LOGIC',
+      'GRAMMAR',
+    ])
+    .catch('HYGIENE'),
   severity: z.enum(['CRITICAL', 'FIXABLE', 'COMPLEX', 'INFO']).catch('INFO'),
   location: z.string().default('global'),
   description: z.string().default('Unknown issue'),
+  /** Exact text with error (for GRAMMAR issues, enables InlineFixer) */
+  quotedText: z.string().optional(),
+  /** Corrected text to replace quotedText (for GRAMMAR issues) */
+  inlineReplacement: z.string().optional(),
 });
 
 // ============================================================================
@@ -48,6 +67,9 @@ export const LLMIssueSchema = z.object({
 /**
  * LLM response schema from self-reviewer prompt
  * Note: patched_content is optional - we use programmatic patching for HYGIENE issues
+ *
+ * GRAMMAR issues (Phase 2.5) include quotedText and inlineReplacement
+ * for zero-token fixes via InlineFixer.
  */
 export interface SelfReviewerLLMResponse {
   status: 'PASS' | 'PASS_WITH_FLAGS' | 'FIXED' | 'REGENERATE' | 'FLAG_TO_JUDGE';
@@ -57,6 +79,10 @@ export interface SelfReviewerLLMResponse {
     severity: string;
     location: string;
     description: string;
+    /** Exact text with error (for GRAMMAR issues, enables InlineFixer) */
+    quotedText?: string;
+    /** Corrected text to replace quotedText (for GRAMMAR issues) */
+    inlineReplacement?: string;
   }>;
   patched_content?: LessonContentBody | null;
 }

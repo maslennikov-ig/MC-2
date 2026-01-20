@@ -21,8 +21,11 @@ import { Alert, AlertDescription } from '@/components/ui/alert'
 // DISABLED: MissionControlBanner handlers moved to GraphView
 // import { approveStage, cancelGeneration, startGeneration } from '@/app/actions/admin-generation';
 import { GraphViewWrapper } from '@/components/generation-graph'
-import { AutomaticModeControlPanel } from '@/components/generation'
-import { cancelGeneration, switchToManualMode } from '@/app/actions/admin-generation'
+import {
+  cancelGeneration,
+  switchToManualMode,
+  startGeneration,
+} from '@/app/actions/admin-generation'
 
 // Celestial Design Imports - SpaceBackground REMOVED: GraphView takes full screen now
 // MissionControlBanner - DISABLED: Now rendered inside GraphView
@@ -292,6 +295,9 @@ export default function GenerationProgressContainerEnhanced({
   const [showSuccess, setShowSuccess] = useState(false)
   const hasTriggeredConfetti = useRef(false)
 
+  // Local state for pause/resume - initialized from prop, updated via realtime and optimistic updates
+  const [isPausedLocal, setIsPausedLocal] = useState(!!generationPausedAt)
+
   // DISABLED: All below moved to GraphView - MissionControlBanner and StageResultsDrawer
   // const [detailsStageId, setDetailsStageId] = useState<string | null>(null);
   // const [isProcessingApproval, setIsProcessingApproval] = useState(false);
@@ -348,6 +354,32 @@ export default function GenerationProgressContainerEnhanced({
     }
   }, [])
 
+  // Auto-start generation in automatic mode
+  // When course is in automatic mode and status is 'pending', start generation automatically
+  const autoStartTriggered = useRef(false)
+  useEffect(() => {
+    // Only auto-start once
+    if (autoStartTriggered.current) return
+
+    // Check conditions for auto-start
+    const shouldAutoStart =
+      generationMode === 'automatic' && initialStatus === 'pending' && !generationPausedAt
+
+    if (shouldAutoStart) {
+      autoStartTriggered.current = true
+      // Start generation automatically
+      startGeneration(courseId)
+        .then(() => {
+          console.log('[AutoStart] Generation started automatically in automatic mode')
+        })
+        .catch((error) => {
+          console.error('[AutoStart] Failed to auto-start generation:', error)
+          // Reset flag to allow retry on error
+          autoStartTriggered.current = false
+        })
+    }
+  }, [courseId, generationMode, initialStatus, generationPausedAt])
+
   // Save state to session storage
   const saveStateToStorage = useCallback(() => {
     if (typeof window !== 'undefined') {
@@ -385,7 +417,7 @@ export default function GenerationProgressContainerEnhanced({
   const handlePause = useCallback(async () => {
     if (!supabase) return
     // Don't pause if already paused or generation is terminal
-    if (generationPausedAt) {
+    if (isPausedLocal) {
       showToast('warning', 'Генерация уже приостановлена')
       return
     }
@@ -394,40 +426,52 @@ export default function GenerationProgressContainerEnhanced({
       showToast('warning', 'Генерация уже завершена')
       return
     }
+    // Optimistic update - set paused state immediately before API call
+    setIsPausedLocal(true)
     try {
       const { error } = await supabase
         .from('courses')
         .update({ generation_paused_at: new Date().toISOString() })
         .eq('id', courseId)
 
-      if (error) throw error
+      if (error) {
+        // Revert optimistic update on error
+        setIsPausedLocal(false)
+        throw error
+      }
       showToast('info', 'Генерация приостановлена')
     } catch (error) {
       showToast('error', 'Не удалось приостановить генерацию')
       console.error(error)
     }
-  }, [courseId, supabase, showToast, generationPausedAt, state.status])
+  }, [courseId, supabase, showToast, isPausedLocal, state.status])
 
   const handleResume = useCallback(async () => {
     if (!supabase) return
     // Only resume if paused
-    if (!generationPausedAt) {
+    if (!isPausedLocal) {
       showToast('warning', 'Генерация не приостановлена')
       return
     }
+    // Optimistic update - set resumed state immediately before API call
+    setIsPausedLocal(false)
     try {
       const { error } = await supabase
         .from('courses')
         .update({ generation_paused_at: null })
         .eq('id', courseId)
 
-      if (error) throw error
+      if (error) {
+        // Revert optimistic update on error
+        setIsPausedLocal(true)
+        throw error
+      }
       showToast('success', 'Генерация продолжена')
     } catch (error) {
       showToast('error', 'Не удалось продолжить генерацию')
       console.error(error)
     }
-  }, [courseId, supabase, showToast, generationPausedAt])
+  }, [courseId, supabase, showToast, isPausedLocal])
 
   const handleCancel = useCallback(async () => {
     if (!confirm('Вы уверены, что хотите отменить генерацию? Это действие нельзя отменить.')) return
@@ -466,7 +510,13 @@ export default function GenerationProgressContainerEnhanced({
       generation_status?: string | null
       error_message?: string | null
       analysis_result?: unknown
+      generation_paused_at?: string | null
     }) => {
+      // Update pause state from realtime data
+      if ('generation_paused_at' in course) {
+        const newIsPaused = course.generation_paused_at !== null
+        setIsPausedLocal(newIsPaused)
+      }
       if (course.generation_progress && typeof course.generation_progress === 'object') {
         const progress = course.generation_progress as {
           steps?: unknown
@@ -862,20 +912,6 @@ export default function GenerationProgressContainerEnhanced({
         )}
       </AnimatePresence>
 
-      {/* Automatic Mode Control Panel - shown above graph when in automatic mode */}
-      {generationMode === 'automatic' && (
-        <div className="absolute top-4 left-1/2 z-50 w-full max-w-3xl -translate-x-1/2 px-4">
-          <AutomaticModeControlPanel
-            status={state.status as string}
-            isPaused={!!generationPausedAt}
-            onPause={handlePause}
-            onResume={handleResume}
-            onCancel={handleCancel}
-            onSwitchToManual={handleSwitchToManual}
-          />
-        </div>
-      )}
-
       {/* GraphView - Full screen */}
       <GraphViewWrapper
         courseId={courseId}
@@ -889,6 +925,11 @@ export default function GenerationProgressContainerEnhanced({
         generationStatus={state.status}
         isRealtimeConnected={state.isConnected}
         readOnly={generationMode === 'automatic'}
+        isPaused={isPausedLocal}
+        onPause={handlePause}
+        onResume={handleResume}
+        onCancelGeneration={handleCancel}
+        onSwitchToManual={handleSwitchToManual}
       />
 
       {/* Success Overlay Animation */}

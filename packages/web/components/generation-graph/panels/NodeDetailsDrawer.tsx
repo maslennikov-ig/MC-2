@@ -1,4 +1,4 @@
-import React, { memo, useState, useEffect, useMemo, useRef, useCallback } from 'react';
+import React, { memo, useState, useEffect, useMemo, useRef, useCallback, Component, ErrorInfo, ReactNode } from 'react';
 import { useReactFlow } from '@xyflow/react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
 import { Maximize2, Minimize2, RotateCcw } from 'lucide-react';
@@ -21,12 +21,14 @@ import { OutputTab } from './OutputTab';
 import { ActivityTab } from './ActivityTab';
 // Stage 1 "Course Passport" UI components
 import { Stage1InputTab, Stage1ProcessTab, Stage1OutputTab, Stage1ActivityTab } from './stage1';
+import type { Stage1InputData, Stage1OutputData } from './stage1/types';
 // Stage 2 "Document Processing" UI components
 import { Stage2InputTab, Stage2ProcessTab, Stage2OutputTab, Stage2ActivityTab, Stage2Dashboard } from './stage2';
 // Stage 3 "Document Classification" UI components
 import { Stage3InputTab, Stage3ProcessTab, Stage3OutputTab, Stage3ActivityTab } from './stage3';
 // Stage 4 "Deep Analysis" UI components
 import { Stage4InputTab, Stage4ProcessTab, Stage4OutputTab, Stage4ActivityTab } from './stage4';
+import type { Stage4InputData } from './stage4/types';
 // Stage 5 "Generation" UI components
 import { Stage5InputTab, Stage5ProcessTab, Stage5OutputTab, Stage5ActivityTab } from './stage5';
 import { useStage2DashboardData } from '../hooks/useStage2DashboardData';
@@ -46,6 +48,7 @@ import {
   retryLessonGeneration,
   deleteLesson,
   approveLessons,
+  exportModuleLessons,
 } from '@/app/actions/lesson-actions';
 // Stage 6 "Glass Factory" UI components
 import { ModuleDashboard } from './module/ModuleDashboard';
@@ -55,6 +58,76 @@ import { useLessonInspectorData } from '../hooks/useLessonInspectorData';
 import { useEnrichmentInspectorStore } from '../stores/enrichment-inspector-store';
 // End Node completion panel
 import { EndNodePanel } from './EndNodePanel';
+
+/**
+ * Extract module number from moduleId string (e.g., "module_1" -> 1)
+ * @param moduleId - Module ID in format "module_N"
+ * @returns Module number or undefined if invalid format
+ */
+function extractModuleNumber(moduleId: string): number | undefined {
+  const match = moduleId.match(/^module_(\d+)$/);
+  return match ? parseInt(match[1], 10) : undefined;
+}
+
+/**
+ * Error Boundary for LessonPanelWithTabs
+ * Catches render errors and displays fallback UI instead of crashing the whole app
+ */
+interface LessonPanelErrorBoundaryProps {
+  children: ReactNode;
+  lessonId: string;
+  onBack?: () => void;
+}
+
+interface LessonPanelErrorBoundaryState {
+  hasError: boolean;
+  error?: Error;
+}
+
+class LessonPanelErrorBoundary extends Component<LessonPanelErrorBoundaryProps, LessonPanelErrorBoundaryState> {
+  constructor(props: LessonPanelErrorBoundaryProps) {
+    super(props);
+    this.state = { hasError: false };
+  }
+
+  static getDerivedStateFromError(error: Error): LessonPanelErrorBoundaryState {
+    return { hasError: true, error };
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
+    console.error('LessonPanelWithTabs error:', error, errorInfo);
+  }
+
+  render(): ReactNode {
+    if (this.state.hasError) {
+      return (
+        <div className="flex h-full flex-col items-center justify-center gap-4 p-6 text-center">
+          <div className="text-red-500">
+            <svg className="mx-auto h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            </svg>
+          </div>
+          <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+            Failed to load lesson
+          </h3>
+          <p className="text-sm text-slate-500 dark:text-slate-400">
+            Lesson ID: {this.props.lessonId}
+          </p>
+          {this.props.onBack && (
+            <button
+              onClick={this.props.onBack}
+              className="rounded-md bg-slate-100 px-4 py-2 text-sm font-medium text-slate-700 hover:bg-slate-200 dark:bg-slate-800 dark:text-slate-300 dark:hover:bg-slate-700"
+            >
+              Go back to module
+            </button>
+          )}
+        </div>
+      );
+    }
+
+    return this.props.children;
+  }
+}
 
 interface DisplayData {
   label?: string;
@@ -104,6 +177,7 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
   const [showRestartDialog, setShowRestartDialog] = useState(false);
   const [isApproving, setIsApproving] = useState(false);
   const [isApprovingAll, setIsApprovingAll] = useState(false);
+  const [isExporting, setIsExporting] = useState(false);
   const [isRetrying, setIsRetrying] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
 
@@ -339,9 +413,7 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
   const handleApproveAllLessons = useCallback(async () => {
     if (!moduleIdForDashboard) return;
 
-    // Extract module number from moduleId (e.g., "module_1" -> 1)
-    const match = moduleIdForDashboard.match(/^module_(\d+)$/);
-    const moduleNumber = match ? parseInt(match[1], 10) : undefined;
+    const moduleNumber = extractModuleNumber(moduleIdForDashboard);
 
     setIsApprovingAll(true);
     try {
@@ -366,6 +438,62 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
       setIsApprovingAll(false);
     }
   }, [moduleIdForDashboard, courseInfo.id, refetchModuleDashboard, t]);
+
+  // Handler for exporting all lessons in a module as Markdown
+  const handleExportAll = useCallback(async () => {
+    if (!moduleIdForDashboard) return;
+
+    // Prevent multiple simultaneous exports (double-click protection)
+    if (isExporting) return;
+
+    const moduleNumber = extractModuleNumber(moduleIdForDashboard);
+    if (!moduleNumber) {
+      toast.error('Invalid module ID');
+      return;
+    }
+
+    setIsExporting(true);
+    const abortController = new AbortController();
+    let blobUrl: string | null = null;
+
+    try {
+      const result = await exportModuleLessons(courseInfo.id, moduleNumber, abortController.signal);
+
+      // Check if request was aborted
+      if (abortController.signal.aborted) return;
+
+      if (result.content) {
+        // Create and trigger download
+        const blob = new Blob([result.content], { type: 'text/markdown;charset=utf-8' });
+        blobUrl = URL.createObjectURL(blob);
+
+        try {
+          const link = document.createElement('a');
+          link.href = blobUrl;
+          link.download = result.filename;
+          document.body.appendChild(link);
+          link.click();
+          document.body.removeChild(link);
+        } finally {
+          // Always cleanup blob URL to prevent memory leak
+          URL.revokeObjectURL(blobUrl);
+          blobUrl = null;
+        }
+
+        toast.success(`${t('actions.exported') || 'Exported'}: ${result.lessonsCount} ${t('actions.lessons') || 'lessons'}`);
+      } else {
+        toast.error(t('actions.noContentToExport') || 'No content to export');
+      }
+    } catch (error) {
+      // Silent abort handling (user navigated away or cancelled)
+      if (error instanceof Error && error.name === 'AbortError') return;
+      toast.error(error instanceof Error ? error.message : (t('actions.exportError') || 'Export failed'));
+    } finally {
+      // Cleanup blob URL if not already done
+      if (blobUrl) URL.revokeObjectURL(blobUrl);
+      setIsExporting(false);
+    }
+  }, [moduleIdForDashboard, courseInfo.id, isExporting, t]);
 
   // Reset phase and attempt selection when node changes
   useEffect(() => {
@@ -704,37 +832,43 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
               data={moduleDashboardData}
               isLoading={isLoadingModuleDashboard}
               error={moduleDashboardError}
-              onExportAll={() => {/* TODO: Implement export */}}
+              onExportAll={() => void handleExportAll()}
               onRegenerateFailed={() => {/* TODO: Implement regenerate failed */}}
               onImproveQuality={() => {/* TODO: Implement improve quality */}}
-              onApproveAll={handleApproveAllLessons}
+              onApproveAll={() => void handleApproveAllLessons()}
               isApproving={isApprovingAll}
+              isExporting={isExporting}
               className="h-full"
             />
           ) : isStage6Lesson ? (
             /* Lesson Panel with Content + Activities tabs */
-            <LessonPanelWithTabs
+            <LessonPanelErrorBoundary
               lessonId={lessonInfoForInspector?.lessonId ?? ''}
-              courseId={courseInfo.id}
-              data={lessonInspectorData}
-              isLoading={isLoadingLessonInspector}
-              error={lessonInspectorError}
               onBack={deselectNode}
-              onClose={deselectNode}
-              onApprove={handleApproveLesson}
-              onEdit={handleEditLesson}
-              onRegenerate={handleRegenerateLesson}
-              onDelete={handleDeleteLesson}
-              onRetryNode={handleRetryNode}
-              isMaximized={isLessonMaximized}
-              onToggleMaximize={() => setIsLessonMaximized(!isLessonMaximized)}
-              className="h-full"
-              isApproving={isApproving}
-              isRegenerating={isRetrying}
-              isDeleting={isDeleting}
-              tier={courseInfo.tier}
-              defaultTab={pendingCreateType ? 'enrichments' : 'content'}
-            />
+            >
+              <LessonPanelWithTabs
+                lessonId={lessonInfoForInspector?.lessonId ?? ''}
+                courseId={courseInfo.id}
+                data={lessonInspectorData}
+                isLoading={isLoadingLessonInspector}
+                error={lessonInspectorError}
+                onBack={deselectNode}
+                onClose={deselectNode}
+                onApprove={handleApproveLesson}
+                onEdit={handleEditLesson}
+                onRegenerate={handleRegenerateLesson}
+                onDelete={handleDeleteLesson}
+                onRetryNode={handleRetryNode}
+                isMaximized={isLessonMaximized}
+                onToggleMaximize={() => setIsLessonMaximized(!isLessonMaximized)}
+                className="h-full"
+                isApproving={isApproving}
+                isRegenerating={isRetrying}
+                isDeleting={isDeleting}
+                tier={courseInfo.tier}
+                defaultTab={pendingCreateType ? 'enrichments' : 'content'}
+              />
+            </LessonPanelErrorBoundary>
           ) : isEndNode ? (
             /* End Node - Course Completion Panel */
             <EndNodePanel
@@ -821,7 +955,7 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
 
                 <TabsContent value="input" className="mt-4 space-y-4" data-testid="content-input">
                   {data?.stageNumber === 1 ? (
-                    <Stage1InputTab inputData={displayData?.inputData} />
+                    <Stage1InputTab inputData={displayData?.inputData as Stage1InputData | undefined} />
                   ) : isDocumentNode ? (
                     <Stage2InputTab
                       documentId={documentId}
@@ -835,7 +969,7 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
                   ) : data?.stageNumber === 4 ? (
                     <Stage4InputTab
                       courseId={courseInfo.id}
-                      inputData={displayData?.inputData}
+                      inputData={displayData?.inputData as Stage4InputData | undefined}
                     />
                   ) : data?.stageNumber === 5 ? (
                     <Stage5InputTab
@@ -893,7 +1027,7 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
                 <TabsContent value="output" className="mt-4 space-y-4" data-testid="content-output">
                   {data?.stageNumber === 1 ? (
                     <Stage1OutputTab
-                      outputData={displayData?.outputData}
+                      outputData={displayData?.outputData as Stage1OutputData | undefined}
                       courseId={courseInfo.id}
                     />
                   ) : isDocumentNode ? (
@@ -944,8 +1078,8 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
                     <Stage1ActivityTab
                       nodeId={selectedNodeId}
                       courseId={courseInfo.id}
-                      inputData={data?.inputData}
-                      outputData={data?.outputData}
+                      inputData={data?.inputData as Stage1InputData | undefined}
+                      outputData={data?.outputData as Stage1OutputData | undefined}
                     />
                   ) : isDocumentNode ? (
                     <Stage2ActivityTab

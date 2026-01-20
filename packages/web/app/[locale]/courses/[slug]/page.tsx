@@ -1,7 +1,7 @@
-// Этап 10: CourseViewerEnhanced (финальная версия)
+// Stage 10: CourseViewerEnhanced (final version)
 import { notFound } from 'next/navigation'
-import { setRequestLocale } from 'next-intl/server';
-import { Locale } from '@/src/i18n/config';
+import { setRequestLocale } from 'next-intl/server'
+import { Locale } from '@/src/i18n/config'
 import { getUserClient } from '@/lib/supabase/client-factory'
 import { logger } from '@/lib/logger'
 import CourseViewerEnhanced from '@/components/course/course-viewer-enhanced'
@@ -12,9 +12,17 @@ import {
   prepareSectionsForViewer,
   prepareLessonsForViewer,
 } from '@/lib/course-data-utils'
-import type { Course, Asset } from '@/types/database'
+import type { Course } from '@/types/database'
 import { PostgrestError } from '@supabase/supabase-js'
 import { Database } from '@/types/database.generated'
+import { z } from 'zod'
+
+/** Minimal schema for Course validation - validates critical fields only */
+const CourseSchema = z.object({
+  id: z.string().uuid(),
+  title: z.string().min(1),
+  slug: z.string().min(1),
+})
 
 // Force dynamic rendering to ensure auth state is fresh
 export const dynamic = 'force-dynamic'
@@ -27,45 +35,60 @@ type AssetRow = Database['public']['Tables']['assets']['Row']
 type EnrichmentRow = Database['public']['Tables']['lesson_enrichments']['Row']
 type LessonContentRow = Database['public']['Tables']['lesson_contents']['Row']
 
-
 interface CoursePageProps {
   params: Promise<{
     locale: Locale
     slug: string
   }>
+  searchParams: Promise<{
+    lesson?: string
+  }>
 }
 
-export default async function CoursePage({ params }: CoursePageProps) {
+export default async function CoursePage({ params, searchParams }: CoursePageProps) {
   const { locale, slug } = await params
-  setRequestLocale(locale); // Enable static rendering
-  
-  // Используем getUserClient для автоматического применения RLS
+  const { lesson: initialLessonLabel } = await searchParams
+  setRequestLocale(locale) // Enable static rendering
+
+  // Use getUserClient for automatic RLS enforcement
   const supabase = await getUserClient()
-  
-  const { data: course, error } = await supabase
+
+  const { data: rawCourse, error } = await supabase
     .from('courses')
     .select('*')
     .eq('slug', slug)
-    .single() as { data: Course | null, error: PostgrestError | null }
-  
-  // Проверяем наличие курса
-  if (error || !course) {
+    .single()
+
+  if (error || !rawCourse) {
     notFound()
   }
-  
-  // Этап 4: Получаем секции и уроки
-  const { data: sections, error: sectionsError } = await supabase
+
+  // Validate critical fields at runtime
+  const validationResult = CourseSchema.safeParse(rawCourse)
+  if (!validationResult.success) {
+    logger.error('Invalid course data from database', {
+      slug,
+      errors: validationResult.error.errors,
+    })
+    notFound()
+  }
+
+  // Type assertion is now safe - we validated the structure
+  const course = rawCourse as Course
+
+  // Stage 4: Fetch sections and lessons
+  const { data: sections, error: sectionsError } = (await supabase
     .from('sections')
     .select('*')
     .eq('course_id', course.id)
-    .order('order_index') as { data: SectionRow[] | null; error: PostgrestError | null }
+    .order('order_index')) as { data: SectionRow[] | null; error: PostgrestError | null }
 
   if (sectionsError) {
     logger.error('Failed to load course sections', {
       courseId: course.id,
       slug,
       error: sectionsError.message,
-      code: sectionsError.code
+      code: sectionsError.code,
     })
   }
 
@@ -75,11 +98,11 @@ export default async function CoursePage({ params }: CoursePageProps) {
 
   if (sections && sections.length > 0) {
     const sectionIds = sections.map((s: SectionRow) => s.id)
-    const lessonsResult = await supabase
+    const lessonsResult = (await supabase
       .from('lessons')
       .select('*')
       .in('section_id', sectionIds)
-      .order('order_index') as { data: LessonRow[] | null; error: PostgrestError | null }
+      .order('order_index')) as { data: LessonRow[] | null; error: PostgrestError | null }
 
     lessons = lessonsResult.data
     lessonsError = lessonsResult.error
@@ -90,11 +113,11 @@ export default async function CoursePage({ params }: CoursePageProps) {
         slug,
         sectionIds,
         error: lessonsError.message,
-        code: lessonsError.code
+        code: lessonsError.code,
       })
     }
   }
-  
+
   // Temporarily use admin client to bypass RLS for assets
   // This ensures assets are loaded even for unpublished courses
   const { getAdminClient } = await import('@/lib/supabase/client-factory')
@@ -106,10 +129,10 @@ export default async function CoursePage({ params }: CoursePageProps) {
 
   if (lessons && lessons.length > 0) {
     const lessonIds = lessons.map((l: LessonRow) => l.id)
-    const assetsResult = await adminSupabase
+    const assetsResult = (await adminSupabase
       .from('assets')
       .select('*')
-      .in('lesson_id', lessonIds) as { data: AssetRow[] | null; error: PostgrestError | null }
+      .in('lesson_id', lessonIds)) as { data: AssetRow[] | null; error: PostgrestError | null }
 
     assets = assetsResult.data
     assetsError = assetsResult.error
@@ -122,7 +145,7 @@ export default async function CoursePage({ params }: CoursePageProps) {
         slug,
         lessonIds,
         error: assetsError.message,
-        code: assetsError.code
+        code: assetsError.code,
       })
     }
   }
@@ -133,12 +156,12 @@ export default async function CoursePage({ params }: CoursePageProps) {
 
   if (lessons && lessons.length > 0) {
     const lessonIds = lessons.map((l: LessonRow) => l.id)
-    const enrichmentsResult = await adminSupabase
+    const enrichmentsResult = (await adminSupabase
       .from('lesson_enrichments')
       .select('*')
       .in('lesson_id', lessonIds)
       .eq('status', 'completed')
-      .order('order_index') as { data: EnrichmentRow[] | null; error: PostgrestError | null }
+      .order('order_index')) as { data: EnrichmentRow[] | null; error: PostgrestError | null }
 
     enrichments = enrichmentsResult.data
 
@@ -151,7 +174,7 @@ export default async function CoursePage({ params }: CoursePageProps) {
         courseId: course.id,
         slug,
         error: enrichmentsResult.error.message,
-        code: enrichmentsResult.error.code
+        code: enrichmentsResult.error.code,
       })
     }
   }
@@ -162,12 +185,15 @@ export default async function CoursePage({ params }: CoursePageProps) {
 
   if (lessons && lessons.length > 0) {
     const lessonIds = lessons.map((l: LessonRow) => l.id)
-    const lessonContentsResult = await adminSupabase
+    const lessonContentsResult = (await adminSupabase
       .from('lesson_contents')
       .select('*')
       .in('lesson_id', lessonIds)
       .eq('status', 'completed')
-      .order('created_at', { ascending: false }) as { data: LessonContentRow[] | null; error: PostgrestError | null }
+      .order('created_at', { ascending: false })) as {
+      data: LessonContentRow[] | null
+      error: PostgrestError | null
+    }
 
     lessonContents = lessonContentsResult.data
 
@@ -176,7 +202,7 @@ export default async function CoursePage({ params }: CoursePageProps) {
         courseId: course.id,
         slug,
         error: lessonContentsResult.error.message,
-        code: lessonContentsResult.error.code
+        code: lessonContentsResult.error.code,
       })
     }
   }
@@ -204,10 +230,11 @@ export default async function CoursePage({ params }: CoursePageProps) {
         course={course}
         sections={sectionsWithLessons}
         lessons={lessonsForViewer}
-        assets={assetsByLessonId as Record<string, Asset[]>}
+        assets={assetsByLessonId}
         enrichments={enrichmentsByLessonId}
         enrichmentsLoadError={enrichmentsError}
         lessonContents={lessonContentsByLessonId}
+        initialLessonLabel={initialLessonLabel}
       />
     </CourseErrorBoundary>
   )

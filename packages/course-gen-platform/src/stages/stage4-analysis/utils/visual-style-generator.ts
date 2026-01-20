@@ -41,7 +41,7 @@ export interface VisualStyle {
  * Zod schema for validating LLM output
  */
 const visualStyleSchema = z.object({
-  colorScheme: z.string().min(10).max(200),
+  colorScheme: z.string().min(10).max(500),
   aesthetic: z.string().min(5).max(150),
   visualElements: z.string().min(10).max(300),
   mood: z.string().min(5).max(100),
@@ -91,7 +91,7 @@ Your task is to analyze a course topic and generate appropriate visual style rec
 CRITICAL RULES:
 1. Output MUST be valid JSON matching this exact schema:
 {
-  "colorScheme": "string (10-200 chars): Color palette description",
+  "colorScheme": "string (10-500 chars): Color palette description",
   "aesthetic": "string (5-150 chars): Overall visual style",
   "visualElements": "string (10-300 chars): Specific visual elements to include",
   "mood": "string (5-100 chars): Emotional tone of the visuals"
@@ -181,9 +181,8 @@ const FALLBACK_STYLES: Record<string, VisualStyle> = {
  * Get fallback style based on category
  */
 function getFallbackStyle(category?: string): VisualStyle {
-  const baseStyle = category && FALLBACK_STYLES[category]
-    ? FALLBACK_STYLES[category]
-    : FALLBACK_STYLES.default;
+  const baseStyle =
+    category && FALLBACK_STYLES[category] ? FALLBACK_STYLES[category] : FALLBACK_STYLES.default;
 
   return baseStyle;
 }
@@ -216,9 +215,7 @@ function getFallbackStyle(category?: string): VisualStyle {
  * //   mood: 'professional, innovative, accessible'
  * // }
  */
-export async function generateVisualStyle(
-  params: VisualStyleParams
-): Promise<VisualStyle> {
+export async function generateVisualStyle(params: VisualStyleParams): Promise<VisualStyle> {
   const { courseTitle, courseTopic, language, category } = params;
 
   logger.info(

@@ -19,14 +19,14 @@
 import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { getModelForPhase } from '@/shared/llm/langchain-models';
 import { trackPhaseExecution, storeTraceData } from '../utils/observability';
-import { buildContextualLanguagePromptSection } from '../utils/contextual-language';
 import type { Phase1Output } from '@megacampus/shared-types/analysis-result';
 import { Phase1OutputSchema } from '@megacampus/shared-types/analysis-schemas';
 import { zodToPromptSchema } from '@/shared/utils/zod-to-prompt-schema';
 import { UnifiedRegenerator } from '@/shared/regeneration';
 import { preprocessObject } from '@/shared/validation/preprocessing';
-import { stripThinkingTags } from '@/shared/utils/json-repair';
+import { extractJSON } from '@/shared/utils/json-repair';
 import { normalizePhase1Output } from '@/shared/utils/structure-normalizer';
+import { logger } from '@/shared/logger';
 
 /**
  * Input data for Phase 1 Classification
@@ -57,9 +57,6 @@ export interface Phase1Input {
  * @returns Formatted prompt messages for LLM
  */
 function buildClassificationPrompt(input: Phase1Input): [SystemMessage, HumanMessage] {
-  // Build contextual language template section
-  const contextualLanguageSection = buildContextualLanguagePromptSection();
-
   // Generate Zod schema description for LLM
   const schemaDescription = zodToPromptSchema(Phase1OutputSchema);
 
@@ -70,7 +67,7 @@ function buildClassificationPrompt(input: Phase1Input): [SystemMessage, HumanMes
   const systemMessage =
     new SystemMessage(`You are an expert curriculum architect with 15+ years of experience in adult education (andragogy).
 
-Your task is to analyze course topics and classify them into one of 6 categories, generate contextual motivational language, and perform topic analysis.
+Your task is to analyze course topics and classify them into one of 6 categories, and perform topic analysis.
 
 CRITICAL RULES:
 1. ALL output MUST be in ${outputLanguage.toUpperCase()} (the course target language is ${outputLanguage})
@@ -78,9 +75,8 @@ CRITICAL RULES:
 
 ${schemaDescription}
 
-3. Use category-specific templates for contextual language
-4. Ensure all character length constraints are met
-5. Extract 3-10 key concepts and 5-15 domain keywords
+3. Ensure all character length constraints are met
+4. Extract 3-10 key concepts and 5-15 domain keywords
 
 FIELD FORMATS:
 - theory_practice_ratio: Format "XX:YY" where XX+YY=100 (e.g., "30:70", "50:50", "70:30")
@@ -91,9 +87,7 @@ CATEGORIES (with examples):
 - creative: Art, music, design, writing (e.g., "Digital Art", "Creative Writing")
 - hobby: Leisure activities, crafts, games (e.g., "Chess", "Photography")
 - spiritual: Meditation, mindfulness, philosophy (e.g., "Mindfulness", "Stoic Philosophy")
-- academic: Formal education subjects (e.g., "Calculus", "World History")
-
-${contextualLanguageSection}`);
+- academic: Formal education subjects (e.g., "Calculus", "World History")`);
 
   /**
    * Truncates document content to stay within token budget
@@ -141,12 +135,12 @@ ${documentContext}
 
 TASK:
 1. Classify this course into the most appropriate category
-2. Generate contextual motivational language adapted to the category
-3. Analyze topic complexity and identify key concepts
-4. Extract domain keywords relevant to this topic
-5. Assess information completeness and identify missing elements
+2. Analyze topic complexity and identify key concepts
+3. Extract domain keywords relevant to this topic
+4. Assess information completeness and identify missing elements
+5. Determine pedagogical patterns for the course
 
-IMPORTANT: Generate ALL text content (contextual_language, topic_analysis descriptions, key_concepts, domain_keywords) in ${outputLanguage.toUpperCase()}.
+IMPORTANT: Generate ALL text content (topic_analysis descriptions, key_concepts, domain_keywords) in ${outputLanguage.toUpperCase()}.
 Output MUST be valid JSON with all text fields in ${outputLanguage}.`);
 
   return [systemMessage, humanMessage];
@@ -196,9 +190,9 @@ export async function runPhase1Classification(input: Phase1Input): Promise<Phase
       });
 
       // TIER 1: PREPROCESSING (before UnifiedRegenerator)
-      // Step 1: Strip thinking tags (Qwen3, DeepSeek models add <think> blocks)
-      // Thinking tags stripped if present - trace data already stored via storeTraceData
-      let preprocessedOutput = stripThinkingTags(rawOutput);
+      // Step 1: Extract JSON from markdown code blocks + strip thinking tags
+      // extractJSON handles: ```json blocks, <think> tags, and finds JSON via brace counting
+      let preprocessedOutput = extractJSON(rawOutput);
 
       // Step 2: Try to parse and preprocess enums
       try {
@@ -211,14 +205,15 @@ export async function runPhase1Classification(input: Phase1Input): Promise<Phase
         });
         preprocessedOutput = JSON.stringify(preprocessed);
       } catch (error) {
+        // CR-007: Use structured logger instead of console.*
         // If preprocessing fails, continue with stripped output (UnifiedRegenerator will handle)
-        console.warn(
-          '[Phase 1] Preprocessing JSON parse failed, continuing with stripped output:',
-          error
-        );
-        console.warn(
-          '[Phase 1] Stripped output preview (first 1000 chars):',
-          preprocessedOutput.substring(0, 1000)
+        logger.warn(
+          {
+            phase: 'phase-1-classifier',
+            error: error instanceof Error ? error.message : String(error),
+            preview: preprocessedOutput.substring(0, 500),
+          },
+          'Preprocessing JSON parse failed, continuing with stripped output'
         );
       }
 
@@ -268,8 +263,15 @@ export async function runPhase1Classification(input: Phase1Input): Promise<Phase
 
       // Final safety check (should never fail after normalization + Zod validation)
       if (!data.course_category?.primary) {
-        console.error('[Phase 1] CRITICAL: course_category.primary missing after normalization!');
-        console.error('[Phase 1] Data:', JSON.stringify(data, null, 2).substring(0, 2000));
+        // CR-007: Use structured logger instead of console.*
+        logger.error(
+          {
+            phase: 'phase-1-classifier',
+            courseId,
+            dataPreview: JSON.stringify(data, null, 2).substring(0, 1000),
+          },
+          'CRITICAL: course_category.primary missing after normalization!'
+        );
         throw new Error(
           'Phase 1 classification failed: Missing required field course_category.primary'
         );

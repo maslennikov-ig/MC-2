@@ -80,6 +80,9 @@ export interface Phase5Input {
   /** Phase 6 output: RAG planning (optional - only if documents exist) */
   phase6_output?: Phase6Output | null;
 
+  /** Minimum lessons constraint from course_size preset (default 10 for AUTO mode) */
+  min_lessons?: number;
+
   /** Total duration across all phases (ms) */
   total_duration_ms: number;
 
@@ -123,11 +126,13 @@ export async function assembleAnalysisResult(input: Phase5Input): Promise<Analys
     throw new Error('Phase 4 output is missing - cannot assemble result');
   }
 
-  // Defensive validation: Minimum 10 lessons (should already be validated in Phase 2)
+  // Defensive validation: Minimum lessons based on course_size preset
+  // Default to 10 for AUTO mode (FR-015), but respect preset min for MICRO/MINI/etc.
+  const minLessonsRequired = input.min_lessons ?? 10;
   const totalLessons = input.phase2_output.recommended_structure.total_lessons;
-  if (totalLessons < 10) {
+  if (totalLessons < minLessonsRequired) {
     throw new Error(
-      `Phase 2 validation failure: total_lessons (${totalLessons}) is less than minimum required (10). ` +
+      `Phase 2 validation failure: total_lessons (${totalLessons}) is less than minimum required (${minLessonsRequired}). ` +
         'This should have been caught in Phase 2 validation.'
     );
   }
@@ -187,21 +192,28 @@ export async function assembleAnalysisResult(input: Phase5Input): Promise<Analys
   // Sanitize LLM-generated text fields to prevent XSS attacks
   // Apply DOMPurify sanitization to all user-facing text that came from LLM outputs
 
-  // Sanitize contextual_language object fields (all are LLM-generated)
-  const sanitizedContextualLanguage = {
-    why_matters_context: sanitizeLLMOutput(
-      input.phase1_output.contextual_language.why_matters_context
-    ),
-    motivators: sanitizeLLMOutput(input.phase1_output.contextual_language.motivators),
-    experience_prompt: sanitizeLLMOutput(input.phase1_output.contextual_language.experience_prompt),
-    problem_statement_context: sanitizeLLMOutput(
-      input.phase1_output.contextual_language.problem_statement_context
-    ),
-    knowledge_bridge: sanitizeLLMOutput(input.phase1_output.contextual_language.knowledge_bridge),
-    practical_benefit_focus: sanitizeLLMOutput(
-      input.phase1_output.contextual_language.practical_benefit_focus
-    ),
-  };
+  // Sanitize contextual_language object fields (DEPRECATED - field is now optional)
+  // Only sanitize if present (for legacy data compatibility)
+  const sanitizedContextualLanguage = input.phase1_output.contextual_language
+    ? {
+        why_matters_context: sanitizeLLMOutput(
+          input.phase1_output.contextual_language.why_matters_context
+        ),
+        motivators: sanitizeLLMOutput(input.phase1_output.contextual_language.motivators),
+        experience_prompt: sanitizeLLMOutput(
+          input.phase1_output.contextual_language.experience_prompt
+        ),
+        problem_statement_context: sanitizeLLMOutput(
+          input.phase1_output.contextual_language.problem_statement_context
+        ),
+        knowledge_bridge: sanitizeLLMOutput(
+          input.phase1_output.contextual_language.knowledge_bridge
+        ),
+        practical_benefit_focus: sanitizeLLMOutput(
+          input.phase1_output.contextual_language.practical_benefit_focus
+        ),
+      }
+    : undefined;
 
   // Sanitize generation_guidance fields (REQUIRED)
   const sanitizedGenerationGuidance: AnalysisResult['generation_guidance'] = {
@@ -221,11 +233,15 @@ export async function assembleAnalysisResult(input: Phase5Input): Promise<Analys
     ),
   };
 
+  // Use pedagogical_strategy directly from Phase 3
+  const pedagogicalStrategy = input.phase3_output.pedagogical_strategy;
+
   // Assemble complete AnalysisResult structure
   const result: AnalysisResult = {
     // From Phase 1: Classification and contextual language
     course_category: input.phase1_output.course_category,
-    contextual_language: sanitizedContextualLanguage, // SANITIZED for XSS protection
+    // contextual_language is now optional (DEPRECATED - only for legacy data)
+    ...(sanitizedContextualLanguage && { contextual_language: sanitizedContextualLanguage }),
     topic_analysis: input.phase1_output.topic_analysis,
     pedagogical_patterns: input.phase1_output.pedagogical_patterns, // Optional - from Analyze Enhancement
 
@@ -233,8 +249,8 @@ export async function assembleAnalysisResult(input: Phase5Input): Promise<Analys
     recommended_structure: input.phase2_output.recommended_structure,
 
     // From Phase 3: Pedagogical strategy and analysis
-    pedagogical_strategy: input.phase3_output.pedagogical_strategy,
-    expansion_areas: input.phase3_output.expansion_areas,
+    pedagogical_strategy: pedagogicalStrategy, // Only assessment_approach and progression_logic
+    expansion_areas: input.phase3_output.expansion_areas ?? null, // Fallback to null if undefined
     research_flags: input.phase3_output.research_flags,
 
     // From Phase 4: Document synthesis
@@ -354,12 +370,8 @@ function validateAnalysisResult(result: AnalysisResult): void {
     throw new Error('Validation error: metadata.created_at is missing');
   }
 
-  // Validate minimum lessons requirement (defensive check)
-  if (result.recommended_structure.total_lessons < 10) {
-    throw new Error(
-      `Validation error: total_lessons (${result.recommended_structure.total_lessons}) is less than minimum required (10)`
-    );
-  }
+  // Note: Minimum lessons validation is done in assembleAnalysisResult
+  // using dynamic min_lessons from course_size preset (not hardcoded 10)
 
   // Validate optional pedagogical_patterns field (when present)
   if (result.pedagogical_patterns) {

@@ -66,6 +66,18 @@ type JobStatusDbUpdate = Database['public']['Tables']['job_status']['Update'];
  */
 export async function createJobStatus(job: Job<JobData>): Promise<void> {
   try {
+    // Validate job.name is defined to prevent NOT NULL constraint violation
+    if (!job.name) {
+      logger.warn(
+        {
+          jobId: job.id,
+          jobData: job.data,
+        },
+        'Skipping job status creation: job.name is undefined (corrupted or test job)'
+      );
+      return;
+    }
+
     const supabase = getSupabaseAdmin();
 
     // Handle both camelCase and snake_case organization_id
@@ -369,6 +381,21 @@ export async function markJobActive(job: Job<JobData>): Promise<void> {
     }
 
     const currentAttempt = job.attemptsMade + 1;
+    const maxAttempts = job.opts.attempts || 3;
+
+    // GUARD: Don't record attempts that exceed max_attempts (database constraint)
+    // This can happen if BullMQ fires 'active' event after job should have stopped
+    if (currentAttempt > maxAttempts) {
+      logger.warn(
+        {
+          jobId: job.id,
+          currentAttempt,
+          maxAttempts,
+        },
+        'Skipping markJobActive - attempt exceeds max_attempts (constraint guard)'
+      );
+      return;
+    }
 
     // If this is a retry (attempt > 1) and we're still active from previous attempt,
     // we need to be extra careful with timestamps to avoid constraint violations
@@ -740,6 +767,10 @@ export async function markJobFailed(job: Job<JobData>, error: Error): Promise<vo
     const maxAttempts = job.opts.attempts || 3;
     const isFinalFailure = job.attemptsMade >= maxAttempts;
 
+    // GUARD: Clamp attempts to max_attempts to satisfy database constraint
+    // This handles edge cases where BullMQ might report more attempts than expected
+    const clampedAttempts = Math.min(job.attemptsMade, maxAttempts);
+
     // Extract error message with proper fallback chain
     let errorMessage = 'Unknown error';
     if (error && typeof error === 'object') {
@@ -758,7 +789,7 @@ export async function markJobFailed(job: Job<JobData>, error: Error): Promise<vo
       status: isFinalFailure ? JobStatus.FAILED : JobStatus.DELAYED,
       error_message: errorMessage,
       error_stack: error.stack || undefined,
-      attempts: job.attemptsMade,
+      attempts: clampedAttempts,
     };
 
     if (isFinalFailure) {

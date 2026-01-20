@@ -1,3 +1,4 @@
+/* eslint-disable */
 /**
  * Context Overflow Handler Tests
  * @module shared/llm/__tests__/context-overflow-handler.test
@@ -64,7 +65,10 @@ describe('Context Overflow Handler', () => {
       });
 
       it('should escalate from extended primary to extended fallback', () => {
-        const fallback = getContextOverflowFallback('google/gemini-2.5-flash-preview-09-2025', 'ru');
+        const fallback = getContextOverflowFallback(
+          'google/gemini-2.5-flash-preview-09-2025',
+          'ru'
+        );
         expect(fallback).not.toBeNull();
         expect(fallback?.modelId).toBe('qwen/qwen-plus-2025-07-28');
       });
@@ -95,7 +99,10 @@ describe('Context Overflow Handler', () => {
       });
 
       it('should return null when on extended fallback', () => {
-        const fallback = getContextOverflowFallback('moonshotai/kimi-linear-48b-a3b-instruct', 'en');
+        const fallback = getContextOverflowFallback(
+          'moonshotai/kimi-linear-48b-a3b-instruct',
+          'en'
+        );
         expect(fallback).toBeNull();
       });
     });
@@ -117,7 +124,8 @@ describe('Context Overflow Handler', () => {
     });
 
     it('should retry with fallback on context overflow', async () => {
-      const operation = jest.fn()
+      const operation = jest
+        .fn()
         .mockRejectedValueOnce(new Error('context_length_exceeded'))
         .mockResolvedValueOnce('success');
 
@@ -135,7 +143,8 @@ describe('Context Overflow Handler', () => {
     });
 
     it('should retry multiple times until success', async () => {
-      const operation = jest.fn()
+      const operation = jest
+        .fn()
         .mockRejectedValueOnce(new Error('context_length_exceeded'))
         .mockRejectedValueOnce(new Error('context_length_exceeded'))
         .mockResolvedValueOnce('success');
@@ -152,8 +161,7 @@ describe('Context Overflow Handler', () => {
     });
 
     it('should throw error when fallbacks exhausted', async () => {
-      const operation = jest.fn()
-        .mockRejectedValue(new Error('context_length_exceeded'));
+      const operation = jest.fn().mockRejectedValue(new Error('context_length_exceeded'));
 
       await expect(
         executeWithContextFallback(operation, 'qwen/qwen3-235b-a22b-2507', 'ru')
@@ -163,8 +171,7 @@ describe('Context Overflow Handler', () => {
     });
 
     it('should throw non-context-overflow errors immediately', async () => {
-      const operation = jest.fn()
-        .mockRejectedValue(new Error('Network error'));
+      const operation = jest.fn().mockRejectedValue(new Error('Network error'));
 
       await expect(
         executeWithContextFallback(operation, 'qwen/qwen3-235b-a22b-2507', 'ru')
@@ -174,8 +181,7 @@ describe('Context Overflow Handler', () => {
     });
 
     it('should respect maxRetries parameter', async () => {
-      const operation = jest.fn()
-        .mockRejectedValue(new Error('context_length_exceeded'));
+      const operation = jest.fn().mockRejectedValue(new Error('context_length_exceeded'));
 
       await expect(
         executeWithContextFallback(operation, 'qwen/qwen3-235b-a22b-2507', 'ru', 1)

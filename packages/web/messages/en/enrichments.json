@@ -267,6 +267,38 @@
       "comingSoon": "Coming Soon"
     }
   },
+  "images": {
+    "title": "Images",
+    "tokens": "tokens",
+    "generateButton": "Generate",
+    "cover": {
+      "title": "Lesson Cover",
+      "description": "Hero banner displayed at the top of the lesson (16:9)"
+    },
+    "card": {
+      "title": "Lesson Thumbnail",
+      "description": "Small preview image for navigation (1:1 square)"
+    },
+    "style": {
+      "label": "Style",
+      "realistic": "Realistic",
+      "abstract": "Abstract",
+      "minimalist": "Minimalist",
+      "dramatic": "Dramatic"
+    },
+    "colorScheme": {
+      "label": "Color Scheme",
+      "auto": "Auto (from course)",
+      "warm": "Warm tones",
+      "cool": "Cool tones",
+      "monochrome": "Monochrome"
+    },
+    "estimatedCost": "Estimated cost",
+    "batchGenerate": "Generate Missing",
+    "batchProgress": "Generating {current} of {total}...",
+    "batchComplete": "Started generation for {count} covers",
+    "allGenerated": "All covers already generated"
+  },
   "generate": "Generate",
   "generating": "Generating...",
   "options": "Options",

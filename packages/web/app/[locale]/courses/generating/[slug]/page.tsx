@@ -189,6 +189,14 @@ export default async function CourseGeneratingPage({ params, searchParams }: Pag
       prerequisites: course.prerequisites || undefined,
       learning_outcomes: course.learning_outcomes || undefined,
       has_files: course.has_files || false,
+      language: course.language || 'ru',
+      course_size: course.course_size || undefined,
+      lesson_duration_minutes:
+        (course.settings as { lesson_duration_minutes?: number })?.lesson_duration_minutes ||
+        undefined,
+      estimated_sections: course.estimated_sections || undefined,
+      generation_mode:
+        (course.generation_mode as 'automatic' | 'semi_automatic') || 'semi_automatic',
     },
     outputData: {
       courseId: course.id,

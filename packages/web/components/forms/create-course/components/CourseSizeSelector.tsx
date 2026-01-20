@@ -31,13 +31,17 @@ export function CourseSizeSelector() {
   const uiLabels = getCourseSizeUILabels(language)
 
   // Handle size selection - also set estimatedLessons and estimatedSections
-  // For 'auto', we don't set these values - LLM decides
+  // For 'auto', we reset these values so LLM decides
   const handleSizeClick = (size: CourseSize) => {
     setValue('courseSize', size)
     if (size !== 'auto') {
       const preset = COURSE_SIZE_PRESETS[size]
       setValue('estimatedLessons', preset.targetLessons)
       setValue('estimatedSections', preset.targetSections)
+    } else {
+      // Reset when selecting 'auto' so cost estimation uses default fallback
+      setValue('estimatedLessons', undefined)
+      setValue('estimatedSections', undefined)
     }
   }
 

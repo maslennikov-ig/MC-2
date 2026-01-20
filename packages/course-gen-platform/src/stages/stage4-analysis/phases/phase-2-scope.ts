@@ -24,6 +24,8 @@ import {
 import { UnifiedRegenerator } from '@/shared/regeneration';
 import { zodToPromptSchema } from '@/shared/utils/zod-to-prompt-schema';
 import { preprocessObject } from '@/shared/validation/preprocessing';
+import { extractJSON } from '@/shared/utils/json-repair';
+import { logger } from '@/shared/logger';
 
 /**
  * Main Phase 2 execution function: Scope Analysis
@@ -83,9 +85,10 @@ export async function runPhase2Scope(input: Phase2Input): Promise<Phase2Output> 
       // Debug logging removed - use observability tracing via storeTraceData instead
 
       // TIER 1: PREPROCESSING (before UnifiedRegenerator)
-      let preprocessedOutput = rawOutput;
+      // Extract JSON from markdown code blocks + strip thinking tags
+      let preprocessedOutput = extractJSON(rawOutput);
       try {
-        const parsedRaw = JSON.parse(rawOutput) as Record<string, unknown>;
+        const parsedRaw = JSON.parse(preprocessedOutput) as Record<string, unknown>;
         const recommendedStructure = parsedRaw.recommended_structure as
           | Record<string, unknown>
           | undefined;
@@ -107,8 +110,14 @@ export async function runPhase2Scope(input: Phase2Input): Promise<Phase2Output> 
         }
         preprocessedOutput = JSON.stringify(parsedRaw);
       } catch (error) {
-        // If preprocessing fails, continue with raw output
-        console.warn('[Phase 2] Preprocessing failed, using raw output:', error);
+        // CR-007: Use structured logger instead of console.*
+        logger.warn(
+          {
+            phase: 'phase-2-scope',
+            error: error instanceof Error ? error.message : String(error),
+          },
+          'Preprocessing failed, using raw output'
+        );
       }
 
       // Parse JSON response with 5-layer repair cascade
@@ -188,7 +197,11 @@ export async function runPhase2Scope(input: Phase2Input): Promise<Phase2Output> 
 
           // UnifiedRegenerator succeeded via layer: ${result.metadata.layerUsed}
         } else {
-          console.error('[Phase 2] ALL REPAIR LAYERS EXHAUSTED');
+          // CR-007: Use structured logger instead of console.*
+          logger.error(
+            { phase: 'phase-2-scope', error: result.error },
+            'ALL REPAIR LAYERS EXHAUSTED'
+          );
           throw new Error(
             `Failed to parse Phase 2 JSON after all 5 repair layers. Error: ${result.error}`
           );
@@ -247,11 +260,31 @@ export async function runPhase2Scope(input: Phase2Input): Promise<Phase2Output> 
         },
       });
 
-      // CRITICAL: Enforce minimum 10 lessons constraint (FR-015)
-      if (validated.recommended_structure.total_lessons < 10) {
+      // CRITICAL: Enforce minimum lessons constraint based on course_size preset
+      // For 'auto' mode (no preset), default minimum is 10 (FR-015)
+      // For specific presets: micro=1, mini=8, compact=15, standard=30, comprehensive=60
+      const minLessonsRequired = validatedInput.min_lessons ?? 10;
+      if (validated.recommended_structure.total_lessons < minLessonsRequired) {
         throw new Error(
-          `Insufficient scope for minimum 10 lessons (estimated: ${validated.recommended_structure.total_lessons}). ` +
+          `Insufficient scope for minimum ${minLessonsRequired} lessons (estimated: ${validated.recommended_structure.total_lessons}). ` +
             `Please expand topic or provide additional requirements.`
+        );
+      }
+
+      // Log if LLM exceeded max_lessons constraint (non-blocking, for analytics)
+      // Note: Root cause fix is in orchestrator.ts - now passing course_size fields to prompt
+      const maxLessonsAllowed = validatedInput.max_lessons;
+      if (maxLessonsAllowed && validated.recommended_structure.total_lessons > maxLessonsAllowed) {
+        logger.warn(
+          {
+            phase: 'phase-2-scope',
+            courseSize: validatedInput.course_size,
+            generated: validated.recommended_structure.total_lessons,
+            max: maxLessonsAllowed,
+            targetSections: validatedInput.target_sections,
+            generatedSections: validated.recommended_structure.total_sections,
+          },
+          'LLM exceeded max_lessons constraint despite prompt guidance'
         );
       }
 
@@ -360,23 +393,43 @@ function buildPhase2Prompt(input: Phase2Input): { role: string; content: string 
       : '';
 
   // Build course size guidance section
-  // - For specific sizes: MANDATORY constraint with ±20% tolerance
-  // - For auto: explicit guidance to determine optimal size
+  // - For specific sizes: MANDATORY constraint with exact min/max from preset
+  // - For auto: explicit guidance to determine optimal size (min 10 default)
   const sizeSection = input.size_guidance
-    ? `\n\n## User-Requested Course Size (MANDATORY CONSTRAINT)
+    ? `\n\n## ⚠️ MANDATORY COURSE SIZE CONSTRAINT ⚠️
 ${input.size_guidance}
 
-**CRITICAL CONSTRAINT**: The user has explicitly selected this course size. You MUST respect this choice.
-- Target: ${input.target_lessons} lessons in ${input.target_sections} sections
-- Allowed range: ${Math.round(input.target_lessons! * 0.8)}-${Math.round(input.target_lessons! * 1.2)} lessons (±20% tolerance)
-- If the topic seems too broad, REDUCE scope by focusing on essentials only
-- If the topic seems too narrow, ADD depth (advanced techniques, case studies, practical exercises)
-- DO NOT exceed the allowed range - adjust content depth, not lesson count`
+**ABSOLUTE REQUIREMENT - READ CAREFULLY:**
+The user has explicitly selected course size: ${input.course_size?.toUpperCase()}
+
+YOU MUST GENERATE EXACTLY:
+- **LESSONS**: ${input.min_lessons} to ${input.max_lessons} (target: ${input.target_lessons})
+- **SECTIONS**: ${input.target_sections} section(s) ONLY
+
+**HARD LIMITS (WILL CAUSE VALIDATION FAILURE IF VIOLATED):**
+- Minimum lessons: ${input.min_lessons}
+- Maximum lessons: ${input.max_lessons}
+- Maximum sections: ${input.target_sections}
+
+**STRICT RULES:**
+1. DO NOT generate more than ${input.max_lessons} lessons under ANY circumstances
+2. DO NOT generate more than ${input.target_sections} section(s) - merge topics if needed
+3. For ${input.course_size} size, focus ONLY on absolute essentials
+4. If topic is broad, REDUCE scope ruthlessly - cover core concepts only
+5. If topic is narrow, add depth but STAY within lesson limit
+6. The output will be REJECTED if it exceeds these limits`
     : `\n\n## Course Size: AI-Determined (AUTO MODE)
-The user has selected **AUTO mode**. Analyze the topic thoroughly and determine the optimal course size yourself based on your expert judgment. No size constraints apply - create exactly as many lessons as the topic genuinely requires for quality coverage.`;
+The user has selected **AUTO mode**. Analyze the topic thoroughly and determine the optimal course size yourself based on your expert judgment.
+- **HARD MINIMUM**: 10 lessons (course WILL FAIL validation if below this)
+- No maximum constraint - create as many lessons as the topic genuinely requires for quality coverage.`;
 
   // Generate Zod schema description for LLM
   const schemaDescription = zodToPromptSchema(Phase2OutputSchema);
+
+  // Build dynamic minimum lesson rule based on course size
+  const minLessonsRule = input.size_guidance
+    ? `3. COURSE SIZE PRESET ACTIVE: ${input.course_size?.toUpperCase()} - Generate ${input.min_lessons}-${input.max_lessons} lessons in ${input.target_sections} section(s). DO NOT default to 10 lessons!`
+    : `3. Minimum 10 lessons REQUIRED (FR-015) - if scope is insufficient, recommend more content`;
 
   const systemPrompt = `You are an expert course designer specializing in scope estimation and structure planning.
 
@@ -388,7 +441,7 @@ CRITICAL RULES:
 
 ${schemaDescription}
 
-3. Minimum 10 lessons REQUIRED (FR-015) - if scope is insufficient, recommend more content
+${minLessonsRule}
 4. Lesson duration: typically 15 minutes (can vary 3-45 min based on content type)
 5. Sections: 1-30 sections, each with 1+ lessons
 6. Provide detailed breakdown for each section (learning objectives, key topics, pedagogy)`;
@@ -411,9 +464,13 @@ ${schemaDescription}
 2. **Calculate Lesson Count**:
    - Determine appropriate lesson duration (3-45 min, typically 15 min)
    - Formula: total_lessons = ceil((estimated_hours * 60) / lesson_duration_minutes)
-   - CRITICAL: Result MUST be ≥ 10 lessons (FR-015)
+${
+  input.size_guidance
+    ? `   - FOR THIS ${input.course_size?.toUpperCase()} COURSE: Generate ${input.min_lessons}-${input.max_lessons} lessons ONLY`
+    : `   - CRITICAL: Result MUST be ≥ 10 lessons (FR-015)`
+}
 
-3. **Generate Sections Breakdown** (1-30 sections):
+3. **Generate Sections Breakdown** (${input.size_guidance ? `${input.target_sections} section(s) for ${input.course_size} size` : '1-30 sections'}):
 
    **CRITICAL: Complete Section Fields**
    EVERY section in sections_breakdown MUST include ALL required fields:
@@ -429,7 +486,7 @@ ${schemaDescription}
    - difficulty (beginner/intermediate/advanced)
    - prerequisites (array of section_ids, empty [] if none)
 
-   If you generate 8 sections, ALL 8 MUST have ALL 11 fields above.
+   ALL sections MUST have ALL 11 fields above. ${input.size_guidance ? `For ${input.course_size} size: generate ${input.target_sections} section(s) only.` : ''}
 
    - Break course into logical sections
    - For each section:
@@ -468,78 +525,29 @@ Each item in \`key_topics\` MUST directly correspond to a \`learning_objective\`
 
 4. **Scope Warning** (if applicable):
    - Warn if scope is very narrow or very broad
-   - Warn if total_lessons is exactly 10 (borderline minimum)
 
-**Critical JSON Structure** (fill with real data):
-{"recommended_structure":{"estimated_content_hours":10.0,"scope_reasoning":"str","lesson_duration_minutes":15,"calculation_explanation":"str","total_lessons":40,"total_sections":2,"scope_warning":null,"sections_breakdown":[{"area":"str","estimated_lessons":5,"importance":"core","learning_objectives":["str"],"key_topics":["str"],"pedagogical_approach":"str","difficulty_progression":"gradual","section_id":"1","estimated_duration_hours":1.25,"difficulty":"beginner","prerequisites":[]}]},"phase_metadata":{"duration_ms":0,"model_used":"str","tokens":{"input":0,"output":0,"total":0},"quality_score":0.0,"retry_count":0}}
-
-**Output Format** (DETAILED JSON with complete data):
-{
-  "recommended_structure": {
-    "estimated_content_hours": 10.0,
-    "scope_reasoning": "Reasoning for 10 hours estimate based on topic complexity...",
-    "lesson_duration_minutes": 15,
-    "calculation_explanation": "10 hours × 60 min/hour ÷ 15 min/lesson = 40 lessons",
-    "total_lessons": 40,
-    "total_sections": 8,
-    "scope_warning": null,
-    "sections_breakdown": [
-      {
-        "area": "Introduction to Fundamentals",
-        "estimated_lessons": 5,
-        "importance": "core",
-        "learning_objectives": [
-          "Understand basic concepts",
-          "Identify key terminology"
-        ],
-        "key_topics": ["Topic A", "Topic B", "Topic C"],
-        "pedagogical_approach": "Start with theory, move to examples, include practice exercises",
-        "difficulty_progression": "gradual",
-        "section_id": "1",
-        "estimated_duration_hours": 1.25,
-        "difficulty": "beginner",
-        "prerequisites": []
-      },
-      {
-        "area": "Advanced Topics",
-        "estimated_lessons": 8,
-        "importance": "important",
-        "learning_objectives": [
-          "Master complex concepts",
-          "Apply advanced techniques"
-        ],
-        "key_topics": ["Topic X", "Topic Y", "Topic Z"],
-        "pedagogical_approach": "Build on fundamentals with challenging exercises",
-        "difficulty_progression": "steep",
-        "section_id": "2",
-        "estimated_duration_hours": 2.0,
-        "difficulty": "advanced",
-        "prerequisites": ["1"]
-      }
-    ]
-  },
-  "phase_metadata": {
-    "duration_ms": 0,
-    "model_used": "openai/gpt-oss-20b",
-    "tokens": { "input": 0, "output": 0, "total": 0 },
-    "quality_score": 0.0,
-    "retry_count": 0
-  }
-}
+**JSON Schema** (fields only, calculate values based on constraints above):
+{"recommended_structure":{"estimated_content_hours":<number>,"scope_reasoning":"<string>","lesson_duration_minutes":<number>,"calculation_explanation":"<string>","total_lessons":<number>,"total_sections":<number>,"scope_warning":<string|null>,"sections_breakdown":[{"area":"<string>","estimated_lessons":<number>,"importance":"<core|important|optional>","learning_objectives":["<string>"],"key_topics":["<string>"],"pedagogical_approach":"<string>","difficulty_progression":"<flat|gradual|steep>","section_id":"<string>","estimated_duration_hours":<number>,"difficulty":"<beginner|intermediate|advanced>","prerequisites":["<section_id>"]}]},"phase_metadata":{"duration_ms":0,"model_used":"","tokens":{"input":0,"output":0,"total":0},"quality_score":0.0,"retry_count":0}}
 
 IMPORTANT:
 - Output ONLY valid JSON (no markdown, no comments)
 - ALL text fields (area, learning_objectives, key_topics, pedagogical_approach, scope_reasoning, calculation_explanation, scope_warning) MUST be in ${outputLanguage.toUpperCase()}
-- total_lessons MUST be >= 10 (expand scope creatively if needed to surprise the learner)
+${
+  input.size_guidance
+    ? `- RESPECT THE SIZE PRESET: Generate ${input.min_lessons}-${input.max_lessons} lessons in ${input.target_sections} section(s) - DO NOT default to 10!
+- For ${input.course_size} size: Focus on essentials ONLY, reduce scope if topic is too broad
+- STAY WITHIN LIMITS: The user explicitly chose ${input.course_size} size, respect their choice`
+    : `- total_lessons MUST be >= 10 (expand scope creatively if needed to surprise the learner)
 - For seemingly narrow topics, think broadly: add context, history, applications, best practices
-- Aim for comprehensive coverage that provides maximum value
+- Aim for comprehensive coverage that provides maximum value`
+}
 - The ONLY hard constraint is lesson_duration_minutes - respect it strictly
 - sections_breakdown array MUST match total_sections count
 
 **New Fields in sections_breakdown (MANDATORY)**:
 1. **section_id**: MUST be sequential strings starting from "1" (not numbers)
    - Format: "1", "2", "3", ..., "N" (where N = total_sections)
-   - Example: For 8 sections, use "1" through "8"
+   - Example: For ${input.target_sections || 3} sections, use "1" through "${input.target_sections || 3}"
 
 2. **estimated_duration_hours**: Calculate for each section
    - Formula: (estimated_lessons × lesson_duration_minutes) ÷ 60

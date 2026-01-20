@@ -180,7 +180,13 @@ class Stage4AnalysisHandler {
   ): Promise<StructureAnalysisJobResult> {
     const startTime = Date.now();
     // Extract identifiers from job data (now correctly typed as camelCase from BaseJobDataSchema)
-    const { courseId: course_id, organizationId: organization_id, userId: user_id } = jobData;
+    // NOTE: courseSize is passed from job data to avoid race conditions (GTQ-6162)
+    const {
+      courseId: course_id,
+      organizationId: organization_id,
+      userId: user_id,
+      courseSize: jobCourseSize,
+    } = jobData;
 
     // Acquire generation lock (FR-037: Prevent concurrent generation)
     const lockId = `stage-4-${job.id || Date.now()}`;
@@ -382,8 +388,24 @@ class Stage4AnalysisHandler {
       const language = rawLang.length === 2 ? rawLang : languageNameToCode[rawLang] || 'ru';
 
       // Extract course_size preset (advisory guidance for LLM)
+      // PRIORITY: Use job data as primary source to avoid race conditions (GTQ-6162)
+      // Fallback to DB value for backward compatibility with jobs created before this fix
+      const dbCourseSize = courseForInput.course_size as CourseSize | null;
+      const courseSize: CourseSize | null = jobCourseSize ?? dbCourseSize;
+      const courseSizeSource = jobCourseSize !== undefined ? 'job_data' : 'database';
+
+      // DIAGNOSTIC LOG: Track course_size source for debugging (GTQ-6162)
+      jobLogger.info(
+        {
+          jobCourseSize,
+          dbCourseSize,
+          effectiveCourseSize: courseSize,
+          source: courseSizeSource,
+        },
+        'Course size resolution (GTQ-6162 fix)'
+      );
+
       // For 'auto', getCourseSizePreset returns undefined (LLM decides without guidance)
-      const courseSize = courseForInput.course_size as CourseSize | null;
       const sizePreset = courseSize ? getCourseSizePreset(courseSize) : null;
 
       // Log course size mode for analytics
@@ -394,7 +416,7 @@ class Stage4AnalysisHandler {
         );
       } else {
         jobLogger.info(
-          { courseSize, targetLessons: sizePreset?.targetLessons },
+          { courseSize, targetLessons: sizePreset?.targetLessons, source: courseSizeSource },
           `Course size: ${courseSize.toUpperCase()} preset selected`
         );
       }
@@ -417,6 +439,9 @@ class Stage4AnalysisHandler {
         target_lessons: sizePreset?.targetLessons,
         target_sections: sizePreset?.targetSections,
         size_guidance: sizePreset?.llmGuidance,
+        // Dynamic min/max constraints based on course_size preset
+        min_lessons: sizePreset?.minLessons,
+        max_lessons: sizePreset?.maxLessons,
 
         // Additional context fields (user-provided)
         course_description: courseForInput.course_description || undefined,
@@ -648,6 +673,12 @@ class Stage4AnalysisHandler {
           'Analysis result stored successfully in courses.analysis_result'
         );
 
+        // CRITICAL: Release lock BEFORE auto-approval to allow Stage 5 to acquire it
+        // Without this, Stage 5 job would fail with "Lock held by stage-4-xxx"
+        clearInterval(heartbeatInterval);
+        await generationLockService.releaseLock(course_id, lockId);
+        jobLogger.debug({ courseId: course_id, lockId }, 'Released lock early for auto-approval');
+
         // Handle stage completion separately (auto-approve if automatic mode)
         try {
           const { autoApproved } = await handleStageCompletion(course_id, 4);
@@ -690,7 +721,6 @@ class Stage4AnalysisHandler {
             total_sections: analysisResult.recommended_structure.total_sections,
             estimated_hours: analysisResult.recommended_structure.estimated_content_hours,
             category: analysisResult.course_category.primary,
-            teaching_style: analysisResult.pedagogical_strategy.teaching_style,
             research_flags: analysisResult.research_flags.length,
             expansion_areas: analysisResult.expansion_areas?.length || 0,
             total_cost_usd: analysisResult.metadata.total_cost_usd,
@@ -782,26 +812,58 @@ class Stage4AnalysisHandler {
         }
 
         // Update course status with failure details (failed_at_stage and error_code)
-        try {
-          const { error: statusUpdateError } = await supabaseAdmin
-            .from('courses')
-            .update({
-              generation_status: 'failed',
-              failed_at_stage: 4, // Stage 4
-              error_code: errorCode as any, // Map to stage_error_code enum
-              updated_at: new Date().toISOString(),
-            })
-            .eq('id', course_id)
-            .eq('organization_id', organization_id);
+        // IMPORTANT: Only mark as failed if: permanent error OR last retry attempt
+        // to allow BullMQ retries to work for transient errors
+        const isPermanentError =
+          errorCode === 'BARRIER_FAILED' || errorCode === 'MINIMUM_LESSONS_NOT_MET';
+        const maxAttempts = job.opts.attempts || 3;
+        const isLastAttempt = job.attemptsMade >= maxAttempts - 1;
 
-          if (statusUpdateError) {
-            jobLogger.error(
-              { error: statusUpdateError },
-              'Failed to update course status with failure details'
-            );
+        if (isPermanentError || isLastAttempt) {
+          jobLogger.info(
+            {
+              courseId: course_id,
+              errorCode,
+              isPermanentError,
+              isLastAttempt,
+              attemptsMade: job.attemptsMade,
+              maxAttempts,
+            },
+            'Marking course as failed (permanent error or last attempt)'
+          );
+
+          try {
+            const { error: statusUpdateError } = await supabaseAdmin
+              .from('courses')
+              .update({
+                generation_status: 'failed',
+                failed_at_stage: 4, // Stage 4
+                error_code: errorCode as any, // Map to stage_error_code enum
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', course_id)
+              .eq('organization_id', organization_id);
+
+            if (statusUpdateError) {
+              jobLogger.error(
+                { error: statusUpdateError },
+                'Failed to update course status with failure details'
+              );
+            }
+          } catch (statusError) {
+            jobLogger.error({ error: statusError }, 'Exception updating course status');
           }
-        } catch (statusError) {
-          jobLogger.error({ error: statusError }, 'Exception updating course status');
+        } else {
+          jobLogger.info(
+            {
+              courseId: course_id,
+              errorCode,
+              attemptsMade: job.attemptsMade,
+              maxAttempts,
+              remainingAttempts: maxAttempts - job.attemptsMade - 1,
+            },
+            'Not last attempt - Keeping status for BullMQ retry'
+          );
         }
 
         // Re-throw error to let BullMQ handle retries

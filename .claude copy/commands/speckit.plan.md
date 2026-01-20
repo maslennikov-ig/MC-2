@@ -8,12 +8,6 @@ handoffs:
   - label: Create Checklist
     agent: speckit.checklist
     prompt: Create a checklist for the following domain...
-scripts:
-  sh: .specify/scripts/bash/setup-plan.sh --json
-  ps: .specify/scripts/powershell/setup-plan.ps1 -Json
-agent_scripts:
-  sh: .specify/scripts/bash/update-agent-context.sh __AGENT__
-  ps: .specify/scripts/powershell/update-agent-context.ps1 -AgentType __AGENT__
 ---
 
 ## User Input
@@ -50,14 +44,7 @@ You **MUST** consider the user input before proceeding (if not empty).
    - For each dependency → best practices task
    - For each integration → patterns task
 
-2. **Library-First Search** (MANDATORY before research):
-   - For each major component (>20 lines expected), search for existing libraries:
-     - WebSearch: "npm {functionality} library 2024" or "python {functionality} package"
-     - Context7: documentation for candidate libraries
-     - Check: weekly downloads >1000, commits in last 6 months, TypeScript/types support
-   - Document library decisions in research.md
-
-3. **Generate and dispatch research agents**:
+2. **Generate and dispatch research agents**:
 
    ```text
    For each unknown in Technical Context:
@@ -66,17 +53,12 @@ You **MUST** consider the user input before proceeding (if not empty).
      Task: "Find best practices for {tech} in {domain}"
    ```
 
-4. **Research Considerations**:
-   - **Simple research**: Questions solvable with available tools (Grep, Read, WebSearch, Context7) - resolve immediately
-   - **Complex research**: Requires deep investigation → create research prompt in `FEATURE_DIR/research/` for deepresearch tool
-
-5. **Consolidate findings** in `research.md` using format:
+3. **Consolidate findings** in `research.md` using format:
    - Decision: [what was chosen]
    - Rationale: [why chosen]
    - Alternatives considered: [what else evaluated]
-   - Library: [if applicable - name, version, why chosen over alternatives]
 
-**Output**: research.md with all NEEDS CLARIFICATION resolved, research/ with complex research prompts (if any)
+**Output**: research.md with all NEEDS CLARIFICATION resolved
 
 ### Phase 1: Design & Contracts
 
@@ -99,10 +81,9 @@ You **MUST** consider the user input before proceeding (if not empty).
    - Add only new technology from current plan
    - Preserve manual additions between markers
 
-**Output**: data-model.md, /contracts/*, quickstart.md, agent-specific file
+**Output**: data-model.md, /contracts/\*, quickstart.md, agent-specific file
 
 ## Key rules
 
 - Use absolute paths
 - ERROR on gate failures or unresolved clarifications
-- Library-first: Always check for existing libraries before planning custom implementations

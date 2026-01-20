@@ -26,8 +26,6 @@ export interface Stage5InputData {
     lessonsRange?: { min: number; max: number }
     /** Content style - user selected (e.g., practical, conversational, academic) */
     contentStyle?: string
-    /** Teaching style - from LLM analysis (e.g., hands-on, theory-first, project-based) */
-    teachingStyle: string
     topicAnalysis?: {
       complexity: string
       prerequisites: string[]

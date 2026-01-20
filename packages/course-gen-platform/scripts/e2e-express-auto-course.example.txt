@@ -1,0 +1,64 @@
+Expected Output Example:
+═══════════════════════════════════════════════════
+  E2E Test: Express Auto Course Generation
+═══════════════════════════════════════════════════
+  Тема: Продажи для школ репетиторства
+  Формат: mini (8-16 уроков)
+  Режим: automatic
+═══════════════════════════════════════════════════
+
+[00:00] Создание курса...
+[00:01] ✓ Курс создан: 12345678-1234-1234-1234-123456789012
+        generation_mode = automatic
+        course_size = mini
+
+[00:02] Запуск Stage 4 (Analysis)...
+[00:03] ✓ Stage 4 job queued
+
+--- Мониторинг прогресса ---
+[00:04] Status: stage_4_analyzing
+[00:18] Status: stage_4_complete
+[00:19] Status: stage_5_generating
+[00:45] Status: stage_5_complete
+[00:46] Status: stage_6_generating
+[02:15] Status: stage_6_complete
+✓ Generation complete!
+
+═══════════════════════════════════════════════════
+  РЕЗУЛЬТАТЫ
+═══════════════════════════════════════════════════
+  Секций: 3 (ожидалось ~3 для mini)
+  Уроков: 12 (ожидалось 8-16 для mini)
+  ✓ Количество уроков в норме для mini
+  Качество: 82.5% (порог: 75%)
+  ✓ Качество выше порога
+  Уроков с контентом: 12/12
+  Стоимость: $0.1234 USD
+═══════════════════════════════════════════════════
+
+═══════════════════════════════════════════════════
+  ИТОГИ
+═══════════════════════════════════════════════════
+  Длительность: 02:15
+  Финальный статус: stage_6_complete
+  Успех: ✓ Да
+  Секций: 3
+  Уроков: 12
+═══════════════════════════════════════════════════
+
+Тестовый курс сохранён: 12345678-1234-1234-1234-123456789012
+Для удаления запустите с флагом --cleanup
+
+Exit code: 0
+
+═══════════════════════════════════════════════════
+
+WARNING Example (if bug still exists):
+[00:46] Status: stage_5_awaiting_approval
+⚠️  WARNING: Stuck on stage_5_awaiting_approval in automatic mode!
+    This indicates the auto-approval fix is not working correctly.
+[00:52] Status: stage_5_awaiting_approval
+[00:58] Status: stage_5_awaiting_approval
+... (continues until timeout)
+
+Exit code: 1

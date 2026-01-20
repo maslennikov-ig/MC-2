@@ -1,13 +1,17 @@
-import React from "react";
-import { motion } from "framer-motion";
-import { Loader2, Sparkles, AlertCircle, CheckCircle2 } from "lucide-react";
-import { useRouter } from "next/navigation";
+import React from 'react'
+import { motion } from 'framer-motion'
+import { Loader2, Sparkles, AlertCircle, CheckCircle2 } from 'lucide-react'
+import { useRouter } from 'next/navigation'
+import { UploadProgressOverlay } from './UploadProgressOverlay'
+import type { UploadedFile } from '@/components/forms/file-upload'
 
 interface SubmitSectionProps {
-  isSubmitting: boolean;
-  workerReady?: boolean;
-  workerLoading?: boolean;
-  workerError?: string | null;
+  isSubmitting: boolean
+  workerReady?: boolean
+  workerLoading?: boolean
+  workerError?: string | null
+  uploadedFiles: UploadedFile[]
+  isUploadingFiles: boolean
 }
 
 export function SubmitSection({
@@ -15,70 +19,76 @@ export function SubmitSection({
   workerReady = true,
   workerLoading = false,
   workerError = null,
+  uploadedFiles,
+  isUploadingFiles,
 }: SubmitSectionProps) {
-  const router = useRouter();
+  const router = useRouter()
 
   // Determine if submit should be disabled
-  const isDisabled = isSubmitting || workerLoading || !workerReady;
+  const isDisabled = isSubmitting || workerLoading || !workerReady
 
   // Get button state info
   const getButtonState = () => {
     if (isSubmitting) {
       return {
-        label: "Создание курса...",
-        ariaLabel: "Создание курса в процессе",
-        icon: <Loader2 className="w-6 h-6 animate-spin" aria-hidden="true" />,
-      };
+        label: 'Создание курса...',
+        ariaLabel: 'Создание курса в процессе',
+        icon: <Loader2 className="h-6 w-6 animate-spin" aria-hidden="true" />,
+      }
     }
     if (workerLoading) {
       return {
-        label: "Проверка системы...",
-        ariaLabel: "Проверка готовности системы генерации",
-        icon: <Loader2 className="w-6 h-6 animate-spin" aria-hidden="true" />,
-      };
+        label: 'Проверка системы...',
+        ariaLabel: 'Проверка готовности системы генерации',
+        icon: <Loader2 className="h-6 w-6 animate-spin" aria-hidden="true" />,
+      }
     }
     if (!workerReady) {
       return {
-        label: "Система недоступна",
-        ariaLabel: "Система генерации курсов временно недоступна",
-        icon: <AlertCircle className="w-6 h-6" aria-hidden="true" />,
-      };
+        label: 'Система недоступна',
+        ariaLabel: 'Система генерации курсов временно недоступна',
+        icon: <AlertCircle className="h-6 w-6" aria-hidden="true" />,
+      }
     }
     return {
-      label: "Создать курс",
-      ariaLabel: "Создать новый курс с указанными параметрами",
-      icon: <Sparkles className="w-6 h-6 group-hover:rotate-12 transition-transform" aria-hidden="true" />,
-    };
-  };
+      label: 'Создать курс',
+      ariaLabel: 'Создать новый курс с указанными параметрами',
+      icon: (
+        <Sparkles
+          className="h-6 w-6 transition-transform group-hover:rotate-12"
+          aria-hidden="true"
+        />
+      ),
+    }
+  }
 
-  const buttonState = getButtonState();
+  const buttonState = getButtonState()
 
   return (
     <motion.div
       initial={{ opacity: 0, y: 20 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, delay: 0.6 }}
-      className="xl:col-span-2 flex flex-col gap-4"
+      className="flex flex-col gap-4 xl:col-span-2"
     >
       {/* Worker status indicator */}
       {!workerLoading && (
         <div className="flex items-center justify-end gap-2 text-sm">
           {workerReady ? (
             <>
-              <CheckCircle2 className="w-4 h-4 text-green-500" />
-              <span className="text-green-600 dark:text-green-400">
-                Система готова к генерации
-              </span>
+              <CheckCircle2 className="h-4 w-4 text-green-500" />
+              <span className="text-green-600 dark:text-green-400">Система готова к генерации</span>
             </>
           ) : (
             <>
-              <AlertCircle className="w-4 h-4 text-amber-500 flex-shrink-0" />
+              <AlertCircle className="h-4 w-4 flex-shrink-0 text-amber-500" />
               <div className="flex flex-col gap-0.5">
                 <span className="text-amber-600 dark:text-amber-400">
-                  {workerError || "Система генерации временно недоступна"}
+                  {workerError || 'Система генерации временно недоступна'}
                 </span>
                 <span className="text-xs text-slate-500 dark:text-slate-400">
-                  Попробуйте обновить страницу через несколько секунд. Если проблема сохраняется, обратитесь в поддержку.
+                  Попробуйте обновить страницу через несколько секунд. Если проблема сохраняется,
+                  обратитесь в поддержку.
                 </span>
               </div>
             </>
@@ -86,15 +96,19 @@ export function SubmitSection({
         </div>
       )}
 
-      <div className="flex flex-col sm:flex-row gap-4 justify-between items-center">
-        <div className="text-slate-500 dark:text-white/60 text-sm">
-          * Обязательные поля
-        </div>
+      {/* Upload Progress Overlay (visible when uploading files during submission) */}
+      <UploadProgressOverlay
+        uploadedFiles={uploadedFiles}
+        isVisible={isSubmitting && isUploadingFiles && uploadedFiles.length > 0}
+      />
+
+      <div className="flex flex-col items-center justify-between gap-4 sm:flex-row">
+        <div className="text-sm text-slate-500 dark:text-white/60">* Обязательные поля</div>
         <div className="flex gap-4">
           <button
             type="button"
-            onClick={() => router.push("/")}
-            className="px-6 py-3 bg-slate-100 dark:bg-white/10 hover:bg-slate-200 dark:hover:bg-white/20 text-slate-700 dark:text-white font-medium rounded-xl transition-all"
+            onClick={() => router.push('/')}
+            className="rounded-xl bg-slate-100 px-6 py-3 font-medium text-slate-700 transition-all hover:bg-slate-200 dark:bg-white/10 dark:text-white dark:hover:bg-white/20"
             aria-label="Отменить создание курса и вернуться на главную страницу"
           >
             Отмена
@@ -102,10 +116,10 @@ export function SubmitSection({
           <button
             type="submit"
             disabled={isDisabled}
-            className={`inline-flex items-center gap-3 px-8 py-4 rounded-xl font-semibold text-lg transition-all duration-200 group ${
+            className={`group inline-flex items-center gap-3 rounded-xl px-8 py-4 text-lg font-semibold transition-all duration-200 ${
               !isDisabled
-                ? "bg-gradient-to-r from-violet-600 to-purple-600 text-white hover:from-violet-700 hover:to-purple-700 shadow-xl hover:shadow-2xl hover:scale-105"
-                : "bg-white/10 text-white/40 cursor-not-allowed"
+                ? 'bg-gradient-to-r from-violet-600 to-purple-600 text-white shadow-xl hover:scale-105 hover:from-violet-700 hover:to-purple-700 hover:shadow-2xl'
+                : 'cursor-not-allowed bg-white/10 text-white/40'
             }`}
             aria-label={buttonState.ariaLabel}
             aria-disabled={isDisabled}
@@ -116,5 +130,5 @@ export function SubmitSection({
         </div>
       </div>
     </motion.div>
-  );
+  )
 }

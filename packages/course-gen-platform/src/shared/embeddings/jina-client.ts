@@ -114,7 +114,7 @@ class RateLimiter {
 
     if (timeSinceLastRequest < this.minInterval) {
       const waitTime = this.minInterval - timeSinceLastRequest;
-      await new Promise((resolve) => setTimeout(resolve, waitTime));
+      await new Promise(resolve => setTimeout(resolve, waitTime));
     }
 
     this.lastRequestTime = Date.now();
@@ -125,6 +125,56 @@ class RateLimiter {
  * Singleton rate limiter instance
  */
 const rateLimiter = new RateLimiter();
+
+/**
+ * Concurrency limiter to enforce max concurrent requests to Jina API
+ *
+ * Jina API has a limit of 2 concurrent requests per API key.
+ * This semaphore-based limiter ensures we never exceed that limit.
+ */
+class ConcurrencyLimiter {
+  private running = 0;
+  private queue: Array<() => void> = [];
+
+  constructor(private maxConcurrent: number = 2) {}
+
+  /**
+   * Acquires a slot for making a request.
+   * If maxConcurrent slots are in use, waits until one is released.
+   */
+  async acquire(): Promise<void> {
+    if (this.running < this.maxConcurrent) {
+      this.running++;
+      return;
+    }
+
+    return new Promise<void>(resolve => {
+      this.queue.push(() => {
+        this.running++;
+        resolve();
+      });
+    });
+  }
+
+  /**
+   * Releases a slot after request completion.
+   * If requests are waiting, immediately grants slot to next in queue.
+   */
+  release(): void {
+    this.running--;
+    if (this.queue.length > 0) {
+      const next = this.queue.shift();
+      if (next) {
+        next();
+      }
+    }
+  }
+}
+
+/**
+ * Singleton concurrency limiter instance (max 2 concurrent requests per Jina API limit)
+ */
+const concurrencyLimiter = new ConcurrencyLimiter(2);
 
 /**
  * Token usage tracker for monitoring Jina API costs
@@ -162,7 +212,11 @@ const tokenTracker = new TokenUsageTracker();
 /**
  * Get current session token usage statistics
  */
-export function getJinaTokenStats(): { totalTokens: number; requestCount: number; sessionDurationMs: number } {
+export function getJinaTokenStats(): {
+  totalTokens: number;
+  requestCount: number;
+  sessionDurationMs: number;
+} {
   return tokenTracker.getStats();
 }
 
@@ -181,10 +235,7 @@ export function resetJinaTokenStats(): void {
  * @returns Result of the function
  * @throws {JinaEmbeddingError} If all retries are exhausted
  */
-async function retryWithExponentialBackoff<T>(
-  fn: () => Promise<T>,
-  maxRetries = 3
-): Promise<T> {
+async function retryWithExponentialBackoff<T>(fn: () => Promise<T>, maxRetries = 3): Promise<T> {
   let lastError: Error | undefined;
 
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
@@ -196,7 +247,12 @@ async function retryWithExponentialBackoff<T>(
       // Don't retry on certain errors
       if (error instanceof JinaEmbeddingError) {
         // Don't retry on client errors (4xx except 429)
-        if (error.statusCode && error.statusCode >= 400 && error.statusCode < 500 && error.statusCode !== 429) {
+        if (
+          error.statusCode &&
+          error.statusCode >= 400 &&
+          error.statusCode < 500 &&
+          error.statusCode !== 429
+        ) {
           throw error;
         }
       }
@@ -210,7 +266,7 @@ async function retryWithExponentialBackoff<T>(
       const backoffDelay = Math.min(1000 * Math.pow(2, attempt), 32000);
 
       // Wait before retrying
-      await new Promise((resolve) => setTimeout(resolve, backoffDelay));
+      await new Promise(resolve => setTimeout(resolve, backoffDelay));
     }
   }
 
@@ -225,66 +281,76 @@ async function retryWithExponentialBackoff<T>(
  * @returns Embedding response
  * @throws {JinaEmbeddingError} On API errors
  */
-async function makeJinaRequest(
-  payload: JinaEmbeddingRequest
-): Promise<JinaEmbeddingResponse> {
+async function makeJinaRequest(payload: JinaEmbeddingRequest): Promise<JinaEmbeddingResponse> {
   validateJinaConfig();
 
-  // Wait for rate limit slot
-  await rateLimiter.waitForSlot();
+  // Acquire concurrency slot (Jina API limits to 2 concurrent requests)
+  await concurrencyLimiter.acquire();
 
-  const response = await fetch('https://api.jina.ai/v1/embeddings', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${process.env.JINA_API_KEY}`,
-      'Content-Type': 'application/json',
-      'Accept': 'application/json',
-    },
-    body: JSON.stringify(payload),
-    signal: AbortSignal.timeout(60000), // 60s timeout to prevent indefinite hangs
-  });
+  try {
+    // Wait for rate limit slot
+    await rateLimiter.waitForSlot();
 
-  if (!response.ok) {
-    let errorMessage = `Jina API request failed with status ${response.status}`;
-    let errorType = 'API_ERROR';
+    const response = await fetch('https://api.jina.ai/v1/embeddings', {
+      method: 'POST',
+      headers: {
+        Authorization: `Bearer ${process.env.JINA_API_KEY}`,
+        'Content-Type': 'application/json',
+        Accept: 'application/json',
+      },
+      body: JSON.stringify(payload),
+      signal: AbortSignal.timeout(60000), // 60s timeout to prevent indefinite hangs
+    });
 
-    try {
-      const errorData = (await response.json()) as JinaErrorResponse;
-      errorMessage = errorData.error?.message || errorData.detail || errorData.message || errorMessage;
-      errorType = errorData.error?.type || errorType;
-    } catch {
-      // If error response is not JSON, use the status text
-      errorMessage = response.statusText || errorMessage;
+    if (!response.ok) {
+      let errorMessage = `Jina API request failed with status ${response.status}`;
+      let errorType = 'API_ERROR';
+
+      try {
+        const errorData = (await response.json()) as JinaErrorResponse;
+        errorMessage =
+          errorData.error?.message || errorData.detail || errorData.message || errorMessage;
+        errorType = errorData.error?.type || errorType;
+      } catch {
+        // If error response is not JSON, use the status text
+        errorMessage = response.statusText || errorMessage;
+      }
+
+      throw new JinaEmbeddingError(errorMessage, response.status, errorType);
     }
 
-    throw new JinaEmbeddingError(errorMessage, response.status, errorType);
-  }
+    const data = (await response.json()) as JinaEmbeddingResponse;
 
-  const data = (await response.json()) as JinaEmbeddingResponse;
+    // Validate response structure
+    if (!data.data || !Array.isArray(data.data) || data.data.length === 0) {
+      throw new JinaEmbeddingError(
+        'Invalid response from Jina API: missing or empty data array',
+        undefined,
+        'INVALID_RESPONSE'
+      );
+    }
 
-  // Validate response structure
-  if (!data.data || !Array.isArray(data.data) || data.data.length === 0) {
-    throw new JinaEmbeddingError(
-      'Invalid response from Jina API: missing or empty data array',
-      undefined,
-      'INVALID_RESPONSE'
+    // Track token usage
+    const tokensUsed = data.usage?.total_tokens || 0;
+    tokenTracker.track(tokensUsed);
+
+    const stats = tokenTracker.getStats();
+    logger.info(
+      {
+        tokensUsed,
+        totalTokensSession: stats.totalTokens,
+        requestCount: stats.requestCount,
+        embeddingsGenerated: data.data.length,
+        task: payload.task,
+      },
+      '[Jina] Embedding request completed'
     );
+
+    return data;
+  } finally {
+    // Always release concurrency slot
+    concurrencyLimiter.release();
   }
-
-  // Track token usage
-  const tokensUsed = data.usage?.total_tokens || 0;
-  tokenTracker.track(tokensUsed);
-
-  const stats = tokenTracker.getStats();
-  logger.info({
-    tokensUsed,
-    totalTokensSession: stats.totalTokens,
-    requestCount: stats.requestCount,
-    embeddingsGenerated: data.data.length,
-    task: payload.task,
-  }, '[Jina] Embedding request completed');
-
-  return data;
 }
 
 /**
@@ -334,7 +400,7 @@ export async function generateEmbedding(
       task,
       dimensions: 768,
       normalized: false, // Qdrant handles normalization for Cosine similarity
-      truncate: true,    // Auto-truncate texts >8192 tokens
+      truncate: true, // Auto-truncate texts >8192 tokens
     });
 
     return response.data[0].embedding;
@@ -420,7 +486,7 @@ export async function generateEmbeddings(
         truncate: true,
       });
 
-      return response.data.map((item) => item.embedding);
+      return response.data.map(item => item.embedding);
     });
 
     // Validate batch embeddings
@@ -484,8 +550,4 @@ export async function healthCheck(): Promise<boolean> {
 /**
  * Export types for external use
  */
-export type {
-  JinaEmbeddingRequest,
-  JinaEmbeddingResponse,
-  JinaErrorResponse,
-};
+export type { JinaEmbeddingRequest, JinaEmbeddingResponse, JinaErrorResponse };

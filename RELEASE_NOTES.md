@@ -2,6 +2,323 @@
 
 _Released on 2025-12-26_
 
+## v0.28.15
+
+_Released on 2026-01-20_
+
+### ✨ New Features
+
+- **web**: Add 5 source file(s), update 8 source file(s), +1 more
+- **create-course**: Reorganize UI/UX for course creation form
+- **i18n**: Add image generation translations for enrichments
+
+### 🐛 Bug Fixes
+
+- **docker**: Add DOCLING_UPLOADS_BASE_PATH override for document processing
+- **web**: Fix type-check by excluding tests from tsconfig
+- **stage6**: Add dedicated worker service and queue isolation for dev
+
+---
+
+_This release was automatically generated from 9 commits._
+
+## v0.28.14
+
+_Released on 2026-01-20_
+
+### ✨ New Features
+
+- **image-gen**: Add quality parameter for GPT-5 Image Mini cost optimization
+- **stage6**: Add person and case agreement grammar rules for Russian
+
+### 🐛 Bug Fixes
+
+- **enrichments**: Disable auto lesson card/cover generation
+- **admin/logs**: Fix status filter not working in flat view
+- **Stage4**: Pass course_size via job data to avoid race condition
+- **Stage5**: Use 'intermediate' as default difficulty instead of undefined
+- **skill**: Dev server errors should be investigated, not bulk resolved
+
+---
+
+_This release was automatically generated from 16 commits._
+
+## v0.28.14
+
+_Released on 2026-01-20_
+
+### ✨ New Features
+
+- **image-gen**: Add quality parameter for GPT-5 Image Mini cost optimization
+- **stage6**: Add person and case agreement grammar rules for Russian
+
+### 🐛 Bug Fixes
+
+- **admin/logs**: Fix status filter not working in flat view
+- **Stage4**: Pass course_size via job data to avoid race condition
+- **Stage5**: Use 'intermediate' as default difficulty instead of undefined
+- **skill**: Dev server errors should be investigated, not bulk resolved
+
+---
+
+_This release was automatically generated from 14 commits._
+
+## v0.28.13
+
+_Released on 2026-01-19_
+
+### ✨ New Features
+
+- **stage6**: Route auto-approval jobs to dedicated queue
+- **stage6**: Activate dedicated queue with 30 concurrent workers
+
+### 🐛 Bug Fixes
+
+- **orchestrator**: Support snake_case in job cleanup logic
+- **orchestrator**: Support snake_case job data fields in queue-events-backup
+- **orchestrator**: Prevent attempts exceeding max_attempts constraint violation
+
+---
+
+_This release was automatically generated from 10 commits._
+
+## v0.28.12
+
+_Released on 2026-01-19_
+
+### ✨ New Features
+
+- **course-gen-platform**: Add 1 source file(s), update docs
+- **stage5**: Dynamic min/max lessons validation from course_size presets
+
+### 🐛 Bug Fixes
+
+- **stage2**: Add hardcoded fallback for model config in Phase 6
+- **stage2**: Store fallback processed_content on summarization failure
+- **auto-approval**: Correct FSM transitions for automatic mode
+- **course-size**: Remove hardcoded min 10 lessons from CourseStructureSchema
+- **auto-approval**: Correct status suffix for all stages + release locks early
+- **stage2**: Handle SandboxedJob missing getState() method
+- **phase-2**: Respect course_size preset constraints (MICRO/MINI/COMPACT)
+- **docling**: Transform local paths to container paths for Docker
+
+---
+
+_This release was automatically generated from 19 commits._
+
+## v0.28.11
+
+_Released on 2026-01-19_
+
+### ✨ New Features
+
+- **course-gen-platform**: Add 1 source file(s), update 2 source file(s)
+
+### 🐛 Bug Fixes
+
+- **stage4**: Respect course_size constraints for MICRO/MINI/COMPACT (mc2-usg3)
+- **pipeline**: Comprehensive Stage 5 retry and placeholder handling
+
+---
+
+_This release was automatically generated from 7 commits._
+
+## v0.28.10
+
+_Released on 2026-01-19_
+
+### ✨ New Features
+
+- **course-gen-platform**: Add 1 source file(s), update 8 source file(s), +3 more
+- **stage5**: Remove redundant fields to save ~10K-15K tokens per course
+- **stage5**: Add auto-approval support for automatic generation mode
+- **course-gen**: Add E2E test for automatic mode express generation
+- **auto-approval**: Add case 6 for Stage 6 lesson content generation
+- **processor**: Add bundle monitoring, health check, and docs
+- **logger**: Add auto-mute rules for job lifecycle warnings
+
+### 🔧 Improvements
+
+- **stage4**: Parallelize Phase 3 and Phase 6 execution
+- **stage4**: Remove conflicting pedagogical_strategy fields
+- **stage4-5**: Eliminate over-engineering and fix bugs
+
+### 🐛 Bug Fixes
+
+- **stage5**: Update JSDoc and fix test import path
+- **stage4**: Remove conflicting pedagogical_strategy fields from Phase 3
+- **auto-approval**: Address code review issues CR-001 through CR-015
+- **course-gen**: Repair JSON parsing and validation failures
+- **auto-approval**: Add two-step FSM transition for automatic mode
+- **web**: Image loader width param and logo aspect ratio
+- **processor**: Bundle with tsup for BullMQ ESM compatibility
+- **deploy**: Add orphan container cleanup before dev deploy
+- **logs**: Return status from RPC to fix filter mismatch
+- **processor**: Add missing .js extension to error-service import
+
+---
+
+_This release was automatically generated from 46 commits._
+
+## v0.28.9
+
+_Released on 2026-01-18_
+
+### ✨ New Features
+
+- Add 1 agent(s)
+
+### 🐛 Bug Fixes
+
+- **Stage5**: Validate style against enum before Zod validation
+- **Stage5**: Handle null DB fields in frontend_parameters validation
+
+---
+
+_This release was automatically generated from 10 commits._
+
+## v0.28.8
+
+_Released on 2026-01-18_
+
+### ✨ New Features
+
+- **GenerationProgress**: Auto-start generation in automatic mode
+- **generation**: Merge automatic and semi-automatic control panels into unified MissionControlBanner
+
+### 🐛 Bug Fixes
+
+- **GenerationProgress**: Pause/resume now updates UI in real-time
+- **GraphHeader**: Show fingerprint button with courseId fallback when generationCode is null
+- **MissionControlBanner**: Address code review P1-P2 issues
+- **worker**: Log errors to DB inside sandbox before stack trace is lost
+
+---
+
+_This release was automatically generated from 14 commits._
+
+## v0.28.7
+
+_Released on 2026-01-17_
+
+### 🐛 Bug Fixes
+
+- **admin-logs**: List view now considers fingerprint-based status
+- **web**: Prevent profile learning_style from overriding user's form selection
+
+---
+
+_This release was automatically generated from 4 commits._
+
+## v0.28.6
+
+_Released on 2026-01-17_
+
+### ✨ New Features
+
+- **course-viewer**: Add deep-linking, breadcrumbs, and server progress sync
+- **orchestrator**: Add processor health check, TTL timeout, and Stage 6 JobResult wrapper
+
+### 🐛 Bug Fixes
+
+- **web**: Update 2 source file(s)
+- **logger**: Use upsert for duplicate problem_id in error logging
+- **processor**: Resolve ESM directory import error in sandboxed processor
+- **course-viewer**: Complete remaining code review fixes CR-005 through CR-022
+- **course-viewer**: Address code review issues CR-001 through CR-018
+- **a11y**: Add ARIA labels and null checks to BreadcrumbNav
+- **orchestrator**: Improve sandboxed processor type safety and reliability
+
+---
+
+_This release was automatically generated from 20 commits._
+
+## v0.28.5
+
+_Released on 2026-01-17_
+
+### ✨ New Features
+
+- **course-gen-platform**: Add 1 source file(s), update 1 source file(s)
+
+### 🐛 Bug Fixes
+
+- **web**: Allow micro course size in validation schema
+
+---
+
+_This release was automatically generated from 3 commits._
+
+## v0.28.4
+
+_Released on 2026-01-17_
+
+### ✨ New Features
+
+- **Interface**: Add missing user settings to Stage 1 Input Tab
+- **export**: Implement module lessons export as Markdown
+- **Database**: Add trigger to auto-sync fingerprint in log_issue_status
+
+### 🔧 Improvements
+
+- **Interface**: DRY Stage2Group with utility functions + accessibility
+- Code quality improvements from review (P2.4, P3.2-P3.6)
+- **logging**: Address code review findings for auto_muted
+
+### 🐛 Bug Fixes
+
+- **course-gen-platform**: Update 3 source file(s), update 1 agent(s), +3 more
+- **types**: Add type casts in NodeDetailsDrawer for Stage props
+- **generation**: Save generation_mode from form + display writing style on Stage 4
+- **Interface**: Complete Stage2Group skipped styling from code review
+- **Interface**: Add strikethrough style to Stage2Group when skipped
+- **export**: Security and performance improvements from code review
+- **Interface**: Resolve single-click/double-click UX conflict in ModuleGroup
+- Add concurrency limiter for Jina API and job.name validation
+- **stage5**: Remove partial-regen layer and add lock cleanup
+- **stage5**: Prevent infinite retry loop and fix validation errors
+
+---
+
+_This release was automatically generated from 38 commits._
+
+## v0.28.3
+
+_Released on 2026-01-16_
+
+### ✨ New Features
+
+- **logging**: Add auto_muted status for expected errors
+- **lesson-approval**: Add migration and tests for batch approval RPC
+- **stage4**: Add course_description and learning_outcomes to analysis input
+- **admin**: Add error log grouping by fingerprint
+- **generation**: добавить difficulty в Stage 5 FrontendParameters
+- **enrichments**: Add optimistic UI + improve error messages
+- **pipeline**: Add language support to Stage 4-5 model selection
+- **logs**: Add full-text search for similar problems v1.5.0
+
+### 🔧 Improvements
+
+- **stage4**: Remove unused answers field
+- **target_audience**: Unify data source to courses.target_audience column
+- **llm**: Add actualLanguage tracking, LanguageCode type, language detection
+
+### 🐛 Bug Fixes
+
+- **shared-types**: Update 4 source file(s), update 1 agent(s), +2 more
+- **logs**: Implement server-side grouping with RPC + code review fixes
+- **stage4**: Use actual target_audience from DB instead of hardcoded value
+- **generation**: передавать course_size и description в Input стадии 5
+- **logs**: Improve PostgrestError logging with full error details
+- **web**: Navigation sheet not working in fullscreen mode
+- **enrichment**: Address code review issues #5-#7
+- **enrichments**: Address code review findings
+- **web**: Cleanup unused type and debug comment in EnrichmentsPanel refactoring
+
+---
+
+_This release was automatically generated from 49 commits._
+
 ## v0.28.2
 
 _Released on 2026-01-15_

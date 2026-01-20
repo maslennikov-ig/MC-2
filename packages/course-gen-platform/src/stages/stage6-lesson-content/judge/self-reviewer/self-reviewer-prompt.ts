@@ -16,19 +16,20 @@
 
 import type { RAGChunk } from '@megacampus/shared-types/lesson-content';
 import type { LessonSpecificationV2 } from '@megacampus/shared-types/lesson-specification-v2';
+import { getGrammarRulesForPrompt } from './grammar-rules';
 
 /**
  * Language-specific token multipliers
  * Non-Latin scripts use more tokens per character
  */
 const TOKEN_MULTIPLIERS: Record<string, number> = {
-  'en': 1.0,    // Baseline - Latin script
-  'ru': 1.33,   // Cyrillic
-  'zh': 2.67,   // Chinese
-  'ja': 2.0,    // Japanese
-  'ko': 2.0,    // Korean
-  'ar': 1.5,    // Arabic
-  'hi': 1.5,    // Hindi/Devanagari
+  en: 1.0, // Baseline - Latin script
+  ru: 1.33, // Cyrillic
+  zh: 2.67, // Chinese
+  ja: 2.0, // Japanese
+  ko: 2.0, // Korean
+  ar: 1.5, // Arabic
+  hi: 1.5, // Hindi/Devanagari
 };
 
 /**
@@ -38,18 +39,20 @@ const TOKEN_MULTIPLIERS: Record<string, number> = {
  */
 function sanitizeForPrompt(text: string): string {
   if (!text) return '';
-  return text
-    // Escape XML special characters (& must be first)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&apos;')
-    // Remove CDATA markers that could break XML structure
-    .replace(/\]\]>/g, ']]&gt;')
-    .replace(/<!\[CDATA\[/gi, '&lt;![CDATA[')
-    // Limit consecutive newlines (prevent structure breaking)
-    .replace(/\n{4,}/g, '\n\n\n');
+  return (
+    text
+      // Escape XML special characters (& must be first)
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&apos;')
+      // Remove CDATA markers that could break XML structure
+      .replace(/\]\]>/g, ']]&gt;')
+      .replace(/<!\[CDATA\[/gi, '&lt;![CDATA[')
+      // Limit consecutive newlines (prevent structure breaking)
+      .replace(/\n{4,}/g, '\n\n\n')
+  );
 }
 
 /**
@@ -65,11 +68,12 @@ Your goal is to validate generated lesson content against its specification and 
 You act as a gatekeeper: you must **REJECT** broken content, **FIX** minor hygiene issues, and **FLAG** semantic risks for human-like judges.
 
 # Input Data
-You will receive four inputs wrapped in XML tags:
+You will receive five inputs wrapped in XML tags:
 1. \`<TARGET_LANGUAGE>\`: The ISO code (e.g., 'ru', 'en', 'zh').
-2. \`<LESSON_SPEC>\`: The architectural blueprint (objectives, difficulty, required elements).
-3. \`<RAG_CONTEXT>\`: Summary of source facts (ground truth).
-4. \`<LESSON_CONTENT>\`: The generated content to review.
+2. \`<GRAMMAR_RULES>\`: Language-specific grammar rules for Phase 2.5 validation.
+3. \`<LESSON_SPEC>\`: The architectural blueprint (objectives, difficulty, required elements).
+4. \`<RAG_CONTEXT>\`: Summary of source facts (ground truth).
+5. \`<LESSON_CONTENT>\`: The generated content to review.
 
 # Protected Content (NEVER modify)
 The following content types are SACRED - never flag, modify, or suggest changes:
@@ -138,6 +142,41 @@ If Phase 1 passes, check structure and fixable issues.
 6. **Duplicate Content**: Check for repeated paragraphs
    - Flag if same paragraph (>50 chars) appears twice
 
+## Phase 2.5: Language & Grammar Fixes (Status: FIXED)
+Check for language-specific grammar errors that can be fixed with EXACT text replacement.
+Use the rules from \`<GRAMMAR_RULES>\` section for the target language.
+
+### Grammar Error Types (see GRAMMAR_RULES for details):
+1. **Case/preposition errors**: Wrong word form after preposition
+2. **Agreement errors**: Adjective/verb doesn't match noun in gender/number
+3. **Numeral agreement**: Wrong form after numerals (2-4 vs 5+)
+
+### Wrong Script Characters:
+Find isolated characters from wrong writing system (e.g., Chinese in Russian text).
+**Exceptions - DO NOT flag**:
+- Content inside code blocks (\`\`\`...\`\`\`)
+- Technical terms and identifiers
+- Proper nouns, brand names
+- URLs and file paths
+
+### Output Format for Grammar Issues:
+For each grammar issue, output with severity "FIXABLE":
+{
+  "type": "GRAMMAR",
+  "severity": "FIXABLE",
+  "location": "sec_<id>",
+  "description": "Brief error description",
+  "quotedText": "exact wrong text (3-50 chars)",
+  "inlineReplacement": "corrected text"
+}
+
+### Grammar Rules:
+- Only flag if 100% certain of the error
+- quotedText must be EXACT match from content (case-sensitive)
+- Fix ONLY the grammar, don't rephrase or improve style
+- Skip content inside code blocks, mermaid diagrams, LaTeX formulas
+- Prefer smaller quotedText (3-50 chars) for precise replacements
+
 ## Phase 3: Semantic Verification (Status: FLAG_TO_JUDGE)
 Check for deep issues requiring Judge attention.
 
@@ -187,10 +226,12 @@ Start with { and end with }.
   "reasoning": "Concise explanation (max 2 sentences).",
   "issues": [
     {
-      "type": "TRUNCATION" | "LANGUAGE" | "EMPTY" | "SHORT_SECTION" | "MISSING_ELEMENT" | "HEADING_HIERARCHY" | "CODE_BLOCK_LANG" | "DUPLICATE" | "ALIGNMENT" | "HALLUCINATION" | "LOGIC" | "DIFFICULTY" | "HYGIENE",
+      "type": "TRUNCATION" | "LANGUAGE" | "EMPTY" | "SHORT_SECTION" | "MISSING_ELEMENT" | "HEADING_HIERARCHY" | "CODE_BLOCK_LANG" | "DUPLICATE" | "ALIGNMENT" | "HALLUCINATION" | "LOGIC" | "DIFFICULTY" | "HYGIENE" | "GRAMMAR",
       "severity": "CRITICAL" | "FIXABLE" | "COMPLEX" | "INFO",
       "location": "intro | sec_<id> | examples | exercises | global",
-      "description": "Specific error details."
+      "description": "Specific error details.",
+      "quotedText": "(optional) Exact text with error, for GRAMMAR issues",
+      "inlineReplacement": "(optional) Corrected text, for GRAMMAR issues"
     }
   ]
 }
@@ -224,9 +265,16 @@ export function buildSelfReviewerUserMessage(
   // Format lesson spec (minimal, focused on what reviewer needs)
   const specSummary = formatLessonSpec(lessonSpec);
 
+  // Get language-specific grammar rules for Phase 2.5
+  const grammarRules = getGrammarRulesForPrompt(language);
+
   return `<TARGET_LANGUAGE>
 ${sanitizeForPrompt(language)}
 </TARGET_LANGUAGE>
+
+<GRAMMAR_RULES>
+${grammarRules}
+</GRAMMAR_RULES>
 
 <LESSON_SPEC>
 ${sanitizeForPrompt(specSummary)}
@@ -268,7 +316,7 @@ function formatRAGContext(chunks: RAGChunk[], maxChunks: number): string {
  */
 function formatLessonSpec(spec: LessonSpecificationV2): string {
   const objectives = spec.learning_objectives
-    .map((lo) => `- [${lo.id}] ${lo.objective} (Bloom: ${lo.bloom_level})`)
+    .map(lo => `- [${lo.id}] ${lo.objective} (Bloom: ${lo.bloom_level})`)
     .join('\n');
 
   return `Title: ${spec.title}

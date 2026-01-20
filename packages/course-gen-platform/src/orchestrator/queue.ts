@@ -180,8 +180,11 @@ export async function removeJobsByCourseId(
       if (!job) continue;
 
       // Check if job has no data (orphaned/corrupted) or belongs to our course
-      const isOrphanedJob = !job.data || !job.data.courseId;
-      const belongsToCourse = job.data?.courseId === courseId;
+      // Support both camelCase and snake_case (some jobs use snake_case internally)
+      const jobData = job.data as Record<string, unknown> | undefined;
+      const jobCourseId = (jobData?.courseId || jobData?.course_id) as string | undefined;
+      const isOrphanedJob = !jobData || !jobCourseId;
+      const belongsToCourse = jobCourseId === courseId;
 
       if (isOrphanedJob || belongsToCourse) {
         try {
@@ -288,8 +291,12 @@ export async function removeJobsByCourseId(
       }
     }
 
-    // Phase 3: Clean up related Redis keys (lesson UUID mappings, etc.)
-    const relatedPatterns = [`lesson:uuid:${courseId}:*`, `rag:${courseId}:*`];
+    // Phase 3: Clean up related Redis keys (lesson UUID mappings, generation locks, etc.)
+    const relatedPatterns = [
+      `lesson:uuid:${courseId}:*`,
+      `rag:${courseId}:*`,
+      `generation:lock:${courseId}`,
+    ];
 
     for (const pattern of relatedPatterns) {
       let relatedCursor = '0';

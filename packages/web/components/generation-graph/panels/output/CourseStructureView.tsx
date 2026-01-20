@@ -164,7 +164,7 @@ export const CourseStructureView = ({
   const applyFieldValue = useCallback(<T,>(data: T, path: string, value: unknown): T => {
     return produce(data, (draft) => {
       const parts = path.replace(/\[/g, '.').replace(/\]/g, '').split('.');
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any -- Dynamic path traversal requires any
+       
       let current: Record<string, unknown> = draft as Record<string, unknown>;
 
       for (let i = 0; i < parts.length - 1; i++) {
@@ -381,7 +381,12 @@ export const CourseStructureView = ({
             value={
               <div className="flex items-center gap-2">
                 <Users className="h-4 w-4 text-slate-500 dark:text-slate-400" />
-                <span>{data.target_audience}</span>
+                <span>
+                  {data.target_audience ||
+                    (data.difficulty_level === 'beginner' ? 'Beginners with no prior experience' :
+                     data.difficulty_level === 'advanced' ? 'Advanced learners with strong background' :
+                     'Intermediate learners with basic knowledge')}
+                </span>
               </div>
             }
           />
@@ -525,9 +530,9 @@ export const CourseStructureView = ({
                   <div className="border border-slate-100 dark:border-slate-700 rounded-md overflow-hidden">
                     {section.lessons.map((lesson, lessonIdx) => (
                       <LessonRow
-                        key={`lesson-${section.section_number}-${lesson.lesson_number}`}
+                        key={`lesson-${section.section_number ?? sectionIdx}-${lesson.lesson_number ?? lessonIdx}`}
                         lesson={lesson}
-                        sectionNumber={section.section_number}
+                        sectionNumber={section.section_number ?? sectionIdx + 1}
                         sectionIndex={sectionIdx}
                         lessonIndex={lessonIdx}
                         locale={locale}

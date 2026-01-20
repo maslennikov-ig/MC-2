@@ -239,6 +239,23 @@
       "description": "Phase {{stageName}} is complete. Please review the results before proceeding to the next stage.",
       "hint": "Click to see details"
     },
+    "automatic": {
+      "title": "Automatic Generation",
+      "titlePaused": "Generation Paused",
+      "hint": "You can close the page — we'll notify when ready",
+      "hintPaused": "Click «Resume» to continue",
+      "pause": "Pause",
+      "resume": "Resume",
+      "cancel": "Cancel",
+      "manualMode": "Manual Mode",
+      "manualModeHint": "In manual mode you can review and modify results at each stage."
+    },
+    "aria": {
+      "expand": "Expand control panel",
+      "collapse": "Collapse panel",
+      "collapseHint": "Collapse (or swipe left)",
+      "swipeHint": "Swipe left to collapse"
+    },
     "cancel": "Cancel",
     "view": "View",
     "confirming": "Confirming...",

@@ -25,8 +25,9 @@ const courseSchema = z.object({
     .array(z.enum(['text', 'audio', 'video', 'presentation', 'test']))
     .optional()
     .default(['text']),
-  estimated_lessons: z.number().min(10).max(100).optional(),
-  estimated_sections: z.number().min(3).max(30).optional(),
+  // Minimum values based on course size presets (micro: 1-5 lessons, 1 section)
+  estimated_lessons: z.number().min(1).max(100).optional(),
+  estimated_sections: z.number().min(1).max(30).optional(),
   course_size: courseSizeSchema.optional(),
   lesson_duration_minutes: z.number().min(3).max(45).optional().default(15),
   content_strategy: z
@@ -35,6 +36,10 @@ const courseSchema = z.object({
     .default('auto'),
   prerequisites: z.string().optional(),
   learning_outcomes: z.string().optional(),
+  generation_mode: z.enum(['automatic', 'semi_automatic']).default('semi_automatic'),
+  notify_on_completion: z.boolean().optional().default(true),
+  notify_on_error: z.boolean().optional().default(true),
+  notify_on_stage_complete: z.boolean().optional().default(false),
 })
 
 /**
@@ -457,6 +462,11 @@ export async function updateDraftAndStartGeneration(
       content_strategy: formData.get('content_strategy') || undefined,
       prerequisites: formData.get('prerequisites') || undefined,
       learning_outcomes: formData.get('learning_outcomes') || undefined,
+      generation_mode:
+        (formData.get('generation_mode') as 'automatic' | 'semi_automatic') || 'semi_automatic',
+      notify_on_completion: formData.get('notify_on_completion') === 'true',
+      notify_on_error: formData.get('notify_on_error') === 'true',
+      notify_on_stage_complete: formData.get('notify_on_stage_complete') === 'true',
     })
 
     if (!validationResult.success) {
@@ -517,6 +527,7 @@ export async function updateDraftAndStartGeneration(
         content_strategy: validatedData.content_strategy || 'auto',
         prerequisites: validatedData.prerequisites || null,
         learning_outcomes: validatedData.learning_outcomes || null,
+        generation_mode: validatedData.generation_mode,
         has_files: hasFiles,
         generation_progress: {
           steps: createInitialProgress(),

@@ -28,10 +28,14 @@
  */
 
 import { getSupabaseAdmin } from '@/shared/supabase/admin';
-import type { InitializeFSMCommand, InitializeFSMResult } from '@megacampus/shared-types/transactional-outbox';
+import type {
+  InitializeFSMCommand,
+  InitializeFSMResult,
+} from '@megacampus/shared-types/transactional-outbox';
 import logger from '@/shared/logger';
 import { getRedisClient } from '@/shared/cache/redis';
 import { metricsStore } from '@/orchestrator/metrics';
+import { QUEUE_NAME } from '@/orchestrator/queue';
 import type { SupabaseClient, PostgrestError } from '@supabase/supabase-js';
 import type { Database } from '@megacampus/shared-types';
 
@@ -44,6 +48,7 @@ interface InitializeRPCParams {
   p_initial_state: string;
   p_job_data: unknown;
   p_metadata: unknown;
+  p_target_queue: string;
 }
 
 type SupabaseClientWithRpc = SupabaseClient<Database> & {
@@ -229,6 +234,7 @@ export class InitializeFSMCommandHandler {
         p_initial_state: command.initialState,
         p_job_data: command.jobs,
         p_metadata: command.data,
+        p_target_queue: command.targetQueue || QUEUE_NAME,
       }
     );
 

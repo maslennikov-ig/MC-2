@@ -205,9 +205,10 @@ export function FilterBar({
               <SelectItem value="all">{t('filters.status')}: All</SelectItem>
               <SelectItem value="new">{t('status.new')}</SelectItem>
               <SelectItem value="in_progress">{t('status.in_progress')}</SelectItem>
-              <SelectItem value="to_verify">To Verify</SelectItem>
+              <SelectItem value="to_verify">{t('status.to_verify')}</SelectItem>
               <SelectItem value="resolved">{t('status.resolved')}</SelectItem>
               <SelectItem value="ignored">{t('status.ignored')}</SelectItem>
+              <SelectItem value="auto_muted">{t('status.auto_muted')}</SelectItem>
             </SelectContent>
           </Select>
 

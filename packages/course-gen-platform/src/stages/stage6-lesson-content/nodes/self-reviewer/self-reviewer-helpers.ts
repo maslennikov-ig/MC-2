@@ -192,14 +192,24 @@ export function buildReasoningMessage(
 // ============================================================================
 
 /**
- * Build heuristic-only result when LLM review is skipped
+ * Build heuristic-only result when LLM review is skipped or fails
+ *
+ * @param heuristicDetails - Details from heuristic checks
+ * @param issues - All detected issues
+ * @param language - Target language code
+ * @param state - Current graph state
+ * @param startTime - Start timestamp for duration calculation
+ * @param llmError - Optional LLM error message (e.g., "invalid response format")
+ * @param llmTokensUsed - Optional tokens consumed by LLM call (even on failure)
  */
 export function buildHeuristicOnlyResult(
   heuristicDetails: HeuristicCheckDetails,
   issues: SelfReviewIssue[],
   language: string,
   state: LessonGraphStateType,
-  startTime: number
+  startTime: number,
+  llmError?: string,
+  llmTokensUsed?: number
 ): LessonGraphStateUpdate {
   const criticalIssues = issues.filter(i => i.severity === 'CRITICAL');
   const minorIssues = issues.filter(i => i.severity !== 'CRITICAL');
@@ -207,12 +217,15 @@ export function buildHeuristicOnlyResult(
   const finalStatus = determineFinalStatus(criticalIssues, minorIssues);
   const reasoning = buildReasoningMessage(finalStatus, criticalIssues.length, minorIssues.length);
 
+  // Include LLM error in reasoning if provided
+  const reasoningSuffix = llmError ? `(LLM review failed: ${llmError})` : '(LLM review skipped)';
+
   const result: SelfReviewResult = {
     status: finalStatus,
-    reasoning: `${reasoning} (LLM review skipped)`,
+    reasoning: `${reasoning} ${reasoningSuffix}`,
     issues,
     patchedContent: null,
-    tokensUsed: HEURISTIC_TOKENS_USED,
+    tokensUsed: llmTokensUsed ?? HEURISTIC_TOKENS_USED,
     durationMs,
     heuristicsPassed: true,
     heuristicDetails,

@@ -20,6 +20,8 @@ import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { UnifiedRegenerator } from '@/shared/regeneration';
 import { zodToPromptSchema } from '@/shared/utils/zod-to-prompt-schema';
 import { preprocessObject } from '@/shared/validation/preprocessing';
+import { extractJSON } from '@/shared/utils/json-repair';
+import { logger } from '@/shared/logger';
 
 /**
  * Input data for Phase 4 Document Synthesis
@@ -168,9 +170,10 @@ ${m.content}`
   };
 
   // TIER 1: PREPROCESSING (before UnifiedRegenerator)
-  let preprocessedOutput = rawOutput;
+  // Extract JSON from markdown code blocks + strip thinking tags
+  let preprocessedOutput = extractJSON(rawOutput);
   try {
-    const parsedRaw = JSON.parse(rawOutput) as RawPhase4Output;
+    const parsedRaw = JSON.parse(preprocessedOutput) as RawPhase4Output;
     // Preprocess generation instructions enum fields
     if (parsedRaw.generation_instructions) {
       parsedRaw.generation_instructions = preprocessObject(
@@ -184,8 +187,14 @@ ${m.content}`
     }
     preprocessedOutput = JSON.stringify(parsedRaw);
   } catch (error) {
-    // If preprocessing fails, continue with raw output
-    console.warn('[Phase 4] Preprocessing failed, using raw output:', error);
+    // CR-007: Use structured logger instead of console.*
+    logger.warn(
+      {
+        phase: 'phase-4-synthesis',
+        error: error instanceof Error ? error.message : String(error),
+      },
+      'Preprocessing failed, using raw output'
+    );
   }
 
   try {
@@ -212,6 +221,17 @@ ${m.content}`
       courseId: input.course_id,
       phaseId: 'stage_4_synthesis',
       allowWarningFallback: true, // Stage 4 advisory fields
+      // Quality validator: ensure arrays not emptied by soft-filter (consistent with Stage 5 pattern)
+      qualityValidator: data => {
+        const guidance = (data as Phase4Output)?.generation_guidance;
+        // After Zod soft-validation, arrays may be empty if all LLM values were unknown
+        // Return false to trigger retry instead of silent fallback in Phase5 assembly
+        const hasVisuals =
+          Array.isArray(guidance?.include_visuals) && guidance.include_visuals.length > 0;
+        const hasExercises =
+          Array.isArray(guidance?.exercise_types) && guidance.exercise_types.length > 0;
+        return hasVisuals && hasExercises;
+      },
     });
 
     const regenerationResult = await regenerator.regenerate({
@@ -251,7 +271,11 @@ ${m.content}`
 
       // UnifiedRegenerator succeeded - observability tracked by metrics
     } else {
-      console.error('[Phase 4] ALL REPAIR LAYERS EXHAUSTED');
+      // CR-007: Use structured logger instead of console.*
+      logger.error(
+        { phase: 'phase-4-synthesis', error: regenerationResult.error },
+        'ALL REPAIR LAYERS EXHAUSTED'
+      );
       throw new Error(
         `Failed to parse Phase 4 JSON after all 5 repair layers. Error: ${regenerationResult.error}`
       );
@@ -325,8 +349,6 @@ function buildPhase4Prompt(input: Phase4Input, documentCount: number): string {
   const category = phase1_output.course_category.primary;
   const totalLessons = phase2_output.recommended_structure.total_lessons;
   const totalSections = phase2_output.recommended_structure.total_sections;
-  const teachingStyle = phase3_output.pedagogical_strategy.teaching_style;
-  const practicalFocus = phase3_output.pedagogical_strategy.practical_focus;
   const researchFlagsCount = phase3_output.research_flags.length;
 
   // Build document summaries section with token-aware truncation
@@ -364,7 +386,6 @@ Course Topic: ${input.topic}
 Target Language: ${input.language} (for final course output)
 Category: ${category}
 Scope: ${totalLessons} lessons, ${totalSections} sections
-Pedagogy: ${teachingStyle}, ${practicalFocus} practical focus
 Document Count: ${documentCount}
 ${researchFlagsSection}
 

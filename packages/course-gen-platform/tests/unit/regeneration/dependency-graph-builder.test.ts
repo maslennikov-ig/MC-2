@@ -49,11 +49,8 @@ const mockAnalysisResult: AnalysisResult = {
     sections_breakdown: [],
   },
   pedagogical_strategy: {
-    teaching_style: 'hands-on',
     assessment_approach: 'Project-based',
-    practical_focus: 'high',
     progression_logic: 'Incremental complexity',
-    interactivity_level: 'high',
   },
   pedagogical_patterns: {
     primary_strategy: 'problem-based learning',
@@ -319,7 +316,7 @@ describe('buildDependencyGraphWithAnalysis', () => {
     const upstream = graph.getUpstream('lesson.0.0.learning_objectives');
 
     // Should include section LO and course LO
-    const upstreamIds = upstream.map((n) => n.id);
+    const upstreamIds = upstream.map(n => n.id);
     expect(upstreamIds).toContain('section.0.learning_objectives');
     expect(upstreamIds).toContain('course.learning_objectives');
   });
@@ -332,7 +329,7 @@ describe('buildDependencyGraphWithAnalysis', () => {
     // Should include all lessons
     // Note: May include transitive dependencies through sequential lesson links
     expect(downstream.length).toBeGreaterThanOrEqual(3);
-    const downstreamIds = downstream.map((n) => n.id);
+    const downstreamIds = downstream.map(n => n.id);
     expect(downstreamIds).toContain('section.0.lesson.0');
     expect(downstreamIds).toContain('section.0.lesson.1');
     expect(downstreamIds).toContain('section.1.lesson.0');
@@ -373,25 +370,23 @@ describe('buildDependencyGraphWithAnalysis', () => {
   it('should include PARENT_OF edges for hierarchical structure', () => {
     const graph = buildDependencyGraphWithAnalysis(mockAnalysisResult, mockCourseStructure);
 
-    const parentEdges = graph.edges.filter((e) => e.type === 'PARENT_OF');
+    const parentEdges = graph.edges.filter(e => e.type === 'PARENT_OF');
     expect(parentEdges.length).toBeGreaterThan(0);
 
     // Check course → section edge
-    const courseSectionEdge = parentEdges.find(
-      (e) => e.from === 'course' && e.to === 'section.0'
-    );
+    const courseSectionEdge = parentEdges.find(e => e.from === 'course' && e.to === 'section.0');
     expect(courseSectionEdge).toBeDefined();
   });
 
   it('should include PREREQUISITE_FOR edges for dependencies', () => {
     const graph = buildDependencyGraphWithAnalysis(mockAnalysisResult, mockCourseStructure);
 
-    const prereqEdges = graph.edges.filter((e) => e.type === 'PREREQUISITE_FOR');
+    const prereqEdges = graph.edges.filter(e => e.type === 'PREREQUISITE_FOR');
     expect(prereqEdges.length).toBeGreaterThan(0);
 
     // Check course LO → section LO edge
     const courseLOEdge = prereqEdges.find(
-      (e) => e.from === 'course.learning_objectives' && e.to === 'section.0.learning_objectives'
+      e => e.from === 'course.learning_objectives' && e.to === 'section.0.learning_objectives'
     );
     expect(courseLOEdge).toBeDefined();
   });

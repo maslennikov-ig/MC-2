@@ -1,11 +1,16 @@
 ---
-description: Automated release management with version bumping and dual changelog generation
+description: Create release (version bump + changelog) — NOT deployment
 argument-hint: [patch|minor|major] [-m "message"]
 ---
 
-Execute the release automation script with auto-confirmation for Claude Code.
+Create a new version release with changelog. **This is NOT deployment!**
+
+- For **Dev deploy**: just `git push` (auto-deploys to dev.ai.megacampus.ru)
+- For **Staging deploy**: use `/deploy` (merges to master → ai.megacampus.ru)
+- For **Release** (version): use `/push patch` (this command)
 
 **Features:**
+
 - Auto-syncs package.json versions with latest git tag (prevents version conflicts)
 - Analyzes commits since last release
 - Auto-detects version bump type from conventional commits
@@ -18,12 +23,14 @@ Execute the release automation script with auto-confirmation for Claude Code.
 - **Custom commit message** for uncommitted changes via `--message` / `-m` flag
 
 **Generated RELEASE_NOTES.md format:**
+
 - Friendly scope names (auth → Authentication, db → Database)
 - Emojis for visual clarity (✨ Features, 🐛 Fixes, 🔒 Security)
 - Skips technical commits (chore, ci, docs) not relevant to users
 - Ready to copy for announcements, app stores, emails
 
 **Tip:** Use `-m` with `feat:` or `fix:` prefix to include your changes in RELEASE_NOTES:
+
 ```bash
 /push patch -m "feat(worker): add worker readiness pre-flight system"
 ```
@@ -31,5 +38,6 @@ Execute the release automation script with auto-confirmation for Claude Code.
 **Usage:**
 
 # Navigate to project root first
+
 PROJECT_ROOT=$(git rev-parse --show-toplevel 2>/dev/null || echo "$PWD")
 cd "$PROJECT_ROOT" && bash .claude/scripts/release.sh $ARGUMENTS --yes

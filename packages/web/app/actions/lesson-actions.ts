@@ -193,3 +193,38 @@ export async function approveLessons(
     skippedCount: result?.skippedCount ?? 0,
   };
 }
+
+/**
+ * Export lessons in a module as Markdown
+ * Connects to trpc.lessonContent.exportLessons
+ *
+ * @param courseId - Course UUID
+ * @param moduleNumber - Module number (1-based)
+ */
+export async function exportModuleLessons(
+  courseId: string,
+  moduleNumber: number,
+  signal?: AbortSignal
+): Promise<{ content: string; filename: string; lessonsCount: number }> {
+  const headers = await getBackendAuthHeaders();
+
+  const response = await fetch(`${TRPC_URL}/lessonContent.exportLessons`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ courseId, moduleNumber }),
+    signal,
+  });
+
+  if (!response.ok) {
+    await extractApiError(response, 'Failed to export lessons');
+  }
+
+  const data = await response.json();
+  const result = data?.result?.data || data;
+
+  return {
+    content: result?.content ?? '',
+    filename: result?.filename ?? `module_${moduleNumber}_export.md`,
+    lessonsCount: result?.lessonsCount ?? 0,
+  };
+}

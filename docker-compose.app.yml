@@ -13,7 +13,7 @@ services:
     container_name: megacampus-web-${COLOR:-blue}
     restart: unless-stopped
     ports:
-      - "127.0.0.1:${WEB_PORT:-3000}:3000"
+      - '127.0.0.1:${WEB_PORT:-3000}:3000'
     env_file:
       - .env.production
     environment:
@@ -22,7 +22,13 @@ services:
       - NEXT_PUBLIC_SITE_URL=${NEXT_PUBLIC_SITE_URL:-https://megacampus.ai}
       - NEXT_PUBLIC_API_URL=http://megacampus-api-${COLOR:-blue}:4000
     healthcheck:
-      test: ["CMD", "node", "-e", "require('http').get('http://localhost:3000/api/health', (r) => {r.statusCode === 200 ? process.exit(0) : process.exit(1)}).on('error', () => process.exit(1))"]
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "require('http').get('http://localhost:3000/api/health', (r) => {r.statusCode === 200 ? process.exit(0) : process.exit(1)}).on('error', () => process.exit(1))",
+        ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -35,10 +41,10 @@ services:
           cpus: '2'
           memory: 2G
     logging:
-      driver: "json-file"
+      driver: 'json-file'
       options:
-        max-size: "50m"
-        max-file: "3"
+        max-size: '50m'
+        max-file: '3'
 
   # API Server (Express + tRPC)
   api:
@@ -46,7 +52,7 @@ services:
     container_name: megacampus-api-${COLOR:-blue}
     restart: unless-stopped
     ports:
-      - "127.0.0.1:${API_PORT:-4000}:4000"
+      - '127.0.0.1:${API_PORT:-4000}:4000'
     env_file:
       - .env.production
     environment:
@@ -57,7 +63,13 @@ services:
     volumes:
       - ./data/uploads:/app/uploads
     healthcheck:
-      test: ["CMD", "node", "-e", "require('http').get('http://localhost:4000/health', (r) => {r.statusCode === 200 ? process.exit(0) : process.exit(1)}).on('error', () => process.exit(1))"]
+      test:
+        [
+          'CMD',
+          'node',
+          '-e',
+          "require('http').get('http://localhost:4000/health', (r) => {r.statusCode === 200 ? process.exit(0) : process.exit(1)}).on('error', () => process.exit(1))",
+        ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -70,10 +82,10 @@ services:
           cpus: '2'
           memory: 2G
     logging:
-      driver: "json-file"
+      driver: 'json-file'
       options:
-        max-size: "50m"
-        max-file: "3"
+        max-size: '50m'
+        max-file: '3'
 
 networks:
   megacampus:

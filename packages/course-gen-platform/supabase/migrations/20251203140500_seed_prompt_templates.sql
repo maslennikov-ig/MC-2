@@ -241,11 +241,8 @@ SCOPE:
 TASK 1: DESIGN PEDAGOGICAL STRATEGY
 
 Design a comprehensive pedagogical strategy:
-1. teaching_style: hands-on, theory-first, project-based, or mixed
-2. assessment_approach: Describe assessment strategy (min 50 chars)
-3. practical_focus: high, medium, or low
-4. progression_logic: Explain learning progression (min 100 chars)
-5. interactivity_level: high, medium, or low
+1. assessment_approach: Describe how learners demonstrate understanding (min 50 chars)
+2. progression_logic: Explain how difficulty increases across lessons (min 100 chars)
 
 TASK 2: IDENTIFY EXPANSION AREAS (if information_completeness < 80%)
 

@@ -58,6 +58,10 @@ export interface CourseSizePreset {
   targetLessons: number;
   /** Target sections count (recommendation, not constraint) */
   targetSections: number;
+  /** Minimum lessons count (hard constraint for validation) */
+  minLessons: number;
+  /** Maximum lessons count (soft constraint, ±20% tolerance) */
+  maxLessons: number;
   /** Estimated hours range minimum (for UI display) */
   estimatedHoursMin: number;
   /** Estimated hours range maximum (for UI display) */
@@ -76,6 +80,8 @@ export const COURSE_SIZE_PRESETS: Record<PresetCourseSize, CourseSizePreset> = {
     size: 'micro',
     targetLessons: 3,
     targetSections: 1,
+    minLessons: 1, // MICRO can have as few as 1 lesson
+    maxLessons: 5,
     estimatedHoursMin: 0.25,
     estimatedHoursMax: 1,
     llmGuidance:
@@ -87,6 +93,8 @@ export const COURSE_SIZE_PRESETS: Record<PresetCourseSize, CourseSizePreset> = {
     size: 'mini',
     targetLessons: 10,
     targetSections: 3,
+    minLessons: 8, // MINI minimum is 8 lessons
+    maxLessons: 16,
     estimatedHoursMin: 1,
     estimatedHoursMax: 3,
     llmGuidance:
@@ -98,6 +106,8 @@ export const COURSE_SIZE_PRESETS: Record<PresetCourseSize, CourseSizePreset> = {
     size: 'compact',
     targetLessons: 20,
     targetSections: 5,
+    minLessons: 15, // COMPACT minimum is 15 lessons
+    maxLessons: 30,
     estimatedHoursMin: 3,
     estimatedHoursMax: 8,
     llmGuidance:
@@ -109,6 +119,8 @@ export const COURSE_SIZE_PRESETS: Record<PresetCourseSize, CourseSizePreset> = {
     size: 'standard',
     targetLessons: 40,
     targetSections: 8,
+    minLessons: 30, // STANDARD minimum is 30 lessons
+    maxLessons: 50,
     estimatedHoursMin: 8,
     estimatedHoursMax: 20,
     llmGuidance:
@@ -120,6 +132,8 @@ export const COURSE_SIZE_PRESETS: Record<PresetCourseSize, CourseSizePreset> = {
     size: 'comprehensive',
     targetLessons: 80,
     targetSections: 15,
+    minLessons: 60, // COMPREHENSIVE minimum is 60 lessons
+    maxLessons: 100,
     estimatedHoursMin: 20,
     estimatedHoursMax: 50,
     llmGuidance:

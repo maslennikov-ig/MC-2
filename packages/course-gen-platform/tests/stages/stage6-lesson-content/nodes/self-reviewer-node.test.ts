@@ -27,8 +27,8 @@ import { LLMClient } from '@/shared/llm';
 // ============================================================================
 
 // Mock logger to avoid console noise during tests
-vi.mock('@/shared/logger', () => ({
-  logger: {
+vi.mock('@/shared/logger', () => {
+  const mockLogger = {
     child: () => ({
       info: vi.fn(),
       warn: vi.fn(),
@@ -39,8 +39,12 @@ vi.mock('@/shared/logger', () => ({
     warn: vi.fn(),
     debug: vi.fn(),
     error: vi.fn(),
-  },
-}));
+  };
+  return {
+    logger: mockLogger,
+    default: mockLogger,
+  };
+});
 
 // Mock trace logger
 vi.mock('@/shared/trace-logger', () => ({
@@ -95,6 +99,13 @@ vi.mock('@/shared/llm/model-config-service', () => ({
   }),
 }));
 
+// Mock database-service to prevent actual Supabase calls
+vi.mock('@/stages/stage6-lesson-content/services/database-service', () => ({
+  saveRejectedContent: vi.fn().mockResolvedValue(undefined),
+  saveLessonContent: vi.fn().mockResolvedValue(undefined),
+  updateCourseProgress: vi.fn().mockResolvedValue(undefined),
+}));
+
 // ============================================================================
 // TEST FIXTURES
 // ============================================================================
@@ -102,7 +113,9 @@ vi.mock('@/shared/llm/model-config-service', () => ({
 /**
  * Create minimal valid lesson specification
  */
-function createMockLessonSpec(overrides: Partial<LessonSpecificationV2> = {}): LessonSpecificationV2 {
+function createMockLessonSpec(
+  overrides: Partial<LessonSpecificationV2> = {}
+): LessonSpecificationV2 {
   return {
     lesson_id: 'test-lesson-1',
     title: 'Test Lesson Title',
@@ -151,7 +164,8 @@ function createMockState(overrides: Partial<LessonGraphStateType> = {}): LessonG
     ragContextId: null,
     userRefinementPrompt: null,
     modelOverride: null,
-    generatedContent: 'Это полноценный текст урока с достаточным количеством символов для прохождения проверки. Текст должен быть достаточно длинным и содержать полезную информацию. Урок завершается правильно с корректной пунктуацией.',
+    generatedContent:
+      'Это полноценный текст урока с достаточным количеством символов для прохождения проверки. Текст должен быть достаточно длинным и содержать полезную информацию. Урок завершается правильно с корректной пунктуацией.',
     sectionProgress: 0,
     selfReviewResult: null,
     lessonContent: null,
@@ -320,7 +334,7 @@ TypeScript — это мощный инструмент с нескольким�
 
     // If there are issues, check they are INFO level
     if (result.selfReviewResult!.issues.length > 0) {
-      const criticalIssues = result.selfReviewResult!.issues.filter((i) => i.severity === 'CRITICAL');
+      const criticalIssues = result.selfReviewResult!.issues.filter(i => i.severity === 'CRITICAL');
       expect(criticalIssues).toHaveLength(0);
     }
   });
@@ -347,7 +361,7 @@ const x: number = 42;
     expect(['PASS', 'PASS_WITH_FLAGS']).toContain(result.selfReviewResult!.status);
 
     if (result.selfReviewResult!.status === 'PASS_WITH_FLAGS') {
-      expect(result.selfReviewResult!.issues.some((i) => i.severity === 'INFO')).toBe(true);
+      expect(result.selfReviewResult!.issues.some(i => i.severity === 'INFO')).toBe(true);
     }
   });
 
@@ -428,7 +442,7 @@ describe('selfReviewerNode - REGENERATE cases', () => {
 
     // Check for CRITICAL language issue
     const criticalIssue = result.selfReviewResult!.issues.find(
-      (i) => i.type === 'LANGUAGE' && i.severity === 'CRITICAL'
+      i => i.type === 'LANGUAGE' && i.severity === 'CRITICAL'
     );
     expect(criticalIssue).toBeDefined();
     expect(criticalIssue!.description).toContain('foreign characters');
@@ -451,7 +465,7 @@ describe('selfReviewerNode - REGENERATE cases', () => {
 
     // Check for CRITICAL truncation issue
     const criticalIssue = result.selfReviewResult!.issues.find(
-      (i) => i.type === 'TRUNCATION' && i.severity === 'CRITICAL'
+      i => i.type === 'TRUNCATION' && i.severity === 'CRITICAL'
     );
     expect(criticalIssue).toBeDefined();
   });
@@ -472,7 +486,7 @@ describe('selfReviewerNode - REGENERATE cases', () => {
     expect(['REGENERATE', 'PASS_WITH_FLAGS']).toContain(result.selfReviewResult!.status);
 
     // Should have at least one truncation issue
-    const truncationIssue = result.selfReviewResult!.issues.find((i) => i.type === 'TRUNCATION');
+    const truncationIssue = result.selfReviewResult!.issues.find(i => i.type === 'TRUNCATION');
     expect(truncationIssue).toBeDefined();
   });
 
@@ -504,7 +518,7 @@ describe('selfReviewerNode - REGENERATE cases', () => {
     expect(['REGENERATE', 'PASS_WITH_FLAGS']).toContain(result.selfReviewResult!.status);
 
     // Should have at least one truncation issue detected
-    const truncationIssue = result.selfReviewResult!.issues.find((i) => i.type === 'TRUNCATION');
+    const truncationIssue = result.selfReviewResult!.issues.find(i => i.type === 'TRUNCATION');
     expect(truncationIssue).toBeDefined();
   });
 });
@@ -536,8 +550,12 @@ describe('selfReviewerNode - Heuristic details', () => {
 
     expect(result.selfReviewResult!.heuristicDetails).toBeDefined();
     expect(result.selfReviewResult!.heuristicDetails!.languageCheck).toBeDefined();
-    expect(result.selfReviewResult!.heuristicDetails!.languageCheck.foreignCharacters).toBeGreaterThanOrEqual(0);
-    expect(result.selfReviewResult!.heuristicDetails!.languageCheck.scriptsFound).toBeInstanceOf(Array);
+    expect(
+      result.selfReviewResult!.heuristicDetails!.languageCheck.foreignCharacters
+    ).toBeGreaterThanOrEqual(0);
+    expect(result.selfReviewResult!.heuristicDetails!.languageCheck.scriptsFound).toBeInstanceOf(
+      Array
+    );
   });
 
   it('should include truncationCheck details with issue list', async () => {
@@ -752,7 +770,7 @@ const x = 42;
 
     expect(result.selfReviewResult!.status).toBe('REGENERATE');
 
-    const truncationIssue = result.selfReviewResult!.issues.find((i) => i.type === 'TRUNCATION');
+    const truncationIssue = result.selfReviewResult!.issues.find(i => i.type === 'TRUNCATION');
     expect(truncationIssue).toBeDefined();
     expect(truncationIssue!.description).toContain('Unmatched code blocks');
   });
@@ -788,7 +806,7 @@ describe('selfReviewerNode - Issue aggregation', () => {
     expect(result.selfReviewResult!.heuristicsPassed).toBe(true);
 
     // All issues (if any) should be INFO level, not CRITICAL
-    const criticalIssues = result.selfReviewResult!.issues.filter((i) => i.severity === 'CRITICAL');
+    const criticalIssues = result.selfReviewResult!.issues.filter(i => i.severity === 'CRITICAL');
     expect(criticalIssues).toHaveLength(0);
   });
 
@@ -796,7 +814,8 @@ describe('selfReviewerNode - Issue aggregation', () => {
     const state = createMockState({
       language: 'ru',
       // Many foreign characters (>20) + very short (<200 chars) + incomplete ending = multiple CRITICAL issues
-      generatedContent: 'Текст 中文字符很多更多文字测试内容包含大量外来字符日本語のテキストもここにあります한국어 텍스트',
+      generatedContent:
+        'Текст 中文字符很多更多文字测试内容包含大量外来字符日本語のテキストもここにあります한국어 텍스트',
     });
 
     const result = await selfReviewerNode(state);
@@ -805,7 +824,7 @@ describe('selfReviewerNode - Issue aggregation', () => {
     expect(result.selfReviewResult!.heuristicsPassed).toBe(false);
 
     // Should have multiple CRITICAL issues
-    const criticalIssues = result.selfReviewResult!.issues.filter((i) => i.severity === 'CRITICAL');
+    const criticalIssues = result.selfReviewResult!.issues.filter(i => i.severity === 'CRITICAL');
     expect(criticalIssues.length).toBeGreaterThan(0);
   });
 
@@ -1003,12 +1022,15 @@ describe('selfReviewerNode - LLM Response Parsing', () => {
 
   it('should extract JSON from markdown code block in LLM response', async () => {
     mockGenerateCompletion.mockResolvedValueOnce({
-      content: '```json\n' + JSON.stringify({
-        status: 'PASS',
-        reasoning: 'Content passed semantic review',
-        issues: [],
-        patched_content: null,
-      }) + '\n```',
+      content:
+        '```json\n' +
+        JSON.stringify({
+          status: 'PASS',
+          reasoning: 'Content passed semantic review',
+          issues: [],
+          patched_content: null,
+        }) +
+        '\n```',
       inputTokens: 200,
       outputTokens: 300,
       totalTokens: 500,
@@ -1051,11 +1073,15 @@ describe('selfReviewerNode - patchedContent Validation', () => {
   it('should accept valid patchedContent and update state', async () => {
     // validPatch must conform to LessonContentBodySchema
     const validPatch = {
-      intro: 'Это вводная часть урока с исправленным содержимым. Достаточно длинный текст для прохождения валидации минимальной длины intro.',
-      sections: [{
-        title: 'Первый раздел',
-        content: 'Исправленное содержимое раздела с достаточным количеством слов для прохождения проверки. Этот текст должен быть достаточно длинным.',
-      }],
+      intro:
+        'Это вводная часть урока с исправленным содержимым. Достаточно длинный текст для прохождения валидации минимальной длины intro.',
+      sections: [
+        {
+          title: 'Первый раздел',
+          content:
+            'Исправленное содержимое раздела с достаточным количеством слов для прохождения проверки. Этот текст должен быть достаточно длинным.',
+        },
+      ],
       examples: [],
       exercises: [],
     };
@@ -1064,12 +1090,14 @@ describe('selfReviewerNode - patchedContent Validation', () => {
       content: JSON.stringify({
         status: 'FIXED',
         reasoning: 'Fixed hygiene issues with proper Russian grammar',
-        issues: [{
-          type: 'HYGIENE',
-          severity: 'FIXABLE',
-          location: 'intro',
-          description: 'Fixed grammar issues in introduction',
-        }],
+        issues: [
+          {
+            type: 'HYGIENE',
+            severity: 'FIXABLE',
+            location: 'intro',
+            description: 'Fixed grammar issues in introduction',
+          },
+        ],
         patched_content: validPatch,
       }),
       inputTokens: 200,
@@ -1096,12 +1124,14 @@ describe('selfReviewerNode - patchedContent Validation', () => {
       content: JSON.stringify({
         status: 'FLAG_TO_JUDGE',
         reasoning: 'Potential factual inaccuracies detected, requires expert review',
-        issues: [{
-          type: 'HALLUCINATION',
-          severity: 'CRITICAL',
-          location: 'section_1',
-          description: 'Claim requires verification against RAG context',
-        }],
+        issues: [
+          {
+            type: 'HALLUCINATION',
+            severity: 'CRITICAL',
+            location: 'section_1',
+            description: 'Claim requires verification against RAG context',
+          },
+        ],
         patched_content: null,
       }),
       inputTokens: 200,
@@ -1130,12 +1160,14 @@ describe('selfReviewerNode - patchedContent Validation', () => {
       content: JSON.stringify({
         status: 'PASS_WITH_FLAGS',
         reasoning: 'Content passed with minor observations about tone consistency',
-        issues: [{
-          type: 'HYGIENE',
-          severity: 'INFO',
-          location: 'section_2',
-          description: 'Tone slightly inconsistent with metadata.tone',
-        }],
+        issues: [
+          {
+            type: 'HYGIENE',
+            severity: 'INFO',
+            location: 'section_2',
+            description: 'Tone slightly inconsistent with metadata.tone',
+          },
+        ],
         patched_content: null,
       }),
       inputTokens: 200,
@@ -1186,20 +1218,24 @@ describe('selfReviewerNode - Content Parsing Edge Cases', () => {
     // In practice, heuristics run on the RAW string (including ```json markers),
     // which can trigger truncation failures. This is expected behavior.
     const validContent = {
-      intro: 'Это вводная часть урока с достаточным количеством текста для прохождения всех проверок качества. Введение должно быть информативным и полезным для студентов. Мы рассмотрим основные концепции и подготовим основу для дальнейшего изучения материала.',
+      intro:
+        'Это вводная часть урока с достаточным количеством текста для прохождения всех проверок качества. Введение должно быть информативным и полезным для студентов. Мы рассмотрим основные концепции и подготовим основу для дальнейшего изучения материала.',
       sections: [
         {
           section_id: 'sec_1',
           section_title: 'Первый раздел',
-          content: 'Содержимое первого раздела достаточной длины для прохождения валидации. Текст должен быть информативным и полезным, содержать примеры и пояснения. Мы подробно разберем каждую концепцию и предоставим практические рекомендации.',
+          content:
+            'Содержимое первого раздела достаточной длины для прохождения валидации. Текст должен быть информативным и полезным, содержать примеры и пояснения. Мы подробно разберем каждую концепцию и предоставим практические рекомендации.',
         },
         {
           section_id: 'sec_2',
           section_title: 'Второй раздел',
-          content: 'Содержимое второго раздела с дополнительной информацией и примерами. Каждый раздел строится на предыдущем материале и расширяет понимание темы. Студенты смогут применить полученные знания на практике.',
+          content:
+            'Содержимое второго раздела с дополнительной информацией и примерами. Каждый раздел строится на предыдущем материале и расширяет понимание темы. Студенты смогут применить полученные знания на практике.',
         },
       ],
-      summary: 'Заключение урока с достаточной информацией и подведением итогов. Мы рассмотрели все ключевые концепции и готовы применить их на практике. Использование полученных знаний поможет в дальнейшей работе.',
+      summary:
+        'Заключение урока с достаточной информацией и подведением итогов. Мы рассмотрели все ключевые концепции и готовы применить их на практике. Использование полученных знаний поможет в дальнейшей работе.',
     };
 
     const state = createMockState({

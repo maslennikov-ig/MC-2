@@ -21,6 +21,10 @@ import 'dotenv/config';
 import { setMaxListeners } from 'events';
 import { startWorker } from './worker';
 import logger from '../shared/logger';
+import {
+  createStage6Worker,
+  gracefulShutdown as gracefulShutdownStage6,
+} from '../stages/stage6-lesson-content/factory';
 
 // Increase max listeners globally to prevent MaxListenersExceededWarning
 // during parallel LLM requests with AbortSignal timeouts
@@ -250,7 +254,51 @@ async function main() {
       'ModelConfigBunker initialized'
     );
 
-    // Start worker with default concurrency (5)
+    // Check if this is a dedicated Stage 6 worker
+    // Stage 6 has its own queue with 30 concurrent workers for I/O-bound LLM operations
+    // @see docs/plans/sprightly-wondering-widget.md
+    if (process.env.STAGE6_WORKER === 'true') {
+      logger.info('Starting dedicated Stage 6 worker (30 concurrent)...');
+
+      const stage6Worker = createStage6Worker();
+
+      // Handle graceful shutdown for Stage 6 worker
+      const shutdownStage6 = () => {
+        logger.info('Received shutdown signal for Stage 6 worker');
+        stopMemoryMonitoring();
+        stopReadinessHeartbeat();
+        const bunker = getModelConfigBunker();
+        if (bunker.isInitialized()) {
+          bunker.shutdown();
+        }
+        gracefulShutdownStage6(stage6Worker)
+          .then(() => process.exit(0))
+          .catch(err => {
+            logger.error({ err }, 'Error during Stage 6 worker shutdown');
+            process.exit(1);
+          });
+      };
+
+      process.on('SIGINT', shutdownStage6);
+      process.on('SIGTERM', shutdownStage6);
+
+      // Start readiness heartbeat for Stage 6 worker
+      startReadinessHeartbeat();
+
+      logger.info(
+        {
+          queueName: 'stage6-lesson-content',
+          concurrency: 30,
+          mode: 'dedicated',
+        },
+        'Stage 6 worker started successfully'
+      );
+
+      // Keep process running
+      return;
+    }
+
+    // Start general worker with default concurrency (5)
     // Adjust concurrency based on server resources:
     // - Development: 2-5 concurrent jobs
     // - Production: 10-20 concurrent jobs (monitor CPU/memory)

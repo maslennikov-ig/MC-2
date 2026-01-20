@@ -18,10 +18,20 @@ import { enrichmentStatusSchema } from './lesson-enrichment';
 /**
  * Enrichment types that can be generated on-demand
  *
- * Only includes types that users can trigger from the course viewer UI.
- * Excludes auto-generated visual types (cover, card, banner).
+ * Includes types that users can trigger from the course viewer UI:
+ * - quiz: Interactive quizzes
+ * - audio: Lesson narration
+ * - presentation: Slide decks
+ * - cover: Lesson hero images (16:9 banners)
+ * - card: Lesson thumbnails (1:1 square images)
  */
-export const onDemandEnrichmentTypeSchema = z.enum(['quiz', 'audio', 'presentation']);
+export const onDemandEnrichmentTypeSchema = z.enum([
+  'quiz',
+  'audio',
+  'presentation',
+  'cover',
+  'card',
+]);
 export type OnDemandEnrichmentType = z.infer<typeof onDemandEnrichmentTypeSchema>;
 
 // ============================================================================
@@ -98,6 +108,29 @@ export const onDemandPresentationSettingsSchema = z.object({
 export type OnDemandPresentationSettings = z.infer<typeof onDemandPresentationSettingsSchema>;
 
 /**
+ * Simplified image settings for on-demand API
+ *
+ * User-facing settings for cover/card image generation requests.
+ * These are transformed into full ImageSettings for workers.
+ *
+ * @example
+ * ```typescript
+ * const settings: OnDemandImageSettings = {
+ *   style: 'realistic',
+ *   colorScheme: 'warm'
+ * };
+ * ```
+ */
+export const onDemandImageSettingsSchema = z.object({
+  /** Visual style for image generation */
+  style: z.enum(['realistic', 'abstract', 'minimalist', 'dramatic']).default('realistic'),
+
+  /** Color scheme preference */
+  colorScheme: z.enum(['auto', 'warm', 'cool', 'monochrome']).default('auto'),
+});
+export type OnDemandImageSettings = z.infer<typeof onDemandImageSettingsSchema>;
+
+/**
  * Union type for all on-demand enrichment settings
  *
  * These are simplified, user-facing settings that differ from
@@ -106,7 +139,8 @@ export type OnDemandPresentationSettings = z.infer<typeof onDemandPresentationSe
 export type OnDemandEnrichmentSettings =
   | OnDemandQuizSettings
   | OnDemandAudioSettings
-  | OnDemandPresentationSettings;
+  | OnDemandPresentationSettings
+  | OnDemandImageSettings;
 
 /**
  * Generation steps for progress tracking in UI
@@ -152,6 +186,7 @@ export const generateOnDemandInputSchema = z.object({
       onDemandQuizSettingsSchema,
       onDemandAudioSettingsSchema,
       onDemandPresentationSettingsSchema,
+      onDemandImageSettingsSchema,
     ])
     .optional(),
 });

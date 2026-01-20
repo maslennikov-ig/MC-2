@@ -340,8 +340,10 @@
     "status": {
       "new": "Новый",
       "in_progress": "В работе",
+      "to_verify": "На проверке",
       "resolved": "Решено",
-      "ignored": "Игнорируется"
+      "ignored": "Игнорируется",
+      "auto_muted": "Авто-игнор"
     },
     "levels": {
       "WARNING": "Предупреждение",

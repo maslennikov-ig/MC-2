@@ -1,55 +1,69 @@
-'use client';
+'use client'
 
-import * as React from 'react';
-import { useEffect, useRef, useState, useId } from 'react';
-import mermaid from 'mermaid';
-import { cn } from '@/lib/utils';
-import type { MermaidDiagramProps } from '../types';
+import * as React from 'react'
+import { useEffect, useRef, useState, useId } from 'react'
+import mermaid from 'mermaid'
+import { cn } from '@/lib/utils'
+import type { MermaidDiagramProps } from '../types'
 
 /**
  * Theme colors for dark mode
  */
 const DARK_COLORS = {
-  nodeBg: '#1e3a5f',        // dark blue node bg
-  nodeText: '#f1f5f9',      // slate-100
-  nodeBorder: '#38bdf8',    // sky-400
-  lineColor: '#94a3b8',     // slate-400
-  textColor: '#e2e8f0',     // slate-200
-  clusterBg: '#1e293b',     // slate-800
+  nodeBg: '#1e3a5f', // dark blue node bg
+  nodeText: '#f1f5f9', // slate-100
+  nodeBorder: '#38bdf8', // sky-400
+  lineColor: '#94a3b8', // slate-400
+  textColor: '#e2e8f0', // slate-200
+  clusterBg: '#1e293b', // slate-800
   clusterBorder: '#475569', // slate-600
-  startNodeBg: '#34d399',   // emerald-400 aligns with dark-mode success palette
+  startNodeBg: '#34d399', // emerald-400 aligns with dark-mode success palette
   startNodeBorder: '#10b981', // emerald-500 ensures contrast on slate backgrounds
-  endNodeBg: '#f87171',     // red-400 stands out while remaining readable in dark UI
+  endNodeBg: '#f87171', // red-400 stands out while remaining readable in dark UI
   endNodeBorder: '#fecaca', // red-200 border provides clear outline on dark bg
-};
+}
 
 /**
  * Theme colors for light mode
  */
 const LIGHT_COLORS = {
-  nodeBg: '#e0f2fe',        // sky-100
-  nodeText: '#0f172a',      // slate-900
-  nodeBorder: '#0ea5e9',    // sky-500
-  lineColor: '#64748b',     // slate-500
-  textColor: '#334155',     // slate-700
-  clusterBg: '#f1f5f9',     // slate-100
+  nodeBg: '#e0f2fe', // sky-100
+  nodeText: '#0f172a', // slate-900
+  nodeBorder: '#0ea5e9', // sky-500
+  lineColor: '#64748b', // slate-500
+  textColor: '#334155', // slate-700
+  clusterBg: '#f1f5f9', // slate-100
   clusterBorder: '#cbd5e1', // slate-300
-  startNodeBg: '#059669',   // emerald-600 keeps consistency with accept states
+  startNodeBg: '#059669', // emerald-600 keeps consistency with accept states
   startNodeBorder: '#047857', // emerald-700 for clear delineation
-  endNodeBg: '#dc2626',     // red-600 = critical/stop color in product palette
+  endNodeBg: '#dc2626', // red-600 = critical/stop color in product palette
   endNodeBorder: '#7f1d1d', // red-800 stroke maintains WCAG contrast
-};
+}
 
 /**
  * Mermaid default colors that need to be replaced
  */
 const MERMAID_DEFAULT_COLORS = [
-  '#f9f', '#ff0', '#faf', '#faa', '#afa', '#aff', '#aaf',
-  '#ffcccc', '#ffffcc', '#ccffcc', '#ccccff', '#ffccff',
-  'rgb(255, 153, 255)', 'rgb(255, 255, 0)',
-  '#ECECFF', '#9370DB', '#8B008B',
-  '#f2f2f2', '#ececff',
-];
+  '#f9f',
+  '#ff0',
+  '#faf',
+  '#faa',
+  '#afa',
+  '#aff',
+  '#aaf',
+  '#ffcccc',
+  '#ffffcc',
+  '#ccffcc',
+  '#ccccff',
+  '#ffccff',
+  'rgb(255, 153, 255)',
+  'rgb(255, 255, 0)',
+  '#ECECFF',
+  '#9370DB',
+  '#8B008B',
+  '#f2f2f2',
+  '#ececff',
+]
 
 /**
  * Named CSS colors mapped to their HEX equivalents
@@ -75,43 +89,43 @@ const NAMED_COLORS: Record<string, string> = {
   lime: '#00FF00',
   cyan: '#00FFFF',
   magenta: '#FF00FF',
-};
+}
 
 /**
  * Parse color string to RGB values [0-255]
  * Supports: HEX (#RGB, #RRGGBB), RGB(r,g,b), RGBA(r,g,b,a), named colors
  */
 function parseColor(color: string): [number, number, number] | null {
-  const normalized = color.toLowerCase().trim();
+  const normalized = color.toLowerCase().trim()
 
   // Named colors
   if (NAMED_COLORS[normalized]) {
-    return parseColor(NAMED_COLORS[normalized]);
+    return parseColor(NAMED_COLORS[normalized])
   }
 
   // HEX: #RGB or #RRGGBB
   if (normalized.startsWith('#')) {
-    const hex = normalized.slice(1);
+    const hex = normalized.slice(1)
     if (hex.length === 3) {
-      const r = parseInt(hex[0] + hex[0], 16);
-      const g = parseInt(hex[1] + hex[1], 16);
-      const b = parseInt(hex[2] + hex[2], 16);
-      return [r, g, b];
+      const r = parseInt(hex[0] + hex[0], 16)
+      const g = parseInt(hex[1] + hex[1], 16)
+      const b = parseInt(hex[2] + hex[2], 16)
+      return [r, g, b]
     } else if (hex.length === 6) {
-      const r = parseInt(hex.slice(0, 2), 16);
-      const g = parseInt(hex.slice(2, 4), 16);
-      const b = parseInt(hex.slice(4, 6), 16);
-      return [r, g, b];
+      const r = parseInt(hex.slice(0, 2), 16)
+      const g = parseInt(hex.slice(2, 4), 16)
+      const b = parseInt(hex.slice(4, 6), 16)
+      return [r, g, b]
     }
   }
 
   // RGB or RGBA: rgb(r, g, b) or rgba(r, g, b, a)
-  const rgbMatch = normalized.match(/rgba?\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/);
+  const rgbMatch = normalized.match(/rgba?\s*\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)/)
   if (rgbMatch) {
-    return [parseInt(rgbMatch[1]), parseInt(rgbMatch[2]), parseInt(rgbMatch[3])];
+    return [parseInt(rgbMatch[1]), parseInt(rgbMatch[2]), parseInt(rgbMatch[3])]
   }
 
-  return null;
+  return null
 }
 
 /**
@@ -125,129 +139,139 @@ function parseColor(color: string): [number, number, number] | null {
  * https://www.w3.org/TR/WCAG21/#dfn-relative-luminance
  */
 function isLightColor(color: string): boolean {
-  const rgb = parseColor(color);
-  if (!rgb) return false;
+  const rgb = parseColor(color)
+  if (!rgb) return false
 
-  const [r, g, b] = rgb;
-  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255;
+  const [r, g, b] = rgb
+  const luminance = (0.299 * r + 0.587 * g + 0.114 * b) / 255
 
-  return luminance > 0.5;
+  return luminance > 0.5
 }
 
 /**
  * Post-process SVG to replace Mermaid's default colors with our theme colors
  */
 function postProcessSvg(container: HTMLElement, isDark: boolean): void {
-  const colors = isDark ? DARK_COLORS : LIGHT_COLORS;
+  const colors = isDark ? DARK_COLORS : LIGHT_COLORS
 
   // Replace default colors in all elements
   container.querySelectorAll('*').forEach((el) => {
-    const element = el as SVGElement;
+    const element = el as SVGElement
 
-    const fill = element.getAttribute('fill');
+    const fill = element.getAttribute('fill')
     if (fill) {
-      const normalizedFill = fill.toLowerCase().trim();
-      if (MERMAID_DEFAULT_COLORS.some(c => normalizedFill === c.toLowerCase())) {
-        element.setAttribute('fill', colors.nodeBg);
+      const normalizedFill = fill.toLowerCase().trim()
+      if (MERMAID_DEFAULT_COLORS.some((c) => normalizedFill === c.toLowerCase())) {
+        element.setAttribute('fill', colors.nodeBg)
       }
     }
 
     if (element.style?.fill) {
-      const styleFill = element.style.fill.toLowerCase().trim();
-      if (MERMAID_DEFAULT_COLORS.some(c => styleFill === c.toLowerCase() || styleFill.includes(c.toLowerCase()))) {
-        element.style.fill = colors.nodeBg;
+      const styleFill = element.style.fill.toLowerCase().trim()
+      if (
+        MERMAID_DEFAULT_COLORS.some(
+          (c) => styleFill === c.toLowerCase() || styleFill.includes(c.toLowerCase())
+        )
+      ) {
+        element.style.fill = colors.nodeBg
       }
     }
 
-    const stroke = element.getAttribute('stroke');
+    const stroke = element.getAttribute('stroke')
     if (stroke) {
-      const normalizedStroke = stroke.toLowerCase().trim();
-      if (MERMAID_DEFAULT_COLORS.some(c => normalizedStroke === c.toLowerCase())) {
-        element.setAttribute('stroke', colors.nodeBorder);
+      const normalizedStroke = stroke.toLowerCase().trim()
+      if (MERMAID_DEFAULT_COLORS.some((c) => normalizedStroke === c.toLowerCase())) {
+        element.setAttribute('stroke', colors.nodeBorder)
       }
     }
-  });
+  })
 
   // Force node styling
-  container.querySelectorAll('.node rect, .node circle, .node ellipse, .node polygon, .node path').forEach((el) => {
-    const element = el as SVGElement;
-    element.setAttribute('fill', colors.nodeBg);
-    element.setAttribute('stroke', colors.nodeBorder);
-    element.style.fill = colors.nodeBg;
-    element.style.stroke = colors.nodeBorder;
-  });
+  container
+    .querySelectorAll('.node rect, .node circle, .node ellipse, .node polygon, .node path')
+    .forEach((el) => {
+      const element = el as SVGElement
+      element.setAttribute('fill', colors.nodeBg)
+      element.setAttribute('stroke', colors.nodeBorder)
+      element.style.fill = colors.nodeBg
+      element.style.stroke = colors.nodeBorder
+    })
 
   // Force text colors
   container.querySelectorAll('.nodeLabel, .node text, .label text').forEach((el) => {
-    const element = el as SVGElement;
-    element.setAttribute('fill', colors.nodeText);
-    element.style.fill = colors.nodeText;
-  });
+    const element = el as SVGElement
+    element.setAttribute('fill', colors.nodeText)
+    element.style.fill = colors.nodeText
+  })
 
   // Force edge/arrow colors
   container.querySelectorAll('.edge-pattern-solid, .flowchart-link, path.path').forEach((el) => {
-    const element = el as SVGElement;
-    element.setAttribute('stroke', colors.lineColor);
-    element.style.stroke = colors.lineColor;
-  });
+    const element = el as SVGElement
+    element.setAttribute('stroke', colors.lineColor)
+    element.style.stroke = colors.lineColor
+  })
 
   // Force arrowhead colors
   container.querySelectorAll('marker path').forEach((el) => {
-    const element = el as SVGElement;
-    element.setAttribute('fill', colors.lineColor);
-    element.style.fill = colors.lineColor;
-  });
+    const element = el as SVGElement
+    element.setAttribute('fill', colors.lineColor)
+    element.style.fill = colors.lineColor
+  })
 
   // State diagrams use dedicated start/end markers that need higher contrast.
   container.querySelectorAll('.state-start').forEach((el) => {
-    const element = el as SVGElement;
-    const hasEndSibling = element.parentElement?.querySelector('.state-end');
+    const element = el as SVGElement
+    const hasEndSibling = element.parentElement?.querySelector('.state-end')
     if (hasEndSibling) {
-      element.setAttribute('fill', 'transparent');
-      element.style.fill = 'transparent';
-      element.setAttribute('stroke', colors.endNodeBorder);
-      element.style.stroke = colors.endNodeBorder;
-      element.setAttribute('stroke-width', '2');
-      element.style.strokeWidth = '2';
+      element.setAttribute('fill', 'transparent')
+      element.style.fill = 'transparent'
+      element.setAttribute('stroke', colors.endNodeBorder)
+      element.style.stroke = colors.endNodeBorder
+      element.setAttribute('stroke-width', '2')
+      element.style.strokeWidth = '2'
     } else {
-      element.setAttribute('fill', colors.startNodeBg);
-      element.style.fill = colors.startNodeBg;
-      element.setAttribute('stroke', colors.startNodeBorder);
-      element.style.stroke = colors.startNodeBorder;
-      element.setAttribute('stroke-width', '2');
-      element.style.strokeWidth = '2';
+      element.setAttribute('fill', colors.startNodeBg)
+      element.style.fill = colors.startNodeBg
+      element.setAttribute('stroke', colors.startNodeBorder)
+      element.style.stroke = colors.startNodeBorder
+      element.setAttribute('stroke-width', '2')
+      element.style.strokeWidth = '2'
     }
-  });
+  })
 
   container.querySelectorAll('.state-end').forEach((el) => {
-    const element = el as SVGElement;
-    element.setAttribute('fill', colors.endNodeBg);
-    element.style.fill = colors.endNodeBg;
-    element.setAttribute('stroke', colors.endNodeBorder);
-    element.style.stroke = colors.endNodeBorder;
-    element.setAttribute('stroke-width', '2');
-    element.style.strokeWidth = '2';
-  });
+    const element = el as SVGElement
+    element.setAttribute('fill', colors.endNodeBg)
+    element.style.fill = colors.endNodeBg
+    element.setAttribute('stroke', colors.endNodeBorder)
+    element.style.stroke = colors.endNodeBorder
+    element.setAttribute('stroke-width', '2')
+    element.style.strokeWidth = '2'
+  })
 
   // Replace light-colored backgrounds in dark mode
   // This catches colors like #90EE90 (lightgreen) that aren't in MERMAID_DEFAULT_COLORS
   if (isDark) {
     container.querySelectorAll('*').forEach((el) => {
-      const element = el as SVGElement;
+      const element = el as SVGElement
 
       // Check fill attribute
-      const fill = element.getAttribute('fill');
+      const fill = element.getAttribute('fill')
       if (fill && fill !== 'none' && isLightColor(fill)) {
-        element.setAttribute('fill', colors.nodeBg);
-        element.style.fill = colors.nodeBg;
+        element.setAttribute('fill', colors.nodeBg)
+        element.style.fill = colors.nodeBg
       }
 
       // Check style.fill property
-      if (element.style?.fill && element.style.fill !== 'none' && isLightColor(element.style.fill)) {
-        element.style.fill = colors.nodeBg;
-        element.setAttribute('fill', colors.nodeBg);
+      if (
+        element.style?.fill &&
+        element.style.fill !== 'none' &&
+        isLightColor(element.style.fill)
+      ) {
+        element.style.fill = colors.nodeBg
+        element.setAttribute('fill', colors.nodeBg)
       }
-    });
+    })
   }
 }
 
@@ -328,7 +352,7 @@ const darkThemeVariables = {
   // Font
   fontFamily: 'system-ui, -apple-system, sans-serif',
   fontSize: '14px',
-};
+}
 
 /**
  * Tailwind-compatible light theme for Mermaid
@@ -406,7 +430,7 @@ const lightThemeVariables = {
   // Font
   fontFamily: 'system-ui, -apple-system, sans-serif',
   fontSize: '14px',
-};
+}
 
 /**
  * MermaidDirect component for rendering Mermaid diagrams using the direct API
@@ -423,31 +447,31 @@ const lightThemeVariables = {
  * ```
  */
 export function MermaidDirect({ chart, className, ariaLabel }: MermaidDiagramProps) {
-  const containerRef = useRef<HTMLDivElement>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [isDark, setIsDark] = useState(false);
-  const uniqueId = useId().replace(/:/g, '-'); // React's useId returns colons which aren't valid in IDs
+  const containerRef = useRef<HTMLDivElement>(null)
+  const [error, setError] = useState<string | null>(null)
+  const [isDark, setIsDark] = useState(false)
+  const uniqueId = useId().replace(/:/g, '-') // React's useId returns colons which aren't valid in IDs
 
   // Detect dark mode
   useEffect(() => {
-    const checkDark = () => document.documentElement.classList.contains('dark');
-    setIsDark(checkDark());
+    const checkDark = () => document.documentElement.classList.contains('dark')
+    setIsDark(checkDark())
 
     const observer = new MutationObserver(() => {
-      setIsDark(checkDark());
-    });
+      setIsDark(checkDark())
+    })
 
     observer.observe(document.documentElement, {
       attributes: true,
       attributeFilter: ['class'],
-    });
+    })
 
-    return () => observer.disconnect();
-  }, []);
+    return () => observer.disconnect()
+  }, [])
 
   // Render diagram
   useEffect(() => {
-    if (!containerRef.current || !chart?.trim()) return;
+    if (!containerRef.current || !chart?.trim()) return
 
     const renderDiagram = async () => {
       try {
@@ -458,50 +482,52 @@ export function MermaidDirect({ chart, className, ariaLabel }: MermaidDiagramPro
           theme: 'base',
           themeVariables: isDark ? darkThemeVariables : lightThemeVariables,
           securityLevel: 'strict',
-        });
+          flowchart: {
+            // Enable Markdown strings for automatic text wrapping in nodes
+            // This allows long text to wrap using `` ["`Long text`"] `` syntax
+            htmlLabels: false,
+          },
+        })
 
         // Render the diagram
-        const { svg, bindFunctions } = await mermaid.render(
-          `mermaid-${uniqueId}`,
-          chart.trim()
-        );
+        const { svg, bindFunctions } = await mermaid.render(`mermaid-${uniqueId}`, chart.trim())
 
         if (containerRef.current) {
           // Mermaid uses securityLevel: 'strict' which provides XSS protection
-          containerRef.current.innerHTML = svg;
+          containerRef.current.innerHTML = svg
 
           // Post-process SVG to force our theme colors
           // This overrides any inline styles Mermaid may have applied
-          postProcessSvg(containerRef.current, isDark);
+          postProcessSvg(containerRef.current, isDark)
 
           // Bind interactive functions if available
           if (bindFunctions) {
-            bindFunctions(containerRef.current);
+            bindFunctions(containerRef.current)
           }
         }
 
-        setError(null);
+        setError(null)
       } catch (err) {
-        console.error('Mermaid rendering error:', err);
-        setError(err instanceof Error ? err.message : 'Failed to render diagram');
+        console.error('Mermaid rendering error:', err)
+        setError(err instanceof Error ? err.message : 'Failed to render diagram')
       }
-    };
+    }
 
-    renderDiagram();
-  }, [chart, isDark, uniqueId]);
+    renderDiagram()
+  }, [chart, isDark, uniqueId])
 
   if (error) {
     return (
       <figure className={cn('mermaid-error not-prose my-6', className)}>
-        <div className="border border-destructive/50 bg-destructive/10 rounded-lg p-4">
-          <div className="text-destructive font-medium mb-2">Diagram Error</div>
-          <div className="text-muted-foreground text-sm mb-2">{error}</div>
-          <pre className="text-xs bg-muted p-2 rounded overflow-x-auto whitespace-pre-wrap">
+        <div className="border-destructive/50 bg-destructive/10 rounded-lg border p-4">
+          <div className="text-destructive mb-2 font-medium">Diagram Error</div>
+          <div className="text-muted-foreground mb-2 text-sm">{error}</div>
+          <pre className="bg-muted overflow-x-auto rounded p-2 text-xs whitespace-pre-wrap">
             {chart}
           </pre>
         </div>
       </figure>
-    );
+    )
   }
 
   return (
@@ -512,8 +538,8 @@ export function MermaidDirect({ chart, className, ariaLabel }: MermaidDiagramPro
     >
       <div
         ref={containerRef}
-        className="mermaid-diagram flex justify-center p-4 rounded-lg bg-card border border-border overflow-x-auto"
+        className="mermaid-diagram bg-card border-border flex justify-center overflow-x-auto rounded-lg border p-4"
       />
     </figure>
-  );
+  )
 }
