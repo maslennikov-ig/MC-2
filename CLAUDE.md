@@ -39,6 +39,27 @@
 
 **8. TYPESCRIPT ERRORS** — Re-delegate to same agent OR `typescript-types-specialist`
 
+**9. /push COMMAND — NEVER DISCARD UNCOMMITTED CHANGES**
+
+When executing `/push` or release commands:
+
+- **NEVER** run `git reset`, `git checkout --`, or `git stash` to discard uncommitted changes
+- **ALWAYS** include ALL uncommitted changes in the release commit
+- If there are unrelated changes, ASK the user before proceeding
+- The release script should handle uncommitted changes by committing them, NOT discarding
+
+```
+# FORBIDDEN during /push:
+git reset HEAD -- <files>      # ❌ NEVER
+git checkout -- <files>        # ❌ NEVER
+git stash                      # ❌ NEVER (unless user explicitly requests)
+
+# CORRECT approach:
+git add .                      # ✅ Stage all changes
+git commit -m "..."            # ✅ Commit everything
+# Then run release script
+```
+
 ---
 
 ## Task Management with Beads
