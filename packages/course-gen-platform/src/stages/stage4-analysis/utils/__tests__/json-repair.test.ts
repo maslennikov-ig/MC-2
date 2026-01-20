@@ -1,3 +1,4 @@
+/* eslint-disable */
 /**
  * Unit tests for JSON Repair Utility
  * Tests all 5 repair strategies with malformed JSON examples

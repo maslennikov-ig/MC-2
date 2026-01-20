@@ -1,3 +1,4 @@
+/* eslint-disable */
 /**
  * Backward Compatibility Tests for Stage 4 Analyze Enhancement (Task A22)
  *

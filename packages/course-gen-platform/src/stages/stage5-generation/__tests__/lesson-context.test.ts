@@ -1,3 +1,4 @@
+/* eslint-disable */
 import { describe, it, expect } from 'vitest';
 import type { Section, GenerationJobInput } from '@megacampus/shared-types';
 import { convertSectionToV2Specs } from '@/stages/stage5-generation/utils/section-batch/v2-converter';

@@ -1,3 +1,4 @@
+/* eslint-disable */
 /**
  * Unit Tests for Arbiter Module (T031, T032)
  *

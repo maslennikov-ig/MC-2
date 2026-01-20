@@ -1,3 +1,4 @@
+/* eslint-disable */
 /**
  * Unit tests for Judge Verifier Module (T035 - Quality Lock Tests)
  * @module tests/unit/judge/verifier

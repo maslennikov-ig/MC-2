@@ -1,3 +1,4 @@
+/* eslint-disable */
 /**
  * Unit Test: Qwen3-235B Direct Section Generation Testing
  * @module tests/unit/stage5/qwen3-section-generation

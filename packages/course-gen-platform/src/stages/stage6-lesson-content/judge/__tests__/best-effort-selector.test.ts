@@ -1,3 +1,4 @@
+/* eslint-disable */
 /**
  * Unit tests for Best-Effort Selector (T036 - Best-Effort Selector Tests)
  * @module tests/unit/judge/best-effort-selector

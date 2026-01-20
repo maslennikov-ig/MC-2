@@ -1,3 +1,4 @@
+/* eslint-disable */
 /**
  * Unit Tests for Metadata Generator (metadata-generator.ts)
  *

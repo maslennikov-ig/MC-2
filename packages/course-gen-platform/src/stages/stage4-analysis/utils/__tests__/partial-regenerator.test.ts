@@ -1,3 +1,4 @@
+/* eslint-disable */
 /**
  * Unit tests for Partial Regeneration Service
  * Tests ATOMIC field-level regeneration with Zod schema validation

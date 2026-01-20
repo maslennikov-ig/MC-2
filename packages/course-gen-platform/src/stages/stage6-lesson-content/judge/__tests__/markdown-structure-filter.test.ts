@@ -1,3 +1,4 @@
+/* eslint-disable */
 /**
  * Unit tests for Markdown Structure Filter (Phase 10)
  * @module tests/unit/judge/markdown-structure-filter

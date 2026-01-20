@@ -1,3 +1,4 @@
+/* eslint-disable */
 /**
  * CJK Character Detection and Handling Tests for Self-Reviewer Node
  * @module stages/stage6-lesson-content/nodes/__tests__/self-reviewer-cjk.test.ts

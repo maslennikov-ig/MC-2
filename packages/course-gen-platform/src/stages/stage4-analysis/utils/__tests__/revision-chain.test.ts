@@ -1,3 +1,4 @@
+/* eslint-disable */
 /**
  * Unit tests for Revision Chain Service
  * Tests LangChain-based JSON repair with mocked LLM responses

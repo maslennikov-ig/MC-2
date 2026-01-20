@@ -42,7 +42,7 @@ import { generationLockService } from '@/shared/locks';
 import { logTrace } from '../../shared/trace-logger';
 import {
   triggerCourseCard,
-  triggerAllLessonCovers,
+  // DISABLED: triggerAllLessonCovers - too expensive (~$0.04/image via OpenRouter)
 } from '../stage7-enrichments/services/auto-card-trigger';
 import { handleStageCompletion } from '@/shared/auto-approval';
 
@@ -926,44 +926,40 @@ class Stage5GenerationHandler {
         });
 
         // =================================================================
-        // STEP 5.6: Auto-trigger Lesson Cover Generation (non-blocking)
-        // Covers can use lesson.objectives from Stage 5 for keyword extraction,
-        // so they can run in parallel with Stage 6 content generation.
+        // DISABLED: Auto lesson cover generation too expensive (~$0.04/image via OpenRouter)
+        // Course card still generated above, lesson covers can be added manually if needed
         // =================================================================
-        triggerAllLessonCovers({
-          courseId: course_id,
-          userId: user_id,
-          organizationId: organization_id,
-        })
-          .then(coverResult => {
-            // Log summary for monitoring
-            jobLogger.info(
-              {
-                courseId: course_id,
-                triggeredCovers: coverResult.succeeded.length,
-                failedCovers: coverResult.failed.length,
-                skippedCovers: coverResult.skipped.length,
-              },
-              'Cover generation trigger completed'
-            );
-
-            // Warn if all covers failed
-            if (coverResult.succeeded.length === 0 && coverResult.failed.length > 0) {
-              jobLogger.warn(
-                {
-                  courseId: course_id,
-                  failedLessons: coverResult.failed.map(f => f.lessonId),
-                },
-                'All cover triggers failed - covers will not be generated'
-              );
-            }
-          })
-          .catch(err => {
-            jobLogger.warn(
-              { courseId: course_id, error: err instanceof Error ? err.message : String(err) },
-              'Non-blocking: Failed to trigger lesson cover generation'
-            );
-          });
+        // triggerAllLessonCovers({
+        //   courseId: course_id,
+        //   userId: user_id,
+        //   organizationId: organization_id,
+        // })
+        //   .then(coverResult => {
+        //     jobLogger.info(
+        //       {
+        //         courseId: course_id,
+        //         triggeredCovers: coverResult.succeeded.length,
+        //         failedCovers: coverResult.failed.length,
+        //         skippedCovers: coverResult.skipped.length,
+        //       },
+        //       'Cover generation trigger completed'
+        //     );
+        //     if (coverResult.succeeded.length === 0 && coverResult.failed.length > 0) {
+        //       jobLogger.warn(
+        //         {
+        //           courseId: course_id,
+        //           failedLessons: coverResult.failed.map(f => f.lessonId),
+        //         },
+        //         'All cover triggers failed - covers will not be generated'
+        //       );
+        //     }
+        //   })
+        //   .catch(err => {
+        //     jobLogger.warn(
+        //       { courseId: course_id, error: err instanceof Error ? err.message : String(err) },
+        //       'Non-blocking: Failed to trigger lesson cover generation'
+        //     );
+        //   });
 
         // =================================================================
         // STEP 6: Return Success Result
