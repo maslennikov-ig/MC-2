@@ -241,6 +241,76 @@ SELECT
    WHERE gt.error_data IS NOT NULL AND lis.id IS NULL) as new_count;
 ```
 
+### Step 1.5: Filter by Environment (IMPORTANT)
+
+The `error_logs` table has an `environment` column that indicates where the error occurred:
+
+| Value     | Environment    | Action                                   |
+| --------- | -------------- | ---------------------------------------- |
+| `NULL`    | Local dev      | **Bulk resolve** — testing/development   |
+| `'dev'`   | Dev server     | **Bulk resolve** — testing on dev server |
+| `'stage'` | Staging (prod) | **Investigate** — real production errors |
+
+**Always check environment distribution first:**
+
+```sql
+-- Check how many errors per environment
+SELECT environment, COUNT(*) as count
+FROM error_logs el
+LEFT JOIN log_issue_status lis ON lis.fingerprint = el.fingerprint
+WHERE lis.id IS NULL
+GROUP BY environment
+ORDER BY count DESC;
+```
+
+**Bulk resolve local/dev errors:**
+
+```sql
+-- Bulk resolve ALL local environment errors (environment IS NULL)
+WITH local_fingerprints AS (
+  SELECT DISTINCT ON (el.fingerprint) el.id, el.fingerprint
+  FROM error_logs el
+  LEFT JOIN log_issue_status lis ON lis.fingerprint = el.fingerprint
+  WHERE lis.id IS NULL
+    AND el.environment IS NULL
+    AND el.fingerprint IS NOT NULL
+  ORDER BY el.fingerprint, el.created_at DESC
+)
+INSERT INTO log_issue_status (log_type, log_id, status, notes, fingerprint, updated_at)
+SELECT 'error_log', lf.id, 'resolved', 'Local environment: Testing/development errors', lf.fingerprint, NOW()
+FROM local_fingerprints lf
+ON CONFLICT (log_type, log_id) DO UPDATE SET status = 'resolved', notes = EXCLUDED.notes, updated_at = NOW();
+```
+
+**Focus on production (stage) errors only:**
+
+```sql
+-- Get only PRODUCTION errors (stage environment)
+SELECT
+  el.fingerprint,
+  el.severity,
+  MIN(el.error_message) as error_message,
+  COUNT(*) as count,
+  MAX(el.created_at) as last_seen
+FROM error_logs el
+LEFT JOIN log_issue_status lis ON lis.fingerprint = el.fingerprint
+WHERE lis.id IS NULL
+  AND el.fingerprint IS NOT NULL
+  AND el.environment = 'stage'  -- Only production!
+GROUP BY el.fingerprint, el.severity
+ORDER BY
+  CASE el.severity WHEN 'CRITICAL' THEN 1 WHEN 'ERROR' THEN 2 ELSE 3 END,
+  COUNT(*) DESC
+LIMIT 20;
+```
+
+**Why this matters:**
+
+- Local testing generates thousands of errors (incomplete data, experiments)
+- Dev server also has test data
+- Only `stage` environment reflects real user issues
+- Bulk resolving local/dev errors saves significant time
+
 ### Step 2: For EACH Error (Loop)
 
 ```
