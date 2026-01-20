@@ -21,21 +21,10 @@ const DEFAULT_IMAGE_MODEL = 'google/gemini-2.5-flash-image-preview';
 /** Model for card images (1:1) - GPT-5 Mini always generates square 1024x1024 */
 export const CARD_IMAGE_MODEL = 'openai/gpt-5-image-mini';
 
-/**
- * Cost per image by model (USD)
- *
- * GPT-5 Image Mini pricing depends on quality setting:
- * - Input: $2.50/1M tokens (~750 tokens = ~$0.002)
- * - Image output: $8.00/1M tokens
- *   - low: ~272 tokens = ~$0.002
- *   - medium: ~1000 tokens = ~$0.008
- *   - high: ~4000+ tokens = ~$0.032+
- *
- * Default quality is 'low', so estimated cost is ~$0.004 (input + output)
- */
+/** Cost per image by model (USD) */
 const MODEL_COSTS: Record<string, number> = {
   'google/gemini-2.5-flash-image-preview': 0.038,
-  'openai/gpt-5-image-mini': 0.004, // Low quality: ~$0.002 input + ~$0.002 image output
+  'openai/gpt-5-image-mini': 0.007,
   'openai/gpt-5-image': 0.04,
 };
 
@@ -101,14 +90,6 @@ function getImageDimensions(
 // TYPES
 // ============================================================================
 
-/**
- * Image quality for GPT models.
- * - 'low': ~272 image tokens, ~$0.002 per image (best for thumbnails/cards)
- * - 'medium': ~1000 image tokens, ~$0.008 per image
- * - 'high': ~4000+ image tokens, ~$0.032+ per image
- */
-export type ImageQuality = 'low' | 'medium' | 'high';
-
 export interface ImageGenerationOptions {
   /** Model to use (default: google/gemini-2.5-flash-image-preview) */
   model?: string;
@@ -120,8 +101,6 @@ export interface ImageGenerationOptions {
   negativePrompt?: string;
   /** Whether to skip negative prompt (default: false) */
   skipNegativePrompt?: boolean;
-  /** Image quality for GPT models (default: 'low' for cost efficiency) */
-  quality?: ImageQuality;
 }
 
 export interface ImageGenerationResult {
@@ -159,31 +138,25 @@ export async function generateImage(
   const imageSize = options.imageSize ?? DEFAULT_IMAGE_SIZE;
   const negativePrompt = options.negativePrompt ?? DEFAULT_NEGATIVE_PROMPT;
   const skipNegativePrompt = options.skipNegativePrompt ?? false;
-  // Default to 'low' quality for GPT models to reduce costs (~75% savings)
-  const quality = options.quality ?? 'low';
 
   // Append negative prompt to strengthen text avoidance
   // Gemini works best with natural language instructions
-  const fullPrompt = skipNegativePrompt ? prompt : `${prompt}\n\n${negativePrompt}`;
+  const fullPrompt = skipNegativePrompt
+    ? prompt
+    : `${prompt}\n\n${negativePrompt}`;
 
-  logger.info(
-    {
-      model,
-      promptLength: prompt.length,
-      aspectRatio,
-      imageSize,
-      quality: model.includes('gpt-5-image') ? quality : undefined,
-      hasNegativePrompt: !skipNegativePrompt,
-    },
-    'Starting image generation'
-  );
+  logger.info({
+    model,
+    promptLength: prompt.length,
+    aspectRatio,
+    imageSize,
+    hasNegativePrompt: !skipNegativePrompt,
+  }, 'Starting image generation');
 
   const apiKey = await getApiKey('openrouter');
 
   if (!apiKey) {
-    throw new Error(
-      'OpenRouter API key not configured. Set OPENROUTER_API_KEY env var or configure in admin panel.'
-    );
+    throw new Error('OpenRouter API key not configured. Set OPENROUTER_API_KEY env var or configure in admin panel.');
   }
 
   const startTime = Date.now();
@@ -226,12 +199,6 @@ export async function generateImage(
       };
     }
 
-    // Add quality parameter for GPT image models
-    // 'low' = ~272 image tokens (~$0.002), 'medium' = ~1000 tokens (~$0.008), 'high' = ~4000+ tokens (~$0.032+)
-    if (model.includes('gpt-5-image')) {
-      requestOptions.quality = quality;
-    }
-
     // @ts-expect-error - OpenRouter extensions not in OpenAI types
     const response = await client.chat.completions.create(requestOptions, {
       signal: abortController.signal,
@@ -251,21 +218,17 @@ export async function generateImage(
     const images = messageAny?.images as unknown[] | undefined;
 
     // Log the actual response structure for debugging
-    logger.info(
-      {
-        hasImages: !!images,
-        imagesLength: images?.length,
-        imagesType: images ? typeof images[0] : 'none',
-        firstImagePreview:
-          images && images[0]
-            ? typeof images[0] === 'string'
-              ? images[0].substring(0, 100)
-              : JSON.stringify(images[0]).substring(0, 200)
-            : 'none',
-        messageContent: messageAny?.content?.substring?.(0, 100) || 'none',
-      },
-      'Image generation response structure'
-    );
+    logger.info({
+      hasImages: !!images,
+      imagesLength: images?.length,
+      imagesType: images ? typeof images[0] : 'none',
+      firstImagePreview: images && images[0]
+        ? (typeof images[0] === 'string'
+            ? images[0].substring(0, 100)
+            : JSON.stringify(images[0]).substring(0, 200))
+        : 'none',
+      messageContent: messageAny?.content?.substring?.(0, 100) || 'none',
+    }, 'Image generation response structure');
 
     if (!images || images.length === 0) {
       throw new Error('No image generated in response');
@@ -357,7 +320,10 @@ export async function generateImage(
 
     // Check if it was a timeout/abort
     if (error instanceof Error && error.name === 'AbortError') {
-      logger.error({ model, durationMs }, 'Image generation timed out');
+      logger.error(
+        { model, durationMs },
+        'Image generation timed out'
+      );
       throw new Error(`Image generation timed out after ${API_TIMEOUT_MS / 1000} seconds`);
     }
 
@@ -378,8 +344,7 @@ export async function generateImage(
  * Generate a card image (1:1 square) using GPT-5 Image Mini
  *
  * Convenience wrapper for card generation with optimal settings.
- * GPT-5 Mini with 'low' quality is cost-effective (~$0.002) and generates 1024x1024 squares.
- * Cards are displayed as small thumbnails (150-200px), so low quality is sufficient.
+ * GPT-5 Mini is cost-effective ($0.007) and always generates 1024x1024 squares.
  *
  * @param prompt - Card image prompt
  * @returns Generated card image data
@@ -389,7 +354,6 @@ export async function generateCardImage(prompt: string): Promise<ImageGeneration
     model: CARD_IMAGE_MODEL,
     aspectRatio: '1:1',
     imageSize: '1K',
-    quality: 'low', // Low quality sufficient for card thumbnails, ~75% cost savings
   });
 }
 
@@ -459,9 +423,14 @@ export async function convertToWebP(
 ): Promise<WebPConversionResult> {
   const originalSizeBytes = imageBuffer.length;
 
-  logger.info({ originalSizeBytes, quality }, 'Starting WebP conversion');
+  logger.info(
+    { originalSizeBytes, quality },
+    'Starting WebP conversion'
+  );
 
-  const webpBuffer = await sharp(imageBuffer).webp({ quality, effort: 6 }).toBuffer();
+  const webpBuffer = await sharp(imageBuffer)
+    .webp({ quality, effort: 6 })
+    .toBuffer();
 
   const sizeBytes = webpBuffer.length;
   const compressionRatio = sizeBytes / originalSizeBytes;
