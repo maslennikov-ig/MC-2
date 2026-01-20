@@ -109,6 +109,8 @@ export default function CreateCourseForm() {
             workerReady={workerReadiness.ready}
             workerLoading={workerReadiness.loading}
             workerError={workerReadiness.error}
+            uploadedFiles={uploadedFiles}
+            isUploadingFiles={isUploadingFiles}
           />
         </form>
       </FormProvider>
