@@ -106,6 +106,18 @@ export function useSubmitCourse({
 
         if (data.writingStyle) formData.append('style', data.writingStyle)
         if (data.courseSize) formData.append('course_size', data.courseSize)
+
+        // Debug: log submitted form values
+        logger.info('Form submission values', {
+          courseSize: data.courseSize,
+          writingStyle: data.writingStyle,
+          language: data.language,
+          generationMode: data.generationMode,
+          formats: data.formats,
+          notifyOnCompletion: data.notifyOnCompletion,
+          notifyOnError: data.notifyOnError,
+          notifyOnStageComplete: data.notifyOnStageComplete,
+        })
         if (data.contentStrategy) formData.append('content_strategy', data.contentStrategy)
         formData.append('lesson_duration_minutes', String(data.lessonDuration || 5))
         formData.append('learning_outcomes', data.learningOutcomes || '')

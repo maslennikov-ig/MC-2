@@ -45,6 +45,11 @@ export function useCreateCourseForm() {
 
   const savedPrefs = getSavedPreferences()
 
+  // Debug: log loaded preferences
+  if (typeof window !== 'undefined' && savedPrefs) {
+    logger.info('Loaded form preferences from localStorage', savedPrefs)
+  }
+
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     mode: 'onChange',
