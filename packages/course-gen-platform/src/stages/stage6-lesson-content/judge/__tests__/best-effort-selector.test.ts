@@ -75,7 +75,7 @@ function createBestEffortInput(
 ): BestEffortSelectorInput {
   return {
     iterationHistory: [
-      createMockIterationResult(0.70, 0),
+      createMockIterationResult(0.7, 0),
       createMockIterationResult(0.82, 1),
       createMockIterationResult(0.78, 2),
     ],
@@ -97,22 +97,22 @@ describe('determineQualityStatus', () => {
 
     it('should return "good" for score >= 0.85', () => {
       expect(determineQualityStatus(0.85, mode)).toBe('good');
-      expect(determineQualityStatus(0.90, mode)).toBe('good');
+      expect(determineQualityStatus(0.9, mode)).toBe('good');
       expect(determineQualityStatus(0.95, mode)).toBe('good');
-      expect(determineQualityStatus(1.00, mode)).toBe('good');
+      expect(determineQualityStatus(1.0, mode)).toBe('good');
     });
 
     it('should return "acceptable" for score >= 0.75 and < 0.85', () => {
       expect(determineQualityStatus(0.75, mode)).toBe('acceptable');
-      expect(determineQualityStatus(0.80, mode)).toBe('acceptable');
+      expect(determineQualityStatus(0.8, mode)).toBe('acceptable');
       expect(determineQualityStatus(0.84, mode)).toBe('acceptable');
     });
 
     it('should return "below_standard" for score < 0.75', () => {
       expect(determineQualityStatus(0.74, mode)).toBe('below_standard');
-      expect(determineQualityStatus(0.70, mode)).toBe('below_standard');
-      expect(determineQualityStatus(0.60, mode)).toBe('below_standard');
-      expect(determineQualityStatus(0.50, mode)).toBe('below_standard');
+      expect(determineQualityStatus(0.7, mode)).toBe('below_standard');
+      expect(determineQualityStatus(0.6, mode)).toBe('below_standard');
+      expect(determineQualityStatus(0.5, mode)).toBe('below_standard');
     });
 
     it('should handle edge cases at exact thresholds', () => {
@@ -127,9 +127,9 @@ describe('determineQualityStatus', () => {
     const mode: OperationMode = 'semi-auto';
 
     it('should return "good" for score >= 0.90', () => {
-      expect(determineQualityStatus(0.90, mode)).toBe('good');
+      expect(determineQualityStatus(0.9, mode)).toBe('good');
       expect(determineQualityStatus(0.95, mode)).toBe('good');
-      expect(determineQualityStatus(1.00, mode)).toBe('good');
+      expect(determineQualityStatus(1.0, mode)).toBe('good');
     });
 
     it('should return "acceptable" for score >= 0.85 and < 0.90', () => {
@@ -140,13 +140,13 @@ describe('determineQualityStatus', () => {
 
     it('should return "below_standard" for score < 0.85', () => {
       expect(determineQualityStatus(0.84, mode)).toBe('below_standard');
-      expect(determineQualityStatus(0.80, mode)).toBe('below_standard');
-      expect(determineQualityStatus(0.70, mode)).toBe('below_standard');
-      expect(determineQualityStatus(0.60, mode)).toBe('below_standard');
+      expect(determineQualityStatus(0.8, mode)).toBe('below_standard');
+      expect(determineQualityStatus(0.7, mode)).toBe('below_standard');
+      expect(determineQualityStatus(0.6, mode)).toBe('below_standard');
     });
 
     it('should handle edge cases at exact thresholds', () => {
-      expect(determineQualityStatus(0.90, mode)).toBe('good');
+      expect(determineQualityStatus(0.9, mode)).toBe('good');
       expect(determineQualityStatus(0.8999, mode)).toBe('acceptable');
       expect(determineQualityStatus(0.85, mode)).toBe('acceptable');
       expect(determineQualityStatus(0.8499, mode)).toBe('below_standard');
@@ -313,7 +313,7 @@ describe('selectBestIteration', () => {
     it('should select iteration with highest score', () => {
       const input = createBestEffortInput({
         iterationHistory: [
-          createMockIterationResult(0.70, 0),
+          createMockIterationResult(0.7, 0),
           createMockIterationResult(0.85, 1),
           createMockIterationResult(0.78, 2),
         ],
@@ -339,7 +339,7 @@ describe('selectBestIteration', () => {
     it('should handle tied scores (takes first occurrence)', () => {
       const input = createBestEffortInput({
         iterationHistory: [
-          createMockIterationResult(0.80, 0),
+          createMockIterationResult(0.8, 0),
           createMockIterationResult(0.85, 1),
           createMockIterationResult(0.85, 2),
         ],
@@ -364,21 +364,21 @@ describe('selectBestIteration', () => {
     it('should return correct qualityStatus for full-auto mode', () => {
       // good: >= 0.85
       const goodInput = createBestEffortInput({
-        iterationHistory: [createMockIterationResult(0.90, 0)],
+        iterationHistory: [createMockIterationResult(0.9, 0)],
         operationMode: 'full-auto',
       });
       expect(selectBestIteration(goodInput).bestResult.qualityStatus).toBe('good');
 
       // acceptable: 0.75-0.84
       const acceptableInput = createBestEffortInput({
-        iterationHistory: [createMockIterationResult(0.80, 0)],
+        iterationHistory: [createMockIterationResult(0.8, 0)],
         operationMode: 'full-auto',
       });
       expect(selectBestIteration(acceptableInput).bestResult.qualityStatus).toBe('acceptable');
 
       // below_standard: < 0.75
       const belowInput = createBestEffortInput({
-        iterationHistory: [createMockIterationResult(0.70, 0)],
+        iterationHistory: [createMockIterationResult(0.7, 0)],
         operationMode: 'full-auto',
       });
       expect(selectBestIteration(belowInput).bestResult.qualityStatus).toBe('below_standard');
@@ -411,7 +411,7 @@ describe('selectBestIteration', () => {
   describe('final status determination', () => {
     it('should return "accepted" for good quality', () => {
       const input = createBestEffortInput({
-        iterationHistory: [createMockIterationResult(0.90, 0)],
+        iterationHistory: [createMockIterationResult(0.9, 0)],
         operationMode: 'full-auto',
       });
 
@@ -422,7 +422,7 @@ describe('selectBestIteration', () => {
 
     it('should return "accepted_warning" for acceptable quality', () => {
       const input = createBestEffortInput({
-        iterationHistory: [createMockIterationResult(0.80, 0)],
+        iterationHistory: [createMockIterationResult(0.8, 0)],
         operationMode: 'full-auto',
       });
 
@@ -433,7 +433,7 @@ describe('selectBestIteration', () => {
 
     it('should return "best_effort" for below_standard in full-auto mode', () => {
       const input = createBestEffortInput({
-        iterationHistory: [createMockIterationResult(0.70, 0)],
+        iterationHistory: [createMockIterationResult(0.7, 0)],
         operationMode: 'full-auto',
       });
 
@@ -513,7 +513,7 @@ describe('selectBestIteration', () => {
   describe('selection reason', () => {
     it('should provide meaningful selectionReason for iteration 0', () => {
       const input = createBestEffortInput({
-        iterationHistory: [createMockIterationResult(0.80, 0)],
+        iterationHistory: [createMockIterationResult(0.8, 0)],
         operationMode: 'full-auto',
       });
 
@@ -526,10 +526,7 @@ describe('selectBestIteration', () => {
 
     it('should provide meaningful selectionReason for iteration > 0', () => {
       const input = createBestEffortInput({
-        iterationHistory: [
-          createMockIterationResult(0.70, 0),
-          createMockIterationResult(0.85, 1),
-        ],
+        iterationHistory: [createMockIterationResult(0.7, 0), createMockIterationResult(0.85, 1)],
         operationMode: 'full-auto',
       });
 
@@ -543,9 +540,9 @@ describe('selectBestIteration', () => {
     it('should mention refinement attempts when multiple iterations', () => {
       const input = createBestEffortInput({
         iterationHistory: [
-          createMockIterationResult(0.70, 0),
+          createMockIterationResult(0.7, 0),
           createMockIterationResult(0.75, 1),
-          createMockIterationResult(0.80, 2),
+          createMockIterationResult(0.8, 2),
         ],
         operationMode: 'full-auto',
       });
@@ -557,7 +554,7 @@ describe('selectBestIteration', () => {
 
     it('should include mode-specific notes for full-auto below_standard', () => {
       const input = createBestEffortInput({
-        iterationHistory: [createMockIterationResult(0.70, 0)],
+        iterationHistory: [createMockIterationResult(0.7, 0)],
         operationMode: 'full-auto',
       });
 
@@ -569,7 +566,7 @@ describe('selectBestIteration', () => {
 
     it('should include mode-specific notes for full-auto acceptable', () => {
       const input = createBestEffortInput({
-        iterationHistory: [createMockIterationResult(0.80, 0)],
+        iterationHistory: [createMockIterationResult(0.8, 0)],
         operationMode: 'full-auto',
       });
 
@@ -620,7 +617,7 @@ describe('selectBestIteration', () => {
 
       const input = createBestEffortInput({
         iterationHistory: [
-          createMockIterationResult(0.70, 0),
+          createMockIterationResult(0.7, 0),
           createMockIterationResult(0.85, 1, customContent),
         ],
       });
@@ -636,7 +633,7 @@ describe('selectBestIteration', () => {
       ];
 
       const input = createBestEffortInput({
-        iterationHistory: [createMockIterationResult(0.80, 0)],
+        iterationHistory: [createMockIterationResult(0.8, 0)],
         unresolvedIssues: issues,
       });
 
@@ -694,7 +691,7 @@ describe('selectBestIteration', () => {
       });
 
       const inputJustAt = createBestEffortInput({
-        iterationHistory: [createMockIterationResult(0.90, 0)],
+        iterationHistory: [createMockIterationResult(0.9, 0)],
         operationMode: 'semi-auto',
       });
 

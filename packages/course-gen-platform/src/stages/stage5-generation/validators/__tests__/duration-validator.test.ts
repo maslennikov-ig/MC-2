@@ -1,4 +1,3 @@
-/* eslint-disable */
 /**
  * Unit tests for Duration Validator
  *
@@ -17,7 +16,7 @@ import {
   MIN_OBJECTIVE_DURATION,
   MAX_OBJECTIVE_DURATION,
   ENGAGEMENT_CAP,
-  DIFFICULTY_MULTIPLIER
+  DIFFICULTY_MULTIPLIER,
 } from '../../../src/services/stage5/validators/duration-validator';
 
 describe('Duration Validator - Difficulty Multiplier', () => {
@@ -89,7 +88,7 @@ describe('Duration Validator - Difficulty Multiplier', () => {
         key_topics: ['Variables', 'Data types'],
         lesson_objectives: [{ text: 'Define variables' }],
         estimated_duration_minutes: 9, // 2×2 + 1×5 = 9 (exact min)
-        difficulty_level: 'beginner' as const
+        difficulty_level: 'beginner' as const,
       };
 
       const result = validateDurationProportionality(lesson);
@@ -103,7 +102,7 @@ describe('Duration Validator - Difficulty Multiplier', () => {
         key_topics: ['Metaprogramming', 'Decorators'],
         lesson_objectives: [{ text: 'Implement decorators' }],
         estimated_duration_minutes: 18, // (2×2 + 1×5) × 2.0 = 18
-        difficulty_level: 'advanced' as const
+        difficulty_level: 'advanced' as const,
       };
 
       const result = validateDurationProportionality(lesson);
@@ -117,7 +116,7 @@ describe('Duration Validator - Difficulty Multiplier', () => {
         key_topics: ['Variables', 'Data types'],
         lesson_objectives: [{ text: 'Define variables' }],
         estimated_duration_minutes: 5, // Below MIN (9 for beginner)
-        difficulty_level: 'beginner' as const
+        difficulty_level: 'beginner' as const,
       };
 
       const result = validateDurationProportionality(lesson);
@@ -133,7 +132,7 @@ describe('Duration Validator - Difficulty Multiplier', () => {
         key_topics: ['Variables', 'Data types'],
         lesson_objectives: [{ text: 'Define variables' }],
         estimated_duration_minutes: 40, // Above MAX (25 for beginner)
-        difficulty_level: 'beginner' as const
+        difficulty_level: 'beginner' as const,
       };
 
       const result = validateDurationProportionality(lesson);
@@ -149,9 +148,9 @@ describe('Duration Validator - Difficulty Multiplier', () => {
         lesson_objectives: [
           { text: 'Explain event loop' },
           { text: 'Implement promises' },
-          { text: 'Debug async errors' }
+          { text: 'Debug async errors' },
         ],
-        estimated_duration_minutes: 35 // Exceeds ENGAGEMENT_CAP (6 min)
+        estimated_duration_minutes: 35, // Exceeds ENGAGEMENT_CAP (6 min)
       };
 
       const result = validateDurationProportionality(complexLesson);
@@ -165,7 +164,7 @@ describe('Duration Validator - Difficulty Multiplier', () => {
       const lesson = {
         key_topics: ['Variables', 'Data types'],
         lesson_objectives: [{ text: 'Define variables' }],
-        estimated_duration_minutes: 14 // Matches intermediate MIN
+        estimated_duration_minutes: 14, // Matches intermediate MIN
         // No difficulty_level provided
       };
 
@@ -179,7 +178,7 @@ describe('Duration Validator - Difficulty Multiplier', () => {
         key_topics: ['Topic 1', 'Topic 2'], // Min 2 topics
         lesson_objectives: [{ text: 'Objective 1' }], // Min 1 objective
         estimated_duration_minutes: 9, // Beginner: 2×2 + 1×5 = 9
-        difficulty_level: 'beginner' as const
+        difficulty_level: 'beginner' as const,
       };
 
       const result = validateDurationProportionality(lesson);
@@ -190,14 +189,9 @@ describe('Duration Validator - Difficulty Multiplier', () => {
     it('should handle edge case: complex advanced lesson', () => {
       const lesson = {
         key_topics: ['T1', 'T2', 'T3', 'T4', 'T5'], // 5 topics
-        lesson_objectives: [
-          { text: 'O1' },
-          { text: 'O2' },
-          { text: 'O3' },
-          { text: 'O4' }
-        ], // 4 objectives
+        lesson_objectives: [{ text: 'O1' }, { text: 'O2' }, { text: 'O3' }, { text: 'O4' }], // 4 objectives
         estimated_duration_minutes: 70, // Advanced: (5×2 + 4×5) × 2 = 60, within range
-        difficulty_level: 'advanced' as const
+        difficulty_level: 'advanced' as const,
       };
 
       const result = validateDurationProportionality(lesson);

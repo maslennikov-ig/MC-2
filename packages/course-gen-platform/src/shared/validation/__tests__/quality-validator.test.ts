@@ -107,8 +107,12 @@ describe('Quality Validator', () => {
 
     it('should compute correct similarity for 768D vectors (Jina-v3 size)', () => {
       // Generate two similar 768D vectors
-      const vecA = Array(768).fill(0).map((_, i) => Math.sin(i / 100));
-      const vecB = Array(768).fill(0).map((_, i) => Math.sin(i / 100) * 0.95); // 95% similar
+      const vecA = Array(768)
+        .fill(0)
+        .map((_, i) => Math.sin(i / 100));
+      const vecB = Array(768)
+        .fill(0)
+        .map((_, i) => Math.sin(i / 100) * 0.95); // 95% similar
 
       const similarity = computeCosineSimilarity(vecA, vecB);
 
@@ -121,15 +125,21 @@ describe('Quality Validator', () => {
   describe('High-Quality Summary Validation', () => {
     it('should pass validation for high-quality summary (>0.75 similarity)', async () => {
       // Mock embeddings with high similarity (>0.75)
-      const mockEmbeddingOriginal = Array(768).fill(0).map((_, i) => Math.sin(i / 100));
-      const mockEmbeddingSummary = Array(768).fill(0).map((_, i) => Math.sin(i / 100) * 0.95);
+      const mockEmbeddingOriginal = Array(768)
+        .fill(0)
+        .map((_, i) => Math.sin(i / 100));
+      const mockEmbeddingSummary = Array(768)
+        .fill(0)
+        .map((_, i) => Math.sin(i / 100) * 0.95);
 
       vi.mocked(jinaClient.generateEmbedding)
         .mockResolvedValueOnce(mockEmbeddingOriginal)
         .mockResolvedValueOnce(mockEmbeddingSummary);
 
-      const originalText = 'This is a long document about machine learning. It covers various topics including supervised learning, unsupervised learning, and reinforcement learning. The document provides detailed explanations and examples.';
-      const summary = 'The document discusses machine learning topics: supervised learning, unsupervised learning, and reinforcement learning with examples.';
+      const originalText =
+        'This is a long document about machine learning. It covers various topics including supervised learning, unsupervised learning, and reinforcement learning. The document provides detailed explanations and examples.';
+      const summary =
+        'The document discusses machine learning topics: supervised learning, unsupervised learning, and reinforcement learning with examples.';
 
       const result = await validateSummaryQuality(originalText, summary);
 
@@ -151,10 +161,7 @@ describe('Quality Validator', () => {
         .mockResolvedValueOnce(mockEmbeddingOriginal)
         .mockResolvedValueOnce(mockEmbeddingSummary);
 
-      const result = await validateSummaryQuality(
-        'Original text about AI',
-        'Summary about AI'
-      );
+      const result = await validateSummaryQuality('Original text about AI', 'Summary about AI');
 
       expect(result.quality_check_passed).toBe(true);
       expect(result.quality_score).toBeGreaterThan(0.75);
@@ -171,7 +178,8 @@ describe('Quality Validator', () => {
         .mockResolvedValueOnce(mockEmbeddingOriginal)
         .mockResolvedValueOnce(mockEmbeddingSummary);
 
-      const originalText = 'This is a scientific paper about quantum mechanics and wave-particle duality.';
+      const originalText =
+        'This is a scientific paper about quantum mechanics and wave-particle duality.';
       const badSummary = 'This is a recipe for chocolate cake with flour and eggs.';
 
       const result = await validateSummaryQuality(originalText, badSummary);
@@ -202,13 +210,16 @@ describe('Quality Validator', () => {
   describe('Multilingual Content Support', () => {
     it('should validate Russian content correctly', async () => {
       // Mock embeddings with high similarity
-      const mockEmbedding = Array(768).fill(0).map((_, i) => Math.sin(i / 50));
+      const mockEmbedding = Array(768)
+        .fill(0)
+        .map((_, i) => Math.sin(i / 50));
 
       vi.mocked(jinaClient.generateEmbedding)
         .mockResolvedValueOnce(mockEmbedding)
         .mockResolvedValueOnce(mockEmbedding);
 
-      const originalText = 'Машинное обучение является подмножеством искусственного интеллекта. Оно включает обучение с учителем, без учителя и обучение с подкреплением.';
+      const originalText =
+        'Машинное обучение является подмножеством искусственного интеллекта. Оно включает обучение с учителем, без учителя и обучение с подкреплением.';
       const summary = 'Машинное обучение - это часть ИИ, включающая различные виды обучения.';
 
       const result = await validateSummaryQuality(originalText, summary);
@@ -225,7 +236,8 @@ describe('Quality Validator', () => {
         .mockResolvedValueOnce(mockEmbedding)
         .mockResolvedValueOnce(mockEmbedding);
 
-      const originalText = 'This document contains both English and русский текст for testing purposes.';
+      const originalText =
+        'This document contains both English and русский текст for testing purposes.';
       const summary = 'Document with English and Russian text.';
 
       const result = await validateSummaryQuality(originalText, summary);
@@ -236,27 +248,27 @@ describe('Quality Validator', () => {
 
   describe('Edge Cases', () => {
     it('should throw error for empty original text', async () => {
-      await expect(
-        validateSummaryQuality('', 'Summary text')
-      ).rejects.toThrow('Original text cannot be empty');
+      await expect(validateSummaryQuality('', 'Summary text')).rejects.toThrow(
+        'Original text cannot be empty'
+      );
     });
 
     it('should throw error for empty summary', async () => {
-      await expect(
-        validateSummaryQuality('Original text', '')
-      ).rejects.toThrow('Summary cannot be empty');
+      await expect(validateSummaryQuality('Original text', '')).rejects.toThrow(
+        'Summary cannot be empty'
+      );
     });
 
     it('should throw error for whitespace-only original text', async () => {
-      await expect(
-        validateSummaryQuality('   ', 'Summary text')
-      ).rejects.toThrow('Original text cannot be empty');
+      await expect(validateSummaryQuality('   ', 'Summary text')).rejects.toThrow(
+        'Original text cannot be empty'
+      );
     });
 
     it('should throw error for whitespace-only summary', async () => {
-      await expect(
-        validateSummaryQuality('Original text', '   ')
-      ).rejects.toThrow('Summary cannot be empty');
+      await expect(validateSummaryQuality('Original text', '   ')).rejects.toThrow(
+        'Summary cannot be empty'
+      );
     });
 
     it('should validate identical text (perfect similarity)', async () => {
@@ -285,7 +297,8 @@ describe('Quality Validator', () => {
         .mockResolvedValueOnce(mockEmbeddingOriginal)
         .mockResolvedValueOnce(mockEmbeddingSummary);
 
-      const originalText = 'This is a very long document with lots of details and information about various topics that need to be summarized concisely.';
+      const originalText =
+        'This is a very long document with lots of details and information about various topics that need to be summarized concisely.';
       const summary = 'Summary.';
 
       const result = await validateSummaryQuality(originalText, summary);
@@ -323,32 +336,32 @@ describe('Quality Validator', () => {
         .mockResolvedValueOnce(mockEmbeddingOriginal)
         .mockResolvedValueOnce(mockEmbeddingSummary);
 
-      const result = await validateSummaryQuality(
-        'Original text',
-        'Summary text',
-        { threshold: 0.60 }
-      );
+      const result = await validateSummaryQuality('Original text', 'Summary text', {
+        threshold: 0.6,
+      });
 
-      expect(result.threshold).toBe(0.60);
+      expect(result.threshold).toBe(0.6);
       expect(result.quality_check_passed).toBe(true);
     });
 
     it('should use custom threshold (0.90 - strict)', async () => {
       // Mock embeddings with similarity around 0.85
-      const vecA = Array(768).fill(0).map((_, i) => Math.sin(i / 100));
-      const vecB = Array(768).fill(0).map((_, i) => Math.sin(i / 100) * 0.9);
+      const vecA = Array(768)
+        .fill(0)
+        .map((_, i) => Math.sin(i / 100));
+      const vecB = Array(768)
+        .fill(0)
+        .map((_, i) => Math.sin(i / 100) * 0.9);
 
       vi.mocked(jinaClient.generateEmbedding)
         .mockResolvedValueOnce(vecA)
         .mockResolvedValueOnce(vecB);
 
-      const result = await validateSummaryQuality(
-        'Original text',
-        'Summary text',
-        { threshold: 0.90 }
-      );
+      const result = await validateSummaryQuality('Original text', 'Summary text', {
+        threshold: 0.9,
+      });
 
-      expect(result.threshold).toBe(0.90);
+      expect(result.threshold).toBe(0.9);
       // With similarity ~0.95, should pass even strict threshold
       expect(result.quality_check_passed).toBe(true);
     });
@@ -385,11 +398,7 @@ describe('Quality Validator', () => {
         .mockResolvedValueOnce(mockEmbedding)
         .mockResolvedValueOnce(mockEmbedding);
 
-      await validateSummaryQuality(
-        'Original text',
-        'Summary text',
-        { debug: true }
-      );
+      await validateSummaryQuality('Original text', 'Summary text', { debug: true });
 
       // Logger mocked, so we just verify no errors thrown
       expect(jinaClient.generateEmbedding).toHaveBeenCalledTimes(2);
@@ -401,8 +410,7 @@ describe('Quality Validator', () => {
       // Mock embeddings for batch processing
       const mockEmbedding = Array(768).fill(1);
 
-      vi.mocked(jinaClient.generateEmbedding)
-        .mockResolvedValue(mockEmbedding);
+      vi.mocked(jinaClient.generateEmbedding).mockResolvedValue(mockEmbedding);
 
       const pairs = [
         { originalText: 'Original text 1', summary: 'Summary 1' },
@@ -465,30 +473,28 @@ describe('Quality Validator', () => {
     it('should use custom threshold in batch validation', async () => {
       const mockEmbedding = Array(768).fill(1);
 
-      vi.mocked(jinaClient.generateEmbedding)
-        .mockResolvedValue(mockEmbedding);
+      vi.mocked(jinaClient.generateEmbedding).mockResolvedValue(mockEmbedding);
 
       const pairs = [
         { originalText: 'Text 1', summary: 'Summary 1' },
         { originalText: 'Text 2', summary: 'Summary 2' },
       ];
 
-      const results = await batchValidateSummaryQuality(pairs, { threshold: 0.90 });
+      const results = await batchValidateSummaryQuality(pairs, { threshold: 0.9 });
 
       expect(results).toHaveLength(2);
-      expect(results[0].threshold).toBe(0.90);
-      expect(results[1].threshold).toBe(0.90);
+      expect(results[0].threshold).toBe(0.9);
+      expect(results[1].threshold).toBe(0.9);
     });
   });
 
   describe('Error Handling', () => {
     it('should throw error when Jina API fails', async () => {
-      vi.mocked(jinaClient.generateEmbedding)
-        .mockRejectedValueOnce(new Error('Jina API error'));
+      vi.mocked(jinaClient.generateEmbedding).mockRejectedValueOnce(new Error('Jina API error'));
 
-      await expect(
-        validateSummaryQuality('Original text', 'Summary text')
-      ).rejects.toThrow('Quality validation failed: Jina API error');
+      await expect(validateSummaryQuality('Original text', 'Summary text')).rejects.toThrow(
+        'Quality validation failed: Jina API error'
+      );
     });
 
     it('should throw error when first embedding generation fails', async () => {
@@ -496,9 +502,9 @@ describe('Quality Validator', () => {
         .mockRejectedValueOnce(new Error('Network error'))
         .mockResolvedValueOnce(Array(768).fill(1));
 
-      await expect(
-        validateSummaryQuality('Original text', 'Summary text')
-      ).rejects.toThrow('Quality validation failed: Network error');
+      await expect(validateSummaryQuality('Original text', 'Summary text')).rejects.toThrow(
+        'Quality validation failed: Network error'
+      );
     });
 
     it('should throw error when second embedding generation fails', async () => {
@@ -511,9 +517,9 @@ describe('Quality Validator', () => {
         throw new Error('Rate limit exceeded');
       });
 
-      await expect(
-        validateSummaryQuality('Original text', 'Summary text')
-      ).rejects.toThrow('Quality validation failed: Rate limit exceeded');
+      await expect(validateSummaryQuality('Original text', 'Summary text')).rejects.toThrow(
+        'Quality validation failed: Rate limit exceeded'
+      );
     });
 
     it('should handle invalid embedding dimensions from API', async () => {
@@ -526,9 +532,9 @@ describe('Quality Validator', () => {
         return Array(768).fill(1);
       });
 
-      await expect(
-        validateSummaryQuality('Original text', 'Summary text')
-      ).rejects.toThrow('Vector dimension mismatch');
+      await expect(validateSummaryQuality('Original text', 'Summary text')).rejects.toThrow(
+        'Vector dimension mismatch'
+      );
     });
   });
 
@@ -549,8 +555,7 @@ describe('Quality Validator', () => {
     it('should track compression ratio >1 for longer summary', async () => {
       const mockEmbedding = Array(768).fill(1);
 
-      vi.mocked(jinaClient.generateEmbedding)
-        .mockResolvedValue(mockEmbedding);
+      vi.mocked(jinaClient.generateEmbedding).mockResolvedValue(mockEmbedding);
 
       const originalText = 'Short';
       const summary = 'This is a much longer summary than the original text.';
@@ -565,8 +570,7 @@ describe('Quality Validator', () => {
     it('should complete validation in reasonable time', async () => {
       const mockEmbedding = Array(768).fill(1);
 
-      vi.mocked(jinaClient.generateEmbedding)
-        .mockResolvedValue(mockEmbedding);
+      vi.mocked(jinaClient.generateEmbedding).mockResolvedValue(mockEmbedding);
 
       const start = Date.now();
 

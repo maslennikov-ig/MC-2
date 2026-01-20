@@ -145,7 +145,9 @@ describe('safeJSONParse - Markdown extraction + jsonrepair', () => {
     // jsonrepair library may parse this as an array with mixed content
     // The extractJSON function will extract just the JSON object
     if (Array.isArray(result)) {
-      const jsonObject = result.find(item => typeof item === 'object' && item !== null && 'success' in item);
+      const jsonObject = result.find(
+        item => typeof item === 'object' && item !== null && 'success' in item
+      );
       expect(jsonObject).toEqual({ success: true });
     } else {
       expect(result).toEqual({ success: true });
@@ -355,7 +357,9 @@ This structure follows best practices.`;
     // jsonrepair library may parse this as an array with mixed content
     // The extractJSON function will extract just the JSON object
     if (Array.isArray(result)) {
-      const jsonObject = result.find(item => typeof item === 'object' && item !== null && 'course_title' in item);
+      const jsonObject = result.find(
+        item => typeof item === 'object' && item !== null && 'course_title' in item
+      );
       expect(jsonObject).toEqual({
         course_title: 'Machine Learning Basics',
         difficulty_level: 'intermediate',
@@ -439,7 +443,9 @@ describe('safeJSONParse - Error handling', () => {
   it('should throw ValidationError when all repair strategies fail', () => {
     const irreparableJSON = 'This is not JSON at all, just random text {{{[[[}}}]]]';
 
-    expect(() => safeJSONParse(irreparableJSON)).toThrow('Failed to parse JSON after repair attempts');
+    expect(() => safeJSONParse(irreparableJSON)).toThrow(
+      'Failed to parse JSON after repair attempts'
+    );
   });
 
   it('should throw ValidationError for completely invalid input', () => {

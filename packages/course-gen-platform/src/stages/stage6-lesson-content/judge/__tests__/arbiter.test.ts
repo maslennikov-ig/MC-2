@@ -50,10 +50,10 @@ import { PRIORITY_HIERARCHY } from '@megacampus/shared-types';
 function createCriteriaScores(overrides?: Partial<CriteriaScores>): CriteriaScores {
   return {
     learning_objective_alignment: 0.85,
-    pedagogical_structure: 0.80,
-    factual_accuracy: 0.90,
+    pedagogical_structure: 0.8,
+    factual_accuracy: 0.9,
     clarity_readability: 0.75,
-    engagement_examples: 0.80,
+    engagement_examples: 0.8,
     completeness: 0.85,
     ...overrides,
   };
@@ -98,7 +98,7 @@ function createMockIssue(overrides?: Partial<JudgeIssue>): JudgeIssue {
 // T031 - KRIPPENDORFF'S ALPHA TESTS
 // ============================================================================
 
-describe('T031 - Krippendorff\'s Alpha calculation', () => {
+describe("T031 - Krippendorff's Alpha calculation", () => {
   describe('calculateAgreementScore - Single verdict', () => {
     it('should return score 1.0 (high) for single verdict', () => {
       const verdict = createMockVerdict();
@@ -112,12 +112,12 @@ describe('T031 - Krippendorff\'s Alpha calculation', () => {
   describe('calculateAgreementScore - Perfect agreement', () => {
     it('should return high agreement when all judges have identical scores', () => {
       const identicalScores = createCriteriaScores({
-        learning_objective_alignment: 0.90,
+        learning_objective_alignment: 0.9,
         pedagogical_structure: 0.85,
         factual_accuracy: 0.95,
-        clarity_readability: 0.80,
+        clarity_readability: 0.8,
         engagement_examples: 0.85,
-        completeness: 0.90,
+        completeness: 0.9,
       });
 
       const verdicts = [
@@ -128,7 +128,7 @@ describe('T031 - Krippendorff\'s Alpha calculation', () => {
 
       const result = calculateAgreementScore(verdicts);
 
-      expect(result.score).toBeGreaterThanOrEqual(0.80); // High threshold
+      expect(result.score).toBeGreaterThanOrEqual(0.8); // High threshold
       expect(result.level).toBe('high');
     });
 
@@ -136,7 +136,7 @@ describe('T031 - Krippendorff\'s Alpha calculation', () => {
       // Very close scores (within 0.05 range)
       const verdict1 = createMockVerdict({
         criteriaScores: createCriteriaScores({
-          learning_objective_alignment: 0.90,
+          learning_objective_alignment: 0.9,
           pedagogical_structure: 0.85,
           factual_accuracy: 0.88,
           clarity_readability: 0.82,
@@ -149,7 +149,7 @@ describe('T031 - Krippendorff\'s Alpha calculation', () => {
         criteriaScores: createCriteriaScores({
           learning_objective_alignment: 0.92,
           pedagogical_structure: 0.87,
-          factual_accuracy: 0.90,
+          factual_accuracy: 0.9,
           clarity_readability: 0.84,
           engagement_examples: 0.86,
           completeness: 0.88,
@@ -158,7 +158,7 @@ describe('T031 - Krippendorff\'s Alpha calculation', () => {
 
       const result = calculateAgreementScore([verdict1, verdict2]);
 
-      expect(result.score).toBeGreaterThanOrEqual(0.80);
+      expect(result.score).toBeGreaterThanOrEqual(0.8);
       expect(result.level).toBe('high');
     });
   });
@@ -168,22 +168,22 @@ describe('T031 - Krippendorff\'s Alpha calculation', () => {
       // Moderate variance with some disagreement
       const verdict1 = createMockVerdict({
         criteriaScores: createCriteriaScores({
-          learning_objective_alignment: 0.90,
+          learning_objective_alignment: 0.9,
           pedagogical_structure: 0.85,
           factual_accuracy: 0.95,
-          clarity_readability: 0.80,
+          clarity_readability: 0.8,
           engagement_examples: 0.85,
-          completeness: 0.90,
+          completeness: 0.9,
         }),
       });
 
       const verdict2 = createMockVerdict({
         criteriaScores: createCriteriaScores({
           learning_objective_alignment: 0.75,
-          pedagogical_structure: 0.70,
-          factual_accuracy: 0.80,
+          pedagogical_structure: 0.7,
+          factual_accuracy: 0.8,
           clarity_readability: 0.65,
-          engagement_examples: 0.70,
+          engagement_examples: 0.7,
           completeness: 0.75,
         }),
       });
@@ -203,9 +203,9 @@ describe('T031 - Krippendorff\'s Alpha calculation', () => {
 
       // Check that agreement is in moderate range or reasonable
       // The actual Krippendorff calculation may vary, so we verify the level matches the score
-      if (result.score >= 0.67 && result.score < 0.80) {
+      if (result.score >= 0.67 && result.score < 0.8) {
         expect(result.level).toBe('moderate');
-      } else if (result.score >= 0.80) {
+      } else if (result.score >= 0.8) {
         expect(result.level).toBe('high');
       } else {
         expect(result.level).toBe('low');
@@ -221,11 +221,11 @@ describe('T031 - Krippendorff\'s Alpha calculation', () => {
       // High variance (>0.3 range)
       const verdict1 = createMockVerdict({
         criteriaScores: createCriteriaScores({
-          learning_objective_alignment: 0.90,
+          learning_objective_alignment: 0.9,
           pedagogical_structure: 0.85,
           factual_accuracy: 0.95,
           clarity_readability: 0.88,
-          engagement_examples: 0.90,
+          engagement_examples: 0.9,
           completeness: 0.92,
         }),
       });
@@ -233,20 +233,20 @@ describe('T031 - Krippendorff\'s Alpha calculation', () => {
       const verdict2 = createMockVerdict({
         criteriaScores: createCriteriaScores({
           learning_objective_alignment: 0.55,
-          pedagogical_structure: 0.50,
-          factual_accuracy: 0.60,
+          pedagogical_structure: 0.5,
+          factual_accuracy: 0.6,
           clarity_readability: 0.45,
           engagement_examples: 0.55,
-          completeness: 0.50,
+          completeness: 0.5,
         }),
       });
 
       const verdict3 = createMockVerdict({
         criteriaScores: createCriteriaScores({
-          learning_objective_alignment: 0.70,
+          learning_objective_alignment: 0.7,
           pedagogical_structure: 0.65,
           factual_accuracy: 0.75,
-          clarity_readability: 0.60,
+          clarity_readability: 0.6,
           engagement_examples: 0.68,
           completeness: 0.65,
         }),
@@ -263,9 +263,9 @@ describe('T031 - Krippendorff\'s Alpha calculation', () => {
       const verdict1 = createMockVerdict({
         criteriaScores: createCriteriaScores({
           learning_objective_alignment: 0.85,
-          pedagogical_structure: 0.80,
+          pedagogical_structure: 0.8,
           factual_accuracy: 0.95, // High
-          clarity_readability: 0.80,
+          clarity_readability: 0.8,
           engagement_examples: 0.82,
           completeness: 0.83,
         }),
@@ -275,9 +275,9 @@ describe('T031 - Krippendorff\'s Alpha calculation', () => {
         criteriaScores: createCriteriaScores({
           learning_objective_alignment: 0.83,
           pedagogical_structure: 0.78,
-          factual_accuracy: 0.40, // Very low
+          factual_accuracy: 0.4, // Very low
           clarity_readability: 0.82,
-          engagement_examples: 0.80,
+          engagement_examples: 0.8,
           completeness: 0.81,
         }),
       });
@@ -285,7 +285,7 @@ describe('T031 - Krippendorff\'s Alpha calculation', () => {
       const result = calculateAgreementScore([verdict1, verdict2]);
 
       // Strong disagreement on one criterion should lower overall agreement
-      expect(result.score).toBeLessThan(0.80);
+      expect(result.score).toBeLessThan(0.8);
     });
   });
 
@@ -306,9 +306,21 @@ describe('T032 - Conflict resolution', () => {
   describe('filterByAgreement - High agreement', () => {
     it('should accept all issues when agreement is high', () => {
       const issues: JudgeIssue[] = [
-        createMockIssue({ criterion: 'clarity_readability', severity: 'minor', location: 'section 1' }),
-        createMockIssue({ criterion: 'factual_accuracy', severity: 'major', location: 'section 2' }),
-        createMockIssue({ criterion: 'engagement_examples', severity: 'critical', location: 'section 3' }),
+        createMockIssue({
+          criterion: 'clarity_readability',
+          severity: 'minor',
+          location: 'section 1',
+        }),
+        createMockIssue({
+          criterion: 'factual_accuracy',
+          severity: 'major',
+          location: 'section 2',
+        }),
+        createMockIssue({
+          criterion: 'engagement_examples',
+          severity: 'critical',
+          location: 'section 3',
+        }),
       ];
 
       const result = filterByAgreement(issues, 'high', 3);
@@ -323,40 +335,72 @@ describe('T032 - Conflict resolution', () => {
     it('should accept issues with 2+ judge consensus', () => {
       const issues: JudgeIssue[] = [
         // Two judges agree on section 1 (same criterion + location)
-        createMockIssue({ criterion: 'clarity_readability', severity: 'minor', location: 'section 1' }),
-        createMockIssue({ criterion: 'clarity_readability', severity: 'minor', location: 'section 1' }),
+        createMockIssue({
+          criterion: 'clarity_readability',
+          severity: 'minor',
+          location: 'section 1',
+        }),
+        createMockIssue({
+          criterion: 'clarity_readability',
+          severity: 'minor',
+          location: 'section 1',
+        }),
         // Single judge on section 2
-        createMockIssue({ criterion: 'factual_accuracy', severity: 'major', location: 'section 2' }),
+        createMockIssue({
+          criterion: 'factual_accuracy',
+          severity: 'major',
+          location: 'section 2',
+        }),
       ];
 
       const result = filterByAgreement(issues, 'moderate', 3);
 
       // Should accept the issue with 2+ judges (section 1)
       expect(result.accepted.length).toBeGreaterThan(0);
-      const acceptedLocations = result.accepted.map((i) => i.location);
+      const acceptedLocations = result.accepted.map(i => i.location);
       expect(acceptedLocations).toContain('section 1');
     });
 
     it('should reject issues with only 1 judge when multiple judges total', () => {
       const issues: JudgeIssue[] = [
         // Single judge on section 1
-        createMockIssue({ criterion: 'clarity_readability', severity: 'minor', location: 'section 1' }),
+        createMockIssue({
+          criterion: 'clarity_readability',
+          severity: 'minor',
+          location: 'section 1',
+        }),
         // Two judges agree on section 2
-        createMockIssue({ criterion: 'factual_accuracy', severity: 'major', location: 'section 2' }),
-        createMockIssue({ criterion: 'factual_accuracy', severity: 'major', location: 'section 2' }),
+        createMockIssue({
+          criterion: 'factual_accuracy',
+          severity: 'major',
+          location: 'section 2',
+        }),
+        createMockIssue({
+          criterion: 'factual_accuracy',
+          severity: 'major',
+          location: 'section 2',
+        }),
       ];
 
       const result = filterByAgreement(issues, 'moderate', 3);
 
       // Should reject single-judge issue (section 1)
-      const rejectedLocations = result.rejected.map((i) => i.location);
+      const rejectedLocations = result.rejected.map(i => i.location);
       expect(rejectedLocations).toContain('section 1');
     });
 
     it('should accept all issues if only 1 judge total', () => {
       const issues: JudgeIssue[] = [
-        createMockIssue({ criterion: 'clarity_readability', severity: 'minor', location: 'section 1' }),
-        createMockIssue({ criterion: 'factual_accuracy', severity: 'major', location: 'section 2' }),
+        createMockIssue({
+          criterion: 'clarity_readability',
+          severity: 'minor',
+          location: 'section 1',
+        }),
+        createMockIssue({
+          criterion: 'factual_accuracy',
+          severity: 'major',
+          location: 'section 2',
+        }),
       ];
 
       const result = filterByAgreement(issues, 'moderate', 1);
@@ -369,9 +413,21 @@ describe('T032 - Conflict resolution', () => {
   describe('filterByAgreement - Low agreement', () => {
     it('should only accept critical severity issues', () => {
       const issues: JudgeIssue[] = [
-        createMockIssue({ criterion: 'clarity_readability', severity: 'minor', location: 'section 1' }),
-        createMockIssue({ criterion: 'factual_accuracy', severity: 'major', location: 'section 2' }),
-        createMockIssue({ criterion: 'factual_accuracy', severity: 'critical', location: 'section 3' }),
+        createMockIssue({
+          criterion: 'clarity_readability',
+          severity: 'minor',
+          location: 'section 1',
+        }),
+        createMockIssue({
+          criterion: 'factual_accuracy',
+          severity: 'major',
+          location: 'section 2',
+        }),
+        createMockIssue({
+          criterion: 'factual_accuracy',
+          severity: 'critical',
+          location: 'section 3',
+        }),
         createMockIssue({ criterion: 'completeness', severity: 'critical', location: 'section 4' }),
       ];
 
@@ -379,18 +435,26 @@ describe('T032 - Conflict resolution', () => {
 
       // Should only accept critical issues
       expect(result.accepted).toHaveLength(2);
-      expect(result.accepted.every((issue) => issue.severity === 'critical')).toBe(true);
+      expect(result.accepted.every(issue => issue.severity === 'critical')).toBe(true);
 
       // Should reject non-critical issues
       expect(result.rejected).toHaveLength(2);
-      expect(result.rejected.some((issue) => issue.severity === 'minor')).toBe(true);
-      expect(result.rejected.some((issue) => issue.severity === 'major')).toBe(true);
+      expect(result.rejected.some(issue => issue.severity === 'minor')).toBe(true);
+      expect(result.rejected.some(issue => issue.severity === 'major')).toBe(true);
     });
 
     it('should reject all issues if none are critical', () => {
       const issues: JudgeIssue[] = [
-        createMockIssue({ criterion: 'clarity_readability', severity: 'minor', location: 'section 1' }),
-        createMockIssue({ criterion: 'engagement_examples', severity: 'major', location: 'section 2' }),
+        createMockIssue({
+          criterion: 'clarity_readability',
+          severity: 'minor',
+          location: 'section 1',
+        }),
+        createMockIssue({
+          criterion: 'engagement_examples',
+          severity: 'major',
+          location: 'section 2',
+        }),
       ];
 
       const result = filterByAgreement(issues, 'low', 3);
@@ -437,11 +501,31 @@ describe('T032 - Conflict resolution', () => {
       // Create issues in reverse priority order for same section
       const issues: JudgeIssue[] = [
         createMockIssue({ criterion: 'completeness', severity: 'major', location: 'section 1' }),
-        createMockIssue({ criterion: 'engagement_examples', severity: 'major', location: 'section 1' }),
-        createMockIssue({ criterion: 'clarity_readability', severity: 'major', location: 'section 1' }),
-        createMockIssue({ criterion: 'pedagogical_structure', severity: 'major', location: 'section 1' }),
-        createMockIssue({ criterion: 'learning_objective_alignment', severity: 'major', location: 'section 1' }),
-        createMockIssue({ criterion: 'factual_accuracy', severity: 'major', location: 'section 1' }),
+        createMockIssue({
+          criterion: 'engagement_examples',
+          severity: 'major',
+          location: 'section 1',
+        }),
+        createMockIssue({
+          criterion: 'clarity_readability',
+          severity: 'major',
+          location: 'section 1',
+        }),
+        createMockIssue({
+          criterion: 'pedagogical_structure',
+          severity: 'major',
+          location: 'section 1',
+        }),
+        createMockIssue({
+          criterion: 'learning_objective_alignment',
+          severity: 'major',
+          location: 'section 1',
+        }),
+        createMockIssue({
+          criterion: 'factual_accuracy',
+          severity: 'major',
+          location: 'section 1',
+        }),
       ];
 
       const result = resolveConflicts(issues, 0.85); // High agreement
@@ -456,9 +540,21 @@ describe('T032 - Conflict resolution', () => {
 
     it('should prefer higher severity when same criterion priority', () => {
       const issues: JudgeIssue[] = [
-        createMockIssue({ criterion: 'clarity_readability', severity: 'minor', location: 'section 1' }),
-        createMockIssue({ criterion: 'clarity_readability', severity: 'critical', location: 'section 1' }),
-        createMockIssue({ criterion: 'clarity_readability', severity: 'major', location: 'section 1' }),
+        createMockIssue({
+          criterion: 'clarity_readability',
+          severity: 'minor',
+          location: 'section 1',
+        }),
+        createMockIssue({
+          criterion: 'clarity_readability',
+          severity: 'critical',
+          location: 'section 1',
+        }),
+        createMockIssue({
+          criterion: 'clarity_readability',
+          severity: 'major',
+          location: 'section 1',
+        }),
       ];
 
       const result = resolveConflicts(issues, 0.85); // High agreement
@@ -488,11 +584,27 @@ describe('T032 - Conflict resolution', () => {
     it('should resolve conflicts independently for different sections', () => {
       const issues: JudgeIssue[] = [
         // Section 1: factual_accuracy vs clarity
-        createMockIssue({ criterion: 'factual_accuracy', severity: 'major', location: 'section 1' }),
-        createMockIssue({ criterion: 'clarity_readability', severity: 'major', location: 'section 1' }),
+        createMockIssue({
+          criterion: 'factual_accuracy',
+          severity: 'major',
+          location: 'section 1',
+        }),
+        createMockIssue({
+          criterion: 'clarity_readability',
+          severity: 'major',
+          location: 'section 1',
+        }),
         // Section 2: pedagogical_structure vs engagement
-        createMockIssue({ criterion: 'pedagogical_structure', severity: 'major', location: 'section 2' }),
-        createMockIssue({ criterion: 'engagement_examples', severity: 'major', location: 'section 2' }),
+        createMockIssue({
+          criterion: 'pedagogical_structure',
+          severity: 'major',
+          location: 'section 2',
+        }),
+        createMockIssue({
+          criterion: 'engagement_examples',
+          severity: 'major',
+          location: 'section 2',
+        }),
       ];
 
       const result = resolveConflicts(issues, 0.85); // High agreement
@@ -500,21 +612,29 @@ describe('T032 - Conflict resolution', () => {
       // Should accept highest priority from each section
       expect(result.accepted).toHaveLength(2);
 
-      const acceptedCriteria = result.accepted.map((i) => i.criterion);
+      const acceptedCriteria = result.accepted.map(i => i.criterion);
       expect(acceptedCriteria).toContain('factual_accuracy'); // Highest in section 1
       expect(acceptedCriteria).toContain('pedagogical_structure'); // Highest in section 2
 
       // Should reject lower priority from each section
       expect(result.rejected).toHaveLength(2);
-      const rejectedCriteria = result.rejected.map((i) => i.criterion);
+      const rejectedCriteria = result.rejected.map(i => i.criterion);
       expect(rejectedCriteria).toContain('clarity_readability');
       expect(rejectedCriteria).toContain('engagement_examples');
     });
 
     it('should not create conflicts between different sections', () => {
       const issues: JudgeIssue[] = [
-        createMockIssue({ criterion: 'clarity_readability', severity: 'major', location: 'section 1' }),
-        createMockIssue({ criterion: 'factual_accuracy', severity: 'major', location: 'section 2' }),
+        createMockIssue({
+          criterion: 'clarity_readability',
+          severity: 'major',
+          location: 'section 1',
+        }),
+        createMockIssue({
+          criterion: 'factual_accuracy',
+          severity: 'major',
+          location: 'section 2',
+        }),
       ];
 
       const result = resolveConflicts(issues, 0.85); // High agreement
@@ -529,11 +649,19 @@ describe('T032 - Conflict resolution', () => {
   describe('resolveConflicts - Agreement integration', () => {
     it('should filter by high agreement before resolving conflicts', () => {
       const issues: JudgeIssue[] = [
-        createMockIssue({ criterion: 'factual_accuracy', severity: 'major', location: 'section 1' }),
-        createMockIssue({ criterion: 'clarity_readability', severity: 'minor', location: 'section 2' }),
+        createMockIssue({
+          criterion: 'factual_accuracy',
+          severity: 'major',
+          location: 'section 1',
+        }),
+        createMockIssue({
+          criterion: 'clarity_readability',
+          severity: 'minor',
+          location: 'section 2',
+        }),
       ];
 
-      const result = resolveConflicts(issues, 0.90); // High agreement score
+      const result = resolveConflicts(issues, 0.9); // High agreement score
 
       // High agreement: all issues accepted (no filtering before conflict resolution)
       expect(result.accepted.length).toBeGreaterThan(0);
@@ -542,24 +670,48 @@ describe('T032 - Conflict resolution', () => {
     it('should filter by moderate agreement before resolving conflicts', () => {
       const issues: JudgeIssue[] = [
         // Two judges agree on section 1
-        createMockIssue({ criterion: 'factual_accuracy', severity: 'major', location: 'section 1' }),
-        createMockIssue({ criterion: 'factual_accuracy', severity: 'major', location: 'section 1' }),
+        createMockIssue({
+          criterion: 'factual_accuracy',
+          severity: 'major',
+          location: 'section 1',
+        }),
+        createMockIssue({
+          criterion: 'factual_accuracy',
+          severity: 'major',
+          location: 'section 1',
+        }),
         // Single judge on section 2
-        createMockIssue({ criterion: 'clarity_readability', severity: 'minor', location: 'section 2' }),
+        createMockIssue({
+          criterion: 'clarity_readability',
+          severity: 'minor',
+          location: 'section 2',
+        }),
       ];
 
       const result = resolveConflicts(issues, 0.75); // Moderate agreement score
 
       // Moderate agreement: should filter to 2+ judge consensus
-      const acceptedLocations = result.accepted.map((i) => i.location);
+      const acceptedLocations = result.accepted.map(i => i.location);
       expect(acceptedLocations).toContain('section 1');
     });
 
     it('should filter by low agreement before resolving conflicts', () => {
       const issues: JudgeIssue[] = [
-        createMockIssue({ criterion: 'factual_accuracy', severity: 'critical', location: 'section 1' }),
-        createMockIssue({ criterion: 'clarity_readability', severity: 'minor', location: 'section 2' }),
-        createMockIssue({ criterion: 'engagement_examples', severity: 'major', location: 'section 3' }),
+        createMockIssue({
+          criterion: 'factual_accuracy',
+          severity: 'critical',
+          location: 'section 1',
+        }),
+        createMockIssue({
+          criterion: 'clarity_readability',
+          severity: 'minor',
+          location: 'section 2',
+        }),
+        createMockIssue({
+          criterion: 'engagement_examples',
+          severity: 'major',
+          location: 'section 3',
+        }),
       ];
 
       const result = resolveConflicts(issues, 0.55); // Low agreement score
@@ -582,7 +734,11 @@ describe('T032 - Conflict resolution', () => {
 
     it('should handle single issue without conflicts', () => {
       const issues: JudgeIssue[] = [
-        createMockIssue({ criterion: 'factual_accuracy', severity: 'major', location: 'section 1' }),
+        createMockIssue({
+          criterion: 'factual_accuracy',
+          severity: 'major',
+          location: 'section 1',
+        }),
       ];
 
       const result = resolveConflicts(issues, 0.85);
@@ -594,9 +750,21 @@ describe('T032 - Conflict resolution', () => {
 
     it('should handle similar issues in different sections', () => {
       const issues: JudgeIssue[] = [
-        createMockIssue({ criterion: 'clarity_readability', severity: 'minor', location: 'section 1' }),
-        createMockIssue({ criterion: 'clarity_readability', severity: 'minor', location: 'section 2' }),
-        createMockIssue({ criterion: 'clarity_readability', severity: 'minor', location: 'section 3' }),
+        createMockIssue({
+          criterion: 'clarity_readability',
+          severity: 'minor',
+          location: 'section 1',
+        }),
+        createMockIssue({
+          criterion: 'clarity_readability',
+          severity: 'minor',
+          location: 'section 2',
+        }),
+        createMockIssue({
+          criterion: 'clarity_readability',
+          severity: 'minor',
+          location: 'section 3',
+        }),
       ];
 
       const result = resolveConflicts(issues, 0.85);
@@ -610,8 +778,16 @@ describe('T032 - Conflict resolution', () => {
   describe('resolveConflicts - Location normalization', () => {
     it('should treat "section 2" and "Section 2" as same location', () => {
       const issues: JudgeIssue[] = [
-        createMockIssue({ criterion: 'factual_accuracy', severity: 'major', location: 'section 2' }),
-        createMockIssue({ criterion: 'clarity_readability', severity: 'major', location: 'Section 2' }),
+        createMockIssue({
+          criterion: 'factual_accuracy',
+          severity: 'major',
+          location: 'section 2',
+        }),
+        createMockIssue({
+          criterion: 'clarity_readability',
+          severity: 'major',
+          location: 'Section 2',
+        }),
       ];
 
       const result = resolveConflicts(issues, 0.85);
@@ -624,8 +800,16 @@ describe('T032 - Conflict resolution', () => {
 
     it('should treat "section 2, paragraph 3" as "section 2"', () => {
       const issues: JudgeIssue[] = [
-        createMockIssue({ criterion: 'factual_accuracy', severity: 'major', location: 'section 2' }),
-        createMockIssue({ criterion: 'clarity_readability', severity: 'major', location: 'section 2, paragraph 3' }),
+        createMockIssue({
+          criterion: 'factual_accuracy',
+          severity: 'major',
+          location: 'section 2',
+        }),
+        createMockIssue({
+          criterion: 'clarity_readability',
+          severity: 'major',
+          location: 'section 2, paragraph 3',
+        }),
       ];
 
       const result = resolveConflicts(issues, 0.85);
@@ -638,8 +822,16 @@ describe('T032 - Conflict resolution', () => {
 
     it('should handle named sections (Introduction, Conclusion)', () => {
       const issues: JudgeIssue[] = [
-        createMockIssue({ criterion: 'factual_accuracy', severity: 'major', location: 'Introduction' }),
-        createMockIssue({ criterion: 'clarity_readability', severity: 'major', location: 'introduction' }),
+        createMockIssue({
+          criterion: 'factual_accuracy',
+          severity: 'major',
+          location: 'Introduction',
+        }),
+        createMockIssue({
+          criterion: 'clarity_readability',
+          severity: 'major',
+          location: 'introduction',
+        }),
       ];
 
       const result = resolveConflicts(issues, 0.85);

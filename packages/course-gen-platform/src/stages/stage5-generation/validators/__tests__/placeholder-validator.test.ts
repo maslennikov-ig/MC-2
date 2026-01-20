@@ -10,7 +10,10 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { hasPlaceholders, scanForPlaceholders } from '../../../src/services/stage5/validators/placeholder-validator';
+import {
+  hasPlaceholders,
+  scanForPlaceholders,
+} from '../../../src/services/stage5/validators/placeholder-validator';
 
 describe('Placeholder Validator - Conservative Detection', () => {
   describe('hasPlaceholders', () => {
@@ -153,8 +156,8 @@ describe('Placeholder Validator - Conservative Detection', () => {
         title: 'Valid title',
         description: 'TODO: add description',
         nested: {
-          content: '[insert content]'
-        }
+          content: '[insert content]',
+        },
       };
 
       const issues = scanForPlaceholders(obj);
@@ -166,7 +169,7 @@ describe('Placeholder Validator - Conservative Detection', () => {
 
     it('should find placeholders in arrays', () => {
       const obj = {
-        topics: ['Valid topic 1', '[TODO]', 'Valid topic 2']
+        topics: ['Valid topic 1', '[TODO]', 'Valid topic 2'],
       };
 
       const issues = scanForPlaceholders(obj);
@@ -179,11 +182,8 @@ describe('Placeholder Validator - Conservative Detection', () => {
       const obj = {
         title: 'JavaScript Arrays and Objects',
         description: 'Learn about arrays [array] and objects [object]',
-        topics: [
-          'Array<number> and Map<string, boolean>',
-          'Generic types: List<T>'
-        ],
-        notes: 'This is interesting... and important'
+        topics: ['Array<number> and Map<string, boolean>', 'Generic types: List<T>'],
+        notes: 'This is interesting... and important',
       };
 
       const issues = scanForPlaceholders(obj);
@@ -201,13 +201,13 @@ describe('Placeholder Validator - Conservative Detection', () => {
                   title: 'Valid lesson',
                   objectives: [
                     { text: 'Learn arrays [array]' }, // ✅ Legitimate
-                    { text: '[TODO] add objective' }  // ❌ Placeholder
-                  ]
-                }
-              ]
-            }
-          ]
-        }
+                    { text: '[TODO] add objective' }, // ❌ Placeholder
+                  ],
+                },
+              ],
+            },
+          ],
+        },
       };
 
       const issues = scanForPlaceholders(obj);

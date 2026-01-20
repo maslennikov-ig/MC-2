@@ -45,7 +45,9 @@ describe('pollImportStatus', () => {
 
   beforeEach(() => {
     mockGetImportStatus = vi.fn();
-    mockGetCourseUrl = vi.fn((courseKey: string) => `https://studio.example.com/course/${courseKey}`);
+    mockGetCourseUrl = vi.fn(
+      (courseKey: string) => `https://studio.example.com/course/${courseKey}`
+    );
 
     mockClient = {
       getImportStatus: mockGetImportStatus,
@@ -260,13 +262,11 @@ describe('pollImportStatus', () => {
         course_key: null,
       });
 
-      await expect(
-        pollImportStatus(mockClient, taskId)
-      ).rejects.toThrow(OpenEdXImportError);
+      await expect(pollImportStatus(mockClient, taskId)).rejects.toThrow(OpenEdXImportError);
 
-      await expect(
-        pollImportStatus(mockClient, taskId)
-      ).rejects.toThrow(`Course import failed: ${errorMessage}`);
+      await expect(pollImportStatus(mockClient, taskId)).rejects.toThrow(
+        `Course import failed: ${errorMessage}`
+      );
     });
 
     it('should use message field if error_message is null on FAILURE', async () => {
@@ -282,9 +282,9 @@ describe('pollImportStatus', () => {
         course_key: null,
       });
 
-      await expect(
-        pollImportStatus(mockClient, taskId)
-      ).rejects.toThrow(`Course import failed: ${message}`);
+      await expect(pollImportStatus(mockClient, taskId)).rejects.toThrow(
+        `Course import failed: ${message}`
+      );
     });
 
     it('should use default message if both error_message and message are null', async () => {
@@ -299,9 +299,9 @@ describe('pollImportStatus', () => {
         course_key: null,
       });
 
-      await expect(
-        pollImportStatus(mockClient, taskId)
-      ).rejects.toThrow('Course import failed: Import failed');
+      await expect(pollImportStatus(mockClient, taskId)).rejects.toThrow(
+        'Course import failed: Import failed'
+      );
     });
 
     it('should throw LMSTimeoutError after maxAttempts exceeded', async () => {
@@ -329,9 +329,7 @@ describe('pollImportStatus', () => {
           intervalMs: 10,
           maxAttempts,
         })
-      ).rejects.toThrow(
-        `Import status polling timed out after ${maxAttempts} attempts`
-      );
+      ).rejects.toThrow(`Import status polling timed out after ${maxAttempts} attempts`);
 
       expect(mockGetImportStatus).toHaveBeenCalledTimes(maxAttempts);
     });
@@ -536,43 +534,26 @@ describe('pollImportStatus', () => {
 
     it('should re-throw OpenEdXImportError directly', async () => {
       const taskId = 'task_import_error';
-      const importError = new OpenEdXImportError(
-        'Custom import error',
-        taskId,
-        'FAILURE'
-      );
+      const importError = new OpenEdXImportError('Custom import error', taskId, 'FAILURE');
 
       mockGetImportStatus.mockRejectedValueOnce(importError);
 
-      await expect(
-        pollImportStatus(mockClient, taskId)
-      ).rejects.toThrow(OpenEdXImportError);
+      await expect(pollImportStatus(mockClient, taskId)).rejects.toThrow(OpenEdXImportError);
 
-      await expect(
-        pollImportStatus(mockClient, taskId)
-      ).rejects.toThrow('Custom import error');
+      await expect(pollImportStatus(mockClient, taskId)).rejects.toThrow('Custom import error');
 
       expect(mockGetImportStatus).toHaveBeenCalledTimes(1);
     });
 
     it('should re-throw LMSTimeoutError directly', async () => {
       const taskId = 'task_timeout_rethrow';
-      const timeoutError = new LMSTimeoutError(
-        'Custom timeout error',
-        'openedx',
-        30000,
-        'poll'
-      );
+      const timeoutError = new LMSTimeoutError('Custom timeout error', 'openedx', 30000, 'poll');
 
       mockGetImportStatus.mockRejectedValueOnce(timeoutError);
 
-      await expect(
-        pollImportStatus(mockClient, taskId)
-      ).rejects.toThrow(LMSTimeoutError);
+      await expect(pollImportStatus(mockClient, taskId)).rejects.toThrow(LMSTimeoutError);
 
-      await expect(
-        pollImportStatus(mockClient, taskId)
-      ).rejects.toThrow('Custom timeout error');
+      await expect(pollImportStatus(mockClient, taskId)).rejects.toThrow('Custom timeout error');
 
       expect(mockGetImportStatus).toHaveBeenCalledTimes(1);
     });

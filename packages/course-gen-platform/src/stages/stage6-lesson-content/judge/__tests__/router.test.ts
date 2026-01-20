@@ -43,7 +43,13 @@ import { REFINEMENT_CONFIG } from '@megacampus/shared-types';
  * Create a mock TargetedIssue for testing
  */
 function createMockIssue(
-  criterion: 'pedagogical_structure' | 'factual_accuracy' | 'clarity_readability' | 'completeness' | 'learning_objective_alignment' | 'engagement_examples',
+  criterion:
+    | 'pedagogical_structure'
+    | 'factual_accuracy'
+    | 'clarity_readability'
+    | 'completeness'
+    | 'learning_objective_alignment'
+    | 'engagement_examples',
   severity: 'critical' | 'major' | 'minor',
   sectionId: string = 'sec_001'
 ): TargetedIssue {
@@ -105,11 +111,9 @@ function createDefaultRoutingConfig(): RoutingConfig {
 describe('T033 - routeTask() decision logic', () => {
   describe('Critical structural issues → FULL_REGENERATE', () => {
     it('should route to planner for critical pedagogical_structure issue', () => {
-      const task = createMockTask(
-        'sec_001',
-        'critical',
-        [createMockIssue('pedagogical_structure', 'critical')]
-      );
+      const task = createMockTask('sec_001', 'critical', [
+        createMockIssue('pedagogical_structure', 'critical'),
+      ]);
       const config = createDefaultRoutingConfig();
 
       const decision = routeTask(task, config);
@@ -122,11 +126,9 @@ describe('T033 - routeTask() decision logic', () => {
     });
 
     it('should route to planner for critical learning_objective_alignment issue', () => {
-      const task = createMockTask(
-        'sec_002',
-        'critical',
-        [createMockIssue('learning_objective_alignment', 'critical')]
-      );
+      const task = createMockTask('sec_002', 'critical', [
+        createMockIssue('learning_objective_alignment', 'critical'),
+      ]);
       const config = createDefaultRoutingConfig();
 
       const decision = routeTask(task, config);
@@ -137,15 +139,11 @@ describe('T033 - routeTask() decision logic', () => {
     });
 
     it('should prioritize critical structural over other issues', () => {
-      const task = createMockTask(
-        'sec_003',
-        'critical',
-        [
-          createMockIssue('pedagogical_structure', 'critical'),
-          createMockIssue('clarity_readability', 'minor'),
-          createMockIssue('engagement_examples', 'major'),
-        ]
-      );
+      const task = createMockTask('sec_003', 'critical', [
+        createMockIssue('pedagogical_structure', 'critical'),
+        createMockIssue('clarity_readability', 'minor'),
+        createMockIssue('engagement_examples', 'major'),
+      ]);
       const config = createDefaultRoutingConfig();
 
       const decision = routeTask(task, config);
@@ -158,11 +156,9 @@ describe('T033 - routeTask() decision logic', () => {
 
   describe('Critical factual errors → REGENERATE_SECTION', () => {
     it('should route to section-expander for critical factual_accuracy issue', () => {
-      const task = createMockTask(
-        'sec_001',
-        'critical',
-        [createMockIssue('factual_accuracy', 'critical')]
-      );
+      const task = createMockTask('sec_001', 'critical', [
+        createMockIssue('factual_accuracy', 'critical'),
+      ]);
       const config = createDefaultRoutingConfig();
 
       const decision = routeTask(task, config);
@@ -174,11 +170,9 @@ describe('T033 - routeTask() decision logic', () => {
     });
 
     it('should route to section-expander for major factual_accuracy issue', () => {
-      const task = createMockTask(
-        'sec_002',
-        'major',
-        [createMockIssue('factual_accuracy', 'major')]
-      );
+      const task = createMockTask('sec_002', 'major', [
+        createMockIssue('factual_accuracy', 'major'),
+      ]);
       const config = createDefaultRoutingConfig();
 
       const decision = routeTask(task, config);
@@ -188,11 +182,9 @@ describe('T033 - routeTask() decision logic', () => {
     });
 
     it('should route to section-expander even for minor factual_accuracy issue', () => {
-      const task = createMockTask(
-        'sec_003',
-        'minor',
-        [createMockIssue('factual_accuracy', 'minor')]
-      );
+      const task = createMockTask('sec_003', 'minor', [
+        createMockIssue('factual_accuracy', 'minor'),
+      ]);
       const config = createDefaultRoutingConfig();
 
       const decision = routeTask(task, config);
@@ -205,15 +197,11 @@ describe('T033 - routeTask() decision logic', () => {
 
   describe('Multiple issues (3+) → REGENERATE_SECTION', () => {
     it('should route to section-expander when task has 3 issues', () => {
-      const task = createMockTask(
-        'sec_001',
-        'major',
-        [
-          createMockIssue('clarity_readability', 'major'),
-          createMockIssue('engagement_examples', 'major'),
-          createMockIssue('completeness', 'minor'),
-        ]
-      );
+      const task = createMockTask('sec_001', 'major', [
+        createMockIssue('clarity_readability', 'major'),
+        createMockIssue('engagement_examples', 'major'),
+        createMockIssue('completeness', 'minor'),
+      ]);
       const config = createDefaultRoutingConfig();
 
       const decision = routeTask(task, config);
@@ -224,16 +212,12 @@ describe('T033 - routeTask() decision logic', () => {
     });
 
     it('should route to section-expander when task has 4+ issues', () => {
-      const task = createMockTask(
-        'sec_002',
-        'major',
-        [
-          createMockIssue('clarity_readability', 'minor'),
-          createMockIssue('engagement_examples', 'minor'),
-          createMockIssue('completeness', 'minor'),
-          createMockIssue('pedagogical_structure', 'minor'),
-        ]
-      );
+      const task = createMockTask('sec_002', 'major', [
+        createMockIssue('clarity_readability', 'minor'),
+        createMockIssue('engagement_examples', 'minor'),
+        createMockIssue('completeness', 'minor'),
+        createMockIssue('pedagogical_structure', 'minor'),
+      ]);
       const config = createDefaultRoutingConfig();
 
       const decision = routeTask(task, config);
@@ -244,14 +228,10 @@ describe('T033 - routeTask() decision logic', () => {
     });
 
     it('should not route to section-expander when task has only 2 issues', () => {
-      const task = createMockTask(
-        'sec_003',
-        'minor',
-        [
-          createMockIssue('clarity_readability', 'minor'),
-          createMockIssue('engagement_examples', 'minor'),
-        ]
-      );
+      const task = createMockTask('sec_003', 'minor', [
+        createMockIssue('clarity_readability', 'minor'),
+        createMockIssue('engagement_examples', 'minor'),
+      ]);
       const config = createDefaultRoutingConfig();
 
       const decision = routeTask(task, config);
@@ -264,11 +244,9 @@ describe('T033 - routeTask() decision logic', () => {
 
   describe('Minor/clarity issues → SURGICAL_EDIT', () => {
     it('should route to patcher for single clarity_readability issue', () => {
-      const task = createMockTask(
-        'sec_001',
-        'minor',
-        [createMockIssue('clarity_readability', 'minor')]
-      );
+      const task = createMockTask('sec_001', 'minor', [
+        createMockIssue('clarity_readability', 'minor'),
+      ]);
       const config = createDefaultRoutingConfig();
 
       const decision = routeTask(task, config);
@@ -280,11 +258,9 @@ describe('T033 - routeTask() decision logic', () => {
     });
 
     it('should route to patcher for single engagement_examples issue', () => {
-      const task = createMockTask(
-        'sec_002',
-        'minor',
-        [createMockIssue('engagement_examples', 'minor')]
-      );
+      const task = createMockTask('sec_002', 'minor', [
+        createMockIssue('engagement_examples', 'minor'),
+      ]);
       const config = createDefaultRoutingConfig();
 
       const decision = routeTask(task, config);
@@ -294,14 +270,10 @@ describe('T033 - routeTask() decision logic', () => {
     });
 
     it('should route to patcher for multiple clarity-only issues', () => {
-      const task = createMockTask(
-        'sec_003',
-        'minor',
-        [
-          createMockIssue('clarity_readability', 'minor'),
-          createMockIssue('engagement_examples', 'minor'),
-        ]
-      );
+      const task = createMockTask('sec_003', 'minor', [
+        createMockIssue('clarity_readability', 'minor'),
+        createMockIssue('engagement_examples', 'minor'),
+      ]);
       const config = createDefaultRoutingConfig();
 
       const decision = routeTask(task, config);
@@ -312,11 +284,7 @@ describe('T033 - routeTask() decision logic', () => {
     });
 
     it('should route to patcher when priority is minor (regardless of issue type)', () => {
-      const task = createMockTask(
-        'sec_004',
-        'minor',
-        [createMockIssue('completeness', 'minor')]
-      );
+      const task = createMockTask('sec_004', 'minor', [createMockIssue('completeness', 'minor')]);
       const config = createDefaultRoutingConfig();
 
       const decision = routeTask(task, config);
@@ -328,11 +296,7 @@ describe('T033 - routeTask() decision logic', () => {
 
   describe('Configuration preference handling', () => {
     it('should use patcher when preferSurgical=true for non-critical issues', () => {
-      const task = createMockTask(
-        'sec_001',
-        'major',
-        [createMockIssue('completeness', 'major')]
-      );
+      const task = createMockTask('sec_001', 'major', [createMockIssue('completeness', 'major')]);
       const config: RoutingConfig = {
         tokenBudget: 10000,
         maxPatcherCalls: 3,
@@ -347,11 +311,7 @@ describe('T033 - routeTask() decision logic', () => {
     });
 
     it('should use section-expander when preferSurgical=false for non-critical issues', () => {
-      const task = createMockTask(
-        'sec_002',
-        'major',
-        [createMockIssue('completeness', 'major')]
-      );
+      const task = createMockTask('sec_002', 'major', [createMockIssue('completeness', 'major')]);
       const config: RoutingConfig = {
         tokenBudget: 10000,
         maxPatcherCalls: 3,
@@ -366,11 +326,9 @@ describe('T033 - routeTask() decision logic', () => {
     });
 
     it('should override preferSurgical for critical structural issues', () => {
-      const task = createMockTask(
-        'sec_003',
-        'critical',
-        [createMockIssue('pedagogical_structure', 'critical')]
-      );
+      const task = createMockTask('sec_003', 'critical', [
+        createMockIssue('pedagogical_structure', 'critical'),
+      ]);
       const config: RoutingConfig = {
         tokenBudget: 10000,
         maxPatcherCalls: 3,
@@ -385,11 +343,9 @@ describe('T033 - routeTask() decision logic', () => {
     });
 
     it('should override preferSurgical for factual errors', () => {
-      const task = createMockTask(
-        'sec_004',
-        'major',
-        [createMockIssue('factual_accuracy', 'major')]
-      );
+      const task = createMockTask('sec_004', 'major', [
+        createMockIssue('factual_accuracy', 'major'),
+      ]);
       const config: RoutingConfig = {
         tokenBudget: 10000,
         maxPatcherCalls: 3,
@@ -406,11 +362,9 @@ describe('T033 - routeTask() decision logic', () => {
 
   describe('Token estimation', () => {
     it('should estimate patcher tokens correctly', () => {
-      const task = createMockTask(
-        'sec_001',
-        'minor',
-        [createMockIssue('clarity_readability', 'minor')]
-      );
+      const task = createMockTask('sec_001', 'minor', [
+        createMockIssue('clarity_readability', 'minor'),
+      ]);
       const config = createDefaultRoutingConfig();
 
       const decision = routeTask(task, config);
@@ -419,11 +373,9 @@ describe('T033 - routeTask() decision logic', () => {
     });
 
     it('should estimate section-expander tokens correctly', () => {
-      const task = createMockTask(
-        'sec_002',
-        'major',
-        [createMockIssue('factual_accuracy', 'major')]
-      );
+      const task = createMockTask('sec_002', 'major', [
+        createMockIssue('factual_accuracy', 'major'),
+      ]);
       const config = createDefaultRoutingConfig();
 
       const decision = routeTask(task, config);
@@ -432,11 +384,9 @@ describe('T033 - routeTask() decision logic', () => {
     });
 
     it('should estimate full regenerate tokens correctly', () => {
-      const task = createMockTask(
-        'sec_003',
-        'critical',
-        [createMockIssue('pedagogical_structure', 'critical')]
-      );
+      const task = createMockTask('sec_003', 'critical', [
+        createMockIssue('pedagogical_structure', 'critical'),
+      ]);
       const config = createDefaultRoutingConfig();
 
       const decision = routeTask(task, config);
@@ -447,11 +397,9 @@ describe('T033 - routeTask() decision logic', () => {
 
   describe('RouterDecision structure', () => {
     it('should return complete RouterDecision object', () => {
-      const task = createMockTask(
-        'sec_001',
-        'minor',
-        [createMockIssue('clarity_readability', 'minor')]
-      );
+      const task = createMockTask('sec_001', 'minor', [
+        createMockIssue('clarity_readability', 'minor'),
+      ]);
       const config = createDefaultRoutingConfig();
 
       const decision = routeTask(task, config);
@@ -470,11 +418,9 @@ describe('T033 - routeTask() decision logic', () => {
     });
 
     it('should have positive token estimate', () => {
-      const task = createMockTask(
-        'sec_001',
-        'minor',
-        [createMockIssue('clarity_readability', 'minor')]
-      );
+      const task = createMockTask('sec_001', 'minor', [
+        createMockIssue('clarity_readability', 'minor'),
+      ]);
       const config = createDefaultRoutingConfig();
 
       const decision = routeTask(task, config);
@@ -513,9 +459,15 @@ describe('T034 - createExecutionBatches() parallel batching', () => {
   describe('Non-adjacent sections can run in parallel', () => {
     it('should batch non-adjacent sections (gap > 1) together', () => {
       const tasks = [
-        createMockTask('sec_0', 'major', [createMockIssue('clarity_readability', 'major', 'sec_0')]),
-        createMockTask('sec_2', 'major', [createMockIssue('clarity_readability', 'major', 'sec_2')]),
-        createMockTask('sec_4', 'major', [createMockIssue('clarity_readability', 'major', 'sec_4')]),
+        createMockTask('sec_0', 'major', [
+          createMockIssue('clarity_readability', 'major', 'sec_0'),
+        ]),
+        createMockTask('sec_2', 'major', [
+          createMockIssue('clarity_readability', 'major', 'sec_2'),
+        ]),
+        createMockTask('sec_4', 'major', [
+          createMockIssue('clarity_readability', 'major', 'sec_4'),
+        ]),
       ];
 
       const batches = createExecutionBatches(tasks);
@@ -527,8 +479,12 @@ describe('T034 - createExecutionBatches() parallel batching', () => {
 
     it('should batch sections with gap of 2', () => {
       const tasks = [
-        createMockTask('sec_1', 'major', [createMockIssue('clarity_readability', 'major', 'sec_1')]),
-        createMockTask('sec_3', 'major', [createMockIssue('clarity_readability', 'major', 'sec_3')]),
+        createMockTask('sec_1', 'major', [
+          createMockIssue('clarity_readability', 'major', 'sec_1'),
+        ]),
+        createMockTask('sec_3', 'major', [
+          createMockIssue('clarity_readability', 'major', 'sec_3'),
+        ]),
       ];
 
       const batches = createExecutionBatches(tasks);
@@ -540,8 +496,12 @@ describe('T034 - createExecutionBatches() parallel batching', () => {
 
     it('should batch sections with large gap (e.g., sec_0 and sec_10)', () => {
       const tasks = [
-        createMockTask('sec_0', 'major', [createMockIssue('clarity_readability', 'major', 'sec_0')]),
-        createMockTask('sec_10', 'major', [createMockIssue('clarity_readability', 'major', 'sec_10')]),
+        createMockTask('sec_0', 'major', [
+          createMockIssue('clarity_readability', 'major', 'sec_0'),
+        ]),
+        createMockTask('sec_10', 'major', [
+          createMockIssue('clarity_readability', 'major', 'sec_10'),
+        ]),
       ];
 
       const batches = createExecutionBatches(tasks);
@@ -554,8 +514,12 @@ describe('T034 - createExecutionBatches() parallel batching', () => {
   describe('Adjacent sections run sequentially', () => {
     it('should separate adjacent sections (gap = 1) into different batches', () => {
       const tasks = [
-        createMockTask('sec_0', 'major', [createMockIssue('clarity_readability', 'major', 'sec_0')]),
-        createMockTask('sec_1', 'major', [createMockIssue('clarity_readability', 'major', 'sec_1')]),
+        createMockTask('sec_0', 'major', [
+          createMockIssue('clarity_readability', 'major', 'sec_0'),
+        ]),
+        createMockTask('sec_1', 'major', [
+          createMockIssue('clarity_readability', 'major', 'sec_1'),
+        ]),
       ];
 
       const batches = createExecutionBatches(tasks);
@@ -568,9 +532,15 @@ describe('T034 - createExecutionBatches() parallel batching', () => {
 
     it('should separate consecutive sections into different batches', () => {
       const tasks = [
-        createMockTask('sec_1', 'major', [createMockIssue('clarity_readability', 'major', 'sec_1')]),
-        createMockTask('sec_2', 'major', [createMockIssue('clarity_readability', 'major', 'sec_2')]),
-        createMockTask('sec_3', 'major', [createMockIssue('clarity_readability', 'major', 'sec_3')]),
+        createMockTask('sec_1', 'major', [
+          createMockIssue('clarity_readability', 'major', 'sec_1'),
+        ]),
+        createMockTask('sec_2', 'major', [
+          createMockIssue('clarity_readability', 'major', 'sec_2'),
+        ]),
+        createMockTask('sec_3', 'major', [
+          createMockIssue('clarity_readability', 'major', 'sec_3'),
+        ]),
       ];
 
       const batches = createExecutionBatches(tasks);
@@ -599,10 +569,18 @@ describe('T034 - createExecutionBatches() parallel batching', () => {
 
     it('should handle mix of adjacent and non-adjacent sections', () => {
       const tasks = [
-        createMockTask('sec_0', 'major', [createMockIssue('clarity_readability', 'major', 'sec_0')]),
-        createMockTask('sec_1', 'major', [createMockIssue('clarity_readability', 'major', 'sec_1')]),
-        createMockTask('sec_3', 'major', [createMockIssue('clarity_readability', 'major', 'sec_3')]),
-        createMockTask('sec_5', 'major', [createMockIssue('clarity_readability', 'major', 'sec_5')]),
+        createMockTask('sec_0', 'major', [
+          createMockIssue('clarity_readability', 'major', 'sec_0'),
+        ]),
+        createMockTask('sec_1', 'major', [
+          createMockIssue('clarity_readability', 'major', 'sec_1'),
+        ]),
+        createMockTask('sec_3', 'major', [
+          createMockIssue('clarity_readability', 'major', 'sec_3'),
+        ]),
+        createMockTask('sec_5', 'major', [
+          createMockIssue('clarity_readability', 'major', 'sec_5'),
+        ]),
       ];
 
       const batches = createExecutionBatches(tasks);
@@ -625,10 +603,18 @@ describe('T034 - createExecutionBatches() parallel batching', () => {
   describe('Max concurrent tasks per batch (maxConcurrent = 3)', () => {
     it('should respect maxConcurrent limit of 3', () => {
       const tasks = [
-        createMockTask('sec_0', 'major', [createMockIssue('clarity_readability', 'major', 'sec_0')]),
-        createMockTask('sec_2', 'major', [createMockIssue('clarity_readability', 'major', 'sec_2')]),
-        createMockTask('sec_4', 'major', [createMockIssue('clarity_readability', 'major', 'sec_4')]),
-        createMockTask('sec_6', 'major', [createMockIssue('clarity_readability', 'major', 'sec_6')]),
+        createMockTask('sec_0', 'major', [
+          createMockIssue('clarity_readability', 'major', 'sec_0'),
+        ]),
+        createMockTask('sec_2', 'major', [
+          createMockIssue('clarity_readability', 'major', 'sec_2'),
+        ]),
+        createMockTask('sec_4', 'major', [
+          createMockIssue('clarity_readability', 'major', 'sec_4'),
+        ]),
+        createMockTask('sec_6', 'major', [
+          createMockIssue('clarity_readability', 'major', 'sec_6'),
+        ]),
       ];
 
       const batches = createExecutionBatches(tasks);
@@ -641,12 +627,24 @@ describe('T034 - createExecutionBatches() parallel batching', () => {
 
     it('should split 6 non-adjacent tasks into 2 batches of 3', () => {
       const tasks = [
-        createMockTask('sec_0', 'major', [createMockIssue('clarity_readability', 'major', 'sec_0')]),
-        createMockTask('sec_2', 'major', [createMockIssue('clarity_readability', 'major', 'sec_2')]),
-        createMockTask('sec_4', 'major', [createMockIssue('clarity_readability', 'major', 'sec_4')]),
-        createMockTask('sec_6', 'major', [createMockIssue('clarity_readability', 'major', 'sec_6')]),
-        createMockTask('sec_8', 'major', [createMockIssue('clarity_readability', 'major', 'sec_8')]),
-        createMockTask('sec_10', 'major', [createMockIssue('clarity_readability', 'major', 'sec_10')]),
+        createMockTask('sec_0', 'major', [
+          createMockIssue('clarity_readability', 'major', 'sec_0'),
+        ]),
+        createMockTask('sec_2', 'major', [
+          createMockIssue('clarity_readability', 'major', 'sec_2'),
+        ]),
+        createMockTask('sec_4', 'major', [
+          createMockIssue('clarity_readability', 'major', 'sec_4'),
+        ]),
+        createMockTask('sec_6', 'major', [
+          createMockIssue('clarity_readability', 'major', 'sec_6'),
+        ]),
+        createMockTask('sec_8', 'major', [
+          createMockIssue('clarity_readability', 'major', 'sec_8'),
+        ]),
+        createMockTask('sec_10', 'major', [
+          createMockIssue('clarity_readability', 'major', 'sec_10'),
+        ]),
       ];
 
       const batches = createExecutionBatches(tasks);
@@ -658,9 +656,15 @@ describe('T034 - createExecutionBatches() parallel batching', () => {
 
     it('should handle custom maxConcurrent parameter', () => {
       const tasks = [
-        createMockTask('sec_0', 'major', [createMockIssue('clarity_readability', 'major', 'sec_0')]),
-        createMockTask('sec_2', 'major', [createMockIssue('clarity_readability', 'major', 'sec_2')]),
-        createMockTask('sec_4', 'major', [createMockIssue('clarity_readability', 'major', 'sec_4')]),
+        createMockTask('sec_0', 'major', [
+          createMockIssue('clarity_readability', 'major', 'sec_0'),
+        ]),
+        createMockTask('sec_2', 'major', [
+          createMockIssue('clarity_readability', 'major', 'sec_2'),
+        ]),
+        createMockTask('sec_4', 'major', [
+          createMockIssue('clarity_readability', 'major', 'sec_4'),
+        ]),
       ];
 
       const batches = createExecutionBatches(tasks, 2); // Max 2 concurrent
@@ -675,8 +679,12 @@ describe('T034 - createExecutionBatches() parallel batching', () => {
   describe('Priority ordering (critical > major > minor)', () => {
     it('should sort tasks by priority before batching', () => {
       const tasks = [
-        createMockTask('sec_0', 'minor', [createMockIssue('clarity_readability', 'minor', 'sec_0')]),
-        createMockTask('sec_2', 'critical', [createMockIssue('pedagogical_structure', 'critical', 'sec_2')]),
+        createMockTask('sec_0', 'minor', [
+          createMockIssue('clarity_readability', 'minor', 'sec_0'),
+        ]),
+        createMockTask('sec_2', 'critical', [
+          createMockIssue('pedagogical_structure', 'critical', 'sec_2'),
+        ]),
         createMockTask('sec_4', 'major', [createMockIssue('completeness', 'major', 'sec_4')]),
       ];
 
@@ -701,9 +709,15 @@ describe('T034 - createExecutionBatches() parallel batching', () => {
 
     it('should prioritize critical tasks in first batch when limited by maxConcurrent', () => {
       const tasks = [
-        createMockTask('sec_0', 'minor', [createMockIssue('clarity_readability', 'minor', 'sec_0')]),
-        createMockTask('sec_2', 'minor', [createMockIssue('clarity_readability', 'minor', 'sec_2')]),
-        createMockTask('sec_4', 'critical', [createMockIssue('pedagogical_structure', 'critical', 'sec_4')]),
+        createMockTask('sec_0', 'minor', [
+          createMockIssue('clarity_readability', 'minor', 'sec_0'),
+        ]),
+        createMockTask('sec_2', 'minor', [
+          createMockIssue('clarity_readability', 'minor', 'sec_2'),
+        ]),
+        createMockTask('sec_4', 'critical', [
+          createMockIssue('pedagogical_structure', 'critical', 'sec_4'),
+        ]),
         createMockTask('sec_6', 'major', [createMockIssue('completeness', 'major', 'sec_6')]),
       ];
 
@@ -720,9 +734,13 @@ describe('T034 - createExecutionBatches() parallel batching', () => {
 
     it('should maintain priority order within same priority level', () => {
       const tasks = [
-        createMockTask('sec_0', 'major', [createMockIssue('clarity_readability', 'major', 'sec_0')]),
+        createMockTask('sec_0', 'major', [
+          createMockIssue('clarity_readability', 'major', 'sec_0'),
+        ]),
         createMockTask('sec_2', 'major', [createMockIssue('completeness', 'major', 'sec_2')]),
-        createMockTask('sec_4', 'major', [createMockIssue('engagement_examples', 'major', 'sec_4')]),
+        createMockTask('sec_4', 'major', [
+          createMockIssue('engagement_examples', 'major', 'sec_4'),
+        ]),
       ];
 
       const batches = createExecutionBatches(tasks);
@@ -740,11 +758,19 @@ describe('T034 - createExecutionBatches() parallel batching', () => {
   describe('Complex batching scenarios', () => {
     it('should handle complex mix of adjacent, non-adjacent, and priority', () => {
       const tasks = [
-        createMockTask('sec_0', 'minor', [createMockIssue('clarity_readability', 'minor', 'sec_0')]),
-        createMockTask('sec_1', 'critical', [createMockIssue('pedagogical_structure', 'critical', 'sec_1')]),
+        createMockTask('sec_0', 'minor', [
+          createMockIssue('clarity_readability', 'minor', 'sec_0'),
+        ]),
+        createMockTask('sec_1', 'critical', [
+          createMockIssue('pedagogical_structure', 'critical', 'sec_1'),
+        ]),
         createMockTask('sec_3', 'major', [createMockIssue('completeness', 'major', 'sec_3')]),
-        createMockTask('sec_5', 'minor', [createMockIssue('engagement_examples', 'minor', 'sec_5')]),
-        createMockTask('sec_6', 'major', [createMockIssue('clarity_readability', 'major', 'sec_6')]),
+        createMockTask('sec_5', 'minor', [
+          createMockIssue('engagement_examples', 'minor', 'sec_5'),
+        ]),
+        createMockTask('sec_6', 'major', [
+          createMockIssue('clarity_readability', 'major', 'sec_6'),
+        ]),
       ];
 
       const batches = createExecutionBatches(tasks);
@@ -774,7 +800,9 @@ describe('T034 - createExecutionBatches() parallel batching', () => {
       const tasks = [];
       for (let i = 0; i < 10; i += 2) {
         tasks.push(
-          createMockTask(`sec_${i}`, 'major', [createMockIssue('clarity_readability', 'major', `sec_${i}`)])
+          createMockTask(`sec_${i}`, 'major', [
+            createMockIssue('clarity_readability', 'major', `sec_${i}`),
+          ])
         );
       }
 
@@ -790,8 +818,12 @@ describe('T034 - createExecutionBatches() parallel batching', () => {
   describe('Named section handling', () => {
     it('should handle named sections (e.g., sec_introduction)', () => {
       const tasks = [
-        createMockTask('sec_introduction', 'major', [createMockIssue('clarity_readability', 'major', 'sec_introduction')]),
-        createMockTask('sec_content', 'major', [createMockIssue('completeness', 'major', 'sec_content')]),
+        createMockTask('sec_introduction', 'major', [
+          createMockIssue('clarity_readability', 'major', 'sec_introduction'),
+        ]),
+        createMockTask('sec_content', 'major', [
+          createMockIssue('completeness', 'major', 'sec_content'),
+        ]),
       ];
 
       const batches = createExecutionBatches(tasks);
@@ -803,9 +835,15 @@ describe('T034 - createExecutionBatches() parallel batching', () => {
 
     it('should handle mix of numeric and named sections', () => {
       const tasks = [
-        createMockTask('sec_0', 'major', [createMockIssue('clarity_readability', 'major', 'sec_0')]),
-        createMockTask('sec_introduction', 'major', [createMockIssue('completeness', 'major', 'sec_introduction')]),
-        createMockTask('sec_2', 'major', [createMockIssue('engagement_examples', 'major', 'sec_2')]),
+        createMockTask('sec_0', 'major', [
+          createMockIssue('clarity_readability', 'major', 'sec_0'),
+        ]),
+        createMockTask('sec_introduction', 'major', [
+          createMockIssue('completeness', 'major', 'sec_introduction'),
+        ]),
+        createMockTask('sec_2', 'major', [
+          createMockIssue('engagement_examples', 'major', 'sec_2'),
+        ]),
       ];
 
       const batches = createExecutionBatches(tasks);

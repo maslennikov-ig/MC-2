@@ -273,7 +273,7 @@ describe('validateCourseInput', () => {
 
       expect(result.valid).toBe(false);
       expect(result.errors.length).toBeGreaterThanOrEqual(1);
-      expect(result.errors.some((e) => e.includes('courseId') && e.includes('ASCII'))).toBe(true);
+      expect(result.errors.some(e => e.includes('courseId') && e.includes('ASCII'))).toBe(true);
     });
 
     it('should reject non-ASCII org', () => {
@@ -282,7 +282,7 @@ describe('validateCourseInput', () => {
 
       expect(result.valid).toBe(false);
       expect(result.errors.length).toBeGreaterThanOrEqual(1);
-      expect(result.errors.some((e) => e.includes('org') && e.includes('ASCII'))).toBe(true);
+      expect(result.errors.some(e => e.includes('org') && e.includes('ASCII'))).toBe(true);
     });
 
     it('should reject non-ASCII run', () => {
@@ -291,7 +291,7 @@ describe('validateCourseInput', () => {
 
       expect(result.valid).toBe(false);
       expect(result.errors.length).toBeGreaterThanOrEqual(1);
-      expect(result.errors.some((e) => e.includes('run') && e.includes('ASCII'))).toBe(true);
+      expect(result.errors.some(e => e.includes('run') && e.includes('ASCII'))).toBe(true);
     });
 
     it('should reject courseId with spaces', () => {
@@ -300,7 +300,7 @@ describe('validateCourseInput', () => {
 
       expect(result.valid).toBe(false);
       expect(result.errors.length).toBeGreaterThanOrEqual(1);
-      expect(result.errors.some((e) => e.includes('courseId') && e.includes('ASCII'))).toBe(true);
+      expect(result.errors.some(e => e.includes('courseId') && e.includes('ASCII'))).toBe(true);
     });
 
     it('should reject org with special characters', () => {
@@ -309,7 +309,7 @@ describe('validateCourseInput', () => {
 
       expect(result.valid).toBe(false);
       expect(result.errors.length).toBeGreaterThanOrEqual(1);
-      expect(result.errors.some((e) => e.includes('org') && e.includes('ASCII'))).toBe(true);
+      expect(result.errors.some(e => e.includes('org') && e.includes('ASCII'))).toBe(true);
     });
 
     it('should reject run with periods', () => {
@@ -318,7 +318,7 @@ describe('validateCourseInput', () => {
 
       expect(result.valid).toBe(false);
       expect(result.errors.length).toBeGreaterThanOrEqual(1);
-      expect(result.errors.some((e) => e.includes('run') && e.includes('ASCII'))).toBe(true);
+      expect(result.errors.some(e => e.includes('run') && e.includes('ASCII'))).toBe(true);
     });
   });
 
@@ -333,9 +333,9 @@ describe('validateCourseInput', () => {
 
       expect(result.valid).toBe(false);
       expect(result.errors.length).toBeGreaterThanOrEqual(3);
-      expect(result.errors.some((e) => e.includes('courseId'))).toBe(true);
-      expect(result.errors.some((e) => e.includes('org'))).toBe(true);
-      expect(result.errors.some((e) => e.includes('must have content'))).toBe(true);
+      expect(result.errors.some(e => e.includes('courseId'))).toBe(true);
+      expect(result.errors.some(e => e.includes('org'))).toBe(true);
+      expect(result.errors.some(e => e.includes('must have content'))).toBe(true);
     });
 
     it('should capture errors from multiple chapters', () => {
@@ -351,8 +351,8 @@ describe('validateCourseInput', () => {
 
       expect(result.valid).toBe(false);
       expect(result.errors.length).toBeGreaterThanOrEqual(2);
-      expect(result.errors.some((e) => e.includes('Chapter 1'))).toBe(true);
-      expect(result.errors.some((e) => e.includes('Chapter 1'))).toBe(true);
+      expect(result.errors.some(e => e.includes('Chapter 1'))).toBe(true);
+      expect(result.errors.some(e => e.includes('Chapter 1'))).toBe(true);
     });
   });
 });
@@ -437,7 +437,7 @@ describe('validateOLXStructure', () => {
       const result = validateOLXStructure(structure);
 
       expect(result.valid).toBe(false);
-      expect(result.errors.some((e) => e.includes('course.xml') && e.includes('empty'))).toBe(true);
+      expect(result.errors.some(e => e.includes('course.xml') && e.includes('empty'))).toBe(true);
     });
 
     it('should reject whitespace-only courseXml', () => {
@@ -447,7 +447,7 @@ describe('validateOLXStructure', () => {
       const result = validateOLXStructure(structure);
 
       expect(result.valid).toBe(false);
-      expect(result.errors.some((e) => e.includes('course.xml') && e.includes('empty'))).toBe(true);
+      expect(result.errors.some(e => e.includes('course.xml') && e.includes('empty'))).toBe(true);
     });
   });
 
@@ -459,7 +459,7 @@ describe('validateOLXStructure', () => {
       const result = validateOLXStructure(structure);
 
       expect(result.valid).toBe(false);
-      expect(result.errors.some((e) => e.includes('Invalid course key format'))).toBe(true);
+      expect(result.errors.some(e => e.includes('Invalid course key format'))).toBe(true);
     });
 
     it('should reject courseKey with wrong prefix', () => {
@@ -469,7 +469,7 @@ describe('validateOLXStructure', () => {
       const result = validateOLXStructure(structure);
 
       expect(result.valid).toBe(false);
-      expect(result.errors.some((e) => e.includes('Invalid course key format'))).toBe(true);
+      expect(result.errors.some(e => e.includes('Invalid course key format'))).toBe(true);
     });
   });
 
@@ -481,9 +481,7 @@ describe('validateOLXStructure', () => {
       const result = validateOLXStructure(structure);
 
       expect(result.valid).toBe(false);
-      expect(result.errors.some((e) => e.includes('Course must have at least 1 chapter'))).toBe(
-        true
-      );
+      expect(result.errors.some(e => e.includes('Course must have at least 1 chapter'))).toBe(true);
     });
   });
 
@@ -495,9 +493,7 @@ describe('validateOLXStructure', () => {
       const result = validateOLXStructure(structure);
 
       expect(result.valid).toBe(false);
-      expect(result.errors.some((e) => e.includes('Invalid') && e.includes('Chapter_1'))).toBe(
-        true
-      );
+      expect(result.errors.some(e => e.includes('Invalid') && e.includes('Chapter_1'))).toBe(true);
     });
 
     it('should reject invalid url_name (Cyrillic)', () => {
@@ -507,7 +503,7 @@ describe('validateOLXStructure', () => {
       const result = validateOLXStructure(structure);
 
       expect(result.valid).toBe(false);
-      expect(result.errors.some((e) => e.includes('Invalid') && e.includes('ASCII'))).toBe(true);
+      expect(result.errors.some(e => e.includes('Invalid') && e.includes('ASCII'))).toBe(true);
     });
 
     it('should reject invalid url_name (spaces)', () => {
@@ -517,7 +513,7 @@ describe('validateOLXStructure', () => {
       const result = validateOLXStructure(structure);
 
       expect(result.valid).toBe(false);
-      expect(result.errors.some((e) => e.includes('Invalid') && e.includes('ASCII'))).toBe(true);
+      expect(result.errors.some(e => e.includes('Invalid') && e.includes('ASCII'))).toBe(true);
     });
 
     it('should reject invalid url_name (special characters)', () => {
@@ -527,7 +523,7 @@ describe('validateOLXStructure', () => {
       const result = validateOLXStructure(structure);
 
       expect(result.valid).toBe(false);
-      expect(result.errors.some((e) => e.includes('Invalid') && e.includes('ASCII'))).toBe(true);
+      expect(result.errors.some(e => e.includes('Invalid') && e.includes('ASCII'))).toBe(true);
     });
   });
 
@@ -539,9 +535,7 @@ describe('validateOLXStructure', () => {
       const result = validateOLXStructure(structure);
 
       expect(result.valid).toBe(false);
-      expect(result.errors.some((e) => e.includes('policy.json') && e.includes('empty'))).toBe(
-        true
-      );
+      expect(result.errors.some(e => e.includes('policy.json') && e.includes('empty'))).toBe(true);
     });
 
     it('should reject whitespace-only policy.json', () => {
@@ -551,9 +545,7 @@ describe('validateOLXStructure', () => {
       const result = validateOLXStructure(structure);
 
       expect(result.valid).toBe(false);
-      expect(result.errors.some((e) => e.includes('policy.json') && e.includes('empty'))).toBe(
-        true
-      );
+      expect(result.errors.some(e => e.includes('policy.json') && e.includes('empty'))).toBe(true);
     });
 
     it('should reject invalid policy.json (not JSON)', () => {
@@ -564,7 +556,7 @@ describe('validateOLXStructure', () => {
 
       expect(result.valid).toBe(false);
       expect(
-        result.errors.some((e) => e.includes('policy.json') && e.includes('not valid JSON'))
+        result.errors.some(e => e.includes('policy.json') && e.includes('not valid JSON'))
       ).toBe(true);
     });
 
@@ -576,7 +568,7 @@ describe('validateOLXStructure', () => {
 
       expect(result.valid).toBe(false);
       expect(
-        result.errors.some((e) => e.includes('grading_policy.json') && e.includes('empty'))
+        result.errors.some(e => e.includes('grading_policy.json') && e.includes('empty'))
       ).toBe(true);
     });
 
@@ -588,7 +580,7 @@ describe('validateOLXStructure', () => {
 
       expect(result.valid).toBe(false);
       expect(
-        result.errors.some((e) => e.includes('grading_policy.json') && e.includes('not valid JSON'))
+        result.errors.some(e => e.includes('grading_policy.json') && e.includes('not valid JSON'))
       ).toBe(true);
     });
   });
@@ -601,7 +593,7 @@ describe('validateOLXStructure', () => {
       const result = validateOLXStructure(structure);
 
       expect(result.valid).toBe(false);
-      expect(result.errors.some((e) => e.includes('chapter/chapter_1.xml'))).toBe(true);
+      expect(result.errors.some(e => e.includes('chapter/chapter_1.xml'))).toBe(true);
     });
 
     it('should reject malformed XML in sequentials (no tags)', () => {
@@ -611,7 +603,7 @@ describe('validateOLXStructure', () => {
       const result = validateOLXStructure(structure);
 
       expect(result.valid).toBe(false);
-      expect(result.errors.some((e) => e.includes('sequential/section_1.xml'))).toBe(true);
+      expect(result.errors.some(e => e.includes('sequential/section_1.xml'))).toBe(true);
     });
 
     it('should reject malformed XML in verticals (mismatched tags)', () => {
@@ -621,7 +613,7 @@ describe('validateOLXStructure', () => {
       const result = validateOLXStructure(structure);
 
       expect(result.valid).toBe(false);
-      expect(result.errors.some((e) => e.includes('vertical/unit_1.xml'))).toBe(true);
+      expect(result.errors.some(e => e.includes('vertical/unit_1.xml'))).toBe(true);
     });
   });
 
@@ -741,7 +733,7 @@ describe('validateXml', () => {
       const result = validateXml(content, 'test.xml');
 
       expect(result.valid).toBe(false);
-      expect(result.errors.some((e) => e.includes('Mismatched XML tags'))).toBe(true);
+      expect(result.errors.some(e => e.includes('Mismatched XML tags'))).toBe(true);
     });
 
     it('should reject mismatched tags (more closing than opening)', () => {
@@ -749,7 +741,7 @@ describe('validateXml', () => {
       const result = validateXml(content, 'test.xml');
 
       expect(result.valid).toBe(false);
-      expect(result.errors.some((e) => e.includes('Mismatched XML tags'))).toBe(true);
+      expect(result.errors.some(e => e.includes('Mismatched XML tags'))).toBe(true);
     });
 
     it('should provide filename in error messages', () => {

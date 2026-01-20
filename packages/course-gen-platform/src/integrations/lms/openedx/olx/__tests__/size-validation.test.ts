@@ -64,7 +64,10 @@ function createMinimalOLXStructure(): OLXStructure {
 `;
 
   const chapters = new Map<string, string>([
-    ['chapter_1', '<chapter url_name="chapter_1">\n  <sequential url_name="seq_1" />\n</chapter>\n'],
+    [
+      'chapter_1',
+      '<chapter url_name="chapter_1">\n  <sequential url_name="seq_1" />\n</chapter>\n',
+    ],
   ]);
 
   const sequentials = new Map<string, string>([
@@ -79,9 +82,15 @@ function createMinimalOLXStructure(): OLXStructure {
     ['html_1', '<html url_name="html_1" display_name="HTML Component 1" />\n'],
   ]);
 
-  const htmlContent = new Map<string, string>([['html_1', '<html><![CDATA[<p>Hello</p>]]></html>\n']]);
+  const htmlContent = new Map<string, string>([
+    ['html_1', '<html><![CDATA[<p>Hello</p>]]></html>\n'],
+  ]);
 
-  const policyJson = JSON.stringify({ 'course/TestOrg_TEST101_2025_Q1': { start: '2025-01-01T00:00:00Z' } }, null, 2);
+  const policyJson = JSON.stringify(
+    { 'course/TestOrg_TEST101_2025_Q1': { start: '2025-01-01T00:00:00Z' } },
+    null,
+    2
+  );
 
   const gradingPolicyJson = JSON.stringify({ GRADER: [], GRADE_CUTOFFS: {} }, null, 2);
 
@@ -129,7 +138,10 @@ function createLargeOLXStructure(targetSizeBytes: number): OLXStructure {
 
     // Add to first vertical
     const firstVert = structure.verticals.get('vert_1')!;
-    const updatedVert = firstVert.replace('</vertical>', `  <html url_name="${urlName}" />\n</vertical>`);
+    const updatedVert = firstVert.replace(
+      '</vertical>',
+      `  <html url_name="${urlName}" />\n</vertical>`
+    );
     structure.verticals.set('vert_1', updatedVert);
   }
 

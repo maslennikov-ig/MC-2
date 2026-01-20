@@ -66,7 +66,7 @@ vi.mock('@/shared/logger', () => ({
 }));
 
 vi.mock('@/shared/utils/retry', () => ({
-  retryWithBackoff: vi.fn((fn) => fn()),
+  retryWithBackoff: vi.fn(fn => fn()),
 }));
 
 // Import after mocks are defined
@@ -152,9 +152,7 @@ describe('LLMClient', () => {
       await client.generateCompletion('test prompt', { model: 'test-model' });
 
       expect(getOpenRouterApiKey).toHaveBeenCalledTimes(1);
-      expect(OpenAI).toHaveBeenCalledWith(
-        expect.objectContaining({ apiKey: 'async-key' })
-      );
+      expect(OpenAI).toHaveBeenCalledWith(expect.objectContaining({ apiKey: 'async-key' }));
     });
 
     it('should skip initialization when already initialized', async () => {
@@ -197,9 +195,7 @@ describe('LLMClient', () => {
       await client.generateCompletion('test prompt', { model: 'test-model' });
 
       expect(getOpenRouterApiKey).toHaveBeenCalledTimes(2);
-      expect(OpenAI).toHaveBeenCalledWith(
-        expect.objectContaining({ apiKey: 'async-key' })
-      );
+      expect(OpenAI).toHaveBeenCalledWith(expect.objectContaining({ apiKey: 'async-key' }));
     });
   });
 
@@ -207,7 +203,7 @@ describe('LLMClient', () => {
     it('should initialize once for concurrent calls', async () => {
       vi.mocked(getApiKeySync).mockReturnValue(undefined);
       vi.mocked(getOpenRouterApiKey).mockImplementation(
-        () => new Promise((resolve) => setTimeout(() => resolve('async-key'), 50))
+        () => new Promise(resolve => setTimeout(() => resolve('async-key'), 50))
       );
 
       const client = new LLMClient();
@@ -248,7 +244,7 @@ describe('LLMClient', () => {
       const results = await Promise.allSettled(promises);
 
       // All should fail with the same error (single initialization attempt)
-      expect(results.every((r) => r.status === 'rejected')).toBe(true);
+      expect(results.every(r => r.status === 'rejected')).toBe(true);
       expect(getOpenRouterApiKey).toHaveBeenCalledTimes(1);
     });
   });
@@ -262,17 +258,13 @@ describe('LLMClient', () => {
 
       // Initial call count
       expect(OpenAI).toHaveBeenCalledTimes(1);
-      expect(OpenAI).toHaveBeenCalledWith(
-        expect.objectContaining({ apiKey: 'old-key' })
-      );
+      expect(OpenAI).toHaveBeenCalledWith(expect.objectContaining({ apiKey: 'old-key' }));
 
       await client.refreshApiKey();
 
       // Should be called twice now (constructor + refreshApiKey)
       expect(OpenAI).toHaveBeenCalledTimes(2);
-      expect(OpenAI).toHaveBeenLastCalledWith(
-        expect.objectContaining({ apiKey: 'new-key' })
-      );
+      expect(OpenAI).toHaveBeenLastCalledWith(expect.objectContaining({ apiKey: 'new-key' }));
       expect(logger.info).toHaveBeenCalledWith('LLMClient API key refreshed');
     });
 
@@ -282,9 +274,7 @@ describe('LLMClient', () => {
 
       const client = new LLMClient();
 
-      await expect(client.refreshApiKey()).rejects.toThrow(
-        'OpenRouter API key not configured'
-      );
+      await expect(client.refreshApiKey()).rejects.toThrow('OpenRouter API key not configured');
     });
   });
 
@@ -383,18 +373,14 @@ describe('LLMClient', () => {
       const client = await createLLMClient();
 
       expect(getOpenRouterApiKey).toHaveBeenCalled();
-      expect(OpenAI).toHaveBeenCalledWith(
-        expect.objectContaining({ apiKey: 'factory-key' })
-      );
+      expect(OpenAI).toHaveBeenCalledWith(expect.objectContaining({ apiKey: 'factory-key' }));
     });
 
     it('should throw when no API key available', async () => {
       vi.mocked(getApiKeySync).mockReturnValue(undefined);
       vi.mocked(getOpenRouterApiKey).mockResolvedValue(null);
 
-      await expect(createLLMClient()).rejects.toThrow(
-        'OpenRouter API key not configured'
-      );
+      await expect(createLLMClient()).rejects.toThrow('OpenRouter API key not configured');
     });
   });
 });

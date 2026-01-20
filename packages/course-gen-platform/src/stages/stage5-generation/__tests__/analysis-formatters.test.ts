@@ -1,4 +1,3 @@
-/* eslint-disable */
 /**
  * Unit Tests for Analysis Formatters (analysis-formatters.ts)
  *

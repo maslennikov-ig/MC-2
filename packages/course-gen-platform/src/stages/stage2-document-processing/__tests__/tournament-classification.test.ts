@@ -138,7 +138,7 @@ describe('Tournament Classification Utility', () => {
       expect(plan.groups.length).toBeGreaterThan(1);
 
       // Verify all documents are included
-      const allDocs = plan.groups.flatMap((g) => g.documents);
+      const allDocs = plan.groups.flatMap(g => g.documents);
       expect(allDocs).toHaveLength(2);
     });
 
@@ -177,7 +177,7 @@ describe('Tournament Classification Utility', () => {
       expect(plan.groups).toHaveLength(3); // ceil(24_000 / 10_000) = 3
 
       // Verify all documents distributed
-      const allDocs = plan.groups.flatMap((g) => g.documents);
+      const allDocs = plan.groups.flatMap(g => g.documents);
       expect(allDocs).toHaveLength(3);
     });
 
@@ -274,7 +274,7 @@ describe('Tournament Classification Utility', () => {
       expect(plan.groups).toHaveLength(2);
 
       // Check balance: groups should have similar token counts
-      const tokenCounts = plan.groups.map((g) => g.totalTokens);
+      const tokenCounts = plan.groups.map(g => g.totalTokens);
       const maxTokens = Math.max(...tokenCounts);
       const minTokens = Math.min(...tokenCounts);
       const imbalance = maxTokens - minTokens;
@@ -318,12 +318,12 @@ describe('Tournament Classification Utility', () => {
       expect(plan.groups).toHaveLength(2);
 
       // Verify all documents included
-      const allDocs = plan.groups.flatMap((g) => g.documents);
+      const allDocs = plan.groups.flatMap(g => g.documents);
       expect(allDocs).toHaveLength(3);
 
       // Original document order should not affect grouping
-      const originalIds = documents.map((d) => d.id);
-      const groupedIds = allDocs.map((d) => d.id).sort();
+      const originalIds = documents.map(d => d.id);
+      const groupedIds = allDocs.map(d => d.id).sort();
       expect(groupedIds).toEqual(originalIds.sort());
     });
 
@@ -362,7 +362,7 @@ describe('Tournament Classification Utility', () => {
       expect(plan.groups).toHaveLength(2);
 
       // With equal-sized docs, bin packing should distribute evenly
-      const groupSizes = plan.groups.map((g) => g.documents.length);
+      const groupSizes = plan.groups.map(g => g.documents.length);
       expect(groupSizes).toEqual([2, 1]); // 2 in one group, 1 in other
     });
   });
@@ -426,7 +426,7 @@ describe('Tournament Classification Utility', () => {
       expect(plan.groups).toHaveLength(3); // ceil(15_000 / 7_000) = 3
 
       // With equal sizes, distribution should be even
-      const groupSizes = plan.groups.map((g) => g.documents.length);
+      const groupSizes = plan.groups.map(g => g.documents.length);
       expect(groupSizes).toEqual([2, 2, 1]); // 5 docs distributed across 3 groups
     });
 
@@ -465,7 +465,7 @@ describe('Tournament Classification Utility', () => {
       expect(plan.groups).toHaveLength(4); // ceil(15_000 / 4_000) = 4
 
       // More groups than documents means some groups empty? No, documents distributed
-      const allDocs = plan.groups.flatMap((g) => g.documents);
+      const allDocs = plan.groups.flatMap(g => g.documents);
       expect(allDocs).toHaveLength(3);
     });
 
@@ -515,7 +515,7 @@ describe('Tournament Classification Utility', () => {
       expect(plan.groups).toHaveLength(2);
 
       // Each document in separate group due to size difference
-      const groupSizes = plan.groups.map((g) => g.documents.length);
+      const groupSizes = plan.groups.map(g => g.documents.length);
       expect(groupSizes).toEqual([1, 1]);
     });
   });
@@ -592,7 +592,7 @@ describe('Tournament Classification Utility', () => {
       expect(plan.requiresTwoStage).toBe(true);
 
       // Verify documents retain all metadata
-      const allDocs = plan.groups.flatMap((g) => g.documents);
+      const allDocs = plan.groups.flatMap(g => g.documents);
       for (const doc of allDocs) {
         expect(doc).toHaveProperty('id');
         expect(doc).toHaveProperty('filename');

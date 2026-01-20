@@ -139,7 +139,7 @@ describe('generateSequentialXml - OLX sequential.xml template', () => {
     it('should escape special XML characters in display_name', () => {
       const sequential: OlxSequential = {
         url_name: 'algorithms',
-        display_name: 'Algorithms: "Sorting & Searching" O(n) < O(n²)',  // All special chars in sequential's display_name
+        display_name: 'Algorithms: "Sorting & Searching" O(n) < O(n²)', // All special chars in sequential's display_name
         verticals: [
           {
             url_name: 'sorting',
@@ -161,7 +161,7 @@ describe('generateSequentialXml - OLX sequential.xml template', () => {
     it('should handle vertical display_name with comparison operators', () => {
       const sequential: OlxSequential = {
         url_name: 'conditions',
-        display_name: 'Conditional Logic: Using < and > operators',  // Put special chars in sequential's display_name
+        display_name: 'Conditional Logic: Using < and > operators', // Put special chars in sequential's display_name
         verticals: [
           {
             url_name: 'less_than',
@@ -291,7 +291,9 @@ describe('generateSequentialXml - OLX sequential.xml template', () => {
 
       const result = generateSequentialXml(sequential);
 
-      expect(result).toContain('url_name="very_long_url_name_for_sequential_testing_purposes_that_is_still_valid"');
+      expect(result).toContain(
+        'url_name="very_long_url_name_for_sequential_testing_purposes_that_is_still_valid"'
+      );
       expect(result).toContain('url_name="vertical_with_very_long_url_name_for_testing"');
     });
 
@@ -338,9 +340,7 @@ describe('generateSequentialXml - OLX sequential.xml template', () => {
       const sequential: OlxSequential = {
         url_name: 'wellformed',
         display_name: 'Well-Formed Sequential',
-        verticals: [
-          { url_name: 'unit_1', display_name: 'Unit 1', components: [] },
-        ],
+        verticals: [{ url_name: 'unit_1', display_name: 'Unit 1', components: [] }],
       };
 
       const result = generateSequentialXml(sequential);
@@ -373,9 +373,7 @@ describe('generateSequentialXml - OLX sequential.xml template', () => {
       const sequential: OlxSequential = {
         url_name: 'newline',
         display_name: 'Newline Sequential',
-        verticals: [
-          { url_name: 'unit_1', display_name: 'Unit', components: [] },
-        ],
+        verticals: [{ url_name: 'unit_1', display_name: 'Unit', components: [] }],
       };
 
       const result = generateSequentialXml(sequential);
@@ -415,7 +413,11 @@ describe('generateSequentialXml - OLX sequential.xml template', () => {
         verticals: [
           { url_name: 'null_hypothesis', display_name: 'Null Hypothesis (H₀)', components: [] },
           { url_name: 'p_values', display_name: 'P-values: p < 0.05 significance', components: [] },
-          { url_name: 't_test', display_name: 'T-test: "Student\'s t-distribution"', components: [] },
+          {
+            url_name: 't_test',
+            display_name: 'T-test: "Student\'s t-distribution"',
+            components: [],
+          },
         ],
       };
 

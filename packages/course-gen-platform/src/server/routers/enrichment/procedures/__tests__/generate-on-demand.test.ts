@@ -1,4 +1,3 @@
-/* eslint-disable */
 /**
  * Unit tests for generate-on-demand enrichment tRPC procedure
  *

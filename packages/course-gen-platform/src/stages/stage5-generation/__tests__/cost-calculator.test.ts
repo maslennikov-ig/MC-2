@@ -36,8 +36,8 @@ describe('Stage 5 Cost Calculator Service', () => {
     it('should have pricing for qwen/qwen3-max with split pricing', () => {
       const pricing = OPENROUTER_PRICING['qwen/qwen3-max'];
       expect(pricing).toBeDefined();
-      expect(pricing.inputPricePerMillion).toBe(0.60);
-      expect(pricing.outputPricePerMillion).toBe(1.80);
+      expect(pricing.inputPricePerMillion).toBe(0.6);
+      expect(pricing.outputPricePerMillion).toBe(1.8);
       expect(pricing.combinedPricePerMillion).toBeUndefined();
     });
 
@@ -52,9 +52,9 @@ describe('Stage 5 Cost Calculator Service', () => {
     it('should have pricing for openai/gpt-oss-120b with unified pricing', () => {
       const pricing = OPENROUTER_PRICING['openai/gpt-oss-120b'];
       expect(pricing).toBeDefined();
-      expect(pricing.combinedPricePerMillion).toBe(0.20);
-      expect(pricing.inputPricePerMillion).toBe(0.20);
-      expect(pricing.outputPricePerMillion).toBe(0.20);
+      expect(pricing.combinedPricePerMillion).toBe(0.2);
+      expect(pricing.inputPricePerMillion).toBe(0.2);
+      expect(pricing.outputPricePerMillion).toBe(0.2);
     });
 
     it('should have pricing for google/gemini-2.5-flash with unified pricing', () => {
@@ -82,7 +82,7 @@ describe('Stage 5 Cost Calculator Service', () => {
       expect(COST_THRESHOLDS.EXPECTED_MIN).toBe(0.33);
       expect(COST_THRESHOLDS.EXPECTED_MAX).toBe(0.39);
       expect(COST_THRESHOLDS.WITH_RETRIES_MAX).toBe(0.51);
-      expect(COST_THRESHOLDS.HARD_LIMIT).toBe(0.60);
+      expect(COST_THRESHOLDS.HARD_LIMIT).toBe(0.6);
     });
 
     it('should have thresholds in ascending order', () => {
@@ -158,7 +158,11 @@ describe('Stage 5 Cost Calculator Service', () => {
         },
         cost_usd: 0,
         duration_ms: { metadata: 2000, sections: 10000, validation: 1000, total: 13000 },
-        quality_scores: { metadata_similarity: 0.94, sections_similarity: [0.91, 0.93], overall: 0.92 },
+        quality_scores: {
+          metadata_similarity: 0.94,
+          sections_similarity: [0.91, 0.93],
+          overall: 0.92,
+        },
         batch_count: 2,
         retry_count: { metadata: 1, sections: [0, 1] },
         created_at: new Date().toISOString(),
@@ -288,7 +292,7 @@ describe('Stage 5 Cost Calculator Service', () => {
       expect(assessCostStatus(0.39).status).toBe('WITHIN_TARGET');
 
       // Just above EXPECTED_MAX (0.40)
-      expect(assessCostStatus(0.40).status).toBe('ACCEPTABLE_WITH_RETRIES');
+      expect(assessCostStatus(0.4).status).toBe('ACCEPTABLE_WITH_RETRIES');
 
       // Exactly at WITH_RETRIES_MAX (0.51)
       expect(assessCostStatus(0.51).status).toBe('ACCEPTABLE_WITH_RETRIES');
@@ -297,7 +301,7 @@ describe('Stage 5 Cost Calculator Service', () => {
       expect(assessCostStatus(0.52).status).toBe('HIGH_COST_WARNING');
 
       // Exactly at HARD_LIMIT (0.60)
-      expect(assessCostStatus(0.60).status).toBe('HIGH_COST_WARNING');
+      expect(assessCostStatus(0.6).status).toBe('HIGH_COST_WARNING');
 
       // Just above HARD_LIMIT (0.61)
       expect(assessCostStatus(0.61).status).toBe('EXCEEDS_LIMIT');
@@ -341,8 +345,8 @@ describe('Stage 5 Cost Calculator Service', () => {
       const pricing = getModelPricing('qwen/qwen3-max');
 
       expect(pricing).not.toBeNull();
-      expect(pricing?.inputPricePerMillion).toBe(0.60);
-      expect(pricing?.outputPricePerMillion).toBe(1.80);
+      expect(pricing?.inputPricePerMillion).toBe(0.6);
+      expect(pricing?.outputPricePerMillion).toBe(1.8);
     });
 
     it('should return null for unknown models', () => {
@@ -441,14 +445,18 @@ describe('Stage 5 Cost Calculator Service', () => {
           validation: 'google/gemini-2.5-flash',
         },
         total_tokens: {
-          metadata: 8000,  // +60% due to retries
+          metadata: 8000, // +60% due to retries
           sections: 72000, // +60% due to retries
           validation: 5000,
           total: 85000,
         },
         cost_usd: 0,
         duration_ms: { metadata: 3000, sections: 12000, validation: 1000, total: 16000 },
-        quality_scores: { metadata_similarity: 0.93, sections_similarity: [0.89, 0.91], overall: 0.90 },
+        quality_scores: {
+          metadata_similarity: 0.93,
+          sections_similarity: [0.89, 0.91],
+          overall: 0.9,
+        },
         batch_count: 2,
         retry_count: { metadata: 2, sections: [1, 2] },
         created_at: new Date().toISOString(),

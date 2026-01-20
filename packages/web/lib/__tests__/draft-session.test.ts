@@ -288,9 +288,7 @@ describe('DraftSessionManager', () => {
 
       expect(result.success).toBe(true)
       expect(result.data).toEqual(mockSession)
-      expect(mockRedis.get).toHaveBeenCalledWith(
-        `draft:session:${testUserId}:${mockSessionId}`
-      )
+      expect(mockRedis.get).toHaveBeenCalledWith(`draft:session:${testUserId}:${mockSessionId}`)
     })
 
     it('should return null for non-existent session', async () => {
@@ -309,9 +307,7 @@ describe('DraftSessionManager', () => {
 
       expect(result.success).toBe(true)
       expect(result.data).toBeNull()
-      expect(mockRedis.get).toHaveBeenCalledWith(
-        `draft:session:different-user:${mockSessionId}`
-      )
+      expect(mockRedis.get).toHaveBeenCalledWith(`draft:session:different-user:${mockSessionId}`)
     })
 
     it('should validate retrieved session schema', async () => {
@@ -346,9 +342,7 @@ describe('DraftSessionManager', () => {
       const result = await manager.deleteSession(testUserId, mockSessionId)
 
       expect(result.success).toBe(true)
-      expect(mockRedis.delete).toHaveBeenCalledWith(
-        `draft:session:${testUserId}:${mockSessionId}`
-      )
+      expect(mockRedis.delete).toHaveBeenCalledWith(`draft:session:${testUserId}:${mockSessionId}`)
     })
 
     it('should handle deletion failures', async () => {
@@ -400,9 +394,7 @@ describe('DraftSessionManager', () => {
         slug: 'test-course',
       })
       expect(mockCreateDraftCourse).toHaveBeenCalledWith('Test Course')
-      expect(mockRedis.delete).toHaveBeenCalledWith(
-        `draft:session:${testUserId}:${mockSessionId}`
-      )
+      expect(mockRedis.delete).toHaveBeenCalledWith(`draft:session:${testUserId}:${mockSessionId}`)
     })
 
     it('should handle missing session error', async () => {
@@ -495,9 +487,7 @@ describe('DraftSessionManager', () => {
       const result = await manager.sessionExists(testUserId, mockSessionId)
 
       expect(result).toBe(true)
-      expect(mockRedis.exists).toHaveBeenCalledWith(
-        `draft:session:${testUserId}:${mockSessionId}`
-      )
+      expect(mockRedis.exists).toHaveBeenCalledWith(`draft:session:${testUserId}:${mockSessionId}`)
     })
 
     it('should return false if session does not exist', async () => {

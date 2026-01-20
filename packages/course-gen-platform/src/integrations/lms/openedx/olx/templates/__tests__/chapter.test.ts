@@ -154,16 +154,16 @@ describe('generateChapterXml - OLX chapter.xml template', () => {
     it('should handle chapter display_name with comparison operators', () => {
       const chapter: OlxChapter = {
         url_name: 'comparisons',
-        display_name: 'Comparison Operations: x < y vs x > y',  // Put special chars in chapter's display_name
+        display_name: 'Comparison Operations: x < y vs x > y', // Put special chars in chapter's display_name
         sequentials: [
           {
             url_name: 'less_than',
-            display_name: 'Less Than (<) Operator',  // These are in their own XML files
+            display_name: 'Less Than (<) Operator', // These are in their own XML files
             verticals: [],
           },
           {
             url_name: 'greater_than',
-            display_name: 'Greater Than (>) Operator',  // These are in their own XML files
+            display_name: 'Greater Than (>) Operator', // These are in their own XML files
             verticals: [],
           },
         ],
@@ -257,7 +257,9 @@ describe('generateChapterXml - OLX chapter.xml template', () => {
 
       const result = generateChapterXml(chapter);
 
-      expect(result).toContain('url_name="very_long_url_name_for_chapter_testing_purposes_that_is_still_valid"');
+      expect(result).toContain(
+        'url_name="very_long_url_name_for_chapter_testing_purposes_that_is_still_valid"'
+      );
       expect(result).toContain('url_name="sequential_with_very_long_url_name_for_testing"');
     });
 
@@ -281,7 +283,7 @@ describe('generateChapterXml - OLX chapter.xml template', () => {
     it('should handle special characters in display_name (quotes, ampersands)', () => {
       const chapter: OlxChapter = {
         url_name: 'special_chars',
-        display_name: "Chapter: \"Quotes\" & 'Apostrophes'",
+        display_name: 'Chapter: "Quotes" & \'Apostrophes\'',
         sequentials: [
           {
             url_name: 'seq_1',
@@ -305,9 +307,7 @@ describe('generateChapterXml - OLX chapter.xml template', () => {
       const chapter: OlxChapter = {
         url_name: 'wellformed',
         display_name: 'Well-Formed Chapter',
-        sequentials: [
-          { url_name: 'seq_1', display_name: 'Sequential 1', verticals: [] },
-        ],
+        sequentials: [{ url_name: 'seq_1', display_name: 'Sequential 1', verticals: [] }],
       };
 
       const result = generateChapterXml(chapter);
@@ -340,9 +340,7 @@ describe('generateChapterXml - OLX chapter.xml template', () => {
       const chapter: OlxChapter = {
         url_name: 'newline',
         display_name: 'Newline Chapter',
-        sequentials: [
-          { url_name: 'seq_1', display_name: 'Sequential', verticals: [] },
-        ],
+        sequentials: [{ url_name: 'seq_1', display_name: 'Sequential', verticals: [] }],
       };
 
       const result = generateChapterXml(chapter);
@@ -380,8 +378,16 @@ describe('generateChapterXml - OLX chapter.xml template', () => {
         display_name: 'Statistics & Machine Learning Fundamentals',
         sequentials: [
           { url_name: 'probability', display_name: 'Probability Theory', verticals: [] },
-          { url_name: 'distributions', display_name: 'Distributions: Normal & T-distribution', verticals: [] },
-          { url_name: 'hypothesis_testing', display_name: 'Hypothesis Testing (p < 0.05)', verticals: [] },
+          {
+            url_name: 'distributions',
+            display_name: 'Distributions: Normal & T-distribution',
+            verticals: [],
+          },
+          {
+            url_name: 'hypothesis_testing',
+            display_name: 'Hypothesis Testing (p < 0.05)',
+            verticals: [],
+          },
         ],
       };
 

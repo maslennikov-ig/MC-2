@@ -114,9 +114,7 @@ Content here.
       expect(result.passed).toBe(false);
       expect(result.issuesBySeverity.critical.length).toBeGreaterThan(0);
 
-      const md001Issue = result.issues.find((issue) =>
-        issue.ruleNames.includes('MD001')
-      );
+      const md001Issue = result.issues.find(issue => issue.ruleNames.includes('MD001'));
       expect(md001Issue).toBeDefined();
       expect(md001Issue?.ruleDescription).toContain('increment');
     });
@@ -136,9 +134,7 @@ More content.
       expect(result.passed).toBe(false);
       expect(result.issuesBySeverity.critical.length).toBeGreaterThan(0);
 
-      const md025Issue = result.issues.find((issue) =>
-        issue.ruleNames.includes('MD025')
-      );
+      const md025Issue = result.issues.find(issue => issue.ruleNames.includes('MD025'));
       expect(md025Issue).toBeDefined();
     });
 
@@ -171,9 +167,7 @@ const code = 'no language specified';
       expect(result.passed).toBe(false);
       expect(result.issuesBySeverity.major.length).toBeGreaterThan(0);
 
-      const md040Issue = result.issues.find((issue) =>
-        issue.ruleNames.includes('MD040')
-      );
+      const md040Issue = result.issues.find(issue => issue.ruleNames.includes('MD040'));
       expect(md040Issue).toBeDefined();
       expect(md040Issue?.ruleDescription).toContain('language');
     });
@@ -191,9 +185,7 @@ More content immediately after.
       expect(result.passed).toBe(false);
       expect(result.issuesBySeverity.major.length).toBeGreaterThan(0);
 
-      const md031Issue = result.issues.find((issue) =>
-        issue.ruleNames.includes('MD031')
-      );
+      const md031Issue = result.issues.find(issue => issue.ruleNames.includes('MD031'));
       expect(md031Issue).toBeDefined();
     });
 
@@ -224,9 +216,7 @@ const code = 'no language';
       expect(result.passed).toBe(true);
       expect(result.issuesBySeverity.minor.length).toBeGreaterThan(0);
 
-      const md009Issue = result.issues.find((issue) =>
-        issue.ruleNames.includes('MD009')
-      );
+      const md009Issue = result.issues.find(issue => issue.ruleNames.includes('MD009'));
       expect(md009Issue).toBeDefined();
     });
 
@@ -240,9 +230,7 @@ const code = 'no language';
       expect(result.passed).toBe(true);
       expect(result.issuesBySeverity.minor.length).toBeGreaterThan(0);
 
-      const md010Issue = result.issues.find((issue) =>
-        issue.ruleNames.includes('MD010')
-      );
+      const md010Issue = result.issues.find(issue => issue.ruleNames.includes('MD010'));
       expect(md010Issue).toBeDefined();
     });
 
@@ -340,10 +328,10 @@ Content.
       const result = validateMarkdownStructure(autoFixableMarkdown);
 
       // MD009 and MD010 are auto-fixable, should not be in patcherIssues
-      const md009InPatcher = result.patcherIssues.some((issue) =>
+      const md009InPatcher = result.patcherIssues.some(issue =>
         issue.description.includes('MD009')
       );
-      const md010InPatcher = result.patcherIssues.some((issue) =>
+      const md010InPatcher = result.patcherIssues.some(issue =>
         issue.description.includes('MD010')
       );
 

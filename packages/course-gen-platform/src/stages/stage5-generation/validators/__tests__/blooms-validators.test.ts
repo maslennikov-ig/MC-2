@@ -23,10 +23,10 @@ import {
   extractActionVerb,
   hasNonMeasurableVerb,
   isBloomsVerb,
-  validateBloomsTaxonomy
+  validateBloomsTaxonomy,
 } from '../../../src/services/stage5/validators/blooms-validators';
 
-describe('Bloom\'s Taxonomy Validators', () => {
+describe("Bloom's Taxonomy Validators", () => {
   describe('extractActionVerb', () => {
     it('should extract first word as verb for English', () => {
       const text1 = 'Explain closures in JavaScript';
@@ -185,7 +185,7 @@ describe('Bloom\'s Taxonomy Validators', () => {
         expect(isBloomsVerb('formulate', 'en')).toBe(true);
       });
 
-      it('should NOT recognize non-Bloom\'s verbs', () => {
+      it("should NOT recognize non-Bloom's verbs", () => {
         expect(isBloomsVerb('understand', 'en')).toBe(false);
         expect(isBloomsVerb('know', 'en')).toBe(false);
         expect(isBloomsVerb('learn', 'en')).toBe(false);
@@ -242,7 +242,7 @@ describe('Bloom\'s Taxonomy Validators', () => {
         expect(isBloomsVerb('сформулировать', 'ru')).toBe(true);
       });
 
-      it('should NOT recognize non-Bloom\'s verbs', () => {
+      it("should NOT recognize non-Bloom's verbs", () => {
         expect(isBloomsVerb('понимать', 'ru')).toBe(false);
         expect(isBloomsVerb('знать', 'ru')).toBe(false);
         expect(isBloomsVerb('изучать', 'ru')).toBe(false);
@@ -266,7 +266,7 @@ describe('Bloom\'s Taxonomy Validators', () => {
       expect(NON_MEASURABLE_VERBS_BLACKLIST.ru.length).toBe(10);
     });
 
-    it('should have 6 Bloom\'s levels for English', () => {
+    it("should have 6 Bloom's levels for English", () => {
       expect(Object.keys(BLOOMS_TAXONOMY_WHITELIST.en).length).toBe(6);
       expect(BLOOMS_TAXONOMY_WHITELIST.en).toHaveProperty('remember');
       expect(BLOOMS_TAXONOMY_WHITELIST.en).toHaveProperty('understand');
@@ -276,7 +276,7 @@ describe('Bloom\'s Taxonomy Validators', () => {
       expect(BLOOMS_TAXONOMY_WHITELIST.en).toHaveProperty('create');
     });
 
-    it('should have 6 Bloom\'s levels for Russian', () => {
+    it("should have 6 Bloom's levels for Russian", () => {
       expect(Object.keys(BLOOMS_TAXONOMY_WHITELIST.ru).length).toBe(6);
       expect(BLOOMS_TAXONOMY_WHITELIST.ru).toHaveProperty('remember');
       expect(BLOOMS_TAXONOMY_WHITELIST.ru).toHaveProperty('understand');
@@ -501,7 +501,7 @@ describe('Bloom\'s Taxonomy Validators', () => {
     });
 
     // Multiple Bloom's levels
-    describe('Bloom\'s levels detection', () => {
+    describe("Bloom's levels detection", () => {
       it('should detect "remember" level for English "define"', () => {
         const result = validateBloomsTaxonomy('define variables', 'en');
         expect(result.passed).toBe(true);
@@ -559,8 +559,8 @@ describe('Bloom\'s Taxonomy Validators', () => {
         expect(result.severity).toBe(ValidationSeverity.WARNING); // ⚠️ WARNING, not ERROR
         expect(result.score).toBe(0.7); // Partial credit
         expect(result.warnings).toBeDefined();
-        expect(result.warnings?.[0]).toContain('not in Bloom\'s whitelist');
-        expect(result.suggestion).toContain('Bloom\'s taxonomy verbs');
+        expect(result.warnings?.[0]).toContain("not in Bloom's whitelist");
+        expect(result.suggestion).toContain("Bloom's taxonomy verbs");
       });
 
       it('should return INFO severity for successful validation', () => {
@@ -569,7 +569,7 @@ describe('Bloom\'s Taxonomy Validators', () => {
         expect(result.severity).toBe(ValidationSeverity.INFO);
         expect(result.score).toBe(1.0);
         expect(result.info).toBeDefined();
-        expect(result.info?.[0]).toContain('validated at Bloom\'s level');
+        expect(result.info?.[0]).toContain("validated at Bloom's level");
       });
 
       it('should include metadata for debugging', () => {
@@ -584,7 +584,7 @@ describe('Bloom\'s Taxonomy Validators', () => {
         const result = validateBloomsTaxonomy('invalidverb task', 'ru');
         expect(result.passed).toBe(false);
         expect(result.suggestion).toBeDefined();
-        expect(result.suggestion).toContain('Bloom\'s taxonomy verbs');
+        expect(result.suggestion).toContain("Bloom's taxonomy verbs");
         expect(result.suggestion).toContain('ru'); // Language-specific
       });
     });

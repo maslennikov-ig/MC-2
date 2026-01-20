@@ -33,11 +33,7 @@ describe('FR-015: Minimum Lessons Validation', () => {
         lessons.push({
           lesson_number: globalLessonNumber++,
           lesson_title: `Lesson ${globalLessonNumber - 1} Title`,
-          lesson_objectives: [
-            'Objective 1',
-            'Objective 2',
-            'Objective 3',
-          ],
+          lesson_objectives: ['Objective 1', 'Objective 2', 'Objective 3'],
           key_topics: ['Topic 1', 'Topic 2', 'Topic 3'],
           estimated_duration_minutes: 15,
           practical_exercises: [
@@ -78,11 +74,7 @@ describe('FR-015: Minimum Lessons Validation', () => {
       estimated_duration_hours: lessonCount * 0.25, // 15 min per lesson
       difficulty_level: 'intermediate',
       prerequisites: ['Basic knowledge', 'Test prerequisite'],
-      learning_outcomes: [
-        'Learning outcome 1',
-        'Learning outcome 2',
-        'Learning outcome 3',
-      ],
+      learning_outcomes: ['Learning outcome 1', 'Learning outcome 2', 'Learning outcome 3'],
       assessment_strategy: {
         quiz_per_section: true,
         final_exam: false,
@@ -299,7 +291,10 @@ describe('FR-015: Minimum Lessons Validation', () => {
 
       const result = CourseStructureSchema.safeParse(course);
       if (!result.success) {
-        console.log('Single section validation errors:', JSON.stringify(result.error.format(), null, 2));
+        console.log(
+          'Single section validation errors:',
+          JSON.stringify(result.error.format(), null, 2)
+        );
       }
       expect(result.success).toBe(true);
     });
@@ -427,7 +422,10 @@ describe('FR-015: Minimum Lessons Validation', () => {
 
       const result = CourseStructureSchema.safeParse(course);
       if (!result.success) {
-        console.log('Uneven distribution validation errors:', JSON.stringify(result.error.format(), null, 2));
+        console.log(
+          'Uneven distribution validation errors:',
+          JSON.stringify(result.error.format(), null, 2)
+        );
       }
       expect(result.success).toBe(true);
     });
@@ -468,7 +466,9 @@ describe('FR-015: Minimum Lessons Validation', () => {
         const error = result.error.errors[0];
 
         // Verify error message
-        expect(error.message).toBe('Course must have minimum 10 lessons total across all sections (FR-015)');
+        expect(error.message).toBe(
+          'Course must have minimum 10 lessons total across all sections (FR-015)'
+        );
 
         // Verify error path
         expect(error.path).toEqual(['sections']);

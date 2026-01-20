@@ -1,4 +1,3 @@
-/* eslint-disable */
 /**
  * Integration test for auto-mute flow
  *

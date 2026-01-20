@@ -150,7 +150,11 @@ describe('Inter-Lesson Context (buildLessonContext)', () => {
       expect(firstLesson.lesson_context?.next_lesson?.lesson_id).toBe('1.2');
       expect(firstLesson.lesson_context?.next_lesson?.title).toBe('Lesson 2');
       expect(firstLesson.lesson_context?.next_lesson?.key_concepts).toHaveLength(3); // Max 3 for next_lesson
-      expect(firstLesson.lesson_context?.next_lesson?.key_concepts).toEqual(['Topic C', 'Topic D', 'Topic E']);
+      expect(firstLesson.lesson_context?.next_lesson?.key_concepts).toEqual([
+        'Topic C',
+        'Topic D',
+        'Topic E',
+      ]);
     });
 
     it('should have empty concepts_already_covered for first lesson', () => {
@@ -229,7 +233,9 @@ describe('Inter-Lesson Context (buildLessonContext)', () => {
         'Topic D',
         'Topic E',
       ]);
-      expect(lastLesson.lesson_context?.previous_lesson?.summary_preview).toBe('Learn topic A. Understand topic B');
+      expect(lastLesson.lesson_context?.previous_lesson?.summary_preview).toBe(
+        'Learn topic A. Understand topic B'
+      );
     });
   });
 
@@ -463,9 +469,14 @@ describe('Inter-Lesson Context (buildLessonContext)', () => {
       // Should reference last lesson of section 1
       expect(firstLessonOfSection2.lesson_context?.previous_lesson).toBeDefined();
       expect(firstLessonOfSection2.lesson_context?.previous_lesson?.lesson_id).toBe('1.2');
-      expect(firstLessonOfSection2.lesson_context?.previous_lesson?.title).toBe('Section 1 - Lesson 2');
+      expect(firstLessonOfSection2.lesson_context?.previous_lesson?.title).toBe(
+        'Section 1 - Lesson 2'
+      );
       // Should have concepts from all previous lessons
-      expect(firstLessonOfSection2.lesson_context?.concepts_already_covered).toEqual(['Topic A', 'Topic B']);
+      expect(firstLessonOfSection2.lesson_context?.concepts_already_covered).toEqual([
+        'Topic A',
+        'Topic B',
+      ]);
     });
 
     it('should accumulate concepts across multiple sections', () => {
@@ -595,7 +606,7 @@ describe('Inter-Lesson Context (buildLessonContext)', () => {
       // Don't pass allSections parameter
       const specs = convertSectionToV2Specs(section, 0, input);
 
-      specs.forEach((spec) => {
+      specs.forEach(spec => {
         expect(spec.lesson_context).toBeUndefined();
       });
     });

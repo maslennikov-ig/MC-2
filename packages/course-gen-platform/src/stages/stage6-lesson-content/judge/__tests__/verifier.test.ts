@@ -43,12 +43,12 @@ import type {
  */
 function createMockCriteriaScores(overrides: Partial<CriteriaScores> = {}): CriteriaScores {
   return {
-    learning_objective_alignment: 0.80,
+    learning_objective_alignment: 0.8,
     pedagogical_structure: 0.75,
     factual_accuracy: 0.85,
     clarity_readability: 0.78,
     engagement_examples: 0.72,
-    completeness: 0.70,
+    completeness: 0.7,
     ...overrides,
   };
 }
@@ -84,12 +84,12 @@ function createMockTargetedIssue(overrides: Partial<TargetedIssue> = {}): Target
 describe('checkQualityLocks', () => {
   it('should pass when scores stay the same', () => {
     const locksBeforePatch = {
-      clarity_readability: 0.80,
+      clarity_readability: 0.8,
       factual_accuracy: 0.85,
     };
 
     const scoresAfterPatch = createMockCriteriaScores({
-      clarity_readability: 0.80,
+      clarity_readability: 0.8,
       factual_accuracy: 0.85,
     });
 
@@ -102,13 +102,13 @@ describe('checkQualityLocks', () => {
 
   it('should pass when scores improve', () => {
     const locksBeforePatch = {
-      clarity_readability: 0.80,
+      clarity_readability: 0.8,
       factual_accuracy: 0.85,
     };
 
     const scoresAfterPatch = createMockCriteriaScores({
       clarity_readability: 0.85, // Improved
-      factual_accuracy: 0.90,    // Improved
+      factual_accuracy: 0.9, // Improved
     });
 
     const result = checkQualityLocks(locksBeforePatch, scoresAfterPatch, 'sec_1');
@@ -119,7 +119,7 @@ describe('checkQualityLocks', () => {
 
   it('should pass when score drops within tolerance (default 5%)', () => {
     const locksBeforePatch = {
-      clarity_readability: 0.80,
+      clarity_readability: 0.8,
     };
 
     const scoresAfterPatch = createMockCriteriaScores({
@@ -134,11 +134,11 @@ describe('checkQualityLocks', () => {
 
   it('should fail when score drops more than tolerance', () => {
     const locksBeforePatch = {
-      clarity_readability: 0.80,
+      clarity_readability: 0.8,
     };
 
     const scoresAfterPatch = createMockCriteriaScores({
-      clarity_readability: 0.70, // -10%, exceeds 5% tolerance
+      clarity_readability: 0.7, // -10%, exceeds 5% tolerance
     });
 
     const result = checkQualityLocks(locksBeforePatch, scoresAfterPatch, 'sec_1');
@@ -148,23 +148,23 @@ describe('checkQualityLocks', () => {
 
     // Check violation details (use toBeCloseTo for delta due to floating point)
     expect(result.violations[0].criterion).toBe('clarity_readability');
-    expect(result.violations[0].lockedScore).toBe(0.80);
-    expect(result.violations[0].newScore).toBe(0.70);
-    expect(result.violations[0].delta).toBeCloseTo(-0.10, 5);
+    expect(result.violations[0].lockedScore).toBe(0.8);
+    expect(result.violations[0].newScore).toBe(0.7);
+    expect(result.violations[0].delta).toBeCloseTo(-0.1, 5);
     expect(result.violations[0].sectionId).toBe('sec_1');
   });
 
   it('should detect multiple violations', () => {
     const locksBeforePatch = {
-      clarity_readability: 0.80,
+      clarity_readability: 0.8,
       factual_accuracy: 0.85,
       completeness: 0.75,
     };
 
     const scoresAfterPatch = createMockCriteriaScores({
-      clarity_readability: 0.70, // -10%, violation
-      factual_accuracy: 0.75,    // -10%, violation
-      completeness: 0.73,        // -2%, within tolerance
+      clarity_readability: 0.7, // -10%, violation
+      factual_accuracy: 0.75, // -10%, violation
+      completeness: 0.73, // -2%, within tolerance
     });
 
     const result = checkQualityLocks(locksBeforePatch, scoresAfterPatch, 'sec_2');
@@ -180,7 +180,7 @@ describe('checkQualityLocks', () => {
 
   it('should respect custom tolerance parameter', () => {
     const locksBeforePatch = {
-      clarity_readability: 0.80,
+      clarity_readability: 0.8,
     };
 
     const scoresAfterPatch = createMockCriteriaScores({
@@ -193,20 +193,20 @@ describe('checkQualityLocks', () => {
     expect(result1.violations).toHaveLength(1);
 
     // With 10% tolerance: should pass
-    const result2 = checkQualityLocks(locksBeforePatch, scoresAfterPatch, 'sec_1', 0.10);
+    const result2 = checkQualityLocks(locksBeforePatch, scoresAfterPatch, 'sec_1', 0.1);
     expect(result2.passed).toBe(true);
     expect(result2.violations).toHaveLength(0);
   });
 
   it('should skip criteria not in locks', () => {
     const locksBeforePatch = {
-      clarity_readability: 0.80,
+      clarity_readability: 0.8,
       // factual_accuracy NOT locked
     };
 
     const scoresAfterPatch = createMockCriteriaScores({
       clarity_readability: 0.79, // Within tolerance
-      factual_accuracy: 0.50,    // Dropped significantly, but not locked
+      factual_accuracy: 0.5, // Dropped significantly, but not locked
     });
 
     const result = checkQualityLocks(locksBeforePatch, scoresAfterPatch, 'sec_1');
@@ -227,7 +227,7 @@ describe('checkQualityLocks', () => {
 
   it('should include section ID in violations', () => {
     const locksBeforePatch = {
-      clarity_readability: 0.80,
+      clarity_readability: 0.8,
     };
 
     const scoresAfterPatch = createMockCriteriaScores({
@@ -247,18 +247,18 @@ describe('checkQualityLocks', () => {
 describe('initializeQualityLocks', () => {
   it('should lock criteria >= default threshold (0.75)', () => {
     const scores = createMockCriteriaScores({
-      learning_objective_alignment: 0.80, // >= 0.75, should lock
-      pedagogical_structure: 0.75,        // >= 0.75, should lock
-      factual_accuracy: 0.85,             // >= 0.75, should lock
-      clarity_readability: 0.70,          // < 0.75, should NOT lock
-      engagement_examples: 0.72,          // < 0.75, should NOT lock
-      completeness: 0.74,                 // < 0.75, should NOT lock
+      learning_objective_alignment: 0.8, // >= 0.75, should lock
+      pedagogical_structure: 0.75, // >= 0.75, should lock
+      factual_accuracy: 0.85, // >= 0.75, should lock
+      clarity_readability: 0.7, // < 0.75, should NOT lock
+      engagement_examples: 0.72, // < 0.75, should NOT lock
+      completeness: 0.74, // < 0.75, should NOT lock
     });
 
     const locks = initializeQualityLocks(scores);
 
     expect(locks).toEqual({
-      learning_objective_alignment: 0.80,
+      learning_objective_alignment: 0.8,
       pedagogical_structure: 0.75,
       factual_accuracy: 0.85,
     });
@@ -266,12 +266,12 @@ describe('initializeQualityLocks', () => {
 
   it('should not lock failing criteria', () => {
     const scores: CriteriaScores = {
-      learning_objective_alignment: 0.60,
+      learning_objective_alignment: 0.6,
       pedagogical_structure: 0.55,
-      factual_accuracy: 0.50,
-      clarity_readability: 0.60,
+      factual_accuracy: 0.5,
+      clarity_readability: 0.6,
       engagement_examples: 0.45,
-      completeness: 0.40,
+      completeness: 0.4,
     };
 
     const locks = initializeQualityLocks(scores);
@@ -284,7 +284,7 @@ describe('initializeQualityLocks', () => {
   it('should respect custom threshold', () => {
     const scores: CriteriaScores = {
       learning_objective_alignment: 0.85,
-      pedagogical_structure: 0.80,
+      pedagogical_structure: 0.8,
       factual_accuracy: 0.79,
       clarity_readability: 0.78,
       engagement_examples: 0.77,
@@ -292,22 +292,22 @@ describe('initializeQualityLocks', () => {
     };
 
     // With threshold 0.80
-    const locks = initializeQualityLocks(scores, 0.80);
+    const locks = initializeQualityLocks(scores, 0.8);
 
     expect(locks).toEqual({
       learning_objective_alignment: 0.85,
-      pedagogical_structure: 0.80,
+      pedagogical_structure: 0.8,
       // All others < 0.80, not locked
     });
   });
 
   it('should lock all criteria when all pass', () => {
     const scores = createMockCriteriaScores({
-      learning_objective_alignment: 0.90,
+      learning_objective_alignment: 0.9,
       pedagogical_structure: 0.85,
       factual_accuracy: 0.88,
       clarity_readability: 0.82,
-      engagement_examples: 0.80,
+      engagement_examples: 0.8,
       completeness: 0.76,
     });
 
@@ -329,11 +329,11 @@ describe('initializeQualityLocks', () => {
 
   it('should return empty locks for all-failing scores', () => {
     const scores = createMockCriteriaScores({
-      learning_objective_alignment: 0.50,
+      learning_objective_alignment: 0.5,
       pedagogical_structure: 0.45,
-      factual_accuracy: 0.40,
+      factual_accuracy: 0.4,
       clarity_readability: 0.35,
-      engagement_examples: 0.30,
+      engagement_examples: 0.3,
       completeness: 0.25,
     });
 
@@ -426,7 +426,8 @@ Third paragraph sentence one. Third paragraph sentence two.`;
   });
 
   it('should handle very long sentences', () => {
-    const longSentence = 'This is a very long sentence with many words that goes on and on and contains lots of information and details.';
+    const longSentence =
+      'This is a very long sentence with many words that goes on and on and contains lots of information and details.';
 
     const metrics = calculateUniversalReadability(longSentence);
 
@@ -451,7 +452,7 @@ describe('validateReadability', () => {
   it('should pass valid metrics within thresholds', () => {
     const validMetrics = {
       avgSentenceLength: 17, // Target, well below max 25
-      avgWordLength: 6,      // Well below max 10
+      avgWordLength: 6, // Well below max 10
       paragraphBreakRatio: 0.12, // Above min 0.08
     };
 
@@ -465,7 +466,7 @@ describe('validateReadability', () => {
     const longSentences = {
       avgSentenceLength: 30, // Exceeds max 25
       avgWordLength: 6,
-      paragraphBreakRatio: 0.10,
+      paragraphBreakRatio: 0.1,
     };
 
     const result = validateReadability(longSentences);
@@ -481,7 +482,7 @@ describe('validateReadability', () => {
     const longWords = {
       avgSentenceLength: 17,
       avgWordLength: 12, // Exceeds max 10
-      paragraphBreakRatio: 0.10,
+      paragraphBreakRatio: 0.1,
     };
 
     const result = validateReadability(longWords);
@@ -512,7 +513,7 @@ describe('validateReadability', () => {
   it('should detect multiple readability issues', () => {
     const multipleIssues = {
       avgSentenceLength: 30, // Too long
-      avgWordLength: 12,     // Too long
+      avgWordLength: 12, // Too long
       paragraphBreakRatio: 0.05, // Too low
     };
 
@@ -525,7 +526,7 @@ describe('validateReadability', () => {
   it('should pass metrics at exact thresholds', () => {
     const atThresholds = {
       avgSentenceLength: 25, // Exactly at max
-      avgWordLength: 10,     // Exactly at max
+      avgWordLength: 10, // Exactly at max
       paragraphBreakRatio: 0.08, // Exactly at min
     };
 
@@ -540,7 +541,7 @@ describe('validateReadability', () => {
     const justOver = {
       avgSentenceLength: 25.1, // Just over max 25
       avgWordLength: 6,
-      paragraphBreakRatio: 0.10,
+      paragraphBreakRatio: 0.1,
     };
 
     const result = validateReadability(justOver);
@@ -566,7 +567,7 @@ describe('validateReadability', () => {
     const metrics = {
       avgSentenceLength: 30,
       avgWordLength: 6,
-      paragraphBreakRatio: 0.10,
+      paragraphBreakRatio: 0.1,
     };
 
     // Custom config with higher max sentence length

@@ -1,4 +1,3 @@
-/* eslint-disable */
 /**
  * Phase 5 Assembly Service Tests
  *
