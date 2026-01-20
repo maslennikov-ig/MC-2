@@ -23,35 +23,40 @@ describe('TokenEstimator', () => {
 
   describe('Language Detection', () => {
     it('should detect English correctly', () => {
-      const text = 'The quick brown fox jumps over the lazy dog. This is a longer English text to ensure accurate language detection.';
+      const text =
+        'The quick brown fox jumps over the lazy dog. This is a longer English text to ensure accurate language detection.';
       const language = estimator.detectLanguage(text);
 
       expect(language).toBe('eng');
     });
 
     it('should detect Russian correctly', () => {
-      const text = 'Быстрая коричневая лиса прыгает через ленивую собаку. Это более длинный русский текст для точного определения языка.';
+      const text =
+        'Быстрая коричневая лиса прыгает через ленивую собаку. Это более длинный русский текст для точного определения языка.';
       const language = estimator.detectLanguage(text);
 
       expect(language).toBe('rus');
     });
 
     it('should detect German correctly', () => {
-      const text = 'Der schnelle braune Fuchs springt über den faulen Hund. Dies ist ein längerer deutscher Text zur genauen Spracherkennung.';
+      const text =
+        'Der schnelle braune Fuchs springt über den faulen Hund. Dies ist ein längerer deutscher Text zur genauen Spracherkennung.';
       const language = estimator.detectLanguage(text);
 
       expect(language).toBe('deu');
     });
 
     it('should detect French correctly', () => {
-      const text = 'Le renard brun rapide saute par-dessus le chien paresseux. Ceci est un texte français plus long pour une détection de langue précise.';
+      const text =
+        'Le renard brun rapide saute par-dessus le chien paresseux. Ceci est un texte français plus long pour une détection de langue précise.';
       const language = estimator.detectLanguage(text);
 
       expect(language).toBe('fra');
     });
 
     it('should detect Spanish correctly', () => {
-      const text = 'El rápido zorro marrón salta sobre el perro perezoso. Este es un texto español más largo para una detección de idioma precisa.';
+      const text =
+        'El rápido zorro marrón salta sobre el perro perezoso. Este es un texto español más largo para una detección de idioma precisa.';
       const language = estimator.detectLanguage(text);
 
       expect(language).toBe('spa');
@@ -71,7 +76,8 @@ describe('TokenEstimator', () => {
 
     it('should handle mixed English and Russian text', () => {
       // Mixed text may detect as either language depending on predominance
-      const text = 'Hello Привет World Мир. This is mixed content with both English and Russian words for testing language detection.';
+      const text =
+        'Hello Привет World Мир. This is mixed content with both English and Russian words for testing language detection.';
       const language = estimator.detectLanguage(text);
 
       // Should detect as one of the two languages (franc picks most prevalent)
@@ -79,7 +85,8 @@ describe('TokenEstimator', () => {
     });
 
     it('should handle text with emojis and special characters', () => {
-      const text = 'Hello world! 😊 This is a test with emojis 🎉 and special characters: @#$%^&*()';
+      const text =
+        'Hello world! 😊 This is a test with emojis 🎉 and special characters: @#$%^&*()';
       const language = estimator.detectLanguage(text);
 
       expect(language).toBe('eng');
@@ -169,7 +176,8 @@ describe('TokenEstimator', () => {
     describe('Accuracy Tests (±10% target)', () => {
       it('should estimate English tokens within ±10% of expected', () => {
         // Sample English technical text (approximate known token count)
-        const text = 'The Token Estimator Service provides language detection and token count estimation based on character-to-token ratios. It supports automatic language detection using franc library.';
+        const text =
+          'The Token Estimator Service provides language detection and token count estimation based on character-to-token ratios. It supports automatic language detection using franc library.';
         // 182 chars / 4.0 = 45.5 tokens (rounded up to 46)
         const tokens = estimator.estimateTokens(text);
 
@@ -180,7 +188,8 @@ describe('TokenEstimator', () => {
 
       it('should estimate Russian tokens within ±10% of expected', () => {
         // Sample Russian text
-        const text = 'Служба оценки токенов обеспечивает обнаружение языка и оценку количества токенов на основе соотношения символов к токенам.';
+        const text =
+          'Служба оценки токенов обеспечивает обнаружение языка и оценку количества токенов на основе соотношения символов к токенам.';
         // 124 chars / 3.2 = 38.75 tokens (rounded up to 39)
         const tokens = estimator.estimateTokens(text);
 
@@ -191,7 +200,8 @@ describe('TokenEstimator', () => {
 
       it('should estimate German tokens within ±10% of expected', () => {
         // Sample German text with compound words
-        const text = 'Der Token-Schätzdienst bietet Spracherkennung und Token-Zählschätzung basierend auf Zeichen-zu-Token-Verhältnissen.';
+        const text =
+          'Der Token-Schätzdienst bietet Spracherkennung und Token-Zählschätzung basierend auf Zeichen-zu-Token-Verhältnissen.';
         // 117 chars / 4.5 = 26 tokens
         const tokens = estimator.estimateTokens(text);
 
@@ -301,11 +311,7 @@ describe('TokenEstimator', () => {
 
   describe('Batch Estimation', () => {
     it('should estimate tokens for multiple texts', () => {
-      const texts = [
-        'Hello world',
-        'Привет мир',
-        'Bonjour le monde',
-      ];
+      const texts = ['Hello world', 'Привет мир', 'Bonjour le monde'];
 
       const counts = estimator.batchEstimateTokens(texts);
 

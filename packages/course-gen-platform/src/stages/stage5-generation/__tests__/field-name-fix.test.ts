@@ -186,10 +186,7 @@ describe('fixFieldNames - Arrays', () => {
       courseSections: [
         {
           sectionTitle: 'Section 1',
-          lessonList: [
-            { lessonTitle: 'Lesson 1.1' },
-            { lessonTitle: 'Lesson 1.2' },
-          ],
+          lessonList: [{ lessonTitle: 'Lesson 1.1' }, { lessonTitle: 'Lesson 1.2' }],
         },
       ],
     };
@@ -199,10 +196,7 @@ describe('fixFieldNames - Arrays', () => {
       course_sections: [
         {
           section_title: 'Section 1',
-          lesson_list: [
-            { lesson_title: 'Lesson 1.1' },
-            { lesson_title: 'Lesson 1.2' },
-          ],
+          lesson_list: [{ lesson_title: 'Lesson 1.1' }, { lesson_title: 'Lesson 1.2' }],
         },
       ],
     });
@@ -607,9 +601,9 @@ describe('fixFieldNames - Performance and stress tests', () => {
 
     const result = fixFieldNames(deepNested);
 
-    expect(result.level1.level2.level3.level4.level5.level6.level7.level8.level9.level10.deep_value).toBe(
-      'value'
-    );
+    expect(
+      result.level1.level2.level3.level4.level5.level6.level7.level8.level9.level10.deep_value
+    ).toBe('value');
   });
 
   it('should handle large arrays of objects', () => {

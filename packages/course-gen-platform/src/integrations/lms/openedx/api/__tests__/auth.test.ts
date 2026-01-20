@@ -111,7 +111,7 @@ describe('OpenEdXAuth', () => {
       expect(token1).toBe('expired-token');
 
       // Wait for token to expire
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      await new Promise(resolve => setTimeout(resolve, 100));
 
       // Second token after expiry
       mockAxiosInstance.post.mockResolvedValueOnce({

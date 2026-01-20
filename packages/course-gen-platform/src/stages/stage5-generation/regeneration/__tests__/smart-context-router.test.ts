@@ -4,7 +4,11 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { detectContextTier, getTokenBudget, _TIER_PATTERNS } from '@/shared/regeneration/smart-context-router';
+import {
+  detectContextTier,
+  getTokenBudget,
+  _TIER_PATTERNS,
+} from '@/shared/regeneration/smart-context-router';
 
 describe('detectContextTier', () => {
   describe('Atomic tier detection', () => {
@@ -177,7 +181,7 @@ describe('_TIER_PATTERNS (pattern validation)', () => {
   it('should have lowercase patterns only', () => {
     for (const tier of Object.keys(_TIER_PATTERNS)) {
       const patterns = _TIER_PATTERNS[tier as keyof typeof _TIER_PATTERNS];
-      patterns.forEach((pattern) => {
+      patterns.forEach(pattern => {
         expect(pattern).toBe(pattern.toLowerCase());
       });
     }
@@ -185,8 +189,7 @@ describe('_TIER_PATTERNS (pattern validation)', () => {
 
   it('should include both English and Russian patterns', () => {
     // Check for at least one Cyrillic pattern per tier
-    const hasCyrillic = (patterns: string[]) =>
-      patterns.some((p) => /[а-яА-Я]/.test(p));
+    const hasCyrillic = (patterns: string[]) => patterns.some(p => /[а-яА-Я]/.test(p));
 
     expect(hasCyrillic(_TIER_PATTERNS.atomic)).toBe(true);
     expect(hasCyrillic(_TIER_PATTERNS.local)).toBe(true);

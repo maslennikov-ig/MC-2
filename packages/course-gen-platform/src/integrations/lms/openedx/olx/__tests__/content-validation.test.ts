@@ -394,7 +394,8 @@ describe('validateContentTypes', () => {
     it('should issue iframe warning only once for multiple iframe elements', () => {
       const input = createValidCourseInput();
       // Replace first unit with iframe content
-      input.chapters[0].sections[0].units[0].content = '<iframe src="https://example1.com"></iframe>';
+      input.chapters[0].sections[0].units[0].content =
+        '<iframe src="https://example1.com"></iframe>';
       // Add more units with iframe
       input.chapters[0].sections[0].units.push({
         id: 'unit-2',
@@ -433,13 +434,9 @@ describe('validateContentTypes', () => {
       expect(result.valid).toBe(true);
       expect(result.errors).toHaveLength(0);
       expect(result.warnings).toHaveLength(3);
-      expect(result.warnings.some((w) => w.includes('Video content detected'))).toBe(true);
-      expect(result.warnings.some((w) => w.includes('Quiz/assessment content detected'))).toBe(
-        true
-      );
-      expect(result.warnings.some((w) => w.includes('External embed (iframe) detected'))).toBe(
-        true
-      );
+      expect(result.warnings.some(w => w.includes('Video content detected'))).toBe(true);
+      expect(result.warnings.some(w => w.includes('Quiz/assessment content detected'))).toBe(true);
+      expect(result.warnings.some(w => w.includes('External embed (iframe) detected'))).toBe(true);
     });
 
     it('should handle warnings across multiple chapters, sections, and units', () => {
@@ -482,10 +479,8 @@ describe('validateContentTypes', () => {
       expect(result.valid).toBe(true);
       expect(result.errors).toHaveLength(0);
       expect(result.warnings).toHaveLength(2);
-      expect(result.warnings.some((w) => w.includes('Video content detected'))).toBe(true);
-      expect(result.warnings.some((w) => w.includes('Quiz/assessment content detected'))).toBe(
-        true
-      );
+      expect(result.warnings.some(w => w.includes('Video content detected'))).toBe(true);
+      expect(result.warnings.some(w => w.includes('Quiz/assessment content detected'))).toBe(true);
     });
   });
 
@@ -542,7 +537,8 @@ describe('validateContentTypes', () => {
 
     it('should handle case-insensitive iframe tag detection', () => {
       const input = createValidCourseInput();
-      input.chapters[0].sections[0].units[0].content = '<IFRAME src="https://example.com"></IFRAME>';
+      input.chapters[0].sections[0].units[0].content =
+        '<IFRAME src="https://example.com"></IFRAME>';
 
       const result = validateContentTypes(input);
 

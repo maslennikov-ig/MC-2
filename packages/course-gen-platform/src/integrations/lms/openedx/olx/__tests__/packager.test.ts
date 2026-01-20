@@ -716,10 +716,7 @@ describe('packageOLX - UTF-8 Content Handling', () => {
   it('should preserve Chinese characters in course.xml', async () => {
     const structure = createMinimalOLXStructure();
 
-    structure.courseXml = structure.courseXml.replace(
-      'Test Course',
-      '测试课程'
-    );
+    structure.courseXml = structure.courseXml.replace('Test Course', '测试课程');
 
     const result = await packageOLX(structure);
     const fileMap = await extractTarGz(result.buffer);

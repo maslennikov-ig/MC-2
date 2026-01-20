@@ -107,7 +107,8 @@ function createMockSectionExpanderInput(
   return {
     sectionId: 'sec_intro',
     sectionTitle: 'Introduction to Machine Learning',
-    originalContent: 'Machine learning is a field of computer science that uses statistical techniques.',
+    originalContent:
+      'Machine learning is a field of computer science that uses statistical techniques.',
     issues: [createMockTargetedIssue()],
     ragChunks: ['Machine learning is a subset of artificial intelligence.'],
     learningObjectives: ['Understand basic ML concepts', 'Identify ML types'],
@@ -355,7 +356,7 @@ describe('T040 - Patcher Execution Tests', () => {
 
       expect(prompt).toContain('OUTPUT REQUIREMENTS');
       expect(prompt).toContain('Return ONLY the corrected section content');
-      expect(prompt).toContain('Preserve all text that doesn\'t need fixing');
+      expect(prompt).toContain("Preserve all text that doesn't need fixing");
       expect(prompt).toContain('Maintain coherent transitions');
     });
   });

@@ -257,7 +257,9 @@ ExerciseSchema = z.object({
   return buildBaselinePrompt(context) + '\n\n' + schemaDoc;
 }
 
-function getPromptBuilder(promptType: TestScenario['promptType']): (context: typeof TEST_SECTION_CONTEXT) => string {
+function getPromptBuilder(
+  promptType: TestScenario['promptType']
+): (context: typeof TEST_SECTION_CONTEXT) => string {
   switch (promptType) {
     case 'baseline':
       return buildBaselinePrompt;
@@ -317,7 +319,7 @@ async function runScenarioTest(scenario: TestScenario): Promise<TestResult> {
       configuration: {
         baseURL: OPENROUTER_BASE_URL,
       },
-      apiKey: process.env.OPENROUTER_API_KEY!,  // Updated for @langchain/openai v1.x
+      apiKey: process.env.OPENROUTER_API_KEY!, // Updated for @langchain/openai v1.x
       temperature: 0.7,
       maxTokens: 30000,
       timeout: 300000, // 5 minutes
@@ -344,7 +346,7 @@ async function runScenarioTest(scenario: TestScenario): Promise<TestResult> {
       enabledLayers: ['auto-repair', 'critique-revise'],
       maxRetries: 5,
       model: model,
-      qualityValidator: (data) => {
+      qualityValidator: data => {
         return data.sections && Array.isArray(data.sections) && data.sections.length > 0;
       },
       metricsTracking: true,
@@ -384,7 +386,7 @@ async function runScenarioTest(scenario: TestScenario): Promise<TestResult> {
 
     if (!validationResult.success) {
       result.validationErrors = validationResult.error.errors.map(
-        (e) => `${e.path.join('.')}: ${e.message}`
+        e => `${e.path.join('.')}: ${e.message}`
       );
       return result;
     }
@@ -394,7 +396,6 @@ async function runScenarioTest(scenario: TestScenario): Promise<TestResult> {
     result.qualityScore = calculateQualityScore(section);
 
     console.log(`[Test] ✅ Success - Quality: ${result.qualityScore?.toFixed(2)}`);
-
   } catch (error) {
     result.parseError = error instanceof Error ? error.message : 'Unknown error';
     console.log(`[Test] ❌ Failed - ${result.parseError}`);
@@ -422,7 +423,7 @@ function calculateQualityScore(section: Section): number {
 
   // Factor 3: Lesson completeness (0.4)
   if (section.lessons) {
-    const validLessons = section.lessons.filter((lesson) => {
+    const validLessons = section.lessons.filter(lesson => {
       const hasObjectives = lesson.lesson_objectives && lesson.lesson_objectives.length > 0;
       const hasTopics = lesson.key_topics && lesson.key_topics.length >= 2;
       const hasExercises = lesson.practical_exercises && lesson.practical_exercises.length >= 3;
@@ -462,14 +463,16 @@ describe('Qwen3-235B Section Generation - Direct Testing', () => {
     expect(results).toHaveLength(4);
 
     // At least control (gpt-oss-120b) should pass
-    const controlResult = results.find((r) => r.model === MODELS.gpt_oss_120b);
+    const controlResult = results.find(r => r.model === MODELS.gpt_oss_120b);
     expect(controlResult).toBeDefined();
     expect(controlResult?.parseSuccess).toBe(true);
 
     console.log('\n\n=== TEST RESULTS SUMMARY ===\n');
-    results.forEach((r) => {
+    results.forEach(r => {
       console.log(`${r.scenario}:`);
-      console.log(`  Parse: ${r.parseSuccess ? '✅' : '❌'} | Layer: ${r.layerUsed} | Quality: ${r.qualityScore?.toFixed(2) || 'N/A'}`);
+      console.log(
+        `  Parse: ${r.parseSuccess ? '✅' : '❌'} | Layer: ${r.layerUsed} | Quality: ${r.qualityScore?.toFixed(2) || 'N/A'}`
+      );
     });
   }, 600000); // 10 minutes timeout
 });
@@ -487,9 +490,9 @@ async function generateInvestigationReport(results: TestResult[]): Promise<void>
   const timestamp = new Date().toISOString().split('T')[0];
 
   // Calculate statistics
-  const qwen3Results = results.filter((r) => r.model === MODELS.qwen3_235b);
-  const controlResult = results.find((r) => r.model === MODELS.gpt_oss_120b);
-  const qwen3SuccessRate = qwen3Results.filter((r) => r.parseSuccess).length / qwen3Results.length;
+  const qwen3Results = results.filter(r => r.model === MODELS.qwen3_235b);
+  const controlResult = results.find(r => r.model === MODELS.gpt_oss_120b);
+  const qwen3SuccessRate = qwen3Results.filter(r => r.parseSuccess).length / qwen3Results.length;
 
   const report = `# Investigation: Qwen3-235B Section Generation Quality Analysis
 
@@ -506,7 +509,7 @@ async function generateInvestigationReport(results: TestResult[]): Promise<void>
 Isolated testing of qwen3-235b model for section generation to determine if T053 failures are **model-specific** or **prompt-specific**.
 
 **Key Findings**:
-- **Qwen3-235B Success Rate**: ${(qwen3SuccessRate * 100).toFixed(0)}% (${qwen3Results.filter((r) => r.parseSuccess).length}/${qwen3Results.length} scenarios)
+- **Qwen3-235B Success Rate**: ${(qwen3SuccessRate * 100).toFixed(0)}% (${qwen3Results.filter(r => r.parseSuccess).length}/${qwen3Results.length} scenarios)
 - **GPT-OSS-120B Success Rate**: ${controlResult?.parseSuccess ? '100%' : '0%'} (control)
 - **Root Cause**: ${qwen3SuccessRate < 0.5 ? 'MODEL-SPECIFIC ISSUE' : qwen3SuccessRate < 1.0 ? 'PROMPT OPTIMIZATION NEEDED' : 'NO ISSUE DETECTED'}
 
@@ -516,7 +519,8 @@ Isolated testing of qwen3-235b model for section generation to determine if T053
 
 ## Test Scenarios
 
-${TEST_SCENARIOS.map((scenario, idx) => `
+${TEST_SCENARIOS.map(
+  (scenario, idx) => `
 ### Scenario ${idx + 1}: ${scenario.name}
 
 **Model**: \`${scenario.model}\`
@@ -525,7 +529,8 @@ ${TEST_SCENARIOS.map((scenario, idx) => `
 
 **Results**:
 ${formatScenarioResults(results[idx])}
-`).join('\n')}
+`
+).join('\n')}
 
 ---
 
@@ -533,7 +538,7 @@ ${formatScenarioResults(results[idx])}
 
 | Scenario | Model | Parse Success | Layer Used | Quality Score | Lesson Count | Token Usage |
 |----------|-------|---------------|------------|---------------|--------------|-------------|
-${results.map((r) => `| ${r.scenario} | ${r.model.split('/')[1]} | ${r.parseSuccess ? '✅' : '❌'} | ${r.layerUsed || 'N/A'} | ${r.qualityScore?.toFixed(2) || 'N/A'} | ${r.lessonCount || 'N/A'} | ${r.tokenUsage?.total.toLocaleString() || 'N/A'} |`).join('\n')}
+${results.map(r => `| ${r.scenario} | ${r.model.split('/')[1]} | ${r.parseSuccess ? '✅' : '❌'} | ${r.layerUsed || 'N/A'} | ${r.qualityScore?.toFixed(2) || 'N/A'} | ${r.lessonCount || 'N/A'} | ${r.tokenUsage?.total.toLocaleString() || 'N/A'} |`).join('\n')}
 
 ---
 
@@ -551,7 +556,9 @@ ${analyzePromptIssues(results)}
 
 ## Raw Output Samples
 
-${results.map((r, idx) => `
+${results
+  .map(
+    (r, idx) => `
 ### Sample ${idx + 1}: ${r.scenario}
 
 **Parse Success**: ${r.parseSuccess ? '✅ YES' : '❌ NO'}
@@ -562,8 +569,10 @@ ${r.rawOutputPreview}
 \`\`\`
 
 ${r.parseError ? `**Parse Error**: ${r.parseError}` : ''}
-${r.validationErrors ? `**Validation Errors**:\n${r.validationErrors.map((e) => `- ${e}`).join('\n')}` : ''}
-`).join('\n')}
+${r.validationErrors ? `**Validation Errors**:\n${r.validationErrors.map(e => `- ${e}`).join('\n')}` : ''}
+`
+  )
+  .join('\n')}
 
 ---
 
@@ -585,7 +594,7 @@ ${generateTopRecommendation(results)}
 
 | Scenario | Input Tokens | Output Tokens | Total Tokens | Est. Cost ($) |
 |----------|--------------|---------------|--------------|---------------|
-${results.map((r) => `| ${r.scenario} | ${r.tokenUsage?.input.toLocaleString() || 'N/A'} | ${r.tokenUsage?.output.toLocaleString() || 'N/A'} | ${r.tokenUsage?.total.toLocaleString() || 'N/A'} | ${r.tokenUsage ? calculateCost(r.tokenUsage, r.model) : 'N/A'} |`).join('\n')}
+${results.map(r => `| ${r.scenario} | ${r.tokenUsage?.input.toLocaleString() || 'N/A'} | ${r.tokenUsage?.output.toLocaleString() || 'N/A'} | ${r.tokenUsage?.total.toLocaleString() || 'N/A'} | ${r.tokenUsage ? calculateCost(r.tokenUsage, r.model) : 'N/A'} |`).join('\n')}
 
 ---
 
@@ -613,14 +622,14 @@ ${result.validationErrors ? `- **Validation Errors**: ${result.validationErrors.
 }
 
 function analyzeModelIssues(results: TestResult[]): string {
-  const qwen3Results = results.filter((r) => r.model === MODELS.qwen3_235b);
-  const controlResult = results.find((r) => r.model === MODELS.gpt_oss_120b);
+  const qwen3Results = results.filter(r => r.model === MODELS.qwen3_235b);
+  const controlResult = results.find(r => r.model === MODELS.gpt_oss_120b);
 
   if (!controlResult?.parseSuccess) {
     return '⚠️ Control test (gpt-oss-120b) also failed. Issue is likely **prompt-specific**, not model-specific.';
   }
 
-  const qwen3SuccessCount = qwen3Results.filter((r) => r.parseSuccess).length;
+  const qwen3SuccessCount = qwen3Results.filter(r => r.parseSuccess).length;
 
   if (qwen3SuccessCount === 0) {
     return `❌ **Critical**: Qwen3-235B failed ALL test scenarios (0/${qwen3Results.length}), while control passed. This is a **MODEL-SPECIFIC ISSUE**. Recommend switching to DeepSeek v3.1 or Kimi K2 for RU lessons.`;
@@ -634,7 +643,7 @@ function analyzeModelIssues(results: TestResult[]): string {
 }
 
 function analyzePromptIssues(results: TestResult[]): string {
-  const qwen3Results = results.filter((r) => r.model === MODELS.qwen3_235b);
+  const qwen3Results = results.filter(r => r.model === MODELS.qwen3_235b);
   const bestQwen3 = qwen3Results.reduce((best, current) =>
     (current.qualityScore || 0) > (best.qualityScore || 0) ? current : best
   );
@@ -654,9 +663,9 @@ function analyzePromptIssues(results: TestResult[]): string {
 }
 
 function generateRecommendation(results: TestResult[]): string {
-  const qwen3Results = results.filter((r) => r.model === MODELS.qwen3_235b);
-  const controlResult = results.find((r) => r.model === MODELS.gpt_oss_120b);
-  const qwen3SuccessCount = qwen3Results.filter((r) => r.parseSuccess).length;
+  const qwen3Results = results.filter(r => r.model === MODELS.qwen3_235b);
+  const controlResult = results.find(r => r.model === MODELS.gpt_oss_120b);
+  const qwen3SuccessCount = qwen3Results.filter(r => r.parseSuccess).length;
 
   if (!controlResult?.parseSuccess) {
     return '⚠️ Fix prompts first - even control test failed';
@@ -677,8 +686,8 @@ function generateRecommendation(results: TestResult[]): string {
 }
 
 function generateTopRecommendation(results: TestResult[]): string {
-  const qwen3Results = results.filter((r) => r.model === MODELS.qwen3_235b);
-  const qwen3SuccessCount = qwen3Results.filter((r) => r.parseSuccess).length;
+  const qwen3Results = results.filter(r => r.model === MODELS.qwen3_235b);
+  const qwen3SuccessCount = qwen3Results.filter(r => r.parseSuccess).length;
 
   if (qwen3SuccessCount === 0) {
     return `

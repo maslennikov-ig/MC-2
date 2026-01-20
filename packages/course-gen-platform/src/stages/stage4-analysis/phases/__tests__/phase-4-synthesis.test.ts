@@ -1,4 +1,3 @@
-/* eslint-disable */
 /**
  * Unit tests for Phase 4: Document Synthesis
  *

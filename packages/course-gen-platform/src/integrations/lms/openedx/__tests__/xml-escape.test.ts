@@ -1,4 +1,3 @@
-/* eslint-disable */
 /**
  * Unit Tests for XML Character Escaping Utilities
  * Tests T033: xmlEscape, xmlUnescape, escapeForAttribute, hasUnescapedXmlChars
@@ -42,7 +41,7 @@ describe('xmlEscape - Escape XML special characters', () => {
       expect(result).toBe('He said &quot;Hello&quot;');
     });
 
-    it('should escape single quote (\')', () => {
+    it("should escape single quote (')", () => {
       const input = "It's working";
       const result = xmlEscape(input);
 
@@ -170,7 +169,7 @@ describe('xmlUnescape - Reverse XML entity escaping', () => {
       expect(result).toBe('He said "Hello"');
     });
 
-    it('should unescape &apos; to \'', () => {
+    it("should unescape &apos; to '", () => {
       const input = 'It&apos;s working';
       const result = xmlUnescape(input);
 
@@ -429,15 +428,9 @@ describe('hasUnescapedXmlChars - Detect unescaped XML characters', () => {
     });
 
     it('should detect when escaping is required', () => {
-      const inputs = [
-        'Data & Analytics',
-        'x < 10',
-        'y > 5',
-        'He said "Hello"',
-        "It's working",
-      ];
+      const inputs = ['Data & Analytics', 'x < 10', 'y > 5', 'He said "Hello"', "It's working"];
 
-      inputs.forEach((input) => {
+      inputs.forEach(input => {
         expect(hasUnescapedXmlChars(input)).toBe(true);
       });
     });
@@ -451,7 +444,7 @@ describe('hasUnescapedXmlChars - Detect unescaped XML characters', () => {
         'It&apos;s working',
       ];
 
-      inputs.forEach((input) => {
+      inputs.forEach(input => {
         expect(hasUnescapedXmlChars(input)).toBe(false);
       });
     });

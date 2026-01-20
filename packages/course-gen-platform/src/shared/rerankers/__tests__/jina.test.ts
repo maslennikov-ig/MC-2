@@ -66,11 +66,7 @@ function createMockResponse(results: Array<{ index: number; relevance_score: num
 /**
  * Creates a mock error response
  */
-function createMockErrorResponse(
-  status: number,
-  errorMessage: string,
-  errorType = 'API_ERROR'
-) {
+function createMockErrorResponse(status: number, errorMessage: string, errorType = 'API_ERROR') {
   return {
     ok: false,
     status,
@@ -106,13 +102,13 @@ describe('Jina Reranker Client - Unit Tests', () => {
       delete process.env.JINA_API_KEY;
 
       // When/Then: Should throw configuration error
-      await expect(
-        rerankDocuments('test query', ['doc1', 'doc2'])
-      ).rejects.toThrow(JinaRerankerError);
+      await expect(rerankDocuments('test query', ['doc1', 'doc2'])).rejects.toThrow(
+        JinaRerankerError
+      );
 
-      await expect(
-        rerankDocuments('test query', ['doc1', 'doc2'])
-      ).rejects.toThrow('Missing required environment variable: JINA_API_KEY');
+      await expect(rerankDocuments('test query', ['doc1', 'doc2'])).rejects.toThrow(
+        'Missing required environment variable: JINA_API_KEY'
+      );
 
       // Verify error details
       try {
@@ -152,9 +148,7 @@ describe('Jina Reranker Client - Unit Tests', () => {
 
     it('should include correct headers in API request', async () => {
       // Given: Valid configuration
-      mockFetch.mockResolvedValueOnce(
-        createMockResponse([{ index: 0, relevance_score: 0.9 }])
-      );
+      mockFetch.mockResolvedValueOnce(createMockResponse([{ index: 0, relevance_score: 0.9 }]));
 
       // When: Making request
       await rerankDocuments('query', ['document']);
@@ -197,9 +191,7 @@ describe('Jina Reranker Client - Unit Tests', () => {
       const query = 'test query';
       const documents = ['single document'];
 
-      mockFetch.mockResolvedValueOnce(
-        createMockResponse([{ index: 0, relevance_score: 0.88 }])
-      );
+      mockFetch.mockResolvedValueOnce(createMockResponse([{ index: 0, relevance_score: 0.88 }]));
 
       // When: Reranking single document
       const result = await rerankDocuments(query, documents);
@@ -216,13 +208,9 @@ describe('Jina Reranker Client - Unit Tests', () => {
       const documents = ['doc1', 'doc2'];
 
       // When/Then: Should throw validation error
-      await expect(rerankDocuments(query, documents)).rejects.toThrow(
-        JinaRerankerError
-      );
+      await expect(rerankDocuments(query, documents)).rejects.toThrow(JinaRerankerError);
 
-      await expect(rerankDocuments(query, documents)).rejects.toThrow(
-        'Query cannot be empty'
-      );
+      await expect(rerankDocuments(query, documents)).rejects.toThrow('Query cannot be empty');
 
       try {
         await rerankDocuments(query, documents);
@@ -238,9 +226,7 @@ describe('Jina Reranker Client - Unit Tests', () => {
       const documents = ['doc1', 'doc2'];
 
       // When/Then: Should throw validation error
-      await expect(rerankDocuments(query, documents)).rejects.toThrow(
-        'Query cannot be empty'
-      );
+      await expect(rerankDocuments(query, documents)).rejects.toThrow('Query cannot be empty');
     });
 
     it('should throw error when all documents are empty', async () => {
@@ -249,13 +235,9 @@ describe('Jina Reranker Client - Unit Tests', () => {
       const documents = ['', '  ', ''];
 
       // When/Then: Should throw validation error
-      await expect(rerankDocuments(query, documents)).rejects.toThrow(
-        JinaRerankerError
-      );
+      await expect(rerankDocuments(query, documents)).rejects.toThrow(JinaRerankerError);
 
-      await expect(rerankDocuments(query, documents)).rejects.toThrow(
-        'All documents are empty'
-      );
+      await expect(rerankDocuments(query, documents)).rejects.toThrow('All documents are empty');
     });
 
     it('should throw error when some documents are empty', async () => {
@@ -264,13 +246,9 @@ describe('Jina Reranker Client - Unit Tests', () => {
       const documents = ['valid doc', '', 'another doc'];
 
       // When/Then: Should throw validation error
-      await expect(rerankDocuments(query, documents)).rejects.toThrow(
-        JinaRerankerError
-      );
+      await expect(rerankDocuments(query, documents)).rejects.toThrow(JinaRerankerError);
 
-      await expect(rerankDocuments(query, documents)).rejects.toThrow(
-        '1 empty documents found'
-      );
+      await expect(rerankDocuments(query, documents)).rejects.toThrow('1 empty documents found');
     });
 
     it('should trim query whitespace before sending to API', async () => {
@@ -278,9 +256,7 @@ describe('Jina Reranker Client - Unit Tests', () => {
       const query = '  test query  ';
       const documents = ['doc1'];
 
-      mockFetch.mockResolvedValueOnce(
-        createMockResponse([{ index: 0, relevance_score: 0.9 }])
-      );
+      mockFetch.mockResolvedValueOnce(createMockResponse([{ index: 0, relevance_score: 0.9 }]));
 
       // When: Reranking with whitespace query
       await rerankDocuments(query, documents);
@@ -440,9 +416,7 @@ describe('Jina Reranker Client - Unit Tests', () => {
       const query = 'test';
       const documents = ['doc'];
 
-      mockFetch.mockResolvedValueOnce(
-        createMockResponse([{ index: 0, relevance_score: 0.88 }])
-      );
+      mockFetch.mockResolvedValueOnce(createMockResponse([{ index: 0, relevance_score: 0.88 }]));
 
       // When: Reranking
       const result = await rerankDocuments(query, documents);
@@ -471,12 +445,8 @@ describe('Jina Reranker Client - Unit Tests', () => {
       const documents = ['doc1'];
 
       mockFetch
-        .mockResolvedValueOnce(
-          createMockErrorResponse(429, 'Rate limit exceeded', 'RATE_LIMIT')
-        )
-        .mockResolvedValueOnce(
-          createMockResponse([{ index: 0, relevance_score: 0.9 }])
-        );
+        .mockResolvedValueOnce(createMockErrorResponse(429, 'Rate limit exceeded', 'RATE_LIMIT'))
+        .mockResolvedValueOnce(createMockResponse([{ index: 0, relevance_score: 0.9 }]));
 
       // When: Reranking with rate limit
       const result = await rerankDocuments(query, documents);
@@ -495,9 +465,7 @@ describe('Jina Reranker Client - Unit Tests', () => {
         .mockResolvedValueOnce(
           createMockErrorResponse(500, 'Internal server error', 'SERVER_ERROR')
         )
-        .mockResolvedValueOnce(
-          createMockResponse([{ index: 0, relevance_score: 0.9 }])
-        );
+        .mockResolvedValueOnce(createMockResponse([{ index: 0, relevance_score: 0.9 }]));
 
       // When: Reranking with server error
       const result = await rerankDocuments(query, documents);
@@ -516,9 +484,7 @@ describe('Jina Reranker Client - Unit Tests', () => {
         .mockResolvedValueOnce(
           createMockErrorResponse(503, 'Service unavailable', 'SERVICE_UNAVAILABLE')
         )
-        .mockResolvedValueOnce(
-          createMockResponse([{ index: 0, relevance_score: 0.9 }])
-        );
+        .mockResolvedValueOnce(createMockResponse([{ index: 0, relevance_score: 0.9 }]));
 
       // When: Reranking with service unavailable
       const result = await rerankDocuments(query, documents);
@@ -533,18 +499,12 @@ describe('Jina Reranker Client - Unit Tests', () => {
       const query = 'test';
       const documents = ['doc1'];
 
-      mockFetch.mockResolvedValue(
-        createMockErrorResponse(400, 'Bad request', 'BAD_REQUEST')
-      );
+      mockFetch.mockResolvedValue(createMockErrorResponse(400, 'Bad request', 'BAD_REQUEST'));
 
       // When/Then: Should throw immediately without retry
-      await expect(rerankDocuments(query, documents)).rejects.toThrow(
-        JinaRerankerError
-      );
+      await expect(rerankDocuments(query, documents)).rejects.toThrow(JinaRerankerError);
 
-      await expect(rerankDocuments(query, documents)).rejects.toThrow(
-        'Bad request'
-      );
+      await expect(rerankDocuments(query, documents)).rejects.toThrow('Bad request');
 
       // Should only call API once per call (no retry for 400 errors)
       expect(mockFetch).toHaveBeenCalledTimes(2); // Two separate calls above
@@ -555,14 +515,10 @@ describe('Jina Reranker Client - Unit Tests', () => {
       const query = 'test';
       const documents = ['doc1'];
 
-      mockFetch.mockResolvedValueOnce(
-        createMockErrorResponse(401, 'Unauthorized', 'UNAUTHORIZED')
-      );
+      mockFetch.mockResolvedValueOnce(createMockErrorResponse(401, 'Unauthorized', 'UNAUTHORIZED'));
 
       // When/Then: Should throw immediately without retry
-      await expect(rerankDocuments(query, documents)).rejects.toThrow(
-        'Unauthorized'
-      );
+      await expect(rerankDocuments(query, documents)).rejects.toThrow('Unauthorized');
 
       expect(mockFetch).toHaveBeenCalledTimes(1);
     });
@@ -572,14 +528,10 @@ describe('Jina Reranker Client - Unit Tests', () => {
       const query = 'test';
       const documents = ['doc1'];
 
-      mockFetch.mockResolvedValueOnce(
-        createMockErrorResponse(403, 'Forbidden', 'FORBIDDEN')
-      );
+      mockFetch.mockResolvedValueOnce(createMockErrorResponse(403, 'Forbidden', 'FORBIDDEN'));
 
       // When/Then: Should throw immediately without retry
-      await expect(rerankDocuments(query, documents)).rejects.toThrow(
-        'Forbidden'
-      );
+      await expect(rerankDocuments(query, documents)).rejects.toThrow('Forbidden');
 
       expect(mockFetch).toHaveBeenCalledTimes(1);
     });
@@ -591,9 +543,7 @@ describe('Jina Reranker Client - Unit Tests', () => {
 
       mockFetch
         .mockRejectedValueOnce(createNetworkError())
-        .mockResolvedValueOnce(
-          createMockResponse([{ index: 0, relevance_score: 0.9 }])
-        );
+        .mockResolvedValueOnce(createMockResponse([{ index: 0, relevance_score: 0.9 }]));
 
       // When: Reranking with network error
       const result = await rerankDocuments(query, documents);
@@ -608,14 +558,10 @@ describe('Jina Reranker Client - Unit Tests', () => {
       const query = 'test';
       const documents = ['doc1'];
 
-      mockFetch.mockResolvedValue(
-        createMockErrorResponse(500, 'Server error', 'SERVER_ERROR')
-      );
+      mockFetch.mockResolvedValue(createMockErrorResponse(500, 'Server error', 'SERVER_ERROR'));
 
       // When/Then: Should fail after 4 attempts (1 initial + 3 retries)
-      await expect(rerankDocuments(query, documents)).rejects.toThrow(
-        JinaRerankerError
-      );
+      await expect(rerankDocuments(query, documents)).rejects.toThrow(JinaRerankerError);
 
       // Total attempts: 1 initial + 3 retries = 4 calls
       expect(mockFetch).toHaveBeenCalledTimes(4);
@@ -627,11 +573,7 @@ describe('Jina Reranker Client - Unit Tests', () => {
       const documents = ['doc1'];
 
       mockFetch.mockResolvedValueOnce(
-        createMockErrorResponse(
-          400,
-          'Invalid model specified',
-          'INVALID_MODEL'
-        )
+        createMockErrorResponse(400, 'Invalid model specified', 'INVALID_MODEL')
       );
 
       // When/Then: Should throw with correct error details
@@ -662,9 +604,7 @@ describe('Jina Reranker Client - Unit Tests', () => {
       });
 
       // When/Then: Should use statusText as error message (after retries)
-      await expect(rerankDocuments(query, documents)).rejects.toThrow(
-        'Internal Server Error'
-      );
+      await expect(rerankDocuments(query, documents)).rejects.toThrow('Internal Server Error');
     }, 60000); // Increased timeout for retries
 
     it('should handle invalid response structure', async () => {
@@ -725,9 +665,7 @@ describe('Jina Reranker Client - Unit Tests', () => {
       const query = 'query';
       const documents = ['only one document'];
 
-      mockFetch.mockResolvedValueOnce(
-        createMockResponse([{ index: 0, relevance_score: 0.92 }])
-      );
+      mockFetch.mockResolvedValueOnce(createMockResponse([{ index: 0, relevance_score: 0.92 }]));
 
       // When: Reranking single document
       const result = await rerankDocuments(query, documents);
@@ -744,9 +682,7 @@ describe('Jina Reranker Client - Unit Tests', () => {
       const documents = ['doc1', 'doc2', 'doc3'];
       const topN = 1;
 
-      mockFetch.mockResolvedValueOnce(
-        createMockResponse([{ index: 1, relevance_score: 0.98 }])
-      );
+      mockFetch.mockResolvedValueOnce(createMockResponse([{ index: 1, relevance_score: 0.98 }]));
 
       // When: Reranking with topN=1
       const result = await rerankDocuments(query, documents, topN);
@@ -762,9 +698,7 @@ describe('Jina Reranker Client - Unit Tests', () => {
       const longDoc = 'word '.repeat(10000); // ~10k words
       const documents = [longDoc];
 
-      mockFetch.mockResolvedValueOnce(
-        createMockResponse([{ index: 0, relevance_score: 0.85 }])
-      );
+      mockFetch.mockResolvedValueOnce(createMockResponse([{ index: 0, relevance_score: 0.85 }]));
 
       // When: Reranking with long document
       const result = await rerankDocuments(query, documents);
@@ -783,9 +717,7 @@ describe('Jina Reranker Client - Unit Tests', () => {
       const query = 'What is "machine learning" & AI?';
       const documents = ['doc1'];
 
-      mockFetch.mockResolvedValueOnce(
-        createMockResponse([{ index: 0, relevance_score: 0.9 }])
-      );
+      mockFetch.mockResolvedValueOnce(createMockResponse([{ index: 0, relevance_score: 0.9 }]));
 
       // When: Reranking with special characters
       const result = await rerankDocuments(query, documents);
@@ -800,10 +732,7 @@ describe('Jina Reranker Client - Unit Tests', () => {
     it('should handle Unicode and emoji in documents', async () => {
       // Given: Documents with Unicode and emoji
       const query = 'test';
-      const documents = [
-        'Document with émojis 😀 and symbols ∑∫∂π',
-        'Документ на русском языке',
-      ];
+      const documents = ['Document with émojis 😀 and symbols ∑∫∂π', 'Документ на русском языке'];
 
       mockFetch.mockResolvedValueOnce(
         createMockResponse([
@@ -904,9 +833,7 @@ describe('Jina Reranker Client - Unit Tests', () => {
 
       // When/Then: Should throw configuration error
       await expect(healthCheck()).rejects.toThrow(JinaRerankerError);
-      await expect(healthCheck()).rejects.toThrow(
-        'Missing required environment variable'
-      );
+      await expect(healthCheck()).rejects.toThrow('Missing required environment variable');
     });
 
     it('should fail health check when API is unreachable', async () => {
@@ -927,9 +854,7 @@ describe('Jina Reranker Client - Unit Tests', () => {
 
     it('should fail health check on invalid API response', async () => {
       // Given: Invalid response (not 2 results)
-      mockFetch.mockResolvedValueOnce(
-        createMockResponse([{ index: 0, relevance_score: 0.9 }])
-      );
+      mockFetch.mockResolvedValueOnce(createMockResponse([{ index: 0, relevance_score: 0.9 }]));
 
       // When: Running health check
       const isHealthy = await healthCheck();
@@ -949,9 +874,7 @@ describe('Jina Reranker Client - Unit Tests', () => {
       const query = 'test';
       const documents = ['doc1'];
 
-      mockFetch.mockResolvedValue(
-        createMockResponse([{ index: 0, relevance_score: 0.9 }])
-      );
+      mockFetch.mockResolvedValue(createMockResponse([{ index: 0, relevance_score: 0.9 }]));
 
       // When: Making two requests back-to-back
       const start = Date.now();
@@ -965,9 +888,7 @@ describe('Jina Reranker Client - Unit Tests', () => {
 
     it('should include timeout in fetch request', async () => {
       // Given: Valid request
-      mockFetch.mockResolvedValueOnce(
-        createMockResponse([{ index: 0, relevance_score: 0.9 }])
-      );
+      mockFetch.mockResolvedValueOnce(createMockResponse([{ index: 0, relevance_score: 0.9 }]));
 
       // When: Making request
       await rerankDocuments('query', ['doc']);

@@ -1,4 +1,3 @@
-/* eslint-disable */
 import { describe, it, expect } from 'vitest';
 import { calculateDynamicContextWindow } from '@/stages/stage6-lesson-content/nodes/generator';
 

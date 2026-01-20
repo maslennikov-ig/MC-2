@@ -68,8 +68,10 @@ describe('MetadataGenerator', () => {
   it('should generate metadata from full Analyze results (FR-001)', async () => {
     const mockMetadata: Partial<CourseStructure> = {
       course_title: 'Machine Learning Basics',
-      course_description: 'A comprehensive introduction to machine learning covering supervised and unsupervised techniques',
-      course_overview: 'This course provides a comprehensive exploration of fundamental machine learning concepts, algorithms, and practical applications using Python and industry-standard libraries',
+      course_description:
+        'A comprehensive introduction to machine learning covering supervised and unsupervised techniques',
+      course_overview:
+        'This course provides a comprehensive exploration of fundamental machine learning concepts, algorithms, and practical applications using Python and industry-standard libraries',
       target_audience: 'Developers with Python experience and basic mathematical knowledge',
       estimated_duration_hours: 20,
       difficulty_level: 'intermediate',
@@ -83,16 +85,23 @@ describe('MetadataGenerator', () => {
         quiz_per_section: true,
         final_exam: true,
         practical_projects: 3,
-        assessment_description: 'Comprehensive assessment including hands-on coding projects, theoretical quizzes, and a final capstone project',
+        assessment_description:
+          'Comprehensive assessment including hands-on coding projects, theoretical quizzes, and a final capstone project',
       },
-      course_tags: ['machine-learning', 'python', 'data-science', 'algorithms', 'supervised-learning'],
+      course_tags: [
+        'machine-learning',
+        'python',
+        'data-science',
+        'algorithms',
+        'supervised-learning',
+      ],
     };
 
     vi.mocked(ChatOpenAI).mockImplementation(
       class {
         invoke = vi.fn().mockResolvedValue({
           content: JSON.stringify(mockMetadata),
-        })
+        });
       } as any
     );
 
@@ -107,7 +116,7 @@ describe('MetadataGenerator', () => {
             qualityPassed: true,
             tokenCost: 0,
           },
-        })
+        });
       } as any
     );
 
@@ -138,8 +147,10 @@ describe('MetadataGenerator', () => {
   it('should generate metadata from title-only input (FR-003)', async () => {
     const mockMetadata: Partial<CourseStructure> = {
       course_title: 'Introduction to Quantum Computing',
-      course_description: 'Explore quantum computing fundamentals including qubits, superposition, entanglement, and quantum algorithms',
-      course_overview: 'Comprehensive introduction to quantum computing principles covering theoretical foundations, mathematical frameworks, and practical applications in quantum information science',
+      course_description:
+        'Explore quantum computing fundamentals including qubits, superposition, entanglement, and quantum algorithms',
+      course_overview:
+        'Comprehensive introduction to quantum computing principles covering theoretical foundations, mathematical frameworks, and practical applications in quantum information science',
       target_audience: 'Physics and computer science students with strong mathematical backgrounds',
       estimated_duration_hours: 15,
       difficulty_level: 'advanced',
@@ -153,7 +164,8 @@ describe('MetadataGenerator', () => {
         quiz_per_section: true,
         final_exam: true,
         practical_projects: 2,
-        assessment_description: 'Theory-based examinations and practical quantum circuit implementation assignments',
+        assessment_description:
+          'Theory-based examinations and practical quantum circuit implementation assignments',
       },
       course_tags: ['quantum-computing', 'qubits', 'algorithms', 'quantum-gates', 'physics'],
     };
@@ -162,7 +174,7 @@ describe('MetadataGenerator', () => {
       class {
         invoke = vi.fn().mockResolvedValue({
           content: JSON.stringify(mockMetadata),
-        })
+        });
       } as any
     );
 
@@ -177,7 +189,7 @@ describe('MetadataGenerator', () => {
             qualityPassed: true,
             tokenCost: 0,
           },
-        })
+        });
       } as any
     );
 
@@ -206,8 +218,10 @@ describe('MetadataGenerator', () => {
   it('should use correct style prompts (FR-028)', async () => {
     const mockMetadata: Partial<CourseStructure> = {
       course_title: 'Test Course Title',
-      course_description: 'Comprehensive course description covering all key topics and learning objectives for beginners',
-      course_overview: 'This course provides an overview of fundamental concepts and principles, designed for students with no prior experience in the subject area',
+      course_description:
+        'Comprehensive course description covering all key topics and learning objectives for beginners',
+      course_overview:
+        'This course provides an overview of fundamental concepts and principles, designed for students with no prior experience in the subject area',
       target_audience: 'Beginners with no prior background or experience required',
       estimated_duration_hours: 5,
       difficulty_level: 'beginner',
@@ -221,7 +235,8 @@ describe('MetadataGenerator', () => {
         quiz_per_section: false,
         final_exam: false,
         practical_projects: 0,
-        assessment_description: 'Self-paced learning with optional exercises and practice problems for skill reinforcement',
+        assessment_description:
+          'Self-paced learning with optional exercises and practice problems for skill reinforcement',
       },
       course_tags: ['test', 'fundamentals', 'beginner', 'basics', 'introduction'],
     };
@@ -230,7 +245,7 @@ describe('MetadataGenerator', () => {
       class {
         invoke = vi.fn().mockResolvedValue({
           content: JSON.stringify(mockMetadata),
-        })
+        });
       } as any
     );
 
@@ -245,7 +260,7 @@ describe('MetadataGenerator', () => {
             qualityPassed: true,
             tokenCost: 0,
           },
-        })
+        });
       } as any
     );
 
@@ -272,8 +287,10 @@ describe('MetadataGenerator', () => {
   it('should extract language from frontend_parameters (FR-027)', async () => {
     const mockMetadata: Partial<CourseStructure> = {
       course_title: 'Curso de Prueba',
-      course_description: 'Descripción completa del curso cubriendo todos los temas principales y objetivos de aprendizaje',
-      course_overview: 'Este curso proporciona una visión general de conceptos fundamentales y principios, diseñado para estudiantes sin experiencia previa en el área',
+      course_description:
+        'Descripción completa del curso cubriendo todos los temas principales y objetivos de aprendizaje',
+      course_overview:
+        'Este curso proporciona una visión general de conceptos fundamentales y principios, diseñado para estudiantes sin experiencia previa en el área',
       target_audience: 'Principiantes sin experiencia previa requerida en el tema',
       estimated_duration_hours: 1,
       difficulty_level: 'beginner',
@@ -287,7 +304,8 @@ describe('MetadataGenerator', () => {
         quiz_per_section: false,
         final_exam: false,
         practical_projects: 0,
-        assessment_description: 'Aprendizaje autónomo con ejercicios opcionales y problemas de práctica para reforzar habilidades',
+        assessment_description:
+          'Aprendizaje autónomo con ejercicios opcionales y problemas de práctica para reforzar habilidades',
       },
       course_tags: ['test', 'fundamentales', 'principiantes', 'basico', 'introduccion'],
     };
@@ -298,7 +316,7 @@ describe('MetadataGenerator', () => {
 
     vi.mocked(ChatOpenAI).mockImplementation(
       class {
-        invoke = mockInvoke
+        invoke = mockInvoke;
       } as any
     );
 
@@ -313,7 +331,7 @@ describe('MetadataGenerator', () => {
             qualityPassed: true,
             tokenCost: 0,
           },
-        })
+        });
       } as any
     );
 
@@ -340,8 +358,10 @@ describe('MetadataGenerator', () => {
   it('should configure UnifiedRegenerator with Layers 1-2 (RT-005)', async () => {
     const mockMetadata: Partial<CourseStructure> = {
       course_title: 'Test Course Title',
-      course_description: 'Comprehensive description of the test course covering fundamental concepts and practical applications',
-      course_overview: 'This course provides a complete overview of test methodologies and best practices, designed for beginners seeking to build foundational knowledge',
+      course_description:
+        'Comprehensive description of the test course covering fundamental concepts and practical applications',
+      course_overview:
+        'This course provides a complete overview of test methodologies and best practices, designed for beginners seeking to build foundational knowledge',
       target_audience: 'Beginners with no prior testing experience required',
       estimated_duration_hours: 5,
       difficulty_level: 'beginner',
@@ -355,7 +375,8 @@ describe('MetadataGenerator', () => {
         quiz_per_section: false,
         final_exam: false,
         practical_projects: 0,
-        assessment_description: 'Self-paced learning with hands-on exercises and practical examples for reinforcement',
+        assessment_description:
+          'Self-paced learning with hands-on exercises and practical examples for reinforcement',
       },
       course_tags: ['test', 'fundamentals', 'beginner', 'basics', 'introduction'],
     };
@@ -364,7 +385,7 @@ describe('MetadataGenerator', () => {
       class {
         invoke = vi.fn().mockResolvedValue({
           content: JSON.stringify(mockMetadata),
-        })
+        });
       } as any
     );
 
@@ -379,7 +400,7 @@ describe('MetadataGenerator', () => {
             qualityPassed: true,
             tokenCost: 0,
           },
-        })
+        });
       } as any
     );
 

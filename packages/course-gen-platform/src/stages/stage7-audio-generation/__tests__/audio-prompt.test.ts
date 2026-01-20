@@ -200,7 +200,7 @@ describe('Audio TTS Preprocessing Module', () => {
 
       expect(chunks.length).toBeGreaterThan(1);
       // Each chunk should be under limit
-      chunks.forEach((chunk) => {
+      chunks.forEach(chunk => {
         expect(chunk.length).toBeLessThanOrEqual(4000);
       });
     });
@@ -212,7 +212,7 @@ describe('Audio TTS Preprocessing Module', () => {
       const chunks = chunkAudioScript(longSentence);
 
       expect(chunks.length).toBeGreaterThan(1);
-      chunks.forEach((chunk) => {
+      chunks.forEach(chunk => {
         expect(chunk.length).toBeLessThanOrEqual(4000);
       });
     });
@@ -222,7 +222,7 @@ describe('Audio TTS Preprocessing Module', () => {
       const chunks = chunkAudioScript(text, 1000);
 
       expect(chunks.length).toBeGreaterThan(2);
-      chunks.forEach((chunk) => {
+      chunks.forEach(chunk => {
         expect(chunk.length).toBeLessThanOrEqual(1000);
       });
     });

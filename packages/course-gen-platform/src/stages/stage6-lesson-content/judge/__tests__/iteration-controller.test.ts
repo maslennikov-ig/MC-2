@@ -63,11 +63,11 @@ function createInput(
     startTime: number;
     latestScore: number;
     operationMode: 'full-auto' | 'semi-auto';
-  }>,
+  }>
 ): IterationControllerInput {
   const defaults = {
     iteration: 1,
-    scoreHistory: [0.70, 0.75],
+    scoreHistory: [0.7, 0.75],
     lockedSections: [] as string[],
     sectionEditCount: { sec_intro: 1, sec_body: 1, sec_conclusion: 0 },
     tokensUsed: 5000,
@@ -101,35 +101,35 @@ function createInput(
 describe('T033 - detectConvergence', () => {
   it('should return false for less than 3 scores', () => {
     expect(detectConvergence([], 0.02)).toBe(false);
-    expect(detectConvergence([0.70], 0.02)).toBe(false);
-    expect(detectConvergence([0.70, 0.75], 0.02)).toBe(false);
+    expect(detectConvergence([0.7], 0.02)).toBe(false);
+    expect(detectConvergence([0.7, 0.75], 0.02)).toBe(false);
   });
 
   it('should return false when scores vary more than threshold', () => {
     // Delta between 0.75 and 0.80 is 0.05 > 0.02
-    const divergentScores = [0.70, 0.75, 0.80];
+    const divergentScores = [0.7, 0.75, 0.8];
     expect(detectConvergence(divergentScores, 0.02)).toBe(false);
 
     // Steady improvement - deltas are 0.05 each
-    const improvingScores = [0.60, 0.65, 0.70, 0.75];
+    const improvingScores = [0.6, 0.65, 0.7, 0.75];
     expect(detectConvergence(improvingScores, 0.02)).toBe(false);
   });
 
   it('should return true when last 3 scores are within threshold', () => {
     // Last 3 scores: 0.78, 0.79, 0.79
     // Deltas: 0.01, 0.00 - both < 0.02
-    const plateauScores = [0.70, 0.78, 0.79, 0.79];
+    const plateauScores = [0.7, 0.78, 0.79, 0.79];
     expect(detectConvergence(plateauScores, 0.02)).toBe(true);
 
     // Last 3 scores: 0.82, 0.83, 0.84
     // Deltas: 0.01, 0.01 - both < 0.02
-    const slowImprovement = [0.70, 0.75, 0.82, 0.83, 0.84];
+    const slowImprovement = [0.7, 0.75, 0.82, 0.83, 0.84];
     expect(detectConvergence(slowImprovement, 0.02)).toBe(true);
   });
 
   it('should return true for identical scores', () => {
     // Perfect plateau
-    const identicalScores = [0.75, 0.80, 0.80, 0.80];
+    const identicalScores = [0.75, 0.8, 0.8, 0.8];
     expect(detectConvergence(identicalScores, 0.02)).toBe(true);
   });
 
@@ -141,7 +141,7 @@ describe('T033 - detectConvergence', () => {
 
   it('should use custom threshold correctly', () => {
     // With threshold 0.05, this should converge
-    const scores = [0.70, 0.73, 0.76, 0.78];
+    const scores = [0.7, 0.73, 0.76, 0.78];
     expect(detectConvergence(scores, 0.05)).toBe(true);
 
     // But not with threshold 0.01
@@ -239,7 +239,7 @@ describe('T035 - shouldContinueIteration', () => {
   it('should continue when no stopping conditions met', () => {
     const input = createInput({
       iteration: 1,
-      scoreHistory: [0.70, 0.75],
+      scoreHistory: [0.7, 0.75],
       latestScore: 0.75,
       tokensUsed: 3000,
       operationMode: 'full-auto',
@@ -269,7 +269,7 @@ describe('T035 - shouldContinueIteration', () => {
 
   it('should stop when score threshold met (semi-auto 0.90)', () => {
     const input = createInput({
-      latestScore: 0.90,
+      latestScore: 0.9,
       operationMode: 'semi-auto',
     });
 
@@ -297,7 +297,7 @@ describe('T035 - shouldContinueIteration', () => {
   it('should stop when max iterations (3) reached', () => {
     const input = createInput({
       iteration: 3,
-      latestScore: 0.70,
+      latestScore: 0.7,
       operationMode: 'full-auto',
     });
 
@@ -311,7 +311,7 @@ describe('T035 - shouldContinueIteration', () => {
   it('should continue at iteration 2 (below max)', () => {
     const input = createInput({
       iteration: 2,
-      latestScore: 0.70,
+      latestScore: 0.7,
       tokensUsed: 5000,
     });
 
@@ -324,7 +324,7 @@ describe('T035 - shouldContinueIteration', () => {
   it('should stop when token budget (15000) exceeded', () => {
     const input = createInput({
       tokensUsed: 15000,
-      latestScore: 0.70,
+      latestScore: 0.7,
       iteration: 1,
     });
 
@@ -338,7 +338,7 @@ describe('T035 - shouldContinueIteration', () => {
   it('should continue when below token budget', () => {
     const input = createInput({
       tokensUsed: 10000,
-      latestScore: 0.70,
+      latestScore: 0.7,
       iteration: 1,
     });
 
@@ -357,7 +357,7 @@ describe('T035 - shouldContinueIteration', () => {
 
     const input = createInput({
       startTime,
-      latestScore: 0.70,
+      latestScore: 0.7,
       iteration: 1,
       tokensUsed: 5000,
     });
@@ -380,7 +380,7 @@ describe('T035 - shouldContinueIteration', () => {
 
     const input = createInput({
       startTime,
-      latestScore: 0.70,
+      latestScore: 0.7,
       iteration: 1,
       tokensUsed: 5000,
     });
@@ -395,7 +395,7 @@ describe('T035 - shouldContinueIteration', () => {
 
   it('should stop when convergence detected', () => {
     const input = createInput({
-      scoreHistory: [0.70, 0.78, 0.79, 0.79], // Plateau: last 3 deltas < 0.02
+      scoreHistory: [0.7, 0.78, 0.79, 0.79], // Plateau: last 3 deltas < 0.02
       latestScore: 0.79,
       iteration: 1,
       tokensUsed: 5000,
@@ -410,8 +410,8 @@ describe('T035 - shouldContinueIteration', () => {
 
   it('should continue when no convergence detected', () => {
     const input = createInput({
-      scoreHistory: [0.60, 0.70, 0.80], // Improving: deltas = 0.10 each
-      latestScore: 0.80,
+      scoreHistory: [0.6, 0.7, 0.8], // Improving: deltas = 0.10 each
+      latestScore: 0.8,
       iteration: 1,
       tokensUsed: 5000,
     });
@@ -429,7 +429,7 @@ describe('T035 - shouldContinueIteration', () => {
         sec_conclusion: 2,
       },
       lockedSections: [],
-      latestScore: 0.70,
+      latestScore: 0.7,
       iteration: 1,
       tokensUsed: 5000,
     });
@@ -439,7 +439,7 @@ describe('T035 - shouldContinueIteration', () => {
     expect(result.shouldContinue).toBe(false);
     expect(result.reason).toBe('stop_all_sections_locked');
     expect(result.newlyLockedSections).toEqual(
-      expect.arrayContaining(['sec_intro', 'sec_body', 'sec_conclusion']),
+      expect.arrayContaining(['sec_intro', 'sec_body', 'sec_conclusion'])
     );
     expect(result.remainingTaskCount).toBe(0);
   });
@@ -452,7 +452,7 @@ describe('T035 - shouldContinueIteration', () => {
         sec_conclusion: 0, // Still available
       },
       lockedSections: [],
-      latestScore: 0.70,
+      latestScore: 0.7,
       iteration: 1,
       tokensUsed: 5000,
     });
@@ -473,7 +473,7 @@ describe('T035 - shouldContinueIteration', () => {
         sec_conclusion: 1,
       },
       lockedSections: [],
-      latestScore: 0.70,
+      latestScore: 0.7,
       iteration: 1,
       tokensUsed: 5000,
     });
@@ -492,7 +492,7 @@ describe('T035 - shouldContinueIteration', () => {
         sec_body: 2,
       },
       lockedSections: ['sec_intro'], // Already locked
-      latestScore: 0.70,
+      latestScore: 0.7,
       iteration: 1,
       tokensUsed: 5000,
     });
@@ -519,7 +519,7 @@ describe('T035 - shouldContinueIteration', () => {
         sec_4: 1,
       },
       lockedSections: [],
-      latestScore: 0.70,
+      latestScore: 0.7,
       iteration: 1,
       tokensUsed: 5000,
     });
@@ -535,7 +535,7 @@ describe('T035 - shouldContinueIteration', () => {
   it('should prioritize stopping conditions in correct order', () => {
     // Score threshold should take priority over max iterations
     const input = createInput({
-      latestScore: 0.90,
+      latestScore: 0.9,
       iteration: 3,
       tokensUsed: 15000,
       operationMode: 'semi-auto',
@@ -555,7 +555,7 @@ describe('T035 - shouldContinueIteration', () => {
     expect(REFINEMENT_CONFIG.quality.sectionLockAfterEdits).toBe(2);
     expect(REFINEMENT_CONFIG.quality.convergenceThreshold).toBe(0.02);
     expect(REFINEMENT_CONFIG.modes['full-auto'].acceptThreshold).toBe(0.85);
-    expect(REFINEMENT_CONFIG.modes['semi-auto'].acceptThreshold).toBe(0.90);
+    expect(REFINEMENT_CONFIG.modes['semi-auto'].acceptThreshold).toBe(0.9);
   });
 });
 
@@ -589,7 +589,7 @@ describe('T061 - Semi-Auto Stopping Conditions', () => {
 
   it('should stop in semi-auto when score meets accept threshold (0.90)', () => {
     const input = createInput({
-      latestScore: 0.90,
+      latestScore: 0.9,
       operationMode: 'semi-auto',
       iteration: 1,
       tokensUsed: 5000,
@@ -643,7 +643,7 @@ describe('T061 - Semi-Auto Stopping Conditions', () => {
 
   it('should verify semi-auto config thresholds', () => {
     // Verify semi-auto specific config values
-    expect(REFINEMENT_CONFIG.modes['semi-auto'].acceptThreshold).toBe(0.90);
+    expect(REFINEMENT_CONFIG.modes['semi-auto'].acceptThreshold).toBe(0.9);
     expect(REFINEMENT_CONFIG.modes['semi-auto'].goodEnoughThreshold).toBe(0.85);
     expect(REFINEMENT_CONFIG.modes['semi-auto'].onMaxIterations).toBe('escalate');
     expect(REFINEMENT_CONFIG.modes['semi-auto'].escalationEnabled).toBe(true);
@@ -667,7 +667,7 @@ describe('T061 - Semi-Auto Stopping Conditions', () => {
 
   it('should continue in semi-auto at iteration 2 with low score', () => {
     const input = createInput({
-      latestScore: 0.70, // Below goodEnough threshold
+      latestScore: 0.7, // Below goodEnough threshold
       operationMode: 'semi-auto',
       iteration: 2, // Below max iterations
       tokensUsed: 5000,
@@ -682,7 +682,7 @@ describe('T061 - Semi-Auto Stopping Conditions', () => {
 
   it('should stop semi-auto on convergence even when score is below threshold', () => {
     const input = createInput({
-      scoreHistory: [0.70, 0.78, 0.79, 0.79], // Plateau detected
+      scoreHistory: [0.7, 0.78, 0.79, 0.79], // Plateau detected
       latestScore: 0.79, // Below semi-auto accept (0.90)
       operationMode: 'semi-auto',
       iteration: 2,
@@ -763,7 +763,7 @@ describe('T062 - Escalation Trigger Logic', () => {
   describe('max iterations trigger scenarios', () => {
     it('should stop at max iterations in semi-auto with below_standard score (escalation scenario)', () => {
       const input = createInput({
-        latestScore: 0.70, // Below goodEnough (0.85)
+        latestScore: 0.7, // Below goodEnough (0.85)
         operationMode: 'semi-auto',
         iteration: 3, // At max iterations
         tokensUsed: 5000,
@@ -797,8 +797,8 @@ describe('T062 - Escalation Trigger Logic', () => {
   describe('convergence trigger scenarios', () => {
     it('should stop on convergence in semi-auto with below_standard score (escalation scenario)', () => {
       const input = createInput({
-        scoreHistory: [0.68, 0.70, 0.70, 0.70], // Plateau below goodEnough
-        latestScore: 0.70,
+        scoreHistory: [0.68, 0.7, 0.7, 0.7], // Plateau below goodEnough
+        latestScore: 0.7,
         operationMode: 'semi-auto',
         iteration: 2,
         tokensUsed: 5000,
@@ -836,7 +836,7 @@ describe('T062 - Escalation Trigger Logic', () => {
 
       const input = createInput({
         startTime,
-        latestScore: 0.70, // Below goodEnough
+        latestScore: 0.7, // Below goodEnough
         operationMode: 'semi-auto',
         iteration: 1,
         tokensUsed: 5000,
@@ -853,7 +853,7 @@ describe('T062 - Escalation Trigger Logic', () => {
 
     it('should stop on token budget in semi-auto with below_standard score (escalation scenario)', () => {
       const input = createInput({
-        latestScore: 0.70, // Below goodEnough
+        latestScore: 0.7, // Below goodEnough
         operationMode: 'semi-auto',
         iteration: 1,
         tokensUsed: 15000, // At limit
@@ -875,7 +875,7 @@ describe('T062 - Escalation Trigger Logic', () => {
           sec_body: 2,
         },
         lockedSections: [],
-        latestScore: 0.70, // Below goodEnough
+        latestScore: 0.7, // Below goodEnough
         operationMode: 'semi-auto',
         iteration: 1,
         tokensUsed: 5000,
@@ -913,14 +913,14 @@ describe('T062 - Escalation Trigger Logic', () => {
     it('should have different escalation behavior for same stopping scenario', () => {
       // Both modes stop at max iterations with low score
       const semiAutoInput = createInput({
-        latestScore: 0.70, // Below both goodEnough thresholds
+        latestScore: 0.7, // Below both goodEnough thresholds
         operationMode: 'semi-auto',
         iteration: 3,
         tokensUsed: 5000,
       });
 
       const fullAutoInput = createInput({
-        latestScore: 0.70, // Below both goodEnough thresholds
+        latestScore: 0.7, // Below both goodEnough thresholds
         operationMode: 'full-auto',
         iteration: 3,
         tokensUsed: 5000,

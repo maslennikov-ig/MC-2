@@ -21,7 +21,11 @@ import type { GenerationJobInput, Section } from '@megacampus/shared-types';
 import { ChatOpenAI } from '@langchain/openai';
 import * as stylePromptsModule from '@megacampus/shared-types/style-prompts';
 import * as regenerationModule from '@/shared/regeneration';
-import { createFullAnalysisResult, createHighComplexityAnalysisResult, createLowComplexityAnalysisResult } from '../../fixtures/analysis-result-fixture';
+import {
+  createFullAnalysisResult,
+  createHighComplexityAnalysisResult,
+  createLowComplexityAnalysisResult,
+} from '../../fixtures/analysis-result-fixture';
 
 // Mock dependencies
 vi.mock('@langchain/openai', () => ({
@@ -48,7 +52,8 @@ function createValidMockSection(overrides: Partial<Section> = {}): Section {
   return {
     section_number: 1,
     section_title: 'Test Section Title (min 5 chars)',
-    section_description: 'This is a comprehensive section description that meets the minimum length requirement of 20 characters',
+    section_description:
+      'This is a comprehensive section description that meets the minimum length requirement of 20 characters',
     learning_objectives: [
       'Test objective text that meets minimum 15 character requirement for schema validation',
     ],
@@ -66,17 +71,20 @@ function createValidMockSection(overrides: Partial<Section> = {}): Section {
           {
             exercise_type: 'hands_on',
             exercise_title: 'Exercise 1 Title (min 5 chars)',
-            exercise_description: 'Exercise description text that meets minimum 10 character requirement',
+            exercise_description:
+              'Exercise description text that meets minimum 10 character requirement',
           },
           {
             exercise_type: 'quiz',
             exercise_title: 'Exercise 2 Title (min 5 chars)',
-            exercise_description: 'Exercise description text that meets minimum 10 character requirement',
+            exercise_description:
+              'Exercise description text that meets minimum 10 character requirement',
           },
           {
             exercise_type: 'case_study',
             exercise_title: 'Exercise 3 Title (min 5 chars)',
-            exercise_description: 'Exercise description text that meets minimum 10 character requirement',
+            exercise_description:
+              'Exercise description text that meets minimum 10 character requirement',
           },
         ],
       },
@@ -101,17 +109,13 @@ describe('SectionBatchGenerator', () => {
         section_number: 1,
         section_title: 'Introduction to Neural Networks',
         section_description: 'Learn the fundamentals of neural networks and deep learning',
-        learning_objectives: [
-          'Explain the fundamental components of neural network architecture',
-        ],
+        learning_objectives: ['Explain the fundamental components of neural network architecture'],
         estimated_duration_minutes: 60,
         lessons: [
           {
             lesson_number: 1,
             lesson_title: 'What is a Neural Network?',
-            lesson_objectives: [
-              'Define the key components and structure of neural networks',
-            ],
+            lesson_objectives: ['Define the key components and structure of neural networks'],
             key_topics: ['neurons', 'layers', 'activation functions'],
             estimated_duration_minutes: 20,
             practical_exercises: [
@@ -135,9 +139,7 @@ describe('SectionBatchGenerator', () => {
           {
             lesson_number: 2,
             lesson_title: 'Backpropagation Algorithm',
-            lesson_objectives: [
-              'Implement the backpropagation algorithm using gradient descent',
-            ],
+            lesson_objectives: ['Implement the backpropagation algorithm using gradient descent'],
             key_topics: ['chain rule', 'gradients', 'weight updates'],
             estimated_duration_minutes: 25,
             practical_exercises: [
@@ -191,7 +193,7 @@ describe('SectionBatchGenerator', () => {
         class {
           invoke = vi.fn().mockResolvedValue({
             content: JSON.stringify({ sections: [mockSection] }),
-          })
+          });
         } as any
       );
 
@@ -206,7 +208,7 @@ describe('SectionBatchGenerator', () => {
               qualityPassed: true,
               tokenCost: 0,
             },
-          })
+          });
         } as any
       );
 
@@ -301,7 +303,7 @@ describe('SectionBatchGenerator', () => {
         class {
           invoke = vi.fn().mockResolvedValue({
             content: JSON.stringify({ sections: [mockSection] }),
-          })
+          });
         } as any
       );
 
@@ -316,7 +318,7 @@ describe('SectionBatchGenerator', () => {
               qualityPassed: true,
               tokenCost: 0,
             },
-          })
+          });
         } as any
       );
 
@@ -345,9 +347,15 @@ describe('SectionBatchGenerator', () => {
         // Verify exercise structure
         for (const exercise of lesson.practical_exercises) {
           expect(exercise.exercise_type).toBeDefined();
-          expect(['self_assessment', 'case_study', 'hands_on', 'discussion', 'quiz', 'simulation', 'reflection']).toContain(
-            exercise.exercise_type
-          );
+          expect([
+            'self_assessment',
+            'case_study',
+            'hands_on',
+            'discussion',
+            'quiz',
+            'simulation',
+            'reflection',
+          ]).toContain(exercise.exercise_type);
           expect(exercise.exercise_title).toBeDefined();
           expect(exercise.exercise_description).toBeDefined();
         }
@@ -369,7 +377,8 @@ describe('SectionBatchGenerator', () => {
 
       const validSection = createValidMockSection({ section_title: 'Valid Section' });
 
-      const mockInvoke = vi.fn()
+      const mockInvoke = vi
+        .fn()
         // Both calls: returns content for regenerator
         .mockResolvedValue({
           content: JSON.stringify({ sections: [validSection] }),
@@ -377,12 +386,13 @@ describe('SectionBatchGenerator', () => {
 
       vi.mocked(ChatOpenAI).mockImplementation(
         class {
-          invoke = mockInvoke
+          invoke = mockInvoke;
         } as any
       );
 
       // First call fails, second call succeeds
-      const mockRegenerate = vi.fn()
+      const mockRegenerate = vi
+        .fn()
         .mockRejectedValueOnce(new Error('Validation failed'))
         .mockResolvedValueOnce({
           success: true,
@@ -397,7 +407,7 @@ describe('SectionBatchGenerator', () => {
 
       vi.mocked(regenerationModule.UnifiedRegenerator).mockImplementation(
         class {
-          regenerate = mockRegenerate
+          regenerate = mockRegenerate;
         } as any
       );
 
@@ -430,17 +440,13 @@ describe('SectionBatchGenerator', () => {
         section_number: 1,
         section_title: 'Valid Section',
         section_description: 'Comprehensive coverage of essential topics and applications',
-        learning_objectives: [
-          'Explain the fundamental concepts and principles of the subject',
-        ],
+        learning_objectives: ['Explain the fundamental concepts and principles of the subject'],
         estimated_duration_minutes: 45,
         lessons: [
           {
             lesson_number: 1,
             lesson_title: 'Lesson 1',
-            lesson_objectives: [
-              'Define the core principles and fundamental concepts',
-            ],
+            lesson_objectives: ['Define the core principles and fundamental concepts'],
             key_topics: ['fundamentals', 'principles'],
             estimated_duration_minutes: 15,
             practical_exercises: [
@@ -470,12 +476,13 @@ describe('SectionBatchGenerator', () => {
 
       vi.mocked(ChatOpenAI).mockImplementation(
         class {
-          invoke = mockInvoke
+          invoke = mockInvoke;
         } as any
       );
 
       // First call fails (Tier 1), second call succeeds (Tier 2)
-      const mockRegenerate = vi.fn()
+      const mockRegenerate = vi
+        .fn()
         .mockRejectedValueOnce(new Error('Tier 1 quality gate failed'))
         .mockResolvedValueOnce({
           success: true,
@@ -490,7 +497,7 @@ describe('SectionBatchGenerator', () => {
 
       vi.mocked(regenerationModule.UnifiedRegenerator).mockImplementation(
         class {
-          regenerate = mockRegenerate
+          regenerate = mockRegenerate;
         } as any
       );
 
@@ -524,14 +531,14 @@ describe('SectionBatchGenerator', () => {
 
       vi.mocked(ChatOpenAI).mockImplementation(
         class {
-          invoke = mockInvoke
+          invoke = mockInvoke;
         } as any
       );
 
       // All attempts fail
       vi.mocked(regenerationModule.UnifiedRegenerator).mockImplementation(
         class {
-          regenerate = vi.fn().mockRejectedValue(new Error('Validation failed'))
+          regenerate = vi.fn().mockRejectedValue(new Error('Validation failed'));
         } as any
       );
 
@@ -569,17 +576,13 @@ describe('SectionBatchGenerator', () => {
         section_number: 1,
         section_title: 'Test Section',
         section_description: 'Comprehensive introduction to test concepts and methodologies',
-        learning_objectives: [
-          'Explain the fundamental concepts and principles of the subject',
-        ],
+        learning_objectives: ['Explain the fundamental concepts and principles of the subject'],
         estimated_duration_minutes: 45,
         lessons: [
           {
             lesson_number: 1,
             lesson_title: 'Lesson 1',
-            lesson_objectives: [
-              'Define the core principles and fundamental concepts',
-            ],
+            lesson_objectives: ['Define the core principles and fundamental concepts'],
             key_topics: ['fundamentals', 'principles'],
             estimated_duration_minutes: 15,
             practical_exercises: [
@@ -609,7 +612,7 @@ describe('SectionBatchGenerator', () => {
 
       vi.mocked(ChatOpenAI).mockImplementation(
         class {
-          invoke = mockInvoke
+          invoke = mockInvoke;
         } as any
       );
 
@@ -624,11 +627,13 @@ describe('SectionBatchGenerator', () => {
               qualityPassed: true,
               tokenCost: 0,
             },
-          })
+          });
         } as any
       );
 
-      vi.mocked(stylePromptsModule.getStylePrompt).mockReturnValue('Storytelling style: Use narrative structure');
+      vi.mocked(stylePromptsModule.getStylePrompt).mockReturnValue(
+        'Storytelling style: Use narrative structure'
+      );
 
       const mockJobInput: GenerationJobInput = {
         course_id: 'course-123',
@@ -659,17 +664,13 @@ describe('SectionBatchGenerator', () => {
         section_number: 1,
         section_title: 'Test Section',
         section_description: 'Comprehensive introduction to test concepts and methodologies',
-        learning_objectives: [
-          'Explain the fundamental concepts and principles of the subject',
-        ],
+        learning_objectives: ['Explain the fundamental concepts and principles of the subject'],
         estimated_duration_minutes: 45,
         lessons: [
           {
             lesson_number: 1,
             lesson_title: 'Lesson 1',
-            lesson_objectives: [
-              'Define the core principles and fundamental concepts',
-            ],
+            lesson_objectives: ['Define the core principles and fundamental concepts'],
             key_topics: ['fundamentals', 'principles'],
             estimated_duration_minutes: 15,
             practical_exercises: [
@@ -697,7 +698,7 @@ describe('SectionBatchGenerator', () => {
         class {
           invoke = vi.fn().mockResolvedValue({
             content: JSON.stringify({ sections: [mockSection] }),
-          })
+          });
         } as any
       );
 
@@ -712,7 +713,7 @@ describe('SectionBatchGenerator', () => {
               qualityPassed: true,
               tokenCost: 0,
             },
-          })
+          });
         } as any
       );
 
@@ -748,17 +749,13 @@ describe('SectionBatchGenerator', () => {
         section_number: 1,
         section_title: 'Test Section',
         section_description: 'Comprehensive introduction to test concepts and methodologies',
-        learning_objectives: [
-          'Explain the fundamental concepts and principles of the subject',
-        ],
+        learning_objectives: ['Explain the fundamental concepts and principles of the subject'],
         estimated_duration_minutes: 45,
         lessons: [
           {
             lesson_number: 1,
             lesson_title: 'Lesson 1',
-            lesson_objectives: [
-              'Define the core principles and fundamental concepts',
-            ],
+            lesson_objectives: ['Define the core principles and fundamental concepts'],
             key_topics: ['fundamentals', 'principles'],
             estimated_duration_minutes: 15,
             practical_exercises: [
@@ -799,7 +796,7 @@ describe('SectionBatchGenerator', () => {
         class {
           invoke = vi.fn().mockResolvedValue({
             content: malformedJSON,
-          })
+          });
         } as any
       );
 
@@ -815,7 +812,7 @@ describe('SectionBatchGenerator', () => {
               qualityPassed: true,
               tokenCost: 0,
             },
-          })
+          });
         } as any
       );
 
@@ -863,17 +860,13 @@ describe('SectionBatchGenerator', () => {
         section_number: 1,
         section_title: 'Simple Section',
         section_description: 'Introduction to foundational concepts and basic principles',
-        learning_objectives: [
-          'Explain the fundamental concepts and principles of the subject',
-        ],
+        learning_objectives: ['Explain the fundamental concepts and principles of the subject'],
         estimated_duration_minutes: 30,
         lessons: [
           {
             lesson_number: 1,
             lesson_title: 'Lesson 1',
-            lesson_objectives: [
-              'Define the core principles and fundamental concepts',
-            ],
+            lesson_objectives: ['Define the core principles and fundamental concepts'],
             key_topics: ['fundamentals', 'principles'],
             estimated_duration_minutes: 15,
             practical_exercises: [
@@ -901,7 +894,7 @@ describe('SectionBatchGenerator', () => {
         class {
           invoke = vi.fn().mockResolvedValue({
             content: JSON.stringify({ sections: [mockSection] }),
-          })
+          });
         } as any
       );
 
@@ -916,7 +909,7 @@ describe('SectionBatchGenerator', () => {
               qualityPassed: true,
               tokenCost: 0,
             },
-          })
+          });
         } as any
       );
 
@@ -948,17 +941,13 @@ describe('SectionBatchGenerator', () => {
         section_number: 1,
         section_title: 'Complex Section',
         section_description: 'Advanced exploration of complex topics and methodologies',
-        learning_objectives: [
-          'Explain the fundamental concepts and principles of the subject',
-        ],
+        learning_objectives: ['Explain the fundamental concepts and principles of the subject'],
         estimated_duration_minutes: 90,
         lessons: [
           {
             lesson_number: 1,
             lesson_title: 'Lesson 1',
-            lesson_objectives: [
-              'Define the core principles and fundamental concepts',
-            ],
+            lesson_objectives: ['Define the core principles and fundamental concepts'],
             key_topics: ['fundamentals', 'principles'],
             estimated_duration_minutes: 20,
             practical_exercises: [
@@ -986,7 +975,7 @@ describe('SectionBatchGenerator', () => {
         class {
           invoke = vi.fn().mockResolvedValue({
             content: JSON.stringify({ sections: [mockSection] }),
-          })
+          });
         } as any
       );
 
@@ -1001,7 +990,7 @@ describe('SectionBatchGenerator', () => {
               qualityPassed: true,
               tokenCost: 0,
             },
-          })
+          });
         } as any
       );
 
@@ -1033,17 +1022,13 @@ describe('SectionBatchGenerator', () => {
         section_number: 1,
         section_title: 'Introduction to Fundamentals',
         section_description: 'Fundamental principles and core concepts for beginners',
-        learning_objectives: [
-          'Explain the fundamental concepts and principles of the subject',
-        ],
+        learning_objectives: ['Explain the fundamental concepts and principles of the subject'],
         estimated_duration_minutes: 45,
         lessons: [
           {
             lesson_number: 1,
             lesson_title: 'Lesson 1',
-            lesson_objectives: [
-              'Define the core principles and fundamental concepts',
-            ],
+            lesson_objectives: ['Define the core principles and fundamental concepts'],
             key_topics: ['fundamentals', 'principles'],
             estimated_duration_minutes: 15,
             practical_exercises: [
@@ -1071,7 +1056,7 @@ describe('SectionBatchGenerator', () => {
         class {
           invoke = vi.fn().mockResolvedValue({
             content: JSON.stringify({ sections: [mockSection] }),
-          })
+          });
         } as any
       );
 
@@ -1086,7 +1071,7 @@ describe('SectionBatchGenerator', () => {
               qualityPassed: true,
               tokenCost: 0,
             },
-          })
+          });
         } as any
       );
 
@@ -1110,7 +1095,7 @@ describe('SectionBatchGenerator', () => {
       // Verify Tier 2 (qwen3-max) was used due to high criticality
       expect(result.tier).toBe('tier2_qwen3Max');
       expect(result.modelUsed).toBe('qwen/qwen3-max');
-      expect(result.criticalityScore).toBeGreaterThanOrEqual(0.80);
+      expect(result.criticalityScore).toBeGreaterThanOrEqual(0.8);
     });
   });
 
@@ -1124,17 +1109,13 @@ describe('SectionBatchGenerator', () => {
         section_number: 1,
         section_title: 'Test Section',
         section_description: 'Comprehensive introduction to test concepts and methodologies',
-        learning_objectives: [
-          'Explain the fundamental concepts and principles of the subject',
-        ],
+        learning_objectives: ['Explain the fundamental concepts and principles of the subject'],
         estimated_duration_minutes: 45,
         lessons: [
           {
             lesson_number: 1,
             lesson_title: 'Lesson 1',
-            lesson_objectives: [
-              'Define the core principles and fundamental concepts',
-            ],
+            lesson_objectives: ['Define the core principles and fundamental concepts'],
             key_topics: ['fundamentals', 'principles'],
             estimated_duration_minutes: 15,
             practical_exercises: [
@@ -1162,7 +1143,7 @@ describe('SectionBatchGenerator', () => {
         class {
           invoke = vi.fn().mockResolvedValue({
             content: JSON.stringify({ sections: [mockSection] }),
-          })
+          });
         } as any
       );
 
@@ -1177,7 +1158,7 @@ describe('SectionBatchGenerator', () => {
               qualityPassed: true,
               tokenCost: 0,
             },
-          })
+          });
         } as any
       );
 
@@ -1219,17 +1200,13 @@ describe('SectionBatchGenerator', () => {
         section_number: 1,
         section_title: 'Test Section',
         section_description: 'Comprehensive introduction to test concepts and methodologies',
-        learning_objectives: [
-          'Explain the fundamental concepts and principles of the subject',
-        ],
+        learning_objectives: ['Explain the fundamental concepts and principles of the subject'],
         estimated_duration_minutes: 45,
         lessons: [
           {
             lesson_number: 1,
             lesson_title: 'Lesson 1',
-            lesson_objectives: [
-              'Define the core principles and fundamental concepts',
-            ],
+            lesson_objectives: ['Define the core principles and fundamental concepts'],
             key_topics: ['fundamentals', 'principles'],
             estimated_duration_minutes: 15,
             practical_exercises: [
@@ -1257,7 +1234,7 @@ describe('SectionBatchGenerator', () => {
         class {
           invoke = vi.fn().mockResolvedValue({
             content: JSON.stringify({ sections: [mockSection] }),
-          })
+          });
         } as any
       );
 
@@ -1272,7 +1249,7 @@ describe('SectionBatchGenerator', () => {
               qualityPassed: true,
               tokenCost: 0,
             },
-          })
+          });
         } as any
       );
 
@@ -1310,17 +1287,13 @@ describe('SectionBatchGenerator', () => {
         section_number: 1,
         section_title: 'Test Section',
         section_description: 'Comprehensive introduction to test concepts and methodologies',
-        learning_objectives: [
-          'Explain the fundamental concepts and principles of the subject',
-        ],
+        learning_objectives: ['Explain the fundamental concepts and principles of the subject'],
         estimated_duration_minutes: 45,
         lessons: [
           {
             lesson_number: 1,
             lesson_title: 'Lesson 1',
-            lesson_objectives: [
-              'Define the core principles and fundamental concepts',
-            ],
+            lesson_objectives: ['Define the core principles and fundamental concepts'],
             key_topics: ['fundamentals', 'principles'],
             estimated_duration_minutes: 15,
             practical_exercises: [
@@ -1348,7 +1321,7 @@ describe('SectionBatchGenerator', () => {
         class {
           invoke = vi.fn().mockResolvedValue({
             content: JSON.stringify({ sections: [mockSection] }),
-          })
+          });
         } as any
       );
 
@@ -1364,7 +1337,7 @@ describe('SectionBatchGenerator', () => {
               qualityPassed: true,
               tokenCost: 0,
             },
-          })
+          });
         } as any
       );
 

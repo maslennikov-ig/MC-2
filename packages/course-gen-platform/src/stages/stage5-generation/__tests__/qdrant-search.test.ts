@@ -13,7 +13,11 @@
  */
 
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { enrichBatchContext, createSearchDocumentsTool, TOKEN_BUDGET } from '@/stages/stage5-generation/utils/qdrant-search';
+import {
+  enrichBatchContext,
+  createSearchDocumentsTool,
+  TOKEN_BUDGET,
+} from '@/stages/stage5-generation/utils/qdrant-search';
 import type { SectionBatchInput } from '@/stages/stage5-generation/utils/qdrant-search';
 import type { AnalysisResult } from '@megacampus/shared-types/analysis-result';
 import * as qdrantSearch from '@/shared/qdrant/search';
@@ -53,7 +57,11 @@ describe('qdrant-search', () => {
         research_flags: [],
       };
 
-      const result = await enrichBatchContext(batchInput, courseId, analysisResult as AnalysisResult);
+      const result = await enrichBatchContext(
+        batchInput,
+        courseId,
+        analysisResult as AnalysisResult
+      );
 
       expect(result).toBe('');
     });
@@ -132,7 +140,11 @@ describe('qdrant-search', () => {
 
       vi.mocked(qdrantSearch.searchChunks).mockResolvedValue(mockSearchResponse);
 
-      const result = await enrichBatchContext(batchInput, courseId, analysisResult as AnalysisResult);
+      const result = await enrichBatchContext(
+        batchInput,
+        courseId,
+        analysisResult as AnalysisResult
+      );
 
       expect(result).toContain('REFERENCE MATERIAL');
       expect(result).toContain('AVAILABLE DOCUMENTS');
@@ -204,7 +216,11 @@ describe('qdrant-search', () => {
 
       vi.mocked(qdrantSearch.searchChunks).mockResolvedValue(mockSearchResponse);
 
-      const result = await enrichBatchContext(batchInput, courseId, analysisResult as AnalysisResult);
+      const result = await enrichBatchContext(
+        batchInput,
+        courseId,
+        analysisResult as AnalysisResult
+      );
 
       // Verify result is truncated (allowing small overhead for header text)
       const estimatedTokens = Math.floor(result.length / 2.5); // Use Math.floor like production code
@@ -229,7 +245,11 @@ describe('qdrant-search', () => {
 
       vi.mocked(qdrantSearch.searchChunks).mockRejectedValue(new Error('Qdrant connection failed'));
 
-      const result = await enrichBatchContext(batchInput, courseId, analysisResult as AnalysisResult);
+      const result = await enrichBatchContext(
+        batchInput,
+        courseId,
+        analysisResult as AnalysisResult
+      );
 
       expect(result).toBe('');
     });
@@ -283,7 +303,11 @@ describe('qdrant-search', () => {
 
       vi.mocked(qdrantSearch.searchChunks).mockResolvedValue(mockSearchResponse);
 
-      const result = await enrichBatchContext(batchInput, courseId, analysisResult as AnalysisResult);
+      const result = await enrichBatchContext(
+        batchInput,
+        courseId,
+        analysisResult as AnalysisResult
+      );
 
       expect(result).toContain('AVAILABLE DOCUMENTS');
       expect(result).toContain('doc-1');

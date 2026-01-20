@@ -1,4 +1,3 @@
-/* eslint-disable */
 /**
  * Vector Lifecycle Management - Deduplication Tests
  *
@@ -116,10 +115,7 @@ async function testDeleteOneReference(fileIds: { file1: string; file2: string })
 
   // Verify course 1 still has vectors
   console.log('\n--- Verify Course 1 Still Has Access ---');
-  const supabase = createClient(
-    process.env.SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_KEY!
-  );
+  const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_KEY!);
 
   const { data: file1, error } = await supabase
     .from('file_catalog')
@@ -160,16 +156,9 @@ async function testDeleteLastReference(fileId: string) {
 
   // Verify file record deleted
   console.log('\n--- Verify File Record Deleted ---');
-  const supabase = createClient(
-    process.env.SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_KEY!
-  );
+  const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_KEY!);
 
-  const { data, error } = await supabase
-    .from('file_catalog')
-    .select('*')
-    .eq('id', fileId)
-    .single();
+  const { data, error } = await supabase.from('file_catalog').select('*').eq('id', fileId).single();
 
   if (error || !data) {
     console.log('✓ PASS: File record deleted from database');
@@ -223,10 +212,7 @@ async function testCrossOrgDeduplication() {
 
   // Verify quota accounting (both orgs pay)
   console.log('\n--- Quota Accounting ---');
-  const supabase = createClient(
-    process.env.SUPABASE_URL!,
-    process.env.SUPABASE_SERVICE_KEY!
-  );
+  const supabase = createClient(process.env.SUPABASE_URL!, process.env.SUPABASE_SERVICE_KEY!);
 
   const { data: org1 } = await supabase
     .from('organizations')
@@ -278,7 +264,9 @@ async function runTests() {
 }
 
 // Run tests if this file is executed directly (ESM compatible)
-const isMainModule = import.meta.url.endsWith(process.argv[1]?.replace(/\\/g, '/').split('/').pop() || '');
+const isMainModule = import.meta.url.endsWith(
+  process.argv[1]?.replace(/\\/g, '/').split('/').pop() || ''
+);
 if (isMainModule) {
   runTests().catch(error => {
     console.error('Fatal error:', error);

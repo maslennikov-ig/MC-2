@@ -16,9 +16,7 @@ describe('generateSemanticDiff', () => {
       'Анализировать архитектурные решения',
     ];
 
-    const regenerated = [
-      'Объяснить основы ООП',
-    ];
+    const regenerated = ['Объяснить основы ООП'];
 
     const diff = await generateSemanticDiff({
       original,
@@ -73,11 +71,7 @@ describe('generateSemanticDiff', () => {
   });
 
   it('should detect restructured or expanded change type for reorganized content', async () => {
-    const original = [
-      'Learn about databases',
-      'Study SQL queries',
-      'Practice data modeling',
-    ];
+    const original = ['Learn about databases', 'Study SQL queries', 'Practice data modeling'];
 
     const regenerated = [
       'Master relational database design',
@@ -159,7 +153,7 @@ describe('generateSemanticDiff', () => {
     expect(poorDiff.alignmentScore).toBeLessThanOrEqual(3);
   });
 
-  it('should validate Bloom\'s level preservation for learning objectives', async () => {
+  it("should validate Bloom's level preservation for learning objectives", async () => {
     // Preserved: both use "Explain" (understand level)
     const preserved = await generateSemanticDiff({
       original: 'Explain the concept of inheritance',
@@ -202,8 +196,8 @@ describe('generateSemanticDiff', () => {
     expect(diff.conceptsAdded.length).toBeGreaterThan(0);
     expect(diff.conceptsRemoved.length).toBeGreaterThan(0);
     // Check for concepts in lowercase (as they're normalized)
-    const hasFrameworkConcept = diff.conceptsAdded.some(c =>
-      c.includes('tensor') || c.includes('pytorch') || c.includes('supervised')
+    const hasFrameworkConcept = diff.conceptsAdded.some(
+      c => c.includes('tensor') || c.includes('pytorch') || c.includes('supervised')
     );
     expect(hasFrameworkConcept).toBe(true);
   });

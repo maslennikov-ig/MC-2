@@ -46,13 +46,7 @@ vi.mock('../../../../../src/orchestrator/services/analysis/langchain-models', ()
             'Well-defined topic with clear learning objectives and structured content requirements',
           target_audience: 'intermediate',
           missing_elements: ['Advanced type system patterns', 'Real-world project examples'],
-          key_concepts: [
-            'Static typing',
-            'Interfaces',
-            'Generics',
-            'Type inference',
-            'Decorators',
-          ],
+          key_concepts: ['Static typing', 'Interfaces', 'Generics', 'Type inference', 'Decorators'],
           domain_keywords: [
             'TypeScript',
             'JavaScript',
@@ -142,12 +136,14 @@ describe('Phase 1 Classification Service', () => {
           {
             document_id: '123e4567-e89b-12d3-a456-426614174000',
             file_name: 'typescript-intro.pdf',
-            processed_content: 'Introduction to TypeScript: static typing, interfaces, and generics...',
+            processed_content:
+              'Introduction to TypeScript: static typing, interfaces, and generics...',
           },
           {
             document_id: '123e4567-e89b-12d3-a456-426614174001',
             file_name: 'advanced-patterns.pdf',
-            processed_content: 'Advanced TypeScript patterns: decorators, mixins, conditional types...',
+            processed_content:
+              'Advanced TypeScript patterns: decorators, mixins, conditional types...',
           },
         ],
       };
@@ -202,7 +198,13 @@ describe('Phase 1 Classification Service', () => {
           target_audience: 'intermediate',
           missing_elements: null,
           key_concepts: ['typing', 'interfaces', 'generics'],
-          domain_keywords: ['typescript', 'javascript', 'static-typing', 'type-safety', 'interfaces'],
+          domain_keywords: [
+            'typescript',
+            'javascript',
+            'static-typing',
+            'type-safety',
+            'interfaces',
+          ],
         },
         phase_metadata: {
           duration_ms: 5000,
