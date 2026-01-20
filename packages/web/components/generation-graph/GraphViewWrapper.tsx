@@ -1,8 +1,8 @@
-'use client';
+'use client'
 
-import dynamic from 'next/dynamic';
-import { GraphSkeleton } from './GraphSkeleton';
-import type { GenerationProgress, CourseStatus } from '@/types/course-generation';
+import dynamic from 'next/dynamic'
+import { GraphSkeleton } from './GraphSkeleton'
+import type { GenerationProgress, CourseStatus } from '@/types/course-generation'
 
 // Dynamic import MUST be inside a Client Component for ssr: false to work
 // This prevents React Flow from being included in server bundle
@@ -12,7 +12,7 @@ const GraphViewDynamic = dynamic(
     ssr: false,
     loading: () => <GraphSkeleton />,
   }
-);
+)
 
 /**
  * Pre-loaded Stage 1 course data from database.
@@ -21,56 +21,64 @@ const GraphViewDynamic = dynamic(
  * The Stage 1 panel components will validate and cast to specific types.
  */
 export interface Stage1CourseData {
-  inputData: Record<string, unknown>;
-  outputData: Record<string, unknown>;
+  inputData: Record<string, unknown>
+  outputData: Record<string, unknown>
 }
 
 // Re-export props type from GraphView for type safety
 export interface GraphViewWrapperProps {
-  courseId: string;
-  courseTitle?: string;
+  courseId: string
+  courseTitle?: string
   /**
    * Whether the course has documents.
    * When false, Stage 2 (Document Processing) and Stage 3 (Classification)
    * are marked as 'skipped' in the graph visualization.
    * @default true
    */
-  hasDocuments?: boolean;
+  hasDocuments?: boolean
   /** Stage number where generation failed (from courses.failed_at_stage) */
-  failedAtStage?: number | null;
+  failedAtStage?: number | null
   /**
    * Actual progress percentage from the database (0-100).
    * When provided, this is used instead of calculating from status.
    * Ensures consistency with CelestialHeader progress display.
    */
-  progressPercentage?: number;
+  progressPercentage?: number
   /** Human-readable generation code (e.g., "ABC-1234") for debugging */
-  generationCode?: string | null;
+  generationCode?: string | null
   /**
    * Pre-loaded Stage 1 course data.
    * When provided, Stage 1 node displays this data immediately
    * instead of waiting for traces from generation.
    */
-  stage1CourseData?: Stage1CourseData;
+  stage1CourseData?: Stage1CourseData
   /**
    * Full generation progress data for header stats display.
    * Contains started_at, modules_total, lessons_total, lessons_completed, etc.
    */
-  generationProgress?: GenerationProgress;
+  generationProgress?: GenerationProgress
   /**
    * Current generation status for header stats display.
    */
-  generationStatus?: CourseStatus;
+  generationStatus?: CourseStatus
   /**
    * Whether realtime connection is active.
    * Used for connection indicator in header.
    */
-  isRealtimeConnected?: boolean;
+  isRealtimeConnected?: boolean
   /**
    * Read-only mode for automatic generation.
    * Hides edit, regenerate, and approve buttons.
    */
-  readOnly?: boolean;
+  readOnly?: boolean
+  /**
+   * NEW: Automatic mode handlers for MissionControlBanner
+   */
+  isPaused?: boolean
+  onPause?: () => Promise<void>
+  onResume?: () => Promise<void>
+  onCancelGeneration?: () => Promise<void>
+  onSwitchToManual?: () => Promise<void>
 }
 
 /**
@@ -98,7 +106,12 @@ export function GraphViewWrapper({
   generationProgress,
   generationStatus,
   isRealtimeConnected,
-  readOnly
+  readOnly,
+  isPaused,
+  onPause,
+  onResume,
+  onCancelGeneration,
+  onSwitchToManual,
 }: GraphViewWrapperProps) {
   return (
     <GraphViewDynamic
@@ -113,9 +126,14 @@ export function GraphViewWrapper({
       generationStatus={generationStatus}
       isRealtimeConnected={isRealtimeConnected}
       readOnly={readOnly}
+      isPaused={isPaused}
+      onPause={onPause}
+      onResume={onResume}
+      onCancelGeneration={onCancelGeneration}
+      onSwitchToManual={onSwitchToManual}
     />
-  );
+  )
 }
 
 // Default export for dynamic import compatibility
-export default GraphViewWrapper;
+export default GraphViewWrapper

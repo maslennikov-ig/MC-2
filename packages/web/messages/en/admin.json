@@ -340,8 +340,10 @@
     "status": {
       "new": "New",
       "in_progress": "In Progress",
+      "to_verify": "To Verify",
       "resolved": "Resolved",
-      "ignored": "Ignored"
+      "ignored": "Ignored",
+      "auto_muted": "Auto-Muted"
     },
     "levels": {
       "WARNING": "Warning",

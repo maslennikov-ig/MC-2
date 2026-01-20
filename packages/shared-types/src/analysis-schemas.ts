@@ -222,7 +222,7 @@ export const Phase2OutputSchema = z.object({
     calculation_explanation: z
       .string()
       .min(50, 'Calculation explanation must be at least 50 characters'), // Removed .max(300) - allow thorough explanations
-    total_lessons: z.number().int().min(10, 'Minimum 10 lessons required (FR-015)'), // Removed .max(100) - let LLM decide optimal count
+    total_lessons: z.number().int().min(1, 'Minimum 1 lesson required'), // Dynamic min based on course_size preset (FR-015 applies only to AUTO mode)
     total_sections: z.number().int().min(1, 'Minimum 1 section'), // Removed .max(30) - let LLM decide structure
     scope_warning: z.string().nullable(),
     sections_breakdown: z.array(SectionBreakdownSchema).min(1, 'Must have at least 1 section'),
@@ -274,14 +274,16 @@ export const Phase2InputSchema = z.object({
         .nullable()
         .optional(),
     }),
-    contextual_language: z.object({
-      why_matters_context: z.string().min(50), // Removed .max(300) - allow rich context
-      motivators: z.string().min(50), // Reduced from 100 - realistic minimum for motivators text
-      experience_prompt: z.string().min(100), // Removed .max(600) - allow detailed prompts
-      problem_statement_context: z.string().min(50), // Removed .max(300) - encourage thorough problem statements
-      knowledge_bridge: z.string().min(100), // Removed .max(600) - allow comprehensive bridging
-      practical_benefit_focus: z.string().min(100), // Removed .max(600) - encourage detailed benefits
-    }),
+    contextual_language: z
+      .object({
+        why_matters_context: z.string().min(50), // Removed .max(300) - allow rich context
+        motivators: z.string().min(50), // Reduced from 100 - realistic minimum for motivators text
+        experience_prompt: z.string().min(100), // Removed .max(600) - allow detailed prompts
+        problem_statement_context: z.string().min(50), // Removed .max(300) - encourage thorough problem statements
+        knowledge_bridge: z.string().min(100), // Removed .max(600) - allow comprehensive bridging
+        practical_benefit_focus: z.string().min(100), // Removed .max(600) - encourage detailed benefits
+      })
+      .optional(),
     topic_analysis: z.object({
       determined_topic: z.string().min(3), // Removed .max(200) - allow detailed topic descriptions
       information_completeness: z.number().min(0).max(100), // Keep .max(100) - technical constraint (percentage)
@@ -309,6 +311,10 @@ export const Phase2InputSchema = z.object({
   target_lessons: z.number().int().positive().optional(),
   target_sections: z.number().int().positive().optional(),
   size_guidance: z.string().min(1).optional(),
+  /** Minimum lessons count (hard constraint from size preset) */
+  min_lessons: z.number().int().positive().optional(),
+  /** Maximum lessons count (soft constraint from size preset) */
+  max_lessons: z.number().int().positive().optional(),
 
   /** Course description (user-provided context) */
   course_description: z.string().optional(),
@@ -349,14 +355,16 @@ export const Phase1OutputSchema = z.object({
       .nullable()
       .optional(),
   }),
-  contextual_language: z.object({
-    why_matters_context: z.string().min(50), // Removed .max(300) - allow rich context
-    motivators: z.string().min(50), // Reduced from 100 - realistic minimum for motivators text
-    experience_prompt: z.string().min(100), // Removed .max(600) - allow detailed prompts
-    problem_statement_context: z.string().min(50), // Removed .max(300) - encourage thorough problem statements
-    knowledge_bridge: z.string().min(100), // Removed .max(600) - allow comprehensive bridging
-    practical_benefit_focus: z.string().min(100), // Removed .max(600) - encourage detailed benefits
-  }),
+  contextual_language: z
+    .object({
+      why_matters_context: z.string().min(50), // Removed .max(300) - allow rich context
+      motivators: z.string().min(50), // Reduced from 100 - realistic minimum for motivators text
+      experience_prompt: z.string().min(100), // Removed .max(600) - allow detailed prompts
+      problem_statement_context: z.string().min(50), // Removed .max(300) - encourage thorough problem statements
+      knowledge_bridge: z.string().min(100), // Removed .max(600) - allow comprehensive bridging
+      practical_benefit_focus: z.string().min(100), // Removed .max(600) - encourage detailed benefits
+    })
+    .optional(),
   topic_analysis: z.object({
     determined_topic: z.string().min(3), // Removed .max(200) - allow detailed topic descriptions
     information_completeness: z.number().min(0).max(100), // Keep .max(100) - technical constraint (percentage)
@@ -428,12 +436,10 @@ export const ExpansionAreaSchema = z.object({
  * Phase 3 output schema: Expert pedagogical analysis
  */
 export const Phase3OutputSchema = z.object({
+  // Note: teaching_style, practical_focus, interactivity_level removed to avoid conflict with user-selected style
   pedagogical_strategy: z.object({
-    teaching_style: z.enum(['hands-on', 'theory-first', 'project-based', 'mixed']),
-    assessment_approach: z.string().min(50), // Removed .max(300) - encourage comprehensive approaches
-    practical_focus: z.enum(['high', 'medium', 'low']),
-    progression_logic: z.string().min(100), // Removed .max(500) - allow detailed logic
-    interactivity_level: z.enum(['high', 'medium', 'low']),
+    assessment_approach: z.string().min(50), // How learners demonstrate understanding
+    progression_logic: z.string().min(100), // How difficulty increases across lessons
   }),
   expansion_areas: z.array(ExpansionAreaSchema).nullable(),
   research_flags: z.array(ResearchFlagSchema),
@@ -520,14 +526,16 @@ export const AnalysisResultSchema = z.object({
       .nullable(),
   }),
 
-  contextual_language: z.object({
-    why_matters_context: z.string().min(50), // Removed .max(300) - allow rich context
-    motivators: z.string().min(50), // Reduced from 100 - realistic minimum for motivators text
-    experience_prompt: z.string().min(100), // Removed .max(600) - allow detailed prompts
-    problem_statement_context: z.string().min(50), // Removed .max(300) - encourage thorough problem statements
-    knowledge_bridge: z.string().min(100), // Removed .max(600) - allow comprehensive bridging
-    practical_benefit_focus: z.string().min(100), // Removed .max(600) - encourage detailed benefits
-  }),
+  contextual_language: z
+    .object({
+      why_matters_context: z.string().min(50), // Removed .max(300) - allow rich context
+      motivators: z.string().min(50), // Reduced from 100 - realistic minimum for motivators text
+      experience_prompt: z.string().min(100), // Removed .max(600) - allow detailed prompts
+      problem_statement_context: z.string().min(50), // Removed .max(300) - encourage thorough problem statements
+      knowledge_bridge: z.string().min(100), // Removed .max(600) - allow comprehensive bridging
+      practical_benefit_focus: z.string().min(100), // Removed .max(600) - encourage detailed benefits
+    })
+    .optional(),
 
   topic_analysis: z.object({
     determined_topic: z.string().min(3), // Removed .max(200) - allow detailed topic descriptions
@@ -545,18 +553,16 @@ export const AnalysisResultSchema = z.object({
     scope_reasoning: z.string().min(100), // Removed .max(500) - encourage detailed reasoning
     lesson_duration_minutes: z.number().int().min(3).max(45), // Keep .max(45) - pedagogical constraint per FR-014
     calculation_explanation: z.string().min(20), // Removed .max(300) - allow thorough explanations
-    total_lessons: z.number().int().min(10), // Removed .max(100) - let LLM decide optimal count per FR-015
+    total_lessons: z.number().int().min(1), // Dynamic min based on course_size preset (FR-015 applies only to AUTO mode)
     total_sections: z.number().int().min(1), // Removed .max(30) - let LLM decide structure
     scope_warning: z.string().nullable(),
     sections_breakdown: z.array(SectionBreakdownSchema),
   }),
 
+  // Note: teaching_style, practical_focus, interactivity_level removed to avoid conflict with user-selected style
   pedagogical_strategy: z.object({
-    teaching_style: z.enum(['hands-on', 'theory-first', 'project-based', 'mixed']),
-    assessment_approach: z.string().min(50), // Removed .max(300) - encourage comprehensive approaches
-    practical_focus: z.enum(['high', 'medium', 'low']),
-    progression_logic: z.string().min(100), // Removed .max(500) - allow detailed logic
-    interactivity_level: z.enum(['high', 'medium', 'low']),
+    assessment_approach: z.string().min(50), // How learners demonstrate understanding
+    progression_logic: z.string().min(100), // How difficulty increases across lessons
   }),
 
   content_strategy: z.enum(['create_from_scratch', 'expand_and_enhance', 'optimize_existing']),

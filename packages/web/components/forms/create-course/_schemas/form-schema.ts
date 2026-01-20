@@ -54,15 +54,18 @@ export const formSchema = z
       .optional(),
     courseSize: courseSizeSchema.optional(),
     targetAudience: z.string().optional(),
+    // Minimum values based on course size presets:
+    // - micro: 1-5 lessons, 1 section
+    // - comprehensive: up to 100 lessons, 30 sections
     estimatedLessons: z
       .number()
-      .min(10)
+      .min(1)
       .max(100)
       .optional()
       .or(z.nan().transform(() => undefined)),
     estimatedSections: z
       .number()
-      .min(3)
+      .min(1)
       .max(30)
       .optional()
       .or(z.nan().transform(() => undefined)),
@@ -74,7 +77,7 @@ export const formSchema = z
     formats: z.array(z.string()).optional(),
 
     // Generation mode fields
-    generationMode: z.enum(['automatic', 'semi_automatic']).default('semi_automatic'),
+    generationMode: z.enum(['automatic', 'semi_automatic']).default('automatic'),
     notifyOnCompletion: z.boolean().default(true),
     notifyOnError: z.boolean().default(true),
     notifyOnStageComplete: z.boolean().default(false),

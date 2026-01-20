@@ -19,11 +19,18 @@ export interface AnalysisResult {
     primary: 'professional' | 'personal' | 'creative' | 'hobby' | 'spiritual' | 'academic';
     confidence: number; // 0-1
     reasoning: string;
-    secondary?: 'professional' | 'personal' | 'creative' | 'hobby' | 'spiritual' | 'academic' | null;
+    secondary?:
+      | 'professional'
+      | 'personal'
+      | 'creative'
+      | 'hobby'
+      | 'spiritual'
+      | 'academic'
+      | null;
   };
 
-  // Category-specific motivational language (Phase 1)
-  contextual_language: {
+  // Category-specific motivational language (Phase 1) - DEPRECATED, no longer generated
+  contextual_language?: {
     why_matters_context: string; // 50-300 chars, TARGET: 100
     motivators: string; // 100-600 chars, TARGET: 200
     experience_prompt: string; // 100-600 chars, TARGET: 200
@@ -57,29 +64,46 @@ export interface AnalysisResult {
   };
 
   // Pedagogical strategy (Phase 3)
+  // Note: teaching_style, practical_focus, interactivity_level removed to avoid conflict with user-selected style
   pedagogical_strategy: {
-    teaching_style: 'hands-on' | 'theory-first' | 'project-based' | 'mixed';
-    assessment_approach: string; // 50-200 chars
-    practical_focus: 'high' | 'medium' | 'low';
-    progression_logic: string; // 100-500 chars
-    interactivity_level: 'high' | 'medium' | 'low';
+    assessment_approach: string; // 50+ chars - how learners demonstrate understanding
+    progression_logic: string; // 100+ chars - how difficulty increases across lessons
   };
 
   // NEW: Pedagogical patterns for Generation quality (Analyze Enhancement) - REQUIRED
   pedagogical_patterns: {
-    primary_strategy: 'problem-based learning' | 'lecture-based' | 'inquiry-based' | 'project-based' | 'mixed';
+    primary_strategy:
+      | 'problem-based learning'
+      | 'lecture-based'
+      | 'inquiry-based'
+      | 'project-based'
+      | 'mixed';
     theory_practice_ratio: string; // e.g., "30:70", "50:50"
-    assessment_types: Array<'coding' | 'quizzes' | 'projects' | 'essays' | 'presentations' | 'peer-review'>;
+    assessment_types: Array<
+      'coding' | 'quizzes' | 'projects' | 'essays' | 'presentations' | 'peer-review'
+    >;
     key_patterns: string[]; // e.g., ["build incrementally", "learn by refactoring"]
   };
 
   // NEW: Structured generation guidance for Stage 5 - REQUIRED
   generation_guidance: {
-    tone: 'conversational but precise' | 'formal academic' | 'casual friendly' | 'technical professional';
+    tone:
+      | 'conversational but precise'
+      | 'formal academic'
+      | 'casual friendly'
+      | 'technical professional';
     use_analogies: boolean;
     specific_analogies: string[]; // e.g., ["assembly line for data flow"]
     avoid_jargon: string[]; // Terms to avoid or explain
-    include_visuals: Array<'diagrams' | 'flowcharts' | 'code examples' | 'screenshots' | 'animations' | 'plots' | 'tables'>;
+    include_visuals: Array<
+      | 'diagrams'
+      | 'flowcharts'
+      | 'code examples'
+      | 'screenshots'
+      | 'animations'
+      | 'plots'
+      | 'tables'
+    >;
     exercise_types: ExerciseType[]; // From analysis-schemas.ts (includes all standard exercise formats)
     contextual_language_hints: string; // Audience assumptions
     real_world_examples: string[]; // Applications to reference
@@ -171,9 +195,16 @@ export interface Phase1Output {
     primary: 'professional' | 'personal' | 'creative' | 'hobby' | 'spiritual' | 'academic';
     confidence: number;
     reasoning: string;
-    secondary?: 'professional' | 'personal' | 'creative' | 'hobby' | 'spiritual' | 'academic' | null;
+    secondary?:
+      | 'professional'
+      | 'personal'
+      | 'creative'
+      | 'hobby'
+      | 'spiritual'
+      | 'academic'
+      | null;
   };
-  contextual_language: {
+  contextual_language?: {
     why_matters_context: string;
     motivators: string;
     experience_prompt: string;
@@ -192,9 +223,16 @@ export interface Phase1Output {
     domain_keywords: string[];
   };
   pedagogical_patterns: {
-    primary_strategy: 'problem-based learning' | 'lecture-based' | 'inquiry-based' | 'project-based' | 'mixed';
+    primary_strategy:
+      | 'problem-based learning'
+      | 'lecture-based'
+      | 'inquiry-based'
+      | 'project-based'
+      | 'mixed';
     theory_practice_ratio: string; // e.g., "30:70", "50:50"
-    assessment_types: Array<'coding' | 'quizzes' | 'projects' | 'essays' | 'presentations' | 'peer-review'>;
+    assessment_types: Array<
+      'coding' | 'quizzes' | 'projects' | 'essays' | 'presentations' | 'peer-review'
+    >;
     key_patterns: string[]; // e.g., ["build incrementally", "learn by refactoring"]
   };
   phase_metadata: {
@@ -227,7 +265,13 @@ export interface Phase2Output {
     quality_score: number;
     retry_count: number;
     repair_metadata?: {
-      layer_used: 'none' | 'layer1_repair' | 'layer2_revise' | 'layer3_partial' | 'layer4_120b' | 'layer5_emergency';
+      layer_used:
+        | 'none'
+        | 'layer1_repair'
+        | 'layer2_revise'
+        | 'layer3_partial'
+        | 'layer4_120b'
+        | 'layer5_emergency';
       repair_attempts: number;
       successful_fields?: string[];
       regenerated_fields?: string[];
@@ -241,11 +285,8 @@ export interface Phase2Output {
  */
 export interface Phase3Output {
   pedagogical_strategy: {
-    teaching_style: 'hands-on' | 'theory-first' | 'project-based' | 'mixed';
-    assessment_approach: string;
-    practical_focus: 'high' | 'medium' | 'low';
-    progression_logic: string;
-    interactivity_level: 'high' | 'medium' | 'low';
+    assessment_approach: string; // 50+ chars
+    progression_logic: string; // 100+ chars
   };
   expansion_areas: ExpansionArea[] | null;
   research_flags: ResearchFlag[];
@@ -263,11 +304,23 @@ export interface Phase3Output {
  */
 export interface Phase4Output {
   generation_guidance: {
-    tone: 'conversational but precise' | 'formal academic' | 'casual friendly' | 'technical professional';
+    tone:
+      | 'conversational but precise'
+      | 'formal academic'
+      | 'casual friendly'
+      | 'technical professional';
     use_analogies: boolean;
     specific_analogies: string[];
     avoid_jargon: string[];
-    include_visuals: Array<'diagrams' | 'flowcharts' | 'code examples' | 'screenshots' | 'animations' | 'plots' | 'tables'>;
+    include_visuals: Array<
+      | 'diagrams'
+      | 'flowcharts'
+      | 'code examples'
+      | 'screenshots'
+      | 'animations'
+      | 'plots'
+      | 'tables'
+    >;
     exercise_types: ExerciseType[]; // From analysis-schemas.ts (includes all standard exercise formats)
     contextual_language_hints: string;
     real_world_examples: string[];

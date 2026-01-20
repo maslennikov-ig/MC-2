@@ -1,24 +1,26 @@
-import type { Course, Section, Lesson, Asset, LessonActivity } from "@/types/database";
-import type { Database } from "@/types/database.generated";
+import type { Course, Section, Lesson, Asset, LessonActivity } from '@/types/database'
+import type { Database } from '@/types/database.generated'
 
-type EnrichmentRow = Database['public']['Tables']['lesson_enrichments']['Row'];
-export type LessonContentRow = Database['public']['Tables']['lesson_contents']['Row'];
+type EnrichmentRow = Database['public']['Tables']['lesson_enrichments']['Row']
+export type LessonContentRow = Database['public']['Tables']['lesson_contents']['Row']
 
 export interface CourseViewerProps {
-  course: Course;
-  sections: Section[];
-  lessons: Lesson[];
-  assets?: Record<string, Asset[]>;
+  course: Course
+  sections: Section[]
+  lessons: Lesson[]
+  assets?: Record<string, Asset[]>
   /** Enrichments grouped by lesson_id (video, audio, quiz, presentation, document) */
-  enrichments?: Record<string, EnrichmentRow[]>;
+  enrichments?: Record<string, EnrichmentRow[]>
   /** Error message if enrichments failed to load */
-  enrichmentsLoadError?: string;
+  enrichmentsLoadError?: string
   /** Lesson contents from lesson_contents table, grouped by lesson_id */
-  lessonContents?: Record<string, LessonContentRow>;
+  lessonContents?: Record<string, LessonContentRow>
   /** Read-only mode for shared/public course viewing (hides edit buttons, generation panel) */
-  readOnly?: boolean;
+  readOnly?: boolean
+  /** Initial lesson label from URL (e.g., "1.2") for deep-linking */
+  initialLessonLabel?: string
 }
 
 export function isActivityObject(activity: string | LessonActivity): activity is LessonActivity {
-  return typeof activity === 'object' && activity !== null && 'exercise_title' in activity;
+  return typeof activity === 'object' && activity !== null && 'exercise_title' in activity
 }

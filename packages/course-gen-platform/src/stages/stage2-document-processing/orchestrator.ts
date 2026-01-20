@@ -296,17 +296,63 @@ export class DocumentProcessingOrchestrator {
         qualityScore: summarizationResult.metadata.qualityScore,
       };
     } catch (summarizationError) {
-      // Summarization failure is non-fatal - Stage 3 classification can use markdown_content
+      // Summarization failure is non-fatal - write fallback to prevent Stage 4 blocking
+      const errorMessage =
+        summarizationError instanceof Error
+          ? summarizationError.message
+          : String(summarizationError);
+
       logger.warn(
-        {
-          fileId,
-          error:
-            summarizationError instanceof Error
-              ? summarizationError.message
-              : String(summarizationError),
-        },
-        'Document summarization failed (non-fatal), Stage 3 classification will use markdown_content'
+        { fileId, error: errorMessage },
+        'Document summarization failed (non-fatal), writing markdown_content as fallback'
       );
+
+      // CRITICAL FIX: Fallback to markdown_content to prevent Stage 4 barrier blocking
+      // Stage 4 requires processed_content IS NOT NULL for all documents
+      try {
+        const supabase = getSupabaseAdmin();
+        const { data: fileData } = await supabase
+          .from('file_catalog')
+          .select('markdown_content')
+          .eq('id', fileId)
+          .single();
+
+        if (fileData?.markdown_content) {
+          const { error: updateError } = await supabase
+            .from('file_catalog')
+            .update({
+              processed_content: fileData.markdown_content,
+              processing_method: 'full_text', // Use 'full_text' to satisfy check constraint
+              summary_metadata: {
+                error: errorMessage,
+                fallback_reason: 'summarization_failed',
+                quality_score: 0,
+                is_fallback: true,
+              },
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', fileId);
+
+          if (updateError) {
+            logger.error(
+              { fileId, error: updateError.message },
+              'Failed to store fallback processed_content'
+            );
+          } else {
+            logger.info({ fileId }, 'Stored markdown_content as fallback processed_content');
+          }
+        } else {
+          logger.warn({ fileId }, 'No markdown_content available for fallback');
+        }
+      } catch (fallbackError) {
+        logger.error(
+          {
+            fileId,
+            error: fallbackError instanceof Error ? fallbackError.message : String(fallbackError),
+          },
+          'Failed to write fallback processed_content'
+        );
+      }
 
       await logTrace({
         courseId,
@@ -314,12 +360,7 @@ export class DocumentProcessingOrchestrator {
         phase: 'summarization',
         stepName: 'generate_summary',
         inputData: { fileId },
-        errorData: {
-          error:
-            summarizationError instanceof Error
-              ? summarizationError.message
-              : String(summarizationError),
-        },
+        errorData: { error: errorMessage, fallback: 'attempted' },
         durationMs: Date.now() - summarizationStartTime,
       });
     }
@@ -537,7 +578,7 @@ export class DocumentProcessingOrchestrator {
       // If the course has already moved past Stage 2, don't try to update
       const { data: course, error: courseError } = await supabaseAdmin
         .from('courses')
-        .select('generation_status')
+        .select('generation_status, generation_mode')
         .eq('id', courseId)
         .single();
 
@@ -550,6 +591,7 @@ export class DocumentProcessingOrchestrator {
       }
 
       const currentStatus = course.generation_status as string;
+      const generationMode = course.generation_mode as string;
 
       // Only update if we're still in early Stage 2 states
       // If already in awaiting_approval or complete, don't try to regress to processing
@@ -561,6 +603,17 @@ export class DocumentProcessingOrchestrator {
           { courseId, currentStatus },
           'Course already in terminal Stage 2 state, skipping progress update (normal parallel processing race condition)'
         );
+        // For automatic mode stuck in awaiting_approval, try auto-approve
+        if (currentStatus === 'stage_2_awaiting_approval' && generationMode === 'automatic') {
+          try {
+            const { autoApproved } = await handleStageCompletion(courseId, 2);
+            if (autoApproved) {
+              logger.info({ courseId }, 'Stage 2 auto-approved from awaiting_approval state');
+            }
+          } catch (err) {
+            logger.warn({ courseId, error: err }, 'Failed to auto-approve from awaiting_approval');
+          }
+        }
         return;
       }
 
@@ -713,8 +766,14 @@ export class DocumentProcessingOrchestrator {
 
   /**
    * Check if job has been cancelled
+   * Note: SandboxedJob doesn't have getState() method, only regular Job does
    */
   private async checkCancellation(job: Job<DocumentProcessingJobData>): Promise<void> {
+    // Type guard: SandboxedJob doesn't have getState() - skip check in sandboxed mode
+    if (typeof (job as { getState?: unknown }).getState !== 'function') {
+      // In sandboxed mode, we rely on BullMQ's built-in cancellation handling
+      return;
+    }
     // Note: BullMQ doesn't have isDiscarded() - check if job state is 'failed' or 'completed'
     const state = await job.getState();
     if (state === 'failed' || state === 'completed') {

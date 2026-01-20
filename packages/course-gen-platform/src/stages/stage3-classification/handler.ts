@@ -17,7 +17,8 @@
 import { Job } from 'bullmq';
 import { Stage3ClassificationOrchestrator } from './orchestrator';
 import type { Stage3Input } from './types';
-import { BaseJobHandler, JobResult } from '../../orchestrator/handlers/base-handler';
+import { BaseJobHandler } from '../../orchestrator/handlers/base-handler';
+import type { JobResult } from '../../orchestrator/handlers/base-handler';
 import { DocumentClassificationJobData, JobType } from '@megacampus/shared-types';
 import { getSupabaseAdmin } from '../../shared/supabase/admin';
 import { handleStageCompletion } from '../../shared/auto-approval';

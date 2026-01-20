@@ -24,7 +24,8 @@ export { metricsStore, exportMetrics } from './metrics';
 export { setupBullBoardUI, createMetricsRouter } from './ui';
 
 // Handlers
-export { BaseJobHandler, JobResult } from './handlers/base-handler';
+export { BaseJobHandler } from './handlers/base-handler';
+export type { JobResult } from './handlers/base-handler';
 export { testJobHandler } from './handlers/test-handler';
 export { initializeJobHandler } from './handlers/initialize';
 export {

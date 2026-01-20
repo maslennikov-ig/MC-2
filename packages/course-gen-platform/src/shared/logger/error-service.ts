@@ -8,30 +8,10 @@
 
 import { getSupabaseAdmin } from '../supabase/admin';
 import { logger } from './index.js';
-import type { ErrorLog, ErrorSeverity, CreateErrorLogParams, LogEnvironment } from './types';
-
-/**
- * Detect environment from APP_URL or NEXT_PUBLIC_APP_URL
- * @returns 'dev' | 'stage' | null
- */
-function detectEnvironment(): LogEnvironment | null {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || '';
-
-  // Use URL.hostname for precise matching
-  try {
-    const url = new URL(appUrl);
-    const hostname = url.hostname;
-
-    if (hostname === 'dev.ai.megacampus.ru') return 'dev';
-    if (hostname === 'ai.megacampus.ru') return 'stage';
-  } catch {
-    // Fallback for invalid URLs
-    if (appUrl.includes('dev.ai.megacampus.ru')) return 'dev';
-    if (appUrl.includes('ai.megacampus.ru') && !appUrl.includes('dev.')) return 'stage';
-  }
-
-  return null;
-}
+import type { ErrorLog, ErrorSeverity, CreateErrorLogParams } from './types';
+import { detectEnvironment } from './utils';
+import { applyAutoMuteStatus } from './auto-mute-service';
+import { shouldAutoMute } from './auto-classification';
 
 /**
  * Log a permanent failure to the error_logs table
@@ -70,8 +50,7 @@ export async function logPermanentFailure(params: CreateErrorLogParams): Promise
   // Auto-detect environment if not provided
   const environment = params.environment || detectEnvironment();
 
-  // Insert error log entry
-  const { error } = await supabase.from('error_logs' as any).insert({
+  const logData = {
     user_id: params.user_id || null,
     organization_id: params.organization_id,
     problem_id: params.problem_id || null,
@@ -85,7 +64,33 @@ export async function logPermanentFailure(params: CreateErrorLogParams): Promise
     job_id: params.job_id || null,
     job_type: params.job_type || null,
     metadata: params.metadata || null,
-  });
+  };
+
+  // Use upsert when problem_id is provided to handle duplicate logging attempts
+  // (e.g., during BullMQ retries where the same error is logged multiple times)
+  // Otherwise use regular insert for unique errors
+  let insertedLog: { id: string } | null = null;
+  let error: Error | null = null;
+
+  if (params.problem_id) {
+    // Upsert: update existing record if problem_id already exists
+    const result = await supabase
+      .from('error_logs' as any)
+      .upsert(logData, { onConflict: 'problem_id', ignoreDuplicates: false })
+      .select('id')
+      .single();
+    insertedLog = result.data as { id: string } | null;
+    error = result.error;
+  } else {
+    // Regular insert for errors without problem_id
+    const result = await supabase
+      .from('error_logs' as any)
+      .insert(logData)
+      .select('id')
+      .single();
+    insertedLog = result.data as { id: string } | null;
+    error = result.error;
+  }
 
   if (error) {
     // Fallback to Pino logger if database insert fails
@@ -99,12 +104,20 @@ export async function logPermanentFailure(params: CreateErrorLogParams): Promise
     throw new Error(`Failed to log permanent failure: ${error.message}`);
   }
 
+  // Check if this error should be auto-muted
+  const logId = (insertedLog as unknown as { id: string } | null)?.id;
+  const autoMuteResult = shouldAutoMute(params.error_message);
+  if (logId) {
+    await applyAutoMuteStatus(logId, params.error_message);
+  }
+
   // Log successful insert
   logger.info(
     {
       organization_id: params.organization_id,
       severity: params.severity,
       job_id: params.job_id,
+      auto_muted: autoMuteResult.mute,
     },
     'Permanent failure logged to error_logs table'
   );

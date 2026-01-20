@@ -18,6 +18,7 @@ import { logger } from '../../../shared/logger/index.js';
 import { addJob } from '../../../orchestrator/queue';
 import { JobType } from '@megacampus/shared-types';
 import type { Database, GenerationMetadata, JobData } from '@megacampus/shared-types';
+import { isValidStyle } from '@megacampus/shared-types/style-prompts';
 import type { CourseSettings } from './_shared/types';
 
 // Type aliases for Database tables
@@ -352,12 +353,14 @@ export const statusRouter = router({
           analysis_result: analysisResult,
           frontend_parameters: {
             course_title: course.title,
-            language: course.language,
-            style: course.style,
-            target_audience: course.target_audience,
-            difficulty: course.difficulty,
-            description: course.course_description,
-            course_size: course.course_size,
+            // Convert null to undefined for cleaner optional fields (nullish schema accepts both)
+            // Validate style against enum to prevent invalid values from breaking Zod
+            language: course.language ?? undefined,
+            style: course.style && isValidStyle(course.style) ? course.style : undefined,
+            target_audience: course.target_audience ?? undefined,
+            difficulty: course.difficulty ?? 'intermediate',
+            description: course.course_description ?? undefined,
+            course_size: course.course_size ?? undefined,
             desired_lessons_count: (course.settings as unknown as CourseSettings)
               ?.desired_lessons_count,
             desired_modules_count: (course.settings as unknown as CourseSettings)

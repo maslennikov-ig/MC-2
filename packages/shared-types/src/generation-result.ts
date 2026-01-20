@@ -769,7 +769,12 @@ export type LearningObjectiveWithoutInjectedFields = z.infer<
  */
 const LessonBaseSchema = z.object({
   // Identification
-  lesson_number: z.number().int().min(0).describe('Lesson number (start from 1)'),
+  lesson_number: z
+    .number()
+    .int()
+    .min(0)
+    .optional()
+    .describe('Lesson number (optional - can derive from array index)'),
   lesson_title: z
     .string()
     .min(5, 'Lesson title too short (min 5 chars)')
@@ -856,7 +861,12 @@ export type Lesson = z.infer<typeof LessonSchema>;
  */
 const SectionBaseSchemaForGeneration = z.object({
   // Identification
-  section_number: z.number().int().min(0).describe('Section number (start from 1)'),
+  section_number: z
+    .number()
+    .int()
+    .min(0)
+    .optional()
+    .describe('Section number (optional - can derive from array index)'),
   section_title: z
     .string()
     .min(10, 'Section title too short (min 10 chars)')
@@ -905,7 +915,7 @@ export type SectionWithoutInjectedFields = z.infer<typeof SectionWithoutInjected
  */
 export const SectionSchema = z
   .object({
-    section_number: z.number().int().positive(),
+    section_number: z.number().int().positive().optional(),
     section_title: z
       .string()
       .min(10, 'Section title too short (min 10 chars)')
@@ -994,13 +1004,17 @@ export const CourseStructureSchema = z
       .string()
       .min(30, 'Course overview too short (min 30 chars)')
       .max(10000, 'Course overview too long (max 10000 chars - FR-022)')
-      .describe('Comprehensive course overview (30-10000 chars, spec recommends 100+)'),
+      .optional()
+      .describe(
+        'DEPRECATED: Redundant with course_description. Optional for backward compatibility.'
+      ),
 
     target_audience: z
       .string()
       .min(20, 'Target audience too short (min 20 chars)')
       .max(1500, 'Target audience too long (max 1500 chars - FR-022)')
-      .describe('Description of target audience (20-1500 chars)'),
+      .optional()
+      .describe('Description of target audience (optional - can derive from difficulty_level)'),
 
     estimated_duration_hours: z.number().positive().describe('Total estimated duration in hours'),
 
@@ -1035,17 +1049,9 @@ export const CourseStructureSchema = z
       .min(1, 'At least 1 section required')
       .describe('Course sections containing lessons'),
   })
-  .refine(
-    data => {
-      // FR-015: Validate minimum 10 lessons total across all sections
-      const totalLessons = data.sections.reduce((sum, section) => sum + section.lessons.length, 0);
-      return totalLessons >= 10;
-    },
-    {
-      message: 'Course must have minimum 10 lessons total across all sections (FR-015)',
-      path: ['sections'],
-    }
-  )
+  // NOTE: FR-015 (minimum lessons) validation is handled dynamically in Stage 4 Phase 5
+  // based on course_size preset (MICRO: 2-4, MINI: 8-16, COMPACT: 15-30, etc.)
+  // Hardcoded min 10 check removed to support course_size flexibility
   .refine(
     structure => {
       // RT-006 P0: Validate no placeholders in course structure
@@ -1105,13 +1111,17 @@ export const CourseMetadataSchema = z
       .string()
       .min(30, 'Course overview too short (min 30 chars)')
       .max(10000, 'Course overview too long (max 10000 chars - FR-022)')
-      .describe('Comprehensive course overview (30-10000 chars, spec recommends 100+)'),
+      .optional()
+      .describe(
+        'DEPRECATED: Redundant with course_description. Optional for backward compatibility.'
+      ),
 
     target_audience: z
       .string()
       .min(20, 'Target audience too short (min 20 chars)')
       .max(1500, 'Target audience too long (max 1500 chars - FR-022)')
-      .describe('Description of target audience (20-1500 chars)'),
+      .optional()
+      .describe('Description of target audience (optional - can derive from difficulty_level)'),
 
     estimated_duration_hours: z.number().positive().describe('Total estimated duration in hours'),
 
@@ -1173,13 +1183,17 @@ export const CourseMetadataWithoutInjectedFieldsSchema = z
       .string()
       .min(30, 'Course overview too short (min 30 chars)')
       .max(10000, 'Course overview too long (max 10000 chars - FR-022)')
-      .describe('Comprehensive course overview (30-10000 chars, spec recommends 100+)'),
+      .optional()
+      .describe(
+        'DEPRECATED: Redundant with course_description. Optional for backward compatibility.'
+      ),
 
     target_audience: z
       .string()
       .min(20, 'Target audience too short (min 20 chars)')
       .max(1500, 'Target audience too long (max 1500 chars - FR-022)')
-      .describe('Description of target audience (20-1500 chars)'),
+      .optional()
+      .describe('Description of target audience (optional - can derive from difficulty_level)'),
 
     estimated_duration_hours: z.number().positive().describe('Total estimated duration in hours'),
 

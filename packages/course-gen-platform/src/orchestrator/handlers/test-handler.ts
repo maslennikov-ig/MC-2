@@ -7,11 +7,10 @@
  * @module orchestrator/handlers/test-handler
  */
 
- 
-
 import { Job } from 'bullmq';
 import { TestJobData, JobType } from '@megacampus/shared-types';
-import { BaseJobHandler, JobResult } from './base-handler';
+import { BaseJobHandler } from './base-handler';
+import type { JobResult } from './base-handler';
 
 /**
  * Test job handler

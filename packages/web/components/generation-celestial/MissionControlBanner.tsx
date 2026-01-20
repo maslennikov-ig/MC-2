@@ -14,10 +14,18 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  Zap,
+  Pause,
+  Settings,
+  Loader2,
 } from 'lucide-react'
 import { STAGE_CONFIG } from './utils'
 
 const getStorageKey = (courseId: string) => `mission-control-banner-minimized-${courseId}`
+
+// Swipe gesture thresholds
+const SWIPE_VELOCITY_THRESHOLD = -500 // px/s
+const SWIPE_DISTANCE_THRESHOLD = -100 // px
 
 interface MissionControlBannerProps {
   courseId: string
@@ -31,6 +39,12 @@ interface MissionControlBannerProps {
   isDark?: boolean
   /** When true, banner auto-minimizes (e.g., when node panel is open) */
   isNodePanelOpen?: boolean
+  /** NEW: Automatic mode support */
+  isAutomaticMode?: boolean
+  isPaused?: boolean
+  onPause?: () => Promise<void>
+  onResume?: () => Promise<void>
+  onSwitchToManual?: () => Promise<void>
 }
 
 export function MissionControlBanner({
@@ -42,9 +56,15 @@ export function MissionControlBanner({
   isProcessing,
   isDark = false,
   isNodePanelOpen = false,
+  isAutomaticMode = false,
+  isPaused = false,
+  onPause,
+  onResume,
+  onSwitchToManual,
 }: MissionControlBannerProps) {
   const [isExpanded, setIsExpanded] = useState(false)
   const [isMinimized, setIsMinimized] = useState(false)
+  const [actionLoading, setActionLoading] = useState<string | null>(null)
   const t = useTranslations('generation.missionControl')
 
   // Swipe tracking
@@ -80,7 +100,7 @@ export function MissionControlBanner({
   const handleDragEnd = useCallback(
     (_: MouseEvent | TouchEvent | PointerEvent, info: PanInfo) => {
       // Swipe left to minimize (velocity or distance threshold)
-      if (info.velocity.x < -500 || info.offset.x < -100) {
+      if (info.velocity.x < SWIPE_VELOCITY_THRESHOLD || info.offset.x < SWIPE_DISTANCE_THRESHOLD) {
         toggleMinimized(true)
       }
       // Reset position
@@ -128,6 +148,24 @@ export function MissionControlBanner({
   // Get the appropriate icon for the button
   const ButtonIcon = isInitialStage ? Play : Rocket
 
+  // Helper for handling async actions with loading states
+  const handleAction = async (action: string, fn?: () => Promise<void>) => {
+    if (!fn) return
+    setActionLoading(action)
+    try {
+      await fn()
+    } catch (error) {
+      console.error('[MissionControlBanner] Action failed:', action, error)
+    } finally {
+      setActionLoading(null)
+    }
+  }
+
+  // Automatic mode: determine icon, title, and hint
+  const AutomaticIcon = Zap
+  const automaticTitle = isPaused ? t('automatic.titlePaused') : t('automatic.title')
+  const automaticHint = isPaused ? t('automatic.hintPaused') : t('automatic.hint')
+
   return (
     <AnimatePresence mode="wait">
       {isMinimized ? (
@@ -148,7 +186,7 @@ export function MissionControlBanner({
                 ? 'border border-r-0 border-amber-500/30 bg-gray-900/95 hover:border-amber-400/50 hover:bg-gray-800/95'
                 : 'border border-r-0 border-amber-200/50 bg-white/95 hover:border-amber-300/70 hover:bg-gray-50/95'
             }`}
-            aria-label="Развернуть панель подтверждения"
+            aria-label={t('aria.expand')}
           >
             <div
               className={`shrink-0 rounded-full border p-1 ${
@@ -157,7 +195,11 @@ export function MissionControlBanner({
                   : 'border-amber-200 bg-amber-50 text-amber-600'
               }`}
             >
-              <AlertTriangle className="h-3 w-3" />
+              {isAutomaticMode ? (
+                <Zap className="h-3 w-3" />
+              ) : (
+                <AlertTriangle className="h-3 w-3" />
+              )}
             </div>
             <span className={`text-xs font-medium ${isDark ? 'text-gray-200' : 'text-gray-700'}`}>
               {awaitingStage}
@@ -185,7 +227,7 @@ export function MissionControlBanner({
             onDragEnd={handleDragEnd}
             style={{ x, opacity }}
             className="pointer-events-auto w-full max-w-3xl touch-pan-y"
-            title="Смахните влево, чтобы свернуть"
+            title={t('aria.swipeHint')}
           >
             <div
               className={`overflow-hidden rounded-xl shadow-lg backdrop-blur-md ${
@@ -221,29 +263,87 @@ export function MissionControlBanner({
                         : 'border-amber-200 bg-amber-50 text-amber-600'
                     }`}
                   >
-                    <AlertTriangle className="h-4 w-4" />
+                    {isAutomaticMode ? (
+                      <AutomaticIcon className="h-4 w-4" />
+                    ) : (
+                      <AlertTriangle className="h-4 w-4" />
+                    )}
                   </div>
                   <div className="flex min-w-0 flex-col">
                     <div className="flex items-center gap-2">
                       <h3
                         className={`truncate text-sm font-bold ${isDark ? 'text-gray-100' : 'text-gray-900'}`}
                       >
-                        {stageName}: {t('awaitingStatus')}
+                        {isAutomaticMode ? automaticTitle : `${stageName}: ${t('awaitingStatus')}`}
                       </h3>
-                      <div className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-amber-500" />
+                      {!isPaused && (
+                        <div className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-amber-500" />
+                      )}
                     </div>
                     {!isExpanded && (
                       <p
                         className={`truncate text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}
                       >
-                        {getHint()}
+                        {isAutomaticMode ? automaticHint : getHint()}
                       </p>
                     )}
                   </div>
                 </div>
 
                 <div className="ml-2 flex shrink-0 items-center gap-2">
-                  {!isExpanded && (
+                  {!isExpanded && isAutomaticMode && (
+                    <>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          void handleAction('cancel', async () => {
+                            await onCancel()
+                          })
+                        }}
+                        disabled={actionLoading === 'cancel'}
+                        className={`h-9 text-xs ${
+                          isDark
+                            ? 'text-gray-400 hover:bg-red-950/30 hover:text-red-400'
+                            : 'text-gray-600 hover:bg-red-50 hover:text-red-600'
+                        }`}
+                      >
+                        {actionLoading === 'cancel' ? (
+                          <Loader2 className="mr-1.5 h-3 w-3 animate-spin" />
+                        ) : (
+                          <X className="mr-1.5 h-3 w-3" />
+                        )}
+                        {t('automatic.cancel')}
+                      </Button>
+                      <Button
+                        size="sm"
+                        onClick={(e) => {
+                          e.stopPropagation()
+                          void handleAction(
+                            isPaused ? 'resume' : 'pause',
+                            isPaused ? onResume : onPause
+                          )
+                        }}
+                        disabled={actionLoading !== null}
+                        className="h-9 border-0 bg-gradient-to-r from-purple-500 to-indigo-600 px-5 text-sm font-medium text-white shadow-lg shadow-purple-500/25 transition-all hover:from-purple-600 hover:to-indigo-700"
+                      >
+                        {actionLoading === (isPaused ? 'resume' : 'pause') ? (
+                          <Loader2 className="h-3 w-3 animate-spin" />
+                        ) : (
+                          <>
+                            {isPaused ? (
+                              <Play className="mr-1.5 h-3 w-3" />
+                            ) : (
+                              <Pause className="mr-1.5 h-3 w-3" />
+                            )}
+                            {isPaused ? t('automatic.resume') : t('automatic.pause')}
+                          </>
+                        )}
+                      </Button>
+                    </>
+                  )}
+                  {!isExpanded && !isAutomaticMode && (
                     <Button
                       size="sm"
                       onClick={(e) => {
@@ -289,8 +389,8 @@ export function MissionControlBanner({
                         ? 'text-gray-400 hover:bg-white/5 hover:text-gray-200'
                         : 'text-gray-500 hover:bg-slate-100 hover:text-gray-700'
                     }`}
-                    aria-label="Свернуть панель"
-                    title="Свернуть (или смахните влево)"
+                    aria-label={t('aria.collapse')}
+                    title={t('aria.collapseHint')}
                   >
                     <ChevronRight className="h-4 w-4" />
                   </button>
@@ -309,63 +409,157 @@ export function MissionControlBanner({
                     <div
                       className={`space-y-4 px-4 pt-0 pb-4 ${isDark ? 'border-t border-white/5' : 'border-t border-slate-100'}`}
                     >
-                      <div className={`pt-4 text-sm ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
-                        <p>{getDescription()}</p>
-                        <p className="mt-2 text-xs text-gray-500 italic">
-                          Смахните влево, чтобы свернуть
-                        </p>
-                      </div>
-
-                      <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div className="flex items-center gap-2">
-                          <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => void onCancel()}
-                            disabled={isProcessing}
-                            className={`h-8 text-xs ${
-                              isDark
-                                ? 'text-gray-400 hover:bg-red-950/30 hover:text-red-400'
-                                : 'text-gray-600 hover:bg-red-50 hover:text-red-600'
-                            }`}
+                      {isAutomaticMode ? (
+                        /* Automatic Mode Expanded View */
+                        <>
+                          <div
+                            className={`pt-4 text-sm ${isDark ? 'text-gray-300' : 'text-gray-700'}`}
                           >
-                            <X className="mr-1.5 h-3 w-3" />
-                            {t('cancel')}
-                          </Button>
-                          {/* Only show View button when there are results to view (not for initial stage) */}
-                          {!isInitialStage && (
-                            <Button
-                              variant="secondary"
-                              size="sm"
-                              onClick={onViewResults}
-                              className={`h-8 text-xs ${
-                                isDark
-                                  ? 'border-gray-700 bg-gray-800 text-gray-200 hover:bg-gray-700'
-                                  : 'border-gray-200 bg-gray-100 text-gray-700 hover:bg-gray-200'
-                              }`}
-                            >
-                              <Eye className="mr-1.5 h-3 w-3" />
-                              {t('view')}
-                            </Button>
-                          )}
-                        </div>
+                            <p>{automaticHint}</p>
+                            {isPaused && (
+                              <p className="mt-2 text-xs italic">{t('automatic.manualModeHint')}</p>
+                            )}
+                            <p className="mt-2 text-xs text-gray-500 italic">
+                              {t('aria.swipeHint')}
+                            </p>
+                          </div>
 
-                        <Button
-                          size="sm"
-                          onClick={() => void onApprove()}
-                          disabled={isProcessing}
-                          className="h-10 w-full border-0 bg-gradient-to-r from-purple-500 to-indigo-600 px-6 text-sm font-medium text-white shadow-lg shadow-purple-500/25 transition-all hover:from-purple-600 hover:to-indigo-700 sm:w-auto"
-                        >
-                          {isProcessing ? (
-                            t('confirming')
-                          ) : (
-                            <>
-                              <ButtonIcon className="mr-2 h-4 w-4" />
-                              {getButtonText(false)}
-                            </>
-                          )}
-                        </Button>
-                      </div>
+                          <div className="flex flex-wrap items-center justify-between gap-3">
+                            <div className="flex items-center gap-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() =>
+                                  void handleAction('cancel', async () => {
+                                    await onCancel()
+                                  })
+                                }
+                                disabled={actionLoading === 'cancel'}
+                                className={`h-8 text-xs ${
+                                  isDark
+                                    ? 'text-gray-400 hover:bg-red-950/30 hover:text-red-400'
+                                    : 'text-gray-600 hover:bg-red-50 hover:text-red-600'
+                                }`}
+                              >
+                                {actionLoading === 'cancel' ? (
+                                  <Loader2 className="mr-1.5 h-3 w-3 animate-spin" />
+                                ) : (
+                                  <X className="mr-1.5 h-3 w-3" />
+                                )}
+                                {t('automatic.cancel')}
+                              </Button>
+                              {isPaused && (
+                                <Button
+                                  variant="secondary"
+                                  size="sm"
+                                  onClick={() => void handleAction('manual', onSwitchToManual)}
+                                  disabled={actionLoading !== null}
+                                  className={`h-8 text-xs ${
+                                    isDark
+                                      ? 'border-gray-700 bg-gray-800 text-gray-200 hover:bg-gray-700'
+                                      : 'border-gray-200 bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                  }`}
+                                >
+                                  {actionLoading === 'manual' ? (
+                                    <Loader2 className="mr-1.5 h-3 w-3 animate-spin" />
+                                  ) : (
+                                    <Settings className="mr-1.5 h-3 w-3" />
+                                  )}
+                                  {t('automatic.manualMode')}
+                                </Button>
+                              )}
+                            </div>
+
+                            <Button
+                              size="sm"
+                              onClick={() =>
+                                void handleAction(
+                                  isPaused ? 'resume' : 'pause',
+                                  isPaused ? onResume : onPause
+                                )
+                              }
+                              disabled={actionLoading !== null}
+                              className="h-10 w-full border-0 bg-gradient-to-r from-purple-500 to-indigo-600 px-6 text-sm font-medium text-white shadow-lg shadow-purple-500/25 transition-all hover:from-purple-600 hover:to-indigo-700 sm:w-auto"
+                            >
+                              {actionLoading === (isPaused ? 'resume' : 'pause') ? (
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              ) : (
+                                <>
+                                  {isPaused ? (
+                                    <Play className="mr-2 h-4 w-4" />
+                                  ) : (
+                                    <Pause className="mr-2 h-4 w-4" />
+                                  )}
+                                  {isPaused ? t('automatic.resume') : t('automatic.pause')}
+                                </>
+                              )}
+                            </Button>
+                          </div>
+                        </>
+                      ) : (
+                        /* Semi-Automatic Mode Expanded View */
+                        <>
+                          <div
+                            className={`pt-4 text-sm ${isDark ? 'text-gray-300' : 'text-gray-700'}`}
+                          >
+                            <p>{getDescription()}</p>
+                            <p className="mt-2 text-xs text-gray-500 italic">
+                              {t('aria.swipeHint')}
+                            </p>
+                          </div>
+
+                          <div className="flex flex-wrap items-center justify-between gap-3">
+                            <div className="flex items-center gap-2">
+                              <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => void onCancel()}
+                                disabled={isProcessing}
+                                className={`h-8 text-xs ${
+                                  isDark
+                                    ? 'text-gray-400 hover:bg-red-950/30 hover:text-red-400'
+                                    : 'text-gray-600 hover:bg-red-50 hover:text-red-600'
+                                }`}
+                              >
+                                <X className="mr-1.5 h-3 w-3" />
+                                {t('cancel')}
+                              </Button>
+                              {/* Only show View button when there are results to view (not for initial stage) */}
+                              {!isInitialStage && (
+                                <Button
+                                  variant="secondary"
+                                  size="sm"
+                                  onClick={onViewResults}
+                                  className={`h-8 text-xs ${
+                                    isDark
+                                      ? 'border-gray-700 bg-gray-800 text-gray-200 hover:bg-gray-700'
+                                      : 'border-gray-200 bg-gray-100 text-gray-700 hover:bg-gray-200'
+                                  }`}
+                                >
+                                  <Eye className="mr-1.5 h-3 w-3" />
+                                  {t('view')}
+                                </Button>
+                              )}
+                            </div>
+
+                            <Button
+                              size="sm"
+                              onClick={() => void onApprove()}
+                              disabled={isProcessing}
+                              className="h-10 w-full border-0 bg-gradient-to-r from-purple-500 to-indigo-600 px-6 text-sm font-medium text-white shadow-lg shadow-purple-500/25 transition-all hover:from-purple-600 hover:to-indigo-700 sm:w-auto"
+                            >
+                              {isProcessing ? (
+                                t('confirming')
+                              ) : (
+                                <>
+                                  <ButtonIcon className="mr-2 h-4 w-4" />
+                                  {getButtonText(false)}
+                                </>
+                              )}
+                            </Button>
+                          </div>
+                        </>
+                      )}
                     </div>
                   </motion.div>
                 )}
@@ -375,24 +569,5 @@ export function MissionControlBanner({
         </motion.div>
       )}
     </AnimatePresence>
-  )
-}
-
-function Loader2({ className }: { className?: string }) {
-  return (
-    <svg
-      xmlns="http://www.w3.org/2000/svg"
-      width="24"
-      height="24"
-      viewBox="0 0 24 24"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="2"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      className={className}
-    >
-      <path d="M21 12a9 9 0 1 1-6.219-8.56" />
-    </svg>
   )
 }

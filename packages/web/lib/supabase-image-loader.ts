@@ -10,9 +10,12 @@ import type { ImageLoaderProps } from 'next/image'
  * @see https://supabase.com/docs/guides/storage/image-transformations
  */
 export default function supabaseLoader({ src, width, quality }: ImageLoaderProps): string {
-  // Only transform Supabase Storage URLs
+  // For non-Supabase URLs, use Next.js default image optimization
+  // This fixes "loader property that does not implement width" warning
   if (!src.includes('supabase.co/storage')) {
-    return src
+    // Local images: use Next.js built-in optimization endpoint
+    const q = quality || 75
+    return `/_next/image?url=${encodeURIComponent(src)}&w=${width}&q=${q}`
   }
 
   try {

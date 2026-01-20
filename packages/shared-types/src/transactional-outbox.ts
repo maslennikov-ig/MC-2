@@ -81,6 +81,9 @@ export interface JobOutboxEntry {
   /** Target BullMQ queue name (e.g., "document-processing", "summarization") */
   queue_name: string;
 
+  /** Target BullMQ queue name for environment isolation (e.g., 'course-generation', 'course-generation-dev') */
+  target_queue: string;
+
   /** JSONB payload for BullMQ job.add(name, data) */
   job_data: Record<string, unknown>;
 
@@ -223,6 +226,9 @@ export interface InitializeFSMCommand {
     /** Job options (priority, delay, attempts, etc.) */
     options?: Record<string, unknown>;
   }>;
+
+  /** Target BullMQ queue name. Defaults to QUEUE_NAME env variable. */
+  targetQueue?: string;
 }
 
 /**
@@ -290,6 +296,7 @@ export const JobOutboxEntrySchema = z.object({
   outbox_id: z.string().uuid(),
   entity_id: z.string().uuid(),
   queue_name: z.string().min(1),
+  target_queue: z.string().min(1),
   job_data: z.record(z.unknown()),
   job_options: z.record(z.unknown()).optional(),
   created_at: z.date(),
@@ -348,6 +355,7 @@ export const InitializeFSMCommandSchema = z.object({
       options: z.record(z.unknown()).optional(),
     })
   ),
+  targetQueue: z.string().min(1).optional(),
 });
 
 /**

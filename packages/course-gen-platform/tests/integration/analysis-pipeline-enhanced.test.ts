@@ -48,12 +48,18 @@ function getMockPhase1OutputWithPatterns(): Phase1Output {
       secondary: null,
     },
     contextual_language: {
-      why_matters_context: 'Understanding procurement law is critical for compliance and avoiding legal issues',
-      motivators: 'Government procurement specialists need this knowledge to make informed decisions and avoid costly mistakes',
-      experience_prompt: 'You will learn practical skills for navigating complex procurement regulations',
-      problem_statement_context: 'Many procurement specialists struggle with understanding the legal framework',
-      knowledge_bridge: 'Build on your existing procurement experience by mastering the legal foundations',
-      practical_benefit_focus: 'Apply procurement law principles to real-world contract negotiations and compliance checks',
+      why_matters_context:
+        'Understanding procurement law is critical for compliance and avoiding legal issues',
+      motivators:
+        'Government procurement specialists need this knowledge to make informed decisions and avoid costly mistakes',
+      experience_prompt:
+        'You will learn practical skills for navigating complex procurement regulations',
+      problem_statement_context:
+        'Many procurement specialists struggle with understanding the legal framework',
+      knowledge_bridge:
+        'Build on your existing procurement experience by mastering the legal foundations',
+      practical_benefit_focus:
+        'Apply procurement law principles to real-world contract negotiations and compliance checks',
     },
     topic_analysis: {
       determined_topic: 'Procurement Law Fundamentals for Government Specialists',
@@ -62,8 +68,18 @@ function getMockPhase1OutputWithPatterns(): Phase1Output {
       reasoning: 'Topic is well-defined with clear scope for government procurement context',
       target_audience: 'intermediate',
       missing_elements: ['Recent case studies', 'International comparison'],
-      key_concepts: ['Contract law basics', 'Federal procurement regulations', 'Compliance requirements'],
-      domain_keywords: ['procurement', 'government contracts', 'legal compliance', 'tender process', 'contract law'],
+      key_concepts: [
+        'Contract law basics',
+        'Federal procurement regulations',
+        'Compliance requirements',
+      ],
+      domain_keywords: [
+        'procurement',
+        'government contracts',
+        'legal compliance',
+        'tender process',
+        'contract law',
+      ],
     },
     // NEW FIELD: pedagogical_patterns
     pedagogical_patterns: {
@@ -98,9 +114,11 @@ function getMockPhase2OutputWithEnhancements(): Phase2Output {
   return {
     recommended_structure: {
       estimated_content_hours: 12,
-      scope_reasoning: 'Course covers all essential procurement law topics for government specialists',
+      scope_reasoning:
+        'Course covers all essential procurement law topics for government specialists',
       lesson_duration_minutes: 15,
-      calculation_explanation: '12 hours of content divided into 15-minute lessons = 48 lessons total',
+      calculation_explanation:
+        '12 hours of content divided into 15-minute lessons = 48 lessons total',
       total_lessons: 48,
       total_sections: 4,
       scope_warning: null,
@@ -147,7 +165,12 @@ function getMockPhase2OutputWithEnhancements(): Phase2Output {
             'Identify compliance risks in procurement',
             'Implement risk mitigation strategies',
           ],
-          key_topics: ['Compliance monitoring', 'Risk assessment', 'Audit preparation', 'Legal remedies'],
+          key_topics: [
+            'Compliance monitoring',
+            'Risk assessment',
+            'Audit preparation',
+            'Legal remedies',
+          ],
           pedagogical_approach: 'Problem-solving with compliance scenarios',
           difficulty_progression: 'steep',
           // NEW FIELDS
@@ -164,7 +187,12 @@ function getMockPhase2OutputWithEnhancements(): Phase2Output {
             'Apply procurement law to complex scenarios',
             'Analyze real-world case studies',
           ],
-          key_topics: ['International procurement', 'Dispute resolution', 'Recent court cases', 'Policy updates'],
+          key_topics: [
+            'International procurement',
+            'Dispute resolution',
+            'Recent court cases',
+            'Policy updates',
+          ],
           pedagogical_approach: 'Case study analysis and peer discussion',
           difficulty_progression: 'flat',
           // NEW FIELDS
@@ -211,11 +239,9 @@ function getMockPhase2OutputLegacy(): Phase2Output {
 function getMockPhase3Output(): Phase3Output {
   return {
     pedagogical_strategy: {
-      teaching_style: 'mixed',
       assessment_approach: 'Combination of quizzes, case analysis, and practical projects',
-      practical_focus: 'high',
-      progression_logic: 'Start with legal foundations, progress to practical application, culminate in complex case studies',
-      interactivity_level: 'high',
+      progression_logic:
+        'Start with legal foundations, progress to practical application, culminate in complex case studies',
     },
     expansion_areas: [
       {
@@ -247,7 +273,8 @@ function getMockPhase3Output(): Phase3Output {
  */
 function getMockPhase4OutputWithGuidance(): Phase4Output {
   return {
-    scope_instructions: 'Focus on practical application of procurement law with real-world examples and case studies. Emphasize regulatory compliance and legal frameworks in government procurement context.',
+    scope_instructions:
+      'Focus on practical application of procurement law with real-world examples and case studies. Emphasize regulatory compliance and legal frameworks in government procurement context.',
     // NEW FIELD: generation_guidance
     generation_guidance: {
       tone: 'conversational but precise',
@@ -259,7 +286,8 @@ function getMockPhase4OutputWithGuidance(): Phase4Output {
       avoid_jargon: ['legalese', 'overly technical terms without explanation'],
       include_visuals: ['flowcharts', 'code examples', 'diagrams'],
       exercise_types: ['coding', 'analysis', 'interpretation'],
-      contextual_language_hints: 'Audience has intermediate procurement experience but limited legal background',
+      contextual_language_hints:
+        'Audience has intermediate procurement experience but limited legal background',
       real_world_examples: [
         'Government contract bid evaluation',
         'Compliance audit preparation',
@@ -473,7 +501,9 @@ describe('Integration: Analysis Pipeline with Enhanced Schema', () => {
       expect(result.generation_guidance?.avoid_jargon).toContain('legalese');
       expect(result.generation_guidance?.include_visuals).toContain('flowcharts');
       expect(result.generation_guidance?.exercise_types).toContain('analysis');
-      expect(result.generation_guidance?.contextual_language_hints).toContain('intermediate procurement experience');
+      expect(result.generation_guidance?.contextual_language_hints).toContain(
+        'intermediate procurement experience'
+      );
       expect(result.generation_guidance?.real_world_examples).toHaveLength(3);
     });
 
@@ -505,7 +535,7 @@ describe('Integration: Analysis Pipeline with Enhanced Schema', () => {
 
       // Validate document_relevance_mapping exists and has correct structure
       expect(result.document_relevance_mapping).toBeDefined();
-      expect(Object.keys(result.document_relevance_mapping!)).toHaveLength(4); // 4 sections
+      expect(Object.keys(result.document_relevance_mapping)).toHaveLength(4); // 4 sections
 
       // Validate Section 1 mapping
       const section1Mapping = result.document_relevance_mapping!['1'];
@@ -514,7 +544,10 @@ describe('Integration: Analysis Pipeline with Enhanced Schema', () => {
       expect(section1Mapping.key_search_terms).toHaveLength(4);
       expect(section1Mapping.key_search_terms).toContain('procurement law basics');
       expect(section1Mapping.expected_topics).toHaveLength(3);
-      expect(section1Mapping.document_processing_methods).toHaveProperty('doc_uuid_1', 'hierarchical');
+      expect(section1Mapping.document_processing_methods).toHaveProperty(
+        'doc_uuid_1',
+        'hierarchical'
+      );
       expect(section1Mapping.document_processing_methods).toHaveProperty('doc_uuid_2', 'full_text');
 
       // Validate Section 2 mapping
@@ -684,7 +717,7 @@ describe('Integration: Analysis Pipeline with Enhanced Schema', () => {
 
       // Validate mapping exists
       expect(result.document_relevance_mapping).toBeDefined();
-      expect(Object.keys(result.document_relevance_mapping!)).toHaveLength(4);
+      expect(Object.keys(result.document_relevance_mapping)).toHaveLength(4);
 
       // Validate each section has proper mapping structure
       for (const sectionId of ['1', '2', '3', '4']) {
@@ -872,7 +905,7 @@ describe('Integration: Analysis Pipeline with Enhanced Schema', () => {
       expect(mapping).toBeDefined();
 
       // Validate each section has 3-10 key_search_terms
-      for (const sectionId of Object.keys(mapping!)) {
+      for (const sectionId of Object.keys(mapping)) {
         const sectionMapping = mapping![sectionId];
         expect(sectionMapping.key_search_terms.length).toBeGreaterThanOrEqual(3);
         expect(sectionMapping.key_search_terms.length).toBeLessThanOrEqual(10);
@@ -947,7 +980,7 @@ describe('Integration: Analysis Pipeline with Enhanced Schema', () => {
     it('should reject invalid theory_practice_ratio format (not XX:YY)', async () => {
       const phase1 = getMockPhase1OutputWithPatterns();
       // Invalid format: "30-70" instead of "30:70"
-      phase1.pedagogical_patterns!.theory_practice_ratio = '30-70';
+      phase1.pedagogical_patterns.theory_practice_ratio = '30-70';
       const phase2 = getMockPhase2OutputWithEnhancements();
       const phase3 = getMockPhase3Output();
       const phase4 = getMockPhase4OutputWithGuidance();
@@ -977,7 +1010,7 @@ describe('Integration: Analysis Pipeline with Enhanced Schema', () => {
     it('should reject theory_practice_ratio that does not sum to 100', async () => {
       const phase1 = getMockPhase1OutputWithPatterns();
       // Invalid sum: 40 + 50 = 90 (not 100)
-      phase1.pedagogical_patterns!.theory_practice_ratio = '40:50';
+      phase1.pedagogical_patterns.theory_practice_ratio = '40:50';
       const phase2 = getMockPhase2OutputWithEnhancements();
       const phase3 = getMockPhase3Output();
       const phase4 = getMockPhase4OutputWithGuidance();
@@ -1010,7 +1043,7 @@ describe('Integration: Analysis Pipeline with Enhanced Schema', () => {
       const phase3 = getMockPhase3Output();
       const phase4 = getMockPhase4OutputWithGuidance();
       // Empty include_visuals array
-      phase4.generation_guidance!.include_visuals = [];
+      phase4.generation_guidance.include_visuals = [];
 
       await expect(
         assembleAnalysisResult({

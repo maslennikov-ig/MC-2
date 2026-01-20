@@ -12,6 +12,7 @@
 import { z } from 'zod';
 import { languageSchema } from './common-enums';
 import { CourseStyleSchema } from './style-prompts';
+import { courseSizeSchema } from './course-size';
 
 // ============================================================================
 // Job Type Enum
@@ -175,6 +176,10 @@ export type DocumentClassificationJobData = z.infer<typeof DocumentClassificatio
  *
  * Note: The handler fetches full course data from the database,
  * so only basic identifiers and optional context are needed in the payload.
+ *
+ * IMPORTANT: courseSize MUST be passed from job data to avoid race conditions.
+ * The initiate endpoint reads course_size at job creation time and passes it here.
+ * The handler uses this as primary source with DB fallback for backward compatibility.
  */
 export const StructureAnalysisJobDataSchema = BaseJobDataSchema.extend({
   jobType: z.literal(JobType.STRUCTURE_ANALYSIS),
@@ -184,6 +189,13 @@ export const StructureAnalysisJobDataSchema = BaseJobDataSchema.extend({
   settings: z.record(z.unknown()).optional(),
   /** Webhook URL for completion notification */
   webhookUrl: z.string().url().nullable().optional(),
+  /**
+   * Course size preset (advisory guidance for LLM)
+   * Passed from job data to avoid race conditions when course_size
+   * is updated asynchronously before generation starts.
+   * @see course-size.ts for preset definitions
+   */
+  courseSize: courseSizeSchema.nullable().optional(),
 });
 
 export type StructureAnalysisJobData = z.infer<typeof StructureAnalysisJobDataSchema>;

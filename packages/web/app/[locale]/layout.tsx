@@ -1,31 +1,32 @@
-import type { Metadata, Viewport } from "next";
-import { Suspense } from "react";
-import { Manrope, JetBrains_Mono } from "next/font/google";
-import { NextIntlClientProvider, hasLocale } from 'next-intl';
-import { getMessages, getTranslations, setRequestLocale } from 'next-intl/server';
-import { notFound } from 'next/navigation';
-import { routing } from '@/src/i18n/routing';
-import { Locale } from '@/src/i18n/config';
-import { ErrorBoundary } from "@/components/common/error-boundary";
-import { InitialLoaderHide } from "@/components/common/initial-loader-hide";
-import { PageTransitionLoader } from "@/components/common/page-transition-loader";
-import { Toaster } from "@/components/ui/sonner";
-import { Providers } from "./providers";
-import { BackToTop } from "@/components/ui/back-to-top";
-import { ServiceWorkerManager } from "@/components/pwa/ServiceWorkerManager";
-import { InstallPrompt } from "@/components/pwa/InstallPrompt";
-import "../globals.css";
+import type { Metadata, Viewport } from 'next'
+import { Suspense } from 'react'
+import { Manrope, JetBrains_Mono } from 'next/font/google'
+import { NextIntlClientProvider, hasLocale } from 'next-intl'
+import { getMessages, getTranslations, setRequestLocale } from 'next-intl/server'
+import { notFound } from 'next/navigation'
+import { routing } from '@/src/i18n/routing'
+import { Locale } from '@/src/i18n/config'
+import { ErrorBoundary } from '@/components/common/error-boundary'
+import { InitialLoaderHide } from '@/components/common/initial-loader-hide'
+import { LocaleInitializer } from '@/components/common/locale-initializer'
+import { PageTransitionLoader } from '@/components/common/page-transition-loader'
+import { Toaster } from '@/components/ui/sonner'
+import { Providers } from './providers'
+import { BackToTop } from '@/components/ui/back-to-top'
+import { ServiceWorkerManager } from '@/components/pwa/ServiceWorkerManager'
+import { InstallPrompt } from '@/components/pwa/InstallPrompt'
+import '../globals.css'
 // KaTeX CSS for math formula rendering
-import "katex/dist/katex.min.css";
-import "@/components/markdown/styles/katex-overrides.css";
+import 'katex/dist/katex.min.css'
+import '@/components/markdown/styles/katex-overrides.css'
 // Code Block styles with Shiki theme integration
-import "@/components/markdown/styles/code-block.css";
+import '@/components/markdown/styles/code-block.css'
 // Task list checkbox styling for GFM
-import "@/components/markdown/styles/task-list.css";
+import '@/components/markdown/styles/task-list.css'
 
 // Force dynamic rendering to ensure auth state is always fresh
-export const dynamic = 'force-dynamic';
-export const fetchCache = 'force-no-store';
+export const dynamic = 'force-dynamic'
+export const fetchCache = 'force-no-store'
 
 /**
  * PWA viewport configuration with theme color
@@ -35,7 +36,7 @@ export const viewport: Viewport = {
   width: 'device-width',
   initialScale: 1,
   maximumScale: 1,
-};
+}
 
 /**
  * Generate static params for all supported locales.
@@ -43,38 +44,38 @@ export const viewport: Viewport = {
  * improving performance even with dynamic rendering.
  */
 export function generateStaticParams() {
-  return routing.locales.map((locale) => ({ locale }));
+  return routing.locales.map((locale) => ({ locale }))
 }
 
 const manrope = Manrope({
-  variable: "--font-manrope",
-  subsets: ["latin", "cyrillic"],
-  weight: ["400", "500", "600", "700"], // Only weights actually used
-  display: "swap",
-});
+  variable: '--font-manrope',
+  subsets: ['latin', 'cyrillic'],
+  weight: ['400', '500', '600', '700'], // Only weights actually used
+  display: 'swap',
+})
 
 const jetbrainsMono = JetBrains_Mono({
-  variable: "--font-jetbrains-mono",
-  subsets: ["latin", "cyrillic"],
-  weight: ["400", "500"], // Only weights for code blocks
-  display: "swap",
+  variable: '--font-jetbrains-mono',
+  subsets: ['latin', 'cyrillic'],
+  weight: ['400', '500'], // Only weights for code blocks
+  display: 'swap',
   preload: false, // Don't preload - only used in code blocks
-});
+})
 
 type Props = {
-  children: React.ReactNode;
-  params: Promise<{ locale: string }>;
-};
+  children: React.ReactNode
+  params: Promise<{ locale: string }>
+}
 
 /**
  * Generate localized metadata for SEO.
  * Uses translations from common.metadata namespace.
  */
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const { locale } = await params;
-  const t = await getTranslations({ locale: locale as Locale, namespace: 'common' });
+  const { locale } = await params
+  const t = await getTranslations({ locale: locale as Locale, namespace: 'common' })
 
-  const ogLocale = locale === 'ru' ? 'ru_RU' : 'en_US';
+  const ogLocale = locale === 'ru' ? 'ru_RU' : 'en_US'
 
   return {
     applicationName: 'MegaCampusAI',
@@ -161,18 +162,18 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
         },
       ],
     },
-  };
+  }
 }
 
 export default async function LocaleLayout({ children, params }: Props) {
-  const { locale } = await params;
+  const { locale } = await params
 
   if (!hasLocale(routing.locales, locale)) {
-    notFound();
+    notFound()
   }
 
-  setRequestLocale(locale);
-  const messages = await getMessages();
+  setRequestLocale(locale)
+  const messages = await getMessages()
 
   return (
     <html lang={locale} suppressHydrationWarning>
@@ -297,9 +298,7 @@ export default async function LocaleLayout({ children, params }: Props) {
           }}
         />
       </head>
-      <body
-        className={`${manrope.variable} ${jetbrainsMono.variable} font-sans antialiased`}
-      >
+      <body className={`${manrope.variable} ${jetbrainsMono.variable} font-sans antialiased`}>
         {/* Initial loader - FIRST element, renders before React */}
         <div id="initial-loader" aria-label="Loading">
           <div className="il-container">
@@ -311,6 +310,7 @@ export default async function LocaleLayout({ children, params }: Props) {
         <NextIntlClientProvider locale={locale} messages={messages}>
           <Providers>
             <InitialLoaderHide />
+            <LocaleInitializer />
             <ErrorBoundary>
               <Suspense fallback={null}>
                 <PageTransitionLoader />
@@ -325,5 +325,5 @@ export default async function LocaleLayout({ children, params }: Props) {
         </NextIntlClientProvider>
       </body>
     </html>
-  );
+  )
 }

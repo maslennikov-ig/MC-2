@@ -60,8 +60,12 @@ services:
       - PORT=4000
       - REDIS_URL=redis://megacampus-redis:6379
       - DOCLING_MCP_URL=http://megacampus-docling-mcp:8000/mcp
+      # Fix file path for document processing (override .env from image)
+      - DOCLING_UPLOADS_BASE_PATH=/app
+      - DOCLING_CONTAINER_UPLOADS_PATH=/app/uploads-dev
       # DEV queue isolation - prevents DEV jobs from being picked up by production workers
       - BULLMQ_QUEUE_NAME=course-generation-dev
+      - BULLMQ_STAGE6_QUEUE_NAME=stage6-lesson-content-dev
       - BULLMQ_STAGE7_QUEUE_NAME=stage7-enrichments-dev
     volumes:
       - ./data/uploads-dev:/app/uploads
@@ -106,9 +110,54 @@ services:
       - DOCLING_MCP_URL=http://megacampus-docling-mcp:8000/mcp
       - DOCLING_CACHE_PATH=/app/docling-cache
       - LKG_CONFIG_PATH=/app/data/lkg-config.json
+      # Fix file path for document processing (override .env from image)
+      - DOCLING_UPLOADS_BASE_PATH=/app
+      - DOCLING_CONTAINER_UPLOADS_PATH=/app/uploads-dev
       # DEV queue isolation - listens to DEV-only queue
       - BULLMQ_QUEUE_NAME=course-generation-dev
       - ENRICHMENTS_STORAGE_BUCKET=course-enrichments
+    volumes:
+      - ./data/uploads-dev:/app/uploads
+      - docling-json-cache:/app/docling-cache
+      - worker-dev-data:/app/data
+    networks:
+      - megacampus
+    depends_on:
+      api-dev:
+        condition: service_healthy
+    deploy:
+      resources:
+        limits:
+          cpus: '2'
+          memory: 2G
+    logging:
+      driver: 'json-file'
+      options:
+        max-size: '50m'
+        max-file: '3'
+
+  # Stage 6 Lesson Content Worker (Dev) - generates lesson content with 30 concurrent LLM operations
+  worker-stage6-dev:
+    image: ghcr.io/maslennikov-ig/mc-2/api:develop
+    container_name: megacampus-worker-stage6-dev
+    restart: unless-stopped
+    command: ['tsx', 'dist/orchestrator/worker-entrypoint.js']
+    healthcheck:
+      disable: true
+    env_file:
+      - .env.dev
+    environment:
+      - NODE_ENV=production
+      - REDIS_URL=redis://megacampus-redis:6379
+      # Enable dedicated Stage 6 worker mode (30 concurrent)
+      - STAGE6_WORKER=true
+      # DEV queue isolation - listens to DEV-only stage6 queue
+      - BULLMQ_STAGE6_QUEUE_NAME=stage6-lesson-content-dev
+      - DOCLING_CACHE_PATH=/app/docling-cache
+      - LKG_CONFIG_PATH=/app/data/lkg-config.json
+      # Fix file path for document processing (override .env from image)
+      - DOCLING_UPLOADS_BASE_PATH=/app
+      - DOCLING_CONTAINER_UPLOADS_PATH=/app/uploads-dev
     volumes:
       - ./data/uploads-dev:/app/uploads
       - docling-json-cache:/app/docling-cache
@@ -145,6 +194,9 @@ services:
       - ENRICHMENTS_STORAGE_BUCKET=course-enrichments
       # DEV queue isolation - listens to DEV-only stage7 queue
       - BULLMQ_STAGE7_QUEUE_NAME=stage7-enrichments-dev
+      # Fix file path for document processing (override .env from image)
+      - DOCLING_UPLOADS_BASE_PATH=/app
+      - DOCLING_CONTAINER_UPLOADS_PATH=/app/uploads-dev
     volumes:
       - ./data/uploads-dev:/app/uploads
     networks:

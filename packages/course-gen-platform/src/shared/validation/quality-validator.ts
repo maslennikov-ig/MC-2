@@ -334,7 +334,7 @@ export class QualityValidator {
         const passed = score >= threshold;
 
         results.push({
-          sectionNumber: section.section_number,
+          sectionNumber: section.section_number ?? 0,
           passed,
           score,
           threshold,

@@ -28,7 +28,8 @@ import {
   checkAndSetStage6Complete,
 } from './database-service';
 import { extractContentMarkdown } from './content-utils';
-import { triggerLessonCard } from '../../stage7-enrichments/services/auto-card-trigger';
+// DISABLED: Auto lesson card generation too expensive
+// import { triggerLessonCard } from '../../stage7-enrichments/services/auto-card-trigger';
 
 function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
@@ -501,15 +502,17 @@ export async function processStage6Job(
         await saveSourceDocuments(courseId, lessonUuid, sourceDocuments);
       }
 
-      // Auto-trigger lesson card generation (non-blocking)
-      if (lessonUuid) {
-        triggerLessonCard({ courseId, lessonId: lessonUuid }).catch(err => {
-          jobLogger.warn(
-            { lessonId: lessonUuid, error: err instanceof Error ? err.message : String(err) },
-            'Non-blocking: Failed to trigger lesson card generation'
-          );
-        });
-      }
+      // DISABLED: Auto lesson card generation too expensive (~$0.04/image via OpenRouter)
+      // Course card still generated in Stage 5, lesson cards can be added manually if needed
+      // See: https://github.com/maslennikov-ig/MC-2/issues/XXX
+      // if (lessonUuid) {
+      //   triggerLessonCard({ courseId, lessonId: lessonUuid }).catch(err => {
+      //     jobLogger.warn(
+      //       { lessonId: lessonUuid, error: err instanceof Error ? err.message : String(err) },
+      //       'Non-blocking: Failed to trigger lesson card generation'
+      //     );
+      //   });
+      // }
 
       // Check if all lessons are complete and update course status to stage_6_complete
       // This runs after each successful lesson save (non-blocking)

@@ -5,7 +5,7 @@
  * Designs pedagogical strategy, identifies expansion areas, and detects research flags.
  *
  * Key responsibilities:
- * - Pedagogical strategy design (teaching_style, assessment_approach, progression_logic)
+ * - Pedagogical strategy design (assessment_approach, progression_logic)
  * - Expansion areas identification (if information_completeness < 80%)
  * - Research flag detection (CONSERVATIVE - minimize false positives)
  *
@@ -29,7 +29,9 @@ import { z } from 'zod';
 import { UnifiedRegenerator } from '@/shared/regeneration';
 import { zodToPromptSchema } from '@/shared/utils/zod-to-prompt-schema';
 import { preprocessObject } from '@/shared/validation/preprocessing';
+import { extractJSON } from '@/shared/utils/json-repair';
 import type { AIMessage } from '@langchain/core/messages';
+import { logger } from '@/shared/logger';
 
 /**
  * Input data for Phase 3 Expert Analysis
@@ -56,12 +58,11 @@ interface RawPhase3Output {
  */
 const Phase3OutputSchema = z.object({
   pedagogical_strategy: z.object({
-    teaching_style: z.enum(['hands-on', 'theory-first', 'project-based', 'mixed']),
-    assessment_approach: z.string().min(50), // Removed .max(200) - encourage comprehensive approaches
-    practical_focus: z.enum(['high', 'medium', 'low']),
-    progression_logic: z.string().min(100), // Removed .max(500) - allow detailed logic
-    interactivity_level: z.enum(['high', 'medium', 'low']),
+    assessment_approach: z.string().min(50), // How learners demonstrate understanding
+    progression_logic: z.string().min(100), // How difficulty increases across lessons
   }),
+  // expansion_areas can be: array of areas, null (explicit no areas), or undefined (LLM omitted field)
+  // All cases are valid - default to null if undefined
   expansion_areas: z
     .array(
       z.object({
@@ -71,7 +72,8 @@ const Phase3OutputSchema = z.object({
         estimated_lessons: z.number().min(1), // Removed .max(10) - let LLM decide optimal count
       })
     )
-    .nullable(),
+    .nullable()
+    .optional(), // Allow undefined - LLM may omit field entirely
 });
 
 /**
@@ -152,30 +154,14 @@ TASK 1: DESIGN PEDAGOGICAL STRATEGY
 
 Design a comprehensive pedagogical strategy for this course:
 
-1. teaching_style: Choose ONE:
-   - "hands-on": Practice-first approach (coding, exercises, labs)
-   - "theory-first": Conceptual understanding before application
-   - "project-based": Learning through building complete projects
-   - "mixed": Balanced theory + practice
-
-2. assessment_approach (min 50 chars): How learners demonstrate understanding
+1. assessment_approach (min 50 chars): How learners demonstrate understanding
    - Examples: "Progressive quizzes after each section", "Final capstone project", "Peer review exercises"
    - Provide comprehensive detail - no upper limit
 
-3. practical_focus: Choose ONE based on topic nature:
-   - "high": 70%+ hands-on exercises (e.g., programming, design)
-   - "medium": 50-70% practical content
-   - "low": 30-50% practical (theory-heavy topics)
-
-4. progression_logic (min 100 chars): How difficulty increases across lessons
+2. progression_logic (min 100 chars): How difficulty increases across lessons
    - Explain the learning arc from beginner to mastery
    - Describe scaffolding strategy
    - Provide comprehensive detail - no upper limit
-
-5. interactivity_level: Choose ONE:
-   - "high": Interactive exercises every 5-10 minutes
-   - "medium": Interactive elements every 15-20 minutes
-   - "low": Mostly passive consumption with occasional exercises
 
 TASK 2: IDENTIFY EXPANSION AREAS (CONDITIONAL)
 
@@ -207,11 +193,8 @@ Respond ONLY with valid JSON (no markdown, no code blocks, no explanations):
 
 {
   "pedagogical_strategy": {
-    "teaching_style": "hands-on" | "theory-first" | "project-based" | "mixed",
     "assessment_approach": "string (min 50 chars, comprehensive detail encouraged)",
-    "practical_focus": "high" | "medium" | "low",
-    "progression_logic": "string (min 100 chars, comprehensive detail encouraged)",
-    "interactivity_level": "high" | "medium" | "low"
+    "progression_logic": "string (min 100 chars, comprehensive detail encouraged)"
   },
   "expansion_areas": [
     {
@@ -249,18 +232,11 @@ export async function runPhase3Expert(input: Phase3Input): Promise<Phase3Output>
       const response = await model.invoke(prompt);
       const content = response.content as string;
       storeTraceData(course_id, 'stage_4_expert', { promptText: prompt, completionText: content });
-      let preprocessedContent = content;
+      // Extract JSON from markdown code blocks + strip thinking tags
+      let preprocessedContent = extractJSON(content);
       try {
-        const parsedRaw = JSON.parse(content) as RawPhase3Output;
-        if (parsedRaw.pedagogical_strategy) {
-          parsedRaw.pedagogical_strategy = preprocessObject(
-            parsedRaw.pedagogical_strategy as Record<string, unknown>,
-            {
-              teaching_style: 'enum',
-              practical_focus: 'enum',
-            }
-          );
-        }
+        const parsedRaw = JSON.parse(preprocessedContent) as RawPhase3Output;
+        // No enum preprocessing needed for pedagogical_strategy (only has string fields)
         if (parsedRaw.exercise_types && Array.isArray(parsedRaw.exercise_types)) {
           parsedRaw.exercise_types = parsedRaw.exercise_types.map((ex: unknown) =>
             typeof ex === 'string'
@@ -270,7 +246,14 @@ export async function runPhase3Expert(input: Phase3Input): Promise<Phase3Output>
         }
         preprocessedContent = JSON.stringify(parsedRaw);
       } catch (error) {
-        console.warn('[Phase 3] Preprocessing failed, using raw output:', error);
+        // CR-007: Use structured logger instead of console.*
+        logger.warn(
+          {
+            phase: 'phase-3-expert',
+            error: error instanceof Error ? error.message : String(error),
+          },
+          'Preprocessing failed, using raw output'
+        );
       }
       let parsedOutput: unknown;
       try {
@@ -340,7 +323,8 @@ export async function runPhase3Expert(input: Phase3Input): Promise<Phase3Output>
   );
   const phase3Output: Phase3Output = {
     pedagogical_strategy: mainPhaseOutput.pedagogical_strategy,
-    expansion_areas: mainPhaseOutput.expansion_areas,
+    // Default to null if LLM omitted expansion_areas field entirely
+    expansion_areas: mainPhaseOutput.expansion_areas ?? null,
     research_flags,
     phase_metadata: {
       duration_ms: totalDurationMs,

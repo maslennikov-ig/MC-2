@@ -29,14 +29,22 @@
 import { getSupabaseAdmin } from '../../../shared/supabase/admin';
 import { tokenEstimator } from '../../../shared/llm/token-estimator';
 import { llmClient } from '../../../shared/llm/client';
-import { hierarchicalChunking, type HierarchicalChunkingResult } from '../../../shared/summarization/hierarchical-chunking';
+import {
+  hierarchicalChunking,
+  type HierarchicalChunkingResult,
+} from '../../../shared/summarization/hierarchical-chunking';
 import {
   validateSummaryQuality,
   type QualityCheckResult,
 } from '../../../shared/validation/quality-validator';
-import { createModelConfigService, getEffectiveStageConfig, type PhaseModelConfig } from '../../../shared/llm/model-config-service';
+import {
+  createModelConfigService,
+  getEffectiveStageConfig,
+  type PhaseModelConfig,
+} from '../../../shared/llm/model-config-service';
 import logger from '../../../shared/logger';
 import { validateLocale } from '@/shared/validation';
+import { DEFAULT_MODEL_ID, DEFAULT_FALLBACK_MODEL_ID } from '@megacampus/shared-types';
 
 /**
  * Default threshold for small document bypass (tokens)
@@ -124,7 +132,8 @@ async function generateDocumentTitle(
       temperature: 0.3, // Low temperature for consistency
     });
 
-    const generatedTitle = response.content.trim()
+    const generatedTitle = response.content
+      .trim()
       // Remove any quotes that might wrap the title
       .replace(/^["'«»]|["'«»]$/g, '')
       // Remove any "Title:" prefix the model might add
@@ -132,21 +141,27 @@ async function generateDocumentTitle(
       .trim();
 
     if (generatedTitle && generatedTitle.length >= 3 && generatedTitle.length <= 200) {
-      logger.debug({
-        textLength: textForTitle.length,
-        generatedTitle,
-        language: langKey,
-      }, '[Phase 6] Document title generated');
+      logger.debug(
+        {
+          textLength: textForTitle.length,
+          generatedTitle,
+          language: langKey,
+        },
+        '[Phase 6] Document title generated'
+      );
       return generatedTitle;
     }
 
     // Fallback: extract from first line if generation failed
     return extractTitleFromText(text, language);
   } catch (error) {
-    logger.warn({
-      error: error instanceof Error ? error.message : String(error),
-      language: langKey,
-    }, '[Phase 6] Title generation failed, using fallback');
+    logger.warn(
+      {
+        error: error instanceof Error ? error.message : String(error),
+        language: langKey,
+      },
+      '[Phase 6] Title generation failed, using fallback'
+    );
 
     return extractTitleFromText(text, language);
   }
@@ -158,7 +173,8 @@ async function generateDocumentTitle(
  */
 function extractTitleFromText(text: string, language: string): string {
   // Split into lines and find first non-empty, non-header line
-  const lines = text.split('\n')
+  const lines = text
+    .split('\n')
     .map(line => line.trim())
     .filter(line => {
       if (!line) return false;
@@ -277,11 +293,14 @@ export async function executePhase6Summarization(
 ): Promise<Phase6Result> {
   const startTime = Date.now();
 
-  logger.info({
-    courseId,
-    fileId,
-    organizationId,
-  }, '[Phase 6] Starting document summarization');
+  logger.info(
+    {
+      courseId,
+      fileId,
+      organizationId,
+    },
+    '[Phase 6] Starting document summarization'
+  );
 
   options?.onProgress?.(0, 'Loading document');
 
@@ -300,7 +319,35 @@ export async function executePhase6Summarization(
 
   const extractedText = fileData.markdown_content || '';
   if (!extractedText) {
-    logger.warn({ fileId }, '[Phase 6] Document has no markdown content, skipping');
+    logger.warn({ fileId }, '[Phase 6] Document has no markdown content, storing empty fallback');
+
+    // CRITICAL FIX: Store empty fallback to prevent Stage 4 barrier blocking
+    // Stage 4 requires processed_content IS NOT NULL for all documents
+    const emptyFallbackMetadata = {
+      error: 'no_markdown_content',
+      fallback_reason: 'empty_content',
+      quality_score: 0,
+    };
+
+    const { error: updateError } = await supabase
+      .from('file_catalog')
+      .update({
+        processed_content: '[NO CONTENT]',
+        processing_method: 'full_text', // Use 'full_text' to satisfy check constraint
+        summary_metadata: { ...emptyFallbackMetadata, is_fallback: true },
+        updated_at: new Date().toISOString(),
+      })
+      .eq('id', fileId);
+
+    if (updateError) {
+      logger.error(
+        { fileId, error: updateError.message },
+        '[Phase 6] Failed to store empty fallback'
+      );
+    } else {
+      logger.info({ fileId }, '[Phase 6] Stored empty fallback for document without content');
+    }
+
     return buildEmptyResult(fileId);
   }
 
@@ -312,40 +359,52 @@ export async function executePhase6Summarization(
   const courseLanguage = await getCourseLanguage(supabase, courseId);
   const titleLanguage = courseLanguage || documentLanguage;
 
-  logger.debug({
-    fileId,
-    documentLanguage,
-    courseLanguage,
-    titleLanguage,
-  }, '[Phase 6] Language detection complete');
+  logger.debug(
+    {
+      fileId,
+      documentLanguage,
+      courseLanguage,
+      titleLanguage,
+    },
+    '[Phase 6] Language detection complete'
+  );
 
   // Use document language for processing, course language for titles
   const language = documentLanguage;
 
-  logger.info({
-    fileId,
-    textLength: extractedText.length,
-    language,
-  }, '[Phase 6] Document loaded');
+  logger.info(
+    {
+      fileId,
+      textLength: extractedText.length,
+      language,
+    },
+    '[Phase 6] Document loaded'
+  );
 
   options?.onProgress?.(10, 'Estimating tokens');
 
   // Step 3: Estimate token count
   const estimatedTokens = tokenEstimator.estimateTokens(extractedText, language);
 
-  logger.info({
-    fileId,
-    estimatedTokens,
-    bypassThreshold: DEFAULT_NO_SUMMARY_THRESHOLD,
-  }, '[Phase 6] Token estimation complete');
+  logger.info(
+    {
+      fileId,
+      estimatedTokens,
+      bypassThreshold: DEFAULT_NO_SUMMARY_THRESHOLD,
+    },
+    '[Phase 6] Token estimation complete'
+  );
 
   // Step 4: Check if should bypass summarization (small documents)
   if (estimatedTokens < DEFAULT_NO_SUMMARY_THRESHOLD) {
-    logger.info({
-      fileId,
-      estimatedTokens,
-      threshold: DEFAULT_NO_SUMMARY_THRESHOLD,
-    }, '[Phase 6] Small document detected, bypassing summarization');
+    logger.info(
+      {
+        fileId,
+        estimatedTokens,
+        threshold: DEFAULT_NO_SUMMARY_THRESHOLD,
+      },
+      '[Phase 6] Small document detected, bypassing summarization'
+    );
 
     options?.onProgress?.(85, 'Generating document title');
 
@@ -381,12 +440,15 @@ export async function executePhase6Summarization(
     retryAttempt: 0,
   };
 
-  logger.info({
-    fileId,
-    model: config.model,
-    fallback: config.fallbackModel,
-    source: modelConfig.source,
-  }, '[Phase 6] Model configuration loaded');
+  logger.info(
+    {
+      fileId,
+      model: config.model,
+      fallback: config.fallbackModel,
+      source: modelConfig.source,
+    },
+    '[Phase 6] Model configuration loaded'
+  );
 
   const result = await executeSummarizationWithRetry(
     fileId,
@@ -444,36 +506,45 @@ async function executeSummarizationWithRetry(
     effectiveQualityThreshold = effectiveConfig.qualityThreshold;
     maxRetries = effectiveConfig.maxRetries;
 
-    logger.info({
-      fileId,
-      phaseName,
-      qualityThreshold: effectiveQualityThreshold,
-      maxRetries,
-      source: phaseConfig.source,
-    }, '[Phase 6] Using database-driven config values');
+    logger.info(
+      {
+        fileId,
+        phaseName,
+        qualityThreshold: effectiveQualityThreshold,
+        maxRetries,
+        source: phaseConfig.source,
+      },
+      '[Phase 6] Using database-driven config values'
+    );
   } catch (error) {
-    logger.warn({
-      fileId,
-      phaseName,
-      error: error instanceof Error ? error.message : String(error),
-      fallbackQualityThreshold: effectiveQualityThreshold,
-      fallbackMaxRetries: maxRetries,
-    }, '[Phase 6] Failed to load phase config, using hardcoded defaults');
+    logger.warn(
+      {
+        fileId,
+        phaseName,
+        error: error instanceof Error ? error.message : String(error),
+        fallbackQualityThreshold: effectiveQualityThreshold,
+        fallbackMaxRetries: maxRetries,
+      },
+      '[Phase 6] Failed to load phase config, using hardcoded defaults'
+    );
   }
 
   let currentAttempt = 0;
 
   while (currentAttempt <= maxRetries) {
     try {
-      logger.info({
-        fileId,
-        attempt: currentAttempt + 1,
-        maxAttempts: maxRetries + 1,
-        model: config.model,
-      }, '[Phase 6] Executing summarization attempt');
+      logger.info(
+        {
+          fileId,
+          attempt: currentAttempt + 1,
+          maxAttempts: maxRetries + 1,
+          model: config.model,
+        },
+        '[Phase 6] Executing summarization attempt'
+      );
 
       // Execute hierarchical chunking
-      const progressBase = 20 + (currentAttempt * 20);
+      const progressBase = 20 + currentAttempt * 20;
       options?.onProgress?.(progressBase, `Summarizing (attempt ${currentAttempt + 1})`);
 
       const chunkingResult: HierarchicalChunkingResult = await hierarchicalChunking(
@@ -491,13 +562,16 @@ async function executeSummarizationWithRetry(
         }
       );
 
-      logger.info({
-        fileId,
-        iterations: chunkingResult.iterations,
-        totalInputTokens: chunkingResult.totalInputTokens,
-        totalOutputTokens: chunkingResult.totalOutputTokens,
-        finalTokenCount: chunkingResult.metadata.final_token_count,
-      }, '[Phase 6] Summarization complete');
+      logger.info(
+        {
+          fileId,
+          iterations: chunkingResult.iterations,
+          totalInputTokens: chunkingResult.totalInputTokens,
+          totalOutputTokens: chunkingResult.totalOutputTokens,
+          finalTokenCount: chunkingResult.metadata.final_token_count,
+        },
+        '[Phase 6] Summarization complete'
+      );
 
       // Validate quality
       options?.onProgress?.(progressBase + 10, 'Validating quality');
@@ -508,12 +582,15 @@ async function executeSummarizationWithRetry(
         { threshold: effectiveQualityThreshold }
       );
 
-      logger.info({
-        fileId,
-        qualityScore: qualityCheck.quality_score,
-        passed: qualityCheck.quality_check_passed,
-        threshold: effectiveQualityThreshold,
-      }, '[Phase 6] Quality validation complete');
+      logger.info(
+        {
+          fileId,
+          qualityScore: qualityCheck.quality_score,
+          passed: qualityCheck.quality_check_passed,
+          threshold: effectiveQualityThreshold,
+        },
+        '[Phase 6] Quality validation complete'
+      );
 
       // If quality passed, store and return
       if (qualityCheck.quality_check_passed) {
@@ -541,23 +618,29 @@ async function executeSummarizationWithRetry(
           currentAttempt
         );
 
-        logger.info({
-          fileId,
-          generatedTitle,
-          qualityScore: qualityCheck.quality_score,
-          attempts: currentAttempt + 1,
-        }, '[Phase 6] Summary stored successfully');
+        logger.info(
+          {
+            fileId,
+            generatedTitle,
+            qualityScore: qualityCheck.quality_score,
+            attempts: currentAttempt + 1,
+          },
+          '[Phase 6] Summary stored successfully'
+        );
 
         return result;
       }
 
       // Quality failed - determine if should retry
       if (currentAttempt >= maxRetries) {
-        logger.warn({
-          fileId,
-          qualityScore: qualityCheck.quality_score,
-          attempts: currentAttempt + 1,
-        }, '[Phase 6] Max retries reached, using best-effort summary');
+        logger.warn(
+          {
+            fileId,
+            qualityScore: qualityCheck.quality_score,
+            attempts: currentAttempt + 1,
+          },
+          '[Phase 6] Max retries reached, using best-effort summary'
+        );
 
         // Generate title even for best-effort summary (use course language)
         options?.onProgress?.(progressBase + 12, 'Generating document title');
@@ -584,28 +667,36 @@ async function executeSummarizationWithRetry(
       }
 
       // Apply escalation and retry
-      logger.warn({
-        fileId,
-        qualityScore: qualityCheck.quality_score,
-        currentAttempt,
-      }, '[Phase 6] Quality check failed, applying escalation');
+      logger.warn(
+        {
+          fileId,
+          qualityScore: qualityCheck.quality_score,
+          currentAttempt,
+        },
+        '[Phase 6] Quality check failed, applying escalation'
+      );
 
       applyEscalation(config, currentAttempt);
       currentAttempt++;
-
     } catch (error) {
-      logger.error({
-        fileId,
-        attempt: currentAttempt + 1,
-        error: error instanceof Error ? error.message : String(error),
-      }, '[Phase 6] Summarization attempt failed');
+      logger.error(
+        {
+          fileId,
+          attempt: currentAttempt + 1,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        '[Phase 6] Summarization attempt failed'
+      );
 
       // If max retries reached, fall back to full text
       if (currentAttempt >= maxRetries) {
-        logger.error({
-          fileId,
-          attempts: currentAttempt + 1,
-        }, '[Phase 6] All attempts failed, falling back to full text');
+        logger.error(
+          {
+            fileId,
+            attempts: currentAttempt + 1,
+          },
+          '[Phase 6] All attempts failed, falling back to full text'
+        );
 
         options?.onProgress?.(85, 'Generating document title');
         const generatedTitle = await generateDocumentTitle(extractedText, titleLanguage);
@@ -655,30 +746,39 @@ function applyEscalation(config: SummarizationConfig, retryAttempt: number): voi
   if (retryAttempt === 0 && config.fallbackModel !== config.model) {
     const previousModel = config.model;
     config.model = config.fallbackModel;
-    logger.info({
-      previousModel,
-      newModel: config.model,
-    }, '[Phase 6] Escalation: Switching to fallback model');
+    logger.info(
+      {
+        previousModel,
+        newModel: config.model,
+      },
+      '[Phase 6] Escalation: Switching to fallback model'
+    );
   }
 
   // Retry 2: Increase output tokens by 25%
   if (retryAttempt === 1) {
     const previousTokens = config.maxOutputTokens;
     config.maxOutputTokens = Math.ceil(config.maxOutputTokens * 1.25);
-    logger.info({
-      previousTokens,
-      newMaxTokens: config.maxOutputTokens,
-    }, '[Phase 6] Escalation: Increasing token budget (+25%)');
+    logger.info(
+      {
+        previousTokens,
+        newMaxTokens: config.maxOutputTokens,
+      },
+      '[Phase 6] Escalation: Increasing token budget (+25%)'
+    );
   }
 
   // Retry 3: Further increase output tokens by 25%
   if (retryAttempt === 2) {
     const previousTokens = config.maxOutputTokens;
     config.maxOutputTokens = Math.ceil(config.maxOutputTokens * 1.25);
-    logger.info({
-      previousTokens,
-      newMaxTokens: config.maxOutputTokens,
-    }, '[Phase 6] Escalation: Increasing token budget further (+25%)');
+    logger.info(
+      {
+        previousTokens,
+        newMaxTokens: config.maxOutputTokens,
+      },
+      '[Phase 6] Escalation: Increasing token budget further (+25%)'
+    );
   }
 }
 
@@ -735,12 +835,15 @@ async function storeSummary(
     throw new Error(`Failed to store summary: ${error.message}`);
   }
 
-  logger.info({
-    fileId,
-    generatedTitle,
-    summaryLength: summary.length,
-    compressionRatio: compressionRatio.toFixed(2),
-  }, '[Phase 6] Summary stored in database');
+  logger.info(
+    {
+      fileId,
+      generatedTitle,
+      summaryLength: summary.length,
+      compressionRatio: compressionRatio.toFixed(2),
+    },
+    '[Phase 6] Summary stored in database'
+  );
 
   return {
     success: true,
@@ -807,12 +910,15 @@ async function storeFullText(
     throw new Error(`Failed to store full text: ${error.message}`);
   }
 
-  logger.info({
-    fileId,
-    generatedTitle,
-    textLength: fullText.length,
-    estimatedTokens,
-  }, '[Phase 6] Full text stored (bypass)');
+  logger.info(
+    {
+      fileId,
+      generatedTitle,
+      textLength: fullText.length,
+      estimatedTokens,
+    },
+    '[Phase 6] Full text stored (bypass)'
+  );
 
   return {
     success: true,
@@ -893,10 +999,13 @@ async function getCourseLanguage(
       .single();
 
     if (error || !data?.language) {
-      logger.warn({
-        courseId,
-        error: error?.message,
-      }, '[Phase 6] Failed to get course language, will use document language');
+      logger.warn(
+        {
+          courseId,
+          error: error?.message,
+        },
+        '[Phase 6] Failed to get course language, will use document language'
+      );
       return null;
     }
 
@@ -909,16 +1018,22 @@ async function getCourseLanguage(
       return 'en';
     }
 
-    logger.warn({
-      courseId,
-      language: data.language,
-    }, '[Phase 6] Unknown course language, will use document language');
+    logger.warn(
+      {
+        courseId,
+        language: data.language,
+      },
+      '[Phase 6] Unknown course language, will use document language'
+    );
     return null;
   } catch (error) {
-    logger.warn({
-      courseId,
-      error: error instanceof Error ? error.message : String(error),
-    }, '[Phase 6] Exception getting course language');
+    logger.warn(
+      {
+        courseId,
+        error: error instanceof Error ? error.message : String(error),
+      },
+      '[Phase 6] Exception getting course language'
+    );
     return null;
   }
 }
@@ -965,12 +1080,15 @@ async function getModelConfigForSummarization(
       assumedMaxContext,
       langCode
     );
-    logger.debug({
-      language,
-      tokenCount,
-      maxContext: assumedMaxContext,
-      dynamicThreshold,
-    }, '[Phase 6] Dynamic threshold calculated');
+    logger.debug(
+      {
+        language,
+        tokenCount,
+        maxContext: assumedMaxContext,
+        dynamicThreshold,
+      },
+      '[Phase 6] Dynamic threshold calculated'
+    );
   } catch (err) {
     // Fallback to hardcoded threshold if dynamic calculation fails
     logger.warn(
@@ -986,22 +1104,65 @@ async function getModelConfigForSummarization(
   // Construct phase name (e.g., 'stage_2_standard_ru', 'stage_2_extended_en')
   const finalPhaseName = `stage_2_${tier}_${langCode}` as const;
 
-  logger.debug({
-    language,
-    tokenCount,
-    dynamicThreshold,
-    tier,
-    phaseName: finalPhaseName,
-  }, '[Phase 6] Determining model configuration');
+  logger.debug(
+    {
+      language,
+      tokenCount,
+      dynamicThreshold,
+      tier,
+      phaseName: finalPhaseName,
+    },
+    '[Phase 6] Determining model configuration'
+  );
 
-  // Fetch config from database with fallback to hardcoded
-  const config = await modelConfigService.getModelForPhase(finalPhaseName);
+  // Fetch config from database with fallback to hardcoded defaults
+  // This handles cases where DB is unavailable (e.g., sandboxed processor startup)
+  try {
+    const config = await modelConfigService.getModelForPhase(finalPhaseName);
 
-  // Also fetch fallback model from emergency config if needed
-  const emergencyConfig = await modelConfigService.getModelForPhase('emergency');
+    // Also fetch fallback model from emergency config if needed
+    let fallbackModelId = DEFAULT_FALLBACK_MODEL_ID;
+    try {
+      const emergencyConfig = await modelConfigService.getModelForPhase('emergency');
+      fallbackModelId = emergencyConfig.modelId;
+    } catch (emergencyError) {
+      logger.warn(
+        {
+          error: emergencyError instanceof Error ? emergencyError.message : String(emergencyError),
+        },
+        '[Phase 6] Failed to get emergency config, using hardcoded fallback'
+      );
+    }
 
-  return {
-    ...config,
-    fallbackModelId: emergencyConfig.modelId,
-  };
+    return {
+      ...config,
+      fallbackModelId,
+    };
+  } catch (configError) {
+    // Database unavailable or config not found - use hardcoded defaults
+    // This is critical for sandboxed processor where DB cache may be empty
+    logger.warn(
+      {
+        phaseName: finalPhaseName,
+        tier,
+        language: langCode,
+        error: configError instanceof Error ? configError.message : String(configError),
+      },
+      '[Phase 6] Failed to get model config from database, using hardcoded defaults'
+    );
+
+    // Return hardcoded fallback config
+    return {
+      modelId: DEFAULT_MODEL_ID,
+      fallbackModelId: DEFAULT_FALLBACK_MODEL_ID,
+      temperature: 0.7,
+      maxTokens: 8192,
+      maxContextTokens: tier === 'extended' ? 200000 : 128000,
+      qualityThreshold: 0.75,
+      maxRetries: 3,
+      timeoutMs: null,
+      tier,
+      source: 'hardcoded' as const,
+    };
+  }
 }

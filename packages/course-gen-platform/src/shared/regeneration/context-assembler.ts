@@ -78,7 +78,7 @@ const TIER_BUDGETS: typeof TIER_TOKEN_BUDGETS = {
 const TOKEN_RATIOS: Record<string, number> = {
   eng: 0.25, // English: 4 chars ≈ 1 token
   rus: 0.35, // Russian: 3 chars ≈ 1 token
-  default: 0.30,
+  default: 0.3,
 };
 
 /**
@@ -176,7 +176,11 @@ function getFieldName(path: string): string {
  *
  * Excludes the target field itself
  */
-function getSiblingFields(data: unknown, parentPath: string, targetField: string): Record<string, unknown> {
+function getSiblingFields(
+  data: unknown,
+  parentPath: string,
+  targetField: string
+): Record<string, unknown> {
   const parent = getFieldValue(data, parentPath);
 
   if (!parent || typeof parent !== 'object') {
@@ -405,8 +409,8 @@ function assembleGlobalContext(
       `<key_concepts>${analysisResult.topic_analysis.key_concepts.join(', ')}</key_concepts>`,
       `<target_audience>${analysisResult.topic_analysis.target_audience}</target_audience>`,
       `<pedagogical_strategy>`,
-      `  Teaching style: ${analysisResult.pedagogical_strategy.teaching_style}`,
-      `  Practical focus: ${analysisResult.pedagogical_strategy.practical_focus}`,
+      `  Assessment approach: ${analysisResult.pedagogical_strategy.assessment_approach}`,
+      `  Progression logic: ${analysisResult.pedagogical_strategy.progression_logic}`,
       `</pedagogical_strategy>`,
       `</analysis_result>`
     );
@@ -610,8 +614,8 @@ export async function assembleStaticContext(input: AssemblerInput): Promise<Stat
       `<key_concepts>${analysisResult.topic_analysis.key_concepts.join(', ')}</key_concepts>`,
       `<target_audience>${analysisResult.topic_analysis.target_audience}</target_audience>`,
       `<pedagogical_strategy>`,
-      `  Teaching style: ${analysisResult.pedagogical_strategy.teaching_style}`,
-      `  Practical focus: ${analysisResult.pedagogical_strategy.practical_focus}`,
+      `  Assessment approach: ${analysisResult.pedagogical_strategy.assessment_approach}`,
+      `  Progression logic: ${analysisResult.pedagogical_strategy.progression_logic}`,
       `</pedagogical_strategy>`,
       `</course_metadata>`
     );

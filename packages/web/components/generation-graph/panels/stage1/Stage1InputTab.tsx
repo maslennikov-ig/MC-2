@@ -1,9 +1,9 @@
-'use client';
+'use client'
 
-import React, { useState, useMemo, memo } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { cn } from '@/lib/utils';
+import React, { useState, useMemo, memo } from 'react'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { cn } from '@/lib/utils'
 import {
   FileText,
   Headphones,
@@ -15,21 +15,26 @@ import {
   FolderOpen,
   ChevronDown,
   ChevronUp,
-} from 'lucide-react';
-import { getLearningStyleByValue } from '@/lib/constants/learning-styles';
-import { GRAPH_TRANSLATIONS } from '@/lib/generation-graph/translations';
-import type { Stage1InputTabProps, Stage1InputData } from './types';
+  Globe,
+  Clock,
+  Layers,
+  Zap,
+  Hand,
+} from 'lucide-react'
+import { getLearningStyleByValue } from '@/lib/constants/learning-styles'
+import { GRAPH_TRANSLATIONS } from '@/lib/generation-graph/translations'
+import type { Stage1InputTabProps, Stage1InputData } from './types'
 
 // ============================================================================
 // HELPERS
 // ============================================================================
 
 function formatFileSize(bytes: number): string {
-  if (!Number.isFinite(bytes) || bytes < 0) return '0 B';
-  if (bytes === 0) return '0 B';
-  if (bytes < 1024) return `${bytes} B`;
-  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
+  if (!Number.isFinite(bytes) || bytes < 0) return '0 B'
+  if (bytes === 0) return '0 B'
+  if (bytes < 1024) return `${bytes} B`
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`
+  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`
 }
 
 const STRATEGY_COLORS: Record<string, string> = {
@@ -37,26 +42,26 @@ const STRATEGY_COLORS: Record<string, string> = {
   create_from_scratch: 'bg-blue-500/10 text-blue-600 dark:text-blue-400 border-blue-500/20',
   expand_and_enhance: 'bg-green-500/10 text-green-600 dark:text-green-400 border-green-500/20',
   default: 'bg-gray-500/10 text-gray-600 dark:text-gray-400 border-gray-500/20',
-} as const;
+} as const
 
 function getStrategyColor(strategy: Stage1InputData['content_strategy']): string {
-  return STRATEGY_COLORS[strategy] || STRATEGY_COLORS.default;
+  return STRATEGY_COLORS[strategy] || STRATEGY_COLORS.default
 }
 
 function getStrategyLabel(
   strategy: Stage1InputData['content_strategy'],
   locale: 'ru' | 'en'
 ): string {
-  const t = GRAPH_TRANSLATIONS.stage1;
+  const t = GRAPH_TRANSLATIONS.stage1
   switch (strategy) {
     case 'auto':
-      return t?.strategyAuto?.[locale] || 'Auto';
+      return t?.strategyAuto?.[locale] || 'Auto'
     case 'create_from_scratch':
-      return t?.strategyFromScratch?.[locale] || 'From Scratch';
+      return t?.strategyFromScratch?.[locale] || 'From Scratch'
     case 'expand_and_enhance':
-      return t?.strategyExpand?.[locale] || 'Expand';
+      return t?.strategyExpand?.[locale] || 'Expand'
     default:
-      return strategy;
+      return strategy
   }
 }
 
@@ -65,9 +70,9 @@ function getStrategyLabel(
 // ============================================================================
 
 interface FormatIconProps {
-  format: 'text' | 'audio' | 'video' | 'presentation' | 'test';
-  isActive: boolean;
-  locale: 'ru' | 'en';
+  format: 'text' | 'audio' | 'video' | 'presentation' | 'test'
+  isActive: boolean
+  locale: 'ru' | 'en'
 }
 
 const FORMAT_ICONS = {
@@ -76,7 +81,7 @@ const FORMAT_ICONS = {
   video: Video,
   presentation: Presentation,
   test: ClipboardCheck,
-} as const;
+} as const
 
 const FORMAT_LABELS = {
   text: { ru: 'Текст', en: 'Text' },
@@ -84,11 +89,11 @@ const FORMAT_LABELS = {
   video: { ru: 'Видео', en: 'Video' },
   presentation: { ru: 'Презентация', en: 'Presentation' },
   test: { ru: 'Тест', en: 'Test' },
-} as const;
+} as const
 
 function FormatIcon({ format, isActive, locale }: FormatIconProps) {
-  const Icon = FORMAT_ICONS[format];
-  const label = FORMAT_LABELS[format][locale];
+  const Icon = FORMAT_ICONS[format]
+  const label = FORMAT_LABELS[format][locale]
 
   return (
     <div
@@ -99,9 +104,9 @@ function FormatIcon({ format, isActive, locale }: FormatIconProps) {
       title={label}
     >
       <Icon className="h-5 w-5" />
-      <span className="text-[10px] text-muted-foreground">{label}</span>
+      <span className="text-muted-foreground text-[10px]">{label}</span>
     </div>
-  );
+  )
 }
 
 // ============================================================================
@@ -109,27 +114,27 @@ function FormatIcon({ format, isActive, locale }: FormatIconProps) {
 // ============================================================================
 
 interface DescriptionWithToggleProps {
-  description: string;
-  locale: 'ru' | 'en';
+  description: string
+  locale: 'ru' | 'en'
 }
 
 function DescriptionWithToggle({ description, locale }: DescriptionWithToggleProps) {
-  const [isExpanded, setIsExpanded] = useState(false);
-  const t = GRAPH_TRANSLATIONS.stage1;
+  const [isExpanded, setIsExpanded] = useState(false)
+  const t = GRAPH_TRANSLATIONS.stage1
 
   // Estimate ~80 chars per line, 3 lines = 240 chars threshold
-  const shouldShowToggle = description.length > 240;
+  const shouldShowToggle = description.length > 240
   const displayText =
-    shouldShowToggle && !isExpanded ? description.slice(0, 240) + '...' : description;
+    shouldShowToggle && !isExpanded ? description.slice(0, 240) + '...' : description
 
   return (
     <div className="space-y-2">
-      <p className="text-sm text-muted-foreground leading-relaxed">{displayText}</p>
+      <p className="text-muted-foreground text-sm leading-relaxed">{displayText}</p>
       {shouldShowToggle && (
         <button
           type="button"
           onClick={() => setIsExpanded(!isExpanded)}
-          className="flex items-center gap-1 text-xs text-primary hover:underline focus:outline-none"
+          className="text-primary flex items-center gap-1 text-xs hover:underline focus:outline-none"
         >
           {isExpanded ? (
             <>
@@ -145,7 +150,7 @@ function DescriptionWithToggle({ description, locale }: DescriptionWithTogglePro
         </button>
       )}
     </div>
-  );
+  )
 }
 
 // ============================================================================
@@ -156,21 +161,18 @@ export const Stage1InputTab = memo<Stage1InputTabProps>(function Stage1InputTab(
   inputData,
   locale = 'ru',
 }) {
-  const t = GRAPH_TRANSLATIONS.stage1;
+  const t = GRAPH_TRANSLATIONS.stage1
 
-  // Parse inputData safely
-  const data = inputData as Stage1InputData | undefined;
+  // Parse inputData safely - cast to expected type
+  const data: Stage1InputData | undefined = inputData as Stage1InputData | undefined
 
   // Memoized computed values
   const learningStyle = useMemo(
     () => (data?.style ? getLearningStyleByValue(data.style) : undefined),
     [data?.style]
-  );
+  )
 
-  const activeFormats = useMemo(
-    () => new Set(data?.output_formats || []),
-    [data?.output_formats]
-  );
+  const activeFormats = useMemo(() => new Set(data?.output_formats || []), [data?.output_formats])
 
   const allFormats: Array<'text' | 'audio' | 'video' | 'presentation' | 'test'> = [
     'text',
@@ -178,14 +180,14 @@ export const Stage1InputTab = memo<Stage1InputTabProps>(function Stage1InputTab(
     'video',
     'presentation',
     'test',
-  ];
+  ]
 
   if (!data) {
     return (
-      <div className="p-4 text-center text-muted-foreground">
+      <div className="text-muted-foreground p-4 text-center">
         {t?.notSpecified?.[locale] || 'Not specified'}
       </div>
-    );
+    )
   }
 
   return (
@@ -193,13 +195,13 @@ export const Stage1InputTab = memo<Stage1InputTabProps>(function Stage1InputTab(
       {/* Card A: Identity - Full width (spans 2 columns) */}
       <Card className="col-span-2">
         <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-medium text-muted-foreground">
+          <CardTitle className="text-muted-foreground text-sm font-medium">
             {t?.identity?.[locale] || 'Identity'}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Topic - Large H3 typography */}
-          <h3 className="text-xl font-bold leading-tight">{data.topic}</h3>
+          <h3 className="text-xl leading-tight font-bold">{data.topic}</h3>
 
           {/* Description with show more/less */}
           {data.course_description && (
@@ -208,21 +210,21 @@ export const Stage1InputTab = memo<Stage1InputTabProps>(function Stage1InputTab(
 
           {/* Optional fields: Prerequisites and Learning Outcomes */}
           {(data.prerequisites || data.learning_outcomes) && (
-            <div className="grid grid-cols-2 gap-4 pt-2 border-t border-border/50">
+            <div className="border-border/50 grid grid-cols-2 gap-4 border-t pt-2">
               {data.prerequisites && (
                 <div>
-                  <span className="text-xs font-medium text-muted-foreground">
+                  <span className="text-muted-foreground text-xs font-medium">
                     {t?.prerequisites?.[locale] || 'Prerequisites'}
                   </span>
-                  <p className="text-sm mt-1">{data.prerequisites}</p>
+                  <p className="mt-1 text-sm">{data.prerequisites}</p>
                 </div>
               )}
               {data.learning_outcomes && (
                 <div>
-                  <span className="text-xs font-medium text-muted-foreground">
+                  <span className="text-muted-foreground text-xs font-medium">
                     {t?.learningOutcomes?.[locale] || 'Learning Outcomes'}
                   </span>
-                  <p className="text-sm mt-1">{data.learning_outcomes}</p>
+                  <p className="mt-1 text-sm">{data.learning_outcomes}</p>
                 </div>
               )}
             </div>
@@ -233,14 +235,14 @@ export const Stage1InputTab = memo<Stage1InputTabProps>(function Stage1InputTab(
       {/* Card B: Strategy & Logistics - Left column */}
       <Card>
         <CardHeader className="pb-3">
-          <CardTitle className="text-sm font-medium text-muted-foreground">
+          <CardTitle className="text-muted-foreground text-sm font-medium">
             {t?.strategyAndLogistics?.[locale] || 'Strategy & Parameters'}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Strategy Badge */}
           <div className="flex items-center gap-2">
-            <span className="text-xs text-muted-foreground">
+            <span className="text-muted-foreground text-xs">
               {t?.strategy?.[locale] || 'Strategy'}:
             </span>
             <Badge className={cn('border', getStrategyColor(data.content_strategy))}>
@@ -250,10 +252,10 @@ export const Stage1InputTab = memo<Stage1InputTabProps>(function Stage1InputTab(
 
           {/* Audience */}
           <div className="flex items-center gap-2">
-            <Users className="h-4 w-4 text-muted-foreground" />
+            <Users className="text-muted-foreground h-4 w-4" />
             <span className="text-sm">
               {data.target_audience || (
-                <span className="italic text-muted-foreground">
+                <span className="text-muted-foreground italic">
                   {t?.notSpecified?.[locale] || 'Not specified'}
                 </span>
               )}
@@ -263,7 +265,7 @@ export const Stage1InputTab = memo<Stage1InputTabProps>(function Stage1InputTab(
           {/* Style */}
           {learningStyle && (
             <div className="flex items-center gap-2">
-              <span className="text-xs text-muted-foreground">
+              <span className="text-muted-foreground text-xs">
                 {t?.style?.[locale] || 'Style'}:
               </span>
               <Badge variant="outline">{learningStyle.title}</Badge>
@@ -272,17 +274,77 @@ export const Stage1InputTab = memo<Stage1InputTabProps>(function Stage1InputTab(
 
           {/* Lesson Count - Large number */}
           <div className="flex items-baseline gap-2 pt-2">
-            <span className="text-3xl font-bold">
-              {data.estimated_lessons ?? '--'}
-            </span>
-            <span className="text-sm text-muted-foreground">
+            <span className="text-3xl font-bold">{data.estimated_lessons ?? '--'}</span>
+            <span className="text-muted-foreground text-sm">
               {t?.lessonsCount?.[locale] || 'Lessons'}
             </span>
           </div>
 
+          {/* Sections Count */}
+          {data.estimated_sections !== undefined && (
+            <div className="flex items-center gap-2">
+              <span className="text-xl font-semibold">{data.estimated_sections}</span>
+              <span className="text-muted-foreground text-xs">
+                {t?.sectionsCount?.[locale] || 'Sections'}
+              </span>
+            </div>
+          )}
+
+          {/* Language */}
+          {data.language && (
+            <div className="flex items-center gap-2">
+              <Globe className="text-muted-foreground h-4 w-4" />
+              <span className="text-sm">{data.language.toUpperCase()}</span>
+            </div>
+          )}
+
+          {/* Lesson Duration */}
+          {data.lesson_duration_minutes && (
+            <div className="flex items-center gap-2">
+              <Clock className="text-muted-foreground h-4 w-4" />
+              <span className="text-sm">
+                {data.lesson_duration_minutes} {t?.lessonDuration?.[locale] || 'min/lesson'}
+              </span>
+            </div>
+          )}
+
+          {/* Course Size */}
+          {data.course_size && (
+            <div className="flex items-center gap-2">
+              <Layers className="text-muted-foreground h-4 w-4" />
+              <Badge variant="outline">
+                {data.course_size === 'small' && (t?.sizeSmall?.[locale] || 'Small')}
+                {data.course_size === 'medium' && (t?.sizeMedium?.[locale] || 'Medium')}
+                {data.course_size === 'large' && (t?.sizeLarge?.[locale] || 'Large')}
+              </Badge>
+            </div>
+          )}
+
+          {/* Generation Mode */}
+          {data.generation_mode && (
+            <div className="flex items-center gap-2">
+              <span className="text-muted-foreground text-xs">
+                {t?.generationMode?.[locale] || 'Mode'}:
+              </span>
+              <Badge variant="outline" className="flex items-center gap-1">
+                {data.generation_mode === 'automatic' ? (
+                  <>
+                    <Zap className="h-3 w-3" />
+                    {t?.modeAutomatic?.[locale] || 'Auto'}
+                  </>
+                ) : (
+                  <>
+                    <Hand className="h-3 w-3" />
+                    {t?.modeSemiAutomatic?.[locale] || 'Manual'}
+                  </>
+                )}
+              </Badge>
+            </div>
+          )}
+
           {/* Output Formats */}
-          <div className="pt-2 border-t border-border/50">
-            <span className="text-xs text-muted-foreground block mb-2">
+          <div className="border-border/50 border-t pt-2">
+            <span className="text-muted-foreground mb-2 block text-xs">
               {t?.formats?.[locale] || 'Formats'}:
             </span>
             <div className="flex items-center gap-4">
@@ -303,8 +365,8 @@ export const Stage1InputTab = memo<Stage1InputTabProps>(function Stage1InputTab(
       <Card>
         <CardHeader className="pb-3">
           <div className="flex items-center gap-2">
-            <FolderOpen className="h-4 w-4 text-muted-foreground" />
-            <CardTitle className="text-sm font-medium text-muted-foreground">
+            <FolderOpen className="text-muted-foreground h-4 w-4" />
+            <CardTitle className="text-muted-foreground text-sm font-medium">
               {t?.knowledgeBase?.[locale] || 'Knowledge Base'}
             </CardTitle>
           </div>
@@ -315,25 +377,25 @@ export const Stage1InputTab = memo<Stage1InputTabProps>(function Stage1InputTab(
               {data.files.map((file) => (
                 <div
                   key={file.id}
-                  className="flex items-center justify-between p-2 rounded-md bg-muted/50 hover:bg-muted transition-colors"
+                  className="bg-muted/50 hover:bg-muted flex items-center justify-between rounded-md p-2 transition-colors"
                 >
-                  <div className="flex items-center gap-2 min-w-0 flex-1">
-                    <FileText className="h-4 w-4 shrink-0 text-muted-foreground" />
-                    <span className="text-sm truncate">{file.name}</span>
+                  <div className="flex min-w-0 flex-1 items-center gap-2">
+                    <FileText className="text-muted-foreground h-4 w-4 shrink-0" />
+                    <span className="truncate text-sm">{file.name}</span>
                   </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <span className="text-xs text-muted-foreground">
+                  <div className="flex shrink-0 items-center gap-2">
+                    <span className="text-muted-foreground text-xs">
                       {formatFileSize(file.size)}
                     </span>
-                    <Eye className="h-4 w-4 text-muted-foreground cursor-pointer hover:text-foreground transition-colors" />
+                    <Eye className="text-muted-foreground hover:text-foreground h-4 w-4 cursor-pointer transition-colors" />
                   </div>
                 </div>
               ))}
             </div>
           ) : (
-            <div className="text-center py-6">
-              <FolderOpen className="h-8 w-8 mx-auto text-muted-foreground/50 mb-2" />
-              <p className="text-sm italic text-muted-foreground">
+            <div className="py-6 text-center">
+              <FolderOpen className="text-muted-foreground/50 mx-auto mb-2 h-8 w-8" />
+              <p className="text-muted-foreground text-sm italic">
                 {t?.noFiles?.[locale] || 'No files'}
               </p>
             </div>
@@ -341,7 +403,7 @@ export const Stage1InputTab = memo<Stage1InputTabProps>(function Stage1InputTab(
         </CardContent>
       </Card>
     </div>
-  );
-});
+  )
+})
 
-export default Stage1InputTab;
+export default Stage1InputTab

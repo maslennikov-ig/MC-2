@@ -1,6 +1,13 @@
-import { Video, Headphones, Presentation, HelpCircle, FileText } from 'lucide-react'
+import { Video, Headphones, Presentation, HelpCircle, FileText, Image } from 'lucide-react'
 
-export type EnrichmentType = 'video' | 'audio' | 'presentation' | 'quiz' | 'document'
+export type EnrichmentType =
+  | 'video'
+  | 'audio'
+  | 'presentation'
+  | 'quiz'
+  | 'document'
+  | 'cover'
+  | 'card'
 
 export const PLACEHOLDER_TYPES: ('quiz' | 'audio' | 'presentation' | 'video')[] = [
   'quiz',
@@ -8,6 +15,9 @@ export const PLACEHOLDER_TYPES: ('quiz' | 'audio' | 'presentation' | 'video')[] 
   'presentation',
   'video',
 ]
+
+// Image types for separate Images section
+export const IMAGE_PLACEHOLDER_TYPES: 'cover'[] = ['cover']
 
 export const ENRICHMENT_CONFIG: Record<
   EnrichmentType,
@@ -47,5 +57,17 @@ export const ENRICHMENT_CONFIG: Record<
     color: 'text-blue-500 dark:text-blue-400',
     bgColor: 'bg-blue-100 dark:bg-blue-900/30',
     labelKey: 'viewer.documentLabel',
+  },
+  cover: {
+    icon: Image,
+    color: 'text-cyan-500 dark:text-cyan-400',
+    bgColor: 'bg-cyan-100 dark:bg-cyan-900/30',
+    labelKey: 'viewer.enrichmentTypes.cover',
+  },
+  card: {
+    icon: Image,
+    color: 'text-indigo-500 dark:text-indigo-400',
+    bgColor: 'bg-indigo-100 dark:bg-indigo-900/30',
+    labelKey: 'viewer.enrichmentTypes.card',
   },
 }

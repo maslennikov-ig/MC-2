@@ -15,35 +15,17 @@ import {
 } from '@megacampus/shared-logger';
 import type { Logger } from 'pino';
 import { getSupabaseAdmin } from '../supabase/admin';
+import { detectEnvironment } from './utils';
+import { applyAutoMuteStatus } from './auto-mute-service';
 
 export type { Logger } from 'pino';
 
 // Re-export error logging types and services (these are local)
 export * from './types';
-export * from './error-service';
+export * from './error-service.js';
 
 // Re-export unchanged functions
 export { createModuleLogger, createRequestLogger };
-
-/**
- * Detect environment from APP_URL or NEXT_PUBLIC_APP_URL
- */
-function detectEnvironment(): 'dev' | 'stage' | null {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || process.env.APP_URL || '';
-
-  try {
-    const url = new URL(appUrl);
-    const hostname = url.hostname;
-
-    if (hostname === 'dev.ai.megacampus.ru') return 'dev';
-    if (hostname === 'ai.megacampus.ru') return 'stage';
-  } catch {
-    if (appUrl.includes('dev.ai.megacampus.ru')) return 'dev';
-    if (appUrl.includes('ai.megacampus.ru') && !appUrl.includes('dev.')) return 'stage';
-  }
-
-  return null;
-}
 
 /**
  * Write log entry to error_logs table (fire-and-forget)
@@ -121,27 +103,42 @@ async function writeToErrorLogs(
       }
     }
 
-    await supabase.from('error_logs' as any).insert({
-      error_message: message,
-      severity: level,
-      environment: environment,
-      organization_id: (organizationId || organization_id || null) as string | null,
-      user_id: (userId || user_id || null) as string | null,
-      job_id: (jobId || job_id || null) as string | null,
-      job_type: (jobType || job_type || null) as string | null,
-      course_id: (courseId || course_id || null) as string | null,
-      lesson_id: (lessonId || lesson_id || null) as string | null,
-      request_id: (requestId || request_id || null) as string | null,
-      trpc_path: (trpcPath || trpc_path || null) as string | null,
-      trpc_input: sanitizedInput,
-      attempted_value: (attemptedValue || attempted_value || null) as string | null,
-      stack_trace: (stack || null) as string | null,
-      metadata: Object.keys(metadata).length > 0 ? metadata : null,
-    });
+    const { data: insertedLog } = await supabase
+      .from('error_logs' as any)
+      .insert({
+        error_message: message,
+        severity: level,
+        environment: environment,
+        organization_id: (organizationId || organization_id || null) as string | null,
+        user_id: (userId || user_id || null) as string | null,
+        job_id: (jobId || job_id || null) as string | null,
+        job_type: (jobType || job_type || null) as string | null,
+        course_id: (courseId || course_id || null) as string | null,
+        lesson_id: (lessonId || lesson_id || null) as string | null,
+        request_id: (requestId || request_id || null) as string | null,
+        trpc_path: (trpcPath || trpc_path || null) as string | null,
+        trpc_input: sanitizedInput,
+        attempted_value: (attemptedValue || attempted_value || null) as string | null,
+        stack_trace: (stack || null) as string | null,
+        metadata: Object.keys(metadata).length > 0 ? metadata : null,
+      })
+      .select('id')
+      .single();
+
+    // Check if this error should be auto-muted
+    const logId = (insertedLog as unknown as { id: string } | null)?.id;
+    if (logId) {
+      await applyAutoMuteStatus(logId, message);
+    }
   } catch (dbError) {
-    // Silently fail - don't break the app if DB write fails
-    // The original log to console/Axiom will still work
-    baseLogger.debug({ dbError }, 'Failed to write log to error_logs table');
+    // Don't break the app if DB write fails, but log at WARN level for visibility
+    baseLogger.warn(
+      {
+        dbError,
+        errorType: dbError instanceof Error ? dbError.constructor.name : typeof dbError,
+      },
+      'Failed to write log to error_logs table - check database connection'
+    );
   }
 }
 

@@ -25,13 +25,6 @@ export const ENUM_SYNONYMS: Record<string, Record<string, string>> = {
     project_based: 'project-based',
   },
 
-  // teaching_style
-  teaching_style: {
-    hands_on: 'hands-on',
-    theory_first: 'theory-first',
-    project_based: 'project-based',
-  },
-
   // target_audience
   target_audience: {
     'entry-level': 'beginner',
@@ -43,6 +36,14 @@ export const ENUM_SYNONYMS: Record<string, Record<string, string>> = {
 
   // difficulty_level
   difficulty_level: {
+    easy: 'beginner',
+    medium: 'intermediate',
+    hard: 'advanced',
+    expert: 'advanced',
+  },
+
+  // difficulty (alias for difficulty_level - used in sections_breakdown)
+  difficulty: {
     easy: 'beginner',
     medium: 'intermediate',
     hard: 'advanced',

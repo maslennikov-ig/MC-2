@@ -311,6 +311,425 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.28.15] - 2026-01-20
+
+### Added
+
+- **web**: add 5 source file(s), update 8 source file(s), +1 more (5d225ae)
+- **create-course**: reorganize UI/UX for course creation form (f4d27e9)
+- **i18n**: add image generation translations for enrichments (19701aa)
+
+### Fixed
+
+- **docker**: add DOCLING_UPLOADS_BASE_PATH override for document processing (36e7af1)
+- **web**: fix type-check by excluding tests from tsconfig (85086bb)
+- **stage6**: add dedicated worker service and queue isolation for dev (2a87bc4)
+
+### Other
+
+- bd sync: 2026-01-20 11:33:31 (a352c32)
+- bd sync: 2026-01-20 11:32:59 (e6c89a8)
+- bd sync: 2026-01-20 11:30:47 (eb7c108)
+
+## [0.28.14] - 2026-01-20
+
+### Added
+
+- **image-gen**: add quality parameter for GPT-5 Image Mini cost optimization (41543af)
+- **stage6**: add person and case agreement grammar rules for Russian (0dc553b)
+
+### Fixed
+
+- **enrichments**: disable auto lesson card/cover generation (6d5f2e3)
+- **admin/logs**: fix status filter not working in flat view (0a7ab30)
+- **Stage4**: pass course_size via job data to avoid race condition (35f848d)
+- **Stage5**: use 'intermediate' as default difficulty instead of undefined (7a01fe8)
+- **skill**: dev server errors should be investigated, not bulk resolved (f1e4522)
+
+### Other
+
+- **course-gen-platform**: update 81 test(s) (306f6b1)
+- Revert "feat(image-gen): add quality parameter for GPT-5 Image Mini cost optimization" (12ea702)
+- bd sync: 2026-01-20 09:11:38 (082955a)
+- bd sync: 2026-01-20 08:53:14 (b574be8)
+- bd sync: 2026-01-20 08:47:41 (c00d8e8)
+- **skill**: add environment filtering to process-logs skill (3bc0103)
+- bd sync: 2026-01-20 08:43:30 (12047bf)
+- bd sync: 2026-01-19 22:07:55 (427cd88)
+- **deps**: update docling-mcp to >=1.3.3 (df4f144)
+
+## [0.28.14] - 2026-01-20
+
+### Added
+
+- **image-gen**: add quality parameter for GPT-5 Image Mini cost optimization (41543af)
+- **stage6**: add person and case agreement grammar rules for Russian (0dc553b)
+
+### Fixed
+
+- **admin/logs**: fix status filter not working in flat view (0a7ab30)
+- **Stage4**: pass course_size via job data to avoid race condition (35f848d)
+- **Stage5**: use 'intermediate' as default difficulty instead of undefined (7a01fe8)
+- **skill**: dev server errors should be investigated, not bulk resolved (f1e4522)
+
+### Other
+
+- Revert "feat(image-gen): add quality parameter for GPT-5 Image Mini cost optimization" (12ea702)
+- bd sync: 2026-01-20 09:11:38 (082955a)
+- bd sync: 2026-01-20 08:53:14 (b574be8)
+- bd sync: 2026-01-20 08:47:41 (c00d8e8)
+- **skill**: add environment filtering to process-logs skill (3bc0103)
+- bd sync: 2026-01-20 08:43:30 (12047bf)
+- bd sync: 2026-01-19 22:07:55 (427cd88)
+- **deps**: update docling-mcp to >=1.3.3 (df4f144)
+
+## [0.28.13] - 2026-01-19
+
+### Added
+
+- **stage6**: route auto-approval jobs to dedicated queue (08c5bdc)
+- **stage6**: activate dedicated queue with 30 concurrent workers (46ac12d)
+
+### Fixed
+
+- **orchestrator**: support snake_case in job cleanup logic (ddc663e)
+- **orchestrator**: support snake_case job data fields in queue-events-backup (f6e7383)
+- **orchestrator**: prevent attempts exceeding max_attempts constraint violation (7b66da1)
+
+### Other
+
+- bd sync: 2026-01-19 20:55:33 (3482258)
+- bd sync: 2026-01-19 20:16:44 (1f81652)
+- bd sync: 2026-01-19 20:00:55 (3469b3c)
+- bd sync: 2026-01-19 20:00:36 (01699f2)
+- bd sync: 2026-01-19 19:57:57 (5ff6918)
+
+## [0.28.12] - 2026-01-19
+
+### Added
+
+- **course-gen-platform**: add 1 source file(s), update docs (12d1b16)
+- **stage5**: dynamic min/max lessons validation from course_size presets (eb47b3a)
+
+### Fixed
+
+- **stage2**: add hardcoded fallback for model config in Phase 6 (3eee06f)
+- **stage2**: store fallback processed_content on summarization failure (7c1edf4)
+- **auto-approval**: correct FSM transitions for automatic mode (ded56e3)
+- **course-size**: remove hardcoded min 10 lessons from CourseStructureSchema (eadb0c8)
+- **auto-approval**: correct status suffix for all stages + release locks early (21e7f2b)
+- **stage2**: handle SandboxedJob missing getState() method (1fe074f)
+- **phase-2**: respect course_size preset constraints (MICRO/MINI/COMPACT) (e1efdc1)
+- **docling**: transform local paths to container paths for Docker (aa647dc)
+
+### Other
+
+- bd sync: 2026-01-19 19:53:34 (865e208)
+- bd sync: 2026-01-19 19:53:08 (765989c)
+- bd sync: 2026-01-19 16:58:41 (99a56aa)
+- bd sync: 2026-01-19 16:53:56 (eead28b)
+- **stage5**: add unit tests for MinimumLessonsValidator (70875b9)
+- bd sync: 2026-01-19 16:34:15 (be14505)
+- bd sync: 2026-01-19 16:33:38 (d017d79)
+- bd sync: 2026-01-19 14:41:24 (4710644)
+- bd sync: 2026-01-19 14:41:08 (01c7a53)
+
+## [0.28.11] - 2026-01-19
+
+### Added
+
+- **course-gen-platform**: add 1 source file(s), update 2 source file(s) (4a72f07)
+
+### Fixed
+
+- **stage4**: respect course_size constraints for MICRO/MINI/COMPACT (mc2-usg3) (299c5b3)
+- **pipeline**: comprehensive Stage 5 retry and placeholder handling (9ced45b)
+
+### Other
+
+- bd sync: 2026-01-19 13:38:09 (e61aa86)
+- bd sync: 2026-01-19 13:35:18 (0bafd9a)
+- bd sync: 2026-01-19 13:25:26 (9f3a586)
+- bd sync: 2026-01-19 13:21:02 (0c4388c)
+
+## [0.28.10] - 2026-01-19
+
+### Added
+
+- **course-gen-platform**: add 1 source file(s), update 8 source file(s), +3 more (8dc939b)
+- **stage5**: remove redundant fields to save ~10K-15K tokens per course (4988cee)
+- **stage5**: add auto-approval support for automatic generation mode (e437736)
+- **course-gen**: add E2E test for automatic mode express generation (ba506e4)
+- **auto-approval**: add case 6 for Stage 6 lesson content generation (7a8c844)
+- **processor**: add bundle monitoring, health check, and docs (615e266)
+- **logger**: add auto-mute rules for job lifecycle warnings (3b584f8)
+
+### Changed
+
+- **stage4**: remove conflicting pedagogical_strategy fields (162feab)
+- **stage4-5**: eliminate over-engineering and fix bugs (9d91a7b)
+- **stage4**: parallelize Phase 3 and Phase 6 execution (4bdc25e)
+
+### Fixed
+
+- **stage5**: update JSDoc and fix test import path (4246db8)
+- **stage4**: remove conflicting pedagogical_strategy fields from Phase 3 (aa8cfe1)
+- **auto-approval**: address code review issues CR-001 through CR-015 (5631bf7)
+- **course-gen**: repair JSON parsing and validation failures (f848f29)
+- **auto-approval**: add two-step FSM transition for automatic mode (b833f2f)
+- **web**: image loader width param and logo aspect ratio (4ebd5a1)
+- **processor**: bundle with tsup for BullMQ ESM compatibility (59527e4)
+- **deploy**: add orphan container cleanup before dev deploy (5c8bdf7)
+- **logs**: return status from RPC to fix filter mismatch (7fa1955)
+- **processor**: add missing .js extension to error-service import (5bc28ab)
+
+### Other
+
+- bd sync: 2026-01-19 09:37:34 (28ac21a)
+- bd sync: 2026-01-19 09:35:00 (808bb5e)
+- bd sync: 2026-01-19 09:09:45 (f53fd5e)
+- bd sync: 2026-01-19 08:41:34 (030e2e6)
+- bd sync: 2026-01-19 08:41:20 (8d5a16b)
+- bd sync: 2026-01-19 08:33:04 (3b1f048)
+- bd sync: 2026-01-19 08:21:31 (cbe291e)
+- bd sync: 2026-01-19 08:16:15 (addc1f3)
+- bd sync: 2026-01-19 08:01:04 (af782cb)
+- bd sync: 2026-01-18 22:36:49 (620ea79)
+- bd sync: 2026-01-18 22:36:31 (bd4c3ce)
+- bd sync: 2026-01-18 21:43:28 (20ecdf0)
+- bd sync: 2026-01-18 21:36:25 (949b4c9)
+- bd sync: 2026-01-18 21:05:54 (f5d8896)
+- bd sync: 2026-01-18 20:55:42 (7dfe20e)
+- bd sync: 2026-01-18 20:45:56 (ef1cad8)
+- **processor**: add integration tests and bundle analysis (a029d20)
+- bd sync: 2026-01-18 20:39:24 (7855416)
+- bd sync: 2026-01-18 20:12:34 (917a07b)
+- bd sync: 2026-01-18 20:11:24 (886cde6)
+- trigger deploy after Docker cleanup (118fd17)
+- bd sync: 2026-01-18 19:15:59 (4631701)
+- bd sync: 2026-01-18 19:03:12 (1a56b1a)
+- bd sync: 2026-01-18 19:00:34 (828f49a)
+- bd sync: 2026-01-18 18:58:16 (d3b5ac4)
+- bd sync: 2026-01-18 18:54:18 (aeba136)
+
+## [0.28.9] - 2026-01-18
+
+### Added
+
+- add 1 agent(s) (2151956)
+
+### Fixed
+
+- **Stage5**: validate style against enum before Zod validation (ce21433)
+- **Stage5**: handle null DB fields in frontend_parameters validation (e8b79c6)
+
+### Other
+
+- bd sync: 2026-01-18 12:46:32 (b37edb2)
+- bd sync: 2026-01-18 12:44:51 (e3dd93f)
+- bd sync: 2026-01-18 12:05:33 (1284709)
+- **deploy**: increase deploy-dev timeout to 20 minutes (382b0dc)
+- bd sync: 2026-01-18 11:19:44 (6a0795e)
+- bd sync: 2026-01-18 11:18:17 (d712f16)
+- bd sync: 2026-01-18 11:17:08 (c6e78b3)
+
+## [0.28.8] - 2026-01-18
+
+### Added
+
+- **GenerationProgress**: auto-start generation in automatic mode (e574d05)
+- **generation**: merge automatic and semi-automatic control panels into unified MissionControlBanner (d0b5d19)
+
+### Fixed
+
+- **GenerationProgress**: pause/resume now updates UI in real-time (00fe5fd)
+- **GraphHeader**: show fingerprint button with courseId fallback when generationCode is null (f94e667)
+- **MissionControlBanner**: address code review P1-P2 issues (2721e94)
+- **worker**: log errors to DB inside sandbox before stack trace is lost (6ee2a5d)
+
+### Other
+
+- update project files (e7a3c0f)
+- bd sync: 2026-01-18 10:13:47 (0a61c99)
+- bd sync: 2026-01-18 09:56:01 (f02d043)
+- bd sync: 2026-01-18 09:55:42 (967e274)
+- bd sync: 2026-01-17 21:17:32 (bbca538)
+- bd sync: 2026-01-17 21:14:33 (e8eff22)
+- bd sync: 2026-01-17 21:01:40 (af48ca0)
+- bd sync: 2026-01-17 20:52:37 (024ec73)
+
+## [0.28.7] - 2026-01-17
+
+### Fixed
+
+- **admin-logs**: list view now considers fingerprint-based status (1a9aa88)
+- **web**: prevent profile learning_style from overriding user's form selection (6aecc35)
+
+### Other
+
+- update project files (9e559b3)
+- bd sync: 2026-01-17 18:12:35 (d526e32)
+
+## [0.28.6] - 2026-01-17
+
+### Added
+
+- **course-viewer**: add deep-linking, breadcrumbs, and server progress sync (585d07d)
+- **orchestrator**: add processor health check, TTL timeout, and Stage 6 JobResult wrapper (deb6c0e)
+
+### Fixed
+
+- **web**: update 2 source file(s) (5f9543c)
+- **logger**: use upsert for duplicate problem_id in error logging (d4591fa)
+- **processor**: resolve ESM directory import error in sandboxed processor (53666ca)
+- **course-viewer**: complete remaining code review fixes CR-005 through CR-022 (60c1f29)
+- **course-viewer**: address code review issues CR-001 through CR-018 (7495849)
+- **a11y**: add ARIA labels and null checks to BreadcrumbNav (67111bb)
+- **orchestrator**: improve sandboxed processor type safety and reliability (70a796c)
+
+### Other
+
+- bd sync: 2026-01-17 17:23:56 (ea31f03)
+- bd sync: 2026-01-17 16:43:04 (2c9eb02)
+- bd sync: 2026-01-17 13:22:01 (d358125)
+- bd sync: 2026-01-17 11:24:30 (a0094e1)
+- bd sync: 2026-01-17 11:21:28 (3dad75d)
+- bd sync: close CR-005 through CR-022 tasks (68f9435)
+- add code review report for course-viewer improvements (82f7a45)
+- bd sync: 2026-01-17 09:47:58 (0b26b11)
+- bd sync: 2026-01-17 09:33:22 (b0a1f8d)
+- bd sync: 2026-01-17 09:25:41 (811b69b)
+- bd sync: 2026-01-17 09:11:46 (c816e58)
+
+## [0.28.5] - 2026-01-17
+
+### Added
+
+- **course-gen-platform**: add 1 source file(s), update 1 source file(s) (15359e4)
+
+### Fixed
+
+- **web**: allow micro course size in validation schema (c930e76)
+
+### Other
+
+- bd sync: 2026-01-17 09:09:53 (855c505)
+
+## [0.28.4] - 2026-01-17
+
+### Added
+
+- **ui**: add missing user settings to Stage 1 Input Tab (6c24b97)
+- **export**: implement module lessons export as Markdown (2c36776)
+- **db**: add trigger to auto-sync fingerprint in log_issue_status (0a7679e)
+
+### Changed
+
+- **ui**: DRY Stage2Group with utility functions + accessibility (ed1a1d4)
+- code quality improvements from review (P2.4, P3.2-P3.6) (0e2bec4)
+- **logging**: address code review findings for auto_muted (fb0d96d)
+
+### Fixed
+
+- **course-gen-platform**: update 3 source file(s), update 1 agent(s), +3 more (bccdfb4)
+- **types**: add type casts in NodeDetailsDrawer for Stage props (0498f9b)
+- **generation**: save generation_mode from form + display writing style on Stage 4 (b5d695d)
+- **ui**: complete Stage2Group skipped styling from code review (65f4e64)
+- **ui**: add strikethrough style to Stage2Group when skipped (722faa5)
+- **export**: security and performance improvements from code review (c9c1cba)
+- **ui**: resolve single-click/double-click UX conflict in ModuleGroup (4eeab94)
+- add concurrency limiter for Jina API and job.name validation (087fbda)
+- **stage5**: remove partial-regen layer and add lock cleanup (b2b1a77)
+- **stage5**: prevent infinite retry loop and fix validation errors (5cbfccc)
+
+### Other
+
+- bd sync: 2026-01-17 08:24:06 (089dce5)
+- bd sync: 2026-01-17 08:15:57 (3887e14)
+- bd sync: 2026-01-17 08:06:39 (d01e493)
+- bd sync: 2026-01-17 08:00:58 (ff4b0fb)
+- bd sync: 2026-01-17 07:50:09 (34455ad)
+- bd sync: 2026-01-16 21:49:24 (694cff0)
+- bd sync: 2026-01-16 21:46:31 (b4505a8)
+- bd sync: 2026-01-16 21:33:15 (e9f715f)
+- bd sync: 2026-01-16 20:39:35 (a34c7d1)
+- bd sync: 2026-01-16 18:52:14 (6af452c)
+- bd sync: 2026-01-16 18:07:11 (367abf2)
+- **skill**: update process-logs to check both error_logs and generation_trace (42598fd)
+- bd sync: 2026-01-16 17:21:03 (bda4576)
+- bd sync: 2026-01-16 17:18:32 (735fbef)
+- bd sync: 2026-01-16 17:05:15 (9111962)
+- bd sync: 2026-01-16 16:45:52 (481e8de)
+- bd sync: 2026-01-16 16:45:07 (e03e2bd)
+- bd sync: 2026-01-16 16:42:38 (2036092)
+- **skill**: sync process-logs SKILL.md with auto-mute rules (e769af1)
+- bd sync: 2026-01-16 16:24:08 (1d4a657)
+- bd sync: 2026-01-16 16:22:55 (49cd4e2)
+- **logging**: add performance optimization strategy and docs sync test (6dea902)
+
+## [0.28.3] - 2026-01-16
+
+### Added
+
+- **logging**: add auto_muted status for expected errors (922ec20)
+- **lesson-approval**: add migration and tests for batch approval RPC (20dd213)
+- **stage4**: add course_description and learning_outcomes to analysis input (16d9817)
+- **admin**: add error log grouping by fingerprint (1eced9b)
+- **generation**: добавить difficulty в Stage 5 FrontendParameters (36c7766)
+- **enrichments**: add optimistic UI + improve error messages (5068594)
+- **pipeline**: add language support to Stage 4-5 model selection (aba14e4)
+- **logs**: add full-text search for similar problems v1.5.0 (38a894e)
+
+### Changed
+
+- **stage4**: remove unused answers field (afff891)
+- **target_audience**: unify data source to courses.target_audience column (84cc1f5)
+- **llm**: add actualLanguage tracking, LanguageCode type, language detection (7db570d)
+
+### Fixed
+
+- **shared-types**: update 4 source file(s), update 1 agent(s), +2 more (5e3b89c)
+- **logs**: implement server-side grouping with RPC + code review fixes (d8125d7)
+- **stage4**: use actual target_audience from DB instead of hardcoded value (4235f29)
+- **generation**: передавать course_size и description в Input стадии 5 (782482a)
+- **logs**: improve PostgrestError logging with full error details (b647a80)
+- **web**: navigation sheet not working in fullscreen mode (c906dfb)
+- **enrichment**: address code review issues #5-#7 (91ac950)
+- **enrichments**: address code review findings (1af32e4)
+- **web**: cleanup unused type and debug comment in EnrichmentsPanel refactoring (55be3e3)
+
+### Other
+
+- bd sync: 2026-01-16 15:56:44 (1b6e087)
+- bd sync: 2026-01-16 15:54:13 (5ed0655)
+- **logging**: verify auto_muted implementation end-to-end (7755348)
+- bd sync: 2026-01-16 15:45:39 (e9462e0)
+- bd sync: 2026-01-16 15:43:00 (b586e58)
+- bd sync: 2026-01-16 15:41:33 (55317b9)
+- bd sync: 2026-01-16 15:26:36 (1b40f56)
+- bd sync: 2026-01-16 13:23:26 (13f1de7)
+- bd sync: 2026-01-16 13:21:42 (4c7c9ea)
+- bd sync: 2026-01-16 13:18:38 (485538e)
+- bd sync: 2026-01-16 13:17:59 (b64e009)
+- bd sync: 2026-01-16 13:02:42 (d86e8a0)
+- bd sync: 2026-01-16 12:54:53 (17890f3)
+- bd sync: 2026-01-16 12:45:54 (cf165d8)
+- bd sync: 2026-01-16 12:29:13 (2d6399e)
+- bd sync: 2026-01-16 12:28:16 (6c9ee6c)
+- merge develop into master (d8f962d)
+- bd sync: 2026-01-16 11:42:59 (615a9e0)
+- bd sync: 2026-01-15 21:23:56 (97c4702)
+- bd sync: 2026-01-15 20:43:31 (77c55b9)
+- bd sync: 2026-01-15 20:42:27 (01f0503)
+- bd sync: 2026-01-15 19:59:47 (15bce39)
+- bd sync: 2026-01-15 19:59:42 (45f5c94)
+- bd sync: 2026-01-15 19:57:21 (f75692f)
+- **web**: split EnrichmentsPanel into smaller modules (06d68dd)
+- merge develop into master (0bc0cc5)
+- **skills**: add log notes requirements to process-logs v1.4.0 (2e8dd60)
+- merge develop into master (de354d6)
+- merge develop into master (48b5614)
+
 ## [0.28.2] - 2026-01-15
 
 ### Added

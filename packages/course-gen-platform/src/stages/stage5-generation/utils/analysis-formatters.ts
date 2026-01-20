@@ -22,9 +22,7 @@ import type { AnalysisResult } from '@megacampus/shared-types/generation-job';
  * // Output: "Professional (95% confidence)\nReasoning: This course teaches..."
  * ```
  */
-export function formatCourseCategoryForPrompt(
-  category: AnalysisResult['course_category']
-): string {
+export function formatCourseCategoryForPrompt(category: AnalysisResult['course_category']): string {
   const primaryLine = `${capitalize(category.primary)} (${Math.round(category.confidence * 100)}% confidence)`;
   const reasoningLine = `Reasoning: ${category.reasoning}`;
 
@@ -39,37 +37,37 @@ export function formatCourseCategoryForPrompt(
 /**
  * Format contextual_language object for LLM prompt
  *
+ * DEPRECATED: This field is no longer generated in new analysis results.
+ * This function is kept for backward compatibility with legacy data.
+ *
  * Supports 3 strategies:
  * - 'full': All 6 fields with headers (most verbose)
  * - 'summary': Concatenated single paragraph (most concise)
  * - 'specific': Only requested fields (targeted)
  *
- * @param contextual - Contextual language object from AnalysisResult
+ * @param contextual - Contextual language object from AnalysisResult (optional)
  * @param strategy - Formatting strategy (default: 'full')
  * @param specificFields - Fields to include when strategy='specific'
- * @returns Formatted contextual language string
+ * @returns Formatted contextual language string, or empty string if not provided
  *
  * @example
  * ```typescript
- * // Full format
+ * // Full format (legacy data)
  * const full = formatContextualLanguageForPrompt(analysis.contextual_language);
  *
- * // Summary format
- * const summary = formatContextualLanguageForPrompt(analysis.contextual_language, 'summary');
- *
- * // Specific fields
- * const specific = formatContextualLanguageForPrompt(
- *   analysis.contextual_language,
- *   'specific',
- *   ['why_matters_context', 'motivators']
- * );
+ * // New data (no contextual_language)
+ * const empty = formatContextualLanguageForPrompt(undefined); // Returns ''
  * ```
  */
 export function formatContextualLanguageForPrompt(
   contextual: AnalysisResult['contextual_language'],
   strategy: 'full' | 'summary' | 'specific' = 'full',
-  specificFields?: Array<keyof AnalysisResult['contextual_language']>
+  specificFields?: Array<keyof NonNullable<AnalysisResult['contextual_language']>>
 ): string {
+  // Handle optional field (new analysis results don't have this)
+  if (!contextual) {
+    return '';
+  }
   if (strategy === 'summary') {
     // Concatenate all fields into single paragraph
     return [
@@ -85,8 +83,10 @@ export function formatContextualLanguageForPrompt(
   if (strategy === 'specific' && specificFields && specificFields.length > 0) {
     // Only include requested fields
     return specificFields
-      .map((field) => {
-        const label = String(field).replace(/_/g, ' ').replace(/\b\w/g, (l: string) => l.toUpperCase());
+      .map(field => {
+        const label = String(field)
+          .replace(/_/g, ' ')
+          .replace(/\b\w/g, (l: string) => l.toUpperCase());
         return `${label}: ${contextual[field]}`;
       })
       .join('\n\n');
@@ -109,23 +109,23 @@ Practical Benefit Focus: ${contextual.practical_benefit_focus}`;
 /**
  * Format pedagogical_strategy object for LLM prompt
  *
+ * Note: teaching_style, practical_focus, interactivity_level removed to avoid
+ * conflict with user-selected style from frontend.
+ *
  * @param strategy - Pedagogical strategy object from AnalysisResult
- * @returns Formatted string with all 5 strategy fields
+ * @returns Formatted string with 2 strategy fields (assessment_approach, progression_logic)
  *
  * @example
  * ```typescript
  * const formatted = formatPedagogicalStrategyForPrompt(analysis.pedagogical_strategy);
- * // Output: "Teaching Style: hands-on\nAssessment Approach: ..."
+ * // Output: "Assessment Approach: ...\nProgression Logic: ..."
  * ```
  */
 export function formatPedagogicalStrategyForPrompt(
   strategy: AnalysisResult['pedagogical_strategy']
 ): string {
-  return `Teaching Style: ${strategy.teaching_style}
-Assessment Approach: ${strategy.assessment_approach}
-Practical Focus: ${strategy.practical_focus}
-Progression Logic: ${strategy.progression_logic}
-Interactivity Level: ${strategy.interactivity_level}`;
+  return `Assessment Approach: ${strategy.assessment_approach}
+Progression Logic: ${strategy.progression_logic}`;
 }
 
 /**
@@ -177,7 +177,9 @@ export function formatGenerationGuidanceForPrompt(
 
   // Specific analogies (REQUIRED field)
   if (guidance.specific_analogies && guidance.specific_analogies.length > 0) {
-    lines.push(`Specific Analogies:\n${guidance.specific_analogies.map((a: string) => `  - ${a}`).join('\n')}`);
+    lines.push(
+      `Specific Analogies:\n${guidance.specific_analogies.map((a: string) => `  - ${a}`).join('\n')}`
+    );
   } else {
     lines.push('Specific Analogies: None provided');
   }
@@ -189,7 +191,9 @@ export function formatGenerationGuidanceForPrompt(
 
   // Real world examples (REQUIRED field)
   if (guidance.real_world_examples && guidance.real_world_examples.length > 0) {
-    lines.push(`Real World Examples:\n${guidance.real_world_examples.map((ex: string) => `  - ${ex}`).join('\n')}`);
+    lines.push(
+      `Real World Examples:\n${guidance.real_world_examples.map((ex: string) => `  - ${ex}`).join('\n')}`
+    );
   } else {
     lines.push('Real World Examples: None provided');
   }

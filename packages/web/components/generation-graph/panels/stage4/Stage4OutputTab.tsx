@@ -1,9 +1,9 @@
-'use client';
+'use client'
 
-import React, { memo, useMemo } from 'react';
-import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
-import { cn } from '@/lib/utils';
+import React, { memo, useMemo } from 'react'
+import { Card, CardContent } from '@/components/ui/card'
+import { Badge } from '@/components/ui/badge'
+import { cn } from '@/lib/utils'
 import {
   Briefcase,
   Heart,
@@ -13,15 +13,16 @@ import {
   GraduationCap,
   BookOpen,
   Clock,
-  Layers,
   Loader2,
-} from 'lucide-react';
-import { GRAPH_TRANSLATIONS } from '@/lib/generation-graph/translations';
-import { AnalysisResultView } from '../output/AnalysisResultView';
-import { VisualStylePreview } from './VisualStylePreview';
-import { useStaticGraph } from '../../contexts/StaticGraphContext';
-import type { Stage4OutputTabProps, AnalysisHeroProps } from './types';
-import type { AnalysisResult } from '@megacampus/shared-types';
+  Pen,
+} from 'lucide-react'
+import { GRAPH_TRANSLATIONS } from '@/lib/generation-graph/translations'
+import { AnalysisResultView } from '../output/AnalysisResultView'
+import { VisualStylePreview } from './VisualStylePreview'
+import { useStaticGraph } from '../../contexts/StaticGraphContext'
+import type { Stage4OutputTabProps, AnalysisHeroProps } from './types'
+import type { AnalysisResult } from '@megacampus/shared-types'
+import { getLearningStyleTitle } from '@/lib/constants/learning-styles'
 
 // ============================================================================
 // CATEGORY ICON MAPPING
@@ -37,15 +38,15 @@ const CATEGORY_ICONS: Record<
   hobby: Gamepad2,
   spiritual: Sparkles,
   academic: GraduationCap,
-};
+}
 
 // ============================================================================
 // TYPE GUARDS
 // ============================================================================
 
 function isAnalysisResult(data: unknown): data is AnalysisResult {
-  if (!data || typeof data !== 'object') return false;
-  const d = data as Record<string, unknown>;
+  if (!data || typeof data !== 'object') return false
+  const d = data as Record<string, unknown>
   return (
     typeof d.course_category === 'object' &&
     d.course_category !== null &&
@@ -54,7 +55,7 @@ function isAnalysisResult(data: unknown): data is AnalysisResult {
     d.recommended_structure !== null &&
     typeof d.pedagogical_strategy === 'object' &&
     d.pedagogical_strategy !== null
-  );
+  )
 }
 
 // ============================================================================
@@ -77,34 +78,27 @@ const AnalysisHero = memo<AnalysisHeroProps>(function AnalysisHero({
   totalLessons,
   totalSections: _totalSections, // Available for future use (e.g., modules count display)
   lessonDuration,
-  teachingStyle,
+  writingStyle,
   locale = 'ru',
 }) {
-  const t = GRAPH_TRANSLATIONS.stage4 as Record<string, { ru: string; en: string }>;
+  const t = GRAPH_TRANSLATIONS.stage4 as Record<string, { ru: string; en: string }>
 
   // Get category icon
   const CategoryIcon =
-    CATEGORY_ICONS[category as AnalysisResult['course_category']['primary']] || GraduationCap;
+    CATEGORY_ICONS[category as AnalysisResult['course_category']['primary']] || GraduationCap
 
   // Get translated category name
-  const categoryTranslationKey = `category${category.charAt(0).toUpperCase()}${category.slice(1)}` as keyof typeof t;
-  const categoryName = t[categoryTranslationKey]?.[locale] ?? category;
-
-  // Get translated teaching style
-  const styleKey = `style${teachingStyle
-    .split('-')
-    .map((s) => s.charAt(0).toUpperCase() + s.slice(1))
-    .join('')}` as keyof typeof t;
-  const styleName = t[styleKey]?.[locale] ?? teachingStyle;
+  const categoryTranslationKey = `category${category.charAt(0).toUpperCase()}${category.slice(1)}`
+  const categoryName = t[categoryTranslationKey]?.[locale] ?? category
 
   // Calculate approximate total duration in hours
-  const totalMinutes = totalLessons * lessonDuration;
-  const hours = Math.floor(totalMinutes / 60);
-  const minutes = totalMinutes % 60;
+  const totalMinutes = totalLessons * lessonDuration
+  const hours = Math.floor(totalMinutes / 60)
+  const minutes = totalMinutes % 60
   const durationDisplay =
     hours > 0
       ? `~${hours}${t.hoursShort?.[locale] ?? 'h'}${minutes > 0 ? ` ${minutes}${t.minutesShort?.[locale] ?? 'min'}` : ''}`
-      : `~${minutes}${t.minutesShort?.[locale] ?? 'min'}`;
+      : `~${minutes}${t.minutesShort?.[locale] ?? 'min'}`
 
   return (
     <Card
@@ -115,12 +109,12 @@ const AnalysisHero = memo<AnalysisHeroProps>(function AnalysisHero({
       )}
     >
       <CardContent className="p-4">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           {/* Left: Category + Confidence */}
           <div className="flex items-center gap-3">
             <div
               className={cn(
-                'flex items-center justify-center w-12 h-12 rounded-xl',
+                'flex h-12 w-12 items-center justify-center rounded-xl',
                 'bg-violet-100 dark:bg-violet-900/40',
                 'text-violet-600 dark:text-violet-400'
               )}
@@ -146,15 +140,15 @@ const AnalysisHero = memo<AnalysisHeroProps>(function AnalysisHero({
           </div>
 
           {/* Right: Stats Grid */}
-          <div className="grid grid-cols-3 gap-4 sm:gap-6">
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 sm:gap-6">
             {/* Lessons */}
             <div className="flex items-center gap-2">
-              <BookOpen className="h-4 w-4 text-violet-500 dark:text-violet-400 shrink-0" />
+              <BookOpen className="h-4 w-4 shrink-0 text-violet-500 dark:text-violet-400" />
               <div className="min-w-0">
                 <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">
                   {totalLessons}
                 </div>
-                <div className="text-xs text-slate-500 dark:text-slate-400 truncate">
+                <div className="truncate text-xs text-slate-500 dark:text-slate-400">
                   {t.lessonsLabel?.[locale] ?? 'Lessons'}
                 </div>
               </div>
@@ -162,38 +156,40 @@ const AnalysisHero = memo<AnalysisHeroProps>(function AnalysisHero({
 
             {/* Duration */}
             <div className="flex items-center gap-2">
-              <Clock className="h-4 w-4 text-violet-500 dark:text-violet-400 shrink-0" />
+              <Clock className="h-4 w-4 shrink-0 text-violet-500 dark:text-violet-400" />
               <div className="min-w-0">
                 <div className="text-lg font-semibold text-slate-900 dark:text-slate-100">
                   {durationDisplay}
                 </div>
-                <div className="text-xs text-slate-500 dark:text-slate-400 truncate">
+                <div className="truncate text-xs text-slate-500 dark:text-slate-400">
                   {t.durationLabel?.[locale] ?? 'Duration'}
                 </div>
               </div>
             </div>
 
-            {/* Style */}
-            <div className="flex items-center gap-2">
-              <Layers className="h-4 w-4 text-violet-500 dark:text-violet-400 shrink-0" />
-              <div className="min-w-0">
-                <div
-                  className="text-sm font-semibold text-slate-900 dark:text-slate-100 truncate"
-                  title={styleName}
-                >
-                  {styleName}
-                </div>
-                <div className="text-xs text-slate-500 dark:text-slate-400 truncate">
-                  {t.teachingStyle?.[locale] ?? 'Style'}
+            {/* Writing Style */}
+            {writingStyle && (
+              <div className="flex items-center gap-2">
+                <Pen className="h-4 w-4 shrink-0 text-violet-500 dark:text-violet-400" />
+                <div className="min-w-0">
+                  <div
+                    className="truncate text-sm font-semibold text-slate-900 dark:text-slate-100"
+                    title={getLearningStyleTitle(writingStyle)}
+                  >
+                    {getLearningStyleTitle(writingStyle)}
+                  </div>
+                  <div className="truncate text-xs text-slate-500 dark:text-slate-400">
+                    {t.writingStyleLabel?.[locale] ?? 'Стиль текста'}
+                  </div>
                 </div>
               </div>
-            </div>
+            )}
           </div>
         </div>
       </CardContent>
     </Card>
-  );
-});
+  )
+})
 
 // ============================================================================
 // MAIN COMPONENT
@@ -218,23 +214,24 @@ export const Stage4OutputTab = memo<Stage4OutputTabProps>(function Stage4OutputT
   locale = 'ru',
   onApproved: _onApproved, // Reserved for future use (approval handled by parent)
 }) {
-  const t = GRAPH_TRANSLATIONS.stage4 as Record<string, { ru: string; en: string }>;
+  const t = GRAPH_TRANSLATIONS.stage4 as Record<string, { ru: string; en: string }>
 
-  // Get visual style from context (generated in Stage 4, stored in courses.visual_style)
-  const { courseInfo } = useStaticGraph();
-  const visualStyle = courseInfo.visualStyle;
+  // Get visual style and writing style from context
+  const { courseInfo } = useStaticGraph()
+  const visualStyle = courseInfo.visualStyle
+  const writingStyle = courseInfo.courseStyle
 
   // Parse output data as AnalysisResult
   const analysisResult = useMemo((): AnalysisResult | null => {
     if (isAnalysisResult(outputData)) {
-      return outputData;
+      return outputData
     }
-    return null;
-  }, [outputData]);
+    return null
+  }, [outputData])
 
   // Extract hero data from analysis result
   const heroData = useMemo(() => {
-    if (!analysisResult) return null;
+    if (!analysisResult) return null
 
     // Check all required fields exist
     if (
@@ -242,10 +239,9 @@ export const Stage4OutputTab = memo<Stage4OutputTabProps>(function Stage4OutputT
       typeof analysisResult.course_category?.confidence !== 'number' ||
       !analysisResult.recommended_structure?.total_lessons ||
       !analysisResult.recommended_structure?.total_sections ||
-      !analysisResult.recommended_structure?.lesson_duration_minutes ||
-      !analysisResult.pedagogical_strategy?.teaching_style
+      !analysisResult.recommended_structure?.lesson_duration_minutes
     ) {
-      return null;
+      return null
     }
 
     return {
@@ -254,20 +250,19 @@ export const Stage4OutputTab = memo<Stage4OutputTabProps>(function Stage4OutputT
       totalLessons: analysisResult.recommended_structure.total_lessons,
       totalSections: analysisResult.recommended_structure.total_sections,
       lessonDuration: analysisResult.recommended_structure.lesson_duration_minutes,
-      teachingStyle: analysisResult.pedagogical_strategy.teaching_style,
-    };
-  }, [analysisResult]);
+    }
+  }, [analysisResult])
 
   // Loading state - no data yet
   if (!analysisResult) {
     return (
       <div className="flex flex-col items-center justify-center p-8 text-center">
-        <Loader2 className="h-8 w-8 animate-spin text-violet-500 mb-4" />
-        <p className="text-sm text-muted-foreground">
+        <Loader2 className="mb-4 h-8 w-8 animate-spin text-violet-500" />
+        <p className="text-muted-foreground text-sm">
           {t.emptyOutput?.[locale] ?? 'Analysis results will appear here'}
         </p>
       </div>
-    );
+    )
   }
 
   return (
@@ -280,15 +275,13 @@ export const Stage4OutputTab = memo<Stage4OutputTabProps>(function Stage4OutputT
           totalLessons={heroData.totalLessons}
           totalSections={heroData.totalSections}
           lessonDuration={heroData.lessonDuration}
-          teachingStyle={heroData.teachingStyle}
+          writingStyle={writingStyle}
           locale={locale}
         />
       )}
 
       {/* Visual Style Preview - only show if visual style data is available */}
-      {visualStyle && (
-        <VisualStylePreview visualStyle={visualStyle} locale={locale} />
-      )}
+      {visualStyle && <VisualStylePreview visualStyle={visualStyle} locale={locale} />}
 
       {/* Detailed Analysis View */}
       <AnalysisResultView
@@ -300,7 +293,7 @@ export const Stage4OutputTab = memo<Stage4OutputTabProps>(function Stage4OutputT
         readOnly={readOnly}
       />
     </div>
-  );
-});
+  )
+})
 
-export default Stage4OutputTab;
+export default Stage4OutputTab

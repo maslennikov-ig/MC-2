@@ -8,7 +8,7 @@
  */
 
 import React from 'react'
-import { Target, BookOpen, Gauge, Palette, PenLine } from 'lucide-react'
+import { Target, BookOpen, Gauge, PenLine } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
@@ -28,7 +28,6 @@ export function BlueprintPreview({
   const lessonsLabel = tAnalysis?.totalLessons?.[locale] ?? 'Lessons'
   const complexityLabel = tAnalysis?.complexity?.[locale] ?? 'Complexity'
   const contentStyleLabel = tAnalysis?.contentStyle?.[locale] ?? 'Content Style'
-  const teachingStyleLabel = tAnalysis?.teachingStyle?.[locale] ?? 'Teaching Style'
 
   // Format confidence percentage
   const confidencePercent = Math.round(analysisResult.confidence * 100)
@@ -107,17 +106,6 @@ export function BlueprintPreview({
               </div>
             </div>
           )}
-
-          {/* Teaching style (LLM analysis) */}
-          <div className="flex min-w-[160px] items-center gap-2">
-            <div className="rounded bg-orange-50 p-1.5 dark:bg-orange-950/20">
-              <Palette className="h-3.5 w-3.5 text-orange-600 dark:text-orange-400" />
-            </div>
-            <div>
-              <div className="text-muted-foreground text-xs">{teachingStyleLabel}</div>
-              <div className="text-sm font-medium capitalize">{analysisResult.teachingStyle}</div>
-            </div>
-          </div>
         </div>
 
         {/* Course title (secondary row) */}

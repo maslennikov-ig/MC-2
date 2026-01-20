@@ -51,11 +51,8 @@ const mockAnalysisResult: AnalysisResult = {
     sections_breakdown: [],
   },
   pedagogical_strategy: {
-    teaching_style: 'hands-on',
     assessment_approach: 'Project-based',
-    practical_focus: 'high',
     progression_logic: 'Incremental complexity',
-    interactivity_level: 'high',
   },
   pedagogical_patterns: {
     primary_strategy: 'problem-based learning',
@@ -310,7 +307,9 @@ describe('assembleContext - Atomic Tier', () => {
     });
 
     expect(result.targetContent).toBe('Introduction to TypeScript');
-    expect(result.surroundingContext).toContain('<target_field path="topic_analysis.determined_topic">');
+    expect(result.surroundingContext).toContain(
+      '<target_field path="topic_analysis.determined_topic">'
+    );
     expect(result.metadata.tier).toBe('atomic');
     expect(result.metadata.blocksIncluded).toContain('topic_analysis.determined_topic');
     expect(result.tokenEstimate).toBeGreaterThan(0);
@@ -345,7 +344,9 @@ describe('assembleContext - Local Tier', () => {
 
     expect(result.targetContent).toBe('Introduction to TypeScript');
     expect(result.surroundingContext).toContain('<parent_object path="topic_analysis">');
-    expect(result.surroundingContext).toContain('<target_field path="topic_analysis.determined_topic">');
+    expect(result.surroundingContext).toContain(
+      '<target_field path="topic_analysis.determined_topic">'
+    );
     expect(result.metadata.blocksIncluded).toContain('topic_analysis.determined_topic');
     expect(result.metadata.blocksIncluded).toContain('topic_analysis');
     expect(result.tokenEstimate).toBeGreaterThan(0);

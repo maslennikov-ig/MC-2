@@ -4,34 +4,35 @@
  * @module lib/course-data-utils
  */
 
-import type { Database } from '@/types/database.generated';
-import type { Section, Lesson, Asset } from '@/types/database';
+import type { Database } from '@/types/database.generated'
+import type { Section, Lesson, Asset } from '@/types/database'
 
 // Database row types
-type SectionRow = Database['public']['Tables']['sections']['Row'];
-type LessonRow = Database['public']['Tables']['lessons']['Row'];
-type AssetRow = Database['public']['Tables']['assets']['Row'];
-type EnrichmentRow = Database['public']['Tables']['lesson_enrichments']['Row'];
+type SectionRow = Database['public']['Tables']['sections']['Row']
+type LessonRow = Database['public']['Tables']['lessons']['Row']
+type AssetRow = Database['public']['Tables']['assets']['Row']
+type EnrichmentRow = Database['public']['Tables']['lesson_enrichments']['Row']
 
 /**
  * Groups assets by their lesson_id for efficient lookup
  * @param assets - Array of asset rows from database
  * @returns Record mapping lesson_id to array of assets
  */
-export function groupAssetsByLessonId(
-  assets: AssetRow[] | null
-): Record<string, Asset[]> {
-  if (!assets || assets.length === 0) return {};
+export function groupAssetsByLessonId(assets: AssetRow[] | null): Record<string, Asset[]> {
+  if (!assets || assets.length === 0) return {}
 
-  return assets.reduce((acc, asset) => {
-    if (asset.lesson_id) {
-      if (!acc[asset.lesson_id]) {
-        acc[asset.lesson_id] = [];
+  return assets.reduce(
+    (acc, asset) => {
+      if (asset.lesson_id) {
+        if (!acc[asset.lesson_id]) {
+          acc[asset.lesson_id] = []
+        }
+        acc[asset.lesson_id].push(asset as Asset)
       }
-      acc[asset.lesson_id].push(asset as Asset);
-    }
-    return acc;
-  }, {} as Record<string, Asset[]>);
+      return acc
+    },
+    {} as Record<string, Asset[]>
+  )
 }
 
 /**
@@ -42,19 +43,22 @@ export function groupAssetsByLessonId(
 export function groupEnrichmentsByLessonId(
   enrichments: EnrichmentRow[] | null
 ): Record<string, EnrichmentRow[]> {
-  if (!enrichments || enrichments.length === 0) return {};
+  if (!enrichments || enrichments.length === 0) return {}
 
-  return enrichments.reduce((acc, enrichment) => {
-    const lessonId = enrichment.lesson_id;
-    // Skip enrichments without lesson_id (like groupAssetsByLessonId does)
-    if (!lessonId) return acc;
+  return enrichments.reduce(
+    (acc, enrichment) => {
+      const lessonId = enrichment.lesson_id
+      // Skip enrichments without lesson_id (like groupAssetsByLessonId does)
+      if (!lessonId) return acc
 
-    if (!acc[lessonId]) {
-      acc[lessonId] = [];
-    }
-    acc[lessonId].push(enrichment);
-    return acc;
-  }, {} as Record<string, EnrichmentRow[]>);
+      if (!acc[lessonId]) {
+        acc[lessonId] = []
+      }
+      acc[lessonId].push(enrichment)
+      return acc
+    },
+    {} as Record<string, EnrichmentRow[]>
+  )
 }
 
 /**
@@ -69,7 +73,7 @@ export function prepareSectionsForViewer(
   lessons: LessonRow[] | null,
   courseId: string
 ): Section[] {
-  if (!sections) return [];
+  if (!sections) return []
 
   return sections.map((section) => ({
     ...section,
@@ -89,7 +93,7 @@ export function prepareSectionsForViewer(
         course_id: courseId,
         order_number: lesson.order_index,
       })),
-  })) as Section[];
+  })) as Section[]
 }
 
 /**
@@ -98,11 +102,8 @@ export function prepareSectionsForViewer(
  * @param courseId - Course ID for association
  * @returns Array of Lesson objects
  */
-export function prepareLessonsForViewer(
-  lessons: LessonRow[] | null,
-  courseId: string
-): Lesson[] {
-  if (!lessons) return [];
+export function prepareLessonsForViewer(lessons: LessonRow[] | null, courseId: string): Lesson[] {
+  if (!lessons) return []
 
   return lessons.map((lesson) => ({
     ...lesson,
@@ -112,7 +113,7 @@ export function prepareLessonsForViewer(
         : '',
     course_id: courseId,
     order_number: lesson.order_index,
-  })) as Lesson[];
+  })) as Lesson[]
 }
 
 /** Share token validation constants */
@@ -122,7 +123,7 @@ export const SHARE_TOKEN_CONFIG = {
   MAX_LENGTH: 50,
   // Only allow alphanumeric, hyphen, and underscore after prefix
   VALID_PATTERN: /^share_[A-Za-z0-9_-]+$/,
-} as const;
+} as const
 
 /**
  * Validates share token format with strict rules
@@ -134,14 +135,14 @@ export const SHARE_TOKEN_CONFIG = {
  * @returns True if token is valid, false otherwise
  */
 export function isValidShareToken(token: string | undefined): token is string {
-  if (!token) return false;
+  if (!token) return false
 
   return (
     token.startsWith(SHARE_TOKEN_CONFIG.PREFIX) &&
     token.length >= SHARE_TOKEN_CONFIG.MIN_LENGTH &&
     token.length <= SHARE_TOKEN_CONFIG.MAX_LENGTH &&
     SHARE_TOKEN_CONFIG.VALID_PATTERN.test(token)
-  );
+  )
 }
 
 /**
@@ -150,6 +151,67 @@ export function isValidShareToken(token: string | undefined): token is string {
  * @returns Sanitized token showing only prefix
  */
 export function sanitizeTokenForLog(token: string): string {
-  if (!token || token.length < 10) return '***';
-  return token.slice(0, 10) + '***';
+  if (!token || token.length < 10) return '***'
+  return token.slice(0, 10) + '***'
+}
+
+/**
+ * Parses a lesson label string (e.g., "1.2") into section and lesson numbers
+ * @param label - Lesson label in format "sectionNumber.lessonNumber"
+ * @returns Object with sectionNumber and lessonNumber, or null if invalid
+ * @example
+ * parseLessonLabel("1.2") // { sectionNumber: "1", lessonNumber: "2" }
+ * parseLessonLabel("invalid") // null
+ */
+export function parseLessonLabel(
+  label: string
+): { sectionNumber: string; lessonNumber: string } | null {
+  const match = label.match(/^(\d+)\.(\d+)$/)
+  if (!match) return null
+  return { sectionNumber: match[1], lessonNumber: match[2] }
+}
+
+/**
+ * Finds a lesson ID by its label (e.g., "1.2")
+ * @param sections - Array of course sections
+ * @param lessons - Array of course lessons
+ * @param label - Lesson label to search for
+ * @returns Lesson ID if found, null otherwise
+ */
+export function findLessonIdByLabel(
+  sections: Section[],
+  lessons: Lesson[],
+  label: string
+): string | null {
+  const parsed = parseLessonLabel(label)
+  if (!parsed) return null
+
+  const section = sections.find((s) => s.section_number === parsed.sectionNumber)
+  if (!section) return null
+
+  const sectionLessons = lessons.filter((l) => l.section_id === section.id)
+  const lesson = sectionLessons.find((l) => l.lesson_number === parsed.lessonNumber)
+
+  return lesson?.id || null
+}
+
+/**
+ * Gets the label for a lesson (e.g., "1.2")
+ * @param lesson - Lesson object
+ * @param sections - Array of course sections
+ * @returns Lesson label in format "sectionNumber.lessonNumber", or null if not found
+ */
+export function getLessonLabel(lesson: Lesson, sections: Section[]): string | null {
+  const section = sections.find((s) => s.id === lesson.section_id)
+  // Check for both null/undefined and empty strings
+  if (
+    !section ||
+    !section.section_number ||
+    section.section_number === '' ||
+    !lesson.lesson_number ||
+    lesson.lesson_number === ''
+  ) {
+    return null
+  }
+  return `${section.section_number}.${lesson.lesson_number}`
 }

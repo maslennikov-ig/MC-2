@@ -1,8 +1,8 @@
-'use client';
+'use client'
 
-import React, { memo, useMemo } from 'react';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { cn } from '@/lib/utils';
+import React, { memo, useMemo } from 'react'
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
+import { cn } from '@/lib/utils'
 import {
   CheckCircle2,
   XCircle,
@@ -20,9 +20,9 @@ import {
   Target,
   Layers,
   Terminal,
-} from 'lucide-react';
-import { GRAPH_TRANSLATIONS } from '@/lib/generation-graph/translations';
-import { formatDuration } from '@/lib/generation-graph/format-utils';
+} from 'lucide-react'
+import { GRAPH_TRANSLATIONS } from '@/lib/generation-graph/translations'
+import { formatDuration } from '@/lib/generation-graph/format-utils'
 import type {
   Stage4ProcessTabProps,
   Stage4Phase,
@@ -30,8 +30,8 @@ import type {
   Stage4PhaseStatus,
   Stage4TelemetryData,
   InsightMessage,
-} from './types';
-import type { AnalysisResult } from '@megacampus/shared-types/analysis-result';
+} from './types'
+import type { AnalysisResult } from '@megacampus/shared-types/analysis-result'
 
 /**
  * Status icon mapping with colors for phase status
@@ -39,9 +39,9 @@ import type { AnalysisResult } from '@megacampus/shared-types/analysis-result';
 const statusConfig: Record<
   Stage4PhaseStatus,
   {
-    icon: React.ElementType;
-    colorClass: string;
-    animate?: boolean;
+    icon: React.ElementType
+    colorClass: string
+    animate?: boolean
   }
 > = {
   completed: {
@@ -65,7 +65,7 @@ const statusConfig: Record<
     icon: Circle,
     colorClass: 'text-muted-foreground/50',
   },
-};
+}
 
 /**
  * Phase configuration with icons and colors - Violet theme
@@ -73,10 +73,10 @@ const statusConfig: Record<
 const phaseConfig: Record<
   Stage4PhaseId,
   {
-    icon: React.ElementType;
-    colorClass: string;
-    bgClass: string;
-    isHighlight?: boolean;
+    icon: React.ElementType
+    colorClass: string
+    bgClass: string
+    isHighlight?: boolean
   }
 > = {
   phase_0: {
@@ -114,7 +114,7 @@ const phaseConfig: Record<
     colorClass: 'text-violet-600 dark:text-violet-400',
     bgClass: 'bg-violet-100 dark:bg-violet-900/30',
   },
-};
+}
 
 /**
  * Generates default phases based on overall status
@@ -123,13 +123,13 @@ function generateDefaultPhases(
   status: 'pending' | 'active' | 'completed' | 'error',
   locale: 'ru' | 'en'
 ): Stage4Phase[] {
-  const t = GRAPH_TRANSLATIONS.stage4 as Record<string, { ru: string; en: string }>;
+  const t = GRAPH_TRANSLATIONS.stage4 as Record<string, { ru: string; en: string }>
 
   const phaseDefinitions: Array<{
-    id: Stage4PhaseId;
-    nameKey: string;
-    descKey: string;
-    mockDuration: number;
+    id: Stage4PhaseId
+    nameKey: string
+    descKey: string
+    mockDuration: number
   }> = [
     {
       id: 'phase_0',
@@ -173,7 +173,7 @@ function generateDefaultPhases(
       descKey: 'phaseMappingDesc',
       mockDuration: 800,
     },
-  ];
+  ]
 
   if (status === 'completed') {
     return phaseDefinitions.map((def) => ({
@@ -182,7 +182,7 @@ function generateDefaultPhases(
       description: t[def.descKey]?.[locale],
       status: 'completed' as const,
       durationMs: def.mockDuration,
-    }));
+    }))
   }
 
   if (status === 'error') {
@@ -190,17 +190,10 @@ function generateDefaultPhases(
       id: def.id,
       name: t[def.nameKey]?.[locale] ?? def.id,
       description: t[def.descKey]?.[locale],
-      status:
-        index === phaseDefinitions.length - 1
-          ? ('error' as const)
-          : ('completed' as const),
-      durationMs:
-        index === phaseDefinitions.length - 1 ? undefined : def.mockDuration,
-      message:
-        index === phaseDefinitions.length - 1
-          ? 'Analysis validation failed'
-          : undefined,
-    }));
+      status: index === phaseDefinitions.length - 1 ? ('error' as const) : ('completed' as const),
+      durationMs: index === phaseDefinitions.length - 1 ? undefined : def.mockDuration,
+      message: index === phaseDefinitions.length - 1 ? 'Analysis validation failed' : undefined,
+    }))
   }
 
   if (status === 'active') {
@@ -211,7 +204,7 @@ function generateDefaultPhases(
       description: t[def.descKey]?.[locale],
       status: index === 0 ? ('active' as const) : ('pending' as const),
       durationMs: undefined,
-    }));
+    }))
   }
 
   // Pending: all phases are pending
@@ -221,59 +214,60 @@ function generateDefaultPhases(
     description: t[def.descKey]?.[locale],
     status: 'pending' as const,
     durationMs: undefined,
-  }));
+  }))
 }
 
 /**
  * Generate synthetic insight messages from AnalysisResult
  */
-function generateInsightMessages(
-  outputData: unknown,
-  locale: 'ru' | 'en'
-): InsightMessage[] {
-  const t = GRAPH_TRANSLATIONS.stage4 as Record<string, { ru: string; en: string }>;
-  const messages: InsightMessage[] = [];
+function generateInsightMessages(outputData: unknown, locale: 'ru' | 'en'): InsightMessage[] {
+  const t = GRAPH_TRANSLATIONS.stage4 as Record<string, { ru: string; en: string }>
+  const messages: InsightMessage[] = []
 
   if (!outputData || typeof outputData !== 'object') {
-    return messages;
+    return messages
   }
 
-  const data = outputData as Partial<AnalysisResult>;
+  const data = outputData as Partial<AnalysisResult>
 
   // Category decision
   if (data.course_category?.primary && data.course_category?.confidence !== undefined) {
-    const categoryKey = `category${data.course_category.primary.charAt(0).toUpperCase()}${data.course_category.primary.slice(1)}` as keyof typeof t;
-    const categoryName = t[categoryKey]?.[locale] ?? data.course_category.primary;
-    const confidence = Math.round(data.course_category.confidence * 100);
+    const categoryKey = `category${data.course_category.primary.charAt(0).toUpperCase()}${data.course_category.primary.slice(1)}`
+    const categoryName = t[categoryKey]?.[locale] ?? data.course_category.primary
+    const confidence = Math.round(data.course_category.confidence * 100)
 
-    const template = t.insightCategorySelected?.[locale] ?? 'Category determined: {category} (confidence {confidence}%)';
+    const template =
+      t.insightCategorySelected?.[locale] ??
+      'Category determined: {category} (confidence {confidence}%)'
     messages.push({
       id: 'category-decision',
       timestamp: new Date(),
       type: 'decision',
-      message: template.replace('{category}', categoryName).replace('{confidence}', String(confidence)),
+      message: template
+        .replace('{category}', categoryName)
+        .replace('{confidence}', String(confidence)),
       phase: 'phase_1',
-    });
+    })
   }
 
-  // Strategy selection
-  if (data.pedagogical_strategy?.teaching_style) {
-    const styleKey = `style${data.pedagogical_strategy.teaching_style.split('-').map(s => s.charAt(0).toUpperCase() + s.slice(1)).join('')}` as keyof typeof t;
-    const styleName = t[styleKey]?.[locale] ?? data.pedagogical_strategy.teaching_style;
-
-    const template = t.insightStrategySelected?.[locale] ?? 'Strategy selected: {strategy}';
+  // Strategy selection - now based on assessment_approach
+  if (data.pedagogical_strategy?.assessment_approach) {
+    const assessmentPreview = data.pedagogical_strategy.assessment_approach.substring(0, 50) + '...'
+    const template = t.insightStrategySelected?.[locale] ?? 'Strategy selected: {strategy}'
     messages.push({
       id: 'strategy-decision',
       timestamp: new Date(),
       type: 'decision',
-      message: template.replace('{strategy}', styleName),
+      message: template.replace('{strategy}', assessmentPreview),
       phase: 'phase_3',
-    });
+    })
   }
 
   // Structure recommendation
   if (data.recommended_structure?.total_sections && data.recommended_structure?.total_lessons) {
-    const template = t.insightStructureRecommended?.[locale] ?? 'Recommended structure: {sections} modules, {lessons} lessons';
+    const template =
+      t.insightStructureRecommended?.[locale] ??
+      'Recommended structure: {sections} modules, {lessons} lessons'
     messages.push({
       id: 'structure-decision',
       timestamp: new Date(),
@@ -282,31 +276,31 @@ function generateInsightMessages(
         .replace('{sections}', String(data.recommended_structure.total_sections))
         .replace('{lessons}', String(data.recommended_structure.total_lessons)),
       phase: 'phase_5',
-    });
+    })
   }
 
-  return messages;
+  return messages
 }
 
 /**
  * Individual phase row component
  */
 interface PhaseRowProps {
-  phase: Stage4Phase;
-  locale: 'ru' | 'en';
+  phase: Stage4Phase
+  locale: 'ru' | 'en'
 }
 
 const PhaseRow = memo<PhaseRowProps>(function PhaseRow({ phase, locale }) {
-  const t = GRAPH_TRANSLATIONS.stage4 as Record<string, { ru: string; en: string }>;
-  const config = phaseConfig[phase.id];
-  const statusCfg = statusConfig[phase.status];
-  const PhaseIcon = config?.icon ?? Circle;
-  const StatusIcon = statusCfg.icon;
-  const isHighlight = config?.isHighlight ?? false;
+  const t = GRAPH_TRANSLATIONS.stage4 as Record<string, { ru: string; en: string }>
+  const config = phaseConfig[phase.id]
+  const statusCfg = statusConfig[phase.status]
+  const PhaseIcon = config?.icon ?? Circle
+  const StatusIcon = statusCfg.icon
+  const isHighlight = config?.isHighlight ?? false
 
   // Get description from translations if not in phase
   const getDescription = (): string => {
-    if (phase.description) return phase.description;
+    if (phase.description) return phase.description
 
     const descMap: Record<Stage4PhaseId, string | undefined> = {
       phase_0: t.phaseAuditDesc?.[locale],
@@ -316,15 +310,15 @@ const PhaseRow = memo<PhaseRowProps>(function PhaseRow({ phase, locale }) {
       phase_4: t.phaseSynthesisDesc?.[locale],
       phase_5: t.phaseBlueprintDesc?.[locale],
       phase_6: t.phaseMappingDesc?.[locale],
-    };
+    }
 
-    return descMap[phase.id] ?? '';
-  };
+    return descMap[phase.id] ?? ''
+  }
 
   return (
     <div
       className={cn(
-        'flex items-start gap-3 p-3 rounded-lg transition-colors duration-200',
+        'flex items-start gap-3 rounded-lg p-3 transition-colors duration-200',
         phase.status === 'error' && 'bg-red-50 dark:bg-red-950/20',
         phase.status === 'completed' && 'bg-green-50/50 dark:bg-green-950/10',
         phase.status === 'active' && 'bg-violet-50/50 dark:bg-violet-950/10',
@@ -349,11 +343,11 @@ const PhaseRow = memo<PhaseRowProps>(function PhaseRow({ phase, locale }) {
       </div>
 
       {/* Phase details */}
-      <div className="flex-1 min-w-0">
+      <div className="min-w-0 flex-1">
         <div className="flex items-center justify-between gap-2">
           <span
             className={cn(
-              'font-medium text-sm',
+              'text-sm font-medium',
               isHighlight && 'text-base',
               phase.status === 'error' && 'text-red-700 dark:text-red-400',
               phase.status === 'completed' && 'text-foreground',
@@ -364,10 +358,10 @@ const PhaseRow = memo<PhaseRowProps>(function PhaseRow({ phase, locale }) {
             {phase.name}
           </span>
 
-          <div className="flex items-center gap-2 flex-shrink-0">
+          <div className="flex flex-shrink-0 items-center gap-2">
             {/* Duration badge */}
             {phase.durationMs !== undefined && phase.durationMs > 0 && (
-              <span className="text-xs font-mono text-muted-foreground">
+              <span className="text-muted-foreground font-mono text-xs">
                 {formatDuration(phase.durationMs)}
               </span>
             )}
@@ -381,29 +375,27 @@ const PhaseRow = memo<PhaseRowProps>(function PhaseRow({ phase, locale }) {
           </div>
         </div>
 
-        <p className="text-sm text-muted-foreground mt-0.5">{getDescription()}</p>
+        <p className="text-muted-foreground mt-0.5 text-sm">{getDescription()}</p>
 
         {/* Error message */}
         {phase.status === 'error' && phase.message && (
-          <div className="mt-2 p-2 bg-red-100 dark:bg-red-900/30 rounded-md">
-            <p className="text-sm text-red-700 dark:text-red-300 font-mono">
-              {phase.message}
-            </p>
+          <div className="mt-2 rounded-md bg-red-100 p-2 dark:bg-red-900/30">
+            <p className="font-mono text-sm text-red-700 dark:text-red-300">{phase.message}</p>
           </div>
         )}
       </div>
     </div>
-  );
-});
+  )
+})
 
 /**
  * Telemetry metric item component
  */
 interface TelemetryItemProps {
-  icon: React.ElementType;
-  label: string;
-  value: string;
-  colorClass?: string;
+  icon: React.ElementType
+  label: string
+  value: string
+  colorClass?: string
 }
 
 const TelemetryItem = memo<TelemetryItemProps>(function TelemetryItem({
@@ -413,77 +405,76 @@ const TelemetryItem = memo<TelemetryItemProps>(function TelemetryItem({
   colorClass = 'text-muted-foreground',
 }) {
   return (
-    <div className="flex flex-col items-center p-3 rounded-lg bg-muted/50">
-      <Icon className={cn('h-5 w-5 mb-1', colorClass)} />
-      <span className="text-lg font-mono font-semibold text-foreground">{value}</span>
-      <span className="text-xs text-muted-foreground text-center">{label}</span>
+    <div className="bg-muted/50 flex flex-col items-center rounded-lg p-3">
+      <Icon className={cn('mb-1 h-5 w-5', colorClass)} />
+      <span className="text-foreground font-mono text-lg font-semibold">{value}</span>
+      <span className="text-muted-foreground text-center text-xs">{label}</span>
     </div>
-  );
-});
+  )
+})
 
 /**
  * Insight Terminal component - console-style display
  */
 interface InsightTerminalComponentProps {
-  messages: InsightMessage[];
-  locale: 'ru' | 'en';
+  messages: InsightMessage[]
+  locale: 'ru' | 'en'
 }
 
-const InsightTerminalComponent = memo<InsightTerminalComponentProps>(function InsightTerminalComponent({
-  messages,
-  locale,
-}) {
-  const t = GRAPH_TRANSLATIONS.stage4 as Record<string, { ru: string; en: string }>;
+const InsightTerminalComponent = memo<InsightTerminalComponentProps>(
+  function InsightTerminalComponent({ messages, locale }) {
+    const t = GRAPH_TRANSLATIONS.stage4 as Record<string, { ru: string; en: string }>
 
-  const getTypePrefix = (type: InsightMessage['type']): string => {
-    switch (type) {
-      case 'decision':
-        return t.insightDecision?.[locale] ?? 'Decision';
-      case 'warning':
-        return t.insightWarning?.[locale] ?? 'Warning';
-      default:
-        return t.insightInfo?.[locale] ?? 'Info';
+    const getTypePrefix = (type: InsightMessage['type']): string => {
+      switch (type) {
+        case 'decision':
+          return t.insightDecision?.[locale] ?? 'Decision'
+        case 'warning':
+          return t.insightWarning?.[locale] ?? 'Warning'
+        default:
+          return t.insightInfo?.[locale] ?? 'Info'
+      }
     }
-  };
 
-  const getTypeColor = (type: InsightMessage['type']): string => {
-    switch (type) {
-      case 'decision':
-        return 'text-violet-400';
-      case 'warning':
-        return 'text-amber-400';
-      default:
-        return 'text-emerald-400';
+    const getTypeColor = (type: InsightMessage['type']): string => {
+      switch (type) {
+        case 'decision':
+          return 'text-violet-400'
+        case 'warning':
+          return 'text-amber-400'
+        default:
+          return 'text-emerald-400'
+      }
     }
-  };
 
-  if (messages.length === 0) {
-    return null;
+    if (messages.length === 0) {
+      return null
+    }
+
+    return (
+      <Card className="mt-4">
+        <CardHeader className="pb-2">
+          <CardTitle className="flex items-center gap-2 text-sm font-medium">
+            <Terminal className="h-4 w-4 text-violet-500" />
+            {t.insightTerminal?.[locale] ?? 'AI Decision Stream'}
+          </CardTitle>
+        </CardHeader>
+        <CardContent>
+          <div className="rounded-lg bg-zinc-900 p-3 font-mono text-sm dark:bg-zinc-950">
+            {messages.map((msg) => (
+              <div key={msg.id} className="mb-1 flex gap-2 last:mb-0">
+                <span className={cn('flex-shrink-0', getTypeColor(msg.type))}>
+                  [{getTypePrefix(msg.type)}]
+                </span>
+                <span className="text-zinc-300">{msg.message}</span>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+    )
   }
-
-  return (
-    <Card className="mt-4">
-      <CardHeader className="pb-2">
-        <CardTitle className="text-sm font-medium flex items-center gap-2">
-          <Terminal className="h-4 w-4 text-violet-500" />
-          {t.insightTerminal?.[locale] ?? 'AI Decision Stream'}
-        </CardTitle>
-      </CardHeader>
-      <CardContent>
-        <div className="bg-zinc-900 dark:bg-zinc-950 rounded-lg p-3 font-mono text-sm">
-          {messages.map((msg) => (
-            <div key={msg.id} className="flex gap-2 mb-1 last:mb-0">
-              <span className={cn('flex-shrink-0', getTypeColor(msg.type))}>
-                [{getTypePrefix(msg.type)}]
-              </span>
-              <span className="text-zinc-300">{msg.message}</span>
-            </div>
-          ))}
-        </div>
-      </CardContent>
-    </Card>
-  );
-});
+)
 
 /**
  * Default telemetry data
@@ -493,7 +484,7 @@ function getDefaultTelemetry(): Stage4TelemetryData {
     processingTimeMs: 0,
     totalTokens: 0,
     tier: 'standard',
-  };
+  }
 }
 
 /**
@@ -501,29 +492,29 @@ function getDefaultTelemetry(): Stage4TelemetryData {
  */
 function extractTelemetryFromOutput(outputData: unknown): Partial<Stage4TelemetryData> {
   if (!outputData || typeof outputData !== 'object') {
-    return {};
+    return {}
   }
 
-  const data = outputData as Partial<AnalysisResult>;
-  const result: Partial<Stage4TelemetryData> = {};
+  const data = outputData as Partial<AnalysisResult>
+  const result: Partial<Stage4TelemetryData> = {}
 
   if (data.course_category?.confidence !== undefined) {
-    result.confidence = Math.round(data.course_category.confidence * 100);
+    result.confidence = Math.round(data.course_category.confidence * 100)
   }
 
   if (data.topic_analysis?.complexity) {
-    result.complexity = data.topic_analysis.complexity;
+    result.complexity = data.topic_analysis.complexity
   }
 
   if (data.metadata?.total_duration_ms) {
-    result.processingTimeMs = data.metadata.total_duration_ms;
+    result.processingTimeMs = data.metadata.total_duration_ms
   }
 
   if (data.metadata?.total_tokens?.total) {
-    result.totalTokens = data.metadata.total_tokens.total;
+    result.totalTokens = data.metadata.total_tokens.total
   }
 
-  return result;
+  return result
 }
 
 /**
@@ -540,41 +531,38 @@ export const Stage4ProcessTab = memo<Stage4ProcessTabProps>(function Stage4Proce
   status = 'completed',
   locale = 'ru',
 }) {
-  const t = GRAPH_TRANSLATIONS.stage4 as Record<string, { ru: string; en: string }>;
+  const t = GRAPH_TRANSLATIONS.stage4 as Record<string, { ru: string; en: string }>
 
   // Generate default phases if not provided
-  const phases = providedPhases || generateDefaultPhases(status, locale);
+  const phases = providedPhases || generateDefaultPhases(status, locale)
 
   // Extract telemetry from output data and merge with provided
-  const extractedTelemetry = useMemo(
-    () => extractTelemetryFromOutput(outputData),
-    [outputData]
-  );
+  const extractedTelemetry = useMemo(() => extractTelemetryFromOutput(outputData), [outputData])
   const telemetry: Stage4TelemetryData = {
     ...getDefaultTelemetry(),
     ...providedTelemetry,
     ...extractedTelemetry,
-  };
+  }
 
   // Generate insight messages from output data
   const insightMessages = useMemo(
     () => generateInsightMessages(outputData, locale),
     [outputData, locale]
-  );
+  )
 
   // Check if we have any data to display
-  const hasData = phases.length > 0 || telemetry.processingTimeMs > 0;
+  const hasData = phases.length > 0 || telemetry.processingTimeMs > 0
 
   // Empty state
   if (!hasData && status === 'pending') {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center">
-        <GraduationCap className="h-12 w-12 text-muted-foreground/50 mb-4" />
-        <p className="text-sm text-muted-foreground">
+        <GraduationCap className="text-muted-foreground/50 mb-4 h-12 w-12" />
+        <p className="text-muted-foreground text-sm">
           {t.emptyProcess?.[locale] ?? 'Analysis not started yet'}
         </p>
       </div>
-    );
+    )
   }
 
   return (
@@ -583,11 +571,11 @@ export const Stage4ProcessTab = memo<Stage4ProcessTabProps>(function Stage4Proce
       <div className="col-span-3">
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-base font-semibold flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2 text-base font-semibold">
               <GraduationCap className="h-4 w-4 text-violet-500" />
               {t.analysisPipeline?.[locale] ?? 'Analysis Pipeline'}
             </CardTitle>
-            <p className="text-sm text-muted-foreground">
+            <p className="text-muted-foreground text-sm">
               {t.analysisPipelineDesc?.[locale] ?? 'Transforming materials into course blueprint'}
             </p>
           </CardHeader>
@@ -603,7 +591,7 @@ export const Stage4ProcessTab = memo<Stage4ProcessTabProps>(function Stage4Proce
       <div className="col-span-2 space-y-4">
         <Card>
           <CardHeader className="pb-3">
-            <CardTitle className="text-base font-semibold flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2 text-base font-semibold">
               <BrainCircuit className="h-4 w-4 text-violet-500" />
               {t.telemetry?.[locale] ?? 'Telemetry'}
             </CardTitle>
@@ -625,20 +613,14 @@ export const Stage4ProcessTab = memo<Stage4ProcessTabProps>(function Stage4Proce
                 icon={BrainCircuit}
                 label={t.tokensUsed?.[locale] ?? 'Tokens'}
                 value={
-                  telemetry.totalTokens > 0
-                    ? `${(telemetry.totalTokens / 1000).toFixed(1)}k`
-                    : '-'
+                  telemetry.totalTokens > 0 ? `${(telemetry.totalTokens / 1000).toFixed(1)}k` : '-'
                 }
                 colorClass="text-violet-500"
               />
               <TelemetryItem
                 icon={Target}
                 label={t.confidenceLevel?.[locale] ?? 'Confidence'}
-                value={
-                  telemetry.confidence !== undefined
-                    ? `${telemetry.confidence}%`
-                    : '-'
-                }
+                value={telemetry.confidence !== undefined ? `${telemetry.confidence}%` : '-'}
                 colorClass="text-emerald-500"
               />
               <TelemetryItem
@@ -655,7 +637,7 @@ export const Stage4ProcessTab = memo<Stage4ProcessTabProps>(function Stage4Proce
         <InsightTerminalComponent messages={insightMessages} locale={locale} />
       </div>
     </div>
-  );
-});
+  )
+})
 
-export default Stage4ProcessTab;
+export default Stage4ProcessTab

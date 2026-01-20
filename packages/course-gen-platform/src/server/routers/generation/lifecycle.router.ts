@@ -19,6 +19,7 @@ import { nanoid } from 'nanoid';
 import { addJob, removeJobsByCourseId } from '../../../orchestrator/queue';
 import { JobType } from '@megacampus/shared-types';
 import type { Database, JobData } from '@megacampus/shared-types';
+import { isValidStyle, DEFAULT_COURSE_STYLE } from '@megacampus/shared-types/style-prompts';
 import { initiateGenerationInputSchema } from './_shared/schemas';
 import { TIER_PRIORITY } from './_shared/constants';
 import type { ConcurrencyCheckResult, CourseSettings } from './_shared/types';
@@ -97,9 +98,10 @@ export const lifecycleRouter = router({
 
       try {
         // T013: Verify course ownership and get organization tier
+        // NOTE: course_size is included to pass to Stage 4 job data (avoid race conditions)
         const { data: course, error: courseError } = await supabase
           .from('courses')
-          .select('*, language, organization:organizations(tier)')
+          .select('*, language, course_size, organization:organizations(tier)')
           .eq('id', courseId)
           .single();
 
@@ -319,6 +321,8 @@ export const lifecycleRouter = router({
           );
         } else {
           // Path 2: Analysis-only (hasFiles=false, skip to Stage 4)
+          // IMPORTANT: course_size is passed in job data to avoid race conditions
+          // (see GTQ-6162: course_size may be updated async before generation starts)
           jobs = [
             {
               queue: JobType.STRUCTURE_ANALYSIS, // 'structure_analysis'
@@ -332,6 +336,8 @@ export const lifecycleRouter = router({
                 // Include basic course data for worker context
                 title: course.title,
                 settings: course.settings,
+                // Pass course_size to avoid race conditions (GTQ-6162)
+                courseSize: course.course_size || null,
               },
               options: { priority },
             },
@@ -342,6 +348,7 @@ export const lifecycleRouter = router({
             {
               requestId,
               courseId,
+              courseSize: course.course_size,
             },
             'Course generation path: analysis-only (Stage 4, no documents)'
           );
@@ -675,9 +682,11 @@ export const lifecycleRouter = router({
           analysis_result: analysisResult, // May be null for title-only
           frontend_parameters: {
             course_title: course.title, // ONLY guaranteed field
-            language: course.language,
-            style: course.style,
-            target_audience: course.target_audience,
+            // Convert null to undefined for cleaner optional fields (nullish schema accepts both)
+            language: course.language ?? undefined,
+            style: course.style && isValidStyle(course.style) ? course.style : DEFAULT_COURSE_STYLE,
+            target_audience: course.target_audience ?? undefined,
+            difficulty: course.difficulty ?? 'intermediate',
             desired_lessons_count: (course.settings as unknown as CourseSettings)
               ?.desired_lessons_count,
             desired_modules_count: (course.settings as unknown as CourseSettings)
@@ -923,10 +932,10 @@ export const lifecycleRouter = router({
         let jobId: string | undefined;
         const organizationId = result.organizationId || ctx.user.organizationId;
 
-        // Get course data for job payload
+        // Get course data for job payload (including course_size for Stage 4)
         const { data: course } = await supabase
           .from('courses')
-          .select('title, settings, language')
+          .select('title, settings, language, course_size')
           .eq('id', courseId)
           .single();
 
@@ -987,11 +996,13 @@ export const lifecycleRouter = router({
           jobId = job.id;
         } else if (stageNumber === 4) {
           // Stage 4: Analysis
+          // IMPORTANT: course_size is passed in job data to avoid race conditions (GTQ-6162)
           const job = await addJob(JobType.STRUCTURE_ANALYSIS, {
             ...baseJobData,
             jobType: JobType.STRUCTURE_ANALYSIS,
             title: course?.title,
             settings: course?.settings,
+            courseSize: course?.course_size || null,
           } as JobData);
           jobId = job.id;
         } else if (stageNumber === 5) {
@@ -1000,7 +1011,7 @@ export const lifecycleRouter = router({
           const { data: fullCourse, error: fullCourseError } = await supabase
             .from('courses')
             .select(
-              'title, settings, language, style, target_audience, analysis_result, organization_id'
+              'title, settings, language, style, target_audience, difficulty, analysis_result, organization_id'
             )
             .eq('id', courseId)
             .single();
@@ -1066,9 +1077,13 @@ export const lifecycleRouter = router({
             analysis_result: fullCourse.analysis_result,
             frontend_parameters: {
               course_title: fullCourse.title,
-              language: fullCourse.language,
-              style: fullCourse.style,
-              target_audience: fullCourse.target_audience,
+              // Convert null to undefined for cleaner optional fields (nullish schema accepts both)
+              // Validate style against enum to prevent invalid values from breaking Zod
+              language: fullCourse.language ?? undefined,
+              style:
+                fullCourse.style && isValidStyle(fullCourse.style) ? fullCourse.style : undefined,
+              target_audience: fullCourse.target_audience ?? undefined,
+              difficulty: fullCourse.difficulty ?? 'intermediate',
               desired_lessons_count: (fullCourse.settings as unknown as CourseSettings)
                 ?.desired_lessons_count,
               desired_modules_count: (fullCourse.settings as unknown as CourseSettings)

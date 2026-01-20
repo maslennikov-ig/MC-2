@@ -11,10 +11,7 @@
  */
 
 import { z } from 'zod';
-import {
-  JudgeCriterionSchema,
-  type JudgeCriterion,
-} from './judge-rubric';
+import { JudgeCriterionSchema, type JudgeCriterion } from './judge-rubric';
 
 // ============================================================================
 // CONFIDENCE AND SEVERITY TYPES
@@ -59,11 +56,11 @@ export type IssueSeverity = z.infer<typeof IssueSeveritySchema>;
  * - ESCALATE_TO_HUMAN: persistent issues after corrections or low confidence
  */
 export const JudgeRecommendationSchema = z.enum([
-  'ACCEPT',                     // score >= 0.90, auto-publish
+  'ACCEPT', // score >= 0.90, auto-publish
   'ACCEPT_WITH_MINOR_REVISION', // score 0.75-0.90, single targeted fix
-  'ITERATIVE_REFINEMENT',       // score 0.60-0.75, 2-iteration refinement
-  'REGENERATE',                 // score < 0.60, regenerate with feedback
-  'ESCALATE_TO_HUMAN',          // persistent issues, manual review required
+  'ITERATIVE_REFINEMENT', // score 0.60-0.75, 2-iteration refinement
+  'REGENERATE', // score < 0.60, regenerate with feedback
+  'ESCALATE_TO_HUMAN', // persistent issues, manual review required
 ]);
 
 /** JudgeRecommendation type */
@@ -141,7 +138,10 @@ export const JudgeIssueSchema = z.object({
    * - Simple text replacements (not structural changes)
    * - Short replacements (<300 chars, <50% size difference from quotedText)
    */
-  inlineReplacement: z.string().optional().describe('Exact replacement text for quotedText (for InlineFixer)'),
+  inlineReplacement: z
+    .string()
+    .optional()
+    .describe('Exact replacement text for quotedText (for InlineFixer)'),
 });
 
 /** JudgeIssue type */
@@ -175,7 +175,10 @@ export const JudgeVerdictSchema = z.object({
   /** Recommended action based on score and issues */
   recommendation: JudgeRecommendationSchema,
   /** Which model performed this evaluation */
-  judgeModel: z.string().min(1).describe('Model identifier (e.g., "deepseek/deepseek-v3.1-terminus")'),
+  judgeModel: z
+    .string()
+    .min(1)
+    .describe('Model identifier (e.g., "deepseek/deepseek-v3.1-terminus")'),
   /** Temperature used for evaluation (recommended: 0.1) */
   temperature: z.number().min(0).max(1),
   /** Total tokens used for this evaluation */
@@ -207,12 +210,16 @@ export const FixRecommendationSchema = z.object({
   /** Domain terminology to maintain consistency */
   preserveTerminology: z.array(z.string()).default([]),
   /** History of previous iterations (for self-refine method) */
-  iterationHistory: z.array(z.object({
-    /** Feedback given in this iteration */
-    feedback: z.string(),
-    /** Score achieved after this iteration */
-    score: z.number().min(0).max(1),
-  })).default([]),
+  iterationHistory: z
+    .array(
+      z.object({
+        /** Feedback given in this iteration */
+        feedback: z.string(),
+        /** Score achieved after this iteration */
+        score: z.number().min(0).max(1),
+      })
+    )
+    .default([]),
 });
 
 /** FixRecommendation type */
@@ -273,9 +280,9 @@ export type JudgeAggregatedResult = z.infer<typeof JudgeAggregatedResultSchema>;
  * - FULL_REGENERATE: Restart from Planner for structural failures (~6000 tokens)
  */
 export const FixActionSchema = z.enum([
-  'SURGICAL_EDIT',        // Patcher: tone, clarity, grammar, minor additions
-  'REGENERATE_SECTION',   // Section-Expander: factual errors, major gaps
-  'FULL_REGENERATE',      // Restart from Planner: structural failure
+  'SURGICAL_EDIT', // Patcher: tone, clarity, grammar, minor additions
+  'REGENERATE_SECTION', // Section-Expander: factual errors, major gaps
+  'FULL_REGENERATE', // Restart from Planner: structural failure
 ]);
 
 /** FixAction type */
@@ -746,12 +753,7 @@ export type ConflictResolution = z.infer<typeof ConflictResolutionSchema>;
 /**
  * RefinementPlanStatus - Status of refinement plan execution
  */
-export const RefinementPlanStatusSchema = z.enum([
-  'PENDING',
-  'EXECUTING',
-  'COMPLETED',
-  'FAILED',
-]);
+export const RefinementPlanStatusSchema = z.enum(['PENDING', 'EXECUTING', 'COMPLETED', 'FAILED']);
 
 /** RefinementPlanStatus type */
 export type RefinementPlanStatus = z.infer<typeof RefinementPlanStatusSchema>;
@@ -841,7 +843,7 @@ export type OperationMode = z.infer<typeof OperationModeSchema>;
  * MaxIterationsAction - What to do when max iterations reached
  */
 export const MaxIterationsActionSchema = z.enum([
-  'escalate_to_human',  // Semi-auto: requires human review
+  'escalate_to_human', // Semi-auto: requires human review
   'accept_best_effort', // Full-auto: return best available
 ]);
 
@@ -857,7 +859,7 @@ export const SemiAutoConfigSchema = z.object({
   /** Escalation to human is possible */
   escalationEnabled: z.literal(true),
   /** Score threshold for automatic accept */
-  acceptThreshold: z.number().min(0).max(1).default(0.90),
+  acceptThreshold: z.number().min(0).max(1).default(0.9),
   /** Score threshold for "good enough" accept */
   goodEnoughThreshold: z.number().min(0).max(1).default(0.85),
   /** Action when max iterations reached */
@@ -940,10 +942,10 @@ export type BestEffortResult = z.infer<typeof BestEffortResultSchema>;
  * RefinementStatus - Final status of refinement process
  */
 export const RefinementStatusSchema = z.enum([
-  'accepted',          // Score met threshold
-  'accepted_warning',  // Full-auto: below ideal but acceptable
-  'best_effort',       // Full-auto: returned best available
-  'escalated',         // Semi-auto only: needs human review
+  'accepted', // Score met threshold
+  'accepted_warning', // Full-auto: below ideal but acceptable
+  'best_effort', // Full-auto: returned best available
+  'escalated', // Semi-auto only: needs human review
 ]);
 
 /** RefinementStatus type */
@@ -1012,12 +1014,12 @@ export type RefinementEvent =
  * Used to catch obvious quality issues before incurring LLM costs.
  */
 export type HeuristicCheckName =
-  | 'word_count'           // Content length validation
-  | 'flesch_kincaid'       // Readability score (English only)
-  | 'keyword_coverage'     // Required keywords present
-  | 'section_headers'      // Section structure validation
-  | 'content_density'      // Content vs whitespace ratio
-  | 'markdown_structure';  // Markdown lint validation
+  | 'word_count' // Content length validation
+  | 'flesch_kincaid' // Readability score (English only)
+  | 'keyword_coverage' // Required keywords present
+  | 'section_headers' // Section structure validation
+  | 'content_density' // Content vs whitespace ratio
+  | 'markdown_structure'; // Markdown lint validation
 
 /**
  * MarkdownStructureDetails - Details from markdown structure validation
@@ -1081,11 +1083,11 @@ export type UniversalReadabilityMetrics = z.infer<typeof UniversalReadabilityMet
  */
 export const CRITERIA_WEIGHTS: Record<JudgeCriterion, number> = {
   learning_objective_alignment: 0.25,
-  pedagogical_structure: 0.20,
+  pedagogical_structure: 0.2,
   factual_accuracy: 0.15,
   clarity_readability: 0.15,
   engagement_examples: 0.15,
-  completeness: 0.10,
+  completeness: 0.1,
 };
 
 /**
@@ -1093,13 +1095,13 @@ export const CRITERIA_WEIGHTS: Record<JudgeCriterion, number> = {
  */
 export const SCORE_THRESHOLDS = {
   /** Score >= 0.90: ACCEPT */
-  ACCEPT: 0.90,
+  ACCEPT: 0.9,
   /** Score 0.75-0.90: ACCEPT_WITH_MINOR_REVISION or ITERATIVE_REFINEMENT */
   MINOR_REVISION: 0.75,
   /** Score 0.60-0.75: ITERATIVE_REFINEMENT */
-  REFINEMENT: 0.60,
+  REFINEMENT: 0.6,
   /** Score < 0.60: REGENERATE */
-  REGENERATE: 0.60,
+  REGENERATE: 0.6,
 } as const;
 
 /**
@@ -1112,12 +1114,12 @@ export const MAX_REFINEMENT_ITERATIONS = 2;
  * Higher priority (lower index) wins when judges contradict
  */
 export const PRIORITY_HIERARCHY: JudgeCriterion[] = [
-  'factual_accuracy',             // 1. Accuracy & Safety (highest)
+  'factual_accuracy', // 1. Accuracy & Safety (highest)
   'learning_objective_alignment', // 2. Learning objectives
-  'pedagogical_structure',        // 3. Structure
-  'clarity_readability',          // 4. Clarity
-  'engagement_examples',          // 5. Engagement
-  'completeness',                 // 6. Completeness (lowest)
+  'pedagogical_structure', // 3. Structure
+  'clarity_readability', // 4. Clarity
+  'engagement_examples', // 5. Engagement
+  'completeness', // 6. Completeness (lowest)
 ];
 
 /**
@@ -1128,7 +1130,7 @@ export const REFINEMENT_CONFIG = {
   // Operation modes
   modes: {
     'semi-auto': {
-      acceptThreshold: 0.90,
+      acceptThreshold: 0.9,
       goodEnoughThreshold: 0.85,
       onMaxIterations: 'escalate' as const,
       escalationEnabled: true,
@@ -1172,7 +1174,7 @@ export const REFINEMENT_CONFIG = {
 
   // Krippendorff's Alpha thresholds for inter-rater agreement
   krippendorff: {
-    highAgreement: 0.80,    // Accept all issues
+    highAgreement: 0.8, // Accept all issues
     moderateAgreement: 0.67, // Accept issues with 2+ judge agreement
     // Below 0.67: Only accept CRITICAL issues, flag for review
   },
@@ -1374,7 +1376,7 @@ export function validateFixRecommendation(recommendation: unknown) {
  */
 export function calculateWeightedScore(
   criteriaScores: CriteriaScores,
-  weights: Record<JudgeCriterion, number> = CRITERIA_WEIGHTS,
+  weights: Record<JudgeCriterion, number> = CRITERIA_WEIGHTS
 ): number {
   let totalWeight = 0;
   let weightedSum = 0;
@@ -1398,7 +1400,7 @@ export function calculateWeightedScore(
 export function determineRecommendation(
   score: number,
   issues: JudgeIssue[],
-  confidence: JudgeConfidence,
+  confidence: JudgeConfidence
 ): JudgeRecommendation {
   // Low confidence always escalates
   if (confidence === 'low') {
@@ -1456,17 +1458,19 @@ export type SelfReviewStatus = z.infer<typeof SelfReviewStatusSchema>;
  *
  * Phase 1 (Integrity/Critical): TRUNCATION, LANGUAGE, EMPTY, SHORT_SECTION
  * Phase 2 (Hygiene): HYGIENE
+ * Phase 2.5 (Language/Grammar): GRAMMAR
  * Phase 3 (Semantic): ALIGNMENT, HALLUCINATION, LOGIC
  */
 export const SelfReviewIssueTypeSchema = z.enum([
-  'TRUNCATION',     // Content appears cut off (Phase 1)
-  'LANGUAGE',       // Wrong language / script pollution (Phase 1)
-  'EMPTY',          // Empty or placeholder fields (Phase 1)
-  'SHORT_SECTION',  // Section has < 50 words (Phase 1)
-  'HYGIENE',        // Chatbot artifacts, markdown errors (Phase 2)
-  'ALIGNMENT',      // Learning objective mismatch (Phase 3)
-  'HALLUCINATION',  // Contradicts RAG context (Phase 3)
-  'LOGIC',          // Internal contradictions (Phase 3)
+  'TRUNCATION', // Content appears cut off (Phase 1)
+  'LANGUAGE', // Wrong language / script pollution (Phase 1)
+  'EMPTY', // Empty or placeholder fields (Phase 1)
+  'SHORT_SECTION', // Section has < 50 words (Phase 1)
+  'HYGIENE', // Chatbot artifacts, markdown errors (Phase 2)
+  'GRAMMAR', // Grammar errors, case endings, agreements (Phase 2.5)
+  'ALIGNMENT', // Learning objective mismatch (Phase 3)
+  'HALLUCINATION', // Contradicts RAG context (Phase 3)
+  'LOGIC', // Internal contradictions (Phase 3)
 ]);
 
 /** SelfReviewIssueType type */
@@ -1481,10 +1485,10 @@ export type SelfReviewIssueType = z.infer<typeof SelfReviewIssueTypeSchema>;
  * - INFO: Informational only (Phase 4)
  */
 export const SelfReviewSeveritySchema = z.enum([
-  'CRITICAL',  // Must regenerate
-  'FIXABLE',   // Can be auto-fixed
-  'COMPLEX',   // Needs Judge
-  'INFO',      // Informational
+  'CRITICAL', // Must regenerate
+  'FIXABLE', // Can be auto-fixed
+  'COMPLEX', // Needs Judge
+  'INFO', // Informational
 ]);
 
 /** SelfReviewSeverity type */
@@ -1502,6 +1506,17 @@ export const SelfReviewIssueSchema = z.object({
   location: z.string().min(1),
   /** Description of the issue */
   description: z.string().min(1),
+  /**
+   * Optional: The problematic text (for targeted fixes).
+   * Used by InlineFixer for zero-token fixes when paired with inlineReplacement.
+   */
+  quotedText: z.string().optional(),
+  /**
+   * Ready-to-apply replacement for quotedText (InlineFixer zero-token fix).
+   * When provided with quotedText, InlineFixer can apply this directly via str.replace()
+   * instead of calling Patcher LLM (~1500 tokens saved per fix).
+   */
+  inlineReplacement: z.string().optional(),
 });
 
 /** SelfReviewIssue type */
@@ -1539,17 +1554,23 @@ export const SelfReviewResultSchema = z.object({
   /** Whether heuristic pre-checks passed */
   heuristicsPassed: z.boolean().default(true),
   /** Details from heuristic checks (language, truncation) */
-  heuristicDetails: z.object({
-    languageCheck: z.object({
-      passed: z.boolean(),
-      foreignCharacters: z.number().default(0),
-      scriptsFound: z.array(z.string()).default([]),
-    }).optional(),
-    truncationCheck: z.object({
-      passed: z.boolean(),
-      issues: z.array(z.string()).default([]),
-    }).optional(),
-  }).optional(),
+  heuristicDetails: z
+    .object({
+      languageCheck: z
+        .object({
+          passed: z.boolean(),
+          foreignCharacters: z.number().default(0),
+          scriptsFound: z.array(z.string()).default([]),
+        })
+        .optional(),
+      truncationCheck: z
+        .object({
+          passed: z.boolean(),
+          issues: z.array(z.string()).default([]),
+        })
+        .optional(),
+    })
+    .optional(),
 });
 
 /** SelfReviewResult type */

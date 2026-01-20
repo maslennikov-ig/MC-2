@@ -31,21 +31,12 @@
 import { logger } from '@/shared/logger';
 import { logTrace } from '@/shared/trace-logger';
 import { saveRejectedContent } from '../services/database-service';
-import type {
-  LessonGraphStateType,
-  LessonGraphStateUpdate,
-} from '../state';
-import type {
-  SelfReviewResult,
-  SelfReviewIssue,
-} from '@megacampus/shared-types/judge-types';
+import type { LessonGraphStateType, LessonGraphStateUpdate } from '../state';
+import type { SelfReviewResult, SelfReviewIssue } from '@megacampus/shared-types/judge-types';
 import { MODEL_FALLBACK } from '../config';
 
 // Import from extracted modules
-import {
-  HEURISTIC_TOKENS_USED,
-  SELF_REVIEW_CONFIG,
-} from './self-reviewer/self-reviewer-constants';
+import { HEURISTIC_TOKENS_USED, SELF_REVIEW_CONFIG } from './self-reviewer/self-reviewer-constants';
 import { removeChatbotArtifacts } from './self-reviewer/self-reviewer-heuristics';
 import {
   buildHeuristicDetails,
@@ -127,7 +118,7 @@ export async function selfReviewerNode(
     // CRITICAL ISSUES: Return REGENERATE immediately
     // ============================================================================
 
-    const criticalIssues = criticalAnalysis.issues.filter((i) => i.severity === 'CRITICAL');
+    const criticalIssues = criticalAnalysis.issues.filter(i => i.severity === 'CRITICAL');
     if (criticalIssues.length > 0) {
       return handleCriticalIssues(
         state,
@@ -160,10 +151,7 @@ export async function selfReviewerNode(
     // ============================================================================
 
     const minorIssues = buildMinorIssues(heuristics);
-    const allHeuristicIssues: SelfReviewIssue[] = [
-      ...criticalAnalysis.issues,
-      ...minorIssues,
-    ];
+    const allHeuristicIssues: SelfReviewIssue[] = [...criticalAnalysis.issues, ...minorIssues];
 
     nodeLogger.debug({
       msg: 'Heuristic pre-checks passed',
@@ -192,11 +180,17 @@ export async function selfReviewerNode(
         error: llmResult.error,
       });
       return buildHeuristicOnlyResult(
-        buildHeuristicDetails(heuristics.languageCheck, heuristics.truncationCheck, heuristics.mermaidCheck),
+        buildHeuristicDetails(
+          heuristics.languageCheck,
+          heuristics.truncationCheck,
+          heuristics.mermaidCheck
+        ),
         allHeuristicIssues,
         language,
         state,
-        startTime
+        startTime,
+        llmResult.error || 'unknown error',
+        llmResult.tokensUsed
       );
     }
 
@@ -387,7 +381,7 @@ async function handleCriticalIssues(
   nodeLogger.warn({
     msg: 'Critical heuristic failures detected, skipping LLM review',
     criticalCount: criticalIssues.length,
-    issues: criticalIssues.map((i) => i.description),
+    issues: criticalIssues.map(i => i.description),
   });
 
   const heuristicDetails = buildHeuristicDetails(
@@ -450,11 +444,23 @@ async function handleCriticalIssues(
     retryCount + 1
   );
 
-  return {
+  // Include modelOverride if analysis requires fallback
+  // This happens when CJK issue persists across retries
+  const baseResult: LessonGraphStateUpdate = {
     currentNode: 'selfReviewer',
     selfReviewResult: result,
     progressSummary,
   };
+
+  if (criticalAnalysis.requiresModelFallback && criticalAnalysis.fallbackModel) {
+    return {
+      ...baseResult,
+      modelOverride: criticalAnalysis.fallbackModel,
+      retryCount: retryCount + 1,
+    };
+  }
+
+  return baseResult;
 }
 
 /**
@@ -538,12 +544,14 @@ async function handleError(
   const result: SelfReviewResult = {
     status: 'REGENERATE',
     reasoning: `Self-review failed: ${errorMessage}`,
-    issues: [{
-      type: 'EMPTY',
-      severity: 'CRITICAL',
-      location: 'global',
-      description: `Self-review error: ${errorMessage}`,
-    }],
+    issues: [
+      {
+        type: 'EMPTY',
+        severity: 'CRITICAL',
+        location: 'global',
+        description: `Self-review error: ${errorMessage}`,
+      },
+    ],
     patchedContent: null,
     tokensUsed: HEURISTIC_TOKENS_USED,
     durationMs,
@@ -609,6 +617,7 @@ function countIssuesByType(issues: SelfReviewIssue[]): Record<string, number> {
     ALIGNMENT: issues.filter(i => i.type === 'ALIGNMENT').length,
     HALLUCINATION: issues.filter(i => i.type === 'HALLUCINATION').length,
     HYGIENE: issues.filter(i => i.type === 'HYGIENE').length,
+    GRAMMAR: issues.filter(i => i.type === 'GRAMMAR').length,
     EMPTY: issues.filter(i => i.type === 'EMPTY').length,
     SHORT_SECTION: issues.filter(i => i.type === 'SHORT_SECTION').length,
     LOGIC: issues.filter(i => i.type === 'LOGIC').length,

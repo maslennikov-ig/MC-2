@@ -31,5 +31,5 @@ export { logger };
 /**
  * Re-export error logging utilities for LMS error logging
  */
-export * from '../../shared/logger/error-service';
+export * from '../../shared/logger/error-service.js';
 export * from '../../shared/logger/types';

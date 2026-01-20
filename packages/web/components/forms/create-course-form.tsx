@@ -8,8 +8,8 @@ import { BasicInfoSection } from './create-course/components/BasicInfoSection'
 import { FormatsSection } from './create-course/components/FormatsSection'
 import { StyleSection } from './create-course/components/StyleSection'
 import { UploadSection } from './create-course/components/UploadSection'
+import { GenerationSettingsSection } from './create-course/components/GenerationSettingsSection'
 import { AdvancedSettingsSection } from './create-course/components/AdvancedSettingsSection'
-import { CostPreviewCard } from './create-course/components/CostPreviewCard'
 import { SubmitSection } from './create-course/components/SubmitSection'
 import { AuthRequiredState, PermissionDeniedState } from '@/components/common/error-states'
 
@@ -97,24 +97,20 @@ export default function CreateCourseForm() {
             isUploadingFiles={isUploadingFiles}
           />
 
-          <AdvancedSettingsSection />
+          <GenerationSettingsSection
+            documentCount={uploadedFiles.length}
+            hasDocuments={uploadedFiles.length > 0}
+          />
 
-          <div className="xl:col-span-2">
-            <CostPreviewCard
-              documentCount={uploadedFiles.length}
-              estimatedLessons={
-                form.watch('estimatedLessons') || (form.watch('courseSize') === 'auto' ? 30 : 15)
-              }
-              hasDocuments={uploadedFiles.length > 0}
-              isVisible={form.watch('generationMode') === 'automatic'}
-            />
-          </div>
+          <AdvancedSettingsSection />
 
           <SubmitSection
             isSubmitting={isSubmitting}
             workerReady={workerReadiness.ready}
             workerLoading={workerReadiness.loading}
             workerError={workerReadiness.error}
+            uploadedFiles={uploadedFiles}
+            isUploadingFiles={isUploadingFiles}
           />
         </form>
       </FormProvider>

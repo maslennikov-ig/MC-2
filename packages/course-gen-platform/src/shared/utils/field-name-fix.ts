@@ -36,9 +36,7 @@ import logger from '@/shared/logger';
 function camelToSnake(str: string): string {
   // Replace uppercase letters with underscore + lowercase
   // Remove leading underscore if string starts with uppercase
-  return str
-    .replace(/[A-Z]/g, (letter) => `_${letter.toLowerCase()}`)
-    .replace(/^_/, '');
+  return str.replace(/[A-Z]/g, letter => `_${letter.toLowerCase()}`).replace(/^_/, '');
 }
 
 /**
@@ -131,11 +129,8 @@ const FIELD_MAPPING: Record<string, string> = {
 
   // Stage 4 Analysis - Pedagogical strategy (Phase 3)
   pedagogicalStrategy: 'pedagogical_strategy',
-  teachingStyle: 'teaching_style',
   assessmentApproach: 'assessment_approach',
-  practicalFocus: 'practical_focus',
   progressionLogic: 'progression_logic',
-  interactivityLevel: 'interactivity_level',
 
   // Stage 4 Analysis - Pedagogical patterns (Phase 1 enhancement)
   pedagogicalPatterns: 'pedagogical_patterns',
@@ -224,7 +219,7 @@ export function fixFieldNames<T = unknown>(obj: unknown): T {
 
   // Handle arrays - recursively transform each element
   if (Array.isArray(obj)) {
-    return obj.map((item) => fixFieldNames(item)) as unknown as T;
+    return obj.map(item => fixFieldNames(item)) as unknown as T;
   }
 
   // Handle objects - transform keys and recursively transform values
@@ -257,9 +252,7 @@ export function fixFieldNamesWithLogging<T = unknown>(obj: unknown, context?: st
   const fixedKeys = Object.keys((fixed as object) || {});
 
   // Check if any keys were transformed
-  const hasChanges = originalKeys.some(
-    (key, index) => key !== fixedKeys[index]
-  );
+  const hasChanges = originalKeys.some((key, index) => key !== fixedKeys[index]);
 
   if (hasChanges) {
     const transformations = originalKeys
@@ -276,10 +269,7 @@ export function fixFieldNamesWithLogging<T = unknown>(obj: unknown, context?: st
       'Field names transformed from camelCase to snake_case'
     );
   } else {
-    logger.debug(
-      { context },
-      'No field name transformations needed (already snake_case)'
-    );
+    logger.debug({ context }, 'No field name transformations needed (already snake_case)');
   }
 
   return fixed;

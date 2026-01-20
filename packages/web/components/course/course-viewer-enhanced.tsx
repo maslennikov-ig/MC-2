@@ -1,20 +1,31 @@
-"use client"
+'use client'
 
-import React from "react"
-import { motion } from "framer-motion"
-import Header from "@/components/layouts/header"
-import ContentGenerationPanel from "@/components/common/content-generation-panel"
-import { useSwipe } from "@/lib/hooks/use-swipe"
-import { toast } from "sonner"
-import { useViewerState } from "./viewer/hooks/useViewerState"
-import { Sidebar } from "./viewer/components/Sidebar"
-import { Toolbar } from "./viewer/components/Toolbar"
-import { LessonView } from "./viewer/components/LessonView"
-import { FAB } from "./viewer/components/FAB"
-import { SharedCourseBanner } from "./viewer/components/SharedCourseBanner"
-import type { CourseViewerProps } from "./viewer/types"
+import React from 'react'
+import { motion } from 'framer-motion'
+import Header from '@/components/layouts/header'
+import ContentGenerationPanel from '@/components/common/content-generation-panel'
+import { useSwipe } from '@/lib/hooks/use-swipe'
+import { toast } from 'sonner'
+import { useViewerState } from './viewer/hooks/useViewerState'
+import { Sidebar } from './viewer/components/Sidebar'
+import { Toolbar } from './viewer/components/Toolbar'
+import { LessonView } from './viewer/components/LessonView'
+import { FAB } from './viewer/components/FAB'
+import { SharedCourseBanner } from './viewer/components/SharedCourseBanner'
+import { BreadcrumbNav } from './viewer/components/BreadcrumbNav'
+import type { CourseViewerProps } from './viewer/types'
 
-export default function CourseViewerEnhanced({ course, sections: rawSections, lessons: rawLessons, assets, enrichments, enrichmentsLoadError, lessonContents, readOnly = false }: CourseViewerProps) {
+export default function CourseViewerEnhanced({
+  course,
+  sections: rawSections,
+  lessons: rawLessons,
+  assets,
+  enrichments,
+  enrichmentsLoadError,
+  lessonContents,
+  readOnly = false,
+  initialLessonLabel,
+}: CourseViewerProps) {
   const {
     sections,
     lessons,
@@ -45,43 +56,46 @@ export default function CourseViewerEnhanced({ course, sections: rawSections, le
     totalMinutes,
     remainingMinutes,
     toggleSection,
-    markLessonComplete
-  } = useViewerState(course, rawSections, rawLessons)
+    markLessonComplete,
+  } = useViewerState(course, rawSections, rawLessons, initialLessonLabel)
 
   // Swipe logic for mobile navigation
-  const swipeHandlers = useSwipe({
-    onSwipeLeft: () => {
-      if (nextLesson && currentLessonId) {
-        setCurrentLessonId(nextLesson.id)
-        toast.success(`Переход к уроку: ${nextLesson.title}`, {
-          duration: 2000,
-          position: 'top-center'
-        })
-      } else if (!nextLesson && currentLessonId) {
-        toast.info('Это последний урок в курсе', {
-          duration: 2000,
-          position: 'top-center'
-        })
-      }
+  const swipeHandlers = useSwipe(
+    {
+      onSwipeLeft: () => {
+        if (nextLesson && currentLessonId) {
+          setCurrentLessonId(nextLesson.id)
+          toast.success(`Переход к уроку: ${nextLesson.title}`, {
+            duration: 2000,
+            position: 'top-center',
+          })
+        } else if (!nextLesson && currentLessonId) {
+          toast.info('Это последний урок в курсе', {
+            duration: 2000,
+            position: 'top-center',
+          })
+        }
+      },
+      onSwipeRight: () => {
+        if (prevLesson && currentLessonId) {
+          setCurrentLessonId(prevLesson.id)
+          toast.success(`Переход к уроку: ${prevLesson.title}`, {
+            duration: 2000,
+            position: 'top-center',
+          })
+        } else if (!prevLesson && currentLessonId) {
+          toast.info('Это первый урок в курсе', {
+            duration: 2000,
+            position: 'top-center',
+          })
+        }
+      },
     },
-    onSwipeRight: () => {
-      if (prevLesson && currentLessonId) {
-        setCurrentLessonId(prevLesson.id)
-        toast.success(`Переход к уроку: ${prevLesson.title}`, {
-          duration: 2000,
-          position: 'top-center'
-        })
-      } else if (!prevLesson && currentLessonId) {
-        toast.info('Это первый урок в курсе', {
-          duration: 2000,
-          position: 'top-center'
-        })
-      }
+    {
+      threshold: 75,
+      preventDefaultTouchmoveEvent: false,
     }
-  }, {
-    threshold: 75,
-    preventDefaultTouchmoveEvent: false
-  })
+  )
 
   const formatTime = (minutes: number) => {
     const hours = Math.floor(minutes / 60)
@@ -96,7 +110,7 @@ export default function CourseViewerEnhanced({ course, sections: rawSections, le
     <div className="min-h-screen bg-white dark:bg-gray-950">
       {/* Subtle gradient overlay */}
       {!focusMode && (
-        <div className="fixed inset-0 bg-gradient-to-br from-transparent via-purple-50/10 to-purple-100/20 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950 pointer-events-none" />
+        <div className="pointer-events-none fixed inset-0 bg-gradient-to-br from-transparent via-purple-50/10 to-purple-100/20 dark:from-gray-950 dark:via-gray-900 dark:to-gray-950" />
       )}
 
       {!focusMode && <Header />}
@@ -104,8 +118,8 @@ export default function CourseViewerEnhanced({ course, sections: rawSections, le
       {/* Shared Course Banner - shown when readOnly is true */}
       {readOnly && !focusMode && <SharedCourseBanner />}
 
-      <div className="relative z-10 min-h-screen flex">
-        <Sidebar 
+      <div className="relative z-10 flex min-h-screen">
+        <Sidebar
           course={course}
           sections={sections}
           lessonsBySection={lessonsBySection}
@@ -124,18 +138,24 @@ export default function CourseViewerEnhanced({ course, sections: rawSections, le
           onSelectLesson={setCurrentLessonId}
         />
 
-        <motion.div 
-          className="flex-1 flex flex-col"
-          animate={{ 
-            width: sidebarOpen && !focusMode ? 'auto' : '100%'
+        <motion.div
+          className="flex flex-1 flex-col"
+          animate={{
+            width: sidebarOpen && !focusMode ? 'auto' : '100%',
           }}
-          transition={{ 
-            type: "spring", 
-            damping: 25, 
+          transition={{
+            type: 'spring',
+            damping: 25,
             stiffness: 300,
-            mass: 0.5
+            mass: 0.5,
           }}
         >
+          <BreadcrumbNav
+            course={course}
+            currentSection={currentSection}
+            currentLesson={currentLesson}
+            focusMode={focusMode}
+          />
           <Toolbar
             currentSection={currentSection}
             currentLesson={currentLesson}
@@ -183,7 +203,7 @@ export default function CourseViewerEnhanced({ course, sections: rawSections, le
                 onExitFocus={() => setFocusMode(false)}
               />
             ) : (
-              <div className="flex items-center justify-center h-full">
+              <div className="flex h-full items-center justify-center">
                 <div className="text-center text-gray-500 dark:text-white/50">
                   <p>Выберите урок для начала обучения</p>
                 </div>
@@ -205,7 +225,7 @@ export default function CourseViewerEnhanced({ course, sections: rawSections, le
           onClose={() => setGenerationPanelOpen(false)}
           courseId={course.id}
           courseTitle={course.title}
-          courseLanguage={(course.request_data?.language as string) || course.language || "ru"}
+          courseLanguage={(course.request_data?.language as string) || course.language || 'ru'}
           sections={sections}
           lessons={lessons}
           selectedLessons={currentLessonId ? [currentLessonId] : []}
