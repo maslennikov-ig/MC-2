@@ -3,11 +3,12 @@
 import { useEffect, useReducer, useCallback, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import Link from 'next/link'
+import { Link } from '@/src/i18n/navigation'
 // import { useTheme } from 'next-themes'; // DISABLED: MissionControlBanner moved to GraphView
 import { createClient } from '@/lib/supabase/client'
 import { motion, AnimatePresence } from 'framer-motion'
 import confetti from 'canvas-confetti'
+import { toast } from 'sonner'
 import { Button } from '@/components/ui/button'
 import { X } from 'lucide-react'
 import {
@@ -17,7 +18,6 @@ import {
   ProgressState,
   ProgressAction,
 } from '@/types/course-generation'
-import { Alert, AlertDescription } from '@/components/ui/alert'
 // DISABLED: MissionControlBanner handlers moved to GraphView
 // import { approveStage, cancelGeneration, startGeneration } from '@/app/actions/admin-generation';
 import { GraphViewWrapper } from '@/components/generation-graph'
@@ -69,20 +69,10 @@ type EnhancedProgressAction =
   | ProgressAction
   | { type: 'RESTORE_STATE'; payload: ProgressState }
   | { type: 'INCREMENT_RETRY'; payload: { stepIndex: number } }
-  | {
-      type: 'SHOW_TOAST'
-      payload: { type: 'success' | 'error' | 'warning' | 'info'; message: string }
-    }
-  | { type: 'CLEAR_TOAST' }
 
 // Enhanced state interface
 interface EnhancedProgressState extends ProgressState {
   stepRetryCount: Map<number, number>
-  toast: {
-    show: boolean
-    type: 'success' | 'error' | 'warning' | 'info'
-    message: string
-  } | null
 }
 
 // Enhanced progress reducer
@@ -171,22 +161,6 @@ function enhancedProgressReducer(
         stepRetryCount: newRetryCount,
       }
 
-    case 'SHOW_TOAST':
-      return {
-        ...state,
-        toast: {
-          show: true,
-          type: action.payload.type,
-          message: action.payload.message,
-        },
-      }
-
-    case 'CLEAR_TOAST':
-      return {
-        ...state,
-        toast: null,
-      }
-
     default:
       return state
   }
@@ -218,7 +192,6 @@ export default function GenerationProgressContainerEnhanced({
   const [supabase, setSupabase] = useState<ReturnType<typeof createClient> | null>(null)
   const pollingInterval = useRef<NodeJS.Timeout | null>(null)
   const redirectTimeout = useRef<NodeJS.Timeout | null>(null)
-  const toastTimeout = useRef<NodeJS.Timeout | null>(null)
   const reconnectAttempts = useRef(0)
   const maxReconnectAttempts = 5
 
@@ -260,7 +233,6 @@ export default function GenerationProgressContainerEnhanced({
               ...parsed,
               progress: mergedProgress,
               status: initialStatus, // Always use server status
-              toast: null, // Don't restore toasts
             }
           } catch {
             // Failed to parse stored state - will use fresh state
@@ -287,7 +259,6 @@ export default function GenerationProgressContainerEnhanced({
       retryAttempts: 0,
       estimatedTime: 180,
       stepRetryCount: new Map(),
-      toast: null,
     }
   }
 
@@ -397,33 +368,17 @@ export default function GenerationProgressContainerEnhanced({
     saveStateToStorage()
   }, [state.progress, state.status, state.error, saveStateToStorage])
 
-  // Show toast helper
-  const showToast = useCallback(
-    (type: 'success' | 'error' | 'warning' | 'info', message: string) => {
-      dispatch({ type: 'SHOW_TOAST', payload: { type, message } })
-
-      // Auto-hide toast after 5 seconds
-      if (toastTimeout.current) {
-        clearTimeout(toastTimeout.current)
-      }
-      toastTimeout.current = setTimeout(() => {
-        dispatch({ type: 'CLEAR_TOAST' })
-      }, 5000)
-    },
-    []
-  )
-
-  // Automatic Mode Control Handlers (after showToast declaration to avoid hoisting issues)
+  // Automatic Mode Control Handlers
   const handlePause = useCallback(async () => {
     if (!supabase) return
     // Don't pause if already paused or generation is terminal
     if (isPausedLocal) {
-      showToast('warning', 'Генерация уже приостановлена')
+      toast.warning('Генерация уже приостановлена')
       return
     }
     const terminalStatuses = ['completed', 'failed', 'cancelled']
     if (terminalStatuses.includes(state.status as string)) {
-      showToast('warning', 'Генерация уже завершена')
+      toast.warning('Генерация уже завершена')
       return
     }
     // Optimistic update - set paused state immediately before API call
@@ -439,18 +394,18 @@ export default function GenerationProgressContainerEnhanced({
         setIsPausedLocal(false)
         throw error
       }
-      showToast('info', 'Генерация приостановлена')
+      toast.info('Генерация приостановлена')
     } catch (error) {
-      showToast('error', 'Не удалось приостановить генерацию')
+      toast.error('Не удалось приостановить генерацию')
       console.error(error)
     }
-  }, [courseId, supabase, showToast, isPausedLocal, state.status])
+  }, [courseId, supabase, isPausedLocal, state.status])
 
   const handleResume = useCallback(async () => {
     if (!supabase) return
     // Only resume if paused
     if (!isPausedLocal) {
-      showToast('warning', 'Генерация не приостановлена')
+      toast.warning('Генерация не приостановлена')
       return
     }
     // Optimistic update - set resumed state immediately before API call
@@ -466,34 +421,34 @@ export default function GenerationProgressContainerEnhanced({
         setIsPausedLocal(true)
         throw error
       }
-      showToast('success', 'Генерация продолжена')
+      toast.success('Генерация продолжена')
     } catch (error) {
-      showToast('error', 'Не удалось продолжить генерацию')
+      toast.error('Не удалось продолжить генерацию')
       console.error(error)
     }
-  }, [courseId, supabase, showToast, isPausedLocal])
+  }, [courseId, supabase, isPausedLocal])
 
   const handleCancel = useCallback(async () => {
     if (!confirm('Вы уверены, что хотите отменить генерацию? Это действие нельзя отменить.')) return
 
     try {
       await cancelGeneration(courseId)
-      showToast('info', 'Генерация отменена')
+      toast.info('Генерация отменена')
     } catch (error) {
-      showToast('error', 'Не удалось отменить генерацию')
+      toast.error('Не удалось отменить генерацию')
       console.error(error)
     }
-  }, [courseId, showToast])
+  }, [courseId])
 
   const handleSwitchToManual = useCallback(async () => {
     try {
       const data = await switchToManualMode(courseId)
-      showToast('success', data?.message || 'Переключено в ручной режим')
+      toast.success(data?.message || 'Переключено в ручной режим')
     } catch (error) {
-      showToast('error', 'Не удалось переключить в ручной режим')
+      toast.error('Не удалось переключить в ручной режим')
       console.error(error)
     }
-  }, [courseId, showToast])
+  }, [courseId])
 
   // Calculate estimated time based on progress
   const calculateEstimatedTime = useCallback((progress: GenerationProgress) => {
@@ -605,7 +560,7 @@ export default function GenerationProgressContainerEnhanced({
         // Check for failed steps
         const failedStep = generationProgress.steps.find((s) => s.status === 'failed')
         if (failedStep) {
-          showToast('error', `Step failed: ${failedStep.name}. You can retry it.`)
+          toast.error(`Step failed: ${failedStep.name}. You can retry it.`)
         }
       }
 
@@ -635,7 +590,7 @@ export default function GenerationProgressContainerEnhanced({
             hasTriggeredConfetti.current = true
             setShowSuccess(true)
             triggerConfetti()
-            showToast('success', 'Course generated successfully!')
+            toast.success('Course generated successfully!')
           }
 
           if (onComplete) {
@@ -653,7 +608,7 @@ export default function GenerationProgressContainerEnhanced({
         if (course.generation_status === 'failed') {
           const error = new Error(course.error_message || 'Course generation failed')
           dispatch({ type: 'SET_ERROR', payload: error })
-          showToast('error', 'Course generation failed. Please check the error details.')
+          toast.error('Course generation failed. Please check the error details.')
 
           if (onError) {
             onError(error)
@@ -671,7 +626,6 @@ export default function GenerationProgressContainerEnhanced({
       onComplete,
       onError,
       calculateEstimatedTime,
-      showToast,
     ]
   )
 
@@ -695,7 +649,7 @@ export default function GenerationProgressContainerEnhanced({
           reconnectAttempts.current++
 
           if (reconnectAttempts.current >= maxReconnectAttempts) {
-            showToast('warning', 'Connection issues detected. Retrying...')
+            toast.warning('Connection issues detected. Retrying...')
           }
         }
       } catch {
@@ -708,7 +662,7 @@ export default function GenerationProgressContainerEnhanced({
     const baseInterval = 3000
     const interval = Math.min(baseInterval * Math.pow(2, reconnectAttempts.current), 30000)
     pollingInterval.current = setInterval(() => void poll(), interval)
-  }, [courseId, supabase, handleProgressUpdate, showToast])
+  }, [courseId, supabase, handleProgressUpdate])
 
   const stopPolling = useCallback(() => {
     if (pollingInterval.current) {
@@ -833,15 +787,6 @@ export default function GenerationProgressContainerEnhanced({
     }
   }, [])
 
-  // Cleanup toast timeout on unmount
-  useEffect(() => {
-    return () => {
-      if (toastTimeout.current) {
-        clearTimeout(toastTimeout.current)
-      }
-    }
-  }, [])
-
   // Confetti celebration animation
   const triggerConfetti = () => {
     const duration = 3000
@@ -887,31 +832,6 @@ export default function GenerationProgressContainerEnhanced({
 
   return (
     <div className="relative h-screen w-full">
-      {/* Toast notifications */}
-      <AnimatePresence>
-        {state.toast && (
-          <motion.div
-            initial={{ opacity: 0, y: -20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: -20 }}
-            className="fixed top-4 right-4 z-[100]"
-          >
-            <Alert
-              variant={state.toast.type === 'error' ? 'destructive' : 'default'}
-              className={` ${state.toast.type === 'success' ? 'border-green-500 bg-green-50 dark:bg-green-950/30' : ''} ${state.toast.type === 'warning' ? 'border-yellow-500 bg-yellow-50 dark:bg-yellow-950/30' : ''} ${state.toast.type === 'info' ? 'border-blue-500 bg-blue-50 dark:bg-blue-950/30' : ''} shadow-lg`}
-            >
-              <AlertDescription className="pr-8">{state.toast.message}</AlertDescription>
-              <button
-                onClick={() => dispatch({ type: 'CLEAR_TOAST' })}
-                className="absolute top-2 right-2 text-gray-400 hover:text-gray-600"
-              >
-                ×
-              </button>
-            </Alert>
-          </motion.div>
-        )}
-      </AnimatePresence>
-
       {/* GraphView - Full screen */}
       <GraphViewWrapper
         courseId={courseId}

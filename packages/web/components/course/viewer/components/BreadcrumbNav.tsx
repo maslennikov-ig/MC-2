@@ -1,7 +1,7 @@
 'use client'
 
 import React from 'react'
-import Link from 'next/link'
+import { Link } from '@/src/i18n/navigation'
 import { useTranslations } from 'next-intl'
 import { ChevronRight, ArrowLeft, BookOpen } from 'lucide-react'
 import type { Course, Section, Lesson } from '@/types/database'

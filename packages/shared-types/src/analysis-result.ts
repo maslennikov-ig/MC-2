@@ -112,8 +112,15 @@ export interface AnalysisResult {
   // Content strategy (Phase 5)
   content_strategy: 'create_from_scratch' | 'expand_and_enhance' | 'optimize_existing';
 
-  // NEW: RAG Planning for Generation - document-to-section mapping (CRITICAL for T022) - REQUIRED (defaults to {})
-  // Enhanced in v0.20.0 with confidence levels and search_queries
+  /**
+   * @deprecated Phase 6 RAG Planning removed in mc2-u9fb.
+   * Vector search with priority boosting (mc2-zac) replaces LLM-based document mapping.
+   * This field is now always an empty object {} for new courses.
+   * Kept for backward compatibility with existing course data.
+   *
+   * Historical: RAG Planning for Generation - document-to-section mapping
+   * Enhanced in v0.20.0 with confidence levels and search_queries
+   */
   document_relevance_mapping: {
     [section_id: string]: {
       primary_documents: string[]; // file_catalog IDs ranked by relevance

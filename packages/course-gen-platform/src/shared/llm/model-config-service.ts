@@ -51,6 +51,226 @@ export const DEFAULT_STAGE_CONFIG = {
 } as const;
 
 /**
+ * Hardcoded fallback configurations for phases (standard tier)
+ * Used as "last resort" when database unavailable AND no cached data
+ *
+ * These match production DB configs as of 2026-01-20.
+ * Production should always use database config for flexibility.
+ */
+export const DEFAULT_PHASE_CONFIGS: Record<string, PhaseModelConfig> = {
+  // Stage 2
+  stage_2_summarization: {
+    modelId: 'xiaomi/mimo-v2-flash:free',
+    fallbackModelId: 'google/gemini-2.5-flash',
+    temperature: 0.7,
+    maxTokens: 8000,
+    maxContextTokens: 128000,
+    qualityThreshold: null,
+    maxRetries: 3,
+    timeoutMs: null,
+    tier: 'standard',
+    source: 'hardcoded',
+  },
+  // Stage 3
+  stage_3_classification: {
+    modelId: 'xiaomi/mimo-v2-flash:free',
+    fallbackModelId: 'google/gemini-2.5-flash',
+    temperature: 0.5,
+    maxTokens: 4096,
+    maxContextTokens: 128000,
+    qualityThreshold: null,
+    maxRetries: 3,
+    timeoutMs: null,
+    tier: 'standard',
+    source: 'hardcoded',
+  },
+  // Stage 4
+  stage_4_classification: {
+    modelId: 'xiaomi/mimo-v2-flash:free',
+    fallbackModelId: 'google/gemini-2.5-flash',
+    temperature: 0.7,
+    maxTokens: 4096,
+    maxContextTokens: 128000,
+    qualityThreshold: null,
+    maxRetries: 3,
+    timeoutMs: null,
+    tier: 'standard',
+    source: 'hardcoded',
+  },
+  stage_4_scope: {
+    modelId: 'xiaomi/mimo-v2-flash:free',
+    fallbackModelId: 'google/gemini-2.5-flash',
+    temperature: 0.7,
+    maxTokens: 4096,
+    maxContextTokens: 128000,
+    qualityThreshold: null,
+    maxRetries: 3,
+    timeoutMs: null,
+    tier: 'standard',
+    source: 'hardcoded',
+  },
+  stage_4_expert: {
+    modelId: 'xiaomi/mimo-v2-flash:free',
+    fallbackModelId: 'google/gemini-2.5-flash',
+    temperature: 0.5,
+    maxTokens: 8000,
+    maxContextTokens: 128000,
+    qualityThreshold: null,
+    maxRetries: 3,
+    timeoutMs: null,
+    tier: 'standard',
+    source: 'hardcoded',
+  },
+  stage_4_synthesis: {
+    modelId: 'xiaomi/mimo-v2-flash:free',
+    fallbackModelId: 'google/gemini-2.5-flash',
+    temperature: 0.7,
+    maxTokens: 6000,
+    maxContextTokens: 128000,
+    qualityThreshold: null,
+    maxRetries: 3,
+    timeoutMs: null,
+    tier: 'standard',
+    source: 'hardcoded',
+  },
+  // Stage 5
+  stage_5_sections: {
+    modelId: 'xiaomi/mimo-v2-flash:free',
+    fallbackModelId: 'google/gemini-2.5-flash',
+    temperature: 0.7,
+    maxTokens: 8000,
+    maxContextTokens: 128000,
+    qualityThreshold: null,
+    maxRetries: 3,
+    timeoutMs: null,
+    tier: 'standard',
+    source: 'hardcoded',
+  },
+  stage_5_metadata: {
+    modelId: 'xiaomi/mimo-v2-flash:free',
+    fallbackModelId: 'google/gemini-2.5-flash',
+    temperature: 0.7,
+    maxTokens: 4096,
+    maxContextTokens: 128000,
+    qualityThreshold: null,
+    maxRetries: 3,
+    timeoutMs: null,
+    tier: 'standard',
+    source: 'hardcoded',
+  },
+  // Stage 6
+  stage_6_refinement: {
+    modelId: 'xiaomi/mimo-v2-flash:free',
+    fallbackModelId: 'google/gemini-2.5-flash',
+    temperature: 0.7,
+    maxTokens: 8000,
+    maxContextTokens: 128000,
+    qualityThreshold: null,
+    maxRetries: 3,
+    timeoutMs: null,
+    tier: 'standard',
+    source: 'hardcoded',
+  },
+  stage_6_section_expander: {
+    modelId: 'xiaomi/mimo-v2-flash:free',
+    fallbackModelId: 'google/gemini-2.5-flash',
+    temperature: 0.7,
+    maxTokens: 8000,
+    maxContextTokens: 128000,
+    qualityThreshold: null,
+    maxRetries: 3,
+    timeoutMs: null,
+    tier: 'standard',
+    source: 'hardcoded',
+  },
+  stage_6_patcher: {
+    modelId: 'xiaomi/mimo-v2-flash:free',
+    fallbackModelId: 'google/gemini-2.5-flash',
+    temperature: 0.7,
+    maxTokens: 4096,
+    maxContextTokens: 128000,
+    qualityThreshold: null,
+    maxRetries: 3,
+    timeoutMs: null,
+    tier: 'standard',
+    source: 'hardcoded',
+  },
+  stage_6_delta_judge: {
+    modelId: 'xiaomi/mimo-v2-flash:free',
+    fallbackModelId: 'google/gemini-2.5-flash',
+    temperature: 0.3,
+    maxTokens: 4096,
+    maxContextTokens: 128000,
+    qualityThreshold: null,
+    maxRetries: 3,
+    timeoutMs: null,
+    tier: 'standard',
+    source: 'hardcoded',
+  },
+  stage_6_arbiter: {
+    modelId: 'xiaomi/mimo-v2-flash:free',
+    fallbackModelId: 'google/gemini-2.5-flash',
+    temperature: 0.3,
+    maxTokens: 4096,
+    maxContextTokens: 128000,
+    qualityThreshold: null,
+    maxRetries: 3,
+    timeoutMs: null,
+    tier: 'standard',
+    source: 'hardcoded',
+  },
+  stage_6_rag_planning: {
+    modelId: 'xiaomi/mimo-v2-flash:free',
+    fallbackModelId: 'google/gemini-2.5-flash',
+    temperature: 0.7,
+    maxTokens: 4096,
+    maxContextTokens: 128000,
+    qualityThreshold: null,
+    maxRetries: 3,
+    timeoutMs: null,
+    tier: 'standard',
+    source: 'hardcoded',
+  },
+  // Emergency & fallback
+  emergency: {
+    modelId: 'google/gemini-2.5-flash',
+    fallbackModelId: 'xiaomi/mimo-v2-flash:free',
+    temperature: 0.7,
+    maxTokens: 4096,
+    maxContextTokens: 128000,
+    qualityThreshold: null,
+    maxRetries: 3,
+    timeoutMs: null,
+    tier: 'standard',
+    source: 'hardcoded',
+  },
+  quality_fallback: {
+    modelId: 'openai/gpt-oss-120b',
+    fallbackModelId: 'google/gemini-2.5-flash',
+    temperature: 0.5,
+    maxTokens: 8000,
+    maxContextTokens: 128000,
+    qualityThreshold: null,
+    maxRetries: 3,
+    timeoutMs: null,
+    tier: 'standard',
+    source: 'hardcoded',
+  },
+  global_default: {
+    modelId: 'xiaomi/mimo-v2-flash:free',
+    fallbackModelId: 'google/gemini-2.5-flash',
+    temperature: 0.7,
+    maxTokens: 4096,
+    maxContextTokens: 128000,
+    qualityThreshold: null,
+    maxRetries: 3,
+    timeoutMs: null,
+    tier: 'standard',
+    source: 'hardcoded',
+  },
+};
+
+/**
  * Model configuration result with primary/fallback models
  */
 export interface ModelConfigResult {
@@ -503,7 +723,30 @@ class ModelConfigServiceImpl {
       return cached.data;
     }
 
-    // Step 4: No cache, no database - explicit failure
+    // Step 4: No cache, no database - try hardcoded fallback
+    const hardcodedConfig = DEFAULT_PHASE_CONFIGS[phaseName];
+    if (hardcodedConfig) {
+      logger.warn(
+        { phaseName, courseId, tier, modelId: hardcodedConfig.modelId },
+        'Using HARDCODED fallback config - database unavailable and no cache'
+      );
+      // Cache the hardcoded config to avoid repeated warnings
+      this.phaseCache.set(cacheKey, hardcodedConfig);
+      return hardcodedConfig;
+    }
+
+    // Step 5: Try global_default as last resort
+    const globalDefault = DEFAULT_PHASE_CONFIGS['global_default'];
+    if (globalDefault) {
+      logger.warn(
+        { phaseName, courseId, tier, modelId: globalDefault.modelId },
+        'Using global_default HARDCODED fallback - unknown phase and no cache'
+      );
+      this.phaseCache.set(cacheKey, globalDefault);
+      return globalDefault;
+    }
+
+    // Step 6: Unknown phase, no fallback - explicit failure (should never happen)
     const errorMsg = `Cannot get phase config for "${phaseName}"${courseId ? ` (course: ${courseId})` : ''} tier "${tier}": database unavailable and no cached data`;
     logger.fatal({ phaseName, courseId, tier }, errorMsg);
     throw new Error(errorMsg);

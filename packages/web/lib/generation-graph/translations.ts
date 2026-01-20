@@ -355,10 +355,11 @@ export const GRAPH_TRANSLATIONS: GraphTranslations & {
     generationMode: { ru: 'Режим', en: 'Mode' },
     modeAutomatic: { ru: 'Авто', en: 'Auto' },
     modeSemiAutomatic: { ru: 'Ручной', en: 'Manual' },
-    sizeLarge: { ru: 'Большой', en: 'Large' },
-    sizeMedium: { ru: 'Средний', en: 'Medium' },
-    sizeSmall: { ru: 'Маленький', en: 'Small' },
     formats: { ru: 'Форматы', en: 'Formats' },
+    // Notification preferences
+    notifyCompletion: { ru: 'При завершении', en: 'On completion' },
+    notifyError: { ru: 'При ошибке', en: 'On error' },
+    notifyStage: { ru: 'По этапам', en: 'By stage' },
     prerequisites: { ru: 'Предварительные требования', en: 'Prerequisites' },
     learningOutcomes: { ru: 'Ожидаемые результаты', en: 'Learning Outcomes' },
 
