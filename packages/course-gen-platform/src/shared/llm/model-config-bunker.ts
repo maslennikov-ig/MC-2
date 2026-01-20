@@ -180,7 +180,7 @@ const ConfigRowSchema = z.object({
   max_retries: z.number().int().min(0).max(10).nullable().optional(),
   timeout_ms: z.number().int().positive().nullable().optional(),
   language: z.string().optional(),
-  stage_number: z.number().int().min(2).max(6).nullable().optional(),
+  stage_number: z.number().int().min(2).max(7).nullable().optional(),
   judge_role: z.enum(['primary', 'secondary', 'tiebreaker']).nullable().optional(),
   weight: z
     .union([z.number(), z.string()])
