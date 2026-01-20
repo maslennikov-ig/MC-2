@@ -11,7 +11,7 @@ Stage 4 performs deep content analysis to extract pedagogical insights, course s
 
 ### Core Components
 
-- **Orchestrator:** `orchestrator.ts` - LangGraph StateGraph with 6 analysis phases
+- **Orchestrator:** `orchestrator.ts` - LangGraph StateGraph with 5 analysis phases
 - **Handler:** `handler.ts` - BullMQ job handler with progress tracking
 - **Phases:** `phases/` - Individual phase implementations
 
@@ -36,10 +36,10 @@ Phase 4: Synthesis (Generation Guidance + Content Strategy)
 Phase 5: Assembly (Pure Logic - Combine All Outputs)
     |
     v
-Phase 6: RAG Planning (Document-Section Mapping) [Optional]
-    |
-    v
 AnalysisResult -> courses.analysis_result
+
+[DEPRECATED] Phase 6: RAG Planning - Removed in mc2-u9fb
+Vector search with priority boosting (mc2-zac) replaces LLM-based mapping.
 ```
 
 ---
@@ -166,28 +166,32 @@ AnalysisResult -> courses.analysis_result
 
 ---
 
-### Phase 6: RAG Planning
+### Phase 6: RAG Planning [DEPRECATED]
 
-**File:** `phases/phase-6-rag-planning.ts`
-**Model:** Configured via database (llm_model_config table)
-**Condition:** Only runs if documents exist
+> **⚠️ DEPRECATED in mc2-u9fb**: This phase has been removed.
+> Vector search with priority boosting (mc2-zac) now handles document retrieval.
 
-**Purpose:** Pre-map documents to sections for efficient RAG in Stage 5.
+**File:** `phases/phase-6-rag-planning.ts` (kept for backward compatibility)
+**Status:** SKIPPED - always returns empty mapping
 
-**Output:**
+**Reason for Deprecation:**
 
-- `document_relevance_mapping`:
-  - Per section:
-    - `primary_documents`: Relevant document IDs
-    - `key_search_terms`: 3-10 RAG query terms
-    - `expected_topics`: 2-8 topics covered
-    - `document_processing_methods`: "full_text" | "hierarchical" per doc
+- LLM-based document-to-section mapping introduced systematic error risk
+- Errors in mapping propagated to all lessons in affected sections
+- Vector search with priority boosting provides dynamic, per-lesson relevance
 
-**Cost Optimization:**
+**Benefits of Removal:**
 
-- Enables SMART mode in Stage 5 (45x cost savings)
-- Pre-computed mapping eliminates runtime Planning LLM calls
-- Targeted RAG queries only relevant documents per section
+- ~5-10 seconds faster per course
+- ~2-5K tokens saved per course
+- No LLM error propagation risk
+- Dynamic relevance scoring instead of static mapping
+
+**Migration:**
+
+- New courses: `document_relevance_mapping` is always `{}`
+- Existing courses: Legacy data remains valid and functional
+- Stage 5/6 RAG retrieval uses priority boosting (CORE +20%, IMPORTANT +12%)
 
 ---
 

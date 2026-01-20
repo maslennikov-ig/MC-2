@@ -21,10 +21,10 @@
  * - This prevents XSS attacks when displaying content to users
  * - Sanitization applied to: contextual_language, scope_instructions
  *
- * Analyze Enhancement (Phase 6):
- * - Phase 6 output (RAG planning) is optional - only present if documents exist
- * - If present, document_relevance_mapping is included in final result
- * - Enables 45x cost savings in Generation Stage 5 via SMART mode
+ * Phase 6 (RAG Planning) DEPRECATED (mc2-u9fb):
+ * - Phase 6 has been removed in favor of vector search with priority boosting
+ * - document_relevance_mapping is now always an empty object {}
+ * - Backward compatibility maintained for existing course data
  *
  * @module phase-5-assembly
  */
@@ -513,6 +513,10 @@ function validateGenerationGuidance(
 /**
  * Validate document_relevance_mapping structure (optional field)
  *
+ * @deprecated Phase 6 RAG Planning removed in mc2-u9fb.
+ * This function is now only used for backward compatibility with existing course data.
+ * New courses will always have document_relevance_mapping = {}.
+ *
  * Checks:
  * - Is an object (not null, not undefined)
  * - Each section mapping has valid structure:
@@ -531,7 +535,12 @@ function validateDocumentRelevanceMapping(
     throw new Error('Validation error: document_relevance_mapping must be an object');
   }
 
-  // Validate each section mapping
+  // Empty mapping is valid (Phase 6 deprecated - this is now the default)
+  if (Object.keys(mapping).length === 0) {
+    return;
+  }
+
+  // Validate each section mapping (backward compatibility for existing data)
   for (const [sectionId, sectionMapping] of Object.entries(mapping)) {
     // Type guard: ensure sectionMapping has expected structure
     if (!sectionMapping || typeof sectionMapping !== 'object') {

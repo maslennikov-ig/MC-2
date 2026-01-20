@@ -1,20 +1,20 @@
 /**
  * Multi-Phase Analysis Orchestrator
  *
- * Coordinates all 7 phases of Stage 4 Analysis workflow:
+ * Coordinates all 5 phases of Stage 4 Analysis workflow:
  * - Phase 0 (Pre-Flight): Stage 3 barrier validation, input validation (0-10%)
  * - Phase 1: Basic Classification (10-25%)
- * - Phase 2: Scope Analysis (25-40%) - includes minimum 10 lessons check
- * - Phase 3 + Phase 6: PARALLEL EXECUTION (40-70%)
- *   - Phase 3: Deep Expert Analysis (depends on Phase 1+2)
- *   - Phase 6: RAG Planning (depends only on Phase 2) - runs in parallel
+ * - Phase 2: Scope Analysis (25-45%) - includes minimum 10 lessons check
+ * - Phase 3: Deep Expert Analysis (45-70%)
  * - Phase 4: Document Synthesis (70-85%)
  * - Phase 5: Final Assembly (85-100%)
  *
- * Parallel Optimization:
- * Phase 6 (RAG Planning) depends only on Phase 2 (sections_breakdown),
- * NOT on Phase 3 or Phase 4. Running Phase 3 and Phase 6 in parallel
- * saves 5-10 seconds per course generation.
+ * DEPRECATED: Phase 6 (RAG Planning) - removed in mc2-u9fb
+ * Vector search with priority boosting (mc2-zac) replaces LLM-based
+ * document-to-section mapping. Benefits:
+ * - No LLM error propagation risk
+ * - Dynamic relevance scoring per lesson
+ * - ~5-10 seconds + 2-5K tokens saved per course
  *
  * Key Features:
  * - Real-time progress updates (Russian messages)
@@ -23,8 +23,6 @@
  * - OpenRouter failure handling (FR-013)
  * - Extended observability metrics (FR-014)
  * - Multi-model orchestration (FR-017)
- * - RAG planning for 45x cost savings in Generation (Analyze Enhancement)
- * - Parallel Phase 3 + Phase 6 execution for faster processing
  *
  * Split from original 555-line file to comply with 300-line constitution principle.
  * Validation logic extracted to analysis-validators.ts.
@@ -37,7 +35,8 @@ import { runPhase1Classification } from './phases/phase-1-classifier';
 import { runPhase2Scope } from './phases/phase-2-scope';
 import { runPhase3Expert } from './phases/phase-3-expert';
 import { runPhase4Synthesis } from './phases/phase-4-synthesis';
-import { runPhase6RagPlanning } from './phases/phase-6-rag-planning';
+// Phase 6 RAG Planning deprecated (mc2-u9fb) - vector search with priority boosting used instead
+// import { runPhase6RagPlanning } from './phases/phase-6-rag-planning';
 import { assembleAnalysisResult } from './phases/phase-5-assembly';
 import {
   updateCourseProgress,
@@ -149,7 +148,7 @@ async function executePhaseWithRetry<T>(
 /**
  * Main orchestration function for Stage 4 Analysis
  *
- * Executes all 7 phases sequentially with real-time progress tracking.
+ * Executes all 5 phases sequentially with real-time progress tracking.
  * Enforces Stage 3 barrier and minimum 10 lessons constraint.
  *
  * Workflow:
@@ -158,8 +157,9 @@ async function executePhaseWithRetry<T>(
  * 3. Phase 2: Scope analysis (model from database, minimum 10 lessons validation)
  * 4. Phase 3: Deep expert analysis (model from database)
  * 5. Phase 4: Document synthesis (model from database)
- * 6. Phase 6: RAG planning (model from database, only if documents exist)
- * 7. Phase 5: Final assembly (no LLM, pure data combination)
+ * 6. Phase 5: Final assembly (no LLM, pure data combination)
+ *
+ * NOTE: Phase 6 (RAG Planning) deprecated - vector search with priority boosting used instead
  *
  * Error Handling (FR-013):
  * - LLM failures: Automatic retry with exponential backoff (handled by phase services)
@@ -431,57 +431,27 @@ export async function runAnalysisOrchestration(job: StructureAnalysisJob): Promi
     });
 
     // =================================================================
-    // PARALLEL EXECUTION: Phase 3 + Phase 6 run concurrently
+    // PHASE 6 DEPRECATED: RAG Planning removed in favor of priority boosting
     // =================================================================
-    // Phase 6 (RAG Planning) depends only on Phase 2 (sections_breakdown),
-    // NOT on Phase 3 or Phase 4. Running them in parallel saves 5-10 seconds.
+    // Phase 6 (RAG Planning) has been deprecated as of mc2-u9fb.
+    // Reason: LLM-based document-to-section mapping introduced systematic risk
+    // of errors that propagate to all lessons in a section.
     //
-    // Dependency graph after Phase 2:
-    //   ├── Phase 3 (Expert) → Phase 4 (Synthesis) ──┐
-    //   │                                            │
-    //   └── Phase 6 (RAG Planning) ──────────────────┘ → Phase 5 (Assembly)
+    // Vector search with priority boosting (mc2-zac) now handles document
+    // retrieval dynamically at generation time, providing:
+    // - No LLM error propagation risk
+    // - Dynamic relevance scoring per lesson
+    // - CORE/IMPORTANT document boosting (+20%/+12%)
+    //
+    // Savings: ~5-10 seconds + 2-5K tokens per course
+    // See: docs/plans/abundant-sparking-sloth.md
 
     const documentSummariesText = input.document_summaries?.map(ds => ds.processed_content) || null;
 
-    // Start Phase 6 in parallel (non-blocking) if documents exist
-    let phase6Promise: Promise<Phase6Output | null> | null = null;
-    const phase6StartTime = Date.now();
-
-    if (input.document_summaries && input.document_summaries.length > 0) {
-      orchestrationLogger.info(
-        { documentCount: input.document_summaries.length },
-        'Starting Phase 6 (RAG Planning) in parallel with Phase 3'
-      );
-
-      phase6Promise = executePhaseWithRetry(
-        'phase6_rag_planning',
-        () =>
-          runPhase6RagPlanning({
-            course_id: courseId,
-            language: input.language,
-            sections_breakdown: phase2Output.recommended_structure.sections_breakdown,
-            document_summaries: input.document_summaries!.map(ds => ({
-              document_id: ds.document_id,
-              file_name: ds.file_name,
-              processed_content: ds.processed_content,
-            })),
-          }),
-        orchestrationLogger
-      ).catch((phase6Error: Error) => {
-        // Phase 6 failed - log warning and return null (graceful degradation)
-        orchestrationLogger.warn(
-          {
-            error: phase6Error.message,
-            phase: 'stage_6_rag_planning',
-            durationMs: Date.now() - phase6StartTime,
-          },
-          'Phase 6 (RAG Planning) failed in parallel - Generation will use NAIVE mode instead of SMART mode'
-        );
-        return null;
-      });
-    } else {
-      orchestrationLogger.info('Skipping Phase 6 (RAG Planning): No documents available');
-    }
+    // Phase 6 is now always skipped - return empty mapping
+    orchestrationLogger.info(
+      'Phase 6 (RAG Planning) skipped: deprecated in favor of vector search with priority boosting (mc2-zac)'
+    );
 
     // =================================================================
     // PHASE 3: Deep Expert Analysis (45-70%)
@@ -588,94 +558,30 @@ export async function runAnalysisOrchestration(job: StructureAnalysisJob): Promi
     }
 
     // =================================================================
-    // AWAIT PHASE 6: Collect parallel result before Assembly
+    // PHASE 6 OUTPUT: Always null (deprecated)
     // =================================================================
-    let phase6Output: Phase6Output | null = null;
-
-    if (phase6Promise) {
-      orchestrationLogger.info('Awaiting Phase 6 (RAG Planning) parallel result...');
-      phase6Output = await phase6Promise;
-
-      if (phase6Output) {
-        // Phase 6 completed successfully - log results
-        const totalSearchTerms = Object.values(phase6Output.document_relevance_mapping).reduce(
-          (sum, mapping) => sum + (mapping.key_search_terms?.length ?? 0),
-          0
-        );
-        const totalTopics = Object.values(phase6Output.document_relevance_mapping).reduce(
-          (sum, mapping) => sum + (mapping.expected_topics?.length ?? 0),
-          0
-        );
-
-        orchestrationLogger.info(
-          {
-            sections_mapped: Object.keys(phase6Output.document_relevance_mapping).length,
-            documents_total: input.document_summaries?.length || 0,
-            duration_ms: phase6Output.phase_metadata.duration_ms,
-            model_used: phase6Output.phase_metadata.model_used,
-            total_search_terms: totalSearchTerms,
-            total_topics: totalTopics,
-            parallel_execution: true,
-          },
-          'Phase 6 (RAG Planning) completed successfully (parallel)'
-        );
-
-        // Get trace data (raw prompt/completion) stored by phase function
-        const phase6TraceData = getAndClearTraceData(courseId, 'stage_6_rag_planning');
-
-        await logTrace({
-          courseId,
-          stage: 'stage_4',
-          phase: 'rag_planning',
-          stepName: 'rag_planning',
-          inputData: { documentsTotal: input.document_summaries?.length || 0 },
-          outputData: phase6Output,
-          promptText: phase6TraceData?.promptText,
-          completionText: phase6TraceData?.completionText,
-          tokensUsed:
-            phase6Output.phase_metadata.tokens.input + phase6Output.phase_metadata.tokens.output,
-          modelUsed: phase6Output.phase_metadata.model_used,
-          durationMs: phase6Output.phase_metadata.duration_ms,
-        });
-      } else {
-        // Phase 6 failed (null returned from catch block)
-        orchestrationLogger.warn(
-          { documentsTotal: input.document_summaries?.length || 0 },
-          'Phase 6 (RAG Planning) failed - continuing without document_relevance_mapping'
-        );
-
-        await logTrace({
-          courseId,
-          stage: 'stage_4',
-          phase: 'rag_planning',
-          stepName: 'rag_planning',
-          inputData: { documentsTotal: input.document_summaries?.length || 0 },
-          errorData: { error: 'Phase 6 failed during parallel execution' },
-          durationMs: Date.now() - phase6StartTime,
-        });
-      }
-    }
+    // Phase 6 is deprecated - always pass null to assembly
+    // Stage 5/6 RAG retrieval uses priority boosting instead
+    const phase6Output: Phase6Output | null = null;
 
     // =================================================================
     // PHASE 5: Final Assembly (85-100%)
     // =================================================================
     await startPhase(5, courseId, supabase, orchestrationLogger);
 
-    // Calculate cumulative metrics
+    // Calculate cumulative metrics (Phase 6 deprecated - no tokens counted)
     const totalDurationMs = Date.now() - startTime;
     const totalTokens = {
       input:
         phase1Output.phase_metadata.tokens.input +
         phase2Output.phase_metadata.tokens.input +
         phase3Output.phase_metadata.tokens.input +
-        phase4Output.phase_metadata.tokens.input +
-        (phase6Output?.phase_metadata.tokens.input || 0),
+        phase4Output.phase_metadata.tokens.input,
       output:
         phase1Output.phase_metadata.tokens.output +
         phase2Output.phase_metadata.tokens.output +
         phase3Output.phase_metadata.tokens.output +
-        phase4Output.phase_metadata.tokens.output +
-        (phase6Output?.phase_metadata.tokens.output || 0),
+        phase4Output.phase_metadata.tokens.output,
       total: 0, // Will be calculated in assembly
     };
     totalTokens.total = totalTokens.input + totalTokens.output;
@@ -716,7 +622,7 @@ export async function runAnalysisOrchestration(job: StructureAnalysisJob): Promi
     orchestrationLogger.info(
       {
         total_duration_ms: totalDurationMs,
-        phases_completed: phase6Output ? 7 : 6,
+        phases_completed: 5, // Phase 6 deprecated
       },
       'Stage 4 analysis orchestration completed successfully'
     );

@@ -6,7 +6,11 @@
  */
 
 import type { PhaseName } from '@megacampus/shared-types';
-import { DEFAULT_MODEL_ID, DEFAULT_FALLBACK_MODEL_ID, MODEL_DEFAULTS } from '@megacampus/shared-types';
+import {
+  DEFAULT_MODEL_ID,
+  DEFAULT_FALLBACK_MODEL_ID,
+  MODEL_DEFAULTS,
+} from '@megacampus/shared-types';
 
 // =============================================================================
 // Static Stage Definitions
@@ -52,7 +56,12 @@ export const PIPELINE_STAGES = [
       'stage_4_expert',
       'stage_4_synthesis',
     ] as PhaseName[],
-    linkedPrompts: ['stage_4_classification', 'stage_4_scope', 'stage_4_expert', 'stage_4_synthesis'],
+    linkedPrompts: [
+      'stage_4_classification',
+      'stage_4_scope',
+      'stage_4_expert',
+      'stage_4_synthesis',
+    ],
   },
   {
     number: 5,
@@ -62,7 +71,8 @@ export const PIPELINE_STAGES = [
     linkedPhases: [
       'stage_5_metadata',
       'stage_5_sections',
-      'stage_6_rag_planning',
+      // NOTE: stage_6_rag_planning was incorrectly placed here (it belonged to Stage 4 Phase 6)
+      // Removed in mc2-u9fb - vector search with priority boosting used instead
     ] as PhaseName[],
     linkedPrompts: ['stage_5_metadata', 'stage_5_sections'],
   },
@@ -83,7 +93,8 @@ export const PIPELINE_STAGES = [
   {
     number: 7,
     name: 'Enrichments',
-    description: 'Generate multimedia enrichments: covers, cards, videos, audio, quizzes, presentations',
+    description:
+      'Generate multimedia enrichments: covers, cards, videos, audio, quizzes, presentations',
     handlerPath: 'stages/stage7-enrichment',
     linkedPhases: [
       'stage_7_cover',
@@ -258,6 +269,11 @@ export const DEFAULT_MODEL_CONFIGS: Record<PhaseName, DefaultModelConfig> = {
     fallbackModelId: DEFAULT_MODEL_ID,
   },
   // Stage 6: Lesson Content
+  /**
+   * @deprecated Phase 6 RAG Planning removed in mc2-u9fb.
+   * Vector search with priority boosting (mc2-zac) replaces this.
+   * Kept for backward compatibility with database records.
+   */
   stage_6_rag_planning: {
     modelId: DEFAULT_MODEL_ID,
     temperature: 0.7,
