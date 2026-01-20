@@ -180,7 +180,13 @@ class Stage4AnalysisHandler {
   ): Promise<StructureAnalysisJobResult> {
     const startTime = Date.now();
     // Extract identifiers from job data (now correctly typed as camelCase from BaseJobDataSchema)
-    const { courseId: course_id, organizationId: organization_id, userId: user_id } = jobData;
+    // NOTE: courseSize is passed from job data to avoid race conditions (GTQ-6162)
+    const {
+      courseId: course_id,
+      organizationId: organization_id,
+      userId: user_id,
+      courseSize: jobCourseSize,
+    } = jobData;
 
     // Acquire generation lock (FR-037: Prevent concurrent generation)
     const lockId = `stage-4-${job.id || Date.now()}`;
@@ -382,8 +388,24 @@ class Stage4AnalysisHandler {
       const language = rawLang.length === 2 ? rawLang : languageNameToCode[rawLang] || 'ru';
 
       // Extract course_size preset (advisory guidance for LLM)
+      // PRIORITY: Use job data as primary source to avoid race conditions (GTQ-6162)
+      // Fallback to DB value for backward compatibility with jobs created before this fix
+      const dbCourseSize = courseForInput.course_size as CourseSize | null;
+      const courseSize: CourseSize | null = jobCourseSize ?? dbCourseSize;
+      const courseSizeSource = jobCourseSize !== undefined ? 'job_data' : 'database';
+
+      // DIAGNOSTIC LOG: Track course_size source for debugging (GTQ-6162)
+      jobLogger.info(
+        {
+          jobCourseSize,
+          dbCourseSize,
+          effectiveCourseSize: courseSize,
+          source: courseSizeSource,
+        },
+        'Course size resolution (GTQ-6162 fix)'
+      );
+
       // For 'auto', getCourseSizePreset returns undefined (LLM decides without guidance)
-      const courseSize = courseForInput.course_size as CourseSize | null;
       const sizePreset = courseSize ? getCourseSizePreset(courseSize) : null;
 
       // Log course size mode for analytics
@@ -394,7 +416,7 @@ class Stage4AnalysisHandler {
         );
       } else {
         jobLogger.info(
-          { courseSize, targetLessons: sizePreset?.targetLessons },
+          { courseSize, targetLessons: sizePreset?.targetLessons, source: courseSizeSource },
           `Course size: ${courseSize.toUpperCase()} preset selected`
         );
       }

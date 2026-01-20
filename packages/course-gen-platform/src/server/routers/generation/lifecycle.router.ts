@@ -98,9 +98,10 @@ export const lifecycleRouter = router({
 
       try {
         // T013: Verify course ownership and get organization tier
+        // NOTE: course_size is included to pass to Stage 4 job data (avoid race conditions)
         const { data: course, error: courseError } = await supabase
           .from('courses')
-          .select('*, language, organization:organizations(tier)')
+          .select('*, language, course_size, organization:organizations(tier)')
           .eq('id', courseId)
           .single();
 
@@ -320,6 +321,8 @@ export const lifecycleRouter = router({
           );
         } else {
           // Path 2: Analysis-only (hasFiles=false, skip to Stage 4)
+          // IMPORTANT: course_size is passed in job data to avoid race conditions
+          // (see GTQ-6162: course_size may be updated async before generation starts)
           jobs = [
             {
               queue: JobType.STRUCTURE_ANALYSIS, // 'structure_analysis'
@@ -333,6 +336,8 @@ export const lifecycleRouter = router({
                 // Include basic course data for worker context
                 title: course.title,
                 settings: course.settings,
+                // Pass course_size to avoid race conditions (GTQ-6162)
+                courseSize: course.course_size || null,
               },
               options: { priority },
             },
@@ -343,6 +348,7 @@ export const lifecycleRouter = router({
             {
               requestId,
               courseId,
+              courseSize: course.course_size,
             },
             'Course generation path: analysis-only (Stage 4, no documents)'
           );
@@ -926,10 +932,10 @@ export const lifecycleRouter = router({
         let jobId: string | undefined;
         const organizationId = result.organizationId || ctx.user.organizationId;
 
-        // Get course data for job payload
+        // Get course data for job payload (including course_size for Stage 4)
         const { data: course } = await supabase
           .from('courses')
-          .select('title, settings, language')
+          .select('title, settings, language, course_size')
           .eq('id', courseId)
           .single();
 
@@ -990,11 +996,13 @@ export const lifecycleRouter = router({
           jobId = job.id;
         } else if (stageNumber === 4) {
           // Stage 4: Analysis
+          // IMPORTANT: course_size is passed in job data to avoid race conditions (GTQ-6162)
           const job = await addJob(JobType.STRUCTURE_ANALYSIS, {
             ...baseJobData,
             jobType: JobType.STRUCTURE_ANALYSIS,
             title: course?.title,
             settings: course?.settings,
+            courseSize: course?.course_size || null,
           } as JobData);
           jobId = job.id;
         } else if (stageNumber === 5) {
