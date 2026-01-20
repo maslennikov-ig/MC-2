@@ -10,7 +10,7 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import { useSupabase } from '@/lib/supabase/browser-client'
-import Link from 'next/link'
+import { Link } from '@/src/i18n/navigation'
 
 interface Lesson {
   id: string
