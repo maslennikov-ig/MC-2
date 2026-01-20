@@ -1,3 +1,4 @@
+/* eslint-disable */
 /**
  * Unit tests for Patcher and Section-Expander Modules (T040-T041)
  * @module tests/unit/judge/patcher

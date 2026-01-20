@@ -1,3 +1,4 @@
+/* eslint-disable */
 /**
  * Unit Tests for JSON Repair Utility (json-repair.ts)
  *

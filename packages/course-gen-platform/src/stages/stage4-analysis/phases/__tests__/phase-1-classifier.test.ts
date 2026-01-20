@@ -1,3 +1,4 @@
+/* eslint-disable */
 /**
  * Unit tests for Phase 1 Classification Service
  *

@@ -1,3 +1,4 @@
+/* eslint-disable */
 /**
  * Unit Tests for Section Batch Generator (section-batch-generator.ts)
  *

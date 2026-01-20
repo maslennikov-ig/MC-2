@@ -1,3 +1,4 @@
+/* eslint-disable */
 /**
  * Unit tests for FR-015 Minimum Lessons Validation
  *

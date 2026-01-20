@@ -1,3 +1,4 @@
+/* eslint-disable */
 /**
  * Unit tests for sanitizeCourseStructure (FR-008 XSS Prevention)
  *

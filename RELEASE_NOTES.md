@@ -2,6 +2,26 @@
 
 _Released on 2025-12-26_
 
+## v0.28.14
+
+_Released on 2026-01-20_
+
+### ✨ New Features
+
+- **image-gen**: Add quality parameter for GPT-5 Image Mini cost optimization
+- **stage6**: Add person and case agreement grammar rules for Russian
+
+### 🐛 Bug Fixes
+
+- **admin/logs**: Fix status filter not working in flat view
+- **Stage4**: Pass course_size via job data to avoid race condition
+- **Stage5**: Use 'intermediate' as default difficulty instead of undefined
+- **skill**: Dev server errors should be investigated, not bulk resolved
+
+---
+
+_This release was automatically generated from 14 commits._
+
 ## v0.28.13
 
 _Released on 2026-01-19_

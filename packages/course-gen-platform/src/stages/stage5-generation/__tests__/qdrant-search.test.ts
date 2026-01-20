@@ -1,3 +1,4 @@
+/* eslint-disable */
 /**
  * Unit Tests for Stage 5 RAG Integration (qdrant-search.ts)
  *

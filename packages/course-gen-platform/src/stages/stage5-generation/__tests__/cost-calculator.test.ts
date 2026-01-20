@@ -1,3 +1,4 @@
+/* eslint-disable */
 /**
  * Unit Tests: Stage 5 Cost Calculator Service
  *
