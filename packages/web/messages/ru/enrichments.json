@@ -267,6 +267,36 @@
       "comingSoon": "Скоро"
     }
   },
+  "images": {
+    "title": "Изображения",
+    "tokens": "токенов",
+    "generateButton": "Сгенерировать",
+    "cover": {
+      "title": "Обложка урока",
+      "description": "Баннер в шапке страницы урока (16:9)"
+    },
+    "card": {
+      "title": "Миниатюра урока",
+      "description": "Превью для навигации (квадрат 1:1)"
+    },
+    "style": {
+      "label": "Стиль",
+      "realistic": "Реалистичный",
+      "abstract": "Абстрактный",
+      "minimalist": "Минималистичный",
+      "dramatic": "Драматичный"
+    },
+    "colorScheme": {
+      "label": "Цветовая схема",
+      "auto": "Авто (из курса)",
+      "warm": "Тёплые тона",
+      "cool": "Холодные тона",
+      "monochrome": "Монохром"
+    },
+    "estimatedCost": "Примерная стоимость",
+    "batchGenerate": "Сгенерировать недостающие",
+    "batchProgress": "Генерация {current} из {total}..."
+  },
   "generate": "Сгенерировать",
   "generating": "Генерация...",
   "options": "Опции",
