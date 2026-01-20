@@ -320,6 +320,33 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **enrichments**: disable auto lesson card/cover generation (6d5f2e3)
+- **admin/logs**: fix status filter not working in flat view (0a7ab30)
+- **Stage4**: pass course_size via job data to avoid race condition (35f848d)
+- **Stage5**: use 'intermediate' as default difficulty instead of undefined (7a01fe8)
+- **skill**: dev server errors should be investigated, not bulk resolved (f1e4522)
+
+### Other
+
+- **course-gen-platform**: update 81 test(s) (306f6b1)
+- Revert "feat(image-gen): add quality parameter for GPT-5 Image Mini cost optimization" (12ea702)
+- bd sync: 2026-01-20 09:11:38 (082955a)
+- bd sync: 2026-01-20 08:53:14 (b574be8)
+- bd sync: 2026-01-20 08:47:41 (c00d8e8)
+- **skill**: add environment filtering to process-logs skill (3bc0103)
+- bd sync: 2026-01-20 08:43:30 (12047bf)
+- bd sync: 2026-01-19 22:07:55 (427cd88)
+- **deps**: update docling-mcp to >=1.3.3 (df4f144)
+
+## [0.28.14] - 2026-01-20
+
+### Added
+
+- **image-gen**: add quality parameter for GPT-5 Image Mini cost optimization (41543af)
+- **stage6**: add person and case agreement grammar rules for Russian (0dc553b)
+
+### Fixed
+
 - **admin/logs**: fix status filter not working in flat view (0a7ab30)
 - **Stage4**: pass course_size via job data to avoid race condition (35f848d)
 - **Stage5**: use 'intermediate' as default difficulty instead of undefined (7a01fe8)
