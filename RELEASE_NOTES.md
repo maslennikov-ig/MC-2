@@ -2,6 +2,19 @@
 
 _Released on 2025-12-26_
 
+## v0.28.17
+
+_Released on 2026-01-20_
+
+### 🐛 Bug Fixes
+
+- **web**: Update 1 source file(s), update docs
+- **docker**: Add BULLMQ_STAGE6_QUEUE_NAME to worker-dev for Stage 6 queue isolation
+
+---
+
+_This release was automatically generated from 5 commits._
+
 ## v0.28.16
 
 _Released on 2026-01-20_
