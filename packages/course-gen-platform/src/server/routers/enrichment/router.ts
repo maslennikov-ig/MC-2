@@ -48,6 +48,8 @@ import { getAutoCard } from './procedures/get-auto-card';
 import { regenerateAutoCard } from './procedures/regenerate-auto-card';
 import { generateOnDemand } from './procedures/generate-on-demand';
 import { getGenerationStatus } from './procedures/get-generation-status';
+import { generateBatchCovers } from './procedures/generate-batch-covers';
+import { generateBatchCards } from './procedures/generate-batch-cards';
 
 /**
  * Enrichment router
@@ -75,6 +77,10 @@ import { getGenerationStatus } from './procedures/get-generation-status';
  * ## On-Demand Generation (Course Viewer UI)
  * - generateOnDemand: Create and queue enrichment for on-demand generation
  * - getGenerationStatus: Poll generation progress for UI display
+ *
+ * ## Batch Image Generation
+ * - generateBatchCovers: Generate cover images for all lessons in a course
+ * - generateBatchCards: Generate card images for all lessons in a course
  */
 export const enrichmentRouter = router({
   /**
@@ -178,6 +184,18 @@ export const enrichmentRouter = router({
    * @see procedures/get-generation-status.ts
    */
   getGenerationStatus,
+
+  /**
+   * Generate cover images for all lessons in a course (batch)
+   * @see procedures/generate-batch-covers.ts
+   */
+  generateBatchCovers,
+
+  /**
+   * Generate card images for all lessons in a course (batch)
+   * @see procedures/generate-batch-cards.ts
+   */
+  generateBatchCards,
 });
 
 /**

@@ -1,4 +1,14 @@
 {
+  "visuals": {
+    "pageTitle": "Visual Assets",
+    "title": "Manage Visual Assets",
+    "courseCard": "Course Thumbnail",
+    "courseCardDescription": "Main image shown in course catalog",
+    "lessonCovers": "Lesson Covers",
+    "lessonCoversDescription": "{completed} of {total} covers generated",
+    "progress": "Progress"
+  },
+  "backToCourse": "Back to course",
   "viewer": {
     "showSidebar": "Show sidebar",
     "section": "Section",

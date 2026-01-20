@@ -7,10 +7,15 @@ import { FileText, AlertTriangle } from 'lucide-react'
 import { EnrichmentErrorBoundary } from '../enrichments/EnrichmentErrorBoundary'
 import { EnrichmentPlaceholderCard } from './EnrichmentPlaceholderCard'
 import { EnrichmentGeneratingCard } from './EnrichmentGeneratingCard'
+import { ImagePlaceholderCard } from './ImagePlaceholderCard'
 import { useEnrichmentGeneration } from '@/lib/hooks/useEnrichmentGeneration'
 import type { Database } from '@/types/database.generated'
 import { EnrichmentCard } from './EnrichmentCard'
-import { PLACEHOLDER_TYPES, type EnrichmentType } from './enrichment-config'
+import {
+  PLACEHOLDER_TYPES,
+  IMAGE_PLACEHOLDER_TYPES,
+  type EnrichmentType,
+} from './enrichment-config'
 
 type EnrichmentRow = Database['public']['Tables']['lesson_enrichments']['Row']
 
@@ -187,6 +192,51 @@ export function EnrichmentsPanel({
           />
         </EnrichmentErrorBoundary>
       ))}
+
+      {/* Images Section - Cover/Card placeholders */}
+      {lessonId && (
+        <div className="mb-6">
+          <h3 className="mb-3 text-sm font-medium text-gray-500 dark:text-gray-400">
+            {t('images.title')}
+          </h3>
+          <div className="grid grid-cols-1 gap-4">
+            {IMAGE_PLACEHOLDER_TYPES.filter((type) => {
+              // Check if cover already exists (use original enrichments, not filtered)
+              const exists = enrichments.some(
+                (e) => e.enrichment_type === type && e.status === 'completed'
+              )
+              return !exists
+            }).map((type) => {
+              const typeIsGenerating = isGenerating(type)
+              const generatingProgress = getProgress(type)
+
+              if (typeIsGenerating && generatingProgress) {
+                return (
+                  <EnrichmentGeneratingCard
+                    key={type}
+                    type={type}
+                    progress={generatingProgress.progress}
+                    currentStep={generatingProgress.currentStep || t('generating')}
+                    onCancel={() => void cancelGeneration(type)}
+                  />
+                )
+              }
+
+              return (
+                <ImagePlaceholderCard
+                  key={type}
+                  type={type}
+                  onGenerate={(settings) => {
+                    if (!lessonId) return
+                    void startGeneration(type, settings)
+                  }}
+                  isGenerating={typeIsGenerating}
+                />
+              )
+            })}
+          </div>
+        </div>
+      )}
 
       {/* Placeholder Cards for Missing Types and Generating Cards */}
       <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">

@@ -42,7 +42,7 @@ import { generationLockService } from '@/shared/locks';
 import { logTrace } from '../../shared/trace-logger';
 import {
   triggerCourseCard,
-  // DISABLED: triggerAllLessonCovers - too expensive (~$0.04/image via OpenRouter)
+  // DISABLED: triggerAllLessonCovers - lesson covers now manual via UI
 } from '../stage7-enrichments/services/auto-card-trigger';
 import { handleStageCompletion } from '@/shared/auto-approval';
 
@@ -913,6 +913,7 @@ class Stage5GenerationHandler {
 
         // =================================================================
         // STEP 5.5: Auto-trigger Course Card Generation (non-blocking)
+        // Course card is auto-generated, lesson covers are manual via UI
         // =================================================================
         triggerCourseCard({
           courseId: course_id,
