@@ -311,6 +311,53 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.28.16] - 2026-01-20
+
+### Added
+
+- **web**: persist all form settings to localStorage (31e5209)
+- **web**: replace upload progress bar with fullscreen overlay modal (9f1e360)
+- **web**: add file upload progress bar on course creation (7f8fb60)
+
+### Changed
+
+- **stage4**: remove Phase 6 RAG Planning (b635475)
+- **web**: unify toast notifications to use Sonner (fc92464)
+- **create-course**: reorganize form with GenerationSettingsSection (566473b)
+
+### Fixed
+
+- **upload-overlay**: prevent layout shift when switching files (082620e)
+- **model-config**: update stage_number Zod constraint from max(6) to max(7) (1abba23)
+- **i18n**: persist selected language in user settings (244f288)
+- **deploy**: remove redundant env var from docker-compose (44e5042)
+- **deploy**: add NEXT_SERVER_ACTIONS_ENCRYPTION_KEY for persistent Server Actions (69e4aaf)
+- **docker**: add uploads-dev mount to docling-mcp for dev environment (60e5bac)
+
+### Other
+
+- bd sync: 2026-01-20 16:09:29 (9552308)
+- bd sync: 2026-01-20 16:01:38 (acb01a6)
+- bd sync: 2026-01-20 15:50:45 (64e0879)
+- bd sync: 2026-01-20 15:44:13 (6e2e59c)
+- bd sync: 2026-01-20 15:24:58 (1b344e8)
+- bd sync: 2026-01-20 15:24:25 (a7a22c4)
+- bd sync: 2026-01-20 15:21:12 (7b52a33)
+- bd sync: 2026-01-20 14:52:04 (37aa46e)
+- bd sync: 2026-01-20 14:36:49 (c726e54)
+- bd sync: 2026-01-20 14:29:53 (fce6b17)
+- bd sync: 2026-01-20 13:45:03 (e4f4317)
+- bd sync: 2026-01-20 13:29:01 (64ca166)
+- bd sync: 2026-01-20 12:49:39 (6e424c9)
+- bd sync: 2026-01-20 12:19:12 (0f80012)
+- bd sync: 2026-01-20 12:17:46 (80cc7c0)
+- bd sync: 2026-01-20 12:16:43 (bda495e)
+- bd sync: 2026-01-20 12:14:37 (b11294d)
+- bd sync: 2026-01-20 12:13:36 (32644de)
+- bd sync: 2026-01-20 12:11:10 (d247ab0)
+- bd sync: 2026-01-20 12:03:07 (7329c82)
+- bd sync: 2026-01-20 12:01:49 (2878f11)
+
 ## [0.28.15] - 2026-01-20
 
 ### Added

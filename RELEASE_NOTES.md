@@ -2,6 +2,35 @@
 
 _Released on 2025-12-26_
 
+## v0.28.16
+
+_Released on 2026-01-20_
+
+### ✨ New Features
+
+- **web**: Persist all form settings to localStorage
+- **web**: Replace upload progress bar with fullscreen overlay modal
+- **web**: Add file upload progress bar on course creation
+
+### 🔧 Improvements
+
+- **stage4**: Remove Phase 6 RAG Planning
+- **web**: Unify toast notifications to use Sonner
+- **create-course**: Reorganize form with GenerationSettingsSection
+
+### 🐛 Bug Fixes
+
+- **upload-overlay**: Prevent layout shift when switching files
+- **model-config**: Update stage_number Zod constraint from max(6) to max(7)
+- **i18n**: Persist selected language in user settings
+- **deploy**: Remove redundant env var from docker-compose
+- **deploy**: Add NEXT_SERVER_ACTIONS_ENCRYPTION_KEY for persistent Server Actions
+- **docker**: Add uploads-dev mount to docling-mcp for dev environment
+
+---
+
+_This release was automatically generated from 33 commits._
+
 ## v0.28.15
 
 _Released on 2026-01-20_
