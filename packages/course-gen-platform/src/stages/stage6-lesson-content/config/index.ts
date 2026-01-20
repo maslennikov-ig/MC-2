@@ -2,8 +2,8 @@
  * Handler configuration constants
  */
 export const HANDLER_CONFIG = {
-  /** Queue name for Stage 6 jobs */
-  QUEUE_NAME: 'stage6-lesson-content',
+  /** Queue name for Stage 6 jobs (supports dev/prod isolation via env) */
+  QUEUE_NAME: process.env.BULLMQ_STAGE6_QUEUE_NAME || 'stage6-lesson-content',
 
   /** Number of concurrent workers (30 for I/O-bound LLM operations) */
   CONCURRENCY: 30,
