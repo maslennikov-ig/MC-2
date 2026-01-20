@@ -900,31 +900,64 @@ async function buildErrorLogsQuery(
   offset: number
 ): Promise<{ items: UnifiedLogItem[]; total: number }> {
   // Status filter: pre-fetch log IDs with matching status
+  // IMPORTANT: Filter BEFORE pagination for correct results
   let statusFilteredIds: string[] | null = null;
-  let excludeIds: string[] | null = null;
 
   if (filters?.status) {
     if (filters.status === 'new') {
       // "new" means logs WITHOUT any status record (individual OR fingerprint-based)
-      // Use raw SQL to get IDs to exclude - logs that have status via log_id OR fingerprint
-      const { data: excludeData, error: excludeError } = await supabase.rpc(
-        'get_error_logs_with_status' as any
+      // FIX: Use get_error_logs_without_status to get IDs BEFORE pagination
+      const { data: newLogsData, error: newLogsError } = await supabase.rpc(
+        'get_error_logs_without_status' as any
       );
 
-      if (excludeError) {
-        // Fallback to simple query if RPC doesn't exist
+      if (newLogsError) {
+        // Fallback: query logs that don't have status via log_id AND don't have fingerprint-based status
         logger.warn(
-          { error: excludeError },
-          'RPC get_error_logs_with_status not available, falling back to simple query'
+          { error: newLogsError },
+          'RPC get_error_logs_without_status not available, falling back to complex query'
         );
-        const allWithStatus = await supabase
+
+        // Get all fingerprints that have status
+        const { data: fingerprintsWithStatus } = await supabase
+          .from('log_issue_status')
+          .select('fingerprint')
+          .eq('log_type', 'error_log')
+          .not('fingerprint', 'is', null);
+
+        const fingerprintSet = new Set(
+          (fingerprintsWithStatus || []).map(r => r.fingerprint).filter(Boolean)
+        );
+
+        // Get all log_ids that have individual status
+        const { data: logIdsWithStatus } = await supabase
           .from('log_issue_status')
           .select('log_id')
           .eq('log_type', 'error_log');
 
-        excludeIds = (allWithStatus.data || []).map(row => row.log_id);
+        const logIdSet = new Set((logIdsWithStatus || []).map(r => r.log_id));
+
+        // Get all error_logs and filter out those with status
+        const { data: allLogs } = await supabase
+          .from('error_logs')
+          .select('id, fingerprint');
+
+        statusFilteredIds = (allLogs || [])
+          .filter(log => {
+            // Exclude if log has individual status
+            if (logIdSet.has(log.id)) return false;
+            // Exclude if log's fingerprint has group status
+            if (log.fingerprint && fingerprintSet.has(log.fingerprint)) return false;
+            return true;
+          })
+          .map(log => log.id);
       } else {
-        excludeIds = (excludeData || []).map((row: { id: string }) => row.id);
+        statusFilteredIds = (newLogsData || []).map((row: { id: string }) => row.id);
+      }
+
+      // If no logs without status, return empty
+      if (!statusFilteredIds || statusFilteredIds.length === 0) {
+        return { items: [], total: 0 };
       }
     } else {
       // Get IDs with specific status (via individual log_id OR fingerprint)
@@ -934,23 +967,45 @@ async function buildErrorLogsQuery(
       );
 
       if (statusError) {
-        // Fallback to simple query if RPC doesn't exist
+        // Fallback: query with fingerprint support
         logger.warn(
           { error: statusError },
-          'RPC get_error_logs_by_status not available, falling back to simple query'
+          'RPC get_error_logs_by_status not available, falling back to complex query'
         );
-        const statusQuery = await supabase
+
+        // Get fingerprints with this status
+        const { data: fingerprintsWithStatus } = await supabase
+          .from('log_issue_status')
+          .select('fingerprint')
+          .eq('log_type', 'error_log')
+          .eq('status', filters.status)
+          .not('fingerprint', 'is', null);
+
+        const fingerprints = (fingerprintsWithStatus || [])
+          .map(r => r.fingerprint)
+          .filter(Boolean) as string[];
+
+        // Get log_ids with this status (individual)
+        const { data: logIdsWithStatus } = await supabase
           .from('log_issue_status')
           .select('log_id')
           .eq('log_type', 'error_log')
           .eq('status', filters.status);
 
-        if (statusQuery.error) {
-          logger.error({ error: statusQuery.error }, 'Error fetching status-filtered IDs');
-          return { items: [], total: 0 };
+        const logIds = (logIdsWithStatus || []).map(r => r.log_id);
+
+        // Get logs by fingerprint
+        let fingerprintLogIds: string[] = [];
+        if (fingerprints.length > 0) {
+          const { data: logsByFingerprint } = await supabase
+            .from('error_logs')
+            .select('id')
+            .in('fingerprint', fingerprints);
+          fingerprintLogIds = (logsByFingerprint || []).map(r => r.id);
         }
 
-        statusFilteredIds = (statusQuery.data || []).map(row => row.log_id);
+        // Combine both sets
+        statusFilteredIds = [...new Set([...logIds, ...fingerprintLogIds])];
       } else {
         statusFilteredIds = (statusData || []).map((row: { id: string }) => row.id);
       }
@@ -968,11 +1023,10 @@ async function buildErrorLogsQuery(
       { count: 'exact' }
     );
 
-  // Apply status filter if we have specific IDs
+  // Apply status filter if we have specific IDs (now includes 'new' status too)
   if (statusFilteredIds !== null) {
     query = query.in('id', statusFilteredIds);
   }
-  // Note: For "new" status, we filter after fetching (excludeIds)
 
   // Apply filters
   if (filters?.level) {
@@ -1022,14 +1076,8 @@ async function buildErrorLogsQuery(
     return { items: [], total: 0 };
   }
 
-  // Filter out excluded IDs for "new" status (logs that have a status record)
-  let filteredData = data || [];
-  let adjustedCount = count || 0;
-  if (excludeIds && excludeIds.length > 0) {
-    const excludeSet = new Set(excludeIds);
-    filteredData = filteredData.filter(log => !excludeSet.has(log.id));
-    adjustedCount = filteredData.length; // Approximate - pagination affected
-  }
+  // All filtering now happens BEFORE pagination, so no post-filter needed
+  const filteredData = data || [];
 
   // Fetch statuses for these logs (individual status by log_id)
   const logIds = filteredData.map(log => log.id);
@@ -1064,7 +1112,7 @@ async function buildErrorLogsQuery(
     };
   });
 
-  return { items, total: adjustedCount };
+  return { items, total: count || 0 };
 }
 
 /**
@@ -1084,18 +1132,33 @@ async function buildGenerationTraceQuery(
   }
 
   // Status filter: pre-fetch log IDs with matching status
+  // IMPORTANT: Filter BEFORE pagination for correct results
   let statusFilteredIds: string[] | null = null;
-  let excludeIds: string[] | null = null;
 
   if (filters?.status) {
     if (filters.status === 'new') {
-      // "new" means logs WITHOUT any status record - get IDs to exclude
+      // "new" means logs WITHOUT any status record
+      // FIX: Get IDs of logs WITHOUT status to filter BEFORE pagination
       const allWithStatus = await supabase
         .from('log_issue_status')
         .select('log_id')
         .eq('log_type', 'generation_trace');
 
-      excludeIds = (allWithStatus.data || []).map(row => row.log_id);
+      const idsWithStatus = new Set((allWithStatus.data || []).map(row => row.log_id));
+
+      // Get all generation_trace with error_data and filter out those with status
+      const { data: allTraces } = await supabase
+        .from('generation_trace')
+        .select('id')
+        .not('error_data', 'is', null);
+
+      statusFilteredIds = (allTraces || [])
+        .filter(trace => !idsWithStatus.has(trace.id))
+        .map(trace => trace.id);
+
+      if (statusFilteredIds.length === 0) {
+        return { items: [], total: 0 };
+      }
     } else {
       // Get IDs with specific status
       const statusQuery = await supabase
@@ -1126,12 +1189,10 @@ async function buildGenerationTraceQuery(
     )
     .not('error_data', 'is', null); // Only traces with errors
 
-  // Apply status filter
+  // Apply status filter (now includes 'new' status too - all filtering before pagination)
   if (statusFilteredIds !== null) {
     query = query.in('id', statusFilteredIds);
   }
-  // Note: Supabase doesn't support NOT IN directly, so for "new" status
-  // we'll filter after fetching (less efficient but works)
 
   // Apply filters
   if (filters?.search && filters.search.length >= 2) {
@@ -1174,14 +1235,8 @@ async function buildGenerationTraceQuery(
     return { items: [], total: 0 };
   }
 
-  // Filter out excluded IDs for "new" status (logs that have a status record)
-  let filteredData = data || [];
-  let adjustedCount = count || 0;
-  if (excludeIds && excludeIds.length > 0) {
-    const excludeSet = new Set(excludeIds);
-    filteredData = filteredData.filter(log => !excludeSet.has(log.id));
-    adjustedCount = filteredData.length; // Approximate - pagination affected
-  }
+  // All filtering now happens BEFORE pagination, so no post-filter needed
+  const filteredData = data || [];
 
   // Fetch statuses for these logs
   const logIds = filteredData.map(log => log.id);
@@ -1210,7 +1265,7 @@ async function buildGenerationTraceQuery(
     };
   });
 
-  return { items, total: adjustedCount };
+  return { items, total: count || 0 };
 }
 
 /**
