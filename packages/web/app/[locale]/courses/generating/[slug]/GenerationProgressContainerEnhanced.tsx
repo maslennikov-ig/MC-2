@@ -3,7 +3,7 @@
 import { useEffect, useReducer, useCallback, useRef, useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
-import Link from 'next/link'
+import { Link } from '@/src/i18n/navigation'
 // import { useTheme } from 'next-themes'; // DISABLED: MissionControlBanner moved to GraphView
 import { createClient } from '@/lib/supabase/client'
 import { motion, AnimatePresence } from 'framer-motion'

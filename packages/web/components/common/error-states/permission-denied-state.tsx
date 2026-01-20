@@ -1,7 +1,7 @@
 'use client'
 
 import React from 'react'
-import Link from 'next/link'
+import { Link } from '@/src/i18n/navigation'
 import type { Route } from 'next'
 import { useTranslations } from 'next-intl'
 import { ShieldAlert, BookOpen, Mail } from 'lucide-react'
@@ -45,12 +45,11 @@ export function PermissionDeniedState({
   const roleDisplay = userRole && (
     <div className="mb-6">
       <p className="text-muted-foreground text-lg">
-        {t('yourRole')}{' '}
-        <span className="font-semibold text-orange-400">{roleLabel}</span>
+        {t('yourRole')} <span className="font-semibold text-orange-400">{roleLabel}</span>
       </p>
       {requiredRoles && requiredRoles.length > 0 && (
-        <p className="text-muted-foreground/70 text-sm mt-2">
-          {t('requiredRoles')} {requiredRoles.map(r => getRoleLabel(r)).join(', ')}
+        <p className="text-muted-foreground/70 mt-2 text-sm">
+          {t('requiredRoles')} {requiredRoles.map((r) => getRoleLabel(r)).join(', ')}
         </p>
       )}
     </div>
@@ -64,11 +63,11 @@ export function PermissionDeniedState({
         className={cn(
           'inline-flex items-center gap-2 px-6 py-3',
           'bg-muted hover:bg-muted/80 text-foreground rounded-xl',
-          'border border-border transition-all',
-          'focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2'
+          'border-border border transition-all',
+          'focus:ring-primary focus:ring-2 focus:ring-offset-2 focus:outline-none'
         )}
       >
-        <BookOpen className="w-5 h-5" />
+        <BookOpen className="h-5 w-5" />
         {t('returnToCourses')}
       </Link>
       <Link
@@ -78,12 +77,12 @@ export function PermissionDeniedState({
           'inline-flex items-center gap-2 px-6 py-3',
           'bg-gradient-to-r from-orange-600 to-red-600',
           'hover:from-orange-700 hover:to-red-700',
-          'text-white font-semibold rounded-xl',
-          'transition-all shadow-lg hover:shadow-xl',
-          'focus:outline-none focus:ring-2 focus:ring-primary focus:ring-offset-2'
+          'rounded-xl font-semibold text-white',
+          'shadow-lg transition-all hover:shadow-xl',
+          'focus:ring-primary focus:ring-2 focus:ring-offset-2 focus:outline-none'
         )}
       >
-        <Mail className="w-5 h-5" />
+        <Mail className="h-5 w-5" />
         {t('contactAdmin')}
       </Link>
     </>
