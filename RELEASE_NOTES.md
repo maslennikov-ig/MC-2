@@ -2,6 +2,20 @@
 
 _Released on 2025-12-26_
 
+## v0.28.18
+
+_Released on 2026-01-20_
+
+### 🐛 Bug Fixes
+
+- **course-gen-platform**: Update 1 source file(s), update docs
+- **generation-graph**: Correct course_size and notifications display on progress page
+- **docker**: Add BULLMQ_STAGE7_QUEUE_NAME to worker-dev for Stage 7 queue isolation
+
+---
+
+_This release was automatically generated from 6 commits._
+
 ## v0.28.17
 
 _Released on 2026-01-20_
