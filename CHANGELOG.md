@@ -311,6 +311,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.28.20] - 2026-01-20
+
+### Added
+
+- **llm**: Add hardcoded fallback for Model Config Service (7b7ed82)
+
+### Fixed
+
+- **web**: Use i18n Link for correct SPA navigation (8aa703c)
+- **stage2**: Add courseId to Phase 6 summarization error logs (de3420c)
+
+### Other
+
+- update docs (b0577b6)
+- bd sync: 2026-01-20 19:12:01 (bdbf540)
+- bd sync: 2026-01-20 19:07:43 (e122f3e)
+
 ## [0.28.19] - 2026-01-20
 
 ### Added

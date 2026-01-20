@@ -2,6 +2,23 @@
 
 _Released on 2025-12-26_
 
+## v0.28.20
+
+_Released on 2026-01-20_
+
+### ✨ New Features
+
+- **llm**: Add hardcoded fallback for Model Config Service
+
+### 🐛 Bug Fixes
+
+- **web**: Use i18n Link for correct SPA navigation
+- **stage2**: Add courseId to Phase 6 summarization error logs
+
+---
+
+_This release was automatically generated from 6 commits._
+
 ## v0.28.19
 
 _Released on 2026-01-20_
