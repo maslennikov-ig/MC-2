@@ -506,7 +506,7 @@ async function queueNextStageJob(
           target_audience: isValidTargetAudience(course.target_audience)
             ? course.target_audience
             : undefined,
-          difficulty: isValidDifficulty(course.difficulty) ? course.difficulty : undefined,
+          difficulty: isValidDifficulty(course.difficulty) ? course.difficulty : 'intermediate',
           description: course.course_description ?? undefined,
           course_size: course.course_size as
             | 'micro'
