@@ -1,274 +1,226 @@
-# План: Реорганизация UI/UX создания нового курса
+# План: Исправление отображения параметров курса на странице прогресса генерации
 
-## Краткое описание
+## Проблема
 
-Реорганизация раздела "Дополнительные настройки" формы создания курса:
+При создании курса пользователь выбирает параметры, данные корректно сохраняются в БД, но на странице прогресса генерации (Stage1InputTab) они отображаются некорректно.
 
-1. Двухколоночная компоновка (размер курса слева, остальное справа)
-2. Автоматический режим генерации по умолчанию
-3. Унификация цветовой гаммы иконок (purple)
-4. Отображение стоимости в LLM токенах вместо долларов
-5. Исправление бага с обновлением стоимости при смене размера курса
+**Верифицировано на курсе BNM-1906:**
 
----
+- БД содержит: `course_size: "standard"`, `notify_on_completion: true`, `notify_on_error: true`
+- UI показывает: пустой Badge для размера, уведомления не отображаются
 
-## Задачи
+## Найденные проблемы
 
-### 1. Исправить баг с обновлением стоимости при смене размера курса
-
-**Файл:** `packages/web/components/forms/create-course/components/CourseSizeSelector.tsx`
-
-**Проблема:** При выборе 'auto' в `handleSizeClick` не сбрасывается `estimatedLessons`, поэтому при переключении micro → auto стоимость остаётся для 3 уроков.
-
-**Решение:** Добавить сброс `estimatedLessons` и `estimatedSections` в undefined при выборе 'auto':
-
-```tsx
-const handleSizeClick = (size: CourseSize) => {
-  setValue('courseSize', size);
-  if (size !== 'auto') {
-    const preset = COURSE_SIZE_PRESETS[size];
-    setValue('estimatedLessons', preset.targetLessons);
-    setValue('estimatedSections', preset.targetSections);
-  } else {
-    // Сбросить при выборе auto, чтобы fallback в форме сработал
-    setValue('estimatedLessons', undefined);
-    setValue('estimatedSections', undefined);
-  }
-};
-```
-
----
-
-### 2. Изменить default для режима генерации на 'automatic'
-
-**Файл:** `packages/web/components/forms/create-course/_schemas/form-schema.ts`
-
-**Изменение:** Строка 80
-
-```tsx
-// Было:
-generationMode: z.enum(['automatic', 'semi_automatic']).default('semi_automatic'),
-
-// Стало:
-generationMode: z.enum(['automatic', 'semi_automatic']).default('automatic'),
-```
-
----
-
-### 3. Добавить функцию оценки токенов в shared-types
-
-**Файл:** `packages/shared-types/src/cost-preview.ts`
-
-Добавить новый интерфейс и функцию для оценки токенов:
-
-```tsx
-export interface TokenEstimate {
-  totalTokens: number;
-  minTokens: number;
-  maxTokens: number;
-  breakdown: {
-    stage2_tokens: number; // Embeddings
-    stage4_tokens: number; // Analysis
-    stage5_tokens: number; // Structure
-    stage6_tokens: number; // Lessons
-  };
-}
-
-// Токены на один урок (на основе реальных тестов: min 2000, max 10000)
-const TOKENS_PER_LESSON_MIN = 2000;
-const TOKENS_PER_LESSON_AVG = 6000;
-const TOKENS_PER_LESSON_MAX = 10000;
-
-export function estimateTokens(input: EstimateCostInput): TokenEstimate {
-  // Расчёт токенов на основе уроков
-  const stage2Tokens = input.hasDocuments ? input.documentCount * 1000 : 0;
-  const stage4Tokens = input.hasDocuments ? 10000 : 5000;
-  const stage5Tokens = 5000 + input.estimatedLessons * 500;
-  const stage6TokensAvg = input.estimatedLessons * TOKENS_PER_LESSON_AVG;
-
-  const totalTokens = stage2Tokens + stage4Tokens + stage5Tokens + stage6TokensAvg;
-
-  // Min/Max на основе variance в stage6 (самая затратная часть)
-  const stage6Min = input.estimatedLessons * TOKENS_PER_LESSON_MIN;
-  const stage6Max = input.estimatedLessons * TOKENS_PER_LESSON_MAX;
-
-  return {
-    totalTokens,
-    minTokens: stage2Tokens + stage4Tokens + stage5Tokens + stage6Min,
-    maxTokens: stage2Tokens + stage4Tokens + stage5Tokens + stage6Max,
-    breakdown: {
-      stage2_tokens: stage2Tokens,
-      stage4_tokens: stage4Tokens,
-      stage5_tokens: stage5Tokens,
-      stage6_tokens: stage6TokensAvg,
-    },
-  };
-}
-
-// Форматирование токенов для отображения (123456 → "~124K")
-// Округляем в большую сторону
-export function formatTokens(tokens: number): string {
-  if (tokens >= 1000000) {
-    return `~${Math.ceil(tokens / 100000) / 10}M`;
-  }
-  if (tokens >= 1000) {
-    return `~${Math.ceil(tokens / 1000)}K`;
-  }
-  return `~${Math.ceil(tokens)}`;
-}
-```
-
----
-
-### 4. Обновить CostPreviewCard для отображения токенов
-
-**Файл:** `packages/web/components/forms/create-course/components/CostPreviewCard.tsx`
-
-**Изменения:**
-
-1. Заменить DollarSign иконку на Hash или Sigma
-2. Заменить заголовок "Ориентировочная стоимость" на "Ориентировочное количество токенов"
-3. Использовать новую функцию `estimateTokens` и `formatTokens`
-4. Отображать токены вместо долларов
-
----
-
-### 5. Реорганизовать AdvancedSettingsSection в 2 колонки
-
-**Файл:** `packages/web/components/forms/create-course/components/AdvancedSettingsSection.tsx`
-
-**Новая структура:**
-
-```
-┌─────────────────────────────────────────────────────┐
-│ Дополнительные настройки (необязательно)      [▼]  │
-├─────────────────────────┬───────────────────────────┤
-│                         │                           │
-│   РАЗМЕР КУРСА          │   ЦЕЛЕВАЯ АУДИТОРИЯ       │
-│   [auto] [micro]        │   [input field]           │
-│   [mini] [compact]      │                           │
-│   [standard]            │   РЕЗУЛЬТАТЫ ОБУЧЕНИЯ     │
-│   [comprehensive]       │   [textarea]              │
-│                         │                           │
-│                         │   РЕЖИМ ГЕНЕРАЦИИ         │
-│                         │   [toggle + notifications]│
-│                         │                           │
-└─────────────────────────┴───────────────────────────┘
-```
-
-**Изменения в коде:**
-
-```tsx
-<div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
-  {/* Левая колонка - Размер курса */}
-  <div>
-    <CourseSizeSelector />
-  </div>
-
-  {/* Правая колонка - Остальные настройки */}
-  <div className="space-y-6">
-    {/* Целевая аудитория */}
-    {/* Результаты обучения */}
-    {/* Режим генерации */}
-  </div>
-</div>
-```
-
----
-
-### 6. Унифицировать цветовую гамму иконок (purple)
-
-**Файл:** `packages/web/components/forms/create-course/components/AdvancedSettingsSection.tsx`
-
-**Изменения:**
-
-| Иконка                | Было                                | Стало                                  |
-| --------------------- | ----------------------------------- | -------------------------------------- |
-| Zap (режим генерации) | `text-yellow-500`                   | `text-purple-500 dark:text-purple-400` |
-| Bell (уведомления)    | `text-yellow-600`                   | `text-purple-500 dark:text-purple-400` |
-| Фон уведомлений       | `border-yellow-200 bg-yellow-50/50` | `border-purple-200 bg-purple-50/50`    |
-
-Иконки состояний (CheckCircle2, AlertCircle) оставить семантическими (зелёный/красный) для индикации типа уведомления.
-
----
+1. **`page.tsx`** (строка 176-200) — не передаёт notification поля в `stage1CourseData.inputData`
+2. **`Stage1InputTab.tsx`** (строки 312-320) — проверяет `small/medium/large`, а реальные значения: `auto/micro/mini/compact/standard/comprehensive`
+3. **`Stage1InputTab.tsx`** — не отображает notification поля
+4. **`types.ts`** — `course_size` типизирован как `string` вместо `CourseSize`
 
 ## Файлы для изменения
 
-| Файл                                                                                 | Изменения                                   |
-| ------------------------------------------------------------------------------------ | ------------------------------------------- |
-| `packages/shared-types/src/cost-preview.ts`                                          | Добавить `estimateTokens`, `formatTokens`   |
-| `packages/shared-types/src/index.ts`                                                 | Экспортировать новые функции                |
-| `packages/web/components/forms/create-course/components/CourseSizeSelector.tsx`      | Исправить сброс estimatedLessons для 'auto' |
-| `packages/web/components/forms/create-course/components/CostPreviewCard.tsx`         | Переделать на токены                        |
-| `packages/web/components/forms/create-course/components/AdvancedSettingsSection.tsx` | 2 колонки + унификация иконок               |
-| `packages/web/components/forms/create-course/_schemas/form-schema.ts`                | default 'automatic'                         |
+| Файл                                                                        | Изменения                                                      |
+| --------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| `packages/web/lib/generation-graph/mappers.ts`                              | **НОВЫЙ** — utility function `mapCourseToStage1Data()`         |
+| `packages/web/app/[locale]/courses/generating/[slug]/page.tsx`              | Использовать `mapCourseToStage1Data()` вместо ручного маппинга |
+| `packages/web/components/generation-graph/panels/stage1/Stage1InputTab.tsx` | Исправить маппинг course_size, добавить уведомления            |
+| `packages/web/components/generation-graph/panels/stage1/types.ts`           | Типизировать course_size и notification поля                   |
+| `packages/web/lib/generation-graph/translations.ts`                         | Добавить переводы для уведомлений, удалить устаревшие          |
 
----
+## Детали реализации
+
+### Шаг 0: Создать utility function `mapCourseToStage1Data()` (НОВЫЙ ФАЙЛ)
+
+**Файл:** `packages/web/lib/generation-graph/mappers.ts`
+
+```typescript
+import type { CourseSize } from '@megacampus/shared-types';
+import type { Stage1CourseData } from '@/components/generation-graph/hooks/use-graph-data/types';
+
+// Type for course from DB (based on Supabase schema)
+interface CourseFromDB {
+  id: string;
+  title: string | null;
+  course_description: string | null;
+  target_audience: string | null;
+  style: string | null;
+  output_formats: string[] | null;
+  estimated_lessons: number | null;
+  estimated_sections: number | null;
+  content_strategy: string | null;
+  prerequisites: string | null;
+  learning_outcomes: string | null;
+  has_files: boolean | null;
+  language: string | null;
+  course_size: string | null;
+  generation_mode: string | null;
+  notify_on_completion: boolean | null;
+  notify_on_error: boolean | null;
+  notify_on_stage_complete: boolean | null;
+  user_id: string | null;
+  created_at: string | null;
+  settings: { lesson_duration_minutes?: number } | null;
+}
+
+export function mapCourseToStage1Data(course: CourseFromDB): Stage1CourseData {
+  return {
+    inputData: {
+      topic: course.title || '',
+      course_description: course.course_description || '',
+      target_audience: course.target_audience || undefined,
+      style: course.style || undefined,
+      output_formats: (course.output_formats as Array<
+        'text' | 'audio' | 'video' | 'presentation' | 'test'
+      >) || ['text'],
+      estimated_lessons: course.estimated_lessons || undefined,
+      estimated_sections: course.estimated_sections || undefined,
+      content_strategy:
+        (course.content_strategy as 'auto' | 'create_from_scratch' | 'expand_and_enhance') ||
+        'auto',
+      prerequisites: course.prerequisites || undefined,
+      learning_outcomes: course.learning_outcomes || undefined,
+      has_files: course.has_files || false,
+      language: course.language || 'ru',
+      course_size: (course.course_size as CourseSize) || undefined,
+      lesson_duration_minutes: course.settings?.lesson_duration_minutes || undefined,
+      generation_mode: (course.generation_mode as 'automatic' | 'semi_automatic') || 'automatic',
+      // Notification preferences (were missing!)
+      notify_on_completion: course.notify_on_completion ?? true,
+      notify_on_error: course.notify_on_error ?? true,
+      notify_on_stage_complete: course.notify_on_stage_complete ?? false,
+    },
+    outputData: {
+      courseId: course.id,
+      ownerId: course.user_id || '',
+      createdAt: course.created_at || new Date().toISOString(),
+      status: 'ready' as const,
+    },
+  };
+}
+```
+
+### Шаг 1: Обновить `types.ts` (строка ~42)
+
+```typescript
+import type { CourseSize } from '@megacampus/shared-types'
+
+// В интерфейсе Stage1InputData:
+course_size?: CourseSize  // было: string
+notify_on_completion?: boolean
+notify_on_error?: boolean
+notify_on_stage_complete?: boolean
+```
+
+### Шаг 2: Исправить `Stage1InputTab.tsx` (строки 312-320)
+
+**Было:**
+
+```typescript
+{
+  data.course_size === 'small' && (t?.sizeSmall?.[locale] || 'Small');
+}
+{
+  data.course_size === 'medium' && (t?.sizeMedium?.[locale] || 'Medium');
+}
+{
+  data.course_size === 'large' && (t?.sizeLarge?.[locale] || 'Large');
+}
+```
+
+**Стало:**
+
+```typescript
+import { getCourseSizeLabels, type CourseSize } from '@megacampus/shared-types'
+
+// В JSX (строки 312-320):
+{data.course_size && (
+  <div className="flex items-center gap-2">
+    <span className="text-muted-foreground text-xs">
+      {t?.courseSize?.[locale] || 'Size:'}
+    </span>
+    <Badge variant="outline">
+      {getCourseSizeLabels(locale, data.course_size).title}
+    </Badge>
+  </div>
+)}
+```
+
+### Шаг 3: Добавить отображение уведомлений (после generation_mode, ~строка 343)
+
+```typescript
+import { Bell } from 'lucide-react'
+
+// После блока generation_mode:
+{(data.notify_on_completion || data.notify_on_error || data.notify_on_stage_complete) && (
+  <div className="flex flex-wrap items-center gap-2">
+    <Bell className="text-muted-foreground h-4 w-4" />
+    {data.notify_on_completion && (
+      <Badge variant="secondary" className="text-xs">
+        {t?.notifyCompletion?.[locale] || 'On completion'}
+      </Badge>
+    )}
+    {data.notify_on_error && (
+      <Badge variant="secondary" className="text-xs">
+        {t?.notifyError?.[locale] || 'On error'}
+      </Badge>
+    )}
+    {data.notify_on_stage_complete && (
+      <Badge variant="secondary" className="text-xs">
+        {t?.notifyStage?.[locale] || 'On stage'}
+      </Badge>
+    )}
+  </div>
+)}
+```
+
+### Шаг 4: Обновить `page.tsx` — использовать utility function
+
+**Файл:** `packages/web/app/[locale]/courses/generating/[slug]/page.tsx`
+
+**Было (строки 176-207):** ~30 строк ручного маппинга
+
+**Стало:**
+
+```typescript
+import { mapCourseToStage1Data } from '@/lib/generation-graph/mappers';
+
+// Заменить весь блок stage1CourseData на:
+const stage1CourseData = mapCourseToStage1Data(course);
+```
+
+### Шаг 5: Обновить `translations.ts`
+
+**Добавить:**
+
+```typescript
+courseSize: { ru: 'Размер:', en: 'Size:' },
+notifyCompletion: { ru: 'При завершении', en: 'On completion' },
+notifyError: { ru: 'При ошибке', en: 'On error' },
+notifyStage: { ru: 'По этапам', en: 'By stage' },
+```
+
+**Удалить устаревшие:**
+
+```typescript
+sizeSmall: { ... },   // удалить
+sizeMedium: { ... },  // удалить
+sizeLarge: { ... },   // удалить
+```
 
 ## Верификация
 
-1. **Type-check**: `pnpm type-check`
-2. **Build**: `pnpm build`
-3. **Ручное тестирование:**
-   - Открыть форму создания курса
-   - Проверить, что режим генерации по умолчанию = automatic
-   - Проверить двухколоночную компоновку
-   - Выбрать micro, затем переключить на auto → стоимость должна обновиться
-   - Проверить, что токены отображаются корректно
-   - Проверить, что иконки имеют фиолетовую гамму
+1. `pnpm type-check` — должен пройти без ошибок
+2. Создать курс с параметрами:
+   - `course_size: standard`
+   - `notify_on_completion: true`
+   - `notify_on_error: true`
+3. Перейти на страницу прогресса генерации
+4. В карточке "Стратегия и параметры" проверить:
+   - Размер курса: **"Стандартный"** (не пустой Badge)
+   - Уведомления отображаются как badges
 
----
+## Cleanup (опционально)
 
-## Делегирование
+После фикса удалить debug-логирование из:
 
-- **Задачи 1, 2, 3**: Простые, выполню сам
-- **Задача 4 (CostPreviewCard)**: Делегировать `nextjs-ui-designer`
-- **Задача 5, 6 (AdvancedSettingsSection)**: Делегировать `nextjs-ui-designer`
-
----
-
-## Задачи Beads (создать перед реализацией)
-
-```bash
-# 1. Баг: стоимость не обновляется при смене размера курса
-bd create --title="fix: Course size change doesn't update cost estimation" \
-  --type=bug \
-  --priority=2 \
-  --files "packages/web/components/forms/create-course/components/CourseSizeSelector.tsx" \
-  --description="При переключении с micro на auto, estimatedLessons не сбрасывается, и стоимость остаётся для старого размера"
-
-# 2. Изменить default режима генерации на automatic
-bd create --title="feat: Change default generation mode to automatic" \
-  --type=task \
-  --priority=3 \
-  --files "packages/web/components/forms/create-course/_schemas/form-schema.ts" \
-  --description="Изменить default для generationMode с semi_automatic на automatic"
-
-# 3. Добавить функцию оценки токенов
-bd create --title="feat: Add token estimation for cost preview" \
-  --type=feature \
-  --priority=2 \
-  --files "packages/shared-types/src/cost-preview.ts,packages/shared-types/src/index.ts" \
-  --description="Добавить estimateTokens и formatTokens функции для отображения стоимости в LLM токенах"
-
-# 4. Обновить CostPreviewCard для отображения токенов
-bd create --title="feat: Display cost in LLM tokens instead of USD" \
-  --type=feature \
-  --priority=2 \
-  --files "packages/web/components/forms/create-course/components/CostPreviewCard.tsx" \
-  --description="Заменить отображение стоимости в USD на LLM токены (input/output)"
-
-# 5. Реорганизовать AdvancedSettingsSection в 2 колонки
-bd create --title="refactor: Two-column layout for advanced settings" \
-  --type=task \
-  --priority=2 \
-  --files "packages/web/components/forms/create-course/components/AdvancedSettingsSection.tsx" \
-  --description="Левая колонка: размер курса. Правая: целевая аудитория, результаты обучения, режим генерации"
-
-# 6. Унифицировать цветовую гамму иконок (purple)
-bd create --title="style: Unify icon colors to purple theme" \
-  --type=task \
-  --priority=3 \
-  --files "packages/web/components/forms/create-course/components/AdvancedSettingsSection.tsx" \
-  --description="Заменить желтые иконки (Zap, Bell) на фиолетовые для соответствия общему стилю"
-```
+- `packages/web/components/forms/create-course/_hooks/useSubmitCourse.ts`
+- `packages/web/components/forms/create-course/_hooks/useCreateCourseForm.ts`
