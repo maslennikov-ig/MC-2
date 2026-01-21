@@ -136,6 +136,13 @@ export const AUTO_MUTE_RULES: AutoMuteRule[] = [
     description: 'Health endpoint returning 503 during startup - expected during deploys',
   },
 
+  // === Redis Reconnection Events ===
+  {
+    pattern: /Redis reconnecting in \d+ms/i,
+    reason: 'graceful_shutdown',
+    description: 'Redis auto-reconnect during restart - expected behavior',
+  },
+
   // === Job Lifecycle Events ===
   {
     pattern: /Job stalled/i,

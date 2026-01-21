@@ -183,10 +183,11 @@ app.use(
 );
 
 // Parse JSON request bodies (for file upload metadata, etc.)
-app.use(express.json({ limit: '10mb' }));
+// Limit must match frontend MAX_FILE_SIZE_BYTES (50MB) in file-upload.tsx
+app.use(express.json({ limit: '50mb' }));
 
 // Parse URL-encoded request bodies
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '50mb' }));
 
 /**
  * Request Logging Middleware
