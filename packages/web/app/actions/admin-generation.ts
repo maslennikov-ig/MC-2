@@ -180,7 +180,8 @@ export async function resumeGeneration(courseId: string) {
 
 /**
  * Cancel course generation
- * Sets the course status to 'cancelled' and cleans up pending jobs
+ * Updates course status to 'cancelled' and triggers backend cleanup.
+ * Backend (lifecycle.router.ts) handles BullMQ job removal via removeJobsByCourseId.
  */
 export async function cancelGeneration(courseId: string) {
   const supabase = await createClient()

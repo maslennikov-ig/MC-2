@@ -84,6 +84,15 @@ function adaptHandler(handler: {
       // for the methods our handlers actually use (data, id, name, updateProgress)
       // Extract token for pause/delay operations (job.moveToDelayed)
       const token = (job as SandboxedJob<JobData> & { token?: string }).token;
+
+      // Warn if token is missing - pause functionality won't work
+      if (!token) {
+        logger.warn(
+          { jobId: job.id, jobName: job.name },
+          'Job token missing - pause/delay functionality disabled for this job'
+        );
+      }
+
       const result = await handler.process(job as unknown as Job<any>, token);
       // Result is guaranteed to have at least the JobResult interface
       // (all handler results extend JobResult with { success, message?, data?, error? })

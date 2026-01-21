@@ -271,6 +271,10 @@ export default function GenerationProgressContainerEnhanced({
   // Local state for pause/resume - initialized from prop, updated via realtime and optimistic updates
   const [isPausedLocal, setIsPausedLocal] = useState(!!generationPausedAt)
 
+  // Request ID tracking to prevent race conditions with optimistic updates
+  const pauseRequestRef = useRef(0)
+  const resumeRequestRef = useRef(0)
+
   // DISABLED: All below moved to GraphView - MissionControlBanner and StageResultsDrawer
   // const [detailsStageId, setDetailsStageId] = useState<string | null>(null);
   // const [isProcessingApproval, setIsProcessingApproval] = useState(false);
@@ -382,15 +386,21 @@ export default function GenerationProgressContainerEnhanced({
       toast.warning('Генерация уже завершена')
       return
     }
+    // Increment request ID and store locally for race condition detection
+    const requestId = ++pauseRequestRef.current
     // Optimistic update - set paused state immediately before API call
     setIsPausedLocal(true)
     try {
       // Use server action that calls API endpoint with proper validation and RPC
       await pauseGeneration(courseId)
-      toast.info('Генерация приостановлена')
+      toast.info(
+        'Генерация приостановлена. Активная задача завершится, новые задачи приостановлены.'
+      )
     } catch (error) {
-      // Revert optimistic update on error
-      setIsPausedLocal(false)
+      // Only revert if this is still the latest request (prevent race condition)
+      if (requestId === pauseRequestRef.current) {
+        setIsPausedLocal(false)
+      }
       toast.error('Не удалось приостановить генерацию')
       console.error(error)
     }
@@ -402,6 +412,8 @@ export default function GenerationProgressContainerEnhanced({
       toast.warning('Генерация не приостановлена')
       return
     }
+    // Increment request ID and store locally for race condition detection
+    const requestId = ++resumeRequestRef.current
     // Optimistic update - set resumed state immediately before API call
     setIsPausedLocal(false)
     try {
@@ -409,8 +421,10 @@ export default function GenerationProgressContainerEnhanced({
       await resumeGeneration(courseId)
       toast.success('Генерация продолжена')
     } catch (error) {
-      // Revert optimistic update on error
-      setIsPausedLocal(true)
+      // Only revert if this is still the latest request (prevent race condition)
+      if (requestId === resumeRequestRef.current) {
+        setIsPausedLocal(true)
+      }
       toast.error('Не удалось продолжить генерацию')
       console.error(error)
     }
@@ -456,9 +470,14 @@ export default function GenerationProgressContainerEnhanced({
       generation_paused_at?: string | null
     }) => {
       // Update pause state from realtime data
+      // Only apply realtime updates if no pending optimistic update (race condition protection)
       if ('generation_paused_at' in course) {
         const newIsPaused = course.generation_paused_at !== null
-        setIsPausedLocal(newIsPaused)
+        // Only update if not in middle of optimistic update sequence
+        // Check if the realtime state matches our optimistic state - if different, prioritize realtime (server is source of truth)
+        if (newIsPaused !== isPausedLocal) {
+          setIsPausedLocal(newIsPaused)
+        }
       }
       if (course.generation_progress && typeof course.generation_progress === 'object') {
         const progress = course.generation_progress as {
