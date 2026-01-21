@@ -37,6 +37,8 @@ interface CoverPromptParams {
     visualElements: string;
     mood: string;
   };
+  /** Custom prompt additions from user (regeneration or initial generation) */
+  customPrompt?: string;
 }
 
 /**
@@ -425,11 +427,12 @@ Start with { and end with }.
  * User message for generating 3 cover prompt variants (draft phase)
  */
 function getVariantsUserMessage(params: CoverPromptParams): string {
-  const { lessonTitle, keywords, courseSubject, language, styleHint, visualStyle } = params;
+  const { lessonTitle, keywords, courseSubject, language, styleHint, visualStyle, customPrompt } =
+    params;
   const keywordsStr = keywords.length > 0 ? keywords.join(', ') : 'general concepts';
   const style = visualStyle ?? DEFAULT_VISUAL_STYLE;
 
-  return `Generate 3 different image prompt variants for a lesson cover with the following context:
+  let message = `Generate 3 different image prompt variants for a lesson cover with the following context:
 
 Lesson Title: ${lessonTitle}
 Course Subject: ${courseSubject}
@@ -444,6 +447,14 @@ ${styleHint ? `Style Preference: ${styleHint}` : ''}
 - Mood: ${style.mood}
 
 Create 3 distinct prompts for 16:9 hero banner images, each with a unique visual approach while maintaining the course visual style.`;
+
+  // Add user's custom instructions if provided
+  if (customPrompt?.trim()) {
+    message += `\n\n## Additional User Instructions (MUST be incorporated):
+${customPrompt.trim()}`;
+  }
+
+  return message;
 }
 
 // ============================================================================
@@ -526,12 +537,17 @@ async function generateDraft(input: EnrichmentHandlerInput): Promise<DraftResult
     // Get visual style from course for consistent styling
     const visualStyle = getVisualStyle(course);
 
+    // Extract customPrompt from settings if provided
+    const customPrompt =
+      typeof input.settings?.customPrompt === 'string' ? input.settings.customPrompt : undefined;
+
     const promptParams: CoverPromptParams = {
       lessonTitle: lesson.title,
       keywords,
       courseSubject: course.title ?? 'Educational Content',
       language: (course.language as 'en' | 'ru') || 'en',
       visualStyle,
+      customPrompt,
     };
 
     logger.debug(
@@ -832,6 +848,18 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
       );
       systemPrompt = getDefaultCoverSystemPrompt();
       userMessage = `Generate an image prompt for a lesson cover:\nLesson: ${lesson.title}\nCourse: ${course.title ?? 'Educational Content'}\nTopics: ${keywords.join(', ') || 'general concepts'}\n\nVisual Style:\n- Color Scheme: ${visualStyle.colorScheme}\n- Aesthetic: ${visualStyle.aesthetic}\n- Visual Elements: ${visualStyle.visualElements}\n- Mood: ${visualStyle.mood}`;
+    }
+
+    // Append custom prompt from user settings if provided
+    const customPrompt =
+      typeof input.settings?.customPrompt === 'string' ? input.settings.customPrompt : undefined;
+
+    if (customPrompt?.trim()) {
+      userMessage += `\n\n## Additional User Instructions (MUST be incorporated):\n${customPrompt.trim()}`;
+      logger.debug(
+        { enrichmentId: enrichment.id, customPromptLength: customPrompt.length },
+        'Cover handler: adding custom prompt to generation'
+      );
     }
 
     // Step 2: Call LLM (separate error handling)

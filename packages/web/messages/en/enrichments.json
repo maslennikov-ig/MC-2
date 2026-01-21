@@ -286,6 +286,7 @@
     },
     "style": {
       "label": "Style",
+      "tooltip": "Visual style of the image. Affects overall aesthetics and level of detail.",
       "realistic": "Realistic",
       "abstract": "Abstract",
       "minimalist": "Minimalist",
@@ -293,11 +294,24 @@
     },
     "colorScheme": {
       "label": "Color Scheme",
+      "tooltip": "Image color palette. \"Auto\" will pick colors based on course settings.",
       "auto": "Auto (from course)",
       "warm": "Warm tones",
       "cool": "Cool tones",
       "monochrome": "Monochrome"
     },
+    "customPrompt": {
+      "label": "Additional Instructions",
+      "placeholder": "E.g., brighter colors, minimalist style, include technology elements...",
+      "tooltip": "Optional. Specify preferences for the image that will be added to the default generation prompt."
+    },
+    "regeneratePrompt": {
+      "label": "What to Change",
+      "placeholder": "E.g., make background darker, add more details, change color scheme...",
+      "tooltip": "Describe what you want to change in the current image. These instructions will be added to the regeneration prompt."
+    },
+    "regenerateSection": "Regenerate",
+    "regenerateButton": "Regenerate",
     "estimatedCost": "Estimated cost",
     "batchGenerate": "Generate Missing",
     "batchProgress": "Generating {current} of {total}...",
