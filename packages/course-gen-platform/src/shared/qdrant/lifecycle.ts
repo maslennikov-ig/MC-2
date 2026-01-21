@@ -165,10 +165,13 @@ export async function updateStorageQuota(
 
   if (updateError) {
     // If RPC doesn't exist, fall back to direct SQL update
-    logger.warn({
-      organizationId,
-      err: updateError.message,
-    }, 'RPC update_organization_storage not available, using direct update');
+    logger.warn(
+      {
+        organizationId,
+        err: updateError.message,
+      },
+      'RPC update_organization_storage not available, using direct update'
+    );
     const { error } = await supabase
       .from('organizations')
       .update({
@@ -182,9 +185,12 @@ export async function updateStorageQuota(
 
     // Manually update storage_used_bytes via SQL (no direct .raw() support in client)
     // In production, ensure the RPC function exists
-    logger.warn({
-      organizationId,
-    }, 'Storage quota update may be inaccurate without RPC function');
+    logger.warn(
+      {
+        organizationId,
+      },
+      'Storage quota update may be inaccurate without RPC function'
+    );
   }
 
   // Check if quota exceeded (only on increment)
@@ -230,12 +236,15 @@ export async function duplicateVectorsForNewCourse(
   newCourseId: string,
   newOrganizationId: string
 ): Promise<number> {
-  logger.info({
-    originalFileId,
-    newFileId,
-    newCourseId,
-    newOrganizationId,
-  }, 'Duplicating vectors for new course');
+  logger.info(
+    {
+      originalFileId,
+      newFileId,
+      newCourseId,
+      newOrganizationId,
+    },
+    'Duplicating vectors for new course'
+  );
 
   try {
     // 1. Get all vectors for original file from Qdrant
@@ -254,10 +263,13 @@ export async function duplicateVectorsForNewCourse(
       throw new Error(`No vectors found for original file ${originalFileId}`);
     }
 
-    logger.info({
-      vectorCount: originalPoints.length,
-      originalFileId,
-    }, 'Found vectors to duplicate');
+    logger.info(
+      {
+        vectorCount: originalPoints.length,
+        originalFileId,
+      },
+      'Found vectors to duplicate'
+    );
 
     // 2. Create new points with SAME vectors but DIFFERENT metadata
     const newPoints = originalPoints.map(point => {
@@ -293,11 +305,14 @@ export async function duplicateVectorsForNewCourse(
     for (let i = 0; i < newPoints.length; i += BATCH_SIZE) {
       const batch = newPoints.slice(i, i + BATCH_SIZE);
 
-      logger.info({
-        batchNumber: Math.floor(i / BATCH_SIZE) + 1,
-        batchSize: batch.length,
-        newCourseId,
-      }, 'Uploading vector duplication batch');
+      logger.info(
+        {
+          batchNumber: Math.floor(i / BATCH_SIZE) + 1,
+          batchSize: batch.length,
+          newCourseId,
+        },
+        'Uploading vector duplication batch'
+      );
 
       await qdrantClient.upsert(COLLECTION_CONFIG.name, {
         wait: true,
@@ -307,18 +322,24 @@ export async function duplicateVectorsForNewCourse(
       uploadedCount += batch.length;
     }
 
-    logger.info({
-      duplicatedCount: uploadedCount,
-      newCourseId,
-    }, 'Vector duplication complete');
+    logger.info(
+      {
+        duplicatedCount: uploadedCount,
+        newCourseId,
+      },
+      'Vector duplication complete'
+    );
     return uploadedCount;
   } catch (error) {
-    logger.error({
-      err: error instanceof Error ? error.message : String(error),
-      originalFileId,
-      newFileId,
-      newCourseId,
-    }, 'Failed to duplicate vectors');
+    logger.error(
+      {
+        err: error instanceof Error ? error.message : String(error),
+        originalFileId,
+        newFileId,
+        newCourseId,
+      },
+      'Failed to duplicate vectors'
+    );
     throw new Error(
       `Vector duplication failed: ${error instanceof Error ? error.message : String(error)}`
     );
@@ -346,12 +367,15 @@ export async function handleFileUpload(
 
   // 1. Calculate SHA-256 hash
   const hash = calculateFileHash(fileBuffer);
-  logger.info({
-    filename: metadata.filename,
-    hashPrefix: hash.substring(0, 16),
-    organizationId: metadata.organization_id,
-    courseId: metadata.course_id,
-  }, 'Calculated file hash');
+  logger.info(
+    {
+      filename: metadata.filename,
+      hashPrefix: hash.substring(0, 16),
+      organizationId: metadata.organization_id,
+      courseId: metadata.course_id,
+    },
+    'Calculated file hash'
+  );
 
   // 2. Check for existing file with same hash (using database function)
   const duplicateResult = await supabase.rpc('find_duplicate_file', {
@@ -359,27 +383,33 @@ export async function handleFileUpload(
   });
 
   if (duplicateResult.error) {
-    logger.error({
-      err: duplicateResult.error.message,
-      hash,
-    }, 'Error searching for duplicate');
+    logger.error(
+      {
+        err: duplicateResult.error.message,
+        hash,
+      },
+      'Error searching for duplicate'
+    );
     // Continue with normal upload on search error
   }
 
   // If existingFile is an array, take the first result
-  const duplicateFile = (Array.isArray(duplicateResult.data)
-    ? duplicateResult.data[0]
-    : duplicateResult.data) as DuplicateFileResult | null | undefined;
+  const duplicateFile = (
+    Array.isArray(duplicateResult.data) ? duplicateResult.data[0] : duplicateResult.data
+  ) as DuplicateFileResult | null | undefined;
 
   if (duplicateFile && duplicateFile.file_id) {
     // ============================================
     // DEDUPLICATION PATH: File already exists
     // ============================================
-    logger.info({
-      existingFileId: duplicateFile.file_id,
-      hashPrefix: hash.substring(0, 16),
-      filename: metadata.filename,
-    }, 'Content deduplication detected');
+    logger.info(
+      {
+        existingFileId: duplicateFile.file_id,
+        hashPrefix: hash.substring(0, 16),
+        filename: metadata.filename,
+      },
+      'Content deduplication detected'
+    );
 
     try {
       // 3a. Create reference record in file_catalog
@@ -417,10 +447,13 @@ export async function handleFileUpload(
       });
 
       if (refCountResult.error) {
-        logger.warn({
-          err: refCountResult.error.message,
-          fileId: duplicateFile.file_id,
-        }, 'Failed to increment reference count');
+        logger.warn(
+          {
+            err: refCountResult.error.message,
+            fileId: duplicateFile.file_id,
+          },
+          'Failed to increment reference count'
+        );
         // Continue anyway - reference was created
       }
 
@@ -435,11 +468,14 @@ export async function handleFileUpload(
       // 3d. Update storage quota (BOTH organizations pay for their reference)
       await updateStorageQuota(metadata.organization_id, fileBuffer.length, 'increment');
 
-      logger.info({
-        newFileId: typedFileRecord.id,
-        vectorsDuplicated,
-        originalFileId: duplicateFile.file_id,
-      }, 'Deduplication complete');
+      logger.info(
+        {
+          newFileId: typedFileRecord.id,
+          vectorsDuplicated,
+          originalFileId: duplicateFile.file_id,
+        },
+        'Deduplication complete'
+      );
 
       return {
         file_id: typedFileRecord.id,
@@ -449,10 +485,13 @@ export async function handleFileUpload(
         vectors_duplicated: vectorsDuplicated,
       };
     } catch (error) {
-      logger.error({
-        err: error instanceof Error ? error.message : String(error),
-        filename: metadata.filename,
-      }, 'Deduplication failed, falling back to normal upload');
+      logger.error(
+        {
+          err: error instanceof Error ? error.message : String(error),
+          filename: metadata.filename,
+        },
+        'Deduplication failed, falling back to normal upload'
+      );
       // Fall through to normal upload path
     }
   }
@@ -460,11 +499,14 @@ export async function handleFileUpload(
   // ============================================
   // NORMAL PATH: New unique file
   // ============================================
-  logger.info({
-    hashPrefix: hash.substring(0, 16),
-    filename: metadata.filename,
-    organizationId: metadata.organization_id,
-  }, 'No deduplication: Processing new file');
+  logger.info(
+    {
+      hashPrefix: hash.substring(0, 16),
+      filename: metadata.filename,
+      organizationId: metadata.organization_id,
+    },
+    'No deduplication: Processing new file'
+  );
 
   // Save file to disk
   const storagePath = await saveFileToDisk(fileBuffer, metadata);
@@ -499,11 +541,14 @@ export async function handleFileUpload(
   // Update storage quota
   await updateStorageQuota(metadata.organization_id, fileBuffer.length, 'increment');
 
-  logger.info({
-    fileId: typedFileRecord.id,
-    filename: metadata.filename,
-    vectorStatus: 'pending',
-  }, 'Created new file record');
+  logger.info(
+    {
+      fileId: typedFileRecord.id,
+      filename: metadata.filename,
+      vectorStatus: 'pending',
+    },
+    'Created new file record'
+  );
 
   return {
     file_id: typedFileRecord.id,
@@ -519,10 +564,7 @@ export async function handleFileUpload(
  * @param metadata - Upload metadata
  * @returns Storage path
  */
-async function saveFileToDisk(
-  fileBuffer: Buffer,
-  metadata: FileUploadMetadata
-): Promise<string> {
+async function saveFileToDisk(fileBuffer: Buffer, metadata: FileUploadMetadata): Promise<string> {
   // Generate storage path: uploads/{organization_id}/{course_id}/{timestamp}-{filename}
   const timestamp = Date.now();
   const sanitizedFilename = metadata.filename.replace(/[^a-zA-Z0-9._-]/g, '_');
@@ -538,11 +580,14 @@ async function saveFileToDisk(
   // Write file
   await fs.writeFile(fullPath, fileBuffer);
 
-  logger.info({
-    storagePath: fullPath,
-    organizationId: metadata.organization_id,
-    courseId: metadata.course_id,
-  }, 'Saved file to disk');
+  logger.info(
+    {
+      storagePath: fullPath,
+      organizationId: metadata.organization_id,
+      courseId: metadata.course_id,
+    },
+    'Saved file to disk'
+  );
 
   return fullPath;
 }
@@ -567,35 +612,42 @@ export async function handleFileDelete(fileId: string): Promise<FileDeleteResult
   const result = await supabase.from('file_catalog').select('*').eq('id', fileId).single();
 
   if (result.error || !result.data) {
-    throw new Error(
-      `File ${fileId} not found: ${result.error?.message || 'No record'}`
-    );
+    throw new Error(`File ${fileId} not found: ${result.error?.message || 'No record'}`);
   }
 
   const typedFileRecord = result.data as FileCatalogRow;
 
-  logger.info({
-    fileId,
-    filename: typedFileRecord.filename,
-    organizationId: typedFileRecord.organization_id,
-    courseId: typedFileRecord.course_id,
-  }, 'Deleting file');
+  logger.info(
+    {
+      fileId,
+      filename: typedFileRecord.filename,
+      organizationId: typedFileRecord.organization_id,
+      courseId: typedFileRecord.course_id,
+    },
+    'Deleting file'
+  );
 
   // 2. Determine if this is original or reference
   const isOriginal = typedFileRecord.original_file_id === null;
   const targetFileId = isOriginal ? fileId : (typedFileRecord.original_file_id as string);
 
-  logger.info({
-    fileId,
-    isOriginal,
-    targetFileId,
-  }, 'File deletion metadata');
+  logger.info(
+    {
+      fileId,
+      isOriginal,
+      targetFileId,
+    },
+    'File deletion metadata'
+  );
 
   // 3. Delete vectors from Qdrant (only for THIS document_id and course_id)
-  logger.info({
-    documentId: fileId,
-    courseId: typedFileRecord.course_id,
-  }, 'Deleting vectors');
+  logger.info(
+    {
+      documentId: fileId,
+      courseId: typedFileRecord.course_id,
+    },
+    'Deleting vectors'
+  );
 
   // Delete operation is fire-and-forget, result not needed
   await qdrantClient.delete(COLLECTION_CONFIG.name, {
@@ -608,10 +660,13 @@ export async function handleFileDelete(fileId: string): Promise<FileDeleteResult
     wait: true,
   });
 
-  logger.info({
-    courseId: typedFileRecord.course_id,
-    documentId: fileId,
-  }, 'Deleted vectors for course');
+  logger.info(
+    {
+      courseId: typedFileRecord.course_id,
+      documentId: fileId,
+    },
+    'Deleted vectors for course'
+  );
 
   // 4. Decrement reference_count on original (or self if original)
   const refCountResult = await supabase.rpc('decrement_file_reference_count', {
@@ -619,17 +674,23 @@ export async function handleFileDelete(fileId: string): Promise<FileDeleteResult
   });
 
   if (refCountResult.error) {
-    logger.warn({
-      err: refCountResult.error.message,
-      targetFileId,
-    }, 'Failed to decrement reference count');
+    logger.warn(
+      {
+        err: refCountResult.error.message,
+        targetFileId,
+      },
+      'Failed to decrement reference count'
+    );
   }
 
   const remainingReferences = (refCountResult.data as number | null) || 0;
-  logger.info({
-    remainingReferences,
-    targetFileId,
-  }, 'Reference count after decrement');
+  logger.info(
+    {
+      remainingReferences,
+      targetFileId,
+    },
+    'Reference count after decrement'
+  );
 
   // 5. Delete file_catalog record for THIS reference
   const { error: deleteRecordError } = await supabase
@@ -638,40 +699,48 @@ export async function handleFileDelete(fileId: string): Promise<FileDeleteResult
     .eq('id', fileId);
 
   if (deleteRecordError) {
-    logger.warn({
-      err: deleteRecordError.message,
-      fileId,
-    }, 'Failed to delete file record');
+    logger.warn(
+      {
+        err: deleteRecordError.message,
+        fileId,
+      },
+      'Failed to delete file record'
+    );
   }
 
   // 6. Update storage quota
-  await updateStorageQuota(
-    typedFileRecord.organization_id,
-    typedFileRecord.file_size,
-    'decrement'
-  );
+  await updateStorageQuota(typedFileRecord.organization_id, typedFileRecord.file_size, 'decrement');
 
   let physicalFileDeleted = false;
 
   // 7. If reference_count reached 0, delete physical file and all vectors
   if (remainingReferences === 0) {
-    logger.info({
-      targetFileId,
-      storagePath: typedFileRecord.storage_path,
-    }, 'Reference count reached zero, deleting physical file');
+    logger.info(
+      {
+        targetFileId,
+        storagePath: typedFileRecord.storage_path,
+      },
+      'Reference count reached zero, deleting physical file'
+    );
 
     try {
       // Delete physical file from disk
       await fs.unlink(typedFileRecord.storage_path);
       physicalFileDeleted = true;
-      logger.info({
-        storagePath: typedFileRecord.storage_path,
-      }, 'Deleted physical file');
+      logger.info(
+        {
+          storagePath: typedFileRecord.storage_path,
+        },
+        'Deleted physical file'
+      );
     } catch (error) {
-      logger.warn({
-        err: error instanceof Error ? error.message : String(error),
-        storagePath: typedFileRecord.storage_path,
-      }, 'Failed to delete physical file');
+      logger.warn(
+        {
+          err: error instanceof Error ? error.message : String(error),
+          storagePath: typedFileRecord.storage_path,
+        },
+        'Failed to delete physical file'
+      );
     }
 
     // Delete ALL remaining vectors for this document (cleanup)
@@ -682,28 +751,40 @@ export async function handleFileDelete(fileId: string): Promise<FileDeleteResult
         },
         wait: true,
       });
-      logger.info({
-        targetFileId,
-      }, 'Deleted all remaining vectors');
+      logger.info(
+        {
+          targetFileId,
+        },
+        'Deleted all remaining vectors'
+      );
     } catch (error) {
-      logger.warn({
-        err: error instanceof Error ? error.message : String(error),
-        targetFileId,
-      }, 'Failed to delete remaining vectors');
+      logger.warn(
+        {
+          err: error instanceof Error ? error.message : String(error),
+          targetFileId,
+        },
+        'Failed to delete remaining vectors'
+      );
     }
 
     // Delete file_catalog record for original (if different from current)
     if (!isOriginal) {
       try {
         await supabase.from('file_catalog').delete().eq('id', targetFileId);
-        logger.info({
-          targetFileId,
-        }, 'Deleted original file record');
+        logger.info(
+          {
+            targetFileId,
+          },
+          'Deleted original file record'
+        );
       } catch (error) {
-        logger.warn({
-          err: error instanceof Error ? error.message : String(error),
-          targetFileId,
-        }, 'Failed to delete original record');
+        logger.warn(
+          {
+            err: error instanceof Error ? error.message : String(error),
+            targetFileId,
+          },
+          'Failed to delete original record'
+        );
       }
     }
   }
@@ -731,10 +812,13 @@ export async function deleteVectorsForDocument(
   documentId: string,
   courseId: string
 ): Promise<{ deleted: boolean }> {
-  logger.info({
-    documentId,
-    courseId,
-  }, 'Deleting vectors for document before retry');
+  logger.info(
+    {
+      documentId,
+      courseId,
+    },
+    'Deleting vectors for document before retry'
+  );
 
   try {
     await qdrantClient.delete(COLLECTION_CONFIG.name, {
@@ -747,20 +831,26 @@ export async function deleteVectorsForDocument(
       wait: true,
     });
 
-    logger.info({
-      documentId,
-      courseId,
-    }, 'Vectors deleted successfully for document');
+    logger.info(
+      {
+        documentId,
+        courseId,
+      },
+      'Vectors deleted successfully for document'
+    );
 
     return { deleted: true };
   } catch (error) {
     // Log but don't fail - vector cleanup is best-effort
     // The upsert during re-processing will overwrite matching vectors anyway
-    logger.warn({
-      documentId,
-      courseId,
-      error: error instanceof Error ? error.message : String(error),
-    }, 'Failed to delete vectors for document (non-fatal, will be overwritten on upsert)');
+    logger.warn(
+      {
+        documentId,
+        courseId,
+        error: error instanceof Error ? error.message : String(error),
+      },
+      'Failed to delete vectors for document (non-fatal, will be overwritten on upsert)'
+    );
 
     return { deleted: false };
   }
@@ -784,11 +874,27 @@ export async function deleteVectorsForCourse(
     return { deleted: false, approximateCount: 0 };
   }
 
-  logger.info({
-    courseId,
-  }, 'Deleting all vectors for course');
+  logger.info(
+    {
+      courseId,
+    },
+    'Deleting all vectors for course'
+  );
 
   try {
+    // Check if collection exists before attempting operations
+    // This prevents ERROR logs for expected scenarios (new Qdrant instance, fresh setup)
+    const collections = await qdrantClient.getCollections();
+    const collectionExists = collections.collections.some(c => c.name === COLLECTION_CONFIG.name);
+
+    if (!collectionExists) {
+      logger.info(
+        { courseId, collection: COLLECTION_CONFIG.name },
+        'Collection does not exist yet, nothing to delete'
+      );
+      return { deleted: true, approximateCount: 0 };
+    }
+
     // Count vectors to be deleted (approximate for performance)
     //
     // Using approximate count (exact: false) because:
@@ -818,17 +924,41 @@ export async function deleteVectorsForCourse(
       wait: true,
     });
 
-    logger.info({
-      courseId,
-      approximateCount,
-    }, 'Vectors deleted successfully for course');
+    logger.info(
+      {
+        courseId,
+        approximateCount,
+      },
+      'Vectors deleted successfully for course'
+    );
 
     return { deleted: true, approximateCount };
   } catch (error) {
-    logger.error({
-      courseId,
-      error: error instanceof Error ? error.message : String(error),
-    }, 'Failed to delete vectors for course');
+    const errorMessage = error instanceof Error ? error.message : String(error);
+
+    // Check for expected "not found" errors (collection deleted, race condition)
+    // These are NOT bugs, just expected cleanup scenarios
+    const isNotFoundError = /not found|does not exist|collection.*not exist/i.test(errorMessage);
+
+    if (isNotFoundError) {
+      logger.warn(
+        {
+          courseId,
+          error: errorMessage,
+        },
+        'Qdrant collection/vectors not found during cleanup (expected for new instances)'
+      );
+      return { deleted: true, approximateCount: 0 };
+    }
+
+    // Unexpected errors are still logged as ERROR
+    logger.error(
+      {
+        courseId,
+        error: errorMessage,
+      },
+      'Failed to delete vectors for course'
+    );
 
     return { deleted: false, approximateCount: 0 };
   }
@@ -855,9 +985,7 @@ export async function getDeduplicationStats(organizationId: string): Promise<{
     .single();
 
   if (result.error || !result.data) {
-    throw new Error(
-      `Failed to get deduplication stats: ${result.error?.message || 'No data'}`
-    );
+    throw new Error(`Failed to get deduplication stats: ${result.error?.message || 'No data'}`);
   }
 
   const typedData = result.data as OrganizationDeduplicationStats;
