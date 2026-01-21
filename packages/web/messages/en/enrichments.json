@@ -103,7 +103,9 @@
     "generationFailed": "Failed to generate enrichment",
     "deleteFailed": "Failed to delete enrichment",
     "loadFailed": "Failed to load enrichments",
-    "noContent": "Lesson content is empty"
+    "noContent": "Lesson content is empty",
+    "rateLimitExceeded": "Rate limit exceeded. Please wait and try again.",
+    "serverError": "Server error. Please try again later."
   },
   "forms": {
     "common": {

@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState } from 'react'
+import React, { useState, useCallback, useRef, useEffect } from 'react'
 import { useTranslations } from 'next-intl'
 import { useRouter } from 'next/navigation'
 import { toast } from 'sonner'
@@ -28,8 +28,20 @@ interface CourseVisualsManagerProps {
   lessons: Lesson[]
 }
 
+type GenerationType = 'covers' | 'cards'
+
 const BACKEND_URL = process.env.NEXT_PUBLIC_COURSEGEN_BACKEND_URL || 'http://localhost:3456'
 
+/**
+ * CourseVisualsManager
+ *
+ * Manages visual assets for a course including:
+ * - Course thumbnail (1:1 card)
+ * - Lesson covers (16:9 banners)
+ * - Lesson cards (1:1 thumbnails)
+ *
+ * Provides batch generation UI for missing assets.
+ */
 export function CourseVisualsManager({
   courseId,
   courseTitle,
@@ -43,9 +55,19 @@ export function CourseVisualsManager({
   const { session } = useSupabase()
 
   const [isGeneratingCovers, setIsGeneratingCovers] = useState(false)
-  const [coversProgress, setCoversProgress] = useState({ current: 0, total: 0 })
   const [isGeneratingCards, setIsGeneratingCards] = useState(false)
-  const [cardsProgress, setCardsProgress] = useState({ current: 0, total: 0 })
+
+  // AbortController refs for cleanup on unmount
+  const coversAbortRef = useRef<AbortController | null>(null)
+  const cardsAbortRef = useRef<AbortController | null>(null)
+
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      coversAbortRef.current?.abort()
+      cardsAbortRef.current?.abort()
+    }
+  }, [])
 
   const missingCovers = lessons.filter((l) => !l.hasCover).length
   const missingCards = lessons.filter((l) => !l.hasCard).length
@@ -55,86 +77,107 @@ export function CourseVisualsManager({
   const cardPercentage =
     totalLessons > 0 ? Math.round(((totalLessons - missingCards) / totalLessons) * 100) : 0
 
-  const getAuthHeaders = () => ({
-    'Content-Type': 'application/json',
-    Authorization: session?.access_token ? `Bearer ${session.access_token}` : '',
-  })
+  const getAuthHeaders = useCallback(
+    () => ({
+      'Content-Type': 'application/json',
+      Authorization: session?.access_token ? `Bearer ${session.access_token}` : '',
+    }),
+    [session?.access_token]
+  )
 
-  const handleGenerateMissingCovers = async () => {
-    if (missingCovers === 0) {
-      toast.info(t('images.allGenerated'))
-      return
-    }
-
-    setIsGeneratingCovers(true)
-    setCoversProgress({ current: 0, total: missingCovers })
-
-    try {
-      const response = await fetch(`${BACKEND_URL}/trpc/enrichment.generateBatchCovers`, {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({
-          courseId,
-          skipExisting: true,
-        }),
-      })
-
-      if (!response.ok) {
-        throw new Error('Batch generation failed')
+  /**
+   * Shared batch generation handler with AbortController support
+   */
+  const handleBatchGeneration = useCallback(
+    async (
+      type: GenerationType,
+      endpoint: string,
+      missingCount: number,
+      setIsGenerating: (value: boolean) => void,
+      abortRef: React.MutableRefObject<AbortController | null>
+    ) => {
+      if (missingCount === 0) {
+        toast.info(t('images.allGenerated'))
+        return
       }
 
-      const result = await response.json()
-      const data = result.result?.data
+      // Abort previous request if any
+      abortRef.current?.abort()
+      abortRef.current = new AbortController()
 
-      toast.success(t('images.batchComplete', { count: data?.triggered || 0 }))
+      setIsGenerating(true)
 
-      // Refresh page to show updated status
-      router.refresh()
-    } catch (error) {
-      console.error('Batch generation error:', error)
-      toast.error(t('errors.generationFailed'))
-    } finally {
-      setIsGeneratingCovers(false)
-    }
-  }
+      try {
+        const response = await fetch(`${BACKEND_URL}/trpc/${endpoint}`, {
+          method: 'POST',
+          headers: getAuthHeaders(),
+          signal: abortRef.current.signal,
+          body: JSON.stringify({
+            courseId,
+            skipExisting: true,
+          }),
+        })
 
-  const handleGenerateMissingCards = async () => {
-    if (missingCards === 0) {
-      toast.info(t('images.allGenerated'))
-      return
-    }
+        if (!response.ok) {
+          // Try to extract error details from response
+          const errorData = await response.json().catch(() => ({}))
+          const errorMessage =
+            errorData?.error?.message ||
+            (response.status === 429
+              ? t('errors.rateLimitExceeded')
+              : response.status >= 500
+                ? t('errors.serverError')
+                : `Batch ${type} generation failed`)
+          throw new Error(errorMessage)
+        }
 
-    setIsGeneratingCards(true)
-    setCardsProgress({ current: 0, total: missingCards })
+        const result = await response.json()
+        const data = result.result?.data
 
-    try {
-      const response = await fetch(`${BACKEND_URL}/trpc/enrichment.generateBatchCards`, {
-        method: 'POST',
-        headers: getAuthHeaders(),
-        body: JSON.stringify({
-          courseId,
-          skipExisting: true,
-        }),
-      })
+        toast.success(t('images.batchComplete', { count: data?.triggered || 0 }))
+        router.refresh()
+      } catch (error) {
+        // Ignore abort errors (user navigated away or cancelled)
+        if (error instanceof Error && error.name === 'AbortError') {
+          return
+        }
 
-      if (!response.ok) {
-        throw new Error('Batch card generation failed')
+        console.error(`Batch ${type} generation error:`, error)
+
+        // Show error message (either extracted from response or generic)
+        const errorMessage = error instanceof Error ? error.message : t('errors.generationFailed')
+        toast.error(errorMessage)
+      } finally {
+        setIsGenerating(false)
+        abortRef.current = null
       }
+    },
+    [courseId, getAuthHeaders, router, t]
+  )
 
-      const result = await response.json()
-      const data = result.result?.data
+  const handleGenerateMissingCovers = useCallback(
+    () =>
+      handleBatchGeneration(
+        'covers',
+        'enrichment.generateBatchCovers',
+        missingCovers,
+        setIsGeneratingCovers,
+        coversAbortRef
+      ),
+    [handleBatchGeneration, missingCovers]
+  )
 
-      toast.success(t('images.batchComplete', { count: data?.triggered || 0 }))
-
-      // Refresh page to show updated status
-      router.refresh()
-    } catch (error) {
-      console.error('Batch card generation error:', error)
-      toast.error(t('errors.generationFailed'))
-    } finally {
-      setIsGeneratingCards(false)
-    }
-  }
+  const handleGenerateMissingCards = useCallback(
+    () =>
+      handleBatchGeneration(
+        'cards',
+        'enrichment.generateBatchCards',
+        missingCards,
+        setIsGeneratingCards,
+        cardsAbortRef
+      ),
+    [handleBatchGeneration, missingCards]
+  )
 
   return (
     <div className="space-y-8">
@@ -199,11 +242,13 @@ export function CourseVisualsManager({
             <Button
               onClick={() => void handleGenerateMissingCovers()}
               disabled={isGeneratingCovers || missingCovers === 0}
+              aria-label={tCourse('visuals.generateMissingCovers', { count: missingCovers })}
+              aria-busy={isGeneratingCovers}
             >
               {isGeneratingCovers ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  {t('images.batchProgress', coversProgress)}
+                  {t('generating')}
                 </>
               ) : (
                 <>
@@ -224,24 +269,30 @@ export function CourseVisualsManager({
           </div>
 
           <div className="max-h-96 space-y-2 overflow-y-auto">
-            {lessons.map((lesson) => (
-              <div
-                key={lesson.id}
-                className="bg-muted/50 flex items-center justify-between rounded-lg p-3"
-              >
-                <div className="min-w-0 flex-1">
-                  <p className="truncate font-medium">{lesson.title}</p>
-                  <p className="text-muted-foreground truncate text-sm">{lesson.sectionTitle}</p>
-                </div>
-                <Badge variant={lesson.hasCover ? 'default' : 'outline'} className="ml-2">
-                  {lesson.hasCover ? (
-                    <CheckCircle className="h-3 w-3" />
-                  ) : (
-                    <Circle className="h-3 w-3" />
-                  )}
-                </Badge>
+            {lessons.length === 0 ? (
+              <div className="text-muted-foreground py-8 text-center text-sm">
+                {tCourse('visuals.noLessons')}
               </div>
-            ))}
+            ) : (
+              lessons.map((lesson) => (
+                <div
+                  key={`cover-${lesson.id}`}
+                  className="bg-muted/50 flex items-center justify-between rounded-lg p-3"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-medium">{lesson.title}</p>
+                    <p className="text-muted-foreground truncate text-sm">{lesson.sectionTitle}</p>
+                  </div>
+                  <Badge variant={lesson.hasCover ? 'default' : 'outline'} className="ml-2">
+                    {lesson.hasCover ? (
+                      <CheckCircle className="h-3 w-3" />
+                    ) : (
+                      <Circle className="h-3 w-3" />
+                    )}
+                  </Badge>
+                </div>
+              ))
+            )}
           </div>
         </CardContent>
       </Card>
@@ -265,11 +316,13 @@ export function CourseVisualsManager({
             <Button
               onClick={() => void handleGenerateMissingCards()}
               disabled={isGeneratingCards || missingCards === 0}
+              aria-label={tCourse('visuals.generateMissingCards', { count: missingCards })}
+              aria-busy={isGeneratingCards}
             >
               {isGeneratingCards ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  {t('images.batchProgress', cardsProgress)}
+                  {t('generating')}
                 </>
               ) : (
                 <>
@@ -290,24 +343,30 @@ export function CourseVisualsManager({
           </div>
 
           <div className="max-h-96 space-y-2 overflow-y-auto">
-            {lessons.map((lesson) => (
-              <div
-                key={`card-${lesson.id}`}
-                className="bg-muted/50 flex items-center justify-between rounded-lg p-3"
-              >
-                <div className="min-w-0 flex-1">
-                  <p className="truncate font-medium">{lesson.title}</p>
-                  <p className="text-muted-foreground truncate text-sm">{lesson.sectionTitle}</p>
-                </div>
-                <Badge variant={lesson.hasCard ? 'default' : 'outline'} className="ml-2">
-                  {lesson.hasCard ? (
-                    <CheckCircle className="h-3 w-3" />
-                  ) : (
-                    <Circle className="h-3 w-3" />
-                  )}
-                </Badge>
+            {lessons.length === 0 ? (
+              <div className="text-muted-foreground py-8 text-center text-sm">
+                {tCourse('visuals.noLessons')}
               </div>
-            ))}
+            ) : (
+              lessons.map((lesson) => (
+                <div
+                  key={`card-${lesson.id}`}
+                  className="bg-muted/50 flex items-center justify-between rounded-lg p-3"
+                >
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate font-medium">{lesson.title}</p>
+                    <p className="text-muted-foreground truncate text-sm">{lesson.sectionTitle}</p>
+                  </div>
+                  <Badge variant={lesson.hasCard ? 'default' : 'outline'} className="ml-2">
+                    {lesson.hasCard ? (
+                      <CheckCircle className="h-3 w-3" />
+                    ) : (
+                      <Circle className="h-3 w-3" />
+                    )}
+                  </Badge>
+                </div>
+              ))
+            )}
           </div>
         </CardContent>
       </Card>

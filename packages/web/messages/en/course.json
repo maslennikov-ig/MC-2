@@ -8,7 +8,10 @@
     "lessonCoversDescription": "{completed} of {total} banners generated (16:9)",
     "lessonCards": "Lesson Thumbnails",
     "lessonCardsDescription": "{completed} of {total} thumbnails generated (1:1)",
-    "progress": "Progress"
+    "progress": "Progress",
+    "generateMissingCovers": "Generate {count} missing banners",
+    "generateMissingCards": "Generate {count} missing thumbnails",
+    "noLessons": "No lessons in this course yet"
   },
   "backToCourse": "Back to course",
   "viewer": {
