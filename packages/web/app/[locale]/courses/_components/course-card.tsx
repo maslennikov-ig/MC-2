@@ -498,8 +498,8 @@ export function CourseCard({
                 priority={isAboveFold}
               />
             </div>
-            {/* Gradient overlay for text readability */}
-            <div className="absolute inset-0 z-[1] bg-gradient-to-t from-black/95 via-black/75 to-black/40" />
+            {/* Glassmorphism overlay - adaptive for light/dark theme */}
+            <div className="absolute inset-0 z-[1] bg-white/50 backdrop-blur-md dark:bg-black/60" />
           </>
         )}
 
@@ -524,7 +524,7 @@ export function CourseCard({
             <Badge
               className={cn(
                 hasCover
-                  ? 'border-white/40 bg-black/50 text-white backdrop-blur-sm'
+                  ? 'border-gray-300 bg-white/70 text-gray-900 backdrop-blur-sm dark:border-white/40 dark:bg-black/50 dark:text-white'
                   : statusInfo.color,
                 'border px-2 py-0.5 text-xs',
                 statusInfo.pulse && 'animate-pulse'
@@ -539,7 +539,7 @@ export function CourseCard({
               <Badge
                 className={cn(
                   hasCover
-                    ? 'border-white/40 bg-black/50 text-white backdrop-blur-sm'
+                    ? 'border-gray-300 bg-white/70 text-gray-900 backdrop-blur-sm dark:border-white/40 dark:bg-black/50 dark:text-white'
                     : difficultyInfo.color,
                   'border px-2 py-0.5 text-xs'
                 )}
@@ -557,7 +557,7 @@ export function CourseCard({
             className={cn(
               'text-truncate-2 transition-colors-fast text-lg font-semibold',
               hasCover
-                ? 'text-white [text-shadow:_0_1px_3px_rgb(0_0_0_/_60%)] group-hover:text-purple-200'
+                ? 'text-gray-900 group-hover:text-purple-700 dark:text-white dark:[text-shadow:_0_1px_3px_rgb(0_0_0_/_60%)] dark:group-hover:text-purple-200'
                 : 'text-gray-900 group-hover:text-purple-600 dark:text-white dark:group-hover:text-purple-300'
             )}
           >
@@ -582,7 +582,9 @@ export function CourseCard({
                         id={`course-description-${course.id}`}
                         className={cn(
                           'line-clamp-2 cursor-help text-sm leading-relaxed',
-                          hasCover ? 'text-gray-200' : 'text-gray-600 dark:text-gray-400'
+                          hasCover
+                            ? 'text-gray-700 dark:text-gray-200'
+                            : 'text-gray-600 dark:text-gray-400'
                         )}
                       >
                         {course.course_description}
@@ -611,19 +613,23 @@ export function CourseCard({
                         <Users
                           className={cn(
                             'mt-0.5 h-3.5 w-3.5 shrink-0',
-                            hasCover ? 'text-purple-300' : 'text-purple-400'
+                            hasCover ? 'text-purple-600 dark:text-purple-300' : 'text-purple-400'
                           )}
                         />
                         <p
                           className={cn(
                             'line-clamp-1 text-xs',
-                            hasCover ? 'text-gray-300' : 'text-gray-500 dark:text-gray-500'
+                            hasCover
+                              ? 'text-gray-600 dark:text-gray-300'
+                              : 'text-gray-500 dark:text-gray-500'
                           )}
                         >
                           <span
                             className={cn(
                               'font-medium',
-                              hasCover ? 'text-gray-200' : 'text-gray-600 dark:text-gray-400'
+                              hasCover
+                                ? 'text-gray-800 dark:text-gray-200'
+                                : 'text-gray-600 dark:text-gray-400'
                             )}
                           >
                             Для кого:
@@ -655,19 +661,23 @@ export function CourseCard({
                         <Award
                           className={cn(
                             'mt-0.5 h-3.5 w-3.5 shrink-0',
-                            hasCover ? 'text-green-300' : 'text-green-400'
+                            hasCover ? 'text-green-600 dark:text-green-300' : 'text-green-400'
                           )}
                         />
                         <p
                           className={cn(
                             'line-clamp-1 text-xs',
-                            hasCover ? 'text-gray-300' : 'text-gray-500 dark:text-gray-500'
+                            hasCover
+                              ? 'text-gray-600 dark:text-gray-300'
+                              : 'text-gray-500 dark:text-gray-500'
                           )}
                         >
                           <span
                             className={cn(
                               'font-medium',
-                              hasCover ? 'text-gray-200' : 'text-gray-600 dark:text-gray-400'
+                              hasCover
+                                ? 'text-gray-800 dark:text-gray-200'
+                                : 'text-gray-600 dark:text-gray-400'
                             )}
                           >
                             Результаты:
@@ -708,18 +718,23 @@ export function CourseCard({
                   className={cn(
                     'flex items-center gap-2 rounded-lg border px-3 py-2.5',
                     hasCover
-                      ? 'border-white/20 bg-white/10 backdrop-blur-sm'
+                      ? 'border-gray-300/50 bg-white/40 backdrop-blur-sm dark:border-white/20 dark:bg-white/10'
                       : 'border-gray-100 bg-gray-50 dark:border-slate-700/50 dark:bg-slate-800/30'
                   )}
                 >
                   <BookOpen
-                    className={cn('h-4 w-4', hasCover ? 'text-purple-300' : 'text-purple-400')}
+                    className={cn(
+                      'h-4 w-4',
+                      hasCover ? 'text-purple-600 dark:text-purple-300' : 'text-purple-400'
+                    )}
                   />
                   <div className="min-w-0 flex-1">
                     <p
                       className={cn(
                         'text-xs',
-                        hasCover ? 'text-gray-300' : 'text-gray-500 dark:text-gray-500'
+                        hasCover
+                          ? 'text-gray-600 dark:text-gray-300'
+                          : 'text-gray-500 dark:text-gray-500'
                       )}
                     >
                       Модули
@@ -727,7 +742,7 @@ export function CourseCard({
                     <p
                       className={cn(
                         'text-sm font-medium',
-                        hasCover ? 'text-white' : 'text-gray-900 dark:text-white'
+                        hasCover ? 'text-gray-900 dark:text-white' : 'text-gray-900 dark:text-white'
                       )}
                     >
                       {sectionsCount}
@@ -738,18 +753,23 @@ export function CourseCard({
                   className={cn(
                     'flex items-center gap-2 rounded-lg border px-3 py-2.5',
                     hasCover
-                      ? 'border-white/20 bg-white/10 backdrop-blur-sm'
+                      ? 'border-gray-300/50 bg-white/40 backdrop-blur-sm dark:border-white/20 dark:bg-white/10'
                       : 'border-gray-100 bg-gray-50 dark:border-slate-700/50 dark:bg-slate-800/30'
                   )}
                 >
                   <BookOpen
-                    className={cn('h-4 w-4', hasCover ? 'text-blue-300' : 'text-blue-400')}
+                    className={cn(
+                      'h-4 w-4',
+                      hasCover ? 'text-blue-600 dark:text-blue-300' : 'text-blue-400'
+                    )}
                   />
                   <div className="min-w-0 flex-1">
                     <p
                       className={cn(
                         'text-xs',
-                        hasCover ? 'text-gray-300' : 'text-gray-500 dark:text-gray-500'
+                        hasCover
+                          ? 'text-gray-600 dark:text-gray-300'
+                          : 'text-gray-500 dark:text-gray-500'
                       )}
                     >
                       Уроки
@@ -757,7 +777,7 @@ export function CourseCard({
                     <p
                       className={cn(
                         'text-sm font-medium',
-                        hasCover ? 'text-white' : 'text-gray-900 dark:text-white'
+                        hasCover ? 'text-gray-900 dark:text-white' : 'text-gray-900 dark:text-white'
                       )}
                     >
                       {lessonsCount}
@@ -768,18 +788,23 @@ export function CourseCard({
                   className={cn(
                     'flex items-center gap-2 rounded-lg border px-3 py-2.5',
                     hasCover
-                      ? 'border-white/20 bg-white/10 backdrop-blur-sm'
+                      ? 'border-gray-300/50 bg-white/40 backdrop-blur-sm dark:border-white/20 dark:bg-white/10'
                       : 'border-gray-100 bg-gray-50 dark:border-slate-700/50 dark:bg-slate-800/30'
                   )}
                 >
                   <Clock
-                    className={cn('h-4 w-4', hasCover ? 'text-green-300' : 'text-green-400')}
+                    className={cn(
+                      'h-4 w-4',
+                      hasCover ? 'text-green-600 dark:text-green-300' : 'text-green-400'
+                    )}
                   />
                   <div className="min-w-0 flex-1">
                     <p
                       className={cn(
                         'text-xs',
-                        hasCover ? 'text-gray-300' : 'text-gray-500 dark:text-gray-500'
+                        hasCover
+                          ? 'text-gray-600 dark:text-gray-300'
+                          : 'text-gray-500 dark:text-gray-500'
                       )}
                     >
                       Время
@@ -787,7 +812,7 @@ export function CourseCard({
                     <p
                       className={cn(
                         'text-sm font-medium',
-                        hasCover ? 'text-white' : 'text-gray-900 dark:text-white'
+                        hasCover ? 'text-gray-900 dark:text-white' : 'text-gray-900 dark:text-white'
                       )}
                     >
                       {duration}ч
@@ -798,18 +823,23 @@ export function CourseCard({
                   className={cn(
                     'flex items-center gap-2 rounded-lg border px-3 py-2.5',
                     hasCover
-                      ? 'border-white/20 bg-white/10 backdrop-blur-sm'
+                      ? 'border-gray-300/50 bg-white/40 backdrop-blur-sm dark:border-white/20 dark:bg-white/10'
                       : 'border-gray-100 bg-gray-50 dark:border-slate-700/50 dark:bg-slate-800/30'
                   )}
                 >
                   <Globe
-                    className={cn('h-4 w-4', hasCover ? 'text-yellow-300' : 'text-yellow-400')}
+                    className={cn(
+                      'h-4 w-4',
+                      hasCover ? 'text-yellow-600 dark:text-yellow-300' : 'text-yellow-400'
+                    )}
                   />
                   <div className="min-w-0 flex-1">
                     <p
                       className={cn(
                         'text-xs',
-                        hasCover ? 'text-gray-300' : 'text-gray-500 dark:text-gray-500'
+                        hasCover
+                          ? 'text-gray-600 dark:text-gray-300'
+                          : 'text-gray-500 dark:text-gray-500'
                       )}
                     >
                       Язык
@@ -817,7 +847,7 @@ export function CourseCard({
                     <p
                       className={cn(
                         'text-sm font-medium',
-                        hasCover ? 'text-white' : 'text-gray-900 dark:text-white'
+                        hasCover ? 'text-gray-900 dark:text-white' : 'text-gray-900 dark:text-white'
                       )}
                     >
                       {course.language === 'ru' ? 'RU' : course.language?.toUpperCase()}
@@ -837,7 +867,9 @@ export function CourseCard({
                     <div className="flex items-center justify-between text-xs">
                       <span
                         className={cn(
-                          hasCover ? 'text-gray-300' : 'text-gray-500 dark:text-gray-500'
+                          hasCover
+                            ? 'text-gray-600 dark:text-gray-300'
+                            : 'text-gray-500 dark:text-gray-500'
                         )}
                       >
                         Прогресс генерации
@@ -845,7 +877,7 @@ export function CourseCard({
                       <span
                         className={cn(
                           'font-medium',
-                          hasCover ? 'text-purple-300' : 'text-purple-400'
+                          hasCover ? 'text-purple-600 dark:text-purple-300' : 'text-purple-400'
                         )}
                       >
                         {progress}%
@@ -855,7 +887,9 @@ export function CourseCard({
                       value={progress}
                       className={cn(
                         'h-2',
-                        hasCover ? 'bg-white/20' : 'bg-gray-200 dark:bg-slate-800'
+                        hasCover
+                          ? 'bg-gray-300/50 dark:bg-white/20'
+                          : 'bg-gray-200 dark:bg-slate-800'
                       )}
                     />
                   </div>
@@ -884,7 +918,9 @@ export function CourseCard({
         <CardFooter
           className={cn(
             'relative flex-shrink-0 border-t px-6 py-3',
-            hasCover ? 'z-[2] border-white/20' : 'border-gray-200 dark:border-slate-800'
+            hasCover
+              ? 'z-[2] border-gray-300/50 dark:border-white/20'
+              : 'border-gray-200 dark:border-slate-800'
           )}
         >
           <div className="flex w-full items-center justify-between">
@@ -909,7 +945,7 @@ export function CourseCard({
                 className={cn(
                   'h-7 w-7',
                   hasCover
-                    ? 'text-gray-300 hover:text-purple-300'
+                    ? 'text-gray-600 hover:text-purple-600 dark:text-gray-300 dark:hover:text-purple-300'
                     : 'text-gray-400 hover:text-purple-400'
                 )}
                 isActive={isFavorited}
@@ -920,7 +956,11 @@ export function CourseCard({
                 shareToken={course.share_token}
                 isOwner={user?.id === course.user_id}
                 isAdmin={user?.role === 'admin' || user?.role === 'superadmin'}
-                className={cn('h-7 w-7', hasCover && 'text-gray-300 hover:text-white')}
+                className={cn(
+                  'h-7 w-7',
+                  hasCover &&
+                    'text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white'
+                )}
               />
 
               {user &&
@@ -980,7 +1020,7 @@ export function CourseCard({
                     className={cn(
                       'h-7 w-7',
                       hasCover
-                        ? 'text-gray-300 hover:text-blue-300'
+                        ? 'text-gray-600 hover:text-blue-600 dark:text-gray-300 dark:hover:text-blue-300'
                         : 'text-gray-400 hover:text-blue-400'
                     )}
                   />
@@ -1001,7 +1041,7 @@ export function CourseCard({
                   className={cn(
                     'h-7 w-7',
                     hasCover
-                      ? 'text-gray-300 hover:text-red-400'
+                      ? 'text-gray-600 hover:text-red-500 dark:text-gray-300 dark:hover:text-red-400'
                       : 'text-gray-400 hover:text-red-500'
                   )}
                 />
