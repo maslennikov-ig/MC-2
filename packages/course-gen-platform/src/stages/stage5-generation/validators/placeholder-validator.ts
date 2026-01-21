@@ -30,7 +30,37 @@ import { ValidationSeverity, type ValidationResult } from '@megacampus/shared-ty
  * - Removed: /\.{3,}/ at any position (caught mid-sentence ellipsis)
  * - Added: Specific patterns like [TODO], [insert...], [add...]
  * - Added: Language-specific patterns (Russian: [название], [описание])
+ *
+ * RT-008: Template syntax whitelist for technical content
+ * - Helm: {{ .Values.* }}, {{ .Release.* }}, {{ if ... }}, {{ range ... }}
+ * - Go templates: {{ .Field }}, {{ request.object }}
+ * - Jinja2: {{ variable }}, {% block %}
+ * These are legitimate code examples in DevOps/Kubernetes courses.
  */
+
+/**
+ * Whitelist patterns for legitimate template syntax in technical content.
+ * These are NOT placeholders - they are valid code examples.
+ */
+const TEMPLATE_WHITELIST_PATTERNS = [
+  // Helm/Go templates: {{ .Values.x }}, {{ .Release.Name }}, {{ .Chart.Name }}
+  /\{\{\s*\.(?:Values|Release|Chart|Capabilities|Template|Files)\.[^}]+\}\}/,
+  // Helm control flow: {{ if .Values.x }}, {{ range .Values.x }}, {{ with .Values.x }}
+  /\{\{\s*(?:if|else|end|range|with|define|template|block|include)\b[^}]*\}\}/,
+  // Helm functions: {{ quote .Values.x }}, {{ default "x" .Values.y }}
+  /\{\{\s*(?:quote|default|required|empty|coalesce|toYaml|toJson|indent|nindent|trim|upper|lower|title|b64enc|b64dec|sha256sum|trunc|replace|contains|hasPrefix|hasSuffix|list|dict|get|set|unset|keys|values|pick|omit|merge|mustMerge|deepCopy|pluck|concat|append|prepend|first|last|initial|rest|reverse|uniq|without|has|slice|until|untilStep|seq|add|sub|mul|div|mod|max|min|ceil|floor|round|len|now|date|dateModify|dateInZone|duration|ago|toDate|mustToDate|unixEpoch|htmlDate|htmlDateInZone|ternary|kindOf|typeOf|kindIs|typeIs|deepEqual|semver|semverCompare|fail|print|println|printf|splitList|sortAlpha|join|splitn|regexMatch|regexFind|regexFindAll|regexReplaceAll|regexReplaceAllLiteral|regexSplit|sha1sum|adler32sum|lookup|tpl|required|fail|urlParse|urlJoin)\s+[^}]+\}\}/,
+  // Go templates field access: {{ .metadata.name }}, {{ .spec.replicas }}
+  /\{\{\s*\.[a-z][a-zA-Z0-9_.]*\s*\}\}/,
+  // Kubernetes admission webhook: {{ request.object }}, {{ request.operation }}
+  /\{\{\s*request\.[a-zA-Z0-9_.]+\s*\}\}/,
+  // Jinja2 variables with filters: {{ variable|filter }}
+  /\{\{\s*[a-z_][a-z0-9_]*\s*\|[^}]+\}\}/,
+  // Ansible variables: {{ ansible_hostname }}, {{ hostvars['x'] }}
+  /\{\{\s*(?:ansible_|hostvars|groups|inventory_hostname|play_hosts)[^}]*\}\}/,
+  // Generic dotted path access (common in templates): {{ .name }}, {{ .data.key }}
+  /\{\{\s*\.[a-zA-Z][a-zA-Z0-9_.]+\s*\}\}/,
+] as const;
+
 const PLACEHOLDER_PATTERNS = [
   // ✅ TODO/FIXME markers (block always) - CASE SENSITIVE
   // RT-007 P5: Made case-sensitive to avoid false positives (e.g., "todo list", "todo app")
@@ -52,7 +82,7 @@ const PLACEHOLDER_PATTERNS = [
   // ❌ REMOVED: /\[.*?\]/ (too aggressive)
   // ❌ REMOVED: /<.*?>/ (catches TypeScript generics)
 
-  // ✅ Template variables (only double braces)
+  // ✅ Template variables (only double braces) - checked AFTER whitelist
   /\{\{[^}]+\}\}/, // {{variable}} - explicit template
   /\$\{[^}]+\}/, // ${variable} - explicit template
 
@@ -71,12 +101,37 @@ const PLACEHOLDER_PATTERNS = [
 ] as const;
 
 /**
+ * Check if text matches a whitelisted template pattern.
+ * Returns true if the {{ }} syntax is legitimate technical content.
+ */
+function isWhitelistedTemplate(text: string): boolean {
+  // Find all {{ }} patterns in text
+  const templateMatches = text.match(/\{\{[^}]+\}\}/g);
+  if (!templateMatches) return false;
+
+  // Check if ALL template matches are whitelisted
+  return templateMatches.every(match =>
+    TEMPLATE_WHITELIST_PATTERNS.some(pattern => pattern.test(match))
+  );
+}
+
+/**
  * Helper: Check if text contains placeholders (legacy function)
  *
  * RT-007: More conservative - only matches explicit placeholders
+ * RT-008: Skip detection if text contains whitelisted template syntax
  * @deprecated Use validatePlaceholders() for severity-based validation
  */
 export function hasPlaceholders(text: string): boolean {
+  // RT-008: First check if {{ }} patterns are whitelisted technical content
+  if (/\{\{[^}]+\}\}/.test(text) && isWhitelistedTemplate(text)) {
+    // All {{ }} in this text are legitimate template syntax
+    // Still check other placeholder patterns (TODO, [insert], etc.)
+    return PLACEHOLDER_PATTERNS.filter(p => p.source !== '\\{\\{[^}]+\\}\\}').some(pattern =>
+      pattern.test(text)
+    );
+  }
+
   return PLACEHOLDER_PATTERNS.some(pattern => pattern.test(text));
 }
 
@@ -110,12 +165,21 @@ function determineSeverity(match: string): ValidationSeverity {
  * Validate text for placeholder content
  *
  * RT-007 Phase 3: Returns ValidationResult with severity-based categorization
+ * RT-008: Skip {{ }} detection for whitelisted technical templates
  *
  * @param text - Text to validate
  * @returns Validation result with severity-based issues
  */
 export function validatePlaceholders(text: string): ValidationResult {
+  // RT-008: Check if {{ }} patterns are whitelisted before validating
+  const hasWhitelistedTemplates = /\{\{[^}]+\}\}/.test(text) && isWhitelistedTemplate(text);
+
   for (const pattern of PLACEHOLDER_PATTERNS) {
+    // RT-008: Skip {{ }} pattern check if text has whitelisted templates
+    if (hasWhitelistedTemplates && pattern.source === '\\{\\{[^}]+\\}\\}') {
+      continue;
+    }
+
     if (pattern.test(text)) {
       const match = text.match(pattern)![0];
       const severity = determineSeverity(match);
