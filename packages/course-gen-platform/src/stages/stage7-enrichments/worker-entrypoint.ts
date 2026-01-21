@@ -18,7 +18,7 @@
 
 import 'dotenv/config';
 import { logger } from '@/shared/logger';
-import { cache } from '@/shared/cache/redis';
+import { cache, REDIS_UNAVAILABLE_EVENT } from '@/shared/cache/redis';
 import { createStage7Worker, gracefulShutdown, STAGE7_CONFIG } from './index';
 import type { Worker } from 'bullmq';
 import type { Stage7JobInput, Stage7JobResult } from './types';
@@ -165,6 +165,8 @@ async function main(): Promise<void> {
     // Register shutdown handlers
     process.on('SIGINT', () => void handleShutdown('SIGINT'));
     process.on('SIGTERM', () => void handleShutdown('SIGTERM'));
+    // Handle Redis unavailable - graceful shutdown before forced exit
+    process.on(REDIS_UNAVAILABLE_EVENT, () => void handleShutdown('REDIS_UNAVAILABLE'));
 
     // Save initial readiness status and start heartbeat
     await saveReadinessToRedis(true);
