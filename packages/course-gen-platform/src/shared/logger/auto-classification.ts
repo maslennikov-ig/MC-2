@@ -32,7 +32,7 @@
  *
  * 4. **Trie-based matching** - For prefix-heavy patterns
  *
- * Current rule count: 20 (no optimization needed)
+ * Current rule count: 22 (no optimization needed)
  * Review threshold: 30+ rules
  */
 
@@ -187,6 +187,16 @@ export const AUTO_MUTE_RULES: AutoMuteRule[] = [
     pattern: /Patcher.*REJECTED.*prompt template markers/i,
     reason: 'cascading_repair',
     description: 'LLM hallucinated prompt template - patcher correctly rejected, will retry',
+  },
+  {
+    pattern: /No RAG chunks found for section/i,
+    reason: 'expected_behavior',
+    description: 'Course without documents - content generated without reference materials',
+  },
+  {
+    pattern: /Mermaid.*fallback.*used|Mermaid.*fix failed.*using fallback/i,
+    reason: 'graceful_fallback',
+    description: 'Mermaid diagram generation failed - graceful fallback to text description',
   },
   {
     pattern: /Invalid job name \(undefined\)/i,
