@@ -8,7 +8,10 @@
     "lessonCoversDescription": "Сгенерировано {completed} из {total} баннеров (16:9)",
     "lessonCards": "Миниатюры уроков",
     "lessonCardsDescription": "Сгенерировано {completed} из {total} миниатюр (1:1)",
-    "progress": "Прогресс"
+    "progress": "Прогресс",
+    "generateMissingCovers": "Сгенерировать {count} недостающих баннеров",
+    "generateMissingCards": "Сгенерировать {count} недостающих миниатюр",
+    "noLessons": "В курсе пока нет уроков"
   },
   "backToCourse": "Назад к курсу",
   "viewer": {
