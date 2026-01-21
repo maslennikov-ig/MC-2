@@ -168,11 +168,7 @@ function getAllowedExtensionsDisplay(tier: Tier): string {
  * // Returns valid: true (uses premium tier limits)
  * ```
  */
-export function validateFileSize(
-  fileSize: number,
-  tier: Tier,
-  userRole?: Role
-): ValidationResult {
+export function validateFileSize(fileSize: number, tier: Tier, userRole?: Role): ValidationResult {
   // Apply superadmin bypass - use effective tier
   const effectiveTier = getEffectiveTier(userRole, tier);
 
@@ -195,7 +191,36 @@ export function validateFileSize(
     };
   }
 
-  // Check against maximum file size
+  // Get tier-specific file size limit
+  const tierLimit = FILE_SIZE_LIMITS_BY_TIER[effectiveTier];
+  const tierLimitMB = tierLimit / (1024 * 1024);
+
+  // Check against tier-specific file size limit
+  if (fileSize > tierLimit) {
+    // Find next tier with higher limit for upgrade suggestion
+    let suggestedTier: Tier | undefined;
+    const tierOrder: Tier[] = ['basic', 'standard', 'premium'];
+    for (const nextTier of tierOrder) {
+      const nextTierLimit = FILE_SIZE_LIMITS_BY_TIER[nextTier];
+      if (nextTierLimit > tierLimit && fileSize <= nextTierLimit) {
+        suggestedTier = nextTier;
+        break;
+      }
+    }
+
+    const upgradeMsg = suggestedTier
+      ? ` Upgrade to ${TIER_DISPLAY_NAMES[suggestedTier]} to upload files up to ${FILE_SIZE_LIMITS_BY_TIER[suggestedTier] / (1024 * 1024)} MB.`
+      : '';
+
+    return {
+      valid: false,
+      error: `File size (${formatFileSize(fileSize)}) exceeds ${tier} tier limit (${tierLimitMB} MB)`,
+      userMessage: `File is too large. Your ${TIER_DISPLAY_NAMES[tier]} plan allows files up to ${tierLimitMB} MB (your file: ${formatFileSize(fileSize)}).${upgradeMsg}`,
+      suggestedTier,
+    };
+  }
+
+  // Also check against absolute maximum (premium tier max)
   if (fileSize > MAX_FILE_SIZE_BYTES) {
     return {
       valid: false,

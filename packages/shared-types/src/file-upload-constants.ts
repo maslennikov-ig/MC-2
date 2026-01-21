@@ -98,15 +98,17 @@ export const FILE_COUNT_LIMITS_BY_TIER = {
 
 /**
  * File size limits by tier (in bytes)
- * - TRIAL/BASIC/STANDARD: 10 MB (files WITHOUT images, Docling for PDF/DOCX/PPTX/HTML)
+ * - FREE: 5 MB (text-only)
+ * - BASIC: 10 MB (text-only)
+ * - TRIAL/STANDARD: 30 MB (all formats WITHOUT images, Docling for PDF/DOCX/PPTX/HTML)
  * - PREMIUM: 100 MB (files WITH images, PDF chunking, Vision API)
  */
 export const FILE_SIZE_LIMITS_BY_TIER = {
-  trial: 10 * 1024 * 1024, // 10 MB (all formats WITHOUT images)
+  trial: 30 * 1024 * 1024, // 30 MB (all formats WITHOUT images)
   free: 5 * 1024 * 1024, // 5 MB (text-only)
   basic: 10 * 1024 * 1024, // 10 MB (text-only)
-  standard: 10 * 1024 * 1024, // 10 MB (all formats WITHOUT images)
-  premium: 100 * 1024 * 1024, // 100 MB (all formats WITH images + PDF chunking)
+  standard: 30 * 1024 * 1024, // 30 MB (all formats WITHOUT images)
+  premium: 100 * 1024 * 1024, // 100 MB (files WITH images + PDF chunking)
 } as const;
 
 // ============================================================================
@@ -164,6 +166,33 @@ export const FILE_UPLOAD = {
 } as const;
 
 // ============================================================================
+// Tier Order (for upgrade suggestions)
+// ============================================================================
+
+/**
+ * Tier hierarchy from lowest to highest privileges
+ * Used for upgrade suggestions and tier comparisons
+ */
+export const TIER_ORDER: readonly ['free', 'basic', 'trial', 'standard', 'premium'] = [
+  'free',
+  'basic',
+  'trial',
+  'standard',
+  'premium',
+] as const;
+
+/**
+ * Display names for tiers (user-friendly)
+ */
+export const TIER_DISPLAY_NAMES: Record<string, string> = {
+  free: 'Free',
+  trial: 'Trial',
+  basic: 'Basic',
+  standard: 'Standard',
+  premium: 'Premium',
+} as const;
+
+// ============================================================================
 // Type Exports
 // ============================================================================
 
@@ -172,3 +201,10 @@ export type FileExtensionsByTier = typeof FILE_EXTENSIONS_BY_TIER;
 export type FileCountLimitsByTier = typeof FILE_COUNT_LIMITS_BY_TIER;
 export type FileSizeLimitsByTier = typeof FILE_SIZE_LIMITS_BY_TIER;
 export type TierKey = keyof MimeTypesByTier;
+
+/**
+ * Type guard to check if a string is a valid tier key
+ */
+export function isValidTierKey(value: string | undefined | null): value is TierKey {
+  return value !== undefined && value !== null && TIER_ORDER.includes(value as TierKey);
+}
