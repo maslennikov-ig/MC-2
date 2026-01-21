@@ -2,7 +2,7 @@
 import { notFound } from 'next/navigation'
 import { setRequestLocale } from 'next-intl/server'
 import { Locale } from '@/src/i18n/config'
-import { getUserClient } from '@/lib/supabase/client-factory'
+import { getUserClient, getAdminClient } from '@/lib/supabase/client-factory'
 import { logger } from '@/lib/logger'
 import CourseViewerEnhanced from '@/components/course/course-viewer-enhanced'
 import { CourseErrorBoundary } from '@/components/common/error-boundary'
@@ -16,6 +16,7 @@ import type { Course } from '@/types/database'
 import { PostgrestError } from '@supabase/supabase-js'
 import { Database } from '@/types/database.generated'
 import { z } from 'zod'
+import type { Metadata } from 'next'
 
 /** Minimal schema for Course validation - validates critical fields only */
 const CourseSchema = z.object({
@@ -27,6 +28,62 @@ const CourseSchema = z.object({
 // Force dynamic rendering to ensure auth state is fresh
 export const dynamic = 'force-dynamic'
 export const fetchCache = 'force-no-store'
+
+// Generate dynamic metadata for OG sharing
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: Locale; slug: string }>
+}): Promise<Metadata> {
+  const { slug } = await params
+
+  try {
+    const supabase = getAdminClient()
+
+    const { data: course } = await supabase
+      .from('courses')
+      .select('title, course_description')
+      .eq('slug', slug)
+      .single()
+
+    if (!course) {
+      return {
+        title: 'Курс не найден',
+      }
+    }
+
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://ai.megacampus.ru'
+
+    return {
+      title: course.title,
+      description: course.course_description || `Онлайн курс: ${course.title}`,
+      openGraph: {
+        title: course.title,
+        description: course.course_description || `Онлайн курс: ${course.title}`,
+        images: [
+          {
+            url: `${baseUrl}/api/og/course/${slug}`,
+            width: 1200,
+            height: 630,
+            alt: course.title,
+          },
+        ],
+        type: 'website',
+        siteName: 'MegaCampusAI',
+      },
+      twitter: {
+        card: 'summary_large_image',
+        title: course.title,
+        description: course.course_description || `Онлайн курс: ${course.title}`,
+        images: [`${baseUrl}/api/og/course/${slug}`],
+      },
+    }
+  } catch {
+    return {
+      title: 'Курс',
+    }
+  }
+}
 
 // Use generated types for better type safety
 type SectionRow = Database['public']['Tables']['sections']['Row']

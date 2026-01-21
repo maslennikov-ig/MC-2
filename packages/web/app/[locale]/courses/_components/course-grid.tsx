@@ -12,12 +12,13 @@ interface User {
   email?: string
   role?: string
 }
-import { getCourses, checkFavorites } from '../actions'
+import { getCourses, checkFavorites, getCourseCovers } from '../actions'
 import type { Course } from '@/types/database'
 import { logger } from '@/lib/client-logger'
 
 interface CourseWithFavorite extends Course {
   isFavorited?: boolean
+  coverUrl?: string | null
 }
 
 interface CourseGridProps {
@@ -63,18 +64,21 @@ export function CourseGrid({
       })
 
       if (result.courses.length > 0) {
-        // Check favorites for new courses if user is authenticated
-        let coursesWithFavorites = result.courses
-        if (user) {
-          const courseIds = result.courses.map((c) => c.id)
-          const favoritesMap = await checkFavorites(courseIds)
-          coursesWithFavorites = result.courses.map((course) => ({
-            ...course,
-            isFavorited: favoritesMap[course.id] || false,
-          }))
-        }
+        const courseIds = result.courses.map((c) => c.id)
 
-        setDisplayedCourses((prev) => [...prev, ...coursesWithFavorites])
+        // Fetch favorites and covers in parallel (not sequentially)
+        const [favoritesMap, coversMap] = await Promise.all([
+          user ? checkFavorites(courseIds) : Promise.resolve({} as Record<string, boolean>),
+          getCourseCovers(courseIds),
+        ])
+
+        const coursesWithExtras = result.courses.map((course) => ({
+          ...course,
+          isFavorited: favoritesMap[course.id] || false,
+          coverUrl: coversMap[course.id] || null,
+        }))
+
+        setDisplayedCourses((prev) => [...prev, ...coursesWithExtras])
         setCurrentLoadedPage(nextPage)
         setHasMoreToLoad(result.hasMore || false)
       }
@@ -108,6 +112,7 @@ export function CourseGrid({
                 user={user || null}
                 canDelete={isSuperAdmin || course.user_id === user?.id || course.user_id === null}
                 isFavorited={course.isFavorited}
+                index={index}
               />
             </motion.div>
           ))}
