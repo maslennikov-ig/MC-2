@@ -2,6 +2,29 @@
 
 _Released on 2025-12-26_
 
+## v0.28.21
+
+_Released on 2026-01-21_
+
+### ✨ New Features
+
+- **scripts**: Add full lesson A/B test with Mermaid generation
+- **Database**: Add trigger to auto-reopen resolved errors on recurrence
+- **scripts**: Add validation script for existing lesson content
+- **scripts**: Improve A/B test script for lesson generation
+- **stage6**: Comprehensive content quality validation
+
+### 🐛 Bug Fixes
+
+- **scripts**: Correct Xiaomi model ID in Stage 6 quality tests
+- **stage6**: Add null checks to prevent TypeError in formatInterLessonContextXML
+- **scripts**: Add dotenv import to test-lesson-generation
+- **mermaid**: Improve dark mode contrast for edge labels and text
+
+---
+
+_This release was automatically generated from 15 commits._
+
 ## v0.28.20
 
 _Released on 2026-01-20_

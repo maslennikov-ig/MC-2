@@ -38,6 +38,7 @@ import { buildPatcherPrompt, buildPatcherSystemPrompt } from './patcher-prompt';
 import { logger } from '../../../../shared/logger';
 import { LLMClient } from '@/shared/llm';
 import { createModelConfigService } from '@/shared/llm/model-config-service';
+import { validateGeneratedContent } from '../../nodes/generator/generator-content';
 
 export { buildPatcherPrompt, buildPatcherSystemPrompt } from './patcher-prompt';
 
@@ -71,8 +72,10 @@ async function defaultLLMCall(
     modelId = config.modelId;
     logger.info({ modelId, source: config.source }, 'Patcher using model from config');
   } catch (error) {
-    logger.warn({ error: error instanceof Error ? error.message : String(error) },
-      'Failed to get patcher model config, using fallback');
+    logger.warn(
+      { error: error instanceof Error ? error.message : String(error) },
+      'Failed to get patcher model config, using fallback'
+    );
   }
 
   const response = await llmClient.generateCompletion(prompt, {
@@ -168,16 +171,19 @@ export async function executePatch(
     input.language
   );
 
-  logger.info({
-    sectionId: input.sectionId,
-    sectionTitle: input.sectionTitle,
-    originalLength: input.originalContent.length,
-    scope: input.contextWindow.scope,
-    lessonDurationMinutes: input.lessonDurationMinutes || 'not provided',
-    language: input.language || 'en (default)',
-    languageMultiplier: getTokenMultiplier(input.language || 'en'),
-    maxTokens,
-  }, 'Executing Patcher: surgical edit');
+  logger.info(
+    {
+      sectionId: input.sectionId,
+      sectionTitle: input.sectionTitle,
+      originalLength: input.originalContent.length,
+      scope: input.contextWindow.scope,
+      lessonDurationMinutes: input.lessonDurationMinutes || 'not provided',
+      language: input.language || 'en (default)',
+      languageMultiplier: getTokenMultiplier(input.language || 'en'),
+      maxTokens,
+    },
+    'Executing Patcher: surgical edit'
+  );
 
   try {
     const prompt = buildPatcherPrompt(input);
@@ -190,17 +196,42 @@ export async function executePatch(
     const patchedContent = response.content.trim();
     const tokensUsed = response.tokensUsed;
 
+    // CRITICAL: Validate that response doesn't contain prompt template markers
+    // This catches LLM hallucination where model returns the prompt structure instead of content
+    const markerValidation = validateGeneratedContent(patchedContent);
+    if (!markerValidation.isValid) {
+      logger.error(
+        {
+          sectionId: input.sectionId,
+          detectedMarkers: markerValidation.detectedMarkers,
+        },
+        'Patcher: REJECTED - response contains prompt template markers (LLM hallucination)'
+      );
+
+      return {
+        patchedContent: input.originalContent, // Return original - patch was corrupted
+        success: false,
+        diffSummary: 'Patch rejected: LLM returned prompt structure instead of content',
+        tokensUsed,
+        durationMs: Date.now() - startTime,
+        errorMessage: `LLM hallucinated prompt markers: ${markerValidation.detectedMarkers.join(', ')}`,
+      };
+    }
+
     // IMPORTANT: Validate that content was not truncated
     // If patched content is significantly shorter than original, reject the patch
     const lengthRatio = patchedContent.length / input.originalContent.length;
     if (lengthRatio < MIN_CONTENT_LENGTH_RATIO) {
-      logger.error({
-        sectionId: input.sectionId,
-        originalLength: input.originalContent.length,
-        patchedLength: patchedContent.length,
-        lengthRatio: lengthRatio.toFixed(2),
-        minRatio: MIN_CONTENT_LENGTH_RATIO,
-      }, 'Patcher: REJECTED - content was truncated, returning original');
+      logger.error(
+        {
+          sectionId: input.sectionId,
+          originalLength: input.originalContent.length,
+          patchedLength: patchedContent.length,
+          lengthRatio: lengthRatio.toFixed(2),
+          minRatio: MIN_CONTENT_LENGTH_RATIO,
+        },
+        'Patcher: REJECTED - content was truncated, returning original'
+      );
 
       return {
         patchedContent: input.originalContent, // Return original - patch was corrupted
@@ -217,15 +248,18 @@ export async function executePatch(
 
     const durationMs = Date.now() - startTime;
 
-    logger.info({
-      sectionId: input.sectionId,
-      tokensUsed,
-      durationMs,
-      diffSummary,
-      patchedLength: patchedContent.length,
-      lengthDelta: patchedContent.length - input.originalContent.length,
-      lengthRatio: lengthRatio.toFixed(2),
-    }, 'Patcher: surgical edit complete');
+    logger.info(
+      {
+        sectionId: input.sectionId,
+        tokensUsed,
+        durationMs,
+        diffSummary,
+        patchedLength: patchedContent.length,
+        lengthDelta: patchedContent.length - input.originalContent.length,
+        lengthRatio: lengthRatio.toFixed(2),
+      },
+      'Patcher: surgical edit complete'
+    );
 
     return {
       patchedContent,
@@ -238,11 +272,14 @@ export async function executePatch(
     const durationMs = Date.now() - startTime;
     const errorMessage = error instanceof Error ? error.message : 'Unknown error';
 
-    logger.error({
-      sectionId: input.sectionId,
-      error: errorMessage,
-      durationMs,
-    }, 'Patcher: surgical edit failed');
+    logger.error(
+      {
+        sectionId: input.sectionId,
+        error: errorMessage,
+        durationMs,
+      },
+      'Patcher: surgical edit failed'
+    );
 
     return {
       patchedContent: input.originalContent, // Return original on error
@@ -293,7 +330,8 @@ function generateDiffSummary(original: string, patched: string): string {
   // Calculate approximate edit distance ratio
   const maxLength = Math.max(original.length, patched.length);
   const minLength = Math.min(original.length, patched.length);
-  const editRatio = maxLength > 0 ? ((maxLength - minLength) / maxLength * 100).toFixed(1) : '0.0';
+  const editRatio =
+    maxLength > 0 ? (((maxLength - minLength) / maxLength) * 100).toFixed(1) : '0.0';
   parts.push(`${editRatio}% changed`);
 
   return parts.length > 0 ? parts.join(', ') : 'Content modified';
