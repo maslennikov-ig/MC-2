@@ -668,6 +668,8 @@ class Stage4AnalysisHandler {
             // Denormalize counts for fast access in UI and queries
             total_lessons_count: analysisResult.recommended_structure.total_lessons,
             total_sections_count: analysisResult.recommended_structure.total_sections,
+            // Save target_audience from topic analysis for UI display
+            target_audience: analysisResult.topic_analysis?.target_audience || null,
             updated_at: new Date().toISOString(),
           })
           .eq('id', course_id)

@@ -524,7 +524,7 @@ export function CourseCard({
             <Badge
               className={cn(
                 hasCover
-                  ? 'border-white/30 bg-white/20 text-white backdrop-blur-sm'
+                  ? 'border-white/40 bg-black/50 text-white backdrop-blur-sm'
                   : statusInfo.color,
                 'border px-2 py-0.5 text-xs',
                 statusInfo.pulse && 'animate-pulse'
@@ -539,7 +539,7 @@ export function CourseCard({
               <Badge
                 className={cn(
                   hasCover
-                    ? 'border-white/30 bg-white/20 text-white backdrop-blur-sm'
+                    ? 'border-white/40 bg-black/50 text-white backdrop-blur-sm'
                     : difficultyInfo.color,
                   'border px-2 py-0.5 text-xs'
                 )}
