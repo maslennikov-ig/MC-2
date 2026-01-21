@@ -286,13 +286,16 @@ SELECT
 
 ### Step 1.5: Filter by Environment (IMPORTANT)
 
+> **CRITICAL**: Both DEV and STAGE are production-like servers. ALL errors on these
+> environments must be investigated and fixed. Only LOCAL (NULL) can be bulk-resolved.
+
 The `error_logs` table has an `environment` column that indicates where the error occurred:
 
-| Value     | Environment    | Action                                       |
-| --------- | -------------- | -------------------------------------------- |
-| `NULL`    | Local dev      | **Bulk resolve** — local testing/development |
-| `'dev'`   | Dev server     | **Investigate** — real errors on dev server  |
-| `'stage'` | Staging (prod) | **Investigate** — real production errors     |
+| Value     | Environment    | Action                                            |
+| --------- | -------------- | ------------------------------------------------- |
+| `NULL`    | Local dev      | **Bulk resolve** — local testing/development only |
+| `'dev'`   | Dev server     | **MUST FIX** — real errors affecting developers   |
+| `'stage'` | Staging (prod) | **MUST FIX** — real production errors             |
 
 **Always check environment distribution first:**
 
@@ -306,10 +309,11 @@ GROUP BY environment
 ORDER BY count DESC;
 ```
 
-**Bulk resolve local/dev errors:**
+**Bulk resolve LOCAL errors only:**
 
 ```sql
--- Bulk resolve ALL local environment errors (environment IS NULL)
+-- Bulk resolve ONLY local environment errors (environment IS NULL)
+-- NEVER bulk resolve dev or stage errors - they must be investigated individually!
 WITH local_fingerprints AS (
   SELECT DISTINCT ON (el.fingerprint) el.id, el.fingerprint
   FROM error_logs el

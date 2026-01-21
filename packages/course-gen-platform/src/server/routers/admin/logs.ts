@@ -20,6 +20,76 @@ import { logger } from '../../../shared/logger/index.js';
 import { ErrorMessages } from '../../utils/error-messages.js';
 
 // ============================================================================
+// Retry Utilities
+// ============================================================================
+
+/**
+ * Retry wrapper for transient database errors
+ * Implements exponential backoff for network/timeout issues
+ */
+async function withRetry<T>(
+  operation: () => Promise<T>,
+  options: { maxRetries?: number; baseDelayMs?: number; operationName: string }
+): Promise<T> {
+  const { maxRetries = 3, baseDelayMs = 100, operationName } = options;
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error;
+      const isRetryable = isTransientError(error);
+
+      if (!isRetryable || attempt === maxRetries) {
+        throw error;
+      }
+
+      const delayMs = baseDelayMs * Math.pow(2, attempt - 1);
+      logger.warn(
+        {
+          attempt,
+          maxRetries,
+          delayMs,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        `${operationName}: Retrying after transient error`
+      );
+
+      await new Promise(resolve => setTimeout(resolve, delayMs));
+    }
+  }
+
+  throw lastError;
+}
+
+/**
+ * Determines if an error is transient and worth retrying
+ */
+function isTransientError(error: unknown): boolean {
+  if (!(error && typeof error === 'object')) return false;
+
+  const errorObj = error as { code?: string; message?: string };
+  const transientCodes = ['PGRST', 'ECONNRESET', 'ETIMEDOUT', 'ENOTFOUND'];
+  const transientPatterns = [
+    /timeout/i,
+    /connection.*reset/i,
+    /network/i,
+    /truncated/i,
+    /malformed/i,
+  ];
+
+  // Check error code
+  if (errorObj.code && transientCodes.some(code => errorObj.code?.includes(code))) {
+    return true;
+  }
+
+  // Check error message patterns
+  const message = errorObj.message || '';
+  return transientPatterns.some(pattern => pattern.test(message));
+}
+
+// ============================================================================
 // Constants
 // ============================================================================
 
@@ -938,9 +1008,7 @@ async function buildErrorLogsQuery(
         const logIdSet = new Set((logIdsWithStatus || []).map(r => r.log_id));
 
         // Get all error_logs and filter out those with status
-        const { data: allLogs } = await supabase
-          .from('error_logs')
-          .select('id, fingerprint');
+        const { data: allLogs } = await supabase.from('error_logs').select('id, fingerprint');
 
         statusFilteredIds = (allLogs || [])
           .filter(log => {
@@ -1061,18 +1129,53 @@ async function buildErrorLogsQuery(
   // Apply pagination
   query = query.range(offset, offset + limit - 1);
 
-  const { data, count, error } = await query;
+  // Execute query with retry for transient errors
+  type QueryData = {
+    id: string;
+    created_at: string;
+    severity: string;
+    error_message: string;
+    job_type: string | null;
+    metadata: unknown;
+    problem_id: string | null;
+    environment: string | null;
+    fingerprint?: string;
+  };
+  let data: QueryData[] | null = null;
+  let count: number | null = null;
+  let queryError: unknown = null;
 
-  if (error) {
-    // Extract all PostgrestError fields for better debugging
+  try {
+    const result = await withRetry(
+      async () => {
+        const response = await query;
+        if (response.error) {
+          // Check if error is truncated/malformed (transient)
+          const isTruncated =
+            response.error.message?.startsWith('{') && !response.error.message?.endsWith('}');
+          if (isTruncated) {
+            throw new Error(`Truncated response: ${response.error.message}`);
+          }
+          throw response.error;
+        }
+        return response;
+      },
+      { operationName: 'buildErrorLogsQuery' }
+    );
+    data = result.data as QueryData[] | null;
+    count = result.count;
+  } catch (error) {
+    queryError = error;
+  }
+
+  if (queryError) {
     const errorDetails = {
-      message: error.message || 'Unknown error',
-      code: error.code || null,
-      details: error.details || null,
-      hint: error.hint || null,
-      isTruncated: error.message?.startsWith('{') && !error.message?.endsWith('}'),
+      message: queryError instanceof Error ? queryError.message : 'Unknown error',
+      code: (queryError as { code?: string }).code || null,
+      details: (queryError as { details?: string }).details || null,
+      hint: (queryError as { hint?: string }).hint || null,
     };
-    logger.error({ errorDetails, rawError: String(error) }, 'Error querying error_logs');
+    logger.error({ errorDetails }, 'Error querying error_logs after retries');
     return { items: [], total: 0 };
   }
 
@@ -1219,19 +1322,53 @@ async function buildGenerationTraceQuery(
   // Apply pagination
   query = query.range(offset, offset + limit - 1);
 
-  const { data, count, error } = await query;
+  // Execute query with retry for transient errors
+  type TraceQueryData = {
+    id: string;
+    created_at: string;
+    stage: string;
+    phase: string;
+    step_name: string;
+    course_id: string;
+    lesson_id: string | null;
+    error_data: unknown;
+    courses: { title: string } | null;
+  };
+  let data: TraceQueryData[] | null = null;
+  let count: number | null = null;
+  let queryError: unknown = null;
 
-  if (error) {
-    // Extract all PostgrestError fields for better debugging
+  try {
+    const result = await withRetry(
+      async () => {
+        const response = await query;
+        if (response.error) {
+          // Check if error is truncated/malformed (transient)
+          const isTruncated =
+            response.error.message?.startsWith('{') && !response.error.message?.endsWith('}');
+          if (isTruncated) {
+            throw new Error(`Truncated response: ${response.error.message}`);
+          }
+          throw response.error;
+        }
+        return response;
+      },
+      { operationName: 'buildGenerationTraceQuery' }
+    );
+    data = result.data as TraceQueryData[] | null;
+    count = result.count;
+  } catch (error) {
+    queryError = error;
+  }
+
+  if (queryError) {
     const errorDetails = {
-      message: error.message || 'Unknown error',
-      code: error.code || null,
-      details: error.details || null,
-      hint: error.hint || null,
-      // Detect truncated/malformed error messages
-      isTruncated: error.message?.startsWith('{') && !error.message?.endsWith('}'),
+      message: queryError instanceof Error ? queryError.message : 'Unknown error',
+      code: (queryError as { code?: string }).code || null,
+      details: (queryError as { details?: string }).details || null,
+      hint: (queryError as { hint?: string }).hint || null,
     };
-    logger.error({ errorDetails, rawError: String(error) }, 'Error querying generation_trace');
+    logger.error({ errorDetails }, 'Error querying generation_trace after retries');
     return { items: [], total: 0 };
   }
 
