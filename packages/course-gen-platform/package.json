@@ -54,6 +54,7 @@
     "axios": "^1.7",
     "bcrypt": "^6.0.0",
     "bullmq": "^5.66.3",
+    "commander": "^14.0.2",
     "cors": "^2.8.5",
     "dompurify": "^3.3.1",
     "dotenv": "^16.3.1",
