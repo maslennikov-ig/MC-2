@@ -311,6 +311,32 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.28.21] - 2026-01-21
+
+### Added
+
+- **scripts**: add full lesson A/B test with Mermaid generation (14bdceb)
+- **db**: add trigger to auto-reopen resolved errors on recurrence (b4b6a4c)
+- **scripts**: add validation script for existing lesson content (f10e6d8)
+- **scripts**: improve A/B test script for lesson generation (65ef641)
+- **stage6**: comprehensive content quality validation (8d593dd)
+
+### Fixed
+
+- **scripts**: correct Xiaomi model ID in Stage 6 quality tests (5ea1412)
+- **stage6**: add null checks to prevent TypeError in formatInterLessonContextXML (58155a3)
+- **scripts**: add dotenv import to test-lesson-generation (27ce4b0)
+- **mermaid**: improve dark mode contrast for edge labels and text (38195b8)
+
+### Other
+
+- update 1 skill(s), update docs (fa9bde2)
+- bd sync: 2026-01-21 10:07:08 (ef1f42c)
+- bd sync: 2026-01-21 10:06:55 (4dd794c)
+- merge develop into master (e60c6a9)
+- Merge develop: fix target_queue filtering in OutboxProcessor (1ceb274)
+- merge develop into master (2b584d3)
+
 ## [0.28.20] - 2026-01-20
 
 ### Added
