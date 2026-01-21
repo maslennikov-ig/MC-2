@@ -6,10 +6,56 @@
 import Redis from 'ioredis';
 import logger from '../logger';
 
+// ============================================================================
+// CONFIGURATION CONSTANTS
+// ============================================================================
+
+/** Maximum reconnection attempts before circuit breaker triggers (~26 minutes) */
+const REDIS_MAX_RECONNECT_ATTEMPTS = 60;
+
+/** Base delay for exponential backoff (ms) */
+const REDIS_BACKOFF_BASE_MS = 100;
+
+/** Maximum delay between reconnection attempts (ms) */
+const REDIS_BACKOFF_MAX_MS = 30000;
+
+/** Log reconnection progress every N attempts */
+const REDIS_LOG_INTERVAL = 10;
+
+/** Warning threshold - approaching circuit breaker */
+const REDIS_WARNING_THRESHOLD = 50;
+
+// ============================================================================
+// MODULE STATE
+// ============================================================================
+
 let redisClient: Redis | null = null;
 let isConnected = false; // Module-level connection state (shared across all RedisCache instances)
 let connectionPromise: Promise<void> | null = null; // Module-level connection promise
 let isClosing = false; // Guard against concurrent close calls
+
+// Health tracking
+let reconnectionAttempts = 0;
+let firstFailureTime: number | null = null;
+let isShuttingDown = false; // Flag for graceful shutdown coordination
+
+// ============================================================================
+// SIGTERM/SIGINT HANDLING
+// ============================================================================
+
+/**
+ * Handle graceful shutdown signals
+ * Stops Redis reconnection attempts to allow clean worker shutdown
+ */
+function handleShutdownSignal(signal: string): void {
+  if (isShuttingDown) return; // Already handling
+  isShuttingDown = true;
+  logger.info({ signal }, 'Shutdown signal received, stopping Redis reconnection attempts');
+}
+
+// Register once at module load
+process.on('SIGTERM', () => handleShutdownSignal('SIGTERM'));
+process.on('SIGINT', () => handleShutdownSignal('SIGINT'));
 
 export function getRedisClient(): Redis {
   if (!redisClient) {
@@ -23,19 +69,42 @@ export function getRedisClient(): Redis {
       keepAlive: 30000,
       family: 4,
       retryStrategy(times) {
-        // Exponential backoff: 100ms, 200ms, 400ms... up to 30s max
-        const delay = Math.min(100 * Math.pow(2, times - 1), 30000);
-
-        // Log progress every 10 attempts
-        if (times % 10 === 0) {
-          logger.warn({ attempts: times, nextDelayMs: delay }, 'Redis reconnecting...');
+        // Track reconnection state for health monitoring
+        reconnectionAttempts = times;
+        if (times === 1) {
+          firstFailureTime = Date.now();
         }
 
-        // After ~20 minutes of trying (60 attempts with max 30s delay),
-        // exit process to let Docker restart us with a fresh state
-        if (times >= 60) {
+        // Stop retrying if graceful shutdown is in progress
+        if (isShuttingDown) {
+          logger.info({ attempts: times }, 'Shutdown in progress, stopping Redis reconnection');
+          return null;
+        }
+
+        // Exponential backoff: 100ms, 200ms, 400ms... up to 30s max
+        const delay = Math.min(
+          REDIS_BACKOFF_BASE_MS * Math.pow(2, times - 1),
+          REDIS_BACKOFF_MAX_MS
+        );
+
+        // Log progress at regular intervals
+        if (times % REDIS_LOG_INTERVAL === 0) {
+          const minutesElapsed = firstFailureTime
+            ? ((Date.now() - firstFailureTime) / 60000).toFixed(1)
+            : '0';
+          logger.warn(
+            { attempts: times, nextDelayMs: delay, minutesElapsed },
+            'Redis reconnecting...'
+          );
+        }
+
+        // After ~26 minutes of trying, exit process for container restart
+        if (times >= REDIS_MAX_RECONNECT_ATTEMPTS) {
+          const minutesElapsed = firstFailureTime
+            ? ((Date.now() - firstFailureTime) / 60000).toFixed(1)
+            : '~26';
           logger.error(
-            { attempts: times, totalTimeMinutes: '~20' },
+            { attempts: times, minutesElapsed },
             'Redis unavailable for extended period, exiting for container restart'
           );
           // Use setImmediate to allow the log to flush before exit
@@ -46,12 +115,25 @@ export function getRedisClient(): Redis {
         return delay;
       },
       reconnectOnError(err) {
-        // Reconnect on transient errors including DNS failures
-        const targetErrors = ['READONLY', 'ECONNRESET', 'ETIMEDOUT', 'EAI_AGAIN', 'ENOTFOUND'];
-        if (targetErrors.some(e => err.message.includes(e))) {
-          logger.warn({ error: err.message }, 'Redis reconnecting on error');
+        // Check error code property first (for DNS/network errors)
+        const errorCode = (err as NodeJS.ErrnoException).code;
+        if (errorCode) {
+          const networkErrors = ['EAI_AGAIN', 'ENOTFOUND', 'ECONNRESET', 'ETIMEDOUT'];
+          if (networkErrors.includes(errorCode)) {
+            logger.warn(
+              { error: err.message, code: errorCode },
+              'Redis reconnecting on network error'
+            );
+            return true;
+          }
+        }
+
+        // Fallback to message check for Redis-specific errors (READONLY has no code)
+        if (err.message.includes('READONLY')) {
+          logger.warn({ error: err.message }, 'Redis reconnecting on READONLY error');
           return true;
         }
+
         return false;
       },
     });
@@ -61,6 +143,9 @@ export function getRedisClient(): Redis {
     });
 
     redisClient.on('connect', () => {
+      // Reset health tracking on successful connection
+      reconnectionAttempts = 0;
+      firstFailureTime = null;
       logger.info('Redis connected successfully');
     });
 
@@ -85,6 +170,44 @@ export function getRedisClient(): Redis {
  */
 export function isRedisConnected(): boolean {
   return redisClient !== null && redisClient.status === 'ready';
+}
+
+/**
+ * Health status for Redis connection
+ */
+export interface RedisHealthStatus {
+  connected: boolean;
+  status: string;
+  reconnectionAttempts: number;
+  minutesSinceFirstFailure: number | null;
+  shutdownImminent: boolean;
+  isShuttingDown: boolean;
+}
+
+/**
+ * Get detailed Redis health status for monitoring
+ *
+ * Use this in health check endpoints to monitor reconnection state:
+ * - shutdownImminent: true when approaching circuit breaker threshold
+ * - minutesSinceFirstFailure: time since Redis became unreachable
+ *
+ * @example
+ * const health = getRedisHealth();
+ * if (health.shutdownImminent) {
+ *   // Alert operations team
+ * }
+ */
+export function getRedisHealth(): RedisHealthStatus {
+  return {
+    connected: isRedisConnected(),
+    status: redisClient?.status || 'not-initialized',
+    reconnectionAttempts,
+    minutesSinceFirstFailure: firstFailureTime
+      ? Math.round(((Date.now() - firstFailureTime) / 60000) * 10) / 10
+      : null,
+    shutdownImminent: reconnectionAttempts >= REDIS_WARNING_THRESHOLD,
+    isShuttingDown,
+  };
 }
 
 /**
