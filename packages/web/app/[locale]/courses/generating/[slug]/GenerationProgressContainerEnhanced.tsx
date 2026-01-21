@@ -908,7 +908,9 @@ export default function GenerationProgressContainerEnhanced({
               </h3>
               <p className="mb-6 text-gray-600 dark:text-gray-400">{t('message')}</p>
               <Button asChild>
-                <Link href={`/courses/${slug}`}>{t('viewCourse')}</Link>
+                <Link href={`/courses/${slug}`} target="_blank" rel="noopener noreferrer">
+                  {t('viewCourse')}
+                </Link>
               </Button>
             </motion.div>
           </motion.div>

@@ -162,10 +162,8 @@ export function GenerationProgress({
         // Handle completion
         if (newStatus === 'completed') {
           toast.success('Курс успешно создан!')
-          // Use replace to remove generation page from history
-          setTimeout(() => {
-            router.replace(`/courses/${slug}`)
-          }, 2000)
+          // Navigate immediately - no delay needed
+          router.replace(`/courses/${slug}`)
         }
 
         // Handle failure
@@ -319,9 +317,8 @@ export function GenerationProgress({
 
                 if (data.generation_status === 'completed') {
                   toast.success('Курс успешно создан!')
-                  setTimeout(() => {
-                    router.push(`/courses/${slug}`)
-                  }, 2000)
+                  // Navigate immediately - no delay needed
+                  router.push(`/courses/${slug}`)
                 } else if (data.generation_status === 'failed') {
                   setError(data.error_message || 'Произошла ошибка')
                   toast.error(data.error_message || 'Произошла ошибка при создании курса')
@@ -743,7 +740,7 @@ export function GenerationProgress({
             {isCourseReady && (
               <Button
                 className="ml-auto"
-                onClick={() => router.push(`/courses/${slug}`)}
+                onClick={() => window.open(`/courses/${slug}`, '_blank', 'noopener,noreferrer')}
               >
                 Перейти к курсу
                 <ArrowRight className="h-4 w-4 ml-2" />

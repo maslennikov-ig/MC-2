@@ -180,53 +180,49 @@ export default async function CoursePage({ params, searchParams }: CoursePagePro
   const { getAdminClient } = await import('@/lib/supabase/client-factory')
   const adminSupabase = getAdminClient()
 
-  // Fetch assets only if we have lessons to avoid empty .in() query
+  // Fetch assets, enrichments, and lesson contents in parallel (performance optimization)
   let assets: AssetRow[] | null = null
-  let assetsError: PostgrestError | null = null
-
-  if (lessons && lessons.length > 0) {
-    const lessonIds = lessons.map((l: LessonRow) => l.id)
-    const assetsResult = (await adminSupabase
-      .from('assets')
-      .select('*')
-      .in('lesson_id', lessonIds)) as { data: AssetRow[] | null; error: PostgrestError | null }
-
-    assets = assetsResult.data
-    assetsError = assetsResult.error
-
-    if (assetsError) {
-      // Log error for monitoring but continue with empty assets list
-      // This ensures the course page still renders even if assets fail to load
-      logger.warn('Failed to load course assets', {
-        courseId: course.id,
-        slug,
-        lessonIds,
-        error: assetsError.message,
-        code: assetsError.code,
-      })
-    }
-  }
-
-  // Fetch enrichments only if we have lessons to avoid empty .in() query
   let enrichments: EnrichmentRow[] | null = null
+  let lessonContents: LessonContentRow[] | null = null
   let enrichmentsError: string | undefined
 
   if (lessons && lessons.length > 0) {
     const lessonIds = lessons.map((l: LessonRow) => l.id)
-    const enrichmentsResult = (await adminSupabase
-      .from('lesson_enrichments')
-      .select('*')
-      .in('lesson_id', lessonIds)
-      .eq('status', 'completed')
-      .order('order_index')) as { data: EnrichmentRow[] | null; error: PostgrestError | null }
 
+    // Execute all three queries in parallel for faster page load
+    const [assetsResult, enrichmentsResult, lessonContentsResult] = await Promise.all([
+      adminSupabase.from('assets').select('*').in('lesson_id', lessonIds),
+      adminSupabase
+        .from('lesson_enrichments')
+        .select('*')
+        .in('lesson_id', lessonIds)
+        .eq('status', 'completed')
+        .order('order_index'),
+      adminSupabase
+        .from('lesson_contents')
+        .select('*')
+        .in('lesson_id', lessonIds)
+        .eq('status', 'completed')
+        .order('created_at', { ascending: false }),
+    ])
+
+    assets = assetsResult.data
     enrichments = enrichmentsResult.data
+    lessonContents = lessonContentsResult.data
+
+    // Log errors but continue with empty lists (graceful degradation)
+    if (assetsResult.error) {
+      logger.warn('Failed to load course assets', {
+        courseId: course.id,
+        slug,
+        lessonIds,
+        error: assetsResult.error.message,
+        code: assetsResult.error.code,
+      })
+    }
 
     if (enrichmentsResult.error) {
-      // Track error message for UI display
       enrichmentsError = enrichmentsResult.error.message
-      // Log error for monitoring but continue with empty enrichments list
-      // This ensures the course page still renders even if enrichments fail to load
       logger.warn('Failed to load lesson enrichments', {
         courseId: course.id,
         slug,
@@ -234,25 +230,6 @@ export default async function CoursePage({ params, searchParams }: CoursePagePro
         code: enrichmentsResult.error.code,
       })
     }
-  }
-
-  // Fetch lesson contents from lesson_contents table (Stage 6 generated content)
-  // This is the actual lesson content that was generated, stored separately from lessons table
-  let lessonContents: LessonContentRow[] | null = null
-
-  if (lessons && lessons.length > 0) {
-    const lessonIds = lessons.map((l: LessonRow) => l.id)
-    const lessonContentsResult = (await adminSupabase
-      .from('lesson_contents')
-      .select('*')
-      .in('lesson_id', lessonIds)
-      .eq('status', 'completed')
-      .order('created_at', { ascending: false })) as {
-      data: LessonContentRow[] | null
-      error: PostgrestError | null
-    }
-
-    lessonContents = lessonContentsResult.data
 
     if (lessonContentsResult.error) {
       logger.warn('Failed to load lesson contents', {
