@@ -22,7 +22,7 @@ import path from 'path';
 import fs from 'fs';
 import { fileURLToPath } from 'url';
 import { Worker, Job } from 'bullmq';
-import { getRedisClient } from '../shared/cache/redis';
+import { getRedisClient, REDIS_UNAVAILABLE_EVENT } from '../shared/cache/redis';
 import { JobData, JobType } from '@megacampus/shared-types';
 import logger from '../shared/logger';
 import { QUEUE_NAME } from './queue';
@@ -544,22 +544,22 @@ export function getWorkerStatus(): object | null {
   };
 }
 
-// Graceful shutdown on process termination
-process.on('SIGTERM', async () => {
-  logger.info('SIGTERM received, shutting down worker gracefully');
+/**
+ * Common graceful shutdown handler
+ */
+async function handleGracefulShutdown(signal: string): Promise<void> {
+  logger.info({ signal }, 'Graceful shutdown initiated');
   const { generationLockService } = await import('../shared/locks');
   await generationLockService.releaseAllLocks();
   await stopWorker(false);
   process.exit(0);
-});
+}
 
-process.on('SIGINT', async () => {
-  logger.info('SIGINT received, shutting down worker gracefully');
-  const { generationLockService } = await import('../shared/locks');
-  await generationLockService.releaseAllLocks();
-  await stopWorker(false);
-  process.exit(0);
-});
+// Graceful shutdown on process termination
+process.on('SIGTERM', () => void handleGracefulShutdown('SIGTERM'));
+process.on('SIGINT', () => void handleGracefulShutdown('SIGINT'));
+// Handle Redis unavailable - graceful shutdown before forced exit
+process.on(REDIS_UNAVAILABLE_EVENT, () => void handleGracefulShutdown('REDIS_UNAVAILABLE'));
 
 export default {
   getWorker,

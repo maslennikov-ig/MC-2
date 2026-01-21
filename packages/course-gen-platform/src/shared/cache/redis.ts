@@ -25,6 +25,15 @@ const REDIS_LOG_INTERVAL = 10;
 /** Warning threshold - approaching circuit breaker */
 const REDIS_WARNING_THRESHOLD = 50;
 
+/** Time to wait for graceful shutdown before forced exit (ms) */
+const REDIS_GRACEFUL_SHUTDOWN_TIMEOUT_MS = 30000;
+
+/**
+ * Custom event emitted when Redis is unavailable for extended period
+ * Workers should listen to this event to perform graceful shutdown
+ */
+export const REDIS_UNAVAILABLE_EVENT = 'REDIS_UNAVAILABLE';
+
 // ============================================================================
 // MODULE STATE
 // ============================================================================
@@ -98,18 +107,30 @@ export function getRedisClient(): Redis {
           );
         }
 
-        // After ~26 minutes of trying, exit process for container restart
+        // After ~26 minutes of trying, initiate graceful shutdown
         if (times >= REDIS_MAX_RECONNECT_ATTEMPTS) {
           const minutesElapsed = firstFailureTime
             ? ((Date.now() - firstFailureTime) / 60000).toFixed(1)
             : '~26';
           logger.error(
             { attempts: times, minutesElapsed },
-            'Redis unavailable for extended period, exiting for container restart'
+            'Redis unavailable for extended period, initiating graceful shutdown'
           );
-          // Use setImmediate to allow the log to flush before exit
-          setImmediate(() => process.exit(1));
-          return null; // Stop retrying (process will exit anyway)
+
+          // Emit event for workers to perform graceful shutdown
+          // Workers should listen: process.on('REDIS_UNAVAILABLE', () => gracefulShutdown())
+          process.emit(REDIS_UNAVAILABLE_EVENT as any);
+
+          // Give workers time to finish current jobs before forced exit
+          setTimeout(() => {
+            logger.error(
+              { timeoutMs: REDIS_GRACEFUL_SHUTDOWN_TIMEOUT_MS },
+              'Graceful shutdown timeout expired, forcing exit'
+            );
+            process.exit(1);
+          }, REDIS_GRACEFUL_SHUTDOWN_TIMEOUT_MS);
+
+          return null; // Stop retrying
         }
 
         return delay;
