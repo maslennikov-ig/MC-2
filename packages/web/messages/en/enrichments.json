@@ -266,6 +266,7 @@
     "video": {
       "title": "Video",
       "description": "AI video lecture",
+      "estimatedTime": "Coming Soon",
       "comingSoon": "Coming Soon"
     }
   },
@@ -274,12 +275,14 @@
     "tokens": "tokens",
     "generateButton": "Generate",
     "cover": {
-      "title": "Lesson Cover",
-      "description": "Hero banner displayed at the top of the lesson (16:9)"
+      "title": "Lesson Banner",
+      "description": "Wide 16:9 image at the top of the lesson page. Displayed as a hero banner above the lesson content.",
+      "usageHint": "Where it appears: lesson page header"
     },
     "card": {
       "title": "Lesson Thumbnail",
-      "description": "Small preview image for navigation (1:1 square)"
+      "description": "Square 1:1 preview for navigation. Displayed in lesson lists and sidebar.",
+      "usageHint": "Where it appears: lesson list, sidebar"
     },
     "style": {
       "label": "Style",
