@@ -116,9 +116,10 @@ export abstract class BaseJobHandler<T extends JobData = JobData> {
    * @abstract
    * @param {T} jobData - The job data payload
    * @param {Job<T>} job - The BullMQ job instance
+   * @param {string} [token] - BullMQ job token for pause/delay operations
    * @returns {Promise<JobResult>} The job execution result
    */
-  abstract execute(jobData: T, job: Job<T>): Promise<JobResult>;
+  abstract execute(jobData: T, job: Job<T>, token?: string): Promise<JobResult>;
 
   /**
    * Process the job with error handling and logging
@@ -133,9 +134,10 @@ export abstract class BaseJobHandler<T extends JobData = JobData> {
    * - Concurrency slot release (T022)
    *
    * @param {Job<T>} job - The BullMQ job instance
+   * @param {string} [token] - BullMQ job token for pause/delay operations
    * @returns {Promise<JobResult>} The job execution result
    */
-  async process(job: Job<T>): Promise<JobResult> {
+  async process(job: Job<T>, token?: string): Promise<JobResult> {
     const startTime = Date.now();
     const { courseId, userId, locale = 'ru' } = job.data;
 
@@ -201,8 +203,8 @@ export abstract class BaseJobHandler<T extends JobData = JobData> {
         );
       }
 
-      // Execute the job
-      const result = await this.execute(job.data, job);
+      // Execute the job (pass token for pause/delay operations)
+      const result = await this.execute(job.data, job, token);
 
       const duration = Date.now() - startTime;
 

@@ -1458,6 +1458,159 @@ export const lifecycleRouter = router({
         });
       }
     }),
+
+  /**
+   * Cancel course generation
+   *
+   * Purpose: Cancels an in-progress course generation by:
+   * 1. Updating course status to 'cancelled'
+   * 2. Removing all pending/active jobs from the BullMQ queue
+   * 3. Cleaning up any related resources
+   *
+   * Authorization: Requires instructor or admin role, course ownership
+   *
+   * Input:
+   * - courseId: UUID of the course to cancel
+   *
+   * Output:
+   * - success: Boolean indicating successful cancellation
+   * - message: Human-readable status message
+   * - removedJobs: Number of jobs removed from queue
+   *
+   * @example
+   * ```typescript
+   * const result = await trpc.generation.cancelGeneration.mutate({
+   *   courseId: '123e4567-e89b-12d3-a456-426614174000',
+   * });
+   * // { success: true, message: '...', removedJobs: 5 }
+   * ```
+   */
+  cancelGeneration: instructorProcedure
+    .input(z.object({ courseId: z.string().uuid() }))
+    .mutation(async ({ ctx, input }) => {
+      const { courseId } = input;
+      const supabase = getSupabaseAdmin();
+      const requestId = nanoid();
+
+      if (!ctx.user) {
+        throw new TRPCError({
+          code: 'UNAUTHORIZED',
+          message: 'Authentication required',
+        });
+      }
+
+      const userId = ctx.user.id;
+
+      try {
+        // Verify course exists and user has ownership
+        const { data: course, error: fetchError } = await supabase
+          .from('courses')
+          .select('id, user_id, generation_status, organization_id')
+          .eq('id', courseId)
+          .single();
+
+        if (fetchError || !course) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: 'Course not found',
+          });
+        }
+
+        if (course.user_id !== userId) {
+          throw new TRPCError({
+            code: 'FORBIDDEN',
+            message: 'You do not have permission to cancel this course',
+          });
+        }
+
+        // Check if course is already in terminal state
+        const terminalStatuses = ['completed', 'failed', 'cancelled'];
+        if (terminalStatuses.includes(course.generation_status as string)) {
+          return {
+            success: true,
+            message: 'Generation already in terminal state',
+            removedJobs: 0,
+          };
+        }
+
+        // Update course status to cancelled
+        const { error: updateError } = await supabase
+          .from('courses')
+          .update({
+            generation_status: 'cancelled',
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', courseId);
+
+        if (updateError) {
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Failed to update course status',
+          });
+        }
+
+        // Remove all pending/active jobs from BullMQ queue
+        let removedJobsCount = 0;
+        try {
+          const result = await removeJobsByCourseId(courseId);
+          removedJobsCount = result.removed;
+
+          logger.info(
+            {
+              requestId,
+              courseId,
+              userId,
+              removedJobs: result.removed,
+              errors: result.errors,
+              orphanedCleaned: result.orphanedCleaned,
+            },
+            'Cleaned up BullMQ jobs for cancelled course'
+          );
+        } catch (queueError) {
+          // Log but don't fail - course status already updated
+          logger.error(
+            {
+              requestId,
+              courseId,
+              error: queueError instanceof Error ? queueError.message : String(queueError),
+            },
+            'Failed to clean up BullMQ jobs (non-fatal)'
+          );
+        }
+
+        logger.info(
+          {
+            requestId,
+            courseId,
+            userId,
+            previousStatus: course.generation_status,
+          },
+          'Course generation cancelled'
+        );
+
+        return {
+          success: true,
+          message: 'Generation cancelled successfully',
+          removedJobs: removedJobsCount,
+        };
+      } catch (error) {
+        if (error instanceof TRPCError) throw error;
+
+        logger.error(
+          {
+            requestId,
+            courseId,
+            error: error instanceof Error ? error.message : String(error),
+          },
+          'Unexpected error in cancelGeneration'
+        );
+
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to cancel generation',
+        });
+      }
+    }),
 });
 
 /**

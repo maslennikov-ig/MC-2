@@ -23,6 +23,8 @@ import {
 import { GraphViewWrapper } from '@/components/generation-graph'
 import {
   cancelGeneration,
+  pauseGeneration,
+  resumeGeneration,
   switchToManualMode,
   startGeneration,
 } from '@/app/actions/admin-generation'
@@ -370,7 +372,6 @@ export default function GenerationProgressContainerEnhanced({
 
   // Automatic Mode Control Handlers
   const handlePause = useCallback(async () => {
-    if (!supabase) return
     // Don't pause if already paused or generation is terminal
     if (isPausedLocal) {
       toast.warning('Генерация уже приостановлена')
@@ -384,25 +385,18 @@ export default function GenerationProgressContainerEnhanced({
     // Optimistic update - set paused state immediately before API call
     setIsPausedLocal(true)
     try {
-      const { error } = await supabase
-        .from('courses')
-        .update({ generation_paused_at: new Date().toISOString() })
-        .eq('id', courseId)
-
-      if (error) {
-        // Revert optimistic update on error
-        setIsPausedLocal(false)
-        throw error
-      }
+      // Use server action that calls API endpoint with proper validation and RPC
+      await pauseGeneration(courseId)
       toast.info('Генерация приостановлена')
     } catch (error) {
+      // Revert optimistic update on error
+      setIsPausedLocal(false)
       toast.error('Не удалось приостановить генерацию')
       console.error(error)
     }
-  }, [courseId, supabase, isPausedLocal, state.status])
+  }, [courseId, isPausedLocal, state.status])
 
   const handleResume = useCallback(async () => {
-    if (!supabase) return
     // Only resume if paused
     if (!isPausedLocal) {
       toast.warning('Генерация не приостановлена')
@@ -411,22 +405,16 @@ export default function GenerationProgressContainerEnhanced({
     // Optimistic update - set resumed state immediately before API call
     setIsPausedLocal(false)
     try {
-      const { error } = await supabase
-        .from('courses')
-        .update({ generation_paused_at: null })
-        .eq('id', courseId)
-
-      if (error) {
-        // Revert optimistic update on error
-        setIsPausedLocal(true)
-        throw error
-      }
+      // Use server action that calls API endpoint with proper validation
+      await resumeGeneration(courseId)
       toast.success('Генерация продолжена')
     } catch (error) {
+      // Revert optimistic update on error
+      setIsPausedLocal(true)
       toast.error('Не удалось продолжить генерацию')
       console.error(error)
     }
-  }, [courseId, supabase, isPausedLocal])
+  }, [courseId, isPausedLocal])
 
   const handleCancel = useCallback(async () => {
     if (!confirm('Вы уверены, что хотите отменить генерацию? Это действие нельзя отменить.')) return
