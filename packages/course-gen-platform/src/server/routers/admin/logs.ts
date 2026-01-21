@@ -975,55 +975,53 @@ async function buildErrorLogsQuery(
 
   if (filters?.status) {
     if (filters.status === 'new') {
-      // "new" means logs WITHOUT any status record (individual OR fingerprint-based)
-      // FIX: Use get_error_logs_without_status to get IDs BEFORE pagination
-      const { data: newLogsData, error: newLogsError } = await supabase.rpc(
-        'get_error_logs_without_status' as any
+      // "new" means:
+      // 1. Logs WITHOUT any status record (individual OR fingerprint-based)
+      // 2. Logs WITH explicit status='new' in log_issue_status (by fingerprint)
+      // This matches the grouped view logic which uses COALESCE(status, 'new')
+
+      // Get fingerprints with explicit 'new' status
+      const { data: fingerprintsWithNewStatus } = await supabase
+        .from('log_issue_status')
+        .select('fingerprint')
+        .eq('log_type', 'error_log')
+        .eq('status', 'new')
+        .not('fingerprint', 'is', null);
+
+      const newStatusFingerprints = new Set(
+        (fingerprintsWithNewStatus || []).map(r => r.fingerprint).filter(Boolean)
       );
 
-      if (newLogsError) {
-        // Fallback: query logs that don't have status via log_id AND don't have fingerprint-based status
-        logger.warn(
-          { error: newLogsError },
-          'RPC get_error_logs_without_status not available, falling back to complex query'
-        );
+      // Get fingerprints with non-new status (to exclude)
+      const { data: fingerprintsWithOtherStatus } = await supabase
+        .from('log_issue_status')
+        .select('fingerprint')
+        .eq('log_type', 'error_log')
+        .neq('status', 'new')
+        .not('fingerprint', 'is', null);
 
-        // Get all fingerprints that have status
-        const { data: fingerprintsWithStatus } = await supabase
-          .from('log_issue_status')
-          .select('fingerprint')
-          .eq('log_type', 'error_log')
-          .not('fingerprint', 'is', null);
+      const otherStatusFingerprints = new Set(
+        (fingerprintsWithOtherStatus || []).map(r => r.fingerprint).filter(Boolean)
+      );
 
-        const fingerprintSet = new Set(
-          (fingerprintsWithStatus || []).map(r => r.fingerprint).filter(Boolean)
-        );
+      // Get all error_logs with fingerprint
+      const { data: allLogs } = await supabase
+        .from('error_logs')
+        .select('id, fingerprint')
+        .not('fingerprint', 'is', null);
 
-        // Get all log_ids that have individual status
-        const { data: logIdsWithStatus } = await supabase
-          .from('log_issue_status')
-          .select('log_id')
-          .eq('log_type', 'error_log');
+      statusFilteredIds = (allLogs || [])
+        .filter(log => {
+          // Include if fingerprint has explicit 'new' status
+          if (log.fingerprint && newStatusFingerprints.has(log.fingerprint)) return true;
+          // Exclude if fingerprint has non-new status
+          if (log.fingerprint && otherStatusFingerprints.has(log.fingerprint)) return false;
+          // Include if fingerprint has no status record at all (truly new)
+          return true;
+        })
+        .map(log => log.id);
 
-        const logIdSet = new Set((logIdsWithStatus || []).map(r => r.log_id));
-
-        // Get all error_logs and filter out those with status
-        const { data: allLogs } = await supabase.from('error_logs').select('id, fingerprint');
-
-        statusFilteredIds = (allLogs || [])
-          .filter(log => {
-            // Exclude if log has individual status
-            if (logIdSet.has(log.id)) return false;
-            // Exclude if log's fingerprint has group status
-            if (log.fingerprint && fingerprintSet.has(log.fingerprint)) return false;
-            return true;
-          })
-          .map(log => log.id);
-      } else {
-        statusFilteredIds = (newLogsData || []).map((row: { id: string }) => row.id);
-      }
-
-      // If no logs without status, return empty
+      // If no logs match, return empty
       if (!statusFilteredIds || statusFilteredIds.length === 0) {
         return { items: [], total: 0 };
       }
@@ -1240,23 +1238,44 @@ async function buildGenerationTraceQuery(
 
   if (filters?.status) {
     if (filters.status === 'new') {
-      // "new" means logs WITHOUT any status record
-      // FIX: Get IDs of logs WITHOUT status to filter BEFORE pagination
-      const allWithStatus = await supabase
+      // "new" means:
+      // 1. Logs WITHOUT any status record
+      // 2. Logs WITH explicit status='new' in log_issue_status
+      // This matches the grouped view logic
+
+      // Get log_ids with explicit 'new' status
+      const { data: logsWithNewStatus } = await supabase
         .from('log_issue_status')
         .select('log_id')
-        .eq('log_type', 'generation_trace');
+        .eq('log_type', 'generation_trace')
+        .eq('status', 'new');
 
-      const idsWithStatus = new Set((allWithStatus.data || []).map(row => row.log_id));
+      const newStatusLogIds = new Set((logsWithNewStatus || []).map(r => r.log_id));
 
-      // Get all generation_trace with error_data and filter out those with status
+      // Get log_ids with non-new status (to exclude)
+      const { data: logsWithOtherStatus } = await supabase
+        .from('log_issue_status')
+        .select('log_id')
+        .eq('log_type', 'generation_trace')
+        .neq('status', 'new');
+
+      const otherStatusLogIds = new Set((logsWithOtherStatus || []).map(r => r.log_id));
+
+      // Get all generation_trace with error_data
       const { data: allTraces } = await supabase
         .from('generation_trace')
         .select('id')
         .not('error_data', 'is', null);
 
       statusFilteredIds = (allTraces || [])
-        .filter(trace => !idsWithStatus.has(trace.id))
+        .filter(trace => {
+          // Include if has explicit 'new' status
+          if (newStatusLogIds.has(trace.id)) return true;
+          // Exclude if has non-new status
+          if (otherStatusLogIds.has(trace.id)) return false;
+          // Include if no status record at all (truly new)
+          return true;
+        })
         .map(trace => trace.id);
 
       if (statusFilteredIds.length === 0) {
