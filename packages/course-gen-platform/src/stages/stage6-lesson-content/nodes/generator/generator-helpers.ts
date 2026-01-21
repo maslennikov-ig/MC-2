@@ -123,9 +123,8 @@ export function extractTokenUsageWithFallback(
   }
 
   // Fallback: estimate from prompt + response content
-  const responseContent = typeof response.content === 'string'
-    ? response.content
-    : JSON.stringify(response.content);
+  const responseContent =
+    typeof response.content === 'string' ? response.content : JSON.stringify(response.content);
 
   const estimatedTokens = estimateTokensFromText(prompt + responseContent, language);
 
@@ -158,9 +157,14 @@ export function formatInterLessonContextXML(
   if (lessonContext.previous_lesson) {
     parts.push('  <previous_lesson>');
     parts.push(`    <title>${lessonContext.previous_lesson.title}</title>`);
-    parts.push(`    <key_concepts>${lessonContext.previous_lesson.key_concepts.join(', ')}</key_concepts>`);
+    const prevKeyConcepts = lessonContext.previous_lesson.key_concepts ?? [];
+    if (prevKeyConcepts.length > 0) {
+      parts.push(`    <key_concepts>${prevKeyConcepts.join(', ')}</key_concepts>`);
+    }
     if (lessonContext.previous_lesson.summary_preview) {
-      parts.push(`    <summary_preview>${lessonContext.previous_lesson.summary_preview}</summary_preview>`);
+      parts.push(
+        `    <summary_preview>${lessonContext.previous_lesson.summary_preview}</summary_preview>`
+      );
     }
     parts.push('  </previous_lesson>');
   }
@@ -169,18 +173,25 @@ export function formatInterLessonContextXML(
   if (lessonContext.next_lesson) {
     parts.push('  <next_lesson>');
     parts.push(`    <title>${lessonContext.next_lesson.title}</title>`);
-    parts.push(`    <preview_concepts>${lessonContext.next_lesson.key_concepts.join(', ')}</preview_concepts>`);
+    const nextKeyConcepts = lessonContext.next_lesson.key_concepts ?? [];
+    if (nextKeyConcepts.length > 0) {
+      parts.push(`    <preview_concepts>${nextKeyConcepts.join(', ')}</preview_concepts>`);
+    }
     parts.push('  </next_lesson>');
   }
 
   // Concepts already covered
-  if (lessonContext.concepts_already_covered.length > 0) {
-    parts.push(`  <concepts_already_covered>${lessonContext.concepts_already_covered.join(', ')}</concepts_already_covered>`);
+  const conceptsCovered = lessonContext.concepts_already_covered ?? [];
+  if (conceptsCovered.length > 0) {
+    parts.push(
+      `  <concepts_already_covered>${conceptsCovered.join(', ')}</concepts_already_covered>`
+    );
   }
 
   // Terms already defined
-  if (lessonContext.terms_already_defined.length > 0) {
-    parts.push(`  <terms_already_defined>${lessonContext.terms_already_defined.join(', ')}</terms_already_defined>`);
+  const termsDefined = lessonContext.terms_already_defined ?? [];
+  if (termsDefined.length > 0) {
+    parts.push(`  <terms_already_defined>${termsDefined.join(', ')}</terms_already_defined>`);
   }
 
   parts.push('</inter_lesson_context>');
@@ -210,7 +221,10 @@ export function formatInterLessonContextXML(
  * extractContextWindow('Short text') // Returns: 'Short text'
  * extractContextWindow(longText, 5000) // Returns: '...\n\n[last ~5000 chars from paragraph boundary]'
  */
-export function extractContextWindow(text: string, maxChars: number = CONTEXT_WINDOW_CHARS): string {
+export function extractContextWindow(
+  text: string,
+  maxChars: number = CONTEXT_WINDOW_CHARS
+): string {
   // First section has no context - return empty string explicitly
   if (text.length === 0) {
     return '';
