@@ -183,6 +183,21 @@ export const AUTO_MUTE_RULES: AutoMuteRule[] = [
     reason: 'cascading_repair',
     description: 'Visual style config invalid - falling back to no visuals, expected behavior',
   },
+  {
+    pattern: /Patcher.*REJECTED.*prompt template markers/i,
+    reason: 'cascading_repair',
+    description: 'LLM hallucinated prompt template - patcher correctly rejected, will retry',
+  },
+  {
+    pattern: /Invalid job name \(undefined\)/i,
+    reason: 'job_lifecycle',
+    description: 'Corrupted or legacy job without proper type - safe to ignore',
+  },
+  {
+    pattern: /job\.name is undefined.*corrupted/i,
+    reason: 'job_lifecycle',
+    description: 'Job created without proper name - legacy or corrupted job',
+  },
 ];
 
 export interface AutoMuteResult {
