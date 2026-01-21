@@ -311,6 +311,60 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.28.23] - 2026-01-21
+
+### Added
+
+- **file-upload**: implement tier-based file limits with upgrade suggestions (fd1f355)
+- **ui**: add glassmorphism for course cards with light/dark theme support (8ec0c6d)
+- **visuals**: add lesson card (1:1) generation to Media section (7b5b71f)
+
+### Changed
+
+- **course-viewer**: open course in new tab for instant navigation (5664ee3)
+
+### Fixed
+
+- **stage6**: suppress false RAG warning for courses without documents (801a0a7)
+- **stage5**: whitelist Helm/Go template syntax in placeholder validator (RT-008) (9b22334)
+- **deploy**: explicitly remove dev containers before recreate (3d5e546)
+- **admin-logs**: align list view status=new filter with grouped view logic (029e62d)
+- **logs**: increase file upload limit + add Redis reconnect auto-mute (bb671d7)
+- **logs+qdrant**: improve error handling for transient failures (91a9867)
+- **docker**: permanent fix for Redis DNS failure (97a0fab)
+- **ui+pipeline**: improve badge contrast and save target_audience in Stage 4 (bfe0841)
+- **i18n**: add missing video.estimatedTime and improve cover/card descriptions (9f52278)
+- **images**: use Next.js optimizer instead of Supabase render (43f635d)
+- **visuals**: address code review issues for lesson cards media (0b93573)
+
+### Other
+
+- fix eslint error and stage pending changes (4799ac0)
+- bd sync: 2026-01-21 21:35:33 (86304e8)
+- bd sync: 2026-01-21 21:34:01 (ab5247e)
+- **logs**: add auto-mute rules for RAG chunks and Mermaid fallback (59c89ee)
+- bd sync: 2026-01-21 21:32:22 (0ff46e9)
+- bd sync: 2026-01-21 21:15:09 (d9776fd)
+- bd sync: 2026-01-21 21:14:15 (4e52f10)
+- bd sync: 2026-01-21 21:09:50 (323d19d)
+- bd sync: 2026-01-21 16:50:34 (c75d862)
+- **code-review**: add file upload tier limits review report (0a22cca)
+- bd sync: 2026-01-21 16:44:40 (d5d21cf)
+- bd sync: 2026-01-21 16:06:00 (1a6b1a1)
+- bd sync: 2026-01-21 16:05:56 (83019aa)
+- bd sync: 2026-01-21 15:44:17 (49b7f36)
+- bd sync: 2026-01-21 15:43:19 (46062c2)
+- **logs**: add auto-mute rules for cascading repair and corrupted jobs (3372662)
+- bd sync: 2026-01-21 15:38:11 (0afac53)
+- bd sync: 2026-01-21 15:31:35 (9c6a417)
+- bd sync: 2026-01-21 15:27:01 (e59dce5)
+- bd sync: 2026-01-21 15:26:16 (331e700)
+- bd sync: 2026-01-21 15:20:55 (4ec4664)
+- bd sync: 2026-01-21 15:20:07 (a47560a)
+- bd sync: 2026-01-21 14:00:00 (7452b0e)
+- bd sync: 2026-01-21 13:59:04 (ea4b3c1)
+- bd sync: 2026-01-21 13:40:25 (eb0e0f2)
+
 ## [0.28.22] - 2026-01-21
 
 ### Added

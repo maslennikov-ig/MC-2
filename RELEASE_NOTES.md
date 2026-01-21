@@ -2,6 +2,38 @@
 
 _Released on 2025-12-26_
 
+## v0.28.23
+
+_Released on 2026-01-21_
+
+### ✨ New Features
+
+- **file-upload**: Implement tier-based file limits with upgrade suggestions
+- **Interface**: Add glassmorphism for course cards with light/dark theme support
+- **visuals**: Add lesson card (1:1) generation to Media section
+
+### 🔧 Improvements
+
+- **course-viewer**: Open course in new tab for instant navigation
+
+### 🐛 Bug Fixes
+
+- **stage6**: Suppress false RAG warning for courses without documents
+- **stage5**: Whitelist Helm/Go template syntax in placeholder validator (RT-008)
+- **deploy**: Explicitly remove dev containers before recreate
+- **admin-logs**: Align list view status=new filter with grouped view logic
+- **logs**: Increase file upload limit + add Redis reconnect auto-mute
+- **logs+qdrant**: Improve error handling for transient failures
+- **docker**: Permanent fix for Redis DNS failure
+- **ui+pipeline**: Improve badge contrast and save target_audience in Stage 4
+- **i18n**: Add missing video.estimatedTime and improve cover/card descriptions
+- **images**: Use Next.js optimizer instead of Supabase render
+- **visuals**: Address code review issues for lesson cards media
+
+---
+
+_This release was automatically generated from 40 commits._
+
 ## v0.28.22
 
 _Released on 2026-01-21_
