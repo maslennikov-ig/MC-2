@@ -22,10 +22,7 @@
 
 import type { LessonSpecificationV2 } from '@megacampus/shared-types/lesson-specification-v2';
 import { logger } from '@/shared/logger';
-import {
-  validateMarkdownStructure,
-  applyMarkdownAutoFixes,
-} from './markdown-structure-filter';
+import { validateMarkdownStructure, applyMarkdownAutoFixes } from './markdown-structure-filter';
 import { MERMAID_BLOCK_REGEX } from '../utils/mermaid-sanitizer';
 
 // ============================================================================
@@ -130,6 +127,25 @@ export interface HeuristicFilterResult {
     totalObjectives: number;
     /** List of prohibited terms found in content */
     prohibitedTermsViolations: string[];
+    /** List of prompt template markers found in content (LLM hallucination) */
+    promptMarkersFound: string[];
+    /** Language consistency check results */
+    languageConsistency?: {
+      foreignCharacters: number;
+      foreignSamples: string[];
+      scriptsFound: string[];
+    };
+    /** Mermaid syntax check results */
+    mermaidSyntax?: {
+      mermaidIssues: string[];
+      affectedDiagrams: number;
+      totalDiagrams: number;
+    };
+    /** Section duplication check results */
+    sectionDuplication?: {
+      duplicatePairs: Array<{ title1: string; title2: string; similarity: number }>;
+      totalSections: number;
+    };
   };
   /** Duration of heuristic check in milliseconds */
   durationMs: number;
@@ -175,14 +191,18 @@ export const DEFAULT_HEURISTIC_CONFIG: HeuristicFilterConfig = {
  * Total must sum to 1.0
  */
 const FILTER_WEIGHTS = {
-  wordCount: 0.12,                   // -0.03
-  fleschKincaid: 0.18,               // -0.02
-  sections: 0.12,                    // -0.03
-  keywordCoverage: 0.13,             // -0.02
-  contentDensity: 0.08,              // -0.02
-  markdownStructure: 0.22,           // -0.03
-  learningObjectiveCoverage: 0.10,   // NEW
-  prohibitedTerms: 0.05,             // NEW
+  wordCount: 0.07, // basic length check
+  fleschKincaid: 0.08, // readability (English only)
+  sections: 0.07, // structure check
+  keywordCoverage: 0.07, // topic coverage
+  contentDensity: 0.05, // section depth
+  markdownStructure: 0.1, // formatting
+  learningObjectiveCoverage: 0.07, // spec alignment
+  prohibitedTerms: 0.05, // term compliance
+  promptMarkers: 0.15, // CRITICAL: LLM hallucination detection
+  languageConsistency: 0.12, // CRITICAL: CJK in Russian detection
+  mermaidSyntax: 0.08, // HIGH: diagram validity
+  sectionDuplication: 0.09, // HIGH: duplicate section detection
 } as const;
 
 // ============================================================================
@@ -244,7 +264,7 @@ export function countSyllables(word: string): number {
  */
 export function calculateFleschKincaidGrade(text: string): number {
   // Split into sentences
-  const sentences = text.split(/[.!?]+/).filter((s) => s.trim().length > 0);
+  const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 0);
   const sentenceCount = Math.max(1, sentences.length);
 
   // Split into words
@@ -277,7 +297,7 @@ export function calculateFleschKincaidGrade(text: string): number {
  * @returns Flesch Reading Ease score (0-100)
  */
 export function calculateFleschReadingEase(text: string): number {
-  const sentences = text.split(/[.!?]+/).filter((s) => s.trim().length > 0);
+  const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 0);
   const sentenceCount = Math.max(1, sentences.length);
 
   const words = text.match(/\b[a-zA-Z]+\b/g) || [];
@@ -399,7 +419,17 @@ export function checkFleschKincaid(
  * Supports multilingual content and common variations
  */
 const SECTION_SYNONYMS: Record<string, string[]> = {
-  conclusion: ['summary', 'заключение', 'итог', 'wrap-up', 'wrap up', 'key takeaways', 'key takeaway', 'closing', 'резюме'],
+  conclusion: [
+    'summary',
+    'заключение',
+    'итог',
+    'wrap-up',
+    'wrap up',
+    'key takeaways',
+    'key takeaway',
+    'closing',
+    'резюме',
+  ],
   introduction: ['введение', 'вступление', 'intro', 'overview', 'обзор'],
 };
 
@@ -418,7 +448,7 @@ export function checkSectionHeaders(
 
   // Find all markdown headers
   const headerMatches = content.match(/^#+\s+(.+)$/gm) || [];
-  const headers = headerMatches.map((h) => h.replace(/^#+\s+/, '').toLowerCase());
+  const headers = headerMatches.map(h => h.replace(/^#+\s+/, '').toLowerCase());
 
   const foundSections: string[] = [];
   const missingSections: string[] = [];
@@ -431,9 +461,8 @@ export function checkSectionHeaders(
     const allTerms = [requiredLower, ...synonyms];
 
     // Check if any of the terms (required or synonyms) are found
-    const found = allTerms.some(term =>
-      headers.some((header) => header.includes(term)) ||
-      contentLower.includes(term)
+    const found = allTerms.some(
+      term => headers.some(header => header.includes(term)) || contentLower.includes(term)
     );
 
     if (found) {
@@ -444,7 +473,8 @@ export function checkSectionHeaders(
   }
 
   const passed = missingSections.length === 0;
-  const scoreContribution = requiredSections.length > 0 ? foundSections.length / requiredSections.length : 1.0;
+  const scoreContribution =
+    requiredSections.length > 0 ? foundSections.length / requiredSections.length : 1.0;
 
   const result: FilterCheckResult & { foundSections: string[]; missingSections: string[] } = {
     passed,
@@ -543,7 +573,7 @@ export function checkContentDensity(
   threshold: number
 ): FilterCheckResult & { avgWordsPerSection: number; sectionCount: number } {
   // Find all sections (markdown headers)
-  const sections = content.split(/^#+\s+/m).filter((s) => s.trim().length > 0);
+  const sections = content.split(/^#+\s+/m).filter(s => s.trim().length > 0);
   const sectionCount = Math.max(1, sections.length);
 
   // Calculate total words and average per section
@@ -583,10 +613,39 @@ export function checkContentDensity(
  * Common words to exclude when extracting key terms
  */
 const COMMON_WORDS = new Set([
-  'the', 'and', 'for', 'that', 'this', 'with', 'from', 'have', 'will',
-  'been', 'would', 'could', 'should', 'into', 'about', 'more', 'when',
-  'than', 'also', 'only', 'their', 'which', 'each', 'other', 'being',
-  'able', 'after', 'before', 'must', 'need', 'such', 'what', 'both',
+  'the',
+  'and',
+  'for',
+  'that',
+  'this',
+  'with',
+  'from',
+  'have',
+  'will',
+  'been',
+  'would',
+  'could',
+  'should',
+  'into',
+  'about',
+  'more',
+  'when',
+  'than',
+  'also',
+  'only',
+  'their',
+  'which',
+  'each',
+  'other',
+  'being',
+  'able',
+  'after',
+  'before',
+  'must',
+  'need',
+  'such',
+  'what',
+  'both',
 ]);
 
 /**
@@ -597,7 +656,7 @@ const COMMON_WORDS = new Set([
  */
 function extractKeyTerms(text: string): string[] {
   const words = text.toLowerCase().match(/\b[a-zA-Z]{4,}\b/g) || [];
-  return words.filter((w) => !COMMON_WORDS.has(w));
+  return words.filter(w => !COMMON_WORDS.has(w));
 }
 
 /**
@@ -647,9 +706,7 @@ export function checkLearningObjectiveCoverage(
     }
 
     // Check if at least 50% of key terms are present in content
-    const matchedTerms = keyTerms.filter((term) =>
-      contentLower.includes(term.toLowerCase())
-    );
+    const matchedTerms = keyTerms.filter(term => contentLower.includes(term.toLowerCase()));
     const coverage = matchedTerms.length / keyTerms.length;
 
     if (coverage >= 0.5) {
@@ -715,9 +772,9 @@ const UNICODE_SCRIPTS = {
  * These scripts should NEVER appear in content of given language
  */
 const LANGUAGE_UNEXPECTED_SCRIPTS: Record<string, (keyof typeof UNICODE_SCRIPTS)[]> = {
-  ru: ['CJK', 'ARABIC', 'DEVANAGARI'],  // Chinese in Russian is always wrong
-  en: ['CJK', 'CYRILLIC', 'ARABIC', 'DEVANAGARI'],  // Non-Latin in English
-  zh: ['CYRILLIC', 'ARABIC', 'DEVANAGARI'],  // Non-CJK in Chinese
+  ru: ['CJK', 'ARABIC', 'DEVANAGARI'], // Chinese in Russian is always wrong
+  en: ['CJK', 'CYRILLIC', 'ARABIC', 'DEVANAGARI'], // Non-Latin in English
+  zh: ['CYRILLIC', 'ARABIC', 'DEVANAGARI'], // Non-CJK in Chinese
 };
 
 /**
@@ -725,8 +782,8 @@ const LANGUAGE_UNEXPECTED_SCRIPTS: Record<string, (keyof typeof UNICODE_SCRIPTS)
  * These are completely incompatible scripts that never appear legitimately
  */
 const ZERO_TOLERANCE_SCRIPTS: Set<string> = new Set([
-  'CJK',        // Chinese/Japanese/Korean ideographs
-  'ARABIC',     // Arabic script
+  'CJK', // Chinese/Japanese/Korean ideographs
+  'ARABIC', // Arabic script
   'DEVANAGARI', // Hindi/Sanskrit script
 ]);
 
@@ -794,9 +851,7 @@ export function checkLanguageConsistency(
 
   // Check if any zero-tolerance scripts were found
   // CJK, Arabic, Devanagari should NEVER appear in incompatible languages
-  const hasZeroToleranceViolation = scriptsFound.some(
-    (script) => ZERO_TOLERANCE_SCRIPTS.has(script)
-  );
+  const hasZeroToleranceViolation = scriptsFound.some(script => ZERO_TOLERANCE_SCRIPTS.has(script));
 
   // For zero-tolerance scripts: ANY occurrence is a failure
   // For other scripts (e.g., Latin in Russian): allow up to 5 chars as typos
@@ -805,9 +860,8 @@ export function checkLanguageConsistency(
     : totalForeignCount <= MINOR_LANGUAGE_THRESHOLD;
 
   // Score contribution: 1.0 if clean, reduces based on foreign count
-  const scoreContribution = totalForeignCount === 0
-    ? 1.0
-    : Math.max(0, 1 - totalForeignCount / LANGUAGE_SCORE_DIVISOR);
+  const scoreContribution =
+    totalForeignCount === 0 ? 1.0 : Math.max(0, 1 - totalForeignCount / LANGUAGE_SCORE_DIVISOR);
 
   const result: FilterCheckResult & {
     foreignCharacters: number;
@@ -880,29 +934,33 @@ export function checkContentTruncation(content: string): FilterCheckResult & {
 
   const validEndingPunctuation = /[.!?。！？:]/;
   if (!validEndingPunctuation.test(lastMeaningfulChar)) {
-    issues.push(`Content does not end with proper punctuation (last char: "${lastMeaningfulChar}")`);
+    issues.push(
+      `Content does not end with proper punctuation (last char: "${lastMeaningfulChar}")`
+    );
   }
 
   // Check 2: Matched code blocks
   const codeBlockCount = (content.match(/```/g) || []).length;
   const hasMatchedCodeBlocks = codeBlockCount % 2 === 0;
   if (!hasMatchedCodeBlocks) {
-    issues.push(`Unmatched code blocks detected (${codeBlockCount} markers found, expected even number)`);
+    issues.push(
+      `Unmatched code blocks detected (${codeBlockCount} markers found, expected even number)`
+    );
   }
 
   // Check 3: Incomplete sentence patterns at the end
   const lastSentence = trimmedContent.slice(-100);
   const incompletePatterns = [
-    /,\s*$/,           // Ends with comma
-    /\band\s*$/i,      // Ends with "and"
-    /\bor\s*$/i,       // Ends with "or"
-    /\bthe\s*$/i,      // Ends with "the"
-    /\ba\s*$/i,        // Ends with "a"
-    /\bto\s*$/i,       // Ends with "to"
-    /\bof\s*$/i,       // Ends with "of"
-    /\bи\s*$/i,        // Russian "and"
-    /\bили\s*$/i,      // Russian "or"
-    /\bчто\s*$/i,      // Russian "that"
+    /,\s*$/, // Ends with comma
+    /\band\s*$/i, // Ends with "and"
+    /\bor\s*$/i, // Ends with "or"
+    /\bthe\s*$/i, // Ends with "the"
+    /\ba\s*$/i, // Ends with "a"
+    /\bto\s*$/i, // Ends with "to"
+    /\bof\s*$/i, // Ends with "of"
+    /\bи\s*$/i, // Russian "and"
+    /\bили\s*$/i, // Russian "or"
+    /\bчто\s*$/i, // Russian "that"
   ];
 
   for (const pattern of incompletePatterns) {
@@ -1012,7 +1070,9 @@ export function checkMermaidSyntax(content: string): FilterCheckResult & {
     const openBrackets = (block.match(/\[/g) || []).length;
     const closeBrackets = (block.match(/\]/g) || []).length;
     if (openBrackets !== closeBrackets) {
-      issues.push(`Diagram ${i + 1}: Unclosed brackets (${openBrackets} open, ${closeBrackets} close)`);
+      issues.push(
+        `Diagram ${i + 1}: Unclosed brackets (${openBrackets} open, ${closeBrackets} close)`
+      );
       hasIssues = true;
     }
 
@@ -1157,6 +1217,207 @@ export function checkProhibitedTerms(
 }
 
 // ============================================================================
+// PROMPT MARKER CHECK (Detects LLM hallucination)
+// ============================================================================
+
+/**
+ * Prompt template markers that should NEVER appear in generated content.
+ * These markers come from patcher-prompt.ts and indicate the model is
+ * generating prompt structure instead of actual content.
+ */
+const PROMPT_TEMPLATE_MARKERS = [
+  '## SECTION TITLE',
+  '## ORIGINAL CONTENT',
+  '## FIX INSTRUCTIONS',
+  '## CONTEXT FOR COHERENCE',
+  '## TARGET AREA',
+  '## OUTPUT REQUIREMENTS',
+  'COMPLETE CORRECTED SECTION:',
+  '## INLINE FIX INSTRUCTIONS',
+] as const;
+
+/**
+ * Check for prompt template markers in content
+ *
+ * Detects if LLM output contains patcher prompt structure,
+ * which indicates the model is reproducing training data
+ * instead of generating actual lesson content.
+ *
+ * This is a CRITICAL check - presence of ANY marker is a failure.
+ *
+ * @param content - Content to check (markdown string)
+ * @returns Filter check result with detected markers
+ */
+export function checkPromptMarkers(content: string): FilterCheckResult & {
+  detectedMarkers: string[];
+} {
+  const detectedMarkers: string[] = [];
+
+  for (const marker of PROMPT_TEMPLATE_MARKERS) {
+    if (content.includes(marker)) {
+      detectedMarkers.push(marker);
+    }
+  }
+
+  const passed = detectedMarkers.length === 0;
+  // Any marker = immediate failure (0 score contribution)
+  const scoreContribution = passed ? 1.0 : 0.0;
+
+  const result: FilterCheckResult & { detectedMarkers: string[] } = {
+    passed,
+    actual: passed ? 'no markers' : `${detectedMarkers.length} markers found`,
+    scoreContribution,
+    detectedMarkers,
+  };
+
+  if (!passed) {
+    result.failure = {
+      filter: 'promptMarkers',
+      expected: '0 prompt markers',
+      actual: `${detectedMarkers.length} markers found`,
+      severity: 'critical', // Always critical - indicates LLM hallucination
+    };
+    result.suggestion = `Content contains prompt template markers: ${detectedMarkers.slice(0, 3).join(', ')}${detectedMarkers.length > 3 ? ` (+${detectedMarkers.length - 3} more)` : ''}. This indicates LLM hallucination - content must be regenerated.`;
+  }
+
+  if (detectedMarkers.length > 0) {
+    logger.warn({
+      msg: 'Prompt template markers detected in content (LLM hallucination)',
+      markersFound: detectedMarkers.length,
+      markers: detectedMarkers,
+    });
+  }
+
+  return result;
+}
+
+// ============================================================================
+// SECTION DUPLICATION CHECK
+// ============================================================================
+
+/**
+ * Check for duplicate or near-duplicate section titles
+ *
+ * Detects when LLM generates the same section multiple times,
+ * which indicates generation loop or hallucination.
+ *
+ * Uses Levenshtein similarity - titles > 80% similar are considered duplicates.
+ *
+ * @param content - Content to check (markdown string)
+ * @returns Filter check result with duplicate details
+ */
+export function checkSectionDuplication(content: string): FilterCheckResult & {
+  duplicatePairs: Array<{ title1: string; title2: string; similarity: number }>;
+  totalSections: number;
+} {
+  // Extract all section headers (## and ### only, skip # which is lesson title)
+  const headerMatches = content.match(/^#{2,3}\s+(.+)$/gm) || [];
+  const headers = headerMatches.map(h => h.replace(/^#{2,3}\s+/, '').trim());
+
+  const duplicatePairs: Array<{ title1: string; title2: string; similarity: number }> = [];
+
+  // Compare each pair of headers for similarity
+  for (let i = 0; i < headers.length; i++) {
+    for (let j = i + 1; j < headers.length; j++) {
+      const similarity = calculateSimilarity(headers[i], headers[j]);
+      if (similarity > 0.8) {
+        duplicatePairs.push({
+          title1: headers[i],
+          title2: headers[j],
+          similarity,
+        });
+      }
+    }
+  }
+
+  const passed = duplicatePairs.length === 0;
+  // Each duplicate pair reduces score by 25% (max 4 pairs = 0 score)
+  const scoreContribution = Math.max(0, 1 - duplicatePairs.length * 0.25);
+
+  const result: FilterCheckResult & {
+    duplicatePairs: Array<{ title1: string; title2: string; similarity: number }>;
+    totalSections: number;
+  } = {
+    passed,
+    actual: passed ? 'no duplicates' : `${duplicatePairs.length} duplicate pairs`,
+    scoreContribution,
+    duplicatePairs,
+    totalSections: headers.length,
+  };
+
+  if (!passed) {
+    result.failure = {
+      filter: 'sectionDuplication',
+      expected: '0 duplicate sections',
+      actual: `${duplicatePairs.length} duplicate pairs`,
+      severity: duplicatePairs.length > 2 ? 'critical' : 'major',
+    };
+    const examples = duplicatePairs
+      .slice(0, 2)
+      .map(p => `"${p.title1}" ≈ "${p.title2}"`)
+      .join('; ');
+    result.suggestion = `Duplicate sections detected: ${examples}${duplicatePairs.length > 2 ? ` (+${duplicatePairs.length - 2} more)` : ''}. Remove duplicates to improve content structure.`;
+  }
+
+  if (duplicatePairs.length > 0) {
+    logger.warn({
+      msg: 'Section duplication detected',
+      duplicatePairs: duplicatePairs.slice(0, 5),
+      totalSections: headers.length,
+    });
+  }
+
+  return result;
+}
+
+/**
+ * Calculate similarity between two strings (0-1)
+ * Uses Levenshtein distance normalized by max length
+ */
+function calculateSimilarity(s1: string, s2: string): number {
+  const s1Lower = s1.toLowerCase();
+  const s2Lower = s2.toLowerCase();
+
+  if (s1Lower === s2Lower) return 1.0;
+
+  const maxLen = Math.max(s1.length, s2.length);
+  if (maxLen === 0) return 1.0;
+
+  const distance = levenshteinDistance(s1Lower, s2Lower);
+  return 1 - distance / maxLen;
+}
+
+/**
+ * Calculate Levenshtein distance between two strings
+ */
+function levenshteinDistance(s1: string, s2: string): number {
+  const m = s1.length;
+  const n = s2.length;
+
+  if (m === 0) return n;
+  if (n === 0) return m;
+
+  // Use two-row optimization for memory efficiency
+  let prev = Array.from({ length: n + 1 }, (_, i) => i);
+  let curr = new Array<number>(n + 1);
+
+  for (let i = 1; i <= m; i++) {
+    curr[0] = i;
+    for (let j = 1; j <= n; j++) {
+      const cost = s1[i - 1] === s2[j - 1] ? 0 : 1;
+      curr[j] = Math.min(
+        prev[j] + 1, // deletion
+        curr[j - 1] + 1, // insertion
+        prev[j - 1] + cost // substitution
+      );
+    }
+    [prev, curr] = [curr, prev];
+  }
+
+  return prev[n];
+}
+
+// ============================================================================
 // KEYWORD EXTRACTION
 // ============================================================================
 
@@ -1240,7 +1501,8 @@ export function extractKeywordsFromSpec(lessonSpec: LessonSpecificationV2): stri
 export function runHeuristicFilters(
   content: string,
   lessonSpec: LessonSpecificationV2,
-  config: Partial<HeuristicFilterConfig> = {}
+  config: Partial<HeuristicFilterConfig> = {},
+  language: string = 'en'
 ): HeuristicFilterResult {
   const startTime = Date.now();
 
@@ -1321,7 +1583,8 @@ export function runHeuristicFilters(
 
   // Run learning objective coverage check
   const objectiveCoverageResult = checkLearningObjectiveCoverage(content, lessonSpec);
-  weightedScore += objectiveCoverageResult.scoreContribution * FILTER_WEIGHTS.learningObjectiveCoverage;
+  weightedScore +=
+    objectiveCoverageResult.scoreContribution * FILTER_WEIGHTS.learningObjectiveCoverage;
   if (objectiveCoverageResult.failure) failures.push(objectiveCoverageResult.failure);
   if (objectiveCoverageResult.suggestion) suggestions.push(objectiveCoverageResult.suggestion);
 
@@ -1331,12 +1594,37 @@ export function runHeuristicFilters(
   if (prohibitedTermsResult.failure) failures.push(prohibitedTermsResult.failure);
   if (prohibitedTermsResult.suggestion) suggestions.push(prohibitedTermsResult.suggestion);
 
+  // Run prompt markers check (CRITICAL: detects LLM hallucination)
+  const promptMarkersResult = checkPromptMarkers(content);
+  weightedScore += promptMarkersResult.scoreContribution * FILTER_WEIGHTS.promptMarkers;
+  if (promptMarkersResult.failure) failures.push(promptMarkersResult.failure);
+  if (promptMarkersResult.suggestion) suggestions.push(promptMarkersResult.suggestion);
+
+  // Run language consistency check (CRITICAL: detects CJK in Russian, etc.)
+  const languageResult = checkLanguageConsistency(content, language);
+  weightedScore += languageResult.scoreContribution * FILTER_WEIGHTS.languageConsistency;
+  if (languageResult.failure) failures.push(languageResult.failure);
+  if (languageResult.suggestion) suggestions.push(languageResult.suggestion);
+
+  // Run Mermaid syntax check (HIGH: diagram validity)
+  const mermaidResult = checkMermaidSyntax(content);
+  weightedScore += mermaidResult.scoreContribution * FILTER_WEIGHTS.mermaidSyntax;
+  if (mermaidResult.failure) failures.push(mermaidResult.failure);
+  if (mermaidResult.suggestion) suggestions.push(mermaidResult.suggestion);
+
+  // Run section duplication check (HIGH: detects generation loops)
+  const duplicationResult = checkSectionDuplication(content);
+  weightedScore += duplicationResult.scoreContribution * FILTER_WEIGHTS.sectionDuplication;
+  if (duplicationResult.failure) failures.push(duplicationResult.failure);
+  if (duplicationResult.suggestion) suggestions.push(duplicationResult.suggestion);
+
   // Calculate sentence stats
-  const sentences = content.split(/[.!?]+/).filter((s) => s.trim().length > 0);
+  const sentences = content.split(/[.!?]+/).filter(s => s.trim().length > 0);
   const words = content.match(/\b[a-zA-Z]+\b/g) || [];
   const avgSentenceLength = sentences.length > 0 ? words.length / sentences.length : 0;
 
-  const passed = failures.filter((f) => f.severity === 'critical' || f.severity === 'major').length === 0;
+  const passed =
+    failures.filter(f => f.severity === 'critical' || f.severity === 'major').length === 0;
   const durationMs = Date.now() - startTime;
 
   logger.info({
@@ -1345,7 +1633,7 @@ export function runHeuristicFilters(
     passed,
     score: weightedScore.toFixed(3),
     failureCount: failures.length,
-    criticalFailures: failures.filter((f) => f.severity === 'critical').length,
+    criticalFailures: failures.filter(f => f.severity === 'critical').length,
     durationMs,
   });
 
@@ -1377,6 +1665,21 @@ export function runHeuristicFilters(
       coveredObjectives: objectiveCoverageResult.coveredObjectives,
       totalObjectives: objectiveCoverageResult.totalObjectives,
       prohibitedTermsViolations: prohibitedTermsResult.violations,
+      promptMarkersFound: promptMarkersResult.detectedMarkers,
+      languageConsistency: {
+        foreignCharacters: languageResult.foreignCharacters,
+        foreignSamples: languageResult.foreignSamples,
+        scriptsFound: languageResult.scriptsFound,
+      },
+      mermaidSyntax: {
+        mermaidIssues: mermaidResult.mermaidIssues,
+        affectedDiagrams: mermaidResult.affectedDiagrams,
+        totalDiagrams: mermaidResult.totalDiagrams,
+      },
+      sectionDuplication: {
+        duplicatePairs: duplicationResult.duplicatePairs,
+        totalSections: duplicationResult.totalSections,
+      },
     },
     durationMs,
   };
