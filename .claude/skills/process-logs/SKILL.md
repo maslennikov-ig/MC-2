@@ -1,7 +1,7 @@
 ---
 name: process-logs
 description: Process error logs from admin panel - fetch new errors, analyze, create tasks, fix, and mark resolved
-version: 1.7.0
+version: 1.8.0
 ---
 
 # Process Error Logs
@@ -152,9 +152,29 @@ Some errors are **automatically ignored** by the system with status `auto_muted`
 - New error types (analyze first, then decide)
 - Anything affecting user experience
 
-### 7. SEARCH SIMILAR PROBLEMS FIRST
+### 7. SEARCH SIMILAR PROBLEMS FIRST (MANDATORY)
 
-**Before fixing, check if we solved this before:**
+**Before fixing ANY error, search BOTH sources:**
+
+#### 7a. Search in Beads (closed bug tasks)
+
+```bash
+# Search by error keywords
+bd search "<keyword>" --type=bug --status=closed
+
+# Example searches:
+bd search "constraint violation"
+bd search "tRPC timeout"
+bd search "undefined property"
+```
+
+**What to look for in Beads:**
+
+- Similar error patterns in task titles
+- Root cause analysis in task descriptions
+- Fix approach and files changed
+
+#### 7b. Search in error_logs (resolved errors)
 
 ```sql
 -- Search similar errors by message (use mcp__supabase__execute_sql)
@@ -173,11 +193,34 @@ LIMIT 5;
 - Function/module names from stack trace
 - Error codes or specific identifiers
 
-**If found similar resolved issue:**
+#### 7c. If found similar resolved issue
 
-1. Read the `notes` field — contains root cause and fix
-2. Apply same solution pattern if applicable
-3. Reference in your notes: `Similar to <date>. Same fix applied.`
+1. **From Beads**: Read task description for root cause and fix approach
+2. **From error_logs**: Read the `notes` field — contains root cause and fix
+3. Apply same solution pattern if applicable
+4. **Reference in your notes**: `Similar to mc2-xxx / <date>. Same fix applied.`
+
+#### 7d. If NOT found — create Beads task (MANDATORY)
+
+**Every new error MUST have a Beads task before fixing:**
+
+```bash
+# 1. Create task with all required fields
+bd create --type=bug --priority=<1-3> --title="Fix: <error_message>" --files "<relevant_files>"
+
+# 2. Start working
+bd update <task_id> --status=in_progress
+
+# 3. After fix - close with detailed reason
+bd close <task_id> --reason="Root cause: <why>. Fix: <what was done>."
+```
+
+**Beads task MUST include:**
+
+- Clear title with error essence
+- Priority based on severity (CRITICAL=1, ERROR=2, WARNING=3)
+- Files that will be modified (`--files`)
+- Closing reason with root cause explanation
 
 ## Usage
 
