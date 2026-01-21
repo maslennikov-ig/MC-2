@@ -4,8 +4,10 @@
     "title": "Управление изображениями",
     "courseCard": "Обложка курса",
     "courseCardDescription": "Главное изображение в каталоге курсов",
-    "lessonCovers": "Обложки уроков",
-    "lessonCoversDescription": "Сгенерировано {completed} из {total} обложек",
+    "lessonCovers": "Баннеры уроков",
+    "lessonCoversDescription": "Сгенерировано {completed} из {total} баннеров (16:9)",
+    "lessonCards": "Миниатюры уроков",
+    "lessonCardsDescription": "Сгенерировано {completed} из {total} миниатюр (1:1)",
     "progress": "Прогресс"
   },
   "backToCourse": "Назад к курсу",

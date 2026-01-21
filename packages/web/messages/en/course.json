@@ -4,8 +4,10 @@
     "title": "Manage Visual Assets",
     "courseCard": "Course Thumbnail",
     "courseCardDescription": "Main image shown in course catalog",
-    "lessonCovers": "Lesson Covers",
-    "lessonCoversDescription": "{completed} of {total} covers generated",
+    "lessonCovers": "Lesson Banners",
+    "lessonCoversDescription": "{completed} of {total} banners generated (16:9)",
+    "lessonCards": "Lesson Thumbnails",
+    "lessonCardsDescription": "{completed} of {total} thumbnails generated (1:1)",
     "progress": "Progress"
   },
   "backToCourse": "Back to course",

@@ -17,7 +17,9 @@ export const PLACEHOLDER_TYPES: ('quiz' | 'audio' | 'presentation' | 'video')[] 
 ]
 
 // Image types for separate Images section
-export const IMAGE_PLACEHOLDER_TYPES: 'cover'[] = ['cover']
+// - cover: 16:9 hero banner for lesson header
+// - card: 1:1 square thumbnail for lesson navigation
+export const IMAGE_PLACEHOLDER_TYPES: ('cover' | 'card')[] = ['cover', 'card']
 
 export const ENRICHMENT_CONFIG: Record<
   EnrichmentType,
