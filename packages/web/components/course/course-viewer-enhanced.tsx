@@ -1,6 +1,6 @@
 'use client'
 
-import React from 'react'
+import React, { useCallback } from 'react'
 import { motion } from 'framer-motion'
 import Header from '@/components/layouts/header'
 import ContentGenerationPanel from '@/components/common/content-generation-panel'
@@ -14,6 +14,8 @@ import { FAB } from './viewer/components/FAB'
 import { SharedCourseBanner } from './viewer/components/SharedCourseBanner'
 import { BreadcrumbNav } from './viewer/components/BreadcrumbNav'
 import type { CourseViewerProps } from './viewer/types'
+import { useServerData } from '@/lib/hooks/useServerData'
+import { getLessonEnrichments } from '@/app/actions/enrichment-actions'
 
 export default function CourseViewerEnhanced({
   course,
@@ -58,6 +60,32 @@ export default function CourseViewerEnhanced({
     toggleSection,
     markLessonComplete,
   } = useViewerState(course, rawSections, rawLessons, initialLessonLabel)
+
+  // Manage enrichments with refetch capability
+  const { data: localEnrichments, refetch: refetchEnrichments } = useServerData({
+    initialData: enrichments,
+    key: 'enrichments',
+  })
+
+  // Callback to refresh enrichments for current lesson
+  const refreshEnrichments = useCallback(async () => {
+    if (!currentLessonId || !course.id) return
+
+    await refetchEnrichments(async () => {
+      const result = await getLessonEnrichments({
+        lessonId: currentLessonId,
+        courseId: course.id,
+      })
+
+      if (result.success && result.enrichments) {
+        return {
+          ...localEnrichments,
+          [currentLessonId]: result.enrichments,
+        }
+      }
+      return null
+    })
+  }, [currentLessonId, course.id, refetchEnrichments, localEnrichments])
 
   // Swipe logic for mobile navigation
   const swipeHandlers = useSwipe(
@@ -182,7 +210,7 @@ export default function CourseViewerEnhanced({
                 currentLesson={currentLesson}
                 currentSection={currentSection}
                 assets={currentLessonId ? assets?.[currentLessonId] : undefined}
-                enrichments={currentLessonId ? enrichments?.[currentLessonId] : undefined}
+                enrichments={currentLessonId ? localEnrichments?.[currentLessonId] : undefined}
                 enrichmentsLoadError={enrichmentsLoadError}
                 lessonContent={currentLessonId ? lessonContents?.[currentLessonId] : undefined}
                 focusMode={focusMode}
@@ -201,6 +229,7 @@ export default function CourseViewerEnhanced({
                 onSelectLesson={setCurrentLessonId}
                 onMarkComplete={markLessonComplete}
                 onExitFocus={() => setFocusMode(false)}
+                onRefreshEnrichments={() => void refreshEnrichments()}
               />
             ) : (
               <div className="flex h-full items-center justify-center">

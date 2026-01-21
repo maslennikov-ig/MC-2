@@ -81,7 +81,9 @@ export function EnrichmentsPanel({
     )
   }
 
-  if (!filteredEnrichments || filteredEnrichments.length === 0) {
+  // Show empty state only if no enrichments AND no ability to generate (no lessonId)
+  // If lessonId exists, we show placeholder cards for generation even if no enrichments
+  if ((!filteredEnrichments || filteredEnrichments.length === 0) && !lessonId) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center">
         <FileText className="mb-4 h-12 w-12 text-gray-300 dark:text-gray-600" />
@@ -193,22 +195,24 @@ export function EnrichmentsPanel({
         </EnrichmentErrorBoundary>
       ))}
 
-      {/* Images Section - Cover/Card placeholders */}
+      {/* Images Section - Cover/Card (always show both types) */}
       {lessonId && (
         <div className="mb-6">
           <h3 className="mb-3 text-sm font-medium text-gray-500 dark:text-gray-400">
             {t('images.title')}
           </h3>
-          <div className="grid grid-cols-1 gap-4">
-            {IMAGE_PLACEHOLDER_TYPES.filter((type) => {
-              // Check if cover already exists (use original enrichments, not filtered)
-              const exists = enrichments.some(
-                (e) => e.enrichment_type === type && e.status === 'completed'
-              )
-              return !exists
-            }).map((type) => {
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            {IMAGE_PLACEHOLDER_TYPES.map((type) => {
               const typeIsGenerating = isGenerating(type)
               const generatingProgress = getProgress(type)
+
+              // Find existing enrichment for this type (use original enrichments, not filtered)
+              // For 'card' type: exclude course-card (title='course-card') - only show lesson cards
+              const existingEnrichment =
+                enrichments.find(
+                  (e) =>
+                    e.enrichment_type === type && (type !== 'card' || e.title !== 'course-card')
+                ) || null
 
               if (typeIsGenerating && generatingProgress) {
                 return (
@@ -226,6 +230,7 @@ export function EnrichmentsPanel({
                 <ImagePlaceholderCard
                   key={type}
                   type={type}
+                  existingEnrichment={existingEnrichment}
                   onGenerate={(settings) => {
                     if (!lessonId) return
                     void startGeneration(type, settings)

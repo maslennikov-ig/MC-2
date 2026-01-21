@@ -343,12 +343,21 @@ export async function checkExistingEnrichment(
 ): Promise<{ exists: boolean; enrichmentId?: string; status?: string }> {
   const supabase = getSupabaseAdmin();
 
-  const { data, error } = await supabase
+  let query = supabase
     .from('lesson_enrichments')
-    .select('id, status')
+    .select('id, status, title')
     .eq('lesson_id', lessonId)
     .eq('enrichment_type', enrichmentType)
     .not('status', 'in', '("failed","cancelled")');
+
+  // For 'card' type, exclude course-card (title='course-card')
+  // This allows lesson cards to be created even if course-card exists on first lesson
+  if (enrichmentType === 'card') {
+    // Filter: title is null OR title != 'course-card'
+    query = query.or('title.is.null,title.neq.course-card');
+  }
+
+  const { data, error } = await query;
 
   if (error) {
     logger.error(

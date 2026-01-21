@@ -3,14 +3,14 @@
 import { useState, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
-import { Card, CardContent, CardFooter, CardHeader } from '@/components/ui/card'
+import { motion, AnimatePresence } from 'framer-motion'
+import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { Progress } from '@/components/ui/progress'
 import {
   Trash2,
   BookOpen,
-  Globe,
   Loader2,
   Lock,
   Clock,
@@ -27,6 +27,7 @@ import {
   GitBranch,
   Building2,
   ChevronDown,
+  Globe,
 } from 'lucide-react'
 import { toast } from 'sonner'
 import { deleteCourse, toggleFavorite, updateCourseVisibility } from '../actions'
@@ -173,11 +174,6 @@ const visibilityConfig: Record<
 
 // Configuration constants
 const NEW_COURSE_DAYS = 7
-const CARD_HEIGHTS = {
-  sm: 'min-h-[420px]',
-  md: 'sm:min-h-[440px]',
-  lg: 'lg:min-h-[460px]',
-} as const
 
 export function CourseCard({
   course,
@@ -189,6 +185,7 @@ export function CourseCard({
 }: CourseCardProps) {
   const router = useRouter()
   const [isDeleting, setIsDeleting] = useState(false)
+  const [isHovered, setIsHovered] = useState(false)
   // Use prop if provided, otherwise use course.isFavorited, otherwise false
   const initialFavorited = propFavorited ?? course.isFavorited ?? false
   const [isFavorited, setIsFavorited] = useState(initialFavorited)
@@ -454,79 +451,78 @@ export function CourseCard({
     )
   }
 
+  // Check if course is being generated
+  const isGenerating =
+    course.generation_status !== null &&
+    course.generation_status !== 'completed' &&
+    course.generation_status !== 'failed' &&
+    course.generation_status !== 'cancelled'
+
   return (
     <TooltipProvider>
-      <Card
-        className={cn(
-          'group transition-smooth relative overflow-hidden',
-          'elevation-3 hover-scale card-interactive',
-          // Background changes based on whether cover exists
-          hasCover
-            ? 'border-slate-700/50 bg-slate-900'
-            : 'border-gray-200 bg-white backdrop-blur-sm hover:bg-gray-50 dark:border-slate-800 dark:bg-slate-900/80 dark:hover:bg-slate-900/90',
-          'hover:border-purple-500/30',
-          'focus:ring-2 focus:ring-purple-500 focus:ring-offset-2',
-          'focus-within:elevation-6 focus-within:border-purple-500/50',
-          'gpu-accelerated cursor-pointer rounded-xl',
-          // Adaptive heights that expand to fill available space
-          `${CARD_HEIGHTS.sm} ${CARD_HEIGHTS.md} ${CARD_HEIGHTS.lg} h-full`,
-          'flex flex-col',
-          isDeleting && 'opacity-50'
-        )}
-        tabIndex={0}
-        role="article"
-        aria-labelledby={`course-title-${course.id}`}
-        aria-describedby={`course-description-${course.id}`}
+      <motion.div
+        initial={{ opacity: 0, y: 20 }}
+        animate={{ opacity: 1, y: 0 }}
+        whileHover={{ y: -4 }}
+        transition={{ duration: 0.3 }}
+        onMouseEnter={() => setIsHovered(true)}
+        onMouseLeave={() => setIsHovered(false)}
+        onClick={handleView}
         onKeyDown={(e) => {
           if (e.key === 'Enter' || e.key === ' ') {
             e.preventDefault()
             handleView()
           }
         }}
-        onClick={handleView}
+        tabIndex={0}
+        role="article"
+        aria-labelledby={`course-title-${course.id}`}
+        aria-describedby={`course-description-${course.id}`}
+        className={cn(
+          'group relative cursor-pointer overflow-hidden rounded-2xl',
+          'flex min-h-[480px] flex-col transition-shadow duration-300',
+          'border border-gray-200 bg-white shadow-md hover:shadow-xl',
+          'dark:border-slate-800 dark:bg-slate-900 dark:shadow-lg dark:hover:shadow-2xl',
+          'focus:ring-2 focus:ring-purple-500 focus:ring-offset-2 focus:outline-none',
+          isDeleting && 'opacity-50'
+        )}
       >
-        {/* Cover image background */}
-        {hasCover && (
-          <>
-            <div className="absolute inset-0 z-0">
-              <Image
-                src={coverUrl}
-                alt={`Обложка курса: ${course.title}`}
-                fill
-                className="object-cover"
-                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-                priority={isAboveFold}
-              />
+        {/* Cover Image - main image area */}
+        <div className="relative min-h-[280px] flex-1 overflow-hidden">
+          {hasCover ? (
+            <Image
+              src={coverUrl}
+              alt={`Обложка курса: ${course.title}`}
+              fill
+              className={cn(
+                'object-cover transition-all duration-500',
+                isHovered && 'scale-105 brightness-90 dark:scale-110 dark:brightness-75'
+              )}
+              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+              priority={isAboveFold}
+            />
+          ) : (
+            <div
+              className={cn(
+                'flex h-full items-center justify-center transition-all duration-500',
+                'bg-gradient-to-br from-gray-100 to-gray-200',
+                'dark:from-slate-800 dark:to-slate-900',
+                isHovered && 'brightness-95 dark:brightness-75'
+              )}
+            >
+              <BookOpen className="h-16 w-16 text-gray-400 dark:text-slate-700" />
             </div>
-            {/* Glassmorphism overlay - adaptive for light/dark theme */}
-            <div className="absolute inset-0 z-[1] bg-white/50 backdrop-blur-md dark:bg-black/60" />
-          </>
-        )}
+          )}
 
-        {/* New badge for new courses */}
-        {isNewCourse && (
-          <div className="absolute top-2 right-2 z-10">
-            <Badge className="border-0 bg-gradient-to-r from-purple-500 to-blue-500 text-white">
-              <Sparkles className="mr-1 h-3 w-3" />
-              Новый
-            </Badge>
-          </div>
-        )}
+          {/* Gradient at bottom of image for dark theme */}
+          <div className="absolute inset-x-0 bottom-0 h-24 bg-gradient-to-t from-black/40 to-transparent dark:from-black/60" />
 
-        {/* Subtle gradient overlay on hover (only when no cover) */}
-        {!hasCover && (
-          <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-purple-500/5 via-transparent to-transparent opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
-        )}
-
-        <CardHeader className={cn('relative flex-shrink-0 px-6 pt-6 pb-3', hasCover && 'z-[2]')}>
-          {/* Status and difficulty badges */}
-          <div className="mb-3 flex flex-wrap gap-2">
+          {/* Badges over image */}
+          <div className="absolute top-4 left-4 flex flex-wrap gap-2">
             <Badge
               className={cn(
-                hasCover
-                  ? 'border-gray-300 bg-white/70 text-gray-900 backdrop-blur-sm dark:border-white/40 dark:bg-black/50 dark:text-white'
-                  : statusInfo.color,
-                'border px-2 py-0.5 text-xs',
+                'border backdrop-blur-sm',
+                statusInfo.color,
                 statusInfo.pulse && 'animate-pulse'
               )}
             >
@@ -534,16 +530,8 @@ export function CourseCard({
               <span className="sr-only">Статус курса: </span>
               {statusInfo.label}
             </Badge>
-
             {difficultyInfo && (
-              <Badge
-                className={cn(
-                  hasCover
-                    ? 'border-gray-300 bg-white/70 text-gray-900 backdrop-blur-sm dark:border-white/40 dark:bg-black/50 dark:text-white'
-                    : difficultyInfo.color,
-                  'border px-2 py-0.5 text-xs'
-                )}
-              >
+              <Badge className={cn('border backdrop-blur-sm', difficultyInfo.color)}>
                 {difficultyInfo.icon}
                 <span className="sr-only">Уровень сложности: </span>
                 <span className="ml-1">{difficultyInfo.label}</span>
@@ -551,505 +539,286 @@ export function CourseCard({
             )}
           </div>
 
-          {/* Title */}
+          {/* New badge */}
+          {isNewCourse && (
+            <div className="absolute top-4 right-4">
+              <Badge className="border-0 bg-gradient-to-r from-purple-500 to-blue-500 text-white backdrop-blur-sm">
+                <Sparkles className="mr-1 h-3 w-3" />
+                Новый
+              </Badge>
+            </div>
+          )}
+        </div>
+
+        {/* Base Content - always visible */}
+        <div className="p-4">
           <h3
             id={`course-title-${course.id}`}
             className={cn(
-              'text-truncate-2 transition-colors-fast text-lg font-semibold',
-              hasCover
-                ? 'text-gray-900 group-hover:text-purple-700 dark:text-white dark:[text-shadow:_0_1px_3px_rgb(0_0_0_/_60%)] dark:group-hover:text-purple-200'
-                : 'text-gray-900 group-hover:text-purple-600 dark:text-white dark:group-hover:text-purple-300'
+              'line-clamp-2 text-base font-semibold transition-colors',
+              'text-gray-900 group-hover:text-purple-600',
+              'dark:text-white dark:group-hover:text-purple-400'
             )}
           >
             {course.title}
           </h3>
-        </CardHeader>
+          <div className="mt-2 flex items-center gap-4 text-sm text-gray-500 dark:text-slate-400">
+            <span className="flex items-center gap-1.5">
+              <BookOpen className="h-4 w-4" />
+              {sectionsCount} модулей
+            </span>
+            <span className="flex items-center gap-1.5">
+              <Clock className="h-4 w-4" />
+              {duration}ч
+            </span>
+          </div>
+        </div>
 
-        <CardContent
-          className={cn(
-            'relative flex flex-1 flex-col justify-between overflow-hidden px-6 py-0',
-            hasCover && 'z-[2]'
-          )}
-        >
-          <div className="space-y-4">
-            {/* Description - more compact with tooltip for full text */}
-            {course.course_description && (
-              <div className="flex-shrink-0">
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <p
-                        id={`course-description-${course.id}`}
-                        className={cn(
-                          'line-clamp-2 cursor-help text-sm leading-relaxed',
-                          hasCover
-                            ? 'text-gray-700 dark:text-gray-200'
-                            : 'text-gray-600 dark:text-gray-400'
-                        )}
-                      >
-                        {course.course_description}
-                      </p>
-                    </TooltipTrigger>
-                    {course.course_description.length > 100 && (
-                      <TooltipContent
-                        side="top"
-                        className="z-50 max-w-md bg-gray-900 p-3 text-white"
-                      >
-                        <p className="text-sm leading-relaxed">{course.course_description}</p>
-                      </TooltipContent>
-                    )}
-                  </Tooltip>
-                </TooltipProvider>
-              </div>
-            )}
+        {/* Hover Reveal Panel */}
+        <AnimatePresence>
+          {isHovered && (
+            <motion.div
+              initial={{ y: '100%' }}
+              animate={{ y: 0 }}
+              exit={{ y: '100%' }}
+              transition={{ duration: 0.35, ease: 'easeOut' }}
+              className={cn(
+                'absolute inset-x-0 bottom-0 flex flex-col',
+                'rounded-t-2xl border-t p-4 pt-5 backdrop-blur-md',
+                'border-gray-200 bg-gradient-to-t from-white via-white to-white/95 shadow-[0_-10px_40px_-10px_rgba(0,0,0,0.1)]',
+                'dark:border-slate-700/50 dark:bg-gradient-to-t dark:from-slate-900 dark:via-slate-900 dark:to-slate-900/95 dark:shadow-[0_-10px_40px_-10px_rgba(0,0,0,0.3)]'
+              )}
+            >
+              {/* Title */}
+              <motion.h3
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.05 }}
+                className="line-clamp-2 text-base font-semibold text-gray-900 dark:text-white"
+              >
+                {course.title}
+              </motion.h3>
 
-            {/* Key Information Section - Only show most important info with tooltip */}
-            {course.target_audience && (
-              <div className="flex-shrink-0">
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <div className="flex cursor-help items-start gap-2">
-                        <Users
-                          className={cn(
-                            'mt-0.5 h-3.5 w-3.5 shrink-0',
-                            hasCover ? 'text-purple-600 dark:text-purple-300' : 'text-purple-400'
-                          )}
-                        />
-                        <p
-                          className={cn(
-                            'line-clamp-1 text-xs',
-                            hasCover
-                              ? 'text-gray-600 dark:text-gray-300'
-                              : 'text-gray-500 dark:text-gray-500'
-                          )}
-                        >
-                          <span
-                            className={cn(
-                              'font-medium',
-                              hasCover
-                                ? 'text-gray-800 dark:text-gray-200'
-                                : 'text-gray-600 dark:text-gray-400'
-                            )}
-                          >
-                            Для кого:
-                          </span>{' '}
-                          {course.target_audience}
-                        </p>
-                      </div>
-                    </TooltipTrigger>
-                    {course.target_audience.length > 50 && (
-                      <TooltipContent
-                        side="top"
-                        className="z-50 max-w-md bg-gray-900 p-3 text-white"
-                      >
-                        <p className="text-sm leading-relaxed">{course.target_audience}</p>
-                      </TooltipContent>
-                    )}
-                  </Tooltip>
-                </TooltipProvider>
-              </div>
-            )}
-
-            {/* Learning Outcomes - Only show if available and not too many */}
-            {course.learning_outcomes && (
-              <div className="flex-shrink-0">
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <div className="flex cursor-help items-start gap-2">
-                        <Award
-                          className={cn(
-                            'mt-0.5 h-3.5 w-3.5 shrink-0',
-                            hasCover ? 'text-green-600 dark:text-green-300' : 'text-green-400'
-                          )}
-                        />
-                        <p
-                          className={cn(
-                            'line-clamp-1 text-xs',
-                            hasCover
-                              ? 'text-gray-600 dark:text-gray-300'
-                              : 'text-gray-500 dark:text-gray-500'
-                          )}
-                        >
-                          <span
-                            className={cn(
-                              'font-medium',
-                              hasCover
-                                ? 'text-gray-800 dark:text-gray-200'
-                                : 'text-gray-600 dark:text-gray-400'
-                            )}
-                          >
-                            Результаты:
-                          </span>{' '}
-                          {Array.isArray(course.learning_outcomes)
-                            ? course.learning_outcomes.slice(0, 2).join(', ') +
-                              (course.learning_outcomes.length > 2 ? '...' : '')
-                            : course.learning_outcomes}
-                        </p>
-                      </div>
-                    </TooltipTrigger>
-                    <TooltipContent side="top" className="z-50 max-w-md bg-gray-900 p-3 text-white">
-                      <div>
-                        <p className="mb-2 text-sm font-medium">Что вы получите:</p>
-                        {Array.isArray(course.learning_outcomes) ? (
-                          <ul className="space-y-1 text-sm leading-relaxed">
-                            {course.learning_outcomes.map((outcome, index) => (
-                              <li key={index} className="flex items-start gap-2">
-                                <CheckCircle className="mt-0.5 h-3 w-3 shrink-0 text-green-400" />
-                                {outcome}
-                              </li>
-                            ))}
-                          </ul>
-                        ) : (
-                          <p className="text-sm leading-relaxed">{course.learning_outcomes}</p>
-                        )}
-                      </div>
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              </div>
-            )}
-
-            {/* Stats grid - expanded to fill space */}
-            <div className="mt-auto pt-4">
-              <div className="grid grid-cols-2 gap-3">
-                <div
-                  className={cn(
-                    'flex items-center gap-2 rounded-lg border px-3 py-2.5',
-                    hasCover
-                      ? 'border-gray-300/50 bg-white/40 backdrop-blur-sm dark:border-white/20 dark:bg-white/10'
-                      : 'border-gray-100 bg-gray-50 dark:border-slate-700/50 dark:bg-slate-800/30'
-                  )}
+              {/* Description */}
+              {course.course_description && (
+                <motion.p
+                  id={`course-description-${course.id}`}
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.1 }}
+                  className="mt-2 line-clamp-2 text-sm text-gray-600 dark:text-slate-300"
                 >
-                  <BookOpen
-                    className={cn(
-                      'h-4 w-4',
-                      hasCover ? 'text-purple-600 dark:text-purple-300' : 'text-purple-400'
-                    )}
-                  />
-                  <div className="min-w-0 flex-1">
-                    <p
-                      className={cn(
-                        'text-xs',
-                        hasCover
-                          ? 'text-gray-600 dark:text-gray-300'
-                          : 'text-gray-500 dark:text-gray-500'
-                      )}
-                    >
-                      Модули
-                    </p>
-                    <p
-                      className={cn(
-                        'text-sm font-medium',
-                        hasCover ? 'text-gray-900 dark:text-white' : 'text-gray-900 dark:text-white'
-                      )}
-                    >
-                      {sectionsCount}
-                    </p>
-                  </div>
-                </div>
-                <div
-                  className={cn(
-                    'flex items-center gap-2 rounded-lg border px-3 py-2.5',
-                    hasCover
-                      ? 'border-gray-300/50 bg-white/40 backdrop-blur-sm dark:border-white/20 dark:bg-white/10'
-                      : 'border-gray-100 bg-gray-50 dark:border-slate-700/50 dark:bg-slate-800/30'
-                  )}
-                >
-                  <BookOpen
-                    className={cn(
-                      'h-4 w-4',
-                      hasCover ? 'text-blue-600 dark:text-blue-300' : 'text-blue-400'
-                    )}
-                  />
-                  <div className="min-w-0 flex-1">
-                    <p
-                      className={cn(
-                        'text-xs',
-                        hasCover
-                          ? 'text-gray-600 dark:text-gray-300'
-                          : 'text-gray-500 dark:text-gray-500'
-                      )}
-                    >
-                      Уроки
-                    </p>
-                    <p
-                      className={cn(
-                        'text-sm font-medium',
-                        hasCover ? 'text-gray-900 dark:text-white' : 'text-gray-900 dark:text-white'
-                      )}
-                    >
-                      {lessonsCount}
-                    </p>
-                  </div>
-                </div>
-                <div
-                  className={cn(
-                    'flex items-center gap-2 rounded-lg border px-3 py-2.5',
-                    hasCover
-                      ? 'border-gray-300/50 bg-white/40 backdrop-blur-sm dark:border-white/20 dark:bg-white/10'
-                      : 'border-gray-100 bg-gray-50 dark:border-slate-700/50 dark:bg-slate-800/30'
-                  )}
-                >
-                  <Clock
-                    className={cn(
-                      'h-4 w-4',
-                      hasCover ? 'text-green-600 dark:text-green-300' : 'text-green-400'
-                    )}
-                  />
-                  <div className="min-w-0 flex-1">
-                    <p
-                      className={cn(
-                        'text-xs',
-                        hasCover
-                          ? 'text-gray-600 dark:text-gray-300'
-                          : 'text-gray-500 dark:text-gray-500'
-                      )}
-                    >
-                      Время
-                    </p>
-                    <p
-                      className={cn(
-                        'text-sm font-medium',
-                        hasCover ? 'text-gray-900 dark:text-white' : 'text-gray-900 dark:text-white'
-                      )}
-                    >
-                      {duration}ч
-                    </p>
-                  </div>
-                </div>
-                <div
-                  className={cn(
-                    'flex items-center gap-2 rounded-lg border px-3 py-2.5',
-                    hasCover
-                      ? 'border-gray-300/50 bg-white/40 backdrop-blur-sm dark:border-white/20 dark:bg-white/10'
-                      : 'border-gray-100 bg-gray-50 dark:border-slate-700/50 dark:bg-slate-800/30'
-                  )}
-                >
-                  <Globe
-                    className={cn(
-                      'h-4 w-4',
-                      hasCover ? 'text-yellow-600 dark:text-yellow-300' : 'text-yellow-400'
-                    )}
-                  />
-                  <div className="min-w-0 flex-1">
-                    <p
-                      className={cn(
-                        'text-xs',
-                        hasCover
-                          ? 'text-gray-600 dark:text-gray-300'
-                          : 'text-gray-500 dark:text-gray-500'
-                      )}
-                    >
-                      Язык
-                    </p>
-                    <p
-                      className={cn(
-                        'text-sm font-medium',
-                        hasCover ? 'text-gray-900 dark:text-white' : 'text-gray-900 dark:text-white'
-                      )}
-                    >
-                      {course.language === 'ru' ? 'RU' : course.language?.toUpperCase()}
-                    </p>
-                  </div>
-                </div>
-              </div>
-            </div>
+                  {course.course_description}
+                </motion.p>
+              )}
 
-            {/* Progress bar */}
-            {course.generation_status !== null &&
-              course.generation_status !== 'completed' &&
-              course.generation_status !== 'failed' &&
-              course.generation_status !== 'cancelled' && (
-                <div className="pt-4">
-                  <div className="space-y-2">
+              {/* Target audience */}
+              {course.target_audience && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.15 }}
+                  className="mt-3 flex items-start gap-2"
+                >
+                  <Users className="mt-0.5 h-4 w-4 shrink-0 text-purple-500 dark:text-purple-400" />
+                  <p className="line-clamp-1 text-sm text-gray-700 dark:text-slate-300">
+                    {course.target_audience}
+                  </p>
+                </motion.div>
+              )}
+
+              {/* Learning outcomes */}
+              {course.learning_outcomes &&
+                Array.isArray(course.learning_outcomes) &&
+                course.learning_outcomes.length > 0 && (
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.2 }}
+                    className="mt-2 flex items-start gap-2"
+                  >
+                    <Award className="mt-0.5 h-4 w-4 shrink-0 text-amber-500 dark:text-amber-400" />
+                    <div className="space-y-0.5 text-sm text-gray-700 dark:text-slate-300">
+                      {course.learning_outcomes.slice(0, 2).map((outcome, i) => (
+                        <div key={i} className="flex items-start gap-1.5">
+                          <CheckCircle className="mt-0.5 h-3 w-3 shrink-0 text-green-500 dark:text-green-400" />
+                          <span className="line-clamp-1">{outcome}</span>
+                        </div>
+                      ))}
+                    </div>
+                  </motion.div>
+                )}
+
+              {/* Progress bar for generating courses */}
+              {isGenerating && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ delay: 0.22 }}
+                  className="mt-3"
+                >
+                  <div className="space-y-1.5">
                     <div className="flex items-center justify-between text-xs">
-                      <span
-                        className={cn(
-                          hasCover
-                            ? 'text-gray-600 dark:text-gray-300'
-                            : 'text-gray-500 dark:text-gray-500'
-                        )}
-                      >
-                        Прогресс генерации
-                      </span>
-                      <span
-                        className={cn(
-                          'font-medium',
-                          hasCover ? 'text-purple-600 dark:text-purple-300' : 'text-purple-400'
-                        )}
-                      >
+                      <span className="text-gray-500 dark:text-slate-400">Прогресс генерации</span>
+                      <span className="font-medium text-purple-500 dark:text-purple-400">
                         {progress}%
                       </span>
                     </div>
-                    <Progress
-                      value={progress}
-                      className={cn(
-                        'h-2',
-                        hasCover
-                          ? 'bg-gray-300/50 dark:bg-white/20'
-                          : 'bg-gray-200 dark:bg-slate-800'
-                      )}
-                    />
+                    <Progress value={progress} className="h-1.5 bg-gray-200 dark:bg-slate-700" />
                   </div>
-                </div>
+                </motion.div>
               )}
-          </div>
-        </CardContent>
 
-        {/* Main action button - positioned between content and footer */}
-        <div className={cn('relative flex-shrink-0 px-6 pt-4 pb-3', hasCover && 'z-[2]')}>
-          <Button
-            size="sm"
-            variant="default"
-            className="h-10 w-full !rounded-full bg-gradient-to-r from-purple-600 to-purple-700 text-sm font-medium text-white shadow-lg transition-all hover:from-purple-700 hover:to-purple-800 hover:shadow-xl"
-            onClick={(e) => {
-              e.stopPropagation()
-              handleView()
-            }}
-            tabIndex={-1}
-          >
-            Открыть курс
-            <ChevronRight className="ml-2 h-4 w-4" />
-          </Button>
-        </div>
+              {/* CTA Button */}
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.25 }}
+              >
+                <Button
+                  size="sm"
+                  variant="default"
+                  className={cn(
+                    'mt-4 h-10 w-full rounded-full',
+                    'bg-gradient-to-r from-purple-600 to-purple-700 font-medium text-white',
+                    'hover:from-purple-700 hover:to-purple-800',
+                    'transition-all hover:scale-[1.02]'
+                  )}
+                  onClick={(e) => {
+                    e.stopPropagation()
+                    handleView()
+                  }}
+                  tabIndex={-1}
+                >
+                  Открыть курс
+                  <ChevronRight className="ml-2 h-4 w-4" />
+                </Button>
+              </motion.div>
 
-        <CardFooter
-          className={cn(
-            'relative flex-shrink-0 border-t px-6 py-3',
-            hasCover
-              ? 'z-[2] border-gray-300/50 dark:border-white/20'
-              : 'border-gray-200 dark:border-slate-800'
-          )}
-        >
-          <div className="flex w-full items-center justify-between">
-            {/* Secondary actions only */}
-            <div className="flex items-center gap-1">
-              <ActionButtonWithTooltip
-                icon={
-                  isUpdatingFavorite ? (
-                    <Loader2 className="h-3.5 w-3.5 animate-spin" />
-                  ) : (
-                    <Heart
-                      className={cn(
-                        'h-3.5 w-3.5',
-                        isFavorited && 'fill-purple-400 text-purple-400'
-                      )}
-                    />
-                  )
-                }
-                label="Добавить в избранное"
-                onClick={(e) => void handleToggleFavorite(e)}
-                disabled={isUpdatingFavorite}
-                className={cn(
-                  'h-7 w-7',
-                  hasCover
-                    ? 'text-gray-600 hover:text-purple-600 dark:text-gray-300 dark:hover:text-purple-300'
-                    : 'text-gray-400 hover:text-purple-400'
-                )}
-                isActive={isFavorited}
+              {/* Divider */}
+              <motion.div
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 0.3 }}
+                className="mt-4 border-t border-gray-200 dark:border-slate-700"
               />
 
-              <ShareButton
-                slug={slug}
-                shareToken={course.share_token}
-                isOwner={user?.id === course.user_id}
-                isAdmin={user?.role === 'admin' || user?.role === 'superadmin'}
-                className={cn(
-                  'h-7 w-7',
-                  hasCover &&
-                    'text-gray-600 hover:text-gray-900 dark:text-gray-300 dark:hover:text-white'
-                )}
-              />
-
-              {user &&
-                (user.id === course.user_id ||
-                  user.role === 'admin' ||
-                  user.role === 'superadmin') && (
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        className={cn(
-                          'h-7 gap-1 px-2 text-xs font-normal',
-                          currentVisibility.color,
-                          'hover:opacity-80'
-                        )}
-                        disabled={isUpdatingVisibility}
-                        onClick={(e) => e.stopPropagation()}
-                      >
-                        {isUpdatingVisibility ? (
-                          <Loader2 className="h-3 w-3 animate-spin" />
-                        ) : (
-                          <currentVisibility.icon className="h-3 w-3" />
-                        )}
-                        <span className="hidden sm:inline">{currentVisibility.label}</span>
-                        <ChevronDown className="h-3 w-3" />
-                      </Button>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="start" onClick={(e) => e.stopPropagation()}>
-                      {(
-                        Object.entries(visibilityConfig) as [
-                          CourseVisibility,
-                          typeof currentVisibility,
-                        ][]
-                      ).map(([key, config]) => (
-                        <DropdownMenuItem
-                          key={key}
-                          onClick={() => void handleUpdateVisibility(key)}
-                          className={cn('cursor-pointer gap-2', visibility === key && 'bg-accent')}
-                        >
-                          <config.icon className="h-4 w-4" />
-                          {config.label}
-                        </DropdownMenuItem>
-                      ))}
-                    </DropdownMenuContent>
-                  </DropdownMenu>
-                )}
-
-              {user &&
-                (user.id === course.user_id ||
-                  user.role === 'admin' ||
-                  user.role === 'superadmin') && (
-                  <ActionButtonWithTooltip
-                    icon={<GitBranch className="h-3.5 w-3.5" />}
-                    label="Конструктор курса"
-                    onClick={handleWorkflow}
-                    className={cn(
-                      'h-7 w-7',
-                      hasCover
-                        ? 'text-gray-600 hover:text-blue-600 dark:text-gray-300 dark:hover:text-blue-300'
-                        : 'text-gray-400 hover:text-blue-400'
-                    )}
-                  />
-                )}
-
-              {canDelete && (
+              {/* Actions */}
+              <motion.div
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: 0.32 }}
+                className="mt-3 flex items-center gap-1"
+              >
                 <ActionButtonWithTooltip
                   icon={
-                    isDeleting ? (
+                    isUpdatingFavorite ? (
                       <Loader2 className="h-3.5 w-3.5 animate-spin" />
                     ) : (
-                      <Trash2 className="h-3.5 w-3.5" />
+                      <Heart
+                        className={cn(
+                          'h-3.5 w-3.5',
+                          isFavorited && 'fill-purple-400 text-purple-400'
+                        )}
+                      />
                     )
                   }
-                  label="Удалить курс"
-                  onClick={() => void handleDelete()}
-                  disabled={isDeleting}
-                  className={cn(
-                    'h-7 w-7',
-                    hasCover
-                      ? 'text-gray-600 hover:text-red-500 dark:text-gray-300 dark:hover:text-red-400'
-                      : 'text-gray-400 hover:text-red-500'
-                  )}
+                  label="Добавить в избранное"
+                  onClick={(e) => void handleToggleFavorite(e)}
+                  disabled={isUpdatingFavorite}
+                  className="h-7 w-7 text-gray-500 hover:text-purple-500 dark:text-slate-400 dark:hover:text-purple-400"
+                  isActive={isFavorited}
                 />
-              )}
-            </div>
-          </div>
-        </CardFooter>
-      </Card>
+
+                <ShareButton
+                  slug={slug}
+                  shareToken={course.share_token}
+                  isOwner={user?.id === course.user_id}
+                  isAdmin={user?.role === 'admin' || user?.role === 'superadmin'}
+                  className="h-7 w-7 text-gray-500 hover:text-gray-700 dark:text-slate-400 dark:hover:text-white"
+                />
+
+                {user &&
+                  (user.id === course.user_id ||
+                    user.role === 'admin' ||
+                    user.role === 'superadmin') && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <Button
+                          variant="ghost"
+                          size="sm"
+                          className={cn(
+                            'h-7 gap-1 px-2 text-xs font-normal',
+                            currentVisibility.color,
+                            'hover:opacity-80'
+                          )}
+                          disabled={isUpdatingVisibility}
+                          onClick={(e) => e.stopPropagation()}
+                        >
+                          {isUpdatingVisibility ? (
+                            <Loader2 className="h-3 w-3 animate-spin" />
+                          ) : (
+                            <currentVisibility.icon className="h-3 w-3" />
+                          )}
+                          <span className="hidden sm:inline">{currentVisibility.label}</span>
+                          <ChevronDown className="h-3 w-3" />
+                        </Button>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="start" onClick={(e) => e.stopPropagation()}>
+                        {(
+                          Object.entries(visibilityConfig) as [
+                            CourseVisibility,
+                            typeof currentVisibility,
+                          ][]
+                        ).map(([key, config]) => (
+                          <DropdownMenuItem
+                            key={key}
+                            onClick={() => void handleUpdateVisibility(key)}
+                            className={cn(
+                              'cursor-pointer gap-2',
+                              visibility === key && 'bg-accent'
+                            )}
+                          >
+                            <config.icon className="h-4 w-4" />
+                            {config.label}
+                          </DropdownMenuItem>
+                        ))}
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
+
+                {user &&
+                  (user.id === course.user_id ||
+                    user.role === 'admin' ||
+                    user.role === 'superadmin') && (
+                    <ActionButtonWithTooltip
+                      icon={<GitBranch className="h-3.5 w-3.5" />}
+                      label="Конструктор курса"
+                      onClick={handleWorkflow}
+                      className="h-7 w-7 text-gray-500 hover:text-blue-500 dark:text-slate-400 dark:hover:text-blue-400"
+                    />
+                  )}
+
+                {canDelete && (
+                  <ActionButtonWithTooltip
+                    icon={
+                      isDeleting ? (
+                        <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                      ) : (
+                        <Trash2 className="h-3.5 w-3.5" />
+                      )
+                    }
+                    label="Удалить курс"
+                    onClick={() => void handleDelete()}
+                    disabled={isDeleting}
+                    className="h-7 w-7 text-gray-500 hover:text-red-500 dark:text-slate-400 dark:hover:text-red-400"
+                  />
+                )}
+              </motion.div>
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </motion.div>
     </TooltipProvider>
   )
 }

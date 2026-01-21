@@ -1,10 +1,11 @@
-'use server';
+'use server'
 
-import { z } from 'zod';
-import { getUserClient, getAdminClient } from '@/lib/supabase/client-factory';
-import { getCurrentUser } from '@/lib/auth-helpers';
-import { logger } from '@/lib/logger';
-import { getBackendAuthHeaders, TRPC_URL } from '@/lib/auth';
+import { z } from 'zod'
+import { getUserClient, getAdminClient } from '@/lib/supabase/client-factory'
+import { getCurrentUser } from '@/lib/auth-helpers'
+import { logger } from '@/lib/logger'
+import { getBackendAuthHeaders, TRPC_URL } from '@/lib/auth'
+import type { Database } from '@/types/database.generated'
 
 // ============================================================================
 // Input Validation Schemas
@@ -13,32 +14,49 @@ import { getBackendAuthHeaders, TRPC_URL } from '@/lib/auth';
 const createEnrichmentSchema = z.object({
   lessonId: z.string().regex(/^\d+\.\d+$/, 'Invalid lesson ID format (expected: "1.2")'),
   courseId: z.string().uuid('Invalid course ID'),
-  enrichmentType: z.enum(['video', 'audio', 'quiz', 'presentation', 'document', 'cover', 'card', 'banner']),
+  enrichmentType: z.enum([
+    'video',
+    'audio',
+    'quiz',
+    'presentation',
+    'document',
+    'cover',
+    'card',
+    'banner',
+  ]),
   settings: z.record(z.unknown()).optional(),
-});
+})
 
 const regenerateEnrichmentSchema = z.object({
   enrichmentId: z.string().uuid('Invalid enrichment ID'),
   courseId: z.string().uuid('Invalid course ID'),
-});
+})
 
 const reorderEnrichmentsSchema = z.object({
   courseId: z.string().uuid('Invalid course ID'),
   lessonId: z.string().regex(/^\d+\.\d+$/, 'Invalid lesson ID format (expected: "1.2")'),
   orderedIds: z.array(z.string().uuid('Invalid enrichment ID')).min(1),
-});
+})
 
 export interface CreateEnrichmentInput {
-  lessonId: string; // In format "1.2" (module.lesson label)
-  courseId: string;
-  enrichmentType: 'video' | 'audio' | 'quiz' | 'presentation' | 'document' | 'cover' | 'card' | 'banner';
-  settings?: Record<string, unknown>;
+  lessonId: string // In format "1.2" (module.lesson label)
+  courseId: string
+  enrichmentType:
+    | 'video'
+    | 'audio'
+    | 'quiz'
+    | 'presentation'
+    | 'document'
+    | 'cover'
+    | 'card'
+    | 'banner'
+  settings?: Record<string, unknown>
 }
 
 export interface CreateEnrichmentResult {
-  success: boolean;
-  enrichmentId?: string;
-  error?: string;
+  success: boolean
+  enrichmentId?: string
+  error?: string
 }
 
 /**
@@ -51,31 +69,31 @@ export async function createEnrichment(
 ): Promise<CreateEnrichmentResult> {
   try {
     // Input validation
-    const validation = createEnrichmentSchema.safeParse(input);
+    const validation = createEnrichmentSchema.safeParse(input)
     if (!validation.success) {
       logger.error('[createEnrichment] Invalid input', {
         errors: validation.error.flatten(),
-      });
-      return { success: false, error: 'Invalid input data' };
+      })
+      return { success: false, error: 'Invalid input data' }
     }
 
-    const currentUser = await getCurrentUser();
+    const currentUser = await getCurrentUser()
     if (!currentUser) {
-      return { success: false, error: 'Not authenticated' };
+      return { success: false, error: 'Not authenticated' }
     }
 
-    const supabase = await getUserClient();
+    const supabase = await getUserClient()
 
     // Authorization: Verify user owns the course
     const { data: course, error: courseError } = await supabase
       .from('courses')
       .select('user_id')
       .eq('id', input.courseId)
-      .single();
+      .single()
 
     if (courseError || !course) {
-      logger.error('[createEnrichment] Course not found', { courseId: input.courseId });
-      return { success: false, error: 'Course not found' };
+      logger.error('[createEnrichment] Course not found', { courseId: input.courseId })
+      return { success: false, error: 'Course not found' }
     }
 
     if (course.user_id !== currentUser.id) {
@@ -83,12 +101,12 @@ export async function createEnrichment(
         userId: currentUser.id,
         courseId: input.courseId,
         courseOwner: course.user_id,
-      });
-      return { success: false, error: 'Unauthorized' };
+      })
+      return { success: false, error: 'Unauthorized' }
     }
 
     // Convert lessonId label to UUID
-    const [moduleNum, lessonNum] = input.lessonId.split('.').map(Number);
+    const [moduleNum, lessonNum] = input.lessonId.split('.').map(Number)
 
     // Get section (module) by order_index
     const { data: section, error: sectionError } = await supabase
@@ -96,15 +114,15 @@ export async function createEnrichment(
       .select('id')
       .eq('course_id', input.courseId)
       .eq('order_index', moduleNum)
-      .single();
+      .single()
 
     if (sectionError || !section) {
       logger.error('[createEnrichment] Section not found', {
         moduleNum,
         courseId: input.courseId,
         error: sectionError?.message,
-      });
-      return { success: false, error: 'Section not found' };
+      })
+      return { success: false, error: 'Section not found' }
     }
 
     // Get lesson by section_id and order_index
@@ -113,19 +131,19 @@ export async function createEnrichment(
       .select('id')
       .eq('section_id', section.id)
       .eq('order_index', lessonNum)
-      .single();
+      .single()
 
     if (lessonError || !lesson) {
       logger.error('[createEnrichment] Lesson not found', {
         lessonNum,
         sectionId: section.id,
         error: lessonError?.message,
-      });
-      return { success: false, error: 'Lesson not found' };
+      })
+      return { success: false, error: 'Lesson not found' }
     }
 
     // Call tRPC API to create enrichment
-    const headers = await getBackendAuthHeaders();
+    const headers = await getBackendAuthHeaders()
     const response = await fetch(`${TRPC_URL}/enrichment.create`, {
       method: 'POST',
       headers: {
@@ -137,44 +155,44 @@ export async function createEnrichment(
         enrichmentType: input.enrichmentType,
         settings: input.settings || {},
       }),
-    });
+    })
 
     if (!response.ok) {
-      const errorText = await response.text();
+      const errorText = await response.text()
       logger.error('[createEnrichment] tRPC call failed', {
         status: response.status,
         error: errorText,
-      });
-      return { success: false, error: `Failed to create enrichment: ${response.status}` };
+      })
+      return { success: false, error: `Failed to create enrichment: ${response.status}` }
     }
 
-    const result = await response.json();
+    const result = await response.json()
 
     if (!result.result?.data?.success) {
       return {
         success: false,
         error: result.result?.data?.error || 'Unknown error',
-      };
+      }
     }
 
     logger.info('[createEnrichment] Enrichment created', {
       enrichmentId: result.result.data.enrichmentId,
       lessonId: input.lessonId,
       type: input.enrichmentType,
-    });
+    })
 
     return {
       success: true,
       enrichmentId: result.result.data.enrichmentId,
-    };
+    }
   } catch (error) {
     logger.error('[createEnrichment] Unexpected error', {
       error: error instanceof Error ? error.message : String(error),
-    });
+    })
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Failed to create enrichment',
-    };
+    }
   }
 }
 
@@ -183,14 +201,14 @@ export async function createEnrichment(
 // ============================================================================
 
 export interface ReorderEnrichmentsInput {
-  courseId: string;
-  lessonId: string; // In format "1.2" (module.lesson label)
-  orderedIds: string[]; // Array of enrichment UUIDs in new order
+  courseId: string
+  lessonId: string // In format "1.2" (module.lesson label)
+  orderedIds: string[] // Array of enrichment UUIDs in new order
 }
 
 export interface ReorderEnrichmentsResult {
-  success: boolean;
-  error?: string;
+  success: boolean
+  error?: string
 }
 
 /**
@@ -207,31 +225,31 @@ export async function reorderEnrichments(
 ): Promise<ReorderEnrichmentsResult> {
   try {
     // Input validation
-    const validation = reorderEnrichmentsSchema.safeParse(input);
+    const validation = reorderEnrichmentsSchema.safeParse(input)
     if (!validation.success) {
       logger.error('[reorderEnrichments] Invalid input', {
         errors: validation.error.flatten(),
-      });
-      return { success: false, error: 'Invalid input data' };
+      })
+      return { success: false, error: 'Invalid input data' }
     }
 
-    const currentUser = await getCurrentUser();
+    const currentUser = await getCurrentUser()
     if (!currentUser) {
-      return { success: false, error: 'Not authenticated' };
+      return { success: false, error: 'Not authenticated' }
     }
 
-    const supabase = await getUserClient();
+    const supabase = await getUserClient()
 
     // Authorization: Verify user owns the course
     const { data: course, error: courseError } = await supabase
       .from('courses')
       .select('user_id')
       .eq('id', input.courseId)
-      .single();
+      .single()
 
     if (courseError || !course) {
-      logger.error('[reorderEnrichments] Course not found', { courseId: input.courseId });
-      return { success: false, error: 'Course not found' };
+      logger.error('[reorderEnrichments] Course not found', { courseId: input.courseId })
+      return { success: false, error: 'Course not found' }
     }
 
     if (course.user_id !== currentUser.id) {
@@ -239,12 +257,12 @@ export async function reorderEnrichments(
         userId: currentUser.id,
         courseId: input.courseId,
         courseOwner: course.user_id,
-      });
-      return { success: false, error: 'Unauthorized' };
+      })
+      return { success: false, error: 'Unauthorized' }
     }
 
     // Convert lessonId label to UUID
-    const [moduleNum, lessonNum] = input.lessonId.split('.').map(Number);
+    const [moduleNum, lessonNum] = input.lessonId.split('.').map(Number)
 
     // Get section (module) by order_index
     const { data: section, error: sectionError } = await supabase
@@ -252,15 +270,15 @@ export async function reorderEnrichments(
       .select('id')
       .eq('course_id', input.courseId)
       .eq('order_index', moduleNum)
-      .single();
+      .single()
 
     if (sectionError || !section) {
       logger.error('[reorderEnrichments] Section not found', {
         moduleNum,
         courseId: input.courseId,
         error: sectionError?.message,
-      });
-      return { success: false, error: 'Section not found' };
+      })
+      return { success: false, error: 'Section not found' }
     }
 
     // Get lesson by section_id and order_index
@@ -269,34 +287,34 @@ export async function reorderEnrichments(
       .select('id')
       .eq('section_id', section.id)
       .eq('order_index', lessonNum)
-      .single();
+      .single()
 
     if (lessonError || !lesson) {
       logger.error('[reorderEnrichments] Lesson not found', {
         lessonNum,
         sectionId: section.id,
         error: lessonError?.message,
-      });
-      return { success: false, error: 'Lesson not found' };
+      })
+      return { success: false, error: 'Lesson not found' }
     }
 
     // Update order_index for each enrichment using admin client
-    const adminClient = getAdminClient();
+    const adminClient = getAdminClient()
 
     for (let i = 0; i < input.orderedIds.length; i++) {
       const { error } = await adminClient
         .from('lesson_enrichments')
         .update({ order_index: i })
         .eq('id', input.orderedIds[i])
-        .eq('lesson_id', lesson.id);
+        .eq('lesson_id', lesson.id)
 
       if (error) {
         logger.error('[reorderEnrichments] Failed to update order', {
           enrichmentId: input.orderedIds[i],
           orderIndex: i,
           error: error.message,
-        });
-        return { success: false, error: 'Failed to update order' };
+        })
+        return { success: false, error: 'Failed to update order' }
       }
     }
 
@@ -304,17 +322,17 @@ export async function reorderEnrichments(
       lessonId: input.lessonId,
       lessonUuid: lesson.id,
       count: input.orderedIds.length,
-    });
+    })
 
-    return { success: true };
+    return { success: true }
   } catch (error) {
     logger.error('[reorderEnrichments] Unexpected error', {
       error: error instanceof Error ? error.message : String(error),
-    });
+    })
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Failed to reorder',
-    };
+    }
   }
 }
 
@@ -325,16 +343,16 @@ export async function reorderEnrichments(
 const deleteEnrichmentSchema = z.object({
   enrichmentId: z.string().uuid('Invalid enrichment ID'),
   courseId: z.string().uuid('Invalid course ID'),
-});
+})
 
 export interface DeleteEnrichmentInput {
-  enrichmentId: string;
-  courseId: string;
+  enrichmentId: string
+  courseId: string
 }
 
 export interface DeleteEnrichmentResult {
-  success: boolean;
-  error?: string;
+  success: boolean
+  error?: string
 }
 
 /**
@@ -351,31 +369,31 @@ export async function deleteEnrichment(
 ): Promise<DeleteEnrichmentResult> {
   try {
     // Input validation
-    const validation = deleteEnrichmentSchema.safeParse(input);
+    const validation = deleteEnrichmentSchema.safeParse(input)
     if (!validation.success) {
       logger.error('[deleteEnrichment] Invalid input', {
         errors: validation.error.flatten(),
-      });
-      return { success: false, error: 'Invalid input data' };
+      })
+      return { success: false, error: 'Invalid input data' }
     }
 
-    const currentUser = await getCurrentUser();
+    const currentUser = await getCurrentUser()
     if (!currentUser) {
-      return { success: false, error: 'Not authenticated' };
+      return { success: false, error: 'Not authenticated' }
     }
 
-    const supabase = await getUserClient();
+    const supabase = await getUserClient()
 
     // Authorization: Verify user owns the course
     const { data: course, error: courseError } = await supabase
       .from('courses')
       .select('user_id')
       .eq('id', input.courseId)
-      .single();
+      .single()
 
     if (courseError || !course) {
-      logger.error('[deleteEnrichment] Course not found', { courseId: input.courseId });
-      return { success: false, error: 'Course not found' };
+      logger.error('[deleteEnrichment] Course not found', { courseId: input.courseId })
+      return { success: false, error: 'Course not found' }
     }
 
     if (course.user_id !== currentUser.id) {
@@ -383,12 +401,12 @@ export async function deleteEnrichment(
         userId: currentUser.id,
         courseId: input.courseId,
         courseOwner: course.user_id,
-      });
-      return { success: false, error: 'Unauthorized' };
+      })
+      return { success: false, error: 'Unauthorized' }
     }
 
     // Call tRPC API to delete enrichment
-    const headers = await getBackendAuthHeaders();
+    const headers = await getBackendAuthHeaders()
     const response = await fetch(`${TRPC_URL}/enrichment.delete`, {
       method: 'POST',
       headers: {
@@ -398,40 +416,40 @@ export async function deleteEnrichment(
       body: JSON.stringify({
         enrichmentId: input.enrichmentId,
       }),
-    });
+    })
 
     if (!response.ok) {
-      const errorText = await response.text();
+      const errorText = await response.text()
       logger.error('[deleteEnrichment] tRPC call failed', {
         status: response.status,
         error: errorText,
-      });
-      return { success: false, error: `Failed to delete enrichment: ${response.status}` };
+      })
+      return { success: false, error: `Failed to delete enrichment: ${response.status}` }
     }
 
-    const result = await response.json();
+    const result = await response.json()
 
     if (!result.result?.data?.success) {
       return {
         success: false,
         error: result.result?.data?.error || 'Unknown error',
-      };
+      }
     }
 
     logger.info('[deleteEnrichment] Enrichment deleted', {
       enrichmentId: input.enrichmentId,
       courseId: input.courseId,
-    });
+    })
 
-    return { success: true };
+    return { success: true }
   } catch (error) {
     logger.error('[deleteEnrichment] Unexpected error', {
       error: error instanceof Error ? error.message : String(error),
-    });
+    })
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Failed to delete enrichment',
-    };
+    }
   }
 }
 
@@ -440,14 +458,14 @@ export async function deleteEnrichment(
 // ============================================================================
 
 export interface RegenerateEnrichmentInput {
-  enrichmentId: string;
-  courseId: string;
+  enrichmentId: string
+  courseId: string
 }
 
 export interface RegenerateEnrichmentResult {
-  success: boolean;
-  newJobId?: string;
-  error?: string;
+  success: boolean
+  newJobId?: string
+  error?: string
 }
 
 /**
@@ -464,31 +482,31 @@ export async function regenerateEnrichment(
 ): Promise<RegenerateEnrichmentResult> {
   try {
     // Input validation
-    const validation = regenerateEnrichmentSchema.safeParse(input);
+    const validation = regenerateEnrichmentSchema.safeParse(input)
     if (!validation.success) {
       logger.error('[regenerateEnrichment] Invalid input', {
         errors: validation.error.flatten(),
-      });
-      return { success: false, error: 'Invalid input data' };
+      })
+      return { success: false, error: 'Invalid input data' }
     }
 
-    const currentUser = await getCurrentUser();
+    const currentUser = await getCurrentUser()
     if (!currentUser) {
-      return { success: false, error: 'Not authenticated' };
+      return { success: false, error: 'Not authenticated' }
     }
 
-    const supabase = await getUserClient();
+    const supabase = await getUserClient()
 
     // Authorization: Verify user owns the course
     const { data: course, error: courseError } = await supabase
       .from('courses')
       .select('user_id')
       .eq('id', input.courseId)
-      .single();
+      .single()
 
     if (courseError || !course) {
-      logger.error('[regenerateEnrichment] Course not found', { courseId: input.courseId });
-      return { success: false, error: 'Course not found' };
+      logger.error('[regenerateEnrichment] Course not found', { courseId: input.courseId })
+      return { success: false, error: 'Course not found' }
     }
 
     if (course.user_id !== currentUser.id) {
@@ -496,12 +514,12 @@ export async function regenerateEnrichment(
         userId: currentUser.id,
         courseId: input.courseId,
         courseOwner: course.user_id,
-      });
-      return { success: false, error: 'Unauthorized' };
+      })
+      return { success: false, error: 'Unauthorized' }
     }
 
     // Call tRPC API to regenerate enrichment
-    const headers = await getBackendAuthHeaders();
+    const headers = await getBackendAuthHeaders()
     const response = await fetch(`${TRPC_URL}/enrichment.regenerate`, {
       method: 'POST',
       headers: {
@@ -511,43 +529,43 @@ export async function regenerateEnrichment(
       body: JSON.stringify({
         enrichmentId: input.enrichmentId,
       }),
-    });
+    })
 
     if (!response.ok) {
-      const errorText = await response.text();
+      const errorText = await response.text()
       logger.error('[regenerateEnrichment] tRPC call failed', {
         status: response.status,
         error: errorText,
-      });
-      return { success: false, error: `Failed to regenerate enrichment: ${response.status}` };
+      })
+      return { success: false, error: `Failed to regenerate enrichment: ${response.status}` }
     }
 
-    const result = await response.json();
+    const result = await response.json()
 
     if (!result.result?.data?.success) {
       return {
         success: false,
         error: result.result?.data?.error || 'Unknown error',
-      };
+      }
     }
 
     logger.info('[regenerateEnrichment] Enrichment regeneration started', {
       enrichmentId: input.enrichmentId,
       newJobId: result.result.data.newJobId,
-    });
+    })
 
     return {
       success: true,
       newJobId: result.result.data.newJobId,
-    };
+    }
   } catch (error) {
     logger.error('[regenerateEnrichment] Unexpected error', {
       error: error instanceof Error ? error.message : String(error),
-    });
+    })
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Failed to regenerate enrichment',
-    };
+    }
   }
 }
 
@@ -558,18 +576,26 @@ export async function regenerateEnrichment(
 const getEnrichmentSchema = z.object({
   enrichmentId: z.string().uuid('Invalid enrichment ID'),
   courseId: z.string().uuid('Invalid course ID'),
-});
+})
 
 export interface GetEnrichmentInput {
-  enrichmentId: string;
-  courseId: string;
+  enrichmentId: string
+  courseId: string
 }
 
 export interface GetEnrichmentResult {
-  success: boolean;
+  success: boolean
   enrichment?: {
-    id: string;
-    enrichment_type: 'video' | 'audio' | 'quiz' | 'presentation' | 'document' | 'cover' | 'card' | 'banner';
+    id: string
+    enrichment_type:
+      | 'video'
+      | 'audio'
+      | 'quiz'
+      | 'presentation'
+      | 'document'
+      | 'cover'
+      | 'card'
+      | 'banner'
     status:
       | 'pending'
       | 'draft_generating'
@@ -577,14 +603,14 @@ export interface GetEnrichmentResult {
       | 'generating'
       | 'completed'
       | 'failed'
-      | 'cancelled';
-    content: unknown;
-    draft_content: unknown;
-    metadata: Record<string, unknown> | null;
-    error_message: string | null;
-    asset_url: string | null;
-  };
-  error?: string;
+      | 'cancelled'
+    content: unknown
+    draft_content: unknown
+    metadata: Record<string, unknown> | null
+    error_message: string | null
+    asset_url: string | null
+  }
+  error?: string
 }
 
 /**
@@ -596,36 +622,34 @@ export interface GetEnrichmentResult {
  * @param input - The enrichment ID and course ID
  * @returns The enrichment data or error
  */
-export async function getEnrichment(
-  input: GetEnrichmentInput
-): Promise<GetEnrichmentResult> {
+export async function getEnrichment(input: GetEnrichmentInput): Promise<GetEnrichmentResult> {
   try {
     // Input validation
-    const validation = getEnrichmentSchema.safeParse(input);
+    const validation = getEnrichmentSchema.safeParse(input)
     if (!validation.success) {
       logger.error('[getEnrichment] Invalid input', {
         errors: validation.error.flatten(),
-      });
-      return { success: false, error: 'Invalid input data' };
+      })
+      return { success: false, error: 'Invalid input data' }
     }
 
-    const currentUser = await getCurrentUser();
+    const currentUser = await getCurrentUser()
     if (!currentUser) {
-      return { success: false, error: 'Not authenticated' };
+      return { success: false, error: 'Not authenticated' }
     }
 
-    const supabase = await getUserClient();
+    const supabase = await getUserClient()
 
     // Authorization: Verify user owns the course
     const { data: course, error: courseError } = await supabase
       .from('courses')
       .select('user_id')
       .eq('id', input.courseId)
-      .single();
+      .single()
 
     if (courseError || !course) {
-      logger.error('[getEnrichment] Course not found', { courseId: input.courseId });
-      return { success: false, error: 'Course not found' };
+      logger.error('[getEnrichment] Course not found', { courseId: input.courseId })
+      return { success: false, error: 'Course not found' }
     }
 
     if (course.user_id !== currentUser.id) {
@@ -633,8 +657,8 @@ export async function getEnrichment(
         userId: currentUser.id,
         courseId: input.courseId,
         courseOwner: course.user_id,
-      });
-      return { success: false, error: 'Unauthorized' };
+      })
+      return { success: false, error: 'Unauthorized' }
     }
 
     // Fetch the enrichment
@@ -643,33 +667,33 @@ export async function getEnrichment(
       .select('id, enrichment_type, status, content, metadata, error_message, asset_id')
       .eq('id', input.enrichmentId)
       .eq('course_id', input.courseId)
-      .single();
+      .single()
 
     if (enrichmentError || !enrichment) {
       logger.error('[getEnrichment] Enrichment not found', {
         enrichmentId: input.enrichmentId,
         error: enrichmentError?.message,
-      });
-      return { success: false, error: 'Enrichment not found' };
+      })
+      return { success: false, error: 'Enrichment not found' }
     }
 
     // Get signed URL for asset if it exists
-    let assetUrl: string | null = null;
+    let assetUrl: string | null = null
     if (enrichment.asset_id) {
       // Get the asset file path
       const { data: asset } = await supabase
         .from('assets')
         .select('file_path')
         .eq('id', enrichment.asset_id)
-        .single();
+        .single()
 
       if (asset?.file_path) {
         // Create signed URL (valid for 1 hour)
         const { data: signedUrlData } = await supabase.storage
           .from('course-assets')
-          .createSignedUrl(asset.file_path, 3600);
+          .createSignedUrl(asset.file_path, 3600)
 
-        assetUrl = signedUrlData?.signedUrl || null;
+        assetUrl = signedUrlData?.signedUrl || null
       }
     }
 
@@ -677,13 +701,13 @@ export async function getEnrichment(
       enrichmentId: input.enrichmentId,
       type: enrichment.enrichment_type,
       status: enrichment.status,
-    });
+    })
 
     // For draft_ready status, content contains draft data
     // Pass it as draft_content for the preview components
-    const isDraftReady = enrichment.status === 'draft_ready';
-    const draftContent = isDraftReady ? enrichment.content : null;
-    const finalContent = isDraftReady ? null : enrichment.content;
+    const isDraftReady = enrichment.status === 'draft_ready'
+    const draftContent = isDraftReady ? enrichment.content : null
+    const finalContent = isDraftReady ? null : enrichment.content
 
     return {
       success: true,
@@ -697,15 +721,15 @@ export async function getEnrichment(
         error_message: enrichment.error_message,
         asset_url: assetUrl,
       },
-    };
+    }
   } catch (error) {
     logger.error('[getEnrichment] Unexpected error', {
       error: error instanceof Error ? error.message : String(error),
-    });
+    })
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Failed to get enrichment',
-    };
+    }
   }
 }
 
@@ -717,17 +741,17 @@ const approveCoverDraftSchema = z.object({
   enrichmentId: z.string().uuid('Invalid enrichment ID'),
   courseId: z.string().uuid('Invalid course ID'),
   selectedVariantId: z.number().int().min(1).max(10),
-});
+})
 
 export interface ApproveCoverDraftInput {
-  enrichmentId: string;
-  courseId: string;
-  selectedVariantId: number;
+  enrichmentId: string
+  courseId: string
+  selectedVariantId: number
 }
 
 export interface ApproveCoverDraftResult {
-  success: boolean;
-  error?: string;
+  success: boolean
+  error?: string
 }
 
 /**
@@ -744,31 +768,31 @@ export async function approveCoverDraft(
 ): Promise<ApproveCoverDraftResult> {
   try {
     // Input validation
-    const validation = approveCoverDraftSchema.safeParse(input);
+    const validation = approveCoverDraftSchema.safeParse(input)
     if (!validation.success) {
       logger.error('[approveCoverDraft] Invalid input', {
         errors: validation.error.flatten(),
-      });
-      return { success: false, error: 'Invalid input data' };
+      })
+      return { success: false, error: 'Invalid input data' }
     }
 
-    const currentUser = await getCurrentUser();
+    const currentUser = await getCurrentUser()
     if (!currentUser) {
-      return { success: false, error: 'Not authenticated' };
+      return { success: false, error: 'Not authenticated' }
     }
 
-    const supabase = await getUserClient();
+    const supabase = await getUserClient()
 
     // Authorization: Verify user owns the course
     const { data: course, error: courseError } = await supabase
       .from('courses')
       .select('user_id')
       .eq('id', input.courseId)
-      .single();
+      .single()
 
     if (courseError || !course) {
-      logger.error('[approveCoverDraft] Course not found', { courseId: input.courseId });
-      return { success: false, error: 'Course not found' };
+      logger.error('[approveCoverDraft] Course not found', { courseId: input.courseId })
+      return { success: false, error: 'Course not found' }
     }
 
     if (course.user_id !== currentUser.id) {
@@ -776,8 +800,8 @@ export async function approveCoverDraft(
         userId: currentUser.id,
         courseId: input.courseId,
         courseOwner: course.user_id,
-      });
-      return { success: false, error: 'Unauthorized' };
+      })
+      return { success: false, error: 'Unauthorized' }
     }
 
     // Verify enrichment exists and is in draft_ready status
@@ -786,34 +810,34 @@ export async function approveCoverDraft(
       .select('id, status, enrichment_type, content')
       .eq('id', input.enrichmentId)
       .eq('course_id', input.courseId)
-      .single();
+      .single()
 
     if (enrichmentError || !enrichment) {
       logger.error('[approveCoverDraft] Enrichment not found', {
         enrichmentId: input.enrichmentId,
         error: enrichmentError?.message,
-      });
-      return { success: false, error: 'Enrichment not found' };
+      })
+      return { success: false, error: 'Enrichment not found' }
     }
 
     if (enrichment.enrichment_type !== 'cover') {
       logger.error('[approveCoverDraft] Enrichment is not a cover type', {
         enrichmentId: input.enrichmentId,
         type: enrichment.enrichment_type,
-      });
-      return { success: false, error: 'Enrichment is not a cover type' };
+      })
+      return { success: false, error: 'Enrichment is not a cover type' }
     }
 
     if (enrichment.status !== 'draft_ready') {
       logger.error('[approveCoverDraft] Enrichment is not in draft_ready status', {
         enrichmentId: input.enrichmentId,
         status: enrichment.status,
-      });
-      return { success: false, error: 'Enrichment is not ready for approval' };
+      })
+      return { success: false, error: 'Enrichment is not ready for approval' }
     }
 
     // Call tRPC API to approve the cover draft
-    const headers = await getBackendAuthHeaders();
+    const headers = await getBackendAuthHeaders()
     const response = await fetch(`${TRPC_URL}/enrichment.approveCoverDraft`, {
       method: 'POST',
       headers: {
@@ -824,39 +848,113 @@ export async function approveCoverDraft(
         enrichmentId: input.enrichmentId,
         selectedVariantId: input.selectedVariantId,
       }),
-    });
+    })
 
     if (!response.ok) {
-      const errorText = await response.text();
+      const errorText = await response.text()
       logger.error('[approveCoverDraft] tRPC call failed', {
         status: response.status,
         error: errorText,
-      });
-      return { success: false, error: `Failed to approve cover draft: ${response.status}` };
+      })
+      return { success: false, error: `Failed to approve cover draft: ${response.status}` }
     }
 
-    const result = await response.json();
+    const result = await response.json()
 
     if (!result.result?.data?.success) {
       return {
         success: false,
         error: result.result?.data?.error || 'Unknown error',
-      };
+      }
     }
 
     logger.info('[approveCoverDraft] Cover draft approved', {
       enrichmentId: input.enrichmentId,
       selectedVariantId: input.selectedVariantId,
-    });
+    })
 
-    return { success: true };
+    return { success: true }
   } catch (error) {
     logger.error('[approveCoverDraft] Unexpected error', {
       error: error instanceof Error ? error.message : String(error),
-    });
+    })
     return {
       success: false,
       error: error instanceof Error ? error.message : 'Failed to approve cover draft',
-    };
+    }
+  }
+}
+
+// ============================================================================
+// Get Lesson Enrichments
+// ============================================================================
+
+const getLessonEnrichmentsSchema = z.object({
+  lessonId: z.string().uuid('Invalid lesson ID'),
+  courseId: z.string().uuid('Invalid course ID'),
+})
+
+export interface GetLessonEnrichmentsInput {
+  lessonId: string
+  courseId: string
+}
+
+export interface GetLessonEnrichmentsResult {
+  success: boolean
+  enrichments?: Database['public']['Tables']['lesson_enrichments']['Row'][]
+  error?: string
+}
+
+/**
+ * Get all enrichments for a lesson by UUID
+ *
+ * Used for client-side refetch after generation completes.
+ */
+export async function getLessonEnrichments(
+  input: GetLessonEnrichmentsInput
+): Promise<GetLessonEnrichmentsResult> {
+  try {
+    const validation = getLessonEnrichmentsSchema.safeParse(input)
+    if (!validation.success) {
+      return { success: false, error: 'Invalid input data' }
+    }
+
+    const currentUser = await getCurrentUser()
+    if (!currentUser) {
+      return { success: false, error: 'Not authenticated' }
+    }
+
+    const supabase = await getUserClient()
+
+    // Authorization: Verify user owns the course
+    const { data: course, error: courseError } = await supabase
+      .from('courses')
+      .select('user_id')
+      .eq('id', input.courseId)
+      .single()
+
+    if (courseError || !course || course.user_id !== currentUser.id) {
+      return { success: false, error: 'Unauthorized' }
+    }
+
+    // Fetch enrichments (only completed status for viewer)
+    const { data: enrichments, error } = await supabase
+      .from('lesson_enrichments')
+      .select('*')
+      .eq('lesson_id', input.lessonId)
+      .eq('status', 'completed')
+      .order('order_index', { ascending: true })
+
+    if (error) {
+      logger.error('[getLessonEnrichments] Failed to fetch', { error: error.message })
+      return { success: false, error: 'Failed to fetch enrichments' }
+    }
+
+    return { success: true, enrichments: enrichments || [] }
+  } catch (error) {
+    logger.error('[getLessonEnrichments] Unexpected error', {
+      error: error instanceof Error ? error.message : String(error),
+    })
+    return { success: false, error: 'Failed to get enrichments' }
   }
 }
