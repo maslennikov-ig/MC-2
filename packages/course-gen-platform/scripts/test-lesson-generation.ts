@@ -19,10 +19,9 @@
 import { program } from 'commander';
 import * as fs from 'fs/promises';
 import * as path from 'path';
-import { getSupabaseAdmin } from '@/shared/supabase/admin';
 import logger from '@/shared/logger';
 import type { LessonSpecificationV2 } from '@megacampus/shared-types/lesson-specification-v2';
-import { ChatOpenAI } from '@langchain/openai';
+import { createOpenRouterModel } from '@/shared/llm/langchain-models';
 import { generateIntroduction } from '@/stages/stage6-lesson-content/nodes/generator/generator-content';
 import {
   checkPromptMarkers,
@@ -98,32 +97,98 @@ function parseArguments(): TestConfig {
 }
 
 /**
- * Load lesson specification from database
+ * Create a mock lesson specification for testing
+ * This is used when database doesn't have specification_v2 column
  */
-async function loadLessonSpec(courseId: string, lessonId: string): Promise<LessonSpecificationV2> {
-  logger.info({ courseId, lessonId }, 'Loading lesson specification from database');
+function createMockLessonSpec(): LessonSpecificationV2 {
+  return {
+    lesson_id: 'test-lesson-001',
+    course_id: 'test-course-001',
+    title: 'Сценарий "Дожим" (Closing the Deal)',
+    description:
+      'Урок о техниках завершения сделки и работе с возражениями клиента на финальном этапе переговоров.',
+    duration_minutes: 15,
+    difficulty_level: 'intermediate',
+    learning_objectives: [
+      {
+        objective: 'Освоить технику "дожима" для успешного завершения сделок',
+        bloom_level: 'apply',
+      },
+      {
+        objective: 'Научиться распознавать сигналы готовности клиента к покупке',
+        bloom_level: 'analyze',
+      },
+      {
+        objective: 'Применять стратегии создания срочности в переговорах',
+        bloom_level: 'apply',
+      },
+    ],
+    sections: [
+      {
+        section_id: 'sec_intro',
+        title: 'Введение в технику дожима',
+        order_index: 0,
+        estimated_duration_minutes: 3,
+        content_type: 'text',
+        key_concepts: ['дожим', 'закрытие сделки', 'финальный этап'],
+        depth_level: 'overview',
+      },
+      {
+        section_id: 'sec_signals',
+        title: 'Сигналы готовности клиента',
+        order_index: 1,
+        estimated_duration_minutes: 5,
+        content_type: 'text',
+        key_concepts: ['невербальные сигналы', 'вопросы клиента', 'позитивные индикаторы'],
+        depth_level: 'detailed',
+      },
+      {
+        section_id: 'sec_techniques',
+        title: 'Техники создания срочности',
+        order_index: 2,
+        estimated_duration_minutes: 5,
+        content_type: 'text',
+        key_concepts: ['ограниченное предложение', 'дедлайн', 'эксклюзивность'],
+        depth_level: 'detailed',
+      },
+      {
+        section_id: 'sec_practice',
+        title: 'Практические примеры',
+        order_index: 3,
+        estimated_duration_minutes: 2,
+        content_type: 'text',
+        key_concepts: ['кейсы', 'скрипты', 'диалоги'],
+        depth_level: 'practical',
+      },
+    ],
+    metadata: {
+      target_audience: 'Менеджеры по продажам B2B с опытом от 1 года',
+      tone: 'professional',
+      language: 'ru',
+      course_style: 'business',
+    },
+    intro_blueprint: {
+      hook_strategy: 'challenge',
+      hook_topic: 'Почему 80% сделок срываются на последнем этапе',
+      key_learning_objectives: 'Техники дожима, сигналы готовности, создание срочности',
+    },
+    lesson_context: {
+      position_in_course: 'middle',
+      prerequisite_concepts: ['базовые техники продаж', 'работа с возражениями'],
+      next_lesson_preview: 'Постпродажное обслуживание и upsell',
+    },
+  };
+}
 
-  const supabase = getSupabaseAdmin();
-
-  // Query lessons table for the spec
-  const { data: lesson, error } = await supabase
-    .from('lessons' as any)
-    .select('specification_v2, title, course_id')
-    .eq('id', lessonId)
-    .eq('course_id', courseId)
-    .single();
-
-  if (error || !lesson) {
-    throw new Error(`Failed to load lesson: ${error?.message || 'Not found'}`);
-  }
-
-  if (!lesson.specification_v2) {
-    throw new Error('Lesson does not have specification_v2 (V2 lesson spec required)');
-  }
-
-  logger.info({ lessonTitle: lesson.title }, 'Lesson specification loaded successfully');
-
-  return lesson.specification_v2 as LessonSpecificationV2;
+/**
+ * Load lesson specification (uses mock for testing)
+ */
+async function loadLessonSpec(
+  _courseId: string,
+  _lessonId: string
+): Promise<LessonSpecificationV2> {
+  logger.info('Using mock lesson specification for A/B testing');
+  return createMockLessonSpec();
 }
 
 /**
@@ -139,27 +204,11 @@ async function generateWithModel(
   logger.info({ model }, `Starting generation with model`);
 
   try {
-    // Create LangChain model instance with model override
-    const openaiKey = process.env.OPENROUTER_API_KEY;
-    if (!openaiKey) {
-      throw new Error('OPENROUTER_API_KEY environment variable not set');
-    }
+    // Create LangChain model instance using the SAME function as Stage 6
+    // This ensures identical configuration: temperature, headers, API key handling
+    const modelInstance = createOpenRouterModel(model, 0.7, 4000);
 
-    const modelInstance = new ChatOpenAI({
-      model: model,
-      temperature: 0.7,
-      maxTokens: 4000,
-      configuration: {
-        baseURL: 'https://openrouter.ai/api/v1',
-        apiKey: openaiKey,
-        defaultHeaders: {
-          'HTTP-Referer': process.env.APP_URL || 'https://megacampus.ai',
-          'X-Title': 'MegaCampus Course Generator - A/B Test',
-        },
-      },
-    });
-
-    // Generate introduction (simpler test than full content)
+    // Generate introduction using the SAME function as Stage 6
     const { content, tokensUsed } = await generateIntroduction(lessonSpec, language, modelInstance);
 
     const durationMs = Date.now() - startTime;
