@@ -14,7 +14,7 @@ const DARK_COLORS = {
   nodeText: '#f1f5f9', // slate-100
   nodeBorder: '#38bdf8', // sky-400
   lineColor: '#94a3b8', // slate-400
-  textColor: '#e2e8f0', // slate-200
+  textColor: '#ffffff', // white - максимальный контраст для edge labels
   clusterBg: '#1e293b', // slate-800
   clusterBorder: '#475569', // slate-600
   startNodeBg: '#34d399', // emerald-400 aligns with dark-mode success palette
@@ -217,6 +217,27 @@ function postProcessSvg(container: HTMLElement, isDark: boolean): void {
     element.setAttribute('fill', colors.lineColor)
     element.style.fill = colors.lineColor
   })
+
+  // Force edge label text colors for better contrast
+  container
+    .querySelectorAll('.edgeLabel, .edgeLabels text, .edgeLabel text, .edgeLabel span')
+    .forEach((el) => {
+      const element = el as SVGElement | HTMLElement
+      if (element instanceof SVGElement) {
+        element.setAttribute('fill', colors.textColor)
+      }
+      element.style.color = colors.textColor
+      element.style.fill = colors.textColor
+    })
+
+  // Force mindmap node text colors
+  container
+    .querySelectorAll('.mindmap-node text, .section text, [class*="mindmap"] text')
+    .forEach((el) => {
+      const element = el as SVGElement
+      element.setAttribute('fill', colors.nodeText)
+      element.style.fill = colors.nodeText
+    })
 
   // State diagrams use dedicated start/end markers that need higher contrast.
   container.querySelectorAll('.state-start').forEach((el) => {
@@ -483,9 +504,12 @@ export function MermaidDirect({ chart, className, ariaLabel }: MermaidDiagramPro
           themeVariables: isDark ? darkThemeVariables : lightThemeVariables,
           securityLevel: 'strict',
           flowchart: {
-            // Enable Markdown strings for automatic text wrapping in nodes
-            // This allows long text to wrap using `` ["`Long text`"] `` syntax
-            htmlLabels: false,
+            // Enable HTML labels for text wrapping support in nodes
+            htmlLabels: true,
+            // Adaptive width for better text display
+            useMaxWidth: true,
+            // Maximum text width before wrapping
+            wrappingWidth: 200,
           },
         })
 
