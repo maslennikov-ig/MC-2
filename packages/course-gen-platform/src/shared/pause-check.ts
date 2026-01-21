@@ -99,6 +99,19 @@ export async function checkPauseAndDelay(
       throw new Error('Job token is required for pause/delay operations');
     }
 
+    // Issue #7: Track pause delay count in job metrics
+    // Increment pauseDelayCount to track how many times this job was delayed due to pause
+    const currentData = job.data as Record<string, unknown>;
+    const previousDelayCount = (currentData.pauseDelayCount as number) || 0;
+    const newDelayCount = previousDelayCount + 1;
+
+    // Update job data with incremented pause delay count
+    // This persists across job retries and can be used for metrics/logging
+    await job.updateData({
+      ...currentData,
+      pauseDelayCount: newDelayCount,
+    });
+
     const delayUntil = Date.now() + PAUSE_DELAY_MS;
     logger.info(
       {
@@ -106,6 +119,7 @@ export async function checkPauseAndDelay(
         courseId,
         jobType: job.name,
         attemptsMade: job.attemptsMade,
+        pauseDelayCount: newDelayCount,
         delayUntil: new Date(delayUntil).toISOString(),
         pauseDelayMs: PAUSE_DELAY_MS,
       },

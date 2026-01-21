@@ -75,6 +75,14 @@ export class DocumentProcessingHandler extends BaseJobHandler<DocumentProcessing
       filePath,
     });
 
+    // Issue #2: Warn if token is missing - pause functionality won't work
+    if (!token) {
+      this.log(job, 'warn', 'Job token missing - pause/delay functionality disabled for this job', {
+        fileId,
+        courseId,
+      });
+    }
+
     // Check if generation is paused before starting work
     await checkPauseAndDelay(job, courseId, token);
 
