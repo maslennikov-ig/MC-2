@@ -23,6 +23,7 @@ import { DocumentProcessingOrchestrator } from './orchestrator';
 import { getSupabaseAdmin } from '../../shared/supabase/admin';
 import { logger } from '../../shared/logger/index.js';
 import { logPermanentFailure } from '../../shared/logger';
+import { checkPauseAndDelay } from '../../shared/pause-check';
 
 /**
  * Configuration for ENOENT retry logic
@@ -64,14 +65,18 @@ export class DocumentProcessingHandler extends BaseJobHandler<DocumentProcessing
    */
   async execute(
     jobData: DocumentProcessingJobData,
-    job: Job<DocumentProcessingJobData>
+    job: Job<DocumentProcessingJobData>,
+    token?: string
   ): Promise<JobResult> {
-    const { fileId, filePath } = jobData;
+    const { fileId, filePath, courseId } = jobData;
 
     this.log(job, 'info', 'Starting document processing', {
       fileId,
       filePath,
     });
+
+    // Check if generation is paused before starting work
+    await checkPauseAndDelay(job, courseId, token);
 
     // Layer 3: Worker validation and fallback initialization
     await this.ensureFsmInitialized(jobData, job);
