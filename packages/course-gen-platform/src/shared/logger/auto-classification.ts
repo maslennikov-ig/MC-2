@@ -67,6 +67,11 @@ export const AUTO_MUTE_RULES: AutoMuteRule[] = [
     reason: 'graceful_shutdown',
     description: 'Server shutdown events - expected during deploys',
   },
+  {
+    pattern: /Shutdown already in progress/i,
+    reason: 'graceful_shutdown',
+    description: 'Duplicate shutdown signal received - expected during process termination',
+  },
 
   // === Monitoring & Health Probes ===
   {
