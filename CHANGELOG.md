@@ -311,6 +311,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.28.22] - 2026-01-21
+
+### Added
+
+- **courses**: integrate course cover images into UI (4a50c9a)
+- **redis**: add graceful shutdown coordination with BullMQ workers (f25336c)
+
+### Fixed
+
+- **generation**: add token validation warnings and pause delay tracking (eae916e)
+- **generation**: address code review findings for pause/stop/resume (fc09aca)
+- **redis**: improve retry strategy with graceful shutdown and health monitoring (861a7a9)
+- **generation**: make pause/stop/resume controls work correctly (f85870f)
+- **redis**: exit process after extended connection failure (~20 min) (22111bb)
+- **redis**: never give up on reconnection, use exponential backoff (a12150b)
+
+### Other
+
+- update docs (a3a01e1)
+- add comprehensive progress report for January 2026 (f9131af)
+- bd sync: 2026-01-21 13:29:35 (a9ebad2)
+- bd sync: 2026-01-21 13:25:34 (897cbeb)
+- bd sync: 2026-01-21 13:24:28 (bbf959a)
+- bd sync: 2026-01-21 13:16:13 (0e81dd7)
+- bd sync: 2026-01-21 13:16:05 (b36e895)
+- bd sync: 2026-01-21 13:08:13 (6acd831)
+- bd sync: 2026-01-21 13:07:23 (76fc306)
+- bd sync: 2026-01-21 13:05:52 (50ac75d)
+- bd sync: 2026-01-21 12:56:35 (b4a4e65)
+- bd sync: 2026-01-21 12:54:12 (6fd6f14)
+- bd sync: 2026-01-21 12:53:42 (9c177d1)
+- bd sync: 2026-01-21 12:43:55 (2c5a740)
+- merge develop into master (4dd1bc8)
+
 ## [0.28.21] - 2026-01-21
 
 ### Added

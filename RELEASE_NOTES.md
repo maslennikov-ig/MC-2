@@ -2,6 +2,28 @@
 
 _Released on 2025-12-26_
 
+## v0.28.22
+
+_Released on 2026-01-21_
+
+### ✨ New Features
+
+- **courses**: Integrate course cover images into UI
+- **redis**: Add graceful shutdown coordination with BullMQ workers
+
+### 🐛 Bug Fixes
+
+- **generation**: Add token validation warnings and pause delay tracking
+- **generation**: Address code review findings for pause/stop/resume
+- **redis**: Improve retry strategy with graceful shutdown and health monitoring
+- **generation**: Make pause/stop/resume controls work correctly
+- **redis**: Exit process after extended connection failure (~20 min)
+- **redis**: Never give up on reconnection, use exponential backoff
+
+---
+
+_This release was automatically generated from 23 commits._
+
 ## v0.28.21
 
 _Released on 2026-01-21_
