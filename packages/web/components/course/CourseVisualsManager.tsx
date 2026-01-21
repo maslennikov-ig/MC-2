@@ -44,11 +44,16 @@ export function CourseVisualsManager({
 
   const [isGeneratingCovers, setIsGeneratingCovers] = useState(false)
   const [coversProgress, setCoversProgress] = useState({ current: 0, total: 0 })
+  const [isGeneratingCards, setIsGeneratingCards] = useState(false)
+  const [cardsProgress, setCardsProgress] = useState({ current: 0, total: 0 })
 
   const missingCovers = lessons.filter((l) => !l.hasCover).length
+  const missingCards = lessons.filter((l) => !l.hasCard).length
   const totalLessons = lessons.length
   const coverPercentage =
     totalLessons > 0 ? Math.round(((totalLessons - missingCovers) / totalLessons) * 100) : 0
+  const cardPercentage =
+    totalLessons > 0 ? Math.round(((totalLessons - missingCards) / totalLessons) * 100) : 0
 
   const getAuthHeaders = () => ({
     'Content-Type': 'application/json',
@@ -90,6 +95,44 @@ export function CourseVisualsManager({
       toast.error(t('errors.generationFailed'))
     } finally {
       setIsGeneratingCovers(false)
+    }
+  }
+
+  const handleGenerateMissingCards = async () => {
+    if (missingCards === 0) {
+      toast.info(t('images.allGenerated'))
+      return
+    }
+
+    setIsGeneratingCards(true)
+    setCardsProgress({ current: 0, total: missingCards })
+
+    try {
+      const response = await fetch(`${BACKEND_URL}/trpc/enrichment.generateBatchCards`, {
+        method: 'POST',
+        headers: getAuthHeaders(),
+        body: JSON.stringify({
+          courseId,
+          skipExisting: true,
+        }),
+      })
+
+      if (!response.ok) {
+        throw new Error('Batch card generation failed')
+      }
+
+      const result = await response.json()
+      const data = result.result?.data
+
+      toast.success(t('images.batchComplete', { count: data?.triggered || 0 }))
+
+      // Refresh page to show updated status
+      router.refresh()
+    } catch (error) {
+      console.error('Batch card generation error:', error)
+      toast.error(t('errors.generationFailed'))
+    } finally {
+      setIsGeneratingCards(false)
     }
   }
 
@@ -192,6 +235,72 @@ export function CourseVisualsManager({
                 </div>
                 <Badge variant={lesson.hasCover ? 'default' : 'outline'} className="ml-2">
                   {lesson.hasCover ? (
+                    <CheckCircle className="h-3 w-3" />
+                  ) : (
+                    <Circle className="h-3 w-3" />
+                  )}
+                </Badge>
+              </div>
+            ))}
+          </div>
+        </CardContent>
+      </Card>
+
+      {/* Lesson Cards Section (1:1 thumbnails) */}
+      <Card>
+        <CardHeader>
+          <div className="flex items-center justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2">
+                <Image className="h-5 w-5 text-indigo-500" />
+                {tCourse('visuals.lessonCards')}
+              </CardTitle>
+              <CardDescription>
+                {tCourse('visuals.lessonCardsDescription', {
+                  completed: totalLessons - missingCards,
+                  total: totalLessons,
+                })}
+              </CardDescription>
+            </div>
+            <Button
+              onClick={() => void handleGenerateMissingCards()}
+              disabled={isGeneratingCards || missingCards === 0}
+            >
+              {isGeneratingCards ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  {t('images.batchProgress', cardsProgress)}
+                </>
+              ) : (
+                <>
+                  <Sparkles className="mr-2 h-4 w-4" />
+                  {t('images.batchGenerate')} ({missingCards})
+                </>
+              )}
+            </Button>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <div className="mb-4">
+            <div className="mb-1 flex justify-between text-sm">
+              <span>{tCourse('visuals.progress')}</span>
+              <span>{cardPercentage}%</span>
+            </div>
+            <Progress value={cardPercentage} className="h-2" />
+          </div>
+
+          <div className="max-h-96 space-y-2 overflow-y-auto">
+            {lessons.map((lesson) => (
+              <div
+                key={`card-${lesson.id}`}
+                className="bg-muted/50 flex items-center justify-between rounded-lg p-3"
+              >
+                <div className="min-w-0 flex-1">
+                  <p className="truncate font-medium">{lesson.title}</p>
+                  <p className="text-muted-foreground truncate text-sm">{lesson.sectionTitle}</p>
+                </div>
+                <Badge variant={lesson.hasCard ? 'default' : 'outline'} className="ml-2">
+                  {lesson.hasCard ? (
                     <CheckCircle className="h-3 w-3" />
                   ) : (
                     <Circle className="h-3 w-3" />
