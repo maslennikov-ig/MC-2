@@ -20,7 +20,8 @@ fi
 
 # 2. Clean up any conflicting containers from previous failed deploys
 echo "Cleaning up orphan dev containers..."
-docker container ls -a --filter "name=megacampus-.*-dev" --format "{{.ID}}" | xargs -r docker rm -f 2>/dev/null || true
+# Docker filter doesn't support regex, so we explicitly list dev container names
+docker rm -f megacampus-api-dev megacampus-web-dev 2>/dev/null || true
 
 # 3. Ensure infrastructure is running (shared with staging)
 echo "Ensuring infrastructure is running..."
