@@ -12,8 +12,25 @@ import { Job, DelayedError } from 'bullmq';
 import { logger } from './logger';
 import { getSupabaseAdmin } from './supabase/admin';
 
-/** How long to delay a job when paused (default 30 seconds, configurable via env) */
-export const PAUSE_DELAY_MS = parseInt(process.env.PAUSE_DELAY_MS || '30000', 10);
+/**
+ * Delay between pause checks (default 30s).
+ * Too short: excessive DB queries during pause.
+ * Too long: poor UX (user waits longer after resume).
+ * Configure via PAUSE_DELAY_MS env var (clamped to 5s-120s range).
+ */
+const DEFAULT_PAUSE_DELAY_MS = 30000;
+const MIN_PAUSE_DELAY_MS = 5000;
+const MAX_PAUSE_DELAY_MS = 120000;
+const PAUSE_DELAY_MS_RAW = parseInt(
+  process.env.PAUSE_DELAY_MS || String(DEFAULT_PAUSE_DELAY_MS),
+  10
+);
+
+// Validate: clamp to valid range (5s-120s)
+export const PAUSE_DELAY_MS = Math.max(
+  MIN_PAUSE_DELAY_MS,
+  Math.min(PAUSE_DELAY_MS_RAW, MAX_PAUSE_DELAY_MS)
+);
 
 /**
  * Check if course generation is paused by querying the generation_paused_at column.
@@ -82,13 +99,21 @@ export async function checkPauseAndDelay(
       throw new Error('Job token is required for pause/delay operations');
     }
 
+    const delayUntil = Date.now() + PAUSE_DELAY_MS;
     logger.info(
-      { jobId: job.id, courseId, jobType: job.name },
+      {
+        jobId: job.id,
+        courseId,
+        jobType: job.name,
+        attemptsMade: job.attemptsMade,
+        delayUntil: new Date(delayUntil).toISOString(),
+        pauseDelayMs: PAUSE_DELAY_MS,
+      },
       'Course generation is paused, delaying job'
     );
 
     // Move job to delayed state - it will be picked up again after PAUSE_DELAY_MS
-    await job.moveToDelayed(Date.now() + PAUSE_DELAY_MS, token);
+    await job.moveToDelayed(delayUntil, token);
 
     // Throw DelayedError to signal the worker that the job was delayed
     throw new DelayedError();
