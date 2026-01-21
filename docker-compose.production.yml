@@ -23,7 +23,9 @@ services:
       timeout: 3s
       retries: 3
     networks:
-      - megacampus
+      megacampus:
+        aliases:
+          - redis
     deploy:
       resources:
         limits:
@@ -164,7 +166,7 @@ services:
     environment:
       - NODE_ENV=production
       - PORT=4000
-      - REDIS_URL=redis://redis:6379
+      - REDIS_URL=redis://megacampus-redis:6379
       - DOCLING_MCP_URL=http://docling-mcp:8000/mcp
       # Fix file path for document processing (override .env from image)
       - DOCLING_UPLOADS_BASE_PATH=/app
@@ -213,7 +215,7 @@ services:
       - .env.production
     environment:
       - NODE_ENV=production
-      - REDIS_URL=redis://redis:6379
+      - REDIS_URL=redis://megacampus-redis:6379
       - DOCLING_MCP_URL=http://docling-mcp:8000/mcp
       # Path to shared docling JSON cache
       - DOCLING_CACHE_PATH=/app/docling-cache
@@ -261,7 +263,7 @@ services:
       - .env.production
     environment:
       - NODE_ENV=production
-      - REDIS_URL=redis://redis:6379
+      - REDIS_URL=redis://megacampus-redis:6379
       # Enable dedicated Stage 6 worker mode (30 concurrent)
       - STAGE6_WORKER=true
       # Path to shared docling JSON cache
@@ -304,7 +306,7 @@ services:
       - .env.production
     environment:
       - NODE_ENV=production
-      - REDIS_URL=redis://redis:6379
+      - REDIS_URL=redis://megacampus-redis:6379
       # Storage bucket for enrichment assets
       - ENRICHMENTS_STORAGE_BUCKET=course-enrichments
       # Fix file path for document processing (override .env from image)
@@ -331,7 +333,8 @@ services:
 
 networks:
   megacampus:
-    driver: bridge
+    external: true
+    name: megacampus-network
 
 volumes:
   redis-data:
