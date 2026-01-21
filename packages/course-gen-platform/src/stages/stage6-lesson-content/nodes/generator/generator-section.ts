@@ -122,10 +122,16 @@ export async function generateSection(
 
   // Filter RAG chunks for this section
   const sectionChunks = filterChunksForSection(ragChunks, section.rag_context_id);
-  if (sectionChunks.length === 0) {
+  // Only warn if documents were available (ragChunks not empty) but none matched this section
+  // If ragChunks is empty, it means course has no documents - already logged in retriever
+  if (sectionChunks.length === 0 && ragChunks.length > 0) {
     logger.warn(
-      { sectionTitle: section.title, ragContextId: section.rag_context_id },
-      'No RAG chunks found for section - content will be generated without reference materials'
+      {
+        sectionTitle: section.title,
+        ragContextId: section.rag_context_id,
+        totalChunks: ragChunks.length,
+      },
+      'No RAG chunks matched this section - content will be generated without section-specific reference materials'
     );
   }
   const ragContextXML = formatRAGContextXML(sectionChunks, 15000);
