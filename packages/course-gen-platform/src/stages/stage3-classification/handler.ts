@@ -55,6 +55,14 @@ export class Stage3ClassificationHandler extends BaseJobHandler<DocumentClassifi
 
     this.log(job, 'info', 'Starting Stage 3 classification', { courseId, organizationId });
 
+    // Issue #2: Warn if token is missing - pause functionality won't work
+    if (!token) {
+      this.log(job, 'warn', 'Job token missing - pause/delay functionality disabled for this job', {
+        courseId,
+        organizationId,
+      });
+    }
+
     // Check if generation is paused before starting work
     await checkPauseAndDelay(job, courseId, token);
 

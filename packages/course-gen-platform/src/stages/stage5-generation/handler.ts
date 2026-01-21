@@ -500,6 +500,14 @@ class Stage5GenerationHandler {
 
     const { course_id, organization_id, user_id } = input;
 
+    // Issue #2: Warn if token is missing - pause functionality won't work
+    if (!token) {
+      logger.warn(
+        { jobId: job.id, courseId: course_id, organizationId: organization_id },
+        'Job token missing - pause/delay functionality disabled for this job'
+      );
+    }
+
     // Check if generation is paused before starting work
     await checkPauseAndDelay(job, course_id, token);
 
