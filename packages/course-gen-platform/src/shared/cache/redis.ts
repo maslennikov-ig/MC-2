@@ -16,22 +16,25 @@ export function getRedisClient(): Redis {
     const redisUrl = process.env.REDIS_URL || 'redis://localhost:6379';
 
     redisClient = new Redis(redisUrl, {
-      maxRetriesPerRequest: null,  // Required for BullMQ
-      enableOfflineQueue: true,  // Always enable for resilience - allows commands to queue while reconnecting
+      maxRetriesPerRequest: null, // Required for BullMQ
+      enableOfflineQueue: true, // Always enable for resilience - allows commands to queue while reconnecting
       lazyConnect: true,
       connectTimeout: 10000,
       keepAlive: 30000,
       family: 4,
       retryStrategy(times) {
-        const delay = Math.min(times * 50, 2000);
-        if (times > 10) {
-          logger.warn('Redis retry limit reached (10 attempts)');
-          return null;
+        // Exponential backoff: 100ms, 200ms, 400ms... up to 30s max
+        // Never return null - keep trying forever for production resilience
+        const delay = Math.min(100 * Math.pow(2, times - 1), 30000);
+        if (times % 10 === 0) {
+          // Log every 10 attempts to avoid spam
+          logger.warn({ attempts: times, nextDelayMs: delay }, 'Redis reconnecting...');
         }
         return delay;
       },
       reconnectOnError(err) {
-        const targetErrors = ['READONLY', 'ECONNRESET', 'ETIMEDOUT'];
+        // Reconnect on transient errors including DNS failures
+        const targetErrors = ['READONLY', 'ECONNRESET', 'ETIMEDOUT', 'EAI_AGAIN', 'ENOTFOUND'];
         if (targetErrors.some(e => err.message.includes(e))) {
           logger.warn({ error: err.message }, 'Redis reconnecting on error');
           return true;
@@ -122,15 +125,18 @@ export async function ensureRedisConnection(timeoutMs: number = 5000): Promise<b
       client.ping(),
       new Promise<never>((_, reject) =>
         setTimeout(() => reject(new Error('Redis ping timeout')), timeoutMs)
-      )
+      ),
     ]);
 
     return true;
   } catch (error) {
-    logger.warn({
-      error: error instanceof Error ? error.message : String(error),
-      timeout: timeoutMs,
-    }, 'Redis connection check failed (graceful degradation)');
+    logger.warn(
+      {
+        error: error instanceof Error ? error.message : String(error),
+        timeout: timeoutMs,
+      },
+      'Redis connection check failed (graceful degradation)'
+    );
     return false;
   }
 }
@@ -175,9 +181,12 @@ export class RedisCache {
           isConnected = true;
           return;
         }
-        logger.error({
-          error: error instanceof Error ? error.message : String(error),
-        }, 'Redis connection failed, degrading gracefully');
+        logger.error(
+          {
+            error: error instanceof Error ? error.message : String(error),
+          },
+          'Redis connection failed, degrading gracefully'
+        );
         // Graceful degradation - app continues without Redis
       } finally {
         connectionPromise = null;
@@ -195,7 +204,10 @@ export class RedisCache {
       const value = await this.client.get(key);
       return value ? (JSON.parse(value) as T) : null;
     } catch (error) {
-      logger.error({ key, err: error instanceof Error ? error.message : String(error) }, 'Redis GET error');
+      logger.error(
+        { key, err: error instanceof Error ? error.message : String(error) },
+        'Redis GET error'
+      );
       return null;
     }
   }
@@ -213,7 +225,10 @@ export class RedisCache {
       }
       return true;
     } catch (error) {
-      logger.error({ key, err: error instanceof Error ? error.message : String(error) }, 'Redis SET error');
+      logger.error(
+        { key, err: error instanceof Error ? error.message : String(error) },
+        'Redis SET error'
+      );
       return false;
     }
   }
@@ -226,7 +241,10 @@ export class RedisCache {
       await this.client.del(key);
       return true;
     } catch (error) {
-      logger.error({ key, err: error instanceof Error ? error.message : String(error) }, 'Redis DELETE error');
+      logger.error(
+        { key, err: error instanceof Error ? error.message : String(error) },
+        'Redis DELETE error'
+      );
       return false;
     }
   }
@@ -239,7 +257,10 @@ export class RedisCache {
       const result = await this.client.exists(key);
       return result === 1;
     } catch (error) {
-      logger.error({ key, err: error instanceof Error ? error.message : String(error) }, 'Redis EXISTS error');
+      logger.error(
+        { key, err: error instanceof Error ? error.message : String(error) },
+        'Redis EXISTS error'
+      );
       return false;
     }
   }
