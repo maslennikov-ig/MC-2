@@ -24,12 +24,25 @@ export function getRedisClient(): Redis {
       family: 4,
       retryStrategy(times) {
         // Exponential backoff: 100ms, 200ms, 400ms... up to 30s max
-        // Never return null - keep trying forever for production resilience
         const delay = Math.min(100 * Math.pow(2, times - 1), 30000);
+
+        // Log progress every 10 attempts
         if (times % 10 === 0) {
-          // Log every 10 attempts to avoid spam
           logger.warn({ attempts: times, nextDelayMs: delay }, 'Redis reconnecting...');
         }
+
+        // After ~20 minutes of trying (60 attempts with max 30s delay),
+        // exit process to let Docker restart us with a fresh state
+        if (times >= 60) {
+          logger.error(
+            { attempts: times, totalTimeMinutes: '~20' },
+            'Redis unavailable for extended period, exiting for container restart'
+          );
+          // Use setImmediate to allow the log to flush before exit
+          setImmediate(() => process.exit(1));
+          return null; // Stop retrying (process will exit anyway)
+        }
+
         return delay;
       },
       reconnectOnError(err) {
