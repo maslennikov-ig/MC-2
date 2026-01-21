@@ -16,6 +16,7 @@
  *   --models "xiaomi/mimo-v2-flash:free,z-ai/glm-4.7-flash,allenai/olmo-3.1-32b-instruct"
  */
 
+import 'dotenv/config';
 import { program } from 'commander';
 import * as fs from 'fs/promises';
 import * as path from 'path';
