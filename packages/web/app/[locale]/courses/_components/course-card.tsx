@@ -499,7 +499,7 @@ export function CourseCard({
               />
             </div>
             {/* Gradient overlay for text readability */}
-            <div className="absolute inset-0 z-[1] bg-gradient-to-t from-black/90 via-black/60 to-black/30" />
+            <div className="absolute inset-0 z-[1] bg-gradient-to-t from-black/95 via-black/75 to-black/40" />
           </>
         )}
 
@@ -557,7 +557,7 @@ export function CourseCard({
             className={cn(
               'text-truncate-2 transition-colors-fast text-lg font-semibold',
               hasCover
-                ? 'text-white group-hover:text-purple-200'
+                ? 'text-white [text-shadow:_0_1px_3px_rgb(0_0_0_/_60%)] group-hover:text-purple-200'
                 : 'text-gray-900 group-hover:text-purple-600 dark:text-white dark:group-hover:text-purple-300'
             )}
           >
@@ -869,12 +869,7 @@ export function CourseCard({
           <Button
             size="sm"
             variant="default"
-            className={cn(
-              'h-10 w-full !rounded-full text-sm font-medium shadow-sm transition-all hover:shadow-md',
-              hasCover
-                ? 'border border-white/30 bg-white/20 text-white backdrop-blur-sm hover:bg-white/30'
-                : 'bg-gradient-to-r from-purple-600 to-purple-700 text-white hover:from-purple-700 hover:to-purple-800'
-            )}
+            className="h-10 w-full !rounded-full bg-gradient-to-r from-purple-600 to-purple-700 text-sm font-medium text-white shadow-lg transition-all hover:from-purple-700 hover:to-purple-800 hover:shadow-xl"
             onClick={(e) => {
               e.stopPropagation()
               handleView()

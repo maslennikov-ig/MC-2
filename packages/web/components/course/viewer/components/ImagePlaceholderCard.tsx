@@ -92,6 +92,9 @@ export function ImagePlaceholderCard({
         <p className="text-sm text-gray-500 dark:text-gray-400">
           {t(`images.${type}.description`)}
         </p>
+        <p className="text-xs text-gray-400 italic dark:text-gray-500">
+          {t(`images.${type}.usageHint`)}
+        </p>
 
         <Collapsible open={isOptionsOpen} onOpenChange={setIsOptionsOpen}>
           <CollapsibleTrigger asChild>

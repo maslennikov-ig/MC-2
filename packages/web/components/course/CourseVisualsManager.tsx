@@ -238,6 +238,9 @@ export function CourseVisualsManager({
                   total: totalLessons,
                 })}
               </CardDescription>
+              <p className="text-muted-foreground mt-1 text-xs italic">
+                {tCourse('visuals.lessonCoversHint')}
+              </p>
             </div>
             <Button
               onClick={() => void handleGenerateMissingCovers()}
@@ -312,6 +315,9 @@ export function CourseVisualsManager({
                   total: totalLessons,
                 })}
               </CardDescription>
+              <p className="text-muted-foreground mt-1 text-xs italic">
+                {tCourse('visuals.lessonCardsHint')}
+              </p>
             </div>
             <Button
               onClick={() => void handleGenerateMissingCards()}
