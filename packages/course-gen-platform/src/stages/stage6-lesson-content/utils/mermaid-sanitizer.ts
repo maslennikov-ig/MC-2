@@ -44,7 +44,8 @@ export interface MermaidFix {
     | 'SUBGRAPH_END_ADDED'
     | 'RAW_QUOTE_REMOVED'
     | 'EDGE_LABEL_ESCAPED'
-    | 'LONG_TEXT_WRAPPED';
+    | 'LONG_TEXT_WRAPPED'
+    | 'BACKTICK_IN_LABEL_REMOVED';
   /** Number of occurrences fixed */
   count: number;
   /** Block index (0-based) */
@@ -245,6 +246,35 @@ export function sanitizeMermaidBlocks(content: string): MermaidSanitizeResult {
             quotesRemoved: escapedQuotesFixed,
           },
           'Mermaid sanitizer: fixed escaped quotes'
+        );
+      }
+
+      // -------------------------------------------------------------------------
+      // Fix 1.5: Remove backticks inside node labels [...]
+      // LLM sometimes generates: D[\"`text`\"] which becomes D[`text`] after Fix 1
+      // Backticks inside square brackets are invalid Mermaid syntax
+      // Pattern: [` text `] → [ text ]
+      // -------------------------------------------------------------------------
+      let backticksInLabelsFixed = 0;
+      sanitized = sanitized.replace(/\[`([^`\]]*)`\]/g, (_match, content) => {
+        backticksInLabelsFixed++;
+        return `[${content}]`;
+      });
+
+      if (backticksInLabelsFixed > 0) {
+        fixes.push({
+          type: 'BACKTICK_IN_LABEL_REMOVED',
+          count: backticksInLabelsFixed,
+          blockIndex,
+        });
+        modified = true;
+
+        logger.debug(
+          {
+            blockIndex,
+            backticksFixed: backticksInLabelsFixed,
+          },
+          'Mermaid sanitizer: removed backticks from node labels'
         );
       }
 
@@ -724,12 +754,21 @@ export function hasBrokenMermaidSyntax(content: string): boolean {
     }
 
     // Check for raw quotes in node labels (causes 'got STR' errors)
-    if (/\w+\[[^\]]*"[^\]"]*"[^\]]*\]/.test(block)) {
+    // Pattern: A[text: "quoted"] → BAD (quotes in middle of label)
+    // But NOT: A["text"] or A["`text`"] → OK (quoted labels / markdown strings)
+    // The difference: content exists BEFORE the first quote
+    if (/\w+\[[^\]"]+[""][^\]"]*[""][^\]]*\]/.test(block)) {
       return true;
     }
 
     // Check for parentheses in edge labels (causes 'got PS' errors)
     if (/\|[^|]*[()][^|]*\|/.test(block)) {
+      return true;
+    }
+
+    // Check for backticks inside node labels (causes parse errors)
+    // Pattern: [`text`] is invalid Mermaid syntax
+    if (/\[`[^`\]]*`\]/.test(block)) {
       return true;
     }
   }
