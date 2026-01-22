@@ -198,6 +198,11 @@ export async function executeTargetedRefinement(
         );
 
         for (const result of patchResults) {
+          // Always increment edit count to prevent infinite loops on repeated failures
+          // Section will lock after sectionLockAfterEdits attempts (success or failure)
+          state.sectionEditCount[result.sectionId] =
+            (state.sectionEditCount[result.sectionId] || 0) + 1;
+
           if (result.success) {
             currentContent = applyPatchToContent(
               currentContent,
@@ -205,8 +210,18 @@ export async function executeTargetedRefinement(
               result.patchedContent
             );
             state.tokensUsed += result.tokensUsed;
-            state.sectionEditCount[result.sectionId] =
-              (state.sectionEditCount[result.sectionId] || 0) + 1;
+          } else {
+            // Log failed attempt for debugging (hallucination rejection, truncation, etc.)
+            logger.warn(
+              {
+                sectionId: result.sectionId,
+                editCount: state.sectionEditCount[result.sectionId],
+                maxEdits: REFINEMENT_CONFIG.quality.sectionLockAfterEdits,
+              },
+              'Patcher failed - edit attempt counted toward section lock'
+            );
+            // Still count tokens used even on failure (for budget tracking)
+            state.tokensUsed += result.tokensUsed;
           }
         }
       }
@@ -223,6 +238,10 @@ export async function executeTargetedRefinement(
             language
           );
 
+          // Always increment edit count to prevent infinite loops on repeated failures
+          state.sectionEditCount[result.sectionId] =
+            (state.sectionEditCount[result.sectionId] || 0) + 1;
+
           if (result.success) {
             currentContent = applyPatchToContent(
               currentContent,
@@ -230,8 +249,17 @@ export async function executeTargetedRefinement(
               result.regeneratedContent
             );
             state.tokensUsed += result.tokensUsed;
-            state.sectionEditCount[result.sectionId] =
-              (state.sectionEditCount[result.sectionId] || 0) + 1;
+          } else {
+            // Log failed attempt for debugging
+            logger.warn(
+              {
+                sectionId: result.sectionId,
+                editCount: state.sectionEditCount[result.sectionId],
+                maxEdits: REFINEMENT_CONFIG.quality.sectionLockAfterEdits,
+              },
+              'Expander failed - edit attempt counted toward section lock'
+            );
+            state.tokensUsed += result.tokensUsed;
           }
         }
       }
