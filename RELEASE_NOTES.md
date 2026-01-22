@@ -2,6 +2,30 @@
 
 _Released on 2025-12-26_
 
+## v0.28.24
+
+_Released on 2026-01-22_
+
+### ✨ New Features
+
+- **types**: Add Zod validation for AnalysisResult type
+- **enrichments**: Unify placeholder cards to Hover Reveal style
+- **pipeline**: Pass user-edited params between stages
+
+### 🔧 Improvements
+
+- **enrichment**: Split UnifiedEnrichmentCard into subcomponents
+- **enrichment**: P3 improvements - extract LabelWithTooltip, use type guards
+
+### 🐛 Bug Fixes
+
+- **pipeline**: Persist Stage 4 edits and show per-field save status
+- **enrichments**: Address code review issues for UnifiedEnrichmentCard
+
+---
+
+_This release was automatically generated from 16 commits._
+
 ## v0.28.23
 
 _Released on 2026-01-21_

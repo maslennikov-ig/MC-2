@@ -311,6 +311,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.28.24] - 2026-01-22
+
+### Added
+
+- **types**: add Zod validation for AnalysisResult type (82dc244)
+- **enrichments**: unify placeholder cards to Hover Reveal style (7f1bfb7)
+- **pipeline**: pass user-edited params between stages (7b226f6)
+
+### Changed
+
+- **enrichment**: split UnifiedEnrichmentCard into subcomponents (da794bf)
+- **enrichment**: P3 improvements - extract LabelWithTooltip, use type guards (1b78cbc)
+
+### Fixed
+
+- **pipeline**: persist Stage 4 edits and show per-field save status (a877e7c)
+- **enrichments**: address code review issues for UnifiedEnrichmentCard (df28103)
+
+### Other
+
+- bd sync: 2026-01-22 11:52:05 (292da7b)
+- bd sync: 2026-01-22 11:47:56 (be8620f)
+- bd sync: 2026-01-22 11:42:40 (0a8d55a)
+- bd sync: 2026-01-22 11:39:45 (96712f1)
+- bd sync: 2026-01-22 11:38:04 (a33430b)
+- bd sync: 2026-01-22 11:36:23 (441a616)
+- bd sync: 2026-01-22 11:27:37 (2430bcf)
+- bd sync: 2026-01-22 10:47:23 (df7ee52)
+- bd sync: 2026-01-22 10:46:21 (6abb58c)
+
 ## [0.28.23] - 2026-01-21
 
 ### Added
