@@ -356,6 +356,31 @@ export class GenerationOrchestrator {
       durationMs: 0,
     });
 
+    // T012: Log parameter validation from Stage 4
+    await logTrace({
+      courseId: input.course_id,
+      stage: 'stage_5',
+      phase: 'init',
+      stepName: 'parameter_validate',
+      inputData: {
+        source: 'stage_4',
+        hasAnalysisResult: !!input.analysis_result,
+        hasGenerationGuidance: !!input.analysis_result?.generation_guidance,
+        hasPedagogicalPatterns: !!input.analysis_result?.pedagogical_patterns,
+        hasRecommendedStructure: !!input.analysis_result?.recommended_structure,
+      },
+      outputData: {
+        validationPassed: !!(
+          input.analysis_result &&
+          input.analysis_result.recommended_structure &&
+          input.analysis_result.content_strategy
+        ),
+        totalSections: input.analysis_result?.recommended_structure?.total_sections,
+        totalLessons: input.analysis_result?.recommended_structure?.total_lessons,
+      },
+      durationMs: 0,
+    });
+
     // ========== STEP 1: Initialize state ==========
     const initialState: GenerationStateType = {
       input,

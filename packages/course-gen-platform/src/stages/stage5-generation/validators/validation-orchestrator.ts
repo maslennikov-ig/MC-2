@@ -18,6 +18,8 @@ import { ValidationSeverity, type ValidationResult } from '@megacampus/shared-ty
 import { validateBloomsTaxonomy, hasNonMeasurableVerb } from './blooms-validators';
 import { validatePlaceholders, scanForPlaceholders } from './placeholder-validator';
 import { validateDurationProportionality } from './duration-validator';
+import { logTrace } from '../../../shared/trace-logger';
+import logger from '../../../shared/logger';
 
 /**
  * Validation issue with context
@@ -60,10 +62,12 @@ export interface OrchestratedValidationResult {
  * - INFO: Monitoring only
  *
  * @param structure - Course structure to validate
+ * @param courseId - Optional course ID for trace logging (Issue #13)
  * @returns Orchestrated validation result
  */
 export async function orchestrateValidation(
-  structure: CourseStructure
+  structure: CourseStructure,
+  courseId?: string
 ): Promise<OrchestratedValidationResult> {
   const results: ValidationResult[] = [];
   const errors: ValidationIssue[] = [];
@@ -88,6 +92,21 @@ export async function orchestrateValidation(
           suggestion: result.suggestion,
           score: result.score,
         });
+
+        // T013: Log placeholder validation failure to error_logs
+        if (courseId) {
+          logger.warn(
+            {
+              courseId,
+              ruleId: 'placeholder_detection',
+              severity: 'WARNING',
+              path: issue,
+              suggestion: result.suggestion,
+              issues: result.issues,
+            },
+            'Validation warning: placeholder detected'
+          );
+        }
       } else if (result.severity === ValidationSeverity.WARNING && result.warnings) {
         warnings.push({
           rule: 'placeholder_detection',
@@ -97,6 +116,21 @@ export async function orchestrateValidation(
           suggestion: result.suggestion,
           score: result.score,
         });
+
+        // T013: Log placeholder validation warning to error_logs
+        if (courseId) {
+          logger.warn(
+            {
+              courseId,
+              ruleId: 'placeholder_detection',
+              severity: 'WARNING',
+              path: issue,
+              suggestion: result.suggestion,
+              warnings: result.warnings,
+            },
+            'Validation warning: placeholder pattern detected'
+          );
+        }
       }
     }
   }
@@ -121,7 +155,7 @@ export async function orchestrateValidation(
       allObjectives.push({
         text,
         language: structureLanguage,
-        path: `sections[${sectionIdx}].learning_objectives[${objIdx}]`
+        path: `sections[${sectionIdx}].learning_objectives[${objIdx}]`,
       });
     });
 
@@ -131,7 +165,7 @@ export async function orchestrateValidation(
         allObjectives.push({
           text,
           language: structureLanguage,
-          path: `sections[${sectionIdx}].lessons[${lessonIdx}].lesson_objectives[${objIdx}]`
+          path: `sections[${sectionIdx}].lessons[${lessonIdx}].lesson_objectives[${objIdx}]`,
         });
       });
     });
@@ -145,7 +179,9 @@ export async function orchestrateValidation(
         rule: 'non_measurable_verbs',
         severity: ValidationSeverity.ERROR,
         path,
-        issues: [`Non-measurable verb detected in "${text}". Cannot verify learning through assessment.`],
+        issues: [
+          `Non-measurable verb detected in "${text}". Cannot verify learning through assessment.`,
+        ],
         suggestion: 'Replace with measurable action verbs (e.g., explain, demonstrate, analyze)',
         score: 0.0,
       });
@@ -176,11 +212,41 @@ export async function orchestrateValidation(
     }
   }
 
+  // T013: Log Bloom's taxonomy validation results to generation_trace
+  if (courseId && allObjectives.length > 0) {
+    const bloomsPassedCount =
+      allObjectives.length - warnings.filter(w => w.rule === 'blooms_taxonomy_whitelist').length;
+
+    await logTrace({
+      courseId,
+      stage: 'stage_5',
+      phase: 'validation',
+      stepName: 'validate_blooms',
+      inputData: {
+        ruleId: 'blooms_taxonomy',
+        objectivesCount: allObjectives.length,
+      },
+      outputData: {
+        passed: bloomsPassedCount === allObjectives.length,
+        checkedItems: allObjectives.length,
+        passedItems: bloomsPassedCount,
+        failedItems: allObjectives.length - bloomsPassedCount,
+        warnings: warnings.filter(w => w.rule === 'blooms_taxonomy_whitelist').length,
+      },
+      qualityScore: allObjectives.length > 0 ? bloomsPassedCount / allObjectives.length : 1.0,
+      durationMs: 0,
+    });
+  }
+
   // 3. Validate duration proportionality for all lessons
+  let durationPassedCount = 0;
+  let durationTotalCount = 0;
+
   structure.sections.forEach((section, sectionIdx) => {
     section.lessons.forEach((lesson, lessonIdx) => {
       const durationResult = validateDurationProportionality(lesson);
       results.push(durationResult);
+      durationTotalCount++;
 
       const path = `sections[${sectionIdx}].lessons[${lessonIdx}]`;
 
@@ -193,7 +259,25 @@ export async function orchestrateValidation(
           suggestion: durationResult.suggestion,
           score: durationResult.score,
         });
-      } else if (durationResult.severity === ValidationSeverity.WARNING && durationResult.warnings) {
+
+        // T013: Log duration validation failure to error_logs
+        if (courseId) {
+          logger.warn(
+            {
+              courseId,
+              ruleId: 'duration_min',
+              severity: 'ERROR',
+              path,
+              suggestion: durationResult.suggestion,
+              issues: durationResult.issues,
+            },
+            'Validation error: duration below minimum threshold'
+          );
+        }
+      } else if (
+        durationResult.severity === ValidationSeverity.WARNING &&
+        durationResult.warnings
+      ) {
         warnings.push({
           rule: 'duration_max',
           severity: ValidationSeverity.WARNING,
@@ -202,6 +286,21 @@ export async function orchestrateValidation(
           suggestion: durationResult.suggestion,
           score: durationResult.score,
         });
+
+        // T013: Log duration validation warning to error_logs
+        if (courseId) {
+          logger.warn(
+            {
+              courseId,
+              ruleId: 'duration_max',
+              severity: 'WARNING',
+              path,
+              suggestion: durationResult.suggestion,
+              warnings: durationResult.warnings,
+            },
+            'Validation warning: duration above maximum threshold'
+          );
+        }
       } else if (durationResult.severity === ValidationSeverity.INFO && durationResult.info) {
         info.push({
           rule: durationResult.metadata?.rule || 'duration_proportionality',
@@ -210,9 +309,36 @@ export async function orchestrateValidation(
           info: durationResult.info,
           score: durationResult.score,
         });
+        durationPassedCount++; // INFO severity means passed
+      } else if (durationResult.passed) {
+        durationPassedCount++; // Explicit pass
       }
     });
   });
+
+  // T013: Log duration validation results to generation_trace
+  if (courseId && durationTotalCount > 0) {
+    await logTrace({
+      courseId,
+      stage: 'stage_5',
+      phase: 'validation',
+      stepName: 'validate_duration',
+      inputData: {
+        ruleId: 'duration_proportionality',
+        lessonsCount: durationTotalCount,
+      },
+      outputData: {
+        passed: durationPassedCount === durationTotalCount,
+        checkedItems: durationTotalCount,
+        passedItems: durationPassedCount,
+        failedItems: durationTotalCount - durationPassedCount,
+        errors: errors.filter(e => e.rule === 'duration_min').length,
+        warnings: warnings.filter(w => w.rule === 'duration_max').length,
+      },
+      qualityScore: durationTotalCount > 0 ? durationPassedCount / durationTotalCount : 1.0,
+      durationMs: 0,
+    });
+  }
 
   // Calculate overall quality score (weighted by severity)
   const overallScore = calculateWeightedScore(results);
@@ -232,7 +358,7 @@ export async function orchestrateValidation(
       errorCount: errors.length,
       warningCount: warnings.length,
       infoCount: info.length,
-    }
+    },
   };
 }
 
