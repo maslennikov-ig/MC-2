@@ -311,6 +311,40 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.28.27] - 2026-01-22
+
+### Added
+
+- **logger**: add type guards, discriminated unions, and usage guide (5f48f29)
+- **logger**: add centralized domain-specific logging architecture (cc7bdff)
+
+### Changed
+
+- **validation**: improve logging and type safety in validation-orchestrator (29e06e2)
+
+### Fixed
+
+- **enrichments**: address code review MEDIUM/LOW priority issues (aa59a54)
+- **enrichments**: address code review HIGH priority issues (9c4c694)
+- **enrichments**: restore generation progress on page reload (8b6781a)
+- **logger**: address HIGH priority code review findings (bb57e7e)
+- **logging**: improve LLM error logging and add TTL timeout auto-mute (3e9e10e)
+
+### Other
+
+- update 1 skill(s), update docs, +1 more (6cc2744)
+- bd sync: 2026-01-22 20:22:57 (9ce5c1c)
+- bd sync: 2026-01-22 20:21:11 (8d475ed)
+- bd sync: 2026-01-22 20:06:50 (8f389e1)
+- bd sync: 2026-01-22 20:04:47 (281e733)
+- bd sync: 2026-01-22 19:13:36 (a5daf74)
+- bd sync: 2026-01-22 19:07:31 (24c7ec2)
+- bd sync: 2026-01-22 18:51:25 (96f760c)
+- bd sync: 2026-01-22 18:30:21 (6ddfe85)
+- bd sync: 2026-01-22 18:28:11 (c178a10)
+- bd sync: 2026-01-22 16:28:35 (29cc292)
+- bd sync: 2026-01-22 16:28:24 (1139cd5)
+
 ## [0.28.26] - 2026-01-22
 
 ### Added
