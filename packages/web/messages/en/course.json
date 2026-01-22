@@ -16,6 +16,25 @@
     "noLessons": "No lessons in this course yet"
   },
   "backToCourse": "Back to course",
+  "lessons": {
+    "backToCourse": "Back to course",
+    "subtitle": "{count, plural, =0 {No lessons} one {# lesson} other {# lessons}}",
+    "filters": {
+      "all": "All",
+      "withVideo": "With Video",
+      "completed": "Completed",
+      "notCompleted": "Not Completed"
+    },
+    "empty": "No lessons found"
+  },
+  "lesson": {
+    "status": {
+      "not_started": "Not Started",
+      "in_progress": "In Progress",
+      "completed": "Completed"
+    },
+    "duration": "{minutes}min"
+  },
   "viewer": {
     "showSidebar": "Show sidebar",
     "section": "Section",

@@ -16,6 +16,25 @@
     "noLessons": "В курсе пока нет уроков"
   },
   "backToCourse": "Назад к курсу",
+  "lessons": {
+    "backToCourse": "Назад к курсу",
+    "subtitle": "{count, plural, =0 {Нет уроков} one {# урок} few {# урока} many {# уроков} other {# уроков}}",
+    "filters": {
+      "all": "Все",
+      "withVideo": "С видео",
+      "completed": "Пройденные",
+      "notCompleted": "Не пройденные"
+    },
+    "empty": "Уроки не найдены"
+  },
+  "lesson": {
+    "status": {
+      "not_started": "Не начат",
+      "in_progress": "В процессе",
+      "completed": "Завершен"
+    },
+    "duration": "{minutes}мин"
+  },
   "viewer": {
     "showSidebar": "Показать боковую панель",
     "section": "Модуль",
