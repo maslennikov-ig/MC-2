@@ -2,6 +2,31 @@
 
 _Released on 2025-12-26_
 
+## v0.28.27
+
+_Released on 2026-01-22_
+
+### ✨ New Features
+
+- **logger**: Add type guards, discriminated unions, and usage guide
+- **logger**: Add centralized domain-specific logging architecture
+
+### 🔧 Improvements
+
+- **validation**: Improve logging and type safety in validation-orchestrator
+
+### 🐛 Bug Fixes
+
+- **enrichments**: Address code review MEDIUM/LOW priority issues
+- **enrichments**: Address code review HIGH priority issues
+- **enrichments**: Restore generation progress on page reload
+- **logger**: Address HIGH priority code review findings
+- **logging**: Improve LLM error logging and add TTL timeout auto-mute
+
+---
+
+_This release was automatically generated from 20 commits._
+
 ## v0.28.26
 
 _Released on 2026-01-22_
