@@ -32,7 +32,7 @@
  *
  * 4. **Trie-based matching** - For prefix-heavy patterns
  *
- * Current rule count: 22 (no optimization needed)
+ * Current rule count: 29 (no optimization needed)
  * Review threshold: 30+ rules
  */
 
@@ -207,6 +207,11 @@ export const AUTO_MUTE_RULES: AutoMuteRule[] = [
     pattern: /job\.name is undefined.*corrupted/i,
     reason: 'job_lifecycle',
     description: 'Job created without proper name - legacy or corrupted job',
+  },
+  {
+    pattern: /Unexpected exit code: 10/i,
+    reason: 'job_lifecycle',
+    description: 'Worker TTL timeout (10 min) - job exceeded max time, will be retried',
   },
 ];
 

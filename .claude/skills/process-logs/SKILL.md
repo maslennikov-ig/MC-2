@@ -124,8 +124,11 @@ Some errors are **automatically ignored** by the system with status `auto_muted`
 | `Critique-revise attempt failed`   | cascading_repair  | Layer 2 retry attempt failed               |
 | `Zod.*validation failed.*Layer`    | cascading_repair  | Layer 1 validation failed, escalating      |
 | `Job stalled`                      | job_lifecycle     | BullMQ job restarted (long LLM operations) |
+| `Unexpected exit code: 10`         | job_lifecycle     | Worker TTL timeout (10 min), will retry    |
+| `No RAG chunks found`              | expected_behavior | Course without docs, generates w/o RAG     |
+| `Mermaid.*fallback.*used`          | graceful_fallback | Diagram gen failed, fallback to text       |
 
-**Total rules: 10** (test validates sync with code)
+**Total rules: 29** (test validates sync with code)
 
 **When you see `auto_muted` errors:**
 
