@@ -196,7 +196,7 @@ export default async function CoursePage({ params, searchParams }: CoursePagePro
         .from('lesson_enrichments')
         .select('*')
         .in('lesson_id', lessonIds)
-        .eq('status', 'completed')
+        .not('status', 'in', '(failed,cancelled)')
         .order('order_index'),
       adminSupabase
         .from('lesson_contents')

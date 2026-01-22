@@ -539,11 +539,57 @@ export function useEnrichmentGeneration({
    */
   const getProgress = useCallback((type: string) => generating.get(type), [generating])
 
+  /**
+   * Resume generation polling for an existing enrichment
+   *
+   * Used to restore progress tracking on page reload for enrichments
+   * that are already being generated (status: pending, draft_generating,
+   * draft_ready, or generating).
+   *
+   * Does NOT call backend to start new generation - only starts polling
+   * for status updates of an existing enrichment.
+   *
+   * @param enrichmentId - UUID of the existing enrichment
+   * @param type - Type of enrichment (for UI state management)
+   */
+  const resumeGeneration = useCallback(
+    (enrichmentId: string, type: OnDemandEnrichmentType) => {
+      // Guard: Don't resume if already tracking this type
+      if (generating.has(type)) {
+        devLog.warn('Already tracking generation for type:', type)
+        return
+      }
+
+      // Guard: Don't resume if unmounted
+      if (!mountedRef.current) {
+        devLog.warn('Attempted to resume generation after unmount')
+        return
+      }
+
+      // Add to generating state with initial progress
+      setGenerating((prev) => {
+        const next = new Map(prev)
+        next.set(type, {
+          enrichmentId,
+          type,
+          progress: 0,
+          currentStep: 'queued',
+        })
+        return next
+      })
+
+      // Start polling for this enrichment
+      startPolling(type, enrichmentId)
+    },
+    [generating, startPolling]
+  )
+
   return {
     generating,
     startGeneration,
     cancelGeneration,
     isGenerating,
     getProgress,
+    resumeGeneration,
   }
 }

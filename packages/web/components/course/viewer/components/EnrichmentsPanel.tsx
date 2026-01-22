@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useCallback } from 'react'
+import React, { useState, useCallback, useEffect, useRef } from 'react'
 import { useTranslations } from 'next-intl'
 import { toast } from 'sonner'
 import { FileText, AlertTriangle } from 'lucide-react'
@@ -15,6 +15,7 @@ import {
   IMAGE_PLACEHOLDER_TYPES,
   type EnrichmentType,
 } from './enrichment-config'
+import { isOnDemandType, type OnDemandEnrichmentType } from '@megacampus/shared-types'
 
 type EnrichmentRow = Database['public']['Tables']['lesson_enrichments']['Row']
 
@@ -58,12 +59,33 @@ export function EnrichmentsPanel({
   )
 
   // Use enrichment generation hook (only if lessonId and courseId are available)
-  const { startGeneration, cancelGeneration, isGenerating, getProgress } = useEnrichmentGeneration({
-    lessonId: lessonId || '',
-    courseId: courseId || '',
-    onComplete: handleGenerationComplete,
-    onError: handleGenerationError,
-  })
+  const { startGeneration, cancelGeneration, isGenerating, getProgress, resumeGeneration } =
+    useEnrichmentGeneration({
+      lessonId: lessonId || '',
+      courseId: courseId || '',
+      onComplete: handleGenerationComplete,
+      onError: handleGenerationError,
+    })
+
+  // Track if we've already resumed to prevent re-running on enrichments array updates
+  const hasResumedRef = useRef(false)
+
+  // Resume polling for active enrichments on mount
+  // Active statuses: pending, draft_generating, draft_ready, generating
+  useEffect(() => {
+    // Only run once on mount
+    if (hasResumedRef.current) return
+    hasResumedRef.current = true
+
+    const activeStatuses = ['pending', 'draft_generating', 'draft_ready', 'generating']
+    const activeEnrichments = enrichments.filter(
+      (e) => activeStatuses.includes(e.status) && isOnDemandType(e.enrichment_type)
+    )
+
+    activeEnrichments.forEach((enrichment) => {
+      resumeGeneration(enrichment.id, enrichment.enrichment_type as OnDemandEnrichmentType)
+    })
+  }, [enrichments, resumeGeneration]) // hasResumedRef prevents re-running
 
   // Filter out cover type - it's displayed as hero banner in lesson content
   const filteredEnrichments = enrichments.filter((e) => (e.enrichment_type as string) !== 'cover')
@@ -208,13 +230,16 @@ export function EnrichmentsPanel({
           const generatingProgress = getProgress(type)
           const isImageType = IMAGE_PLACEHOLDER_TYPES.includes(type as 'cover' | 'card')
 
-          // Find existing enrichment for image types
+          // Find existing enrichment for:
+          // - Image types: always (they have existingEnrichment logic for regeneration)
+          // - Non-image types with draft_ready status: to show draft preview
           // For 'card' type: exclude course-card (title='course-card') - only show lesson cards
           const existingEnrichment = isImageType
             ? enrichments.find(
                 (e) => e.enrichment_type === type && (type !== 'card' || e.title !== 'course-card')
               ) || null
-            : null
+            : enrichments.find((e) => e.enrichment_type === type && e.status === 'draft_ready') ||
+              null
 
           // Show generating card if generation is in progress
           if (typeIsGenerating && generatingProgress) {

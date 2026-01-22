@@ -17,7 +17,11 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import type { Database } from '@/types/database.generated'
-import { isEnrichmentContentType } from '@megacampus/shared-types'
+import {
+  isEnrichmentContentType,
+  type PresentationEnrichmentContent,
+  type VideoEnrichmentContent,
+} from '@megacampus/shared-types'
 import { cn } from '@/lib/utils'
 import { EnrichmentCardImage } from './EnrichmentCardImage'
 import { EnrichmentCardOptions, getOptionsSectionTitle } from './EnrichmentCardOptions'
@@ -132,6 +136,40 @@ export function UnifiedEnrichmentCard({
       altText: alt,
     }
   }, [existingEnrichment])
+
+  // Check if enrichment is in draft_ready status (two-stage generation)
+  const isDraftReady = existingEnrichment?.status === 'draft_ready'
+
+  // Extract draft content for display (presentation slides or video script)
+  const draftContent = useMemo(() => {
+    if (!isDraftReady || !existingEnrichment?.content) return null
+
+    const rawContent = existingEnrichment.content
+
+    // For presentation: show slide titles/count
+    if (isEnrichmentContentType(rawContent, 'presentation')) {
+      const content = rawContent as PresentationEnrichmentContent
+      return {
+        type: 'presentation' as const,
+        slideCount: content.total_slides || content.slides?.length || 0,
+        slideTitles: content.slides?.slice(0, 3).map((s) => s.title) || [],
+        hasMore: (content.slides?.length || 0) > 3,
+      }
+    }
+
+    // For video: show script preview
+    if (isEnrichmentContentType(rawContent, 'video')) {
+      const content = rawContent as VideoEnrichmentContent
+      const scriptPreview = content.script?.slice(0, 200) || ''
+      return {
+        type: 'video' as const,
+        scriptPreview: scriptPreview + (content.script && content.script.length > 200 ? '...' : ''),
+        estimatedDuration: content.estimated_duration_seconds,
+      }
+    }
+
+    return null
+  }, [isDraftReady, existingEnrichment])
 
   // Show reveal panel on hover (desktop) or touch (mobile)
   const shouldShowPanel = isHovered || isTouched
@@ -339,6 +377,55 @@ export function UnifiedEnrichmentCard({
             {getDescription()}
           </p>
         </div>
+
+        {/* Draft Ready Preview - shown when draft content is available */}
+        {isDraftReady && draftContent && (
+          <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50 p-3 dark:border-amber-800/30 dark:bg-amber-900/20">
+            <div className="mb-2 flex items-center gap-2">
+              <Badge
+                variant="outline"
+                className="border-amber-500 bg-amber-100 text-amber-700 dark:bg-amber-900/50 dark:text-amber-300"
+              >
+                {t('draftReady')}
+              </Badge>
+            </div>
+
+            {draftContent.type === 'presentation' && (
+              <div className="space-y-1 text-sm">
+                <p className="font-medium text-amber-800 dark:text-amber-200">
+                  {t('draftPreview.slideCount', { count: draftContent.slideCount })}
+                </p>
+                {draftContent.slideTitles.length > 0 && (
+                  <ul className="ml-4 list-disc space-y-0.5 text-amber-700 dark:text-amber-300">
+                    {draftContent.slideTitles.map((title, i) => (
+                      <li key={i} className="line-clamp-1">
+                        {title}
+                      </li>
+                    ))}
+                    {draftContent.hasMore && (
+                      <li className="text-amber-600 dark:text-amber-400">...</li>
+                    )}
+                  </ul>
+                )}
+              </div>
+            )}
+
+            {draftContent.type === 'video' && (
+              <div className="space-y-1 text-sm">
+                {draftContent.estimatedDuration && (
+                  <p className="font-medium text-amber-800 dark:text-amber-200">
+                    {t('draftPreview.estimatedDuration', {
+                      minutes: Math.ceil(draftContent.estimatedDuration / 60),
+                    })}
+                  </p>
+                )}
+                <p className="line-clamp-3 text-amber-700 dark:text-amber-300">
+                  {draftContent.scriptPreview}
+                </p>
+              </div>
+            )}
+          </div>
+        )}
       </div>
 
       {/* Hover Reveal Panel */}
