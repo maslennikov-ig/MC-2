@@ -206,6 +206,9 @@ export default function GenerationProgressContainerEnhanced({
   const pendingSave = useRef<NodeJS.Timeout | null>(null)
   const SAVE_THROTTLE_MS = 2000
 
+  // Ref for state to allow flush on unmount without stale closure
+  const stateRef = useRef<EnhancedProgressState | null>(null)
+
   // Refs to preserve last known values for modules/lessons counts (survives realtime updates that don't include analysis_result)
   const lastKnownModulesTotal = useRef<number | undefined>(initialProgress.modules_total)
   const lastKnownLessonsTotal = useRef<number>(
@@ -288,6 +291,11 @@ export default function GenerationProgressContainerEnhanced({
   useEffect(() => {
     isPausedRef.current = isPausedLocal
   }, [isPausedLocal])
+
+  // Keep stateRef in sync for flush on unmount
+  useEffect(() => {
+    stateRef.current = state
+  }, [state])
 
   // Request ID tracking to prevent race conditions with optimistic updates
   const pauseRequestRef = useRef(0)
@@ -406,12 +414,22 @@ export default function GenerationProgressContainerEnhanced({
     saveStateToStorage()
   }, [state.progress, state.status, state.error, saveStateToStorage])
 
-  // Cleanup pending save on unmount
+  // Cleanup and flush pending save on unmount
   useEffect(() => {
     return () => {
-      if (pendingSave.current) clearTimeout(pendingSave.current)
+      // Flush pending save on unmount to prevent data loss
+      if (pendingSave.current && stateRef.current) {
+        clearTimeout(pendingSave.current)
+        // Synchronously save final state
+        const stateToSave = {
+          ...stateRef.current,
+          stepRetryCount: Array.from(stateRef.current.stepRetryCount.entries()),
+        }
+        sessionStorage.setItem(STORAGE_KEY_STATE(courseId), JSON.stringify(stateToSave))
+        sessionStorage.setItem(STORAGE_KEY_TIMESTAMP(courseId), new Date().toISOString())
+      }
     }
-  }, [])
+  }, [courseId])
 
   // Automatic Mode Control Handlers
   const handlePause = useCallback(async () => {
@@ -625,6 +643,12 @@ export default function GenerationProgressContainerEnhanced({
             },
           })
 
+          // Clear pending save first to prevent race condition
+          if (pendingSave.current) {
+            clearTimeout(pendingSave.current)
+            pendingSave.current = null
+          }
+
           // Clear session storage
           if (typeof window !== 'undefined') {
             sessionStorage.removeItem(STORAGE_KEY_STATE(courseId))
@@ -797,7 +821,8 @@ export default function GenerationProgressContainerEnhanced({
     let isMounted = true
 
     const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible' && isMounted) {
+      if (!isMounted) return // Early exit guard
+      if (document.visibilityState === 'visible') {
         // Tab became visible - refetch current state to ensure UI is up-to-date
         void (async () => {
           try {
