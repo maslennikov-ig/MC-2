@@ -7,6 +7,7 @@ import { extractContentMarkdown } from './content-utils';
 import type { SanityCheckResult } from '../utils/sanity-check';
 import { LessonUUID, LessonLabel } from '@megacampus/shared-types';
 import type { SelfReviewResult } from '@megacampus/shared-types/judge-types';
+import { parseGenerationProgress } from '@/shared/schemas/generation-progress.schema';
 
 /**
  * Handle partial success scenarios
@@ -546,7 +547,18 @@ export async function checkAndSetStage6Complete(courseId: string): Promise<void>
       const completedAt = shouldAutoFinalize ? new Date().toISOString() : undefined;
 
       // Update progress with 100% and completion message
-      const existingProgress = (course.generation_progress as Record<string, unknown>) || {};
+      // Validate existing progress data with Zod schema
+      const parsedProgress = parseGenerationProgress(course.generation_progress);
+      if (!parsedProgress && course.generation_progress) {
+        logger.warn(
+          {
+            courseId,
+            generation_progress: course.generation_progress,
+          },
+          'Invalid generation_progress data in database - using fallback'
+        );
+      }
+      const existingProgress = parsedProgress || {};
       const updatedProgress = {
         ...existingProgress,
         percentage: 100,
