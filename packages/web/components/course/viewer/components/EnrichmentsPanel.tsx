@@ -11,7 +11,7 @@ import { useEnrichmentGeneration } from '@/lib/hooks/useEnrichmentGeneration'
 import type { Database } from '@/types/database.generated'
 import { EnrichmentCard } from './EnrichmentCard'
 import {
-  PLACEHOLDER_TYPES,
+  ALL_PLACEHOLDER_TYPES,
   IMAGE_PLACEHOLDER_TYPES,
   type EnrichmentType,
 } from './enrichment-config'
@@ -194,60 +194,27 @@ export function EnrichmentsPanel({
         </EnrichmentErrorBoundary>
       ))}
 
-      {/* Images Section - Cover/Card (always show both types) */}
-      {lessonId && (
-        <div className="mb-6">
-          <h3 className="mb-3 text-sm font-medium text-gray-500 dark:text-gray-400">
-            {t('images.title')}
-          </h3>
-          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {IMAGE_PLACEHOLDER_TYPES.map((type) => {
-              const typeIsGenerating = isGenerating(type)
-              const generatingProgress = getProgress(type)
-
-              // Find existing enrichment for this type (use original enrichments, not filtered)
-              // For 'card' type: exclude course-card (title='course-card') - only show lesson cards
-              const existingEnrichment =
-                enrichments.find(
-                  (e) =>
-                    e.enrichment_type === type && (type !== 'card' || e.title !== 'course-card')
-                ) || null
-
-              if (typeIsGenerating && generatingProgress) {
-                return (
-                  <EnrichmentGeneratingCard
-                    key={type}
-                    type={type}
-                    progress={generatingProgress.progress}
-                    currentStep={generatingProgress.currentStep || t('generating')}
-                    onCancel={() => void cancelGeneration(type)}
-                  />
-                )
-              }
-
-              return (
-                <UnifiedEnrichmentCard
-                  key={type}
-                  type={type}
-                  existingEnrichment={existingEnrichment}
-                  onGenerate={(settings) => {
-                    if (!lessonId) return
-                    void startGeneration(type, settings)
-                  }}
-                  isGenerating={typeIsGenerating}
-                />
-              )
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Placeholder Cards for Missing Types and Generating Cards */}
-      <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        {PLACEHOLDER_TYPES.filter((type) => !groupedEnrichments[type]).map((type) => {
-          // Check if this type is currently generating
-          const generatingProgress = getProgress(type)
+      {/* All Enrichment Cards - Unified Grid */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        {ALL_PLACEHOLDER_TYPES.filter((type) => {
+          // For image types, always show (they have existingEnrichment logic)
+          if (IMAGE_PLACEHOLDER_TYPES.includes(type as 'cover' | 'card')) {
+            return true
+          }
+          // For other types, only show if no existing enrichment
+          return !groupedEnrichments[type]
+        }).map((type) => {
           const typeIsGenerating = isGenerating(type)
+          const generatingProgress = getProgress(type)
+          const isImageType = IMAGE_PLACEHOLDER_TYPES.includes(type as 'cover' | 'card')
+
+          // Find existing enrichment for image types
+          // For 'card' type: exclude course-card (title='course-card') - only show lesson cards
+          const existingEnrichment = isImageType
+            ? enrichments.find(
+                (e) => e.enrichment_type === type && (type !== 'card' || e.title !== 'course-card')
+              ) || null
+            : null
 
           // Show generating card if generation is in progress
           if (typeIsGenerating && generatingProgress) {
@@ -262,18 +229,17 @@ export function EnrichmentsPanel({
             )
           }
 
-          // Show placeholder card otherwise
           return (
             <UnifiedEnrichmentCard
               key={type}
               type={type}
+              existingEnrichment={existingEnrichment}
               onGenerate={(settings) => {
-                // Only allow generation if lessonId is available
                 if (!lessonId) {
                   toast.error(t('viewer.noMaterials'))
                   return
                 }
-                // Only generate on-demand types (quiz, audio, presentation)
+                // Video generation not available yet
                 if (type === 'video') {
                   return
                 }
