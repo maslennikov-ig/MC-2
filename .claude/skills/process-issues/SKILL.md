@@ -1,7 +1,7 @@
 ---
 name: process-issues
-description: Process GitHub Issues - fetch open issues, analyze, find similar, create Beads tasks, propose fix plan
-version: 1.0.0
+description: Process GitHub Issues - fetch open issues, read comments, analyze suggestions, find similar, create Beads tasks, propose fix plan
+version: 1.1.0
 ---
 
 # Process GitHub Issues
@@ -22,7 +22,46 @@ bd create --type=<bug|task|feature> --priority=<1-3> --title="<issue_title>" --e
 bd update <task_id> --status=in_progress
 ```
 
-### 2. SEARCH SIMILAR PROBLEMS FIRST (MANDATORY)
+### 2. READ ISSUE COMMENTS (MANDATORY)
+
+**ALWAYS read comments to issues — they contain valuable insights:**
+
+```bash
+# View issue with all comments
+gh issue view <number> --comments
+
+# Or via API for structured data
+gh api repos/{owner}/{repo}/issues/<number>/comments --jq '.[].body'
+```
+
+**What to analyze in comments:**
+
+- **User clarifications**: Additional context about the problem
+- **Suggested solutions**: Community/team members often propose fixes
+- **Workarounds**: Temporary solutions that hint at root cause
+- **Related issues**: Links to other issues with same problem
+- **Screenshots/logs**: Additional debugging information
+
+**Decision making for suggestions:**
+
+| Suggestion Type       | Action                                          |
+| --------------------- | ----------------------------------------------- |
+| Clear fix with code   | Verify correctness, adopt if valid              |
+| Architecture proposal | Evaluate complexity, discuss with user if major |
+| Workaround            | Note it, but look for proper fix                |
+| Conflicting advice    | Analyze trade-offs, choose best approach        |
+| Outdated advice       | Check if still relevant to current codebase     |
+
+**Include in analysis:**
+
+```markdown
+### Comments Analysis
+
+- **Useful suggestions**: <list helpful comments>
+- **Decision**: Adopt / Modify / Reject with reason
+```
+
+### 3. SEARCH SIMILAR PROBLEMS FIRST (MANDATORY)
 
 **Before fixing ANY issue, search BOTH sources:**
 
@@ -40,6 +79,7 @@ bd search "regeneration"
 ```
 
 **What to look for in Beads:**
+
 - Similar issue patterns in task titles
 - Root cause analysis in task descriptions
 - Fix approach and files changed
@@ -61,7 +101,7 @@ gh issue view <number>
 3. Apply same solution pattern if applicable
 4. **Reference in your fix**: `Similar to mc2-xxx / gh-NN. Same fix applied.`
 
-### 3. CONTEXT7 IS MANDATORY
+### 4. CONTEXT7 IS MANDATORY
 
 **ALWAYS query documentation before implementing:**
 
@@ -70,12 +110,13 @@ mcp__context7__resolve-library-id → mcp__context7__query-docs
 ```
 
 **When to use:**
+
 - React/Next.js patterns
 - Supabase queries
 - BullMQ job handling
 - Any external library involved
 
-### 4. TASK COMPLEXITY ROUTING
+### 5. TASK COMPLEXITY ROUTING
 
 **Route tasks by complexity:**
 
@@ -87,25 +128,25 @@ mcp__context7__resolve-library-id → mcp__context7__query-docs
 
 **Subagent selection for MEDIUM tasks:**
 
-| Domain           | Subagent                      | When                        |
-| ---------------- | ----------------------------- | --------------------------- |
-| DB/migrations    | `database-architect`          | Schema changes, RLS         |
-| UI components    | `nextjs-ui-designer`          | New pages, components       |
-| Backend services | `fullstack-nextjs-specialist` | APIs, workers               |
-| Types            | `typescript-types-specialist` | Complex types, generics     |
-| Pipeline stages  | `stage-pipeline-specialist`   | Stages 1-7                  |
+| Domain           | Subagent                      | When                    |
+| ---------------- | ----------------------------- | ----------------------- |
+| DB/migrations    | `database-architect`          | Schema changes, RLS     |
+| UI components    | `nextjs-ui-designer`          | New pages, components   |
+| Backend services | `fullstack-nextjs-specialist` | APIs, workers           |
+| Types            | `typescript-types-specialist` | Complex types, generics |
+| Pipeline stages  | `stage-pipeline-specialist`   | Stages 1-7              |
 
-### 5. ISSUE LABELS → PRIORITY MAPPING
+### 6. ISSUE LABELS → PRIORITY MAPPING
 
-| GitHub Label | Priority | Description                    |
-|--------------|----------|--------------------------------|
-| `bug`        | P1-P2    | Bug fix (severity determines)  |
-| `enhancement`| P2-P3    | Feature improvement            |
-| `UX`         | P2       | User experience issue          |
-| `A11Y`       | P3       | Accessibility                  |
-| `feature`    | P3       | New feature request            |
+| GitHub Label  | Priority | Description                   |
+| ------------- | -------- | ----------------------------- |
+| `bug`         | P1-P2    | Bug fix (severity determines) |
+| `enhancement` | P2-P3    | Feature improvement           |
+| `UX`          | P2       | User experience issue         |
+| `A11Y`        | P3       | Accessibility                 |
+| `feature`     | P3       | New feature request           |
 
-### 6. BUG FIXING PRINCIPLES
+### 7. BUG FIXING PRINCIPLES
 
 > **This is PRODUCTION. Every bug matters.**
 
@@ -130,6 +171,7 @@ mcp__context7__resolve-library-id → mcp__context7__query-docs
 Invoke via: `/process-issues` or "обработай GitHub issues"
 
 Optional arguments:
+
 - `/process-issues --label=bug` — only bug issues
 - `/process-issues --limit=5` — process max 5 issues
 - `/process-issues 123` — process specific issue #123
@@ -153,17 +195,38 @@ gh issue list --state open --label bug --json number,title,labels,body
 For each open issue:
 
 1. **Read issue details**:
+
    ```bash
    gh issue view <number>
    ```
 
-2. **Extract key information**:
+2. **Read and analyze comments** (MANDATORY):
+
+   ```bash
+   # View issue with all comments
+   gh issue view <number> --comments
+
+   # Or get comments via API for parsing
+   gh api repos/{owner}/{repo}/issues/<number>/comments
+   ```
+
+   **Analyze each comment for:**
+   - Proposed solutions or code fixes
+   - Additional context/reproduction steps
+   - Links to related issues or PRs
+   - Workarounds that hint at root cause
+
+   **Make decision**: Adopt useful suggestions, note rejected ones with reason.
+
+3. **Extract key information**:
    - Issue type (bug/feature/enhancement)
    - Affected files/components (from description)
    - Error messages (if bug)
    - Expected behavior
+   - **Useful suggestions from comments**
 
-3. **Search for similar resolved issues** (MANDATORY):
+4. **Search for similar resolved issues** (MANDATORY):
+
    ```bash
    # In Beads
    bd search "<keyword from issue>"
@@ -180,29 +243,46 @@ For each issue, generate:
 ## Issue #NN: <title>
 
 ### Type & Priority
+
 - Type: bug | feature | enhancement | UX
 - Priority: P0 (blocker) | P1 (critical) | P2 (important) | P3 (nice-to-have)
 
+### Comments Analysis
+
+- **Total comments**: N
+- **Useful suggestions**:
+  - @user1: "Suggested fix X" → **Adopt** (valid approach)
+  - @user2: "Try workaround Y" → **Note** (temporary, need proper fix)
+  - @user3: "Related to #MM" → **Investigate** (check linked issue)
+- **Rejected suggestions**:
+  - @user4: "Do Z" → **Reject** (outdated, doesn't match current architecture)
+
 ### Similar Issues Found
+
 - Beads: mc2-xxx (similar problem with X, fixed by Y)
 - GitHub: #NN (same root cause, fix in commit abc123)
 
 ### Root Cause Analysis
+
 <Why this happens>
 
 ### Proposed Solution
+
 1. <Step 1>
 2. <Step 2>
 
 ### Files to Modify
+
 - `path/to/file1.ts` — description
 - `path/to/file2.tsx` — description
 
 ### Subagent Assignment
+
 - Subagent: <name> | Execute directly
 - Complexity: Simple | Medium | Complex
 
 ### Context7 Queries Needed
+
 - [ ] Next.js: <topic>
 - [ ] Supabase: <topic>
 ```
@@ -238,25 +318,30 @@ Present to user:
 ## GitHub Issues Processing Plan
 
 ### Summary
-| # | Issue | Type | Priority | Similar Found | Subagent |
-|---|-------|------|----------|---------------|----------|
-| 1 | #NN   | bug  | P1       | mc2-xxx       | database-architect |
-| 2 | #MM   | UX   | P2       | —             | nextjs-ui-designer |
+
+| #   | Issue | Type | Priority | Similar Found | Subagent           |
+| --- | ----- | ---- | -------- | ------------- | ------------------ |
+| 1   | #NN   | bug  | P1       | mc2-xxx       | database-architect |
+| 2   | #MM   | UX   | P2       | —             | nextjs-ui-designer |
 
 ### Beads Tasks Created
+
 - mc2-aaa: Issue #NN (P1)
 - mc2-bbb: Issue #MM (P2)
 
 ### Execution Order (by priority)
+
 1. **P0-P1 (Critical)**: #NN, #MM
 2. **P2 (Important)**: #XX
 3. **P3 (Nice-to-have)**: #YY
 
 ### Questions for User
+
 - Issue #ZZ: Need clarification on <topic>
 - Issue #WW: Complex change, approve approach?
 
 ### Ready to Execute?
+
 - [ ] Approve plan
 - [ ] Modify priorities
 - [ ] Skip certain issues
@@ -267,11 +352,13 @@ Present to user:
 **For each issue in priority order:**
 
 1. **Claim Beads task**:
+
    ```bash
    bd update <task_id> --status=in_progress
    ```
 
 2. **Query Context7** (if needed):
+
    ```
    mcp__context7__resolve-library-id → mcp__context7__query-docs
    ```
@@ -282,12 +369,14 @@ Present to user:
    - Complex: Ask user first
 
 4. **Verify**:
+
    ```bash
    pnpm type-check
    pnpm build
    ```
 
 5. **Close GitHub Issue**:
+
    ```bash
    gh issue close <number> --comment "Fixed in commit <sha>
 
@@ -308,20 +397,24 @@ Present to user:
 ## Issues Processing Complete
 
 ### Results
-| Issue | Status | Beads Task | Commit |
-|-------|--------|------------|--------|
-| #NN   | Fixed  | mc2-aaa    | abc123 |
-| #MM   | Fixed  | mc2-bbb    | def456 |
-| #XX   | Deferred | mc2-ccc  | —      |
+
+| Issue | Status   | Beads Task | Commit |
+| ----- | -------- | ---------- | ------ |
+| #NN   | Fixed    | mc2-aaa    | abc123 |
+| #MM   | Fixed    | mc2-bbb    | def456 |
+| #XX   | Deferred | mc2-ccc    | —      |
 
 ### Deferred Issues (need user input)
+
 - #XX: <reason>
 
 ### Commits Made
+
 - `abc123`: fix: <description>
 - `def456`: feat: <description>
 
 ### Validation
+
 - Type Check: PASS
 - Build: PASS
 ```
@@ -330,17 +423,17 @@ Present to user:
 
 ## Issue Categories & Subagents
 
-| Pattern in Issue         | Category      | Subagent                      | Priority |
-| ------------------------ | ------------- | ----------------------------- | -------- |
-| `silent failure`         | Bug           | Same domain subagent          | P1       |
-| `not displayed`          | UI Bug        | `nextjs-ui-designer`          | P2       |
-| `not editable`           | UI Bug        | `nextjs-ui-designer`          | P2       |
-| `focus`, `scroll`        | UX            | `nextjs-ui-designer`          | P2       |
-| `keyboard`, `a11y`       | Accessibility | `nextjs-ui-designer`          | P3       |
-| `Stage N`                | Pipeline      | `stage-pipeline-specialist`   | P2       |
-| `database`, `migration`  | DB            | `database-architect`          | P2       |
-| `tRPC`, `API`            | Backend       | `fullstack-nextjs-specialist` | P2       |
-| `type error`             | Types         | `typescript-types-specialist` | P2       |
+| Pattern in Issue        | Category      | Subagent                      | Priority |
+| ----------------------- | ------------- | ----------------------------- | -------- |
+| `silent failure`        | Bug           | Same domain subagent          | P1       |
+| `not displayed`         | UI Bug        | `nextjs-ui-designer`          | P2       |
+| `not editable`          | UI Bug        | `nextjs-ui-designer`          | P2       |
+| `focus`, `scroll`       | UX            | `nextjs-ui-designer`          | P2       |
+| `keyboard`, `a11y`      | Accessibility | `nextjs-ui-designer`          | P3       |
+| `Stage N`               | Pipeline      | `stage-pipeline-specialist`   | P2       |
+| `database`, `migration` | DB            | `database-architect`          | P2       |
+| `tRPC`, `API`           | Backend       | `fullstack-nextjs-specialist` | P2       |
+| `type error`            | Types         | `typescript-types-specialist` | P2       |
 
 ---
 
@@ -348,6 +441,8 @@ Present to user:
 
 Before marking ANY issue as fixed:
 
+- [ ] Issue comments read and analyzed
+- [ ] Useful suggestions considered (adopted/rejected with reason)
 - [ ] Similar issues searched (Beads + GitHub)
 - [ ] Beads task exists for this issue
 - [ ] Context7 queried for relevant docs
@@ -368,6 +463,15 @@ gh issue list --state open --json number,title,labels,body
 
 # View specific issue
 gh issue view 123
+
+# View issue with comments (IMPORTANT!)
+gh issue view 123 --comments
+
+# Get comments via API (structured)
+gh api repos/{owner}/{repo}/issues/123/comments
+
+# Get comments as JSON for parsing
+gh api repos/{owner}/{repo}/issues/123/comments --jq '.[] | {author: .user.login, body: .body}'
 
 # Search closed issues
 gh issue list --state closed --search "keyword"
