@@ -100,13 +100,14 @@ export function EnrichmentCardImage({
             </button>
           </>
         ) : (
-          /* Placeholder image */
+          /* Placeholder image - grayscale with hover effect to reveal colors */
           <Image
             src={placeholderImage}
             alt={altText}
             fill
             className={cn(
               'object-cover transition-all duration-500',
+              'grayscale group-hover:grayscale-0',
               shouldShowPanel && 'scale-105 brightness-90 dark:brightness-75'
             )}
             sizes="(max-width: 640px) 100vw, (max-width: 1280px) 50vw, 33vw"

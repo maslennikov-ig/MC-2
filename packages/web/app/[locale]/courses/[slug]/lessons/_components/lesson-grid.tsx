@@ -15,6 +15,10 @@ interface LessonGridProps {
   enrichments: Map<string, EnrichmentRow[]>
   completedLessons: Set<string>
   courseSlug: string
+  /** ID of lesson currently being updated */
+  updatingLessonId?: string | null
+  /** Callback to toggle lesson completion */
+  onToggleComplete?: (lessonId: string) => void
 }
 
 // Convert enrichment rows to enrichment flags for LessonCard
@@ -35,6 +39,8 @@ export function LessonGrid({
   enrichments,
   completedLessons,
   courseSlug,
+  updatingLessonId,
+  onToggleComplete,
 }: LessonGridProps) {
   const router = useRouter()
 
@@ -61,7 +67,9 @@ export function LessonGrid({
                 }}
                 enrichments={getEnrichmentFlags(enrichments.get(lesson.id))}
                 isCompleted={isCompleted}
+                isUpdating={updatingLessonId === lesson.id}
                 onClick={() => router.push(`/courses/${courseSlug}?lesson=${lesson.id}`)}
+                onToggleComplete={onToggleComplete}
               />
             </motion.div>
           )

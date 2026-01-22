@@ -25,7 +25,15 @@
       "completed": "Пройденные",
       "notCompleted": "Не пройденные"
     },
-    "empty": "Уроки не найдены"
+    "empty": "Уроки не найдены",
+    "lessonCompleted": "Урок завершён!",
+    "updateError": "Не удалось обновить прогресс",
+    "milestones": {
+      "completed": "Курс пройден!",
+      "almostThere": "Почти готово!",
+      "halfWay": "Половина пройдена!",
+      "greatStart": "Отличное начало!"
+    }
   },
   "lesson": {
     "status": {
@@ -39,6 +47,10 @@
       "audio": "Доступно аудио",
       "presentation": "Доступна презентация",
       "quiz": "Доступен тест"
+    },
+    "actions": {
+      "markComplete": "Отметить как пройденный",
+      "markIncomplete": "Отметить как не пройденный"
     }
   },
   "viewer": {
