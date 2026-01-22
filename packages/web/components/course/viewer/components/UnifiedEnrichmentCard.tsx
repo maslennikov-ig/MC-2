@@ -29,6 +29,10 @@ import { EnrichmentCardOptions, getOptionsSectionTitle } from './EnrichmentCardO
 type EnrichmentRow = Database['public']['Tables']['lesson_enrichments']['Row']
 type EnrichmentType = 'quiz' | 'audio' | 'presentation' | 'video' | 'cover' | 'card'
 
+// Draft preview configuration
+const PREVIEW_SLIDE_COUNT = 3
+const PREVIEW_SCRIPT_LENGTH = 200
+
 interface UnifiedEnrichmentCardProps {
   type: EnrichmentType
   onGenerate: (settings: Record<string, unknown>) => void
@@ -152,18 +156,20 @@ export function UnifiedEnrichmentCard({
       return {
         type: 'presentation' as const,
         slideCount: content.total_slides || content.slides?.length || 0,
-        slideTitles: content.slides?.slice(0, 3).map((s) => s.title) || [],
-        hasMore: (content.slides?.length || 0) > 3,
+        slideTitles: content.slides?.slice(0, PREVIEW_SLIDE_COUNT).map((s) => s.title) || [],
+        hasMore: (content.slides?.length || 0) > PREVIEW_SLIDE_COUNT,
       }
     }
 
     // For video: show script preview
     if (isEnrichmentContentType(rawContent, 'video')) {
       const content = rawContent as VideoEnrichmentContent
-      const scriptPreview = content.script?.slice(0, 200) || ''
+      const scriptPreview = content.script?.slice(0, PREVIEW_SCRIPT_LENGTH) || ''
       return {
         type: 'video' as const,
-        scriptPreview: scriptPreview + (content.script && content.script.length > 200 ? '...' : ''),
+        scriptPreview:
+          scriptPreview +
+          (content.script && content.script.length > PREVIEW_SCRIPT_LENGTH ? '...' : ''),
         estimatedDuration: content.estimated_duration_seconds,
       }
     }
