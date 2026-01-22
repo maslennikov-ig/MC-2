@@ -6,6 +6,10 @@
  * that match expected error patterns.
  */
 
+// CRITICAL: Use baseLogger from @megacampus/shared-logger, NOT '../index'
+// to prevent infinite recursion in enhanced logger proxy.
+// The enhanced logger calls applyAutoMuteStatus, which could call logger.warn,
+// creating an infinite loop. Using baseLogger bypasses the proxy.
 import { logger as baseLogger } from '@megacampus/shared-logger';
 import { getSupabaseAdmin } from '../supabase/admin';
 import { shouldAutoMute } from './auto-classification';
