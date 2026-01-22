@@ -295,6 +295,9 @@ function GraphViewInner({
   // Course writing style (fetched from courses.style) - used in Stage 4 Hero Card via StaticGraphContext
   const [courseStyle, setCourseStyle] = useState<string | null>(null)
 
+  // Analysis result from Stage 4 (persisted edits from courses.analysis_result)
+  const [analysisResult, setAnalysisResult] = useState<unknown>(null)
+
   // Theme support
   const { resolvedTheme, mounted } = useThemeSync()
   const isDark = mounted && resolvedTheme === 'dark'
@@ -401,11 +404,11 @@ function GraphViewInner({
     const fetchCourseStructure = async () => {
       const supabase = createClient()
 
-      // Fetch course structure, visual_style, style, and completed lessons in parallel
+      // Fetch course structure, visual_style, style, analysis_result, and completed lessons in parallel
       const [courseResult, lessonsResult] = await Promise.all([
         supabase
           .from('courses')
-          .select('course_structure, visual_style, style')
+          .select('course_structure, visual_style, style, analysis_result')
           .eq('id', courseId)
           .single(),
         supabase
@@ -432,6 +435,11 @@ function GraphViewInner({
       // Store course writing style if available
       if (courseResult.data?.style) {
         setCourseStyle(courseResult.data.style)
+      }
+
+      // Store analysis result if available (persisted Stage 4 edits)
+      if (courseResult.data?.analysis_result) {
+        setAnalysisResult(courseResult.data.analysis_result)
       }
 
       if (courseResult.data?.course_structure) {
@@ -823,9 +831,10 @@ function GraphViewInner({
         visualStyle,
         courseStyle,
         readOnly,
+        analysisResult,
       },
     }
-  }, [courseId, courseTitle, tier, nodes, visualStyle, courseStyle, readOnly])
+  }, [courseId, courseTitle, tier, nodes, visualStyle, courseStyle, readOnly, analysisResult])
 
   // Mobile view - show simplified graph (no separate list view)
   // Graph view works on mobile with touch gestures enabled
