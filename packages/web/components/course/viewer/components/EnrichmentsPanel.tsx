@@ -243,7 +243,7 @@ export function EnrichmentsPanel({
       )}
 
       {/* Placeholder Cards for Missing Types and Generating Cards */}
-      <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+      <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
         {PLACEHOLDER_TYPES.filter((type) => !groupedEnrichments[type]).map((type) => {
           // Check if this type is currently generating
           const generatingProgress = getProgress(type)
