@@ -5,7 +5,8 @@ import { useTranslations } from 'next-intl'
 import { Video, Headphones, Presentation, HelpCircle, Image } from 'lucide-react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Progress } from '@/components/ui/progress'
+import { useSmoothProgress } from '@/lib/hooks/useSmoothProgress'
+import { StagedProgress } from '@/components/ui/staged-progress'
 
 type EnrichmentType = 'quiz' | 'audio' | 'presentation' | 'video' | 'cover' | 'card'
 
@@ -49,6 +50,12 @@ const ENRICHMENT_CONFIG: Record<
   },
 }
 
+const GENERATION_STAGES = [
+  { id: 'prepare', label: 'Подготовка' },
+  { id: 'generate', label: 'Генерация' },
+  { id: 'save', label: 'Сохранение' },
+]
+
 interface EnrichmentGeneratingCardProps {
   type: EnrichmentType
   progress: number
@@ -65,6 +72,22 @@ export function EnrichmentGeneratingCard({
   const t = useTranslations('enrichments')
   const config = ENRICHMENT_CONFIG[type]
   const Icon = config.icon
+
+  // Map backend step to stage index
+  const stageIndex =
+    currentStep === 'queued'
+      ? 0
+      : currentStep === 'generating'
+        ? 1
+        : currentStep === 'finalizing'
+          ? 2
+          : 1
+
+  // Smooth interpolation within stage
+  const { progress: smoothProgress } = useSmoothProgress({
+    targetProgress: progress,
+    isComplete: progress >= 100,
+  })
 
   const getTitle = () => {
     switch (type) {
@@ -94,19 +117,12 @@ export function EnrichmentGeneratingCard({
         </div>
       </CardHeader>
       <CardContent className="space-y-4 py-4">
-        <div className="space-y-2">
-          <div className="flex items-center justify-between text-sm">
-            <span className="text-gray-600 dark:text-gray-400">{currentStep}</span>
-            <span className="font-medium text-gray-900 dark:text-gray-100">
-              {Math.round(progress)}%
-            </span>
-          </div>
-          <Progress
-            value={progress}
-            className="w-full"
-            aria-label={`${getTitle()} generation progress: ${Math.round(progress)}%`}
-          />
-        </div>
+        <StagedProgress
+          stages={GENERATION_STAGES}
+          currentStageIndex={stageIndex}
+          stageProgress={smoothProgress}
+          isComplete={progress >= 100}
+        />
 
         <div className="flex justify-end">
           <Button

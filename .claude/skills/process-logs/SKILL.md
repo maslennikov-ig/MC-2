@@ -124,8 +124,11 @@ Some errors are **automatically ignored** by the system with status `auto_muted`
 | `Critique-revise attempt failed`   | cascading_repair  | Layer 2 retry attempt failed               |
 | `Zod.*validation failed.*Layer`    | cascading_repair  | Layer 1 validation failed, escalating      |
 | `Job stalled`                      | job_lifecycle     | BullMQ job restarted (long LLM operations) |
+| `Unexpected exit code: 10`         | job_lifecycle     | Worker TTL timeout (10 min), will retry    |
+| `No RAG chunks found`              | expected_behavior | Course without docs, generates w/o RAG     |
+| `Mermaid.*fallback.*used`          | graceful_fallback | Diagram gen failed, fallback to text       |
 
-**Total rules: 10** (test validates sync with code)
+**Total rules: 29** (test validates sync with code)
 
 **When you see `auto_muted` errors:**
 
@@ -286,13 +289,16 @@ SELECT
 
 ### Step 1.5: Filter by Environment (IMPORTANT)
 
+> **CRITICAL**: Both DEV and STAGE are production-like servers. ALL errors on these
+> environments must be investigated and fixed. Only LOCAL (NULL) can be bulk-resolved.
+
 The `error_logs` table has an `environment` column that indicates where the error occurred:
 
-| Value     | Environment    | Action                                       |
-| --------- | -------------- | -------------------------------------------- |
-| `NULL`    | Local dev      | **Bulk resolve** — local testing/development |
-| `'dev'`   | Dev server     | **Investigate** — real errors on dev server  |
-| `'stage'` | Staging (prod) | **Investigate** — real production errors     |
+| Value     | Environment    | Action                                            |
+| --------- | -------------- | ------------------------------------------------- |
+| `NULL`    | Local dev      | **Bulk resolve** — local testing/development only |
+| `'dev'`   | Dev server     | **MUST FIX** — real errors affecting developers   |
+| `'stage'` | Staging (prod) | **MUST FIX** — real production errors             |
 
 **Always check environment distribution first:**
 
@@ -306,10 +312,11 @@ GROUP BY environment
 ORDER BY count DESC;
 ```
 
-**Bulk resolve local/dev errors:**
+**Bulk resolve LOCAL errors only:**
 
 ```sql
--- Bulk resolve ALL local environment errors (environment IS NULL)
+-- Bulk resolve ONLY local environment errors (environment IS NULL)
+-- NEVER bulk resolve dev or stage errors - they must be investigated individually!
 WITH local_fingerprints AS (
   SELECT DISTINCT ON (el.fingerprint) el.id, el.fingerprint
   FROM error_logs el

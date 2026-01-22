@@ -12,6 +12,11 @@ overrides:
   mdast-util-to-hast: '>=13.2.1'
   '@langchain/core': '>=1.1.8'
   '@modelcontextprotocol/sdk': '>=1.25.2'
+  tar: '>=7.5.4'
+  undici: '>=6.23.0'
+  lodash: '>=4.17.23'
+  lodash-es: '>=4.17.23'
+  diff: '>=5.2.2'
 
 importers:
 
@@ -233,8 +238,8 @@ importers:
         specifier: ^2.67.1
         version: 2.67.1
       tar:
-        specifier: ^7.5.2
-        version: 7.5.2
+        specifier: '>=7.5.4'
+        version: 7.5.6
       tsup:
         specifier: ^8.0.0
         version: 8.5.1(postcss@8.5.6)(tsx@4.21.0)(typescript@5.9.3)
@@ -1929,14 +1934,14 @@ packages:
     dependencies:
       '@chevrotain/gast': 11.0.3
       '@chevrotain/types': 11.0.3
-      lodash-es: 4.17.21
+      lodash-es: 4.17.23
     dev: false
 
   /@chevrotain/gast@11.0.3:
     resolution: {integrity: sha512-+qNfcoNk70PyS/uxmj3li5NiECO+2YKZZQMbmjTqRI3Qchu8Hig/Q9vgkHpI3alNjr7M+a2St5pw5w5F6NL5/Q==}
     dependencies:
       '@chevrotain/types': 11.0.3
-      lodash-es: 4.17.21
+      lodash-es: 4.17.23
     dev: false
 
   /@chevrotain/regexp-to-ast@11.0.3:
@@ -3930,7 +3935,7 @@ packages:
     dependencies:
       '@qdrant/openapi-typescript-fetch': 1.2.6
       typescript: 5.9.3
-      undici: 6.22.0
+      undici: 7.19.0
     dev: false
 
   /@qdrant/openapi-typescript-fetch@1.2.6:
@@ -7649,7 +7654,7 @@ packages:
       graceful-fs: 4.2.11
       is-stream: 2.0.1
       lazystream: 1.0.1
-      lodash: 4.17.21
+      lodash: 4.17.23
       normalize-path: 3.0.0
       readable-stream: 4.7.0
     dev: false
@@ -8253,7 +8258,7 @@ packages:
       chevrotain: ^11.0.0
     dependencies:
       chevrotain: 11.0.3
-      lodash-es: 4.17.21
+      lodash-es: 4.17.23
     dev: false
 
   /chevrotain@11.0.3:
@@ -8264,7 +8269,7 @@ packages:
       '@chevrotain/regexp-to-ast': 11.0.3
       '@chevrotain/types': 11.0.3
       '@chevrotain/utils': 11.0.3
-      lodash-es: 4.17.21
+      lodash-es: 4.17.23
     dev: false
 
   /chokidar@4.0.3:
@@ -8946,7 +8951,7 @@ packages:
     resolution: {integrity: sha512-efEhnxpSuwpYOKRm/L5KbqoZmNNukHa/Flty4Wp62JRvgH2ojwVgPgdYyr4twpieZnyRDdIH7PY2mopX26+j2Q==}
     dependencies:
       d3: 7.9.0
-      lodash-es: 4.17.21
+      lodash-es: 4.17.23
     dev: false
 
   /damerau-levenshtein@1.0.8:
@@ -9172,8 +9177,8 @@ packages:
       dequal: 2.0.3
     dev: false
 
-  /diff@5.2.0:
-    resolution: {integrity: sha512-uIFDxqpRZGZ6ThOk84hEfqWoHx2devRFvpTZcTHur85vImfaxUbTW9Ryh4CpCuDnToOP1CEtXKIgytHBPVff5A==}
+  /diff@8.0.3:
+    resolution: {integrity: sha512-qejHi7bcSD4hQAZE0tNAawRK1ZtafHDmMTMkrrIGgSLl7hTnQHmKCeB45xAcbfTqK2zowkM3j3bHt/4b/ARbYQ==}
     engines: {node: '>=0.3.1'}
     dev: false
 
@@ -11605,7 +11610,7 @@ packages:
     dependencies:
       commander: 11.1.0
       fast-myers-diff: 3.2.0
-      lodash: 4.17.21
+      lodash: 4.17.23
       prompts: 2.4.2
     optionalDependencies:
       terminal-kit: 3.1.2
@@ -11980,8 +11985,8 @@ packages:
       p-locate: 5.0.0
     dev: true
 
-  /lodash-es@4.17.21:
-    resolution: {integrity: sha512-mKnC+QJ9pWVzv+C4/U3rRsHapFfHvQFoFB92e52xeyGMcX6/OlIl78je1u8vePzYZSkkogMPJ2yjxxsb89cxyw==}
+  /lodash-es@4.17.23:
+    resolution: {integrity: sha512-kVI48u3PZr38HdYz98UmfPnXl2DXrpdctLrFLCd3kOx1xUkOmpFPx7gCWWM5MPkL/fD8zb+Ph0QzjGFs4+hHWg==}
     dev: false
 
   /lodash.debounce@4.0.8:
@@ -12004,8 +12009,8 @@ packages:
     resolution: {integrity: sha512-HDWXG8isMntAyRF5vZ7xKuEvOhT4AhlRt/3czTSjvGUxjYCBVRQY48ViDHyfYz9VIoBkW4TMGQNapx+l3RUwdA==}
     dev: false
 
-  /lodash@4.17.21:
-    resolution: {integrity: sha512-v2kDEe57lecTulaDIuNTPy3Ry4gLGJ6Z1O3vE1krgXZNrsQ+LFTGHVxVjcXPs17LhbZVGedAJv8XZ1tvj5FvSg==}
+  /lodash@4.17.23:
+    resolution: {integrity: sha512-LgVTMpQtIopCi79SJeDiP0TfWi5CNEc/L/aRdTh3yIvmZXTnheWpKjSZhnvMl8iXbC1tFg9gdHHDMLoV7CnG+w==}
     dev: false
 
   /log-update@6.1.0:
@@ -12405,7 +12410,7 @@ packages:
       dompurify: 3.3.1
       katex: 0.16.27
       khroma: 2.1.0
-      lodash-es: 4.17.21
+      lodash-es: 4.17.23
       marked: 16.4.2
       roughjs: 4.6.6
       stylis: 4.3.6
@@ -14037,7 +14042,7 @@ packages:
     dependencies:
       '@emotion/css': 11.13.5
       classnames: 2.5.1
-      diff: 5.2.0
+      diff: 8.0.3
       memoize-one: 6.0.0
       prop-types: 15.8.1
       react: 19.2.3
@@ -14342,7 +14347,7 @@ packages:
   /redis-info@3.1.0:
     resolution: {integrity: sha512-ER4L9Sh/vm63DkIE0bkSjxluQlioBiBgf5w1UuldaW/3vPcecdljVDisZhmnCMvsxHNiARTTDDHGg9cGwTfrKg==}
     dependencies:
-      lodash: 4.17.21
+      lodash: 4.17.23
     dev: false
 
   /redis-parser@3.0.0:
@@ -15585,7 +15590,7 @@ packages:
       bin-links: 6.0.0
       https-proxy-agent: 7.0.6
       node-fetch: 3.3.2
-      tar: 7.5.2
+      tar: 7.5.6
     transitivePeerDependencies:
       - supports-color
     dev: true
@@ -15599,7 +15604,7 @@ packages:
       bin-links: 6.0.0
       https-proxy-agent: 7.0.6
       node-fetch: 3.3.2
-      tar: 7.5.2
+      tar: 7.5.6
     transitivePeerDependencies:
       - supports-color
     dev: true
@@ -15650,8 +15655,8 @@ packages:
       - react-native-b4a
     dev: false
 
-  /tar@7.5.2:
-    resolution: {integrity: sha512-7NyxrTE4Anh8km8iEy7o0QYPs+0JKBTj5ZaqHg6B39erLg0qYXN3BijtShwbsNSvQ+LN75+KV+C4QR/f6Gwnpg==}
+  /tar@7.5.6:
+    resolution: {integrity: sha512-xqUeu2JAIJpXyvskvU3uvQW8PAmHrtXp2KDuMJwQqW8Sqq0CaZBAQ+dKS3RBXVhU4wC5NjAdKrmh84241gO9cA==}
     engines: {node: '>=18'}
     dependencies:
       '@isaacs/fs-minipass': 4.0.1
@@ -16161,9 +16166,9 @@ packages:
   /undici-types@7.16.0:
     resolution: {integrity: sha512-Zz+aZWSj8LE6zoxD+xrjh4VfkIG8Ya6LvYkZqtUQGJPZjYl53ypCaUwWqo7eI0x66KBGeRo+mlBEkMSeSZ38Nw==}
 
-  /undici@6.22.0:
-    resolution: {integrity: sha512-hU/10obOIu62MGYjdskASR3CUAiYaFTtC9Pa6vHyf//mAipSvSQg6od2CnJswq7fvzNS3zJhxoRkgNVaHurWKw==}
-    engines: {node: '>=18.17'}
+  /undici@7.19.0:
+    resolution: {integrity: sha512-Heho1hJD81YChi+uS2RkSjcVO+EQLmLSyUlHyp7Y/wFbxQaGb4WXVKD073JytrjXJVkSZVzoE2MCSOKugFGtOQ==}
+    engines: {node: '>=20.18.1'}
     dev: false
 
   /unicode-canonical-property-names-ecmascript@2.0.1:
@@ -17140,7 +17145,7 @@ packages:
       fast-json-stable-stringify: 2.1.0
       fs-extra: 9.1.0
       glob: 7.2.3
-      lodash: 4.17.21
+      lodash: 4.17.23
       pretty-bytes: 5.6.0
       rollup: 2.79.2
       source-map: 0.8.0-beta.0
@@ -17186,7 +17191,7 @@ packages:
       fast-json-stable-stringify: 2.1.0
       fs-extra: 9.1.0
       glob: 7.2.3
-      lodash: 4.17.21
+      lodash: 4.17.23
       pretty-bytes: 5.6.0
       rollup: 2.79.2
       source-map: 0.8.0-beta.0

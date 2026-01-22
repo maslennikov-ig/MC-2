@@ -16,8 +16,29 @@ export const PLACEHOLDER_TYPES: ('quiz' | 'audio' | 'presentation' | 'video')[] 
   'video',
 ]
 
-// Image types for separate Images section
-export const IMAGE_PLACEHOLDER_TYPES: 'cover'[] = ['cover']
+// Image types
+// - cover: 16:9 hero banner for lesson header
+// - card: 1:1 square thumbnail for lesson navigation
+export const IMAGE_PLACEHOLDER_TYPES: ('cover' | 'card')[] = ['cover', 'card']
+
+// Generatable enrichment types (excludes 'document' which is uploaded, not generated)
+export type GeneratableEnrichmentType =
+  | 'quiz'
+  | 'audio'
+  | 'presentation'
+  | 'video'
+  | 'cover'
+  | 'card'
+
+// All placeholder types in unified order for single grid display
+export const ALL_PLACEHOLDER_TYPES: GeneratableEnrichmentType[] = [
+  'cover',
+  'card',
+  'quiz',
+  'audio',
+  'presentation',
+  'video',
+]
 
 export const ENRICHMENT_CONFIG: Record<
   EnrichmentType,

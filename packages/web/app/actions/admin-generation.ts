@@ -4,6 +4,7 @@ import { createClient } from '@/lib/supabase/server'
 import { revalidatePath } from 'next/cache'
 import { getBackendAuthHeaders, TRPC_URL } from '@/lib/auth'
 import { extractApiError } from '@/lib/api-error-handler'
+import { ENV } from '@/lib/env'
 
 export async function triggerStage6ForLesson(lessonId: string) {
   const headers = await getBackendAuthHeaders()
@@ -108,8 +109,79 @@ export async function approveStage(courseId: string, currentStage: number) {
 }
 
 /**
+ * Pause course generation
+ * Calls the API endpoint to pause generation with proper validation and RPC
+ */
+export async function pauseGeneration(courseId: string) {
+  const supabase = await createClient()
+
+  // Get the course slug for API call
+  const { data: course, error: fetchError } = await supabase
+    .from('courses')
+    .select('slug')
+    .eq('id', courseId)
+    .single()
+
+  if (fetchError || !course) {
+    throw new Error('Course not found')
+  }
+
+  // Call the API endpoint which uses atomic RPC with FOR UPDATE lock
+  // Use absolute URL for server actions (fetch requires absolute URLs in server context)
+  const appUrl = ENV.NEXT_PUBLIC_APP_URL
+  const response = await fetch(`${appUrl}/api/courses/${course.slug}/pause`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+  })
+
+  if (!response.ok) {
+    const errorData = await response.json()
+    throw new Error(errorData.error || 'Failed to pause generation')
+  }
+
+  revalidatePath('/courses/generating/[slug]', 'page')
+  return response.json()
+}
+
+/**
+ * Resume paused course generation
+ * Calls the API endpoint to resume generation with proper validation
+ */
+export async function resumeGeneration(courseId: string) {
+  const supabase = await createClient()
+
+  // Get the course slug for API call
+  const { data: course, error: fetchError } = await supabase
+    .from('courses')
+    .select('slug')
+    .eq('id', courseId)
+    .single()
+
+  if (fetchError || !course) {
+    throw new Error('Course not found')
+  }
+
+  // Call the API endpoint
+  // Use absolute URL for server actions (fetch requires absolute URLs in server context)
+  const appUrl = ENV.NEXT_PUBLIC_APP_URL
+  const response = await fetch(`${appUrl}/api/courses/${course.slug}/resume`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+  })
+
+  if (!response.ok) {
+    const errorData = await response.json()
+    throw new Error(errorData.error || 'Failed to resume generation')
+  }
+
+  revalidatePath('/courses/generating/[slug]', 'page')
+  return response.json()
+}
+
+/**
  * Cancel course generation
- * Sets the course status to 'cancelled'
+ * Updates course status to 'cancelled' and triggers backend cleanup.
+ * Backend (lifecycle.router.ts) handles BullMQ job removal via removeJobsByCourseId.
  */
 export async function cancelGeneration(courseId: string) {
   const supabase = await createClient()
@@ -121,6 +193,24 @@ export async function cancelGeneration(courseId: string) {
 
   if (error) {
     throw new Error(error.message || 'Failed to cancel generation')
+  }
+
+  // Call backend tRPC to clean up BullMQ jobs
+  try {
+    const headers = await getBackendAuthHeaders()
+    const response = await fetch(`${TRPC_URL}/generation.cancelGeneration`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify({ courseId }),
+    })
+
+    if (!response.ok) {
+      // Log but don't fail - status already updated
+      console.error('Failed to cancel backend jobs:', await response.text())
+    }
+  } catch (backendError) {
+    // Log but don't fail - status already updated
+    console.error('Failed to call backend cancel:', backendError)
   }
 
   revalidatePath('/courses/generating/[slug]', 'page')
@@ -357,6 +447,30 @@ export async function switchToManualMode(courseId: string) {
   }
 
   revalidatePath('/courses/generating/[slug]', 'page')
+  const data = await response.json()
+  return data?.result?.data || data
+}
+
+/**
+ * Get edit history for a course
+ * Used by EditHistoryPanel to display all regeneration changes
+ * Calls generation.getEditHistory tRPC endpoint
+ */
+export async function getEditHistoryAction(courseId: string, limit: number = 50) {
+  const headers = await getBackendAuthHeaders()
+
+  const response = await fetch(
+    `${TRPC_URL}/generation.getEditHistory?input=${encodeURIComponent(JSON.stringify({ courseId, limit }))}`,
+    {
+      method: 'GET',
+      headers,
+    }
+  )
+
+  if (!response.ok) {
+    await extractApiError(response, 'Failed to get edit history')
+  }
+
   const data = await response.json()
   return data?.result?.data || data
 }

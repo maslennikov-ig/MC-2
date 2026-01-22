@@ -3,7 +3,7 @@ import { Suspense } from 'react'
 import { setRequestLocale } from 'next-intl/server'
 import { Locale } from '@/src/i18n/config'
 import { getCurrentUser } from '@/lib/auth-helpers'
-import { getCourses, getCoursesStatistics, checkFavorites } from './actions'
+import { getCourses, getCoursesStatistics, checkFavorites, getCourseCovers } from './actions'
 import { CoursesHeader } from './_components/courses-header'
 import { CoursesFilters } from './_components/courses-filters'
 import { CourseGrid } from './_components/course-grid'
@@ -53,34 +53,35 @@ export default async function CoursesPage({ params, searchParams }: PageProps) {
   const searchParamsResolved = await searchParams
   const user = await getCurrentUser()
 
-  // Fetch courses using server action
-  const coursesData = await getCourses({
-    search: searchParamsResolved.search,
-    status: searchParamsResolved.status,
-    difficulty: searchParamsResolved.difficulty,
-    favorites: searchParamsResolved.favorites === 'true',
-    sort: searchParamsResolved.sort || 'created_desc',
-    page: parseInt(searchParamsResolved.page || '1'),
-    limit: 12,
-  })
+  // Fetch courses and statistics in parallel (independent queries)
+  const [coursesData, statistics] = await Promise.all([
+    getCourses({
+      search: searchParamsResolved.search,
+      status: searchParamsResolved.status,
+      difficulty: searchParamsResolved.difficulty,
+      favorites: searchParamsResolved.favorites === 'true',
+      sort: searchParamsResolved.sort || 'created_desc',
+      page: parseInt(searchParamsResolved.page || '1'),
+      limit: 12,
+    }),
+    getCoursesStatistics(),
+  ])
 
-  // Get full statistics (not filtered by pagination)
-  const statistics = await getCoursesStatistics()
+  // Get course IDs for batch queries
+  const courseIds = coursesData.courses.map((c) => c.id)
 
-  // Check favorites for all courses if user is authenticated
-  let favoritesMap: Record<string, boolean> = {}
-  if (user) {
-    const courseIds = coursesData.courses.map((c) => c.id)
-    favoritesMap = await checkFavorites(courseIds)
-  }
+  // Fetch favorites and covers in parallel (both depend on courseIds)
+  const [favoritesMap, coversMap] = await Promise.all([
+    user ? checkFavorites(courseIds) : Promise.resolve({} as Record<string, boolean>),
+    getCourseCovers(courseIds),
+  ])
 
-  // Add favorites status to courses
+  // Add favorites status and cover to courses
   const coursesWithFavorites = coursesData.courses.map((course) => ({
     ...course,
     isFavorited: favoritesMap[course.id] || false,
+    coverUrl: coversMap[course.id] || null,
   }))
-
-  // Favorites have been mapped to courses
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-white via-purple-50/20 to-gray-50 transition-colors duration-200 dark:from-slate-950 dark:via-purple-950/20 dark:to-slate-950">

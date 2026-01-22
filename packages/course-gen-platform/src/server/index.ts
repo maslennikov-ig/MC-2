@@ -183,10 +183,12 @@ app.use(
 );
 
 // Parse JSON request bodies (for file upload metadata, etc.)
-app.use(express.json({ limit: '10mb' }));
+// Limit set to 100MB to support premium tier (max file size)
+// Tier-based validation happens in frontend (FileUpload) and backend (tRPC)
+app.use(express.json({ limit: '100mb' }));
 
 // Parse URL-encoded request bodies
-app.use(express.urlencoded({ extended: true, limit: '10mb' }));
+app.use(express.urlencoded({ extended: true, limit: '100mb' }));
 
 /**
  * Request Logging Middleware

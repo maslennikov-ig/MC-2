@@ -28,7 +28,32 @@ export * from './error-service.js';
 export { createModuleLogger, createRequestLogger };
 
 /**
+ * Safely extract error details from unknown error object
+ * Handles Error instances, plain objects, and primitives
+ */
+function extractErrorDetails(errorObj: unknown): { errorDetails: Record<string, unknown> } | null {
+  if (!errorObj) return null;
+
+  if (typeof errorObj === 'object' && errorObj !== null) {
+    const errAny = errorObj as Record<string, unknown>;
+    return {
+      errorDetails: {
+        message: errAny.message || String(errorObj),
+        code: errAny.code,
+        name: errAny.name,
+      },
+    };
+  }
+
+  return { errorDetails: { message: String(errorObj) } };
+}
+
+/**
  * Write log entry to error_logs table (fire-and-forget)
+ *
+ * IMPORTANT: Failures are logged to console but not retried.
+ * This prevents application blocking on database issues.
+ * For critical errors, use logPermanentFailure() from error-service.ts instead.
  */
 async function writeToErrorLogs(
   level: 'WARNING' | 'ERROR' | 'CRITICAL',
@@ -72,19 +97,11 @@ async function writeToErrorLogs(
     // Build metadata with remaining context
     const metadata: Record<string, unknown> = { ...restMetadata };
 
-    // Extract error details safely
+    // Extract error details safely using helper function
     const errorObj = err || error;
-    if (errorObj) {
-      if (typeof errorObj === 'object' && errorObj !== null) {
-        const errAny = errorObj as Record<string, unknown>;
-        metadata.errorDetails = {
-          message: errAny.message || String(errorObj),
-          code: errAny.code,
-          name: errAny.name,
-        };
-      } else {
-        metadata.errorDetails = { message: String(errorObj) };
-      }
+    const errorDetails = extractErrorDetails(errorObj);
+    if (errorDetails) {
+      Object.assign(metadata, errorDetails);
     }
 
     // Include current value in metadata for context
@@ -126,9 +143,13 @@ async function writeToErrorLogs(
       .single();
 
     // Check if this error should be auto-muted
+    // SAFETY: applyAutoMuteStatus uses baseLogger internally to prevent recursion.
+    // DO NOT await - fire-and-forget to prevent blocking main log flow.
     const logId = (insertedLog as unknown as { id: string } | null)?.id;
     if (logId) {
-      await applyAutoMuteStatus(logId, message);
+      applyAutoMuteStatus(logId, message).catch(() => {
+        // Silently ignore auto-mute failures to prevent cascading errors
+      });
     }
   } catch (dbError) {
     // Don't break the app if DB write fails, but log at WARN level for visibility
@@ -230,3 +251,9 @@ export function createChildLogger(context: Record<string, unknown>): Logger {
   const childLogger = baseCreateChildLogger(context);
   return createEnhancedLogger(childLogger);
 }
+
+// Re-export domain loggers
+export * from './domain';
+
+// Re-export context builders
+export * from './context/builders';

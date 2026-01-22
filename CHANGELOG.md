@@ -311,6 +311,240 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.28.27] - 2026-01-22
+
+### Added
+
+- **logger**: add type guards, discriminated unions, and usage guide (5f48f29)
+- **logger**: add centralized domain-specific logging architecture (cc7bdff)
+
+### Changed
+
+- **validation**: improve logging and type safety in validation-orchestrator (29e06e2)
+
+### Fixed
+
+- **enrichments**: address code review MEDIUM/LOW priority issues (aa59a54)
+- **enrichments**: address code review HIGH priority issues (9c4c694)
+- **enrichments**: restore generation progress on page reload (8b6781a)
+- **logger**: address HIGH priority code review findings (bb57e7e)
+- **logging**: improve LLM error logging and add TTL timeout auto-mute (3e9e10e)
+
+### Other
+
+- update 1 skill(s), update docs, +1 more (6cc2744)
+- bd sync: 2026-01-22 20:22:57 (9ce5c1c)
+- bd sync: 2026-01-22 20:21:11 (8d475ed)
+- bd sync: 2026-01-22 20:06:50 (8f389e1)
+- bd sync: 2026-01-22 20:04:47 (281e733)
+- bd sync: 2026-01-22 19:13:36 (a5daf74)
+- bd sync: 2026-01-22 19:07:31 (24c7ec2)
+- bd sync: 2026-01-22 18:51:25 (96f760c)
+- bd sync: 2026-01-22 18:30:21 (6ddfe85)
+- bd sync: 2026-01-22 18:28:11 (c178a10)
+- bd sync: 2026-01-22 16:28:35 (29cc292)
+- bd sync: 2026-01-22 16:28:24 (1139cd5)
+
+## [0.28.26] - 2026-01-22
+
+### Added
+
+- **enrichment**: add grayscale placeholder with hover color reveal (3fdb463)
+
+### Changed
+
+- fix CPU/memory issues in course generation page (086efcf)
+- **template-whitelist**: optimize Helm function matching with Set lookup (6864a32)
+
+### Fixed
+
+- **web**: update 4 source file(s), update docs (002342f)
+- address code review issues for performance optimization (9543318)
+- sprint bug fixes - template whitelist, patcher retry, banner flow, status validation (2466f45)
+
+### Other
+
+- bd sync: 2026-01-22 16:21:29 (f271e2c)
+- bd sync: 2026-01-22 16:21:19 (aebc91b)
+- bd sync: 2026-01-22 16:19:05 (e0335f1)
+- bd sync: 2026-01-22 16:16:30 (91931f2)
+- bd sync: 2026-01-22 16:15:55 (e086cc9)
+- bd sync: 2026-01-22 15:03:17 (8645448)
+- bd sync: 2026-01-22 15:03:08 (4ca7f9d)
+- bd sync: 2026-01-22 14:51:05 (206ff2f)
+- bd sync: 2026-01-22 14:09:18 (26a7654)
+- bd sync: 2026-01-22 13:59:04 (6ac77ac)
+- bd sync: 2026-01-22 13:58:40 (96d8980)
+- remove demo pages (ae8c454)
+
+## [0.28.25] - 2026-01-22
+
+### Added
+
+- **lessons**: add progress card to lessons page header (091c133)
+- **#14**: add parameter flow dashboard with real-time updates (02e6bd7)
+- **lessons**: add course lessons page with cards grid (5c5f17b)
+- **#16**: add course edit history for diff view (4de7689)
+- **demo**: add placeholder vs generated comparison page (8228b30)
+- **logging**: add parameter tracking and validation logging (#12, #13) (4b01105)
+- **a11y**: implement keyboard navigation for generation graph UI (00e17c2)
+- **skills**: add /process-issues skill for GitHub Issues workflow (b80d910)
+
+### Changed
+
+- **enrichment**: unify all 6 cards into single grid section (63cd31a)
+
+### Fixed
+
+- **web**: update 1 source file(s), update 5 test(s), +1 more (b938ed5)
+- **lessons**: address code review issues for lessons page (593de91)
+- **progress**: address code review findings for Stage 6 progress bar (63f4dfc)
+- **code-review**: address P1 and P2 issues from review (38f750d)
+- **progress**: update percentage during Stage 6 lesson generation (b89d608)
+- **generation-graph**: implement GitHub Issues #10, #11, #17 (1339f0f)
+- **enrichment**: resolve cover/banner generation issues (e476020)
+- **enrichment**: unify grid layout for all enrichment cards (a984f77)
+- **pipeline**: implement per-field save status and fix type compatibility (dc4062e)
+
+### Other
+
+- bd sync: 2026-01-22 13:47:23 (58d77ce)
+- bd sync: 2026-01-22 13:43:39 (ef02ae6)
+- bd sync: 2026-01-22 13:43:11 (e5e0bd2)
+- bd sync: 2026-01-22 13:40:27 (bfd0a50)
+- bd sync: 2026-01-22 13:35:08 (8d4e306)
+- bd sync: 2026-01-22 13:26:41 (fb7366a)
+- bd sync: 2026-01-22 13:20:53 (89a7ba4)
+- bd sync: 2026-01-22 13:15:00 (985726f)
+- bd sync: 2026-01-22 13:11:28 (8f2f14c)
+- bd sync: 2026-01-22 13:06:27 (9d27401)
+- bd sync: 2026-01-22 12:52:57 (56a7642)
+- bd sync: 2026-01-22 12:41:58 (da8152a)
+- bd sync: 2026-01-22 12:38:22 (6c7bcbf)
+- bd sync: 2026-01-22 12:37:00 (4c6ab14)
+- bd sync: 2026-01-22 12:22:05 (092961a)
+- **plans**: mark Stage 4 persistence plan as completed (5489c26)
+- bd sync: 2026-01-22 12:01:59 (3bf95b3)
+- bd sync: 2026-01-22 12:00:58 (cbaa4b1)
+
+## [0.28.24] - 2026-01-22
+
+### Added
+
+- **types**: add Zod validation for AnalysisResult type (82dc244)
+- **enrichments**: unify placeholder cards to Hover Reveal style (7f1bfb7)
+- **pipeline**: pass user-edited params between stages (7b226f6)
+
+### Changed
+
+- **enrichment**: split UnifiedEnrichmentCard into subcomponents (da794bf)
+- **enrichment**: P3 improvements - extract LabelWithTooltip, use type guards (1b78cbc)
+
+### Fixed
+
+- **pipeline**: persist Stage 4 edits and show per-field save status (a877e7c)
+- **enrichments**: address code review issues for UnifiedEnrichmentCard (df28103)
+
+### Other
+
+- bd sync: 2026-01-22 11:52:05 (292da7b)
+- bd sync: 2026-01-22 11:47:56 (be8620f)
+- bd sync: 2026-01-22 11:42:40 (0a8d55a)
+- bd sync: 2026-01-22 11:39:45 (96712f1)
+- bd sync: 2026-01-22 11:38:04 (a33430b)
+- bd sync: 2026-01-22 11:36:23 (441a616)
+- bd sync: 2026-01-22 11:27:37 (2430bcf)
+- bd sync: 2026-01-22 10:47:23 (df7ee52)
+- bd sync: 2026-01-22 10:46:21 (6abb58c)
+
+## [0.28.23] - 2026-01-21
+
+### Added
+
+- **file-upload**: implement tier-based file limits with upgrade suggestions (fd1f355)
+- **ui**: add glassmorphism for course cards with light/dark theme support (8ec0c6d)
+- **visuals**: add lesson card (1:1) generation to Media section (7b5b71f)
+
+### Changed
+
+- **course-viewer**: open course in new tab for instant navigation (5664ee3)
+
+### Fixed
+
+- **stage6**: suppress false RAG warning for courses without documents (801a0a7)
+- **stage5**: whitelist Helm/Go template syntax in placeholder validator (RT-008) (9b22334)
+- **deploy**: explicitly remove dev containers before recreate (3d5e546)
+- **admin-logs**: align list view status=new filter with grouped view logic (029e62d)
+- **logs**: increase file upload limit + add Redis reconnect auto-mute (bb671d7)
+- **logs+qdrant**: improve error handling for transient failures (91a9867)
+- **docker**: permanent fix for Redis DNS failure (97a0fab)
+- **ui+pipeline**: improve badge contrast and save target_audience in Stage 4 (bfe0841)
+- **i18n**: add missing video.estimatedTime and improve cover/card descriptions (9f52278)
+- **images**: use Next.js optimizer instead of Supabase render (43f635d)
+- **visuals**: address code review issues for lesson cards media (0b93573)
+
+### Other
+
+- fix eslint error and stage pending changes (4799ac0)
+- bd sync: 2026-01-21 21:35:33 (86304e8)
+- bd sync: 2026-01-21 21:34:01 (ab5247e)
+- **logs**: add auto-mute rules for RAG chunks and Mermaid fallback (59c89ee)
+- bd sync: 2026-01-21 21:32:22 (0ff46e9)
+- bd sync: 2026-01-21 21:15:09 (d9776fd)
+- bd sync: 2026-01-21 21:14:15 (4e52f10)
+- bd sync: 2026-01-21 21:09:50 (323d19d)
+- bd sync: 2026-01-21 16:50:34 (c75d862)
+- **code-review**: add file upload tier limits review report (0a22cca)
+- bd sync: 2026-01-21 16:44:40 (d5d21cf)
+- bd sync: 2026-01-21 16:06:00 (1a6b1a1)
+- bd sync: 2026-01-21 16:05:56 (83019aa)
+- bd sync: 2026-01-21 15:44:17 (49b7f36)
+- bd sync: 2026-01-21 15:43:19 (46062c2)
+- **logs**: add auto-mute rules for cascading repair and corrupted jobs (3372662)
+- bd sync: 2026-01-21 15:38:11 (0afac53)
+- bd sync: 2026-01-21 15:31:35 (9c6a417)
+- bd sync: 2026-01-21 15:27:01 (e59dce5)
+- bd sync: 2026-01-21 15:26:16 (331e700)
+- bd sync: 2026-01-21 15:20:55 (4ec4664)
+- bd sync: 2026-01-21 15:20:07 (a47560a)
+- bd sync: 2026-01-21 14:00:00 (7452b0e)
+- bd sync: 2026-01-21 13:59:04 (ea4b3c1)
+- bd sync: 2026-01-21 13:40:25 (eb0e0f2)
+
+## [0.28.22] - 2026-01-21
+
+### Added
+
+- **courses**: integrate course cover images into UI (4a50c9a)
+- **redis**: add graceful shutdown coordination with BullMQ workers (f25336c)
+
+### Fixed
+
+- **generation**: add token validation warnings and pause delay tracking (eae916e)
+- **generation**: address code review findings for pause/stop/resume (fc09aca)
+- **redis**: improve retry strategy with graceful shutdown and health monitoring (861a7a9)
+- **generation**: make pause/stop/resume controls work correctly (f85870f)
+- **redis**: exit process after extended connection failure (~20 min) (22111bb)
+- **redis**: never give up on reconnection, use exponential backoff (a12150b)
+
+### Other
+
+- update docs (a3a01e1)
+- add comprehensive progress report for January 2026 (f9131af)
+- bd sync: 2026-01-21 13:29:35 (a9ebad2)
+- bd sync: 2026-01-21 13:25:34 (897cbeb)
+- bd sync: 2026-01-21 13:24:28 (bbf959a)
+- bd sync: 2026-01-21 13:16:13 (0e81dd7)
+- bd sync: 2026-01-21 13:16:05 (b36e895)
+- bd sync: 2026-01-21 13:08:13 (6acd831)
+- bd sync: 2026-01-21 13:07:23 (76fc306)
+- bd sync: 2026-01-21 13:05:52 (50ac75d)
+- bd sync: 2026-01-21 12:56:35 (b4a4e65)
+- bd sync: 2026-01-21 12:54:12 (6fd6f14)
+- bd sync: 2026-01-21 12:53:42 (9c177d1)
+- bd sync: 2026-01-21 12:43:55 (2c5a740)
+- merge develop into master (4dd1bc8)
+
 ## [0.28.21] - 2026-01-21
 
 ### Added

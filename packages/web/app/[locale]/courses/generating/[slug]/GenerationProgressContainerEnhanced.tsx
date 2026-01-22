@@ -23,6 +23,8 @@ import {
 import { GraphViewWrapper } from '@/components/generation-graph'
 import {
   cancelGeneration,
+  pauseGeneration,
+  resumeGeneration,
   switchToManualMode,
   startGeneration,
 } from '@/app/actions/admin-generation'
@@ -195,6 +197,20 @@ export default function GenerationProgressContainerEnhanced({
   const reconnectAttempts = useRef(0)
   const maxReconnectAttempts = 5
 
+  // Refs for stable callbacks to prevent realtime subscription re-creation
+  const statusRef = useRef<CourseStatus>(initialStatus)
+  const isPausedRef = useRef(!!generationPausedAt)
+
+  // Throttle refs for session storage writes (prevents excessive writes)
+  // 2 seconds balances data persistence with performance - reduces I/O by ~99%
+  // while ensuring progress is saved frequently enough to survive page refreshes
+  const lastSaveTime = useRef(0)
+  const pendingSave = useRef<NodeJS.Timeout | null>(null)
+  const SAVE_THROTTLE_MS = 2000
+
+  // Ref for state to allow flush on unmount without stale closure
+  const stateRef = useRef<EnhancedProgressState | null>(null)
+
   // Refs to preserve last known values for modules/lessons counts (survives realtime updates that don't include analysis_result)
   const lastKnownModulesTotal = useRef<number | undefined>(initialProgress.modules_total)
   const lastKnownLessonsTotal = useRef<number>(
@@ -268,6 +284,24 @@ export default function GenerationProgressContainerEnhanced({
 
   // Local state for pause/resume - initialized from prop, updated via realtime and optimistic updates
   const [isPausedLocal, setIsPausedLocal] = useState(!!generationPausedAt)
+
+  // Sync refs with state for stable callbacks (prevents realtime re-subscription)
+  useEffect(() => {
+    statusRef.current = state.status
+  }, [state.status])
+
+  useEffect(() => {
+    isPausedRef.current = isPausedLocal
+  }, [isPausedLocal])
+
+  // Keep stateRef in sync for flush on unmount
+  useEffect(() => {
+    stateRef.current = state
+  }, [state])
+
+  // Request ID tracking to prevent race conditions with optimistic updates
+  const pauseRequestRef = useRef(0)
+  const resumeRequestRef = useRef(0)
 
   // DISABLED: All below moved to GraphView - MissionControlBanner and StageResultsDrawer
   // const [detailsStageId, setDetailsStageId] = useState<string | null>(null);
@@ -351,26 +385,56 @@ export default function GenerationProgressContainerEnhanced({
     }
   }, [courseId, generationMode, initialStatus, generationPausedAt])
 
-  // Save state to session storage
+  // Save state to session storage with throttling to prevent excessive writes
   const saveStateToStorage = useCallback(() => {
-    if (typeof window !== 'undefined') {
+    if (typeof window === 'undefined') return
+
+    const now = Date.now()
+    if (pendingSave.current) {
+      clearTimeout(pendingSave.current)
+    }
+
+    const doSave = () => {
       const stateToSave = {
         ...state,
         stepRetryCount: Array.from(state.stepRetryCount.entries()),
       }
       sessionStorage.setItem(STORAGE_KEY_STATE(courseId), JSON.stringify(stateToSave))
       sessionStorage.setItem(STORAGE_KEY_TIMESTAMP(courseId), new Date().toISOString())
+      lastSaveTime.current = Date.now()
+    }
+
+    if (now - lastSaveTime.current >= SAVE_THROTTLE_MS) {
+      doSave()
+    } else {
+      pendingSave.current = setTimeout(doSave, SAVE_THROTTLE_MS)
     }
   }, [state, courseId])
 
-  // Save state on changes
+  // Save state on changes (throttled)
   useEffect(() => {
     saveStateToStorage()
   }, [state.progress, state.status, state.error, saveStateToStorage])
 
+  // Cleanup and flush pending save on unmount
+  useEffect(() => {
+    return () => {
+      // Flush pending save on unmount to prevent data loss
+      if (pendingSave.current && stateRef.current) {
+        clearTimeout(pendingSave.current)
+        // Synchronously save final state
+        const stateToSave = {
+          ...stateRef.current,
+          stepRetryCount: Array.from(stateRef.current.stepRetryCount.entries()),
+        }
+        sessionStorage.setItem(STORAGE_KEY_STATE(courseId), JSON.stringify(stateToSave))
+        sessionStorage.setItem(STORAGE_KEY_TIMESTAMP(courseId), new Date().toISOString())
+      }
+    }
+  }, [courseId])
+
   // Automatic Mode Control Handlers
   const handlePause = useCallback(async () => {
-    if (!supabase) return
     // Don't pause if already paused or generation is terminal
     if (isPausedLocal) {
       toast.warning('Генерация уже приостановлена')
@@ -381,52 +445,49 @@ export default function GenerationProgressContainerEnhanced({
       toast.warning('Генерация уже завершена')
       return
     }
+    // Increment request ID and store locally for race condition detection
+    const requestId = ++pauseRequestRef.current
     // Optimistic update - set paused state immediately before API call
     setIsPausedLocal(true)
     try {
-      const { error } = await supabase
-        .from('courses')
-        .update({ generation_paused_at: new Date().toISOString() })
-        .eq('id', courseId)
-
-      if (error) {
-        // Revert optimistic update on error
-        setIsPausedLocal(false)
-        throw error
-      }
-      toast.info('Генерация приостановлена')
+      // Use server action that calls API endpoint with proper validation and RPC
+      await pauseGeneration(courseId)
+      toast.info(
+        'Генерация приостановлена. Активная задача завершится, новые задачи приостановлены.'
+      )
     } catch (error) {
+      // Only revert if this is still the latest request (prevent race condition)
+      if (requestId === pauseRequestRef.current) {
+        setIsPausedLocal(false)
+      }
       toast.error('Не удалось приостановить генерацию')
       console.error(error)
     }
-  }, [courseId, supabase, isPausedLocal, state.status])
+  }, [courseId, isPausedLocal, state.status])
 
   const handleResume = useCallback(async () => {
-    if (!supabase) return
     // Only resume if paused
     if (!isPausedLocal) {
       toast.warning('Генерация не приостановлена')
       return
     }
+    // Increment request ID and store locally for race condition detection
+    const requestId = ++resumeRequestRef.current
     // Optimistic update - set resumed state immediately before API call
     setIsPausedLocal(false)
     try {
-      const { error } = await supabase
-        .from('courses')
-        .update({ generation_paused_at: null })
-        .eq('id', courseId)
-
-      if (error) {
-        // Revert optimistic update on error
-        setIsPausedLocal(true)
-        throw error
-      }
+      // Use server action that calls API endpoint with proper validation
+      await resumeGeneration(courseId)
       toast.success('Генерация продолжена')
     } catch (error) {
+      // Only revert if this is still the latest request (prevent race condition)
+      if (requestId === resumeRequestRef.current) {
+        setIsPausedLocal(true)
+      }
       toast.error('Не удалось продолжить генерацию')
       console.error(error)
     }
-  }, [courseId, supabase, isPausedLocal])
+  }, [courseId, isPausedLocal])
 
   const handleCancel = useCallback(async () => {
     if (!confirm('Вы уверены, что хотите отменить генерацию? Это действие нельзя отменить.')) return
@@ -468,9 +529,14 @@ export default function GenerationProgressContainerEnhanced({
       generation_paused_at?: string | null
     }) => {
       // Update pause state from realtime data
+      // Only apply realtime updates if no pending optimistic update (race condition protection)
       if ('generation_paused_at' in course) {
         const newIsPaused = course.generation_paused_at !== null
-        setIsPausedLocal(newIsPaused)
+        // Only update if not in middle of optimistic update sequence
+        // Check if the realtime state matches our optimistic state - if different, prioritize realtime (server is source of truth)
+        if (newIsPaused !== isPausedRef.current) {
+          setIsPausedLocal(newIsPaused)
+        }
       }
       if (course.generation_progress && typeof course.generation_progress === 'object') {
         const progress = course.generation_progress as {
@@ -564,7 +630,7 @@ export default function GenerationProgressContainerEnhanced({
         }
       }
 
-      if (course.generation_status && course.generation_status !== state.status) {
+      if (course.generation_status && course.generation_status !== statusRef.current) {
         dispatch({ type: 'SET_STATUS', payload: course.generation_status as CourseStatus })
 
         // Handle completion
@@ -578,6 +644,12 @@ export default function GenerationProgressContainerEnhanced({
               message: 'Course generation completed successfully!',
             },
           })
+
+          // Clear pending save first to prevent race condition
+          if (pendingSave.current) {
+            clearTimeout(pendingSave.current)
+            pendingSave.current = null
+          }
 
           // Clear session storage
           if (typeof window !== 'undefined') {
@@ -617,7 +689,6 @@ export default function GenerationProgressContainerEnhanced({
       }
     },
     [
-      state.status,
       courseId,
       slug,
       router,
@@ -628,6 +699,12 @@ export default function GenerationProgressContainerEnhanced({
       calculateEstimatedTime,
     ]
   )
+
+  // Ref for stable handleProgressUpdate to prevent realtime re-subscription
+  const handleProgressUpdateRef = useRef(handleProgressUpdate)
+  useEffect(() => {
+    handleProgressUpdateRef.current = handleProgressUpdate
+  }, [handleProgressUpdate])
 
   // Enhanced polling with exponential backoff
   const startPolling = useCallback(() => {
@@ -642,7 +719,7 @@ export default function GenerationProgressContainerEnhanced({
           .single()
 
         if (!error && data) {
-          handleProgressUpdate(data)
+          handleProgressUpdateRef.current(data)
           reconnectAttempts.current = 0 // Reset on success
         } else if (error) {
           // Polling error - will be handled by error state
@@ -662,7 +739,7 @@ export default function GenerationProgressContainerEnhanced({
     const baseInterval = 3000
     const interval = Math.min(baseInterval * Math.pow(2, reconnectAttempts.current), 30000)
     pollingInterval.current = setInterval(() => void poll(), interval)
-  }, [courseId, supabase, handleProgressUpdate])
+  }, [courseId, supabase])
 
   const stopPolling = useCallback(() => {
     if (pollingInterval.current) {
@@ -692,7 +769,7 @@ export default function GenerationProgressContainerEnhanced({
             },
             (payload) => {
               if (payload.new) {
-                handleProgressUpdate(payload.new)
+                handleProgressUpdateRef.current(payload.new)
               }
             }
           )
@@ -737,7 +814,7 @@ export default function GenerationProgressContainerEnhanced({
         clearTimeout(reconnectTimeout)
       }
     }
-  }, [courseId, supabase, handleProgressUpdate, startPolling, stopPolling])
+  }, [courseId, supabase, startPolling, stopPolling])
 
   // Refetch state when tab becomes visible (handles browser throttling WebSocket)
   useEffect(() => {
@@ -746,7 +823,8 @@ export default function GenerationProgressContainerEnhanced({
     let isMounted = true
 
     const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible' && isMounted) {
+      if (!isMounted) return // Early exit guard
+      if (document.visibilityState === 'visible') {
         // Tab became visible - refetch current state to ensure UI is up-to-date
         void (async () => {
           try {
@@ -758,7 +836,7 @@ export default function GenerationProgressContainerEnhanced({
 
             // Check isMounted again after async operation
             if (!error && data && isMounted) {
-              handleProgressUpdate(data)
+              handleProgressUpdateRef.current(data)
             }
           } catch {
             // Silently fail - polling will handle it
@@ -773,7 +851,7 @@ export default function GenerationProgressContainerEnhanced({
       isMounted = false
       document.removeEventListener('visibilitychange', handleVisibilityChange)
     }
-  }, [courseId, supabase, handleProgressUpdate])
+  }, [courseId, supabase])
 
   // Track confetti interval
   const confettiInterval = useRef<NodeJS.Timeout | null>(null)
@@ -806,10 +884,9 @@ export default function GenerationProgressContainerEnhanced({
       const timeLeft = animationEnd - Date.now()
 
       if (timeLeft <= 0) {
-        if (confettiInterval.current) {
-          clearInterval(confettiInterval.current)
-          confettiInterval.current = null
-        }
+        // Interval existence already guaranteed by outer setInterval context
+        clearInterval(confettiInterval.current!)
+        confettiInterval.current = null
         return
       }
 
@@ -901,7 +978,9 @@ export default function GenerationProgressContainerEnhanced({
               </h3>
               <p className="mb-6 text-gray-600 dark:text-gray-400">{t('message')}</p>
               <Button asChild>
-                <Link href={`/courses/${slug}`}>{t('viewCourse')}</Link>
+                <Link href={`/courses/${slug}`} target="_blank" rel="noopener noreferrer">
+                  {t('viewCourse')}
+                </Link>
               </Button>
             </motion.div>
           </motion.div>

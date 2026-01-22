@@ -1,23 +1,37 @@
 'use client'
 
-import React, { useState, useCallback } from 'react'
+import React, { useState, useCallback, useEffect, useRef } from 'react'
 import { useTranslations } from 'next-intl'
 import { toast } from 'sonner'
 import { FileText, AlertTriangle } from 'lucide-react'
 import { EnrichmentErrorBoundary } from '../enrichments/EnrichmentErrorBoundary'
-import { EnrichmentPlaceholderCard } from './EnrichmentPlaceholderCard'
+import { UnifiedEnrichmentCard } from './UnifiedEnrichmentCard'
 import { EnrichmentGeneratingCard } from './EnrichmentGeneratingCard'
-import { ImagePlaceholderCard } from './ImagePlaceholderCard'
 import { useEnrichmentGeneration } from '@/lib/hooks/useEnrichmentGeneration'
 import type { Database } from '@/types/database.generated'
 import { EnrichmentCard } from './EnrichmentCard'
 import {
-  PLACEHOLDER_TYPES,
+  ALL_PLACEHOLDER_TYPES,
   IMAGE_PLACEHOLDER_TYPES,
   type EnrichmentType,
 } from './enrichment-config'
+import {
+  isOnDemandType,
+  isActiveGenerationStatus,
+  type OnDemandEnrichmentType,
+} from '@megacampus/shared-types'
 
 type EnrichmentRow = Database['public']['Tables']['lesson_enrichments']['Row']
+
+/**
+ * Type guard for enrichments with on-demand type
+ * Fixes HIGH #3: unsafe type assertion
+ */
+function isEnrichmentOnDemand(
+  enrichment: EnrichmentRow
+): enrichment is EnrichmentRow & { enrichment_type: OnDemandEnrichmentType } {
+  return isOnDemandType(enrichment.enrichment_type)
+}
 
 interface EnrichmentsPanelProps {
   enrichments: EnrichmentRow[]
@@ -59,12 +73,53 @@ export function EnrichmentsPanel({
   )
 
   // Use enrichment generation hook (only if lessonId and courseId are available)
-  const { startGeneration, cancelGeneration, isGenerating, getProgress } = useEnrichmentGeneration({
-    lessonId: lessonId || '',
-    courseId: courseId || '',
-    onComplete: handleGenerationComplete,
-    onError: handleGenerationError,
-  })
+  const { startGeneration, cancelGeneration, isGenerating, getProgress, resumeGeneration } =
+    useEnrichmentGeneration({
+      lessonId: lessonId || '',
+      courseId: courseId || '',
+      onComplete: handleGenerationComplete,
+      onError: handleGenerationError,
+    })
+
+  // Track resumed enrichment IDs to prevent duplicate resumes
+  // Fixes HIGH #1: race condition (Set persists but tracks IDs, not boolean)
+  const resumedIdsRef = useRef(new Set<string>())
+
+  // Resume polling for active enrichments on mount and when new active enrichments appear
+  // Fixes HIGH #1, #2, #3: proper tracking, cleanup, and type safety
+  //
+  // Note (#5): Currently only ONE enrichment per type is supported.
+  // If multiple enrichments of the same type exist in 'generating' state,
+  // only the first encountered will be tracked (hook guards against duplicates).
+  // This may change in future when multiple enrichments per type are allowed.
+  useEffect(() => {
+    // Find enrichments that need resuming (active + on-demand + not yet resumed)
+    const activeEnrichments = enrichments
+      .filter((e) => isActiveGenerationStatus(e.status))
+      .filter(isEnrichmentOnDemand)
+      .filter((e) => !resumedIdsRef.current.has(e.id))
+
+    // Resume polling for each new active enrichment
+    // #7 fix: Show visual feedback on auto-resume
+    if (activeEnrichments.length > 0) {
+      toast.info(t('viewer.resumingGeneration', { count: activeEnrichments.length }))
+    }
+    activeEnrichments.forEach((enrichment) => {
+      resumeGeneration(enrichment.id, enrichment.enrichment_type)
+      resumedIdsRef.current.add(enrichment.id)
+    })
+
+    // Cleanup: remove IDs for enrichments that are no longer active
+    // Fixes HIGH #2: memory leak - stop tracking completed/removed enrichments
+    const currentActiveIds = new Set(
+      enrichments.filter((e) => isActiveGenerationStatus(e.status)).map((e) => e.id)
+    )
+    resumedIdsRef.current.forEach((id) => {
+      if (!currentActiveIds.has(id)) {
+        resumedIdsRef.current.delete(id)
+      }
+    })
+  }, [enrichments, resumeGeneration])
 
   // Filter out cover type - it's displayed as hero banner in lesson content
   const filteredEnrichments = enrichments.filter((e) => (e.enrichment_type as string) !== 'cover')
@@ -81,7 +136,9 @@ export function EnrichmentsPanel({
     )
   }
 
-  if (!filteredEnrichments || filteredEnrichments.length === 0) {
+  // Show empty state only if no enrichments AND no ability to generate (no lessonId)
+  // If lessonId exists, we show placeholder cards for generation even if no enrichments
+  if ((!filteredEnrichments || filteredEnrichments.length === 0) && !lessonId) {
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center">
         <FileText className="mb-4 h-12 w-12 text-gray-300 dark:text-gray-600" />
@@ -193,62 +250,30 @@ export function EnrichmentsPanel({
         </EnrichmentErrorBoundary>
       ))}
 
-      {/* Images Section - Cover/Card placeholders */}
-      {lessonId && (
-        <div className="mb-6">
-          <h3 className="mb-3 text-sm font-medium text-gray-500 dark:text-gray-400">
-            {t('images.title')}
-          </h3>
-          <div className="grid grid-cols-1 gap-4">
-            {IMAGE_PLACEHOLDER_TYPES.filter((type) => {
-              // Check if cover already exists (use original enrichments, not filtered)
-              const exists = enrichments.some(
-                (e) => e.enrichment_type === type && e.status === 'completed'
-              )
-              return !exists
-            }).map((type) => {
-              const typeIsGenerating = isGenerating(type)
-              const generatingProgress = getProgress(type)
-
-              if (typeIsGenerating && generatingProgress) {
-                return (
-                  <EnrichmentGeneratingCard
-                    key={type}
-                    type={type}
-                    progress={generatingProgress.progress}
-                    currentStep={generatingProgress.currentStep || t('generating')}
-                    onCancel={() => void cancelGeneration(type)}
-                  />
-                )
-              }
-
-              return (
-                <ImagePlaceholderCard
-                  key={type}
-                  type={type}
-                  onGenerate={(settings) => {
-                    if (!lessonId) return
-                    void startGeneration(type, settings)
-                  }}
-                  isGenerating={typeIsGenerating}
-                />
-              )
-            })}
-          </div>
-        </div>
-      )}
-
-      {/* Placeholder Cards for Missing Types and Generating Cards */}
-      <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
-        {PLACEHOLDER_TYPES.filter((type) => !groupedEnrichments[type]).map((type) => {
-          // Check if this type is currently generating
-          const generatingProgress = getProgress(type)
+      {/* All Enrichment Cards - Unified Grid */}
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
+        {ALL_PLACEHOLDER_TYPES.filter((type) => {
+          // For image types, always show (they have existingEnrichment logic)
+          if (IMAGE_PLACEHOLDER_TYPES.includes(type as 'cover' | 'card')) {
+            return true
+          }
+          // For other types, only show if no existing enrichment
+          return !groupedEnrichments[type]
+        }).map((type) => {
           const typeIsGenerating = isGenerating(type)
+          const generatingProgress = getProgress(type)
+          const isImageType = IMAGE_PLACEHOLDER_TYPES.includes(type as 'cover' | 'card')
 
-          // Construct translation key dynamically - path exists in enrichments.json
-          const estimatedTimeKey = `placeholder.${type}.estimatedTime`
-
-          const estimatedTime = t(estimatedTimeKey as Parameters<typeof t>[0])
+          // Find existing enrichment for:
+          // - Image types: always (they have existingEnrichment logic for regeneration)
+          // - Non-image types with draft_ready status: to show draft preview
+          // For 'card' type: exclude course-card (title='course-card') - only show lesson cards
+          const existingEnrichment = isImageType
+            ? enrichments.find(
+                (e) => e.enrichment_type === type && (type !== 'card' || e.title !== 'course-card')
+              ) || null
+            : enrichments.find((e) => e.enrichment_type === type && e.status === 'draft_ready') ||
+              null
 
           // Show generating card if generation is in progress
           if (typeIsGenerating && generatingProgress) {
@@ -263,24 +288,22 @@ export function EnrichmentsPanel({
             )
           }
 
-          // Show placeholder card otherwise
           return (
-            <EnrichmentPlaceholderCard
+            <UnifiedEnrichmentCard
               key={type}
               type={type}
+              existingEnrichment={existingEnrichment}
               onGenerate={(settings) => {
-                // Only allow generation if lessonId is available
                 if (!lessonId) {
                   toast.error(t('viewer.noMaterials'))
                   return
                 }
-                // Only generate on-demand types (quiz, audio, presentation)
+                // Video generation not available yet
                 if (type === 'video') {
                   return
                 }
                 void startGeneration(type, settings)
               }}
-              estimatedTime={estimatedTime}
               disabled={type === 'video' || !lessonId}
               isGenerating={typeIsGenerating}
             />

@@ -81,7 +81,14 @@ export const EditableChips: React.FC<EditableChipsProps> = ({
       previousValueRef.current = newItems;
     }
 
-    if (isLearningObjective && courseId && fieldPath) {
+    if (isLearningObjective) {
+      // Validate required props for learning objective cascade flow
+      if (!courseId || !fieldPath) {
+        console.warn('[EditableChips] isLearningObjective=true but courseId or fieldPath missing, falling back to direct onChange');
+        onChange(newItems);
+        return;
+      }
+
       // Store pending value and fetch affected count
       setPendingValue(newItems);
 

@@ -20,6 +20,76 @@ import { logger } from '../../../shared/logger/index.js';
 import { ErrorMessages } from '../../utils/error-messages.js';
 
 // ============================================================================
+// Retry Utilities
+// ============================================================================
+
+/**
+ * Retry wrapper for transient database errors
+ * Implements exponential backoff for network/timeout issues
+ */
+async function withRetry<T>(
+  operation: () => Promise<T>,
+  options: { maxRetries?: number; baseDelayMs?: number; operationName: string }
+): Promise<T> {
+  const { maxRetries = 3, baseDelayMs = 100, operationName } = options;
+  let lastError: unknown;
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      return await operation();
+    } catch (error) {
+      lastError = error;
+      const isRetryable = isTransientError(error);
+
+      if (!isRetryable || attempt === maxRetries) {
+        throw error;
+      }
+
+      const delayMs = baseDelayMs * Math.pow(2, attempt - 1);
+      logger.warn(
+        {
+          attempt,
+          maxRetries,
+          delayMs,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        `${operationName}: Retrying after transient error`
+      );
+
+      await new Promise(resolve => setTimeout(resolve, delayMs));
+    }
+  }
+
+  throw lastError;
+}
+
+/**
+ * Determines if an error is transient and worth retrying
+ */
+function isTransientError(error: unknown): boolean {
+  if (!(error && typeof error === 'object')) return false;
+
+  const errorObj = error as { code?: string; message?: string };
+  const transientCodes = ['PGRST', 'ECONNRESET', 'ETIMEDOUT', 'ENOTFOUND'];
+  const transientPatterns = [
+    /timeout/i,
+    /connection.*reset/i,
+    /network/i,
+    /truncated/i,
+    /malformed/i,
+  ];
+
+  // Check error code
+  if (errorObj.code && transientCodes.some(code => errorObj.code?.includes(code))) {
+    return true;
+  }
+
+  // Check error message patterns
+  const message = errorObj.message || '';
+  return transientPatterns.some(pattern => pattern.test(message));
+}
+
+// ============================================================================
 // Constants
 // ============================================================================
 
@@ -497,6 +567,7 @@ export const logsRouter = router({
    * Update log status
    *
    * Upserts status into log_issue_status table.
+   * Validates status transitions and warns on reopening without notes.
    *
    * Authorization: admin or superadmin only
    */
@@ -518,6 +589,26 @@ export const logsRouter = router({
             logId
           ),
         });
+      }
+
+      // Fetch current status and validate transition
+      const currentStatus = await fetchCurrentLogStatus(supabase, logType, logId);
+      const validation = validateStatusTransition(currentStatus, status, !!notes);
+
+      // Log warning for reopening transitions
+      if (validation.warning) {
+        logger.warn(
+          {
+            logType,
+            logId,
+            fromStatus: currentStatus,
+            toStatus: status,
+            hasNotes: !!notes,
+            requiresNotes: validation.requiresNotes,
+            updatedBy: userId,
+          },
+          validation.warning
+        );
       }
 
       // Upsert status
@@ -546,13 +637,19 @@ export const logsRouter = router({
         {
           logType,
           logId,
-          status,
+          fromStatus: currentStatus,
+          toStatus: status,
           updatedBy: userId,
+          isReopening: validation.requiresNotes,
         },
         'Log status updated'
       );
 
-      return { success: true };
+      return {
+        success: true,
+        warning: validation.warning,
+        requiresNotes: validation.requiresNotes,
+      };
     } catch (error) {
       if (error instanceof TRPCError) throw error;
 
@@ -905,57 +1002,53 @@ async function buildErrorLogsQuery(
 
   if (filters?.status) {
     if (filters.status === 'new') {
-      // "new" means logs WITHOUT any status record (individual OR fingerprint-based)
-      // FIX: Use get_error_logs_without_status to get IDs BEFORE pagination
-      const { data: newLogsData, error: newLogsError } = await supabase.rpc(
-        'get_error_logs_without_status' as any
+      // "new" means:
+      // 1. Logs WITHOUT any status record (individual OR fingerprint-based)
+      // 2. Logs WITH explicit status='new' in log_issue_status (by fingerprint)
+      // This matches the grouped view logic which uses COALESCE(status, 'new')
+
+      // Get fingerprints with explicit 'new' status
+      const { data: fingerprintsWithNewStatus } = await supabase
+        .from('log_issue_status')
+        .select('fingerprint')
+        .eq('log_type', 'error_log')
+        .eq('status', 'new')
+        .not('fingerprint', 'is', null);
+
+      const newStatusFingerprints = new Set(
+        (fingerprintsWithNewStatus || []).map(r => r.fingerprint).filter(Boolean)
       );
 
-      if (newLogsError) {
-        // Fallback: query logs that don't have status via log_id AND don't have fingerprint-based status
-        logger.warn(
-          { error: newLogsError },
-          'RPC get_error_logs_without_status not available, falling back to complex query'
-        );
+      // Get fingerprints with non-new status (to exclude)
+      const { data: fingerprintsWithOtherStatus } = await supabase
+        .from('log_issue_status')
+        .select('fingerprint')
+        .eq('log_type', 'error_log')
+        .neq('status', 'new')
+        .not('fingerprint', 'is', null);
 
-        // Get all fingerprints that have status
-        const { data: fingerprintsWithStatus } = await supabase
-          .from('log_issue_status')
-          .select('fingerprint')
-          .eq('log_type', 'error_log')
-          .not('fingerprint', 'is', null);
+      const otherStatusFingerprints = new Set(
+        (fingerprintsWithOtherStatus || []).map(r => r.fingerprint).filter(Boolean)
+      );
 
-        const fingerprintSet = new Set(
-          (fingerprintsWithStatus || []).map(r => r.fingerprint).filter(Boolean)
-        );
+      // Get all error_logs with fingerprint
+      const { data: allLogs } = await supabase
+        .from('error_logs')
+        .select('id, fingerprint')
+        .not('fingerprint', 'is', null);
 
-        // Get all log_ids that have individual status
-        const { data: logIdsWithStatus } = await supabase
-          .from('log_issue_status')
-          .select('log_id')
-          .eq('log_type', 'error_log');
+      statusFilteredIds = (allLogs || [])
+        .filter(log => {
+          // Include if fingerprint has explicit 'new' status
+          if (log.fingerprint && newStatusFingerprints.has(log.fingerprint)) return true;
+          // Exclude if fingerprint has non-new status
+          if (log.fingerprint && otherStatusFingerprints.has(log.fingerprint)) return false;
+          // Include if fingerprint has no status record at all (truly new)
+          return true;
+        })
+        .map(log => log.id);
 
-        const logIdSet = new Set((logIdsWithStatus || []).map(r => r.log_id));
-
-        // Get all error_logs and filter out those with status
-        const { data: allLogs } = await supabase
-          .from('error_logs')
-          .select('id, fingerprint');
-
-        statusFilteredIds = (allLogs || [])
-          .filter(log => {
-            // Exclude if log has individual status
-            if (logIdSet.has(log.id)) return false;
-            // Exclude if log's fingerprint has group status
-            if (log.fingerprint && fingerprintSet.has(log.fingerprint)) return false;
-            return true;
-          })
-          .map(log => log.id);
-      } else {
-        statusFilteredIds = (newLogsData || []).map((row: { id: string }) => row.id);
-      }
-
-      // If no logs without status, return empty
+      // If no logs match, return empty
       if (!statusFilteredIds || statusFilteredIds.length === 0) {
         return { items: [], total: 0 };
       }
@@ -1061,18 +1154,53 @@ async function buildErrorLogsQuery(
   // Apply pagination
   query = query.range(offset, offset + limit - 1);
 
-  const { data, count, error } = await query;
+  // Execute query with retry for transient errors
+  type QueryData = {
+    id: string;
+    created_at: string;
+    severity: string;
+    error_message: string;
+    job_type: string | null;
+    metadata: unknown;
+    problem_id: string | null;
+    environment: string | null;
+    fingerprint?: string;
+  };
+  let data: QueryData[] | null = null;
+  let count: number | null = null;
+  let queryError: unknown = null;
 
-  if (error) {
-    // Extract all PostgrestError fields for better debugging
+  try {
+    const result = await withRetry(
+      async () => {
+        const response = await query;
+        if (response.error) {
+          // Check if error is truncated/malformed (transient)
+          const isTruncated =
+            response.error.message?.startsWith('{') && !response.error.message?.endsWith('}');
+          if (isTruncated) {
+            throw new Error(`Truncated response: ${response.error.message}`);
+          }
+          throw response.error;
+        }
+        return response;
+      },
+      { operationName: 'buildErrorLogsQuery' }
+    );
+    data = result.data as QueryData[] | null;
+    count = result.count;
+  } catch (error) {
+    queryError = error;
+  }
+
+  if (queryError) {
     const errorDetails = {
-      message: error.message || 'Unknown error',
-      code: error.code || null,
-      details: error.details || null,
-      hint: error.hint || null,
-      isTruncated: error.message?.startsWith('{') && !error.message?.endsWith('}'),
+      message: queryError instanceof Error ? queryError.message : 'Unknown error',
+      code: (queryError as { code?: string }).code || null,
+      details: (queryError as { details?: string }).details || null,
+      hint: (queryError as { hint?: string }).hint || null,
     };
-    logger.error({ errorDetails, rawError: String(error) }, 'Error querying error_logs');
+    logger.error({ errorDetails }, 'Error querying error_logs after retries');
     return { items: [], total: 0 };
   }
 
@@ -1137,23 +1265,44 @@ async function buildGenerationTraceQuery(
 
   if (filters?.status) {
     if (filters.status === 'new') {
-      // "new" means logs WITHOUT any status record
-      // FIX: Get IDs of logs WITHOUT status to filter BEFORE pagination
-      const allWithStatus = await supabase
+      // "new" means:
+      // 1. Logs WITHOUT any status record
+      // 2. Logs WITH explicit status='new' in log_issue_status
+      // This matches the grouped view logic
+
+      // Get log_ids with explicit 'new' status
+      const { data: logsWithNewStatus } = await supabase
         .from('log_issue_status')
         .select('log_id')
-        .eq('log_type', 'generation_trace');
+        .eq('log_type', 'generation_trace')
+        .eq('status', 'new');
 
-      const idsWithStatus = new Set((allWithStatus.data || []).map(row => row.log_id));
+      const newStatusLogIds = new Set((logsWithNewStatus || []).map(r => r.log_id));
 
-      // Get all generation_trace with error_data and filter out those with status
+      // Get log_ids with non-new status (to exclude)
+      const { data: logsWithOtherStatus } = await supabase
+        .from('log_issue_status')
+        .select('log_id')
+        .eq('log_type', 'generation_trace')
+        .neq('status', 'new');
+
+      const otherStatusLogIds = new Set((logsWithOtherStatus || []).map(r => r.log_id));
+
+      // Get all generation_trace with error_data
       const { data: allTraces } = await supabase
         .from('generation_trace')
         .select('id')
         .not('error_data', 'is', null);
 
       statusFilteredIds = (allTraces || [])
-        .filter(trace => !idsWithStatus.has(trace.id))
+        .filter(trace => {
+          // Include if has explicit 'new' status
+          if (newStatusLogIds.has(trace.id)) return true;
+          // Exclude if has non-new status
+          if (otherStatusLogIds.has(trace.id)) return false;
+          // Include if no status record at all (truly new)
+          return true;
+        })
         .map(trace => trace.id);
 
       if (statusFilteredIds.length === 0) {
@@ -1219,19 +1368,53 @@ async function buildGenerationTraceQuery(
   // Apply pagination
   query = query.range(offset, offset + limit - 1);
 
-  const { data, count, error } = await query;
+  // Execute query with retry for transient errors
+  type TraceQueryData = {
+    id: string;
+    created_at: string;
+    stage: string;
+    phase: string;
+    step_name: string;
+    course_id: string;
+    lesson_id: string | null;
+    error_data: unknown;
+    courses: { title: string } | null;
+  };
+  let data: TraceQueryData[] | null = null;
+  let count: number | null = null;
+  let queryError: unknown = null;
 
-  if (error) {
-    // Extract all PostgrestError fields for better debugging
+  try {
+    const result = await withRetry(
+      async () => {
+        const response = await query;
+        if (response.error) {
+          // Check if error is truncated/malformed (transient)
+          const isTruncated =
+            response.error.message?.startsWith('{') && !response.error.message?.endsWith('}');
+          if (isTruncated) {
+            throw new Error(`Truncated response: ${response.error.message}`);
+          }
+          throw response.error;
+        }
+        return response;
+      },
+      { operationName: 'buildGenerationTraceQuery' }
+    );
+    data = result.data as TraceQueryData[] | null;
+    count = result.count;
+  } catch (error) {
+    queryError = error;
+  }
+
+  if (queryError) {
     const errorDetails = {
-      message: error.message || 'Unknown error',
-      code: error.code || null,
-      details: error.details || null,
-      hint: error.hint || null,
-      // Detect truncated/malformed error messages
-      isTruncated: error.message?.startsWith('{') && !error.message?.endsWith('}'),
+      message: queryError instanceof Error ? queryError.message : 'Unknown error',
+      code: (queryError as { code?: string }).code || null,
+      details: (queryError as { details?: string }).details || null,
+      hint: (queryError as { hint?: string }).hint || null,
     };
-    logger.error({ errorDetails, rawError: String(error) }, 'Error querying generation_trace');
+    logger.error({ errorDetails }, 'Error querying generation_trace after retries');
     return { items: [], total: 0 };
   }
 
@@ -1511,6 +1694,85 @@ async function verifyLogExists(
   const { data } = await supabase.from(table).select('id').eq('id', logId).single();
 
   return !!data;
+}
+
+/**
+ * Terminal statuses - considered "closed" issues
+ */
+const TERMINAL_STATUSES: LogStatus[] = ['resolved', 'ignored', 'auto_muted'];
+
+/**
+ * Active statuses - issues being worked on
+ */
+const ACTIVE_STATUSES: LogStatus[] = ['new', 'in_progress', 'to_verify'];
+
+/**
+ * Validate status transition and return warning if reopening
+ *
+ * Transitioning from terminal states (resolved, ignored, auto_muted)
+ * back to active states (new, in_progress, to_verify) is a "reopening"
+ * and should require notes to explain why.
+ *
+ * @param fromStatus - Current status (or null if no status set)
+ * @param toStatus - Target status
+ * @param hasNotes - Whether notes are provided
+ * @returns Object with isValid flag and optional warning message
+ */
+function validateStatusTransition(
+  fromStatus: LogStatus | null,
+  toStatus: LogStatus,
+  hasNotes: boolean
+): { isValid: boolean; warning?: string; requiresNotes: boolean } {
+  // No current status - any transition is valid (initial assignment)
+  if (!fromStatus || fromStatus === 'new') {
+    return { isValid: true, requiresNotes: false };
+  }
+
+  // Same status - valid but pointless
+  if (fromStatus === toStatus) {
+    return { isValid: true, requiresNotes: false };
+  }
+
+  // Check if this is a "reopening" transition
+  const isFromTerminal = TERMINAL_STATUSES.includes(fromStatus);
+  const isToActive = ACTIVE_STATUSES.includes(toStatus);
+
+  if (isFromTerminal && isToActive) {
+    // Reopening requires notes to explain why
+    if (!hasNotes) {
+      return {
+        isValid: true, // Allow but warn
+        warning: `Reopening issue from '${fromStatus}' to '${toStatus}' without notes. Consider adding explanation.`,
+        requiresNotes: true,
+      };
+    }
+    return {
+      isValid: true,
+      warning: `Issue reopened from '${fromStatus}' to '${toStatus}'`,
+      requiresNotes: false,
+    };
+  }
+
+  // All other transitions are valid
+  return { isValid: true, requiresNotes: false };
+}
+
+/**
+ * Fetch current status for a log
+ */
+async function fetchCurrentLogStatus(
+  supabase: ReturnType<typeof getSupabaseAdmin>,
+  logType: LogType,
+  logId: string
+): Promise<LogStatus | null> {
+  const { data } = await supabase
+    .from('log_issue_status')
+    .select('status')
+    .eq('log_type', logType)
+    .eq('log_id', logId)
+    .single();
+
+  return data?.status as LogStatus | null;
 }
 
 export type LogsRouter = typeof logsRouter;

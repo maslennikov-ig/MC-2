@@ -353,6 +353,27 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
       }
     }
 
+    // Append custom prompt from user settings if provided
+    const customPrompt =
+      typeof input.settings?.customPrompt === 'string' ? input.settings.customPrompt : undefined;
+
+    if (customPrompt?.trim()) {
+      // Add custom instructions before the no-text requirement
+      const noTextSuffix =
+        ', absolutely no text, no letters, no words, no numbers, no writing, no typography, no inscriptions, text-free image';
+      if (imagePrompt.includes(noTextSuffix)) {
+        // Insert custom prompt before no-text suffix
+        imagePrompt = imagePrompt.replace(noTextSuffix, `. ${customPrompt.trim()}${noTextSuffix}`);
+      } else {
+        // Just append
+        imagePrompt += ` ${customPrompt.trim()}`;
+      }
+      logger.debug(
+        { enrichmentId: enrichment.id, customPromptLength: customPrompt.length },
+        'Card handler: adding custom prompt to generation'
+      );
+    }
+
     logger.info(
       {
         enrichmentId: enrichment.id,
@@ -365,6 +386,7 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
           : course.settings?.visual_style
             ? 'settings'
             : 'default',
+        hasCustomPrompt: !!customPrompt?.trim(),
       },
       'Card handler: prompt built'
     );

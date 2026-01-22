@@ -309,3 +309,98 @@ export function calculateMaxTokensForSection(
 
   return maxTokens;
 }
+
+// ============================================================================
+// GENERATION GUIDANCE FORMATTING
+// ============================================================================
+
+/**
+ * Format generation guidance from Stage 4 analysis as XML for prompt inclusion
+ *
+ * Extracts actionable guidance from AnalysisResult.generation_guidance:
+ * - specific_analogies: Domain-specific analogies to use
+ * - real_world_examples: Concrete examples from the field
+ * - assessment_approach: How to design exercises
+ * - tone: Writing tone guidance
+ *
+ * @param analysisResult - AnalysisResult from Stage 4 with generation_guidance
+ * @returns XML string for prompt inclusion or empty string if no guidance
+ */
+export function formatGenerationGuidanceXML(
+  analysisResult:
+    | {
+        generation_guidance?: {
+          specific_analogies?: string[];
+          real_world_examples?: string[];
+          assessment_approach?: string;
+          tone?: string;
+          pedagogical_strategy?: {
+            teaching_style?: string;
+            progression_logic?: string;
+          };
+        };
+      }
+    | null
+    | undefined
+): string {
+  if (!analysisResult?.generation_guidance) {
+    return '';
+  }
+
+  const guidance = analysisResult.generation_guidance;
+  const parts: string[] = ['<generation_guidance>'];
+
+  // Specific analogies to use in explanations
+  if (guidance.specific_analogies && guidance.specific_analogies.length > 0) {
+    parts.push('  <specific_analogies>');
+    parts.push('    <!-- Use these domain-specific analogies to explain complex concepts -->');
+    for (const analogy of guidance.specific_analogies) {
+      parts.push(`    <analogy>${analogy}</analogy>`);
+    }
+    parts.push('  </specific_analogies>');
+  }
+
+  // Real-world examples
+  if (guidance.real_world_examples && guidance.real_world_examples.length > 0) {
+    parts.push('  <real_world_examples>');
+    parts.push('    <!-- Incorporate these practical examples from the field -->');
+    for (const example of guidance.real_world_examples) {
+      parts.push(`    <example>${example}</example>`);
+    }
+    parts.push('  </real_world_examples>');
+  }
+
+  // Assessment approach
+  if (guidance.assessment_approach) {
+    parts.push(`  <assessment_approach>${guidance.assessment_approach}</assessment_approach>`);
+  }
+
+  // Tone guidance
+  if (guidance.tone) {
+    parts.push(`  <tone_guidance>${guidance.tone}</tone_guidance>`);
+  }
+
+  // Pedagogical strategy
+  if (guidance.pedagogical_strategy) {
+    const strategy = guidance.pedagogical_strategy;
+    if (strategy.teaching_style || strategy.progression_logic) {
+      parts.push('  <pedagogical_strategy>');
+      if (strategy.teaching_style) {
+        parts.push(`    <teaching_style>${strategy.teaching_style}</teaching_style>`);
+      }
+      if (strategy.progression_logic) {
+        parts.push(`    <progression_logic>${strategy.progression_logic}</progression_logic>`);
+      }
+      parts.push('  </pedagogical_strategy>');
+    }
+  }
+
+  parts.push('</generation_guidance>');
+
+  // Return empty if only opening/closing tags (no actual content)
+  if (parts.length <= 2) {
+    return '';
+  }
+
+  return parts.join('\n');
+}

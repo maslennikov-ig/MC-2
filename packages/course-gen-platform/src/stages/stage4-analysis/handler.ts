@@ -27,6 +27,7 @@ import { generationLockService } from '@/shared/locks';
 import { generateVisualStyle } from './utils/visual-style-generator';
 import { handleStageCompletion } from '../../shared/auto-approval';
 import { notifyStageComplete, notifyCourseError } from '../../shared/notifications';
+import { checkPauseAndDelay } from '../../shared/pause-check';
 
 /**
  * Error details for STRUCTURE_ANALYSIS jobs
@@ -153,12 +154,16 @@ class Stage4AnalysisHandler {
    * Main entry point called by BullMQ worker.
    *
    * @param job - BullMQ job instance with StructureAnalysisJob payload
+   * @param token - BullMQ job token for pause/delay operations
    * @returns Job result with analysis data or error details
    */
-  async process(job: Job<StructureAnalysisJobData>): Promise<StructureAnalysisJobResult> {
+  async process(
+    job: Job<StructureAnalysisJobData>,
+    token?: string
+  ): Promise<StructureAnalysisJobResult> {
     const jobData = job.data;
 
-    return await this.execute(jobData, job);
+    return await this.execute(jobData, job, token);
   }
 
   /**
@@ -172,11 +177,13 @@ class Stage4AnalysisHandler {
    *
    * @param jobData - Job payload from BullMQ
    * @param job - BullMQ job instance
+   * @param token - BullMQ job token for pause/delay operations
    * @returns Structured job result
    */
   async execute(
     jobData: StructureAnalysisJobData,
-    job: Job<StructureAnalysisJobData>
+    job: Job<StructureAnalysisJobData>,
+    token?: string
   ): Promise<StructureAnalysisJobResult> {
     const startTime = Date.now();
     // Extract identifiers from job data (now correctly typed as camelCase from BaseJobDataSchema)
@@ -187,6 +194,17 @@ class Stage4AnalysisHandler {
       userId: user_id,
       courseSize: jobCourseSize,
     } = jobData;
+
+    // Issue #2: Warn if token is missing - pause functionality won't work
+    if (!token) {
+      logger.warn(
+        { jobId: job.id, courseId: course_id, organizationId: organization_id },
+        'Job token missing - pause/delay functionality disabled for this job'
+      );
+    }
+
+    // Check if generation is paused before starting work
+    await checkPauseAndDelay(job, course_id, token);
 
     // Acquire generation lock (FR-037: Prevent concurrent generation)
     const lockId = `stage-4-${job.id || Date.now()}`;
@@ -650,6 +668,8 @@ class Stage4AnalysisHandler {
             // Denormalize counts for fast access in UI and queries
             total_lessons_count: analysisResult.recommended_structure.total_lessons,
             total_sections_count: analysisResult.recommended_structure.total_sections,
+            // Save target_audience from topic analysis for UI display
+            target_audience: analysisResult.topic_analysis?.target_audience || null,
             updated_at: new Date().toISOString(),
           })
           .eq('id', course_id)

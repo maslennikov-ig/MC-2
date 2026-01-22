@@ -213,7 +213,7 @@ export function EndNodePanel({
               className="w-full bg-emerald-500 text-white hover:bg-emerald-600 dark:bg-emerald-600 dark:hover:bg-emerald-500"
               size="lg"
             >
-              <Link href={`/courses/${courseSlug}`}>
+              <Link href={`/courses/${courseSlug}`} target="_blank" rel="noopener noreferrer">
                 <span>{t('endNode.viewCourse')}</span>
                 <ExternalLink size={16} className="ml-2" />
               </Link>

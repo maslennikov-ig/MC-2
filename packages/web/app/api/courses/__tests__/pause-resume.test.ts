@@ -1,4 +1,3 @@
-/* eslint-disable */
 /**
  * Unit tests for pause/resume course generation API endpoints
  * @module tests/api/courses/pause-resume

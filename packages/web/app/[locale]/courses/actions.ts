@@ -7,6 +7,7 @@ import type { CourseStructureData, CourseVisibility } from '@/types/database'
 import type { GenerationProgress } from '@/types/course-generation'
 import { logger } from '@/lib/logger'
 import { PostgrestError } from '@supabase/supabase-js'
+import { z } from 'zod'
 import { generateSlug } from '@/lib/utils/slug'
 import { getBackendAuthHeaders, TRPC_URL } from '@/lib/auth'
 
@@ -16,6 +17,28 @@ type StatisticsQueryResponse = {
   generation_status: string | null
   total_lessons_count: number | null
 }
+
+/**
+ * Zod schema for course cover content validation
+ * Validates that imageUrl is a valid http/https URL
+ */
+const courseCoverContentSchema = z.object({
+  imageUrl: z
+    .string()
+    .url()
+    .refine(
+      (url) => {
+        try {
+          const parsed = new URL(url)
+          return parsed.protocol === 'http:' || parsed.protocol === 'https:'
+        } catch {
+          return false
+        }
+      },
+      { message: 'URL must use http or https protocol' }
+    )
+    .optional(),
+})
 
 /**
  * Get courses with RLS enforcement
@@ -731,6 +754,94 @@ export async function toggleFavorite(courseId: string) {
     logger.error('toggleFavorite: Caught error:', error)
     return { error: 'Failed to update favorite status' }
   }
+}
+
+/**
+ * Get course cover images from lesson_enrichments
+ * Cover images are stored as enrichment_type='card' AND title='course-card'
+ */
+export async function getCourseCovers(courseIds: string[]): Promise<Record<string, string>> {
+  if (courseIds.length === 0) {
+    return {}
+  }
+
+  const adminClient = getAdminClient()
+
+  const { data, error } = await adminClient
+    .from('lesson_enrichments')
+    .select('course_id, content')
+    .in('course_id', courseIds)
+    .eq('enrichment_type', 'card')
+    .eq('title', 'course-card')
+    .eq('status', 'completed')
+
+  if (error) {
+    logger.warn('Failed to fetch course covers', {
+      error: error.message,
+      courseIds: courseIds.slice(0, 5), // Log first 5 IDs for debugging
+      count: courseIds.length,
+    })
+    return {}
+  }
+
+  const coversMap: Record<string, string> = {}
+
+  for (const enrichment of data || []) {
+    if (enrichment.course_id && enrichment.content) {
+      // Validate content with Zod schema
+      const parsed = courseCoverContentSchema.safeParse(enrichment.content)
+      if (parsed.success && parsed.data.imageUrl) {
+        coversMap[enrichment.course_id] = parsed.data.imageUrl
+      } else if (!parsed.success) {
+        logger.warn('Invalid course cover content', {
+          courseId: enrichment.course_id,
+          error: parsed.error.message,
+        })
+      }
+    }
+  }
+
+  return coversMap
+}
+
+/**
+ * Get single course cover image
+ */
+export async function getCourseCover(courseId: string): Promise<string | null> {
+  const adminClient = getAdminClient()
+
+  const { data, error } = await adminClient
+    .from('lesson_enrichments')
+    .select('content')
+    .eq('course_id', courseId)
+    .eq('enrichment_type', 'card')
+    .eq('title', 'course-card')
+    .eq('status', 'completed')
+    .maybeSingle()
+
+  if (error) {
+    logger.warn('Failed to fetch course cover', {
+      courseId,
+      error: error.message,
+    })
+    return null
+  }
+
+  if (!data) {
+    return null
+  }
+
+  // Validate content with Zod schema
+  const parsed = courseCoverContentSchema.safeParse(data.content)
+  if (!parsed.success) {
+    logger.warn('Invalid course cover content', {
+      courseId,
+      error: parsed.error.message,
+    })
+    return null
+  }
+
+  return parsed.data.imageUrl ?? null
 }
 
 /**

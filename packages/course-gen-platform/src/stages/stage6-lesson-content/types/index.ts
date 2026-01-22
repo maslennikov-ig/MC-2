@@ -1,6 +1,7 @@
 import type { LessonSpecificationV2 } from '@megacampus/shared-types/lesson-specification-v2';
 import type { LessonContent, RAGChunk } from '@megacampus/shared-types/lesson-content';
 import type { CourseStyle } from '@megacampus/shared-types/style-prompts';
+import type { AnalysisResult } from '@megacampus/shared-types/analysis-result';
 
 /**
  * Stage 6 job input structure
@@ -39,6 +40,13 @@ export interface Stage6JobInput {
    * @default 'professional' (fallback in getStylePrompt when null/undefined)
    */
   style?: CourseStyle;
+
+  /**
+   * Analysis result from Stage 4 containing generation guidance
+   * Provides specific analogies, real-world examples, and pedagogical strategy
+   * for higher quality content generation
+   */
+  analysisResult?: AnalysisResult;
 }
 
 /**
@@ -135,6 +143,12 @@ export interface Stage6Input {
    * @default 'professional' (fallback in getStylePrompt when null/undefined)
    */
   style?: string;
+  /**
+   * Analysis result from Stage 4 containing generation guidance
+   * Provides specific analogies, real-world examples, and pedagogical strategy
+   * for higher quality content generation
+   */
+  analysisResult?: AnalysisResult;
 }
 
 /**

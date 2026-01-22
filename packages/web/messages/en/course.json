@@ -3,12 +3,56 @@
     "pageTitle": "Visual Assets",
     "title": "Manage Visual Assets",
     "courseCard": "Course Thumbnail",
-    "courseCardDescription": "Main image shown in course catalog",
-    "lessonCovers": "Lesson Covers",
-    "lessonCoversDescription": "{completed} of {total} covers generated",
-    "progress": "Progress"
+    "courseCardDescription": "Square 1:1 image shown in course catalog",
+    "lessonCovers": "Lesson Banners",
+    "lessonCoversDescription": "Wide 16:9 banners at the top of lesson pages ({completed} of {total})",
+    "lessonCoversHint": "Displayed above lesson content as a hero banner",
+    "lessonCards": "Lesson Thumbnails",
+    "lessonCardsDescription": "Square 1:1 previews for navigation ({completed} of {total})",
+    "lessonCardsHint": "Displayed in lesson lists and sidebar",
+    "progress": "Progress",
+    "generateMissingCovers": "Generate {count} missing banners",
+    "generateMissingCards": "Generate {count} missing thumbnails",
+    "noLessons": "No lessons in this course yet"
   },
   "backToCourse": "Back to course",
+  "lessons": {
+    "backToCourse": "Back to course",
+    "subtitle": "{count, plural, =0 {No lessons} one {# lesson} other {# lessons}}",
+    "filters": {
+      "all": "All",
+      "withVideo": "With Video",
+      "completed": "Completed",
+      "notCompleted": "Not Completed"
+    },
+    "empty": "No lessons found",
+    "lessonCompleted": "Lesson completed!",
+    "updateError": "Failed to update progress",
+    "milestones": {
+      "completed": "Course completed!",
+      "almostThere": "Almost there!",
+      "halfWay": "Halfway done!",
+      "greatStart": "Great start!"
+    }
+  },
+  "lesson": {
+    "status": {
+      "not_started": "Not Started",
+      "in_progress": "In Progress",
+      "completed": "Completed"
+    },
+    "duration": "{minutes}min",
+    "media": {
+      "video": "Video available",
+      "audio": "Audio available",
+      "presentation": "Presentation available",
+      "quiz": "Quiz available"
+    },
+    "actions": {
+      "markComplete": "Mark as complete",
+      "markIncomplete": "Mark as incomplete"
+    }
+  },
   "viewer": {
     "showSidebar": "Show sidebar",
     "section": "Section",

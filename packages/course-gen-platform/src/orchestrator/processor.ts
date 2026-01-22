@@ -75,12 +75,25 @@ type JobHandler = {
  * @param handler - A handler with a process method that accepts Job<T>
  * @returns A JobHandler that accepts SandboxedJob<JobData>
  */
-function adaptHandler(handler: { process: (job: any) => Promise<unknown> }): JobHandler {
+function adaptHandler(handler: {
+  process: (job: any, token?: string) => Promise<unknown>;
+}): JobHandler {
   return {
     process: async (job: SandboxedJob<JobData>) => {
       // Single documented cast: SandboxedJob is structurally compatible with Job
       // for the methods our handlers actually use (data, id, name, updateProgress)
-      const result = await handler.process(job as unknown as Job<any>);
+      // Extract token for pause/delay operations (job.moveToDelayed)
+      const token = (job as SandboxedJob<JobData> & { token?: string }).token;
+
+      // Warn if token is missing - pause functionality won't work
+      if (!token) {
+        logger.warn(
+          { jobId: job.id, jobName: job.name },
+          'Job token missing - pause/delay functionality disabled for this job'
+        );
+      }
+
+      const result = await handler.process(job as unknown as Job<any>, token);
       // Result is guaranteed to have at least the JobResult interface
       // (all handler results extend JobResult with { success, message?, data?, error? })
       return result as JobResult;

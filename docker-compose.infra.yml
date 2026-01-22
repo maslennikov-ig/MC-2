@@ -13,12 +13,12 @@ services:
     container_name: megacampus-redis
     restart: unless-stopped
     ports:
-      - "127.0.0.1:6379:6379"
+      - '127.0.0.1:6379:6379'
     volumes:
       - redis-data:/data
     command: redis-server --appendonly yes --maxmemory 1gb --maxmemory-policy noeviction
     healthcheck:
-      test: ["CMD", "redis-cli", "ping"]
+      test: ['CMD', 'redis-cli', 'ping']
       interval: 10s
       timeout: 3s
       retries: 3
@@ -30,16 +30,16 @@ services:
           cpus: '1'
           memory: 1G
     logging:
-      driver: "json-file"
+      driver: 'json-file'
       options:
-        max-size: "10m"
-        max-file: "3"
+        max-size: '10m'
+        max-file: '3'
 
   # Docling MCP Server for document processing (internal - behind nginx proxy)
   # NOTE: Image built manually on server (too large for GitHub Actions)
   docling-mcp-internal:
     image: ghcr.io/maslennikov-ig/mc-2/docling-mcp:latest
-    pull_policy: if_not_present  # Don't pull if local image exists (too large: 8GB)
+    pull_policy: if_not_present # Don't pull if local image exists (too large: 8GB)
     container_name: megacampus-docling-mcp-internal
     restart: unless-stopped
     # No external ports - only accessible via nginx proxy
@@ -58,7 +58,11 @@ services:
       - MCP_PORT=8000
       - PYTHONUNBUFFERED=1
     healthcheck:
-      test: ["CMD-SHELL", "python -c \"import socket; s=socket.socket(); s.connect(('localhost', 8000)); s.close()\" || exit 1"]
+      test:
+        [
+          'CMD-SHELL',
+          'python -c "import socket; s=socket.socket(); s.connect((''localhost'', 8000)); s.close()" || exit 1',
+        ]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -73,10 +77,10 @@ services:
         reservations:
           memory: 2G
     logging:
-      driver: "json-file"
+      driver: 'json-file'
       options:
-        max-size: "50m"
-        max-file: "3"
+        max-size: '50m'
+        max-file: '3'
 
   # Nginx proxy for Docling MCP - rewrites Host header to bypass DNS rebinding protection
   docling-mcp:
@@ -84,7 +88,7 @@ services:
     container_name: megacampus-docling-mcp
     restart: unless-stopped
     ports:
-      - "127.0.0.1:8000:8000"
+      - '127.0.0.1:8000:8000'
     volumes:
       - ./nginx-docling-proxy.conf:/etc/nginx/conf.d/default.conf:ro
     depends_on:
@@ -95,17 +99,17 @@ services:
     networks:
       - megacampus
     logging:
-      driver: "json-file"
+      driver: 'json-file'
       options:
-        max-size: "10m"
-        max-file: "3"
+        max-size: '10m'
+        max-file: '3'
 
   # BullMQ Worker for background jobs (course generation stages 1-6)
   worker:
     image: ghcr.io/maslennikov-ig/mc-2/api:latest
     container_name: megacampus-worker
     restart: unless-stopped
-    command: ["tsx", "dist/orchestrator/worker-entrypoint.js"]
+    command: ['tsx', 'dist/orchestrator/worker-entrypoint.js']
     # Worker doesn't expose HTTP - disable healthcheck inherited from api image
     healthcheck:
       disable: true
@@ -113,7 +117,7 @@ services:
       - .env.production
     environment:
       - NODE_ENV=production
-      - REDIS_URL=redis://redis:6379
+      - REDIS_URL=redis://megacampus-redis:6379
       - DOCLING_MCP_URL=http://docling-mcp:8000/mcp
       # Path to shared docling JSON cache
       - DOCLING_CACHE_PATH=/app/docling-cache
@@ -138,24 +142,24 @@ services:
           cpus: '2'
           memory: 2G
     logging:
-      driver: "json-file"
+      driver: 'json-file'
       options:
-        max-size: "50m"
-        max-file: "3"
+        max-size: '50m'
+        max-file: '3'
 
   # Stage 7 Enrichment Worker (cover images, audio, video, quiz, presentation)
   worker-stage7:
     image: ghcr.io/maslennikov-ig/mc-2/api:latest
     container_name: megacampus-worker-stage7
     restart: unless-stopped
-    command: ["tsx", "dist/stages/stage7-enrichments/worker-entrypoint.js"]
+    command: ['tsx', 'dist/stages/stage7-enrichments/worker-entrypoint.js']
     healthcheck:
       disable: true
     env_file:
       - .env.production
     environment:
       - NODE_ENV=production
-      - REDIS_URL=redis://redis:6379
+      - REDIS_URL=redis://megacampus-redis:6379
       # Storage bucket for enrichment assets
       - ENRICHMENTS_STORAGE_BUCKET=course-enrichments
     volumes:
@@ -171,10 +175,10 @@ services:
           cpus: '1'
           memory: 1G
     logging:
-      driver: "json-file"
+      driver: 'json-file'
       options:
-        max-size: "50m"
-        max-file: "3"
+        max-size: '50m'
+        max-file: '3'
 
 networks:
   megacampus:
