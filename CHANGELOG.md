@@ -311,6 +311,56 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.28.25] - 2026-01-22
+
+### Added
+
+- **lessons**: add progress card to lessons page header (091c133)
+- **#14**: add parameter flow dashboard with real-time updates (02e6bd7)
+- **lessons**: add course lessons page with cards grid (5c5f17b)
+- **#16**: add course edit history for diff view (4de7689)
+- **demo**: add placeholder vs generated comparison page (8228b30)
+- **logging**: add parameter tracking and validation logging (#12, #13) (4b01105)
+- **a11y**: implement keyboard navigation for generation graph UI (00e17c2)
+- **skills**: add /process-issues skill for GitHub Issues workflow (b80d910)
+
+### Changed
+
+- **enrichment**: unify all 6 cards into single grid section (63cd31a)
+
+### Fixed
+
+- **web**: update 1 source file(s), update 5 test(s), +1 more (b938ed5)
+- **lessons**: address code review issues for lessons page (593de91)
+- **progress**: address code review findings for Stage 6 progress bar (63f4dfc)
+- **code-review**: address P1 and P2 issues from review (38f750d)
+- **progress**: update percentage during Stage 6 lesson generation (b89d608)
+- **generation-graph**: implement GitHub Issues #10, #11, #17 (1339f0f)
+- **enrichment**: resolve cover/banner generation issues (e476020)
+- **enrichment**: unify grid layout for all enrichment cards (a984f77)
+- **pipeline**: implement per-field save status and fix type compatibility (dc4062e)
+
+### Other
+
+- bd sync: 2026-01-22 13:47:23 (58d77ce)
+- bd sync: 2026-01-22 13:43:39 (ef02ae6)
+- bd sync: 2026-01-22 13:43:11 (e5e0bd2)
+- bd sync: 2026-01-22 13:40:27 (bfd0a50)
+- bd sync: 2026-01-22 13:35:08 (8d4e306)
+- bd sync: 2026-01-22 13:26:41 (fb7366a)
+- bd sync: 2026-01-22 13:20:53 (89a7ba4)
+- bd sync: 2026-01-22 13:15:00 (985726f)
+- bd sync: 2026-01-22 13:11:28 (8f2f14c)
+- bd sync: 2026-01-22 13:06:27 (9d27401)
+- bd sync: 2026-01-22 12:52:57 (56a7642)
+- bd sync: 2026-01-22 12:41:58 (da8152a)
+- bd sync: 2026-01-22 12:38:22 (6c7bcbf)
+- bd sync: 2026-01-22 12:37:00 (4c6ab14)
+- bd sync: 2026-01-22 12:22:05 (092961a)
+- **plans**: mark Stage 4 persistence plan as completed (5489c26)
+- bd sync: 2026-01-22 12:01:59 (3bf95b3)
+- bd sync: 2026-01-22 12:00:58 (cbaa4b1)
+
 ## [0.28.24] - 2026-01-22
 
 ### Added

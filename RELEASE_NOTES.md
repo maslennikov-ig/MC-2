@@ -2,6 +2,41 @@
 
 _Released on 2025-12-26_
 
+## v0.28.25
+
+_Released on 2026-01-22_
+
+### ✨ New Features
+
+- **lessons**: Add progress card to lessons page header
+- **#14**: Add parameter flow dashboard with real-time updates
+- **lessons**: Add course lessons page with cards grid
+- **#16**: Add course edit history for diff view
+- **demo**: Add placeholder vs generated comparison page
+- **logging**: Add parameter tracking and validation logging (#12, #13)
+- **a11y**: Implement keyboard navigation for generation graph UI
+- **Skills**: Add /process-issues skill for GitHub Issues workflow
+
+### 🔧 Improvements
+
+- **enrichment**: Unify all 6 cards into single grid section
+
+### 🐛 Bug Fixes
+
+- **web**: Update 1 source file(s), update 5 test(s), +1 more
+- **lessons**: Address code review issues for lessons page
+- **progress**: Address code review findings for Stage 6 progress bar
+- **code-review**: Address P1 and P2 issues from review
+- **progress**: Update percentage during Stage 6 lesson generation
+- **generation-graph**: Implement GitHub Issues #10, #11, #17
+- **enrichment**: Resolve cover/banner generation issues
+- **enrichment**: Unify grid layout for all enrichment cards
+- **pipeline**: Implement per-field save status and fix type compatibility
+
+---
+
+_This release was automatically generated from 36 commits._
+
 ## v0.28.24
 
 _Released on 2026-01-22_
