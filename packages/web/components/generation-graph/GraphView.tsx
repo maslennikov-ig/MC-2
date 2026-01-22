@@ -332,6 +332,23 @@ function GraphViewInner({
   // Graceful degradation
   const { degradationMode, handleRealtimeFailure, statusMessage } = useGracefulDegradation()
 
+  // Helper to focus viewport on a specific node
+  const focusOnNode = useCallback(
+    (nodeId: string) => {
+      const nodes = getNodes()
+      const targetNode = nodes.find((n) => n.id === nodeId)
+      if (targetNode?.position) {
+        const width = targetNode.measured?.width || 180
+        const height = targetNode.measured?.height || 80
+        setCenter(targetNode.position.x + width / 2, targetNode.position.y + height / 2, {
+          zoom: 1.0,
+          duration: 600,
+        })
+      }
+    },
+    [getNodes, setCenter]
+  )
+
   // Auto-focus on error (T122)
   useEffect(() => {
     if (pipelineStatus === 'failed') {
@@ -1023,6 +1040,8 @@ function GraphViewInner({
                           try {
                             await startGeneration(courseId)
                             toast.success('Генерация запущена!')
+                            // Focus on Stage 1 after starting generation
+                            focusOnNode('stage_1')
                           } catch (error) {
                             // Rollback optimistic update on error
                             setStageStatusOptimistic('stage_1', 'pending')
@@ -1051,6 +1070,11 @@ function GraphViewInner({
                         try {
                           await approveStage(courseId, awaitingStage)
                           toast.success(`Стадия ${awaitingStage} подтверждена!`)
+                          // Focus on next stage after approval
+                          const nextStage = awaitingStage + 1
+                          if (nextStage <= 7) {
+                            focusOnNode(`stage_${nextStage}`)
+                          }
                         } catch (error) {
                           toast.error('Не удалось подтвердить стадию', {
                             description:
