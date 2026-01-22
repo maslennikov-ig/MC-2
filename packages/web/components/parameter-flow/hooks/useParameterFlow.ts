@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { createClient } from '@/lib/supabase/client'
 
 interface ParameterData {
@@ -24,6 +24,9 @@ export function useParameterFlow(courseId: string) {
     {}
   )
   const [isLoading, setIsLoading] = useState(true)
+
+  // Store timeout IDs for cleanup on unmount
+  const timeoutIds = useRef<Set<NodeJS.Timeout>>(new Set())
 
   // Fetch initial state from generation_trace
   const fetchInitialState = useCallback(async () => {
@@ -143,8 +146,8 @@ export function useParameterFlow(courseId: string) {
                 },
               }))
 
-              // Reset animation after delay
-              setTimeout(() => {
+              // Reset animation after delay (with cleanup tracking)
+              const timeoutId = setTimeout(() => {
                 setParameterTransfers((prev) => ({
                   ...prev,
                   [transferKey]: {
@@ -153,7 +156,9 @@ export function useParameterFlow(courseId: string) {
                     status: 'completed',
                   },
                 }))
+                timeoutIds.current.delete(timeoutId)
               }, 2000)
+              timeoutIds.current.add(timeoutId)
             }
           }
         }
@@ -162,6 +167,9 @@ export function useParameterFlow(courseId: string) {
 
     return () => {
       void supabase.removeChannel(channel)
+      // Clear all pending timeouts to prevent memory leaks
+      timeoutIds.current.forEach(clearTimeout)
+      timeoutIds.current.clear()
     }
   }, [courseId, fetchInitialState])
 

@@ -65,6 +65,7 @@ export const ParameterStageNode = memo(({ data }: { data: ParameterStageNodeData
               key={param.name}
               variant="secondary"
               className={cn('px-1.5 py-0 text-[10px]', paramStatusColors[param.status])}
+              aria-label={`Parameter ${param.name}, status: ${param.status}`}
             >
               {param.name}
             </Badge>

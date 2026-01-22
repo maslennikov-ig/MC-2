@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useCallback } from 'react'
+import React, { useState, useEffect, useCallback, memo } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { History, ChevronDown, ChevronUp, RefreshCw, AlertCircle } from 'lucide-react'
@@ -93,11 +93,28 @@ const getAlignmentScoreColor = (score: number): string => {
 
 /**
  * Converts a value to a string for diff display
+ * Handles circular references, large arrays, and non-serializable objects
  */
 function valueToString(value: unknown): string {
   if (value === null || value === undefined) return ''
   if (typeof value === 'string') return value
-  return JSON.stringify(value, null, 2)
+
+  try {
+    return JSON.stringify(
+      value,
+      (_key, val) => {
+        // Truncate very large arrays for diff readability
+        if (Array.isArray(val) && val.length > 100) {
+          return `[Array with ${val.length} items (truncated)]`
+        }
+        return val
+      },
+      2
+    )
+  } catch {
+    // Handle circular references or non-serializable objects
+    return `[Complex object: ${Object.prototype.toString.call(value)}]`
+  }
 }
 
 /**
@@ -113,7 +130,11 @@ function valueToString(value: unknown): string {
  * - Semantic diff metadata (change type, alignment score)
  * - Auto-refresh capability
  */
-export function EditHistoryPanel({ courseId, locale = 'ru', className }: EditHistoryPanelProps) {
+export const EditHistoryPanel = memo(function EditHistoryPanel({
+  courseId,
+  locale = 'ru',
+  className,
+}: EditHistoryPanelProps) {
   const [edits, setEdits] = useState<CourseEdit[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
@@ -346,4 +367,4 @@ export function EditHistoryPanel({ courseId, locale = 'ru', className }: EditHis
       </CardContent>
     </Card>
   )
-}
+})
