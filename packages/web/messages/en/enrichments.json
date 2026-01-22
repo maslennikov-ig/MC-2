@@ -287,6 +287,7 @@
     "style": {
       "label": "Style",
       "tooltip": "Visual style of the image. Affects overall aesthetics and level of detail.",
+      "premium3d": "Cinematic 3D",
       "realistic": "Realistic",
       "abstract": "Abstract",
       "minimalist": "Minimalist",

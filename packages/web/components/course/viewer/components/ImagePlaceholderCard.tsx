@@ -124,7 +124,7 @@ export function ImagePlaceholderCard({
 
   return (
     <Card
-      className={`overflow-hidden border-2 ${hasImage ? 'border-solid' : 'border-dashed'} bg-gray-50 transition-shadow hover:shadow-md dark:bg-gray-900/20`}
+      className={`flex min-h-[480px] flex-col overflow-hidden rounded-2xl border-2 ${hasImage ? 'border-solid' : 'border-dashed'} bg-gray-50 transition-shadow hover:shadow-md dark:bg-gray-900/20`}
     >
       <CardHeader className={`${config.bgColor} py-3`}>
         <div className="flex items-center justify-between">
@@ -145,14 +145,14 @@ export function ImagePlaceholderCard({
           </div>
         </div>
       </CardHeader>
-      <CardContent className="space-y-4 py-4">
+      <CardContent className="flex flex-1 flex-col space-y-4 py-4">
         {/* Show preview if image exists */}
         {hasImage && (
           <>
             <button
               type="button"
               onClick={() => setIsLightboxOpen(true)}
-              className={`group relative w-full overflow-hidden rounded-lg border bg-gray-100 dark:bg-gray-800 ${config.previewAspectRatio} hover:ring-primary/50 max-h-48 cursor-pointer transition-all hover:ring-2`}
+              className={`group relative min-h-[280px] w-full flex-1 overflow-hidden rounded-lg border bg-gray-100 dark:bg-gray-800 ${config.previewAspectRatio} hover:ring-primary/50 cursor-pointer transition-all hover:ring-2`}
             >
               <Image
                 src={imageUrl}
@@ -185,16 +185,17 @@ export function ImagePlaceholderCard({
           </>
         )}
 
-        {/* Description - only show if no image */}
+        {/* Placeholder area - show if no image */}
         {!hasImage && (
-          <>
-            <p className="text-sm text-gray-500 dark:text-gray-400">
+          <div className="flex min-h-[280px] flex-1 flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-200 bg-gray-100/50 dark:border-gray-700 dark:bg-gray-800/30">
+            <ImageIcon className={`mb-4 h-16 w-16 ${config.color} opacity-30`} />
+            <p className="max-w-[200px] text-center text-sm text-gray-500 dark:text-gray-400">
               {t(`images.${type}.description`)}
             </p>
-            <p className="text-xs text-gray-400 italic dark:text-gray-500">
+            <p className="mt-2 text-center text-xs text-gray-400 italic dark:text-gray-500">
               {t(`images.${type}.usageHint`)}
             </p>
-          </>
+          </div>
         )}
 
         {/* Options/Regenerate Section */}
