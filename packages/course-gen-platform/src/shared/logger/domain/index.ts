@@ -2,6 +2,9 @@
  * Domain Loggers - Re-exports
  *
  * Централизованный экспорт всех domain-specific логгеров.
+ *
+ * NOTE: Uses camelCase for TypeScript interfaces (courseId, jobId)
+ * but enhanced logger automatically converts to snake_case for DB (course_id, job_id).
  */
 
 // Validation
@@ -9,6 +12,8 @@ export {
   logValidationIssue,
   logValidationSuccess,
   logValidationStart,
+  isValidationIssueParams,
+  isValidationSuccessParams,
   type ValidationIssueParams,
   type ValidationSuccessParams,
 } from './validation.logger';
@@ -20,6 +25,7 @@ export {
   logPipelineError,
   logPipelineRetry,
   logStageTransition,
+  isPipelineContext,
   type PipelineContext,
 } from './pipeline.logger';
 
@@ -30,6 +36,7 @@ export {
   logGenerationSuccess,
   logQualityCheck,
   logModelFallback,
+  isGenerationContext,
   type GenerationContext,
 } from './generation.logger';
 
@@ -40,6 +47,7 @@ export {
   logRagCache,
   logRagEmbedding,
   logRagNoResults,
+  isRagContext,
   type RagContext,
 } from './rag.logger';
 
@@ -51,5 +59,6 @@ export {
   logJobProgress,
   logJobRetry,
   logJobStalled,
+  isJobContext,
   type JobContext,
 } from './job.logger';
