@@ -7,6 +7,7 @@ import { ChevronLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import LessonProgressCard from '@/components/common/lesson-progress-card'
 import { LessonGrid } from './lesson-grid'
+import { useLessonProgress } from './use-lesson-progress'
 import type { Database } from '@/types/database.generated'
 
 type SectionRow = Database['public']['Tables']['sections']['Row']
@@ -38,6 +39,18 @@ export function LessonsContent({
   const router = useRouter()
   const [activeFilter, setActiveFilter] = useState<FilterType>('all')
 
+  // Lesson progress with optimistic updates and milestone toasts
+  const {
+    completedLessons: completedLessonsSet,
+    isUpdating,
+    toggleLessonComplete,
+    completedCount,
+  } = useLessonProgress({
+    courseSlug: course.slug || course.id,
+    initialCompleted: lessonsCompleted,
+    totalLessons: lessons.length,
+  })
+
   // Create enrichment lookup map
   const enrichmentsByLesson = useMemo(() => {
     const map = new Map<string, EnrichmentRow[]>()
@@ -57,8 +70,6 @@ export function LessonsContent({
     return map
   }, [sections])
 
-  // Create completed lessons set for fast lookup
-  const completedLessonsSet = useMemo(() => new Set(lessonsCompleted), [lessonsCompleted])
 
   // Calculate remaining time for uncompleted lessons
   const remainingMinutes = useMemo(() => {
@@ -115,7 +126,7 @@ export function LessonsContent({
           {/* Progress card */}
           {lessons.length > 0 && (
             <LessonProgressCard
-              completedCount={lessonsCompleted.length}
+              completedCount={completedCount}
               totalLessons={lessons.length}
               remainingMinutes={remainingMinutes}
               compact
@@ -163,7 +174,7 @@ export function LessonsContent({
                   : 'border-gray-300 text-gray-700 hover:bg-gray-50 dark:border-slate-700 dark:text-gray-300 dark:hover:bg-slate-800'
               }
             >
-              {t('filters.completed')} ({lessonsCompleted.length})
+              {t('filters.completed')} ({completedCount})
             </Button>
             <Button
               variant={activeFilter === 'not_completed' ? 'default' : 'outline'}
@@ -174,7 +185,7 @@ export function LessonsContent({
                   : 'border-gray-300 text-gray-700 hover:bg-gray-50 dark:border-slate-700 dark:text-gray-300 dark:hover:bg-slate-800'
               }
             >
-              {t('filters.notCompleted')} ({lessons.length - lessonsCompleted.length})
+              {t('filters.notCompleted')} ({lessons.length - completedCount})
             </Button>
           </div>
         </div>
@@ -186,6 +197,10 @@ export function LessonsContent({
           enrichments={enrichmentsByLesson}
           completedLessons={completedLessonsSet}
           courseSlug={course.slug || course.id}
+          updatingLessonId={isUpdating}
+          onToggleComplete={(lessonId) => {
+            void toggleLessonComplete(lessonId)
+          }}
         />
 
         {/* Empty State */}

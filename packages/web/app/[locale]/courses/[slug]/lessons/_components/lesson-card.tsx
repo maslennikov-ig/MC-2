@@ -18,6 +18,8 @@ interface LessonCardProps {
   }
   /** Whether the lesson has been completed by the user */
   isCompleted?: boolean
+  /** Whether the lesson is currently being updated */
+  isUpdating?: boolean
   enrichments?: {
     has_video: boolean
     has_audio: boolean
@@ -25,6 +27,8 @@ interface LessonCardProps {
     has_quiz: boolean
   }
   onClick?: () => void
+  /** Callback to toggle lesson completion */
+  onToggleComplete?: (lessonId: string) => void
   className?: string
 }
 
@@ -81,8 +85,10 @@ const mediaBadges = [
 export function LessonCard({
   lesson,
   isCompleted = false,
+  isUpdating = false,
   enrichments,
   onClick,
+  onToggleComplete,
   className,
 }: LessonCardProps) {
   const t = useTranslations('course.lesson')
@@ -91,6 +97,14 @@ export function LessonCard({
   const progressPercent = isCompleted ? 100 : 0
   const statusInfo = statusConfig[status]
   const StatusIcon = statusInfo.icon
+
+  // Handle toggle click (prevent card click propagation)
+  const handleToggleClick = (e: React.MouseEvent) => {
+    e.stopPropagation()
+    if (!isUpdating && onToggleComplete) {
+      onToggleComplete(lesson.id)
+    }
+  }
 
   // Filter active media badges
   const activeMediaBadges = enrichments ? mediaBadges.filter((badge) => enrichments[badge.key]) : []
@@ -136,6 +150,25 @@ export function LessonCard({
               </Badge>
             ))}
           </div>
+        )}
+
+        {/* Toggle complete button (top-right) */}
+        {onToggleComplete && (
+          <button
+            onClick={handleToggleClick}
+            disabled={isUpdating}
+            className={cn(
+              'absolute top-2 right-2 rounded-full p-1.5 transition-all duration-200',
+              'hover:scale-110 focus:ring-2 focus:ring-purple-500 focus:outline-none',
+              isCompleted
+                ? 'bg-green-500 text-white hover:bg-green-600'
+                : 'bg-white/80 text-gray-400 hover:bg-white hover:text-green-500 dark:bg-slate-800/80 dark:hover:bg-slate-700',
+              isUpdating && 'animate-pulse cursor-wait'
+            )}
+            aria-label={isCompleted ? t('actions.markIncomplete') : t('actions.markComplete')}
+          >
+            <CheckCircle2 className="h-5 w-5" />
+          </button>
         )}
 
         {/* Lesson type icon (center) */}

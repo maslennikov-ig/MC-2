@@ -25,7 +25,15 @@
       "completed": "Completed",
       "notCompleted": "Not Completed"
     },
-    "empty": "No lessons found"
+    "empty": "No lessons found",
+    "lessonCompleted": "Lesson completed!",
+    "updateError": "Failed to update progress",
+    "milestones": {
+      "completed": "Course completed!",
+      "almostThere": "Almost there!",
+      "halfWay": "Halfway done!",
+      "greatStart": "Great start!"
+    }
   },
   "lesson": {
     "status": {
@@ -39,6 +47,10 @@
       "audio": "Audio available",
       "presentation": "Presentation available",
       "quiz": "Quiz available"
+    },
+    "actions": {
+      "markComplete": "Mark as complete",
+      "markIncomplete": "Mark as incomplete"
     }
   },
   "viewer": {
