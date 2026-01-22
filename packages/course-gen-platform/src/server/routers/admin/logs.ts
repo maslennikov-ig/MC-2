@@ -567,6 +567,7 @@ export const logsRouter = router({
    * Update log status
    *
    * Upserts status into log_issue_status table.
+   * Validates status transitions and warns on reopening without notes.
    *
    * Authorization: admin or superadmin only
    */
@@ -588,6 +589,26 @@ export const logsRouter = router({
             logId
           ),
         });
+      }
+
+      // Fetch current status and validate transition
+      const currentStatus = await fetchCurrentLogStatus(supabase, logType, logId);
+      const validation = validateStatusTransition(currentStatus, status, !!notes);
+
+      // Log warning for reopening transitions
+      if (validation.warning) {
+        logger.warn(
+          {
+            logType,
+            logId,
+            fromStatus: currentStatus,
+            toStatus: status,
+            hasNotes: !!notes,
+            requiresNotes: validation.requiresNotes,
+            updatedBy: userId,
+          },
+          validation.warning
+        );
       }
 
       // Upsert status
@@ -616,13 +637,19 @@ export const logsRouter = router({
         {
           logType,
           logId,
-          status,
+          fromStatus: currentStatus,
+          toStatus: status,
           updatedBy: userId,
+          isReopening: validation.requiresNotes,
         },
         'Log status updated'
       );
 
-      return { success: true };
+      return {
+        success: true,
+        warning: validation.warning,
+        requiresNotes: validation.requiresNotes,
+      };
     } catch (error) {
       if (error instanceof TRPCError) throw error;
 
@@ -1667,6 +1694,85 @@ async function verifyLogExists(
   const { data } = await supabase.from(table).select('id').eq('id', logId).single();
 
   return !!data;
+}
+
+/**
+ * Terminal statuses - considered "closed" issues
+ */
+const TERMINAL_STATUSES: LogStatus[] = ['resolved', 'ignored', 'auto_muted'];
+
+/**
+ * Active statuses - issues being worked on
+ */
+const ACTIVE_STATUSES: LogStatus[] = ['new', 'in_progress', 'to_verify'];
+
+/**
+ * Validate status transition and return warning if reopening
+ *
+ * Transitioning from terminal states (resolved, ignored, auto_muted)
+ * back to active states (new, in_progress, to_verify) is a "reopening"
+ * and should require notes to explain why.
+ *
+ * @param fromStatus - Current status (or null if no status set)
+ * @param toStatus - Target status
+ * @param hasNotes - Whether notes are provided
+ * @returns Object with isValid flag and optional warning message
+ */
+function validateStatusTransition(
+  fromStatus: LogStatus | null,
+  toStatus: LogStatus,
+  hasNotes: boolean
+): { isValid: boolean; warning?: string; requiresNotes: boolean } {
+  // No current status - any transition is valid (initial assignment)
+  if (!fromStatus || fromStatus === 'new') {
+    return { isValid: true, requiresNotes: false };
+  }
+
+  // Same status - valid but pointless
+  if (fromStatus === toStatus) {
+    return { isValid: true, requiresNotes: false };
+  }
+
+  // Check if this is a "reopening" transition
+  const isFromTerminal = TERMINAL_STATUSES.includes(fromStatus);
+  const isToActive = ACTIVE_STATUSES.includes(toStatus);
+
+  if (isFromTerminal && isToActive) {
+    // Reopening requires notes to explain why
+    if (!hasNotes) {
+      return {
+        isValid: true, // Allow but warn
+        warning: `Reopening issue from '${fromStatus}' to '${toStatus}' without notes. Consider adding explanation.`,
+        requiresNotes: true,
+      };
+    }
+    return {
+      isValid: true,
+      warning: `Issue reopened from '${fromStatus}' to '${toStatus}'`,
+      requiresNotes: false,
+    };
+  }
+
+  // All other transitions are valid
+  return { isValid: true, requiresNotes: false };
+}
+
+/**
+ * Fetch current status for a log
+ */
+async function fetchCurrentLogStatus(
+  supabase: ReturnType<typeof getSupabaseAdmin>,
+  logType: LogType,
+  logId: string
+): Promise<LogStatus | null> {
+  const { data } = await supabase
+    .from('log_issue_status')
+    .select('status')
+    .eq('log_type', logType)
+    .eq('log_id', logId)
+    .single();
+
+  return data?.status as LogStatus | null;
 }
 
 export type LogsRouter = typeof logsRouter;

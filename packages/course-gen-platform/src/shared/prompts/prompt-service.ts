@@ -15,7 +15,12 @@
 import { getSupabaseAdmin } from '../supabase/admin';
 import logger from '../logger';
 import type { PromptVariable, PromptStage } from '@megacampus/shared-types';
-import { PROMPT_REGISTRY, getPrompt as getHardcodedPrompt, type HardcodedPrompt } from './prompt-registry';
+import {
+  PROMPT_REGISTRY,
+  getPrompt as getHardcodedPrompt,
+  type HardcodedPrompt,
+} from './prompt-registry';
+import { filterWhitelistedTemplates } from '../validation/template-whitelist';
 
 // ============================================================================
 // TYPES
@@ -141,9 +146,9 @@ class PromptServiceImpl {
 
     // Validate required variables
     const missingVars = prompt.variables
-      .filter((v) => v.required)
-      .filter((v) => !variables[v.name])
-      .map((v) => v.name);
+      .filter(v => v.required)
+      .filter(v => !variables[v.name])
+      .map(v => v.name);
 
     if (missingVars.length > 0) {
       throw new Error(
@@ -158,13 +163,21 @@ class PromptServiceImpl {
       rendered = rendered.replaceAll(placeholder, value);
     }
 
-    // Check for unresolved placeholders
-    const unresolvedMatches = rendered.match(/\{\{[^}]+\}\}/g);
-    if (unresolvedMatches) {
-      logger.warn(
-        { promptKey, unresolved: unresolvedMatches },
-        'Prompt has unresolved placeholders'
-      );
+    // Check for unresolved placeholders (filter out whitelisted templates from RAG context)
+    const allMatches = rendered.match(/\{\{[^}]+\}\}/g);
+    if (allMatches) {
+      // Filter out legitimate template syntax (Helm, Go, Jinja2, etc.)
+      const unresolvedMatches = filterWhitelistedTemplates(allMatches);
+      if (unresolvedMatches.length > 0) {
+        logger.warn(
+          {
+            promptKey,
+            unresolved: unresolvedMatches,
+            whitelistedCount: allMatches.length - unresolvedMatches.length,
+          },
+          'Prompt has unresolved placeholders'
+        );
+      }
     }
 
     return rendered;
@@ -181,7 +194,10 @@ class PromptServiceImpl {
     try {
       const dbPrompts = await this.fetchPromptsForStageFromDb(stage);
       if (dbPrompts.length > 0) {
-        logger.info({ stage, count: dbPrompts.length, source: 'database' }, 'Fetched stage prompts from database');
+        logger.info(
+          { stage, count: dbPrompts.length, source: 'database' },
+          'Fetched stage prompts from database'
+        );
         return dbPrompts;
       }
     } catch (err) {
@@ -190,8 +206,8 @@ class PromptServiceImpl {
 
     // Fallback to hardcoded registry
     const hardcodedPrompts = Array.from(PROMPT_REGISTRY.values())
-      .filter((p) => p.stage === stage)
-      .map((p) => this.convertHardcodedToResult(p));
+      .filter(p => p.stage === stage)
+      .map(p => this.convertHardcodedToResult(p));
 
     logger.info(
       { stage, count: hardcodedPrompts.length, source: 'hardcoded' },
@@ -263,7 +279,7 @@ class PromptServiceImpl {
       return [];
     }
 
-    return data.map((row) => ({
+    return data.map(row => ({
       promptKey: row.prompt_key,
       promptName: row.prompt_name,
       promptTemplate: row.prompt_template,
