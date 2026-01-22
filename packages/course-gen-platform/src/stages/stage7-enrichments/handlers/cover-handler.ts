@@ -154,7 +154,7 @@ const RETRY_CONFIG = {
  */
 const coverPromptVariantSchema = z.object({
   id: z.number().int().min(1).max(3),
-  prompt_en: z.string().min(20).max(500),
+  prompt_en: z.string().min(20).max(800), // Increased from 500 to accommodate visual style + no-text suffix
   description_localized: z.string().min(5).max(200),
 });
 
@@ -398,7 +398,7 @@ Also avoid: logos, watermarks, signatures, labels, captions, titles, and human f
 - Leave visual breathing room for potential title overlay
 
 # Format
-Return ONLY the image prompt text (2-4 sentences, 60-120 words).
+Return ONLY the image prompt text (2-3 sentences, 50-80 words).
 Do not include any explanation, preamble, or commentary - just the prompt itself.
 ALWAYS end your prompt with: ", absolutely no text, no letters, no words, no typography, text-free image"`;
 }
@@ -480,17 +480,17 @@ Start with { and end with }.
   "variants": [
     {
       "id": 1,
-      "prompt_en": "Cinematic 3D prompt here (60-120 words)..., absolutely no text, no letters, no words, no typography, text-free image",
+      "prompt_en": "Cinematic 3D prompt here (50-80 words)..., absolutely no text, no letters, no words, no typography, text-free image",
       "description_localized": "${descriptionExample1}"
     },
     {
       "id": 2,
-      "prompt_en": "Futuristic tech 3D prompt here (60-120 words)..., absolutely no text, no letters, no words, no typography, text-free image",
+      "prompt_en": "Futuristic tech 3D prompt here (50-80 words)..., absolutely no text, no letters, no words, no typography, text-free image",
       "description_localized": "${descriptionExample2}"
     },
     {
       "id": 3,
-      "prompt_en": "Elegant depth 3D prompt here (60-120 words)..., absolutely no text, no letters, no words, no typography, text-free image",
+      "prompt_en": "Elegant depth 3D prompt here (50-80 words)..., absolutely no text, no letters, no words, no typography, text-free image",
       "description_localized": "${descriptionExample3}"
     }
   ]
@@ -969,9 +969,9 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
       inputTokens = llmResponse.inputTokens;
       outputTokens = llmResponse.outputTokens;
 
-      // Validate prompt length
+      // Validate prompt length (800 to accommodate visual style + no-text suffix)
       const MIN_PROMPT_LENGTH = 20;
-      const MAX_PROMPT_LENGTH = 500;
+      const MAX_PROMPT_LENGTH = 800;
 
       if (imagePrompt.length < MIN_PROMPT_LENGTH || imagePrompt.length > MAX_PROMPT_LENGTH) {
         logger.warn(

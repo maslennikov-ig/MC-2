@@ -90,8 +90,8 @@ export function useEnrichmentGeneration({
   onComplete,
   onError,
 }: UseEnrichmentGenerationOptions) {
-  // Get session from Supabase provider for auth headers
-  const { session } = useSupabase()
+  // Get supabase client for auth operations
+  const { supabase } = useSupabase()
 
   // State for currently generating enrichments (by type)
   const [generating, setGenerating] = useState<Map<string, GeneratingEnrichment>>(new Map())
@@ -110,13 +110,17 @@ export function useEnrichmentGeneration({
 
   /**
    * Get auth headers for backend requests
+   * Always fetches fresh session to avoid stale token issues during long polling
    */
-  const getAuthHeaders = useCallback((): Record<string, string> => {
+  const getAuthHeaders = useCallback(async (): Promise<Record<string, string>> => {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession()
     return {
       'Content-Type': 'application/json',
       Authorization: session?.access_token ? `Bearer ${session.access_token}` : '',
     }
-  }, [session])
+  }, [supabase])
 
   useEffect(() => {
     mountedRef.current = true
@@ -187,7 +191,8 @@ export function useEnrichmentGeneration({
         abortControllersRef.current.set(type, controller)
 
         try {
-          const headers = getAuthHeaders()
+          // Always get fresh token to avoid stale token during long polling
+          const headers = await getAuthHeaders()
 
           const response = await fetch(
             `${TRPC_URL}/enrichment.getGenerationStatus?input=${encodeURIComponent(
@@ -199,6 +204,28 @@ export function useEnrichmentGeneration({
               signal: controller.signal,
             }
           )
+
+          // Handle 401 Unauthorized - try to refresh session
+          if (response.status === 401) {
+            devLog.warn('401 Unauthorized during polling, attempting session refresh')
+            const { data, error } = await supabase.auth.refreshSession()
+            if (!error && data.session) {
+              // Refresh succeeded - retry immediately without counting as failure
+              devLog.warn('Session refreshed successfully, retrying poll')
+              void pollStatus()
+              return
+            }
+            // Refresh failed - treat as auth error
+            devLog.error('Session refresh failed:', error)
+            stopPolling(type)
+            setGenerating((prev) => {
+              const next = new Map(prev)
+              next.delete(type)
+              return next
+            })
+            onError?.('Session expired. Please log in again.')
+            return
+          }
 
           if (!response.ok) {
             throw new Error(`Status poll failed: ${response.status}`)
@@ -284,7 +311,7 @@ export function useEnrichmentGeneration({
       const interval = setInterval(() => void pollStatus(), currentInterval)
       pollingIntervalsRef.current.set(type, interval)
     },
-    [pollingInterval, onComplete, onError, getAuthHeaders, stopPolling]
+    [pollingInterval, onComplete, onError, getAuthHeaders, stopPolling, supabase]
   )
 
   /**
@@ -326,7 +353,7 @@ export function useEnrichmentGeneration({
       abortControllersRef.current.set(`generate-${type}`, controller)
 
       try {
-        const headers = getAuthHeaders()
+        const headers = await getAuthHeaders()
 
         const response = await fetch(`${TRPC_URL}/enrichment.generateOnDemand`, {
           method: 'POST',
@@ -457,7 +484,7 @@ export function useEnrichmentGeneration({
 
       // Backend job exists - send cancel request
       try {
-        const headers = getAuthHeaders()
+        const headers = await getAuthHeaders()
 
         const response = await fetch(`${TRPC_URL}/enrichment.cancel`, {
           method: 'POST',
