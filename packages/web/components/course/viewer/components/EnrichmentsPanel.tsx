@@ -5,9 +5,8 @@ import { useTranslations } from 'next-intl'
 import { toast } from 'sonner'
 import { FileText, AlertTriangle } from 'lucide-react'
 import { EnrichmentErrorBoundary } from '../enrichments/EnrichmentErrorBoundary'
-import { EnrichmentPlaceholderCard } from './EnrichmentPlaceholderCard'
+import { UnifiedEnrichmentCard } from './UnifiedEnrichmentCard'
 import { EnrichmentGeneratingCard } from './EnrichmentGeneratingCard'
-import { ImagePlaceholderCard } from './ImagePlaceholderCard'
 import { useEnrichmentGeneration } from '@/lib/hooks/useEnrichmentGeneration'
 import type { Database } from '@/types/database.generated'
 import { EnrichmentCard } from './EnrichmentCard'
@@ -227,7 +226,7 @@ export function EnrichmentsPanel({
               }
 
               return (
-                <ImagePlaceholderCard
+                <UnifiedEnrichmentCard
                   key={type}
                   type={type}
                   existingEnrichment={existingEnrichment}
@@ -250,11 +249,6 @@ export function EnrichmentsPanel({
           const generatingProgress = getProgress(type)
           const typeIsGenerating = isGenerating(type)
 
-          // Construct translation key dynamically - path exists in enrichments.json
-          const estimatedTimeKey = `placeholder.${type}.estimatedTime`
-
-          const estimatedTime = t(estimatedTimeKey as Parameters<typeof t>[0])
-
           // Show generating card if generation is in progress
           if (typeIsGenerating && generatingProgress) {
             return (
@@ -270,7 +264,7 @@ export function EnrichmentsPanel({
 
           // Show placeholder card otherwise
           return (
-            <EnrichmentPlaceholderCard
+            <UnifiedEnrichmentCard
               key={type}
               type={type}
               onGenerate={(settings) => {
@@ -285,7 +279,6 @@ export function EnrichmentsPanel({
                 }
                 void startGeneration(type, settings)
               }}
-              estimatedTime={estimatedTime}
               disabled={type === 'video' || !lessonId}
               isGenerating={typeIsGenerating}
             />
