@@ -32,7 +32,13 @@ import { GraphOperationsProvider } from './contexts/GraphOperationsContext'
 import { GRAPH_STAGE_CONFIG, NODE_STYLES, ACTIVE_STATUSES } from '@/lib/generation-graph/constants'
 import { GRAPH_TRANSLATIONS } from '@/lib/generation-graph/translations'
 import { useGenerationRealtime } from '@/components/generation-monitoring/realtime-provider'
-import { RealtimeStatusData, NodeStatusEntry, VisualStyle } from '@megacampus/shared-types'
+import {
+  RealtimeStatusData,
+  NodeStatusEntry,
+  VisualStyle,
+  parseAnalysisResult,
+  type AnalysisResult,
+} from '@megacampus/shared-types'
 import { GenerationProgress, CourseStatus } from '@/types/course-generation'
 import {
   mapStatusToNodeStatus,
@@ -296,7 +302,7 @@ function GraphViewInner({
   const [courseStyle, setCourseStyle] = useState<string | null>(null)
 
   // Analysis result from Stage 4 (persisted edits from courses.analysis_result)
-  const [analysisResult, setAnalysisResult] = useState<unknown>(null)
+  const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null)
 
   // Theme support
   const { resolvedTheme, mounted } = useThemeSync()
@@ -439,7 +445,10 @@ function GraphViewInner({
 
       // Store analysis result if available (persisted Stage 4 edits)
       if (courseResult.data?.analysis_result) {
-        setAnalysisResult(courseResult.data.analysis_result)
+        const parsed = parseAnalysisResult(courseResult.data.analysis_result)
+        if (parsed) {
+          setAnalysisResult(parsed)
+        }
       }
 
       if (courseResult.data?.course_structure) {

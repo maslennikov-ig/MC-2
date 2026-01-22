@@ -4,20 +4,17 @@
  *
  * Provides runtime validation for AnalysisResult data from Supabase JSONB columns.
  * This enables safe type casting from unknown data (e.g., course.analysis_result).
+ *
+ * Now powered by Zod schemas for comprehensive validation.
  */
 
-import type { AnalysisResult } from './analysis-result';
+import { AnalysisResultSchema, type AnalysisResult } from './analysis-schemas';
 
 /**
- * Runtime type guard for AnalysisResult
+ * Runtime type guard for AnalysisResult (Zod-based)
  *
- * Validates that the data has the minimum required structure for safe usage.
- * This is a minimal check focusing on what's actually used in the codebase.
- *
- * Key validation points:
- * - Checks for presence of core top-level properties
- * - Validates document_relevance_mapping structure (used for RAG planning)
- * - Does NOT validate every nested field (performance optimization)
+ * Validates that the data conforms to the full AnalysisResultSchema.
+ * Uses Zod validation for comprehensive structural and type checking.
  *
  * @param data - Unknown data from Supabase JSONB column
  * @returns True if data conforms to AnalysisResult structure
@@ -32,51 +29,32 @@ import type { AnalysisResult } from './analysis-result';
  * ```
  */
 export function isAnalysisResult(data: unknown): data is AnalysisResult {
-  if (!data || typeof data !== 'object') return false;
-
-  const obj = data as Record<string, unknown>;
-
-  // Check for required top-level properties
-  // These are the core fields that should always exist in a valid AnalysisResult
-  const hasRequiredFields =
-    'course_category' in obj &&
-    'topic_analysis' in obj &&
-    'recommended_structure' in obj &&
-    'metadata' in obj;
-
-  if (!hasRequiredFields) return false;
-
-  // Validate document_relevance_mapping structure if present
-  // This is critical for RAG planning in buildMinimalLessonSpec
-  if ('document_relevance_mapping' in obj) {
-    const drm = obj.document_relevance_mapping;
-    // Can be an empty object {} or null/undefined in some cases
-    if (drm !== null && drm !== undefined && typeof drm !== 'object') {
-      return false; // Invalid type
-    }
-  }
-
-  return true;
+  const result = AnalysisResultSchema.safeParse(data);
+  return result.success;
 }
 
 /**
- * Safely extracts AnalysisResult from unknown data
+ * Parse and validate AnalysisResult from unknown data (Zod-based)
  *
- * Combines type guard validation with safe extraction.
- * Returns undefined if data is not a valid AnalysisResult.
+ * Used to safely parse courses.analysis_result JSONB column data.
+ * Returns null if validation fails (with warning logged to console).
  *
- * This is the recommended function for most use cases as it provides
- * a clean API: `const result = parseAnalysisResult(data);`
- *
- * @param data - Unknown data from Supabase JSONB column
- * @returns AnalysisResult if valid, undefined otherwise
+ * @param data - Unknown data from database or API
+ * @returns Validated AnalysisResult or null if invalid
  *
  * @example
  * ```typescript
- * const analysisResult = parseAnalysisResult(course.analysis_result);
- * const spec = buildMinimalLessonSpec(lessonId, lesson, sectionNum, requestId, analysisResult);
+ * const result = parseAnalysisResult(courseData.analysis_result);
+ * if (result) {
+ *   console.log(result.course_category.primary); // Type-safe access
+ * }
  * ```
  */
-export function parseAnalysisResult(data: unknown): AnalysisResult | undefined {
-  return isAnalysisResult(data) ? data : undefined;
+export function parseAnalysisResult(data: unknown): AnalysisResult | null {
+  const result = AnalysisResultSchema.safeParse(data);
+  if (!result.success) {
+    console.warn('[parseAnalysisResult] Invalid analysis result:', result.error.issues);
+    return null;
+  }
+  return result.data;
 }
