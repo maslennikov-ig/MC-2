@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { useTranslations } from 'next-intl'
 import { ChevronLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
+import LessonProgressCard from '@/components/common/lesson-progress-card'
 import { LessonGrid } from './lesson-grid'
 import type { Database } from '@/types/database.generated'
 
@@ -59,6 +60,13 @@ export function LessonsContent({
   // Create completed lessons set for fast lookup
   const completedLessonsSet = useMemo(() => new Set(lessonsCompleted), [lessonsCompleted])
 
+  // Calculate remaining time for uncompleted lessons
+  const remainingMinutes = useMemo(() => {
+    return lessons
+      .filter((l) => !completedLessonsSet.has(l.id))
+      .reduce((sum, l) => sum + (l.duration_minutes || 0), 0)
+  }, [lessons, completedLessonsSet])
+
   // Filter lessons based on active filter
   const filteredLessons = useMemo(() => {
     switch (activeFilter) {
@@ -103,6 +111,17 @@ export function LessonsContent({
               {t('subtitle', { count: lessons.length })}
             </p>
           </div>
+
+          {/* Progress card */}
+          {lessons.length > 0 && (
+            <LessonProgressCard
+              completedCount={lessonsCompleted.length}
+              totalLessons={lessons.length}
+              remainingMinutes={remainingMinutes}
+              compact
+              className="mb-6"
+            />
+          )}
 
           {/* Filters */}
           <div className="flex flex-wrap gap-2">
