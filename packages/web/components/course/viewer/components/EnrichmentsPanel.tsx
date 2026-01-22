@@ -15,9 +15,23 @@ import {
   IMAGE_PLACEHOLDER_TYPES,
   type EnrichmentType,
 } from './enrichment-config'
-import { isOnDemandType, type OnDemandEnrichmentType } from '@megacampus/shared-types'
+import {
+  isOnDemandType,
+  isActiveGenerationStatus,
+  type OnDemandEnrichmentType,
+} from '@megacampus/shared-types'
 
 type EnrichmentRow = Database['public']['Tables']['lesson_enrichments']['Row']
+
+/**
+ * Type guard for enrichments with on-demand type
+ * Fixes HIGH #3: unsafe type assertion
+ */
+function isEnrichmentOnDemand(
+  enrichment: EnrichmentRow
+): enrichment is EnrichmentRow & { enrichment_type: OnDemandEnrichmentType } {
+  return isOnDemandType(enrichment.enrichment_type)
+}
 
 interface EnrichmentsPanelProps {
   enrichments: EnrichmentRow[]
@@ -67,25 +81,36 @@ export function EnrichmentsPanel({
       onError: handleGenerationError,
     })
 
-  // Track if we've already resumed to prevent re-running on enrichments array updates
-  const hasResumedRef = useRef(false)
+  // Track resumed enrichment IDs to prevent duplicate resumes
+  // Fixes HIGH #1: race condition (Set persists but tracks IDs, not boolean)
+  const resumedIdsRef = useRef(new Set<string>())
 
-  // Resume polling for active enrichments on mount
-  // Active statuses: pending, draft_generating, draft_ready, generating
+  // Resume polling for active enrichments on mount and when new active enrichments appear
+  // Fixes HIGH #1, #2, #3: proper tracking, cleanup, and type safety
   useEffect(() => {
-    // Only run once on mount
-    if (hasResumedRef.current) return
-    hasResumedRef.current = true
+    // Find enrichments that need resuming (active + on-demand + not yet resumed)
+    const activeEnrichments = enrichments
+      .filter((e) => isActiveGenerationStatus(e.status))
+      .filter(isEnrichmentOnDemand)
+      .filter((e) => !resumedIdsRef.current.has(e.id))
 
-    const activeStatuses = ['pending', 'draft_generating', 'draft_ready', 'generating']
-    const activeEnrichments = enrichments.filter(
-      (e) => activeStatuses.includes(e.status) && isOnDemandType(e.enrichment_type)
-    )
-
+    // Resume polling for each new active enrichment
     activeEnrichments.forEach((enrichment) => {
-      resumeGeneration(enrichment.id, enrichment.enrichment_type as OnDemandEnrichmentType)
+      resumeGeneration(enrichment.id, enrichment.enrichment_type)
+      resumedIdsRef.current.add(enrichment.id)
     })
-  }, [enrichments, resumeGeneration]) // hasResumedRef prevents re-running
+
+    // Cleanup: remove IDs for enrichments that are no longer active
+    // Fixes HIGH #2: memory leak - stop tracking completed/removed enrichments
+    const currentActiveIds = new Set(
+      enrichments.filter((e) => isActiveGenerationStatus(e.status)).map((e) => e.id)
+    )
+    resumedIdsRef.current.forEach((id) => {
+      if (!currentActiveIds.has(id)) {
+        resumedIdsRef.current.delete(id)
+      }
+    })
+  }, [enrichments, resumeGeneration])
 
   // Filter out cover type - it's displayed as hero banner in lesson content
   const filteredEnrichments = enrichments.filter((e) => (e.enrichment_type as string) !== 'cover')
