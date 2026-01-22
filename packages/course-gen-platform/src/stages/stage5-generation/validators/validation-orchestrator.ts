@@ -19,7 +19,7 @@ import { validateBloomsTaxonomy, hasNonMeasurableVerb } from './blooms-validator
 import { validatePlaceholders, scanForPlaceholders } from './placeholder-validator';
 import { validateDurationProportionality } from './duration-validator';
 import { logTrace } from '../../../shared/trace-logger';
-import { logValidationIssue } from '../../../shared/logger';
+import { logValidationIssue } from '../../../shared/logger/domain';
 
 /**
  * Extract language from CourseStructure

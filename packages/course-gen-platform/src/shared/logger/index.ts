@@ -231,42 +231,8 @@ export function createChildLogger(context: Record<string, unknown>): Logger {
   return createEnhancedLogger(childLogger);
 }
 
-/**
- * Parameters for validation issue logging
- */
-export interface ValidationIssueLogParams {
-  courseId: string;
-  ruleId: string;
-  severity: 'ERROR' | 'WARNING';
-  path: string;
-  suggestion?: string;
-  issues?: string[];
-  warnings?: string[];
-}
+// Re-export domain loggers
+export * from './domain';
 
-/**
- * T013: Helper to log validation issues to error_logs
- * Reduces code duplication and ensures consistent logging format
- *
- * Uses the enhanced logger to automatically write to both console and DB.
- *
- * @param params - Logging parameters
- */
-export function logValidationIssue(params: ValidationIssueLogParams): void {
-  const { courseId, ruleId, severity, path, suggestion, issues, warnings } = params;
-  const logData = {
-    courseId,
-    ruleId,
-    severity,
-    path,
-    suggestion,
-    ...(issues && { issues }),
-    ...(warnings && { warnings }),
-  };
-
-  if (severity === 'ERROR') {
-    logger.error(logData, `Validation error: ${ruleId}`);
-  } else {
-    logger.warn(logData, `Validation warning: ${ruleId}`);
-  }
-}
+// Re-export context builders
+export * from './context/builders';
