@@ -7,9 +7,7 @@ import {
   regenerateBlockInputSchema,
   regenerationResponseSchema,
 } from '@megacampus/shared-types/regeneration-types';
-import type {
-  RegenerationResponse,
-} from '@megacampus/shared-types/regeneration-types';
+import type { RegenerationResponse } from '@megacampus/shared-types/regeneration-types';
 import { llmClient } from '../../../../shared/llm/client';
 import {
   detectContextTier,
@@ -19,14 +17,12 @@ import {
   getFieldValue,
 } from '../../../../shared/regeneration';
 import { contextCacheManager } from '../../../../shared/regeneration/context-cache-manager';
-import {
-  setNestedValue,
-} from '../_shared/helpers';
+import { setNestedValue } from '../_shared/helpers';
 
 export const regenerationRouter = {
   regenerateBlock: instructorProcedure
     .input(regenerateBlockInputSchema)
-    .mutation(async ({ ctx, input }: { ctx: any, input: any }): Promise<RegenerationResponse> => {
+    .mutation(async ({ ctx, input }: { ctx: any; input: any }): Promise<RegenerationResponse> => {
       const { courseId, stageId, blockPath, userInstruction } = input;
       const supabase = getSupabaseAdmin();
       const requestId = nanoid();
@@ -56,21 +52,23 @@ export const regenerationRouter = {
         }
 
         if (course.user_id !== userId) {
-          logger.warn({
-            requestId,
-            userId,
-            courseId,
-            courseOwnerId: course.user_id,
-          }, 'Course ownership violation in regenerateBlock');
+          logger.warn(
+            {
+              requestId,
+              userId,
+              courseId,
+              courseOwnerId: course.user_id,
+            },
+            'Course ownership violation in regenerateBlock'
+          );
           throw new TRPCError({
             code: 'FORBIDDEN',
             message: 'You do not have access to this course',
           });
         }
 
-        const currentData = stageId === 'stage_4'
-          ? course.analysis_result
-          : course.course_structure;
+        const currentData =
+          stageId === 'stage_4' ? course.analysis_result : course.course_structure;
 
         if (!currentData) {
           logger.warn({ requestId, courseId, stageId }, 'Target data is null or undefined');
@@ -82,14 +80,17 @@ export const regenerationRouter = {
 
         const tier = detectContextTier(userInstruction);
 
-        logger.info({
-          requestId,
-          courseId,
-          stageId,
-          blockPath,
-          tier,
-          instruction: userInstruction.slice(0, 100),
-        }, 'RegenerateBlock: Context tier detected');
+        logger.info(
+          {
+            requestId,
+            courseId,
+            stageId,
+            blockPath,
+            tier,
+            instruction: userInstruction.slice(0, 100),
+          },
+          'RegenerateBlock: Context tier detected'
+        );
 
         const cacheKey = contextCacheManager.getCacheKey(courseId, tier);
         let staticContextContent: string;
@@ -102,13 +103,16 @@ export const regenerationRouter = {
           staticTokenEstimate = cachedStatic.tokenEstimate;
           cacheHit = true;
 
-          logger.info({
-            requestId,
-            courseId,
-            tier,
-            cacheKey,
-            tokenEstimate: staticTokenEstimate,
-          }, 'RegenerateBlock: Static context cache hit');
+          logger.info(
+            {
+              requestId,
+              courseId,
+              tier,
+              cacheKey,
+              tokenEstimate: staticTokenEstimate,
+            },
+            'RegenerateBlock: Static context cache hit'
+          );
         } else {
           const staticContext = await assembleStaticContext({
             courseId,
@@ -124,13 +128,16 @@ export const regenerationRouter = {
 
           contextCacheManager.set(cacheKey, staticContextContent, staticTokenEstimate);
 
-          logger.info({
-            requestId,
-            courseId,
-            tier,
-            cacheKey,
-            tokenEstimate: staticTokenEstimate,
-          }, 'RegenerateBlock: Static context assembled and cached');
+          logger.info(
+            {
+              requestId,
+              courseId,
+              tier,
+              cacheKey,
+              tokenEstimate: staticTokenEstimate,
+            },
+            'RegenerateBlock: Static context assembled and cached'
+          );
         }
 
         const dynamicContext = await assembleDynamicContext({
@@ -145,16 +152,19 @@ export const regenerationRouter = {
         const dynamicContextContent = dynamicContext.content;
         const dynamicTokenEstimate = dynamicContext.tokenEstimate;
 
-        logger.info({
-          requestId,
-          courseId,
-          blockPath,
-          tier,
-          staticTokens: staticTokenEstimate,
-          dynamicTokens: dynamicTokenEstimate,
-          totalTokens: staticTokenEstimate + dynamicTokenEstimate,
-          cacheHit,
-        }, 'RegenerateBlock: Context assembled (static + dynamic)');
+        logger.info(
+          {
+            requestId,
+            courseId,
+            blockPath,
+            tier,
+            staticTokens: staticTokenEstimate,
+            dynamicTokens: dynamicTokenEstimate,
+            totalTokens: staticTokenEstimate + dynamicTokenEstimate,
+            cacheHit,
+          },
+          'RegenerateBlock: Context assembled (static + dynamic)'
+        );
 
         const systemPrompt = `You are an expert instructional designer. Generate valid JSON only, no markdown or explanations.
 
@@ -185,13 +195,16 @@ ${dynamicContextContent}
   </dynamic_context>
 </regeneration_task>`;
 
-        logger.info({
-          requestId,
-          courseId,
-          blockPath,
-          model: 'openai/gpt-4o-mini',
-          enableCaching: true,
-        }, 'RegenerateBlock: Calling LLM with cache control');
+        logger.info(
+          {
+            requestId,
+            courseId,
+            blockPath,
+            model: 'openai/gpt-4o-mini',
+            enableCaching: true,
+          },
+          'RegenerateBlock: Calling LLM with cache control'
+        );
 
         const llmResponse = await llmClient.generateCompletion(userPrompt, {
           model: 'openai/gpt-4o-mini',
@@ -213,26 +226,32 @@ ${dynamicContextContent}
           const parsedResponse = JSON.parse(cleanedContent);
           regenerationData = regenerationResponseSchema.parse(parsedResponse);
         } catch (parseError) {
-          logger.error({
-            requestId,
-            courseId,
-            blockPath,
-            error: parseError,
-            content: llmResponse.content,
-          }, 'Failed to parse LLM response for regenerateBlock');
+          logger.error(
+            {
+              requestId,
+              courseId,
+              blockPath,
+              error: parseError,
+              content: llmResponse.content,
+            },
+            'Failed to parse LLM response for regenerateBlock'
+          );
           throw new TRPCError({
             code: 'INTERNAL_SERVER_ERROR',
             message: 'AI generation failed: invalid JSON response',
           });
         }
 
-        logger.info({
-          requestId,
-          courseId,
-          blockPath,
-          alignmentScore: regenerationData.alignment_score,
-          bloomPreserved: regenerationData.bloom_level_preserved,
-        }, 'RegenerateBlock: LLM response parsed and validated');
+        logger.info(
+          {
+            requestId,
+            courseId,
+            blockPath,
+            alignmentScore: regenerationData.alignment_score,
+            bloomPreserved: regenerationData.bloom_level_preserved,
+          },
+          'RegenerateBlock: LLM response parsed and validated'
+        );
 
         const sourceData = stageId === 'stage_4' ? currentData : currentData;
         const targetContent = getFieldValue(sourceData, blockPath);
@@ -245,24 +264,30 @@ ${dynamicContextContent}
           llmChangeLog: regenerationData.pedagogical_change_log,
         });
 
-        logger.info({
-          requestId,
-          courseId,
-          blockPath,
-          changeType: semanticDiff.changeType,
-          alignmentScore: semanticDiff.alignmentScore,
-        }, 'RegenerateBlock: Semantic diff generated');
+        logger.info(
+          {
+            requestId,
+            courseId,
+            blockPath,
+            changeType: semanticDiff.changeType,
+            alignmentScore: semanticDiff.alignmentScore,
+          },
+          'RegenerateBlock: Semantic diff generated'
+        );
 
         const updatedData = structuredClone(currentData);
         try {
           setNestedValue(updatedData, blockPath, regenerationData.regenerated_content);
         } catch (error) {
-          logger.warn({
-            requestId,
-            courseId,
-            blockPath,
-            error: error instanceof Error ? error.message : String(error),
-          }, 'Invalid field path in regenerateBlock');
+          logger.warn(
+            {
+              requestId,
+              courseId,
+              blockPath,
+              error: error instanceof Error ? error.message : String(error),
+            },
+            'Invalid field path in regenerateBlock'
+          );
           throw new TRPCError({
             code: 'BAD_REQUEST',
             message: `Invalid field path: ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -281,31 +306,62 @@ ${dynamicContextContent}
           .eq('id', courseId);
 
         if (updateError) {
-          logger.error({
-            requestId,
-            courseId,
-            stageId,
-            blockPath,
-            error: updateError,
-          }, 'Database update failed in regenerateBlock');
+          logger.error(
+            {
+              requestId,
+              courseId,
+              stageId,
+              blockPath,
+              error: updateError,
+            },
+            'Database update failed in regenerateBlock'
+          );
           throw new TRPCError({
             code: 'INTERNAL_SERVER_ERROR',
             message: 'Failed to update regenerated content',
           });
         }
 
-        logger.info({
-          requestId,
-          courseId,
-          stageId,
-          blockPath,
-          tier,
-          staticTokens: staticTokenEstimate,
-          dynamicTokens: dynamicTokenEstimate,
-          totalTokens: staticTokenEstimate + dynamicTokenEstimate,
-          inputTokens: llmResponse.inputTokens,
-          outputTokens: llmResponse.outputTokens,
-        }, 'RegenerateBlock: Completed successfully');
+        // #16: Save edit history for diff view
+        const { error: editHistoryError } = await supabase.from('course_edits').insert({
+          course_id: courseId,
+          edited_by: userId,
+          stage: stageId,
+          field_path: blockPath,
+          previous_value: targetContent as any,
+          new_value: regenerationData.regenerated_content as any,
+          semantic_diff: semanticDiff as any,
+          user_instruction: userInstruction,
+        });
+
+        if (editHistoryError) {
+          // Non-blocking: log error but don't fail the regeneration
+          logger.warn(
+            {
+              requestId,
+              courseId,
+              blockPath,
+              error: editHistoryError,
+            },
+            'Failed to save edit history (non-blocking)'
+          );
+        }
+
+        logger.info(
+          {
+            requestId,
+            courseId,
+            stageId,
+            blockPath,
+            tier,
+            staticTokens: staticTokenEstimate,
+            dynamicTokens: dynamicTokenEstimate,
+            totalTokens: staticTokenEstimate + dynamicTokenEstimate,
+            inputTokens: llmResponse.inputTokens,
+            outputTokens: llmResponse.outputTokens,
+          },
+          'RegenerateBlock: Completed successfully'
+        );
 
         return {
           regenerated_content: regenerationData.regenerated_content,
@@ -318,11 +374,14 @@ ${dynamicContextContent}
       } catch (error) {
         if (error instanceof TRPCError) throw error;
 
-        logger.error({
-          requestId,
-          courseId,
-          error: error instanceof Error ? error.message : String(error),
-        }, 'Unexpected error in regenerateBlock');
+        logger.error(
+          {
+            requestId,
+            courseId,
+            error: error instanceof Error ? error.message : String(error),
+          },
+          'Unexpected error in regenerateBlock'
+        );
 
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
