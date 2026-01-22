@@ -110,14 +110,16 @@ export const Stage5InputTab = memo<Stage5InputTabProps>(function Stage5InputTab(
               | undefined
             const topicAnalysis = ar.topic_analysis as Record<string, unknown> | undefined
 
-            // Get total_lessons from recommended_structure (Stage 4 output)
+            // Get total_lessons and total_sections from recommended_structure (Stage 4 output)
             const totalLessons = (recommendedStructure?.total_lessons as number) || 10
+            const totalSections = (recommendedStructure?.total_sections as number) || undefined
 
             parsedAnalysisResult = {
               // Use 'primary' not 'category' - real AnalysisResult structure
               courseCategory: (courseCategory?.primary as string) || 'professional',
               confidence: (courseCategory?.confidence as number) || 0,
               totalLessons,
+              totalSections,
               // Don't show range on Stage 5 - we already know the exact number from Stage 4
               lessonsRange: undefined,
               // Content style - user selected (affects tone: practical, conversational, academic)

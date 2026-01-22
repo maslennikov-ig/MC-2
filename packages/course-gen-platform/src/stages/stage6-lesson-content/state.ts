@@ -23,6 +23,7 @@ import type {
   SelfReviewResult,
   ProgressSummary,
 } from '@megacampus/shared-types/judge-types';
+import type { AnalysisResult } from '@megacampus/shared-types/analysis-result';
 
 /**
  * Graph node names for state tracking
@@ -147,6 +148,16 @@ export const LessonGraphState = Annotation.Root({
    * Defaults to 'professional' if not provided
    */
   style: Annotation<string | null>({
+    reducer: (x, y) => y ?? x,
+    default: () => null,
+  }),
+
+  /**
+   * Analysis result from Stage 4 containing generation guidance
+   * Provides specific_analogies, real_world_examples, assessment_approach,
+   * and tone for higher quality content generation
+   */
+  analysisResult: Annotation<AnalysisResult | null>({
     reducer: (x, y) => y ?? x,
     default: () => null,
   }),

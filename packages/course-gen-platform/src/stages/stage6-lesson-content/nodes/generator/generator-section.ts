@@ -21,6 +21,7 @@ import {
   DEFAULT_COURSE_STYLE,
 } from '@megacampus/shared-types';
 import type { RAGChunk } from '@megacampus/shared-types/lesson-content';
+import type { AnalysisResult } from '@megacampus/shared-types/analysis-result';
 import { createPromptService } from '@/shared/prompts/prompt-service';
 import { formatRAGContextXML, filterChunksForSection } from '@/shared/prompts';
 import {
@@ -34,6 +35,7 @@ import {
   extractContextWindow,
   calculateMaxTokensForSection,
   extractTokenUsageWithFallback,
+  formatGenerationGuidanceXML,
 } from './generator-helpers';
 
 /**
@@ -48,6 +50,7 @@ import {
  * @param language - ISO language code ('en', 'ru')
  * @param modelOverride - Optional model ID override
  * @param style - Course content style (e.g., 'gamified', 'professional')
+ * @param analysisResult - Analysis result from Stage 4 with generation guidance
  * @returns Generated section content and token usage
  */
 export async function generateSection(
@@ -57,7 +60,8 @@ export async function generateSection(
   previousContext: string,
   language: string,
   modelOverride: string | null = null,
-  style: string | null = null
+  style: string | null = null,
+  analysisResult: AnalysisResult | null = null
 ): Promise<{ content: string; tokensUsed: number }> {
   const startTime = performance.now();
 
@@ -179,6 +183,26 @@ export async function generateSection(
     );
   }
 
+  // Format generation guidance from Stage 4 analysis (if available)
+  const generationGuidanceXML = formatGenerationGuidanceXML(analysisResult);
+  if (generationGuidanceXML) {
+    logger.debug(
+      {
+        lessonId: lessonSpec.lesson_id,
+        sectionTitle: section.title,
+        hasAnalogies: Boolean(analysisResult?.generation_guidance?.specific_analogies?.length),
+        hasExamples: Boolean(analysisResult?.generation_guidance?.real_world_examples?.length),
+      },
+      'Using generation guidance from Stage 4 analysis'
+    );
+  }
+
+  // Combine inter-lesson context and generation guidance as extended context
+  const interLessonContextXML = formatInterLessonContextXML(lessonSpec.lesson_context);
+  const extendedContext = [interLessonContextXML, generationGuidanceXML]
+    .filter(Boolean)
+    .join('\n\n');
+
   const prompt = await promptService.renderPrompt('stage6_serial_generator', {
     lessonTitle: lessonSpec.title,
     targetAudience: lessonSpec.metadata.target_audience,
@@ -195,8 +219,8 @@ export async function generateSection(
     outputLanguage: getLanguageName(language),
     ragContext: ragContextXML,
     previousContext: previousContextValue,
-    // Inter-lesson context for coherence (optional, rendered as XML string)
-    interLessonContext: formatInterLessonContextXML(lessonSpec.lesson_context),
+    // Inter-lesson context + generation guidance (combined XML blocks)
+    interLessonContext: extendedContext,
     // Course content style (e.g., gamified, professional, storytelling)
     stylePrompt,
   });

@@ -201,7 +201,7 @@ export function EnrichmentsPanel({
           <h3 className="mb-3 text-sm font-medium text-gray-500 dark:text-gray-400">
             {t('images.title')}
           </h3>
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {IMAGE_PLACEHOLDER_TYPES.map((type) => {
               const typeIsGenerating = isGenerating(type)
               const generatingProgress = getProgress(type)
@@ -244,7 +244,7 @@ export function EnrichmentsPanel({
       )}
 
       {/* Placeholder Cards for Missing Types and Generating Cards */}
-      <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2">
+      <div className="mt-6 grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
         {PLACEHOLDER_TYPES.filter((type) => !groupedEnrichments[type]).map((type) => {
           // Check if this type is currently generating
           const generatingProgress = getProgress(type)

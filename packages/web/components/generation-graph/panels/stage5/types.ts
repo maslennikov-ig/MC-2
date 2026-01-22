@@ -22,6 +22,8 @@ export interface Stage5InputData {
     courseCategory: string
     confidence: number
     totalLessons: number
+    /** Total sections (modules) from Stage 4 */
+    totalSections?: number
     /** Optional range - only shown on Stage 1, not on Stage 5 where exact count is known */
     lessonsRange?: { min: number; max: number }
     /** Content style - user selected (e.g., practical, conversational, academic) */

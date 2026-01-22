@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useMemo } from 'react'
+import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -18,7 +18,6 @@ import {
   Award,
   ChevronRight,
   Heart,
-  Sparkles,
   CheckCircle,
   AlertCircle,
   Zap,
@@ -172,9 +171,6 @@ const visibilityConfig: Record<
   },
 }
 
-// Configuration constants
-const NEW_COURSE_DAYS = 7
-
 export function CourseCard({
   course,
   user,
@@ -219,13 +215,6 @@ export function CourseCard({
   const displayStatus = course.generation_status || course.status
   const statusInfo = statusConfig[displayStatus as keyof typeof statusConfig] || statusConfig.draft
   const difficultyInfo = difficultyConfig[course.difficulty as keyof typeof difficultyConfig]
-
-  // Optimize date calculations with useMemo
-  const isNewCourse = useMemo(() => {
-    return (
-      new Date(course.created_at) > new Date(Date.now() - NEW_COURSE_DAYS * 24 * 60 * 60 * 1000)
-    )
-  }, [course.created_at])
 
   const handleDelete = async () => {
     if (!confirm('Вы уверены, что хотите удалить этот курс?')) return
@@ -538,16 +527,6 @@ export function CourseCard({
               </Badge>
             )}
           </div>
-
-          {/* New badge */}
-          {isNewCourse && (
-            <div className="absolute top-4 right-4">
-              <Badge className="border-0 bg-gradient-to-r from-purple-500 to-blue-500 text-white backdrop-blur-sm">
-                <Sparkles className="mr-1 h-3 w-3" />
-                Новый
-              </Badge>
-            </div>
-          )}
         </div>
 
         {/* Base Content - always visible */}
@@ -565,7 +544,7 @@ export function CourseCard({
           <div className="mt-2 flex items-center gap-4 text-sm text-gray-500 dark:text-slate-400">
             <span className="flex items-center gap-1.5">
               <BookOpen className="h-4 w-4" />
-              {sectionsCount} модулей
+              {lessonsCount} уроков
             </span>
             <span className="flex items-center gap-1.5">
               <Clock className="h-4 w-4" />

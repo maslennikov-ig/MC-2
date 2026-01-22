@@ -123,7 +123,9 @@ export type OnDemandPresentationSettings = z.infer<typeof onDemandPresentationSe
  */
 export const onDemandImageSettingsSchema = z.object({
   /** Visual style for image generation */
-  style: z.enum(['realistic', 'abstract', 'minimalist', 'dramatic']).default('realistic'),
+  style: z
+    .enum(['premium3d', 'realistic', 'abstract', 'minimalist', 'dramatic'])
+    .default('premium3d'),
 
   /** Color scheme preference */
   colorScheme: z.enum(['auto', 'warm', 'cool', 'monochrome']).default('auto'),

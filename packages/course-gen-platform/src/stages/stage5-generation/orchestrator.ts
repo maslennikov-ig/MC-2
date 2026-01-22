@@ -749,11 +749,40 @@ export class GenerationOrchestrator {
     }
 
     // T037: Minimum lessons validation (FR-015)
-    // Use dynamic min_lessons from course_size preset, fallback to 10 for AUTO mode
+    // Priority: user-edited total_lessons > course_size preset > default (10)
+    // User edits come from Stage 4 UI where they can adjust recommended_structure
+    const userEditedTotalLessons = input.analysis_result?.recommended_structure?.total_lessons;
+    const userEditedTotalSections = input.analysis_result?.recommended_structure?.total_sections;
+
     const courseSize = input.frontend_parameters?.course_size ?? 'auto';
     const sizePreset = courseSize !== 'auto' ? getCourseSizePreset(courseSize) : undefined;
-    const minLessons = sizePreset?.minLessons ?? 10;
-    const maxLessons = sizePreset?.maxLessons;
+
+    let minLessons: number;
+    let maxLessons: number | undefined;
+
+    if (userEditedTotalLessons !== undefined && userEditedTotalLessons > 0) {
+      // User edited total_lessons in Stage 4: use ±20% tolerance
+      minLessons = Math.max(1, Math.floor(userEditedTotalLessons * 0.8));
+      maxLessons = Math.ceil(userEditedTotalLessons * 1.2);
+      this.logger.info(
+        {
+          userEditedTotalLessons,
+          userEditedTotalSections,
+          minLessons,
+          maxLessons,
+          source: 'user_edited',
+        },
+        'Using user-edited lesson constraints from Stage 4'
+      );
+    } else if (sizePreset) {
+      // Use course_size preset
+      minLessons = sizePreset.minLessons;
+      maxLessons = sizePreset.maxLessons;
+    } else {
+      // Default fallback for AUTO mode
+      minLessons = 10;
+      maxLessons = undefined;
+    }
 
     const lessonsValidator = new MinimumLessonsValidator({
       minimumLessons: minLessons,

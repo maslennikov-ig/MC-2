@@ -74,6 +74,7 @@ async function executeStage6(input: Stage6JobInput): Promise<Stage6Output> {
     modelOverride,
     userRefinementPrompt,
     style,
+    analysisResult,
   } = input;
 
   const lessonLabel = lessonSpec.lesson_id;
@@ -89,6 +90,7 @@ async function executeStage6(input: Stage6JobInput): Promise<Stage6Output> {
     userRefinementPrompt,
     modelOverride,
     style,
+    analysisResult,
   };
 
   return executeStage6Orchestrator(orchestratorInput);

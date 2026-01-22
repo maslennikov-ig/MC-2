@@ -51,6 +51,7 @@ export async function executeStage6(input: Stage6Input): Promise<Stage6Output> {
       userRefinementPrompt: input.userRefinementPrompt ?? null,
       modelOverride: validatedModelOverride,
       style: input.style ?? null,
+      analysisResult: input.analysisResult ?? null,
       currentNode: 'generator',
       errors: [],
       retryCount: 0,
