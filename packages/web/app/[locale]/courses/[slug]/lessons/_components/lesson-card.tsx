@@ -16,10 +16,8 @@ interface LessonCardProps {
     duration_minutes?: number | null
     order_index?: number
   }
-  progress?: {
-    status: LessonStatus
-    progress_percent: number
-  }
+  /** Whether the lesson has been completed by the user */
+  isCompleted?: boolean
   enrichments?: {
     has_video: boolean
     has_audio: boolean
@@ -52,25 +50,29 @@ const statusConfig: Record<
   },
 }
 
-// Media badge configuration
+// Media badge configuration with i18n keys for accessibility
 const mediaBadges = [
   {
     key: 'has_video' as const,
+    labelKey: 'media.video' as const,
     emoji: '🎬',
     color: 'bg-purple-500/10 text-purple-600 dark:bg-purple-500/20 dark:text-purple-400',
   },
   {
     key: 'has_audio' as const,
+    labelKey: 'media.audio' as const,
     emoji: '🎧',
     color: 'bg-blue-500/10 text-blue-600 dark:bg-blue-500/20 dark:text-blue-400',
   },
   {
     key: 'has_presentation' as const,
+    labelKey: 'media.presentation' as const,
     emoji: '📊',
     color: 'bg-indigo-500/10 text-indigo-600 dark:bg-indigo-500/20 dark:text-indigo-400',
   },
   {
     key: 'has_quiz' as const,
+    labelKey: 'media.quiz' as const,
     emoji: '❓',
     color: 'bg-amber-500/10 text-amber-600 dark:bg-amber-500/20 dark:text-amber-400',
   },
@@ -78,13 +80,15 @@ const mediaBadges = [
 
 export function LessonCard({
   lesson,
-  progress = { status: 'not_started', progress_percent: 0 },
+  isCompleted = false,
   enrichments,
   onClick,
   className,
 }: LessonCardProps) {
   const t = useTranslations('course.lesson')
-  const status = progress.status
+  // Determine status based on completion (simple binary for now)
+  const status: LessonStatus = isCompleted ? 'completed' : 'not_started'
+  const progressPercent = isCompleted ? 100 : 0
   const statusInfo = statusConfig[status]
   const StatusIcon = statusInfo.icon
 
@@ -119,15 +123,16 @@ export function LessonCard({
     >
       {/* Top section: Media badges and lesson type icon */}
       <div className="relative min-h-[160px] flex-1 overflow-hidden bg-gradient-to-br from-gray-50 to-gray-100 dark:from-slate-800 dark:to-slate-900">
-        {/* Media badges (top-left) */}
+        {/* Media badges (top-left) with accessibility labels */}
         {activeMediaBadges.length > 0 && (
           <div className="absolute top-2 left-2 flex gap-1">
             {activeMediaBadges.map((badge) => (
               <Badge
                 key={badge.key}
+                aria-label={t(badge.labelKey)}
                 className={cn('border px-1.5 py-0.5 text-xs backdrop-blur-sm', badge.color)}
               >
-                {badge.emoji}
+                <span aria-hidden="true">{badge.emoji}</span>
               </Badge>
             ))}
           </div>
@@ -139,7 +144,6 @@ export function LessonCard({
             className={cn(
               'h-12 w-12 transition-all duration-300',
               status === 'not_started' && 'text-gray-400 dark:text-slate-700',
-              status === 'in_progress' && 'text-blue-500 dark:text-blue-400',
               status === 'completed' && 'text-green-500 dark:text-green-400',
               'group-hover:scale-110'
             )}
@@ -163,7 +167,7 @@ export function LessonCard({
 
         {/* Progress bar */}
         <SmoothProgress
-          value={progress.progress_percent}
+          value={progressPercent}
           size="sm"
           colorClass={
             status === 'completed'

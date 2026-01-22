@@ -33,7 +33,13 @@
       "in_progress": "In Progress",
       "completed": "Completed"
     },
-    "duration": "{minutes}min"
+    "duration": "{minutes}min",
+    "media": {
+      "video": "Video available",
+      "audio": "Audio available",
+      "presentation": "Presentation available",
+      "quiz": "Quiz available"
+    }
   },
   "viewer": {
     "showSidebar": "Show sidebar",
