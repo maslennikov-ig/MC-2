@@ -27,9 +27,9 @@ import {
 } from '@/components/ui/select'
 import { Textarea } from '@/components/ui/textarea'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { LabelWithTooltip } from '@/components/ui/label-with-tooltip'
 import type { Database } from '@/types/database.generated'
-import type { CoverEnrichmentContent, CardEnrichmentContent } from '@megacampus/shared-types'
+import { isEnrichmentContentType } from '@megacampus/shared-types'
 import { cn } from '@/lib/utils'
 
 type EnrichmentRow = Database['public']['Tables']['lesson_enrichments']['Row']
@@ -91,25 +91,6 @@ const PLACEHOLDER_CONFIG: Record<
   },
 }
 
-/** Helper component for field label with tooltip */
-function LabelWithTooltip({ label, tooltip }: { label: string; tooltip: string }) {
-  return (
-    <div className="flex items-center gap-1.5">
-      <span className="text-sm font-medium">{label}</span>
-      <TooltipProvider delayDuration={200}>
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <HelpCircle className="h-3.5 w-3.5 cursor-help text-gray-400 hover:text-gray-600 dark:text-gray-500 dark:hover:text-gray-300" />
-          </TooltipTrigger>
-          <TooltipContent side="top" className="max-w-xs">
-            <p className="text-xs">{tooltip}</p>
-          </TooltipContent>
-        </Tooltip>
-      </TooltipProvider>
-    </div>
-  )
-}
-
 export function UnifiedEnrichmentCard({
   type,
   onGenerate,
@@ -143,16 +124,24 @@ export function UnifiedEnrichmentCard({
   const isImageType = useMemo(() => type === 'cover' || type === 'card', [type])
 
   // Extract image URL from content if enrichment exists (for image types)
+  // Uses type guards for runtime type safety instead of type assertion
   const { imageUrl, hasImage, altText } = useMemo(() => {
-    const content = existingEnrichment?.content as
-      | CoverEnrichmentContent
-      | CardEnrichmentContent
-      | null
-    const url = content?.imageUrl
+    const rawContent = existingEnrichment?.content
+    let url: string | undefined
+    let alt: string | undefined
+
+    if (isEnrichmentContentType(rawContent, 'cover')) {
+      url = rawContent.imageUrl
+      alt = rawContent.altText
+    } else if (isEnrichmentContentType(rawContent, 'card')) {
+      url = rawContent.imageUrl
+      alt = rawContent.altText
+    }
+
     return {
       imageUrl: url,
       hasImage: existingEnrichment?.status === 'completed' && !!url,
-      altText: content?.altText,
+      altText: alt,
     }
   }, [existingEnrichment])
 
