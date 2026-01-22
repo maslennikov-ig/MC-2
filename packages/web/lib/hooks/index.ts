@@ -16,6 +16,7 @@ export * from './use-intersection-observer'
 export * from './use-keyboard-shortcut'
 export * from './use-media-query'
 export * from './use-reduced-motion'
+export * from './use-tab-visibility'
 
 // PWA
 export * from './use-install-prompt'
@@ -37,3 +38,4 @@ export {
 } from './use-keyboard-shortcut'
 export { useInstallPrompt } from './use-install-prompt'
 export { usePushNotifications } from './use-push-notifications'
+export { useTabVisibility } from './use-tab-visibility'
