@@ -2,6 +2,29 @@
 
 _Released on 2025-12-26_
 
+## v0.28.26
+
+_Released on 2026-01-22_
+
+### ✨ New Features
+
+- **enrichment**: Add grayscale placeholder with hover color reveal
+
+### 🔧 Improvements
+
+- Fix CPU/memory issues in course generation page
+- **template-whitelist**: Optimize Helm function matching with Set lookup
+
+### 🐛 Bug Fixes
+
+- **web**: Update 4 source file(s), update docs
+- Address code review issues for performance optimization
+- Sprint bug fixes - template whitelist, patcher retry, banner flow, status validation
+
+---
+
+_This release was automatically generated from 18 commits._
+
 ## v0.28.25
 
 _Released on 2026-01-22_
