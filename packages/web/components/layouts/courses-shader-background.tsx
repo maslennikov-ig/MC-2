@@ -95,6 +95,9 @@ export default function CoursesShaderBackground({ children }: CoursesShaderBackg
     setShaderSettings(settings)
 
     // Debounced resize handler to reduce WebGL checks
+    // 250ms is standard debounce for resize events - balances responsiveness
+    // with avoiding excessive WebGL context queries during rapid resizing
+    const RESIZE_DEBOUNCE_MS = 250
     let resizeTimeout: NodeJS.Timeout
     const handleResize = () => {
       clearTimeout(resizeTimeout)
@@ -104,7 +107,7 @@ export default function CoursesShaderBackground({ children }: CoursesShaderBackg
           setDisableShaders(shouldDisable)
           setShaderSettings(getOptimizedShaderSettings())
         }
-      }, 250) // Debounce by 250ms
+      }, RESIZE_DEBOUNCE_MS)
     }
 
     window.addEventListener('resize', handleResize)
@@ -114,8 +117,7 @@ export default function CoursesShaderBackground({ children }: CoursesShaderBackg
       clearTimeout(resizeTimeout)
       mediaQuery.removeEventListener('change', handleChange)
       window.removeEventListener('resize', handleResize)
-      // Force cleanup of WebGL contexts
-      setIsClient(false)
+      // Note: setIsClient(false) removed - no effect during unmount
     }
   }, [])
 
