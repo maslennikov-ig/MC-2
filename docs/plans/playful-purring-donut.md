@@ -1,485 +1,231 @@
-# План исправления GitHub Issues
+# План следующего спринта
 
-## Обзор
-
-5 открытых issues на GitHub, сгруппированных по связанности:
-
-| Issue                           | Тип         | Приоритет | Сложность |
-| ------------------------------- | ----------- | --------- | --------- |
-| #18 A11Y Keyboard Navigation    | enhancement | P1        | Medium    |
-| #12 Live Log Parameter Tracking | enhancement | P1        | Low       |
-| #13 Validation Rules Logging    | enhancement | P2        | Low       |
-| #16 Regeneration Diff View      | bug         | P2        | Medium    |
-| #14 Parameter Flow Dashboard    | enhancement | P3        | High      |
+**Дата**: 2026-01-22
+**Статус**: Планирование
 
 ---
 
-## Issue #18: [A11Y] Keyboard Navigation
+## Анализ открытых задач Beads
 
-**Статус**: Частично реализовано, требует доработки
+### Задачи которые можно закрыть
 
-### Что уже есть
+| Issue        | Описание          | Причина закрытия              |
+| ------------ | ----------------- | ----------------------------- |
+| **mc2-pkld** | SemanticDiff в UI | ⚠️ Частично реализовано в #16 |
 
-- `useKeyboardShortcuts.ts` - Ctrl+0/+/- для zoom, Space для pan
-- `useKeyboardNavigation.ts` - Arrow keys для навигации между узлами
-- `StageNode.tsx` имеет `tabIndex={0}`, `role="button"`, `aria-label`
-- Radix UI Dialog с автоматическим focus management
+**mc2-pkld детали:**
 
-### Что нужно добавить
+- ✅ `course_edits` таблица для хранения diff
+- ✅ `EditHistoryPanel` для просмотра истории
+- ✅ `SemanticDiffViewer` уже используется в `EditableField.tsx:418`
+- ✅ Inline regeneration показывает diff
 
-**1. Live Regions для логов**
+**Что осталось (новая задача):**
 
-```tsx
-// ActivityLog.tsx и LiveTerminal.tsx
-<div role="log" aria-live="polite" aria-atomic="false">
-  {entries.map(...)}
-</div>
-```
+- ❌ Real-time уведомление о завершении async BullMQ job
+- ❌ Показ diff сразу после lesson-level regeneration
 
-**2. Focus management для dialogs**
-
-```tsx
-// RestartConfirmDialog.tsx
-<Dialog onOpenAutoFocus={(e) => e.preventDefault()}>
-  <Button ref={cancelButtonRef} autoFocus>Cancel</Button>
-```
-
-**3. Keyboard shortcuts для Approval**
-
-- Enter → Approve/Confirm
-- Escape → Cancel/Reject
-
-**4. Skip links и landmark roles**
-
-```tsx
-<a href="#main-content" className="sr-only focus:not-sr-only">
-  Skip to content
-</a>
-<main id="main-content" role="main">
-```
-
-### Файлы для изменения
-
-- `packages/web/app/[locale]/courses/generating/[slug]/ActivityLog.tsx`
-- `packages/web/components/generation-graph/components/LiveTerminal.tsx`
-- `packages/web/components/generation-graph/controls/RestartConfirmDialog.tsx`
-- `packages/web/components/generation-graph/controls/ApprovalControls.tsx`
-- `packages/web/components/generation-graph/nodes/MediumNode.tsx`
-- `packages/web/components/generation-graph/nodes/MinimalNode.tsx`
-
-### Acceptance Criteria
-
-- [ ] Все интерактивные элементы доступны через Tab
-- [ ] Live regions объявляют новые записи лога
-- [ ] Enter/Space активирует кнопки
-- [ ] Escape закрывает dialogs
-- [ ] Arrow keys навигация между stage nodes
+**Рекомендация:** Закрыть mc2-pkld, создать mc2-async-diff-notification для оставшегося.
 
 ---
 
-## Issue #12: Live Log Parameter Tracking
+### Открытые задачи по приоритету
 
-**Статус**: Инфраструктура есть, нужно расширить логируемые события
+#### P2 (Баги - критичные)
 
-### Текущая архитектура (Единая система логирования)
+| Issue        | Описание                       | Частота    | Сложность |
+| ------------ | ------------------------------ | ---------- | --------- |
+| **mc2-48o0** | Banner generation hangs at 50% | UX blocker | Medium    |
+| **mc2-b6uc** | Helm/Go template whitelist     | 22/day     | Low       |
+| **mc2-ndhm** | Patcher retry logic            | 62/day     | Medium    |
+| **mc2-xod**  | Status transition validation   | -          | Low       |
 
-**Две таблицы в админке**:
+#### P3 (Фичи и улучшения)
 
-1. `error_logs` - ошибки и warnings (через `logger.error/warn`)
-2. `generation_trace` - трассировка генерации (через `traceLogger.logTrace`)
-
-**Админка уже показывает оба источника** с фильтрацией по `source`:
-
-- `error_log` - из error_logs
-- `generation_trace` - из generation_trace
-
-**Существующие поля для параметров**:
-
-- `input_data` (JSONB) - входные параметры шага
-- `output_data` (JSONB) - результат шага
-- `metadata` (JSONB) - дополнительные данные
-
-### Что нужно добавить
-
-**1. Новые step_name значения для parameter events**
-
-```typescript
-// В generation_trace через traceLogger.logTrace
-step_name:
-  | 'parameter_store'       // Stage X: Storing parameters
-  | 'parameter_propagate'   // Stage X→Y: Propagating
-  | 'parameter_validate'    // Validation check
-  | 'parameter_receive';    // Stage Y: Received from X
-```
-
-**2. Логирование в orchestrator'ах через traceLogger**
-
-```typescript
-// В каждом stage orchestrator - ИНТЕГРАЦИЯ С АДМИНКОЙ
-await traceLogger.logTrace({
-  course_id: courseId,
-  stage: 'stage_4',
-  phase: 'analysis',
-  step_name: 'parameter_store',
-  input_data: { source: 'stage_3' },
-  output_data: {
-    lessons: 20,
-    modules: 5,
-    estimatedDuration: 180,
-  },
-});
-
-// При propagation
-await traceLogger.logTrace({
-  course_id: courseId,
-  stage: 'stage_4',
-  phase: 'completion',
-  step_name: 'parameter_propagate',
-  input_data: { targetStage: 'stage_5' },
-  output_data: {
-    propagatedParams: ['lessons', 'modules', 'topics'],
-    success: true,
-  },
-});
-```
-
-**3. Расширение ActivityLog UI**
-
-- Иконки для разных step_name (parameter_store → 💾, parameter_propagate → ➡️)
-- Фильтрация по step_name
-- Link на детали в админке
-
-**4. Фильтр в админке по step_name**
-
-- Добавить filter option для parameter-related steps
-- Уже работает через существующий search
-
-### Файлы для изменения
-
-- `packages/course-gen-platform/src/shared/trace-logger.ts` - документация step_name
-- `packages/course-gen-platform/src/stages/stage4-analysis/orchestrator.ts` - добавить logTrace
-- `packages/course-gen-platform/src/stages/stage5-generation/orchestrator.ts` - добавить logTrace
-- `packages/course-gen-platform/src/stages/stage5-generation/phases/generation-phases.ts`
-- `packages/web/app/[locale]/courses/generating/[slug]/ActivityLog.tsx` - UI improvements
-
-### Acceptance Criteria
-
-- [ ] Логи parameter_store видны в generation_trace (админка)
-- [ ] Логи parameter_propagate видны в generation_trace (админка)
-- [ ] Логи parameter_validate видны в generation_trace (админка)
-- [ ] ActivityLog показывает эти события с иконками
-- [ ] Можно фильтровать по step_name в админке
+| Issue        | Описание                              | ROI          | Сложность |
+| ------------ | ------------------------------------- | ------------ | --------- |
+| **mc2-z6er** | LanguageTool integration (7 подзадач) | $89/month    | High      |
+| **mc2-dopy** | Extract duplicate colors              | Code quality | Low       |
+| **mc2-4nf3** | Enhance orchestrateValidation         | Code quality | Low       |
+| **mc2-vs0r** | UNAUTHORIZED errors on polling        | UX           | Medium    |
+| **mc2-xxj6** | Cover handler 500 char limit          | UX           | Low       |
 
 ---
 
-## Issue #13: Validation Rules Logging
+## Рекомендации для спринта
 
-**Статус**: Валидация есть, логирование минимальное
+### Вариант A: Фокус на багах (4-6 часов)
 
-### Текущая архитектура (Единая система логирования)
+**Приоритет:** Быстрый импакт на production
 
-**Validation failures → error_logs** (через logger.warn/error):
+| #   | Задача                      | Время   | Импакт               |
+| --- | --------------------------- | ------- | -------------------- |
+| 1   | mc2-b6uc (Helm whitelist)   | 30 min  | High (22 errors/day) |
+| 2   | mc2-ndhm (Patcher retry)    | 2 hours | High (62 errors/day) |
+| 3   | mc2-48o0 (Banner hangs)     | 2 hours | High (UX blocker)    |
+| 4   | mc2-xod (Status validation) | 1 hour  | Medium               |
+
+**Результат:** Устраняет ~84 ошибки/день + critical UX bug
+
+---
+
+### Вариант B: Фокус на LanguageTool (8-12 часов)
+
+**Приоритет:** Долгосрочный ROI + качество
+
+| #   | Подзадача                            | Время   |
+| --- | ------------------------------------ | ------- |
+| 1   | mc2-e35y: Docker service             | 1 hour  |
+| 2   | mc2-rqev: TypeScript client          | 2 hours |
+| 3   | mc2-03z1: Tests                      | 1 hour  |
+| 4   | mc2-5coh: Deploy                     | 1 hour  |
+| 5   | mc2-41t1: Phase 0 module             | 2 hours |
+| 6   | mc2-jk01: Integration                | 2 hours |
+| 7   | mc2-ebjd: Remove grammar from prompt | 1 hour  |
+
+**Результат:** $89/month savings, 912 grammar rules vs current 9, ~43% token reduction
+
+---
+
+### Вариант C: Микс (рекомендуемый)
+
+**День 1 - Баги (4-5 часов):**
+
+1. ✅ mc2-b6uc - Helm whitelist (30 min)
+2. ✅ mc2-ndhm - Patcher retry (2 hours)
+3. ✅ mc2-48o0 - Banner hangs (2 hours)
+
+**День 2 - LanguageTool start (4-5 часов):**
+
+1. ✅ mc2-e35y - Docker service (1 hour)
+2. ✅ mc2-rqev - TypeScript client (2 hours)
+3. ✅ mc2-03z1 - Tests (1 hour)
+
+**Результат:** Устраняет critical bugs + начинает LanguageTool
+
+---
+
+## Детали задач
+
+### mc2-b6uc: Helm/Go Template Whitelist
+
+**Проблема:** `prompt-service.ts:161-168` ловит Helm templates как unresolved.
+
+**Решение:**
 
 ```typescript
-logger.warn(
-  {
-    ...createErrorContext({
-      courseId,
-      trpcPath: 'generation.validate',
-      attemptedValue: 'understand', // non-measurable verb
-    }),
-  },
-  "Bloom's validation warning: non-measurable verb detected"
+// Перенести из placeholder-validator.ts в shared
+export const TEMPLATE_WHITELIST_PATTERNS = [
+  /\{\{\s*\.[\w.]+\s*\}\}/, // Helm: {{ .Values.x }}
+  /\{\{[a-z]+\.[\w.-]+\}\}/, // Go: {{args.service-name}}
+];
+
+// Фильтровать в prompt-service.ts
+const realUnresolved = unresolvedMatches.filter(
+  m => !TEMPLATE_WHITELIST_PATTERNS.some(p => p.test(m))
 );
 ```
 
-**Validation traces → generation_trace** (через traceLogger):
+**Файлы:**
 
-- `step_name: 'validate_blooms'` | `'validate_placeholders'` | `'validate_duration'`
-- `quality_score` для итогового результата
+- `packages/course-gen-platform/src/shared/prompts/prompt-service.ts`
+- `packages/course-gen-platform/src/shared/validation/template-whitelist.ts` (new)
 
-### Что нужно добавить
+---
 
-**1. Детальное логирование в валидаторах (ИНТЕГРАЦИЯ С АДМИНКОЙ)**
+### mc2-ndhm: Patcher Retry Logic
 
-```typescript
-// validation-orchestrator.ts - для каждого rule
+**Проблема:** Edit count не инкрементируется при rejection → infinite loop.
 
-// Success → generation_trace (info level)
-await traceLogger.logTrace({
-  course_id: courseId,
-  stage: 'stage_5',
-  phase: 'validation',
-  step_name: 'validate_blooms',
-  input_data: {
-    ruleId: 'blooms_taxonomy',
-    targetParameter: 'learning_objectives',
-    objectivesCount: objectives.length,
-  },
-  output_data: {
-    passed: true,
-    checkedItems: 15,
-    warnings: [],
-  },
-  quality_score: 1.0,
-});
-
-// Failure → error_logs (warning/error) + generation_trace
-logger.warn({
-  ...createErrorContext({
-    courseId,
-    trpcPath: 'stage5.validation',
-    attemptedValue: 'understand',
-    metadata: {
-      ruleId: 'blooms_taxonomy',
-      severity: 'WARNING',
-      objectiveIndex: 3,
-      suggestion: 'Replace with: explain, describe, identify'
-    }
-  }),
-}, 'Bloom\'s validation: non-measurable verb detected');
-
-// Также в trace для полноты
-await traceLogger.logTrace({
-  course_id: courseId,
-  stage: 'stage_5',
-  phase: 'validation',
-  step_name: 'validate_blooms',
-  input_data: { ruleId: 'blooms_taxonomy', objectives },
-  output_data: { passed: false, issues: [...] },
-  error_data: { issues: validationIssues }, // Это делает запись видимой как ошибка
-  quality_score: 0.85,
-});
-```
-
-**2. Структура validation issue для metadata**
+**Решение:**
 
 ```typescript
-interface ValidationIssueLog {
-  ruleId: string; // 'blooms_taxonomy'
-  severity: 'ERROR' | 'WARNING' | 'INFO';
-  field: string; // 'sections[0].lessons[1].objectives[0]'
-  value: string; // 'understand the concept'
-  reason: string; // 'Non-measurable verb: understand'
-  suggestion?: string; // 'Use: explain, describe, identify'
+// В patcher-node.ts
+if (isHallucinationRejection) {
+  // 1. Increment edit count
+  state.editCounts[sectionId] = (state.editCounts[sectionId] || 0) + 1;
+
+  // 2. Check max retries
+  if (state.editCounts[sectionId] >= MAX_EDIT_RETRIES) {
+    state.lockedSections.add(sectionId);
+    return { ...state, status: 'section_locked' };
+  }
+
+  // 3. Try different model on retry
+  const nextModel = getEscalationModel(state.editCounts[sectionId]);
+  return { ...state, currentModel: nextModel };
 }
 ```
 
-**3. UI в админке**
+**Файлы:**
 
-- Уже работает через фильтр `source: generation_trace`
-- Фильтр по `step_name` starts with `validate_`
-- Детали validation issues в `output_data` / `error_data`
-
-**4. UI в NodeDetailsDrawer (Stage5Panel)**
-
-- Показать validation результаты из generation_trace
-- Query: `step_name LIKE 'validate_%' AND course_id = X`
-- Expandable секция с деталями каждого rule
-
-### Файлы для изменения
-
-- `packages/course-gen-platform/src/stages/stage5-generation/validators/validation-orchestrator.ts`
-- `packages/course-gen-platform/src/stages/stage5-generation/validators/blooms-validator.ts`
-- `packages/course-gen-platform/src/stages/stage5-generation/validators/placeholder-validator.ts`
-- `packages/course-gen-platform/src/stages/stage5-generation/validators/duration-validator.ts`
-- `packages/web/components/generation-graph/panels/stage-panels/Stage5Panel.tsx`
-
-### Acceptance Criteria
-
-- [ ] Каждое применение validation rule логируется в generation_trace
-- [ ] Failed validations также идут в error_logs (видны в админке как warnings)
-- [ ] Логи содержат ruleId, field, value, reason, suggestion
-- [ ] Можно фильтровать validation логи в админке
-- [ ] Stage5Panel показывает validation history
-- [ ] Performance overhead <5%
+- `packages/course-gen-platform/src/stages/stage6-content/nodes/patcher-node.ts`
 
 ---
 
-## Issue #16: Regeneration Diff View
+### mc2-48o0: Banner Generation Hangs
 
-**Статус**: Инфраструктура есть, нужен UI
+**Проблема:** Job завершается `draft_ready` но Phase 2 не стартует.
 
-### Текущая архитектура
+**Решение:** Проверить автоматический trigger в cover-handler.ts
 
-- `SemanticDiffGenerator` - анализирует изменения
-- `DiffViewer` компонент (json-diff-kit)
-- `generation_trace` хранит input/output каждого шага
-- `regenerateBlock` endpoint сохраняет semantic diff
+**Файлы:**
 
-### Что нужно добавить
-
-**1. Таблица course_edits (миграция)**
-
-```sql
-CREATE TABLE course_edits (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  course_id UUID REFERENCES courses(id) ON DELETE CASCADE,
-  edited_by UUID REFERENCES users(id),
-
-  stage TEXT NOT NULL,                    -- 'stage_4' | 'stage_5'
-  field_path TEXT NOT NULL,               -- 'sections[0].lessons[1].title'
-  previous_value JSONB,
-  new_value JSONB,
-
-  semantic_diff JSONB,                    -- SemanticDiff object
-  user_instruction TEXT,                  -- что пользователь попросил
-
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
-
-CREATE INDEX idx_course_edits_course ON course_edits(course_id);
-CREATE INDEX idx_course_edits_created ON course_edits(created_at DESC);
-```
-
-**2. Сохранение edits в regenerateBlock**
-
-```typescript
-// После успешной регенерации
-await supabase.from('course_edits').insert({
-  course_id,
-  edited_by: userId,
-  stage: 'stage_5',
-  field_path: blockPath,
-  previous_value: oldValue,
-  new_value: newValue,
-  semantic_diff: diff,
-  user_instruction: instruction,
-});
-```
-
-**3. UI Timeline компонент**
-
-- Список всех edits для курса
-- Click → показать diff (side-by-side)
-- Semantic annotations (что изменилось семантически)
-
-### Файлы для изменения
-
-- `packages/course-gen-platform/supabase/migrations/` - новая миграция
-- `packages/course-gen-platform/src/server/routers/courses/regenerate.ts`
-- `packages/web/components/generation-graph/panels/` - новый EditHistoryPanel.tsx
-- `packages/web/components/generation-graph/panels/NodeDetailsDrawer.tsx` - добавить tab
-
-### Acceptance Criteria
-
-- [ ] История изменений сохраняется в БД
-- [ ] UI показывает timeline всех edits
-- [ ] Diff view показывает before/after
-- [ ] Semantic diff объясняет что изменилось
-
----
-
-## Issue #14: Parameter Flow Dashboard
-
-**Статус**: Новая фича, требует значительной разработки
-
-### Архитектура решения
-
-**1. Новый React Flow dashboard**
-
-- Отдельная страница или modal
-- 6 stage nodes + parameter flow edges
-- Real-time обновления через WebSocket
-
-**2. Custom nodes для stages**
-
-```typescript
-const ParameterFlowNode = ({ data }: NodeProps) => (
-  <div className="parameter-flow-node">
-    <h3>{data.stageName}</h3>
-    <div className="parameters">
-      {data.parameters.map(p => (
-        <ParameterChip
-          key={p.name}
-          name={p.name}
-          value={p.value}
-          status={p.status} // pending | active | completed | failed
-        />
-      ))}
-    </div>
-  </div>
-);
-```
-
-**3. Animated edges для parameter flow**
-
-```typescript
-const ParameterFlowEdge = ({ data }: EdgeProps) => (
-  <BaseEdge
-    animated={data.isActive}
-    style={{ stroke: getStatusColor(data.status) }}
-  />
-);
-```
-
-**4. Real-time state через WebSocket**
-
-- Подписка на `generation_trace` changes
-- Обновление node/edge статусов при новых записях
-
-### Файлы для создания
-
-- `packages/web/components/parameter-flow/ParameterFlowDashboard.tsx`
-- `packages/web/components/parameter-flow/nodes/ParameterStageNode.tsx`
-- `packages/web/components/parameter-flow/edges/ParameterFlowEdge.tsx`
-- `packages/web/components/parameter-flow/hooks/useParameterFlow.ts`
-
-### Acceptance Criteria
-
-- [ ] Dashboard показывает все 6 stages
-- [ ] Parameter flow анимирован и real-time
-- [ ] Parameters color-coded по статусу
-- [ ] Latency обновлений <500ms
-- [ ] Zoom, pan, filter работают
-
----
-
-## Порядок реализации (согласован с пользователем)
-
-### Phase 1: Logging Improvements (НАЧИНАЕМ ЗДЕСЬ)
-
-1. **#12** - Parameter tracking в Live Log
-   - Добавить `logTrace` calls в stage orchestrators
-   - step_name: `parameter_store`, `parameter_propagate`, `parameter_validate`
-   - Все попадает в единую систему (generation_trace → админка)
-
-2. **#13** - Validation rules logging
-   - Добавить детальное логирование в validators
-   - Success → generation_trace, Failures → error_logs + generation_trace
-   - Структурированные ValidationIssueLog в metadata
-
-### Phase 2: UX Improvements
-
-3. **#18** - A11Y improvements (Medium effort, High value)
-4. **#16** - Diff view (Medium effort, High value)
-
-### Phase 3: New Feature
-
-5. **#14** - Parameter Flow Dashboard (включён в план по запросу)
+- `packages/course-gen-platform/src/stages/stage7-enrichments/handlers/cover-handler.ts`
+- `packages/course-gen-platform/src/server/routers/enrichment.router.ts`
 
 ---
 
 ## Верификация
 
-После каждого issue:
+После каждой задачи:
 
-1. `pnpm type-check` - проверка типов
-2. `pnpm build` - сборка
-3. Manual testing на dev.ai.megacampus.ru
-4. Для #18: тестирование с keyboard only (no mouse)
-5. Для #14: проверка latency обновлений
+```bash
+pnpm type-check
+pnpm build
+# Test на dev.ai.megacampus.ru
+```
 
 ---
 
-## Связанные Beads Issues
+## Решение: Вариант A + закрытие mc2-pkld
 
-Создать в Beads для tracking:
+### Почему mc2-pkld можно закрыть
+
+**mc2-pkld требовал:** "Show SemanticDiff in UI after regeneration"
+
+**Что уже работает:**
+
+1. ✅ **Inline regeneration** (кнопка "Регенерировать" в поле) → показывает `SemanticDiffViewer` сразу
+   - Файл: `EditableField.tsx:416-429`
+   - Пользователь видит diff и может Accept/Edit/Cancel
+2. ✅ **История изменений** → `EditHistoryPanel` показывает все прошлые diff
+   - Хранится в `course_edits` таблице
+   - Доступно через timeline
+
+**Что НЕ реализовано (но это отдельная фича):**
+
+- ❌ Async lesson-level regeneration через BullMQ → нет real-time notification
+- Это edge case: когда regeneration идёт долго (>30 сек) и пользователь не ждёт
+
+**Вывод:** Основной use case (inline regeneration) покрыт. mc2-pkld можно закрыть.
+
+---
+
+## План спринта (Вариант A)
+
+### Шаг 0: Закрыть mc2-pkld
 
 ```bash
-bd create -t feature --title "[A11Y] Keyboard navigation improvements" --files packages/web/components/generation-graph
-bd create -t feature --title "Parameter tracking in Live Log" --files packages/course-gen-platform/src/shared/logging
-bd create -t feature --title "Validation rules logging" --files packages/course-gen-platform/src/stages/stage5-generation/validators
-bd create -t bug --title "Regeneration diff view" --files packages/web/components/generation-graph/panels
-bd create -t feature --title "Parameter flow dashboard" --files packages/web/components/parameter-flow
+bd close mc2-pkld --reason "Inline regeneration shows SemanticDiff (EditableField.tsx:416). History in EditHistoryPanel. Async notification is separate feature."
 ```
+
+### Шаг 1: mc2-b6uc - Helm/Go Template Whitelist (30 min)
+
+### Шаг 2: mc2-ndhm - Patcher Retry Logic (2 hours)
+
+### Шаг 3: mc2-48o0 - Banner Generation Hangs (2 hours)
+
+### Шаг 4: mc2-xod - Status Transition Validation (1 hour)
+
+**Итого:** ~5-6 часов, устраняет 84+ ошибки/день

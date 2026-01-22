@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react'
+import React, { useEffect, useLayoutEffect, useState, useRef } from 'react'
 import { Clock, Sigma, Hourglass } from 'lucide-react'
 import { useGenerationRealtime } from '@/components/generation-monitoring/realtime-provider'
 
@@ -19,11 +19,13 @@ export const StatsBar = ({ progress = 0, isDark }: StatsBarProps) => {
   const smoothedRemainingRef = useRef(smoothedRemaining)
   const progressRef = useRef(progress)
 
-  useEffect(() => {
+  // Use useLayoutEffect for synchronous ref updates before paint
+  // This ensures refs are always current when interval callback reads them
+  useLayoutEffect(() => {
     smoothedRemainingRef.current = smoothedRemaining
   }, [smoothedRemaining])
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     progressRef.current = progress
   }, [progress])
 
@@ -58,10 +60,11 @@ export const StatsBar = ({ progress = 0, isDark }: StatsBarProps) => {
         const estimatedTotal = elapsed / (progress / 100)
         const newRemaining = Math.max(0, estimatedTotal - elapsed)
 
-        // Smooth the estimate to avoid jumps
+        // Smooth the estimate to avoid jumps using exponential moving average
+        // 70% old / 30% new provides smooth transitions while still responding
+        // to actual progress changes within ~3-4 updates
         setSmoothedRemaining((prev) => {
           if (prev === null) return newRemaining
-          // Weighted average: 70% old estimate, 30% new
           return Math.round(prev * 0.7 + newRemaining * 0.3)
         })
 
