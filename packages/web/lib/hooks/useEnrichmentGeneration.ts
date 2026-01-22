@@ -166,9 +166,12 @@ export function useEnrichmentGeneration({
 
   /**
    * Start polling for generation status
+   * @param type - Enrichment type
+   * @param enrichmentId - UUID of enrichment to poll
+   * @param isResume - If true, this is a resume after page reload (affects error messages)
    */
   const startPolling = useCallback(
-    (type: OnDemandEnrichmentType, enrichmentId: string) => {
+    (type: OnDemandEnrichmentType, enrichmentId: string, isResume = false) => {
       // Guard: Don't start polling if unmounted
       if (!mountedRef.current) {
         devLog.warn('Attempted to start polling after unmount')
@@ -298,7 +301,11 @@ export function useEnrichmentGeneration({
               return next
             })
 
-            onError?.('Lost connection to server. Please refresh and try again.')
+            // #8 fix: Context-aware error message
+            const errorMessage = isResume
+              ? `Failed to resume ${type} generation. The enrichment may have been deleted or completed.`
+              : 'Lost connection to server. Please refresh and try again.'
+            onError?.(errorMessage)
           } else {
             // Exponential backoff
             currentInterval = Math.min(currentInterval * 1.5, MAX_BACKOFF_INTERVAL)
@@ -549,8 +556,29 @@ export function useEnrichmentGeneration({
    * Does NOT call backend to start new generation - only starts polling
    * for status updates of an existing enrichment.
    *
+   * Race Condition Protection:
+   * - Guards against resuming if already tracking the same type
+   * - Guards against resuming after unmount
+   *
+   * Note: Currently only one enrichment per type is supported.
+   * If multiple enrichments of the same type exist, only the first
+   * will be tracked (others are silently ignored with a dev warning).
+   *
    * @param enrichmentId - UUID of the existing enrichment
    * @param type - Type of enrichment (for UI state management)
+   *
+   * @example
+   * ```tsx
+   * // Auto-resume on mount for active enrichments
+   * useEffect(() => {
+   *   const active = enrichments.filter(e =>
+   *     isActiveGenerationStatus(e.status) && isOnDemandType(e.enrichment_type)
+   *   )
+   *   active.forEach(e => {
+   *     resumeGeneration(e.id, e.enrichment_type)
+   *   })
+   * }, [enrichments, resumeGeneration])
+   * ```
    */
   const resumeGeneration = useCallback(
     (enrichmentId: string, type: OnDemandEnrichmentType) => {
@@ -578,8 +606,8 @@ export function useEnrichmentGeneration({
         return next
       })
 
-      // Start polling for this enrichment
-      startPolling(type, enrichmentId)
+      // Start polling for this enrichment (isResume = true for context-aware errors)
+      startPolling(type, enrichmentId, true)
     },
     [generating, startPolling]
   )

@@ -87,6 +87,11 @@ export function EnrichmentsPanel({
 
   // Resume polling for active enrichments on mount and when new active enrichments appear
   // Fixes HIGH #1, #2, #3: proper tracking, cleanup, and type safety
+  //
+  // Note (#5): Currently only ONE enrichment per type is supported.
+  // If multiple enrichments of the same type exist in 'generating' state,
+  // only the first encountered will be tracked (hook guards against duplicates).
+  // This may change in future when multiple enrichments per type are allowed.
   useEffect(() => {
     // Find enrichments that need resuming (active + on-demand + not yet resumed)
     const activeEnrichments = enrichments
@@ -95,6 +100,10 @@ export function EnrichmentsPanel({
       .filter((e) => !resumedIdsRef.current.has(e.id))
 
     // Resume polling for each new active enrichment
+    // #7 fix: Show visual feedback on auto-resume
+    if (activeEnrichments.length > 0) {
+      toast.info(t('viewer.resumingGeneration', { count: activeEnrichments.length }))
+    }
     activeEnrichments.forEach((enrichment) => {
       resumeGeneration(enrichment.id, enrichment.enrichment_type)
       resumedIdsRef.current.add(enrichment.id)

@@ -245,7 +245,8 @@
       "banner": "Decorative Banner"
     },
     "generationComplete": "Enrichment generated successfully",
-    "generationFailed": "Failed to generate enrichment"
+    "generationFailed": "Failed to generate enrichment",
+    "resumingGeneration": "Resuming {count, plural, one {# generation} other {# generations}}..."
   },
   "placeholder": {
     "quiz": {

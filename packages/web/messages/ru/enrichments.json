@@ -245,7 +245,8 @@
       "banner": "Декоративный баннер"
     },
     "generationComplete": "Дополнение успешно создано",
-    "generationFailed": "Не удалось создать дополнение"
+    "generationFailed": "Не удалось создать дополнение",
+    "resumingGeneration": "Восстанавливаем {count, plural, one {# генерацию} few {# генерации} many {# генераций} other {# генерации}}..."
   },
   "placeholder": {
     "quiz": {
