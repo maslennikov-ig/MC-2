@@ -458,10 +458,12 @@ export async function checkAndSetStage6Complete(courseId: string): Promise<void>
   const supabaseAdmin = getSupabaseAdmin();
 
   try {
-    // Get current course status and auto_finalize flag
+    // Get current course status, progress, and auto_finalize flag
     const { data: course, error: courseError } = await supabaseAdmin
       .from('courses')
-      .select('generation_status, course_structure, auto_finalize_after_stage6')
+      .select(
+        'generation_status, course_structure, auto_finalize_after_stage6, generation_progress'
+      )
       .eq('id', courseId)
       .single();
 
@@ -543,10 +545,20 @@ export async function checkAndSetStage6Complete(courseId: string): Promise<void>
       // Set generation_completed_at when finalizing
       const completedAt = shouldAutoFinalize ? new Date().toISOString() : undefined;
 
+      // Update progress with 100% and completion message
+      const existingProgress = (course.generation_progress as Record<string, unknown>) || {};
+      const updatedProgress = {
+        ...existingProgress,
+        percentage: 100,
+        message: shouldAutoFinalize ? 'Курс успешно создан!' : 'Генерация уроков завершена',
+        lessons_completed: completedLessonsCount,
+      };
+
       const { error: updateError } = await supabaseAdmin
         .from('courses')
         .update({
           generation_status: shouldAutoFinalize ? 'completed' : 'stage_6_complete',
+          generation_progress: updatedProgress,
           ...(completedAt && { generation_completed_at: completedAt }),
         })
         .eq('id', courseId)
