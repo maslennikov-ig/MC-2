@@ -1,7 +1,7 @@
 ---
 name: health-bugs
-description: Inline orchestration workflow for automated bug detection and fixing with Beads integration. Provides step-by-step phases for bug-hunter detection, priority-based fixing with bug-fixer, and verification cycles.
-version: 3.0.0
+description: Inline orchestration workflow for automated bug detection and fixing with Beads integration. Provides step-by-step phases for bug-hunter detection, history enrichment for priority bugs, priority-based fixing with bug-fixer, and verification cycles.
+version: 3.1.0
 ---
 
 # Bug Health Check (Inline Orchestration)
@@ -11,12 +11,13 @@ You ARE the orchestrator. Execute this workflow directly without spawning a sepa
 ## Workflow Overview
 
 ```
-Beads Init → Detection → Create Issues → Fix by Priority → Close Issues → Verify → Beads Complete
+Beads Init → Detection → History Check (HIGH+) → Create Issues → Fix by Priority → Close Issues → Verify → Beads Complete
 ```
 
 **Max iterations**: 3
 **Priorities**: critical → high → medium → low
 **Beads integration**: Automatic issue tracking
+**History enrichment**: For CRITICAL and HIGH bugs only
 
 ---
 
@@ -88,19 +89,101 @@ prompt: |
 
 ---
 
-## Phase 3: Create Beads Issues
+## Phase 2.5: History Enrichment (CRITICAL/HIGH only)
 
-**For each bug found**, create a Beads issue:
+**Purpose**: Find previously fixed similar bugs to detect regressions and provide historical context.
+
+**When to run**: Only for CRITICAL and HIGH priority bugs (skip for MEDIUM/LOW).
+
+### Steps
+
+1. **Extract keywords** from each CRITICAL/HIGH bug title/description
+
+2. **Search Beads history**:
+
+   ```bash
+   # For each bug, search by relevant keywords
+   bd search "{keywords}" --status closed --limit 5
+
+   # Also search by category
+   bd search "security" --status closed --limit 5      # for security bugs
+   bd search "dependency" --status closed --limit 5    # for dependency bugs
+   bd search "{file_path}" --status closed --limit 3   # for file-specific bugs
+   ```
+
+3. **Evaluate results**:
+   - **Match found**: Similar closed issue exists
+     - Could be regression (same bug returned)
+     - Could be related pattern (similar problem elsewhere)
+   - **No match**: New type of bug
+
+4. **Enrich bug data**:
+
+   ```
+   For each bug with history matches:
+   - Add to bug metadata: related_issues: [mc2-xxx, mc2-yyy]
+   - Note if potential regression: is_regression: true/false
+   ```
+
+5. **Store enrichment** for Phase 3 and Phase 5:
+   ```json
+   // .tmp/current/history-enrichment.json
+   {
+     "bug_1": {
+       "related_closed": ["mc2-abc", "mc2-def"],
+       "is_potential_regression": false,
+       "context": "Similar security fix in mc2-abc"
+     }
+   }
+   ```
+
+### Output
+
+- **If related issues found**: Include in bug description when creating Beads issue
+- **If potential regression**: Flag for special attention in bug-fixer prompt
+- **If no history**: Proceed normally (new bug type)
+
+### Example
 
 ```bash
-# Critical bugs (P1)
-bd create "BUG: {bug_title}" -t bug -p 1 -d "{description}" \
+# Bug: "Vulnerable tar package"
+bd search "tar" --status closed --limit 5
+bd search "vulnerability" --status closed --limit 5
+bd search "pnpm override" --status closed --limit 5
+
+# Results: No matches → new bug, no enrichment needed
+# Results: mc2-xyz found → add to related_issues
+```
+
+**Note**: History enrichment is informational, not blocking. Missing history doesn't prevent fixing.
+
+---
+
+## Phase 3: Create Beads Issues
+
+**For each bug found**, create a Beads issue.
+
+### For CRITICAL/HIGH bugs (with history enrichment):
+
+```bash
+# If related_issues found in Phase 2.5:
+bd create "BUG: {bug_title}" -t bug -p {1|2} \
+  -d "{description}
+
+## History Context
+Related closed issues: {related_issues}
+Potential regression: {yes/no}
+Previous fix context: {context from enrichment}" \
   --deps discovered-from:{wisp_id}
 
-# High bugs (P2)
-bd create "BUG: {bug_title}" -t bug -p 2 -d "{description}" \
+# If no history found:
+bd create "BUG: {bug_title}" -t bug -p {1|2} -d "{description}" \
   --deps discovered-from:{wisp_id}
+```
 
+### For MEDIUM/LOW bugs (no history check):
+
+```bash
 # Medium bugs (P3)
 bd create "BUG: {bug_title}" -t bug -p 3 -d "{description}" \
   --deps discovered-from:{wisp_id}
@@ -113,7 +196,7 @@ bd create "BUG: {bug_title}" -t bug -p 4 -d "{description}" \
 **Track issue IDs** in a mapping:
 
 ```
-bug_1 → mc2-aaa
+bug_1 → mc2-aaa (related: mc2-xyz)
 bug_2 → mc2-bbb
 ...
 ```
@@ -159,10 +242,18 @@ pnpm build
    prompt: |
      Read bug-hunting-report.md and fix all {priority} priority bugs.
 
+     ## History Context (for CRITICAL/HIGH only)
+     Check .tmp/current/history-enrichment.json for related closed issues.
+     If a bug has related_closed issues:
+     - Review the previous fix approach (bd show {related_id})
+     - Consider if this is a regression
+     - Apply learnings from previous fix
+
      For each bug:
      1. Backup file before editing
-     2. Implement fix
-     3. Log change to .tmp/current/changes/bug-changes.json
+     2. If history exists, review previous fix first
+     3. Implement fix
+     4. Log change to .tmp/current/changes/bug-changes.json
 
      Generate/update: bug-fixes-implemented.md
 
@@ -320,14 +411,15 @@ To rollback:
 
 ## Quick Reference
 
-| Phase              | Beads Action                     |
-| ------------------ | -------------------------------- |
-| 1. Pre-flight      | `bd mol wisp healthcheck`        |
-| 3. After detection | `bd create` for each bug         |
-| 5. Before fix      | `bd update --status in_progress` |
-| 5. After fix       | `bd close --reason "Fixed"`      |
-| 7. Complete        | `bd mol squash/burn`             |
-| 7. Remaining       | `bd create` for unfixed bugs     |
+| Phase                | Beads Action                             |
+| -------------------- | ---------------------------------------- |
+| 1. Pre-flight        | `bd mol wisp healthcheck`                |
+| 2.5. History (HIGH+) | `bd search "{keywords}" --status closed` |
+| 3. After detection   | `bd create` for each bug (with history)  |
+| 5. Before fix        | `bd update --status in_progress`         |
+| 5. After fix         | `bd close --reason "Fixed"`              |
+| 7. Complete          | `bd mol squash/burn`                     |
+| 7. Remaining         | `bd create` for unfixed bugs             |
 
 ---
 
