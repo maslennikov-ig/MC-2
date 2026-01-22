@@ -11,10 +11,7 @@
  */
 
 import { z } from 'zod';
-import {
-  enrichmentContentSchema,
-  enrichmentMetadataSchema,
-} from './enrichment-content';
+import { enrichmentContentSchema, enrichmentMetadataSchema } from './enrichment-content';
 
 // ============================================================================
 // ENUMS (From Database)
@@ -29,9 +26,9 @@ export const enrichmentTypeSchema = z.enum([
   'presentation',
   'quiz',
   'document',
-  'cover',   // Auto-generated lesson hero image (after Stage 5)
-  'card',    // Auto-generated thumbnail (lesson card after Stage 6, course card after Stage 5)
-  'banner',  // Manually created decorative header image
+  'cover', // Auto-generated lesson hero image (after Stage 5)
+  'card', // Auto-generated thumbnail (lesson card after Stage 6, course card after Stage 5)
+  'banner', // Manually created decorative header image
 ]);
 
 export type EnrichmentType = z.infer<typeof enrichmentTypeSchema>;
@@ -49,16 +46,49 @@ export type EnrichmentType = z.infer<typeof enrichmentTypeSchema>;
  * Reference: research.md section 11
  */
 export const enrichmentStatusSchema = z.enum([
-  'pending',           // Queued for generation
-  'draft_generating',  // Phase 1: Generating draft/script (two-stage only)
-  'draft_ready',       // Phase 1 complete: Awaiting user review (two-stage only)
-  'generating',        // Phase 2: Final content (or single-stage generation)
-  'completed',         // Successfully generated
-  'failed',            // Generation failed
-  'cancelled',         // User cancelled
+  'pending', // Queued for generation
+  'draft_generating', // Phase 1: Generating draft/script (two-stage only)
+  'draft_ready', // Phase 1 complete: Awaiting user review (two-stage only)
+  'generating', // Phase 2: Final content (or single-stage generation)
+  'completed', // Successfully generated
+  'failed', // Generation failed
+  'cancelled', // User cancelled
 ]);
 
 export type EnrichmentStatus = z.infer<typeof enrichmentStatusSchema>;
+
+/**
+ * Active generation statuses (enrichments that are in-progress)
+ * Used for: auto-resume polling, filtering active enrichments, UI states
+ */
+export const ACTIVE_GENERATION_STATUSES = [
+  'pending',
+  'draft_generating',
+  'draft_ready',
+  'generating',
+] as const;
+
+export type ActiveGenerationStatus = (typeof ACTIVE_GENERATION_STATUSES)[number];
+
+/**
+ * Terminal statuses (enrichments that have finished processing)
+ */
+export const TERMINAL_STATUSES = ['completed', 'failed', 'cancelled'] as const;
+export type TerminalStatus = (typeof TERMINAL_STATUSES)[number];
+
+/**
+ * Type guard to check if a status indicates active generation
+ */
+export function isActiveGenerationStatus(status: string): status is ActiveGenerationStatus {
+  return (ACTIVE_GENERATION_STATUSES as readonly string[]).includes(status);
+}
+
+/**
+ * Type guard to check if a status indicates terminal state
+ */
+export function isTerminalStatus(status: string): status is TerminalStatus {
+  return (TERMINAL_STATUSES as readonly string[]).includes(status);
+}
 
 // ============================================================================
 // LESSON ENRICHMENT (Base Schema)
@@ -165,9 +195,7 @@ export const enrichmentWithPlaybackUrlSchema = lessonEnrichmentBaseSchema.extend
   playback_url_expires_at: z.string().datetime().nullable(),
 });
 
-export type EnrichmentWithPlaybackUrl = z.infer<
-  typeof enrichmentWithPlaybackUrlSchema
->;
+export type EnrichmentWithPlaybackUrl = z.infer<typeof enrichmentWithPlaybackUrlSchema>;
 
 // ============================================================================
 // ENRICHMENT CREATE INPUT (For tRPC/BullMQ)
@@ -214,9 +242,7 @@ export const createBatchEnrichmentInputSchema = z.object({
   settings: z.record(z.unknown()).optional(),
 });
 
-export type CreateBatchEnrichmentInput = z.infer<
-  typeof createBatchEnrichmentInputSchema
->;
+export type CreateBatchEnrichmentInput = z.infer<typeof createBatchEnrichmentInputSchema>;
 
 // ============================================================================
 // VALIDATION HELPERS
@@ -264,7 +290,9 @@ export function isEnrichmentSummary(value: unknown): value is EnrichmentSummary 
  * @returns True if type requires Supabase Storage asset
  */
 export function requiresAsset(type: EnrichmentType): boolean {
-  return type === 'audio' || type === 'video' || type === 'cover' || type === 'card' || type === 'banner';
+  return (
+    type === 'audio' || type === 'video' || type === 'cover' || type === 'card' || type === 'banner'
+  );
 }
 
 /**

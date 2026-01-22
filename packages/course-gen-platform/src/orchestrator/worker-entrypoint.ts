@@ -19,12 +19,13 @@
 
 import 'dotenv/config';
 import { setMaxListeners } from 'events';
-import { startWorker } from './worker';
+import { startWorker, stopWorker } from './worker';
 import logger from '../shared/logger';
 import {
   createStage6Worker,
   gracefulShutdown as gracefulShutdownStage6,
 } from '../stages/stage6-lesson-content/factory';
+import { REDIS_UNAVAILABLE_EVENT } from '../shared/cache/redis';
 
 // Increase max listeners globally to prevent MaxListenersExceededWarning
 // during parallel LLM requests with AbortSignal timeouts
@@ -176,25 +177,65 @@ function stopReadinessHeartbeat(): void {
 // Start monitoring immediately
 startMemoryMonitoring();
 
-// Cleanup on exit
-process.on('SIGINT', () => {
+// Track active worker for graceful shutdown
+let activeGeneralWorker: Awaited<ReturnType<typeof startWorker>> | null = null;
+let activeStage6Worker: ReturnType<typeof createStage6Worker> | null = null;
+let isShuttingDownWorker = false;
+
+/**
+ * Common cleanup for all shutdown scenarios
+ */
+function performCommonCleanup(): void {
   stopMemoryMonitoring();
   stopReadinessHeartbeat();
-  // Shutdown bunker (stops background sync timer)
   const bunker = getModelConfigBunker();
   if (bunker.isInitialized()) {
     bunker.shutdown();
   }
-});
-process.on('SIGTERM', () => {
-  stopMemoryMonitoring();
-  stopReadinessHeartbeat();
-  // Shutdown bunker (stops background sync timer)
-  const bunker = getModelConfigBunker();
-  if (bunker.isInitialized()) {
-    bunker.shutdown();
+}
+
+/**
+ * Graceful shutdown handler for all workers
+ */
+async function handleWorkerShutdown(reason: string): Promise<void> {
+  if (isShuttingDownWorker) {
+    logger.debug({ reason }, 'Shutdown already in progress, ignoring');
+    return;
   }
-});
+  isShuttingDownWorker = true;
+  logger.info({ reason }, 'Initiating graceful worker shutdown');
+
+  performCommonCleanup();
+
+  try {
+    // Shutdown Stage 6 worker if active
+    if (activeStage6Worker) {
+      logger.info('Closing Stage 6 worker...');
+      await gracefulShutdownStage6(activeStage6Worker);
+      activeStage6Worker = null;
+    }
+
+    // Shutdown general worker if active
+    if (activeGeneralWorker) {
+      logger.info('Closing general worker...');
+      await stopWorker(false);
+      activeGeneralWorker = null;
+    }
+
+    logger.info({ reason }, 'Worker shutdown complete');
+    process.exit(0);
+  } catch (err) {
+    logger.error({ err, reason }, 'Error during worker shutdown');
+    process.exit(1);
+  }
+}
+
+// Cleanup on exit signals
+process.on('SIGINT', () => void handleWorkerShutdown('SIGINT'));
+process.on('SIGTERM', () => void handleWorkerShutdown('SIGTERM'));
+
+// Handle Redis unavailable - graceful shutdown before forced exit
+process.on(REDIS_UNAVAILABLE_EVENT, () => void handleWorkerShutdown('REDIS_UNAVAILABLE'));
 
 /**
  * Wrapper for executing async function with timeout
@@ -260,27 +301,8 @@ async function main() {
     if (process.env.STAGE6_WORKER === 'true') {
       logger.info('Starting dedicated Stage 6 worker (30 concurrent)...');
 
-      const stage6Worker = createStage6Worker();
-
-      // Handle graceful shutdown for Stage 6 worker
-      const shutdownStage6 = () => {
-        logger.info('Received shutdown signal for Stage 6 worker');
-        stopMemoryMonitoring();
-        stopReadinessHeartbeat();
-        const bunker = getModelConfigBunker();
-        if (bunker.isInitialized()) {
-          bunker.shutdown();
-        }
-        gracefulShutdownStage6(stage6Worker)
-          .then(() => process.exit(0))
-          .catch(err => {
-            logger.error({ err }, 'Error during Stage 6 worker shutdown');
-            process.exit(1);
-          });
-      };
-
-      process.on('SIGINT', shutdownStage6);
-      process.on('SIGTERM', shutdownStage6);
+      // Store reference for graceful shutdown (handled by handleWorkerShutdown)
+      activeStage6Worker = createStage6Worker();
 
       // Start readiness heartbeat for Stage 6 worker
       startReadinessHeartbeat();
@@ -304,7 +326,8 @@ async function main() {
     // - Production: 10-20 concurrent jobs (monitor CPU/memory)
     const concurrency = parseInt(process.env.WORKER_CONCURRENCY || '5', 10);
 
-    await startWorker(concurrency);
+    // Store reference for graceful shutdown (handled by handleWorkerShutdown)
+    activeGeneralWorker = await startWorker(concurrency);
 
     // Start readiness heartbeat to keep Redis TTL fresh
     // This allows API server to detect if worker crashes

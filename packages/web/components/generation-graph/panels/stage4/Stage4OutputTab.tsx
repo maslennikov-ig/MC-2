@@ -21,7 +21,7 @@ import { AnalysisResultView } from '../output/AnalysisResultView'
 import { VisualStylePreview } from './VisualStylePreview'
 import { useStaticGraph } from '../../contexts/StaticGraphContext'
 import type { Stage4OutputTabProps, AnalysisHeroProps } from './types'
-import type { AnalysisResult } from '@megacampus/shared-types'
+import { parseAnalysisResult, type AnalysisResult } from '@megacampus/shared-types'
 import { getLearningStyleTitle } from '@/lib/constants/learning-styles'
 
 // ============================================================================
@@ -38,24 +38,6 @@ const CATEGORY_ICONS: Record<
   hobby: Gamepad2,
   spiritual: Sparkles,
   academic: GraduationCap,
-}
-
-// ============================================================================
-// TYPE GUARDS
-// ============================================================================
-
-function isAnalysisResult(data: unknown): data is AnalysisResult {
-  if (!data || typeof data !== 'object') return false
-  const d = data as Record<string, unknown>
-  return (
-    typeof d.course_category === 'object' &&
-    d.course_category !== null &&
-    typeof (d.course_category as Record<string, unknown>).primary === 'string' &&
-    typeof d.recommended_structure === 'object' &&
-    d.recommended_structure !== null &&
-    typeof d.pedagogical_strategy === 'object' &&
-    d.pedagogical_strategy !== null
-  )
 }
 
 // ============================================================================
@@ -216,18 +198,27 @@ export const Stage4OutputTab = memo<Stage4OutputTabProps>(function Stage4OutputT
 }) {
   const t = GRAPH_TRANSLATIONS.stage4 as Record<string, { ru: string; en: string }>
 
-  // Get visual style and writing style from context
+  // Get visual style, writing style, and persisted analysis result from context
   const { courseInfo } = useStaticGraph()
   const visualStyle = courseInfo.visualStyle
   const writingStyle = courseInfo.courseStyle
+  const persistedAnalysisResult = courseInfo.analysisResult
 
   // Parse output data as AnalysisResult
+  // Priority: persisted analysis_result (from courses table, includes user edits) > outputData (from traces)
   const analysisResult = useMemo((): AnalysisResult | null => {
-    if (isAnalysisResult(outputData)) {
-      return outputData
+    // First try persisted analysis_result from courses table (includes user edits)
+    if (persistedAnalysisResult) {
+      const parsed = parseAnalysisResult(persistedAnalysisResult)
+      if (parsed) return parsed
+    }
+    // Fall back to outputData from generation_trace
+    if (outputData) {
+      const parsed = parseAnalysisResult(outputData)
+      if (parsed) return parsed
     }
     return null
-  }, [outputData])
+  }, [persistedAnalysisResult, outputData])
 
   // Extract hero data from analysis result
   const heroData = useMemo(() => {

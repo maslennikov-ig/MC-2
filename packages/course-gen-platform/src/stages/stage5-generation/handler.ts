@@ -45,6 +45,7 @@ import {
   // DISABLED: triggerAllLessonCovers - lesson covers now manual via UI
 } from '../stage7-enrichments/services/auto-card-trigger';
 import { handleStageCompletion } from '@/shared/auto-approval';
+import { checkPauseAndDelay } from '../../shared/pause-check';
 
 /**
  * Cleanup placeholder patterns in generated content
@@ -453,12 +454,16 @@ class Stage5GenerationHandler {
    * Main entry point called by BullMQ worker.
    *
    * @param job - BullMQ job instance with GenerationJobData payload
+   * @param token - BullMQ job token for pause/delay operations
    * @returns Job result with generation data or error details
    */
-  async process(job: Job<GenerationJobData>): Promise<StructureGenerationJobResult> {
+  async process(
+    job: Job<GenerationJobData>,
+    token?: string
+  ): Promise<StructureGenerationJobResult> {
     const jobData = job.data;
 
-    return await this.execute(jobData, job);
+    return await this.execute(jobData, job, token);
   }
 
   /**
@@ -474,11 +479,13 @@ class Stage5GenerationHandler {
    *
    * @param jobData - Job payload from BullMQ
    * @param job - BullMQ job instance
+   * @param token - BullMQ job token for pause/delay operations
    * @returns Structured job result
    */
   async execute(
     jobData: GenerationJobData,
-    job: Job<GenerationJobData>
+    job: Job<GenerationJobData>,
+    token?: string
   ): Promise<StructureGenerationJobResult> {
     const startTime = Date.now();
 
@@ -492,6 +499,17 @@ class Stage5GenerationHandler {
     };
 
     const { course_id, organization_id, user_id } = input;
+
+    // Issue #2: Warn if token is missing - pause functionality won't work
+    if (!token) {
+      logger.warn(
+        { jobId: job.id, courseId: course_id, organizationId: organization_id },
+        'Job token missing - pause/delay functionality disabled for this job'
+      );
+    }
+
+    // Check if generation is paused before starting work
+    await checkPauseAndDelay(job, course_id, token);
 
     // Acquire generation lock (FR-037: Prevent concurrent generation)
     const lockId = `stage-5-${job.id || Date.now()}`;

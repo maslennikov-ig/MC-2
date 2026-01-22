@@ -2,6 +2,167 @@
 
 _Released on 2025-12-26_
 
+## v0.28.27
+
+_Released on 2026-01-22_
+
+### ✨ New Features
+
+- **logger**: Add type guards, discriminated unions, and usage guide
+- **logger**: Add centralized domain-specific logging architecture
+
+### 🔧 Improvements
+
+- **validation**: Improve logging and type safety in validation-orchestrator
+
+### 🐛 Bug Fixes
+
+- **enrichments**: Address code review MEDIUM/LOW priority issues
+- **enrichments**: Address code review HIGH priority issues
+- **enrichments**: Restore generation progress on page reload
+- **logger**: Address HIGH priority code review findings
+- **logging**: Improve LLM error logging and add TTL timeout auto-mute
+
+---
+
+_This release was automatically generated from 20 commits._
+
+## v0.28.26
+
+_Released on 2026-01-22_
+
+### ✨ New Features
+
+- **enrichment**: Add grayscale placeholder with hover color reveal
+
+### 🔧 Improvements
+
+- Fix CPU/memory issues in course generation page
+- **template-whitelist**: Optimize Helm function matching with Set lookup
+
+### 🐛 Bug Fixes
+
+- **web**: Update 4 source file(s), update docs
+- Address code review issues for performance optimization
+- Sprint bug fixes - template whitelist, patcher retry, banner flow, status validation
+
+---
+
+_This release was automatically generated from 18 commits._
+
+## v0.28.25
+
+_Released on 2026-01-22_
+
+### ✨ New Features
+
+- **lessons**: Add progress card to lessons page header
+- **#14**: Add parameter flow dashboard with real-time updates
+- **lessons**: Add course lessons page with cards grid
+- **#16**: Add course edit history for diff view
+- **demo**: Add placeholder vs generated comparison page
+- **logging**: Add parameter tracking and validation logging (#12, #13)
+- **a11y**: Implement keyboard navigation for generation graph UI
+- **Skills**: Add /process-issues skill for GitHub Issues workflow
+
+### 🔧 Improvements
+
+- **enrichment**: Unify all 6 cards into single grid section
+
+### 🐛 Bug Fixes
+
+- **web**: Update 1 source file(s), update 5 test(s), +1 more
+- **lessons**: Address code review issues for lessons page
+- **progress**: Address code review findings for Stage 6 progress bar
+- **code-review**: Address P1 and P2 issues from review
+- **progress**: Update percentage during Stage 6 lesson generation
+- **generation-graph**: Implement GitHub Issues #10, #11, #17
+- **enrichment**: Resolve cover/banner generation issues
+- **enrichment**: Unify grid layout for all enrichment cards
+- **pipeline**: Implement per-field save status and fix type compatibility
+
+---
+
+_This release was automatically generated from 36 commits._
+
+## v0.28.24
+
+_Released on 2026-01-22_
+
+### ✨ New Features
+
+- **types**: Add Zod validation for AnalysisResult type
+- **enrichments**: Unify placeholder cards to Hover Reveal style
+- **pipeline**: Pass user-edited params between stages
+
+### 🔧 Improvements
+
+- **enrichment**: Split UnifiedEnrichmentCard into subcomponents
+- **enrichment**: P3 improvements - extract LabelWithTooltip, use type guards
+
+### 🐛 Bug Fixes
+
+- **pipeline**: Persist Stage 4 edits and show per-field save status
+- **enrichments**: Address code review issues for UnifiedEnrichmentCard
+
+---
+
+_This release was automatically generated from 16 commits._
+
+## v0.28.23
+
+_Released on 2026-01-21_
+
+### ✨ New Features
+
+- **file-upload**: Implement tier-based file limits with upgrade suggestions
+- **Interface**: Add glassmorphism for course cards with light/dark theme support
+- **visuals**: Add lesson card (1:1) generation to Media section
+
+### 🔧 Improvements
+
+- **course-viewer**: Open course in new tab for instant navigation
+
+### 🐛 Bug Fixes
+
+- **stage6**: Suppress false RAG warning for courses without documents
+- **stage5**: Whitelist Helm/Go template syntax in placeholder validator (RT-008)
+- **deploy**: Explicitly remove dev containers before recreate
+- **admin-logs**: Align list view status=new filter with grouped view logic
+- **logs**: Increase file upload limit + add Redis reconnect auto-mute
+- **logs+qdrant**: Improve error handling for transient failures
+- **docker**: Permanent fix for Redis DNS failure
+- **ui+pipeline**: Improve badge contrast and save target_audience in Stage 4
+- **i18n**: Add missing video.estimatedTime and improve cover/card descriptions
+- **images**: Use Next.js optimizer instead of Supabase render
+- **visuals**: Address code review issues for lesson cards media
+
+---
+
+_This release was automatically generated from 40 commits._
+
+## v0.28.22
+
+_Released on 2026-01-21_
+
+### ✨ New Features
+
+- **courses**: Integrate course cover images into UI
+- **redis**: Add graceful shutdown coordination with BullMQ workers
+
+### 🐛 Bug Fixes
+
+- **generation**: Add token validation warnings and pause delay tracking
+- **generation**: Address code review findings for pause/stop/resume
+- **redis**: Improve retry strategy with graceful shutdown and health monitoring
+- **generation**: Make pause/stop/resume controls work correctly
+- **redis**: Exit process after extended connection failure (~20 min)
+- **redis**: Never give up on reconnection, use exponential backoff
+
+---
+
+_This release was automatically generated from 23 commits._
+
 ## v0.28.21
 
 _Released on 2026-01-21_

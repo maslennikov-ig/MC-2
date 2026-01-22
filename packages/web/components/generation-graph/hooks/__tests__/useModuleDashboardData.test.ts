@@ -1,4 +1,3 @@
-/* eslint-disable */
 import { describe, it, expect } from 'vitest'
 import type { LessonMatrixRow } from '@megacampus/shared-types'
 

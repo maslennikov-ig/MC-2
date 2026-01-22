@@ -1,8 +1,8 @@
-import { Job, DelayedError } from 'bullmq';
+import { Job } from 'bullmq';
 import { logger } from '@/shared/logger';
 import { logTrace } from '@/shared/trace-logger';
 import { resolveLessonUuid } from '@/shared/database/lesson-resolver';
-import { getSupabaseAdmin } from '@/shared/supabase/admin';
+import { checkPauseAndDelay, isCoursePaused } from '@/shared/pause-check';
 import {
   executeStage6 as executeStage6Orchestrator,
   type Stage6Input,
@@ -33,80 +33,6 @@ import { extractContentMarkdown } from './content-utils';
 
 function sleep(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
-}
-
-/** How long to delay a job when paused (default 30 seconds, configurable via env) */
-const PAUSE_DELAY_MS = parseInt(process.env.PAUSE_DELAY_MS || '30000', 10);
-
-/**
- * Check if course generation is paused by querying the generation_paused_at column.
- * Returns true if the course is currently paused, false otherwise.
- *
- * Note: This is a non-locking read. There is a small theoretical race window
- * where a pause could be set between this check and job processing.
- * This is acceptable: jobs that start during pause will complete normally,
- * and subsequent jobs will be delayed. The pause RPC uses FOR UPDATE for
- * atomic state changes.
- */
-async function isCoursePaused(courseId: string): Promise<boolean> {
-  try {
-    const supabase = getSupabaseAdmin();
-    // Query the generation_paused_at column to check pause status
-    // Column added in migration: 20260114100000_add_generation_pause_fields.sql
-    const { data, error } = await supabase
-      .from('courses')
-      .select('generation_paused_at')
-      .eq('id', courseId)
-      .single();
-
-    if (error) {
-      logger.warn({ courseId, error: error.message }, 'Failed to check pause status');
-      return false;
-    }
-
-    // Course is paused if generation_paused_at is not null
-    return data?.generation_paused_at !== null;
-  } catch (err) {
-    logger.warn(
-      { courseId, error: err instanceof Error ? err.message : String(err) },
-      'Exception checking pause status'
-    );
-    return false;
-  }
-}
-
-/**
- * Check if course is paused and delay the job if so.
- *
- * NOTE: This check only happens at the START of job processing.
- * If a job is already running when the user pauses, it will continue
- * to completion. New jobs will be delayed until the course is resumed.
- *
- * @param job - The BullMQ job to delay
- * @param courseId - The course ID to check pause status for
- * @param token - Job token for lock management (required for moveToDelayed, validated at runtime)
- * @throws DelayedError if the job was moved to delayed state
- * @throws Error if token is missing when pause is needed
- */
-async function checkPauseAndDelay(job: Job, courseId: string, token?: string): Promise<void> {
-  const isPaused = await isCoursePaused(courseId);
-
-  if (isPaused) {
-    // Token is required for moveToDelayed (Issue #6 from code review)
-    // BullMQ types say token is optional, but it's required for proper lock management
-    if (!token) {
-      logger.error({ jobId: job.id, courseId }, 'Cannot delay job: token is missing');
-      throw new Error('Job token is required for pause/delay operations');
-    }
-
-    logger.info({ jobId: job.id, courseId }, 'Course generation is paused, delaying job');
-
-    // Move job to delayed state - it will be picked up again after PAUSE_DELAY_MS
-    await job.moveToDelayed(Date.now() + PAUSE_DELAY_MS, token);
-
-    // Throw DelayedError to signal the worker that the job was delayed
-    throw new DelayedError();
-  }
 }
 
 /**
@@ -148,6 +74,7 @@ async function executeStage6(input: Stage6JobInput): Promise<Stage6Output> {
     modelOverride,
     userRefinementPrompt,
     style,
+    analysisResult,
   } = input;
 
   const lessonLabel = lessonSpec.lesson_id;
@@ -163,6 +90,7 @@ async function executeStage6(input: Stage6JobInput): Promise<Stage6Output> {
     userRefinementPrompt,
     modelOverride,
     style,
+    analysisResult,
   };
 
   return executeStage6Orchestrator(orchestratorInput);

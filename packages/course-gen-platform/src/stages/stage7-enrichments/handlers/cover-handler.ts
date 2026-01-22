@@ -37,6 +37,8 @@ interface CoverPromptParams {
     visualElements: string;
     mood: string;
   };
+  /** Custom prompt additions from user (regeneration or initial generation) */
+  customPrompt?: string;
 }
 
 /**
@@ -67,13 +69,72 @@ const STORAGE_BUCKET = process.env.ENRICHMENTS_STORAGE_BUCKET ?? 'course-enrichm
 /**
  * Default visual style if none is configured on the course
  * Used for consistent styling across cover images when course lacks visual_style
+ *
+ * Style: Premium 3D Render + Cinematic lighting
+ * - Professional yet visually striking
+ * - Works well for B2B educational content
+ * - Inspired by Apple, Notion, Linear aesthetics
  */
 const DEFAULT_VISUAL_STYLE = {
-  colorScheme: 'blue and purple gradients with subtle accents',
-  aesthetic: 'modern, professional, clean',
-  visualElements: 'abstract geometric shapes, flowing lines',
-  mood: 'professional, engaging, educational',
+  colorScheme: 'rich gradients with deep shadows and luminous highlights, vibrant accent colors',
+  aesthetic: 'premium 3D render, cinematic lighting, sophisticated and polished',
+  visualElements:
+    'glossy 3D objects, volumetric light rays, soft reflections, depth of field blur, floating elements',
+  mood: 'inspiring, professional, cutting-edge, premium quality',
 };
+
+/**
+ * Style presets for user-selectable image styles
+ * Maps UI style options to visual style parameters
+ */
+const STYLE_PRESETS: Record<string, typeof DEFAULT_VISUAL_STYLE> = {
+  premium3d: {
+    colorScheme: 'rich gradients with deep shadows and luminous highlights, vibrant accent colors',
+    aesthetic: 'premium 3D render, cinematic lighting, sophisticated and polished',
+    visualElements:
+      'glossy 3D objects, volumetric light rays, soft reflections, depth of field blur, floating elements',
+    mood: 'inspiring, professional, cutting-edge, premium quality',
+  },
+  realistic: {
+    colorScheme: 'natural colors with realistic lighting and shadows',
+    aesthetic: 'photorealistic, high-detail rendering, lifelike textures',
+    visualElements:
+      'realistic objects, natural materials, detailed surfaces, environmental lighting',
+    mood: 'authentic, trustworthy, grounded, professional',
+  },
+  abstract: {
+    colorScheme: 'bold gradients with contrasting accent colors',
+    aesthetic: 'modern abstract art, flowing shapes, artistic interpretation',
+    visualElements: 'geometric patterns, flowing curves, color blends, artistic compositions',
+    mood: 'creative, innovative, conceptual, artistic',
+  },
+  minimalist: {
+    colorScheme: 'clean monochromatic or duo-tone palette with subtle gradients',
+    aesthetic: 'minimal design, clean lines, elegant simplicity',
+    visualElements: 'simple shapes, negative space, subtle shadows, refined details',
+    mood: 'calm, focused, sophisticated, clean',
+  },
+  dramatic: {
+    colorScheme: 'high contrast with deep darks and bright highlights, dramatic color accents',
+    aesthetic: 'cinematic drama, moody lighting, intense atmosphere',
+    visualElements: 'dramatic shadows, rim lighting, atmospheric effects, bold contrasts',
+    mood: 'powerful, intense, captivating, bold',
+  },
+};
+
+/**
+ * Get visual style based on user-selected style preset
+ * Falls back to course visual style or default if preset not found
+ */
+function getStylePreset(
+  styleName: string | undefined,
+  courseVisualStyle: typeof DEFAULT_VISUAL_STYLE
+): typeof DEFAULT_VISUAL_STYLE {
+  if (styleName && STYLE_PRESETS[styleName]) {
+    return STYLE_PRESETS[styleName];
+  }
+  return courseVisualStyle;
+}
 
 /**
  * Retry configuration for upload operations
@@ -93,7 +154,7 @@ const RETRY_CONFIG = {
  */
 const coverPromptVariantSchema = z.object({
   id: z.number().int().min(1).max(3),
-  prompt_en: z.string().min(20).max(500),
+  prompt_en: z.string().min(20).max(800), // Increased from 500 to accommodate visual style + no-text suffix
   description_localized: z.string().min(5).max(200),
 });
 
@@ -304,40 +365,48 @@ function extractKeywordsFromObjectives(objectives: string[] | null): string[] {
 
 /**
  * Default system prompt for cover generation (inline fallback)
+ *
+ * Style: Premium 3D Render + Cinematic lighting
+ * Creates visually striking, professional covers suitable for B2B educational content
  */
 function getDefaultCoverSystemPrompt(): string {
   return `# Role
-You are an expert prompt engineer specializing in AI image generation for educational content.
-Your task is to create optimized prompts for generating lesson cover images (hero banners).
+You are an expert prompt engineer specializing in AI image generation for premium educational content.
+Your task is to create optimized prompts for generating stunning lesson cover images (hero banners).
 
 # Output Requirements
 Generate a single, detailed image prompt that will produce:
-- A visually striking hero banner suitable for educational content
-- Professional, clean aesthetic appropriate for online learning
-- Abstract or symbolic representation of the lesson topic
-- Modern, high-quality digital art style
+- A visually striking, premium-quality hero banner
+- Cinematic lighting with dramatic depth and atmosphere
+- 3D rendered aesthetic with glossy surfaces and volumetric effects
+- Professional yet eye-catching imagery suitable for B2B education
 
 # CRITICAL: No Text Requirement
 IMPORTANT: The image MUST NOT contain ANY text, words, letters, numbers, characters, typography, writing, or inscriptions in ANY language.
 Always include in your prompt: "absolutely no text, no letters, no words, no numbers, no writing, no typography, no inscriptions, text-free image"
 Also avoid: logos, watermarks, signatures, labels, captions, titles, and human faces.
 
-# Style Guidelines
-- IMPORTANT: Use the provided visual style (color scheme, aesthetic, visual elements) from the course to maintain visual consistency
-- Create depth and visual interest through composition
-- Avoid literal depictions - prefer abstract/conceptual representations
+# Style Guidelines - Premium 3D Cinematic
+- IMPORTANT: Use the provided visual style (color scheme, aesthetic, visual elements) from the course
+- Create stunning 3D rendered scenes with glossy, polished surfaces
+- Use cinematic lighting: dramatic shadows, volumetric light rays, lens flares
+- Add depth through: depth of field blur, floating elements, layered composition
+- Rich color gradients with luminous highlights and deep shadows
+- Inspired by Apple, Notion, Linear, Stripe visual aesthetics
+- Premium, sophisticated feel - not cartoonish or flat
 - Ensure the image works well as a wide banner (16:9 aspect ratio)
-- Consider how a title might be overlaid (leave visual breathing room)
-- Use clean geometric shapes, gradients, and modern design elements
+- Leave visual breathing room for potential title overlay
 
 # Format
-Return ONLY the image prompt text (1-3 sentences, 50-100 words).
+Return ONLY the image prompt text (2-3 sentences, 50-80 words).
 Do not include any explanation, preamble, or commentary - just the prompt itself.
 ALWAYS end your prompt with: ", absolutely no text, no letters, no words, no typography, text-free image"`;
 }
 
 /**
  * Default fallback prompt if LLM/DB fails to generate one
+ *
+ * Style: Premium 3D Render + Cinematic lighting
  */
 function getDefaultImagePrompt(
   lessonTitle: string,
@@ -345,47 +414,63 @@ function getDefaultImagePrompt(
   visualStyle?: { colorScheme: string; aesthetic: string; visualElements: string; mood: string }
 ): string {
   const style = visualStyle ?? DEFAULT_VISUAL_STYLE;
-  return `A stunning abstract visualization representing "${lessonTitle}" in the context of ${courseSubject}. Modern digital art style with ${style.colorScheme}. ${style.visualElements} creating depth and movement. Ultra-wide 16:9 format, suitable as an educational hero banner. ${style.aesthetic} aesthetic with ${style.mood} atmosphere, absolutely no text, no letters, no words, no numbers, no writing, no typography, no inscriptions, text-free image.`;
+  return `A stunning premium 3D rendered visualization representing "${lessonTitle}" in the context of ${courseSubject}. Cinematic lighting with dramatic shadows and volumetric light rays. ${style.colorScheme}. Glossy, polished 3D surfaces with ${style.visualElements}. Ultra-wide 16:9 format hero banner with depth of field blur and floating elements. ${style.aesthetic} quality inspired by Apple and Notion aesthetics. ${style.mood} atmosphere, absolutely no text, no letters, no words, no numbers, no writing, no typography, no inscriptions, text-free image.`;
 }
 
 /**
  * System prompt for generating 3 cover prompt variants (draft phase)
+ *
+ * Style: Premium 3D Render + Cinematic lighting
+ * Three distinct approaches within the premium aesthetic
  */
 function getVariantsSystemPrompt(language: 'en' | 'ru'): string {
   const descriptionLanguage = language === 'ru' ? 'Russian' : 'English';
-  const descriptionExample =
+  const descriptionExample1 =
     language === 'ru'
-      ? 'Абстрактная визуализация с геометрическими формами'
-      : 'Abstract visualization with geometric shapes';
+      ? 'Кинематографичная 3D сцена с драматичным освещением'
+      : 'Cinematic 3D scene with dramatic lighting';
+  const descriptionExample2 =
+    language === 'ru'
+      ? 'Футуристичные глянцевые объекты с неоновым свечением'
+      : 'Futuristic glossy objects with neon glow';
+  const descriptionExample3 =
+    language === 'ru'
+      ? 'Элегантная композиция с мягкими градиентами и глубиной'
+      : 'Elegant composition with soft gradients and depth';
 
   return `# Role
-You are an expert prompt engineer specializing in AI image generation for educational content.
-Your task is to create 3 different image prompt variants for a lesson cover image (hero banner).
+You are an expert prompt engineer specializing in AI image generation for premium B2B educational content.
+Your task is to create 3 stunning image prompt variants for a lesson cover image (hero banner).
 
 # Output Requirements
-Generate exactly 3 distinct image prompts, each with a unique visual approach:
-1. **Abstract/Conceptual**: Focus on abstract shapes, gradients, and symbolic representation
-2. **Illustrative**: Use metaphorical imagery and visual storytelling
-3. **Minimalist/Modern**: Clean, simple design with bold colors and minimal elements
+Generate exactly 3 distinct image prompts, each with a unique visual approach within PREMIUM 3D CINEMATIC style:
 
-Each prompt should produce:
-- A visually striking hero banner suitable for educational content
-- Professional, clean aesthetic appropriate for online learning
-- Different visual style from other variants
-- Modern, high-quality digital art style
+1. **Cinematic Drama**: Epic 3D scene with dramatic lighting, deep shadows, volumetric rays, movie-poster quality
+2. **Futuristic Tech**: Glossy 3D objects, neon accents, holographic effects, sci-fi inspired, high-tech feel
+3. **Elegant Depth**: Sophisticated 3D composition, soft gradients, floating elements, depth of field, refined luxury
+
+Each prompt MUST produce:
+- Premium-quality, visually stunning hero banner
+- 3D rendered aesthetic with polished, glossy surfaces
+- Cinematic lighting with depth and atmosphere
+- Professional yet eye-catching imagery (Apple/Notion/Linear quality)
+- NOT flat, NOT cartoonish, NOT simple geometric shapes
 
 # CRITICAL: No Text Requirement
 IMPORTANT: All images MUST NOT contain ANY text, words, letters, numbers, characters, typography, writing, or inscriptions in ANY language.
 Every prompt MUST end with: ", absolutely no text, no letters, no words, no numbers, no writing, no typography, no inscriptions, text-free image"
 Also avoid: logos, watermarks, signatures, labels, captions, titles, and human faces.
 
-# Style Guidelines
-- Use rich, vibrant colors that convey the subject matter
-- Create depth and visual interest through composition
-- Avoid literal depictions - prefer abstract/conceptual representations
-- Ensure the image works well as a wide banner (16:9 aspect ratio)
-- Consider how a title might be overlaid (leave visual breathing room)
-- Each variant should have a distinctly different mood and visual approach
+# Style Guidelines - Premium 3D Cinematic
+- Create stunning 3D rendered scenes, NOT flat illustrations
+- Use cinematic lighting: dramatic shadows, volumetric light, lens effects
+- Rich color gradients with luminous highlights and deep shadows
+- Add depth through: blur effects, floating elements, layered composition
+- Glossy, polished surfaces with reflections
+- Inspired by Apple keynotes, Notion templates, Linear app, Stripe visuals
+- Premium, sophisticated, cutting-edge feel
+- Works well as wide banner (16:9 aspect ratio)
+- Leave breathing room for potential title overlay
 
 # Format
 Return ONLY valid JSON. No markdown code blocks.
@@ -395,29 +480,30 @@ Start with { and end with }.
   "variants": [
     {
       "id": 1,
-      "prompt_en": "First image prompt here (50-100 words), absolutely no text, no letters, no words, no typography, text-free image",
-      "description_localized": "${descriptionExample}"
+      "prompt_en": "Cinematic 3D prompt here (50-80 words)..., absolutely no text, no letters, no words, no typography, text-free image",
+      "description_localized": "${descriptionExample1}"
     },
     {
       "id": 2,
-      "prompt_en": "Second image prompt here (50-100 words), absolutely no text, no letters, no words, no typography, text-free image",
-      "description_localized": "${descriptionExample}"
+      "prompt_en": "Futuristic tech 3D prompt here (50-80 words)..., absolutely no text, no letters, no words, no typography, text-free image",
+      "description_localized": "${descriptionExample2}"
     },
     {
       "id": 3,
-      "prompt_en": "Third image prompt here (50-100 words), absolutely no text, no letters, no words, no typography, text-free image",
-      "description_localized": "${descriptionExample}"
+      "prompt_en": "Elegant depth 3D prompt here (50-80 words)..., absolutely no text, no letters, no words, no typography, text-free image",
+      "description_localized": "${descriptionExample3}"
     }
   ]
 }
 
 # Critical Rules
 - Generate EXACTLY 3 variants
-- Each prompt must be unique with different visual approach
+- ALL variants must be premium 3D cinematic style (not flat/geometric)
+- Each prompt must be unique with different mood within the premium aesthetic
 - All prompts in English (prompt_en)
 - All descriptions in ${descriptionLanguage} (description_localized)
 - Each prompt must end with the no-text requirement
-- Each description should be 5-15 words explaining the visual style
+- Each description should be 5-15 words explaining the visual approach
 - Return ONLY raw JSON (no markdown code blocks)`;
 }
 
@@ -425,11 +511,12 @@ Start with { and end with }.
  * User message for generating 3 cover prompt variants (draft phase)
  */
 function getVariantsUserMessage(params: CoverPromptParams): string {
-  const { lessonTitle, keywords, courseSubject, language, styleHint, visualStyle } = params;
+  const { lessonTitle, keywords, courseSubject, language, styleHint, visualStyle, customPrompt } =
+    params;
   const keywordsStr = keywords.length > 0 ? keywords.join(', ') : 'general concepts';
   const style = visualStyle ?? DEFAULT_VISUAL_STYLE;
 
-  return `Generate 3 different image prompt variants for a lesson cover with the following context:
+  let message = `Generate 3 different image prompt variants for a lesson cover with the following context:
 
 Lesson Title: ${lessonTitle}
 Course Subject: ${courseSubject}
@@ -444,6 +531,14 @@ ${styleHint ? `Style Preference: ${styleHint}` : ''}
 - Mood: ${style.mood}
 
 Create 3 distinct prompts for 16:9 hero banner images, each with a unique visual approach while maintaining the course visual style.`;
+
+  // Add user's custom instructions if provided
+  if (customPrompt?.trim()) {
+    message += `\n\n## Additional User Instructions (MUST be incorporated):
+${customPrompt.trim()}`;
+  }
+
+  return message;
 }
 
 // ============================================================================
@@ -524,7 +619,15 @@ async function generateDraft(input: EnrichmentHandlerInput): Promise<DraftResult
     }
 
     // Get visual style from course for consistent styling
-    const visualStyle = getVisualStyle(course);
+    const courseVisualStyle = getVisualStyle(course);
+
+    // Apply user-selected style preset if provided, otherwise use course style
+    const userStyle = typeof input.settings?.style === 'string' ? input.settings.style : undefined;
+    const visualStyle = getStylePreset(userStyle, courseVisualStyle);
+
+    // Extract customPrompt from settings if provided
+    const customPrompt =
+      typeof input.settings?.customPrompt === 'string' ? input.settings.customPrompt : undefined;
 
     const promptParams: CoverPromptParams = {
       lessonTitle: lesson.title,
@@ -532,6 +635,7 @@ async function generateDraft(input: EnrichmentHandlerInput): Promise<DraftResult
       courseSubject: course.title ?? 'Educational Content',
       language: (course.language as 'en' | 'ru') || 'en',
       visualStyle,
+      customPrompt,
     };
 
     logger.debug(
@@ -785,16 +889,22 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
       language === 'ru' ? 'Russian educational content' : 'English educational content';
 
     // Get visual style from course for consistent styling
-    const visualStyle = getVisualStyle(course);
+    const courseVisualStyle = getVisualStyle(course);
+
+    // Apply user-selected style preset if provided, otherwise use course style
+    const userStyle = typeof input.settings?.style === 'string' ? input.settings.style : undefined;
+    const visualStyle = getStylePreset(userStyle, courseVisualStyle);
 
     logger.debug(
       {
         enrichmentId: enrichment.id,
-        visualStyleSource: course.visual_style
-          ? 'visual_style'
-          : course.settings?.visual_style
-            ? 'settings'
-            : 'default',
+        visualStyleSource: userStyle
+          ? `preset:${userStyle}`
+          : course.visual_style
+            ? 'visual_style'
+            : course.settings?.visual_style
+              ? 'settings'
+              : 'default',
         colorScheme: visualStyle.colorScheme,
       },
       'Cover handler: using visual style for generation'
@@ -834,6 +944,18 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
       userMessage = `Generate an image prompt for a lesson cover:\nLesson: ${lesson.title}\nCourse: ${course.title ?? 'Educational Content'}\nTopics: ${keywords.join(', ') || 'general concepts'}\n\nVisual Style:\n- Color Scheme: ${visualStyle.colorScheme}\n- Aesthetic: ${visualStyle.aesthetic}\n- Visual Elements: ${visualStyle.visualElements}\n- Mood: ${visualStyle.mood}`;
     }
 
+    // Append custom prompt from user settings if provided
+    const customPrompt =
+      typeof input.settings?.customPrompt === 'string' ? input.settings.customPrompt : undefined;
+
+    if (customPrompt?.trim()) {
+      userMessage += `\n\n## Additional User Instructions (MUST be incorporated):\n${customPrompt.trim()}`;
+      logger.debug(
+        { enrichmentId: enrichment.id, customPromptLength: customPrompt.length },
+        'Cover handler: adding custom prompt to generation'
+      );
+    }
+
     // Step 2: Call LLM (separate error handling)
     try {
       const llmResponse = await llmClient.generateCompletion(userMessage, {
@@ -847,9 +969,9 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
       inputTokens = llmResponse.inputTokens;
       outputTokens = llmResponse.outputTokens;
 
-      // Validate prompt length
+      // Validate prompt length (800 to accommodate visual style + no-text suffix)
       const MIN_PROMPT_LENGTH = 20;
-      const MAX_PROMPT_LENGTH = 500;
+      const MAX_PROMPT_LENGTH = 800;
 
       if (imagePrompt.length < MIN_PROMPT_LENGTH || imagePrompt.length > MAX_PROMPT_LENGTH) {
         logger.warn(

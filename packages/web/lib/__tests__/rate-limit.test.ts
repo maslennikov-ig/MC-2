@@ -1,4 +1,3 @@
-/* eslint-disable */
 import { NextRequest } from 'next/server'
 import { rateLimiters, createRateLimiter, checkRateLimit } from '@/lib/rate-limit'
 

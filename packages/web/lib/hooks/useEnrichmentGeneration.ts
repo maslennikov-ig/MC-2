@@ -90,8 +90,8 @@ export function useEnrichmentGeneration({
   onComplete,
   onError,
 }: UseEnrichmentGenerationOptions) {
-  // Get session from Supabase provider for auth headers
-  const { session } = useSupabase()
+  // Get supabase client for auth operations
+  const { supabase } = useSupabase()
 
   // State for currently generating enrichments (by type)
   const [generating, setGenerating] = useState<Map<string, GeneratingEnrichment>>(new Map())
@@ -110,13 +110,17 @@ export function useEnrichmentGeneration({
 
   /**
    * Get auth headers for backend requests
+   * Always fetches fresh session to avoid stale token issues during long polling
    */
-  const getAuthHeaders = useCallback((): Record<string, string> => {
+  const getAuthHeaders = useCallback(async (): Promise<Record<string, string>> => {
+    const {
+      data: { session },
+    } = await supabase.auth.getSession()
     return {
       'Content-Type': 'application/json',
       Authorization: session?.access_token ? `Bearer ${session.access_token}` : '',
     }
-  }, [session])
+  }, [supabase])
 
   useEffect(() => {
     mountedRef.current = true
@@ -162,9 +166,12 @@ export function useEnrichmentGeneration({
 
   /**
    * Start polling for generation status
+   * @param type - Enrichment type
+   * @param enrichmentId - UUID of enrichment to poll
+   * @param isResume - If true, this is a resume after page reload (affects error messages)
    */
   const startPolling = useCallback(
-    (type: OnDemandEnrichmentType, enrichmentId: string) => {
+    (type: OnDemandEnrichmentType, enrichmentId: string, isResume = false) => {
       // Guard: Don't start polling if unmounted
       if (!mountedRef.current) {
         devLog.warn('Attempted to start polling after unmount')
@@ -187,7 +194,8 @@ export function useEnrichmentGeneration({
         abortControllersRef.current.set(type, controller)
 
         try {
-          const headers = getAuthHeaders()
+          // Always get fresh token to avoid stale token during long polling
+          const headers = await getAuthHeaders()
 
           const response = await fetch(
             `${TRPC_URL}/enrichment.getGenerationStatus?input=${encodeURIComponent(
@@ -199,6 +207,28 @@ export function useEnrichmentGeneration({
               signal: controller.signal,
             }
           )
+
+          // Handle 401 Unauthorized - try to refresh session
+          if (response.status === 401) {
+            devLog.warn('401 Unauthorized during polling, attempting session refresh')
+            const { data, error } = await supabase.auth.refreshSession()
+            if (!error && data.session) {
+              // Refresh succeeded - retry immediately without counting as failure
+              devLog.warn('Session refreshed successfully, retrying poll')
+              void pollStatus()
+              return
+            }
+            // Refresh failed - treat as auth error
+            devLog.error('Session refresh failed:', error)
+            stopPolling(type)
+            setGenerating((prev) => {
+              const next = new Map(prev)
+              next.delete(type)
+              return next
+            })
+            onError?.('Session expired. Please log in again.')
+            return
+          }
 
           if (!response.ok) {
             throw new Error(`Status poll failed: ${response.status}`)
@@ -271,7 +301,11 @@ export function useEnrichmentGeneration({
               return next
             })
 
-            onError?.('Lost connection to server. Please refresh and try again.')
+            // #8 fix: Context-aware error message
+            const errorMessage = isResume
+              ? `Failed to resume ${type} generation. The enrichment may have been deleted or completed.`
+              : 'Lost connection to server. Please refresh and try again.'
+            onError?.(errorMessage)
           } else {
             // Exponential backoff
             currentInterval = Math.min(currentInterval * 1.5, MAX_BACKOFF_INTERVAL)
@@ -284,7 +318,7 @@ export function useEnrichmentGeneration({
       const interval = setInterval(() => void pollStatus(), currentInterval)
       pollingIntervalsRef.current.set(type, interval)
     },
-    [pollingInterval, onComplete, onError, getAuthHeaders, stopPolling]
+    [pollingInterval, onComplete, onError, getAuthHeaders, stopPolling, supabase]
   )
 
   /**
@@ -326,7 +360,7 @@ export function useEnrichmentGeneration({
       abortControllersRef.current.set(`generate-${type}`, controller)
 
       try {
-        const headers = getAuthHeaders()
+        const headers = await getAuthHeaders()
 
         const response = await fetch(`${TRPC_URL}/enrichment.generateOnDemand`, {
           method: 'POST',
@@ -457,7 +491,7 @@ export function useEnrichmentGeneration({
 
       // Backend job exists - send cancel request
       try {
-        const headers = getAuthHeaders()
+        const headers = await getAuthHeaders()
 
         const response = await fetch(`${TRPC_URL}/enrichment.cancel`, {
           method: 'POST',
@@ -512,11 +546,78 @@ export function useEnrichmentGeneration({
    */
   const getProgress = useCallback((type: string) => generating.get(type), [generating])
 
+  /**
+   * Resume generation polling for an existing enrichment
+   *
+   * Used to restore progress tracking on page reload for enrichments
+   * that are already being generated (status: pending, draft_generating,
+   * draft_ready, or generating).
+   *
+   * Does NOT call backend to start new generation - only starts polling
+   * for status updates of an existing enrichment.
+   *
+   * Race Condition Protection:
+   * - Guards against resuming if already tracking the same type
+   * - Guards against resuming after unmount
+   *
+   * Note: Currently only one enrichment per type is supported.
+   * If multiple enrichments of the same type exist, only the first
+   * will be tracked (others are silently ignored with a dev warning).
+   *
+   * @param enrichmentId - UUID of the existing enrichment
+   * @param type - Type of enrichment (for UI state management)
+   *
+   * @example
+   * ```tsx
+   * // Auto-resume on mount for active enrichments
+   * useEffect(() => {
+   *   const active = enrichments.filter(e =>
+   *     isActiveGenerationStatus(e.status) && isOnDemandType(e.enrichment_type)
+   *   )
+   *   active.forEach(e => {
+   *     resumeGeneration(e.id, e.enrichment_type)
+   *   })
+   * }, [enrichments, resumeGeneration])
+   * ```
+   */
+  const resumeGeneration = useCallback(
+    (enrichmentId: string, type: OnDemandEnrichmentType) => {
+      // Guard: Don't resume if already tracking this type
+      if (generating.has(type)) {
+        devLog.warn('Already tracking generation for type:', type)
+        return
+      }
+
+      // Guard: Don't resume if unmounted
+      if (!mountedRef.current) {
+        devLog.warn('Attempted to resume generation after unmount')
+        return
+      }
+
+      // Add to generating state with initial progress
+      setGenerating((prev) => {
+        const next = new Map(prev)
+        next.set(type, {
+          enrichmentId,
+          type,
+          progress: 0,
+          currentStep: 'queued',
+        })
+        return next
+      })
+
+      // Start polling for this enrichment (isResume = true for context-aware errors)
+      startPolling(type, enrichmentId, true)
+    },
+    [generating, startPolling]
+  )
+
   return {
     generating,
     startGeneration,
     cancelGeneration,
     isGenerating,
     getProgress,
+    resumeGeneration,
   }
 }

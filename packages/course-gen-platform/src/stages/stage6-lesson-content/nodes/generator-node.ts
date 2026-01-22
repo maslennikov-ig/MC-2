@@ -59,7 +59,7 @@ export { calculateDynamicContextWindow, generateSection };
  */
 export async function generatorNode(state: LessonGraphStateType): Promise<LessonGraphStateUpdate> {
   const startTime = performance.now();
-  const { lessonSpec, ragChunks, courseId, lessonUuid, language, style } = state;
+  const { lessonSpec, ragChunks, courseId, lessonUuid, language, style, analysisResult } = state;
 
   // Get localized section headers (supports all 19 languages via shared-types)
   const headers = getContentLabels(language);
@@ -153,7 +153,8 @@ export async function generatorNode(state: LessonGraphStateType): Promise<Lesson
         accumulatedContent, // Pass context window
         language,
         state.modelOverride,
-        style // Pass course content style for style-specific prompts
+        style, // Pass course content style for style-specific prompts
+        analysisResult // Pass analysis result for generation guidance
       );
 
       totalTokens += sectionResult.tokensUsed;

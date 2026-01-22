@@ -9,7 +9,10 @@
  */
 
 import { describe, it, expect } from 'vitest';
-import { hasPlaceholders, scanForPlaceholders } from '../../../src/services/stage5/validators/placeholder-validator';
+import {
+  hasPlaceholders,
+  scanForPlaceholders,
+} from '../../../src/stages/stage5-generation/validators/placeholder-validator';
 
 describe('Placeholder Validator - Conservative Detection', () => {
   describe('hasPlaceholders', () => {
@@ -89,6 +92,62 @@ describe('Placeholder Validator - Conservative Detection', () => {
       expect(hasPlaceholders(text3)).toBe(true); // ❌ Blocked
     });
 
+    // RT-008: Whitelisted technical templates
+    it('should NOT block Helm/Go template syntax', () => {
+      // Helm Values/Release/Chart
+      const helm1 = 'Set the release name: {{ .Release.Name }}';
+      const helm2 = 'Use {{ .Values.replicaCount }} replicas';
+      const helm3 = 'Chart: {{ .Chart.Name }}-{{ .Chart.Version }}';
+
+      expect(hasPlaceholders(helm1)).toBe(false); // ✅ NOT blocked - Helm template
+      expect(hasPlaceholders(helm2)).toBe(false); // ✅ NOT blocked - Helm template
+      expect(hasPlaceholders(helm3)).toBe(false); // ✅ NOT blocked - Helm template
+
+      // Helm control flow
+      const helm4 = '{{ if .Values.sidecar.enabled }}';
+      const helm5 = '{{ range .Values.containers }}';
+      const helm6 = '{{ end }}';
+
+      expect(hasPlaceholders(helm4)).toBe(false); // ✅ NOT blocked - Helm control
+      expect(hasPlaceholders(helm5)).toBe(false); // ✅ NOT blocked - Helm control
+      expect(hasPlaceholders(helm6)).toBe(false); // ✅ NOT blocked - Helm control
+
+      // Go template field access
+      const go1 = 'Get metadata: {{ .metadata.name }}';
+      const go2 = 'Spec: {{ .spec.replicas }}';
+
+      expect(hasPlaceholders(go1)).toBe(false); // ✅ NOT blocked - Go template
+      expect(hasPlaceholders(go2)).toBe(false); // ✅ NOT blocked - Go template
+
+      // Kubernetes admission webhook
+      const k8s1 = 'Request object: {{ request.object }}';
+      const k8s2 = 'Operation: {{ request.operation }}';
+
+      expect(hasPlaceholders(k8s1)).toBe(false); // ✅ NOT blocked - K8s admission
+      expect(hasPlaceholders(k8s2)).toBe(false); // ✅ NOT blocked - K8s admission
+    });
+
+    it('should still block non-technical {{ }} placeholders', () => {
+      // Generic placeholders that are NOT technical templates
+      const text1 = '{{courseName}}'; // No dot notation - not a Helm template
+      const text2 = '{{placeholder}}';
+      const text3 = '{{ADD_CONTENT_HERE}}';
+
+      expect(hasPlaceholders(text1)).toBe(true); // ❌ Blocked - not a technical template
+      expect(hasPlaceholders(text2)).toBe(true); // ❌ Blocked - not a technical template
+      expect(hasPlaceholders(text3)).toBe(true); // ❌ Blocked - not a technical template
+    });
+
+    it('should NOT block Helm functions', () => {
+      const text1 = '{{ quote .Values.name }}';
+      const text2 = '{{ default "nginx" .Values.image }}';
+      const text3 = '{{ toYaml .Values.resources | nindent 4 }}';
+
+      expect(hasPlaceholders(text1)).toBe(false); // ✅ NOT blocked - Helm function
+      expect(hasPlaceholders(text2)).toBe(false); // ✅ NOT blocked - Helm function
+      expect(hasPlaceholders(text3)).toBe(false); // ✅ NOT blocked - Helm function
+    });
+
     it('should block line-start ellipsis', () => {
       const text1 = '...';
       const text2 = '... and more content';
@@ -152,8 +211,8 @@ describe('Placeholder Validator - Conservative Detection', () => {
         title: 'Valid title',
         description: 'TODO: add description',
         nested: {
-          content: '[insert content]'
-        }
+          content: '[insert content]',
+        },
       };
 
       const issues = scanForPlaceholders(obj);
@@ -165,7 +224,7 @@ describe('Placeholder Validator - Conservative Detection', () => {
 
     it('should find placeholders in arrays', () => {
       const obj = {
-        topics: ['Valid topic 1', '[TODO]', 'Valid topic 2']
+        topics: ['Valid topic 1', '[TODO]', 'Valid topic 2'],
       };
 
       const issues = scanForPlaceholders(obj);
@@ -178,11 +237,8 @@ describe('Placeholder Validator - Conservative Detection', () => {
       const obj = {
         title: 'JavaScript Arrays and Objects',
         description: 'Learn about arrays [array] and objects [object]',
-        topics: [
-          'Array<number> and Map<string, boolean>',
-          'Generic types: List<T>'
-        ],
-        notes: 'This is interesting... and important'
+        topics: ['Array<number> and Map<string, boolean>', 'Generic types: List<T>'],
+        notes: 'This is interesting... and important',
       };
 
       const issues = scanForPlaceholders(obj);
@@ -200,13 +256,13 @@ describe('Placeholder Validator - Conservative Detection', () => {
                   title: 'Valid lesson',
                   objectives: [
                     { text: 'Learn arrays [array]' }, // ✅ Legitimate
-                    { text: '[TODO] add objective' }  // ❌ Placeholder
-                  ]
-                }
-              ]
-            }
-          ]
-        }
+                    { text: '[TODO] add objective' }, // ❌ Placeholder
+                  ],
+                },
+              ],
+            },
+          ],
+        },
       };
 
       const issues = scanForPlaceholders(obj);

@@ -13,6 +13,7 @@ import { fieldUpdateRouter } from './editing/field-update.router';
 import { elementCrudRouter } from './editing/element-crud.router';
 import { regenerationRouter } from './editing/regeneration.router';
 import { permissionsRouter } from './editing/permissions.router';
+import { editHistoryRouter } from './editing/edit-history.router';
 
 /**
  * Editing Router - Course content editing operations
@@ -23,10 +24,12 @@ import { permissionsRouter } from './editing/permissions.router';
  * - addElement: Add a lesson or section to Stage 5 course structure with AI generation
  * - regenerateBlock: Regenerate a block (field) using AI with smart context routing
  * - getEditPermissions: Check if the current user can edit a specific course
+ * - getEditHistory: Get edit history for a course (diff view)
  */
 export const editingRouter = router({
   ...fieldUpdateRouter,
   ...elementCrudRouter,
   ...regenerationRouter,
   ...permissionsRouter,
+  ...editHistoryRouter,
 });

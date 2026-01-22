@@ -23,6 +23,7 @@ import { DocumentClassificationJobData, JobType } from '@megacampus/shared-types
 import { getSupabaseAdmin } from '../../shared/supabase/admin';
 import { handleStageCompletion } from '../../shared/auto-approval';
 import { notifyStageComplete, notifyCourseError } from '../../shared/notifications';
+import { checkPauseAndDelay } from '../../shared/pause-check';
 
 /**
  * Stage 3 Classification Job Handler
@@ -42,15 +43,28 @@ export class Stage3ClassificationHandler extends BaseJobHandler<DocumentClassifi
    *
    * @param jobData - Classification job data
    * @param job - BullMQ job instance
+   * @param token - BullMQ job token for pause/delay operations
    * @returns Job result with classification summary
    */
   async execute(
     jobData: DocumentClassificationJobData,
-    job: Job<DocumentClassificationJobData>
+    job: Job<DocumentClassificationJobData>,
+    token?: string
   ): Promise<JobResult> {
     const { courseId, organizationId } = jobData;
 
     this.log(job, 'info', 'Starting Stage 3 classification', { courseId, organizationId });
+
+    // Issue #2: Warn if token is missing - pause functionality won't work
+    if (!token) {
+      this.log(job, 'warn', 'Job token missing - pause/delay functionality disabled for this job', {
+        courseId,
+        organizationId,
+      });
+    }
+
+    // Check if generation is paused before starting work
+    await checkPauseAndDelay(job, courseId, token);
 
     try {
       // Build orchestrator input

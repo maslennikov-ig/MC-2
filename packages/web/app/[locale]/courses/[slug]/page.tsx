@@ -2,7 +2,7 @@
 import { notFound } from 'next/navigation'
 import { setRequestLocale } from 'next-intl/server'
 import { Locale } from '@/src/i18n/config'
-import { getUserClient } from '@/lib/supabase/client-factory'
+import { getUserClient, getAdminClient } from '@/lib/supabase/client-factory'
 import { logger } from '@/lib/logger'
 import CourseViewerEnhanced from '@/components/course/course-viewer-enhanced'
 import { CourseErrorBoundary } from '@/components/common/error-boundary'
@@ -16,6 +16,7 @@ import type { Course } from '@/types/database'
 import { PostgrestError } from '@supabase/supabase-js'
 import { Database } from '@/types/database.generated'
 import { z } from 'zod'
+import type { Metadata } from 'next'
 
 /** Minimal schema for Course validation - validates critical fields only */
 const CourseSchema = z.object({
@@ -27,6 +28,62 @@ const CourseSchema = z.object({
 // Force dynamic rendering to ensure auth state is fresh
 export const dynamic = 'force-dynamic'
 export const fetchCache = 'force-no-store'
+
+// Generate dynamic metadata for OG sharing
+export async function generateMetadata({
+  params,
+}: {
+  params: Promise<{ locale: Locale; slug: string }>
+}): Promise<Metadata> {
+  const { slug } = await params
+
+  try {
+    const supabase = getAdminClient()
+
+    const { data: course } = await supabase
+      .from('courses')
+      .select('title, course_description')
+      .eq('slug', slug)
+      .single()
+
+    if (!course) {
+      return {
+        title: 'Курс не найден',
+      }
+    }
+
+    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://ai.megacampus.ru'
+
+    return {
+      title: course.title,
+      description: course.course_description || `Онлайн курс: ${course.title}`,
+      openGraph: {
+        title: course.title,
+        description: course.course_description || `Онлайн курс: ${course.title}`,
+        images: [
+          {
+            url: `${baseUrl}/api/og/course/${slug}`,
+            width: 1200,
+            height: 630,
+            alt: course.title,
+          },
+        ],
+        type: 'website',
+        siteName: 'MegaCampusAI',
+      },
+      twitter: {
+        card: 'summary_large_image',
+        title: course.title,
+        description: course.course_description || `Онлайн курс: ${course.title}`,
+        images: [`${baseUrl}/api/og/course/${slug}`],
+      },
+    }
+  } catch {
+    return {
+      title: 'Курс',
+    }
+  }
+}
 
 // Use generated types for better type safety
 type SectionRow = Database['public']['Tables']['sections']['Row']
@@ -123,53 +180,49 @@ export default async function CoursePage({ params, searchParams }: CoursePagePro
   const { getAdminClient } = await import('@/lib/supabase/client-factory')
   const adminSupabase = getAdminClient()
 
-  // Fetch assets only if we have lessons to avoid empty .in() query
+  // Fetch assets, enrichments, and lesson contents in parallel (performance optimization)
   let assets: AssetRow[] | null = null
-  let assetsError: PostgrestError | null = null
-
-  if (lessons && lessons.length > 0) {
-    const lessonIds = lessons.map((l: LessonRow) => l.id)
-    const assetsResult = (await adminSupabase
-      .from('assets')
-      .select('*')
-      .in('lesson_id', lessonIds)) as { data: AssetRow[] | null; error: PostgrestError | null }
-
-    assets = assetsResult.data
-    assetsError = assetsResult.error
-
-    if (assetsError) {
-      // Log error for monitoring but continue with empty assets list
-      // This ensures the course page still renders even if assets fail to load
-      logger.warn('Failed to load course assets', {
-        courseId: course.id,
-        slug,
-        lessonIds,
-        error: assetsError.message,
-        code: assetsError.code,
-      })
-    }
-  }
-
-  // Fetch enrichments only if we have lessons to avoid empty .in() query
   let enrichments: EnrichmentRow[] | null = null
+  let lessonContents: LessonContentRow[] | null = null
   let enrichmentsError: string | undefined
 
   if (lessons && lessons.length > 0) {
     const lessonIds = lessons.map((l: LessonRow) => l.id)
-    const enrichmentsResult = (await adminSupabase
-      .from('lesson_enrichments')
-      .select('*')
-      .in('lesson_id', lessonIds)
-      .eq('status', 'completed')
-      .order('order_index')) as { data: EnrichmentRow[] | null; error: PostgrestError | null }
 
+    // Execute all three queries in parallel for faster page load
+    const [assetsResult, enrichmentsResult, lessonContentsResult] = await Promise.all([
+      adminSupabase.from('assets').select('*').in('lesson_id', lessonIds),
+      adminSupabase
+        .from('lesson_enrichments')
+        .select('*')
+        .in('lesson_id', lessonIds)
+        .not('status', 'in', '(failed,cancelled)')
+        .order('order_index'),
+      adminSupabase
+        .from('lesson_contents')
+        .select('*')
+        .in('lesson_id', lessonIds)
+        .eq('status', 'completed')
+        .order('created_at', { ascending: false }),
+    ])
+
+    assets = assetsResult.data
     enrichments = enrichmentsResult.data
+    lessonContents = lessonContentsResult.data
+
+    // Log errors but continue with empty lists (graceful degradation)
+    if (assetsResult.error) {
+      logger.warn('Failed to load course assets', {
+        courseId: course.id,
+        slug,
+        lessonIds,
+        error: assetsResult.error.message,
+        code: assetsResult.error.code,
+      })
+    }
 
     if (enrichmentsResult.error) {
-      // Track error message for UI display
       enrichmentsError = enrichmentsResult.error.message
-      // Log error for monitoring but continue with empty enrichments list
-      // This ensures the course page still renders even if enrichments fail to load
       logger.warn('Failed to load lesson enrichments', {
         courseId: course.id,
         slug,
@@ -177,25 +230,6 @@ export default async function CoursePage({ params, searchParams }: CoursePagePro
         code: enrichmentsResult.error.code,
       })
     }
-  }
-
-  // Fetch lesson contents from lesson_contents table (Stage 6 generated content)
-  // This is the actual lesson content that was generated, stored separately from lessons table
-  let lessonContents: LessonContentRow[] | null = null
-
-  if (lessons && lessons.length > 0) {
-    const lessonIds = lessons.map((l: LessonRow) => l.id)
-    const lessonContentsResult = (await adminSupabase
-      .from('lesson_contents')
-      .select('*')
-      .in('lesson_id', lessonIds)
-      .eq('status', 'completed')
-      .order('created_at', { ascending: false })) as {
-      data: LessonContentRow[] | null
-      error: PostgrestError | null
-    }
-
-    lessonContents = lessonContentsResult.data
 
     if (lessonContentsResult.error) {
       logger.warn('Failed to load lesson contents', {

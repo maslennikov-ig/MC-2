@@ -23,6 +23,7 @@ import { JsonViewer } from '../../shared/JsonViewer';
 import { AutoCardPreview } from '../../shared/AutoCardPreview';
 import { Stage6StatsStrip } from './Stage6StatsStrip';
 import { Stage6QualityTab } from './tabs/Stage6QualityTab';
+import { Stage6InputTab } from './tabs/Stage6InputTab';
 import {
   CheckCircle2,
   Edit3,
@@ -216,13 +217,14 @@ export const Stage6InspectorContent = memo(function Stage6InspectorContent({
   locale = 'en',
   className,
 }: Stage6InspectorContentProps) {
-  const [activeTab, setActiveTab] = useState<'preview' | 'quality' | 'sources' | 'blueprint' | 'trace' | 'card'>('preview');
+  const [activeTab, setActiveTab] = useState<'preview' | 'quality' | 'sources' | 'input' | 'blueprint' | 'trace' | 'card'>('preview');
 
   // Localized labels
   const labels = {
     preview: locale === 'ru' ? 'Просмотр' : 'Preview',
     quality: locale === 'ru' ? 'Качество' : 'Quality',
     sources: locale === 'ru' ? 'Источники' : 'Sources',
+    input: locale === 'ru' ? 'Входные' : 'Input',
     blueprint: locale === 'ru' ? 'Схема' : 'Blueprint',
     trace: locale === 'ru' ? 'Трассировка' : 'Trace',
     card: locale === 'ru' ? 'Карточка' : 'Card',
@@ -294,6 +296,21 @@ export const Stage6InspectorContent = memo(function Stage6InspectorContent({
       );
     }
 
+    if (activeTab === 'input') {
+      // Extract input parameters from metadata and sourceDocuments
+      const ragChunksCount = sourceDocuments?.reduce((sum, doc) => sum + (doc.chunk_count || 0), 0) || 0;
+
+      return (
+        <Stage6InputTab
+          lessonSpec={null} // TODO: Add lessonSpec to LessonInspectorData
+          style={null} // TODO: Add style to LessonInspectorData
+          language={null} // TODO: Add language to LessonInspectorData
+          ragChunksCount={ragChunksCount}
+          locale={locale}
+        />
+      );
+    }
+
     if (activeTab === 'blueprint') {
       if (!metadata) {
         return (
@@ -348,6 +365,7 @@ export const Stage6InspectorContent = memo(function Stage6InspectorContent({
               <TabsTrigger value="preview">{labels.preview}</TabsTrigger>
               <TabsTrigger value="quality">{labels.quality}</TabsTrigger>
               <TabsTrigger value="sources">{labels.sources}</TabsTrigger>
+              <TabsTrigger value="input">{labels.input}</TabsTrigger>
               <TabsTrigger value="blueprint">{labels.blueprint}</TabsTrigger>
               <TabsTrigger value="trace">{labels.trace}</TabsTrigger>
               <TabsTrigger value="card">{labels.card}</TabsTrigger>

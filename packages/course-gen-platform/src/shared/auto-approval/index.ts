@@ -545,7 +545,7 @@ async function queueNextStageJob(
       const supabase = getSupabaseAdmin();
       const { data: courseData, error: fetchError } = await supabase
         .from('courses')
-        .select('course_structure, language, style, title')
+        .select('course_structure, language, style, title, analysis_result')
         .eq('id', courseId)
         .single();
 
@@ -626,6 +626,7 @@ async function queueNextStageJob(
           const fullLessonSpec = convertToLessonSpecV2(lesson, courseTitle);
 
           // Use Stage6JobInput for dedicated queue (not JobData)
+          // Include analysisResult for generation guidance (specific_analogies, real_world_examples, etc.)
           const lessonJobData: Stage6JobInput = {
             lessonSpec: fullLessonSpec,
             courseId,
@@ -633,6 +634,7 @@ async function queueNextStageJob(
             style,
             ragChunks: [], // Handler fetches RAG chunks via retrieveLessonContext()
             ragContextId: null, // Handler manages context cache
+            analysisResult: courseData.analysis_result as AnalysisResult | undefined,
           };
 
           await stage6Queue.add(`lesson:${lesson.lesson_id}`, lessonJobData, {

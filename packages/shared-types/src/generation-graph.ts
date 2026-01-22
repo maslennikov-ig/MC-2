@@ -3,6 +3,8 @@
  * Based on n8n-style graph visualization data model
  */
 
+import type { AnalysisResult } from './analysis-schemas';
+
 /**
  * Node type enumeration
  */
@@ -721,6 +723,8 @@ export interface StaticGraphData {
     courseStyle?: string | null;
     /** Read-only mode for automatic generation (hides edit/regenerate/approve buttons) */
     readOnly?: boolean;
+    /** Analysis result from Stage 4 (persisted in courses.analysis_result) */
+    analysisResult?: AnalysisResult | null;
   };
 }
 

@@ -14,7 +14,7 @@ import { loadUserPreferences } from '@/lib/user-preferences'
 import { canCreateCourses } from '@/app/actions/courses'
 import { createDraftSession } from '@/app/actions/draft-session'
 import { formSchema, type FormData } from '../_schemas/form-schema'
-import { DEFAULT_COURSE_SIZE } from '@megacampus/shared-types'
+import { DEFAULT_COURSE_SIZE, type TierKey, isValidTierKey } from '@megacampus/shared-types'
 import { useFileUpload } from './useFileUpload'
 import { useAutoSave } from './useAutoSave'
 import { useSubmitCourse } from './useSubmitCourse'
@@ -28,6 +28,8 @@ export function useCreateCourseForm() {
   const [draftCourseId, setDraftCourseId] = useState<string | null>(null)
   const [canCreate, setCanCreate] = useState<boolean | null>(null)
   const [userRole, setUserRole] = useState<string>('unknown')
+  // null = loading, TierKey = loaded. Using null prevents showing wrong limits during load
+  const [organizationTier, setOrganizationTier] = useState<TierKey | null>(null)
 
   const validationTimeoutsRef = useRef<NodeJS.Timeout[]>([])
   const autoSubmitTimeoutRef = useRef<NodeJS.Timeout | null>(null)
@@ -171,13 +173,26 @@ export function useCreateCourseForm() {
 
       const { data: orgData } = await supabase
         .from('users')
-        .select('organization_id')
+        .select('organization_id, organizations!inner(tier)')
         .eq('id', user.id)
         .single()
 
       if (!orgData?.organization_id) {
-        logger.warn('No organization_id found for user', { userId: user.id })
+        logger.error('No organization_id found for user', { userId: user.id })
+        toast.error(
+          'Не удалось загрузить информацию об организации. Используются стандартные лимиты.'
+        )
+        // Keep default 'standard' tier as fallback
         return
+      }
+
+      // Extract and validate tier from organization data
+      const rawTier = (orgData.organizations as { tier?: string } | null)?.tier
+      if (isValidTierKey(rawTier)) {
+        setOrganizationTier(rawTier)
+      } else {
+        logger.error('Invalid tier from database', { tier: rawTier, userId: user.id })
+        // Keep default 'standard' tier as safe fallback
       }
 
       const result = await createDraftSession(user.id, orgData.organization_id)
@@ -344,6 +359,7 @@ export function useCreateCourseForm() {
     isUploadingFiles,
     canCreate,
     userRole,
+    organizationTier,
     draftCourseId,
     handleFormChange,
     handleFormSubmit,

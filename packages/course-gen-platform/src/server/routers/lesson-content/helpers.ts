@@ -122,7 +122,7 @@ export function buildMinimalLessonSpec(
   },
   sectionNumber: number,
   requestId: string,
-  analysisResult?: AnalysisResult
+  analysisResult?: AnalysisResult | null
 ): LessonSpecificationV2 {
   // Get RAG plan from document_relevance_mapping for this section
   const ragPlan = analysisResult?.document_relevance_mapping?.[String(sectionNumber)];

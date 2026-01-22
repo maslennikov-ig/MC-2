@@ -32,7 +32,13 @@ import { GraphOperationsProvider } from './contexts/GraphOperationsContext'
 import { GRAPH_STAGE_CONFIG, NODE_STYLES, ACTIVE_STATUSES } from '@/lib/generation-graph/constants'
 import { GRAPH_TRANSLATIONS } from '@/lib/generation-graph/translations'
 import { useGenerationRealtime } from '@/components/generation-monitoring/realtime-provider'
-import { RealtimeStatusData, NodeStatusEntry, VisualStyle } from '@megacampus/shared-types'
+import {
+  RealtimeStatusData,
+  NodeStatusEntry,
+  VisualStyle,
+  parseAnalysisResult,
+  type AnalysisResult,
+} from '@megacampus/shared-types'
 import { GenerationProgress, CourseStatus } from '@/types/course-generation'
 import {
   mapStatusToNodeStatus,
@@ -295,6 +301,9 @@ function GraphViewInner({
   // Course writing style (fetched from courses.style) - used in Stage 4 Hero Card via StaticGraphContext
   const [courseStyle, setCourseStyle] = useState<string | null>(null)
 
+  // Analysis result from Stage 4 (persisted edits from courses.analysis_result)
+  const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null)
+
   // Theme support
   const { resolvedTheme, mounted } = useThemeSync()
   const isDark = mounted && resolvedTheme === 'dark'
@@ -322,6 +331,23 @@ function GraphViewInner({
 
   // Graceful degradation
   const { degradationMode, handleRealtimeFailure, statusMessage } = useGracefulDegradation()
+
+  // Helper to focus viewport on a specific node
+  const focusOnNode = useCallback(
+    (nodeId: string) => {
+      const nodes = getNodes()
+      const targetNode = nodes.find((n) => n.id === nodeId)
+      if (targetNode?.position) {
+        const width = targetNode.measured?.width || 180
+        const height = targetNode.measured?.height || 80
+        setCenter(targetNode.position.x + width / 2, targetNode.position.y + height / 2, {
+          zoom: 1.0,
+          duration: 600,
+        })
+      }
+    },
+    [getNodes, setCenter]
+  )
 
   // Auto-focus on error (T122)
   useEffect(() => {
@@ -401,11 +427,11 @@ function GraphViewInner({
     const fetchCourseStructure = async () => {
       const supabase = createClient()
 
-      // Fetch course structure, visual_style, style, and completed lessons in parallel
+      // Fetch course structure, visual_style, style, analysis_result, and completed lessons in parallel
       const [courseResult, lessonsResult] = await Promise.all([
         supabase
           .from('courses')
-          .select('course_structure, visual_style, style')
+          .select('course_structure, visual_style, style, analysis_result')
           .eq('id', courseId)
           .single(),
         supabase
@@ -432,6 +458,14 @@ function GraphViewInner({
       // Store course writing style if available
       if (courseResult.data?.style) {
         setCourseStyle(courseResult.data.style)
+      }
+
+      // Store analysis result if available (persisted Stage 4 edits)
+      if (courseResult.data?.analysis_result) {
+        const parsed = parseAnalysisResult(courseResult.data.analysis_result)
+        if (parsed) {
+          setAnalysisResult(parsed)
+        }
       }
 
       if (courseResult.data?.course_structure) {
@@ -823,9 +857,10 @@ function GraphViewInner({
         visualStyle,
         courseStyle,
         readOnly,
+        analysisResult,
       },
     }
-  }, [courseId, courseTitle, tier, nodes, visualStyle, courseStyle, readOnly])
+  }, [courseId, courseTitle, tier, nodes, visualStyle, courseStyle, readOnly, analysisResult])
 
   // Mobile view - show simplified graph (no separate list view)
   // Graph view works on mobile with touch gestures enabled
@@ -1005,6 +1040,8 @@ function GraphViewInner({
                           try {
                             await startGeneration(courseId)
                             toast.success('Генерация запущена!')
+                            // Focus on Stage 1 after starting generation
+                            focusOnNode('stage_1')
                           } catch (error) {
                             // Rollback optimistic update on error
                             setStageStatusOptimistic('stage_1', 'pending')
@@ -1033,6 +1070,11 @@ function GraphViewInner({
                         try {
                           await approveStage(courseId, awaitingStage)
                           toast.success(`Стадия ${awaitingStage} подтверждена!`)
+                          // Focus on next stage after approval
+                          const nextStage = awaitingStage + 1
+                          if (nextStage <= 7) {
+                            focusOnNode(`stage_${nextStage}`)
+                          }
                         } catch (error) {
                           toast.error('Не удалось подтвердить стадию', {
                             description:

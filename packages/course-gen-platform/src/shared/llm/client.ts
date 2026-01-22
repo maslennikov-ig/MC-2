@@ -11,7 +11,10 @@
  */
 
 import OpenAI from 'openai';
-import type { ChatCompletionMessageParam, ChatCompletionCreateParamsNonStreaming } from 'openai/resources/chat/completions';
+import type {
+  ChatCompletionMessageParam,
+  ChatCompletionCreateParamsNonStreaming,
+} from 'openai/resources/chat/completions';
 import logger from '../../shared/logger';
 import { retryWithBackoff } from '../../shared/utils/retry';
 import { getOpenRouterApiKey, getApiKeySync } from '../services/api-key-service';
@@ -160,7 +163,9 @@ export class LLMClient {
     try {
       const apiKey = await getOpenRouterApiKey();
       if (!apiKey) {
-        throw new Error('OpenRouter API key not configured. Set OPENROUTER_API_KEY env var or configure in admin panel.');
+        throw new Error(
+          'OpenRouter API key not configured. Set OPENROUTER_API_KEY env var or configure in admin panel.'
+        );
       }
 
       this.initializeClient(apiKey);
@@ -192,10 +197,7 @@ export class LLMClient {
    * @returns Promise<LLMResponse> - Generated completion with metadata
    * @throws Error on API failures after retries
    */
-  async generateCompletion(
-    prompt: string,
-    options: LLMClientOptions
-  ): Promise<LLMResponse> {
+  async generateCompletion(prompt: string, options: LLMClientOptions): Promise<LLMResponse> {
     // Ensure client is initialized with API key from centralized service
     await this.ensureInitialized();
 
@@ -208,13 +210,16 @@ export class LLMClient {
       enableCaching = false,
     } = options;
 
-    logger.info({
-      model,
-      promptLength: prompt.length,
-      maxTokens,
-      temperature,
-      enableCaching,
-    }, 'Generating LLM completion');
+    logger.info(
+      {
+        model,
+        promptLength: prompt.length,
+        maxTokens,
+        temperature,
+        enableCaching,
+      },
+      'Generating LLM completion'
+    );
 
     // Retry logic for transient errors
     const executeRequest = async (): Promise<LLMResponse> => {
@@ -250,15 +255,22 @@ export class LLMClient {
           };
         }
 
-        const completion = await this.client.chat.completions.create(
-          requestOptions,
-          {
-            timeout,
-          }
-        );
+        const completion = await this.client.chat.completions.create(requestOptions, {
+          timeout,
+        });
 
         const choice = completion.choices[0];
         if (!choice?.message?.content) {
+          logger.error(
+            {
+              model,
+              promptLength: prompt.length,
+              systemPromptLength: systemPrompt.length,
+              finishReason: choice?.finish_reason,
+              choicesCount: completion.choices?.length,
+            },
+            'LLM returned empty response - no content in completion'
+          );
           throw new Error('No content in completion response');
         }
 
@@ -278,12 +290,15 @@ export class LLMClient {
           outputTokens = Math.ceil(outputLength / 4);
           totalTokens = inputTokens + outputTokens;
 
-          logger.debug({
-            model,
-            estimatedInputTokens: inputTokens,
-            estimatedOutputTokens: outputTokens,
-            estimatedTotalTokens: totalTokens,
-          }, 'Token usage estimated from content length (model did not report usage)');
+          logger.debug(
+            {
+              model,
+              estimatedInputTokens: inputTokens,
+              estimatedOutputTokens: outputTokens,
+              estimatedTotalTokens: totalTokens,
+            },
+            'Token usage estimated from content length (model did not report usage)'
+          );
         }
 
         const response: LLMResponse = {
@@ -296,25 +311,31 @@ export class LLMClient {
           requestId: (completion as any)._request_id,
         };
 
-        logger.info({
-          model: response.model,
-          inputTokens: response.inputTokens,
-          outputTokens: response.outputTokens,
-          totalTokens: response.totalTokens,
-          finishReason: response.finishReason,
-          requestId: response.requestId,
-        }, 'LLM completion generated successfully');
+        logger.info(
+          {
+            model: response.model,
+            inputTokens: response.inputTokens,
+            outputTokens: response.outputTokens,
+            totalTokens: response.totalTokens,
+            finishReason: response.finishReason,
+            requestId: response.requestId,
+          },
+          'LLM completion generated successfully'
+        );
 
         return response;
       } catch (error) {
         // Enhanced error handling
         if (error instanceof OpenAI.APIError) {
-          logger.error({
-            status: error.status,
-            message: error.message,
-            requestId: (error as any).request_id,
-            code: (error as any).code,
-          }, 'OpenAI API error');
+          logger.error(
+            {
+              status: error.status,
+              message: error.message,
+              requestId: (error as any).request_id,
+              code: (error as any).code,
+            },
+            'OpenAI API error'
+          );
 
           // Check if error is retryable
           const isRetryable = this.isRetryableError(error);
@@ -327,8 +348,19 @@ export class LLMClient {
           throw error;
         }
 
-        // Unknown error
-        logger.error({ error }, 'Unknown error during LLM request');
+        // Unknown error - log with full context for debugging
+        logger.error(
+          {
+            error: error instanceof Error ? error.message : String(error),
+            errorName: error instanceof Error ? error.name : 'Unknown',
+            model,
+            promptLength: prompt.length,
+            systemPromptLength: systemPrompt.length,
+            maxTokens,
+            temperature,
+          },
+          'Unknown error during LLM request'
+        );
         throw error;
       }
     };
@@ -339,18 +371,24 @@ export class LLMClient {
         maxRetries: this.maxRetries,
         delays: this.retryDelays,
         onRetry: (attempt, error) => {
-          logger.warn({
-            attempt,
-            maxRetries: this.maxRetries,
-            error: error.message,
-          }, 'Retrying LLM request');
+          logger.warn(
+            {
+              attempt,
+              maxRetries: this.maxRetries,
+              error: error.message,
+            },
+            'Retrying LLM request'
+          );
         },
       });
     } catch (error) {
-      logger.error({
-        model,
-        error: error instanceof Error ? error.message : String(error),
-      }, 'LLM request failed after all retries');
+      logger.error(
+        {
+          model,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        'LLM request failed after all retries'
+      );
       throw error;
     }
   }
@@ -414,12 +452,7 @@ export class LLMClient {
     maxTokens?: number;
     temperature?: number;
   }): Promise<LLMResponse> {
-    const {
-      text,
-      model = 'openai/gpt-oss-20b',
-      maxTokens = 10000,
-      temperature = 0.7,
-    } = params;
+    const { text, model = 'openai/gpt-oss-20b', maxTokens = 10000, temperature = 0.7 } = params;
 
     const systemPrompt = `You are a highly skilled document summarizer. Your task is to create a comprehensive yet concise summary that:
 1. Preserves all key information, concepts, and insights
@@ -455,8 +488,8 @@ Create a summary that someone could use to understand the core content without r
     // Pricing per 1M tokens (USD)
     const pricing: Record<string, { input: number; output: number }> = {
       'openai/gpt-oss-20b': { input: 0.03, output: 0.14 },
-      'openai/gpt-oss-120b': { input: 0.04, output: 0.40 },
-      'google/gemini-2.5-flash-preview': { input: 0.10, output: 0.40 },
+      'openai/gpt-oss-120b': { input: 0.04, output: 0.4 },
+      'google/gemini-2.5-flash-preview': { input: 0.1, output: 0.4 },
     };
 
     const modelPricing = pricing[model] || { input: 0.05, output: 0.15 }; // Default fallback

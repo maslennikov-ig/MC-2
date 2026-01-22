@@ -24,6 +24,7 @@ export default function CreateCourseForm() {
     isUploadingFiles,
     canCreate,
     userRole,
+    organizationTier,
     draftCourseId,
     handleFormChange,
     handleFormSubmit,
@@ -95,6 +96,7 @@ export default function CreateCourseForm() {
             uploadSingleFile={uploadSingleFile}
             isSubmitting={isSubmitting}
             isUploadingFiles={isUploadingFiles}
+            tier={organizationTier}
           />
 
           <GenerationSettingsSection

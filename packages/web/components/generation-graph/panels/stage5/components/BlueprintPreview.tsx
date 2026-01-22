@@ -8,7 +8,7 @@
  */
 
 import React from 'react'
-import { Target, BookOpen, Gauge, PenLine } from 'lucide-react'
+import { Target, BookOpen, Gauge, PenLine, LayoutGrid } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
@@ -26,6 +26,7 @@ export function BlueprintPreview({
   const categoryLabel = tAnalysis?.category?.[locale] ?? 'Category'
   const confidenceLabel = tAnalysis?.confidence?.[locale] ?? 'Confidence'
   const lessonsLabel = tAnalysis?.totalLessons?.[locale] ?? 'Lessons'
+  const modulesLabel = tAnalysis?.totalSections?.[locale] ?? 'Modules'
   const complexityLabel = tAnalysis?.complexity?.[locale] ?? 'Complexity'
   const contentStyleLabel = tAnalysis?.contentStyle?.[locale] ?? 'Content Style'
 
@@ -78,6 +79,19 @@ export function BlueprintPreview({
               <div className="text-sm font-medium">{lessonsRange}</div>
             </div>
           </div>
+
+          {/* Modules count */}
+          {analysisResult.totalSections && analysisResult.totalSections > 0 && (
+            <div className="flex min-w-[120px] items-center gap-2">
+              <div className="rounded bg-orange-50 p-1.5 dark:bg-orange-950/20">
+                <LayoutGrid className="h-3.5 w-3.5 text-orange-600 dark:text-orange-400" />
+              </div>
+              <div>
+                <div className="text-muted-foreground text-xs">{modulesLabel}</div>
+                <div className="text-sm font-medium">{analysisResult.totalSections}</div>
+              </div>
+            </div>
+          )}
 
           {/* Complexity indicator */}
           {analysisResult.topicAnalysis?.complexity && (

@@ -1,0 +1,135 @@
+/**
+ * Course Generation Pause Check Utility
+ *
+ * Shared utility for checking and handling pause state across all stages.
+ * This module provides functions to check if a course is paused and delay
+ * BullMQ jobs accordingly.
+ *
+ * @module shared/pause-check
+ */
+
+import { Job, DelayedError } from 'bullmq';
+import { logger } from './logger';
+import { getSupabaseAdmin } from './supabase/admin';
+
+/**
+ * Delay between pause checks (default 30s).
+ * Too short: excessive DB queries during pause.
+ * Too long: poor UX (user waits longer after resume).
+ * Configure via PAUSE_DELAY_MS env var (clamped to 5s-120s range).
+ */
+const DEFAULT_PAUSE_DELAY_MS = 30000;
+const MIN_PAUSE_DELAY_MS = 5000;
+const MAX_PAUSE_DELAY_MS = 120000;
+const PAUSE_DELAY_MS_RAW = parseInt(
+  process.env.PAUSE_DELAY_MS || String(DEFAULT_PAUSE_DELAY_MS),
+  10
+);
+
+// Validate: clamp to valid range (5s-120s)
+export const PAUSE_DELAY_MS = Math.max(
+  MIN_PAUSE_DELAY_MS,
+  Math.min(PAUSE_DELAY_MS_RAW, MAX_PAUSE_DELAY_MS)
+);
+
+/**
+ * Check if course generation is paused by querying the generation_paused_at column.
+ * Returns true if the course is currently paused, false otherwise.
+ *
+ * Note: This is a non-locking read. There is a small theoretical race window
+ * where a pause could be set between this check and job processing.
+ * This is acceptable: jobs that start during pause will complete normally,
+ * and subsequent jobs will be delayed. The pause RPC uses FOR UPDATE for
+ * atomic state changes.
+ *
+ * @param courseId - The course ID to check pause status for
+ * @returns true if paused, false otherwise
+ */
+export async function isCoursePaused(courseId: string): Promise<boolean> {
+  try {
+    const supabase = getSupabaseAdmin();
+    // Query the generation_paused_at column to check pause status
+    const { data, error } = await supabase
+      .from('courses')
+      .select('generation_paused_at')
+      .eq('id', courseId)
+      .single();
+
+    if (error) {
+      logger.warn({ courseId, error: error.message }, 'Failed to check pause status');
+      return false;
+    }
+
+    // Course is paused if generation_paused_at is not null
+    return data?.generation_paused_at !== null;
+  } catch (err) {
+    logger.warn(
+      { courseId, error: err instanceof Error ? err.message : String(err) },
+      'Exception checking pause status'
+    );
+    return false;
+  }
+}
+
+/**
+ * Check if course is paused and delay the job if so.
+ *
+ * NOTE: This check only happens at the START of job processing.
+ * If a job is already running when the user pauses, it will continue
+ * to completion. New jobs will be delayed until the course is resumed.
+ *
+ * @param job - The BullMQ job to delay
+ * @param courseId - The course ID to check pause status for
+ * @param token - Job token for lock management (required for moveToDelayed, validated at runtime)
+ * @throws DelayedError if the job was moved to delayed state
+ * @throws Error if token is missing when pause is needed
+ */
+export async function checkPauseAndDelay(
+  job: Job,
+  courseId: string,
+  token?: string
+): Promise<void> {
+  const isPaused = await isCoursePaused(courseId);
+
+  if (isPaused) {
+    // Token is required for moveToDelayed
+    // BullMQ types say token is optional, but it's required for proper lock management
+    if (!token) {
+      logger.error({ jobId: job.id, courseId }, 'Cannot delay job: token is missing');
+      throw new Error('Job token is required for pause/delay operations');
+    }
+
+    // Issue #7: Track pause delay count in job metrics
+    // Increment pauseDelayCount to track how many times this job was delayed due to pause
+    const currentData = job.data as Record<string, unknown>;
+    const previousDelayCount = (currentData.pauseDelayCount as number) || 0;
+    const newDelayCount = previousDelayCount + 1;
+
+    // Update job data with incremented pause delay count
+    // This persists across job retries and can be used for metrics/logging
+    await job.updateData({
+      ...currentData,
+      pauseDelayCount: newDelayCount,
+    });
+
+    const delayUntil = Date.now() + PAUSE_DELAY_MS;
+    logger.info(
+      {
+        jobId: job.id,
+        courseId,
+        jobType: job.name,
+        attemptsMade: job.attemptsMade,
+        pauseDelayCount: newDelayCount,
+        delayUntil: new Date(delayUntil).toISOString(),
+        pauseDelayMs: PAUSE_DELAY_MS,
+      },
+      'Course generation is paused, delaying job'
+    );
+
+    // Move job to delayed state - it will be picked up again after PAUSE_DELAY_MS
+    await job.moveToDelayed(delayUntil, token);
+
+    // Throw DelayedError to signal the worker that the job was delayed
+    throw new DelayedError();
+  }
+}

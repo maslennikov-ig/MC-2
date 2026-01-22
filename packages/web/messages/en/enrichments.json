@@ -103,7 +103,9 @@
     "generationFailed": "Failed to generate enrichment",
     "deleteFailed": "Failed to delete enrichment",
     "loadFailed": "Failed to load enrichments",
-    "noContent": "Lesson content is empty"
+    "noContent": "Lesson content is empty",
+    "rateLimitExceeded": "Rate limit exceeded. Please wait and try again.",
+    "serverError": "Server error. Please try again later."
   },
   "forms": {
     "common": {
@@ -243,7 +245,8 @@
       "banner": "Decorative Banner"
     },
     "generationComplete": "Enrichment generated successfully",
-    "generationFailed": "Failed to generate enrichment"
+    "generationFailed": "Failed to generate enrichment",
+    "resumingGeneration": "Resuming {count, plural, one {# generation} other {# generations}}..."
   },
   "placeholder": {
     "quiz": {
@@ -264,6 +267,7 @@
     "video": {
       "title": "Video",
       "description": "AI video lecture",
+      "estimatedTime": "Coming Soon",
       "comingSoon": "Coming Soon"
     }
   },
@@ -272,15 +276,19 @@
     "tokens": "tokens",
     "generateButton": "Generate",
     "cover": {
-      "title": "Lesson Cover",
-      "description": "Hero banner displayed at the top of the lesson (16:9)"
+      "title": "Lesson Banner",
+      "description": "Wide 16:9 image at the top of the lesson page. Displayed as a hero banner above the lesson content.",
+      "usageHint": "Where it appears: lesson page header"
     },
     "card": {
       "title": "Lesson Thumbnail",
-      "description": "Small preview image for navigation (1:1 square)"
+      "description": "Square 1:1 preview for navigation. Displayed in lesson lists and sidebar.",
+      "usageHint": "Where it appears: lesson list, sidebar"
     },
     "style": {
       "label": "Style",
+      "tooltip": "Visual style of the image. Affects overall aesthetics and level of detail.",
+      "premium3d": "Cinematic 3D",
       "realistic": "Realistic",
       "abstract": "Abstract",
       "minimalist": "Minimalist",
@@ -288,11 +296,24 @@
     },
     "colorScheme": {
       "label": "Color Scheme",
+      "tooltip": "Image color palette. \"Auto\" will pick colors based on course settings.",
       "auto": "Auto (from course)",
       "warm": "Warm tones",
       "cool": "Cool tones",
       "monochrome": "Monochrome"
     },
+    "customPrompt": {
+      "label": "Additional Instructions",
+      "placeholder": "E.g., brighter colors, minimalist style, include technology elements...",
+      "tooltip": "Optional. Specify preferences for the image that will be added to the default generation prompt."
+    },
+    "regeneratePrompt": {
+      "label": "What to Change",
+      "placeholder": "E.g., make background darker, add more details, change color scheme...",
+      "tooltip": "Describe what you want to change in the current image. These instructions will be added to the regeneration prompt."
+    },
+    "regenerateSection": "Regenerate",
+    "regenerateButton": "Regenerate",
     "estimatedCost": "Estimated cost",
     "batchGenerate": "Generate Missing",
     "batchProgress": "Generating {current} of {total}...",
@@ -303,5 +324,10 @@
   "generating": "Generating...",
   "options": "Options",
   "cancel": "Cancel",
-  "retry": "Retry"
+  "retry": "Retry",
+  "draftReady": "Draft Ready",
+  "draftPreview": {
+    "slideCount": "{count} slides ready",
+    "estimatedDuration": "~{minutes} min video"
+  }
 }

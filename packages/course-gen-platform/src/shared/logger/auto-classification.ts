@@ -32,7 +32,7 @@
  *
  * 4. **Trie-based matching** - For prefix-heavy patterns
  *
- * Current rule count: 20 (no optimization needed)
+ * Current rule count: 29 (no optimization needed)
  * Review threshold: 30+ rules
  */
 
@@ -66,6 +66,11 @@ export const AUTO_MUTE_RULES: AutoMuteRule[] = [
     pattern: /graceful.*shutdown/i,
     reason: 'graceful_shutdown',
     description: 'Server shutdown events - expected during deploys',
+  },
+  {
+    pattern: /Shutdown already in progress/i,
+    reason: 'graceful_shutdown',
+    description: 'Duplicate shutdown signal received - expected during process termination',
   },
 
   // === Monitoring & Health Probes ===
@@ -131,6 +136,13 @@ export const AUTO_MUTE_RULES: AutoMuteRule[] = [
     description: 'Health endpoint returning 503 during startup - expected during deploys',
   },
 
+  // === Redis Reconnection Events ===
+  {
+    pattern: /Redis reconnecting in \d+ms/i,
+    reason: 'graceful_shutdown',
+    description: 'Redis auto-reconnect during restart - expected behavior',
+  },
+
   // === Job Lifecycle Events ===
   {
     pattern: /Job stalled/i,
@@ -170,6 +182,36 @@ export const AUTO_MUTE_RULES: AutoMuteRule[] = [
     pattern: /Visual style validation failed.*using fallback/i,
     reason: 'cascading_repair',
     description: 'Visual style config invalid - falling back to no visuals, expected behavior',
+  },
+  {
+    pattern: /Patcher.*REJECTED.*prompt template markers/i,
+    reason: 'cascading_repair',
+    description: 'LLM hallucinated prompt template - patcher correctly rejected, will retry',
+  },
+  {
+    pattern: /No RAG chunks found for section/i,
+    reason: 'expected_behavior',
+    description: 'Course without documents - content generated without reference materials',
+  },
+  {
+    pattern: /Mermaid.*fallback.*used|Mermaid.*fix failed.*using fallback/i,
+    reason: 'graceful_fallback',
+    description: 'Mermaid diagram generation failed - graceful fallback to text description',
+  },
+  {
+    pattern: /Invalid job name \(undefined\)/i,
+    reason: 'job_lifecycle',
+    description: 'Corrupted or legacy job without proper type - safe to ignore',
+  },
+  {
+    pattern: /job\.name is undefined.*corrupted/i,
+    reason: 'job_lifecycle',
+    description: 'Job created without proper name - legacy or corrupted job',
+  },
+  {
+    pattern: /Unexpected exit code: 10/i,
+    reason: 'job_lifecycle',
+    description: 'Worker TTL timeout (10 min) - job exceeded max time, will be retried',
   },
 ];
 

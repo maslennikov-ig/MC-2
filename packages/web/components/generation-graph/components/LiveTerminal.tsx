@@ -1,8 +1,8 @@
-'use client';
+'use client'
 
-import React, { useEffect, useRef, useState } from 'react';
-import { X } from 'lucide-react';
-import { LessonLogEntry, Stage6NodeName, STAGE6_NODE_LABELS } from '@megacampus/shared-types';
+import React, { useEffect, useRef, useState } from 'react'
+import { X } from 'lucide-react'
+import { LessonLogEntry, Stage6NodeName, STAGE6_NODE_LABELS } from '@megacampus/shared-types'
 
 // =============================================================================
 // Types
@@ -10,13 +10,13 @@ import { LessonLogEntry, Stage6NodeName, STAGE6_NODE_LABELS } from '@megacampus/
 
 interface LiveTerminalProps {
   /** Log entries to display */
-  logs: LessonLogEntry[];
+  logs: LessonLogEntry[]
   /** Maximum number of lines to keep in buffer (default: 100) */
-  maxLines?: number;
+  maxLines?: number
   /** Additional CSS classes */
-  className?: string;
+  className?: string
   /** Callback when Clear button is clicked */
-  onClear?: () => void;
+  onClear?: () => void
 }
 
 // =============================================================================
@@ -29,7 +29,7 @@ const LOG_LEVEL_COLORS: Record<LessonLogEntry['level'], string> = {
   info: 'text-slate-300 dark:text-slate-400',
   warn: 'text-yellow-500',
   error: 'text-red-500',
-};
+}
 
 /** Color classes for node tags
  * 4-node pipeline: generator, selfReviewer, judge, coverGenerator
@@ -40,7 +40,7 @@ const NODE_TAG_COLORS: Record<Stage6NodeName | 'system', string> = {
   judge: 'text-orange-400',
   coverGenerator: 'text-pink-400',
   system: 'text-slate-500',
-};
+}
 
 // =============================================================================
 // Utility Functions
@@ -55,15 +55,15 @@ function formatTimestamp(date: Date): string {
     minute: '2-digit',
     second: '2-digit',
     hour12: false,
-  }).format(date);
+  }).format(date)
 }
 
 /**
  * Get display name for node tag
  */
 function getNodeDisplayName(node: Stage6NodeName | 'system'): string {
-  if (node === 'system') return 'System';
-  return STAGE6_NODE_LABELS[node].ru;
+  if (node === 'system') return 'System'
+  return STAGE6_NODE_LABELS[node].ru
 }
 
 // =============================================================================
@@ -81,48 +81,40 @@ function getNodeDisplayName(node: Stage6NodeName | 'system'): string {
  * - Dark theme (even in light mode)
  * - Buffered to max lines
  */
-export function LiveTerminal({
-  logs,
-  maxLines = 100,
-  className = '',
-  onClear,
-}: LiveTerminalProps) {
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
-  const [showCursor, setShowCursor] = useState(true);
+export function LiveTerminal({ logs, maxLines = 100, className = '', onClear }: LiveTerminalProps) {
+  const scrollContainerRef = useRef<HTMLDivElement>(null)
+  const [showCursor, setShowCursor] = useState(true)
 
   // Limit logs to maxLines (keep most recent)
-  const displayLogs = logs.slice(-maxLines);
+  const displayLogs = logs.slice(-maxLines)
 
   // Auto-scroll to bottom when new logs arrive
   useEffect(() => {
     if (scrollContainerRef.current) {
-      scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight;
+      scrollContainerRef.current.scrollTop = scrollContainerRef.current.scrollHeight
     }
-  }, [logs.length]);
+  }, [logs.length])
 
   // Blinking cursor animation
   useEffect(() => {
     const interval = setInterval(() => {
-      setShowCursor((prev) => !prev);
-    }, 530); // Blink every 530ms (standard terminal cursor speed)
+      setShowCursor((prev) => !prev)
+    }, 530) // Blink every 530ms (standard terminal cursor speed)
 
-    return () => clearInterval(interval);
-  }, []);
+    return () => clearInterval(interval)
+  }, [])
 
   return (
     <div
-      className={`
-        flex flex-col h-full bg-slate-950 text-slate-300 rounded-lg overflow-hidden border border-slate-800
-        ${className}
-      `}
+      className={`flex h-full flex-col overflow-hidden rounded-lg border border-slate-800 bg-slate-950 text-slate-300 ${className} `}
     >
       {/* Header */}
-      <div className="flex items-center justify-between px-4 py-2 bg-slate-900 border-b border-slate-800">
+      <div className="flex items-center justify-between border-b border-slate-800 bg-slate-900 px-4 py-2">
         <h3 className="text-sm font-medium text-slate-400">Terminal</h3>
         {onClear && (
           <button
             onClick={onClear}
-            className="p-1 rounded hover:bg-slate-800 transition-colors text-slate-500 hover:text-slate-300"
+            className="rounded p-1 text-slate-500 transition-colors hover:bg-slate-800 hover:text-slate-300"
             title="Clear logs"
             aria-label="Clear logs"
           >
@@ -134,38 +126,37 @@ export function LiveTerminal({
       {/* Log Content */}
       <div
         ref={scrollContainerRef}
-        className="flex-1 overflow-y-auto p-3 font-mono text-xs leading-relaxed scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-slate-900"
+        role="log"
+        aria-live="polite"
+        aria-atomic="false"
+        aria-label="Terminal output"
+        className="scrollbar-thin scrollbar-thumb-slate-700 scrollbar-track-slate-900 flex-1 overflow-y-auto p-3 font-mono text-xs leading-relaxed"
       >
         {displayLogs.length === 0 ? (
           <div className="text-slate-600 italic">No logs yet...</div>
         ) : (
           <>
             {displayLogs.map((log) => (
-              <div
-                key={log.id}
-                className={`flex gap-2 mb-1 ${LOG_LEVEL_COLORS[log.level]}`}
-              >
+              <div key={log.id} className={`mb-1 flex gap-2 ${LOG_LEVEL_COLORS[log.level]}`}>
                 {/* Timestamp */}
-                <span className="text-slate-500 select-none shrink-0">
+                <span className="shrink-0 text-slate-500 select-none">
                   {formatTimestamp(log.timestamp)}
                 </span>
 
                 {/* Node Tag */}
-                <span
-                  className={`${NODE_TAG_COLORS[log.node]} font-semibold select-none shrink-0`}
-                >
+                <span className={`${NODE_TAG_COLORS[log.node]} shrink-0 font-semibold select-none`}>
                   [{getNodeDisplayName(log.node)}]
                 </span>
 
                 {/* Message */}
-                <span className="break-words flex-1">{log.message}</span>
+                <span className="flex-1 break-words">{log.message}</span>
               </div>
             ))}
 
             {/* Blinking Cursor */}
-            <div className="flex gap-2 mt-1">
+            <div className="mt-1 flex gap-2">
               <span
-                className={`inline-block w-2 h-4 bg-slate-400 transition-opacity ${
+                className={`inline-block h-4 w-2 bg-slate-400 transition-opacity ${
                   showCursor ? 'opacity-100' : 'opacity-0'
                 }`}
               />
@@ -174,5 +165,5 @@ export function LiveTerminal({
         )}
       </div>
     </div>
-  );
+  )
 }

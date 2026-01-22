@@ -1,6 +1,6 @@
 {
   "name": "megacampus-monorepo",
-  "version": "0.28.21",
+  "version": "0.28.27",
   "private": true,
   "description": "MegaCampusAI - Stage 0: Foundation Infrastructure",
   "scripts": {
@@ -45,7 +45,12 @@
       "body-parser": ">=2.2.1",
       "mdast-util-to-hast": ">=13.2.1",
       "@langchain/core": ">=1.1.8",
-      "@modelcontextprotocol/sdk": ">=1.25.2"
+      "@modelcontextprotocol/sdk": ">=1.25.2",
+      "tar": ">=7.5.4",
+      "undici": ">=6.23.0",
+      "lodash": ">=4.17.23",
+      "lodash-es": ">=4.17.23",
+      "diff": ">=5.2.2"
     }
   },
   "dependencies": {
