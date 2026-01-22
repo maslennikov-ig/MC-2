@@ -1,4 +1,3 @@
-/* eslint-disable */
 /**
  * Contract tests for MarkdownRenderer RSC (React Server Component)
  *
