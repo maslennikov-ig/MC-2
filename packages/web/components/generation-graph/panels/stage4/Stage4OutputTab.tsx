@@ -216,18 +216,25 @@ export const Stage4OutputTab = memo<Stage4OutputTabProps>(function Stage4OutputT
 }) {
   const t = GRAPH_TRANSLATIONS.stage4 as Record<string, { ru: string; en: string }>
 
-  // Get visual style and writing style from context
+  // Get visual style, writing style, and persisted analysis result from context
   const { courseInfo } = useStaticGraph()
   const visualStyle = courseInfo.visualStyle
   const writingStyle = courseInfo.courseStyle
+  const persistedAnalysisResult = courseInfo.analysisResult
 
   // Parse output data as AnalysisResult
+  // Priority: persisted analysis_result (from courses table, includes user edits) > outputData (from traces)
   const analysisResult = useMemo((): AnalysisResult | null => {
+    // First try persisted analysis_result from courses table (includes user edits)
+    if (isAnalysisResult(persistedAnalysisResult)) {
+      return persistedAnalysisResult
+    }
+    // Fall back to outputData from generation_trace
     if (isAnalysisResult(outputData)) {
       return outputData
     }
     return null
-  }, [outputData])
+  }, [persistedAnalysisResult, outputData])
 
   // Extract hero data from analysis result
   const heroData = useMemo(() => {

@@ -721,6 +721,8 @@ export interface StaticGraphData {
     courseStyle?: string | null;
     /** Read-only mode for automatic generation (hides edit/regenerate/approve buttons) */
     readOnly?: boolean;
+    /** Analysis result from Stage 4 (persisted in courses.analysis_result) */
+    analysisResult?: unknown;
   };
 }
 

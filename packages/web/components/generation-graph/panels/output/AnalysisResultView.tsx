@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useCallback, useMemo } from 'react'
+import React, { useEffect, useCallback, useMemo, useState } from 'react'
 import { PhaseAccordion, AccordionItem } from './PhaseAccordion'
 import { AnalysisResult } from '@megacampus/shared-types'
 import { Badge } from '@/components/ui/badge'
@@ -170,6 +170,41 @@ export const AnalysisResultView = ({
     { debounceMs: 1000 }
   )
 
+  // Track which field is currently being edited/saved for per-field status indication
+  const [activeField, setActiveField] = useState<string | null>(null)
+
+  // Wrapper for save that tracks active field
+  const handleFieldSave = useCallback(
+    (fieldPath: string, value: unknown) => {
+      setActiveField(fieldPath)
+      save(fieldPath, value)
+    },
+    [save]
+  )
+
+  // Get status for a specific field (only show status for the active field)
+  const getFieldStatus = useCallback(
+    (fieldPath: string) => {
+      if (activeField === fieldPath) {
+        return status
+      }
+      return 'idle'
+    },
+    [activeField, status]
+  )
+
+  // Clear active field when save completes or errors
+  useEffect(() => {
+    if (status === 'saved' || status === 'error') {
+      // Delay clearing to show the status briefly
+      const timer = setTimeout(() => {
+        setActiveField(null)
+      }, 2000)
+      return () => clearTimeout(timer)
+    }
+    return undefined
+  }, [status])
+
   const canEdit = editable && courseId && !readOnly
 
   // Edit history store
@@ -320,9 +355,9 @@ export const AnalysisResultView = ({
                     ],
                   }}
                   value={data.course_category.primary}
-                  onChange={(v) => save('course_category.primary', v)}
+                  onChange={(v) => handleFieldSave('course_category.primary', v)}
                   onBlur={flush}
-                  status={status}
+                  status={getFieldStatus('course_category.primary')}
                 />
               </div>
             ) : (
@@ -347,9 +382,9 @@ export const AnalysisResultView = ({
                       type: 'textarea',
                     }}
                     value={data.contextual_language.why_matters_context}
-                    onChange={(v) => save('contextual_language.why_matters_context', v)}
+                    onChange={(v) => handleFieldSave('contextual_language.why_matters_context', v)}
                     onBlur={flush}
-                    status={status}
+                    status={getFieldStatus('contextual_language.why_matters_context')}
                   />
                 ) : (
                   <LabeledValue
@@ -365,9 +400,9 @@ export const AnalysisResultView = ({
                       type: 'textarea',
                     }}
                     value={data.contextual_language.motivators}
-                    onChange={(v) => save('contextual_language.motivators', v)}
+                    onChange={(v) => handleFieldSave('contextual_language.motivators', v)}
                     onBlur={flush}
-                    status={status}
+                    status={getFieldStatus('contextual_language.motivators')}
                   />
                 ) : (
                   <LabeledValue label={t.motivators} value={data.contextual_language.motivators} />
@@ -388,9 +423,9 @@ export const AnalysisResultView = ({
                   type: 'text',
                 }}
                 value={data.topic_analysis.determined_topic}
-                onChange={(v) => save('topic_analysis.determined_topic', v)}
+                onChange={(v) => handleFieldSave('topic_analysis.determined_topic', v)}
                 onBlur={flush}
-                status={status}
+                status={getFieldStatus('topic_analysis.determined_topic')}
               />
             ) : (
               <LabeledValue label={t.topic} value={data.topic_analysis.determined_topic} />
@@ -403,9 +438,9 @@ export const AnalysisResultView = ({
               <EditableChips
                 label={t.keyConcepts}
                 items={data.topic_analysis.key_concepts}
-                onChange={(items) => save('topic_analysis.key_concepts', items)}
+                onChange={(items) => handleFieldSave('topic_analysis.key_concepts', items)}
                 onBlur={flush}
-                status={status}
+                status={getFieldStatus('topic_analysis.key_concepts')}
               />
             ) : (
               <LabeledValue
@@ -434,9 +469,9 @@ export const AnalysisResultView = ({
                     max: 100,
                   }}
                   value={data.recommended_structure.total_lessons}
-                  onChange={(v) => save('recommended_structure.total_lessons', v)}
+                  onChange={(v) => handleFieldSave('recommended_structure.total_lessons', v)}
                   onBlur={flush}
-                  status={status}
+                  status={getFieldStatus('recommended_structure.total_lessons')}
                 />
               ) : (
                 <LabeledValue
@@ -454,9 +489,9 @@ export const AnalysisResultView = ({
                     max: 30,
                   }}
                   value={data.recommended_structure.total_sections}
-                  onChange={(v) => save('recommended_structure.total_sections', v)}
+                  onChange={(v) => handleFieldSave('recommended_structure.total_sections', v)}
                   onBlur={flush}
-                  status={status}
+                  status={getFieldStatus('recommended_structure.total_sections')}
                 />
               ) : (
                 <LabeledValue
@@ -492,9 +527,9 @@ export const AnalysisResultView = ({
                   type: 'textarea',
                 }}
                 value={data.pedagogical_strategy.assessment_approach}
-                onChange={(v) => save('pedagogical_strategy.assessment_approach', v)}
+                onChange={(v) => handleFieldSave('pedagogical_strategy.assessment_approach', v)}
                 onBlur={flush}
-                status={status}
+                status={getFieldStatus('pedagogical_strategy.assessment_approach')}
               />
             ) : (
               <LabeledValue
@@ -510,9 +545,9 @@ export const AnalysisResultView = ({
                   type: 'textarea',
                 }}
                 value={data.pedagogical_strategy.progression_logic}
-                onChange={(v) => save('pedagogical_strategy.progression_logic', v)}
+                onChange={(v) => handleFieldSave('pedagogical_strategy.progression_logic', v)}
                 onBlur={flush}
-                status={status}
+                status={getFieldStatus('pedagogical_strategy.progression_logic')}
               />
             ) : (
               <LabeledValue
@@ -524,9 +559,9 @@ export const AnalysisResultView = ({
               <EditableChips
                 label={t.assessmentTypes}
                 items={data.pedagogical_patterns.assessment_types}
-                onChange={(items) => save('pedagogical_patterns.assessment_types', items)}
+                onChange={(items) => handleFieldSave('pedagogical_patterns.assessment_types', items)}
                 onBlur={flush}
-                status={status}
+                status={getFieldStatus('pedagogical_patterns.assessment_types')}
               />
             ) : (
               <LabeledValue
@@ -550,17 +585,17 @@ export const AnalysisResultView = ({
                     type: 'toggle',
                   }}
                   value={data.generation_guidance.use_analogies}
-                  onChange={(v) => save('generation_guidance.use_analogies', v)}
+                  onChange={(v) => handleFieldSave('generation_guidance.use_analogies', v)}
                   onBlur={flush}
-                  status={status}
+                  status={getFieldStatus('generation_guidance.use_analogies')}
                 />
                 {data.generation_guidance.use_analogies && (
                   <EditableChips
                     label="Специфичные аналогии"
                     items={data.generation_guidance.specific_analogies || []}
-                    onChange={(items) => save('generation_guidance.specific_analogies', items)}
+                    onChange={(items) => handleFieldSave('generation_guidance.specific_analogies', items)}
                     onBlur={flush}
-                    status={status}
+                    status={getFieldStatus('generation_guidance.specific_analogies')}
                   />
                 )}
               </>
