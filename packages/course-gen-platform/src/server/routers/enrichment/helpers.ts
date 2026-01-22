@@ -390,13 +390,14 @@ export async function checkExistingEnrichment(
 /**
  * Check if enrichment type uses two-stage generation
  *
+ * Only video and presentation use two-stage flow (they have approval UI).
+ * Cover/banner use single-stage for on-demand generation (no draft approval UI).
+ *
  * @param enrichmentType - Type of enrichment
  * @returns True if type uses draft -> final flow
  */
 export function isTwoStageType(enrichmentType: string): boolean {
-  return (
-    enrichmentType === 'video' || enrichmentType === 'presentation' || enrichmentType === 'cover'
-  );
+  return enrichmentType === 'video' || enrichmentType === 'presentation';
 }
 
 /**
