@@ -450,3 +450,27 @@ export async function switchToManualMode(courseId: string) {
   const data = await response.json()
   return data?.result?.data || data
 }
+
+/**
+ * Get edit history for a course
+ * Used by EditHistoryPanel to display all regeneration changes
+ * Calls generation.getEditHistory tRPC endpoint
+ */
+export async function getEditHistoryAction(courseId: string, limit: number = 50) {
+  const headers = await getBackendAuthHeaders()
+
+  const response = await fetch(
+    `${TRPC_URL}/generation.getEditHistory?input=${encodeURIComponent(JSON.stringify({ courseId, limit }))}`,
+    {
+      method: 'GET',
+      headers,
+    }
+  )
+
+  if (!response.ok) {
+    await extractApiError(response, 'Failed to get edit history')
+  }
+
+  const data = await response.json()
+  return data?.result?.data || data
+}

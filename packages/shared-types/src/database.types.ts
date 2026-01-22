@@ -307,6 +307,53 @@ export type Database = {
         }
         Relationships: []
       }
+      course_edits: {
+        Row: {
+          course_id: string
+          created_at: string
+          edited_by: string | null
+          field_path: string
+          id: string
+          new_value: Json | null
+          previous_value: Json | null
+          semantic_diff: Json | null
+          stage: string
+          user_instruction: string | null
+        }
+        Insert: {
+          course_id: string
+          created_at?: string
+          edited_by?: string | null
+          field_path: string
+          id?: string
+          new_value?: Json | null
+          previous_value?: Json | null
+          semantic_diff?: Json | null
+          stage: string
+          user_instruction?: string | null
+        }
+        Update: {
+          course_id?: string
+          created_at?: string
+          edited_by?: string | null
+          field_path?: string
+          id?: string
+          new_value?: Json | null
+          previous_value?: Json | null
+          semantic_diff?: Json | null
+          stage?: string
+          user_instruction?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "course_edits_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       course_enrollments: {
         Row: {
           completed_at: string | null
