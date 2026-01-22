@@ -323,5 +323,10 @@
   "generating": "Generating...",
   "options": "Options",
   "cancel": "Cancel",
-  "retry": "Retry"
+  "retry": "Retry",
+  "draftReady": "Draft Ready",
+  "draftPreview": {
+    "slideCount": "{count} slides ready",
+    "estimatedDuration": "~{minutes} min video"
+  }
 }

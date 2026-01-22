@@ -323,5 +323,10 @@
   "generating": "Генерация...",
   "options": "Опции",
   "cancel": "Отменить",
-  "retry": "Повторить"
+  "retry": "Повторить",
+  "draftReady": "Черновик готов",
+  "draftPreview": {
+    "slideCount": "{count, plural, one {# слайд} few {# слайда} many {# слайдов} other {# слайдов}} готово",
+    "estimatedDuration": "~{minutes} мин видео"
+  }
 }
