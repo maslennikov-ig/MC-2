@@ -311,6 +311,38 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.28.26] - 2026-01-22
+
+### Added
+
+- **enrichment**: add grayscale placeholder with hover color reveal (3fdb463)
+
+### Changed
+
+- fix CPU/memory issues in course generation page (086efcf)
+- **template-whitelist**: optimize Helm function matching with Set lookup (6864a32)
+
+### Fixed
+
+- **web**: update 4 source file(s), update docs (002342f)
+- address code review issues for performance optimization (9543318)
+- sprint bug fixes - template whitelist, patcher retry, banner flow, status validation (2466f45)
+
+### Other
+
+- bd sync: 2026-01-22 16:21:29 (f271e2c)
+- bd sync: 2026-01-22 16:21:19 (aebc91b)
+- bd sync: 2026-01-22 16:19:05 (e0335f1)
+- bd sync: 2026-01-22 16:16:30 (91931f2)
+- bd sync: 2026-01-22 16:15:55 (e086cc9)
+- bd sync: 2026-01-22 15:03:17 (8645448)
+- bd sync: 2026-01-22 15:03:08 (4ca7f9d)
+- bd sync: 2026-01-22 14:51:05 (206ff2f)
+- bd sync: 2026-01-22 14:09:18 (26a7654)
+- bd sync: 2026-01-22 13:59:04 (6ac77ac)
+- bd sync: 2026-01-22 13:58:40 (96d8980)
+- remove demo pages (ae8c454)
+
 ## [0.28.25] - 2026-01-22
 
 ### Added
