@@ -216,8 +216,9 @@ describe('shouldAutoMute', () => {
   });
 
   describe('AUTO_MUTE_RULES configuration', () => {
-    it('should have 6 rules defined', () => {
-      expect(AUTO_MUTE_RULES).toHaveLength(6);
+    it('should have rules defined (auto-mute patterns)', () => {
+      // At least 20 rules expected - exact count changes as rules are added
+      expect(AUTO_MUTE_RULES.length).toBeGreaterThanOrEqual(20);
     });
 
     it('should have valid structure for all rules', () => {
