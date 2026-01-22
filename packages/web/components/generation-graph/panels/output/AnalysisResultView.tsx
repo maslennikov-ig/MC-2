@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useEffect, useCallback, useMemo, useState } from 'react'
+import React, { useEffect, useCallback, useMemo, useState, useRef } from 'react'
 import { PhaseAccordion, AccordionItem } from './PhaseAccordion'
 import { AnalysisResult } from '@megacampus/shared-types'
 import { Badge } from '@/components/ui/badge'
@@ -8,7 +8,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { cn } from '@/lib/utils'
 import { EditableField } from './EditableField'
 import { EditableChips } from './EditableChips'
-import { useAutoSave } from '../../hooks/useAutoSave'
+import { useAutoSave, SaveStatus } from '../../hooks/useAutoSave'
 import { updateFieldAction } from '@/app/actions/admin-generation'
 import { SaveStatusIndicator } from './SaveStatusIndicator'
 import { Eye } from 'lucide-react'
@@ -170,37 +170,61 @@ export const AnalysisResultView = ({
     { debounceMs: 1000 }
   )
 
-  // Track which field is currently being edited/saved for per-field status indication
-  const [activeField, setActiveField] = useState<string | null>(null)
+  // Per-field save status tracking (fixes race condition with rapid edits)
+  const [fieldStatuses, setFieldStatuses] = useState<Map<string, SaveStatus>>(new Map())
+  const lastSavedFieldRef = useRef<string | null>(null)
 
-  // Wrapper for save that tracks active field
+  // Wrapper for save that tracks per-field status
   const handleFieldSave = useCallback(
     (fieldPath: string, value: unknown) => {
-      setActiveField(fieldPath)
+      // Set this field to 'saving' immediately
+      setFieldStatuses(prev => {
+        const next = new Map(prev)
+        next.set(fieldPath, 'saving')
+        return next
+      })
+      lastSavedFieldRef.current = fieldPath
       save(fieldPath, value)
     },
     [save]
   )
 
-  // Get status for a specific field (only show status for the active field)
+  // Get status for a specific field from the Map
   const getFieldStatus = useCallback(
-    (fieldPath: string) => {
-      if (activeField === fieldPath) {
-        return status
-      }
-      return 'idle'
+    (fieldPath: string): SaveStatus => {
+      return fieldStatuses.get(fieldPath) ?? 'idle'
     },
-    [activeField, status]
+    [fieldStatuses]
   )
 
-  // Clear active field when save completes or errors
+  // Update per-field status when save completes or errors
   useEffect(() => {
-    if (status === 'saved' || status === 'error') {
-      // Delay clearing to show the status briefly
+    if ((status === 'saved' || status === 'error') && lastSavedFieldRef.current) {
+      const fieldPath = lastSavedFieldRef.current
+
+      // Update this field's status
+      setFieldStatuses(prev => {
+        const next = new Map(prev)
+        next.set(fieldPath, status)
+        return next
+      })
+
+      // Clear after 2 seconds with isMounted guard
+      let isMounted = true
       const timer = setTimeout(() => {
-        setActiveField(null)
+        if (isMounted) {
+          setFieldStatuses(prev => {
+            const next = new Map(prev)
+            next.delete(fieldPath)
+            return next
+          })
+        }
       }, 2000)
-      return () => clearTimeout(timer)
+
+      return () => {
+        isMounted = false
+        clearTimeout(timer)
+      }
     }
     return undefined
   }, [status])
