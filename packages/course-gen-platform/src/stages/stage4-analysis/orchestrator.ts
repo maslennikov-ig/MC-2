@@ -543,6 +543,25 @@ export async function runAnalysisOrchestration(job: StructureAnalysisJob): Promi
       durationMs: phase4Output.phase_metadata.duration_ms,
     });
 
+    // T012: Log parameter storage after Phase 4 completion
+    await logTrace({
+      courseId,
+      stage: 'stage_4',
+      phase: 'completion',
+      stepName: 'parameter_store',
+      inputData: {
+        source: 'phase_4_synthesis',
+        hasGenerationGuidance: !!phase4Output.generation_guidance,
+        hasPedagogicalPatterns: !!phase1Output.pedagogical_patterns,
+      },
+      outputData: {
+        generation_guidance: phase4Output.generation_guidance,
+        pedagogical_patterns: phase1Output.pedagogical_patterns,
+        content_strategy: phase4Output.content_strategy,
+      },
+      durationMs: 0,
+    });
+
     // Log generation_guidance if present (Analyze Enhancement A20)
     if (phase4Output.generation_guidance) {
       orchestrationLogger.info(
@@ -637,6 +656,25 @@ export async function runAnalysisOrchestration(job: StructureAnalysisJob): Promi
       costUsd: analysisResult.metadata.total_cost_usd,
       tokensUsed: analysisResult.metadata.total_tokens.total,
       durationMs: totalDurationMs,
+    });
+
+    // T012: Log parameter propagation to Stage 5
+    await logTrace({
+      courseId,
+      stage: 'stage_4',
+      phase: 'complete',
+      stepName: 'parameter_propagate',
+      inputData: {
+        targetStage: 'stage_5',
+        parameterTypes: ['generation_guidance', 'pedagogical_patterns', 'content_strategy'],
+      },
+      outputData: {
+        generation_guidance: analysisResult.generation_guidance,
+        pedagogical_patterns: analysisResult.pedagogical_patterns,
+        content_strategy: analysisResult.content_strategy,
+        recommended_structure: analysisResult.recommended_structure,
+      },
+      durationMs: 0,
     });
 
     return analysisResult;
