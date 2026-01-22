@@ -13,6 +13,7 @@ interface LessonGridProps {
   lessons: LessonRow[]
   sections: Map<string, SectionRow>
   enrichments: Map<string, EnrichmentRow[]>
+  completedLessons: Set<string>
   courseSlug: string
 }
 
@@ -29,33 +30,42 @@ function getEnrichmentFlags(enrichmentRows: EnrichmentRow[] | undefined) {
   }
 }
 
-export function LessonGrid({ lessons, enrichments, courseSlug }: LessonGridProps) {
+export function LessonGrid({
+  lessons,
+  enrichments,
+  completedLessons,
+  courseSlug,
+}: LessonGridProps) {
   const router = useRouter()
 
   return (
     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 md:gap-6 lg:grid-cols-3">
       <AnimatePresence mode="popLayout">
-        {lessons.map((lesson, index) => (
-          <motion.div
-            key={lesson.id}
-            initial={{ opacity: 0, y: 20 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, scale: 0.95 }}
-            transition={{ duration: 0.3, delay: index * 0.05 }}
-            layout
-          >
-            <LessonCard
-              lesson={{
-                id: lesson.id,
-                title: lesson.title,
-                duration_minutes: lesson.duration_minutes,
-                order_index: lesson.order_index,
-              }}
-              enrichments={getEnrichmentFlags(enrichments.get(lesson.id))}
-              onClick={() => router.push(`/courses/${courseSlug}?lesson=${lesson.id}`)}
-            />
-          </motion.div>
-        ))}
+        {lessons.map((lesson, index) => {
+          const isCompleted = completedLessons.has(lesson.id)
+          return (
+            <motion.div
+              key={lesson.id}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, scale: 0.95 }}
+              transition={{ duration: 0.3, delay: index * 0.05 }}
+              layout
+            >
+              <LessonCard
+                lesson={{
+                  id: lesson.id,
+                  title: lesson.title,
+                  duration_minutes: lesson.duration_minutes,
+                  order_index: lesson.order_index,
+                }}
+                enrichments={getEnrichmentFlags(enrichments.get(lesson.id))}
+                isCompleted={isCompleted}
+                onClick={() => router.push(`/courses/${courseSlug}?lesson=${lesson.id}`)}
+              />
+            </motion.div>
+          )
+        })}
       </AnimatePresence>
     </div>
   )

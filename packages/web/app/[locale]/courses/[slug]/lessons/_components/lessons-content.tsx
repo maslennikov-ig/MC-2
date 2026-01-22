@@ -21,11 +21,18 @@ interface LessonsContentProps {
   sections: SectionRow[]
   lessons: LessonRow[]
   enrichments: EnrichmentRow[]
+  lessonsCompleted: string[]
 }
 
 type FilterType = 'all' | 'with_video' | 'completed' | 'not_completed'
 
-export function LessonsContent({ course, sections, lessons, enrichments }: LessonsContentProps) {
+export function LessonsContent({
+  course,
+  sections,
+  lessons,
+  enrichments,
+  lessonsCompleted,
+}: LessonsContentProps) {
   const t = useTranslations('course.lessons')
   const router = useRouter()
   const [activeFilter, setActiveFilter] = useState<FilterType>('all')
@@ -49,6 +56,9 @@ export function LessonsContent({ course, sections, lessons, enrichments }: Lesso
     return map
   }, [sections])
 
+  // Create completed lessons set for fast lookup
+  const completedLessonsSet = useMemo(() => new Set(lessonsCompleted), [lessonsCompleted])
+
   // Filter lessons based on active filter
   const filteredLessons = useMemo(() => {
     switch (activeFilter) {
@@ -58,18 +68,14 @@ export function LessonsContent({ course, sections, lessons, enrichments }: Lesso
           return lessonEnrichments.some((e) => e.enrichment_type === 'video')
         })
       case 'completed':
-        // For now, we don't have completion tracking, so return all
-        // TODO: Add user progress tracking
-        return lessons
+        return lessons.filter((lesson) => completedLessonsSet.has(lesson.id))
       case 'not_completed':
-        // For now, return empty since we don't have completion tracking
-        // TODO: Add user progress tracking
-        return []
+        return lessons.filter((lesson) => !completedLessonsSet.has(lesson.id))
       case 'all':
       default:
         return lessons
     }
-  }, [lessons, activeFilter, enrichmentsByLesson])
+  }, [lessons, activeFilter, enrichmentsByLesson, completedLessonsSet])
 
   const handleBackToCourse = () => {
     router.push(`/courses/${course.slug || course.id}`)
@@ -129,19 +135,28 @@ export function LessonsContent({ course, sections, lessons, enrichments }: Lesso
               }
               )
             </Button>
-            {/* Commented out until we add user progress tracking */}
-            {/* <Button
+            <Button
               variant={activeFilter === 'completed' ? 'default' : 'outline'}
               onClick={() => setActiveFilter('completed')}
+              className={
+                activeFilter === 'completed'
+                  ? 'bg-green-600 text-white hover:bg-green-700'
+                  : 'border-gray-300 text-gray-700 hover:bg-gray-50 dark:border-slate-700 dark:text-gray-300 dark:hover:bg-slate-800'
+              }
             >
-              {t('filters.completed')}
+              {t('filters.completed')} ({lessonsCompleted.length})
             </Button>
             <Button
               variant={activeFilter === 'not_completed' ? 'default' : 'outline'}
               onClick={() => setActiveFilter('not_completed')}
+              className={
+                activeFilter === 'not_completed'
+                  ? 'bg-gray-600 text-white hover:bg-gray-700'
+                  : 'border-gray-300 text-gray-700 hover:bg-gray-50 dark:border-slate-700 dark:text-gray-300 dark:hover:bg-slate-800'
+              }
             >
-              {t('filters.notCompleted')}
-            </Button> */}
+              {t('filters.notCompleted')} ({lessons.length - lessonsCompleted.length})
+            </Button>
           </div>
         </div>
 
@@ -150,6 +165,7 @@ export function LessonsContent({ course, sections, lessons, enrichments }: Lesso
           lessons={filteredLessons}
           sections={sectionsById}
           enrichments={enrichmentsByLesson}
+          completedLessons={completedLessonsSet}
           courseSlug={course.slug || course.id}
         />
 

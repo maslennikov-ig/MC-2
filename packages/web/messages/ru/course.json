@@ -33,7 +33,13 @@
       "in_progress": "В процессе",
       "completed": "Завершен"
     },
-    "duration": "{minutes}мин"
+    "duration": "{minutes}мин",
+    "media": {
+      "video": "Доступно видео",
+      "audio": "Доступно аудио",
+      "presentation": "Доступна презентация",
+      "quiz": "Доступен тест"
+    }
   },
   "viewer": {
     "showSidebar": "Показать боковую панель",

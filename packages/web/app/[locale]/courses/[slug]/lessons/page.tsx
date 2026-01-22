@@ -45,7 +45,7 @@ export default async function LessonsPage({ params }: LessonsPageProps) {
 
   const supabase = await getUserClient()
 
-  // Fetch course
+  // Fetch course first (needed for other queries)
   const { data: course, error: courseError } = await supabase
     .from('courses')
     .select('id, title, slug')
@@ -56,39 +56,62 @@ export default async function LessonsPage({ params }: LessonsPageProps) {
     notFound()
   }
 
-  // Fetch sections with all columns to satisfy type
-  const { data: sectionsData } = await supabase
+  // Fetch user auth in parallel with data queries
+  const userPromise = supabase.auth.getUser()
+
+  // Use nested select to fetch all data in ONE query (optimized from N+1)
+  const { data: sectionsWithLessons } = await supabase
     .from('sections')
-    .select('*')
+    .select(
+      `
+      *,
+      lessons (
+        *,
+        lesson_enrichments (*)
+      )
+    `
+    )
     .eq('course_id', course.id)
     .order('order_index')
 
-  const sections: SectionRow[] = sectionsData || []
-  const sectionIds = sections.map((s) => s.id)
+  // Flatten the nested data structure
+  const sections: SectionRow[] = (sectionsWithLessons || []).map((s) => {
+    const { lessons: _, ...section } = s
+    return section as SectionRow
+  })
 
-  // Fetch lessons only if sections exist
-  let lessons: LessonRow[] = []
-  if (sectionIds.length > 0) {
-    const { data: lessonsData } = await supabase
-      .from('lessons')
-      .select('*')
-      .in('section_id', sectionIds)
-      .order('order_index')
+  // Extract and flatten lessons from all sections
+  type LessonWithEnrichments = LessonRow & { lesson_enrichments: EnrichmentRow[] }
+  const allLessons: LessonWithEnrichments[] = (sectionsWithLessons || []).flatMap(
+    (s) => (s.lessons as LessonWithEnrichments[]) || []
+  )
+  const lessons: LessonRow[] = allLessons.map((l) => {
+    const { lesson_enrichments: _, ...lesson } = l
+    return lesson
+  })
 
-    lessons = lessonsData || []
-  }
+  // Extract enrichments (only completed ones)
+  const enrichments: EnrichmentRow[] = allLessons.flatMap((l) =>
+    (l.lesson_enrichments || []).filter((e) => e.status === 'completed')
+  )
 
-  // Fetch enrichments for lessons
-  const lessonIds = lessons.map((l) => l.id)
-  let enrichments: EnrichmentRow[] = []
-  if (lessonIds.length > 0) {
-    const { data: enrichmentsData } = await supabase
-      .from('lesson_enrichments')
-      .select('*')
-      .in('lesson_id', lessonIds)
-      .eq('status', 'completed')
+  // Get user progress (await the earlier promise)
+  const {
+    data: { user },
+  } = await userPromise
+  let lessonsCompleted: string[] = []
 
-    enrichments = enrichmentsData || []
+  if (user) {
+    const { data: progressData } = await supabase.rpc('get_lesson_progress', {
+      p_user_id: user.id,
+      p_course_id: course.id,
+    })
+
+    // RPC returns JSONB, type cast to expected shape
+    const progress = progressData as { lessons_completed?: string[] } | null
+    if (progress?.lessons_completed) {
+      lessonsCompleted = progress.lessons_completed
+    }
   }
 
   return (
@@ -97,6 +120,7 @@ export default async function LessonsPage({ params }: LessonsPageProps) {
       sections={sections}
       lessons={lessons}
       enrichments={enrichments}
+      lessonsCompleted={lessonsCompleted}
     />
   )
 }
