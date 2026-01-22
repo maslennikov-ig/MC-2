@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import { useTranslations } from 'next-intl'
 import Image from 'next/image'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -138,30 +138,42 @@ export function UnifiedEnrichmentCard({
 
   const config = PLACEHOLDER_CONFIG[type]
   const Icon = config.icon
-  const isImageType = type === 'cover' || type === 'card'
+
+  // Memoize computed values for performance
+  const isImageType = useMemo(() => type === 'cover' || type === 'card', [type])
 
   // Extract image URL from content if enrichment exists (for image types)
-  const content = existingEnrichment?.content as
-    | CoverEnrichmentContent
-    | CardEnrichmentContent
-    | null
-  const imageUrl = content?.imageUrl
-  const hasImage = existingEnrichment?.status === 'completed' && imageUrl
+  const { imageUrl, hasImage, altText } = useMemo(() => {
+    const content = existingEnrichment?.content as
+      | CoverEnrichmentContent
+      | CardEnrichmentContent
+      | null
+    const url = content?.imageUrl
+    return {
+      imageUrl: url,
+      hasImage: existingEnrichment?.status === 'completed' && !!url,
+      altText: content?.altText,
+    }
+  }, [existingEnrichment])
 
   // Show reveal panel on hover (desktop) or touch (mobile)
   const shouldShowPanel = isHovered || isTouched
 
   // Close touch panel when generating starts
   useEffect(() => {
-    if (isGenerating) {
+    let isMounted = true
+    if (isGenerating && isMounted) {
       setIsTouched(false)
+    }
+    return () => {
+      isMounted = false
     }
   }, [isGenerating])
 
   /**
    * Collect current settings based on enrichment type
    */
-  const getSettings = (): Record<string, unknown> => {
+  const getSettings = useCallback((): Record<string, unknown> => {
     switch (type) {
       case 'quiz':
         return {
@@ -188,14 +200,25 @@ export function UnifiedEnrichmentCard({
       default:
         return {}
     }
-  }
+  }, [
+    type,
+    quizQuestions,
+    quizDifficulty,
+    audioVoice,
+    audioSpeed,
+    presentationSlides,
+    presentationTheme,
+    imageStyle,
+    colorScheme,
+    customPrompt,
+  ])
 
-  const handleGenerate = () => {
+  const handleGenerate = useCallback(() => {
     onGenerate(getSettings())
     setIsOptionsOpen(false)
-  }
+  }, [onGenerate, getSettings])
 
-  const handleRegenerate = () => {
+  const handleRegenerate = useCallback(() => {
     onGenerate({
       style: imageStyle,
       colorScheme,
@@ -204,14 +227,15 @@ export function UnifiedEnrichmentCard({
     })
     setCustomPrompt('')
     setIsOptionsOpen(false)
-  }
+  }, [onGenerate, imageStyle, colorScheme, customPrompt])
 
-  const handleCardClick = () => {
-    // For mobile, toggle the touch state instead of navigating
-    if ('ontouchstart' in window) {
-      setIsTouched(!isTouched)
+  const handleCardClick = useCallback(() => {
+    // Check if device has no hover capability (truly mobile)
+    const isMobile = window.matchMedia('(hover: none)').matches
+    if (isMobile) {
+      setIsTouched((prev) => !prev)
     }
-  }
+  }, [])
 
   /**
    * Render options based on enrichment type
@@ -401,17 +425,23 @@ export function UnifiedEnrichmentCard({
   }
 
   const getTitle = () => {
+    // Type assertion needed for dynamic i18n keys
     if (isImageType) {
-      return t(`images.${type}.title`)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return t(`images.${type}.title` as any)
     }
-    return t(`placeholder.${type}.title`)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return t(`placeholder.${type}.title` as any)
   }
 
   const getDescription = () => {
+    // Type assertion needed for dynamic i18n keys
     if (isImageType) {
-      return t(`images.${type}.description`)
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      return t(`images.${type}.description` as any)
     }
-    return t(`placeholder.${type}.description`)
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    return t(`placeholder.${type}.description` as any)
   }
 
   return (
@@ -434,17 +464,17 @@ export function UnifiedEnrichmentCard({
         {/* Image Area - Placeholder or Preview */}
         <div className="relative min-h-[280px] flex-1 overflow-hidden">
           {/* For image types with existing image, show preview */}
-          {isImageType && hasImage ? (
+          {isImageType && hasImage && imageUrl ? (
             <>
               <Image
                 src={imageUrl}
-                alt={content?.altText || getTitle()}
+                alt={altText || getTitle()}
                 fill
                 className={cn(
                   'object-cover transition-all duration-500',
                   shouldShowPanel && 'scale-105 brightness-90 dark:brightness-75'
                 )}
-                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                sizes="(max-width: 640px) 100vw, (max-width: 1280px) 50vw, 33vw"
               />
               {/* Lightbox button overlay */}
               <button
@@ -453,7 +483,14 @@ export function UnifiedEnrichmentCard({
                   e.stopPropagation()
                   setIsLightboxOpen(true)
                 }}
-                className="absolute inset-0 flex items-center justify-center bg-black/0 transition-colors hover:bg-black/20"
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault()
+                    e.stopPropagation()
+                    setIsLightboxOpen(true)
+                  }
+                }}
+                className="absolute inset-0 flex items-center justify-center bg-black/0 transition-colors hover:bg-black/20 focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500"
                 aria-label="View full image"
               >
                 <Expand className="h-6 w-6 text-white opacity-0 transition-opacity group-hover:opacity-100" />
@@ -469,7 +506,7 @@ export function UnifiedEnrichmentCard({
                 'object-cover transition-all duration-500',
                 shouldShowPanel && 'scale-105 brightness-90 dark:brightness-75'
               )}
-              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+              sizes="(max-width: 640px) 100vw, (max-width: 1280px) 50vw, 33vw"
             />
           )}
 
@@ -514,6 +551,7 @@ export function UnifiedEnrichmentCard({
         <AnimatePresence>
           {shouldShowPanel && !isGenerating && (
             <motion.div
+              key="hover-panel"
               initial={{ y: '100%' }}
               animate={{ y: 0 }}
               exit={{ y: '100%' }}
@@ -648,7 +686,7 @@ export function UnifiedEnrichmentCard({
       </motion.div>
 
       {/* Lightbox Dialog for image preview */}
-      {isImageType && hasImage && (
+      {isImageType && hasImage && imageUrl && (
         <Dialog open={isLightboxOpen} onOpenChange={setIsLightboxOpen}>
           <DialogContent className="max-w-4xl p-2">
             <DialogTitle className="sr-only">{getTitle()}</DialogTitle>
@@ -657,7 +695,7 @@ export function UnifiedEnrichmentCard({
             >
               <Image
                 src={imageUrl}
-                alt={content?.altText || getTitle()}
+                alt={altText || getTitle()}
                 fill
                 className="object-contain"
                 sizes="(max-width: 1024px) 100vw, 900px"
