@@ -13,13 +13,25 @@
  * @see specs/008-generation-generation-json/research-decisions/rt-007-bloom-taxonomy-validation-improvements.md (lines 860-890)
  */
 
-import type { CourseStructure } from '@megacampus/shared-types';
+import type { CourseStructure, LearningObjective } from '@megacampus/shared-types';
 import { ValidationSeverity, type ValidationResult } from '@megacampus/shared-types';
 import { validateBloomsTaxonomy, hasNonMeasurableVerb } from './blooms-validators';
 import { validatePlaceholders, scanForPlaceholders } from './placeholder-validator';
 import { validateDurationProportionality } from './duration-validator';
 import { logTrace } from '../../../shared/trace-logger';
-import logger from '../../../shared/logger';
+import { logValidationIssue } from '../../../shared/logger';
+
+/**
+ * Extract language from CourseStructure
+ * Uses first learning_outcome's language or falls back to 'en'
+ *
+ * @param structure - Course structure
+ * @returns Language code (e.g., 'en', 'ru')
+ */
+function extractStructureLanguage(structure: CourseStructure): string {
+  const firstOutcome = structure.learning_outcomes[0] as LearningObjective | undefined;
+  return firstOutcome?.language ?? 'en';
+}
 
 /**
  * Validation issue with context
@@ -95,17 +107,14 @@ export async function orchestrateValidation(
 
         // T013: Log placeholder validation failure to error_logs
         if (courseId) {
-          logger.warn(
-            {
-              courseId,
-              ruleId: 'placeholder_detection',
-              severity: 'WARNING',
-              path: issue,
-              suggestion: result.suggestion,
-              issues: result.issues,
-            },
-            'Validation warning: placeholder detected'
-          );
+          logValidationIssue({
+            courseId,
+            ruleId: 'placeholder_detection',
+            severity: 'ERROR',
+            path: issue,
+            suggestion: result.suggestion,
+            issues: result.issues,
+          });
         }
       } else if (result.severity === ValidationSeverity.WARNING && result.warnings) {
         warnings.push({
@@ -119,17 +128,14 @@ export async function orchestrateValidation(
 
         // T013: Log placeholder validation warning to error_logs
         if (courseId) {
-          logger.warn(
-            {
-              courseId,
-              ruleId: 'placeholder_detection',
-              severity: 'WARNING',
-              path: issue,
-              suggestion: result.suggestion,
-              warnings: result.warnings,
-            },
-            'Validation warning: placeholder pattern detected'
-          );
+          logValidationIssue({
+            courseId,
+            ruleId: 'placeholder_detection',
+            severity: 'WARNING',
+            path: issue,
+            suggestion: result.suggestion,
+            warnings: result.warnings,
+          });
         }
       }
     }
@@ -139,9 +145,8 @@ export async function orchestrateValidation(
   // Note: ALL learning objectives at ALL levels are simple strings, not LearningObjective objects
   const allObjectives: Array<{ text: string; language: string; path: string }> = [];
 
-  // Determine language from structure (fallback to 'en')
-  // CourseStructure doesn't have metadata property - fields are at top level
-  const structureLanguage = 'en'; // Default, could be extracted from frontend_parameters if available
+  // Extract language from learning_outcomes (fallback to 'en')
+  const structureLanguage = extractStructureLanguage(structure);
 
   // Course-level outcomes (can be strings or objects)
   structure.learning_outcomes.forEach((outcome: unknown, idx: number) => {
@@ -171,20 +176,36 @@ export async function orchestrateValidation(
     });
   });
 
-  // Validate each objective
+  // Validate each objective (with timing)
+  const bloomsStartTime = Date.now();
   for (const { text, language, path } of allObjectives) {
     // Check for non-measurable verbs (ERROR)
     if (hasNonMeasurableVerb(text, language)) {
+      const issueMessage = `Non-measurable verb detected in "${text}". Cannot verify learning through assessment.`;
+      const suggestionText =
+        'Replace with measurable action verbs (e.g., explain, demonstrate, analyze)';
+
       errors.push({
         rule: 'non_measurable_verbs',
         severity: ValidationSeverity.ERROR,
         path,
-        issues: [
-          `Non-measurable verb detected in "${text}". Cannot verify learning through assessment.`,
-        ],
-        suggestion: 'Replace with measurable action verbs (e.g., explain, demonstrate, analyze)',
+        issues: [issueMessage],
+        suggestion: suggestionText,
         score: 0.0,
       });
+
+      // T013: Log non-measurable verb error to error_logs
+      if (courseId) {
+        logValidationIssue({
+          courseId,
+          ruleId: 'non_measurable_verbs',
+          severity: 'ERROR',
+          path,
+          suggestion: suggestionText,
+          issues: [issueMessage],
+        });
+      }
+
       continue; // Skip Bloom's validation if non-measurable verb found
     }
 
@@ -213,6 +234,7 @@ export async function orchestrateValidation(
   }
 
   // T013: Log Bloom's taxonomy validation results to generation_trace
+  const bloomsDurationMs = Date.now() - bloomsStartTime;
   if (courseId && allObjectives.length > 0) {
     const bloomsPassedCount =
       allObjectives.length - warnings.filter(w => w.rule === 'blooms_taxonomy_whitelist').length;
@@ -234,11 +256,12 @@ export async function orchestrateValidation(
         warnings: warnings.filter(w => w.rule === 'blooms_taxonomy_whitelist').length,
       },
       qualityScore: allObjectives.length > 0 ? bloomsPassedCount / allObjectives.length : 1.0,
-      durationMs: 0,
+      durationMs: bloomsDurationMs,
     });
   }
 
-  // 3. Validate duration proportionality for all lessons
+  // 3. Validate duration proportionality for all lessons (with timing)
+  const durationStartTime = Date.now();
   let durationPassedCount = 0;
   let durationTotalCount = 0;
 
@@ -262,17 +285,14 @@ export async function orchestrateValidation(
 
         // T013: Log duration validation failure to error_logs
         if (courseId) {
-          logger.warn(
-            {
-              courseId,
-              ruleId: 'duration_min',
-              severity: 'ERROR',
-              path,
-              suggestion: durationResult.suggestion,
-              issues: durationResult.issues,
-            },
-            'Validation error: duration below minimum threshold'
-          );
+          logValidationIssue({
+            courseId,
+            ruleId: 'duration_min',
+            severity: 'ERROR',
+            path,
+            suggestion: durationResult.suggestion,
+            issues: durationResult.issues,
+          });
         }
       } else if (
         durationResult.severity === ValidationSeverity.WARNING &&
@@ -289,17 +309,14 @@ export async function orchestrateValidation(
 
         // T013: Log duration validation warning to error_logs
         if (courseId) {
-          logger.warn(
-            {
-              courseId,
-              ruleId: 'duration_max',
-              severity: 'WARNING',
-              path,
-              suggestion: durationResult.suggestion,
-              warnings: durationResult.warnings,
-            },
-            'Validation warning: duration above maximum threshold'
-          );
+          logValidationIssue({
+            courseId,
+            ruleId: 'duration_max',
+            severity: 'WARNING',
+            path,
+            suggestion: durationResult.suggestion,
+            warnings: durationResult.warnings,
+          });
         }
       } else if (durationResult.severity === ValidationSeverity.INFO && durationResult.info) {
         info.push({
@@ -317,6 +334,7 @@ export async function orchestrateValidation(
   });
 
   // T013: Log duration validation results to generation_trace
+  const durationValidationMs = Date.now() - durationStartTime;
   if (courseId && durationTotalCount > 0) {
     await logTrace({
       courseId,
@@ -336,7 +354,7 @@ export async function orchestrateValidation(
         warnings: warnings.filter(w => w.rule === 'duration_max').length,
       },
       qualityScore: durationTotalCount > 0 ? durationPassedCount / durationTotalCount : 1.0,
-      durationMs: 0,
+      durationMs: durationValidationMs,
     });
   }
 
@@ -391,11 +409,14 @@ function extractTextFromPath(structure: unknown, path: string): string {
   // Simple path extraction (for placeholder detection)
   // This is a helper to get the actual text value from nested paths
   const parts = path.split(/[\.\[\]]+/).filter(Boolean);
-  let current: any = structure;
+  let current: unknown = structure;
 
   for (const part of parts) {
-    if (current && typeof current === 'object') {
-      current = current[part];
+    if (current && typeof current === 'object' && !Array.isArray(current)) {
+      current = (current as Record<string, unknown>)[part];
+    } else if (Array.isArray(current)) {
+      const index = parseInt(part, 10);
+      current = Number.isNaN(index) ? undefined : current[index];
     } else {
       return '';
     }
