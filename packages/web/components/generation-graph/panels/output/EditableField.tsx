@@ -118,7 +118,14 @@ export const EditableField: React.FC<EditableFieldProps> = ({
       previousValueRef.current = newValue;
     }
 
-    if (isLearningObjective && courseId && config.path) {
+    if (isLearningObjective) {
+      // Validate required props for learning objective cascade flow
+      if (!courseId || !config.path) {
+        console.warn('[EditableField] isLearningObjective=true but courseId or config.path missing, falling back to direct onChange');
+        onChange(newValue);
+        return;
+      }
+
       // Store pending value and fetch affected count
       setPendingValue(newValue);
 
@@ -347,7 +354,7 @@ export const EditableField: React.FC<EditableFieldProps> = ({
             aria-describedby={helpText ? `${fieldId}-help` : undefined}
           />
           <span className="text-sm text-slate-600 dark:text-slate-400" aria-live="polite">
-            {Boolean(value) ? 'Включено' : 'Выключено'}
+            {value ? 'Включено' : 'Выключено'}
           </span>
         </div>
       )}
