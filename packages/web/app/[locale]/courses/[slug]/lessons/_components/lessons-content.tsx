@@ -70,7 +70,6 @@ export function LessonsContent({
     return map
   }, [sections])
 
-
   // Calculate remaining time for uncompleted lessons
   const remainingMinutes = useMemo(() => {
     return lessons
