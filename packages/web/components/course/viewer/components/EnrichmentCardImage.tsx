@@ -26,7 +26,7 @@ interface EnrichmentCardImageProps {
   /** Badge color class */
   badgeColor: string
   /** Image aspect ratio for lightbox */
-  aspectRatio: 'video' | 'square'
+  aspectRatio: 'video' | 'square' | 'cinematic'
   /** Whether generation just completed (show skeleton instead of placeholder) */
   isRecentlyCompleted?: boolean
   /** Callback when image loads (to clear recently completed state) */
@@ -221,7 +221,11 @@ export function EnrichmentCardImage({
             <div
               className={cn(
                 'relative w-full',
-                aspectRatio === 'video' ? 'aspect-video' : 'aspect-square'
+                aspectRatio === 'cinematic'
+                  ? 'aspect-[21/9]'
+                  : aspectRatio === 'video'
+                    ? 'aspect-video'
+                    : 'aspect-square'
               )}
             >
               <Image

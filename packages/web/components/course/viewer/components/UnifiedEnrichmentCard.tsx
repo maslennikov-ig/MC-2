@@ -369,7 +369,7 @@ export function UnifiedEnrichmentCard({
         badgeText={config.badgeText}
         BadgeIcon={Icon}
         badgeColor={config.color}
-        aspectRatio={type === 'cover' ? 'video' : 'square'}
+        aspectRatio={type === 'cover' ? 'cinematic' : 'square'}
         isRecentlyCompleted={isRecentlyCompleted}
         onImageLoaded={onImageLoaded}
       />
