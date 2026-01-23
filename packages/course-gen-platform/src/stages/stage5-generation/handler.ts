@@ -38,7 +38,7 @@ import { SectionBatchGenerator } from './utils/section-batch-generator';
 import { QualityValidator } from '../../shared/validation/quality-validator';
 import { sanitizeCourseStructure } from './utils/sanitize';
 import { qdrantClient } from '@/shared/qdrant/client';
-import { generationLockService } from '@/shared/locks';
+import { acquireGenerationLock } from '@/shared/locks';
 import { logTrace } from '../../shared/trace-logger';
 import {
   triggerCourseCard,
@@ -511,32 +511,12 @@ class Stage5GenerationHandler {
     // Check if generation is paused before starting work
     await checkPauseAndDelay(job, course_id, token);
 
-    // Acquire generation lock (FR-037: Prevent concurrent generation)
-    const lockId = `stage-5-${job.id || Date.now()}`;
-    const lockResult = await generationLockService.acquireLock(course_id, lockId);
-    if (!lockResult.acquired) {
-      logger.warn(
-        { courseId: course_id, reason: lockResult.reason },
-        'Failed to acquire generation lock'
-      );
-      throw new Error(`Course ${course_id} is already being processed: ${lockResult.reason}`);
-    }
-
-    // Set up heartbeat to extend lock every 2 minutes
-    const heartbeatInterval = setInterval(() => {
-      void (async () => {
-        try {
-          const extended = await generationLockService.extendLock(course_id, lockId);
-          if (!extended) {
-            logger.warn({ courseId: course_id, lockId }, 'Heartbeat: lock extension failed');
-          } else {
-            logger.debug({ courseId: course_id, lockId }, 'Heartbeat: lock extended');
-          }
-        } catch (err) {
-          logger.error({ courseId: course_id, lockId, error: err }, 'Heartbeat error');
-        }
-      })();
-    }, 120000); // Every 2 minutes
+    // Acquire generation lock with heartbeat (FR-037: Prevent concurrent generation)
+    const lockGuard = await acquireGenerationLock(
+      course_id,
+      `stage-5-${job.id || Date.now()}`,
+      logger
+    );
 
     try {
       // Layer 3: Worker validation and fallback initialization for Stage 5
@@ -880,7 +860,7 @@ class Stage5GenerationHandler {
         }
 
         // Clear heartbeat - lock will be released in finally block
-        clearInterval(heartbeatInterval);
+        clearInterval(lockGuard.heartbeatInterval);
 
         // Step 2: Handle stage completion (checks generation_mode)
         // If automatic: auto-approves and queues Stage 6
@@ -1113,9 +1093,8 @@ class Stage5GenerationHandler {
         throw error;
       }
     } finally {
-      clearInterval(heartbeatInterval); // Clear heartbeat
       // Release generation lock (FR-037: always release in finally)
-      await generationLockService.releaseLock(course_id, lockId);
+      await lockGuard.release();
     }
   }
 }
