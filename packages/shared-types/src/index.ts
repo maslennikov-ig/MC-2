@@ -18,6 +18,7 @@ export * from './generation-result';
 export * from './style-prompts';
 export * from './generation-job';
 export * from './generation-metadata';
+export * from './generation-progress.types';
 export * from './transactional-outbox';
 
 // Stage 4-6 Pipeline Types (v0.20.0+)
