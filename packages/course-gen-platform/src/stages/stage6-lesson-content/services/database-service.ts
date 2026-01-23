@@ -559,11 +559,20 @@ export async function checkAndSetStage6Complete(courseId: string): Promise<void>
         );
       }
       const existingProgress = parsedProgress || {};
+
+      // Update all steps to completed status if steps exist
+      const updatedSteps = (existingProgress as any).steps?.map((step: any) => ({
+        ...step,
+        status: 'completed' as const,
+        completed_at: step.completed_at || new Date().toISOString(),
+      }));
+
       const updatedProgress = {
         ...existingProgress,
         percentage: 100,
         message: shouldAutoFinalize ? 'Курс успешно создан!' : 'Генерация уроков завершена',
         lessons_completed: completedLessonsCount,
+        ...(updatedSteps && { steps: updatedSteps }),
       };
 
       const { error: updateError } = await supabaseAdmin
