@@ -2,6 +2,22 @@
 
 _Released on 2025-12-26_
 
+## v0.28.29
+
+_Released on 2026-01-23_
+
+### ✨ New Features
+
+- **web**: Expand rotating status messages with type-specific content
+
+### 🐛 Bug Fixes
+
+- **web**: Update 15 source file(s), update docs
+
+---
+
+_This release was automatically generated from 2 commits._
+
 ## v0.28.28
 
 _Released on 2026-01-23_

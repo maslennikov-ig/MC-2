@@ -311,6 +311,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.28.29] - 2026-01-23
+
+### Added
+
+- **web**: expand rotating status messages with type-specific content (13c70d2a)
+
+### Fixed
+
+- **web**: update 15 source file(s), update docs (dcfe7f27)
+
 ## [0.28.28] - 2026-01-23
 
 ### Security
