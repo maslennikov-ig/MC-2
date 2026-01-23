@@ -57,6 +57,8 @@
     "showSidebar": "Show sidebar",
     "section": "Section",
     "lesson": "Lesson",
+    "allLessons": "Lessons",
+    "allLessonsTooltip": "All course lessons",
     "constructor": "Constructor",
     "constructorTooltip": "Course Constructor",
     "focusMode": "Focus Mode",
