@@ -6,7 +6,10 @@ import { Video, Headphones, Presentation, HelpCircle, Image } from 'lucide-react
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { useSmoothProgress } from '@/lib/hooks/useSmoothProgress'
+import { useRotatingStatusMessage } from '@/lib/hooks/useRotatingStatusMessage'
+import { getNextMilestone } from '@megacampus/shared-types'
 import { StagedProgress } from '@/components/ui/staged-progress'
+import { cn } from '@/lib/utils'
 
 type EnrichmentType = 'quiz' | 'audio' | 'presentation' | 'video' | 'cover' | 'card'
 
@@ -83,10 +86,20 @@ export function EnrichmentGeneratingCard({
           ? 2
           : 1
 
-  // Smooth interpolation within stage
-  const { progress: smoothProgress } = useSmoothProgress({
+  // Smooth interpolation within stage with asymptotic crawl
+  const { progress: smoothProgress, isCrawling } = useSmoothProgress({
     targetProgress: progress,
     isComplete: progress >= 100,
+    enableAsymptoticCrawl: true,
+    nextMilestone: getNextMilestone(progress),
+    crawlDelay: 3000,
+    crawlIncrement: 0.15,
+  })
+
+  // Rotating status messages
+  const { message: statusMessage } = useRotatingStatusMessage({
+    status: currentStep,
+    interval: 4000,
   })
 
   const getTitle = () => {
@@ -107,34 +120,76 @@ export function EnrichmentGeneratingCard({
   }
 
   return (
-    <Card className="overflow-hidden transition-shadow hover:shadow-md">
-      <CardHeader className={`${config.bgColor} py-3`}>
-        <div className="flex items-center gap-2">
-          <Icon className={`h-5 w-5 ${config.color} animate-pulse`} />
-          <CardTitle className="text-base font-medium">
-            {getTitle()} - {t('generating')}
-          </CardTitle>
-        </div>
-      </CardHeader>
-      <CardContent className="space-y-4 py-4">
-        <StagedProgress
-          stages={GENERATION_STAGES}
-          currentStageIndex={stageIndex}
-          stageProgress={smoothProgress}
-          isComplete={progress >= 100}
-        />
+    <>
+      <style jsx>{`
+        @keyframes shimmer {
+          0% {
+            transform: translateX(-100%);
+          }
+          100% {
+            transform: translateX(100%);
+          }
+        }
+      `}</style>
+      <Card className="overflow-hidden transition-shadow hover:shadow-md">
+        <CardHeader className={`${config.bgColor} py-3`}>
+          <div className="flex items-center gap-2">
+            <Icon
+              className={cn(
+                `h-5 w-5 ${config.color}`,
+                isCrawling ? 'animate-pulse' : 'animate-pulse'
+              )}
+            />
+            <CardTitle className="text-base font-medium">
+              {getTitle()} - {t('generating')}
+            </CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent className="space-y-4 py-4">
+          {/* Progress bar with shimmer effect */}
+          <div className="relative">
+            <StagedProgress
+              stages={GENERATION_STAGES}
+              currentStageIndex={stageIndex}
+              stageProgress={smoothProgress}
+              isComplete={progress >= 100}
+            />
 
-        <div className="flex justify-end">
-          <Button
-            variant="outline"
-            size="sm"
-            onClick={onCancel}
-            aria-label={`Cancel ${type} generation`}
-          >
-            {t('cancel')}
-          </Button>
-        </div>
-      </CardContent>
-    </Card>
+            {/* Shimmer overlay when crawling */}
+            {isCrawling && (
+              <div
+                className="pointer-events-none absolute inset-0 overflow-hidden rounded-full"
+                style={{ width: `${smoothProgress}%` }}
+              >
+                <div
+                  className="absolute inset-0"
+                  style={{
+                    background:
+                      'linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent)',
+                    animation: 'shimmer 2s infinite',
+                  }}
+                />
+              </div>
+            )}
+          </div>
+
+          {/* Rotating status message */}
+          <p className="text-muted-foreground text-sm transition-opacity duration-300">
+            {statusMessage}
+          </p>
+
+          <div className="flex justify-end">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={onCancel}
+              aria-label={`Cancel ${type} generation`}
+            >
+              {t('cancel')}
+            </Button>
+          </div>
+        </CardContent>
+      </Card>
+    </>
   )
 }

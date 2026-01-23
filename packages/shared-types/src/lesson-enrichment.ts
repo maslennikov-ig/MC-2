@@ -297,12 +297,11 @@ export function requiresAsset(type: EnrichmentType): boolean {
 
 /**
  * Check if enrichment uses two-stage generation flow
+ * @deprecated Use isTwoStageType from enrichment-on-demand.ts instead (includes cover/banner)
  * @param type - Enrichment type
  * @returns True if type uses draft -> final flow
  */
-export function isTwoStageType(type: EnrichmentType): boolean {
-  return type === 'video' || type === 'presentation';
-}
+// Removed duplicate export - use isTwoStageType from enrichment-on-demand.ts
 
 /**
  * Get default title for enrichment type
