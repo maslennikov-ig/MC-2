@@ -388,6 +388,69 @@ export async function checkExistingEnrichment(
 }
 
 /**
+ * Find a reusable (cancelled/failed) enrichment of given type for a lesson
+ *
+ * Used to reuse existing enrichment records instead of creating new ones,
+ * which is required due to unique constraint on (lesson_id, enrichment_type).
+ *
+ * @param lessonId - Lesson UUID
+ * @param enrichmentType - Type of enrichment to check
+ * @param requestId - Request ID for logging
+ * @returns Enrichment ID if found, null otherwise
+ */
+export async function findReusableEnrichment(
+  lessonId: string,
+  enrichmentType: EnrichmentType,
+  requestId: string
+): Promise<string | null> {
+  const supabase = getSupabaseAdmin();
+
+  let query = supabase
+    .from('lesson_enrichments')
+    .select('id, title')
+    .eq('lesson_id', lessonId)
+    .eq('enrichment_type', enrichmentType)
+    .in('status', ['failed', 'cancelled'])
+    .order('updated_at', { ascending: false })
+    .limit(1);
+
+  // For 'card' type, exclude course-card (title='course-card')
+  if (enrichmentType === 'card') {
+    query = query.or('title.is.null,title.neq.course-card');
+  }
+
+  const { data, error } = await query;
+
+  if (error) {
+    logger.warn(
+      {
+        requestId,
+        lessonId,
+        enrichmentType,
+        error: error.message,
+      },
+      'Failed to find reusable enrichment'
+    );
+    return null;
+  }
+
+  if (data && data.length > 0) {
+    logger.info(
+      {
+        requestId,
+        lessonId,
+        enrichmentType,
+        reusableId: data[0].id,
+      },
+      'Found reusable enrichment'
+    );
+    return data[0].id;
+  }
+
+  return null;
+}
+
+/**
  * Check if enrichment type uses two-stage generation
  *
  * Two-stage types generate a draft first, then require user approval
@@ -411,7 +474,12 @@ export function isTwoStageType(enrichmentType: string): boolean {
 /**
  * Statuses that can be cancelled
  */
-export const CANCELLABLE_STATUSES = ['pending', 'draft_generating', 'generating'] as const;
+export const CANCELLABLE_STATUSES = [
+  'pending',
+  'draft_generating',
+  'draft_ready',
+  'generating',
+] as const;
 
 /**
  * Check if enrichment is in a cancellable state

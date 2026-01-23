@@ -60,11 +60,14 @@ export const cancel = protectedProcedure
     const requestId = nanoid();
     const currentUser = ctx.user;
 
-    logger.info({
-      requestId,
-      enrichmentId,
-      userId: currentUser.id,
-    }, 'Cancel enrichment request');
+    logger.info(
+      {
+        requestId,
+        enrichmentId,
+        userId: currentUser.id,
+      },
+      'Cancel enrichment request'
+    );
 
     try {
       // Step 1: Verify enrichment access and get current data
@@ -77,15 +80,18 @@ export const cancel = protectedProcedure
 
       // Step 2: Check if enrichment can be cancelled
       if (!isCancellableStatus(enrichment.status)) {
-        logger.warn({
-          requestId,
-          enrichmentId,
-          currentStatus: enrichment.status,
-        }, 'Cannot cancel enrichment with current status');
+        logger.warn(
+          {
+            requestId,
+            enrichmentId,
+            currentStatus: enrichment.status,
+          },
+          'Cannot cancel enrichment with current status'
+        );
 
         throw new TRPCError({
           code: 'BAD_REQUEST',
-          message: `Cannot cancel enrichment with status '${enrichment.status}'. Only 'pending', 'draft_generating', or 'generating' enrichments can be cancelled.`,
+          message: `Cannot cancel enrichment with status '${enrichment.status}'. Only 'pending', 'draft_generating', 'draft_ready', or 'generating' enrichments can be cancelled.`,
         });
       }
 
@@ -100,11 +106,14 @@ export const cancel = protectedProcedure
         .eq('id', enrichmentId);
 
       if (updateError) {
-        logger.error({
-          requestId,
-          enrichmentId,
-          error: updateError.message,
-        }, 'Failed to update enrichment status to cancelled');
+        logger.error(
+          {
+            requestId,
+            enrichmentId,
+            error: updateError.message,
+          },
+          'Failed to update enrichment status to cancelled'
+        );
 
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
@@ -123,19 +132,25 @@ export const cancel = protectedProcedure
           const state = await job.getState();
           if (state === 'waiting' || state === 'delayed') {
             await job.remove();
-            logger.info({
-              requestId,
-              enrichmentId,
-              jobId,
-              state,
-            }, 'Removed enrichment job from queue');
+            logger.info(
+              {
+                requestId,
+                enrichmentId,
+                jobId,
+                state,
+              },
+              'Removed enrichment job from queue'
+            );
           } else {
-            logger.info({
-              requestId,
-              enrichmentId,
-              jobId,
-              state,
-            }, 'Job already active, cannot remove from queue');
+            logger.info(
+              {
+                requestId,
+                enrichmentId,
+                jobId,
+                state,
+              },
+              'Job already active, cannot remove from queue'
+            );
           }
         } else {
           // Also try with retry attempt suffix
@@ -143,27 +158,36 @@ export const cancel = protectedProcedure
           const matchingJob = jobs.find(j => j.id?.startsWith(`enrich-${enrichmentId}`));
           if (matchingJob) {
             await matchingJob.remove();
-            logger.info({
-              requestId,
-              enrichmentId,
-              jobId: matchingJob.id,
-            }, 'Removed enrichment job from queue (found by prefix)');
+            logger.info(
+              {
+                requestId,
+                enrichmentId,
+                jobId: matchingJob.id,
+              },
+              'Removed enrichment job from queue (found by prefix)'
+            );
           }
         }
       } catch (queueError) {
         // Log but don't fail - database update is the primary operation
-        logger.warn({
-          requestId,
-          enrichmentId,
-          error: queueError instanceof Error ? queueError.message : String(queueError),
-        }, 'Failed to remove job from queue (non-critical)');
+        logger.warn(
+          {
+            requestId,
+            enrichmentId,
+            error: queueError instanceof Error ? queueError.message : String(queueError),
+          },
+          'Failed to remove job from queue (non-critical)'
+        );
       }
 
-      logger.info({
-        requestId,
-        enrichmentId,
-        previousStatus: enrichment.status,
-      }, 'Enrichment cancelled');
+      logger.info(
+        {
+          requestId,
+          enrichmentId,
+          previousStatus: enrichment.status,
+        },
+        'Enrichment cancelled'
+      );
 
       return {
         success: true,
@@ -176,11 +200,14 @@ export const cancel = protectedProcedure
       }
 
       // Log and wrap unexpected errors
-      logger.error({
-        requestId,
-        enrichmentId,
-        error: error instanceof Error ? error.message : String(error),
-      }, 'Cancel enrichment failed');
+      logger.error(
+        {
+          requestId,
+          enrichmentId,
+          error: error instanceof Error ? error.message : String(error),
+        },
+        'Cancel enrichment failed'
+      );
 
       throw new TRPCError({
         code: 'INTERNAL_SERVER_ERROR',

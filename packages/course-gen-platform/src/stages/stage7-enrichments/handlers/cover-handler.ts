@@ -12,14 +12,21 @@
 import { z } from 'zod';
 import { logger } from '@/shared/logger';
 import { llmClient } from '@/shared/llm/client';
-import { getSupabaseAdmin } from '@/shared/supabase/admin';
 import { createPromptService } from '@/shared/prompts/prompt-service';
+import { uploadEnrichmentAsset, buildPublicUrl } from '../services/unified-storage-service';
 import { DEFAULT_MODEL_ID } from '@megacampus/shared-types';
 import type { CoverEnrichmentContent, EnrichmentMetadata } from '@megacampus/shared-types';
 import type { EnrichmentHandler } from '../services/enrichment-router';
 import type { EnrichmentHandlerInput, GenerateResult, DraftResult } from '../types';
 import { generateImage, base64ToBuffer, convertToWebP } from '../services/image-generation-service';
 import { getLessonContent } from '../services/database-service';
+import {
+  retryWithBackoff,
+  getVisualStyle,
+  getCoverAltText,
+  DEFAULT_COVER_VISUAL_STYLE,
+  type VisualStyle,
+} from '../services/enrichment-utils';
 
 // ============================================================================
 // TYPES
@@ -31,12 +38,7 @@ interface CoverPromptParams {
   courseSubject: string;
   language: 'en' | 'ru';
   styleHint?: string;
-  visualStyle?: {
-    colorScheme: string;
-    aesthetic: string;
-    visualElements: string;
-    mood: string;
-  };
+  visualStyle?: VisualStyle;
   /** Custom prompt additions from user (regeneration or initial generation) */
   customPrompt?: string;
 }
@@ -63,31 +65,14 @@ const MAX_PROMPT_TOKENS = 500;
 /** Temperature for prompt generation */
 const PROMPT_TEMPERATURE = 0.7;
 
-/** Supabase Storage bucket for cover images */
-const STORAGE_BUCKET = process.env.ENRICHMENTS_STORAGE_BUCKET ?? 'course-enrichments';
-
-/**
- * Default visual style if none is configured on the course
- * Used for consistent styling across cover images when course lacks visual_style
- *
- * Style: Premium 3D Render + Cinematic lighting
- * - Professional yet visually striking
- * - Works well for B2B educational content
- * - Inspired by Apple, Notion, Linear aesthetics
- */
-const DEFAULT_VISUAL_STYLE = {
-  colorScheme: 'rich gradients with deep shadows and luminous highlights, vibrant accent colors',
-  aesthetic: 'premium 3D render, cinematic lighting, sophisticated and polished',
-  visualElements:
-    'glossy 3D objects, volumetric light rays, soft reflections, depth of field blur, floating elements',
-  mood: 'inspiring, professional, cutting-edge, premium quality',
-};
+// Note: Local storage is now used instead of Supabase Storage
+// See: services/local-storage-service.ts
 
 /**
  * Style presets for user-selectable image styles
  * Maps UI style options to visual style parameters
  */
-const STYLE_PRESETS: Record<string, typeof DEFAULT_VISUAL_STYLE> = {
+const STYLE_PRESETS: Record<string, VisualStyle> = {
   premium3d: {
     colorScheme: 'rich gradients with deep shadows and luminous highlights, vibrant accent colors',
     aesthetic: 'premium 3D render, cinematic lighting, sophisticated and polished',
@@ -128,22 +113,13 @@ const STYLE_PRESETS: Record<string, typeof DEFAULT_VISUAL_STYLE> = {
  */
 function getStylePreset(
   styleName: string | undefined,
-  courseVisualStyle: typeof DEFAULT_VISUAL_STYLE
-): typeof DEFAULT_VISUAL_STYLE {
+  courseVisualStyle: VisualStyle
+): VisualStyle {
   if (styleName && STYLE_PRESETS[styleName]) {
     return STYLE_PRESETS[styleName];
   }
   return courseVisualStyle;
 }
-
-/**
- * Retry configuration for upload operations
- */
-const RETRY_CONFIG = {
-  MAX_ATTEMPTS: 3,
-  INITIAL_DELAY_MS: 1000,
-  BACKOFF_MULTIPLIER: 2,
-} as const;
 
 // ============================================================================
 // SCHEMAS
@@ -177,69 +153,6 @@ export interface CoverDraftContent {
 // ============================================================================
 // HELPER FUNCTIONS
 // ============================================================================
-
-/**
- * Retry a function with exponential backoff
- */
-async function retryWithBackoff<T>(
-  fn: () => Promise<T>,
-  maxAttempts: number = RETRY_CONFIG.MAX_ATTEMPTS,
-  initialDelayMs: number = RETRY_CONFIG.INITIAL_DELAY_MS
-): Promise<T> {
-  let lastError: Error | null = null;
-
-  for (let attempt = 1; attempt <= maxAttempts; attempt++) {
-    try {
-      return await fn();
-    } catch (error) {
-      lastError = error instanceof Error ? error : new Error(String(error));
-
-      if (attempt === maxAttempts) {
-        break;
-      }
-
-      const delayMs = initialDelayMs * Math.pow(RETRY_CONFIG.BACKOFF_MULTIPLIER, attempt - 1);
-      logger.warn({ attempt, delayMs, error: lastError.message }, 'Upload failed, retrying...');
-      await new Promise(resolve => setTimeout(resolve, delayMs));
-    }
-  }
-
-  throw lastError instanceof Error ? lastError : new Error(String(lastError));
-}
-
-/**
- * Alt text templates for cover images - all 19 supported languages
- */
-const COVER_ALT_TEMPLATES: Record<string, string> = {
-  en: 'Cover illustration for lesson:',
-  ru: 'Обложка урока:',
-  zh: '课程封面插图:',
-  es: 'Ilustración de portada de la lección:',
-  fr: 'Illustration de couverture de la leçon:',
-  de: 'Titelbild der Lektion:',
-  ja: 'レッスンのカバー画像:',
-  ko: '수업 표지 일러스트:',
-  ar: 'صورة غلاف الدرس:',
-  pt: 'Ilustração de capa da lição:',
-  it: 'Illustrazione di copertina della lezione:',
-  tr: 'Ders kapak resmi:',
-  vi: 'Hình minh họa bìa bài học:',
-  th: 'ภาพปกบทเรียน:',
-  id: 'Ilustrasi sampul pelajaran:',
-  ms: 'Ilustrasi kulit pelajaran:',
-  hi: 'पाठ के लिए कवर चित्रण:',
-  bn: 'পাঠের কভার ইলাস্ট্রেশন:',
-  pl: 'Ilustracja okładki lekcji:',
-};
-
-/**
- * Generate localized alt text for cover images
- */
-function getLocalizedAltText(language: string, lessonTitle: string): string {
-  const safeTitle = lessonTitle.slice(0, 100); // Limit length
-  const template = COVER_ALT_TEMPLATES[language] ?? COVER_ALT_TEMPLATES.en;
-  return `${template} ${safeTitle}`;
-}
 
 /**
  * Patterns for prohibited content in image prompts
@@ -303,54 +216,6 @@ function extractKeywords(lessonContent: string | null): string[] {
 }
 
 /**
- * Extract visual style from course data
- *
- * Retrieves the visual style from course.visual_style column,
- * falling back to course.settings.visual_style for legacy courses.
- * Uses DEFAULT_VISUAL_STYLE if no style is configured.
- *
- * @param course - Course data with visual_style and settings
- * @returns Visual style object with colorScheme, aesthetic, visualElements, mood
- */
-function getVisualStyle(course: { visual_style?: unknown; settings?: unknown }): {
-  colorScheme: string;
-  aesthetic: string;
-  visualElements: string;
-  mood: string;
-} {
-  // First try dedicated visual_style column
-  if (course.visual_style && typeof course.visual_style === 'object') {
-    const vs = course.visual_style as Record<string, unknown>;
-    if (vs.colorScheme && vs.aesthetic && vs.visualElements && vs.mood) {
-      return {
-        colorScheme: String(vs.colorScheme),
-        aesthetic: String(vs.aesthetic),
-        visualElements: String(vs.visualElements),
-        mood: String(vs.mood),
-      };
-    }
-  }
-
-  // Fallback to settings.visual_style (legacy)
-  if (course.settings && typeof course.settings === 'object') {
-    const settings = course.settings as Record<string, unknown>;
-    if (settings.visual_style && typeof settings.visual_style === 'object') {
-      const vs = settings.visual_style as Record<string, unknown>;
-      if (vs.colorScheme && vs.aesthetic && vs.visualElements && vs.mood) {
-        return {
-          colorScheme: String(vs.colorScheme),
-          aesthetic: String(vs.aesthetic),
-          visualElements: String(vs.visualElements),
-          mood: String(vs.mood),
-        };
-      }
-    }
-  }
-
-  return DEFAULT_VISUAL_STYLE;
-}
-
-/**
  * Extract keywords from lesson objectives
  * Primary source for keyword extraction after Stage 5 completes
  * Objectives contain rich semantic descriptions of lesson content
@@ -411,9 +276,9 @@ ALWAYS end your prompt with: ", absolutely no text, no letters, no words, no typ
 function getDefaultImagePrompt(
   lessonTitle: string,
   courseSubject: string,
-  visualStyle?: { colorScheme: string; aesthetic: string; visualElements: string; mood: string }
+  visualStyle?: VisualStyle
 ): string {
-  const style = visualStyle ?? DEFAULT_VISUAL_STYLE;
+  const style = visualStyle ?? DEFAULT_COVER_VISUAL_STYLE;
   return `A stunning premium 3D rendered visualization representing "${lessonTitle}" in the context of ${courseSubject}. Cinematic lighting with dramatic shadows and volumetric light rays. ${style.colorScheme}. Glossy, polished 3D surfaces with ${style.visualElements}. Ultra-wide 16:9 format hero banner with depth of field blur and floating elements. ${style.aesthetic} quality inspired by Apple and Notion aesthetics. ${style.mood} atmosphere, absolutely no text, no letters, no words, no numbers, no writing, no typography, no inscriptions, text-free image.`;
 }
 
@@ -514,7 +379,7 @@ function getVariantsUserMessage(params: CoverPromptParams): string {
   const { lessonTitle, keywords, courseSubject, language, styleHint, visualStyle, customPrompt } =
     params;
   const keywordsStr = keywords.length > 0 ? keywords.join(', ') : 'general concepts';
-  const style = visualStyle ?? DEFAULT_VISUAL_STYLE;
+  const style = visualStyle ?? DEFAULT_COVER_VISUAL_STYLE;
 
   let message = `Generate 3 different image prompt variants for a lesson cover with the following context:
 
@@ -619,7 +484,7 @@ async function generateDraft(input: EnrichmentHandlerInput): Promise<DraftResult
     }
 
     // Get visual style from course for consistent styling
-    const courseVisualStyle = getVisualStyle(course);
+    const courseVisualStyle = getVisualStyle(course, DEFAULT_COVER_VISUAL_STYLE);
 
     // Apply user-selected style preset if provided, otherwise use course style
     const userStyle = typeof input.settings?.style === 'string' ? input.settings.style : undefined;
@@ -792,18 +657,22 @@ async function generateDraft(input: EnrichmentHandlerInput): Promise<DraftResult
   } catch (error) {
     const durationMs = Date.now() - startTime;
     const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorStack = error instanceof Error ? error.stack : undefined;
 
     logger.error(
       {
         enrichmentId: enrichment.id,
         lessonId: lesson.id,
+        courseId: course.id,
         durationMs,
         error: errorMessage,
+        stack: errorStack,
       },
       'Cover handler: draft generation failed'
     );
 
-    throw new Error(`Cover draft generation failed: ${errorMessage}`);
+    // Re-throw original error to preserve stack trace
+    throw error;
   }
 }
 
@@ -889,7 +758,7 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
       language === 'ru' ? 'Russian educational content' : 'English educational content';
 
     // Get visual style from course for consistent styling
-    const courseVisualStyle = getVisualStyle(course);
+    const courseVisualStyle = getVisualStyle(course, DEFAULT_COVER_VISUAL_STYLE);
 
     // Apply user-selected style preset if provided, otherwise use course style
     const userStyle = typeof input.settings?.style === 'string' ? input.settings.style : undefined;
@@ -1055,32 +924,16 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
       'Cover handler: converted to WebP'
     );
 
-    // Phase 4: Upload to Supabase Storage with retry
-    const supabase = getSupabaseAdmin();
-    const storagePath = `${course.id}/${lesson.id}/${enrichment.id}.webp`;
-
-    // Retry upload up to 3 times with exponential backoff
-    await retryWithBackoff(
-      async () => {
-        const { error: uploadError } = await supabase.storage
-          .from(STORAGE_BUCKET)
-          .upload(storagePath, webpResult.buffer, {
-            contentType: 'image/webp',
-            upsert: true,
-          });
-
-        if (uploadError) {
-          throw new Error(`Failed to upload image: ${uploadError.message}`);
-        }
-      },
+    // Phase 4: Upload to local storage with retry
+    const storagePath = await retryWithBackoff(
+      () => uploadEnrichmentAsset(course.id, lesson.id, enrichment.id, webpResult.buffer, 'webp'),
       3,
-      1000
+      1000,
+      'Cover upload'
     );
 
-    // Get public URL
-    const { data: publicUrlData } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(storagePath);
-
-    const imageUrl = publicUrlData.publicUrl;
+    // Build public URL (nginx serves from /storage/enrichments/)
+    const imageUrl = buildPublicUrl(storagePath);
 
     logger.info(
       {
@@ -1103,7 +956,7 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
       },
       aspectRatio: '16:9',
       generation_prompt: imagePrompt,
-      altText: getLocalizedAltText(course.language ?? 'en', lesson.title),
+      altText: getCoverAltText(course.language ?? 'en', lesson.title),
       format: 'webp',
       file_size_bytes: webpResult.sizeBytes,
     };
@@ -1133,18 +986,22 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
   } catch (error) {
     const durationMs = Date.now() - startTime;
     const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorStack = error instanceof Error ? error.stack : undefined;
 
     logger.error(
       {
         enrichmentId: enrichment.id,
         lessonId: lesson.id,
+        courseId: course.id,
         durationMs,
         error: errorMessage,
+        stack: errorStack,
       },
       'Cover handler: generation failed'
     );
 
-    throw new Error(`Cover generation failed: ${errorMessage}`);
+    // Re-throw original error to preserve stack trace
+    throw error;
   }
 }
 
@@ -1234,32 +1091,16 @@ async function generateFinal(
       'Cover handler: converted to WebP'
     );
 
-    // Phase 3: Upload to Supabase Storage with retry
-    const supabase = getSupabaseAdmin();
-    const storagePath = `${course.id}/${lesson.id}/${enrichment.id}.webp`;
-
-    // Retry upload up to 3 times with exponential backoff
-    await retryWithBackoff(
-      async () => {
-        const { error: uploadError } = await supabase.storage
-          .from(STORAGE_BUCKET)
-          .upload(storagePath, webpResult.buffer, {
-            contentType: 'image/webp',
-            upsert: true,
-          });
-
-        if (uploadError) {
-          throw new Error(`Failed to upload image: ${uploadError.message}`);
-        }
-      },
+    // Phase 3: Upload to local storage with retry
+    const storagePath = await retryWithBackoff(
+      () => uploadEnrichmentAsset(course.id, lesson.id, enrichment.id, webpResult.buffer, 'webp'),
       3,
-      1000
+      1000,
+      'Cover upload'
     );
 
-    // Get public URL
-    const { data: publicUrlData } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(storagePath);
-
-    const imageUrl = publicUrlData.publicUrl;
+    // Build public URL (nginx serves from /storage/enrichments/)
+    const imageUrl = buildPublicUrl(storagePath);
 
     logger.info(
       {
@@ -1283,7 +1124,7 @@ async function generateFinal(
       },
       aspectRatio: '16:9',
       generation_prompt: imagePrompt,
-      altText: getLocalizedAltText(course.language ?? 'en', lesson.title),
+      altText: getCoverAltText(course.language ?? 'en', lesson.title),
       format: 'webp',
       file_size_bytes: webpResult.sizeBytes,
     };
@@ -1318,18 +1159,22 @@ async function generateFinal(
   } catch (error) {
     const durationMs = Date.now() - startTime;
     const errorMessage = error instanceof Error ? error.message : String(error);
+    const errorStack = error instanceof Error ? error.stack : undefined;
 
     logger.error(
       {
         enrichmentId: enrichment.id,
         lessonId: lesson.id,
+        courseId: course.id,
         durationMs,
         error: errorMessage,
+        stack: errorStack,
       },
       'Cover handler: final generation failed'
     );
 
-    throw new Error(`Cover final generation failed: ${errorMessage}`);
+    // Re-throw original error to preserve stack trace
+    throw error;
   }
 }
 
