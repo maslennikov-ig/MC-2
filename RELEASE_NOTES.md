@@ -2,6 +2,34 @@
 
 _Released on 2025-12-26_
 
+## v0.28.33
+
+_Released on 2026-01-23_
+
+### ✨ New Features
+
+- **types**: Add TypeScript types for GenerationProgress
+- **stage3**: Auto-assign CORE priority for single document
+- **web**: Add navigation to lessons page (Toolbar + Sidebar)
+
+### 🔧 Improvements
+
+- **locks**: Extract lock pattern to shared utility
+
+### 🐛 Bug Fixes
+
+- **generation**: Stage 3 now runs for deduplicated documents
+- **web**: Use vector_status for document processing status
+- **stage2**: Enhance filePath validation for empty strings
+- **stage2**: Add filePath validation before document processing
+- **stage6**: Sync generation_progress.steps[] on completion
+- **locks**: Remove double releaseLock in Stage 4 and Stage 5 handlers
+- **nginx**: Add rewrite for /api/trpc to /trpc
+
+---
+
+_This release was automatically generated from 25 commits._
+
 ## v0.28.32
 
 _Released on 2026-01-23_
