@@ -195,14 +195,20 @@ services:
     environment:
       - NODE_ENV=production
       - REDIS_URL=redis://megacampus-redis:6379
-      - ENRICHMENTS_STORAGE_BUCKET=course-enrichments
       # DEV queue isolation - listens to DEV-only stage7 queue
       - BULLMQ_STAGE7_QUEUE_NAME=stage7-enrichments-dev
+      # Use local storage instead of Supabase (auto-switch in unified-storage-service)
+      - USE_LOCAL_STORAGE=true
+      # Local storage for enrichment assets
+      - ENRICHMENTS_LOCAL_PATH=/app/data/enrichments
+      - ENRICHMENTS_PUBLIC_URL=/storage/enrichments
       # Fix file path for document processing (override .env from image)
       - DOCLING_UPLOADS_BASE_PATH=/app
       - DOCLING_CONTAINER_UPLOADS_PATH=/app/uploads-dev
     volumes:
       - ./data/uploads-dev:/app/uploads
+      # Local enrichment storage (covers, cards) - served by nginx
+      - ./data/enrichments-dev:/app/data/enrichments
     networks:
       - megacampus
     depends_on:

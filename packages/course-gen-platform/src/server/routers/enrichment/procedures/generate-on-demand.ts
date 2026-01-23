@@ -24,6 +24,7 @@ import {
   getNextOrderIndex,
   isTwoStageType,
   checkExistingEnrichment,
+  findReusableEnrichment,
 } from '../helpers';
 import { getSupabaseAdmin } from '../../../../shared/supabase/admin';
 import { createStage7Queue, addEnrichmentJob } from '../../../../stages/stage7-enrichments/factory';
@@ -129,51 +130,104 @@ export const generateOnDemand = protectedProcedure
         });
       }
 
-      // Step 4: Get next order index
+      // Step 4: Check for reusable (cancelled/failed) enrichment
       const supabase = getSupabaseAdmin();
-      const orderIndex = await getNextOrderIndex(lessonId);
+      const reusableId = await findReusableEnrichment(lessonId, enrichmentType, requestId);
 
       // Step 5: Determine initial status (two-stage types start with draft generation)
       const initialStatus = isTwoStageType(enrichmentType) ? 'pending' : 'pending';
 
-      // Step 6: Insert enrichment record
-      const { error: insertError } = await supabase.from('lesson_enrichments').insert({
-        id: enrichmentId,
-        lesson_id: lessonId,
-        course_id: lesson.course_id,
-        enrichment_type: enrichmentType,
-        order_index: orderIndex,
-        title: null,
-        content: null,
-        asset_id: null,
-        status: initialStatus,
-        generation_attempt: 0,
-        error_message: null,
-        error_details: null,
-        metadata: {},
-      });
+      // Step 6: Either reuse existing enrichment or create new one
+      let finalEnrichmentId: string;
 
-      if (insertError) {
-        logger.error(
+      if (reusableId) {
+        // Reuse existing cancelled/failed enrichment (reset it)
+        const { error: updateError } = await supabase
+          .from('lesson_enrichments')
+          .update({
+            status: initialStatus,
+            title: null,
+            content: null,
+            asset_id: null,
+            generation_attempt: 0,
+            error_message: null,
+            error_details: null,
+            metadata: {},
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', reusableId);
+
+        if (updateError) {
+          logger.error(
+            {
+              requestId,
+              enrichmentId: reusableId,
+              lessonId,
+              error: updateError.message,
+            },
+            'Failed to reset reusable enrichment'
+          );
+
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Unable to create enrichment. Please try again later.',
+          });
+        }
+
+        finalEnrichmentId = reusableId;
+        logger.info(
           {
             requestId,
-            enrichmentId,
+            enrichmentId: reusableId,
             lessonId,
-            error: insertError.message,
+            enrichmentType,
           },
-          'Failed to insert enrichment record'
+          'Reused cancelled/failed enrichment'
         );
+      } else {
+        // Create new enrichment
+        const orderIndex = await getNextOrderIndex(lessonId);
 
-        throw new TRPCError({
-          code: 'INTERNAL_SERVER_ERROR',
-          message: 'Unable to create enrichment. Please try again later.',
+        const { error: insertError } = await supabase.from('lesson_enrichments').insert({
+          id: enrichmentId,
+          lesson_id: lessonId,
+          course_id: lesson.course_id,
+          enrichment_type: enrichmentType,
+          order_index: orderIndex,
+          title: null,
+          content: null,
+          asset_id: null,
+          status: initialStatus,
+          generation_attempt: 0,
+          error_message: null,
+          error_details: null,
+          metadata: {},
         });
+
+        if (insertError) {
+          logger.error(
+            {
+              requestId,
+              enrichmentId,
+              lessonId,
+              error: insertError.message,
+            },
+            'Failed to insert enrichment record'
+          );
+
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Unable to create enrichment. Please try again later.',
+          });
+        }
+
+        finalEnrichmentId = enrichmentId;
       }
 
       // Step 7: Enqueue BullMQ job
       const queue = getQueue();
       const jobInput: Stage7JobInput = {
-        enrichmentId,
+        enrichmentId: finalEnrichmentId,
         enrichmentType,
         lessonId,
         courseId: lesson.course_id,
@@ -185,23 +239,23 @@ export const generateOnDemand = protectedProcedure
       };
 
       const job = await addEnrichmentJob(queue, jobInput, {
-        jobId: `enrich-ondemand-${enrichmentId}`,
+        jobId: `enrich-ondemand-${finalEnrichmentId}`,
       });
 
       logger.info(
         {
           requestId,
-          enrichmentId,
+          enrichmentId: finalEnrichmentId,
           lessonId,
           enrichmentType,
           jobId: job.id,
-          orderIndex,
+          reused: !!reusableId,
         },
         'On-demand enrichment created and job enqueued'
       );
 
       return {
-        enrichmentId,
+        enrichmentId: finalEnrichmentId,
         status: initialStatus as 'pending',
         jobId: job.id,
       };

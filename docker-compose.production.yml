@@ -307,12 +307,17 @@ services:
     environment:
       - NODE_ENV=production
       - REDIS_URL=redis://megacampus-redis:6379
-      # Storage bucket for enrichment assets
-      - ENRICHMENTS_STORAGE_BUCKET=course-enrichments
+      # Use local storage instead of Supabase (auto-switch in unified-storage-service)
+      - USE_LOCAL_STORAGE=true
+      # Local storage for enrichment assets (migrated from Supabase Storage)
+      - ENRICHMENTS_LOCAL_PATH=/app/data/enrichments
+      - ENRICHMENTS_PUBLIC_URL=/storage/enrichments
       # Fix file path for document processing (override .env from image)
       - DOCLING_UPLOADS_BASE_PATH=/app
     volumes:
       - ./data/uploads:/app/uploads
+      # Local enrichment storage (covers, cards) - served by nginx
+      - ./data/enrichments:/app/data/enrichments
     networks:
       - megacampus
     depends_on:
