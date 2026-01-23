@@ -5,6 +5,7 @@ import { useRouter, usePathname } from 'next/navigation'
 import type { Course, Section, Lesson } from '@/types/database'
 import { getLessonLabel } from '@/lib/course-data-utils'
 import { BREAKPOINTS } from '@/lib/constants/breakpoints'
+import { useAuth } from '@/lib/hooks/use-auth'
 
 /** Structure for localStorage progress with timestamps (CR-005) */
 interface LocalProgressData {
@@ -38,6 +39,7 @@ export function useViewerState(
 
   const router = useRouter()
   const pathname = usePathname()
+  const { user: authUser } = useAuth()
 
   // Sort sections and lessons
   const sections = useMemo(() => {
@@ -94,21 +96,10 @@ export function useViewerState(
     return () => window.removeEventListener('resize', checkIsMobile)
   }, [])
 
-  // Get current user for server sync
+  // Sync userId from auth hook
   useEffect(() => {
-    const getUserId = async () => {
-      try {
-        const response = await fetch('/api/auth/me')
-        if (response.ok) {
-          const data = await response.json()
-          setUserId(data.user?.id || null)
-        }
-      } catch {
-        // Offline or error - continue with localStorage only
-      }
-    }
-    getUserId()
-  }, [])
+    setUserId(authUser?.id || null)
+  }, [authUser?.id])
 
   // CR-005: Ref to track local progress timestamp for conflict resolution
   const localProgressTimestampRef = useRef<string | null>(null)
