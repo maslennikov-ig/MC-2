@@ -1,5 +1,5 @@
-import React from "react"
-import { motion, AnimatePresence } from "framer-motion"
+import React from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
 import {
   ChevronRight,
   BookOpen,
@@ -10,37 +10,34 @@ import {
   PanelLeftClose,
   X,
   Home,
-  GitBranch
-} from "lucide-react"
-import Link from "next/link"
-import { Button } from "@/components/ui/button"
-import { Badge } from "@/components/ui/badge"
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipProvider,
-  TooltipTrigger,
-} from "@/components/ui/tooltip"
-import LessonProgressCard from "@/components/common/lesson-progress-card"
-import { Course, Section, Lesson } from "@/types/database"
+  GitBranch,
+  LayoutGrid,
+} from 'lucide-react'
+import { useTranslations } from 'next-intl'
+import Link from 'next/link'
+import { Button } from '@/components/ui/button'
+import { Badge } from '@/components/ui/badge'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import LessonProgressCard from '@/components/common/lesson-progress-card'
+import { Course, Section, Lesson } from '@/types/database'
 
 interface SidebarProps {
-  course: Course;
-  sections: Section[];
-  lessonsBySection: Record<string, Lesson[]>;
-  currentLessonId: string | null;
-  completedLessons: Set<string>;
-  expandedSections: Set<string>;
-  sidebarOpen: boolean;
-  mobileSidebarOpen: boolean;
-  focusMode: boolean;
-  completedCount: number;
-  totalLessons: number;
-  remainingMinutes: number;
-  onToggleSidebar: (open: boolean) => void;
-  onToggleMobileSidebar: (open: boolean) => void;
-  onToggleSection: (id: string) => void;
-  onSelectLesson: (id: string) => void;
+  course: Course
+  sections: Section[]
+  lessonsBySection: Record<string, Lesson[]>
+  currentLessonId: string | null
+  completedLessons: Set<string>
+  expandedSections: Set<string>
+  sidebarOpen: boolean
+  mobileSidebarOpen: boolean
+  focusMode: boolean
+  completedCount: number
+  totalLessons: number
+  remainingMinutes: number
+  onToggleSidebar: (open: boolean) => void
+  onToggleMobileSidebar: (open: boolean) => void
+  onToggleSection: (id: string) => void
+  onSelectLesson: (id: string) => void
 }
 
 export function Sidebar({
@@ -59,18 +56,24 @@ export function Sidebar({
   onToggleSidebar,
   onToggleMobileSidebar,
   onToggleSection,
-  onSelectLesson
+  onSelectLesson,
 }: SidebarProps) {
+  const t = useTranslations('course.viewer')
+
   const sidebarContent = (isMobile = false) => (
     <div className="h-full overflow-y-auto">
-      <div className="p-6 border-b border-gray-200/60 dark:border-gray-800">
-        <div className="flex items-center justify-between mb-4">
+      <div className="border-b border-gray-200/60 p-6 dark:border-gray-800">
+        <div className="mb-4 flex items-center justify-between">
           <Link
-            href={isMobile ? "/courses" : "/courses"}
-            className="inline-flex items-center gap-2 text-gray-600 dark:text-white/70 hover:text-purple-600 dark:hover:text-white transition-colors group"
+            href={isMobile ? '/courses' : '/courses'}
+            className="group inline-flex items-center gap-2 text-gray-600 transition-colors hover:text-purple-600 dark:text-white/70 dark:hover:text-white"
           >
-            {isMobile ? <Home className="w-4 h-4" /> : <ArrowLeft className="w-4 h-4 group-hover:-translate-x-1 transition-transform" />}
-            <span className="text-sm">{isMobile ? "К каталогу" : "К каталогу"}</span>
+            {isMobile ? (
+              <Home className="h-4 w-4" />
+            ) : (
+              <ArrowLeft className="h-4 w-4 transition-transform group-hover:-translate-x-1" />
+            )}
+            <span className="text-sm">{isMobile ? 'К каталогу' : 'К каталогу'}</span>
           </Link>
           <div className="flex items-center gap-1">
             <TooltipProvider>
@@ -82,8 +85,11 @@ export function Sidebar({
                     size="icon"
                     className="h-8 w-8 text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400"
                   >
-                    <Link href={`/courses/generating/${course.slug || course.id}?workflow=true`} target="_blank">
-                      <GitBranch className="w-4 h-4" />
+                    <Link
+                      href={`/courses/generating/${course.slug || course.id}?workflow=true`}
+                      target="_blank"
+                    >
+                      <GitBranch className="h-4 w-4" />
                     </Link>
                   </Button>
                 </TooltipTrigger>
@@ -98,77 +104,95 @@ export function Sidebar({
                 className="h-8 w-8 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200"
                 title="Скрыть боковую панель"
               >
-                <PanelLeftClose className="w-4 h-4" />
+                <PanelLeftClose className="h-4 w-4" />
               </Button>
             )}
             {isMobile && (
               <button
                 onClick={() => onToggleMobileSidebar(false)}
-                className="p-2 text-gray-700 dark:text-white/70 hover:text-gray-900 dark:hover:text-white hover:bg-gray-100 dark:hover:bg-gray-800 rounded-lg transition-colors"
+                className="rounded-lg p-2 text-gray-700 transition-colors hover:bg-gray-100 hover:text-gray-900 dark:text-white/70 dark:hover:bg-gray-800 dark:hover:text-white"
               >
-                <X className="w-6 h-6" />
+                <X className="h-6 w-6" />
               </button>
             )}
           </div>
         </div>
-        <h2 className="text-2xl font-bold text-gray-800 dark:text-white/90 mb-3">
-          {course.title}
-        </h2>
-        <div className="flex flex-wrap gap-2 mb-4">
-          <Badge variant="secondary" className="bg-purple-600 text-white border-purple-700 dark:bg-purple-500/20 dark:text-purple-300 dark:border-purple-500/30">
+        <h2 className="mb-3 text-2xl font-bold text-gray-800 dark:text-white/90">{course.title}</h2>
+        <div className="mb-4 flex flex-wrap gap-2">
+          <Badge
+            variant="secondary"
+            className="border-purple-700 bg-purple-600 text-white dark:border-purple-500/30 dark:bg-purple-500/20 dark:text-purple-300"
+          >
             {course.difficulty}
           </Badge>
-          <Badge variant="secondary" className="bg-blue-600 text-white border-blue-700 dark:bg-blue-500/20 dark:text-blue-300 dark:border-blue-500/30">
+          <Badge
+            variant="secondary"
+            className="border-blue-700 bg-blue-600 text-white dark:border-blue-500/30 dark:bg-blue-500/20 dark:text-blue-300"
+          >
             {course.style}
           </Badge>
         </div>
-        
+
         <LessonProgressCard
           completedCount={completedCount}
           totalLessons={totalLessons}
           remainingMinutes={remainingMinutes}
           compact={isMobile}
         />
+
+        {/* All Lessons button */}
+        <Link
+          href={`/courses/${course.slug || course.id}/lessons`}
+          className="hover:to-purple-150/50 group mt-4 flex w-full items-center justify-between rounded-lg border border-purple-200/50 bg-gradient-to-r from-purple-50 to-purple-100/50 px-4 py-3 transition-all hover:from-purple-100 dark:border-purple-700/30 dark:from-purple-900/20 dark:to-purple-800/10 dark:hover:from-purple-900/30 dark:hover:to-purple-800/20"
+        >
+          <div className="flex items-center gap-3">
+            <LayoutGrid className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+            <span className="text-sm font-medium text-gray-800 dark:text-white/90">
+              {t('allLessons')}
+            </span>
+          </div>
+          <ChevronRight className="h-4 w-4 text-purple-500 transition-transform group-hover:translate-x-0.5 dark:text-purple-400" />
+        </Link>
       </div>
 
-      <div className="p-4 space-y-2">
+      <div className="space-y-2 p-4">
         {sections.map((section) => {
           const sectionLessons = lessonsBySection[section.id] || []
-          const sectionCompleted = sectionLessons.filter(l => completedLessons.has(l.id)).length
+          const sectionCompleted = sectionLessons.filter((l) => completedLessons.has(l.id)).length
           const isExpanded = expandedSections.has(section.id)
-          
+
           return (
-            <div key={section.id} className="rounded-lg overflow-hidden">
+            <div key={section.id} className="overflow-hidden rounded-lg">
               <button
                 onClick={() => onToggleSection(section.id)}
-                className="w-full px-3 py-2 bg-gradient-to-r from-gray-50 to-gray-100 dark:from-gray-800/30 dark:to-gray-800/20 hover:from-gray-100 hover:to-gray-150 dark:hover:from-gray-800/50 dark:hover:to-gray-800/40 border border-gray-200 dark:border-gray-800 rounded-lg transition-all duration-200 flex items-center justify-between group shadow-sm hover:shadow-md"
+                className="hover:to-gray-150 group flex w-full items-center justify-between rounded-lg border border-gray-200 bg-gradient-to-r from-gray-50 to-gray-100 px-3 py-2 shadow-sm transition-all duration-200 hover:from-gray-100 hover:shadow-md dark:border-gray-800 dark:from-gray-800/30 dark:to-gray-800/20 dark:hover:from-gray-800/50 dark:hover:to-gray-800/40"
               >
                 <div className="flex items-center gap-2">
-                  <ChevronRight 
-                    className={`w-4 h-4 text-gray-600 dark:text-white/60 transition-transform ${
+                  <ChevronRight
+                    className={`h-4 w-4 text-gray-600 transition-transform dark:text-white/60 ${
                       isExpanded ? 'rotate-90' : ''
                     }`}
                   />
-                  <Layers className="w-4 h-4 text-gray-600 dark:text-white/60" />
+                  <Layers className="h-4 w-4 text-gray-600 dark:text-white/60" />
                   <span className="text-sm font-semibold text-gray-800 dark:text-white/85">
                     Модуль {section.section_number}: {section.title}
                   </span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="text-xs text-gray-600 font-medium dark:text-white/50">
+                  <span className="text-xs font-medium text-gray-600 dark:text-white/50">
                     {sectionCompleted}/{sectionLessons.length}
                   </span>
                   {sectionCompleted === sectionLessons.length && sectionLessons.length > 0 && (
-                    <CheckCircle2 className="w-4 h-4 text-green-400" />
+                    <CheckCircle2 className="h-4 w-4 text-green-400" />
                   )}
                 </div>
               </button>
-              
+
               <AnimatePresence>
                 {isExpanded && (
                   <motion.div
                     initial={{ height: 0, opacity: 0 }}
-                    animate={{ height: "auto", opacity: 1 }}
+                    animate={{ height: 'auto', opacity: 1 }}
                     exit={{ height: 0, opacity: 0 }}
                     transition={{ duration: 0.2 }}
                     className="overflow-hidden"
@@ -177,32 +201,32 @@ export function Sidebar({
                       {sectionLessons.map((lesson) => {
                         const isCompleted = completedLessons.has(lesson.id)
                         const isCurrent = currentLessonId === lesson.id
-                        
+
                         return (
                           <button
                             key={lesson.id}
                             onClick={() => onSelectLesson(lesson.id)}
-                            className={`w-full text-left px-3 py-2 rounded-lg transition-all flex items-center gap-2 ${
+                            className={`flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left transition-all ${
                               isCurrent
-                                ? 'bg-purple-600 border border-purple-700 text-white dark:bg-purple-500/30 dark:border-purple-500/50 dark:text-white/90'
+                                ? 'border border-purple-700 bg-purple-600 text-white dark:border-purple-500/50 dark:bg-purple-500/30 dark:text-white/90'
                                 : isCompleted
-                                ? 'bg-green-100 text-green-800 border border-green-200 dark:bg-green-500/10 dark:text-white/70 dark:border-transparent hover:bg-green-200 dark:hover:bg-green-500/20'
-                                : 'text-gray-700 dark:text-white/70 hover:bg-gray-200 hover:text-gray-900 dark:hover:bg-white/5 dark:hover:text-white/90'
+                                  ? 'border border-green-200 bg-green-100 text-green-800 hover:bg-green-200 dark:border-transparent dark:bg-green-500/10 dark:text-white/70 dark:hover:bg-green-500/20'
+                                  : 'text-gray-700 hover:bg-gray-200 hover:text-gray-900 dark:text-white/70 dark:hover:bg-white/5 dark:hover:text-white/90'
                             }`}
                           >
                             <div className="flex-shrink-0">
                               {isCompleted ? (
-                                <CheckCircle2 className="w-4 h-4 text-green-400" />
+                                <CheckCircle2 className="h-4 w-4 text-green-400" />
                               ) : (
-                                <BookOpen className="w-4 h-4" />
+                                <BookOpen className="h-4 w-4" />
                               )}
                             </div>
-                            <div className="flex-1 min-w-0">
-                              <div className="text-sm truncate">
+                            <div className="min-w-0 flex-1">
+                              <div className="truncate text-sm">
                                 {lesson.lesson_number}. {lesson.title}
                               </div>
-                              <div className="flex items-center gap-2 mt-0.5 text-xs text-gray-500 dark:text-white/50">
-                                <Clock className="w-3 h-3" />
+                              <div className="mt-0.5 flex items-center gap-2 text-xs text-gray-500 dark:text-white/50">
+                                <Clock className="h-3 w-3" />
                                 <span>{lesson.duration_minutes} мин</span>
                               </div>
                             </div>
@@ -229,8 +253,8 @@ export function Sidebar({
             initial={{ x: -320, opacity: 0 }}
             animate={{ x: 0, opacity: 1 }}
             exit={{ x: -320, opacity: 0 }}
-            transition={{ type: "spring", damping: 25, stiffness: 300 }}
-            className="hidden lg:block w-80 bg-white dark:bg-gray-900/50 backdrop-blur-sm border-r border-gray-200 dark:border-gray-800 shadow-sm flex-shrink-0"
+            transition={{ type: 'spring', damping: 25, stiffness: 300 }}
+            className="hidden w-80 flex-shrink-0 border-r border-gray-200 bg-white shadow-sm backdrop-blur-sm lg:block dark:border-gray-800 dark:bg-gray-900/50"
           >
             {sidebarContent(false)}
           </motion.aside>
@@ -245,15 +269,15 @@ export function Sidebar({
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
-              className="lg:hidden fixed inset-0 bg-black/20 dark:bg-black/50 z-40"
+              className="fixed inset-0 z-40 bg-black/20 lg:hidden dark:bg-black/50"
               onClick={() => onToggleMobileSidebar(false)}
             />
             <motion.aside
               initial={{ x: -320 }}
               animate={{ x: 0 }}
               exit={{ x: -320 }}
-              transition={{ type: "spring", damping: 25 }}
-              className="lg:hidden fixed left-0 top-0 h-full w-80 bg-white dark:bg-gray-900 backdrop-blur-sm border-r border-gray-200 dark:border-gray-800 z-50 overflow-y-auto shadow-2xl"
+              transition={{ type: 'spring', damping: 25 }}
+              className="fixed top-0 left-0 z-50 h-full w-80 overflow-y-auto border-r border-gray-200 bg-white shadow-2xl backdrop-blur-sm lg:hidden dark:border-gray-800 dark:bg-gray-900"
             >
               {sidebarContent(true)}
             </motion.aside>

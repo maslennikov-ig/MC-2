@@ -57,6 +57,8 @@
     "showSidebar": "Показать боковую панель",
     "section": "Модуль",
     "lesson": "Урок",
+    "allLessons": "Уроки",
+    "allLessonsTooltip": "Все уроки курса",
     "constructor": "Конструктор",
     "constructorTooltip": "Конструктор курса",
     "focusMode": "Режим чтения",
