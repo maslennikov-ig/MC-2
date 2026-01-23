@@ -311,6 +311,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.28.31] - 2026-01-23
+
+### Fixed
+
+- **cover**: use 21:9 cinematic ratio in lightbox preview (ee1883c7)
+
 ## [0.28.30] - 2026-01-23
 
 ### Added

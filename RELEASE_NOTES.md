@@ -2,6 +2,18 @@
 
 _Released on 2025-12-26_
 
+## v0.28.31
+
+_Released on 2026-01-23_
+
+### 🐛 Bug Fixes
+
+- **cover**: Use 21:9 cinematic ratio in lightbox preview
+
+---
+
+_This release was automatically generated from 1 commits._
+
 ## v0.28.30
 
 _Released on 2026-01-23_
