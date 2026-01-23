@@ -2,6 +2,18 @@
 
 _Released on 2025-12-26_
 
+## v0.28.30
+
+_Released on 2026-01-23_
+
+### ✨ New Features
+
+- **cover**: Switch to 21:9 cinematic aspect ratio for lesson covers
+
+---
+
+_This release was automatically generated from 1 commits._
+
 ## v0.28.29
 
 _Released on 2026-01-23_

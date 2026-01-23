@@ -311,6 +311,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.28.30] - 2026-01-23
+
+### Added
+
+- **cover**: switch to 21:9 cinematic aspect ratio for lesson covers (a08a5597)
+
 ## [0.28.29] - 2026-01-23
 
 ### Added
