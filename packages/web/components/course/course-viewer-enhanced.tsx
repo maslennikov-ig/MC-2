@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useCallback } from 'react'
+import React, { useCallback, useEffect, useRef } from 'react'
 import { motion } from 'framer-motion'
 import Header from '@/components/layouts/header'
 import ContentGenerationPanel from '@/components/common/content-generation-panel'
@@ -62,7 +62,11 @@ export default function CourseViewerEnhanced({
   } = useViewerState(course, rawSections, rawLessons, initialLessonLabel)
 
   // Manage enrichments with refetch capability
-  const { data: localEnrichments, refetch: refetchEnrichments } = useServerData({
+  const {
+    data: localEnrichments,
+    refetch: refetchEnrichments,
+    isRefetching: isEnrichmentsRefetching,
+  } = useServerData({
     initialData: enrichments,
     key: 'enrichments',
   })
@@ -86,6 +90,30 @@ export default function CourseViewerEnhanced({
       return null
     })
   }, [currentLessonId, course.id, refetchEnrichments, localEnrichments])
+
+  // Track previous lesson to detect lesson changes (SPA navigation)
+  const prevLessonIdRef = useRef<string | null>(null)
+
+  // Auto-refresh enrichments when switching lessons via SPA navigation
+  // This ensures fresh data instead of stale SSR cache
+  useEffect(() => {
+    // Skip on initial mount (we have SSR data)
+    if (prevLessonIdRef.current === null) {
+      prevLessonIdRef.current = currentLessonId
+      return undefined
+    }
+
+    // Only refetch when lesson actually changed
+    if (prevLessonIdRef.current !== currentLessonId && currentLessonId) {
+      prevLessonIdRef.current = currentLessonId
+      // Small delay to debounce rapid navigation
+      const timeoutId = setTimeout(() => {
+        void refreshEnrichments()
+      }, 150)
+      return () => clearTimeout(timeoutId)
+    }
+    return undefined
+  }, [currentLessonId, refreshEnrichments])
 
   // Swipe logic for mobile navigation
   const swipeHandlers = useSwipe(
@@ -212,6 +240,7 @@ export default function CourseViewerEnhanced({
                 assets={currentLessonId ? assets?.[currentLessonId] : undefined}
                 enrichments={currentLessonId ? localEnrichments?.[currentLessonId] : undefined}
                 enrichmentsLoadError={enrichmentsLoadError}
+                isEnrichmentsLoading={isEnrichmentsRefetching}
                 lessonContent={currentLessonId ? lessonContents?.[currentLessonId] : undefined}
                 focusMode={focusMode}
                 currentIndex={currentIndex}

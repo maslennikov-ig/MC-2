@@ -221,7 +221,7 @@ const PHASE_FALLBACK_CONFIG: Record<
   // Stage 7: Enrichments (Activities)
   // Cover and Card use image generation models directly (not LLM text generation)
   stage_7_cover: {
-    modelId: 'google/gemini-2.5-flash-image-preview', // 16:9 aspect ratio, $0.038
+    modelId: 'google/gemini-2.5-flash-image', // 16:9 aspect ratio, $0.038
     temperature: 0.7,
     maxTokens: 1024,
   },
