@@ -211,6 +211,14 @@ const nextConfig: NextConfig = {
         protocol: 'https',
         hostname: 'picsum.photos',
       },
+      {
+        protocol: 'https',
+        hostname: 'ai.megacampus.ru',
+      },
+      {
+        protocol: 'https',
+        hostname: 'dev.ai.megacampus.ru',
+      },
     ],
     loader: 'default',
     loaderFile: './lib/supabase-image-loader.ts',
@@ -292,6 +300,19 @@ const nextConfig: NextConfig = {
     }
 
     return config
+  },
+  // Rewrites for local development - proxy enrichments to staging server
+  async rewrites() {
+    // Only proxy in development - in production nginx serves these files
+    if (process.env.NODE_ENV === 'development') {
+      return [
+        {
+          source: '/storage/enrichments/:path*',
+          destination: 'https://ai.megacampus.ru/storage/enrichments/:path*',
+        },
+      ]
+    }
+    return []
   },
   async headers() {
     return [
