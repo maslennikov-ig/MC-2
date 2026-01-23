@@ -70,9 +70,9 @@ export class DocumentProcessingHandler extends BaseJobHandler<DocumentProcessing
   ): Promise<JobResult> {
     const { fileId, filePath, courseId } = jobData;
 
-    // Fail-fast validation: filePath must be a valid string
-    if (!filePath || typeof filePath !== 'string') {
-      const errorMsg = `Invalid file path for document processing: expected string, got ${typeof filePath}. CourseID: ${courseId}, FileID: ${fileId}. This indicates a database integrity issue or failed file upload.`;
+    // Fail-fast validation: filePath must be a valid non-empty string
+    if (!filePath || typeof filePath !== 'string' || filePath.trim().length === 0) {
+      const errorMsg = `Invalid file path for document processing: expected non-empty string, got ${typeof filePath} (value: "${filePath ?? 'undefined'}"). CourseID: ${courseId}, FileID: ${fileId}. This indicates a database integrity issue or failed file upload.`;
       this.log(job, 'error', errorMsg, { fileId, courseId, filePath });
       throw new Error(errorMsg);
     }
