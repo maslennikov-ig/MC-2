@@ -879,11 +879,8 @@ class Stage5GenerationHandler {
           );
         }
 
-        // CRITICAL: Release lock BEFORE auto-approval to allow Stage 6 to acquire it
-        // Without this, Stage 6 jobs would fail with "Lock held by stage-5-xxx"
+        // Clear heartbeat - lock will be released in finally block
         clearInterval(heartbeatInterval);
-        await generationLockService.releaseLock(course_id, lockId);
-        jobLogger.debug({ courseId: course_id, lockId }, 'Released lock early for auto-approval');
 
         // Step 2: Handle stage completion (checks generation_mode)
         // If automatic: auto-approves and queues Stage 6

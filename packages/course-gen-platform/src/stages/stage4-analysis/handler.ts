@@ -693,11 +693,8 @@ class Stage4AnalysisHandler {
           'Analysis result stored successfully in courses.analysis_result'
         );
 
-        // CRITICAL: Release lock BEFORE auto-approval to allow Stage 5 to acquire it
-        // Without this, Stage 5 job would fail with "Lock held by stage-4-xxx"
+        // Clear heartbeat - lock will be released in finally block
         clearInterval(heartbeatInterval);
-        await generationLockService.releaseLock(course_id, lockId);
-        jobLogger.debug({ courseId: course_id, lockId }, 'Released lock early for auto-approval');
 
         // Handle stage completion separately (auto-approve if automatic mode)
         try {
