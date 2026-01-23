@@ -1,10 +1,11 @@
 'use client'
 
-import React, { useState, useCallback, useEffect } from 'react'
+import React, { useState, useCallback, useEffect, useRef } from 'react'
 import Image from 'next/image'
 import { Expand } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
+import { ImageSkeleton, ImageErrorFallback } from '@/components/ui/image-skeleton'
 import { cn } from '@/lib/utils'
 
 interface EnrichmentCardImageProps {
@@ -44,6 +45,29 @@ export function EnrichmentCardImage({
   aspectRatio,
 }: EnrichmentCardImageProps) {
   const [isLightboxOpen, setIsLightboxOpen] = useState(false)
+  const [isImageLoaded, setIsImageLoaded] = useState(false)
+  const [hasError, setHasError] = useState(false)
+  const [isHydrated, setIsHydrated] = useState(false)
+  const isMountedRef = useRef(true)
+
+  // Mark as hydrated after first client render (prevents SSR mismatch)
+  useEffect(() => {
+    setIsHydrated(true)
+  }, [])
+
+  // Cleanup on unmount to prevent memory leaks
+  useEffect(() => {
+    return () => {
+      isMountedRef.current = false
+    }
+  }, [])
+
+  // Reset loading state when image source changes (race condition fix)
+  const currentSrc = hasImage && imageUrl ? imageUrl : placeholderImage
+  useEffect(() => {
+    setIsImageLoaded(false)
+    setHasError(false)
+  }, [currentSrc])
 
   // Handle keyboard navigation for lightbox
   const handleKeyDown = useCallback(
@@ -66,10 +90,31 @@ export function EnrichmentCardImage({
     setIsLightboxOpen(true)
   }, [])
 
+  // Safe state updates to prevent memory leaks and SSR hydration issues
+  const handleImageLoad = useCallback(() => {
+    if (isMountedRef.current && isHydrated) {
+      setIsImageLoaded(true)
+    }
+  }, [isHydrated])
+
+  const handleImageError = useCallback(() => {
+    if (isMountedRef.current && isHydrated) {
+      setIsImageLoaded(true) // Hide skeleton
+      setHasError(true)
+    }
+  }, [isHydrated])
+
   return (
     <>
       {/* Image Area */}
-      <div className="relative min-h-[280px] flex-1 overflow-hidden">
+      <div
+        className="relative min-h-[280px] flex-1 overflow-hidden"
+        aria-busy={!isImageLoaded && !hasError}
+      >
+        {/* Skeleton while loading */}
+        {!isImageLoaded && !hasError && <ImageSkeleton withIcon />}
+        {/* Error fallback */}
+        {hasError && <ImageErrorFallback />}
         {/* Show actual image if exists, otherwise placeholder */}
         {hasImage && imageUrl ? (
           <>
@@ -77,8 +122,11 @@ export function EnrichmentCardImage({
               src={imageUrl}
               alt={altText}
               fill
+              onLoad={handleImageLoad}
+              onError={handleImageError}
               className={cn(
-                'object-cover transition-all duration-500',
+                'object-cover transition-all duration-500 motion-reduce:transition-none',
+                isImageLoaded && !hasError ? 'opacity-100' : 'opacity-0',
                 shouldShowPanel && 'scale-105 brightness-90 dark:brightness-75'
               )}
               sizes="(max-width: 640px) 100vw, (max-width: 1280px) 50vw, 33vw"
@@ -105,8 +153,11 @@ export function EnrichmentCardImage({
             src={placeholderImage}
             alt={altText}
             fill
+            onLoad={handleImageLoad}
+            onError={handleImageError}
             className={cn(
-              'object-cover transition-all duration-500',
+              'object-cover transition-all duration-500 motion-reduce:transition-none',
+              isImageLoaded && !hasError ? 'opacity-100' : 'opacity-0',
               'grayscale group-hover:grayscale-0',
               shouldShowPanel && 'scale-105 brightness-90 dark:brightness-75'
             )}
