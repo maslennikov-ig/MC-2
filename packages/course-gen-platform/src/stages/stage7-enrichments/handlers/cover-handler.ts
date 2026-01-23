@@ -13,7 +13,7 @@ import { z } from 'zod';
 import { logger } from '@/shared/logger';
 import { llmClient } from '@/shared/llm/client';
 import { createPromptService } from '@/shared/prompts/prompt-service';
-import { uploadEnrichmentAssetLocal, buildPublicUrl } from '../services/local-storage-service';
+import { uploadEnrichmentAsset, buildPublicUrl } from '../services/unified-storage-service';
 import { DEFAULT_MODEL_ID } from '@megacampus/shared-types';
 import type { CoverEnrichmentContent, EnrichmentMetadata } from '@megacampus/shared-types';
 import type { EnrichmentHandler } from '../services/enrichment-router';
@@ -926,8 +926,7 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
 
     // Phase 4: Upload to local storage with retry
     const storagePath = await retryWithBackoff(
-      () =>
-        uploadEnrichmentAssetLocal(course.id, lesson.id, enrichment.id, webpResult.buffer, 'webp'),
+      () => uploadEnrichmentAsset(course.id, lesson.id, enrichment.id, webpResult.buffer, 'webp'),
       3,
       1000,
       'Cover upload'
@@ -1094,8 +1093,7 @@ async function generateFinal(
 
     // Phase 3: Upload to local storage with retry
     const storagePath = await retryWithBackoff(
-      () =>
-        uploadEnrichmentAssetLocal(course.id, lesson.id, enrichment.id, webpResult.buffer, 'webp'),
+      () => uploadEnrichmentAsset(course.id, lesson.id, enrichment.id, webpResult.buffer, 'webp'),
       3,
       1000,
       'Cover upload'

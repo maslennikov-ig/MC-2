@@ -15,10 +15,10 @@
 import { logger } from '@/shared/logger';
 import { createPromptService } from '@/shared/prompts/prompt-service';
 import {
-  uploadEnrichmentAssetLocal,
-  uploadCourseCardLocal,
+  uploadEnrichmentAsset,
+  uploadCourseCard,
   buildPublicUrl,
-} from '../services/local-storage-service';
+} from '../services/unified-storage-service';
 import type { CardEnrichmentContent, EnrichmentMetadata } from '@megacampus/shared-types';
 import type { EnrichmentHandler } from '../services/enrichment-router';
 import type { EnrichmentHandlerInput, GenerateResult } from '../types';
@@ -290,15 +290,9 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
       () =>
         isCourseCard
           ? // Course card: {courseId}/card.webp
-            uploadCourseCardLocal(course.id, webpResult.buffer, 'webp')
+            uploadCourseCard(course.id, webpResult.buffer, 'webp')
           : // Lesson card: {courseId}/{lessonId}/{enrichmentId}.webp
-            uploadEnrichmentAssetLocal(
-              course.id,
-              lesson.id,
-              enrichment.id,
-              webpResult.buffer,
-              'webp'
-            ),
+            uploadEnrichmentAsset(course.id, lesson.id, enrichment.id, webpResult.buffer, 'webp'),
       3,
       1000,
       'Card upload'
