@@ -2,11 +2,19 @@
  * Cover Enrichment Handler
  * @module stages/stage7-enrichments/handlers/cover-handler
  *
- * Two-stage handler for lesson cover image generation.
- * Phase 1 (Draft): LLM generates 3 image prompt variants with different visual approaches
- * Phase 2 (Final): Image model generates hero banner from selected variant
+ * Single-stage handler for lesson cover image generation.
+ * User selects style preset (premium3d, realistic, abstract, minimalist, dramatic)
+ * before generation. Handler generates image directly using selected style.
+ *
+ * Flow:
+ * 1. User selects style in UI (or uses course default)
+ * 2. LLM generates image prompt based on style
+ * 3. Image model generates hero banner (16:9)
+ * 4. Image converted to WebP and uploaded
  *
  * Uses OpenRouter API with bytedance-seed/seedream-4.5 model for image generation.
+ *
+ * @see _twoStageReserved for archived two-stage implementation
  */
 
 import { z } from 'zod';
@@ -1197,5 +1205,9 @@ export const coverHandler: EnrichmentHandler = {
   generate,
 };
 
-// Reserved for potential future two-stage flow (kept for git history reference)
+/**
+ * @deprecated Reserved for potential future two-stage flow revival.
+ * DO NOT USE - Not tested, not maintained, may be removed without notice.
+ * @internal
+ */
 export const _twoStageReserved = { generateDraft: _generateDraft, generateFinal: _generateFinal };

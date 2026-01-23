@@ -42,7 +42,6 @@ import { getPlaybackUrl } from './procedures/get-playback-url';
 import { regenerateDraft } from './procedures/regenerate-draft';
 import { updateDraft } from './procedures/update-draft';
 import { approveDraft } from './procedures/approve-draft';
-import { approveCoverDraft } from './procedures/approve-cover-draft';
 import { createBatch } from './procedures/create-batch';
 import { getAutoCard } from './procedures/get-auto-card';
 import { regenerateAutoCard } from './procedures/regenerate-auto-card';
@@ -154,12 +153,6 @@ export const enrichmentRouter = router({
    * @see procedures/approve-draft.ts
    */
   approveDraft,
-
-  /**
-   * Approve cover draft with selected variant
-   * @see procedures/approve-cover-draft.ts
-   */
-  approveCoverDraft,
 
   /**
    * Get automatically generated card for course or lesson
