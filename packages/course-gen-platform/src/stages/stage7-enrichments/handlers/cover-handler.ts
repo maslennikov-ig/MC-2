@@ -420,7 +420,9 @@ ${customPrompt.trim()}`;
  * @param input - Enrichment handler input with context
  * @returns Draft result with 3 prompt variants
  */
-async function generateDraft(input: EnrichmentHandlerInput): Promise<DraftResult> {
+// NOTE: generateDraft is kept for potential future two-stage flow revival
+
+async function _generateDraft(input: EnrichmentHandlerInput): Promise<DraftResult> {
   const { enrichmentContext } = input;
   const { enrichment, lesson, course } = enrichmentContext;
 
@@ -1019,7 +1021,9 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
  * @param draft - Approved draft result from Phase 1 with selected variant
  * @returns Generate result with cover image and metadata
  */
-async function generateFinal(
+// NOTE: generateFinal is kept for potential future two-stage flow revival
+
+async function _generateFinal(
   input: EnrichmentHandlerInput,
   draft: DraftResult
 ): Promise<GenerateResult> {
@@ -1183,16 +1187,15 @@ async function generateFinal(
 // ============================================================================
 
 /**
- * Cover enrichment handler implementing two-stage flow
+ * Cover enrichment handler implementing single-stage flow
  *
- * Stage 1 (Draft): Generate 3 image prompt variants using LLM
- * Stage 2 (Final): Generate cover image from selected variant
- *
- * The handler follows the presentation-handler pattern for two-stage generation.
+ * Generates cover image directly using style presets and optional custom prompt.
+ * User selects style in UI before generation starts (not after draft).
  */
 export const coverHandler: EnrichmentHandler = {
-  generationFlow: 'two-stage',
-  generateDraft,
+  generationFlow: 'single-stage',
   generate,
-  generateFinal,
 };
+
+// Reserved for potential future two-stage flow (kept for git history reference)
+export const _twoStageReserved = { generateDraft: _generateDraft, generateFinal: _generateFinal };

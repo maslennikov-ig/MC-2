@@ -463,12 +463,7 @@ export async function findReusableEnrichment(
  * @returns True if type uses draft -> final flow
  */
 export function isTwoStageType(enrichmentType: string): boolean {
-  return (
-    enrichmentType === 'video' ||
-    enrichmentType === 'presentation' ||
-    enrichmentType === 'cover' ||
-    enrichmentType === 'banner'
-  );
+  return enrichmentType === 'video' || enrichmentType === 'presentation';
 }
 
 /**

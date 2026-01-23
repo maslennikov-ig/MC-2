@@ -367,7 +367,7 @@ export function isAwaitingSelection(status: string): boolean {
  * These types pause at `draft_ready` status waiting for user to select a variant
  * before proceeding to final generation.
  */
-export const TWO_STAGE_ENRICHMENT_TYPES = ['cover', 'banner'] as const;
+export const TWO_STAGE_ENRICHMENT_TYPES = [] as const;
 export type TwoStageEnrichmentType = (typeof TWO_STAGE_ENRICHMENT_TYPES)[number];
 
 /**
