@@ -159,6 +159,7 @@
   "viewer": {
     "noMaterials": "Дополнительные материалы отсутствуют",
     "noMaterialsDescription": "Для этого урока пока нет медиа-контента",
+    "loadingMaterials": "Загрузка материалов...",
     "loadError": "Не удалось загрузить дополнительные материалы. Попробуйте обновить страницу.",
     "videoLesson": "Видеолекция",
     "audioLesson": "Аудиоурок",
@@ -246,7 +247,7 @@
     },
     "generationComplete": "Дополнение успешно создано",
     "generationFailed": "Не удалось создать дополнение",
-    "resumingGeneration": "Восстанавливаем {count, plural, one {# генерацию} few {# генерации} many {# генераций} other {# генерации}}..."
+    "resumingGeneration": "Отслеживаем {count, plural, one {# активную генерацию} few {# активные генерации} many {# активных генераций} other {# активные генерации}}..."
   },
   "placeholder": {
     "quiz": {

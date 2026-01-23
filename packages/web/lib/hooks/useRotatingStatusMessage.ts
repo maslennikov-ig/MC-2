@@ -121,6 +121,15 @@ const STATUS_MESSAGES: Record<string, string[]> = {
     'Готово к просмотру...',
   ],
 
+  // Syncing (resuming tracking of active generation)
+  syncing: [
+    'Синхронизируем прогресс...',
+    'Подключаемся к генерации...',
+    'Получаем статус...',
+    'Загружаем данные...',
+    'Восстанавливаем соединение...',
+  ],
+
   // Uploading
   uploading_assets: [
     'Загружаем файлы...',

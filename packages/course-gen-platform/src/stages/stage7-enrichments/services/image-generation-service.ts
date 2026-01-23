@@ -16,14 +16,14 @@ import { getApiKey } from '@/shared/services/api-key-service';
 // ============================================================================
 
 /** Default model for cover images (16:9) - Gemini supports aspect ratio control */
-const DEFAULT_IMAGE_MODEL = 'google/gemini-2.5-flash-image-preview';
+const DEFAULT_IMAGE_MODEL = 'google/gemini-2.5-flash-image';
 
 /** Model for card images (1:1) - GPT-5 Mini always generates square 1024x1024 */
 export const CARD_IMAGE_MODEL = 'openai/gpt-5-image-mini';
 
 /** Cost per image by model (USD) */
 const MODEL_COSTS: Record<string, number> = {
-  'google/gemini-2.5-flash-image-preview': 0.038,
+  'google/gemini-2.5-flash-image': 0.038,
   'openai/gpt-5-image-mini': 0.007,
   'openai/gpt-5-image': 0.04,
 };
@@ -91,7 +91,7 @@ function getImageDimensions(
 // ============================================================================
 
 export interface ImageGenerationOptions {
-  /** Model to use (default: google/gemini-2.5-flash-image-preview) */
+  /** Model to use (default: google/gemini-2.5-flash-image) */
   model?: string;
   /** Aspect ratio for image generation (default: '16:9') */
   aspectRatio?: string;
@@ -141,22 +141,25 @@ export async function generateImage(
 
   // Append negative prompt to strengthen text avoidance
   // Gemini works best with natural language instructions
-  const fullPrompt = skipNegativePrompt
-    ? prompt
-    : `${prompt}\n\n${negativePrompt}`;
+  const fullPrompt = skipNegativePrompt ? prompt : `${prompt}\n\n${negativePrompt}`;
 
-  logger.info({
-    model,
-    promptLength: prompt.length,
-    aspectRatio,
-    imageSize,
-    hasNegativePrompt: !skipNegativePrompt,
-  }, 'Starting image generation');
+  logger.info(
+    {
+      model,
+      promptLength: prompt.length,
+      aspectRatio,
+      imageSize,
+      hasNegativePrompt: !skipNegativePrompt,
+    },
+    'Starting image generation'
+  );
 
   const apiKey = await getApiKey('openrouter');
 
   if (!apiKey) {
-    throw new Error('OpenRouter API key not configured. Set OPENROUTER_API_KEY env var or configure in admin panel.');
+    throw new Error(
+      'OpenRouter API key not configured. Set OPENROUTER_API_KEY env var or configure in admin panel.'
+    );
   }
 
   const startTime = Date.now();
@@ -218,17 +221,21 @@ export async function generateImage(
     const images = messageAny?.images as unknown[] | undefined;
 
     // Log the actual response structure for debugging
-    logger.info({
-      hasImages: !!images,
-      imagesLength: images?.length,
-      imagesType: images ? typeof images[0] : 'none',
-      firstImagePreview: images && images[0]
-        ? (typeof images[0] === 'string'
-            ? images[0].substring(0, 100)
-            : JSON.stringify(images[0]).substring(0, 200))
-        : 'none',
-      messageContent: messageAny?.content?.substring?.(0, 100) || 'none',
-    }, 'Image generation response structure');
+    logger.info(
+      {
+        hasImages: !!images,
+        imagesLength: images?.length,
+        imagesType: images ? typeof images[0] : 'none',
+        firstImagePreview:
+          images && images[0]
+            ? typeof images[0] === 'string'
+              ? images[0].substring(0, 100)
+              : JSON.stringify(images[0]).substring(0, 200)
+            : 'none',
+        messageContent: messageAny?.content?.substring?.(0, 100) || 'none',
+      },
+      'Image generation response structure'
+    );
 
     if (!images || images.length === 0) {
       throw new Error('No image generated in response');
@@ -320,10 +327,7 @@ export async function generateImage(
 
     // Check if it was a timeout/abort
     if (error instanceof Error && error.name === 'AbortError') {
-      logger.error(
-        { model, durationMs },
-        'Image generation timed out'
-      );
+      logger.error({ model, durationMs }, 'Image generation timed out');
       throw new Error(`Image generation timed out after ${API_TIMEOUT_MS / 1000} seconds`);
     }
 
@@ -423,14 +427,9 @@ export async function convertToWebP(
 ): Promise<WebPConversionResult> {
   const originalSizeBytes = imageBuffer.length;
 
-  logger.info(
-    { originalSizeBytes, quality },
-    'Starting WebP conversion'
-  );
+  logger.info({ originalSizeBytes, quality }, 'Starting WebP conversion');
 
-  const webpBuffer = await sharp(imageBuffer)
-    .webp({ quality, effort: 6 })
-    .toBuffer();
+  const webpBuffer = await sharp(imageBuffer).webp({ quality, effort: 6 }).toBuffer();
 
   const sizeBytes = webpBuffer.length;
   const compressionRatio = sizeBytes / originalSizeBytes;

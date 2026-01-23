@@ -189,46 +189,60 @@ export function CourseCard({
   const [isUpdatingFavorite, setIsUpdatingFavorite] = useState(false)
   const [visibility, setVisibility] = useState<CourseVisibility>(course.visibility || 'private')
   const [isUpdatingVisibility, setIsUpdatingVisibility] = useState(false)
-  const [isImageLoaded, setIsImageLoaded] = useState(false)
-  const [hasImageError, setHasImageError] = useState(false)
-  const [isHydrated, setIsHydrated] = useState(false)
+  // Track which URLs have been loaded to avoid flickering on re-renders
+  const [loadedUrls, setLoadedUrls] = useState<Set<string>>(new Set())
+  const [errorUrls, setErrorUrls] = useState<Set<string>>(new Set())
   const isMountedRef = useRef(true)
+  const imageRef = useRef<HTMLImageElement>(null)
 
   const slug = course.slug || course.id
   const coverUrl = course.coverUrl
   const hasCover = !!coverUrl
 
-  // Mark as hydrated after first client render (prevents SSR mismatch)
-  useEffect(() => {
-    setIsHydrated(true)
-  }, [])
+  // Determine current state based on URL
+  const isImageLoaded = coverUrl ? loadedUrls.has(coverUrl) : false
+  const hasImageError = coverUrl ? errorUrls.has(coverUrl) : false
 
   // Cleanup on unmount to prevent memory leaks
   useEffect(() => {
+    isMountedRef.current = true
     return () => {
       isMountedRef.current = false
     }
   }, [])
 
-  // Reset loading state when cover URL changes (race condition fix)
+  // Check if image is already loaded from cache on mount/URL change
   useEffect(() => {
-    setIsImageLoaded(false)
-    setHasImageError(false)
+    if (!coverUrl || !hasCover) return
+
+    const checkComplete = () => {
+      if (imageRef.current?.complete && imageRef.current.naturalWidth > 0) {
+        if (isMountedRef.current && !loadedUrls.has(coverUrl)) {
+          setLoadedUrls((prev) => new Set(prev).add(coverUrl))
+        }
+      }
+    }
+
+    checkComplete()
+    const timeoutId = setTimeout(checkComplete, 100)
+
+    return () => clearTimeout(timeoutId)
+  }, [coverUrl, hasCover, loadedUrls])
+
+  // Safe state updates to prevent memory leaks
+  // Track specific URL that was loaded to handle race conditions
+  const handleImageLoad = useCallback(() => {
+    if (isMountedRef.current && coverUrl) {
+      setLoadedUrls((prev) => new Set(prev).add(coverUrl))
+    }
   }, [coverUrl])
 
-  // Safe state updates to prevent memory leaks and SSR hydration issues
-  const handleImageLoad = useCallback(() => {
-    if (isMountedRef.current && isHydrated) {
-      setIsImageLoaded(true)
-    }
-  }, [isHydrated])
-
   const handleImageError = useCallback(() => {
-    if (isMountedRef.current && isHydrated) {
-      setIsImageLoaded(true) // Hide skeleton
-      setHasImageError(true)
+    if (isMountedRef.current && coverUrl) {
+      setErrorUrls((prev) => new Set(prev).add(coverUrl))
+      setLoadedUrls((prev) => new Set(prev).add(coverUrl)) // Also mark as "loaded" to hide skeleton
     }
-  }, [isHydrated])
+  }, [coverUrl])
   // First 4 cards are typically above the fold in 2x2 grid
   const isAboveFold = index < 4
   // Use total_lessons_count if available, otherwise fall back to actual_lessons_count
@@ -532,9 +546,12 @@ export function CourseCard({
                 />
               )}
               <Image
+                ref={imageRef}
                 src={coverUrl}
                 alt={`Обложка курса: ${course.title}`}
                 fill
+                loading="eager"
+                unoptimized // External Supabase URLs - skip Next.js optimization for reliable onLoad
                 onLoad={handleImageLoad}
                 onError={handleImageError}
                 className={cn(

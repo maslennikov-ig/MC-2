@@ -159,6 +159,7 @@
   "viewer": {
     "noMaterials": "No additional materials",
     "noMaterialsDescription": "No media content for this lesson yet",
+    "loadingMaterials": "Loading materials...",
     "loadError": "Failed to load additional materials. Try refreshing the page.",
     "videoLesson": "Video lesson",
     "audioLesson": "Audio lesson",
@@ -246,7 +247,7 @@
     },
     "generationComplete": "Enrichment generated successfully",
     "generationFailed": "Failed to generate enrichment",
-    "resumingGeneration": "Resuming {count, plural, one {# generation} other {# generations}}..."
+    "resumingGeneration": "Tracking {count, plural, one {# active generation} other {# active generations}}..."
   },
   "placeholder": {
     "quiz": {

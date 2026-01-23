@@ -76,9 +76,12 @@ export function EnrichmentGeneratingCard({
   const config = ENRICHMENT_CONFIG[type]
   const Icon = config.icon
 
+  // Check if we're in syncing state (progress === -1 means resuming, waiting for first poll)
+  const isSyncing = progress === -1
+
   // Map backend step to stage index
   const stageIndex =
-    currentStep === 'queued'
+    currentStep === 'queued' || currentStep === 'syncing'
       ? 0
       : currentStep === 'generating'
         ? 1
@@ -87,17 +90,22 @@ export function EnrichmentGeneratingCard({
           : 1
 
   // Smooth interpolation within stage with asymptotic crawl
+  // Use 0 as target when syncing to avoid jumps
   const { progress: smoothProgress, isCrawling } = useSmoothProgress({
-    targetProgress: progress,
+    targetProgress: isSyncing ? 0 : progress,
     isComplete: progress >= 100,
     enableAsymptoticCrawl: true,
-    nextMilestone: getNextMilestone(progress),
+    nextMilestone: getNextMilestone(isSyncing ? 0 : progress),
     crawlDelay: 3000,
     crawlIncrement: 0.15,
   })
 
   // Map type to specific status for rotating messages
   const getRotatingStatus = () => {
+    // Syncing state - waiting for first poll after resume
+    if (currentStep === 'syncing') {
+      return 'syncing'
+    }
     // For generating state, use type-specific messages
     if (currentStep === 'generating') {
       switch (type) {
@@ -155,6 +163,14 @@ export function EnrichmentGeneratingCard({
             transform: translateX(100%);
           }
         }
+        @keyframes indeterminate {
+          0% {
+            left: -33%;
+          }
+          100% {
+            left: 100%;
+          }
+        }
       `}</style>
       <Card className="overflow-hidden transition-shadow hover:shadow-md">
         <CardHeader className={`${config.bgColor} py-3`}>
@@ -173,15 +189,27 @@ export function EnrichmentGeneratingCard({
         <CardContent className="space-y-4 py-4">
           {/* Progress bar with shimmer effect */}
           <div className="relative">
-            <StagedProgress
-              stages={GENERATION_STAGES}
-              currentStageIndex={stageIndex}
-              stageProgress={smoothProgress}
-              isComplete={progress >= 100}
-            />
+            {isSyncing ? (
+              /* Indeterminate progress bar while syncing */
+              <div className="bg-muted relative h-2 w-full overflow-hidden rounded-full">
+                <div
+                  className="bg-primary/60 absolute h-full w-1/3 rounded-full"
+                  style={{
+                    animation: 'indeterminate 1.5s ease-in-out infinite',
+                  }}
+                />
+              </div>
+            ) : (
+              <StagedProgress
+                stages={GENERATION_STAGES}
+                currentStageIndex={stageIndex}
+                stageProgress={smoothProgress}
+                isComplete={progress >= 100}
+              />
+            )}
 
             {/* Shimmer overlay when crawling */}
-            {isCrawling && (
+            {isCrawling && !isSyncing && (
               <div
                 className="pointer-events-none absolute inset-0 overflow-hidden rounded-full"
                 style={{ width: `${smoothProgress}%` }}

@@ -55,11 +55,14 @@ interface UseEnrichmentGenerationOptions {
   onError?: (error: string) => void
 }
 
+/** Frontend-only step for when resuming tracking (waiting for first poll) */
+type FrontendOnlyStep = 'syncing'
+
 export interface GeneratingEnrichment {
   enrichmentId: string
   type: OnDemandEnrichmentType
   progress: number
-  currentStep?: GenerationStep
+  currentStep?: GenerationStep | FrontendOnlyStep
 }
 
 interface GenerateOnDemandResponse {
@@ -112,6 +115,10 @@ export function useEnrichmentGeneration({
   // State for currently generating enrichments (by type)
   const [generating, setGenerating] = useState<Map<string, GeneratingEnrichment>>(new Map())
 
+  // Track types that just completed generation (for showing skeleton instead of placeholder)
+  // This bridges the gap between generation complete and data refetch
+  const [recentlyCompleted, setRecentlyCompleted] = useState<Set<string>>(new Set())
+
   // Track mounted state to prevent state updates after unmount
   const mountedRef = useRef(true)
 
@@ -152,6 +159,21 @@ export function useEnrichmentGeneration({
       pollingIntervalsRef.current.clear()
     }
   }, [])
+
+  // Reset state when lessonId changes (user navigates to different lesson)
+  // This prevents generation state from "leaking" between lessons
+  useEffect(() => {
+    // Clear all polling and abort controllers
+    abortControllersRef.current.forEach((controller) => controller.abort())
+    abortControllersRef.current.clear()
+    pollingIntervalsRef.current.forEach((interval) => clearInterval(interval))
+    pollingIntervalsRef.current.clear()
+    pollFailuresRef.current.clear()
+
+    // Reset generating state
+    setGenerating(new Map())
+    setRecentlyCompleted(new Set())
+  }, [lessonId])
 
   /**
    * Stop polling and cleanup for a specific type
@@ -267,6 +289,10 @@ export function useEnrichmentGeneration({
               next.delete(type)
               return next
             })
+
+            // Mark as recently completed to show skeleton instead of placeholder
+            // while data is being refetched
+            setRecentlyCompleted((prev) => new Set(prev).add(type))
 
             onComplete?.(enrichmentId)
           } else if (status.status === 'failed' || status.status === 'cancelled') {
@@ -610,14 +636,15 @@ export function useEnrichmentGeneration({
         return
       }
 
-      // Add to generating state with initial progress
+      // Add to generating state with unknown progress (-1 means "syncing")
+      // Real progress will be fetched on first poll
       setGenerating((prev) => {
         const next = new Map(prev)
         next.set(type, {
           enrichmentId,
           type,
-          progress: 0,
-          currentStep: 'queued',
+          progress: -1, // -1 indicates "loading progress", not actual 0%
+          currentStep: 'syncing',
         })
         return next
       })
@@ -628,6 +655,27 @@ export function useEnrichmentGeneration({
     [generating, startPolling]
   )
 
+  /**
+   * Check if a type just completed generation
+   * Used to show skeleton instead of placeholder while data refetches
+   */
+  const isRecentlyCompleted = useCallback(
+    (type: string): boolean => recentlyCompleted.has(type),
+    [recentlyCompleted]
+  )
+
+  /**
+   * Clear recently completed status for a type
+   * Called by parent component when new data arrives with the image
+   */
+  const clearRecentlyCompleted = useCallback((type: string) => {
+    setRecentlyCompleted((prev) => {
+      const next = new Set(prev)
+      next.delete(type)
+      return next
+    })
+  }, [])
+
   return {
     generating,
     startGeneration,
@@ -635,5 +683,7 @@ export function useEnrichmentGeneration({
     isGenerating,
     getProgress,
     resumeGeneration,
+    isRecentlyCompleted,
+    clearRecentlyCompleted,
   }
 }

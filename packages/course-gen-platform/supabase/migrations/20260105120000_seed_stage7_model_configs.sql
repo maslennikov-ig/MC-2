@@ -54,7 +54,7 @@ INSERT INTO llm_model_config (
     primary_display_name, fallback_display_name
 ) VALUES
 -- Cover (16:9 image generation for lesson covers)
-('global', 'stage_7_cover', 'google/gemini-2.5-flash-image-preview', 'xiaomi/mimo-v2-flash:free',
+('global', 'stage_7_cover', 'google/gemini-2.5-flash-image', 'xiaomi/mimo-v2-flash:free',
  0.7, 1024, 'any', 'standard', true, 'Gemini 2.5 Flash Image', 'MiMo V2 Flash'),
 
 -- Card (1:1 square image generation for thumbnails)
