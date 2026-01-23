@@ -364,19 +364,26 @@ export function isAwaitingSelection(status: string): boolean {
 /**
  * Enrichment types that use two-stage generation (draft → selection → final)
  *
- * These types pause at `draft_ready` status waiting for user to select a variant
- * before proceeding to final generation.
+ * Currently empty - all types use single-stage flow:
+ * - cover/banner: switched to single-stage (user selects style in UI before generation)
+ * - video/presentation: may add two-stage in future if needed
+ *
+ * @note When this array is empty, TwoStageEnrichmentType resolves to `never`
+ * and isTwoStageType() always returns false. This is intentional.
  */
 export const TWO_STAGE_ENRICHMENT_TYPES = [] as const;
+
+/**
+ * Type for two-stage enrichment types.
+ * Currently `never` since no types use two-stage flow.
+ */
 export type TwoStageEnrichmentType = (typeof TWO_STAGE_ENRICHMENT_TYPES)[number];
 
 /**
  * Check if enrichment type uses two-stage generation
  *
- * Two-stage types: cover, banner (future: video, presentation)
- *
  * @param type - Enrichment type to check
- * @returns True if type uses two-stage generation flow
+ * @returns Always false (no types currently use two-stage flow)
  */
 export function isTwoStageType(type: string): type is TwoStageEnrichmentType {
   return (TWO_STAGE_ENRICHMENT_TYPES as readonly string[]).includes(type);

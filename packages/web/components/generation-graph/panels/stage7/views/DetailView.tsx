@@ -21,7 +21,6 @@ import {
   deleteEnrichment,
   regenerateEnrichment,
 } from '@/app/actions/enrichment-actions';
-import { type CoverDraftContent } from '../CoverPreview';
 
 export interface DetailViewProps {
   enrichmentId: string;
@@ -334,7 +333,6 @@ function toCoverPreviewProps(e: CoverEnrichmentData): CoverEnrichment {
     id: e.id,
     status: e.status,
     content: e.content,
-    draft_content: e.draft_content as CoverDraftContent | null,
     metadata: e.metadata,
     error_message: e.error_message,
   };
