@@ -14,29 +14,32 @@ Five migrations were successfully applied to production today to address critica
 
 ### Overall Assessment: ⚠️ **PARTIAL SUCCESS**
 
-| Migration | Status | Assessment |
-|-----------|--------|------------|
-| `20260123085334_add_missing_fk_indexes` | ✅ **SUCCESS** | All 4 indexes created, performance improved |
-| `20260123085358_fix_pwa_analytics_rls` | ✅ **SUCCESS** | Security hole fixed, rate limiting added |
-| `20260123085427_fix_function_search_paths` | ✅ **SUCCESS** | All 3 functions secured |
-| `20260123085453_optimize_rls_auth_calls_lesson_progress` | ⚠️ **INCOMPLETE** | Only optimized 3/5 policies correctly |
-| `20260123085502_optimize_rls_auth_calls_users` | ⚠️ **INCOMPLETE** | Only optimized 1/5 policies |
+| Migration                                                | Status            | Assessment                                  |
+| -------------------------------------------------------- | ----------------- | ------------------------------------------- |
+| `20260123085334_add_missing_fk_indexes`                  | ✅ **SUCCESS**    | All 4 indexes created, performance improved |
+| `20260123085358_fix_pwa_analytics_rls`                   | ✅ **SUCCESS**    | Security hole fixed, rate limiting added    |
+| `20260123085427_fix_function_search_paths`               | ✅ **SUCCESS**    | All 3 functions secured                     |
+| `20260123085453_optimize_rls_auth_calls_lesson_progress` | ⚠️ **INCOMPLETE** | Only optimized 3/5 policies correctly       |
+| `20260123085502_optimize_rls_auth_calls_users`           | ⚠️ **INCOMPLETE** | Only optimized 1/5 policies                 |
 
 ### Key Findings
 
 ✅ **Successes**:
+
 - All 4 missing FK indexes created → **10-100x performance improvement on JOINs**
 - `pwa_analytics` security hole fixed → No more unrestricted INSERT
 - Rate limiting trigger added → Protection against DoS
 - 3 functions secured with `search_path`
 
 ⚠️ **Issues Discovered**:
+
 - **104 RLS policies still unoptimized** (out of ~110 total with auth.uid())
 - Only **4 policies optimized** (lesson_progress: 3, users: 1)
 - **7 Security Definer Views still present** (NOT addressed by migrations)
 - **100+ remaining policies use direct `auth.uid()`** causing 10-50x slowdown
 
 🔴 **Critical Gap**:
+
 - Migrations **only addressed 2 tables** but audit identified **30+ tables** needing optimization
 - **~24 tables remain unoptimized** with severe performance implications
 
@@ -73,11 +76,11 @@ Five migrations were successfully applied to production today to address critica
 
 #### Impact Assessment
 
-| Metric | Before | After | Improvement |
-|--------|--------|-------|-------------|
-| JOIN on `lesson_progress.course_id` | Seq Scan (~1000ms) | Index Scan (~8ms) | **125x faster** |
-| JOIN on `course_edits.edited_by` | Seq Scan | Index Scan | **10-50x faster** |
-| Storage Cost | 0 | ~5-10MB | Negligible |
+| Metric                              | Before             | After             | Improvement       |
+| ----------------------------------- | ------------------ | ----------------- | ----------------- |
+| JOIN on `lesson_progress.course_id` | Seq Scan (~1000ms) | Index Scan (~8ms) | **125x faster**   |
+| JOIN on `course_edits.edited_by`    | Seq Scan           | Index Scan        | **10-50x faster** |
+| Storage Cost                        | 0                  | ~5-10MB           | Negligible        |
 
 ✅ **EXCELLENT**: Critical performance bottleneck resolved. No issues found.
 
@@ -92,12 +95,14 @@ Five migrations were successfully applied to production today to address critica
 #### What Was Applied
 
 1. **Dropped overly permissive policy**:
+
    ```sql
    DROP POLICY "Anyone can insert pwa analytics"
    -- Old: WITH CHECK (true) ❌
    ```
 
 2. **Created restricted policy**:
+
    ```sql
    CREATE POLICY "Authenticated users can insert own pwa analytics"
    ON pwa_analytics FOR INSERT TO authenticated
@@ -113,12 +118,12 @@ Five migrations were successfully applied to production today to address critica
 
 #### Security Assessment
 
-| Aspect | Before | After |
-|--------|--------|-------|
-| Anonymous users | ❌ Could INSERT | ✅ Blocked |
-| Authenticated users | ❌ Could INSERT any user_id | ✅ Only own user_id |
-| Rate limiting | ❌ None | ✅ 100/hour per user |
-| DoS protection | ❌ Vulnerable | ✅ Protected |
+| Aspect              | Before                      | After                |
+| ------------------- | --------------------------- | -------------------- |
+| Anonymous users     | ❌ Could INSERT             | ✅ Blocked           |
+| Authenticated users | ❌ Could INSERT any user_id | ✅ Only own user_id  |
+| Rate limiting       | ❌ None                     | ✅ 100/hour per user |
+| DoS protection      | ❌ Vulnerable               | ✅ Protected         |
 
 ✅ **EXCELLENT**: Security vulnerability fully resolved. Rate limiting is appropriate.
 
@@ -132,6 +137,7 @@ CREATE OR REPLACE FUNCTION check_pwa_insert_rate_limit()
 ```
 
 **Analysis**: This is **acceptable** because:
+
 - ✅ `search_path` is fixed (secure)
 - ✅ Function only reads `pwa_analytics` table (no privilege escalation risk)
 - ✅ Necessary to check across user's own records
@@ -170,10 +176,10 @@ ALTER FUNCTION public.trigger_set_problem_id()
 
 #### Security Impact
 
-| Risk | Before | After |
-|------|--------|-------|
-| Schema poisoning | ❌ Vulnerable | ✅ Protected |
-| Function hijacking | ❌ Possible | ✅ Prevented |
+| Risk               | Before        | After        |
+| ------------------ | ------------- | ------------ |
+| Schema poisoning   | ❌ Vulnerable | ✅ Protected |
+| Function hijacking | ❌ Possible   | ✅ Prevented |
 
 ✅ **EXCELLENT**: All identified functions secured. No issues found.
 
@@ -191,23 +197,25 @@ Optimize 5 RLS policies on `lesson_progress` table to wrap `auth.uid()` in `(SEL
 
 #### What Was Actually Applied
 
-| Policy | Status | Verification |
-|--------|--------|--------------|
-| `users_insert_own_lesson_progress` | ⚠️ **PARTIAL** | Has `(SELECT auth.uid())` but still flagged |
-| `users_select_own_lesson_progress` | ⚠️ **PARTIAL** | Has `(SELECT auth.uid())` but still flagged |
-| `users_update_own_lesson_progress` | ⚠️ **PARTIAL** | Has `(SELECT auth.uid())` but still flagged |
-| `admin_lesson_progress_all` | ❌ **NOT OPTIMIZED** | Still uses bare `auth.uid()` in subquery |
-| `instructor_lesson_progress_view` | ❌ **NOT OPTIMIZED** | Still uses bare `auth.uid()` in subquery |
+| Policy                             | Status               | Verification                                |
+| ---------------------------------- | -------------------- | ------------------------------------------- |
+| `users_insert_own_lesson_progress` | ⚠️ **PARTIAL**       | Has `(SELECT auth.uid())` but still flagged |
+| `users_select_own_lesson_progress` | ⚠️ **PARTIAL**       | Has `(SELECT auth.uid())` but still flagged |
+| `users_update_own_lesson_progress` | ⚠️ **PARTIAL**       | Has `(SELECT auth.uid())` but still flagged |
+| `admin_lesson_progress_all`        | ❌ **NOT OPTIMIZED** | Still uses bare `auth.uid()` in subquery    |
+| `instructor_lesson_progress_view`  | ❌ **NOT OPTIMIZED** | Still uses bare `auth.uid()` in subquery    |
 
 #### The Problem
 
 **Migration SQL shows optimization was attempted**:
+
 ```sql
 -- Migration claimed to optimize admin_lesson_progress_all:
 WHERE users.id = (SELECT auth.uid())
 ```
 
 **But actual policy in database shows**:
+
 ```sql
 -- Current state (UNOPTIMIZED):
 WHERE users.id = ( SELECT auth.uid() AS uid)
@@ -248,6 +256,7 @@ WHERE courses.organization_id IN (
 ```
 
 **Fix Required**:
+
 ```sql
 -- ALL auth.uid() calls must be wrapped, including nested ones:
 WHERE users.id = (SELECT auth.uid())  -- ✅ No "AS uid" alias
@@ -267,17 +276,18 @@ Optimize **5 RLS policies** on `users` table.
 
 #### What Was Actually Applied
 
-| Policy | Status | Issue |
-|--------|--------|-------|
-| `users_insert_unified` | ⚠️ **PARTIAL** | Has `(SELECT auth.uid())` but cast as `uid` |
-| `users_read_unified` | ❌ **NOT OPTIMIZED** | Multiple bare `auth.uid()` calls |
-| `users_update_unified` | ❌ **NOT OPTIMIZED** | Multiple bare `auth.uid()` calls |
-| `superadmin_users_delete` | ❌ **NOT OPTIMIZED** | `is_superadmin(( SELECT auth.uid()))` |
-| `Allow auth admin to read user data` | N/A | Policy is `USING (true)`, no auth check |
+| Policy                               | Status               | Issue                                       |
+| ------------------------------------ | -------------------- | ------------------------------------------- |
+| `users_insert_unified`               | ⚠️ **PARTIAL**       | Has `(SELECT auth.uid())` but cast as `uid` |
+| `users_read_unified`                 | ❌ **NOT OPTIMIZED** | Multiple bare `auth.uid()` calls            |
+| `users_update_unified`               | ❌ **NOT OPTIMIZED** | Multiple bare `auth.uid()` calls            |
+| `superadmin_users_delete`            | ❌ **NOT OPTIMIZED** | `is_superadmin(( SELECT auth.uid()))`       |
+| `Allow auth admin to read user data` | N/A                  | Policy is `USING (true)`, no auth check     |
 
 #### Critical Issue: `users_read_unified`
 
 **Current policy** (UNOPTIMIZED):
+
 ```sql
 USING (
   is_superadmin(( SELECT auth.uid() AS uid))  -- ❌ Cast breaks optimization
@@ -287,11 +297,13 @@ USING (
 ```
 
 **Problem**:
+
 - Multiple `auth.uid()` calls, all with `AS uid` cast
 - `is_superadmin()` function called with casted result
 - **Re-evaluated for EVERY user row** in SELECT queries
 
 **Performance Impact**:
+
 - On queries like `SELECT * FROM users WHERE organization_id = X`:
   - **Before**: Evaluate `is_superadmin()` once → fast
   - **After migration**: STILL evaluating for each row → slow ❌
@@ -301,6 +313,7 @@ USING (
 🔴 **CRITICAL**: Migration **only attempted 1 out of 5 policies** on `users` table.
 
 **Missing optimizations**:
+
 1. `users_read_unified` - most critical (used in every user lookup)
 2. `users_update_unified` - has complex nested auth.uid() calls
 3. `superadmin_users_delete` - has function call with auth.uid()
@@ -312,6 +325,7 @@ USING (
 ### 1. Unoptimized RLS Policies (CRITICAL)
 
 **Current State**:
+
 ```sql
 -- Query results show:
 104 policies still have direct auth.uid() calls
@@ -319,10 +333,12 @@ Across 41 tables
 ```
 
 **Impact**:
+
 - **10-50x performance degradation** on tables with thousands of rows
 - Affects critical tables: `courses`, `lesson_contents`, `generation_trace`, `assets`, etc.
 
 **Tables Still Needing Optimization** (sample):
+
 1. `courses` - 4+ policies unoptimized
 2. `lesson_contents` - 3+ policies unoptimized
 3. `generation_trace` - 4+ policies unoptimized
@@ -350,11 +366,13 @@ Across 41 tables
 ```
 
 **Why This Is Dangerous**:
+
 - Views execute with **creator's privileges**, bypassing RLS
 - Any user with SELECT permission can access **all data** through the view
 - Potential **privilege escalation** and **data leak**
 
 **Example Attack Vector**:
+
 ```sql
 -- Attacker (student role) can bypass RLS:
 SELECT * FROM admin_generation_dashboard;
@@ -378,11 +396,13 @@ WHERE created_at > NOW() - INTERVAL '1 hour'
 ```
 
 **Potential Problem**:
+
 - If `pwa_analytics` grows to millions of records
 - And no index on `(user_id, created_at)`
 - Then **every INSERT will be slow**
 
 **Verification**:
+
 ```sql
 -- Check if index exists:
 SELECT * FROM pg_indexes
@@ -391,15 +411,18 @@ WHERE tablename = 'pwa_analytics'
 ```
 
 **Current Indexes**:
+
 - `idx_pwa_analytics_user_id` (single column) ✅
 - No composite index on `(user_id, created_at)` ⚠️
 
 **Impact at Scale**:
+
 - 0-1000 records: Fast (~1ms)
 - 10,000 records: Medium (~10ms)
 - 100,000+ records: Slow (~100ms+)
 
 **Recommendation**: Add composite index:
+
 ```sql
 CREATE INDEX CONCURRENTLY idx_pwa_analytics_user_rate_limit
   ON pwa_analytics (user_id, created_at DESC);
@@ -418,6 +441,7 @@ CREATE INDEX CONCURRENTLY idx_pwa_analytics_user_rate_limit
 **Impact**: Users can use compromised passwords
 
 **Fix**: Enable in Supabase Dashboard:
+
 - Authentication → Password Settings → "Leaked Password Protection"
 
 **Priority**: **P2 - Medium**
@@ -436,6 +460,7 @@ CREATE INDEX CONCURRENTLY idx_pwa_analytics_user_rate_limit
 The migrations attempt to optimize policies but Postgres **casts the result** of `(SELECT auth.uid())` as `AS uid`, which **negates the optimization**.
 
 **Evidence**:
+
 ```sql
 -- Migration SQL:
 CREATE POLICY ... USING (user_id = (SELECT auth.uid()));
@@ -450,10 +475,12 @@ This appears to be **Postgres auto-casting** the result for display purposes, bu
 
 **Fix**:
 Need to verify if this is:
+
 1. A display artifact (optimization still works) ✅
 2. An actual optimization failure ❌
 
 **Test Required**:
+
 ```sql
 EXPLAIN ANALYZE SELECT * FROM lesson_progress WHERE user_id = (SELECT auth.uid());
 -- Check for: "InitPlan" (bad) vs "SubPlan" (good)
@@ -471,14 +498,17 @@ EXPLAIN ANALYZE SELECT * FROM lesson_progress WHERE user_id = (SELECT auth.uid()
 Migrations **only addressed 2 tables** but audit identified **30+ tables** with the same issue.
 
 **Expected**:
+
 - Audit report: "30+ RLS policies with inefficient auth()"
 - Migrations: Optimize ALL 30+ tables
 
 **Actual**:
+
 - Migrations: Optimized 2 tables (partially)
 - Remaining: **~28 tables still unoptimized**
 
 **Impact**:
+
 - Users still experience **10-50x slowdown** on unoptimized tables
 - Critical tables like `courses`, `lessons`, `generation_trace` still slow
 
@@ -526,12 +556,12 @@ Audit identified **7 Security Definer Views** as **P0 critical security issue**,
 
 ### Overall Security Posture
 
-| Category | Before | After | Status |
-|----------|--------|-------|--------|
-| RLS Bypass (pwa_analytics) | ❌ Vulnerable | ✅ Fixed | ✅ GOOD |
-| Function Injection | ⚠️ 3 functions vulnerable | ✅ Fixed | ✅ GOOD |
-| Privilege Escalation (Views) | ❌ 7 views at risk | ❌ 7 views at risk | 🔴 **BAD** |
-| Password Security | ⚠️ No leak check | ⚠️ No leak check | ⚠️ MEDIUM |
+| Category                     | Before                    | After              | Status     |
+| ---------------------------- | ------------------------- | ------------------ | ---------- |
+| RLS Bypass (pwa_analytics)   | ❌ Vulnerable             | ✅ Fixed           | ✅ GOOD    |
+| Function Injection           | ⚠️ 3 functions vulnerable | ✅ Fixed           | ✅ GOOD    |
+| Privilege Escalation (Views) | ❌ 7 views at risk        | ❌ 7 views at risk | 🔴 **BAD** |
+| Password Security            | ⚠️ No leak check          | ⚠️ No leak check   | ⚠️ MEDIUM  |
 
 **Overall**: ⚠️ **SECURITY IMPROVED BUT CRITICAL ISSUES REMAIN**
 
@@ -556,12 +586,12 @@ Audit identified **7 Security Definer Views** as **P0 critical security issue**,
 
 ### Performance Benchmarks
 
-| Operation | Before | After Migration | After Full Fix |
-|-----------|--------|-----------------|----------------|
-| JOIN on lesson_progress.course_id | 1000ms | **8ms** ✅ | 8ms |
-| SELECT lesson_progress (RLS) | 500ms | **450ms** ⚠️ | 5ms ⏳ |
-| SELECT courses (RLS) | 300ms | **300ms** ❌ | 3ms ⏳ |
-| SELECT lesson_contents (RLS) | 200ms | **200ms** ❌ | 2ms ⏳ |
+| Operation                         | Before | After Migration | After Full Fix |
+| --------------------------------- | ------ | --------------- | -------------- |
+| JOIN on lesson_progress.course_id | 1000ms | **8ms** ✅      | 8ms            |
+| SELECT lesson_progress (RLS)      | 500ms  | **450ms** ⚠️    | 5ms ⏳         |
+| SELECT courses (RLS)              | 300ms  | **300ms** ❌    | 3ms ⏳         |
+| SELECT lesson_contents (RLS)      | 200ms  | **200ms** ❌    | 2ms ⏳         |
 
 **Overall**: ⚠️ **SOME IMPROVEMENT, MAJOR WORK REMAINING**
 
@@ -578,6 +608,7 @@ Audit identified **7 Security Definer Views** as **P0 critical security issue**,
 **Impact**: Eliminates privilege escalation risk
 
 **Migration Template**:
+
 ```sql
 -- For each view, determine if SECURITY DEFINER is truly needed:
 
@@ -597,6 +628,7 @@ WITH (security_invoker = false) AS
 ```
 
 **Analysis Required**:
+
 - Review each view's purpose
 - Determine if SECURITY DEFINER is necessary
 - If yes, add explicit RLS/role checks in WHERE clause
@@ -610,6 +642,7 @@ WITH (security_invoker = false) AS
 **Impact**: **10-50x performance improvement** on high-traffic tables
 
 **Phase 1 - High Traffic Tables** (2 hours):
+
 ```sql
 -- Create migration: 20260124000001_optimize_rls_critical_tables.sql
 
@@ -621,6 +654,7 @@ WITH (security_invoker = false) AS
 ```
 
 **Phase 2 - Remaining Tables** (4 hours):
+
 ```sql
 -- Create migration: 20260124000002_optimize_rls_remaining_tables.sql
 
@@ -648,6 +682,7 @@ WHERE (qual LIKE '%auth.uid()%' OR with_check LIKE '%auth.uid()%')
 ```
 
 **IMPORTANT**:
+
 - Test each policy after creation with `EXPLAIN ANALYZE`
 - Verify "InitPlan" is removed from query plan
 - Do NOT use `AS uid` casting in subqueries
@@ -680,6 +715,7 @@ CREATE INDEX CONCURRENTLY idx_pwa_analytics_user_rate_limit
 **Impact**: Prevents compromised passwords
 
 **Steps**:
+
 1. Open Supabase Dashboard
 2. Navigate to: Authentication → Password Settings
 3. Enable: "Leaked Password Protection"
@@ -696,6 +732,7 @@ CREATE INDEX CONCURRENTLY idx_pwa_analytics_user_rate_limit
 **Impact**: Prevents future SECURITY DEFINER mistakes
 
 **Actions**:
+
 1. Document purpose of each view
 2. Document why SECURITY DEFINER was needed (if any)
 3. Create coding standard: "Never use SECURITY DEFINER without explicit RLS in view"
@@ -712,6 +749,7 @@ CREATE INDEX CONCURRENTLY idx_pwa_analytics_user_rate_limit
 **Affected Tables**: 9 tables with multiple permissive policies
 
 **Example**: `generation_stats` has 3 policies for admin SELECT:
+
 ```sql
 -- Current (3 policies):
 1. "Instructors can view stats for their organization courses"
@@ -875,17 +913,20 @@ done
 ## Summary
 
 ### Migrations Applied: 5
+
 - ✅ **SUCCESS**: 2 migrations (indexes, function security)
 - ⚠️ **PARTIAL**: 2 migrations (RLS optimization incomplete)
 - ❓ **UNCLEAR**: 1 migration (pwa_analytics - need to verify rate limit index)
 
 ### Issues Fixed: 8
+
 - ✅ 4 missing FK indexes
 - ✅ 1 overly permissive RLS policy
 - ✅ 1 rate limiting protection added
 - ✅ 3 function search_path vulnerabilities
 
 ### Issues Remaining: 112+
+
 - 🔴 **7 Security Definer Views** (P0 - CRITICAL SECURITY)
 - 🔴 **104 unoptimized RLS policies** (P0 - CRITICAL PERFORMANCE)
 - ⚠️ **1 missing composite index** (P1 - PERFORMANCE AT SCALE)
@@ -900,6 +941,7 @@ done
 ### Next Steps
 
 **Immediate** (This Week):
+
 1. Fix 7 Security Definer Views (1 hour)
 2. Complete RLS optimization (6 hours)
 3. Verify optimizations work (1 hour)
@@ -907,6 +949,7 @@ done
 **Total Effort to Complete**: ~8 hours
 
 **Expected Impact After Completion**:
+
 - ✅ Eliminate privilege escalation risk
 - ✅ 10-50x performance improvement on 40+ tables
 - ✅ Production-ready security posture
@@ -915,18 +958,18 @@ done
 
 ## Appendix A: Migration Coverage Matrix
 
-| Table | Policies Total | Policies Optimized | Status |
-|-------|----------------|-------------------|--------|
-| **lesson_progress** | 5 | 3 (60%) | ⚠️ PARTIAL |
-| **users** | 5 | 1 (20%) | ⚠️ PARTIAL |
-| courses | 4+ | 0 (0%) | ❌ TODO |
-| lesson_contents | 3+ | 0 (0%) | ❌ TODO |
-| generation_trace | 4+ | 0 (0%) | ❌ TODO |
-| assets | 4+ | 0 (0%) | ❌ TODO |
-| course_enrollments | 2+ | 0 (0%) | ❌ TODO |
-| file_catalog | 2+ | 0 (0%) | ❌ TODO |
-| ... | ... | ... | ❌ TODO |
-| **TOTAL** | ~110 | 4 (4%) | ⚠️ **96% INCOMPLETE** |
+| Table               | Policies Total | Policies Optimized | Status                |
+| ------------------- | -------------- | ------------------ | --------------------- |
+| **lesson_progress** | 5              | 3 (60%)            | ⚠️ PARTIAL            |
+| **users**           | 5              | 1 (20%)            | ⚠️ PARTIAL            |
+| courses             | 4+             | 0 (0%)             | ❌ TODO               |
+| lesson_contents     | 3+             | 0 (0%)             | ❌ TODO               |
+| generation_trace    | 4+             | 0 (0%)             | ❌ TODO               |
+| assets              | 4+             | 0 (0%)             | ❌ TODO               |
+| course_enrollments  | 2+             | 0 (0%)             | ❌ TODO               |
+| file_catalog        | 2+             | 0 (0%)             | ❌ TODO               |
+| ...                 | ...            | ...                | ❌ TODO               |
+| **TOTAL**           | ~110           | 4 (4%)             | ⚠️ **96% INCOMPLETE** |
 
 ---
 
@@ -935,6 +978,7 @@ done
 ### FK Index Performance
 
 **Before** (no index on `lesson_progress.course_id`):
+
 ```sql
 EXPLAIN ANALYZE
 SELECT * FROM courses c
@@ -949,6 +993,7 @@ Nested Loop (cost=0.00..10000.00 rows=1000)
 ```
 
 **After** (with index):
+
 ```sql
 Nested Loop (cost=0.58..16.62 rows=10)
   -> Index Scan on courses (cost=0.29..8.31 rows=1)
@@ -988,6 +1033,7 @@ SELECT * FROM admin_generation_dashboard WHERE course_id = '<admin-course-id>';
 ---
 
 **Report Metadata**:
+
 - Generated by: Claude Code (Code Review Agent)
 - Date: 2026-01-23
 - Review Duration: ~30 minutes
@@ -997,6 +1043,7 @@ SELECT * FROM admin_generation_dashboard WHERE course_id = '<admin-course-id>';
 - Overall Grade: C+ (Partial Success)
 
 **Distribution**:
+
 - Database Team
 - DevOps Team
 - Security Team
