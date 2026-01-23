@@ -38,6 +38,7 @@ import { Badge } from '@/components/ui/badge';
 import { MarkdownRendererFull } from '@/components/markdown';
 import { JsonViewer } from '../shared/JsonViewer';
 import { EnrichmentStatusBadge } from './EnrichmentStatusBadge';
+import { useRotatingStatusMessage } from '@/lib/hooks/useRotatingStatusMessage';
 import { type EnrichmentStatus } from '@/lib/generation-graph/enrichment-config';
 import { cn } from '@/lib/utils';
 import type {
@@ -450,11 +451,18 @@ export function PresentationPreview({
   isRegenerating = false,
   className,
 }: PresentationPreviewProps): React.JSX.Element {
-  const locale = useLocale() as 'ru' | 'en';
+  const locale = useLocale();
   const t: Translations = TRANSLATIONS[locale] || TRANSLATIONS.ru;
 
   const [currentSlide, setCurrentSlide] = useState(0);
   const [detailsExpanded, setDetailsExpanded] = useState(false);
+
+  // Rotating status message for loading state
+  const { message: statusMessage } = useRotatingStatusMessage({
+    status: 'presentation_generating',
+    interval: 5000,
+    enabled: isLoadingStatus(enrichment.status),
+  });
 
   // Determine mode based on status
   const isDraft = isDraftPhase(enrichment.status);
@@ -530,11 +538,7 @@ export function PresentationPreview({
         <div className="flex-1 p-6 space-y-6">
           <div className="flex items-center justify-center space-x-2 text-muted-foreground mb-6">
             <Loader2 className="w-5 h-5 animate-spin" />
-            <span className="text-sm">
-              {enrichment.status === 'draft_generating'
-                ? t.generatingOutline
-                : t.generatingSlides}
-            </span>
+            <span className="text-sm transition-opacity duration-300">{statusMessage}</span>
           </div>
 
           {/* Skeleton slide */}

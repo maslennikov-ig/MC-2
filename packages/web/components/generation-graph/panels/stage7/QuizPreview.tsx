@@ -41,6 +41,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Skeleton } from '@/components/ui/skeleton';
 import { JsonViewer } from '../shared/JsonViewer';
 import { EnrichmentStatusBadge } from './EnrichmentStatusBadge';
+import { useRotatingStatusMessage } from '@/lib/hooks/useRotatingStatusMessage';
 import { type EnrichmentStatus } from '@/lib/generation-graph/enrichment-config';
 import { cn } from '@/lib/utils';
 
@@ -628,11 +629,18 @@ export function QuizPreview({
   isRegenerating = false,
   className,
 }: QuizPreviewProps): React.JSX.Element {
-  const locale = useLocale() as 'ru' | 'en';
+  const locale = useLocale();
   const t: Translations = TRANSLATIONS[locale] || TRANSLATIONS.ru;
 
   const [activeTab, setActiveTab] = useState<'questions' | 'metadata'>('questions');
   const [expandedQuestions, setExpandedQuestions] = useState<string[]>([]);
+
+  // Rotating status message for loading state
+  const { message: statusMessage } = useRotatingStatusMessage({
+    status: 'quiz_generating',
+    interval: 5000,
+    enabled: isLoadingStatus(enrichment.status),
+  });
 
   // Determine mode based on status
   const isLoading = isLoadingStatus(enrichment.status);
@@ -668,7 +676,7 @@ export function QuizPreview({
         <div className="flex-1 p-6 space-y-6">
           <div className="flex items-center justify-center space-x-2 text-muted-foreground mb-6">
             <Loader2 className="w-5 h-5 animate-spin" />
-            <span className="text-sm">{t.generating}</span>
+            <span className="text-sm transition-opacity duration-300">{statusMessage}</span>
           </div>
 
           {/* Skeleton loaders */}
