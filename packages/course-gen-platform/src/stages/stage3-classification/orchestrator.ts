@@ -55,12 +55,15 @@ export class Stage3ClassificationOrchestrator {
     // Check feature flag to skip LLM classification
     if (SKIP_STAGE3_CLASSIFICATION) {
       // SECURITY AUDIT: Log feature flag bypass for observability
-      logger.warn({
-        courseId,
-        organizationId,
-        featureFlag: 'SKIP_STAGE3_CLASSIFICATION',
-        reason: 'LLM classification bypassed via environment variable',
-      }, 'SECURITY: Stage 3 classification bypassed via feature flag');
+      logger.warn(
+        {
+          courseId,
+          organizationId,
+          featureFlag: 'SKIP_STAGE3_CLASSIFICATION',
+          reason: 'LLM classification bypassed via environment variable',
+        },
+        'SECURITY: Stage 3 classification bypassed via feature flag'
+      );
 
       // Log to trace system for full observability
       await logTrace({
@@ -107,6 +110,26 @@ export class Stage3ClassificationOrchestrator {
       };
     }
 
+    // Single document optimization: auto-assign CORE priority (skip LLM classification)
+    if (fileIds.length === 1) {
+      logger.info(
+        { courseId, fileId: fileIds[0] },
+        'Single document detected - auto-assigning CORE priority (skipping LLM classification)'
+      );
+
+      if (onProgress) {
+        onProgress(50, 'Single document - assigning CORE priority...');
+      }
+
+      const result = await this.assignSingleDocumentAsCORE(courseId, fileIds[0], startTime);
+
+      if (onProgress) {
+        onProgress(100, 'Classification complete (single document)');
+      }
+
+      return result;
+    }
+
     logger.info({ courseId, documentCount: fileIds.length }, 'Documents loaded for classification');
 
     if (onProgress) {
@@ -114,11 +137,8 @@ export class Stage3ClassificationOrchestrator {
     }
 
     // Step 2: Execute comparative classification
-    const classificationResults: DocumentPriority[] = await executeDocumentClassificationComparative(
-      courseId,
-      fileIds,
-      organizationId
-    );
+    const classificationResults: DocumentPriority[] =
+      await executeDocumentClassificationComparative(courseId, fileIds, organizationId);
 
     if (onProgress) {
       onProgress(80, 'Classification complete, preparing results...');
@@ -128,7 +148,7 @@ export class Stage3ClassificationOrchestrator {
     const filenames = await this.loadFilenames(fileIds);
 
     // Step 4: Build output
-    const classifications = classificationResults.map((result) => ({
+    const classifications = classificationResults.map(result => ({
       fileId: result.file_id,
       filename: filenames.get(result.file_id) || 'Unknown',
       priority: this.mapPriorityToLevel(result.importance_score),
@@ -136,20 +156,23 @@ export class Stage3ClassificationOrchestrator {
     }));
 
     // Count priority levels
-    const coreCount = classifications.filter((c) => c.priority === 'CORE').length;
-    const importantCount = classifications.filter((c) => c.priority === 'IMPORTANT').length;
-    const supplementaryCount = classifications.filter((c) => c.priority === 'SUPPLEMENTARY').length;
+    const coreCount = classifications.filter(c => c.priority === 'CORE').length;
+    const importantCount = classifications.filter(c => c.priority === 'IMPORTANT').length;
+    const supplementaryCount = classifications.filter(c => c.priority === 'SUPPLEMENTARY').length;
 
     const processingTimeMs = Date.now() - startTime;
 
-    logger.info({
-      courseId,
-      totalDocuments: fileIds.length,
-      coreCount,
-      importantCount,
-      supplementaryCount,
-      processingTimeMs,
-    }, 'Stage 3 classification complete');
+    logger.info(
+      {
+        courseId,
+        totalDocuments: fileIds.length,
+        coreCount,
+        importantCount,
+        supplementaryCount,
+        processingTimeMs,
+      },
+      'Stage 3 classification complete'
+    );
 
     if (onProgress) {
       onProgress(100, 'Classification finished');
@@ -188,7 +211,7 @@ export class Stage3ClassificationOrchestrator {
       return [];
     }
 
-    return data.map((file) => file.id);
+    return data.map(file => file.id);
   }
 
   /**
@@ -236,6 +259,109 @@ export class Stage3ClassificationOrchestrator {
   }
 
   /**
+   * Auto-assign CORE priority to single document (skip LLM classification)
+   *
+   * When only one document is uploaded, it's automatically the most important.
+   * No need to call LLM for comparative classification.
+   */
+  private async assignSingleDocumentAsCORE(
+    courseId: string,
+    fileId: string,
+    startTime: number
+  ): Promise<Stage3Output> {
+    const supabase = getSupabaseAdmin();
+
+    // Log trace for observability
+    await logTrace({
+      courseId,
+      stage: 'stage_3',
+      phase: 'single_document_skip',
+      stepName: 'auto_assign_core',
+      inputData: {
+        fileId,
+        reason: 'single_document_auto_core',
+      },
+      durationMs: 0,
+    });
+
+    // Load filename for output
+    const { data: fileData, error: fileError } = await supabase
+      .from('file_catalog')
+      .select('filename, summary_metadata')
+      .eq('id', fileId)
+      .single();
+
+    if (fileError || !fileData) {
+      logger.error(
+        { fileId, error: fileError },
+        'Failed to load file for single-document CORE assignment'
+      );
+      throw new Error(`Failed to load file: ${fileError?.message || 'not found'}`);
+    }
+
+    // Build classification metadata
+    const now = new Date();
+    const existingMetadata = (fileData.summary_metadata as Record<string, unknown>) || {};
+    const classificationMetadata = {
+      ...existingMetadata,
+      classification: {
+        priority: 'HIGH',
+        priority_level: 'CORE',
+        importance_score: 1.0, // Max score for single document
+        order: 1,
+        classification_rationale:
+          'Auto-assigned CORE: single document in course (LLM classification skipped)',
+        classified_at: now.toISOString(),
+      },
+    };
+
+    // Update file_catalog with CORE priority
+    const { error: updateError } = await supabase
+      .from('file_catalog')
+      .update({
+        priority: 'CORE',
+        summary_metadata: classificationMetadata,
+        updated_at: now.toISOString(),
+      })
+      .eq('id', fileId);
+
+    if (updateError) {
+      logger.error({ fileId, error: updateError }, 'Failed to update file with CORE priority');
+      throw new Error(`Failed to update priority: ${updateError.message}`);
+    }
+
+    const processingTimeMs = Date.now() - startTime;
+
+    logger.info(
+      {
+        courseId,
+        fileId,
+        filename: fileData.filename,
+        processingTimeMs,
+      },
+      'Single document auto-assigned as CORE'
+    );
+
+    return {
+      success: true,
+      courseId,
+      classifications: [
+        {
+          fileId,
+          filename: fileData.filename,
+          priority: 'CORE',
+          rationale: 'Auto-assigned CORE: single document in course (LLM classification skipped)',
+        },
+      ],
+      totalDocuments: 1,
+      coreCount: 1,
+      importantCount: 0,
+      supplementaryCount: 0,
+      processingTimeMs,
+    };
+  }
+
+  /**
    * Skip LLM classification and return success with existing priorities
    *
    * Called when SKIP_STAGE3_CLASSIFICATION feature flag is enabled.
@@ -243,10 +369,7 @@ export class Stage3ClassificationOrchestrator {
    *
    * @see docs/tasks/REFACTOR-RAG-PRIORITY-BASED-RETRIEVAL.md
    */
-  private async skipClassification(
-    courseId: string,
-    startTime: number
-  ): Promise<Stage3Output> {
+  private async skipClassification(courseId: string, startTime: number): Promise<Stage3Output> {
     const supabase = getSupabaseAdmin();
 
     // Load documents with existing priorities
@@ -263,18 +386,21 @@ export class Stage3ClassificationOrchestrator {
     const documents = data || [];
 
     // Validate: warn if documents are missing priority values
-    const documentsWithoutPriority = documents.filter((doc) => !doc.priority);
+    const documentsWithoutPriority = documents.filter(doc => !doc.priority);
     if (documentsWithoutPriority.length > 0) {
-      logger.warn({
-        courseId,
-        documentCount: documents.length,
-        missingPriorityCount: documentsWithoutPriority.length,
-        affectedFileIds: documentsWithoutPriority.map((d) => d.id),
-      }, 'Documents missing priority values when Stage 3 classification skipped - defaulting to SUPPLEMENTARY');
+      logger.warn(
+        {
+          courseId,
+          documentCount: documents.length,
+          missingPriorityCount: documentsWithoutPriority.length,
+          affectedFileIds: documentsWithoutPriority.map(d => d.id),
+        },
+        'Documents missing priority values when Stage 3 classification skipped - defaulting to SUPPLEMENTARY'
+      );
     }
 
     // Build classifications from existing priorities
-    const classifications = documents.map((doc) => ({
+    const classifications = documents.map(doc => ({
       fileId: doc.id,
       filename: doc.filename,
       priority: (doc.priority as DocumentPriorityLevel) ?? 'SUPPLEMENTARY',
@@ -284,21 +410,24 @@ export class Stage3ClassificationOrchestrator {
     }));
 
     // Count priority levels
-    const coreCount = classifications.filter((c) => c.priority === 'CORE').length;
-    const importantCount = classifications.filter((c) => c.priority === 'IMPORTANT').length;
-    const supplementaryCount = classifications.filter((c) => c.priority === 'SUPPLEMENTARY').length;
+    const coreCount = classifications.filter(c => c.priority === 'CORE').length;
+    const importantCount = classifications.filter(c => c.priority === 'IMPORTANT').length;
+    const supplementaryCount = classifications.filter(c => c.priority === 'SUPPLEMENTARY').length;
 
     const processingTimeMs = Date.now() - startTime;
 
-    logger.info({
-      courseId,
-      totalDocuments: documents.length,
-      coreCount,
-      importantCount,
-      supplementaryCount,
-      processingTimeMs,
-      skipped: true,
-    }, 'Stage 3 classification skipped - using existing priorities');
+    logger.info(
+      {
+        courseId,
+        totalDocuments: documents.length,
+        coreCount,
+        importantCount,
+        supplementaryCount,
+        processingTimeMs,
+        skipped: true,
+      },
+      'Stage 3 classification skipped - using existing priorities'
+    );
 
     return {
       success: true,
