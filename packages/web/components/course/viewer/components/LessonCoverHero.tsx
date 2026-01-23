@@ -33,10 +33,10 @@ interface LessonCoverHeroProps {
 /**
  * LessonCoverHero - Hero banner component for lesson cover images
  *
- * Displays a 16:9 aspect ratio hero image at the top of lesson content.
+ * Displays a 21:9 cinematic aspect ratio hero image at the top of lesson content.
  *
  * Features:
- * - Responsive height (200px mobile, 250px tablet, 300px desktop)
+ * - 21:9 cinematic ratio with max-h-[400px] limit on desktop
  * - Fade-in animation with skeleton loader during image load
  * - GPU-optimized animations with willChange hints
  * - Memory-safe state updates (prevents setState on unmounted)
@@ -133,8 +133,8 @@ export function LessonCoverHero({
   return (
     <div
       className={cn(
-        // Base styles - 16:9 aspect ratio container (shows full image without cropping)
-        'relative aspect-video w-full overflow-hidden rounded-xl',
+        // Base styles - 21:9 cinematic aspect ratio, limited height on desktop
+        'relative aspect-[21/9] max-h-[400px] w-full overflow-hidden rounded-xl',
         // Skeleton background while loading
         !isLoaded &&
           'bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-900',

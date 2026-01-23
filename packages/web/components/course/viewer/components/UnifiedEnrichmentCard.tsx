@@ -82,7 +82,7 @@ const PLACEHOLDER_CONFIG: Record<
   cover: {
     image: '/placeholders/Cover.webp',
     color: 'text-cyan-500 dark:text-cyan-400',
-    badgeText: '16:9',
+    badgeText: '21:9',
     icon: ImageIcon,
   },
   card: {

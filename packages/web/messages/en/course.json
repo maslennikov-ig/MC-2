@@ -5,7 +5,7 @@
     "courseCard": "Course Thumbnail",
     "courseCardDescription": "Square 1:1 image shown in course catalog",
     "lessonCovers": "Lesson Banners",
-    "lessonCoversDescription": "Wide 16:9 banners at the top of lesson pages ({completed} of {total})",
+    "lessonCoversDescription": "Cinematic 21:9 banners at the top of lesson pages ({completed} of {total})",
     "lessonCoversHint": "Displayed above lesson content as a hero banner",
     "lessonCards": "Lesson Thumbnails",
     "lessonCardsDescription": "Square 1:1 previews for navigation ({completed} of {total})",

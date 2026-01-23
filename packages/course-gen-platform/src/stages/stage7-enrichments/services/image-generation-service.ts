@@ -15,7 +15,7 @@ import { getApiKey } from '@/shared/services/api-key-service';
 // CONFIGURATION
 // ============================================================================
 
-/** Default model for cover images (16:9) - Gemini supports aspect ratio control */
+/** Default model for cover images (21:9 cinematic) - Gemini supports aspect ratio control */
 const DEFAULT_IMAGE_MODEL = 'google/gemini-2.5-flash-image';
 
 /** Model for card images (1:1) - GPT-5 Mini always generates square 1024x1024 */
@@ -31,8 +31,8 @@ const MODEL_COSTS: Record<string, number> = {
 /** Default cost if model not in lookup */
 const DEFAULT_COST_USD = 0.04;
 
-const DEFAULT_ASPECT_RATIO = '16:9';
-const DEFAULT_IMAGE_SIZE = '1K'; // 1344x768 for 16:9 - optimal for web covers
+const DEFAULT_ASPECT_RATIO = '21:9';
+const DEFAULT_IMAGE_SIZE = '1K'; // 1536x672 for 21:9 cinematic - optimal for web covers
 const API_TIMEOUT_MS = 120000; // 2 minutes for image generation (some models like gpt-5-image-mini take 60-90s)
 
 /**
@@ -55,6 +55,7 @@ function supportsImageConfig(model: string): boolean {
  * Gemini supports: 1K, 2K, 4K with various aspect ratios
  * GPT-5 Mini: Always 1024x1024 (square only)
  *
+ * 21:9 dimensions: 1K=1536x672 (cinematic, used for covers)
  * 16:9 dimensions: 1K=1344x768, 2K=2688x1536, 4K=5765x3072
  * 1:1 dimensions: 1K=1024x1024, 2K=2048x2048, 4K=4096x4096
  */
@@ -68,7 +69,12 @@ function getImageDimensions(
     return { width: 1024, height: 1024 };
   }
 
-  // For 16:9 aspect ratio (most common for covers)
+  // For 21:9 aspect ratio (cinematic, used for covers)
+  if (aspectRatio === '21:9') {
+    // Gemini returns 1536x672 for 21:9 @ 1K
+    return { width: 1536, height: 672 };
+  }
+  // For 16:9 aspect ratio
   if (aspectRatio === '16:9') {
     if (imageSize === '4K') return { width: 5765, height: 3072 };
     if (imageSize === '2K') return { width: 2688, height: 1536 };
@@ -80,10 +86,8 @@ function getImageDimensions(
     if (imageSize === '2K') return { width: 2048, height: 2048 };
     return { width: 1024, height: 1024 }; // 1K default
   }
-  // Default fallback to 16:9
-  if (imageSize === '4K') return { width: 5765, height: 3072 };
-  if (imageSize === '2K') return { width: 2688, height: 1536 };
-  return { width: 1344, height: 768 };
+  // Default fallback to 21:9 (covers)
+  return { width: 1536, height: 672 };
 }
 
 // ============================================================================
@@ -93,7 +97,7 @@ function getImageDimensions(
 export interface ImageGenerationOptions {
   /** Model to use (default: google/gemini-2.5-flash-image) */
   model?: string;
-  /** Aspect ratio for image generation (default: '16:9') */
+  /** Aspect ratio for image generation (default: '21:9' cinematic) */
   aspectRatio?: string;
   /** Image size/resolution: '1K', '2K' or '4K' (default: '1K') */
   imageSize?: '1K' | '2K' | '4K';
@@ -362,10 +366,10 @@ export async function generateCardImage(prompt: string): Promise<ImageGeneration
 }
 
 /**
- * Generate a cover image (16:9) using Gemini
+ * Generate a cover image (21:9 cinematic) using Gemini
  *
  * Convenience wrapper for cover generation with optimal settings.
- * Gemini produces high-quality 16:9 covers at 1344x768.
+ * Gemini produces high-quality 21:9 cinematic covers at 1536x672.
  *
  * @param prompt - Cover image prompt
  * @returns Generated cover image data
@@ -373,7 +377,7 @@ export async function generateCardImage(prompt: string): Promise<ImageGeneration
 export async function generateCoverImage(prompt: string): Promise<ImageGenerationResult> {
   return generateImage(prompt, {
     model: DEFAULT_IMAGE_MODEL,
-    aspectRatio: '16:9',
+    aspectRatio: '21:9',
     imageSize: '1K',
   });
 }
