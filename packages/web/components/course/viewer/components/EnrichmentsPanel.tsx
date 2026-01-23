@@ -7,6 +7,7 @@ import { FileText, AlertTriangle } from 'lucide-react'
 import { EnrichmentErrorBoundary } from '../enrichments/EnrichmentErrorBoundary'
 import { UnifiedEnrichmentCard } from './UnifiedEnrichmentCard'
 import { EnrichmentGeneratingCard } from './EnrichmentGeneratingCard'
+import { CoverVariantSelector } from './CoverVariantSelector'
 import { useEnrichmentGeneration } from '@/lib/hooks/useEnrichmentGeneration'
 import type { Database } from '@/types/database.generated'
 import { EnrichmentCard } from './EnrichmentCard'
@@ -18,6 +19,8 @@ import {
 import {
   isOnDemandType,
   isActiveGenerationStatus,
+  isAwaitingSelection,
+  isTwoStageType,
   type OnDemandEnrichmentType,
 } from '@megacampus/shared-types'
 
@@ -73,13 +76,20 @@ export function EnrichmentsPanel({
   )
 
   // Use enrichment generation hook (only if lessonId and courseId are available)
-  const { startGeneration, cancelGeneration, isGenerating, getProgress, resumeGeneration } =
-    useEnrichmentGeneration({
-      lessonId: lessonId || '',
-      courseId: courseId || '',
-      onComplete: handleGenerationComplete,
-      onError: handleGenerationError,
-    })
+  const {
+    startGeneration,
+    cancelGeneration,
+    isGenerating,
+    getProgress,
+    resumeGeneration,
+    approveCoverDraft,
+    isApprovingDraft,
+  } = useEnrichmentGeneration({
+    lessonId: lessonId || '',
+    courseId: courseId || '',
+    onComplete: handleGenerationComplete,
+    onError: handleGenerationError,
+  })
 
   // Track resumed enrichment TYPES (not IDs) to prevent duplicate resumes
   // Fixes race condition: when enrichment ID changes but type is same, prevent double resume
@@ -268,8 +278,37 @@ export function EnrichmentsPanel({
             : enrichments.find((e) => e.enrichment_type === type && e.status === 'draft_ready') ||
               null
 
-          // Show generating card if generation is in progress
-          if (typeIsGenerating && generatingProgress) {
+          // CRITICAL FIX: Show variant selector for two-stage types (cover/banner) when draft_ready
+          // This replaces the progress bar with a variant selection UI
+          const draftReadyEnrichment = enrichments.find(
+            (e) => e.enrichment_type === type && isAwaitingSelection(e.status)
+          )
+
+          if (draftReadyEnrichment && isTwoStageType(type)) {
+            return (
+              <CoverVariantSelector
+                key={type}
+                enrichment={{
+                  id: draftReadyEnrichment.id,
+                  enrichment_type: type as 'cover' | 'banner',
+                  status: draftReadyEnrichment.status,
+                  content: draftReadyEnrichment.content,
+                }}
+                onApproveDraft={(enrichmentId, variantId) => {
+                  void approveCoverDraft(enrichmentId, variantId)
+                }}
+                isApproving={isApprovingDraft(draftReadyEnrichment.id)}
+              />
+            )
+          }
+
+          // Show generating card if generation is in progress (but NOT for draft_ready)
+          // draft_ready has its own UI above (CoverVariantSelector)
+          if (
+            typeIsGenerating &&
+            generatingProgress &&
+            !isAwaitingSelection(existingEnrichment?.status ?? '')
+          ) {
             return (
               <EnrichmentGeneratingCard
                 key={type}

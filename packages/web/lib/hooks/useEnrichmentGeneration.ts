@@ -5,7 +5,23 @@ import { useSupabase } from '@/lib/supabase/browser-client'
 import type { OnDemandEnrichmentType, GenerationStep } from '@megacampus/shared-types'
 
 // Backend URL for tRPC calls (client-side)
-const BACKEND_URL = process.env.NEXT_PUBLIC_COURSEGEN_BACKEND_URL || 'http://localhost:3456'
+// In production: uses '/api' (nginx proxies /api/trpc to API server)
+// In development: uses env var or localhost:3456
+const BACKEND_URL = (() => {
+  // 1. If NEXT_PUBLIC_* is set → use it (CI/CD sets at build time)
+  const url = process.env.NEXT_PUBLIC_COURSEGEN_BACKEND_URL
+  if (url) return url // → '/api' for production builds
+
+  // 2. Fallback: runtime detection by hostname
+  if (typeof window !== 'undefined') {
+    const isProduction =
+      window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1'
+    if (isProduction) return '/api' // Relative URL - nginx proxies /api/trpc to API
+  }
+
+  // 3. Development fallback
+  return 'http://localhost:3456'
+})()
 const TRPC_URL = `${BACKEND_URL}/trpc`
 
 // Polling configuration
@@ -95,6 +111,9 @@ export function useEnrichmentGeneration({
 
   // State for currently generating enrichments (by type)
   const [generating, setGenerating] = useState<Map<string, GeneratingEnrichment>>(new Map())
+
+  // Track approving state by enrichment ID (for cover/banner draft approval)
+  const [approving, setApproving] = useState<Map<string, boolean>>(new Map())
 
   // Track mounted state to prevent state updates after unmount
   const mountedRef = useRef(true)
@@ -612,6 +631,104 @@ export function useEnrichmentGeneration({
     [generating, startPolling]
   )
 
+  /**
+   * Approve cover/banner draft with selected variant and trigger Phase 2 generation
+   *
+   * @param enrichmentId - UUID of the enrichment in draft_ready status
+   * @param variantId - Selected variant ID (1, 2, or 3)
+   * @returns true if successful, false otherwise
+   */
+  const approveCoverDraft = useCallback(
+    async (enrichmentId: string, variantId: number): Promise<boolean> => {
+      // Guard: Don't approve if already approving this enrichment
+      if (approving.get(enrichmentId)) {
+        devLog.warn('Already approving enrichment:', enrichmentId)
+        return false
+      }
+
+      // Set approving state
+      setApproving((prev) => {
+        const next = new Map(prev)
+        next.set(enrichmentId, true)
+        return next
+      })
+
+      try {
+        const headers = await getAuthHeaders()
+
+        const response = await fetch(`${TRPC_URL}/enrichment.approveCoverDraft`, {
+          method: 'POST',
+          headers,
+          body: JSON.stringify({
+            enrichmentId,
+            selectedVariantId: variantId,
+          }),
+        })
+
+        if (!response.ok) {
+          const errorText = await response.text()
+          devLog.error('Approve cover draft failed:', errorText)
+
+          let errorMessage = 'Failed to approve draft'
+          try {
+            const errorJson = JSON.parse(errorText)
+            if (errorJson.error?.message) {
+              errorMessage = errorJson.error.message
+            }
+          } catch {
+            // Keep default error message
+          }
+
+          onError?.(errorMessage)
+          return false
+        }
+
+        const result = await response.json()
+        const data = result.result?.data
+
+        if (!data?.success) {
+          onError?.('Failed to approve draft')
+          return false
+        }
+
+        // After successful approve, find the type and start polling for Phase 2
+        // The backend changes status to 'generating', so we need to poll
+        // Find the type from currently tracked enrichments or default to 'cover'
+        const existingGen = Array.from(generating.values()).find(
+          (g) => g.enrichmentId === enrichmentId
+        )
+        const type = existingGen?.type || 'cover'
+
+        // Start polling for Phase 2
+        startPolling(type, enrichmentId)
+
+        return true
+      } catch (error) {
+        devLog.error('Approve cover draft error:', error)
+        onError?.(error instanceof Error ? error.message : 'Failed to approve draft')
+        return false
+      } finally {
+        // Clear approving state
+        if (mountedRef.current) {
+          setApproving((prev) => {
+            const next = new Map(prev)
+            next.delete(enrichmentId)
+            return next
+          })
+        }
+      }
+    },
+    [approving, getAuthHeaders, onError, generating, startPolling]
+  )
+
+  /**
+   * Check if a specific enrichment is being approved
+   */
+  const isApprovingDraft = useCallback(
+    (enrichmentId: string) => approving.get(enrichmentId) === true,
+    [approving]
+  )
+
   return {
     generating,
     startGeneration,
@@ -619,5 +736,8 @@ export function useEnrichmentGeneration({
     isGenerating,
     getProgress,
     resumeGeneration,
+    // Draft approval
+    approveCoverDraft,
+    isApprovingDraft,
   }
 }
