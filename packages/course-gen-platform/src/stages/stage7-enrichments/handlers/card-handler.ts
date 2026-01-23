@@ -13,8 +13,12 @@
  */
 
 import { logger } from '@/shared/logger';
-import { getSupabaseAdmin } from '@/shared/supabase/admin';
 import { createPromptService } from '@/shared/prompts/prompt-service';
+import {
+  uploadEnrichmentAssetLocal,
+  uploadCourseCardLocal,
+  buildPublicUrl,
+} from '../services/local-storage-service';
 import type { CardEnrichmentContent, EnrichmentMetadata } from '@megacampus/shared-types';
 import type { EnrichmentHandler } from '../services/enrichment-router';
 import type { EnrichmentHandlerInput, GenerateResult } from '../types';
@@ -29,8 +33,8 @@ import { getLessonContent } from '../services/database-service';
 // CONFIGURATION
 // ============================================================================
 
-/** Supabase Storage bucket for card images (defaults to 'course-enrichments') */
-const STORAGE_BUCKET = process.env.ENRICHMENTS_STORAGE_BUCKET ?? 'course-enrichments';
+// Note: Local storage is now used instead of Supabase Storage
+// See: services/local-storage-service.ts
 
 /**
  * Retry configuration for card generation operations
@@ -422,33 +426,26 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
       'Card handler: converted to WebP'
     );
 
-    // Upload to Supabase Storage with retry
-    const supabase = getSupabaseAdmin();
-    const storagePath = isCourseCard
-      ? `${course.id}/card.webp`
-      : `${course.id}/${lesson.id}/${enrichment.id}.webp`;
-
-    await retryWithBackoff(
-      async () => {
-        const { error: uploadError } = await supabase.storage
-          .from(STORAGE_BUCKET)
-          .upload(storagePath, webpResult.buffer, {
-            contentType: 'image/webp',
-            upsert: true,
-          });
-
-        if (uploadError) {
-          throw new Error(`Failed to upload card: ${uploadError.message}`);
-        }
-      },
+    // Upload to local storage with retry
+    const storagePath = await retryWithBackoff(
+      () =>
+        isCourseCard
+          ? // Course card: {courseId}/card.webp
+            uploadCourseCardLocal(course.id, webpResult.buffer, 'webp')
+          : // Lesson card: {courseId}/{lessonId}/{enrichmentId}.webp
+            uploadEnrichmentAssetLocal(
+              course.id,
+              lesson.id,
+              enrichment.id,
+              webpResult.buffer,
+              'webp'
+            ),
       3,
       1000
     );
 
-    // Get public URL
-    const { data: publicUrlData } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(storagePath);
-
-    const imageUrl = publicUrlData.publicUrl;
+    // Build public URL (nginx serves from /storage/enrichments/)
+    const imageUrl = buildPublicUrl(storagePath);
 
     logger.info(
       {

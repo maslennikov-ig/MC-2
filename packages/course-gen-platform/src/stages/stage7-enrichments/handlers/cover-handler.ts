@@ -12,8 +12,8 @@
 import { z } from 'zod';
 import { logger } from '@/shared/logger';
 import { llmClient } from '@/shared/llm/client';
-import { getSupabaseAdmin } from '@/shared/supabase/admin';
 import { createPromptService } from '@/shared/prompts/prompt-service';
+import { uploadEnrichmentAssetLocal, buildPublicUrl } from '../services/local-storage-service';
 import { DEFAULT_MODEL_ID } from '@megacampus/shared-types';
 import type { CoverEnrichmentContent, EnrichmentMetadata } from '@megacampus/shared-types';
 import type { EnrichmentHandler } from '../services/enrichment-router';
@@ -63,8 +63,8 @@ const MAX_PROMPT_TOKENS = 500;
 /** Temperature for prompt generation */
 const PROMPT_TEMPERATURE = 0.7;
 
-/** Supabase Storage bucket for cover images */
-const STORAGE_BUCKET = process.env.ENRICHMENTS_STORAGE_BUCKET ?? 'course-enrichments';
+// Note: Local storage is now used instead of Supabase Storage
+// See: services/local-storage-service.ts
 
 /**
  * Default visual style if none is configured on the course
@@ -1055,32 +1055,16 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
       'Cover handler: converted to WebP'
     );
 
-    // Phase 4: Upload to Supabase Storage with retry
-    const supabase = getSupabaseAdmin();
-    const storagePath = `${course.id}/${lesson.id}/${enrichment.id}.webp`;
-
-    // Retry upload up to 3 times with exponential backoff
-    await retryWithBackoff(
-      async () => {
-        const { error: uploadError } = await supabase.storage
-          .from(STORAGE_BUCKET)
-          .upload(storagePath, webpResult.buffer, {
-            contentType: 'image/webp',
-            upsert: true,
-          });
-
-        if (uploadError) {
-          throw new Error(`Failed to upload image: ${uploadError.message}`);
-        }
-      },
+    // Phase 4: Upload to local storage with retry
+    const storagePath = await retryWithBackoff(
+      () =>
+        uploadEnrichmentAssetLocal(course.id, lesson.id, enrichment.id, webpResult.buffer, 'webp'),
       3,
       1000
     );
 
-    // Get public URL
-    const { data: publicUrlData } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(storagePath);
-
-    const imageUrl = publicUrlData.publicUrl;
+    // Build public URL (nginx serves from /storage/enrichments/)
+    const imageUrl = buildPublicUrl(storagePath);
 
     logger.info(
       {
@@ -1234,32 +1218,16 @@ async function generateFinal(
       'Cover handler: converted to WebP'
     );
 
-    // Phase 3: Upload to Supabase Storage with retry
-    const supabase = getSupabaseAdmin();
-    const storagePath = `${course.id}/${lesson.id}/${enrichment.id}.webp`;
-
-    // Retry upload up to 3 times with exponential backoff
-    await retryWithBackoff(
-      async () => {
-        const { error: uploadError } = await supabase.storage
-          .from(STORAGE_BUCKET)
-          .upload(storagePath, webpResult.buffer, {
-            contentType: 'image/webp',
-            upsert: true,
-          });
-
-        if (uploadError) {
-          throw new Error(`Failed to upload image: ${uploadError.message}`);
-        }
-      },
+    // Phase 3: Upload to local storage with retry
+    const storagePath = await retryWithBackoff(
+      () =>
+        uploadEnrichmentAssetLocal(course.id, lesson.id, enrichment.id, webpResult.buffer, 'webp'),
       3,
       1000
     );
 
-    // Get public URL
-    const { data: publicUrlData } = supabase.storage.from(STORAGE_BUCKET).getPublicUrl(storagePath);
-
-    const imageUrl = publicUrlData.publicUrl;
+    // Build public URL (nginx serves from /storage/enrichments/)
+    const imageUrl = buildPublicUrl(storagePath);
 
     logger.info(
       {
