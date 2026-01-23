@@ -951,112 +951,6 @@ export type Database = {
           },
         ]
       }
-      generation_locks: {
-        Row: {
-          course_id: string
-          expires_at: string
-          id: string
-          locked_at: string
-          stage: Database["public"]["Enums"]["generation_stage"]
-          worker_id: string
-        }
-        Insert: {
-          course_id: string
-          expires_at: string
-          id?: string
-          locked_at?: string
-          stage: Database["public"]["Enums"]["generation_stage"]
-          worker_id: string
-        }
-        Update: {
-          course_id?: string
-          expires_at?: string
-          id?: string
-          locked_at?: string
-          stage?: Database["public"]["Enums"]["generation_stage"]
-          worker_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "generation_locks_course_id_fkey"
-            columns: ["course_id"]
-            isOneToOne: false
-            referencedRelation: "courses"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
-      generation_stats: {
-        Row: {
-          avg_quality_score: number | null
-          cached_traces: number
-          course_id: string
-          created_at: string
-          failed_traces: number
-          first_trace_at: string | null
-          id: string
-          last_trace_at: string | null
-          max_quality_score: number | null
-          min_quality_score: number | null
-          models_used: Json
-          successful_traces: number
-          total_cost_usd: number
-          total_duration_ms: number
-          total_tokens: number
-          total_traces: number
-          traces_by_stage: Json
-          updated_at: string
-        }
-        Insert: {
-          avg_quality_score?: number | null
-          cached_traces?: number
-          course_id: string
-          created_at?: string
-          failed_traces?: number
-          first_trace_at?: string | null
-          id?: string
-          last_trace_at?: string | null
-          max_quality_score?: number | null
-          min_quality_score?: number | null
-          models_used?: Json
-          successful_traces?: number
-          total_cost_usd?: number
-          total_duration_ms?: number
-          total_tokens?: number
-          total_traces?: number
-          traces_by_stage?: Json
-          updated_at?: string
-        }
-        Update: {
-          avg_quality_score?: number | null
-          cached_traces?: number
-          course_id?: string
-          created_at?: string
-          failed_traces?: number
-          first_trace_at?: string | null
-          id?: string
-          last_trace_at?: string | null
-          max_quality_score?: number | null
-          min_quality_score?: number | null
-          models_used?: Json
-          successful_traces?: number
-          total_cost_usd?: number
-          total_duration_ms?: number
-          total_tokens?: number
-          total_traces?: number
-          traces_by_stage?: Json
-          updated_at?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "generation_stats_course_id_fkey"
-            columns: ["course_id"]
-            isOneToOne: true
-            referencedRelation: "courses"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       generation_status_history: {
         Row: {
           changed_at: string
@@ -1181,78 +1075,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
-      generation_trace_archive: {
-        Row: {
-          archived_at: string
-          completion_text: string | null
-          cost_usd: number | null
-          course_id: string
-          created_at: string
-          duration_ms: number | null
-          error_data: Json | null
-          id: string
-          input_data: Json
-          lesson_id: string | null
-          model_used: string | null
-          output_data: Json | null
-          phase: string
-          prompt_text: string | null
-          quality_score: number | null
-          retry_attempt: number | null
-          stage: string
-          step_name: string
-          temperature: number | null
-          tokens_used: number | null
-          was_cached: boolean | null
-        }
-        Insert: {
-          archived_at?: string
-          completion_text?: string | null
-          cost_usd?: number | null
-          course_id: string
-          created_at: string
-          duration_ms?: number | null
-          error_data?: Json | null
-          id: string
-          input_data?: Json
-          lesson_id?: string | null
-          model_used?: string | null
-          output_data?: Json | null
-          phase: string
-          prompt_text?: string | null
-          quality_score?: number | null
-          retry_attempt?: number | null
-          stage: string
-          step_name: string
-          temperature?: number | null
-          tokens_used?: number | null
-          was_cached?: boolean | null
-        }
-        Update: {
-          archived_at?: string
-          completion_text?: string | null
-          cost_usd?: number | null
-          course_id?: string
-          created_at?: string
-          duration_ms?: number | null
-          error_data?: Json | null
-          id?: string
-          input_data?: Json
-          lesson_id?: string | null
-          model_used?: string | null
-          output_data?: Json | null
-          phase?: string
-          prompt_text?: string | null
-          quality_score?: number | null
-          retry_attempt?: number | null
-          stage?: string
-          step_name?: string
-          temperature?: number | null
-          tokens_used?: number | null
-          was_cached?: boolean | null
-        }
-        Relationships: []
       }
       idempotency_keys: {
         Row: {
@@ -1584,52 +1406,59 @@ export type Database = {
           },
         ]
       }
-      lesson_improvement_suggestions: {
+      lesson_progress: {
         Row: {
-          created_at: string
-          criterion: string
-          description: string
+          completed_at: string | null
+          content_read_percent: number | null
+          course_id: string
+          created_at: string | null
           id: string
           lesson_id: string
-          location: string
-          quoted_text: string | null
-          severity: string
-          source: string
-          status: string
-          suggested_fix: string | null
-          updated_at: string
+          progress_percent: number | null
+          quiz_completed: boolean | null
+          status: string | null
+          updated_at: string | null
+          user_id: string
+          video_watched_percent: number | null
         }
         Insert: {
-          created_at?: string
-          criterion: string
-          description: string
+          completed_at?: string | null
+          content_read_percent?: number | null
+          course_id: string
+          created_at?: string | null
           id?: string
           lesson_id: string
-          location?: string
-          quoted_text?: string | null
-          severity: string
-          source?: string
-          status?: string
-          suggested_fix?: string | null
-          updated_at?: string
+          progress_percent?: number | null
+          quiz_completed?: boolean | null
+          status?: string | null
+          updated_at?: string | null
+          user_id: string
+          video_watched_percent?: number | null
         }
         Update: {
-          created_at?: string
-          criterion?: string
-          description?: string
+          completed_at?: string | null
+          content_read_percent?: number | null
+          course_id?: string
+          created_at?: string | null
           id?: string
           lesson_id?: string
-          location?: string
-          quoted_text?: string | null
-          severity?: string
-          source?: string
-          status?: string
-          suggested_fix?: string | null
-          updated_at?: string
+          progress_percent?: number | null
+          quiz_completed?: boolean | null
+          status?: string | null
+          updated_at?: string | null
+          user_id?: string
+          video_watched_percent?: number | null
         }
         Relationships: [
           {
-            foreignKeyName: "lesson_improvement_suggestions_lesson_id_fkey"
+            foreignKeyName: "lesson_progress_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "lesson_progress_lesson_id_fkey"
             columns: ["lesson_id"]
             isOneToOne: false
             referencedRelation: "lessons"
@@ -2826,17 +2655,6 @@ export type Database = {
         }
         Relationships: []
       }
-      trace_storage_stats: {
-        Row: {
-          last_24h: number | null
-          newest: string | null
-          oldest: string | null
-          row_count: number | null
-          table_name: string | null
-          total_size: string | null
-        }
-        Relationships: []
-      }
       v_rls_policy_audit: {
         Row: {
           cmd: string | null
@@ -2880,34 +2698,14 @@ export type Database = {
         }
         Returns: number
       }
-      calculate_course_stats: {
+      calculate_course_progress: {
         Args: { p_course_id: string }
         Returns: {
-          avg_quality_score: number | null
-          cached_traces: number
-          course_id: string
-          created_at: string
-          failed_traces: number
-          first_trace_at: string | null
-          id: string
-          last_trace_at: string | null
-          max_quality_score: number | null
-          min_quality_score: number | null
-          models_used: Json
-          successful_traces: number
-          total_cost_usd: number
-          total_duration_ms: number
-          total_tokens: number
-          total_traces: number
-          traces_by_stage: Json
-          updated_at: string
-        }
-        SetofOptions: {
-          from: "*"
-          to: "generation_stats"
-          isOneToOne: true
-          isSetofReturn: false
-        }
+          completed_lessons: number
+          in_progress_lessons: number
+          overall_progress_percent: number
+          total_lessons: number
+        }[]
       }
       check_generation_lock: {
         Args: {
@@ -3031,7 +2829,62 @@ export type Database = {
         Returns: string
       }
       generate_problem_id: { Args: never; Returns: string }
+      get_cleanup_job_monitoring: {
+        Args: never
+        Returns: {
+          active: boolean
+          end_time: string
+          jobid: number
+          jobname: string
+          return_message: string
+          runid: number
+          schedule: string
+          start_time: string
+          status: string
+        }[]
+      }
+      get_course_lesson_progress: {
+        Args: { p_course_id: string }
+        Returns: {
+          completed_at: string | null
+          content_read_percent: number | null
+          course_id: string
+          created_at: string | null
+          id: string
+          lesson_id: string
+          progress_percent: number | null
+          quiz_completed: boolean | null
+          status: string | null
+          updated_at: string | null
+          user_id: string
+          video_watched_percent: number | null
+        }[]
+        SetofOptions: {
+          from: "*"
+          to: "lesson_progress"
+          isOneToOne: false
+          isSetofReturn: true
+        }
+      }
       get_current_auth_context: { Args: never; Returns: Json }
+      get_error_logs_by_status: {
+        Args: { p_status: string }
+        Returns: {
+          id: string
+        }[]
+      }
+      get_error_logs_with_status: {
+        Args: never
+        Returns: {
+          id: string
+        }[]
+      }
+      get_error_logs_without_status: {
+        Args: never
+        Returns: {
+          id: string
+        }[]
+      }
       get_grouped_error_logs: {
         Args: {
           p_date_from?: string
@@ -3048,6 +2901,7 @@ export type Database = {
           environments: string[]
           fingerprint: string
           first_seen: string
+          issue_status: string
           job_type: string
           last_seen: string
           latest_log_id: string
@@ -3074,6 +2928,18 @@ export type Database = {
       get_organization_from_api_key: {
         Args: { key_prefix_param: string }
         Returns: string
+      }
+      get_rls_policy_audit: {
+        Args: never
+        Returns: {
+          cmd: string
+          has_superadmin_access: boolean
+          permissive: string
+          policy_role: string
+          policyname: unknown
+          schemaname: unknown
+          tablename: unknown
+        }[]
       }
       get_tenant_token_balance: {
         Args: { p_tenant_id: string }
@@ -3112,6 +2978,17 @@ export type Database = {
           isOneToOne: true
           isSetofReturn: false
         }
+      }
+      get_trace_storage_stats: {
+        Args: never
+        Returns: {
+          last_24h: number
+          newest: string
+          oldest: string
+          row_count: number
+          table_name: string
+          total_size: string
+        }[]
       }
       hash_password: { Args: { password: string }; Returns: string }
       increment_file_reference_count: {
@@ -3292,6 +3169,36 @@ export type Database = {
           p_user_id: string
         }
         Returns: Json
+      }
+      update_lesson_progress_v2: {
+        Args: {
+          p_content_read_percent?: number
+          p_lesson_id: string
+          p_progress_percent?: number
+          p_quiz_completed?: boolean
+          p_status?: string
+          p_video_watched_percent?: number
+        }
+        Returns: {
+          completed_at: string | null
+          content_read_percent: number | null
+          course_id: string
+          created_at: string | null
+          id: string
+          lesson_id: string
+          progress_percent: number | null
+          quiz_completed: boolean | null
+          status: string | null
+          updated_at: string | null
+          user_id: string
+          video_watched_percent: number | null
+        }
+        SetofOptions: {
+          from: "*"
+          to: "lesson_progress"
+          isOneToOne: true
+          isSetofReturn: false
+        }
       }
       validate_minimum_lessons: {
         Args: { course_structure: Json }
