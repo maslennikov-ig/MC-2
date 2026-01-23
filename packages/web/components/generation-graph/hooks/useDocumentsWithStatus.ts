@@ -1,17 +1,17 @@
-'use client';
+'use client'
 
-import { useState, useEffect, useCallback, useMemo } from 'react';
-import { createClient } from '@/lib/supabase/client';
-import { NodeStatus } from '@megacampus/shared-types';
+import { useState, useEffect, useCallback, useMemo } from 'react'
+import { createClient } from '@/lib/supabase/client'
+import { NodeStatus } from '@megacampus/shared-types'
 
 /**
  * Document entry with processing status for Stage 2 graph initialization.
  */
 export interface DocumentWithStatus {
-  id: string;
-  name: string;
-  status: NodeStatus;
-  priority?: 'CORE' | 'IMPORTANT' | 'SUPPLEMENTARY';
+  id: string
+  name: string
+  status: NodeStatus
+  priority?: 'CORE' | 'IMPORTANT' | 'SUPPLEMENTARY'
 }
 
 /**
@@ -27,42 +27,42 @@ export interface DocumentWithStatus {
  *   - error: Error if fetch failed
  */
 export function useDocumentsWithStatus(courseId: string) {
-  const [documents, setDocuments] = useState<DocumentWithStatus[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<Error | null>(null);
+  const [documents, setDocuments] = useState<DocumentWithStatus[]>([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState<Error | null>(null)
 
   // Fetch file catalog data with processing statuses
   useEffect(() => {
     if (!courseId) {
-      setIsLoading(false);
-      return;
+      setIsLoading(false)
+      return
     }
 
-    let cancelled = false;
+    let cancelled = false
 
     const fetchDocuments = async () => {
       try {
-        setIsLoading(true);
-        setError(null);
+        setIsLoading(true)
+        setError(null)
 
-        const supabase = createClient();
+        const supabase = createClient()
 
-        // Fetch files from file_catalog
+        // Fetch files from file_catalog with vector_status for processing status
         const { data: files, error: filesError } = await supabase
           .from('file_catalog')
-          .select('id, filename, generated_title, original_name, priority')
-          .eq('course_id', courseId);
+          .select('id, filename, generated_title, original_name, priority, vector_status')
+          .eq('course_id', courseId)
 
         if (filesError) {
-          throw new Error(filesError.message);
+          throw new Error(filesError.message)
         }
 
         if (!files || files.length === 0) {
           if (!cancelled) {
-            setDocuments([]);
-            setIsLoading(false);
+            setDocuments([])
+            setIsLoading(false)
           }
-          return;
+          return
         }
 
         // Fetch Stage 2 traces to determine document statuses
@@ -71,87 +71,101 @@ export function useDocumentsWithStatus(courseId: string) {
           .from('generation_trace')
           .select('input_data, error_data, step_name')
           .eq('course_id', courseId)
-          .eq('stage', 'stage_2');
+          .eq('stage', 'stage_2')
 
         if (tracesError) {
-          console.warn('[useDocumentsWithStatus] Failed to fetch traces:', tracesError);
+          console.warn('[useDocumentsWithStatus] Failed to fetch traces:', tracesError)
           // Continue with files, assuming all pending
         }
 
         // Build a map of document statuses from traces
-        const documentStatuses = new Map<string, NodeStatus>();
+        const documentStatuses = new Map<string, NodeStatus>()
 
         if (traces) {
-          traces.forEach(trace => {
+          traces.forEach((trace) => {
             // Safely extract fileId from input_data (which is Json type)
             // Stage 2 traces use 'fileId' field, not 'document_id'
-            const inputData = trace.input_data as Record<string, unknown> | null;
-            const docId = inputData?.fileId as string | undefined;
-            if (!docId) return;
+            const inputData = trace.input_data as Record<string, unknown> | null
+            const docId = inputData?.fileId as string | undefined
+            if (!docId) return
 
             // Determine status from trace
             if (trace.error_data) {
-              documentStatuses.set(docId, 'error');
+              documentStatuses.set(docId, 'error')
             } else if (trace.step_name === 'finish') {
               // Only mark as completed if we have a finish trace
               if (documentStatuses.get(docId) !== 'error') {
-                documentStatuses.set(docId, 'completed');
+                documentStatuses.set(docId, 'completed')
               }
             } else if (!documentStatuses.has(docId)) {
               // Active if we have traces but not finished
-              documentStatuses.set(docId, 'active');
+              documentStatuses.set(docId, 'active')
             }
-          });
+          })
         }
 
         // Build documents array
-        const docsWithStatus: DocumentWithStatus[] = files.map(file => {
-          const displayName = file.generated_title || file.original_name || file.filename;
-          const status = documentStatuses.get(file.id) || 'pending';
+        // Priority: vector_status from file_catalog > traces > pending
+        const docsWithStatus: DocumentWithStatus[] = files.map((file) => {
+          const displayName = file.generated_title || file.original_name || file.filename
+
+          // Determine status: vector_status is the source of truth for document processing
+          let status: NodeStatus
+          if (file.vector_status === 'indexed') {
+            status = 'completed'
+          } else if (file.vector_status === 'failed') {
+            status = 'error'
+          } else {
+            // Fallback to traces if vector_status is not set
+            status = documentStatuses.get(file.id) || 'pending'
+          }
 
           return {
             id: file.id,
             name: displayName,
             status,
             priority: file.priority as 'CORE' | 'IMPORTANT' | 'SUPPLEMENTARY' | undefined,
-          };
-        });
+          }
+        })
 
         if (!cancelled) {
-          setDocuments(docsWithStatus);
+          setDocuments(docsWithStatus)
         }
       } catch (err) {
-        console.error('[useDocumentsWithStatus] Failed to fetch documents:', err);
+        console.error('[useDocumentsWithStatus] Failed to fetch documents:', err)
         if (!cancelled) {
-          setError(err instanceof Error ? err : new Error('Failed to fetch documents'));
+          setError(err instanceof Error ? err : new Error('Failed to fetch documents'))
         }
       } finally {
         if (!cancelled) {
-          setIsLoading(false);
+          setIsLoading(false)
         }
       }
-    };
+    }
 
-    fetchDocuments();
+    fetchDocuments()
 
     return () => {
-      cancelled = true;
-    };
-  }, [courseId]);
+      cancelled = true
+    }
+  }, [courseId])
 
   // Build filename map from documents
   const filenameMap = useMemo(() => {
-    const map = new Map<string, string>();
-    documents.forEach(doc => {
-      map.set(doc.id, doc.name);
-    });
-    return map;
-  }, [documents]);
+    const map = new Map<string, string>()
+    documents.forEach((doc) => {
+      map.set(doc.id, doc.name)
+    })
+    return map
+  }, [documents])
 
   // Lookup function
-  const getFilename = useCallback((fileId: string): string | undefined => {
-    return filenameMap.get(fileId);
-  }, [filenameMap]);
+  const getFilename = useCallback(
+    (fileId: string): string | undefined => {
+      return filenameMap.get(fileId)
+    },
+    [filenameMap]
+  )
 
   return {
     documents,
@@ -159,5 +173,5 @@ export function useDocumentsWithStatus(courseId: string) {
     getFilename,
     isLoading,
     error,
-  };
+  }
 }
