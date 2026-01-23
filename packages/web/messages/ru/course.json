@@ -5,7 +5,7 @@
     "courseCard": "Обложка курса",
     "courseCardDescription": "Квадратное изображение 1:1, отображается в каталоге курсов",
     "lessonCovers": "Баннеры уроков",
-    "lessonCoversDescription": "Широкие баннеры 16:9 в шапке страницы урока ({completed} из {total})",
+    "lessonCoversDescription": "Кинематографичные баннеры 21:9 в шапке страницы урока ({completed} из {total})",
     "lessonCoversHint": "Отображаются над текстом каждого урока как hero-баннер",
     "lessonCards": "Миниатюры уроков",
     "lessonCardsDescription": "Квадратные превью 1:1 для навигации ({completed} из {total})",

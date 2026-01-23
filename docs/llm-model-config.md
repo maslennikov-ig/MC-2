@@ -94,14 +94,14 @@
 
 ## Stage 7: Enrichments
 
-| Phase                | Primary Model                         | Fallback Model            | Tokens | Description           |
-| -------------------- | ------------------------------------- | ------------------------- | ------ | --------------------- |
-| stage_7_cover        | google/gemini-2.5-flash-image-preview | xiaomi/mimo-v2-flash:free | 1024   | Обложки уроков (16:9) |
-| stage_7_card         | openai/gpt-5-image-mini               | xiaomi/mimo-v2-flash:free | 1024   | Карточки (1:1)        |
-| stage_7_video        | xiaomi/mimo-v2-flash:free             | openai/gpt-4o-mini        | 8000   | Видео-скрипты         |
-| stage_7_audio        | xiaomi/mimo-v2-flash:free             | openai/gpt-4o-mini        | 8000   | TTS-скрипты           |
-| stage_7_quiz         | xiaomi/mimo-v2-flash:free             | openai/gpt-4o-mini        | 4096   | Тесты                 |
-| stage_7_presentation | xiaomi/mimo-v2-flash:free             | openai/gpt-4o-mini        | 8000   | Презентации           |
+| Phase                | Primary Model                 | Fallback Model            | Tokens | Description           |
+| -------------------- | ----------------------------- | ------------------------- | ------ | --------------------- |
+| stage_7_cover        | google/gemini-2.5-flash-image | xiaomi/mimo-v2-flash:free | 1024   | Обложки уроков (16:9) |
+| stage_7_card         | openai/gpt-5-image-mini       | xiaomi/mimo-v2-flash:free | 1024   | Карточки (1:1)        |
+| stage_7_video        | xiaomi/mimo-v2-flash:free     | openai/gpt-4o-mini        | 8000   | Видео-скрипты         |
+| stage_7_audio        | xiaomi/mimo-v2-flash:free     | openai/gpt-4o-mini        | 8000   | TTS-скрипты           |
+| stage_7_quiz         | xiaomi/mimo-v2-flash:free     | openai/gpt-4o-mini        | 4096   | Тесты                 |
+| stage_7_presentation | xiaomi/mimo-v2-flash:free     | openai/gpt-4o-mini        | 8000   | Презентации           |
 
 ---
 

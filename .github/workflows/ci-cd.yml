@@ -369,6 +369,7 @@ jobs:
             ${{ matrix.image == 'web' && format('NEXT_PUBLIC_SUPABASE_ANON_KEY={0}', secrets.SUPABASE_ANON_KEY) || '' }}
             ${{ matrix.image == 'web' && format('SUPABASE_SERVICE_ROLE_KEY={0}', secrets.SUPABASE_SERVICE_KEY) || '' }}
             ${{ matrix.image == 'web' && format('SUPABASE_JWT_SECRET={0}', secrets.SUPABASE_JWT_SECRET) || '' }}
+            ${{ matrix.image == 'web' && 'NEXT_PUBLIC_COURSEGEN_BACKEND_URL=/api' || '' }}
 
   # ============================================
   # STAGE 6: Deploy to Production
@@ -401,20 +402,21 @@ jobs:
             docker-compose.app.yml \
             docker-compose.production.yml \
             nginx-docling-proxy.conf \
-            nginx-megacampus.conf \
-            nginx.conf.template \
             ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }}:${{ env.DEPLOY_PATH }}/
+
+          # Copy nginx template (single source of truth for Blue/Green)
+          scp -i ~/.ssh/deploy_key \
+            deploy/nginx/megacampus.conf.template \
+            ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }}:${{ env.DEPLOY_PATH }}/nginx.conf.template
 
           scp -i ~/.ssh/deploy_key \
             scripts/deploy_blue_green.sh \
             scripts/rollback_blue_green.sh \
             ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }}:${{ env.DEPLOY_PATH }}/scripts/
 
-      - name: Update nginx config
-        run: |
-          ssh -i ~/.ssh/deploy_key \
-            ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }} \
-            "sudo cp ${{ env.DEPLOY_PATH }}/nginx-megacampus.conf /etc/nginx/sites-enabled/megacampus && sudo nginx -t && sudo systemctl reload nginx"
+      # NOTE: Do NOT update nginx config here!
+      # deploy_blue_green.sh applies the template with correct Blue/Green ports.
+      # Manually copying a static config would break the Blue/Green deployment.
 
       - name: Create .env.production
         run: |
@@ -441,6 +443,7 @@ jobs:
           CORS_ORIGIN=https://ai.megacampus.ru,https://megacampus.ai
           DOCLING_MCP_URL=http://docling-mcp:8000/mcp
           COURSEGEN_BACKEND_URL=http://api:4000
+          NEXT_PUBLIC_COURSEGEN_BACKEND_URL=/api
           NEXT_TELEMETRY_DISABLED=1
           NODE_OPTIONS=--max-old-space-size=2048
           ENVEOF
@@ -549,8 +552,12 @@ jobs:
         run: |
           scp -i ~/.ssh/deploy_key \
             docker-compose.dev.yml \
-            nginx-dev.conf \
             ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }}:${{ env.DEPLOY_PATH }}/
+
+          # Copy nginx dev config (single source of truth)
+          scp -i ~/.ssh/deploy_key \
+            deploy/nginx/megacampus-dev.conf \
+            ${{ env.DEPLOY_USER }}@${{ env.DEPLOY_HOST }}:${{ env.DEPLOY_PATH }}/nginx-dev.conf
 
           scp -i ~/.ssh/deploy_key \
             scripts/deploy_dev.sh \
@@ -581,6 +588,7 @@ jobs:
           CORS_ORIGIN=https://dev.ai.megacampus.ru,https://ai.megacampus.ru
           DOCLING_MCP_URL=http://megacampus-docling-mcp:8000/mcp
           COURSEGEN_BACKEND_URL=http://megacampus-api-dev:4000
+          NEXT_PUBLIC_COURSEGEN_BACKEND_URL=/api
           NEXT_TELEMETRY_DISABLED=1
           NODE_OPTIONS=--max-old-space-size=1024
           ENVEOF

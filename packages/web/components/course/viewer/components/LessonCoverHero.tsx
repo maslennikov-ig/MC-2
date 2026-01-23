@@ -1,10 +1,10 @@
-"use client"
+'use client'
 
-import React, { useState, useCallback, useRef, useEffect } from "react"
-import { motion, AnimatePresence } from "framer-motion"
-import NextImage from "next/image"
-import { ImageIcon } from "lucide-react"
-import { cn } from "@/lib/utils"
+import React, { useState, useCallback, useRef, useEffect } from 'react'
+import { motion, AnimatePresence } from 'framer-motion'
+import NextImage from 'next/image'
+import { ImageIcon, Clock } from 'lucide-react'
+import { cn } from '@/lib/utils'
 
 /**
  * Props for the LessonCoverHero component
@@ -16,6 +16,10 @@ interface LessonCoverHeroProps {
   lessonTitle: string
   /** Section/module title displayed above lesson title in overlay */
   sectionTitle?: string
+  /** Section/module number for display in overlay */
+  sectionNumber?: number
+  /** Reading time in minutes */
+  readingTime?: number
   /** Whether to show gradient overlay with lesson and section titles */
   showOverlay?: boolean
   /** Callback fired when image loads successfully */
@@ -29,10 +33,10 @@ interface LessonCoverHeroProps {
 /**
  * LessonCoverHero - Hero banner component for lesson cover images
  *
- * Displays a 16:9 aspect ratio hero image at the top of lesson content.
+ * Displays a 21:9 cinematic aspect ratio hero image at the top of lesson content.
  *
  * Features:
- * - Responsive height (200px mobile, 250px tablet, 300px desktop)
+ * - 21:9 cinematic ratio with max-h-[400px] limit on desktop
  * - Fade-in animation with skeleton loader during image load
  * - GPU-optimized animations with willChange hints
  * - Memory-safe state updates (prevents setState on unmounted)
@@ -66,14 +70,22 @@ export function LessonCoverHero({
   imageUrl,
   lessonTitle,
   sectionTitle,
+  sectionNumber,
+  readingTime,
   showOverlay = false,
   onImageLoad,
   onImageError,
   className,
 }: LessonCoverHeroProps) {
-  const [isLoaded, setIsLoaded] = useState(false)
-  const [hasError, setHasError] = useState(false)
+  // Track loaded/error URLs to handle URL changes without race conditions
+  const [loadedUrls, setLoadedUrls] = useState<Set<string>>(new Set())
+  const [errorUrls, setErrorUrls] = useState<Set<string>>(new Set())
   const isMountedRef = useRef(true)
+  const imageRef = useRef<HTMLImageElement>(null)
+
+  // Derive state from URL tracking
+  const isLoaded = imageUrl ? loadedUrls.has(imageUrl) : false
+  const hasError = imageUrl ? errorUrls.has(imageUrl) : false
 
   useEffect(() => {
     isMountedRef.current = true
@@ -82,17 +94,36 @@ export function LessonCoverHero({
     }
   }, [])
 
+  // Check if image is already loaded from cache on mount/URL change
+  useEffect(() => {
+    if (!imageUrl) return
+
+    const checkComplete = () => {
+      if (imageRef.current?.complete && imageRef.current.naturalWidth > 0) {
+        if (isMountedRef.current && !loadedUrls.has(imageUrl)) {
+          setLoadedUrls((prev) => new Set(prev).add(imageUrl))
+          onImageLoad?.()
+        }
+      }
+    }
+
+    checkComplete()
+    const timeoutId = setTimeout(checkComplete, 100)
+
+    return () => clearTimeout(timeoutId)
+  }, [imageUrl, loadedUrls, onImageLoad])
+
   const handleLoad = useCallback(() => {
-    if (!isMountedRef.current) return  // Prevent state update on unmounted
-    setIsLoaded(true)
+    if (!isMountedRef.current || !imageUrl) return
+    setLoadedUrls((prev) => new Set(prev).add(imageUrl))
     onImageLoad?.()
-  }, [onImageLoad])
+  }, [imageUrl, onImageLoad])
 
   const handleError = useCallback(() => {
-    if (!isMountedRef.current) return  // Prevent state update on unmounted
-    setHasError(true)
+    if (!isMountedRef.current || !imageUrl) return
+    setErrorUrls((prev) => new Set(prev).add(imageUrl))
     onImageError?.()
-  }, [onImageError])
+  }, [imageUrl, onImageError])
 
   // Don't render if no URL or error occurred
   if (!imageUrl || hasError) {
@@ -102,12 +133,11 @@ export function LessonCoverHero({
   return (
     <div
       className={cn(
-        // Base styles - 16:9 aspect ratio container
-        "relative w-full overflow-hidden rounded-xl",
-        // Responsive heights: 200px mobile, 250px tablet, 300px desktop
-        "h-[200px] sm:h-[250px] md:h-[300px]",
+        // Base styles - 21:9 cinematic aspect ratio, limited height on desktop
+        'relative aspect-[21/9] max-h-[400px] w-full overflow-hidden rounded-xl',
         // Skeleton background while loading
-        !isLoaded && "bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-900",
+        !isLoaded &&
+          'bg-gradient-to-br from-gray-100 to-gray-200 dark:from-gray-800 dark:to-gray-900',
         className
       )}
     >
@@ -121,7 +151,7 @@ export function LessonCoverHero({
             className="absolute inset-0 flex items-center justify-center"
           >
             <div className="flex flex-col items-center gap-2">
-              <ImageIcon className="w-12 h-12 text-gray-400 dark:text-gray-600 animate-pulse" />
+              <ImageIcon className="h-12 w-12 animate-pulse text-gray-400 dark:text-gray-600" />
             </div>
           </motion.div>
         )}
@@ -135,11 +165,12 @@ export function LessonCoverHero({
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: isLoaded ? 1 : 0 }}
-        transition={{ duration: 0.5, ease: "easeOut" }}
+        transition={{ duration: 0.5, ease: 'easeOut' }}
         className="absolute inset-0"
         style={{ willChange: isLoaded ? 'auto' : 'opacity' }}
       >
         <NextImage
+          ref={imageRef}
           src={imageUrl}
           alt={`Cover image for lesson: ${lessonTitle}`}
           fill
@@ -152,23 +183,32 @@ export function LessonCoverHero({
         />
       </motion.div>
 
-      {/* Optional gradient overlay with title */}
+      {/* Optional gradient overlay with lesson info */}
       {showOverlay && isLoaded && (
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ duration: 0.5, delay: 0.2 }}
-          className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/20 to-transparent"
+          className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/30 to-transparent"
         >
-          <div className="absolute bottom-0 left-0 right-0 p-4 sm:p-6">
+          <div className="absolute right-0 bottom-0 left-0 p-4 sm:p-6 md:p-8">
+            {/* Module info */}
             {sectionTitle && (
-              <p className="text-white/80 text-sm font-medium mb-1">
-                {sectionTitle}
+              <p className="mb-1 text-sm font-medium text-white/90 drop-shadow-md">
+                {sectionNumber ? `Модуль ${sectionNumber}: ${sectionTitle}` : sectionTitle}
               </p>
             )}
-            <h2 className="text-white text-lg sm:text-xl md:text-2xl font-bold line-clamp-2">
+            {/* Lesson title */}
+            <h2 className="mb-2 line-clamp-2 text-xl font-bold text-white drop-shadow-lg sm:text-2xl md:text-3xl">
               {lessonTitle}
             </h2>
+            {/* Reading time */}
+            {readingTime && (
+              <div className="flex items-center gap-1.5 text-sm text-white/80 drop-shadow-md">
+                <Clock className="h-4 w-4" />
+                <span>{readingTime} мин</span>
+              </div>
+            )}
           </div>
         </motion.div>
       )}

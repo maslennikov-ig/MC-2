@@ -23,7 +23,7 @@
     "presentation": "Slide presentation for visual accompaniment",
     "quiz": "Comprehension quiz to reinforce learning",
     "document": "Additional document for download",
-    "cover": "Premium 16:9 hero banner for lesson page header (manual generation)",
+    "cover": "Premium 21:9 cinematic hero banner for lesson page header (manual generation)",
     "card": "AI-generated 1:1 thumbnail for course catalog and navigation (automatic)",
     "banner": "Manually created decorative header image for extra visual appeal"
   },
@@ -159,6 +159,7 @@
   "viewer": {
     "noMaterials": "No additional materials",
     "noMaterialsDescription": "No media content for this lesson yet",
+    "loadingMaterials": "Loading materials...",
     "loadError": "Failed to load additional materials. Try refreshing the page.",
     "videoLesson": "Video lesson",
     "audioLesson": "Audio lesson",
@@ -246,7 +247,7 @@
     },
     "generationComplete": "Enrichment generated successfully",
     "generationFailed": "Failed to generate enrichment",
-    "resumingGeneration": "Resuming {count, plural, one {# generation} other {# generations}}..."
+    "resumingGeneration": "Tracking {count, plural, one {# active generation} other {# active generations}}..."
   },
   "placeholder": {
     "quiz": {
@@ -277,7 +278,7 @@
     "generateButton": "Generate",
     "cover": {
       "title": "Lesson Banner",
-      "description": "Wide 16:9 image at the top of the lesson page. Displayed as a hero banner above the lesson content.",
+      "description": "Wide 21:9 cinematic image at the top of the lesson page. Displayed as a hero banner above the lesson content.",
       "usageHint": "Where it appears: lesson page header"
     },
     "card": {

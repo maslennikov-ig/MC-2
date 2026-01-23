@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useRef, useEffect, useCallback } from 'react'
 import { useRouter } from 'next/navigation'
 import Image from 'next/image'
 import { motion, AnimatePresence } from 'framer-motion'
@@ -41,6 +41,7 @@ import { cn } from '@/lib/utils'
 import type { Course } from '@/types/database'
 import { ShareButton } from '@/components/courses/share-button'
 import { ActionButtonWithTooltip } from '@/components/courses/action-button-with-tooltip'
+import { ImageSkeleton } from '@/components/ui/image-skeleton'
 
 interface User {
   id: string
@@ -188,10 +189,60 @@ export function CourseCard({
   const [isUpdatingFavorite, setIsUpdatingFavorite] = useState(false)
   const [visibility, setVisibility] = useState<CourseVisibility>(course.visibility || 'private')
   const [isUpdatingVisibility, setIsUpdatingVisibility] = useState(false)
+  // Track which URLs have been loaded to avoid flickering on re-renders
+  const [loadedUrls, setLoadedUrls] = useState<Set<string>>(new Set())
+  const [errorUrls, setErrorUrls] = useState<Set<string>>(new Set())
+  const isMountedRef = useRef(true)
+  const imageRef = useRef<HTMLImageElement>(null)
 
   const slug = course.slug || course.id
   const coverUrl = course.coverUrl
   const hasCover = !!coverUrl
+
+  // Determine current state based on URL
+  const isImageLoaded = coverUrl ? loadedUrls.has(coverUrl) : false
+  const hasImageError = coverUrl ? errorUrls.has(coverUrl) : false
+
+  // Cleanup on unmount to prevent memory leaks
+  useEffect(() => {
+    isMountedRef.current = true
+    return () => {
+      isMountedRef.current = false
+    }
+  }, [])
+
+  // Check if image is already loaded from cache on mount/URL change
+  useEffect(() => {
+    if (!coverUrl || !hasCover) return
+
+    const checkComplete = () => {
+      if (imageRef.current?.complete && imageRef.current.naturalWidth > 0) {
+        if (isMountedRef.current && !loadedUrls.has(coverUrl)) {
+          setLoadedUrls((prev) => new Set(prev).add(coverUrl))
+        }
+      }
+    }
+
+    checkComplete()
+    const timeoutId = setTimeout(checkComplete, 100)
+
+    return () => clearTimeout(timeoutId)
+  }, [coverUrl, hasCover, loadedUrls])
+
+  // Safe state updates to prevent memory leaks
+  // Track specific URL that was loaded to handle race conditions
+  const handleImageLoad = useCallback(() => {
+    if (isMountedRef.current && coverUrl) {
+      setLoadedUrls((prev) => new Set(prev).add(coverUrl))
+    }
+  }, [coverUrl])
+
+  const handleImageError = useCallback(() => {
+    if (isMountedRef.current && coverUrl) {
+      setErrorUrls((prev) => new Set(prev).add(coverUrl))
+      setLoadedUrls((prev) => new Set(prev).add(coverUrl)) // Also mark as "loaded" to hide skeleton
+    }
+  }, [coverUrl])
   // First 4 cards are typically above the fold in 2x2 grid
   const isAboveFold = index < 4
   // Use total_lessons_count if available, otherwise fall back to actual_lessons_count
@@ -477,19 +528,41 @@ export function CourseCard({
         )}
       >
         {/* Cover Image - main image area */}
-        <div className="relative min-h-[280px] flex-1 overflow-hidden">
+        <div
+          className="relative min-h-[280px] flex-1 overflow-hidden"
+          aria-busy={!isImageLoaded && !hasImageError && hasCover}
+        >
           {hasCover ? (
-            <Image
-              src={coverUrl}
-              alt={`Обложка курса: ${course.title}`}
-              fill
-              className={cn(
-                'object-cover transition-all duration-500',
-                isHovered && 'scale-105 brightness-90 dark:scale-110 dark:brightness-75'
+            <>
+              {/* Skeleton while loading */}
+              {!isImageLoaded && !hasImageError && (
+                <ImageSkeleton gradient aria-label="Загрузка обложки курса" />
               )}
-              sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
-              priority={isAboveFold}
-            />
+              {/* Error fallback */}
+              {hasImageError && (
+                <ImageSkeleton
+                  icon={<BookOpen className="h-16 w-16 text-gray-400 dark:text-slate-700" />}
+                  className="animate-none bg-gradient-to-br from-gray-100 to-gray-200 dark:from-slate-800 dark:to-slate-900"
+                />
+              )}
+              <Image
+                ref={imageRef}
+                src={coverUrl}
+                alt={`Обложка курса: ${course.title}`}
+                fill
+                loading="eager"
+                unoptimized // External Supabase URLs - skip Next.js optimization for reliable onLoad
+                onLoad={handleImageLoad}
+                onError={handleImageError}
+                className={cn(
+                  'object-cover transition-all duration-500 motion-reduce:transition-none',
+                  isImageLoaded && !hasImageError ? 'opacity-100' : 'opacity-0',
+                  isHovered && 'scale-105 brightness-90 dark:scale-110 dark:brightness-75'
+                )}
+                sizes="(max-width: 768px) 100vw, (max-width: 1200px) 50vw, 33vw"
+                priority={isAboveFold}
+              />
+            </>
           ) : (
             <div
               className={cn(

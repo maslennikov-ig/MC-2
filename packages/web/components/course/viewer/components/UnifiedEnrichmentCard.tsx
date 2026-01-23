@@ -40,6 +40,10 @@ interface UnifiedEnrichmentCardProps {
   isGenerating?: boolean
   /** For image types (cover/card) - existing enrichment to show preview */
   existingEnrichment?: EnrichmentRow | null
+  /** Whether generation just completed (show skeleton instead of placeholder) */
+  isRecentlyCompleted?: boolean
+  /** Callback when image loads (to clear recently completed state) */
+  onImageLoaded?: () => void
 }
 
 const PLACEHOLDER_CONFIG: Record<
@@ -78,7 +82,7 @@ const PLACEHOLDER_CONFIG: Record<
   cover: {
     image: '/placeholders/Cover.webp',
     color: 'text-cyan-500 dark:text-cyan-400',
-    badgeText: '16:9',
+    badgeText: '21:9',
     icon: ImageIcon,
   },
   card: {
@@ -95,6 +99,8 @@ export function UnifiedEnrichmentCard({
   disabled = false,
   isGenerating = false,
   existingEnrichment,
+  isRecentlyCompleted = false,
+  onImageLoaded,
 }: UnifiedEnrichmentCardProps) {
   const t = useTranslations('enrichments')
   const [isHovered, setIsHovered] = useState(false)
@@ -363,7 +369,9 @@ export function UnifiedEnrichmentCard({
         badgeText={config.badgeText}
         BadgeIcon={Icon}
         badgeColor={config.color}
-        aspectRatio={type === 'cover' ? 'video' : 'square'}
+        aspectRatio={type === 'cover' ? 'cinematic' : 'square'}
+        isRecentlyCompleted={isRecentlyCompleted}
+        onImageLoaded={onImageLoaded}
       />
 
       {/* Base Content - always visible */}
