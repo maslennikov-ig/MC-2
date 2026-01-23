@@ -1,10 +1,11 @@
 'use client'
 
-import React, { useState, useCallback, useEffect } from 'react'
+import React, { useState, useCallback, useEffect, useRef } from 'react'
 import Image from 'next/image'
 import { Expand } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Dialog, DialogContent, DialogTitle } from '@/components/ui/dialog'
+import { ImageSkeleton, ImageErrorFallback } from '@/components/ui/image-skeleton'
 import { cn } from '@/lib/utils'
 
 interface EnrichmentCardImageProps {
@@ -25,7 +26,11 @@ interface EnrichmentCardImageProps {
   /** Badge color class */
   badgeColor: string
   /** Image aspect ratio for lightbox */
-  aspectRatio: 'video' | 'square'
+  aspectRatio: 'video' | 'square' | 'cinematic'
+  /** Whether generation just completed (show skeleton instead of placeholder) */
+  isRecentlyCompleted?: boolean
+  /** Callback when image loads (to clear recently completed state) */
+  onImageLoaded?: () => void
 }
 
 /**
@@ -42,8 +47,49 @@ export function EnrichmentCardImage({
   BadgeIcon,
   badgeColor,
   aspectRatio,
+  isRecentlyCompleted = false,
+  onImageLoaded,
 }: EnrichmentCardImageProps) {
   const [isLightboxOpen, setIsLightboxOpen] = useState(false)
+  // Track which URLs have been loaded to avoid flickering on re-renders
+  const [loadedUrls, setLoadedUrls] = useState<Set<string>>(new Set())
+  const [errorUrls, setErrorUrls] = useState<Set<string>>(new Set())
+  const isMountedRef = useRef(true)
+  const imageRef = useRef<HTMLImageElement>(null)
+
+  // Cleanup on unmount to prevent memory leaks
+  useEffect(() => {
+    isMountedRef.current = true
+    return () => {
+      isMountedRef.current = false
+    }
+  }, [])
+
+  // Check if image is already loaded from cache on mount/URL change
+  // This handles cases where onLoad doesn't fire (cached images, SSR hydration)
+  useEffect(() => {
+    if (!imageUrl || !hasImage) return
+
+    // Small delay to let the Image component mount and set the ref
+    const checkComplete = () => {
+      if (imageRef.current?.complete && imageRef.current.naturalWidth > 0) {
+        if (isMountedRef.current && !loadedUrls.has(imageUrl)) {
+          setLoadedUrls((prev) => new Set(prev).add(imageUrl))
+        }
+      }
+    }
+
+    // Check immediately and after a short delay (for SSR hydration)
+    checkComplete()
+    const timeoutId = setTimeout(checkComplete, 100)
+
+    return () => clearTimeout(timeoutId)
+  }, [imageUrl, hasImage, loadedUrls])
+
+  // Determine current state based on URL
+  const isPlaceholder = !hasImage || !imageUrl
+  const isImageLoaded = isPlaceholder || (imageUrl ? loadedUrls.has(imageUrl) : false)
+  const hasError = imageUrl ? errorUrls.has(imageUrl) : false
 
   // Handle keyboard navigation for lightbox
   const handleKeyDown = useCallback(
@@ -66,19 +112,50 @@ export function EnrichmentCardImage({
     setIsLightboxOpen(true)
   }, [])
 
+  // Safe state updates to prevent memory leaks
+  // Track specific URL that was loaded to handle race conditions
+  const handleImageLoad = useCallback(() => {
+    if (isMountedRef.current && imageUrl) {
+      setLoadedUrls((prev) => new Set(prev).add(imageUrl))
+      // Notify parent that image loaded (clears "recently completed" state)
+      onImageLoaded?.()
+    }
+  }, [imageUrl, onImageLoaded])
+
+  const handleImageError = useCallback(() => {
+    if (isMountedRef.current && imageUrl) {
+      setErrorUrls((prev) => new Set(prev).add(imageUrl))
+      setLoadedUrls((prev) => new Set(prev).add(imageUrl)) // Also mark as "loaded" to hide skeleton
+    }
+  }, [imageUrl])
+
   return (
     <>
       {/* Image Area */}
-      <div className="relative min-h-[280px] flex-1 overflow-hidden">
+      <div
+        className="relative min-h-[280px] flex-1 overflow-hidden"
+        aria-busy={!isImageLoaded && !hasError && !isPlaceholder}
+      >
+        {/* Skeleton while loading - only for real images, not placeholders */}
+        {!isImageLoaded && !hasError && !isPlaceholder && <ImageSkeleton withIcon />}
+        {/* Error fallback */}
+        {hasError && <ImageErrorFallback />}
         {/* Show actual image if exists, otherwise placeholder */}
         {hasImage && imageUrl ? (
           <>
             <Image
+              ref={imageRef}
+              key={imageUrl} // Force remount when URL changes to ensure onLoad fires
               src={imageUrl}
               alt={altText}
               fill
+              loading="eager"
+              unoptimized // Skip Next.js optimization for external URLs - fixes onLoad reliability
+              onLoad={handleImageLoad}
+              onError={handleImageError}
               className={cn(
-                'object-cover transition-all duration-500',
+                'object-cover transition-all duration-500 motion-reduce:transition-none',
+                isImageLoaded && !hasError ? 'opacity-100' : 'opacity-0',
                 shouldShowPanel && 'scale-105 brightness-90 dark:brightness-75'
               )}
               sizes="(max-width: 640px) 100vw, (max-width: 1280px) 50vw, 33vw"
@@ -99,14 +176,18 @@ export function EnrichmentCardImage({
               <Expand className="h-6 w-6 text-white opacity-0 transition-opacity group-hover:opacity-100" />
             </button>
           </>
+        ) : isRecentlyCompleted ? (
+          /* Show skeleton while waiting for data to refetch after generation completes */
+          <ImageSkeleton withIcon />
         ) : (
-          /* Placeholder image - grayscale with hover effect to reveal colors */
+          /* Placeholder image - show immediately, no loading state needed */
           <Image
             src={placeholderImage}
             alt={altText}
             fill
+            priority
             className={cn(
-              'object-cover transition-all duration-500',
+              'object-cover transition-all duration-300 motion-reduce:transition-none',
               'grayscale group-hover:grayscale-0',
               shouldShowPanel && 'scale-105 brightness-90 dark:brightness-75'
             )}
@@ -140,7 +221,11 @@ export function EnrichmentCardImage({
             <div
               className={cn(
                 'relative w-full',
-                aspectRatio === 'video' ? 'aspect-video' : 'aspect-square'
+                aspectRatio === 'cinematic'
+                  ? 'aspect-[21/9]'
+                  : aspectRatio === 'video'
+                    ? 'aspect-video'
+                    : 'aspect-square'
               )}
             >
               <Image

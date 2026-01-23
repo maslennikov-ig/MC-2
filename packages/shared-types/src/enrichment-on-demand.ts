@@ -321,3 +321,88 @@ export function statusToStep(
 export function isOnDemandType(type: string): type is OnDemandEnrichmentType {
   return onDemandEnrichmentTypeSchema.safeParse(type).success;
 }
+
+// ============================================================================
+// UI STATUS HELPERS
+// ============================================================================
+
+/**
+ * Statuses that should show progress bar (active generation without user interaction)
+ *
+ * Note: `draft_ready` is NOT included - it requires user selection.
+ * Use `isAwaitingSelection()` to check for draft_ready.
+ */
+export const PROGRESS_BAR_STATUSES = ['pending', 'draft_generating', 'generating'] as const;
+export type ProgressBarStatus = (typeof PROGRESS_BAR_STATUSES)[number];
+
+/**
+ * Check if status should show progress bar (active generation, NOT awaiting selection)
+ *
+ * Use this instead of `isActiveGenerationStatus` when deciding whether to show
+ * the progress bar UI. For `draft_ready` status, show variant selection instead.
+ *
+ * @param status - Current enrichment status
+ * @returns True if progress bar should be shown
+ */
+export function isProgressBarStatus(status: string): status is ProgressBarStatus {
+  return (PROGRESS_BAR_STATUSES as readonly string[]).includes(status);
+}
+
+/**
+ * Check if status is awaiting user selection (draft_ready)
+ *
+ * When this returns true, the UI should show variant selection component
+ * instead of progress bar. Applies to two-stage enrichments (cover, banner, video, presentation).
+ *
+ * @param status - Current enrichment status
+ * @returns True if user needs to select a variant
+ */
+export function isAwaitingSelection(status: string): boolean {
+  return status === 'draft_ready';
+}
+
+/**
+ * Enrichment types that use two-stage generation (draft → selection → final)
+ *
+ * Currently empty - all types use single-stage flow:
+ * - cover/banner: switched to single-stage (user selects style in UI before generation)
+ * - video/presentation: may add two-stage in future if needed
+ *
+ * @note When this array is empty, TwoStageEnrichmentType resolves to `never`
+ * and isTwoStageType() always returns false. This is intentional.
+ */
+export const TWO_STAGE_ENRICHMENT_TYPES = [] as const;
+
+/**
+ * Type for two-stage enrichment types.
+ * Currently `never` since no types use two-stage flow.
+ */
+export type TwoStageEnrichmentType = (typeof TWO_STAGE_ENRICHMENT_TYPES)[number];
+
+/**
+ * Check if enrichment type uses two-stage generation
+ *
+ * @param type - Enrichment type to check
+ * @returns Always false (no types currently use two-stage flow)
+ */
+export function isTwoStageType(type: string): type is TwoStageEnrichmentType {
+  return (TWO_STAGE_ENRICHMENT_TYPES as readonly string[]).includes(type);
+}
+
+/**
+ * Get the next progress milestone for a given current progress
+ *
+ * Used for asymptotic progress animation - smooth progress should never
+ * exceed the next milestone until the actual status changes.
+ *
+ * Milestones: 0% → 25% → 50% → 75% → 100%
+ *
+ * @param currentProgress - Current progress percentage (0-100)
+ * @returns Next milestone percentage
+ */
+export function getNextMilestone(currentProgress: number): number {
+  if (currentProgress < 25) return 25;
+  if (currentProgress < 50) return 50;
+  if (currentProgress < 75) return 75;
+  return 100;
+}

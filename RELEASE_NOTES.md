@@ -2,6 +2,96 @@
 
 _Released on 2025-12-26_
 
+## v0.28.32
+
+_Released on 2026-01-23_
+
+---
+
+_This release was automatically generated from 1 commits._
+
+## v0.28.31
+
+_Released on 2026-01-23_
+
+### 🐛 Bug Fixes
+
+- **cover**: Use 21:9 cinematic ratio in lightbox preview
+
+---
+
+_This release was automatically generated from 1 commits._
+
+## v0.28.30
+
+_Released on 2026-01-23_
+
+### ✨ New Features
+
+- **cover**: Switch to 21:9 cinematic aspect ratio for lesson covers
+
+---
+
+_This release was automatically generated from 1 commits._
+
+## v0.28.29
+
+_Released on 2026-01-23_
+
+### ✨ New Features
+
+- **web**: Expand rotating status messages with type-specific content
+
+### 🐛 Bug Fixes
+
+- **web**: Update 15 source file(s), update docs
+
+---
+
+_This release was automatically generated from 2 commits._
+
+## v0.28.28
+
+_Released on 2026-01-23_
+
+### ✨ New Features
+
+- **web**: Smooth image loading with skeleton placeholders
+- **enrichments**: Fix cover/banner generation UX - show variant selection at draft_ready
+- **web**: Improve EnrichmentGeneratingCard with shimmer and rotating messages
+- Add asymptotic crawl to useSmoothProgress hook
+- Add Next.js rewrite for local enrichments proxy
+- **storage**: Add unified storage service with auto-backend switching
+- **scripts**: Enhance migration script with safety features
+- **storage**: Migrate enrichment images from Supabase to local storage
+
+### 🔧 Improvements
+
+- **cover**: Remove two-stage dead code from CoverPreview
+- **enrichments**: Simplify cover/banner to single-stage generation
+- Improve enrichment handlers and add nginx rate limiting
+
+### 🔒 Security
+
+- Fix critical vulnerabilities in local-storage-service
+
+### 🐛 Bug Fixes
+
+- **enrichments**: Remove dead approveCoverDraft code
+- **web**: Resolve CSP error for enrichment generation in production
+- Move nginx configs to deploy/nginx as single source of truth
+- **Database**: Remove unused tables and fix performance warnings
+- **enrichment**: Reuse cancelled/failed enrichments for regeneration
+- **enrichment**: Allow cancelling draft_ready enrichments and fix resume race condition
+- **Database**: Complete Supabase security and performance optimizations
+- **web**: Replace missing /api/auth/me endpoint with useAuth hook
+- **Database**: Apply Supabase performance and security optimizations
+- Security vulnerabilities and code cleanup (mc2-wisp-157)
+
+---
+
+_This release was automatically generated from 48 commits._
+
 ## v0.28.27
 
 _Released on 2026-01-22_

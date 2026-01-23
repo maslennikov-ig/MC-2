@@ -20,9 +20,7 @@ import {
   getEnrichment,
   deleteEnrichment,
   regenerateEnrichment,
-  approveCoverDraft,
 } from '@/app/actions/enrichment-actions';
-import { type CoverDraftContent } from '../CoverPreview';
 
 export interface DetailViewProps {
   enrichmentId: string;
@@ -335,7 +333,6 @@ function toCoverPreviewProps(e: CoverEnrichmentData): CoverEnrichment {
     id: e.id,
     status: e.status,
     content: e.content,
-    draft_content: e.draft_content as CoverDraftContent | null,
     metadata: e.metadata,
     error_message: e.error_message,
   };
@@ -343,11 +340,9 @@ function toCoverPreviewProps(e: CoverEnrichmentData): CoverEnrichment {
 
 /**
  * Cover preview props for passing handlers to CoverPreview
+ * Note: onSelectVariant, onApproveDraft, isApproving removed (single-stage flow)
  */
 interface CoverPreviewHandlers {
-  onSelectVariant?: (variantId: number) => void;
-  onApproveDraft?: () => void;
-  isApproving?: boolean;
   onRegenerate?: () => void;
   isRegenerating?: boolean;
   onDelete?: () => void;
@@ -372,9 +367,6 @@ function renderPreview(enrichment: EnrichmentData, coverHandlers?: CoverPreviewH
       return (
         <CoverPreview
           enrichment={toCoverPreviewProps(enrichment)}
-          onSelectVariant={coverHandlers?.onSelectVariant}
-          onApproveDraft={coverHandlers?.onApproveDraft}
-          isApproving={coverHandlers?.isApproving}
           onRegenerate={coverHandlers?.onRegenerate}
           isRegenerating={coverHandlers?.isRegenerating}
           onDelete={coverHandlers?.onDelete}
@@ -400,10 +392,6 @@ export function DetailView({ enrichmentId, className }: DetailViewProps) {
 
   // Regenerate state
   const [isRegenerating, setIsRegenerating] = useState(false);
-
-  // Cover draft approval state
-  const [selectedCoverVariant, setSelectedCoverVariant] = useState<number | null>(null);
-  const [isApprovingCover, setIsApprovingCover] = useState(false);
 
   // Fetch real enrichment data
   const dataState = useEnrichmentDetail(enrichmentId);
@@ -497,55 +485,6 @@ export function DetailView({ enrichmentId, className }: DetailViewProps) {
     toast.info(locale === 'ru' ? 'Скоро будет доступно' : 'Coming soon');
   }, [locale]);
 
-  // Handle cover variant selection
-  const handleCoverVariantSelect = useCallback((variantId: number) => {
-    setSelectedCoverVariant(variantId);
-  }, []);
-
-  // Handle cover draft approval
-  const handleCoverApprove = useCallback(async () => {
-    if (!courseInfo?.id || selectedCoverVariant === null) {
-      toast.error(
-        locale === 'ru' ? 'Выберите вариант обложки' : 'Please select a cover variant'
-      );
-      return;
-    }
-
-    setIsApprovingCover(true);
-
-    try {
-      const result = await approveCoverDraft({
-        enrichmentId,
-        courseId: courseInfo.id,
-        selectedVariantId: selectedCoverVariant,
-      });
-
-      if (result.success) {
-        toast.success(
-          locale === 'ru'
-            ? 'Генерация обложки запущена'
-            : 'Cover generation started'
-        );
-        // Refetch to show updated status
-        dataState.refetch();
-      } else {
-        toast.error(
-          locale === 'ru'
-            ? `Ошибка: ${result.error}`
-            : `Error: ${result.error}`
-        );
-      }
-    } catch {
-      toast.error(
-        locale === 'ru'
-          ? 'Не удалось запустить генерацию'
-          : 'Failed to start generation'
-      );
-    } finally {
-      setIsApprovingCover(false);
-    }
-  }, [enrichmentId, courseInfo?.id, selectedCoverVariant, locale, dataState]);
-
   // Render based on data state
   const renderContent = () => {
     switch (dataState.status) {
@@ -566,13 +505,10 @@ export function DetailView({ enrichmentId, className }: DetailViewProps) {
           return <ErrorState error={enrichment.error_message} onRetry={handleRegenerate} />;
         }
 
-        // Cover handlers for CoverPreview component
+        // Cover handlers for CoverPreview component (single-stage flow - no variant selection)
         const coverHandlers: CoverPreviewHandlers =
           enrichment.type === 'cover'
             ? {
-                onSelectVariant: handleCoverVariantSelect,
-                onApproveDraft: handleCoverApprove,
-                isApproving: isApprovingCover,
                 onRegenerate: handleRegenerate,
                 isRegenerating,
                 onDelete: handleDeleteClick,
@@ -580,10 +516,9 @@ export function DetailView({ enrichmentId, className }: DetailViewProps) {
               }
             : {};
 
-        // Hide action bar for cover draft_ready and completed states (CoverPreview has its own action bar)
+        // Hide action bar for cover completed state (CoverPreview has its own action bar)
         const hideCoverActionBar =
-          enrichment.type === 'cover' &&
-          (enrichment.status === 'draft_ready' || enrichment.status === 'completed');
+          enrichment.type === 'cover' && enrichment.status === 'completed';
 
         // Render preview with action bar
         return (

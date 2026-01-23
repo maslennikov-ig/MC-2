@@ -118,9 +118,11 @@ git push                          # → dev.ai.megacampus.ru
 - Green: web:3002, api:4002
 - Zero-downtime, instant rollback
 
+**Nginx**: `deploy/nginx/` (single source of truth, never edit on server)
+
 **Rollback:** `ssh megacampus-prod "bash /opt/megacampus/scripts/rollback_blue_green.sh"`
 
-**Details**: `docs/ADR-005-deployment-strategy.md`
+**Full guide**: `.claude/docs/deployment-guide.md`
 
 ### How User Gives Me Tasks
 

@@ -8,6 +8,31 @@
 | Dev         | https://dev.ai.megacampus.ru | develop | Rolling         |
 | Production  | TBD                          | TBD     | Blue/Green      |
 
+## Environment Variables
+
+### Client-Side Variables (NEXT*PUBLIC*\*)
+
+Variables prefixed with `NEXT_PUBLIC_` are embedded into the JavaScript bundle at **build time**.
+
+**Important**: Changing these variables requires rebuilding the Docker image.
+
+| Variable                            | Description                | Default         |
+| ----------------------------------- | -------------------------- | --------------- |
+| `NEXT_PUBLIC_SUPABASE_URL`          | Supabase project URL       | Required        |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY`     | Supabase anon key          | Required        |
+| `NEXT_PUBLIC_COURSEGEN_BACKEND_URL` | API backend URL for client | Auto-detected\* |
+
+\*Auto-detection: In production (non-localhost), uses relative URL `/api` which nginx proxies to API.
+
+### Server-Side Variables
+
+These are read at runtime and can be changed without rebuilding:
+
+| Variable                    | Description                    | Default           |
+| --------------------------- | ------------------------------ | ----------------- |
+| `COURSEGEN_BACKEND_URL`     | API URL for server-side calls  | `http://api:4000` |
+| `SUPABASE_SERVICE_ROLE_KEY` | Service role key (server only) | Required          |
+
 ## Blue/Green Deployment
 
 Zero-downtime deployment using nginx port switching.
@@ -31,9 +56,10 @@ Zero-downtime deployment using nginx port switching.
 
 - `docker-compose.infra.yml` — Shared infrastructure (redis, docling, workers)
 - `docker-compose.app.yml` — Application services (web, api) with dynamic ports
-- `nginx.conf.template` — Nginx config with port placeholders
+- `deploy/nginx/megacampus.conf.template` — Nginx template (SINGLE SOURCE OF TRUTH)
 - `scripts/deploy_blue_green.sh` — Deploy script
 - `scripts/rollback_blue_green.sh` — Rollback script
+- `scripts/verify-nginx.sh` — Nginx health check script
 
 ## Deploy Commands
 
@@ -113,12 +139,25 @@ docker logs megacampus-api-green
 
 ### Manual nginx switch
 
-```bash
-# Edit nginx config
-sudo nano /etc/nginx/sites-enabled/megacampus
+**IMPORTANT**: Never edit `/etc/nginx/sites-enabled/megacampus` directly!
+Edit `deploy/nginx/megacampus.conf.template` in repo and apply:
 
-# Test and reload
+```bash
+# 1. Check active color
+cat /opt/megacampus/active_color  # → "blue" or "green"
+
+# 2. Apply template with correct ports (example for blue)
+sed -e 's/{{WEB_PORT}}/3001/g' -e 's/{{API_PORT}}/4001/g' -e 's/{{COLOR}}/blue/g' \
+  /opt/megacampus/nginx.conf.template | sudo tee /etc/nginx/sites-enabled/megacampus > /dev/null
+
+# 3. Test and reload
 sudo nginx -t && sudo nginx -s reload
+```
+
+Or use verification script:
+
+```bash
+./scripts/verify-nginx.sh
 ```
 
 ### Health check manually
@@ -133,8 +172,20 @@ curl -f http://localhost:4001/health
 curl -f http://localhost:4002/health
 ```
 
+## Nginx Configuration
+
+**Single Source of Truth**: `deploy/nginx/`
+
+| File                       | Environment | Description                         |
+| -------------------------- | ----------- | ----------------------------------- |
+| `megacampus.conf.template` | Staging     | Blue/Green with `{{WEB_PORT}}` vars |
+| `megacampus-dev.conf`      | Dev         | Static ports 3010/4010              |
+
+See `deploy/nginx/README.md` for troubleshooting.
+
 ## Related Docs
 
 - [ADR-004: Blue/Green Deployment Strategy](../../docs/ADR-004-blue-green-deployment.md)
 - [ADR-005: Deployment Strategy and Environment Architecture](../../docs/ADR-005-deployment-strategy.md)
 - [RFC-001: Branching Strategy](../../docs/RFC-001-branching-strategy.md)
+- [Nginx Config README](../../deploy/nginx/README.md)

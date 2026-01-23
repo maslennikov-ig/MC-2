@@ -31,6 +31,8 @@ interface LessonViewProps {
   enrichments?: EnrichmentRow[]
   /** Error message if enrichments failed to load */
   enrichmentsLoadError?: string
+  /** Whether enrichments are being refetched */
+  isEnrichmentsLoading?: boolean
   /** Lesson content from lesson_contents table (Stage 6 generated content) */
   lessonContent?: LessonContentRow
   focusMode: boolean
@@ -63,6 +65,7 @@ export function LessonView({
   assets,
   enrichments,
   enrichmentsLoadError,
+  isEnrichmentsLoading,
   lessonContent,
   focusMode,
   currentIndex,
@@ -302,6 +305,7 @@ export function LessonView({
         <EnrichmentsPanel
           enrichments={enrichments || []}
           enrichmentsLoadError={enrichmentsLoadError}
+          isLoading={isEnrichmentsLoading}
           lessonId={currentLesson.id}
           courseId={currentLesson.course_id}
           onRefreshEnrichments={onRefreshEnrichments}

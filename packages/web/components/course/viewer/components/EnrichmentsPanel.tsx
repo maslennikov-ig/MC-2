@@ -37,6 +37,8 @@ interface EnrichmentsPanelProps {
   enrichments: EnrichmentRow[]
   /** Error message if enrichments failed to load */
   enrichmentsLoadError?: string
+  /** Whether enrichments are being loaded/refetched */
+  isLoading?: boolean
   /** Lesson UUID for generating new enrichments */
   lessonId?: string
   /** Course UUID for generating new enrichments */
@@ -48,6 +50,7 @@ interface EnrichmentsPanelProps {
 export function EnrichmentsPanel({
   enrichments,
   enrichmentsLoadError,
+  isLoading: _isLoading,
   lessonId,
   courseId,
   onRefreshEnrichments,
@@ -73,21 +76,51 @@ export function EnrichmentsPanel({
   )
 
   // Use enrichment generation hook (only if lessonId and courseId are available)
-  const { startGeneration, cancelGeneration, isGenerating, getProgress, resumeGeneration } =
-    useEnrichmentGeneration({
-      lessonId: lessonId || '',
-      courseId: courseId || '',
-      onComplete: handleGenerationComplete,
-      onError: handleGenerationError,
-    })
+  const {
+    startGeneration,
+    cancelGeneration,
+    isGenerating,
+    getProgress,
+    resumeGeneration,
+    isRecentlyCompleted,
+    clearRecentlyCompleted,
+  } = useEnrichmentGeneration({
+    lessonId: lessonId || '',
+    courseId: courseId || '',
+    onComplete: handleGenerationComplete,
+    onError: handleGenerationError,
+  })
 
   // Track resumed enrichment TYPES (not IDs) to prevent duplicate resumes
   // Fixes race condition: when enrichment ID changes but type is same, prevent double resume
   // Only ONE enrichment per type is supported at a time
   const resumedTypesRef = useRef(new Set<string>())
 
+  // Track if we just switched lessons to avoid acting on stale cached data
+  const isInitialLoadRef = useRef(true)
+  const lessonSwitchTimeRef = useRef<number>(0)
+
+  // Reset state when lessonId changes (user navigates to different lesson)
+  useEffect(() => {
+    resumedTypesRef.current.clear()
+    isInitialLoadRef.current = true
+    lessonSwitchTimeRef.current = Date.now()
+  }, [lessonId])
+
   // Resume polling for active enrichments on mount and when new active enrichments appear
   useEffect(() => {
+    // Skip if this is the initial render after lesson switch
+    // Wait for fresh data to arrive (avoid acting on stale cache)
+    if (isInitialLoadRef.current) {
+      isInitialLoadRef.current = false
+      // If data arrived very quickly after lesson switch, it might be stale cache
+      // Wait a bit before trusting it
+      const timeSinceSwitch = Date.now() - lessonSwitchTimeRef.current
+      if (timeSinceSwitch < 100) {
+        return // Skip this render, wait for fresh data
+      }
+    }
+
     // Find enrichments that need resuming (active + on-demand + type not yet resumed)
     const activeEnrichments = enrichments
       .filter((e) => isActiveGenerationStatus(e.status))
@@ -299,6 +332,8 @@ export function EnrichmentsPanel({
               }}
               disabled={type === 'video' || !lessonId}
               isGenerating={typeIsGenerating}
+              isRecentlyCompleted={isRecentlyCompleted(type)}
+              onImageLoaded={() => clearRecentlyCompleted(type)}
             />
           )
         })}

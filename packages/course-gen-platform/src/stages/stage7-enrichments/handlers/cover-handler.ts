@@ -2,11 +2,19 @@
  * Cover Enrichment Handler
  * @module stages/stage7-enrichments/handlers/cover-handler
  *
- * Two-stage handler for lesson cover image generation.
- * Phase 1 (Draft): LLM generates 3 image prompt variants with different visual approaches
- * Phase 2 (Final): Image model generates hero banner from selected variant
+ * Single-stage handler for lesson cover image generation.
+ * User selects style preset (premium3d, realistic, abstract, minimalist, dramatic)
+ * before generation. Handler generates image directly using selected style.
+ *
+ * Flow:
+ * 1. User selects style in UI (or uses course default)
+ * 2. LLM generates image prompt based on style
+ * 3. Image model generates hero banner (16:9)
+ * 4. Image converted to WebP and uploaded
  *
  * Uses OpenRouter API with bytedance-seed/seedream-4.5 model for image generation.
+ *
+ * @see _twoStageReserved for archived two-stage implementation
  */
 
 import { z } from 'zod';
@@ -420,7 +428,9 @@ ${customPrompt.trim()}`;
  * @param input - Enrichment handler input with context
  * @returns Draft result with 3 prompt variants
  */
-async function generateDraft(input: EnrichmentHandlerInput): Promise<DraftResult> {
+// NOTE: generateDraft is kept for potential future two-stage flow revival
+
+async function _generateDraft(input: EnrichmentHandlerInput): Promise<DraftResult> {
   const { enrichmentContext } = input;
   const { enrichment, lesson, course } = enrichmentContext;
 
@@ -954,7 +964,7 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
         width: imageResult.width,
         height: imageResult.height,
       },
-      aspectRatio: '16:9',
+      aspectRatio: '21:9',
       generation_prompt: imagePrompt,
       altText: getCoverAltText(course.language ?? 'en', lesson.title),
       format: 'webp',
@@ -1019,7 +1029,9 @@ async function generate(input: EnrichmentHandlerInput): Promise<GenerateResult> 
  * @param draft - Approved draft result from Phase 1 with selected variant
  * @returns Generate result with cover image and metadata
  */
-async function generateFinal(
+// NOTE: generateFinal is kept for potential future two-stage flow revival
+
+async function _generateFinal(
   input: EnrichmentHandlerInput,
   draft: DraftResult
 ): Promise<GenerateResult> {
@@ -1122,7 +1134,7 @@ async function generateFinal(
         width: imageResult.width,
         height: imageResult.height,
       },
-      aspectRatio: '16:9',
+      aspectRatio: '21:9',
       generation_prompt: imagePrompt,
       altText: getCoverAltText(course.language ?? 'en', lesson.title),
       format: 'webp',
@@ -1183,16 +1195,19 @@ async function generateFinal(
 // ============================================================================
 
 /**
- * Cover enrichment handler implementing two-stage flow
+ * Cover enrichment handler implementing single-stage flow
  *
- * Stage 1 (Draft): Generate 3 image prompt variants using LLM
- * Stage 2 (Final): Generate cover image from selected variant
- *
- * The handler follows the presentation-handler pattern for two-stage generation.
+ * Generates cover image directly using style presets and optional custom prompt.
+ * User selects style in UI before generation starts (not after draft).
  */
 export const coverHandler: EnrichmentHandler = {
-  generationFlow: 'two-stage',
-  generateDraft,
+  generationFlow: 'single-stage',
   generate,
-  generateFinal,
 };
+
+/**
+ * @deprecated Reserved for potential future two-stage flow revival.
+ * DO NOT USE - Not tested, not maintained, may be removed without notice.
+ * @internal
+ */
+export const _twoStageReserved = { generateDraft: _generateDraft, generateFinal: _generateFinal };
