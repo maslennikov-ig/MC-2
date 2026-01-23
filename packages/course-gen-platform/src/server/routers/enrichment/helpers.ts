@@ -411,7 +411,12 @@ export function isTwoStageType(enrichmentType: string): boolean {
 /**
  * Statuses that can be cancelled
  */
-export const CANCELLABLE_STATUSES = ['pending', 'draft_generating', 'generating'] as const;
+export const CANCELLABLE_STATUSES = [
+  'pending',
+  'draft_generating',
+  'draft_ready',
+  'generating',
+] as const;
 
 /**
  * Check if enrichment is in a cancellable state

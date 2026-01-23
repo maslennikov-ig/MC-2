@@ -81,45 +81,38 @@ export function EnrichmentsPanel({
       onError: handleGenerationError,
     })
 
-  // Track resumed enrichment IDs to prevent duplicate resumes
-  // Fixes HIGH #1: race condition (Set persists but tracks IDs, not boolean)
-  const resumedIdsRef = useRef(new Set<string>())
+  // Track resumed enrichment TYPES (not IDs) to prevent duplicate resumes
+  // Fixes race condition: when enrichment ID changes but type is same, prevent double resume
+  // Only ONE enrichment per type is supported at a time
+  const resumedTypesRef = useRef(new Set<string>())
 
   // Resume polling for active enrichments on mount and when new active enrichments appear
-  // Fixes HIGH #1, #2, #3: proper tracking, cleanup, and type safety
-  //
-  // Note (#5): Currently only ONE enrichment per type is supported.
-  // If multiple enrichments of the same type exist in 'generating' state,
-  // only the first encountered will be tracked (hook guards against duplicates).
-  // This may change in future when multiple enrichments per type are allowed.
   useEffect(() => {
-    // Find enrichments that need resuming (active + on-demand + not yet resumed)
+    // Find enrichments that need resuming (active + on-demand + type not yet resumed)
     const activeEnrichments = enrichments
       .filter((e) => isActiveGenerationStatus(e.status))
       .filter(isEnrichmentOnDemand)
-      .filter((e) => !resumedIdsRef.current.has(e.id))
+      .filter((e) => !resumedTypesRef.current.has(e.enrichment_type))
 
     // Resume polling for each new active enrichment
-    // #7 fix: Show visual feedback on auto-resume
     if (activeEnrichments.length > 0) {
       toast.info(t('viewer.resumingGeneration', { count: activeEnrichments.length }))
     }
     activeEnrichments.forEach((enrichment) => {
       resumeGeneration(enrichment.id, enrichment.enrichment_type)
-      resumedIdsRef.current.add(enrichment.id)
+      resumedTypesRef.current.add(enrichment.enrichment_type)
     })
 
-    // Cleanup: remove IDs for enrichments that are no longer active
-    // Fixes HIGH #2: memory leak - stop tracking completed/removed enrichments
-    const currentActiveIds = new Set(
-      enrichments.filter((e) => isActiveGenerationStatus(e.status)).map((e) => e.id)
+    // Cleanup: remove types for enrichments that are no longer active
+    const currentActiveTypes = new Set<string>(
+      enrichments.filter((e) => isActiveGenerationStatus(e.status)).map((e) => e.enrichment_type)
     )
-    resumedIdsRef.current.forEach((id) => {
-      if (!currentActiveIds.has(id)) {
-        resumedIdsRef.current.delete(id)
+    resumedTypesRef.current.forEach((type) => {
+      if (!currentActiveTypes.has(type)) {
+        resumedTypesRef.current.delete(type)
       }
     })
-  }, [enrichments, resumeGeneration])
+  }, [enrichments, resumeGeneration, t])
 
   // Filter out cover type - it's displayed as hero banner in lesson content
   const filteredEnrichments = enrichments.filter((e) => (e.enrichment_type as string) !== 'cover')
