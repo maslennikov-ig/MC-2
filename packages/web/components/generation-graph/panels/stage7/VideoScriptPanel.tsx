@@ -41,6 +41,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { MarkdownRendererFull } from '@/components/markdown';
 import { JsonViewer } from '../shared/JsonViewer';
 import { EnrichmentStatusBadge } from './EnrichmentStatusBadge';
+import { useRotatingStatusMessage } from '@/lib/hooks/useRotatingStatusMessage';
 import { type EnrichmentStatus } from '@/lib/generation-graph/enrichment-config';
 import { cn } from '@/lib/utils';
 
@@ -421,11 +422,18 @@ export function VideoScriptPanel({
   isRegenerating = false,
   className,
 }: VideoScriptPanelProps): React.JSX.Element {
-  const locale = useLocale() as 'ru' | 'en';
+  const locale = useLocale();
   const t: Translations = TRANSLATIONS[locale] || TRANSLATIONS.ru;
 
   const [activeTab, setActiveTab] = useState<'script' | 'metadata'>('script');
   const [expandedSections, setExpandedSections] = useState<string[]>(['intro']);
+
+  // Rotating status message for loading state
+  const { message: statusMessage } = useRotatingStatusMessage({
+    status: 'video_generating',
+    interval: 5000,
+    enabled: isLoadingStatus(enrichment.status),
+  });
 
   // Local draft state for editing
   const [localDraft, setLocalDraft] = useState<VideoScriptOutput | null>(() => {
@@ -547,9 +555,7 @@ export function VideoScriptPanel({
         <div className="flex-1 p-6 space-y-6">
           <div className="flex items-center justify-center space-x-2 text-muted-foreground mb-6">
             <Loader2 className="w-5 h-5 animate-spin" />
-            <span className="text-sm">
-              {enrichment.status === 'draft_generating' ? t.generatingDraft : t.generatingFinal}
-            </span>
+            <span className="text-sm transition-opacity duration-300">{statusMessage}</span>
           </div>
 
           {/* Skeleton loaders */}

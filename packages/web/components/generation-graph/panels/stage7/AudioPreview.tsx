@@ -36,6 +36,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Slider } from '@/components/ui/slider';
 import { JsonViewer } from '../shared/JsonViewer';
 import { EnrichmentStatusBadge } from './EnrichmentStatusBadge';
+import { useRotatingStatusMessage } from '@/lib/hooks/useRotatingStatusMessage';
 import { type EnrichmentStatus } from '@/lib/generation-graph/enrichment-config';
 import { cn } from '@/lib/utils';
 
@@ -468,10 +469,17 @@ export function AudioPreview({
   isRegenerating = false,
   className,
 }: AudioPreviewProps): React.JSX.Element {
-  const locale = useLocale() as 'ru' | 'en';
+  const locale = useLocale();
   const t: Translations = TRANSLATIONS[locale] || TRANSLATIONS.ru;
 
   const [activeTab, setActiveTab] = useState<'player' | 'script' | 'metadata'>('player');
+
+  // Rotating status message for loading state
+  const { message: statusMessage } = useRotatingStatusMessage({
+    status: 'audio_generating',
+    interval: 5000,
+    enabled: isLoadingStatus(enrichment.status),
+  });
 
   // Determine mode based on status
   const isLoading = isLoadingStatus(enrichment.status);
@@ -507,7 +515,7 @@ export function AudioPreview({
         <div className="flex-1 p-6 space-y-6">
           <div className="flex items-center justify-center space-x-2 text-muted-foreground mb-6">
             <Loader2 className="w-5 h-5 animate-spin" />
-            <span className="text-sm">{t.generating}</span>
+            <span className="text-sm transition-opacity duration-300">{statusMessage}</span>
           </div>
 
           {/* Skeleton loaders */}

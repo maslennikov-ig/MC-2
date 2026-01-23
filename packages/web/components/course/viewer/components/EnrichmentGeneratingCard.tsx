@@ -96,10 +96,35 @@ export function EnrichmentGeneratingCard({
     crawlIncrement: 0.15,
   })
 
+  // Map type to specific status for rotating messages
+  const getRotatingStatus = () => {
+    // For generating state, use type-specific messages
+    if (currentStep === 'generating') {
+      switch (type) {
+        case 'cover':
+          return 'cover_generating'
+        case 'card':
+          return 'cover_generating' // Cards use same messages as covers
+        case 'quiz':
+          return 'quiz_generating'
+        case 'audio':
+          return 'audio_generating'
+        case 'presentation':
+          return 'presentation_generating'
+        case 'video':
+          return 'video_generating'
+        default:
+          return 'generating'
+      }
+    }
+    // For other states (queued, finalizing, etc.) use as-is
+    return currentStep
+  }
+
   // Rotating status messages
   const { message: statusMessage } = useRotatingStatusMessage({
-    status: currentStep,
-    interval: 4000,
+    status: getRotatingStatus(),
+    interval: 5000,
   })
 
   const getTitle = () => {

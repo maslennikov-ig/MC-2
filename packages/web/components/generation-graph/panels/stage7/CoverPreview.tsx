@@ -6,6 +6,7 @@ import { ImageIcon, FileText, Download, Loader2, RefreshCw, Trash2 } from 'lucid
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
+import { useRotatingStatusMessage } from '@/lib/hooks/useRotatingStatusMessage'
 import type { EnrichmentStatus, CoverEnrichmentContent } from '@megacampus/shared-types'
 
 // ============================================================================
@@ -46,7 +47,6 @@ const TRANSLATIONS = {
     regenerating: 'Перегенерация...',
     delete: 'Удалить',
     deleting: 'Удаление...',
-    generating: 'Генерация обложки...',
   },
   en: {
     coverNotGenerated: 'Cover not generated',
@@ -56,7 +56,6 @@ const TRANSLATIONS = {
     regenerating: 'Regenerating...',
     delete: 'Delete',
     deleting: 'Deleting...',
-    generating: 'Generating cover...',
   },
 }
 
@@ -213,16 +212,21 @@ function EmptyView({ t, className }: EmptyViewProps) {
 }
 
 interface GeneratingViewProps {
-  t: Translations
   className?: string
 }
 
-function GeneratingView({ t, className }: GeneratingViewProps) {
+function GeneratingView({ className }: GeneratingViewProps) {
+  // Use rotating status messages for better UX during generation
+  const { message } = useRotatingStatusMessage({
+    status: 'cover_generating',
+    interval: 5000,
+  })
+
   return (
     <div className={cn('flex h-full items-center justify-center p-8', className)}>
       <div className="text-muted-foreground text-center">
         <Loader2 className="mx-auto mb-4 h-12 w-12 animate-spin opacity-50" />
-        <p>{t.generating}</p>
+        <p className="transition-opacity duration-300">{message}</p>
       </div>
     </div>
   )
@@ -265,7 +269,7 @@ export function CoverPreview({
 
   // Show generating state
   if (isGenerating) {
-    return <GeneratingView t={t} className={className} />
+    return <GeneratingView className={className} />
   }
 
   // Show completed cover
