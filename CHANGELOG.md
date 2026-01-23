@@ -311,6 +311,45 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.28.33] - 2026-01-23
+
+### Added
+
+- **types**: add TypeScript types for GenerationProgress (55839d00)
+- **stage3**: auto-assign CORE priority for single document (16857bc7)
+- **web**: add navigation to lessons page (Toolbar + Sidebar) (874dfb35)
+
+### Changed
+
+- **locks**: extract lock pattern to shared utility (9ae0234e)
+
+### Fixed
+
+- **generation**: stage 3 now runs for deduplicated documents (5a98a616)
+- **web**: use vector_status for document processing status (513996b9)
+- **stage2**: enhance filePath validation for empty strings (37df4e54)
+- **stage2**: add filePath validation before document processing (07700f6b)
+- **stage6**: sync generation_progress.steps[] on completion (ccb72221)
+- **locks**: remove double releaseLock in Stage 4 and Stage 5 handlers (283c3d5c)
+- **nginx**: add rewrite for /api/trpc to /trpc (99a3baa0)
+
+### Other
+
+- update docs (7c88dbd4)
+- bd sync: 2026-01-23 22:16:16 (b5007724)
+- bd sync: 2026-01-23 21:54:35 (3e1c1be6)
+- bd sync: 2026-01-23 21:54:09 (54def15c)
+- bd sync: 2026-01-23 21:50:10 (183713ff)
+- bd sync: 2026-01-23 21:49:10 (605feff6)
+- bd sync: 2026-01-23 21:46:54 (e5633e2d)
+- bd sync: 2026-01-23 21:43:10 (b325400f)
+- add code review report for session fixes (d1406535)
+- bd sync: 2026-01-23 21:28:07 (d4d30af0)
+- bd sync: 2026-01-23 21:26:40 (e230c5e2)
+- **stage3**: add unit tests for single document optimization (d4450842)
+- add product discovery answers (ru) (7791a6a5)
+- merge develop into master (3e453a60)
+
 ## [0.28.32] - 2026-01-23
 
 ### Other
