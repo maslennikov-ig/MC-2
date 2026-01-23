@@ -30,7 +30,24 @@ interface CourseVisualsManagerProps {
 
 type GenerationType = 'covers' | 'cards'
 
-const BACKEND_URL = process.env.NEXT_PUBLIC_COURSEGEN_BACKEND_URL || 'http://localhost:3456'
+// Backend URL for tRPC calls (client-side)
+// In production: uses '/api' (nginx proxies /api/trpc to API server)
+// In development: uses env var or localhost:3456
+const BACKEND_URL = (() => {
+  // 1. If NEXT_PUBLIC_* is set → use it (CI/CD sets at build time)
+  const url = process.env.NEXT_PUBLIC_COURSEGEN_BACKEND_URL
+  if (url) return url // → '/api' for production builds
+
+  // 2. Fallback: runtime detection by hostname
+  if (typeof window !== 'undefined') {
+    const isProduction =
+      window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1'
+    if (isProduction) return '/api' // Relative URL - nginx proxies /api/trpc to API
+  }
+
+  // 3. Development fallback
+  return 'http://localhost:3456'
+})()
 
 /**
  * CourseVisualsManager

@@ -8,6 +8,31 @@
 | Dev         | https://dev.ai.megacampus.ru | develop | Rolling         |
 | Production  | TBD                          | TBD     | Blue/Green      |
 
+## Environment Variables
+
+### Client-Side Variables (NEXT*PUBLIC*\*)
+
+Variables prefixed with `NEXT_PUBLIC_` are embedded into the JavaScript bundle at **build time**.
+
+**Important**: Changing these variables requires rebuilding the Docker image.
+
+| Variable                            | Description                | Default         |
+| ----------------------------------- | -------------------------- | --------------- |
+| `NEXT_PUBLIC_SUPABASE_URL`          | Supabase project URL       | Required        |
+| `NEXT_PUBLIC_SUPABASE_ANON_KEY`     | Supabase anon key          | Required        |
+| `NEXT_PUBLIC_COURSEGEN_BACKEND_URL` | API backend URL for client | Auto-detected\* |
+
+\*Auto-detection: In production (non-localhost), uses relative URL `/api` which nginx proxies to API.
+
+### Server-Side Variables
+
+These are read at runtime and can be changed without rebuilding:
+
+| Variable                    | Description                    | Default           |
+| --------------------------- | ------------------------------ | ----------------- |
+| `COURSEGEN_BACKEND_URL`     | API URL for server-side calls  | `http://api:4000` |
+| `SUPABASE_SERVICE_ROLE_KEY` | Service role key (server only) | Required          |
+
 ## Blue/Green Deployment
 
 Zero-downtime deployment using nginx port switching.
