@@ -311,6 +311,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.28.32] - 2026-01-23
+
+### Other
+
+- add system configuration analysis 2026 report (5cbec50d)
+
 ## [0.28.31] - 2026-01-23
 
 ### Fixed
