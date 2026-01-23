@@ -311,6 +311,71 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.28.28] - 2026-01-23
+
+### Security
+
+- fix critical vulnerabilities in local-storage-service (56f6691e)
+
+### Added
+
+- **web**: smooth image loading with skeleton placeholders (6df01294)
+- **enrichments**: fix cover/banner generation UX - show variant selection at draft_ready (99eb6800)
+- **web**: improve EnrichmentGeneratingCard with shimmer and rotating messages (91ba5b8c)
+- add asymptotic crawl to useSmoothProgress hook (688a8934)
+- add Next.js rewrite for local enrichments proxy (dc9e46f9)
+- **storage**: add unified storage service with auto-backend switching (7c4da690)
+- **scripts**: enhance migration script with safety features (17d1bae3)
+- **storage**: migrate enrichment images from Supabase to local storage (19fba129)
+
+### Changed
+
+- **cover**: remove two-stage dead code from CoverPreview (9fdd9cd9)
+- **enrichments**: simplify cover/banner to single-stage generation (8db572cc)
+- improve enrichment handlers and add nginx rate limiting (a5a9651b)
+
+### Fixed
+
+- **enrichments**: remove dead approveCoverDraft code (981976e0)
+- **web**: resolve CSP error for enrichment generation in production (dbfc4934)
+- move nginx configs to deploy/nginx as single source of truth (ecd696db)
+- **db**: remove unused tables and fix performance warnings (93cccce3)
+- **enrichment**: reuse cancelled/failed enrichments for regeneration (e60d2ddc)
+- **enrichment**: allow cancelling draft_ready enrichments and fix resume race condition (d73bea67)
+- **db**: complete Supabase security and performance optimizations (c4b5dde9)
+- **web**: replace missing /api/auth/me endpoint with useAuth hook (469aea87)
+- **db**: apply Supabase performance and security optimizations (389e7f2e)
+- security vulnerabilities and code cleanup (mc2-wisp-157) (b9553cd6)
+
+### Other
+
+- bd sync: 2026-01-23 13:57:06 (a7067856)
+- bd sync: 2026-01-23 13:45:03 (760b57ad)
+- bd sync: 2026-01-23 12:50:42 (7775492e)
+- update deployment guide with nginx single source of truth (07568863)
+- bd sync: 2026-01-23 12:47:20 (b0ef627e)
+- merge develop into master (b4c32ce8)
+- bd sync: 2026-01-23 12:11:13 (4b02c872)
+- bd sync: 2026-01-23 12:10:38 (1b416160)
+- bd sync: 2026-01-23 12:08:44 (70de28bc)
+- bd sync: 2026-01-23 12:03:38 (7eee8b9c)
+- **database**: comprehensive code review of 2026-01-23 migrations (ead781d0)
+- bd sync: 2026-01-23 12:03:03 (9e1df107)
+- bd sync: 2026-01-23 11:57:28 (d2fc8216)
+- bd sync: 2026-01-23 11:53:55 (ff0c3c53)
+- bd sync: 2026-01-23 11:52:47 (6856cd6c)
+- bd sync: 2026-01-23 11:41:37 (6078e650)
+- bd sync: 2026-01-23 11:34:22 (092d01e4)
+- bd sync: 2026-01-23 11:16:11 (ca0b0a64)
+- bd sync: 2026-01-23 11:15:44 (0b1811e7)
+- bd sync: 2026-01-23 10:59:28 (0b9e1ca8)
+- bd sync: 2026-01-23 10:58:12 (ba266705)
+- merge develop into master (3c38aaed)
+- bd sync: 2026-01-22 21:09:12 (a4054d5f)
+- bd sync: 2026-01-22 21:08:26 (719a92be)
+- bd sync: 2026-01-22 20:48:24 (42405720)
+- bd sync: 2026-01-22 20:41:50 (ae42a5db)
+
 ## [0.28.27] - 2026-01-22
 
 ### Added
