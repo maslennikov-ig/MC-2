@@ -23,7 +23,7 @@ import { getCourseSizePreset, type CourseSize } from '@megacampus/shared-types';
 import logger from '../../shared/logger';
 import { getSupabaseAdmin } from '../../shared/supabase/admin';
 import { runAnalysisOrchestration } from './orchestrator';
-import { generationLockService } from '@/shared/locks';
+import { acquireGenerationLock } from '@/shared/locks';
 import { generateVisualStyle } from './utils/visual-style-generator';
 import { handleStageCompletion } from '../../shared/auto-approval';
 import { notifyStageComplete, notifyCourseError } from '../../shared/notifications';
@@ -206,32 +206,12 @@ class Stage4AnalysisHandler {
     // Check if generation is paused before starting work
     await checkPauseAndDelay(job, course_id, token);
 
-    // Acquire generation lock (FR-037: Prevent concurrent generation)
-    const lockId = `stage-4-${job.id || Date.now()}`;
-    const lockResult = await generationLockService.acquireLock(course_id, lockId);
-    if (!lockResult.acquired) {
-      logger.warn(
-        { courseId: course_id, reason: lockResult.reason },
-        'Failed to acquire generation lock'
-      );
-      throw new Error(`Course ${course_id} is already being processed: ${lockResult.reason}`);
-    }
-
-    // Set up heartbeat to extend lock every 2 minutes
-    const heartbeatInterval = setInterval(() => {
-      void (async () => {
-        try {
-          const extended = await generationLockService.extendLock(course_id, lockId);
-          if (!extended) {
-            logger.warn({ courseId: course_id, lockId }, 'Heartbeat: lock extension failed');
-          } else {
-            logger.debug({ courseId: course_id, lockId }, 'Heartbeat: lock extended');
-          }
-        } catch (err) {
-          logger.error({ courseId: course_id, lockId, error: err }, 'Heartbeat error');
-        }
-      })();
-    }, 120000); // Every 2 minutes
+    // Acquire generation lock with heartbeat (FR-037: Prevent concurrent generation)
+    const lockGuard = await acquireGenerationLock(
+      course_id,
+      `stage-4-${job.id || Date.now()}`,
+      logger
+    );
 
     try {
       // Layer 3: Worker validation and fallback initialization for Stage 4
@@ -694,7 +674,7 @@ class Stage4AnalysisHandler {
         );
 
         // Clear heartbeat - lock will be released in finally block
-        clearInterval(heartbeatInterval);
+        clearInterval(lockGuard.heartbeatInterval);
 
         // Handle stage completion separately (auto-approve if automatic mode)
         try {
@@ -889,9 +869,8 @@ class Stage4AnalysisHandler {
         throw error;
       }
     } finally {
-      clearInterval(heartbeatInterval); // Clear heartbeat
       // Release generation lock (FR-037: always release in finally)
-      await generationLockService.releaseLock(course_id, lockId);
+      await lockGuard.release();
     }
   }
 }
