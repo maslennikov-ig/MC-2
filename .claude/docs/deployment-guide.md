@@ -172,6 +172,40 @@ curl -f http://localhost:4001/health
 curl -f http://localhost:4002/health
 ```
 
+## Dev Environment (dev.ai.megacampus.ru)
+
+Dev environment runs alongside staging on the same server with isolated resources.
+
+### Key Differences from Staging
+
+| Resource      | Staging                             | Dev                     |
+| ------------- | ----------------------------------- | ----------------------- |
+| Uploads dir   | `./data/uploads`                    | `./data/uploads-dev`    |
+| BullMQ queues | `course-generation`                 | `course-generation-dev` |
+| Ports         | 3001/4001 (blue), 3002/4002 (green) | 3010/4010               |
+
+### Shared Infrastructure Requirements
+
+**IMPORTANT:** `docling-mcp-internal` in `docker-compose.infra.yml` must mount BOTH directories:
+
+```yaml
+volumes:
+  - ./data/uploads:/app/uploads:ro
+  - ./data/uploads-dev:/app/uploads-dev:ro # Required for dev!
+```
+
+Without `uploads-dev` mount, document processing fails with "File not found" errors.
+
+### Deploying Dev Changes
+
+```bash
+# Dev auto-deploys on push to develop
+git push  # → dev.ai.megacampus.ru
+
+# Manual restart if needed
+ssh megacampus-prod "cd /opt/megacampus && docker compose -f docker-compose.dev.yml up -d"
+```
+
 ## Nginx Configuration
 
 **Single Source of Truth**: `deploy/nginx/`
