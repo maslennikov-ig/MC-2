@@ -5,310 +5,6 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
-## [0.26.84] - 2026-01-13
-
-### Fixed
-
-- **web**: remove excessive full-page loaders from fast pages (7464e9d)
-- **db**: allow both lesson cards and course cards on same lesson (6c301f8)
-- **web**: prevent Select/RadioGroup controlled/uncontrolled switching (53075f3)
-- **security**: restrict RLS INSERT policies for users and service tables (670f4bf)
-
-### Other
-
-- **beads**: close mc2-kfa (Leaked Password Protection requires Pro Plan) (b45a9b3)
-- **scripts**: add trigger-stage5.ts for E2E testing (6832415)
-
-## [0.26.82] - 2026-01-11
-
-### Added
-
-- add 1 command(s), update scripts, +1 more (ad3da96)
-- batch improvements - graceful shutdown, source docs UI, RAG docs (552846e)
-- **embeddings**: implement token-aware batching for Jina API (fb505ed)
-- **stage6**: enable priority boosting and save source_documents attribution (74ef973)
-- **rag**: implement priority-based retrieval and Stage 3 deprecation (3f09f84)
-- **stage6**: add RAG relevance validation to generator prompt (81bc18c)
-- **stage7**: add 19-language support for image alt text (a5c3561)
-- **i18n**: add full 19-language support for lesson content labels (2a81903)
-- **stage6**: add reviewInfo for UI warnings and fix Mermaid parsing (e9aeda8)
-- **skills**: add improvements support to code-review-inline v1.1.0 (ecff0f3)
-- **skills**: add code-review-inline skill with Beads integration (3980b90)
-- **beads**: integrate Beads workflow into all health check skills (16af043)
-
-### Fixed
-
-- code review improvements - race conditions, validation, memory leaks (2ee43d6)
-- **rag**: address code review findings for priority-based retrieval (eab7985)
-- **stage6**: resolve ESM module resolution conflict for generator import (94510a7)
-- **queue**: clean up orphaned jobs with missing data during course deletion (3c1be32)
-- **queue**: handle undefined jobs in removeJobsByCourseId (bc4d6bf)
-- **cleanup**: add orphaned Redis data cleanup to course deletion (c527a68)
-- **queue**: include prioritized queue in removeJobsByCourseId cleanup (4f01211)
-- add BullMQ job cleanup to course deletion and fix local dev fetch timeout (133d909)
-- **stage6**: resolve multiple production issues in lesson generation (133ce29)
-- **stage6**: add 19-language support to markdown parser (56e7205)
-- **stage6**: use getContentLabels for section-regenerator titles (26a1eb9)
-- **stage6**: localize section headers and exercise labels for Russian (a442d99)
-- **stage6**: resolve exercises parsing, factual verification, and sec_global issues (e25d2f4)
-- **stage6**: resolve multiple production issues in lesson generation (3ad1ae4)
-
-### Other
-
-- bd sync: 2026-01-11 12:54:17 (cbf7d47)
-- bd daemon export: 2026-01-11 12:23:02 (1c4002b)
-- bd daemon export: 2026-01-11 12:21:53 (e585d0c)
-- bd daemon export: 2026-01-11 12:14:10 (3c1e175)
-- bd daemon export: 2026-01-11 12:10:08 (b67dd76)
-- bd daemon export: 2026-01-11 12:10:06 (8dd2180)
-- bd daemon export: 2026-01-11 12:09:28 (b561032)
-- bd daemon export: 2026-01-11 12:07:11 (15beb0c)
-- bd daemon export: 2026-01-11 12:05:53 (f461b60)
-- bd daemon export: 2026-01-11 12:05:51 (3274a7f)
-- bd daemon export: 2026-01-11 12:05:49 (7707848)
-- bd daemon export: 2026-01-11 12:05:48 (c32a54a)
-- bd daemon export: 2026-01-11 12:05:47 (fc7c89a)
-- bd sync: 2026-01-11 12:02:18 (df856c9)
-- bd daemon export: 2026-01-11 11:59:54 (eb3fcef)
-- bd daemon export: 2026-01-11 11:59:36 (35b19cb)
-- bd daemon export: 2026-01-11 11:59:27 (b80ecd6)
-- bd daemon export: 2026-01-11 11:59:13 (66467b5)
-- bd daemon export: 2026-01-11 11:59:05 (12e669f)
-- **i18n**: update Stage 3 description to reflect optional nature (300a7be)
-- bd daemon export: 2026-01-11 11:56:42 (0a82a4b)
-- bd daemon export: 2026-01-11 11:56:18 (1ee5729)
-- bd daemon export: 2026-01-11 11:54:56 (5630859)
-- bd daemon export: 2026-01-11 11:54:54 (39f1934)
-- bd daemon export: 2026-01-11 11:54:53 (2d9f3ae)
-- bd daemon export: 2026-01-11 11:51:45 (4c62463)
-- bd daemon export: 2026-01-11 11:47:02 (d0bae8a)
-- bd daemon export: 2026-01-11 11:45:31 (4e6e856)
-- bd daemon export: 2026-01-11 11:45:22 (bb89601)
-- bd daemon export: 2026-01-11 11:45:21 (4ad4641)
-- bd daemon export: 2026-01-11 11:45:20 (9c09d8c)
-- bd daemon export: 2026-01-11 11:45:18 (1c72811)
-- bd daemon export: 2026-01-11 11:45:17 (b28d5e2)
-- bd daemon export: 2026-01-11 11:45:16 (1c82f4e)
-- bd daemon export: 2026-01-11 11:37:43 (9104c21)
-- bd daemon export: 2026-01-11 11:37:17 (eae08a7)
-- bd daemon export: 2026-01-11 11:37:07 (9b47c4e)
-- bd daemon export: 2026-01-11 11:36:56 (7fa364e)
-- bd daemon export: 2026-01-11 11:36:54 (a33dcdd)
-- bd daemon export: 2026-01-11 11:24:01 (6347dd0)
-- bd daemon export: 2026-01-11 11:14:55 (48b69f6)
-- **beads**: enhance integration and add RAG refactoring task (7ea817b)
-- bd sync: 2026-01-11 10:58:36 (cb8d788)
-- **beads**: add Health Check Workflows section to quickstart (4e3bee2)
-
-## [0.26.81] - 2026-01-08
-
-### Added
-
-- **course-gen-platform**: add 14 source file(s), update 18 source file(s), +5 more (908aec2)
-
-### Other
-
-- bd sync: 2026-01-08 16:37:48 (e123ce3)
-- **video-pipeline**: complete research phase, add avatar decision (5f14e8a)
-
-## [0.26.79] - 2026-01-07
-
-### Added
-
-- **web**: add 1 source file(s), update 5 source file(s) (2ffe537)
-
-## [0.26.78] - 2026-01-07
-
-### Fixed
-
-- **web**: update 1 source file(s) (9f733b8)
-
-## [0.26.77] - 2026-01-07
-
-### Fixed
-
-- **web**: update 2 source file(s) (2622bf0)
-
-## [0.26.76] - 2026-01-06
-
-### Fixed
-
-- **course-gen-platform**: update 5 source file(s), update 2 test(s), +2 more (76f8d11)
-
-## [0.26.73] - 2026-01-06
-
-### Fixed
-
-- **web**: filter progress summary by current node to preserve details without duplication (8955baf)
-
-## [0.26.72] - 2026-01-06
-
-### Fixed
-
-- **web**: remove duplicate self-review display in quality assessment (73f7493)
-
-## [0.26.69] - 2026-01-06
-
-### Fixed
-
-- **course-gen-platform**: update 1 source file(s) (ec89219)
-
-## [0.26.68] - 2026-01-06
-
-### Added
-
-- **web**: add 1 source file(s), update 4 source file(s), +1 more (ad3a71b)
-
-## [0.26.67] - 2026-01-06
-
-### Added
-
-- **web**: add 4 source file(s), update 41 source file(s), +3 more (d80723a)
-
-## [0.26.66] - 2026-01-05
-
-### Fixed
-
-- **course-gen-platform**: update 7 source file(s), cleanup 2 file(s) (0e43ce6)
-- **ci**: use pnpm store cache instead of artifacts, fix rollback --pull flag (bcd99ac)
-
-## [0.26.65] - 2026-01-05
-
-### Other
-
-- update project files (04ba405)
-
-## [0.26.62] - 2026-01-05
-
-### Fixed
-
-- **web**: update 2 source file(s) (300914d)
-
-## [0.26.60] - 2026-01-04
-
-### Fixed
-
-- **web**: prevent hydration error by not removing initial-loader from DOM (a1cc5b5)
-
-## [0.26.59] - 2026-01-04
-
-### Fixed
-
-- **web**: unify theme management with hydration-safe useThemeSync hook (6f3d1c8)
-
-## [0.26.57] - 2026-01-04
-
-### Fixed
-
-- **nginx**: add no-cache headers to prevent stale HTML errors (921faeb)
-
-## [0.26.56] - 2026-01-04
-
-### Fixed
-
-- **web**: add smart cache invalidator on version change (e2dcaf4)
-
-## [0.26.55] - 2026-01-04
-
-### Fixed
-
-- **web**: remove obsolete KillSwitch script (PWA disabled) (b4d126d)
-
-## [0.26.53] - 2026-01-04
-
-### Fixed
-
-- **web**: update 1 source file(s) (84d9edb)
-
-## [0.26.52] - 2026-01-04
-
-### Added
-
-- **web**: add 24 source file(s), update 4 source file(s) (60b2610)
-
-### Fixed
-
-- **api**: use Redis-based readiness check for cross-process sync (bda855c)
-- **generation-ui**: show Stage 1 as completed when awaiting launch (d30a3dd)
-- **worker-readiness**: add Redis sync for cross-process readiness status (4c98de3)
-
-## [0.26.51] - 2026-01-04
-
-### Fixed
-
-- **course-gen-platform**: update 5 source file(s), add 1 test(s), +1 more (d64a5e2)
-
-## [0.26.47] - 2026-01-03
-
-### Fixed
-
-- **stage7**: fix two-stage cover flow and delete extension mapping (13e84a3)
-
-## [0.26.46] - 2026-01-03
-
-### Fixed
-
-- **stage7**: add image_config for proper aspect ratio and resolution (f7e98d2)
-
-## [0.26.45] - 2026-01-01
-
-### Added
-
-- **web**: add 5 source file(s), update 19 source file(s) (455a30b)
-- **stage7**: add cover preview and delete button for enrichments (764d0ec)
-- **docker**: add Stage 7 enrichment worker to production compose (5e2541a)
-
-### Fixed
-
-- **stage7**: use unoptimized images for cover preview (f86769a)
-- **nginx**: increase proxy buffers to fix 502 errors (e209173)
-- **stage7**: handle OpenRouter chat completion image format (df9779c)
-- **stage7**: handle different OpenRouter image response formats (89347a5)
-
-### Other
-
-- **release**: v0.26.45 (0fc6d7f)
-
-## [0.26.36] - 2025-12-28
-
-### Added
-
-- add 4 skill(s), add 1 command(s), +4 more (2372fca)
-
-## [0.26.30] - 2025-12-26
-
-### Other
-
-- update scripts (f3a19f5)
-
-## [0.26.10] - 2025-12-21
-
-### Other
-
-- update documentation (fbdf974)
-
-## [0.26.2] - 2025-12-15
-
-### Added
-
-- **agents**: add 2 new agents (deployment-engineer, docling-devops)
-
-### Fixed
-
-- **mcp-client**: fix reconnection for 'Not connected' errors in Docling client
-- **worker**: increase retry count and delay for MCP connection stability
-
-## [0.22.43] - 2025-12-09
-
-### Added
-
-- **web**: implement Stage 6 "Glass Factory" UI for lesson generation (a064a83)
-
-### Fixed
-
-- **stage6-ui**: query lesson_contents via sections/lessons tables (ab57b46)
-- **stage6-ui**: resolve module data loading and lesson double-click (a879d49)
-
 ## [Unreleased]
 
 ## [0.28.36] - 2026-01-24
@@ -1670,6 +1366,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - bd sync: 2026-01-13 12:03:19 (8ccec0f)
 - bd sync: 2026-01-13 11:48:44 (aa89ab5)
 
+## [0.26.84] - 2026-01-13
+
+### Fixed
+
+- **web**: remove excessive full-page loaders from fast pages (7464e9d)
+- **db**: allow both lesson cards and course cards on same lesson (6c301f8)
+- **web**: prevent Select/RadioGroup controlled/uncontrolled switching (53075f3)
+- **security**: restrict RLS INSERT policies for users and service tables (670f4bf)
+
+### Other
+
+- **beads**: close mc2-kfa (Leaked Password Protection requires Pro Plan) (b45a9b3)
+- **scripts**: add trigger-stage5.ts for E2E testing (6832415)
+
 ## [0.26.83] - 2026-01-12
 
 ### Added
@@ -1739,11 +1449,127 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - beads config.yaml with new features (329ef77)
 - merge develop into master (78596c3)
 
+## [0.26.82] - 2026-01-11
+
+### Added
+
+- add 1 command(s), update scripts, +1 more (ad3da96)
+- batch improvements - graceful shutdown, source docs UI, RAG docs (552846e)
+- **embeddings**: implement token-aware batching for Jina API (fb505ed)
+- **stage6**: enable priority boosting and save source_documents attribution (74ef973)
+- **rag**: implement priority-based retrieval and Stage 3 deprecation (3f09f84)
+- **stage6**: add RAG relevance validation to generator prompt (81bc18c)
+- **stage7**: add 19-language support for image alt text (a5c3561)
+- **i18n**: add full 19-language support for lesson content labels (2a81903)
+- **stage6**: add reviewInfo for UI warnings and fix Mermaid parsing (e9aeda8)
+- **skills**: add improvements support to code-review-inline v1.1.0 (ecff0f3)
+- **skills**: add code-review-inline skill with Beads integration (3980b90)
+- **beads**: integrate Beads workflow into all health check skills (16af043)
+
+### Fixed
+
+- code review improvements - race conditions, validation, memory leaks (2ee43d6)
+- **rag**: address code review findings for priority-based retrieval (eab7985)
+- **stage6**: resolve ESM module resolution conflict for generator import (94510a7)
+- **queue**: clean up orphaned jobs with missing data during course deletion (3c1be32)
+- **queue**: handle undefined jobs in removeJobsByCourseId (bc4d6bf)
+- **cleanup**: add orphaned Redis data cleanup to course deletion (c527a68)
+- **queue**: include prioritized queue in removeJobsByCourseId cleanup (4f01211)
+- add BullMQ job cleanup to course deletion and fix local dev fetch timeout (133d909)
+- **stage6**: resolve multiple production issues in lesson generation (133ce29)
+- **stage6**: add 19-language support to markdown parser (56e7205)
+- **stage6**: use getContentLabels for section-regenerator titles (26a1eb9)
+- **stage6**: localize section headers and exercise labels for Russian (a442d99)
+- **stage6**: resolve exercises parsing, factual verification, and sec_global issues (e25d2f4)
+- **stage6**: resolve multiple production issues in lesson generation (3ad1ae4)
+
+### Other
+
+- bd sync: 2026-01-11 12:54:17 (cbf7d47)
+- bd daemon export: 2026-01-11 12:23:02 (1c4002b)
+- bd daemon export: 2026-01-11 12:21:53 (e585d0c)
+- bd daemon export: 2026-01-11 12:14:10 (3c1e175)
+- bd daemon export: 2026-01-11 12:10:08 (b67dd76)
+- bd daemon export: 2026-01-11 12:10:06 (8dd2180)
+- bd daemon export: 2026-01-11 12:09:28 (b561032)
+- bd daemon export: 2026-01-11 12:07:11 (15beb0c)
+- bd daemon export: 2026-01-11 12:05:53 (f461b60)
+- bd daemon export: 2026-01-11 12:05:51 (3274a7f)
+- bd daemon export: 2026-01-11 12:05:49 (7707848)
+- bd daemon export: 2026-01-11 12:05:48 (c32a54a)
+- bd daemon export: 2026-01-11 12:05:47 (fc7c89a)
+- bd sync: 2026-01-11 12:02:18 (df856c9)
+- bd daemon export: 2026-01-11 11:59:54 (eb3fcef)
+- bd daemon export: 2026-01-11 11:59:36 (35b19cb)
+- bd daemon export: 2026-01-11 11:59:27 (b80ecd6)
+- bd daemon export: 2026-01-11 11:59:13 (66467b5)
+- bd daemon export: 2026-01-11 11:59:05 (12e669f)
+- **i18n**: update Stage 3 description to reflect optional nature (300a7be)
+- bd daemon export: 2026-01-11 11:56:42 (0a82a4b)
+- bd daemon export: 2026-01-11 11:56:18 (1ee5729)
+- bd daemon export: 2026-01-11 11:54:56 (5630859)
+- bd daemon export: 2026-01-11 11:54:54 (39f1934)
+- bd daemon export: 2026-01-11 11:54:53 (2d9f3ae)
+- bd daemon export: 2026-01-11 11:51:45 (4c62463)
+- bd daemon export: 2026-01-11 11:47:02 (d0bae8a)
+- bd daemon export: 2026-01-11 11:45:31 (4e6e856)
+- bd daemon export: 2026-01-11 11:45:22 (bb89601)
+- bd daemon export: 2026-01-11 11:45:21 (4ad4641)
+- bd daemon export: 2026-01-11 11:45:20 (9c09d8c)
+- bd daemon export: 2026-01-11 11:45:18 (1c72811)
+- bd daemon export: 2026-01-11 11:45:17 (b28d5e2)
+- bd daemon export: 2026-01-11 11:45:16 (1c82f4e)
+- bd daemon export: 2026-01-11 11:37:43 (9104c21)
+- bd daemon export: 2026-01-11 11:37:17 (eae08a7)
+- bd daemon export: 2026-01-11 11:37:07 (9b47c4e)
+- bd daemon export: 2026-01-11 11:36:56 (7fa364e)
+- bd daemon export: 2026-01-11 11:36:54 (a33dcdd)
+- bd daemon export: 2026-01-11 11:24:01 (6347dd0)
+- bd daemon export: 2026-01-11 11:14:55 (48b69f6)
+- **beads**: enhance integration and add RAG refactoring task (7ea817b)
+- bd sync: 2026-01-11 10:58:36 (cb8d788)
+- **beads**: add Health Check Workflows section to quickstart (4e3bee2)
+
+## [0.26.81] - 2026-01-08
+
+### Added
+
+- **course-gen-platform**: add 14 source file(s), update 18 source file(s), +5 more (908aec2)
+
+### Other
+
+- bd sync: 2026-01-08 16:37:48 (e123ce3)
+- **video-pipeline**: complete research phase, add avatar decision (5f14e8a)
+
 ## [0.26.80] - 2026-01-08
 
 ### Fixed
 
 - **course-gen-platform**: update 28 source file(s), update docs (076aeea)
+
+## [0.26.79] - 2026-01-07
+
+### Added
+
+- **web**: add 1 source file(s), update 5 source file(s) (2ffe537)
+
+## [0.26.78] - 2026-01-07
+
+### Fixed
+
+- **web**: update 1 source file(s) (9f733b8)
+
+## [0.26.77] - 2026-01-07
+
+### Fixed
+
+- **web**: update 2 source file(s) (2622bf0)
+
+## [0.26.76] - 2026-01-06
+
+### Fixed
+
+- **course-gen-platform**: update 5 source file(s), update 2 test(s), +2 more (76f8d11)
 
 ## [0.26.75] - 2026-01-06
 
@@ -1761,6 +1587,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **web**: add 5 source file(s), update 4 source file(s), +1 more (7592229)
 
+## [0.26.73] - 2026-01-06
+
+### Fixed
+
+- **web**: filter progress summary by current node to preserve details without duplication (8955baf)
+
+## [0.26.72] - 2026-01-06
+
+### Fixed
+
+- **web**: remove duplicate self-review display in quality assessment (73f7493)
+
 ## [0.26.71] - 2026-01-06
 
 ### Fixed
@@ -1772,6 +1610,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **web**: add 1 source file(s), update 8 source file(s) (fe95a64)
+
+## [0.26.69] - 2026-01-06
+
+### Fixed
+
+- **course-gen-platform**: update 1 source file(s) (ec89219)
+
+## [0.26.68] - 2026-01-06
+
+### Added
+
+- **web**: add 1 source file(s), update 4 source file(s), +1 more (ad3a71b)
+
+## [0.26.67] - 2026-01-06
+
+### Added
+
+- **web**: add 4 source file(s), update 41 source file(s), +3 more (d80723a)
+
+## [0.26.66] - 2026-01-05
+
+### Fixed
+
+- **course-gen-platform**: update 7 source file(s), cleanup 2 file(s) (0e43ce6)
+- **ci**: use pnpm store cache instead of artifacts, fix rollback --pull flag (bcd99ac)
+
+## [0.26.65] - 2026-01-05
+
+### Other
+
+- update project files (04ba405)
 
 ## [0.26.64] - 2026-01-05
 
@@ -1789,6 +1658,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **course-gen-platform**: update 9 source file(s), add 1 test(s), +3 more (d8cb89c)
 
+## [0.26.62] - 2026-01-05
+
+### Fixed
+
+- **web**: update 2 source file(s) (300914d)
+
 ## [0.26.61] - 2026-01-04
 
 ### Changed
@@ -1799,17 +1674,71 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **web**: update 3 source file(s) (ed91e87)
 
+## [0.26.60] - 2026-01-04
+
+### Fixed
+
+- **web**: prevent hydration error by not removing initial-loader from DOM (a1cc5b5)
+
+## [0.26.59] - 2026-01-04
+
+### Fixed
+
+- **web**: unify theme management with hydration-safe useThemeSync hook (6f3d1c8)
+
 ## [0.26.58] - 2026-01-04
 
 ### Fixed
 
 - **web**: revert enableSystem to fix hydration errors (2ae6b19)
 
+## [0.26.57] - 2026-01-04
+
+### Fixed
+
+- **nginx**: add no-cache headers to prevent stale HTML errors (921faeb)
+
+## [0.26.56] - 2026-01-04
+
+### Fixed
+
+- **web**: add smart cache invalidator on version change (e2dcaf4)
+
+## [0.26.55] - 2026-01-04
+
+### Fixed
+
+- **web**: remove obsolete KillSwitch script (PWA disabled) (b4d126d)
+
 ## [0.26.54] - 2026-01-04
 
 ### Fixed
 
 - **web**: update 1 source file(s) (3994dee)
+
+## [0.26.53] - 2026-01-04
+
+### Fixed
+
+- **web**: update 1 source file(s) (84d9edb)
+
+## [0.26.52] - 2026-01-04
+
+### Added
+
+- **web**: add 24 source file(s), update 4 source file(s) (60b2610)
+
+### Fixed
+
+- **api**: use Redis-based readiness check for cross-process sync (bda855c)
+- **generation-ui**: show Stage 1 as completed when awaiting launch (d30a3dd)
+- **worker-readiness**: add Redis sync for cross-process readiness status (4c98de3)
+
+## [0.26.51] - 2026-01-04
+
+### Fixed
+
+- **course-gen-platform**: update 5 source file(s), add 1 test(s), +1 more (d64a5e2)
 
 ## [0.26.50] - 2026-01-04
 
@@ -1833,6 +1762,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - **stage7**: allow text in generated images (12f76e8)
+
+## [0.26.47] - 2026-01-03
+
+### Fixed
+
+- **stage7**: fix two-stage cover flow and delete extension mapping (13e84a3)
+
+## [0.26.46] - 2026-01-03
+
+### Fixed
+
+- **stage7**: add image_config for proper aspect ratio and resolution (f7e98d2)
+
+## [0.26.45] - 2026-01-01
+
+### Added
+
+- **web**: add 5 source file(s), update 19 source file(s) (455a30b)
+- **stage7**: add cover preview and delete button for enrichments (764d0ec)
+- **docker**: add Stage 7 enrichment worker to production compose (5e2541a)
+
+### Fixed
+
+- **stage7**: use unoptimized images for cover preview (f86769a)
+- **nginx**: increase proxy buffers to fix 502 errors (e209173)
+- **stage7**: handle OpenRouter chat completion image format (df9779c)
+- **stage7**: handle different OpenRouter image response formats (89347a5)
+
+### Other
+
+- **release**: v0.26.45 (0fc6d7f)
 
 ## [0.26.44] - 2025-12-31
 
@@ -1960,6 +1920,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **pwa**: remove JS/CSS from SW cache to prevent 502 after deploy (9d8c6c7)
 
+## [0.26.36] - 2025-12-28
+
+### Added
+
+- add 4 skill(s), add 1 command(s), +4 more (2372fca)
+
 ## [0.26.35] - 2025-12-28
 
 ### Fixed
@@ -1994,6 +1960,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Other
 
 - update project files (b28dca2)
+
+## [0.26.30] - 2025-12-26
+
+### Other
+
+- update scripts (f3a19f5)
 
 ## [0.26.29] - 2025-12-26
 
@@ -2117,6 +2089,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - update project files (83359c4)
 
+## [0.26.10] - 2025-12-21
+
+### Other
+
+- update documentation (fbdf974)
+
 ## [0.26.9] - 2025-12-20
 
 ### Added
@@ -2192,64 +2170,18 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [0.26.3] - 2025-12-15
 
-## [0.26.1] - 2025-12-15
-
-## [0.23.4] - 2025-12-14
-
-## [0.23.3] - 2025-12-14
-
-## [0.23.2] - 2025-12-14
+## [0.26.2] - 2025-12-15
 
 ### Added
 
-- add speckit commands for Cursor Agent:; (faa74b5)
-- **lms**: implement Phase 9 performance, fixtures, and documentation (T121-T132) (d4ab753)
-- **lms**: implement Phase 8 edge cases and error handling (T107-T120) (3ec6476)
-- **lms**: implement config CRUD operations (T097-T106) (aff2069)
-- **openedx**: implement status monitoring for LMS publish (T080-T083) (d4807a2)
-- **markdown**: add ServerRenderedMarkdown component (6a7899c)
-- **markdown**: add useServerRenderedMarkdown hook (80c8499)
-- **markdown**: add renderMarkdownAction Server Action (d7a883d)
-- **markdown**: add accessibility components (Phase 12) (ed88fb2)
-- **openedx**: implement course mapper and tRPC routes (T068-T077) (1430384)
-- **markdown**: add task list styling and verify extended markdown (Phase 11) (4592746)
-- **markdown**: add responsive table wrapper (Phase 10) (20149ea)
-- **markdown**: add heading anchors with copy-to-clipboard (Phase 9) (6ea0823)
-- **openedx**: implement adapter and LMS factory (T064-T067) (1fb6f76)
-- **web**: implement US6 - content notices and callouts (Phase 8) (bd537bb)
-- **openedx**: implement API client with OAuth2 auth (T057-T063) (fe0bf67)
-- **web**: implement US5 - real-time AI chat formatting (Phase 7) (d222369)
-- **web**: implement US4 - technical diagram support (Phase 6) (45f5837)
-- **web**: implement US3 - mathematical formula display (Phase 5) (23ce203)
-- **openedx**: implement OLX generator and packager (T053-T056a) (75a777e)
-- **web**: implement US2 - code block readability (Phase 4) (1fd7509)
-- **web**: implement US1 - consistent content experience (Phase 3) (4cc9fd7)
-- **openedx**: Phase 3 OLX Templates - implementation and tests (T036-T052) (dc6bc05)
-- **web**: implement core markdown renderers (Phase 2) (24b6f7e)
-- **openedx**: Complete Phase 2 Foundational - adapter, tests, logger (4deff15)
-- **web**: setup unified markdown rendering system (Phase 1) (5a620b0)
-- **openedx**: Phase 2 Foundational - database schema, types, and utilities (af60fad)
-- **openedx**: Phase 1 Setup - install dependencies and create directory structure (68e9aa9)
-- **openedx**: complete Phase 0 planning - create lms-integration-specialist agent (ceb69af)
-
-### Changed
-
-- **lms**: extract organization verification to shared helper (DRY) (8f5eeaf)
-- **generation-graph**: use ServerRenderedMarkdown in LessonContentView (d6c4bb5)
-- **generation-graph**: use ServerRenderedMarkdown in ContentPreviewPanel (bc64699)
-- **markdown**: migrate old components to unified renderer (Phase 13) (203ee41)
+- **agents**: add 2 new agents (deployment-engineer, docling-devops)
 
 ### Fixed
 
-- **lms**: resolve medium and low priority issues from code review (5154d4c)
-- **lms**: resolve critical and high priority issues from code review (602f7fa)
-- **a11y**: resolve all axe.test.ts accessibility violations (9ef8f93)
-- **a11y**: resolve accessibility violations found by axe-core (90ae32c)
-- **markdown**: revert ServerRenderedMarkdown due to Next.js limitations (d16188c)
-- **markdown**: address code review findings (69efc95)
-- **openedx**: address code review findings - type safety and validation (71c8939)
-- **markdown**: address code review findings (163fabf)
-- **openedx**: resolve TypeScript errors for LMS tables and routers (c0ee8c7)
+- **mcp-client**: fix reconnection for 'Not connected' errors in Docling client
+- **worker**: increase retry count and delay for MCP connection stability
+
+## [0.26.1] - 2025-12-15
 
 ## [0.25.0] - 2025-12-14
 
@@ -2337,6 +2269,63 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **openedx**: address code review findings - type safety and validation (71c8939)
 - **openedx**: resolve TypeScript errors for LMS tables and routers (c0ee8c7)
 
+## [0.23.4] - 2025-12-14
+
+## [0.23.3] - 2025-12-14
+
+## [0.23.2] - 2025-12-14
+
+### Added
+
+- add speckit commands for Cursor Agent:; (faa74b5)
+- **lms**: implement Phase 9 performance, fixtures, and documentation (T121-T132) (d4ab753)
+- **lms**: implement Phase 8 edge cases and error handling (T107-T120) (3ec6476)
+- **lms**: implement config CRUD operations (T097-T106) (aff2069)
+- **openedx**: implement status monitoring for LMS publish (T080-T083) (d4807a2)
+- **markdown**: add ServerRenderedMarkdown component (6a7899c)
+- **markdown**: add useServerRenderedMarkdown hook (80c8499)
+- **markdown**: add renderMarkdownAction Server Action (d7a883d)
+- **markdown**: add accessibility components (Phase 12) (ed88fb2)
+- **openedx**: implement course mapper and tRPC routes (T068-T077) (1430384)
+- **markdown**: add task list styling and verify extended markdown (Phase 11) (4592746)
+- **markdown**: add responsive table wrapper (Phase 10) (20149ea)
+- **markdown**: add heading anchors with copy-to-clipboard (Phase 9) (6ea0823)
+- **openedx**: implement adapter and LMS factory (T064-T067) (1fb6f76)
+- **web**: implement US6 - content notices and callouts (Phase 8) (bd537bb)
+- **openedx**: implement API client with OAuth2 auth (T057-T063) (fe0bf67)
+- **web**: implement US5 - real-time AI chat formatting (Phase 7) (d222369)
+- **web**: implement US4 - technical diagram support (Phase 6) (45f5837)
+- **web**: implement US3 - mathematical formula display (Phase 5) (23ce203)
+- **openedx**: implement OLX generator and packager (T053-T056a) (75a777e)
+- **web**: implement US2 - code block readability (Phase 4) (1fd7509)
+- **web**: implement US1 - consistent content experience (Phase 3) (4cc9fd7)
+- **openedx**: Phase 3 OLX Templates - implementation and tests (T036-T052) (dc6bc05)
+- **web**: implement core markdown renderers (Phase 2) (24b6f7e)
+- **openedx**: Complete Phase 2 Foundational - adapter, tests, logger (4deff15)
+- **web**: setup unified markdown rendering system (Phase 1) (5a620b0)
+- **openedx**: Phase 2 Foundational - database schema, types, and utilities (af60fad)
+- **openedx**: Phase 1 Setup - install dependencies and create directory structure (68e9aa9)
+- **openedx**: complete Phase 0 planning - create lms-integration-specialist agent (ceb69af)
+
+### Changed
+
+- **lms**: extract organization verification to shared helper (DRY) (8f5eeaf)
+- **generation-graph**: use ServerRenderedMarkdown in LessonContentView (d6c4bb5)
+- **generation-graph**: use ServerRenderedMarkdown in ContentPreviewPanel (bc64699)
+- **markdown**: migrate old components to unified renderer (Phase 13) (203ee41)
+
+### Fixed
+
+- **lms**: resolve medium and low priority issues from code review (5154d4c)
+- **lms**: resolve critical and high priority issues from code review (602f7fa)
+- **a11y**: resolve all axe.test.ts accessibility violations (9ef8f93)
+- **a11y**: resolve accessibility violations found by axe-core (90ae32c)
+- **markdown**: revert ServerRenderedMarkdown due to Next.js limitations (d16188c)
+- **markdown**: address code review findings (69efc95)
+- **openedx**: address code review findings - type safety and validation (71c8939)
+- **markdown**: address code review findings (163fabf)
+- **openedx**: resolve TypeScript errors for LMS tables and routers (c0ee8c7)
+
 ## [0.22.47] - 2025-12-10
 
 ### Fixed
@@ -2355,6 +2344,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Added
 
 - **stage6-ui**: comprehensive LessonInspector improvements (97d8abf)
+
+## [0.22.43] - 2025-12-09
+
+### Added
+
+- **web**: implement Stage 6 "Glass Factory" UI for lesson generation (a064a83)
+
+### Fixed
+
+- **stage6-ui**: query lesson_contents via sections/lessons tables (ab57b46)
+- **stage6-ui**: resolve module data loading and lesson double-click (a879d49)
 
 ## [0.22.42] - 2025-12-09
 
@@ -2782,6 +2782,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **test**: restore JWT auth test fixtures and RLS organization isolation (e6f7d44)
 - parallel test failure fixes across unit, contract, and schema layers (7fdef35)
 
+## [0.18.1] - 2025-11-16
+
+## [0.18.0] - 2025-11-16
+
+### Added
+
+- **cleanup**: implement automated draft course cleanup system (1f3a43b)
+- **frontend**: remove difficulty selection and fix RLS recursion (1eb4d5e)
+
+### Changed
+
+- **worktree**: simplify file sync using rsync instead of config-based approach (0deb66a)
+
 ## [0.17.3] - 2025-11-16
 
 ## [0.17.2] - 2025-11-16
@@ -3087,18 +3100,43 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **spec-008**: complete Phase 2 Foundation (T001-T005) (c87f624)
 
-## [0.18.1] - 2025-11-16
+## [0.14.6] - 2025-11-04
 
-## [0.18.0] - 2025-11-16
+### Fixed
+
+- **tests**: resolve FK constraint violation in T055 E2E test (b68739c)
+
+## [0.14.5] - 2025-11-03
+
+### Fixed
+
+- **tests**: complete contract test suite - all 20/20 passing (40fd7f5)
+- **tests**: implement RPC-based auth user creation for test fixtures (bd68a09)
+
+## [0.14.4] - 2025-11-01
+
+### Fixed
+
+- **release**: add automatic version sync between package.json and git tags (0b4a0b1)
+
+## [0.14.3] - 2025-11-01
 
 ### Added
 
-- **cleanup**: implement automated draft course cleanup system (1f3a43b)
-- **frontend**: remove difficulty selection and fix RLS recursion (1eb4d5e)
+- **stage-4**: implement multi-phase analysis orchestration and API endpoints (T023-T025, T032-T033) (a03e374)
 
-### Changed
+## [0.14.0] - 2025-11-01
 
-- **worktree**: simplify file sync using rsync instead of config-based approach (0deb66a)
+### Added
+
+- **stage-4**: Add Phase 1-2 Foundation - Database schema and TypeScript types (e20f6e7)
+- **stage-3**: Phase 9 production readiness improvements + TypeScript fixes (4e58561)
+- **stage-3**: Add Phase 9 tasks for production readiness improvements (2e7b19e)
+
+### Fixed
+
+- **stage-3**: Eliminate infinite job loop with Named Processor Pattern (cb69b10)
+- **tests**: Fix E2E test fixture initialization (797353f)
 
 ## [0.13.1] - 2025-11-06
 
@@ -3146,44 +3184,6 @@ in 'generating_structure' state if job creation failed, requiring manual databas
 - Pattern: Matches existing generation.ts rollback implementations
 
 ---
-
-## [0.14.6] - 2025-11-04
-
-### Fixed
-
-- **tests**: resolve FK constraint violation in T055 E2E test (b68739c)
-
-## [0.14.5] - 2025-11-03
-
-### Fixed
-
-- **tests**: complete contract test suite - all 20/20 passing (40fd7f5)
-- **tests**: implement RPC-based auth user creation for test fixtures (bd68a09)
-
-## [0.14.4] - 2025-11-01
-
-### Fixed
-
-- **release**: add automatic version sync between package.json and git tags (0b4a0b1)
-
-## [0.14.3] - 2025-11-01
-
-### Added
-
-- **stage-4**: implement multi-phase analysis orchestration and API endpoints (T023-T025, T032-T033) (a03e374)
-
-## [0.14.0] - 2025-11-01
-
-### Added
-
-- **stage-4**: Add Phase 1-2 Foundation - Database schema and TypeScript types (e20f6e7)
-- **stage-3**: Phase 9 production readiness improvements + TypeScript fixes (4e58561)
-- **stage-3**: Add Phase 9 tasks for production readiness improvements (2e7b19e)
-
-### Fixed
-
-- **stage-3**: Eliminate infinite job loop with Named Processor Pattern (cb69b10)
-- **tests**: Fix E2E test fixture initialization (797353f)
 
 ## [0.13.1] - 2025-10-29
 
