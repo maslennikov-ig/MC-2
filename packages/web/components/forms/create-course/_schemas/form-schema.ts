@@ -5,7 +5,7 @@ export const formSchema = z
   .object({
     topic: z.string().min(3, 'Тема должна содержать минимум 3 символа').max(200),
     email: z.string().email('Введите корректный email'),
-    description: z.string().optional(),
+    description: z.string().max(5000, 'Описание должно быть менее 5000 символов').optional(),
     writingStyle: z
       .enum([
         'academic',
@@ -56,17 +56,18 @@ export const formSchema = z
     targetAudience: z.string().optional(),
     // Minimum values based on course size presets:
     // - micro: 1-5 lessons, 1 section
-    // - comprehensive: up to 100 lessons, 30 sections
+    // - comprehensive: up to 100 lessons, 18 sections
+    // - custom: up to 200 lessons, 50 sections (for advanced users)
     estimatedLessons: z
       .number()
       .min(1)
-      .max(100)
+      .max(200, 'Максимум 200 уроков')
       .optional()
       .or(z.nan().transform(() => undefined)),
     estimatedSections: z
       .number()
       .min(1)
-      .max(30)
+      .max(50, 'Максимум 50 секций')
       .optional()
       .or(z.nan().transform(() => undefined)),
     contentStrategy: z

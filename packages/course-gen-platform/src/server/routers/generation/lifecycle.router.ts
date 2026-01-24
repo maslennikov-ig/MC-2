@@ -725,10 +725,10 @@ export const lifecycleRouter = router({
           : [];
 
         // Step 5: Build GenerationJobInput
-        // Validate input lengths (prevent token limit issues)
+        // Validate input lengths (frontend enforces these, backend logs violations)
         const MAX_DESCRIPTION_LENGTH = 5000;
         const MAX_LEARNING_OUTCOMES = 20;
-        const MAX_ESTIMATED_LESSONS = 100;
+        const MAX_ESTIMATED_LESSONS = 200;
         const MAX_ESTIMATED_SECTIONS = 50;
 
         if (
@@ -737,7 +737,7 @@ export const lifecycleRouter = router({
         ) {
           logger.warn(
             { requestId, courseId, descriptionLength: course.course_description.length },
-            `Course description exceeds ${MAX_DESCRIPTION_LENGTH} chars, will be truncated`
+            `Course description exceeds ${MAX_DESCRIPTION_LENGTH} chars (frontend validation bypassed?)`
           );
         }
 
@@ -768,13 +768,12 @@ export const lifecycleRouter = router({
           }
         }
 
-        // Validate learning_outcomes count
+        // Validate learning_outcomes count (frontend enforces limit, backend logs violations)
         if (parsedLearningOutcomes && parsedLearningOutcomes.length > MAX_LEARNING_OUTCOMES) {
           logger.warn(
             { requestId, courseId, count: parsedLearningOutcomes.length },
-            `Learning outcomes exceed ${MAX_LEARNING_OUTCOMES} items, will use first ${MAX_LEARNING_OUTCOMES}`
+            `Learning outcomes exceed ${MAX_LEARNING_OUTCOMES} items (frontend validation bypassed?)`
           );
-          parsedLearningOutcomes = parsedLearningOutcomes.slice(0, MAX_LEARNING_OUTCOMES);
         }
 
         // Validate estimated_lessons/sections bounds
@@ -809,10 +808,8 @@ export const lifecycleRouter = router({
             style: course.style && isValidStyle(course.style) ? course.style : DEFAULT_COURSE_STYLE,
             target_audience: course.target_audience ?? undefined,
             difficulty: course.difficulty ?? 'intermediate',
-            // NEW: Add user description for context (truncate if too long)
-            description: course.course_description
-              ? course.course_description.substring(0, MAX_DESCRIPTION_LENGTH)
-              : undefined,
+            // User description for context (frontend enforces 5000 char limit)
+            description: course.course_description ?? undefined,
             // NEW: Add course size preset
             course_size: course.course_size ?? undefined,
             // FIX: Read from courses table, not from settings
