@@ -86,8 +86,8 @@ function NewLogsBanner() {
 function LogsPageContent() {
   const { refreshTrigger, requestRefresh } = useLogsRealtime()
 
-  // Filter state
-  const [filters, setFilters] = useState<LogFilters>({})
+  // Filter state - default to 'new' status to show only unresolved issues
+  const [filters, setFilters] = useState<LogFilters>({ status: 'new' })
 
   // View mode state (default to grouped)
   const [viewMode, setViewMode] = useState<ViewMode>('grouped')
