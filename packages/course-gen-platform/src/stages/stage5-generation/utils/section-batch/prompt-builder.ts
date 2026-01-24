@@ -30,6 +30,13 @@ export interface CourseConstraints {
 
 /**
  * Build batch prompt with RT-002 prompt engineering (T021)
+ *
+ * @param input - Generation job input with course context and analysis
+ * @param sectionIndex - Section index (0-based)
+ * @param qdrantClient - Optional Qdrant client for RAG search
+ * @param attemptNumber - Current attempt number (1-based, for retry prompts)
+ * @param constraints - Optional course constraints from Stage 4 user edits
+ * @returns Formatted prompt string for LLM section generation
  */
 export function buildBatchPrompt(
   input: GenerationJobInput,
@@ -99,15 +106,15 @@ ${guidance}
   // Add user-edited course constraints from Stage 4 (if provided)
   if (constraints) {
     prompt += `**CRITICAL COURSE CONSTRAINTS** (from Stage 4 user settings):
-- Total sections in this course: ${constraints.totalSections} (HARD LIMIT - user specified)
-- Total lessons in this course: ${constraints.totalLessons} (HARD LIMIT - user specified)
-- This is section ${constraints.currentSectionIndex + 1} of ${constraints.totalSections}
-- Lessons budget for THIS section: approximately ${constraints.lessonsPerSectionBudget} lessons
+- Total sections: ${constraints.totalSections} (user-specified)
+- Total lessons: ${constraints.totalLessons} (user-specified)
+- Current section: ${constraints.currentSectionIndex + 1} of ${constraints.totalSections}
+- **Target lesson count for THIS section**: ${constraints.lessonsPerSectionBudget}
 
-**IMPORTANT**: The user has explicitly configured these limits. You MUST:
-1. Generate approximately ${constraints.lessonsPerSectionBudget} lessons for this section
-2. Each section contributes proportionally to the ${constraints.totalLessons} total lessons target
-3. Do NOT exceed the section lesson budget significantly
+**IMPORTANT**: The user explicitly configured these limits. You MUST:
+1. Generate ${constraints.lessonsPerSectionBudget} lessons for this section (±1 if pedagogically justified)
+2. Respect the total ${constraints.totalLessons} lessons budget across all ${constraints.totalSections} sections
+3. Distribute lessons evenly unless content complexity requires adjustment
 
 `;
   }
@@ -116,7 +123,7 @@ ${guidance}
 
   // Dynamic lesson guidance based on constraints
   const lessonGuidance = constraints
-    ? `Generate exactly ${constraints.lessonsPerSectionBudget} lessons (budget from course structure, ±1 if pedagogically necessary)`
+    ? `Generate ${constraints.lessonsPerSectionBudget} lessons (target from user settings; ±1 if content requires it)`
     : `Generate ${estimatedLessons} lessons (can be 3-5 if pedagogically justified)`;
 
   prompt += `**Your Task**: Expand this section into 3-5 detailed lessons.
