@@ -35,6 +35,37 @@ interface GlobalCourseChatProps {
   onRegenerationRequest?: () => void
 }
 
+// ============================================================================
+// Layout Constants
+// ============================================================================
+
+/**
+ * Chat panel styling constants.
+ * Extracted for maintainability and documentation.
+ *
+ * Note: These values are mirrored in Tailwind classes below for performance.
+ * When changing values, update both the constant AND the corresponding Tailwind class:
+ * - PANEL_MAX_HEIGHT: 400 → max-h-[400px]
+ * - HISTORY_MIN_HEIGHT: 200 → min-h-[200px]
+ * - SEND_BUTTON_SIZE: 60 → h-[60px] w-[60px]
+ * - INPUT_MIN_HEIGHT: 60 → min-h-[60px]
+ * - MESSAGE_MAX_WIDTH: 85 → max-w-[85%]
+ */
+const CHAT_LAYOUT = {
+  /** Maximum height of expanded chat panel (px) - Tailwind: max-h-[400px] */
+  PANEL_MAX_HEIGHT: 400,
+  /** Minimum height of chat history area (px) - Tailwind: min-h-[200px] */
+  HISTORY_MIN_HEIGHT: 200,
+  /** Size of send button (px) - Tailwind: h-[60px] w-[60px] */
+  SEND_BUTTON_SIZE: 60,
+  /** Minimum height of message input (px) - Tailwind: min-h-[60px] */
+  INPUT_MIN_HEIGHT: 60,
+  /** Maximum width of message bubbles (%) - Tailwind: max-w-[85%] */
+  MESSAGE_MAX_WIDTH: 85,
+  /** Delay before focusing input after panel opens (ms) - allows for CSS transition */
+  FOCUS_DELAY_MS: 300,
+} as const
+
 // Quick action buttons
 const QUICK_ACTIONS = [
   {
@@ -84,7 +115,7 @@ export function GlobalCourseChat({
   // Focus textarea when opening
   useEffect(() => {
     if (isOpen && textareaRef.current) {
-      setTimeout(() => textareaRef.current?.focus(), 300)
+      setTimeout(() => textareaRef.current?.focus(), CHAT_LAYOUT.FOCUS_DELAY_MS)
     }
   }, [isOpen])
 

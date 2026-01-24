@@ -27,6 +27,25 @@ import { llmClient } from '../../../../shared/llm/client';
 import { createModelConfigService } from '../../../../shared/llm/model-config-service';
 
 // ============================================================================
+// Fallback Configuration
+// ============================================================================
+
+/**
+ * Default fallback configuration for chat when ModelConfigService is unavailable.
+ * Can be overridden via environment variables for flexibility without redeployment.
+ *
+ * Environment variables:
+ * - CHAT_FALLBACK_MODEL: OpenRouter model ID (default: openai/gpt-4o-mini)
+ * - CHAT_FALLBACK_TEMPERATURE: Temperature 0-1 (default: 0.7)
+ * - CHAT_FALLBACK_MAX_TOKENS: Max tokens (default: 4096)
+ */
+const CHAT_FALLBACK_CONFIG = {
+  modelId: process.env.CHAT_FALLBACK_MODEL || 'openai/gpt-4o-mini',
+  temperature: parseFloat(process.env.CHAT_FALLBACK_TEMPERATURE || '0.7'),
+  maxTokens: parseInt(process.env.CHAT_FALLBACK_MAX_TOKENS || '4096', 10),
+} as const;
+
+// ============================================================================
 // Intent Classification
 // ============================================================================
 
@@ -153,9 +172,9 @@ export const chatRouter = {
       // Get model config for chat phase
       const modelConfigService = createModelConfigService();
       const phaseName = chatType === 'node' ? 'chat_node_refinement' : 'chat_global_guidance';
-      let modelId = 'xiaomi/mimo-v2-flash:free'; // Default fallback
-      let temperature = 0.7;
-      let maxTokens = 4096;
+      let modelId = CHAT_FALLBACK_CONFIG.modelId;
+      let temperature = CHAT_FALLBACK_CONFIG.temperature;
+      let maxTokens = CHAT_FALLBACK_CONFIG.maxTokens;
 
       try {
         const config = await modelConfigService.getModelForPhase(
@@ -168,10 +187,10 @@ export const chatRouter = {
         temperature = config.temperature;
         maxTokens = config.maxTokens;
       } catch (configError) {
-        // Use defaults if config lookup fails
+        // Use fallback config if ModelConfigService fails
         logger.warn(
-          { requestId, phaseName, error: configError },
-          'Failed to get model config, using defaults'
+          { requestId, phaseName, error: configError, fallback: CHAT_FALLBACK_CONFIG },
+          'Failed to get model config, using fallback'
         );
       }
 
