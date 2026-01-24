@@ -19,9 +19,9 @@ We have decided to implement a **Blue/Green Deployment** strategy orchestrated v
 
 We will adopt a branch-per-environment strategy:
 
-- `develop` -> **Dev**
-- `staging` -> **Stage**
-- `main` -> **Production**
+- `develop` -> **Dev** (dev.ai.megacampus.ru)
+- `master` -> **Staging** (ai.megacampus.ru)
+- TBD -> **Production** (future)
 
 ### 2. GitHub Environments
 
@@ -32,7 +32,11 @@ We will utilize GitHub Environments to manage configuration differences between 
 
 ### 3. Blue/Green Architecture
 
-We will run two identical application instances ("Blue" and "Green") on the production server, listening on different ports (e.g., 4001 and 4002).
+We will run two identical application sets ("Blue" and "Green") with:
+
+- **Blue**: web:3001, api:4001
+- **Green**: web:3002, api:4002
+- **Dev**: web:3010, api:4010 (separate environment)
 
 - **Nginx** will serve as the reverse proxy and traffic switch.
 - **Docker Compose** will manage the application containers for each color slot.
