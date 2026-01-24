@@ -1,9 +1,9 @@
-'use client';
+'use client'
 
-import React, { useState, useRef, useEffect, useCallback } from 'react';
-import { Button } from '@/components/ui/button';
-import { Textarea } from '@/components/ui/textarea';
-import { ScrollArea } from '@/components/ui/scroll-area';
+import React, { useState, useRef, useEffect, useCallback } from 'react'
+import { Button } from '@/components/ui/button'
+import { Textarea } from '@/components/ui/textarea'
+import { ScrollArea } from '@/components/ui/scroll-area'
 import {
   MessageSquare,
   ChevronUp,
@@ -13,25 +13,26 @@ import {
   Sparkles,
   RefreshCcw,
   Scissors,
-  Plus
-} from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { useTranslations } from 'next-intl';
-import { MarkdownRendererClient } from '@/components/markdown/MarkdownRendererClient';
-import { toast } from '@/lib/toast';
+  Plus,
+} from 'lucide-react'
+import { cn } from '@/lib/utils'
+import { useTranslations } from 'next-intl'
+import { MarkdownRendererClient } from '@/components/markdown/MarkdownRendererClient'
+import { toast } from '@/lib/toast'
 
 interface ChatMessage {
-  role: 'user' | 'assistant';
-  content: string;
-  timestamp: string;
-  intent?: 'refine' | 'regenerate';
+  id?: string // Add optional ID for tracking
+  role: 'user' | 'assistant'
+  content: string
+  timestamp: string
+  intent?: 'refine' | 'regenerate'
 }
 
 interface GlobalCourseChatProps {
-  courseId: string;
-  courseTitle?: string;
-  isGenerating?: boolean;
-  onRegenerationRequest?: () => void;
+  courseId: string
+  courseTitle?: string
+  isGenerating?: boolean
+  onRegenerationRequest?: () => void
 }
 
 // Quick action buttons
@@ -41,153 +42,160 @@ const QUICK_ACTIONS = [
     label: 'Добавить практику',
     labelEn: 'Add practice',
     icon: Plus,
-    prompt: 'Добавь больше практических заданий и упражнений в курс'
+    prompt: 'Добавь больше практических заданий и упражнений в курс',
   },
   {
     id: 'simplify',
     label: 'Упростить',
     labelEn: 'Simplify',
     icon: Scissors,
-    prompt: 'Упрости язык и объяснения, сделай материал более доступным'
+    prompt: 'Упрости язык и объяснения, сделай материал более доступным',
   },
   {
     id: 'regenerate',
     label: 'Перегенерировать',
     labelEn: 'Regenerate',
     icon: RefreshCcw,
-    prompt: 'Перегенерируй курс с учётом моих пожеланий'
+    prompt: 'Перегенерируй курс с учётом моих пожеланий',
   },
-];
+]
 
 export function GlobalCourseChat({
   courseId,
   isGenerating = false,
-  onRegenerationRequest
+  onRegenerationRequest,
 }: GlobalCourseChatProps) {
-  const t = useTranslations('generation.globalChat');
-  const [isOpen, setIsOpen] = useState(false);
-  const [message, setMessage] = useState('');
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
-  const [conversationId, setConversationId] = useState<string | undefined>();
-  const scrollRef = useRef<HTMLDivElement>(null);
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const t = useTranslations('generation.globalChat')
+  const [isOpen, setIsOpen] = useState(false)
+  const [message, setMessage] = useState('')
+  const [isProcessing, setIsProcessing] = useState(false)
+  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([])
+  const [conversationId, setConversationId] = useState<string | undefined>()
+  const scrollRef = useRef<HTMLDivElement>(null)
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
 
   // Scroll to bottom on new messages
   useEffect(() => {
     if (scrollRef.current && chatHistory.length > 0) {
-      scrollRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      scrollRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
     }
-  }, [chatHistory]);
+  }, [chatHistory])
 
   // Focus textarea when opening
   useEffect(() => {
     if (isOpen && textareaRef.current) {
-      setTimeout(() => textareaRef.current?.focus(), 300);
+      setTimeout(() => textareaRef.current?.focus(), 300)
     }
-  }, [isOpen]);
+  }, [isOpen])
 
-  const sendMessage = useCallback(async (messageText: string) => {
-    if (!messageText.trim() || isProcessing) return;
+  const sendMessage = useCallback(
+    async (messageText: string) => {
+      if (!messageText.trim() || isProcessing) return
 
-    setIsProcessing(true);
+      setIsProcessing(true)
 
-    // Optimistic update - add user message immediately
-    const userMessage: ChatMessage = {
-      role: 'user',
-      content: messageText,
-      timestamp: new Date().toISOString(),
-    };
-    setChatHistory(prev => [...prev, userMessage]);
-    setMessage('');
+      // Create unique ID for tracking
+      const tempId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
 
-    try {
-      const response = await fetch('/api/trpc/generation.chat', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          json: {
-            courseId,
-            chatType: 'global',
-            userMessage: messageText,
-            conversationId,
-          }
-        }),
-      });
-
-      if (!response.ok) {
-        throw new Error('Failed to send message');
+      const userMessage: ChatMessage = {
+        id: tempId, // Add ID
+        role: 'user',
+        content: messageText,
+        timestamp: new Date().toISOString(),
       }
+      setChatHistory((prev) => [...prev, userMessage])
+      setMessage('')
 
-      const data = await response.json();
-      const result = data?.result?.data;
+      try {
+        const response = await fetch('/api/trpc/generation.chat', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            json: {
+              courseId,
+              chatType: 'global',
+              userMessage: messageText,
+              conversationId,
+            },
+          }),
+        })
 
-      if (result) {
-        setConversationId(result.conversationId);
-
-        const assistantMessage: ChatMessage = {
-          role: 'assistant',
-          content: result.assistantMessage,
-          timestamp: new Date().toISOString(),
-          intent: result.intent,
-        };
-        setChatHistory(prev => [...prev, assistantMessage]);
-
-        // If regeneration intent detected, trigger callback
-        if (result.intent === 'regenerate' && onRegenerationRequest) {
-          toast.info(t('regenerationTriggered'), {
-            description: t('preparingRegeneration'),
-          });
-          onRegenerationRequest();
+        if (!response.ok) {
+          throw new Error('Failed to send message')
         }
+
+        const data = await response.json()
+        const result = data?.result?.data
+
+        if (result) {
+          setConversationId(result.conversationId)
+
+          const assistantMessage: ChatMessage = {
+            id: `msg-${Date.now()}`, // Add ID
+            role: 'assistant',
+            content: result.assistantMessage,
+            timestamp: new Date().toISOString(),
+            intent: result.intent,
+          }
+          setChatHistory((prev) => [...prev, assistantMessage])
+
+          // If regeneration intent detected, trigger callback
+          if (result.intent === 'regenerate' && onRegenerationRequest) {
+            toast.info(t('regenerationTriggered'), {
+              description: t('preparingRegeneration'),
+            })
+            onRegenerationRequest()
+          }
+        }
+      } catch (error) {
+        toast.error(t('error'), {
+          description: t('errorDescription'),
+        })
+        // FIX: Remove specific message by ID, not last message
+        setChatHistory((prev) => prev.filter((msg) => msg.id !== tempId))
+      } finally {
+        setIsProcessing(false)
       }
-    } catch (error) {
-      toast.error(t('error'), {
-        description: t('errorDescription'),
-      });
-      // Remove optimistic message on error
-      setChatHistory(prev => prev.slice(0, -1));
-    } finally {
-      setIsProcessing(false);
-    }
-  }, [courseId, conversationId, isProcessing, onRegenerationRequest, t]);
+    },
+    [courseId, conversationId, isProcessing, onRegenerationRequest, t]
+  )
 
   const handleSubmit = (e?: React.FormEvent) => {
-    e?.preventDefault();
-    sendMessage(message);
-  };
+    e?.preventDefault()
+    sendMessage(message)
+  }
 
   const handleQuickAction = (actionPrompt: string) => {
-    sendMessage(actionPrompt);
-  };
+    sendMessage(actionPrompt)
+  }
 
   return (
-    <div className="fixed bottom-0 left-0 right-0 z-40 bg-background border-t shadow-lg">
+    <div className="bg-background fixed right-0 bottom-0 left-0 z-40 border-t shadow-lg">
       {/* Collapsed header */}
       <button
         onClick={() => setIsOpen(!isOpen)}
-        className="flex items-center justify-between w-full px-4 py-3 text-sm font-medium hover:bg-accent/50 transition-colors"
+        className="hover:bg-accent/50 flex w-full items-center justify-between px-4 py-3 text-sm font-medium transition-colors"
       >
         <div className="flex items-center gap-2">
-          <Sparkles className="w-4 h-4 text-primary" />
+          <Sparkles className="text-primary h-4 w-4" />
           <span>{t('title')}</span>
           {chatHistory.length > 0 && (
-            <span className="text-xs text-muted-foreground">
+            <span className="text-muted-foreground text-xs">
               ({t('messageCount', { count: chatHistory.length })})
             </span>
           )}
         </div>
-        {isOpen ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
+        {isOpen ? <ChevronDown className="h-4 w-4" /> : <ChevronUp className="h-4 w-4" />}
       </button>
 
       {/* Expanded panel */}
       {isOpen && (
-        <div className="border-t max-h-[400px] flex flex-col">
+        <div className="flex max-h-[400px] flex-col border-t">
           {/* Chat history */}
-          <ScrollArea className="flex-1 p-4 min-h-[200px]">
+          <ScrollArea className="min-h-[200px] flex-1 p-4">
             {chatHistory.length === 0 ? (
-              <div className="text-center text-muted-foreground py-8">
-                <MessageSquare className="w-8 h-8 mx-auto mb-2 opacity-50" />
+              <div className="text-muted-foreground py-8 text-center">
+                <MessageSquare className="mx-auto mb-2 h-8 w-8 opacity-50" />
                 <p>{t('emptyState')}</p>
               </div>
             ) : (
@@ -196,31 +204,31 @@ export function GlobalCourseChat({
                   <div
                     key={idx}
                     className={cn(
-                      "flex w-full flex-col gap-1",
-                      msg.role === 'user' ? "items-end" : "items-start"
+                      'flex w-full flex-col gap-1',
+                      msg.role === 'user' ? 'items-end' : 'items-start'
                     )}
                   >
-                    <div className={cn(
-                      "px-3 py-2 rounded-lg max-w-[85%]",
-                      msg.role === 'user'
-                        ? "bg-primary text-primary-foreground"
-                        : "bg-muted"
-                    )}>
+                    <div
+                      className={cn(
+                        'max-w-[85%] rounded-lg px-3 py-2',
+                        msg.role === 'user' ? 'bg-primary text-primary-foreground' : 'bg-muted'
+                      )}
+                    >
                       {msg.role === 'assistant' ? (
                         <MarkdownRendererClient content={msg.content} preset="chat" />
                       ) : (
                         <span className="whitespace-pre-wrap">{msg.content}</span>
                       )}
                     </div>
-                    <span className="text-[10px] text-muted-foreground">
+                    <span className="text-muted-foreground text-[10px]">
                       {new Date(msg.timestamp).toLocaleTimeString()}
                     </span>
                   </div>
                 ))}
 
                 {isProcessing && (
-                  <div className="flex items-center gap-2 text-muted-foreground">
-                    <Loader2 className="w-4 h-4 animate-spin" />
+                  <div className="text-muted-foreground flex items-center gap-2">
+                    <Loader2 className="h-4 w-4 animate-spin" />
                     <span className="text-sm">{t('thinking')}</span>
                   </div>
                 )}
@@ -231,7 +239,7 @@ export function GlobalCourseChat({
           </ScrollArea>
 
           {/* Quick actions */}
-          <div className="px-4 py-2 border-t flex gap-2 flex-wrap">
+          <div className="flex flex-wrap gap-2 border-t px-4 py-2">
             {QUICK_ACTIONS.map((action) => (
               <Button
                 key={action.id}
@@ -241,25 +249,25 @@ export function GlobalCourseChat({
                 disabled={isProcessing || isGenerating}
                 className="text-xs"
               >
-                <action.icon className="w-3 h-3 mr-1" />
+                <action.icon className="mr-1 h-3 w-3" />
                 {action.label}
               </Button>
             ))}
           </div>
 
           {/* Input */}
-          <form onSubmit={handleSubmit} className="p-4 pt-2 border-t flex gap-2">
+          <form onSubmit={handleSubmit} className="flex gap-2 border-t p-4 pt-2">
             <Textarea
               ref={textareaRef}
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               placeholder={t('placeholder')}
-              className="min-h-[60px] resize-none flex-1"
+              className="min-h-[60px] flex-1 resize-none"
               disabled={isProcessing || isGenerating}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
-                  e.preventDefault();
-                  handleSubmit();
+                  e.preventDefault()
+                  handleSubmit()
                 }
               }}
             />
@@ -270,14 +278,14 @@ export function GlobalCourseChat({
               disabled={!message.trim() || isProcessing || isGenerating}
             >
               {isProcessing ? (
-                <Loader2 className="w-4 h-4 animate-spin" />
+                <Loader2 className="h-4 w-4 animate-spin" />
               ) : (
-                <Send className="w-4 h-4" />
+                <Send className="h-4 w-4" />
               )}
             </Button>
           </form>
         </div>
       )}
     </div>
-  );
+  )
 }
