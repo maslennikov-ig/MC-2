@@ -37,6 +37,17 @@ interface GlobalCourseChatProps {
   onRegenerationRequest?: () => void
 }
 
+interface TokenEstimates {
+  refine: {
+    tokens: number
+    formatted: string
+  }
+  regenerate: {
+    tokens: number
+    formatted: string
+  }
+}
+
 // ============================================================================
 // Layout Constants
 // ============================================================================
@@ -68,36 +79,36 @@ const CHAT_LAYOUT = {
   FOCUS_DELAY_MS: 300,
 } as const
 
-// Quick action buttons
-const QUICK_ACTIONS = [
-  {
-    id: 'add-practice',
-    label: 'Добавить практику',
-    labelEn: 'Add practice',
-    icon: Plus,
-    prompt: 'Добавь больше практических заданий и упражнений в курс',
-  },
-  {
-    id: 'simplify',
-    label: 'Упростить',
-    labelEn: 'Simplify',
-    icon: Scissors,
-    prompt: 'Упрости язык и объяснения, сделай материал более доступным',
-  },
-]
-
 export function GlobalCourseChat({
   courseId,
   isGenerating = false,
   onRegenerationRequest,
 }: GlobalCourseChatProps) {
   const t = useTranslations('generation.globalChat')
+
+  // Quick action buttons with i18n
+  const quickActions = [
+    {
+      id: 'add-practice',
+      label: t('quickActions.addPractice.label'),
+      icon: Plus,
+      prompt: t('quickActions.addPractice.prompt'),
+    },
+    {
+      id: 'simplify',
+      label: t('quickActions.simplify.label'),
+      icon: Scissors,
+      prompt: t('quickActions.simplify.prompt'),
+    },
+  ]
+
   const [isOpen, setIsOpen] = useState(false)
   const [message, setMessage] = useState('')
   const [isProcessing, setIsProcessing] = useState(false)
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([])
   const [conversationId, setConversationId] = useState<string | undefined>()
   const [selectedIntent, setSelectedIntent] = useState<'refine' | 'regenerate'>('refine')
+  const [tokenEstimates, setTokenEstimates] = useState<TokenEstimates | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
@@ -175,12 +186,19 @@ export function GlobalCourseChat({
             onRegenerationRequest()
           }
         }
-      } catch (error) {
+      } catch {
         toast.error(t('error'), {
           description: t('errorDescription'),
         })
-        // FIX: Remove specific message by ID, not last message
-        setChatHistory((prev) => prev.filter((msg) => msg.id !== tempId))
+        // Remove pending message by ID with additional safety check
+        setChatHistory((prev) => {
+          // If the pending message is still the last one, remove it safely
+          if (prev.length > 0 && prev[prev.length - 1].id === tempId) {
+            return prev.slice(0, -1)
+          }
+          // Fallback: filter by ID if message position changed
+          return prev.filter((msg) => msg.id !== tempId)
+        })
       } finally {
         setIsProcessing(false)
       }
@@ -194,7 +212,7 @@ export function GlobalCourseChat({
   }
 
   const handleQuickAction = (actionPrompt: string) => {
-    void sendMessage(actionPrompt, 'refine')
+    void sendMessage(actionPrompt, selectedIntent)
   }
 
   return (
@@ -275,16 +293,13 @@ export function GlobalCourseChat({
                 value && setSelectedIntent(value as 'refine' | 'regenerate')
               }
               className="justify-start"
+              disabled={isProcessing}
             >
               <ToggleGroupItem value="refine" aria-label="Refine mode" className="text-xs">
                 <Wand2 className="mr-1 h-3 w-3" />
                 {t('modes.refine')} (~2K)
               </ToggleGroupItem>
-              <ToggleGroupItem
-                value="regenerate"
-                aria-label="Regenerate mode"
-                className="text-xs"
-              >
+              <ToggleGroupItem value="regenerate" aria-label="Regenerate mode" className="text-xs">
                 <RefreshCcw className="mr-1 h-3 w-3" />
                 {t('modes.regenerate')} (~20K+)
               </ToggleGroupItem>
@@ -293,7 +308,7 @@ export function GlobalCourseChat({
 
           {/* Quick actions */}
           <div className="flex flex-wrap gap-2 border-t px-4 py-2">
-            {QUICK_ACTIONS.map((action) => (
+            {quickActions.map((action) => (
               <Button
                 key={action.id}
                 variant="outline"
