@@ -86,6 +86,22 @@ export type ChatResponse = z.infer<typeof chatResponseSchema>;
 export type ChatIntent = 'refine' | 'regenerate';
 export type ChatType = 'node' | 'global';
 
+/**
+ * Type guard for ChatIntent validation.
+ * Use for runtime validation of intent values from external sources.
+ *
+ * @param value - Unknown value to validate
+ * @returns True if value is a valid ChatIntent
+ *
+ * @example
+ * if (isValidIntent(userInput)) {
+ *   // userInput is now typed as ChatIntent
+ * }
+ */
+export function isValidIntent(value: unknown): value is ChatIntent {
+  return value === 'refine' || value === 'regenerate';
+}
+
 // ============================================================================
 // Chat Message Types (for database storage)
 // ============================================================================

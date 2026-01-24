@@ -637,6 +637,12 @@ export interface GraphTranslations {
       simplify: { ru: string; en: string };
       moreDetail: { ru: string; en: string };
     };
+    modes?: {
+      refine: { ru: string; en: string };
+      regenerate: { ru: string; en: string };
+      refineAriaLabel: { ru: string; en: string };
+      regenerateAriaLabel: { ru: string; en: string };
+    };
   };
   errors: {
     connectionLost: { ru: string; en: string };

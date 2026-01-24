@@ -309,7 +309,9 @@
     "preparingRegeneration": "Подготавливаем перегенерацию...",
     "modes": {
       "refine": "Уточнить",
-      "regenerate": "Перегенерировать"
+      "regenerate": "Перегенерировать",
+      "refineAriaLabel": "Переключить в режим уточнения для небольших правок",
+      "regenerateAriaLabel": "Переключить в режим перегенерации для полного пересоздания"
     },
     "quickActions": {
       "addPractice": {

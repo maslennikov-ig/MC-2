@@ -155,6 +155,12 @@ export const GRAPH_TRANSLATIONS: GraphTranslations & {
       simplify: { ru: 'Упростить', en: 'Simplify' },
       moreDetail: { ru: 'Подробнее', en: 'More detail' },
     },
+    modes: {
+      refine: { ru: 'Уточнить', en: 'Refine' },
+      regenerate: { ru: 'Перегенерировать', en: 'Regenerate' },
+      refineAriaLabel: { ru: 'Переключить в режим уточнения', en: 'Switch to refine mode' },
+      regenerateAriaLabel: { ru: 'Переключить в режим перегенерации', en: 'Switch to regenerate mode' },
+    },
   },
   errors: {
     connectionLost: { ru: 'Соединение потеряно', en: 'Connection lost' },
