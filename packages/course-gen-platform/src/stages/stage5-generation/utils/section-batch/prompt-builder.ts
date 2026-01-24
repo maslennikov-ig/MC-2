@@ -2,7 +2,6 @@ import type { QdrantClient } from '@qdrant/js-client-rest';
 import type { GenerationJobInput } from '@megacampus/shared-types';
 import { SectionWithoutInjectedFieldsSchema } from '@megacampus/shared-types/generation-result';
 import { getStylePrompt } from '@megacampus/shared-types/style-prompts';
-import { getCourseSizePreset, type CourseSize } from '@megacampus/shared-types/course-size';
 import { zodToPromptSchema } from '@/shared/utils/zod-to-prompt-schema';
 import {
   getDifficultyFromAnalysis,
@@ -12,6 +11,7 @@ import {
   formatGenerationGuidanceForPrompt,
 } from '../analysis-formatters';
 import { extractSection } from './utils';
+import { buildUserContextSection } from '../prompt-helpers';
 
 /**
  * Build batch prompt with RT-002 prompt engineering (T021)
@@ -41,17 +41,10 @@ export function buildBatchPrompt(
 ${input.frontend_parameters.target_audience ? `- Target Audience: ${input.frontend_parameters.target_audience}` : ''}
 `;
 
-  // Add user-provided context if available
-  if (input.frontend_parameters.description) {
-    prompt += `\n**User Requirements**: ${input.frontend_parameters.description}\n`;
-  }
-
-  // Add course size context
-  if (input.frontend_parameters.course_size && input.frontend_parameters.course_size !== 'auto') {
-    const preset = getCourseSizePreset(input.frontend_parameters.course_size as CourseSize);
-    if (preset?.llmGuidance) {
-      prompt += `\n**Course Size**: ${preset.llmGuidance}\n`;
-    }
+  // Add user-provided context
+  const userContext = buildUserContextSection(input.frontend_parameters);
+  if (userContext) {
+    prompt += `\n${userContext}`;
   }
 
   prompt += `
