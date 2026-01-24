@@ -31,12 +31,18 @@ import {
 vi.mock('@langchain/openai', () => ({
   ChatOpenAI: vi.fn(),
 }));
-vi.mock('@megacampus/shared-types/style-prompts');
+vi.mock('@megacampus/shared-types/style-prompts', async importOriginal => {
+  const actual = await importOriginal<typeof import('@megacampus/shared-types/style-prompts')>();
+  return {
+    ...actual,
+    getStylePrompt: vi.fn(),
+  };
+});
 vi.mock('@/shared/regeneration', () => ({
   UnifiedRegenerator: vi.fn(),
 }));
 vi.mock('@/shared/logger', () => ({
-  logger: {
+  default: {
     debug: vi.fn(),
     info: vi.fn(),
     warn: vi.fn(),
@@ -1402,6 +1408,758 @@ describe('SectionBatchGenerator', () => {
       const generator = new SectionBatchGenerator();
       await expect(generator.generateBatch(0, 0, 1, mockJobInput)).rejects.toThrow(
         'Cannot generate sections: analysis_result is null'
+      );
+    });
+  });
+
+  /**
+   * Test 9: buildBatchPrompt - CourseConstraints
+   * Requirement: Verify constraints block inclusion and dynamic lesson guidance
+   */
+  describe('buildBatchPrompt - CourseConstraints', () => {
+    it('should include CRITICAL COURSE CONSTRAINTS block when constraints provided', async () => {
+      const mockSection: Section = {
+        section_number: 1,
+        section_title: 'Test Section with Constraints',
+        section_description: 'Section generated with user-specified constraints from Stage 4',
+        learning_objectives: ['Apply user-defined structural constraints to lesson planning'],
+        estimated_duration_minutes: 45,
+        lessons: [
+          {
+            lesson_number: 1,
+            lesson_title: 'Lesson 1',
+            lesson_objectives: ['Define the core principles and fundamental concepts'],
+            key_topics: ['fundamentals', 'principles'],
+            estimated_duration_minutes: 15,
+            practical_exercises: [
+              {
+                exercise_type: 'hands_on',
+                exercise_title: 'Exercise 1',
+                exercise_description: 'Description 1',
+              },
+              {
+                exercise_type: 'quiz',
+                exercise_title: 'Exercise 2',
+                exercise_description: 'Description 2',
+              },
+              {
+                exercise_type: 'case_study',
+                exercise_title: 'Exercise 3',
+                exercise_description: 'Description 3',
+              },
+            ],
+          },
+        ],
+      };
+
+      // Mock ChatOpenAI to capture prompt
+      let capturedPrompt = '';
+      const mockInvoke = vi.fn().mockImplementation((prompt: string) => {
+        capturedPrompt = prompt;
+        return Promise.resolve({
+          content: JSON.stringify({ sections: [mockSection] }),
+        });
+      });
+
+      vi.mocked(ChatOpenAI).mockImplementation(
+        class {
+          invoke = mockInvoke;
+        } as any
+      );
+
+      vi.mocked(regenerationModule.UnifiedRegenerator).mockImplementation(
+        class {
+          regenerate = vi.fn().mockResolvedValue({
+            success: true,
+            data: { sections: [mockSection] },
+            metadata: {
+              layerUsed: 'auto-repair',
+              retryCount: 0,
+              qualityPassed: true,
+              tokenCost: 0,
+            },
+          });
+        } as any
+      );
+
+      vi.mocked(stylePromptsModule.getStylePrompt).mockReturnValue('Style prompt');
+
+      // Create input with constraints: totalSections=6, totalLessons=30
+      const analysisWithConstraints = createFullAnalysisResult('Constraints Test');
+      analysisWithConstraints.recommended_structure.total_sections = 6;
+      analysisWithConstraints.recommended_structure.total_lessons = 30;
+
+      const mockJobInput: GenerationJobInput = {
+        course_id: 'course-123',
+        organization_id: 'org-456',
+        user_id: 'user-789',
+        analysis_result: analysisWithConstraints,
+        frontend_parameters: {
+          course_title: 'Test Course with Constraints',
+        },
+        vectorized_documents: false,
+      };
+
+      const generator = new SectionBatchGenerator();
+      // Generate section 0 (first section, 0-based)
+      await generator.generateBatch(0, 0, 1, mockJobInput);
+
+      // Verify prompt contains CRITICAL COURSE CONSTRAINTS block
+      expect(capturedPrompt).toContain('CRITICAL COURSE CONSTRAINTS');
+      expect(capturedPrompt).toContain('Total sections: 6 (user-specified)');
+      expect(capturedPrompt).toContain('Total lessons: 30 (user-specified)');
+      expect(capturedPrompt).toContain('Current section: 1 of 6');
+
+      // lessonsPerSectionBudget = Math.round(30 / 6) = 5
+      expect(capturedPrompt).toContain('**Target lesson count for THIS section**: 5');
+    });
+
+    it('should use dynamic lesson guidance with constraints', async () => {
+      const mockSection: Section = {
+        section_number: 1,
+        section_title: 'Test Section',
+        section_description: 'Comprehensive introduction to test concepts and methodologies',
+        learning_objectives: ['Explain the fundamental concepts and principles of the subject'],
+        estimated_duration_minutes: 45,
+        lessons: [
+          {
+            lesson_number: 1,
+            lesson_title: 'Lesson 1',
+            lesson_objectives: ['Define the core principles and fundamental concepts'],
+            key_topics: ['fundamentals', 'principles'],
+            estimated_duration_minutes: 15,
+            practical_exercises: [
+              {
+                exercise_type: 'hands_on',
+                exercise_title: 'Exercise 1',
+                exercise_description: 'Description 1',
+              },
+              {
+                exercise_type: 'quiz',
+                exercise_title: 'Exercise 2',
+                exercise_description: 'Description 2',
+              },
+              {
+                exercise_type: 'case_study',
+                exercise_title: 'Exercise 3',
+                exercise_description: 'Description 3',
+              },
+            ],
+          },
+        ],
+      };
+
+      let capturedPrompt = '';
+      const mockInvoke = vi.fn().mockImplementation((prompt: string) => {
+        capturedPrompt = prompt;
+        return Promise.resolve({
+          content: JSON.stringify({ sections: [mockSection] }),
+        });
+      });
+
+      vi.mocked(ChatOpenAI).mockImplementation(
+        class {
+          invoke = mockInvoke;
+        } as any
+      );
+
+      vi.mocked(regenerationModule.UnifiedRegenerator).mockImplementation(
+        class {
+          regenerate = vi.fn().mockResolvedValue({
+            success: true,
+            data: { sections: [mockSection] },
+            metadata: {
+              layerUsed: 'auto-repair',
+              retryCount: 0,
+              qualityPassed: true,
+              tokenCost: 0,
+            },
+          });
+        } as any
+      );
+
+      vi.mocked(stylePromptsModule.getStylePrompt).mockReturnValue('Style prompt');
+
+      // Create input with constraints: total_sections=5, total_lessons=25
+      const analysisWithConstraints = createFullAnalysisResult('Dynamic Guidance Test');
+      analysisWithConstraints.recommended_structure.total_sections = 5;
+      analysisWithConstraints.recommended_structure.total_lessons = 25;
+
+      const mockJobInput: GenerationJobInput = {
+        course_id: 'course-123',
+        organization_id: 'org-456',
+        user_id: 'user-789',
+        analysis_result: analysisWithConstraints,
+        frontend_parameters: {
+          course_title: 'Test',
+        },
+        vectorized_documents: false,
+      };
+
+      const generator = new SectionBatchGenerator();
+      await generator.generateBatch(0, 0, 1, mockJobInput);
+
+      // With constraints: budget = Math.round(25 / 5) = 5
+      expect(capturedPrompt).toContain('Generate 5 lessons (target from user settings');
+    });
+
+    it('should use fallback lesson guidance without constraints', async () => {
+      const mockSection: Section = {
+        section_number: 1,
+        section_title: 'Test Section',
+        section_description: 'Comprehensive introduction to test concepts and methodologies',
+        learning_objectives: ['Explain the fundamental concepts and principles of the subject'],
+        estimated_duration_minutes: 45,
+        lessons: [
+          {
+            lesson_number: 1,
+            lesson_title: 'Lesson 1',
+            lesson_objectives: ['Define the core principles and fundamental concepts'],
+            key_topics: ['fundamentals', 'principles'],
+            estimated_duration_minutes: 15,
+            practical_exercises: [
+              {
+                exercise_type: 'hands_on',
+                exercise_title: 'Exercise 1',
+                exercise_description: 'Description 1',
+              },
+              {
+                exercise_type: 'quiz',
+                exercise_title: 'Exercise 2',
+                exercise_description: 'Description 2',
+              },
+              {
+                exercise_type: 'case_study',
+                exercise_title: 'Exercise 3',
+                exercise_description: 'Description 3',
+              },
+            ],
+          },
+        ],
+      };
+
+      let capturedPrompt = '';
+      const mockInvoke = vi.fn().mockImplementation((prompt: string) => {
+        capturedPrompt = prompt;
+        return Promise.resolve({
+          content: JSON.stringify({ sections: [mockSection] }),
+        });
+      });
+
+      vi.mocked(ChatOpenAI).mockImplementation(
+        class {
+          invoke = mockInvoke;
+        } as any
+      );
+
+      vi.mocked(regenerationModule.UnifiedRegenerator).mockImplementation(
+        class {
+          regenerate = vi.fn().mockResolvedValue({
+            success: true,
+            data: { sections: [mockSection] },
+            metadata: {
+              layerUsed: 'auto-repair',
+              retryCount: 0,
+              qualityPassed: true,
+              tokenCost: 0,
+            },
+          });
+        } as any
+      );
+
+      vi.mocked(stylePromptsModule.getStylePrompt).mockReturnValue('Style prompt');
+
+      // No constraints in analysis_result (no total_sections/total_lessons)
+      const analysisWithoutConstraints = createFullAnalysisResult('Fallback Test');
+      // Remove constraint fields (set to undefined)
+      analysisWithoutConstraints.recommended_structure.total_sections = undefined as any;
+      analysisWithoutConstraints.recommended_structure.total_lessons = undefined as any;
+
+      const mockJobInput: GenerationJobInput = {
+        course_id: 'course-123',
+        organization_id: 'org-456',
+        user_id: 'user-789',
+        analysis_result: analysisWithoutConstraints,
+        frontend_parameters: {
+          course_title: 'Test',
+        },
+        vectorized_documents: false,
+      };
+
+      const generator = new SectionBatchGenerator();
+      await generator.generateBatch(0, 0, 1, mockJobInput);
+
+      // Without constraints: use estimatedLessons from section (first section in fixture has estimated_lessons: 4)
+      expect(capturedPrompt).toContain(
+        'Generate 4 lessons (can be 3-5 if pedagogically justified)'
+      );
+    });
+
+    it('should not include constraint block when constraints undefined', async () => {
+      const mockSection: Section = {
+        section_number: 1,
+        section_title: 'Test Section',
+        section_description: 'Comprehensive introduction to test concepts and methodologies',
+        learning_objectives: ['Explain the fundamental concepts and principles of the subject'],
+        estimated_duration_minutes: 45,
+        lessons: [
+          {
+            lesson_number: 1,
+            lesson_title: 'Lesson 1',
+            lesson_objectives: ['Define the core principles and fundamental concepts'],
+            key_topics: ['fundamentals', 'principles'],
+            estimated_duration_minutes: 15,
+            practical_exercises: [
+              {
+                exercise_type: 'hands_on',
+                exercise_title: 'Exercise 1',
+                exercise_description: 'Description 1',
+              },
+              {
+                exercise_type: 'quiz',
+                exercise_title: 'Exercise 2',
+                exercise_description: 'Description 2',
+              },
+              {
+                exercise_type: 'case_study',
+                exercise_title: 'Exercise 3',
+                exercise_description: 'Description 3',
+              },
+            ],
+          },
+        ],
+      };
+
+      let capturedPrompt = '';
+      const mockInvoke = vi.fn().mockImplementation((prompt: string) => {
+        capturedPrompt = prompt;
+        return Promise.resolve({
+          content: JSON.stringify({ sections: [mockSection] }),
+        });
+      });
+
+      vi.mocked(ChatOpenAI).mockImplementation(
+        class {
+          invoke = mockInvoke;
+        } as any
+      );
+
+      vi.mocked(regenerationModule.UnifiedRegenerator).mockImplementation(
+        class {
+          regenerate = vi.fn().mockResolvedValue({
+            success: true,
+            data: { sections: [mockSection] },
+            metadata: {
+              layerUsed: 'auto-repair',
+              retryCount: 0,
+              qualityPassed: true,
+              tokenCost: 0,
+            },
+          });
+        } as any
+      );
+
+      vi.mocked(stylePromptsModule.getStylePrompt).mockReturnValue('Style prompt');
+
+      // No total_sections provided
+      const analysisWithoutConstraints = createFullAnalysisResult('No Constraints Test');
+      delete (analysisWithoutConstraints.recommended_structure as any).total_sections;
+      delete (analysisWithoutConstraints.recommended_structure as any).total_lessons;
+
+      const mockJobInput: GenerationJobInput = {
+        course_id: 'course-123',
+        organization_id: 'org-456',
+        user_id: 'user-789',
+        analysis_result: analysisWithoutConstraints,
+        frontend_parameters: {
+          course_title: 'Test',
+        },
+        vectorized_documents: false,
+      };
+
+      const generator = new SectionBatchGenerator();
+      await generator.generateBatch(0, 0, 1, mockJobInput);
+
+      // Should NOT contain constraint block
+      expect(capturedPrompt).not.toContain('CRITICAL COURSE CONSTRAINTS');
+      expect(capturedPrompt).not.toContain('from Stage 4 user settings');
+    });
+  });
+
+  /**
+   * Test 10: SectionBatchGenerator - constraint calculation
+   * Requirement: Verify constraint calculation from analysis_result.recommended_structure
+   */
+  describe('SectionBatchGenerator - constraint calculation', () => {
+    it('should calculate constraints from analysis_result.recommended_structure', async () => {
+      const mockSection: Section = {
+        section_number: 1,
+        section_title: 'Test Section',
+        section_description: 'Comprehensive introduction to test concepts and methodologies',
+        learning_objectives: ['Explain the fundamental concepts and principles of the subject'],
+        estimated_duration_minutes: 45,
+        lessons: [
+          {
+            lesson_number: 1,
+            lesson_title: 'Lesson 1',
+            lesson_objectives: ['Define the core principles and fundamental concepts'],
+            key_topics: ['fundamentals', 'principles'],
+            estimated_duration_minutes: 15,
+            practical_exercises: [
+              {
+                exercise_type: 'hands_on',
+                exercise_title: 'Exercise 1',
+                exercise_description: 'Description 1',
+              },
+              {
+                exercise_type: 'quiz',
+                exercise_title: 'Exercise 2',
+                exercise_description: 'Description 2',
+              },
+              {
+                exercise_type: 'case_study',
+                exercise_title: 'Exercise 3',
+                exercise_description: 'Description 3',
+              },
+            ],
+          },
+        ],
+      };
+
+      let capturedPrompt = '';
+      const mockInvoke = vi.fn().mockImplementation((prompt: string) => {
+        capturedPrompt = prompt;
+        return Promise.resolve({
+          content: JSON.stringify({ sections: [mockSection] }),
+        });
+      });
+
+      vi.mocked(ChatOpenAI).mockImplementation(
+        class {
+          invoke = mockInvoke;
+        } as any
+      );
+
+      vi.mocked(regenerationModule.UnifiedRegenerator).mockImplementation(
+        class {
+          regenerate = vi.fn().mockResolvedValue({
+            success: true,
+            data: { sections: [mockSection] },
+            metadata: {
+              layerUsed: 'auto-repair',
+              retryCount: 0,
+              qualityPassed: true,
+              tokenCost: 0,
+            },
+          });
+        } as any
+      );
+
+      vi.mocked(stylePromptsModule.getStylePrompt).mockReturnValue('Style prompt');
+
+      // Create input with recommended_structure: { total_sections: 6, total_lessons: 30 }
+      const analysisWithStructure = createFullAnalysisResult('Structure Test');
+      analysisWithStructure.recommended_structure.total_sections = 6;
+      analysisWithStructure.recommended_structure.total_lessons = 30;
+
+      const mockJobInput: GenerationJobInput = {
+        course_id: 'course-123',
+        organization_id: 'org-456',
+        user_id: 'user-789',
+        analysis_result: analysisWithStructure,
+        frontend_parameters: {
+          course_title: 'Test',
+        },
+        vectorized_documents: false,
+      };
+
+      const generator = new SectionBatchGenerator();
+      await generator.generateBatch(0, 0, 1, mockJobInput);
+
+      // Verify prompt contains constraint block with calculated values
+      expect(capturedPrompt).toContain('CRITICAL COURSE CONSTRAINTS');
+      expect(capturedPrompt).toContain('Total sections: 6 (user-specified)');
+      expect(capturedPrompt).toContain('Total lessons: 30 (user-specified)');
+      // Budget = Math.round(30 / 6) = 5
+      expect(capturedPrompt).toContain('**Target lesson count for THIS section**: 5');
+    });
+
+    it('should handle missing total_sections gracefully (fallback)', async () => {
+      const mockSection: Section = {
+        section_number: 1,
+        section_title: 'Test Section',
+        section_description: 'Comprehensive introduction to test concepts and methodologies',
+        learning_objectives: ['Explain the fundamental concepts and principles of the subject'],
+        estimated_duration_minutes: 45,
+        lessons: [
+          {
+            lesson_number: 1,
+            lesson_title: 'Lesson 1',
+            lesson_objectives: ['Define the core principles and fundamental concepts'],
+            key_topics: ['fundamentals', 'principles'],
+            estimated_duration_minutes: 15,
+            practical_exercises: [
+              {
+                exercise_type: 'hands_on',
+                exercise_title: 'Exercise 1',
+                exercise_description: 'Description 1',
+              },
+              {
+                exercise_type: 'quiz',
+                exercise_title: 'Exercise 2',
+                exercise_description: 'Description 2',
+              },
+              {
+                exercise_type: 'case_study',
+                exercise_title: 'Exercise 3',
+                exercise_description: 'Description 3',
+              },
+            ],
+          },
+        ],
+      };
+
+      let capturedPrompt = '';
+      const mockInvoke = vi.fn().mockImplementation((prompt: string) => {
+        capturedPrompt = prompt;
+        return Promise.resolve({
+          content: JSON.stringify({ sections: [mockSection] }),
+        });
+      });
+
+      vi.mocked(ChatOpenAI).mockImplementation(
+        class {
+          invoke = mockInvoke;
+        } as any
+      );
+
+      vi.mocked(regenerationModule.UnifiedRegenerator).mockImplementation(
+        class {
+          regenerate = vi.fn().mockResolvedValue({
+            success: true,
+            data: { sections: [mockSection] },
+            metadata: {
+              layerUsed: 'auto-repair',
+              retryCount: 0,
+              qualityPassed: true,
+              tokenCost: 0,
+            },
+          });
+        } as any
+      );
+
+      vi.mocked(stylePromptsModule.getStylePrompt).mockReturnValue('Style prompt');
+
+      // Create input with recommended_structure: { total_sections: undefined, total_lessons: 30 }
+      const analysisWithStructure = createFullAnalysisResult('Missing Sections Test');
+      analysisWithStructure.recommended_structure.total_sections = undefined as any;
+      analysisWithStructure.recommended_structure.total_lessons = 30;
+
+      const mockJobInput: GenerationJobInput = {
+        course_id: 'course-123',
+        organization_id: 'org-456',
+        user_id: 'user-789',
+        analysis_result: analysisWithStructure,
+        frontend_parameters: {
+          course_title: 'Test',
+        },
+        vectorized_documents: false,
+      };
+
+      const generator = new SectionBatchGenerator();
+      await generator.generateBatch(0, 0, 1, mockJobInput);
+
+      // Should NOT include constraint block, use estimatedLessons fallback
+      expect(capturedPrompt).not.toContain('CRITICAL COURSE CONSTRAINTS');
+      // First section in fixture has estimated_lessons: 4
+      expect(capturedPrompt).toContain(
+        'Generate 4 lessons (can be 3-5 if pedagogically justified)'
+      );
+    });
+
+    it('should handle zero total_sections gracefully (fallback)', async () => {
+      const mockSection: Section = {
+        section_number: 1,
+        section_title: 'Test Section',
+        section_description: 'Comprehensive introduction to test concepts and methodologies',
+        learning_objectives: ['Explain the fundamental concepts and principles of the subject'],
+        estimated_duration_minutes: 45,
+        lessons: [
+          {
+            lesson_number: 1,
+            lesson_title: 'Lesson 1',
+            lesson_objectives: ['Define the core principles and fundamental concepts'],
+            key_topics: ['fundamentals', 'principles'],
+            estimated_duration_minutes: 15,
+            practical_exercises: [
+              {
+                exercise_type: 'hands_on',
+                exercise_title: 'Exercise 1',
+                exercise_description: 'Description 1',
+              },
+              {
+                exercise_type: 'quiz',
+                exercise_title: 'Exercise 2',
+                exercise_description: 'Description 2',
+              },
+              {
+                exercise_type: 'case_study',
+                exercise_title: 'Exercise 3',
+                exercise_description: 'Description 3',
+              },
+            ],
+          },
+        ],
+      };
+
+      let capturedPrompt = '';
+      const mockInvoke = vi.fn().mockImplementation((prompt: string) => {
+        capturedPrompt = prompt;
+        return Promise.resolve({
+          content: JSON.stringify({ sections: [mockSection] }),
+        });
+      });
+
+      vi.mocked(ChatOpenAI).mockImplementation(
+        class {
+          invoke = mockInvoke;
+        } as any
+      );
+
+      vi.mocked(regenerationModule.UnifiedRegenerator).mockImplementation(
+        class {
+          regenerate = vi.fn().mockResolvedValue({
+            success: true,
+            data: { sections: [mockSection] },
+            metadata: {
+              layerUsed: 'auto-repair',
+              retryCount: 0,
+              qualityPassed: true,
+              tokenCost: 0,
+            },
+          });
+        } as any
+      );
+
+      vi.mocked(stylePromptsModule.getStylePrompt).mockReturnValue('Style prompt');
+
+      // Create input with recommended_structure: { total_sections: 0, total_lessons: 30 }
+      const analysisWithStructure = createFullAnalysisResult('Zero Sections Test');
+      analysisWithStructure.recommended_structure.total_sections = 0;
+      analysisWithStructure.recommended_structure.total_lessons = 30;
+
+      const mockJobInput: GenerationJobInput = {
+        course_id: 'course-123',
+        organization_id: 'org-456',
+        user_id: 'user-789',
+        analysis_result: analysisWithStructure,
+        frontend_parameters: {
+          course_title: 'Test',
+        },
+        vectorized_documents: false,
+      };
+
+      const generator = new SectionBatchGenerator();
+      await generator.generateBatch(0, 0, 1, mockJobInput);
+
+      // Should NOT include constraint block due to truthy check (0 is falsy)
+      expect(capturedPrompt).not.toContain('CRITICAL COURSE CONSTRAINTS');
+      // First section in fixture has estimated_lessons: 4
+      expect(capturedPrompt).toContain(
+        'Generate 4 lessons (can be 3-5 if pedagogically justified)'
+      );
+    });
+
+    it('should handle lessonsPerSectionBudget < 1 with fallback', async () => {
+      const mockSection: Section = {
+        section_number: 1,
+        section_title: 'Test Section',
+        section_description: 'Comprehensive introduction to test concepts and methodologies',
+        learning_objectives: ['Explain the fundamental concepts and principles of the subject'],
+        estimated_duration_minutes: 45,
+        lessons: [
+          {
+            lesson_number: 1,
+            lesson_title: 'Lesson 1',
+            lesson_objectives: ['Define the core principles and fundamental concepts'],
+            key_topics: ['fundamentals', 'principles'],
+            estimated_duration_minutes: 15,
+            practical_exercises: [
+              {
+                exercise_type: 'hands_on',
+                exercise_title: 'Exercise 1',
+                exercise_description: 'Description 1',
+              },
+              {
+                exercise_type: 'quiz',
+                exercise_title: 'Exercise 2',
+                exercise_description: 'Description 2',
+              },
+              {
+                exercise_type: 'case_study',
+                exercise_title: 'Exercise 3',
+                exercise_description: 'Description 3',
+              },
+            ],
+          },
+        ],
+      };
+
+      let capturedPrompt = '';
+      const mockInvoke = vi.fn().mockImplementation((prompt: string) => {
+        capturedPrompt = prompt;
+        return Promise.resolve({
+          content: JSON.stringify({ sections: [mockSection] }),
+        });
+      });
+
+      vi.mocked(ChatOpenAI).mockImplementation(
+        class {
+          invoke = mockInvoke;
+        } as any
+      );
+
+      vi.mocked(regenerationModule.UnifiedRegenerator).mockImplementation(
+        class {
+          regenerate = vi.fn().mockResolvedValue({
+            success: true,
+            data: { sections: [mockSection] },
+            metadata: {
+              layerUsed: 'auto-repair',
+              retryCount: 0,
+              qualityPassed: true,
+              tokenCost: 0,
+            },
+          });
+        } as any
+      );
+
+      vi.mocked(stylePromptsModule.getStylePrompt).mockReturnValue('Style prompt');
+
+      // Create input: total_sections: 100, total_lessons: 30 -> budget = Math.round(30/100) = 0
+      const analysisWithStructure = createFullAnalysisResult('Budget < 1 Test');
+      analysisWithStructure.recommended_structure.total_sections = 100;
+      analysisWithStructure.recommended_structure.total_lessons = 30;
+
+      const mockJobInput: GenerationJobInput = {
+        course_id: 'course-123',
+        organization_id: 'org-456',
+        user_id: 'user-789',
+        analysis_result: analysisWithStructure,
+        frontend_parameters: {
+          course_title: 'Test',
+        },
+        vectorized_documents: false,
+      };
+
+      const generator = new SectionBatchGenerator();
+      await generator.generateBatch(0, 0, 1, mockJobInput);
+
+      // Should warn and use fallback (constraints undefined)
+      expect(capturedPrompt).not.toContain('CRITICAL COURSE CONSTRAINTS');
+      // First section in fixture has estimated_lessons: 4
+      expect(capturedPrompt).toContain(
+        'Generate 4 lessons (can be 3-5 if pedagogically justified)'
       );
     });
   });
