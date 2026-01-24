@@ -49,6 +49,15 @@ vi.mock('@/shared/logger', () => ({
     error: vi.fn(),
   },
 }));
+// Mock getModelForPhase to return expected models for tier routing tests
+vi.mock('@/shared/llm/langchain-models', () => ({
+  getModelForPhase: vi.fn().mockResolvedValue({
+    model: 'deepseek/deepseek-v3.1-terminus',
+  }),
+  createModel: vi.fn().mockImplementation(() => ({
+    invoke: vi.fn(),
+  })),
+}));
 
 /**
  * Helper function to create RT-006 compliant mock section
@@ -525,8 +534,8 @@ describe('SectionBatchGenerator', () => {
       const result = await generator.generateBatch(0, 0, 1, mockJobInput);
 
       // Verify escalation happened
-      expect(result.tier).toBe('tier2_qwen3Max');
-      expect(result.modelUsed).toBe('qwen/qwen3-max');
+      expect(result.tier).toBe('tier2_en_lessons');
+      expect(result.modelUsed).toBe('deepseek/deepseek-v3.1-terminus');
       expect(result.retryCount).toBe(1);
     });
 
@@ -841,8 +850,8 @@ describe('SectionBatchGenerator', () => {
       // Verify UnifiedRegenerator was called
       expect(regenerationModule.UnifiedRegenerator).toHaveBeenCalledWith(
         expect.objectContaining({
-          enabledLayers: ['auto-repair', 'critique-revise'],
-          maxRetries: 2,
+          enabledLayers: ['auto-repair', 'critique-revise', 'model-escalation', 'emergency'],
+          maxRetries: 3,
         })
       );
 
@@ -1018,8 +1027,8 @@ describe('SectionBatchGenerator', () => {
       const result = await generator.generateBatch(0, 0, 1, mockJobInput);
 
       // Verify Tier 2 (qwen3-max) was used due to high complexity
-      expect(result.tier).toBe('tier2_qwen3Max');
-      expect(result.modelUsed).toBe('qwen/qwen3-max');
+      expect(result.tier).toBe('tier2_en_lessons');
+      expect(result.modelUsed).toBe('deepseek/deepseek-v3.1-terminus');
       expect(result.complexityScore).toBeGreaterThanOrEqual(0.75);
     });
 
@@ -1099,8 +1108,8 @@ describe('SectionBatchGenerator', () => {
       const result = await generator.generateBatch(0, 0, 1, mockJobInput);
 
       // Verify Tier 2 (qwen3-max) was used due to high criticality
-      expect(result.tier).toBe('tier2_qwen3Max');
-      expect(result.modelUsed).toBe('qwen/qwen3-max');
+      expect(result.tier).toBe('tier2_en_lessons');
+      expect(result.modelUsed).toBe('deepseek/deepseek-v3.1-terminus');
       expect(result.criticalityScore).toBeGreaterThanOrEqual(0.8);
     });
   });
@@ -1278,12 +1287,12 @@ describe('SectionBatchGenerator', () => {
       // Verify UnifiedRegenerator was configured correctly
       expect(regenerationModule.UnifiedRegenerator).toHaveBeenCalledWith(
         expect.objectContaining({
-          enabledLayers: ['auto-repair', 'critique-revise'],
-          maxRetries: 2,
+          enabledLayers: ['auto-repair', 'critique-revise', 'model-escalation', 'emergency'],
+          maxRetries: 3,
           metricsTracking: true,
           stage: 'generation',
           courseId: 'course-regen',
-          phaseId: 'section_batch_0',
+          phaseId: 'section_batch_generation_0',
         })
       );
     });
