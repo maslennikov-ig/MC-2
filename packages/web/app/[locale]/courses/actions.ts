@@ -133,7 +133,10 @@ export async function getCourses({
       prerequisites,
       target_audience,
       estimated_lessons,
-      estimated_sections
+      estimated_sections,
+      organizations!inner (
+        slug
+      )
     `,
     { count: 'exact' }
   )
@@ -262,9 +265,14 @@ export async function getCourses({
 
       const slug = course.slug || generateSlug(course.title)
 
+      // Extract orgSlug from joined organizations
+      const orgSlug =
+        (course as unknown as { organizations: { slug: string } }).organizations?.slug || ''
+
       const processedCourse = {
         ...course,
         slug,
+        orgSlug,
         course_description: description,
         course_structure: course.course_structure as Record<string, unknown> | null,
         status: course.status || 'draft',

@@ -1,29 +1,41 @@
 import { Metadata } from 'next'
 import { notFound } from 'next/navigation'
 import { getTranslations } from 'next-intl/server'
-import { createClient } from '@/lib/supabase/server'
 import { getAdminClient } from '@/lib/supabase/client-factory'
+import { getCourseByOrgAndSlugWithRLS } from '@/lib/helpers/organization'
 import { CourseVisualsManager } from '@/components/course/CourseVisualsManager'
 
 interface Props {
-  params: Promise<{ locale: string; slug: string }>
+  params: Promise<{ locale: string; orgSlug: string; courseSlug: string }>
 }
 
 export async function generateMetadata({ params }: Props): Promise<Metadata> {
-  const { slug } = await params
+  const { orgSlug, courseSlug } = await params
   const t = await getTranslations('course')
 
+  const course = await getCourseByOrgAndSlugWithRLS(orgSlug, courseSlug)
+
   return {
-    title: `${t('visuals.pageTitle')} - ${slug}`,
+    title: course
+      ? `${t('visuals.pageTitle')} - ${course.title}`
+      : `${t('visuals.pageTitle')} - ${courseSlug}`,
   }
 }
 
 export default async function CourseVisualsPage({ params }: Props) {
-  const { slug } = await params
-  const supabase = await createClient()
+  const { orgSlug, courseSlug } = await params
 
-  // Fetch course by slug
-  const { data: course, error } = await supabase
+  // Fetch course with RLS first
+  const course = await getCourseByOrgAndSlugWithRLS(orgSlug, courseSlug)
+
+  if (!course) {
+    notFound()
+  }
+
+  const adminClient = getAdminClient()
+
+  // Fetch course with sections and lessons
+  const { data: courseWithSections } = await adminClient
     .from('courses')
     .select(
       `
@@ -43,15 +55,15 @@ export default async function CourseVisualsPage({ params }: Props) {
       )
     `
     )
-    .eq('slug', slug)
+    .eq('id', course.id)
     .single()
 
-  if (error || !course) {
+  if (!courseWithSections) {
     notFound()
   }
 
   // Fetch existing enrichments (covers and cards)
-  const { data: enrichments } = await supabase
+  const { data: enrichments } = await adminClient
     .from('lesson_enrichments')
     .select('id, lesson_id, enrichment_type, status, title')
     .eq('course_id', course.id)
@@ -73,23 +85,9 @@ export default async function CourseVisualsPage({ params }: Props) {
   // Check if course card exists
   const courseCard = enrichments?.find((e) => e.title === 'course-card' && e.status === 'completed')
 
-  // Get organization slug from organization_id
-  let orgSlug = 'default'
-  if (course.organization_id) {
-    const adminClient = getAdminClient()
-    const { data: org } = await adminClient
-      .from('organizations')
-      .select('slug')
-      .eq('id', course.organization_id)
-      .single()
-    if (org?.slug) {
-      orgSlug = org.slug
-    }
-  }
-
   // Flatten lessons with section info
   const lessons =
-    course.sections
+    courseWithSections.sections
       ?.sort((a, b) => a.order_index - b.order_index)
       .flatMap(
         (section) =>

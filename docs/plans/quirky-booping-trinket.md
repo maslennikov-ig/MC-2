@@ -1,196 +1,255 @@
-# План: Реализация чата для корректировки курса во время генерации
+# План: Явный выбор режима чата вместо keyword classification
 
 ## Проблема
 
-1. **Frontend чата существует**, но backend endpoint `generation.refine` **не реализован**
-2. **Общий чат** на странице генерации отсутствует полностью
-3. **Модели для чата** не настроены в `llm_model_config`
+1. **Keyword matching не масштабируется** на многоязычность (ru, en, kk, uz...)
+2. **Ложные срабатывания**: "Объясни заново" → думает regenerate
+3. **Пользователь не контролирует** что произойдёт
+4. **Нужно показывать стоимость** в токенах для каждого режима
 
-## Сценарии использования
+## Решение
 
-| Сценарий              | Чат               | Пример                                     |
-| --------------------- | ----------------- | ------------------------------------------ |
-| Корректировка деталей | NodeDetailsDrawer | "Добавь больше примеров в этот урок"       |
-| Полная перегенерация  | Глобальный чат    | "Перегенерируй курс с фокусом на практику" |
+Заменить автоматическую классификацию на **явный выбор режима через UI**:
 
-## Архитектура решения
+- Toggle buttons: `[Уточнить (~2K)] [Перегенерировать (~45K)]`
+- Intent передаётся явно с frontend на backend
+- Удалить `classifyIntent()` и `REGENERATE_KEYWORDS`
 
-### 1. Backend: Единый endpoint `generation.chat`
+## UI Design
 
-**Файл:** `packages/course-gen-platform/src/server/routers/generation/editing/chat.router.ts`
+```
+┌────────────────────────────────────────────────────────────┐
+│ [🪄 Уточнить (~2K)]  [🔄 Перегенерировать (~45K)]         │  ← Toggle группа
+├────────────────────────────────────────────────────────────┤
+│ Quick actions: [+ Практику] [✂ Упростить]                 │  ← Без regenerate
+├────────────────────────────────────────────────────────────┤
+│ ┌──────────────────────────────────────────────────────┐  │
+│ │ Добавь больше примеров...                            │  │
+│ └──────────────────────────────────────────────────────┘  │
+│                                                [Отправить] │
+└────────────────────────────────────────────────────────────┘
+```
+
+**Режимы:**
+| Режим | Label | Описание | Токены |
+|-------|-------|----------|--------|
+| `refine` | Уточнить | Точечные изменения текущего контента | ~2-5K |
+| `regenerate` | Перегенерировать | Создать контент заново | ~20-100K |
+
+## Изменения
+
+### 1. Schema (shared-types/src/chat-types.ts)
+
+**Добавить `intent` в ChatRequest:**
 
 ```typescript
-interface ChatRequest {
-  courseId: string;
-  chatType: 'node' | 'global';
-  userMessage: string;
-  conversationId?: string;
-  nodeContext?: {
-    stageId: string;
-    nodeId?: string;
-    blockPath?: string;
-  };
-  previousOutput?: string;
+export const chatRequestSchema = z.object({
+  courseId: z.string().uuid(),
+  chatType: z.enum(['node', 'global']),
+  userMessage: z.string().min(1).max(10000),
+  conversationId: z.string().uuid().optional(),
+  nodeContext: z.object({...}).optional(),
+  previousOutput: z.string().optional(),
+  intent: z.enum(['refine', 'regenerate']), // NEW: явный intent
+});
+```
+
+**Удалить REGENERATE_KEYWORDS:**
+
+```typescript
+// УДАЛИТЬ ПОЛНОСТЬЮ:
+export const REGENERATE_KEYWORDS = [
+  'перегенерируй', 'перегенерировать', 'сгенерируй заново',
+  'заново', 'с нуля', 'весь курс', 'полностью', 'переделай',
+  'regenerate', 'generate again', 'from scratch', ...
+] as const;
+```
+
+### 2. Backend (chat.router.ts)
+
+**Удалить classifyIntent():**
+
+```typescript
+// УДАЛИТЬ ФУНКЦИЮ:
+function classifyIntent(message: string): ChatIntent {
+  const lowerMessage = message.toLowerCase();
+  const isRegenerate = REGENERATE_KEYWORDS.some((keyword: string) =>
+    lowerMessage.includes(keyword)
+  );
+  return isRegenerate ? 'regenerate' : 'refine';
 }
 ```
 
-**Обработка:**
-
-- `chatType: 'node'` + refinement → Синхронная обработка (быстрый feedback)
-- `chatType: 'global'` + regeneration → Async через BullMQ job
-
-### 2. Определение intent (rule-based для MVP)
+**Использовать intent из request:**
 
 ```typescript
-function classifyIntent(message: string): 'refine' | 'regenerate' {
-  const regenerateKeywords = [
-    'перегенерируй',
-    'regenerate',
-    'заново',
-    'с нуля',
-    'весь курс',
-    'полностью',
-  ];
-  return regenerateKeywords.some(kw => message.toLowerCase().includes(kw))
-    ? 'regenerate'
-    : 'refine';
-}
+// БЫЛО:
+const intent = classifyIntent(userMessage);
+
+// СТАЛО:
+const intent = input.intent;
 ```
 
-### 3. Что отдаём в LLM
+**Убрать импорт REGENERATE_KEYWORDS:**
 
-| Сценарий          | Контекст                                               |
-| ----------------- | ------------------------------------------------------ |
-| Node refinement   | Course metadata + current node content + sibling nodes |
-| Full regeneration | Full course structure + source documents               |
+```typescript
+// БЫЛО:
+import { chatRequestSchema, REGENERATE_KEYWORDS, type ChatResponse, type ChatIntent }
 
-**System prompt структура:**
-
-```
-<course_context>
-  Title, Language, Style, Target Audience
-</course_context>
-<current_content>
-  JSON текущего контента
-</current_content>
-<instructions>
-  - Respond in user's language
-  - Return JSON в той же структуре
-  - Preserve pedagogical structure
-</instructions>
+// СТАЛО:
+import { chatRequestSchema, type ChatResponse, type ChatIntent }
 ```
 
-### 4. Модели в llm_model_config
+### 3. Token Estimation Endpoint (NEW)
 
-```sql
--- Node refinement (синхронный, conversational)
-INSERT INTO llm_model_config (phase_name, model_id, temperature, max_tokens, language)
-VALUES ('chat_node_refinement', 'openai/gpt-4o', 0.7, 4096, 'any');
+**Файл:** `packages/course-gen-platform/src/server/routers/generation/editing/token-estimate.router.ts`
 
--- Global guidance
-INSERT INTO llm_model_config (phase_name, model_id, temperature, max_tokens, language)
-VALUES ('chat_global_guidance', 'openai/gpt-4o', 0.7, 2048, 'any');
+```typescript
+export const tokenEstimateRouter = {
+  getChatTokenEstimates: instructorProcedure
+    .input(z.object({ courseId: z.string().uuid() }))
+    .query(async ({ input }) => {
+      const course = await getCourse(input.courseId);
 
--- Full regeneration (async, premium)
-INSERT INTO llm_model_config (phase_name, model_id, temperature, max_tokens, language)
-VALUES ('chat_full_regeneration', 'anthropic/claude-sonnet-4', 0.6, 16000, 'any');
+      return {
+        refine: {
+          tokens: 2500, // conversation context + response
+          formatted: '~2.5K',
+        },
+        regenerate: {
+          tokens: estimateRegenerateTokens(course),
+          formatted: formatTokens(tokens),
+        },
+      };
+    }),
+};
 ```
 
-### 5. UI: Глобальный чат
+### 4. Frontend (GlobalCourseChat.tsx)
 
-**Расположение:** Bottom panel (как терминал в VS Code)
+**Добавить state и fetch:**
 
-**Компонент:** `packages/web/components/generation/GlobalCourseChat.tsx`
+```typescript
+const [selectedIntent, setSelectedIntent] = useState<'refine' | 'regenerate'>('refine');
+const { data: tokenEstimates } = api.generation.getChatTokenEstimates.useQuery({ courseId });
+```
+
+**Добавить Toggle UI:**
 
 ```tsx
-- Коллапсируемая панель внизу страницы генерации
-- Quick actions: "Добавить практики", "Сократить", "Перегенерировать"
-- История сообщений
-- Input с кнопкой отправки
+<ToggleGroup type="single" value={selectedIntent} onValueChange={setSelectedIntent}>
+  <ToggleGroupItem value="refine">
+    <Wand2 className="w-4 h-4 mr-1" />
+    {t('modes.refine')} ({tokenEstimates?.refine.formatted})
+  </ToggleGroupItem>
+  <ToggleGroupItem value="regenerate">
+    <RefreshCcw className="w-4 h-4 mr-1" />
+    {t('modes.regenerate')} ({tokenEstimates?.regenerate.formatted})
+  </ToggleGroupItem>
+</ToggleGroup>
 ```
 
-### 6. БД: Таблица для истории чата
+**Передавать intent в запросе:**
 
-```sql
-CREATE TABLE course_chat_messages (
-  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  course_id UUID NOT NULL REFERENCES courses(id),
-  conversation_id UUID NOT NULL,
-  role TEXT NOT NULL CHECK (role IN ('user', 'assistant')),
-  content TEXT NOT NULL,
-  chat_type TEXT NOT NULL CHECK (chat_type IN ('node', 'global')),
-  node_context JSONB,
-  intent TEXT,
-  model_used TEXT,
-  input_tokens INTEGER,
-  output_tokens INTEGER,
-  created_at TIMESTAMPTZ DEFAULT NOW()
-);
+```typescript
+body: JSON.stringify({
+  json: { courseId, chatType: 'global', userMessage, conversationId, intent: selectedIntent },
+});
 ```
 
-## План реализации
+**Убрать regenerate из QUICK_ACTIONS:**
 
-### Phase 1: Backend Foundation
+```typescript
+// БЫЛО:
+const QUICK_ACTIONS = [
+  { id: 'add-practice', ... },
+  { id: 'simplify', ... },
+  { id: 'regenerate', label: 'Перегенерировать', prompt: '...' }, // УДАЛИТЬ
+];
 
-1. **Миграция БД**
-   - `course_chat_messages` таблица
-   - Seed моделей в `llm_model_config`
+// СТАЛО:
+const QUICK_ACTIONS = [
+  { id: 'add-practice', ... },
+  { id: 'simplify', ... },
+];
+```
 
-2. **Chat router**
-   - Файл: `packages/course-gen-platform/src/server/routers/generation/editing/chat.router.ts`
-   - Endpoint: `generation.chat`
-   - Intent classification (rule-based)
-   - Context assembly (reuse from regeneration)
-   - LLM call + response handling
+### 5. i18n
 
-3. **Регистрация в app-router**
-   - Добавить в `generationRouter`
+**en/generation.json:**
 
-### Phase 2: Node Refinement Integration
+```json
+{
+  "chat": {
+    "modes": {
+      "refine": "Refine",
+      "regenerate": "Regenerate"
+    }
+  }
+}
+```
 
-4. **Update useRefinement hook**
-   - Файл: `packages/web/components/generation-graph/hooks/useRefinement.ts`
-   - Вызывать `generation.chat` вместо `generation.refine`
-   - Добавить conversation state
+**ru/generation.json:**
 
-5. **Update RefinementChat component**
-   - Файл: `packages/web/components/generation-graph/panels/RefinementChat.tsx`
-   - Показывать ответы assistant в истории
-   - Multi-turn conversation support
+```json
+{
+  "chat": {
+    "modes": {
+      "refine": "Уточнить",
+      "regenerate": "Перегенерировать"
+    }
+  }
+}
+```
 
-### Phase 3: Global Chat UI
+## Файлы для изменения
 
-6. **GlobalCourseChat component**
-   - Файл: `packages/web/components/generation/GlobalCourseChat.tsx`
-   - Bottom panel layout
-   - Quick actions
-   - Message history
+| Файл                                                        | Действие                                                |
+| ----------------------------------------------------------- | ------------------------------------------------------- |
+| `shared-types/src/chat-types.ts`                            | Добавить `intent`, удалить `REGENERATE_KEYWORDS`        |
+| `course-gen-platform/.../chat.router.ts`                    | Удалить `classifyIntent()`, использовать `input.intent` |
+| `course-gen-platform/.../token-estimate.router.ts`          | **СОЗДАТЬ** - endpoint для оценки токенов               |
+| `course-gen-platform/.../editing.router.ts`                 | Добавить `tokenEstimateRouter`                          |
+| `web/components/generation/GlobalCourseChat.tsx`            | Toggle UI, token estimates, передача intent             |
+| `web/components/generation-graph/panels/RefinementChat.tsx` | Аналогичные изменения                                   |
+| `web/messages/en/generation.json`                           | i18n для modes                                          |
+| `web/messages/ru/generation.json`                           | i18n для modes                                          |
 
-7. **Интеграция в страницу генерации**
-   - Файл: `packages/web/app/[locale]/courses/generating/[slug]/page.tsx`
-   - Добавить GlobalCourseChat
+## План выполнения
 
-### Phase 4: Full Regeneration
+### Phase 1: Schema & Backend (breaking change)
 
-8. **COURSE_REGENERATION job type**
-   - Новый job handler в orchestrator
-   - Progress tracking через realtime
+1. Добавить `intent: z.enum(['refine', 'regenerate'])` в chatRequestSchema
+2. Удалить `REGENERATE_KEYWORDS` из chat-types.ts
+3. Удалить `classifyIntent()` из chat.router.ts
+4. Использовать `input.intent` вместо classification
+5. Создать token-estimate.router.ts
 
-## Критические файлы
+### Phase 2: Frontend
 
-| Файл                                                                       | Изменение                       |
-| -------------------------------------------------------------------------- | ------------------------------- |
-| `course-gen-platform/src/server/routers/generation/editing/chat.router.ts` | **Создать** - основной endpoint |
-| `course-gen-platform/src/server/routers/generation/index.ts`               | Добавить chatRouter             |
-| `web/components/generation-graph/hooks/useRefinement.ts`                   | Update endpoint call            |
-| `web/components/generation-graph/panels/RefinementChat.tsx`                | Add assistant messages          |
-| `web/components/generation/GlobalCourseChat.tsx`                           | **Создать** - UI компонент      |
-| `web/app/[locale]/courses/generating/[slug]/page.tsx`                      | Integrate GlobalCourseChat      |
-| `supabase/migrations/YYYYMMDD_chat_messages.sql`                           | **Создать** - БД миграция       |
+6. Добавить Toggle группу в GlobalCourseChat.tsx
+7. Fetch token estimates
+8. Передавать intent в запросе
+9. Убрать 'regenerate' из QUICK_ACTIONS
+10. Аналогичные изменения в RefinementChat.tsx
+
+### Phase 3: i18n & Cleanup
+
+11. Добавить i18n ключи
+12. Проверить все hardcoded тексты
+13. Type-check и тесты
 
 ## Верификация
 
-1. **Unit tests:** chat.router.ts intent classification
-2. **Integration:** Send message → see response in chat history
-3. **E2E:** Full refinement flow через UI
-4. **Manual:** Test quick actions, multi-turn conversation
+1. **Type-check**: `pnpm type-check` проходит
+2. **Manual test**:
+   - Открыть чат → видны кнопки режимов с токенами
+   - Выбрать "Уточнить" → отправить сообщение → intent=refine на backend
+   - Выбрать "Перегенерировать" → отправить → intent=regenerate
+3. **Search**: `grep -r "REGENERATE_KEYWORDS"` → 0 результатов
+4. **Search**: `grep -r "classifyIntent"` → 0 результатов
+
+## Beads
+
+- **Закрыть mc2-jmwe** с reason: "Заменено на explicit UI selection"
+- **Создать новую задачу** для реализации
