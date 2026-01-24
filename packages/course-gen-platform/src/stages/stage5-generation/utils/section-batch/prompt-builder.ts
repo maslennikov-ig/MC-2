@@ -14,13 +14,29 @@ import { extractSection } from './utils';
 import { buildUserContextSection } from '../prompt-helpers';
 
 /**
+ * Course constraints from Stage 4 user edits
+ * These represent the user's explicit configuration for course structure
+ */
+export interface CourseConstraints {
+  /** Total number of sections in the course (user-specified) */
+  totalSections: number;
+  /** Total number of lessons in the course (user-specified) */
+  totalLessons: number;
+  /** Current section index (0-based) */
+  currentSectionIndex: number;
+  /** Calculated lessons budget for this section */
+  lessonsPerSectionBudget: number;
+}
+
+/**
  * Build batch prompt with RT-002 prompt engineering (T021)
  */
 export function buildBatchPrompt(
   input: GenerationJobInput,
   sectionIndex: number,
   qdrantClient: QdrantClient | undefined,
-  attemptNumber: number
+  attemptNumber: number,
+  constraints?: CourseConstraints
 ): string {
   const language = input.frontend_parameters.language || 'en';
   const style = input.frontend_parameters.style || 'conversational';
@@ -80,7 +96,28 @@ ${guidance}
 `;
   }
 
+  // Add user-edited course constraints from Stage 4 (if provided)
+  if (constraints) {
+    prompt += `**CRITICAL COURSE CONSTRAINTS** (from Stage 4 user settings):
+- Total sections in this course: ${constraints.totalSections} (HARD LIMIT - user specified)
+- Total lessons in this course: ${constraints.totalLessons} (HARD LIMIT - user specified)
+- This is section ${constraints.currentSectionIndex + 1} of ${constraints.totalSections}
+- Lessons budget for THIS section: approximately ${constraints.lessonsPerSectionBudget} lessons
+
+**IMPORTANT**: The user has explicitly configured these limits. You MUST:
+1. Generate approximately ${constraints.lessonsPerSectionBudget} lessons for this section
+2. Each section contributes proportionally to the ${constraints.totalLessons} total lessons target
+3. Do NOT exceed the section lesson budget significantly
+
+`;
+  }
+
   const schemaDescription = zodToPromptSchema(SectionWithoutInjectedFieldsSchema);
+
+  // Dynamic lesson guidance based on constraints
+  const lessonGuidance = constraints
+    ? `Generate exactly ${constraints.lessonsPerSectionBudget} lessons (budget from course structure, ±1 if pedagogically necessary)`
+    : `Generate ${estimatedLessons} lessons (can be 3-5 if pedagogically justified)`;
 
   prompt += `**Your Task**: Expand this section into 3-5 detailed lessons.
 
@@ -89,7 +126,7 @@ ${guidance}
 ${schemaDescription}
 
 **Constraints**:
-1. **Lesson Breakdown**: Generate ${estimatedLessons} lessons (can be 3-5 if pedagogically justified)
+1. **Lesson Breakdown**: ${lessonGuidance}
 2. **Learning Objectives** (FR-011): Each lesson must have 1-5 SMART objectives using Bloom's taxonomy action verbs
    - FR-030: Apply ${style} style to objectives (e.g., storytelling: "explore", "discover"; academic: "analyze", "evaluate")
 3. **Key Topics** (FR-011): Each lesson must have 2-10 specific key topics

@@ -8,7 +8,7 @@ import { z } from 'zod';
 import logger from '@/shared/logger';
 import { ModelTier, SectionBatchResult } from './types';
 import { MODELS, OPENROUTER_BASE_URL } from './constants';
-import { buildBatchPrompt } from './prompt-builder';
+import { buildBatchPrompt, CourseConstraints } from './prompt-builder';
 import { estimateTokens } from './utils';
 
 /**
@@ -270,7 +270,8 @@ export async function generateWithRetry(
   qdrantClient: QdrantClient | undefined,
   complexityScore: number,
   criticalityScore: number,
-  language: string
+  language: string,
+  constraints?: CourseConstraints
 ): Promise<SectionBatchResult> {
   const maxAttempts = 2;
   let retryCount = 0;
@@ -278,7 +279,13 @@ export async function generateWithRetry(
 
   while (retryCount < maxAttempts) {
     try {
-      const prompt = buildBatchPrompt(input, sectionIndex, qdrantClient, retryCount + 1);
+      const prompt = buildBatchPrompt(
+        input,
+        sectionIndex,
+        qdrantClient,
+        retryCount + 1,
+        constraints
+      );
 
       const model = createModel(currentModelTier.model);
       const response = await model.invoke(prompt);
