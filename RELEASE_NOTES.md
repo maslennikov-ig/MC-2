@@ -2,6 +2,23 @@
 
 _Released on 2025-12-26_
 
+## v0.28.37
+
+_Released on 2026-01-24_
+
+### 🐛 Bug Fixes
+
+- **deploy**: Add docling-mcp image check before deploy
+- **admin/logs**: Default to status='new' in list view
+- **deploy**: Add automatic Docker cleanup after each deploy
+- **graph**: Auto-refresh UI when stage reaches awaiting_approval
+- **infra**: Add uploads-dev mount to docling and BARRIER_FAILED enum
+- **changelog**: Sort versions in correct descending order
+
+---
+
+_This release was automatically generated from 11 commits._
+
 ## v0.28.36
 
 _Released on 2026-01-24_
