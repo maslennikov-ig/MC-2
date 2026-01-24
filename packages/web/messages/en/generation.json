@@ -310,6 +310,16 @@
     "modes": {
       "refine": "Refine",
       "regenerate": "Regenerate"
+    },
+    "quickActions": {
+      "addPractice": {
+        "label": "Add practice",
+        "prompt": "Add more practical exercises and tasks to the course"
+      },
+      "simplify": {
+        "label": "Simplify",
+        "prompt": "Simplify the language and explanations, make the material more accessible"
+      }
     }
   }
 }
