@@ -126,6 +126,39 @@ export function GlobalCourseChat({
     }
   }, [isOpen])
 
+  // Fetch token estimates on mount
+  useEffect(() => {
+    if (!courseId) return
+
+    const fetchTokenEstimates = async () => {
+      try {
+        const response = await fetch(
+          `/api/trpc/generation.getChatTokenEstimates?input=${encodeURIComponent(JSON.stringify({ json: { courseId } }))}`,
+          {
+            method: 'GET',
+            headers: { 'Content-Type': 'application/json' },
+          }
+        )
+
+        if (!response.ok) {
+          throw new Error('Failed to fetch token estimates')
+        }
+
+        const data = await response.json()
+        const result = data?.result?.data
+
+        if (result) {
+          setTokenEstimates(result)
+        }
+      } catch (error) {
+        // Silent fail - will use fallback values in UI
+        console.warn('Failed to fetch token estimates:', error)
+      }
+    }
+
+    void fetchTokenEstimates()
+  }, [courseId])
+
   const sendMessage = useCallback(
     async (messageText: string, intent: 'refine' | 'regenerate' = selectedIntent) => {
       if (!messageText.trim() || isProcessing) return
@@ -297,11 +330,11 @@ export function GlobalCourseChat({
             >
               <ToggleGroupItem value="refine" aria-label="Refine mode" className="text-xs">
                 <Wand2 className="mr-1 h-3 w-3" />
-                {t('modes.refine')} (~2K)
+                {t('modes.refine')} ({tokenEstimates?.refine?.formatted ?? '~2K'})
               </ToggleGroupItem>
               <ToggleGroupItem value="regenerate" aria-label="Regenerate mode" className="text-xs">
                 <RefreshCcw className="mr-1 h-3 w-3" />
-                {t('modes.regenerate')} (~20K+)
+                {t('modes.regenerate')} ({tokenEstimates?.regenerate?.formatted ?? '~20K+'})
               </ToggleGroupItem>
             </ToggleGroup>
           </div>

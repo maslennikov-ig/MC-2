@@ -174,6 +174,7 @@ export const RefinementChat: React.FC<RefinementChatProps> = ({
                  value={selectedIntent}
                  onValueChange={(value) => value && setSelectedIntent(value as 'refine' | 'regenerate')}
                  className="justify-start"
+                 disabled={isProcessing}
                >
                  <ToggleGroupItem value="refine" aria-label="Refine mode" className="text-xs h-8">
                    <Wand2 className="h-3 w-3 mr-1" />
