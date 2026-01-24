@@ -87,6 +87,55 @@ bash scripts/deploy_blue_green.sh production latest
 bash scripts/rollback_blue_green.sh
 ```
 
+## Docling MCP Image
+
+**IMPORTANT:** The `docling-mcp` image is NOT built in CI/CD — it's too large (~8GB with PyTorch/CUDA).
+
+### Image Details
+
+| Property      | Value                                              |
+| ------------- | -------------------------------------------------- |
+| Image name    | `ghcr.io/maslennikov-ig/mc-2/docling-mcp:latest`   |
+| Size          | ~8GB                                               |
+| Build context | `packages/course-gen-platform/docker/docling-mcp/` |
+| Pull policy   | `if_not_present` (never auto-pull)                 |
+
+### Manual Build (on server)
+
+```bash
+cd /opt/megacampus
+docker build -t ghcr.io/maslennikov-ig/mc-2/docling-mcp:latest \
+  -f packages/course-gen-platform/docker/docling-mcp/Dockerfile .
+```
+
+### If Image Missing After Cleanup
+
+If `docker image prune -a` removes the docling image:
+
+```bash
+# Option 1: Retag from old name (if exists)
+docker tag ghcr.io/maslennikov-ig/megacampusai/docling-mcp:latest \
+  ghcr.io/maslennikov-ig/mc-2/docling-mcp:latest
+
+# Option 2: Rebuild (takes ~30 min)
+cd /opt/megacampus
+docker build -t ghcr.io/maslennikov-ig/mc-2/docling-mcp:latest \
+  -f packages/course-gen-platform/docker/docling-mcp/Dockerfile .
+```
+
+### Protect from Cleanup
+
+The image is protected by `pull_policy: if_not_present` in `docker-compose.infra.yml`.
+However, `docker image prune -a` removes ALL unused images. To prevent this:
+
+```bash
+# Use selective prune (dangling only, not -a)
+docker image prune -f
+
+# Or exclude docling when using -a
+docker image prune -a --filter "label!=docling"
+```
+
 ## Rollback
 
 Instant rollback via nginx reload:
