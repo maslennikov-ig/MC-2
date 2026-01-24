@@ -79,6 +79,16 @@ const CHAT_LAYOUT = {
   FOCUS_DELAY_MS: 300,
 } as const
 
+/**
+ * Generate unique ID for chat messages.
+ * Uses timestamp + random suffix for uniqueness.
+ *
+ * @param prefix - 'temp' for pending user messages, 'msg' for confirmed messages
+ */
+function generateMessageId(prefix: 'temp' | 'msg'): string {
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+}
+
 export function GlobalCourseChat({
   courseId,
   isGenerating = false,
@@ -166,10 +176,10 @@ export function GlobalCourseChat({
       setIsProcessing(true)
 
       // Create unique ID for tracking
-      const tempId = `temp-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+      const tempId = generateMessageId('temp')
 
       const userMessage: ChatMessage = {
-        id: tempId, // Add ID
+        id: tempId,
         role: 'user',
         content: messageText,
         timestamp: new Date().toISOString(),
@@ -203,7 +213,7 @@ export function GlobalCourseChat({
           setConversationId(result.conversationId)
 
           const assistantMessage: ChatMessage = {
-            id: `msg-${Date.now()}`, // Add ID
+            id: generateMessageId('msg'),
             role: 'assistant',
             content: result.assistantMessage,
             timestamp: new Date().toISOString(),
@@ -328,11 +338,11 @@ export function GlobalCourseChat({
               className="justify-start"
               disabled={isProcessing}
             >
-              <ToggleGroupItem value="refine" aria-label="Refine mode" className="text-xs">
+              <ToggleGroupItem value="refine" aria-label={t('modes.refineAriaLabel')} className="text-xs">
                 <Wand2 className="mr-1 h-3 w-3" />
                 {t('modes.refine')} ({tokenEstimates?.refine?.formatted ?? '~2K'})
               </ToggleGroupItem>
-              <ToggleGroupItem value="regenerate" aria-label="Regenerate mode" className="text-xs">
+              <ToggleGroupItem value="regenerate" aria-label={t('modes.regenerateAriaLabel')} className="text-xs">
                 <RefreshCcw className="mr-1 h-3 w-3" />
                 {t('modes.regenerate')} ({tokenEstimates?.regenerate?.formatted ?? '~20K+'})
               </ToggleGroupItem>

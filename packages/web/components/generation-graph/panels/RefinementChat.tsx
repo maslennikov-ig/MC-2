@@ -176,13 +176,13 @@ export const RefinementChat: React.FC<RefinementChatProps> = ({
                  className="justify-start"
                  disabled={isProcessing}
                >
-                 <ToggleGroupItem value="refine" aria-label="Refine mode" className="text-xs h-8">
+                 <ToggleGroupItem value="refine" aria-label={t('refinementChat.modes.refineAriaLabel')} className="text-xs h-8">
                    <Wand2 className="h-3 w-3 mr-1" />
-                   {t('refinementChat.modes.refine') || 'Уточнить'} (~2K)
+                   {t('refinementChat.modes.refine')} (~2K)
                  </ToggleGroupItem>
-                 <ToggleGroupItem value="regenerate" aria-label="Regenerate mode" className="text-xs h-8">
+                 <ToggleGroupItem value="regenerate" aria-label={t('refinementChat.modes.regenerateAriaLabel')} className="text-xs h-8">
                    <RefreshCcw className="h-3 w-3 mr-1" />
-                   {t('refinementChat.modes.regenerate') || 'Перегенерировать'} (~20K)
+                   {t('refinementChat.modes.regenerate')} (~20K)
                  </ToggleGroupItem>
                </ToggleGroup>
              </div>

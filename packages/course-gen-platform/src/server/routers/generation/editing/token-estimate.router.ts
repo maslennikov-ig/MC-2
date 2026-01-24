@@ -33,15 +33,28 @@ const TOKEN_ESTIMATES = {
 // ============================================================================
 
 /**
+ * Token formatting constants.
+ * Values < threshold shown as-is, larger values shown in K format.
+ */
+const TOKEN_FORMAT = {
+  /** Threshold for switching to K format */
+  THRESHOLD: 1000,
+  /** Decimal places for K format */
+  DECIMALS: 1,
+} as const;
+
+/**
  * Format token count for display.
+ * Values < 1000 shown as-is (e.g., "500"), larger values shown in K format (e.g., "~2.5K").
+ *
  * @param tokens - Raw token count
- * @returns Formatted string (e.g., "500" or "~2.5K")
+ * @returns Formatted string
  */
 function formatTokens(tokens: number): string {
-  if (tokens < 1000) {
+  if (tokens < TOKEN_FORMAT.THRESHOLD) {
     return `${tokens}`;
   }
-  return `~${(tokens / 1000).toFixed(1)}K`;
+  return `~${(tokens / TOKEN_FORMAT.THRESHOLD).toFixed(TOKEN_FORMAT.DECIMALS)}K`;
 }
 
 // ============================================================================

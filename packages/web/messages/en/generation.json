@@ -309,7 +309,9 @@
     "preparingRegeneration": "Preparing regeneration...",
     "modes": {
       "refine": "Refine",
-      "regenerate": "Regenerate"
+      "regenerate": "Regenerate",
+      "refineAriaLabel": "Switch to refine mode for small edits",
+      "regenerateAriaLabel": "Switch to regenerate mode for full content recreation"
     },
     "quickActions": {
       "addPractice": {
