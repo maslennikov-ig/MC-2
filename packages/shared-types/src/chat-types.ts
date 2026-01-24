@@ -46,6 +46,9 @@ export const chatRequestSchema = z.object({
 
   /** Previous output content for context */
   previousOutput: z.string().optional(),
+
+  /** Explicit user intent: refine (inline edit) or regenerate (full regen) */
+  intent: z.enum(['refine', 'regenerate']),
 });
 
 /**
@@ -114,31 +117,3 @@ export interface ChatMessage {
   createdAt: string;
 }
 
-// ============================================================================
-// Intent Classification Keywords
-// ============================================================================
-
-/**
- * Keywords that indicate regeneration intent (vs refinement).
- * Used for rule-based intent classification.
- */
-export const REGENERATE_KEYWORDS = [
-  // Russian
-  'перегенерируй',
-  'перегенерировать',
-  'сгенерируй заново',
-  'заново',
-  'с нуля',
-  'весь курс',
-  'полностью',
-  'переделай',
-  'переделать полностью',
-  // English
-  'regenerate',
-  'generate again',
-  'from scratch',
-  'entire course',
-  'completely',
-  'redo',
-  'start over',
-] as const;

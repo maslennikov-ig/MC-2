@@ -46,6 +46,10 @@
       "moreExamples": "More examples",
       "simplify": "Simplify",
       "moreDetail": "More detail"
+    },
+    "modes": {
+      "refine": "Refine",
+      "regenerate": "Regenerate"
     }
   },
   "errors": {
@@ -302,6 +306,10 @@
     "error": "Error",
     "errorDescription": "Failed to send message. Please try again.",
     "regenerationTriggered": "Course Regeneration",
-    "preparingRegeneration": "Preparing regeneration..."
+    "preparingRegeneration": "Preparing regeneration...",
+    "modes": {
+      "refine": "Refine",
+      "regenerate": "Regenerate"
+    }
   }
 }

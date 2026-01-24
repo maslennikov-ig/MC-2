@@ -2,7 +2,8 @@ import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
-import { MessageSquare, ChevronDown, ChevronUp, Send, Loader2 } from 'lucide-react';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { MessageSquare, ChevronDown, ChevronUp, Send, Loader2, Wand2, RefreshCcw } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTranslation } from '@/lib/generation-graph/useTranslation';
 import { QuickActions } from './QuickActions';
@@ -20,7 +21,7 @@ interface RefinementChatProps {
   stageId: string;
   nodeId?: string;
   attemptNumber: number;
-  onRefine: (message: string) => void;
+  onRefine: (message: string, intent: 'refine' | 'regenerate') => void;
   history?: ChatMessage[];
   isProcessing?: boolean;
 }
@@ -33,6 +34,7 @@ export const RefinementChat: React.FC<RefinementChatProps> = ({
   const { t } = useTranslation();
   const [isOpen, setIsOpen] = useState(false); // Collapsed by default
   const [message, setMessage] = useState('');
+  const [selectedIntent, setSelectedIntent] = useState<'refine' | 'regenerate'>('refine');
   const [pendingMessages, setPendingMessages] = useState<ChatMessage[]>([]);
   const scrollRef = useRef<HTMLDivElement>(null);
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -88,7 +90,7 @@ export const RefinementChat: React.FC<RefinementChatProps> = ({
         pending: true
       }]);
 
-      onRefine(message);
+      onRefine(message, selectedIntent);
       setMessage('');
     }
   };
@@ -166,6 +168,23 @@ export const RefinementChat: React.FC<RefinementChatProps> = ({
           )}
 
           <div className="space-y-3">
+             <div className="flex items-center gap-2 mb-3">
+               <ToggleGroup
+                 type="single"
+                 value={selectedIntent}
+                 onValueChange={(value) => value && setSelectedIntent(value as 'refine' | 'regenerate')}
+                 className="justify-start"
+               >
+                 <ToggleGroupItem value="refine" aria-label="Refine mode" className="text-xs h-8">
+                   <Wand2 className="h-3 w-3 mr-1" />
+                   {t('refinementChat.modes.refine') || 'Уточнить'} (~2K)
+                 </ToggleGroupItem>
+                 <ToggleGroupItem value="regenerate" aria-label="Regenerate mode" className="text-xs h-8">
+                   <RefreshCcw className="h-3 w-3 mr-1" />
+                   {t('refinementChat.modes.regenerate') || 'Перегенерировать'} (~20K)
+                 </ToggleGroupItem>
+               </ToggleGroup>
+             </div>
              <QuickActions onSelect={handleQuickAction} disabled={isProcessing} />
 
              <form onSubmit={handleSubmit} className="flex gap-2">
