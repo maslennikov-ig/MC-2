@@ -3,6 +3,43 @@
  * Single source of truth for all course-related URLs
  */
 
+import { z } from 'zod'
+
+/**
+ * Slug validation schema
+ * Allows: lowercase letters, numbers, hyphens
+ * Max length: 100 characters
+ */
+export const SlugSchema = z
+  .string()
+  .min(1, 'Slug cannot be empty')
+  .max(100, 'Slug too long')
+  .regex(/^[a-z0-9][a-z0-9-]*[a-z0-9]$|^[a-z0-9]$/, 'Invalid slug format')
+
+/**
+ * Validate a slug string
+ * @param slug - String to validate
+ * @returns true if valid, false otherwise
+ */
+export function isValidSlug(slug: string): boolean {
+  return SlugSchema.safeParse(slug).success
+}
+
+/**
+ * Validate and sanitize a slug, throws if invalid
+ * @param slug - String to validate
+ * @param name - Name for error message (e.g., 'orgSlug', 'courseSlug')
+ * @returns Validated slug
+ * @throws Error if slug is invalid
+ */
+export function validateSlug(slug: string, name: string = 'slug'): string {
+  const result = SlugSchema.safeParse(slug)
+  if (!result.success) {
+    throw new Error(`Invalid ${name}: ${result.error.issues[0]?.message || 'invalid format'}`)
+  }
+  return result.data
+}
+
 /**
  * Build URL for viewing a course
  * @param orgSlug - Organization slug
