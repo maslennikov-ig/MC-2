@@ -142,6 +142,7 @@ echo ""
 echo "Cleaning up Docker resources..."
 
 # Remove dangling images (not tagged, safe to remove)
+# NOTE: Using -f (dangling only), NOT -a which would remove docling-mcp (8GB, manually built)
 DANGLING_CLEANED=$(docker image prune -f 2>/dev/null | tail -1 || echo "0B")
 echo "   Dangling images cleaned: $DANGLING_CLEANED"
 
