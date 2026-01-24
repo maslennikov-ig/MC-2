@@ -2,6 +2,7 @@ import type { QdrantClient } from '@qdrant/js-client-rest';
 import type { GenerationJobInput } from '@megacampus/shared-types';
 import { SectionWithoutInjectedFieldsSchema } from '@megacampus/shared-types/generation-result';
 import { getStylePrompt } from '@megacampus/shared-types/style-prompts';
+import { getCourseSizePreset, type CourseSize } from '@megacampus/shared-types/course-size';
 import { zodToPromptSchema } from '@/shared/utils/zod-to-prompt-schema';
 import {
   getDifficultyFromAnalysis,
@@ -37,7 +38,23 @@ export function buildBatchPrompt(
 - Course Title: ${input.frontend_parameters.course_title}
 - Target Language: ${language}
 - Content Style: ${stylePrompt}
+${input.frontend_parameters.target_audience ? `- Target Audience: ${input.frontend_parameters.target_audience}` : ''}
+`;
 
+  // Add user-provided context if available
+  if (input.frontend_parameters.description) {
+    prompt += `\n**User Requirements**: ${input.frontend_parameters.description}\n`;
+  }
+
+  // Add course size context
+  if (input.frontend_parameters.course_size && input.frontend_parameters.course_size !== 'auto') {
+    const preset = getCourseSizePreset(input.frontend_parameters.course_size as CourseSize);
+    if (preset?.llmGuidance) {
+      prompt += `\n**Course Size**: ${preset.llmGuidance}\n`;
+    }
+  }
+
+  prompt += `
 **Section to Expand** (Section ${sectionIndex + 1}):
 - Section Title: ${sectionTitle}
 - Learning Objectives (section-level): ${learningObjectives.join('; ')}

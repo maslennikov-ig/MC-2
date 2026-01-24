@@ -98,10 +98,12 @@ export const lifecycleRouter = router({
 
       try {
         // T013: Verify course ownership and get organization tier
-        // NOTE: course_size is included to pass to Stage 4 job data (avoid race conditions)
+        // NOTE: All form fields included to pass to Stage 5 job data (frontend_parameters)
         const { data: course, error: courseError } = await supabase
           .from('courses')
-          .select('*, language, course_size, organization:organizations(tier)')
+          .select(
+            '*, language, course_size, course_description, estimated_lessons, estimated_sections, learning_outcomes, organization:organizations(tier)'
+          )
           .eq('id', courseId)
           .single();
 
@@ -723,6 +725,24 @@ export const lifecycleRouter = router({
           : [];
 
         // Step 5: Build GenerationJobInput
+        // Parse learning_outcomes: can be JSON array string or newline-separated string
+        let parsedLearningOutcomes: string[] | undefined;
+        if (course.learning_outcomes) {
+          if (typeof course.learning_outcomes === 'string') {
+            // Try JSON parse first, then fallback to newline split
+            try {
+              parsedLearningOutcomes = JSON.parse(course.learning_outcomes);
+            } catch {
+              parsedLearningOutcomes = course.learning_outcomes
+                .split('\n')
+                .map((s: string) => s.trim())
+                .filter(Boolean);
+            }
+          } else if (Array.isArray(course.learning_outcomes)) {
+            parsedLearningOutcomes = course.learning_outcomes;
+          }
+        }
+
         const jobInput = {
           course_id: courseId,
           organization_id: course.organization_id,
@@ -735,13 +755,17 @@ export const lifecycleRouter = router({
             style: course.style && isValidStyle(course.style) ? course.style : DEFAULT_COURSE_STYLE,
             target_audience: course.target_audience ?? undefined,
             difficulty: course.difficulty ?? 'intermediate',
-            desired_lessons_count: (course.settings as unknown as CourseSettings)
-              ?.desired_lessons_count,
-            desired_modules_count: (course.settings as unknown as CourseSettings)
-              ?.desired_modules_count,
+            // NEW: Add user description for context
+            description: course.course_description ?? undefined,
+            // NEW: Add course size preset
+            course_size: course.course_size ?? undefined,
+            // FIX: Read from courses table, not from settings
+            desired_lessons_count: course.estimated_lessons ?? undefined,
+            desired_modules_count: course.estimated_sections ?? undefined,
             lesson_duration_minutes: (course.settings as unknown as CourseSettings)
               ?.lesson_duration_minutes,
-            learning_outcomes: (course.settings as unknown as CourseSettings)?.learning_outcomes,
+            // FIX: Read from courses table with proper parsing
+            learning_outcomes: parsedLearningOutcomes,
           },
           vectorized_documents: hasVectorizedDocs,
           document_summaries: documentSummaries,
