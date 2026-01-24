@@ -1,7 +1,7 @@
 import type { QdrantClient } from '@qdrant/js-client-rest';
 import type { GenerationJobInput } from '@megacampus/shared-types';
 import type { SectionBreakdown } from '@megacampus/shared-types/analysis-schemas';
-import { getModelForPhase } from '../../../../shared/llm/langchain-models';
+import { createModelConfigService } from '../../../../shared/llm/model-config-service';
 import { getRagTokenBudget } from '../../../../services/global-settings-service';
 import logger from '@/shared/logger';
 import { ModelTier } from './types';
@@ -118,13 +118,14 @@ export async function selectModelTier(
   ) {
     try {
       const langCode = normalizeLanguageCode(language, 'en');
-      const model = await getModelForPhase(
+      const modelConfigService = createModelConfigService();
+      const config = await modelConfigService.getModelForPhase(
         'stage_5_sections',
         undefined,
         estimatedContextLength,
         langCode
       );
-      const modelId = model.model || MODELS.lessons_fallback;
+      const modelId = config.modelId || MODELS.lessons_fallback;
 
       const isRussian = langCode === 'ru';
       const tierName = isRussian ? 'tier2_ru_lessons' : 'tier2_en_lessons';
@@ -163,9 +164,42 @@ export async function selectModelTier(
     }
   }
 
-  return {
-    model: MODELS.tier1_oss120b,
-    tier: 'tier1_oss120b',
-    reason: `Standard section: complexity=${complexityScore.toFixed(2)} <${QUALITY_THRESHOLDS.complexity}, criticality=${criticalityScore.toFixed(2)} <${QUALITY_THRESHOLDS.criticality}`,
-  };
+  // Tier 1: Standard complexity - try to get model from database
+  const langCode = normalizeLanguageCode(language, 'en');
+  try {
+    const modelConfigService = createModelConfigService();
+    const tier1Config = await modelConfigService.getModelForPhase(
+      'stage_5_tier1',
+      undefined,
+      estimatedContextLength,
+      langCode
+    );
+    const tier1Model = tier1Config.modelId || MODELS.tier1_oss120b;
+
+    logger.info({
+      msg: 'Tier 1 model selection via getModelForPhase',
+      phase: 'stage_5_tier1',
+      modelId: tier1Model,
+      source: tier1Config.source,
+      complexityScore,
+      criticalityScore,
+    });
+
+    return {
+      model: tier1Model,
+      tier: 'tier1_oss120b',
+      reason: `Standard section (model from ${tier1Config.source}: ${tier1Model}): complexity=${complexityScore.toFixed(2)}, criticality=${criticalityScore.toFixed(2)}`,
+    };
+  } catch (error) {
+    logger.warn({
+      msg: 'getModelForPhase failed for tier1, using hardcoded fallback',
+      error: error instanceof Error ? error.message : 'Unknown error',
+    });
+
+    return {
+      model: MODELS.tier1_oss120b,
+      tier: 'tier1_oss120b',
+      reason: `Standard section (hardcoded fallback): complexity=${complexityScore.toFixed(2)}, criticality=${criticalityScore.toFixed(2)}`,
+    };
+  }
 }

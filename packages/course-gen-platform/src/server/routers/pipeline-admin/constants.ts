@@ -71,6 +71,8 @@ export const PIPELINE_STAGES = [
     linkedPhases: [
       'stage_5_metadata',
       'stage_5_sections',
+      'stage_5_tier1',
+      'stage_5_escalation',
       // NOTE: stage_6_rag_planning was incorrectly placed here (it belonged to Stage 4 Phase 6)
       // Removed in mc2-u9fb - vector search with priority boosting used instead
     ] as PhaseName[],
@@ -243,6 +245,18 @@ export const DEFAULT_MODEL_CONFIGS: Record<PhaseName, DefaultModelConfig> = {
     temperature: 0.7,
     maxTokens: 8000,
     fallbackModelId: DEFAULT_FALLBACK_MODEL_ID,
+  },
+  stage_5_tier1: {
+    modelId: 'openai/gpt-oss-120b',
+    temperature: 0.7,
+    maxTokens: 30000,
+    fallbackModelId: 'moonshotai/kimi-k2-0905',
+  },
+  stage_5_escalation: {
+    modelId: 'moonshotai/kimi-k2-0905',
+    temperature: 0.7,
+    maxTokens: 30000,
+    fallbackModelId: 'google/gemini-2.5-flash',
   },
   stage_5_standard_ru: {
     modelId: DEFAULT_MODEL_ID,
