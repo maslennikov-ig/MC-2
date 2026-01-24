@@ -1,10 +1,18 @@
 import { useState, useCallback, useRef, useEffect } from 'react';
 import { toast } from "sonner";
-import { RefinementRequest } from '@megacampus/shared-types';
-import { refineStageResult } from '@/app/actions/refinement';
+import { ChatRequest, ChatResponse } from '@megacampus/shared-types/chat-types';
+import { sendChatMessage } from '@/app/actions/refinement';
+
+interface ChatMessage {
+  role: 'user' | 'assistant';
+  content: string;
+  timestamp: string;
+}
 
 export const useRefinement = (courseId: string) => {
   const [isRefining, setIsRefining] = useState(false);
+  const [conversationId, setConversationId] = useState<string | undefined>();
+  const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const abortControllerRef = useRef<AbortController | null>(null);
 
   // Cleanup: abort pending requests on unmount
@@ -24,13 +32,18 @@ export const useRefinement = (courseId: string) => {
     }
   }, []);
 
+  const clearConversation = useCallback(() => {
+    setConversationId(undefined);
+    setChatHistory([]);
+  }, []);
+
   const refine = useCallback(async (
       stageId: string,
       nodeId: string | undefined,
-      attemptNumber: number,
+      _attemptNumber: number,
       userMessage: string,
       previousOutput: string
-  ) => {
+  ): Promise<ChatResponse | undefined> => {
     // Cancel any existing request
     if (abortControllerRef.current) {
       abortControllerRef.current.abort();
@@ -42,22 +55,45 @@ export const useRefinement = (courseId: string) => {
 
     setIsRefining(true);
     try {
-      const request: RefinementRequest = {
+      const request: ChatRequest = {
           courseId,
-          stageId: stageId as RefinementRequest['stageId'],
-          nodeId,
-          attemptNumber,
+          chatType: 'node',
           userMessage,
-          previousOutput
+          conversationId,
+          nodeContext: {
+            stageId,
+            nodeId,
+            blockPath: undefined,
+          },
+          previousOutput,
       };
 
-      const response = await refineStageResult(request, controller.signal);
+      const response = await sendChatMessage(request, controller.signal);
 
-      // Only show success toast if request wasn't aborted
+      // Only update state if request wasn't aborted
       if (!controller.signal.aborted) {
-        toast.success("Refinement Started", {
-            description: "AI is working on your changes. A new attempt will appear shortly.",
-        });
+        // Update conversation state from response
+        if (response.conversationId) {
+          setConversationId(response.conversationId);
+        }
+
+        // Add messages to history
+        setChatHistory(prev => [
+          ...prev,
+          { role: 'user', content: userMessage, timestamp: new Date().toISOString() },
+          { role: 'assistant', content: response.assistantMessage, timestamp: new Date().toISOString() }
+        ]);
+
+        // Show appropriate toast based on intent
+        if (response.intent === 'regenerate') {
+          toast.success("Regeneration Started", {
+            description: "AI is regenerating the content. A new version will appear shortly.",
+          });
+        } else {
+          toast.success("Refinement Applied", {
+            description: response.assistantMessage,
+          });
+        }
       }
 
       return response;
@@ -68,8 +104,8 @@ export const useRefinement = (courseId: string) => {
         return;
       }
 
-      toast.error("Refinement Failed", {
-          description: error instanceof Error ? error.message : "Could not submit refinement request. Please try again.",
+      toast.error("Chat Failed", {
+          description: error instanceof Error ? error.message : "Could not send message. Please try again.",
       });
       throw error;
     } finally {
@@ -79,11 +115,14 @@ export const useRefinement = (courseId: string) => {
         abortControllerRef.current = null;
       }
     }
-  }, [courseId]);
+  }, [courseId, conversationId]);
 
   return {
     refine,
     isRefining,
-    cancel
+    cancel,
+    conversationId,
+    chatHistory,
+    clearConversation,
   };
 };

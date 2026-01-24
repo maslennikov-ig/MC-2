@@ -48,6 +48,9 @@ export * from './pipeline-admin-schemas';
 export * from './regeneration-types';
 export * from './dependency-graph';
 
+// Chat Types for Course Refinement/Regeneration
+export * from './chat-types';
+
 // Stage 6 UI Types (Glass Factory Dashboard)
 export * from './stage6-ui.types';
 

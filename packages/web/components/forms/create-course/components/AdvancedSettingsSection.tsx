@@ -89,7 +89,7 @@ export function AdvancedSettingsSection() {
             <textarea
               {...register('learningOutcomes')}
               rows={3}
-              maxLength={1000}
+              maxLength={2000}
               className="w-full resize-none rounded-xl border border-slate-300 bg-slate-100 px-4 py-3 text-slate-900 placeholder-slate-400 transition-all focus:border-purple-500 focus:bg-slate-50 focus:outline-none dark:border-white/20 dark:bg-white/10 dark:text-white dark:placeholder-white/40 dark:focus:border-purple-400 dark:focus:bg-white/15"
               placeholder="После прохождения курса студенты смогут..."
             />

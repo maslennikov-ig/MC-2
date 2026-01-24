@@ -292,5 +292,16 @@
     "title": "Курс создан!",
     "message": "Ваш курс готов.",
     "viewCourse": "Открыть курс"
+  },
+  "globalChat": {
+    "title": "AI-ассистент курса",
+    "messageCount": "{count} сообщений",
+    "emptyState": "Задайте вопрос или попросите улучшить курс",
+    "placeholder": "Как я могу помочь улучшить курс?",
+    "thinking": "Думаю...",
+    "error": "Ошибка",
+    "errorDescription": "Не удалось отправить сообщение. Попробуйте снова.",
+    "regenerationTriggered": "Перегенерация курса",
+    "preparingRegeneration": "Подготавливаем перегенерацию..."
   }
 }

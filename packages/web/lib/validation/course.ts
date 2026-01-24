@@ -12,7 +12,7 @@ export const createCourseSchema = z.object({
 
   description: z
     .string()
-    .max(5000, 'Description must be less than 5000 characters')
+    .max(7000, 'Description must be less than 7000 characters')
     .regex(/^[^<>]*$/, 'Description cannot contain HTML tags')
     .optional(),
 
@@ -36,7 +36,7 @@ export const createCourseSchema = z.object({
 
   learningOutcomes: z
     .string()
-    .max(1000, 'Learning outcomes must be less than 1000 characters')
+    .max(2000, 'Learning outcomes must be less than 2000 characters')
     .regex(/^[^<>]*$/, 'Learning outcomes cannot contain HTML tags')
     .optional(),
 

@@ -183,7 +183,7 @@ export function BasicInfoSection({ onBlur }: BasicInfoSectionProps) {
             id="description"
             {...register('description')}
             rows={4}
-            maxLength={5000}
+            maxLength={7000}
             className={`w-full resize-none rounded-xl border bg-slate-100 px-4 py-3 text-slate-900 placeholder-slate-400 transition-all focus:bg-slate-50 focus:outline-none dark:bg-white/10 dark:text-white dark:placeholder-white/40 dark:focus:bg-white/15 ${
               errors.description
                 ? 'animate-pulse border-red-500'
