@@ -311,6 +311,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.28.34] - 2026-01-24
+
+### Added
+
+- **course-gen-platform**: add 1 source file(s), update 3 source file(s), +1 more (ddd54cf3)
+
+### Fixed
+
+- **generation**: use all form fields in course generation prompts (6f0f99df)
+
 ## [0.28.33] - 2026-01-23
 
 ### Added

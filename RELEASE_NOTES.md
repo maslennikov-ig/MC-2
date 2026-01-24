@@ -2,6 +2,22 @@
 
 _Released on 2025-12-26_
 
+## v0.28.34
+
+_Released on 2026-01-24_
+
+### ✨ New Features
+
+- **course-gen-platform**: Add 1 source file(s), update 3 source file(s), +1 more
+
+### 🐛 Bug Fixes
+
+- **generation**: Use all form fields in course generation prompts
+
+---
+
+_This release was automatically generated from 2 commits._
+
 ## v0.28.33
 
 _Released on 2026-01-23_
