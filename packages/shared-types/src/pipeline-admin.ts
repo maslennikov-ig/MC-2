@@ -38,6 +38,8 @@ export const phaseNameSchema = z.enum([
   // Stage 5: Structure Generation
   'stage_5_metadata',
   'stage_5_sections',
+  'stage_5_tier1', // Standard complexity tier (Tier 1 models)
+  'stage_5_escalation', // Escalation/retry tier (language-specific premium models)
   'stage_5_standard_ru',
   'stage_5_standard_en',
   'stage_5_extended_ru',
@@ -226,22 +228,28 @@ export const configBackupSchema = z.object({
 export type ConfigBackup = z.infer<typeof configBackupSchema>;
 
 export const importPreviewSchema = z.object({
-  modelConfigChanges: z.array(z.object({
-    phaseName: phaseNameSchema,
-    currentModelId: z.string().nullable(),
-    newModelId: z.string(),
-    changeType: z.enum(['add', 'update', 'unchanged']),
-  })),
-  promptTemplateChanges: z.array(z.object({
-    stage: z.string(),
-    promptKey: z.string(),
-    changeType: z.enum(['add', 'update', 'unchanged']),
-  })),
-  settingsChanges: z.array(z.object({
-    key: z.string(),
-    currentValue: z.unknown(),
-    newValue: z.unknown(),
-  })),
+  modelConfigChanges: z.array(
+    z.object({
+      phaseName: phaseNameSchema,
+      currentModelId: z.string().nullable(),
+      newModelId: z.string(),
+      changeType: z.enum(['add', 'update', 'unchanged']),
+    })
+  ),
+  promptTemplateChanges: z.array(
+    z.object({
+      stage: z.string(),
+      promptKey: z.string(),
+      changeType: z.enum(['add', 'update', 'unchanged']),
+    })
+  ),
+  settingsChanges: z.array(
+    z.object({
+      key: z.string(),
+      currentValue: z.unknown(),
+      newValue: z.unknown(),
+    })
+  ),
 });
 
 export type ImportPreview = z.infer<typeof importPreviewSchema>;

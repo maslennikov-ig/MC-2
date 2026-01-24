@@ -116,6 +116,16 @@ const PHASE_FALLBACK_CONFIG: Record<
     temperature: 0.7,
     maxTokens: 8000,
   },
+  stage_5_tier1: {
+    modelId: 'openai/gpt-oss-120b',
+    temperature: 0.7,
+    maxTokens: 30000,
+  },
+  stage_5_escalation: {
+    modelId: 'moonshotai/kimi-k2-0905',
+    temperature: 0.7,
+    maxTokens: 30000,
+  },
   stage_5_standard_ru: {
     modelId: DEFAULT_MODEL_ID,
     temperature: MODEL_DEFAULTS.temperature,
