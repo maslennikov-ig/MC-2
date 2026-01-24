@@ -23,7 +23,26 @@ echo "Cleaning up orphan dev containers..."
 # Docker filter doesn't support regex, so we explicitly list dev container names
 docker rm -f megacampus-api-dev megacampus-web-dev 2>/dev/null || true
 
-# 3. Ensure infrastructure is running (shared with staging)
+# 3. Check docling-mcp image exists (manually built, 8GB)
+DOCLING_IMAGE="ghcr.io/maslennikov-ig/mc-2/docling-mcp:latest"
+if ! docker image inspect "$DOCLING_IMAGE" > /dev/null 2>&1; then
+    echo ""
+    echo "ERROR: docling-mcp image not found!"
+    echo ""
+    echo "This image is built manually (too large for CI/CD)."
+    echo "To fix, run one of:"
+    echo ""
+    echo "  # Option 1: Retag from old name (if exists)"
+    echo "  docker tag ghcr.io/maslennikov-ig/megacampusai/docling-mcp:latest $DOCLING_IMAGE"
+    echo ""
+    echo "  # Option 2: Rebuild (~30 min)"
+    echo "  cd $BASE_PATH && docker build -t $DOCLING_IMAGE \\"
+    echo "    -f packages/course-gen-platform/docker/docling-mcp/Dockerfile ."
+    echo ""
+    exit 1
+fi
+
+# 4. Ensure infrastructure is running (shared with staging)
 echo "Ensuring infrastructure is running..."
 docker compose -f "$BASE_PATH/docker-compose.infra.yml" up -d
 echo "   Infrastructure ready."
