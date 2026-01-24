@@ -14,11 +14,13 @@ import {
   RefreshCcw,
   Scissors,
   Plus,
+  Wand2,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useTranslations } from 'next-intl'
 import { MarkdownRendererClient } from '@/components/markdown/MarkdownRendererClient'
 import { toast } from '@/lib/toast'
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 
 interface ChatMessage {
   id?: string // Add optional ID for tracking
@@ -82,13 +84,6 @@ const QUICK_ACTIONS = [
     icon: Scissors,
     prompt: 'Упрости язык и объяснения, сделай материал более доступным',
   },
-  {
-    id: 'regenerate',
-    label: 'Перегенерировать',
-    labelEn: 'Regenerate',
-    icon: RefreshCcw,
-    prompt: 'Перегенерируй курс с учётом моих пожеланий',
-  },
 ]
 
 export function GlobalCourseChat({
@@ -102,6 +97,7 @@ export function GlobalCourseChat({
   const [isProcessing, setIsProcessing] = useState(false)
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([])
   const [conversationId, setConversationId] = useState<string | undefined>()
+  const [selectedIntent, setSelectedIntent] = useState<'refine' | 'regenerate'>('refine')
   const scrollRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
 
@@ -120,7 +116,7 @@ export function GlobalCourseChat({
   }, [isOpen])
 
   const sendMessage = useCallback(
-    async (messageText: string) => {
+    async (messageText: string, intent: 'refine' | 'regenerate' = selectedIntent) => {
       if (!messageText.trim() || isProcessing) return
 
       setIsProcessing(true)
@@ -147,6 +143,7 @@ export function GlobalCourseChat({
               chatType: 'global',
               userMessage: messageText,
               conversationId,
+              intent,
             },
           }),
         })
@@ -188,16 +185,16 @@ export function GlobalCourseChat({
         setIsProcessing(false)
       }
     },
-    [courseId, conversationId, isProcessing, onRegenerationRequest, t]
+    [courseId, conversationId, isProcessing, onRegenerationRequest, selectedIntent, t]
   )
 
   const handleSubmit = (e?: React.FormEvent) => {
     e?.preventDefault()
-    sendMessage(message)
+    void sendMessage(message, selectedIntent)
   }
 
   const handleQuickAction = (actionPrompt: string) => {
-    sendMessage(actionPrompt)
+    void sendMessage(actionPrompt, 'refine')
   }
 
   return (
@@ -268,6 +265,31 @@ export function GlobalCourseChat({
               </div>
             )}
           </ScrollArea>
+
+          {/* Intent mode toggle */}
+          <div className="flex items-center gap-2 border-t px-4 py-2">
+            <ToggleGroup
+              type="single"
+              value={selectedIntent}
+              onValueChange={(value) =>
+                value && setSelectedIntent(value as 'refine' | 'regenerate')
+              }
+              className="justify-start"
+            >
+              <ToggleGroupItem value="refine" aria-label="Refine mode" className="text-xs">
+                <Wand2 className="mr-1 h-3 w-3" />
+                {t('modes.refine')} (~2K)
+              </ToggleGroupItem>
+              <ToggleGroupItem
+                value="regenerate"
+                aria-label="Regenerate mode"
+                className="text-xs"
+              >
+                <RefreshCcw className="mr-1 h-3 w-3" />
+                {t('modes.regenerate')} (~20K+)
+              </ToggleGroupItem>
+            </ToggleGroup>
+          </div>
 
           {/* Quick actions */}
           <div className="flex flex-wrap gap-2 border-t px-4 py-2">

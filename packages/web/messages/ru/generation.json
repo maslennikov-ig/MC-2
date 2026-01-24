@@ -46,6 +46,10 @@
       "moreExamples": "Больше примеров",
       "simplify": "Упростить",
       "moreDetail": "Подробнее"
+    },
+    "modes": {
+      "refine": "Уточнить",
+      "regenerate": "Перегенерировать"
     }
   },
   "errors": {
@@ -302,6 +306,10 @@
     "error": "Ошибка",
     "errorDescription": "Не удалось отправить сообщение. Попробуйте снова.",
     "regenerationTriggered": "Перегенерация курса",
-    "preparingRegeneration": "Подготавливаем перегенерацию..."
+    "preparingRegeneration": "Подготавливаем перегенерацию...",
+    "modes": {
+      "refine": "Уточнить",
+      "regenerate": "Перегенерировать"
+    }
   }
 }

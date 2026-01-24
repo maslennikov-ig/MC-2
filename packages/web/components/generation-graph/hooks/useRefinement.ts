@@ -43,7 +43,8 @@ export const useRefinement = (courseId: string) => {
       nodeId: string | undefined,
       _attemptNumber: number,
       userMessage: string,
-      previousOutput: string
+      previousOutput: string,
+      intent: 'refine' | 'regenerate' = 'refine'
     ): Promise<ChatResponse | undefined> => {
       // Cancel any existing request
       if (abortControllerRef.current) {
@@ -67,6 +68,7 @@ export const useRefinement = (courseId: string) => {
             blockPath: undefined,
           },
           previousOutput,
+          intent,
         }
 
         const response = await sendChatMessage(request, controller.signal)

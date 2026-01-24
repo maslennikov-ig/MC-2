@@ -667,18 +667,19 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
     };
   }, [selectedNodeId, displayData?.traceId, displayData?.outputData, displayData?.status, fetchTraceDetails]);
 
-  const handleRefine = async (message: string) => {
+  const handleRefine = async (message: string, intent: 'refine' | 'regenerate' = 'refine') => {
       if (!data || !selectedAttemptNum) return;
-      
+
       // Get current output to refine
       const currentOutput = JSON.stringify(displayData?.outputData || {});
-      
+
       await refine(
           `stage_${data.stageNumber}`,
           selectedNodeId || undefined,
           selectedAttemptNum,
           message,
-          currentOutput
+          currentOutput,
+          intent
       );
   };
 
@@ -1107,7 +1108,7 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
                           stageId={`stage_${data?.stageNumber}`}
                           nodeId={selectedNodeId || undefined}
                           attemptNumber={selectedAttemptNum || 1}
-                          onRefine={handleRefine}
+                          onRefine={(msg, intent) => void handleRefine(msg, intent)}
                           history={chatHistory}
                           isProcessing={isRefining}
                       />

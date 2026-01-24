@@ -15,6 +15,7 @@ import { regenerationRouter } from './editing/regeneration.router';
 import { permissionsRouter } from './editing/permissions.router';
 import { editHistoryRouter } from './editing/edit-history.router';
 import { chatRouter } from './editing/chat.router';
+import { tokenEstimateRouter } from './editing/token-estimate.router';
 
 /**
  * Editing Router - Course content editing operations
@@ -35,4 +36,5 @@ export const editingRouter = router({
   ...permissionsRouter,
   ...editHistoryRouter,
   ...chatRouter,
+  ...tokenEstimateRouter,
 });

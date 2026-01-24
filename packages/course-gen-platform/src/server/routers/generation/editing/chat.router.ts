@@ -22,12 +22,7 @@ import {
 } from '../../../../shared/supabase/authenticated';
 import { logger } from '../../../../shared/logger/index.js';
 import { nanoid } from 'nanoid';
-import {
-  chatRequestSchema,
-  REGENERATE_KEYWORDS,
-  type ChatResponse,
-  type ChatIntent,
-} from '@megacampus/shared-types/chat-types';
+import { chatRequestSchema, type ChatResponse } from '@megacampus/shared-types/chat-types';
 import { llmClient } from '../../../../shared/llm/client';
 import { createModelConfigService } from '../../../../shared/llm/model-config-service';
 
@@ -66,30 +61,6 @@ const CHAT_FALLBACK_CONFIG = {
   temperature: parseFloat(process.env.CHAT_FALLBACK_TEMPERATURE || '0.7'),
   maxTokens: parseInt(process.env.CHAT_FALLBACK_MAX_TOKENS || '4096', 10),
 } as const;
-
-// ============================================================================
-// Intent Classification
-// ============================================================================
-
-/**
- * Rule-based intent classification using keyword matching.
- * Returns 'regenerate' if message contains regeneration keywords,
- * otherwise returns 'refine' for inline content refinement.
- *
- * @param message - User message to classify
- * @returns Intent: 'refine' or 'regenerate'
- *
- * @example
- * classifyIntent('Перегенерируй курс') // returns 'regenerate'
- * classifyIntent('Добавь больше примеров') // returns 'refine'
- */
-function classifyIntent(message: string): ChatIntent {
-  const lowerMessage = message.toLowerCase();
-  const isRegenerate = REGENERATE_KEYWORDS.some((keyword: string) =>
-    lowerMessage.includes(keyword)
-  );
-  return isRegenerate ? 'regenerate' : 'refine';
-}
 
 // ============================================================================
 // Chat Router
@@ -163,8 +134,8 @@ export const chatRouter = {
       // Note: Manual ownership check removed - RLS policy on courses table enforces
       // that users can only select their own courses (user_id = auth.uid())
 
-      // Classify intent
-      const intent = classifyIntent(userMessage);
+      // Use explicit intent from request (UI selection, not keyword classification)
+      const intent = input.intent;
       const convId = conversationId || crypto.randomUUID();
 
       // Fetch conversation history before calling LLM
