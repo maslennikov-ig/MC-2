@@ -565,6 +565,53 @@ function GraphViewInner({
     }
   }, [pipelineStatus, courseId, initializeFromCourseStructure])
 
+  // Re-fetch course data (analysis_result, visual_style, style) when stage transitions to awaiting_approval
+  // This ensures results appear immediately without manual page refresh
+  useEffect(() => {
+    const awaitingStatuses = [
+      'stage_3_awaiting_approval',
+      'stage_4_awaiting_approval',
+      'stage_5_awaiting_approval',
+    ]
+
+    const wasNotAwaiting = !awaitingStatuses.includes(prevPipelineStatus.current || '')
+    const isNowAwaiting = awaitingStatuses.includes(pipelineStatus || '')
+
+    // Only trigger on transition TO awaiting status (not initial load or re-render)
+    if (wasNotAwaiting && isNowAwaiting) {
+      const fetchCourseData = async () => {
+        const supabase = createClient()
+        const { data, error } = await supabase
+          .from('courses')
+          .select('analysis_result, visual_style, style')
+          .eq('id', courseId)
+          .single()
+
+        if (error) {
+          console.error('[GraphView] Failed to fetch course data on awaiting:', error)
+          return
+        }
+
+        if (data?.analysis_result) {
+          const parsed = parseAnalysisResult(data.analysis_result)
+          if (parsed) {
+            setAnalysisResult(parsed)
+          }
+        }
+
+        if (data?.visual_style && isVisualStyle(data.visual_style)) {
+          setVisualStyle(data.visual_style)
+        }
+
+        if (data?.style) {
+          setCourseStyle(data.style)
+        }
+      }
+
+      fetchCourseData()
+    }
+  }, [pipelineStatus, courseId])
+
   // Initialize Stage 2 documents from database with proper statuses
   // This ensures documents appear in the graph on page load (before realtime traces arrive)
   // and have correct completion status for Stage2Group display
