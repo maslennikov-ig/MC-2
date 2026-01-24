@@ -7,6 +7,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.28.37] - 2026-01-24
+
+### Fixed
+
+- **deploy**: add docling-mcp image check before deploy (b2cf9efc)
+- **admin/logs**: default to status='new' in list view (2b99aaf0)
+- **deploy**: add automatic Docker cleanup after each deploy (7866287a)
+- **graph**: auto-refresh UI when stage reaches awaiting_approval (cdcc360e)
+- **infra**: add uploads-dev mount to docling and BARRIER_FAILED enum (5d6d05c7)
+- **changelog**: sort versions in correct descending order (8d2abbd9)
+
+### Other
+
+- **deploy**: add docling-mcp image management section (f25184fb)
+- bd sync: 2026-01-24 22:08:37 (ee74bd37)
+- bd sync: 2026-01-24 22:04:35 (8682bdd8)
+- bd sync: 2026-01-24 21:48:08 (f166ee0f)
+- **deploy**: add Dev Environment section to deployment guide (8bc58c84)
+
 ## [0.28.36] - 2026-01-24
 
 ### Fixed
