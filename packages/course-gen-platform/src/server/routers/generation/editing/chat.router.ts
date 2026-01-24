@@ -14,7 +14,12 @@
 
 import { TRPCError } from '@trpc/server';
 import { instructorProcedure } from '../../../procedures';
+import { createRateLimiter } from '../../../middleware/rate-limit';
 import { getSupabaseAdmin } from '../../../../shared/supabase/admin';
+import {
+  createAuthenticatedClient,
+  extractAccessToken,
+} from '../../../../shared/supabase/authenticated';
 import { logger } from '../../../../shared/logger/index.js';
 import { nanoid } from 'nanoid';
 import {
@@ -25,6 +30,23 @@ import {
 } from '@megacampus/shared-types/chat-types';
 import { llmClient } from '../../../../shared/llm/client';
 import { createModelConfigService } from '../../../../shared/llm/model-config-service';
+
+// ============================================================================
+// Rate Limiting Configuration
+// ============================================================================
+
+/**
+ * Rate limiter for chat endpoint to prevent abuse and control LLM costs.
+ * Configuration:
+ * - 20 requests per minute per user
+ * - Uses Redis for distributed rate limiting across instances
+ * - Fail-open strategy: if Redis is down, requests are allowed
+ */
+const chatRateLimiter = createRateLimiter({
+  requests: 20,
+  window: 60, // 1 minute
+  keyPrefix: 'chat-rate-limit',
+});
 
 // ============================================================================
 // Fallback Configuration
@@ -88,11 +110,11 @@ export const chatRouter = {
    * 8. Return response with intent and metrics
    */
   chat: instructorProcedure
+    .use(chatRateLimiter)
     .input(chatRequestSchema)
     .mutation(async ({ ctx, input }): Promise<ChatResponse> => {
       const { courseId, chatType, userMessage, conversationId, nodeContext, previousOutput } =
         input;
-      const supabase = getSupabaseAdmin();
       const requestId = nanoid();
       const userId = ctx.user?.id;
 
@@ -103,51 +125,76 @@ export const chatRouter = {
         });
       }
 
-      // Verify course ownership
-      const { data: course, error: courseError } = await supabase
+      // Extract access token for authenticated Supabase client (RLS enforcement)
+      const accessToken = extractAccessToken(ctx.req);
+      if (!accessToken) {
+        throw new TRPCError({
+          code: 'UNAUTHORIZED',
+          message: 'Authentication token required',
+        });
+      }
+
+      // Use authenticated client for course queries - RLS policies enforce access control
+      // This replaces the manual ownership check with database-level security
+      const supabaseAuth = createAuthenticatedClient(accessToken);
+
+      // Use admin client for chat message inserts (no user-facing RLS on chat_messages)
+      const supabaseAdmin = getSupabaseAdmin();
+
+      // Query course using authenticated client - RLS enforces ownership automatically
+      const { data: course, error: courseError } = await supabaseAuth
         .from('courses')
         .select('id, user_id, title, language, style, analysis_result, course_structure')
         .eq('id', courseId)
         .single();
 
       if (courseError || !course) {
-        logger.warn({ requestId, userId, courseId, error: courseError }, 'Course not found');
+        // RLS returns no data if user doesn't have access, so this covers both not found and forbidden
+        logger.warn(
+          { requestId, userId, courseId, error: courseError },
+          'Course not found or access denied'
+        );
         throw new TRPCError({
           code: 'NOT_FOUND',
-          message: 'Course not found',
+          message: 'Course not found or access denied',
         });
       }
 
-      if (course.user_id !== userId) {
-        logger.warn(
-          {
-            requestId,
-            userId,
-            courseId,
-            courseOwnerId: course.user_id,
-          },
-          'Course ownership violation in chat'
-        );
-        throw new TRPCError({
-          code: 'FORBIDDEN',
-          message: 'You do not have access to this course',
-        });
-      }
+      // Note: Manual ownership check removed - RLS policy on courses table enforces
+      // that users can only select their own courses (user_id = auth.uid())
 
       // Classify intent
       const intent = classifyIntent(userMessage);
       const convId = conversationId || crypto.randomUUID();
 
-      // Save user message to conversation history
-      const { error: insertUserMsgError } = await supabase.from('course_chat_messages').insert({
-        course_id: courseId,
-        conversation_id: convId,
-        role: 'user',
-        content: userMessage,
-        chat_type: chatType,
-        node_context: nodeContext || null,
-        intent,
-      });
+      // Fetch conversation history before calling LLM
+      // Limit to last 10 messages to stay within context window
+      const { data: history, error: historyError } = await supabaseAdmin
+        .from('course_chat_messages')
+        .select('role, content')
+        .eq('conversation_id', convId)
+        .order('created_at', { ascending: true })
+        .limit(10);
+
+      if (historyError) {
+        logger.warn(
+          { requestId, courseId, conversationId: convId, error: historyError },
+          'Failed to fetch conversation history (non-blocking, will continue without history)'
+        );
+      }
+
+      // Save user message to conversation history (using admin client - no RLS on chat_messages)
+      const { error: insertUserMsgError } = await supabaseAdmin
+        .from('course_chat_messages')
+        .insert({
+          course_id: courseId,
+          conversation_id: convId,
+          role: 'user',
+          content: userMessage,
+          chat_type: chatType,
+          node_context: nodeContext || null,
+          intent,
+        });
 
       if (insertUserMsgError) {
         // Non-blocking: log but continue
@@ -165,6 +212,7 @@ export const chatRouter = {
           intent,
           conversationId: convId,
           messageLength: userMessage.length,
+          historyMessageCount: history?.length || 0,
         },
         'Chat: Processing message'
       );
@@ -230,14 +278,32 @@ ${contentContext}
 - Focus on pedagogical quality and alignment with course goals
 </instructions>`;
 
-      // Generate LLM response
+      // Build messages array for multi-turn conversation
+      // Start with system prompt
+      const messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }> = [
+        { role: 'system', content: systemPrompt },
+      ];
+
+      // Add conversation history (if available)
+      if (history && history.length > 0) {
+        for (const msg of history) {
+          messages.push({
+            role: msg.role as 'user' | 'assistant',
+            content: msg.content,
+          });
+        }
+      }
+
+      // Add current user message
+      messages.push({ role: 'user', content: userMessage });
+
+      // Generate LLM response using chat completion (multi-turn conversation support)
       let llmResponse;
       try {
-        llmResponse = await llmClient.generateCompletion(userMessage, {
+        llmResponse = await llmClient.generateChatCompletion(messages, {
           model: modelId,
           temperature,
           maxTokens,
-          systemPrompt,
         });
       } catch (llmError) {
         logger.error(
@@ -255,8 +321,8 @@ ${contentContext}
         });
       }
 
-      // Save assistant message with metrics
-      const { error: insertAssistantMsgError } = await supabase
+      // Save assistant message with metrics (using admin client - no RLS on chat_messages)
+      const { error: insertAssistantMsgError } = await supabaseAdmin
         .from('course_chat_messages')
         .insert({
           course_id: courseId,
