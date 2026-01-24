@@ -1,274 +1,226 @@
-# Plan: Fix Stage 5 ignoring Stage 4 user-edited constraints
+# Plan: Stage 5 Models Configurable via Admin Panel
 
-**Issue:** GitHub #6 - Stage 4 parameters are saved but NOT used in Stage 5 generation
-**Status:** Phase 2 complete - Design finalized
-**Beads:** To be created on approval
-
----
-
-## Recent Changes (commit 6f0f99df) - ALREADY DONE
-
-Другой агент добавил передачу **form fields** в промпты:
-
-- ✅ `course_size` → передаётся как `llmGuidance` из preset
-- ✅ `target_audience`, `description` → передаются в промпт
-- ✅ `desired_lessons_count`, `desired_modules_count` → читаются из courses table
-
-**НО ЭТО НЕ РЕШАЕТ ПРОБЛЕМУ!**
-
-Проблема в том, что пользователь **редактирует значения в Stage 4 UI** (не в форме создания курса), и эти **user-edited** значения сохраняются в:
-
-```
-analysis_result.recommended_structure.total_lessons = 30
-analysis_result.recommended_structure.total_sections = 6
-```
-
-Эти значения **НЕ передаются** в промпт LLM.
+**Task:** Убрать hardcoded модели из Stage 5 и сделать их настраиваемыми через админку
+**Status:** Ready for approval
 
 ---
 
-## Problem Summary
+## Problem
 
-Тестер (2026-01-24):
+Stage 5 использует hardcoded модели в `constants.ts`:
 
-> "The changes are saved and persistent now but they do NOT affect the Stage 5 generation!"
-
-Пользователь редактирует **в Stage 4 Output Tab**:
-
-- `Уроков = 30`, `Модулей = 6`
-
-Эти значения сохраняются в `analysis_result.recommended_structure`, но:
-
-- ❌ НЕ передаются в `buildBatchPrompt()`
-- ❌ Строка 99: "Generate ${estimatedLessons} lessons (can be 3-5 if pedagogically justified)"
-
-Сгенерированный курс:
-
-- 8 модулей, 46 уроков (вместо 6/30)
-
----
-
-## Root Cause
-
-`buildBatchPrompt()` использует только `section.estimated_lessons` для ОДНОЙ секции, но НЕ знает о глобальных ограничениях:
-
+```typescript
+export const MODELS = {
+  tier1_oss120b: 'openai/gpt-oss-120b',
+  ru_lessons_primary: 'qwen/qwen3-235b-a22b-2507',
+  en_lessons_primary: 'deepseek/deepseek-v3.1-terminus',
+  lessons_fallback: 'moonshotai/kimi-k2-0905',
+  tier3_gemini: 'google/gemini-2.5-flash',
+};
 ```
-analysis_result.recommended_structure (Stage 4 user edits)
-  ↓
-total_lessons: 30, total_sections: 6  ← ЕСТЬ в input
-  ↓
-Stage 5 orchestrator (логирует, но НЕ передает дальше)
-  ↓
-section-batch-generator.ts → generator-core.ts → buildBatchPrompt()
-  ↓
-Промпт: "Generate ${estimatedLessons} lessons (can be 3-5)"  ← НЕТ total_lessons/total_sections
-  ↓
-LLM генерирует секции независимо → 46 уроков в 8 модулях
-```
+
+Эти модели используются в 3 местах:
+
+1. `model-selector.ts:167` - Tier 1 для простых секций
+2. `model-selector.ts:155` - Fallback при ошибке БД
+3. `generator-core.ts:385` - Escalation при retry
+
+**Stage 4 и Stage 6 уже читают модели из БД** через `getModelForPhase()`.
 
 ---
 
 ## Solution
 
-Добавить **user-edited constraints** из `analysis_result.recommended_structure` в промпт:
+### 1. SQL Migration - Добавить записи в `llm_model_config`
 
+```sql
+-- Tier 1: Standard complexity sections
+INSERT INTO llm_model_config (config_type, phase_name, stage_number, language, context_tier, model_id, fallback_model_id, temperature, max_tokens, max_context_tokens, is_active)
+VALUES
+  ('global', 'stage_5_tier1', 5, 'any', 'standard', 'openai/gpt-oss-120b', 'moonshotai/kimi-k2-0905', 0.7, 30000, 128000, true),
+  ('global', 'stage_5_tier1', 5, 'any', 'extended', 'google/gemini-2.5-flash', 'openai/gpt-oss-120b', 0.7, 30000, 128000, true);
+
+-- Escalation: Language-specific models for retry
+INSERT INTO llm_model_config (config_type, phase_name, stage_number, language, context_tier, model_id, fallback_model_id, temperature, max_tokens, max_context_tokens, is_active)
+VALUES
+  ('global', 'stage_5_escalation', 5, 'ru', 'standard', 'qwen/qwen3-235b-a22b-2507', 'moonshotai/kimi-k2-0905', 0.7, 30000, 128000, true),
+  ('global', 'stage_5_escalation', 5, 'en', 'standard', 'deepseek/deepseek-v3.1-terminus', 'moonshotai/kimi-k2-0905', 0.7, 30000, 128000, true),
+  ('global', 'stage_5_escalation', 5, 'any', 'standard', 'moonshotai/kimi-k2-0905', 'google/gemini-2.5-flash', 0.7, 30000, 128000, true);
+
+-- Language-specific for stage_5_sections (high complexity)
+INSERT INTO llm_model_config (config_type, phase_name, stage_number, language, context_tier, model_id, fallback_model_id, temperature, max_tokens, max_context_tokens, is_active)
+VALUES
+  ('global', 'stage_5_sections', 5, 'ru', 'standard', 'qwen/qwen3-235b-a22b-2507', 'moonshotai/kimi-k2-0905', 0.7, 30000, 128000, true),
+  ('global', 'stage_5_sections', 5, 'en', 'standard', 'deepseek/deepseek-v3.1-terminus', 'moonshotai/kimi-k2-0905', 0.7, 30000, 128000, true)
+ON CONFLICT (phase_name, language, context_tier) DO NOTHING;
 ```
-**CRITICAL COURSE CONSTRAINTS** (from Stage 4):
-- Total sections: 6 (HARD LIMIT)
-- Total lessons: 30 (HARD LIMIT)
-- This is section 2 of 6
-- Lessons budget for THIS section: ~5 lessons
+
+### 2. Update PhaseName Type
+
+**File:** `packages/shared-types/src/model-config.ts`
+
+Add:
+
+```typescript
+| 'stage_5_tier1'        // Standard complexity tier
+| 'stage_5_escalation'   // Escalation/retry tier
+```
+
+### 3. Update model-selector.ts
+
+**File:** `packages/course-gen-platform/src/stages/stage5-generation/utils/section-batch/model-selector.ts`
+
+**Replace Tier 1 selection (lines 166-170):**
+
+```typescript
+// BEFORE:
+return {
+  model: MODELS.tier1_oss120b,
+  tier: 'tier1_oss120b',
+  reason: `Standard section...`,
+};
+
+// AFTER:
+try {
+  const tier1Config = await getModelForPhase(
+    'stage_5_tier1',
+    undefined,
+    estimatedContextLength,
+    langCode
+  );
+  return {
+    model: tier1Config.model || MODELS.tier1_oss120b,
+    tier: 'tier1_oss120b',
+    reason: `Standard section (model from DB: ${tier1Config.model})`,
+  };
+} catch (error) {
+  logger.warn({ msg: 'getModelForPhase failed for tier1, using hardcoded fallback' });
+  return {
+    model: MODELS.tier1_oss120b,
+    tier: 'tier1_oss120b',
+    reason: `Standard section (hardcoded fallback)`,
+  };
+}
+```
+
+### 4. Update generator-core.ts
+
+**File:** `packages/course-gen-platform/src/stages/stage5-generation/utils/section-batch/generator-core.ts`
+
+**Replace escalation logic (lines 384-391):**
+
+```typescript
+// BEFORE:
+const escalationModel = isRussian ? MODELS.ru_lessons_primary : MODELS.en_lessons_primary;
+
+// AFTER:
+let escalationModel: string;
+try {
+  const escalationConfig = await getModelForPhase(
+    'stage_5_escalation',
+    undefined,
+    undefined,
+    langCode
+  );
+  escalationModel = escalationConfig.model || MODELS.lessons_fallback;
+} catch {
+  escalationModel = isRussian ? MODELS.ru_lessons_primary : MODELS.en_lessons_primary;
+}
+```
+
+### 5. Update Fallback Configs
+
+**File:** `packages/course-gen-platform/src/shared/llm/model-config-service.ts`
+
+Add to `DEFAULT_PHASE_CONFIGS`:
+
+```typescript
+stage_5_tier1: {
+  modelId: 'openai/gpt-oss120b',
+  fallbackModelId: 'moonshotai/kimi-k2-0905',
+  temperature: 0.7,
+  maxTokens: 30000,
+  maxContextTokens: 128000,
+  tier: 'standard',
+  source: 'hardcoded',
+},
+stage_5_escalation: {
+  modelId: 'moonshotai/kimi-k2-0905',
+  fallbackModelId: 'google/gemini-2.5-flash',
+  temperature: 0.7,
+  maxTokens: 30000,
+  maxContextTokens: 128000,
+  tier: 'standard',
+  source: 'hardcoded',
+},
+```
+
+### 6. Update constants.ts Comments
+
+**File:** `packages/course-gen-platform/src/stages/stage5-generation/utils/section-batch/constants.ts`
+
+```typescript
+/**
+ * LAST-RESORT FALLBACK MODELS
+ *
+ * Primary model selection uses getModelForPhase() from database.
+ * These constants are only used when database is completely unavailable.
+ *
+ * To change models, update llm_model_config table via admin panel.
+ */
+export const MODELS = { ... }
 ```
 
 ---
 
 ## Files to Modify
 
-### 1. `prompt-builder.ts`
-
-**Path:** `packages/course-gen-platform/src/stages/stage5-generation/utils/section-batch/prompt-builder.ts`
-
-**Changes:**
-
-1. Add interface `CourseConstraints`
-2. Add optional parameter `constraints?: CourseConstraints`
-3. Add CRITICAL COURSE CONSTRAINTS block in prompt (after line 87, after Generation Guidance block)
-4. Modify lesson breakdown guidance based on constraints (line 99)
-
-```typescript
-// NEW Interface (add before buildBatchPrompt, around line 16)
-export interface CourseConstraints {
-  totalSections: number;
-  totalLessons: number;
-  currentSectionIndex: number;  // 0-based
-  lessonsPerSectionBudget: number;
-}
-
-// MODIFY function signature (line 19-24)
-export function buildBatchPrompt(
-  input: GenerationJobInput,
-  sectionIndex: number,
-  qdrantClient: QdrantClient | undefined,
-  attemptNumber: number,
-  constraints?: CourseConstraints  // NEW
-): string {
-```
-
-**New prompt section (after line 87, after Generation Guidance block):**
-
-```typescript
-// Add user-edited course constraints from Stage 4
-if (constraints) {
-  prompt += `**CRITICAL COURSE CONSTRAINTS** (from Stage 4 user settings):
-- Total sections in this course: ${constraints.totalSections} (HARD LIMIT - user specified)
-- Total lessons in this course: ${constraints.totalLessons} (HARD LIMIT - user specified)
-- This is section ${constraints.currentSectionIndex + 1} of ${constraints.totalSections}
-- Lessons budget for THIS section: approximately ${constraints.lessonsPerSectionBudget} lessons
-
-**IMPORTANT**: The user has explicitly configured these limits. You MUST:
-1. Generate approximately ${constraints.lessonsPerSectionBudget} lessons for this section
-2. Each section contributes proportionally to the ${constraints.totalLessons} total lessons target
-3. Do NOT exceed the section lesson budget significantly
-
-`;
-}
-```
-
-**Modify line 99 to use dynamic lesson guidance:**
-
-```typescript
-// BEFORE (line 99):
-1. **Lesson Breakdown**: Generate ${estimatedLessons} lessons (can be 3-5 if pedagogically justified)
-
-// AFTER:
-const lessonGuidance = constraints
-  ? `Generate exactly ${constraints.lessonsPerSectionBudget} lessons (budget from course structure, ±1 if pedagogically necessary)`
-  : `Generate ${estimatedLessons} lessons (can be 3-5 if pedagogically justified)`;
-// ... use in prompt:
-1. **Lesson Breakdown**: ${lessonGuidance}
-```
-
-### 2. `generator-core.ts`
-
-**Path:** `packages/course-gen-platform/src/stages/stage5-generation/utils/section-batch/generator-core.ts`
-
-**Changes:**
-
-1. Import `CourseConstraints` type
-2. Add `constraints?` parameter to `generateWithRetry()` (line 265-274)
-3. Pass constraints to `buildBatchPrompt()` (line 281)
-
-```typescript
-// Line 265-274: Add parameter
-export async function generateWithRetry(
-  ...existing params...,
-  constraints?: CourseConstraints  // NEW
-): Promise<SectionBatchResult> {
-
-// Line 281: Pass constraints
-const prompt = buildBatchPrompt(input, sectionIndex, qdrantClient, retryCount + 1, constraints);
-```
-
-### 3. `section-batch-generator.ts`
-
-**Path:** `packages/course-gen-platform/src/stages/stage5-generation/utils/section-batch/section-batch-generator.ts`
-
-**Changes:**
-
-1. Import `CourseConstraints` type
-2. Calculate constraints from `analysis_result` (after line 36)
-3. Pass constraints to `generateWithRetry()` (line 64-73)
-
-```typescript
-// After line 36: Calculate constraints
-const recommendedStructure = input.analysis_result?.recommended_structure;
-let constraints: CourseConstraints | undefined;
-
-if (recommendedStructure?.total_sections && recommendedStructure?.total_lessons) {
-  constraints = {
-    totalSections: recommendedStructure.total_sections,
-    totalLessons: recommendedStructure.total_lessons,
-    currentSectionIndex: sectionIndex,
-    lessonsPerSectionBudget: Math.round(
-      recommendedStructure.total_lessons / recommendedStructure.total_sections
-    ),
-  };
-}
-
-// Line 64-73: Pass constraints
-return await generateWithRetry(
-  ...existing args...,
-  constraints  // NEW
-);
-```
-
-### 4. `generation-phases.ts`
-
-**Path:** `packages/course-gen-platform/src/stages/stage5-generation/phases/generation-phases.ts`
-
-**Changes:**
-
-1. Use `total_sections` instead of `sections_breakdown.length` (lines 437-438)
-2. Add logging for constraint awareness
-
-```typescript
-// Lines 437-438: Use user-edited total_sections
-const recommendedStructure = state.input.analysis_result.recommended_structure;
-const totalSections =
-  recommendedStructure.total_sections ?? recommendedStructure.sections_breakdown.length;
-```
-
----
-
-## Backward Compatibility
-
-1. **`constraints` is optional** - если не передан, поведение идентично текущему
-2. **Fallback to `sections_breakdown.length`** - если `total_sections` не задан
-3. **No breaking API changes** - все изменения аддитивные
+| File                                                        | Changes                                     |
+| ----------------------------------------------------------- | ------------------------------------------- |
+| `supabase/migrations/XXXXXX_stage5_configurable_models.sql` | NEW: Add DB records                         |
+| `packages/shared-types/src/model-config.ts`                 | Add `stage_5_tier1`, `stage_5_escalation`   |
+| `.../section-batch/model-selector.ts`                       | Replace hardcoded with `getModelForPhase()` |
+| `.../section-batch/generator-core.ts`                       | Replace escalation with DB lookup           |
+| `.../section-batch/constants.ts`                            | Update comments                             |
+| `.../llm/model-config-service.ts`                           | Add DEFAULT_PHASE_CONFIGS                   |
 
 ---
 
 ## Verification
 
-### Type Check & Build
+1. **Type-check & Build:**
 
-```bash
-pnpm type-check
-pnpm build
-```
+   ```bash
+   pnpm type-check && pnpm build
+   ```
 
-### Manual Test
+2. **Run existing tests:**
 
-1. Создать курс, пройти до Stage 4
-2. Отредактировать: `Уроков = 30`, `Модулей = 6`
-3. Approve → Stage 5
-4. Проверить логи: должны быть "CRITICAL COURSE CONSTRAINTS"
-5. Дождаться генерации
-6. Проверить результат: ~6 секций, ~30 уроков (±20% допуск)
+   ```bash
+   pnpm --filter course-gen-platform test section-batch-generator
+   ```
 
-### Test Cases
+3. **Apply migration:**
 
-| Input                  | Expected Output                 |
-| ---------------------- | ------------------------------- |
-| 30 lessons, 6 sections | ~5 lessons/section, total 24-36 |
-| 20 lessons, 4 sections | ~5 lessons/section, total 16-24 |
-| 15 lessons, 5 sections | ~3 lessons/section, total 12-18 |
+   ```bash
+   pnpm supabase db push
+   ```
 
----
+4. **Verify in admin panel:**
+   - Open admin → LLM Config
+   - Check `stage_5_tier1` and `stage_5_escalation` records exist
+   - Try changing model for `stage_5_sections` → verify Stage 5 uses new model
 
-## Implementation Order
-
-1. Modify `prompt-builder.ts` - add interface and parameter
-2. Modify `generator-core.ts` - pass through constraints
-3. Modify `section-batch-generator.ts` - calculate constraints
-4. Modify `generation-phases.ts` - use total_sections
-5. Run type-check and build
-6. Manual verification
+5. **Manual test:**
+   - Create course, run Stage 5
+   - Check logs for "model from DB" messages
+   - Verify correct model is used based on language
 
 ---
 
-## Risk Mitigation
+## Backward Compatibility
 
-- **Existing validator unchanged** - MinimumLessonsValidator (orchestrator.ts:776-844) remains as safety net
-- **Optional constraints** - backward compatible
-- **±20% tolerance** - already implemented in post-validation
+- Existing `stage_5_sections` and `stage_5_metadata` records preserved
+- Hardcoded fallbacks remain for DB unavailability
+- Tier names unchanged (`tier1_oss120b`, `tier2_en_lessons`, etc.)
+- Tests should pass without modification
