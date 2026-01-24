@@ -311,6 +311,66 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.28.35] - 2026-01-24
+
+### Added
+
+- **stage5**: make tier1 and escalation models configurable via admin panel (7be3a4b7)
+- **i18n**: add i18n support for quick action prompts in GlobalCourseChat (84e537be)
+- **llm**: upgrade stage_4_expert, stage_4_synthesis, stage_5_metadata to KIMI K2 (e736be7a)
+- **routes**: migrate course URLs to /courses/{org}/{course} (d393065b)
+- **chat**: replace keyword classification with explicit UI mode selection (169e280e)
+- **chat**: add authenticated Supabase client and rate limiting (f1ad5c46)
+- **chat**: add conversation history to LLM prompts (bf2e38d8)
+- **form**: add frontend validation limits for course creation (da4402cd)
+
+### Changed
+
+- **chat**: code review improvements - type guards, constants, utilities, a11y (0b4807f4)
+- **chat**: configurable fallback model and extract magic numbers (9958fcfe)
+
+### Fixed
+
+- **web**: update 1 source file(s), update docs (ca6d8137)
+- **routes**: complete URL migration with full sanitization (9c0a4d91)
+- **routes**: remove legacy [slug] routes and add slug validation (e9e5b378)
+- **chat**: address code review findings for intent selection (d8caa922)
+- **llm**: update fallback to google/gemini-3-flash-preview for premium phases (98af5bd6)
+- **tests**: update section-batch-generator tests for current implementation (1274c2fa)
+- duplicate key violation and FSM transition errors (946cec54)
+- **web**: add Zod validation and HTTP error mapping to chat server action (66f3af3c)
+- **stage5**: address code review issues for constraints implementation (1840a2ea)
+- **chat**: address code review findings (e4bc9e2a)
+- **chat**: fix race condition in GlobalCourseChat and add error boundary (3352e255)
+- **stage5**: respect Stage 4 user-edited constraints (total_lessons, total_sections) (5b364c36)
+- **migrations**: remove duplicate course_chat_messages migration (371d3ef9)
+
+### Other
+
+- bd sync: 2026-01-24 18:04:45 (3c4c649f)
+- bd sync: 2026-01-24 18:00:22 (b1662eb6)
+- bd sync: 2026-01-24 17:59:39 (3ba6ebf8)
+- bd sync: 2026-01-24 17:47:42 (9a844ab3)
+- bd sync: 2026-01-24 17:02:46 (e4330ba0)
+- bd sync: 2026-01-24 16:44:24 (b2cae8c2)
+- bd sync: 2026-01-24 16:41:58 (b27ff54d)
+- bd sync: 2026-01-24 16:39:30 (b998eb67)
+- bd sync: 2026-01-24 16:33:00 (f4c19734)
+- **stage5**: add unit tests for CourseConstraints implementation (618b229e)
+- bd sync: 2026-01-24 16:22:21 (3c1aaedd)
+- bd sync: 2026-01-24 16:19:44 (faf5a649)
+- bd sync: 2026-01-24 15:08:11 (84eefb27)
+- bd sync: 2026-01-24 15:07:58 (084fe7f2)
+- bd sync: 2026-01-24 14:59:34 (6e6b6386)
+- bd sync: 2026-01-24 14:58:45 (0361ea7e)
+- bd sync: 2026-01-24 14:51:54 (dd1dbd25)
+- bd sync: 2026-01-24 14:47:04 (8a44639b)
+- bd sync: 2026-01-24 14:39:42 (dbbf260d)
+- bd sync: 2026-01-24 14:33:33 (ebd5f07d)
+- increase form field limits (00062ffd)
+- bd sync: 2026-01-24 14:25:30 (fe036c99)
+- bd sync: 2026-01-24 14:19:26 (ad574901)
+
 ## [0.28.34] - 2026-01-24
 
 ### Added

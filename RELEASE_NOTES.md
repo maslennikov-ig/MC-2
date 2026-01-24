@@ -2,6 +2,46 @@
 
 _Released on 2025-12-26_
 
+## v0.28.35
+
+_Released on 2026-01-24_
+
+### ✨ New Features
+
+- **stage5**: Make tier1 and escalation models configurable via admin panel
+- **i18n**: Add i18n support for quick action prompts in GlobalCourseChat
+- **llm**: Upgrade stage_4_expert, stage_4_synthesis, stage_5_metadata to KIMI K2
+- **routes**: Migrate course URLs to /courses/{org}/{course}
+- **chat**: Replace keyword classification with explicit UI mode selection
+- **chat**: Add authenticated Supabase client and rate limiting
+- **chat**: Add conversation history to LLM prompts
+- **form**: Add frontend validation limits for course creation
+
+### 🔧 Improvements
+
+- **chat**: Code review improvements - type guards, constants, utilities, a11y
+- **chat**: Configurable fallback model and extract magic numbers
+
+### 🐛 Bug Fixes
+
+- **web**: Update 1 source file(s), update docs
+- **routes**: Complete URL migration with full sanitization
+- **routes**: Remove legacy [slug] routes and add slug validation
+- **chat**: Address code review findings for intent selection
+- **llm**: Update fallback to google/gemini-3-flash-preview for premium phases
+- **tests**: Update section-batch-generator tests for current implementation
+- Duplicate key violation and FSM transition errors
+- **web**: Add Zod validation and HTTP error mapping to chat server action
+- **stage5**: Address code review issues for constraints implementation
+- **chat**: Address code review findings
+- **chat**: Fix race condition in GlobalCourseChat and add error boundary
+- **stage5**: Respect Stage 4 user-edited constraints (total_lessons, total_sections)
+- **migrations**: Remove duplicate course_chat_messages migration
+
+---
+
+_This release was automatically generated from 46 commits._
+
 ## v0.28.34
 
 _Released on 2026-01-24_
