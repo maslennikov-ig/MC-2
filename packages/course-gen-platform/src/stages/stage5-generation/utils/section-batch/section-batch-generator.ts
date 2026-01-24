@@ -47,25 +47,44 @@ export class SectionBatchGenerator {
     const recommendedStructure = input.analysis_result?.recommended_structure;
     let constraints: CourseConstraints | undefined;
 
-    if (recommendedStructure?.total_sections && recommendedStructure?.total_lessons) {
-      constraints = {
-        totalSections: recommendedStructure.total_sections,
-        totalLessons: recommendedStructure.total_lessons,
-        currentSectionIndex: sectionIndex,
-        lessonsPerSectionBudget: Math.round(
-          recommendedStructure.total_lessons / recommendedStructure.total_sections
-        ),
-      };
+    if (
+      recommendedStructure?.total_sections &&
+      recommendedStructure?.total_lessons &&
+      recommendedStructure.total_sections > 0 // Explicit positive check for defense-in-depth
+    ) {
+      const lessonsPerSectionBudget = Math.round(
+        recommendedStructure.total_lessons / recommendedStructure.total_sections
+      );
 
-      logger.info({
-        msg: 'Course constraints calculated from Stage 4 user edits',
-        batchNum,
-        sectionIndex,
-        totalSections: constraints.totalSections,
-        totalLessons: constraints.totalLessons,
-        lessonsPerSectionBudget: constraints.lessonsPerSectionBudget,
-        courseId: input.course_id,
-      });
+      // Validate calculated budget is sensible
+      if (lessonsPerSectionBudget < 1) {
+        logger.warn({
+          msg: 'Calculated lessons budget is less than 1 - falling back to estimatedLessons',
+          totalLessons: recommendedStructure.total_lessons,
+          totalSections: recommendedStructure.total_sections,
+          calculatedBudget: lessonsPerSectionBudget,
+          batchNum,
+          courseId: input.course_id,
+        });
+        // constraints remains undefined, will use fallback estimatedLessons
+      } else {
+        constraints = {
+          totalSections: recommendedStructure.total_sections,
+          totalLessons: recommendedStructure.total_lessons,
+          currentSectionIndex: sectionIndex,
+          lessonsPerSectionBudget,
+        };
+
+        logger.info({
+          msg: 'Course constraints calculated from Stage 4 user edits',
+          batchNum,
+          sectionIndex,
+          totalSections: constraints.totalSections,
+          totalLessons: constraints.totalLessons,
+          lessonsPerSectionBudget: constraints.lessonsPerSectionBudget,
+          courseId: input.course_id,
+        });
+      }
     }
 
     const modelTier = await selectModelTier(
