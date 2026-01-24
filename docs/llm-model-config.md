@@ -31,27 +31,27 @@
 
 ## Stage 4: Analysis
 
-| Phase                  | Tier     | Primary Model             | Fallback Model            | Temp | Tokens |
-| ---------------------- | -------- | ------------------------- | ------------------------- | ---- | ------ |
-| stage_4_classification | standard | xiaomi/mimo-v2-flash:free | google/gemini-2.5-flash   | 0.70 | 4096   |
-| stage_4_classification | extended | google/gemini-2.5-flash   | xiaomi/mimo-v2-flash:free | 0.70 | 4096   |
-| stage_4_scope          | standard | xiaomi/mimo-v2-flash:free | google/gemini-2.5-flash   | 0.70 | 4096   |
-| stage_4_scope          | extended | google/gemini-2.5-flash   | xiaomi/mimo-v2-flash:free | 0.70 | 4096   |
-| stage_4_expert         | standard | moonshotai/kimi-k2-0905   | google/gemini-2.5-flash   | 0.50 | 8000   |
-| stage_4_expert         | extended | google/gemini-2.5-flash   | xiaomi/mimo-v2-flash:free | 0.50 | 8000   |
-| stage_4_synthesis      | standard | moonshotai/kimi-k2-0905   | google/gemini-2.5-flash   | 0.70 | 6000   |
-| stage_4_synthesis      | extended | google/gemini-2.5-flash   | xiaomi/mimo-v2-flash:free | 0.70 | 6000   |
+| Phase                  | Tier     | Primary Model             | Fallback Model                | Temp | Tokens |
+| ---------------------- | -------- | ------------------------- | ----------------------------- | ---- | ------ |
+| stage_4_classification | standard | xiaomi/mimo-v2-flash:free | google/gemini-2.5-flash       | 0.70 | 4096   |
+| stage_4_classification | extended | google/gemini-2.5-flash   | xiaomi/mimo-v2-flash:free     | 0.70 | 4096   |
+| stage_4_scope          | standard | xiaomi/mimo-v2-flash:free | google/gemini-2.5-flash       | 0.70 | 4096   |
+| stage_4_scope          | extended | google/gemini-2.5-flash   | xiaomi/mimo-v2-flash:free     | 0.70 | 4096   |
+| stage_4_expert         | standard | moonshotai/kimi-k2-0905   | google/gemini-3-flash-preview | 0.50 | 8000   |
+| stage_4_expert         | extended | google/gemini-2.5-flash   | xiaomi/mimo-v2-flash:free     | 0.50 | 8000   |
+| stage_4_synthesis      | standard | moonshotai/kimi-k2-0905   | google/gemini-3-flash-preview | 0.70 | 6000   |
+| stage_4_synthesis      | extended | google/gemini-2.5-flash   | xiaomi/mimo-v2-flash:free     | 0.70 | 6000   |
 
 ---
 
 ## Stage 5: Structure Generation
 
-| Phase            | Tier     | Primary Model             | Fallback Model            | Temp | Tokens |
-| ---------------- | -------- | ------------------------- | ------------------------- | ---- | ------ |
-| stage_5_metadata | standard | moonshotai/kimi-k2-0905   | google/gemini-2.5-flash   | 0.70 | 4096   |
-| stage_5_metadata | extended | google/gemini-2.5-flash   | xiaomi/mimo-v2-flash:free | 0.70 | 4096   |
-| stage_5_sections | standard | xiaomi/mimo-v2-flash:free | google/gemini-2.5-flash   | 0.70 | 8000   |
-| stage_5_sections | extended | google/gemini-2.5-flash   | xiaomi/mimo-v2-flash:free | 0.70 | 8000   |
+| Phase            | Tier     | Primary Model             | Fallback Model                | Temp | Tokens |
+| ---------------- | -------- | ------------------------- | ----------------------------- | ---- | ------ |
+| stage_5_metadata | standard | moonshotai/kimi-k2-0905   | google/gemini-3-flash-preview | 0.70 | 4096   |
+| stage_5_metadata | extended | google/gemini-2.5-flash   | xiaomi/mimo-v2-flash:free     | 0.70 | 4096   |
+| stage_5_sections | standard | xiaomi/mimo-v2-flash:free | google/gemini-2.5-flash       | 0.70 | 8000   |
+| stage_5_sections | extended | google/gemini-2.5-flash   | xiaomi/mimo-v2-flash:free     | 0.70 | 8000   |
 
 ---
 
