@@ -197,7 +197,7 @@ export function CourseCard({
   const isMountedRef = useRef(true)
   const imageRef = useRef<HTMLImageElement>(null)
 
-  const slug = course.slug || course.id
+  const courseSlug = course.slug || course.id
   const coverUrl = course.coverUrl
   const hasCover = !!coverUrl
 
@@ -274,7 +274,7 @@ export function CourseCard({
 
     setIsDeleting(true)
     try {
-      const result = await deleteCourse(slug)
+      const result = await deleteCourse(courseSlug)
       toast.success(`Курс "${result.deletedTitle}" успешно удален`)
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Ошибка при удалении курса')
@@ -283,12 +283,12 @@ export function CourseCard({
   }
 
   const handleView = () => {
-    router.push(buildCourseUrl(course.orgSlug, slug))
+    router.push(buildCourseUrl(course.orgSlug, courseSlug))
   }
 
   const handleWorkflow = (e: React.MouseEvent) => {
     e.stopPropagation()
-    window.open(buildCourseGeneratingUrl(course.orgSlug, slug, true), '_blank')
+    window.open(buildCourseGeneratingUrl(course.orgSlug, courseSlug, true), '_blank')
   }
 
   const handleToggleFavorite = async (e: React.MouseEvent) => {
@@ -413,7 +413,7 @@ export function CourseCard({
                 </div>
                 <div className="flex items-center gap-1">
                   <ShareButton
-                    slug={slug}
+                    slug={courseSlug}
                     shareToken={course.share_token}
                     isOwner={user?.id === course.user_id}
                     isAdmin={user?.role === 'admin' || user?.role === 'superadmin'}
@@ -785,7 +785,7 @@ export function CourseCard({
                 />
 
                 <ShareButton
-                  slug={slug}
+                  slug={courseSlug}
                   shareToken={course.share_token}
                   isOwner={user?.id === course.user_id}
                   isAdmin={user?.role === 'admin' || user?.role === 'superadmin'}
