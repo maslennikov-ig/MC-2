@@ -40,6 +40,7 @@ import {
 import { cn } from '@/lib/utils'
 import type { Course } from '@/types/database'
 import { ShareButton } from '@/components/courses/share-button'
+import { buildCourseUrl, buildCourseGeneratingUrl } from '@/lib/helpers/course-urls'
 import { ActionButtonWithTooltip } from '@/components/courses/action-button-with-tooltip'
 import { ImageSkeleton } from '@/components/ui/image-skeleton'
 
@@ -51,6 +52,7 @@ interface User {
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 
 interface CourseWithFavorite extends Course {
+  orgSlug: string
   isFavorited?: boolean
   share_token?: string | null
   coverUrl?: string | null
@@ -281,12 +283,12 @@ export function CourseCard({
   }
 
   const handleView = () => {
-    router.push(`/courses/${slug}`)
+    router.push(buildCourseUrl(course.orgSlug, slug))
   }
 
   const handleWorkflow = (e: React.MouseEvent) => {
     e.stopPropagation()
-    window.open(`/courses/generating/${slug}?workflow=true`, '_blank')
+    window.open(buildCourseGeneratingUrl(course.orgSlug, slug, true), '_blank')
   }
 
   const handleToggleFavorite = async (e: React.MouseEvent) => {

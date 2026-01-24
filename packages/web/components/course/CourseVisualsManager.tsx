@@ -24,6 +24,7 @@ interface CourseVisualsManagerProps {
   courseId: string
   courseTitle: string
   courseSlug: string
+  orgSlug: string
   hasCourseCard: boolean
   lessons: Lesson[]
 }
@@ -63,6 +64,7 @@ export function CourseVisualsManager({
   courseId,
   courseTitle,
   courseSlug,
+  orgSlug,
   hasCourseCard,
   lessons,
 }: CourseVisualsManagerProps) {
@@ -203,7 +205,7 @@ export function CourseVisualsManager({
         <div>
           <div className="mb-2 flex items-center gap-2">
             <Button variant="ghost" size="sm" asChild>
-              <Link href={`/courses/${courseSlug}`}>
+              <Link href={`/courses/${orgSlug}/${courseSlug}`}>
                 <ArrowLeft className="mr-1 h-4 w-4" />
                 {tCourse('backToCourse')}
               </Link>

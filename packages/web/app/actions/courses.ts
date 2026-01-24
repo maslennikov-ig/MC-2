@@ -236,7 +236,7 @@ export async function canCreateCourses(): Promise<{ canCreate: boolean; role: st
  */
 export async function createDraftCourse(
   topic: string
-): Promise<{ id: string; slug: string } | { error: string }> {
+): Promise<{ id: string; slug: string; orgSlug: string } | { error: string }> {
   try {
     const supabase = await createClient()
 
@@ -415,8 +415,15 @@ export async function createDraftCourse(
       return { error: 'Failed to create draft course: too many slug collisions' }
     }
 
+    // Fetch org slug for URL building
+    const { data: orgData } = await supabase
+      .from('organizations')
+      .select('slug')
+      .eq('id', organizationId)
+      .single()
+
     logger.info('Draft course created', { courseId: course.id, slug: course.slug })
-    return { id: course.id, slug: course.slug || '' }
+    return { id: course.id, slug: course.slug || '', orgSlug: orgData?.slug || '' }
   } catch (error) {
     logger.error('Error creating draft course', { error })
     return { error: 'Failed to create draft course' }
@@ -600,6 +607,13 @@ export async function updateDraftAndStartGeneration(
       slug: course.slug,
     })
 
+    // Fetch org slug for URL building
+    const { data: orgData } = await supabase
+      .from('organizations')
+      .select('slug')
+      .eq('id', course.organization_id)
+      .single()
+
     revalidatePath('/courses')
     revalidatePath(`/courses/${course.slug}`)
 
@@ -607,6 +621,7 @@ export async function updateDraftAndStartGeneration(
       id: course.id,
       courseId: course.id, // For compatibility with CreateCourseResponse interface
       slug: course.slug || '',
+      orgSlug: orgData?.slug || '',
     }
   } catch (error) {
     logger.error('Error updating draft course', { error })

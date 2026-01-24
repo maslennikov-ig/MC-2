@@ -9,6 +9,7 @@ import type { FormData } from '../_schemas/form-schema'
 import type { UploadedFile } from '@/components/forms/file-upload'
 import { createDraftCourse, updateDraftAndStartGeneration } from '@/app/actions/courses'
 import { materializeDraftSession } from '@/app/actions/draft-session'
+import { buildCourseGeneratingUrl } from '@/lib/helpers/course-urls'
 import type { Route } from 'next'
 
 interface UseSubmitCourseProps {
@@ -167,7 +168,7 @@ export function useSubmitCourse({
           duration: 1500,
         })
 
-        router.push(`/courses/generating/${result.slug}` as Route<string>)
+        router.push(buildCourseGeneratingUrl(result.orgSlug, result.slug) as Route<string>)
       } catch (error) {
         logger.error('Error creating course:', error)
         toast.error('Произошла ошибка', {
