@@ -70,13 +70,18 @@ export async function generateMetadata({
 
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || 'https://ai.megacampus.ru'
     const ogImageUrl = `${baseUrl}${buildCourseOgImageUrl(orgSlug, courseSlug)}`
+    const canonicalUrl = `${baseUrl}/courses/${orgSlug}/${courseSlug}`
 
     return {
       title: course.title,
       description: course.course_description || `Онлайн курс: ${course.title}`,
+      alternates: {
+        canonical: canonicalUrl,
+      },
       openGraph: {
         title: course.title,
         description: course.course_description || `Онлайн курс: ${course.title}`,
+        url: canonicalUrl,
         images: [
           {
             url: ogImageUrl,

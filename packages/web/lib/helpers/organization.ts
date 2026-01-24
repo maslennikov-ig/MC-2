@@ -1,5 +1,6 @@
 import { getAdminClient, getUserClient } from '@/lib/supabase/client-factory'
 import { logger } from '@/lib/logger'
+import { isValidSlug } from './course-urls'
 
 /**
  * Get organization by slug
@@ -7,6 +8,12 @@ import { logger } from '@/lib/logger'
  * @returns Organization data or null
  */
 export async function getOrganizationBySlug(slug: string) {
+  // Validate slug format
+  if (!isValidSlug(slug)) {
+    logger.warn('Invalid organization slug format', { slug })
+    return null
+  }
+
   const supabase = getAdminClient()
 
   const { data, error } = await supabase
@@ -31,6 +38,12 @@ export async function getOrganizationBySlug(slug: string) {
  * @returns Course data with organization info, or null if not found
  */
 export async function getCourseByOrgAndSlug(orgSlug: string, courseSlug: string) {
+  // Validate slug formats
+  if (!isValidSlug(orgSlug) || !isValidSlug(courseSlug)) {
+    logger.warn('Invalid slug format', { orgSlug, courseSlug })
+    return null
+  }
+
   const supabase = getAdminClient()
 
   // First, get the organization by slug
@@ -77,6 +90,12 @@ export async function getCourseByOrgAndSlug(orgSlug: string, courseSlug: string)
  * @returns Course data with organization info, or null if not found/not accessible
  */
 export async function getCourseByOrgAndSlugWithRLS(orgSlug: string, courseSlug: string) {
+  // Validate slug formats
+  if (!isValidSlug(orgSlug) || !isValidSlug(courseSlug)) {
+    logger.warn('Invalid slug format', { orgSlug, courseSlug })
+    return null
+  }
+
   const supabase = await getUserClient()
 
   // First, get the organization by slug using admin client (orgs are public)
