@@ -307,6 +307,59 @@ export type Database = {
         }
         Relationships: []
       }
+      course_chat_messages: {
+        Row: {
+          chat_type: string
+          content: string
+          conversation_id: string
+          course_id: string
+          created_at: string | null
+          id: string
+          input_tokens: number | null
+          intent: string | null
+          model_used: string | null
+          node_context: Json | null
+          output_tokens: number | null
+          role: string
+        }
+        Insert: {
+          chat_type: string
+          content: string
+          conversation_id: string
+          course_id: string
+          created_at?: string | null
+          id?: string
+          input_tokens?: number | null
+          intent?: string | null
+          model_used?: string | null
+          node_context?: Json | null
+          output_tokens?: number | null
+          role: string
+        }
+        Update: {
+          chat_type?: string
+          content?: string
+          conversation_id?: string
+          course_id?: string
+          created_at?: string | null
+          id?: string
+          input_tokens?: number | null
+          intent?: string | null
+          model_used?: string | null
+          node_context?: Json | null
+          output_tokens?: number | null
+          role?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "course_chat_messages_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       course_edits: {
         Row: {
           course_id: string
