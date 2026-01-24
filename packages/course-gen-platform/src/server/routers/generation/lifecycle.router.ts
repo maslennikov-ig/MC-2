@@ -725,6 +725,22 @@ export const lifecycleRouter = router({
           : [];
 
         // Step 5: Build GenerationJobInput
+        // Validate input lengths (prevent token limit issues)
+        const MAX_DESCRIPTION_LENGTH = 5000;
+        const MAX_LEARNING_OUTCOMES = 20;
+        const MAX_ESTIMATED_LESSONS = 100;
+        const MAX_ESTIMATED_SECTIONS = 50;
+
+        if (
+          course.course_description &&
+          course.course_description.length > MAX_DESCRIPTION_LENGTH
+        ) {
+          logger.warn(
+            { requestId, courseId, descriptionLength: course.course_description.length },
+            `Course description exceeds ${MAX_DESCRIPTION_LENGTH} chars, will be truncated`
+          );
+        }
+
         // Parse learning_outcomes: can be JSON array string or newline-separated string
         let parsedLearningOutcomes: string[] | undefined;
         if (course.learning_outcomes) {
@@ -732,7 +748,16 @@ export const lifecycleRouter = router({
             // Try JSON parse first, then fallback to newline split
             try {
               parsedLearningOutcomes = JSON.parse(course.learning_outcomes);
-            } catch {
+            } catch (parseError) {
+              logger.warn(
+                {
+                  requestId,
+                  courseId,
+                  error: parseError instanceof Error ? parseError.message : 'Unknown',
+                  rawValueLength: course.learning_outcomes.length,
+                },
+                'Failed to parse learning_outcomes as JSON, using newline fallback'
+              );
               parsedLearningOutcomes = course.learning_outcomes
                 .split('\n')
                 .map((s: string) => s.trim())
@@ -741,6 +766,35 @@ export const lifecycleRouter = router({
           } else if (Array.isArray(course.learning_outcomes)) {
             parsedLearningOutcomes = course.learning_outcomes;
           }
+        }
+
+        // Validate learning_outcomes count
+        if (parsedLearningOutcomes && parsedLearningOutcomes.length > MAX_LEARNING_OUTCOMES) {
+          logger.warn(
+            { requestId, courseId, count: parsedLearningOutcomes.length },
+            `Learning outcomes exceed ${MAX_LEARNING_OUTCOMES} items, will use first ${MAX_LEARNING_OUTCOMES}`
+          );
+          parsedLearningOutcomes = parsedLearningOutcomes.slice(0, MAX_LEARNING_OUTCOMES);
+        }
+
+        // Validate estimated_lessons/sections bounds
+        if (
+          course.estimated_lessons &&
+          (course.estimated_lessons < 1 || course.estimated_lessons > MAX_ESTIMATED_LESSONS)
+        ) {
+          logger.warn(
+            { requestId, courseId, value: course.estimated_lessons },
+            `estimated_lessons out of recommended range (1-${MAX_ESTIMATED_LESSONS})`
+          );
+        }
+        if (
+          course.estimated_sections &&
+          (course.estimated_sections < 1 || course.estimated_sections > MAX_ESTIMATED_SECTIONS)
+        ) {
+          logger.warn(
+            { requestId, courseId, value: course.estimated_sections },
+            `estimated_sections out of recommended range (1-${MAX_ESTIMATED_SECTIONS})`
+          );
         }
 
         const jobInput = {
@@ -755,8 +809,10 @@ export const lifecycleRouter = router({
             style: course.style && isValidStyle(course.style) ? course.style : DEFAULT_COURSE_STYLE,
             target_audience: course.target_audience ?? undefined,
             difficulty: course.difficulty ?? 'intermediate',
-            // NEW: Add user description for context
-            description: course.course_description ?? undefined,
+            // NEW: Add user description for context (truncate if too long)
+            description: course.course_description
+              ? course.course_description.substring(0, MAX_DESCRIPTION_LENGTH)
+              : undefined,
             // NEW: Add course size preset
             course_size: course.course_size ?? undefined,
             // FIX: Read from courses table, not from settings

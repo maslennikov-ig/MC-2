@@ -21,7 +21,6 @@ import {
   CourseMetadataWithoutInjectedFieldsSchema,
 } from '@megacampus/shared-types/generation-result';
 import { getStylePrompt } from '@megacampus/shared-types/style-prompts';
-import { getCourseSizePreset, type CourseSize } from '@megacampus/shared-types/course-size';
 import { UnifiedRegenerator } from '@/shared/regeneration';
 import { z } from 'zod';
 import {
@@ -30,6 +29,7 @@ import {
   formatPedagogicalStrategyForPrompt,
 } from './analysis-formatters';
 import { normalizeLanguageCode } from '@/shared/utils/language-utils';
+import { buildUserContextSection } from './prompt-helpers';
 import { validateQwen3MaxContext, estimateTokenCount } from '../../../shared/llm/cost-calculator';
 import { zodToPromptSchema } from '@/shared/utils/zod-to-prompt-schema';
 import { preprocessObject } from '@/shared/validation/preprocessing';
@@ -517,41 +517,7 @@ export class MetadataGenerator {
 `;
 
     // Add user-provided context if available (FR-002 form fields)
-    if (input.frontend_parameters.description) {
-      prompt += `**User Requirements**: ${input.frontend_parameters.description}\n\n`;
-    }
-
-    if (input.frontend_parameters.target_audience) {
-      prompt += `**Target Audience**: ${input.frontend_parameters.target_audience}\n\n`;
-    }
-
-    if (input.frontend_parameters.learning_outcomes?.length) {
-      prompt += `**Required Learning Outcomes** (MUST be included in course):\n`;
-      input.frontend_parameters.learning_outcomes.forEach((outcome, i) => {
-        prompt += `${i + 1}. ${outcome}\n`;
-      });
-      prompt += '\n';
-    }
-
-    // Add course size guidance if specified
-    if (input.frontend_parameters.course_size && input.frontend_parameters.course_size !== 'auto') {
-      const preset = getCourseSizePreset(input.frontend_parameters.course_size as CourseSize);
-      if (preset?.llmGuidance) {
-        prompt += `**Course Size Guidance**: ${preset.llmGuidance}\n\n`;
-      }
-    } else if (
-      input.frontend_parameters.desired_lessons_count ||
-      input.frontend_parameters.desired_modules_count
-    ) {
-      prompt += `**Structure Guidance**:\n`;
-      if (input.frontend_parameters.desired_lessons_count) {
-        prompt += `- Target: ~${input.frontend_parameters.desired_lessons_count} lessons\n`;
-      }
-      if (input.frontend_parameters.desired_modules_count) {
-        prompt += `- Target: ~${input.frontend_parameters.desired_modules_count} sections\n`;
-      }
-      prompt += '\n';
-    }
+    prompt += buildUserContextSection(input.frontend_parameters);
 
     // Add context based on scenario
     if (isTitleOnly) {
