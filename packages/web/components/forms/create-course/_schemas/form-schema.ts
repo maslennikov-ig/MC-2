@@ -5,7 +5,7 @@ export const formSchema = z
   .object({
     topic: z.string().min(3, 'Тема должна содержать минимум 3 символа').max(200),
     email: z.string().email('Введите корректный email'),
-    description: z.string().max(5000, 'Описание должно быть менее 5000 символов').optional(),
+    description: z.string().max(7000, 'Описание должно быть менее 7000 символов').optional(),
     writingStyle: z
       .enum([
         'academic',

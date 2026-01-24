@@ -34,6 +34,7 @@ import {
 // StageResultsDrawer - DISABLED: Replaced by NodeDetailsDrawer in GraphView
 // GenerationProgressBar - REMOVED: Integrated into GraphHeader for unified UI
 import type { Stage1CourseData } from '@/components/generation-graph'
+import { GlobalCourseChat } from '@/components/generation'
 
 /** Default fallback when lessons count is unknown (before Stage 4 analysis completes) */
 const DEFAULT_LESSONS_COUNT = 5
@@ -927,6 +928,19 @@ export default function GenerationProgressContainerEnhanced({
         onResume={handleResume}
         onCancelGeneration={handleCancel}
         onSwitchToManual={handleSwitchToManual}
+      />
+
+      {/* Global Course Chat - Bottom panel for course-wide AI assistance */}
+      <GlobalCourseChat
+        courseId={courseId}
+        isGenerating={
+          state.status !== 'completed' &&
+          state.status !== 'failed' &&
+          state.status !== 'cancelled' &&
+          state.status !== 'pending' &&
+          !state.status?.includes('awaiting_approval') &&
+          !state.status?.includes('_complete')
+        }
       />
 
       {/* Success Overlay Animation */}

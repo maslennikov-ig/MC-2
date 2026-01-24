@@ -170,7 +170,7 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
   const courseSlug = params?.slug as string | undefined;
   const [selectedAttemptNum, setSelectedAttemptNum] = useState<number | null>(null);
   const [selectedPhaseId, setSelectedPhaseId] = useState<string | null>(null);
-  const { refine, isRefining } = useRefinement(courseInfo.id);
+  const { refine, isRefining, chatHistory } = useRefinement(courseInfo.id);
   const refinementChatRef = useRef<HTMLDivElement>(null);
   const [isExpanded, setIsExpanded] = useState(false);
   const [isLessonMaximized, setIsLessonMaximized] = useState(false);
@@ -666,15 +666,6 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
       cancelled = true;
     };
   }, [selectedNodeId, displayData?.traceId, displayData?.outputData, displayData?.status, fetchTraceDetails]);
-
-  // Construct chat history - only show REAL user refinement messages
-  // DO NOT show LLM prompts (prompt_text) which were incorrectly set as refinementMessage
-  const chatHistory = useMemo(() => {
-      // For now, return empty until proper refinement tracking is implemented
-      // Previously, refinementMessage was incorrectly set to prompt_text (LLM prompt)
-      // Real user refinements need to be tracked separately in the database
-      return [];
-  }, []);
 
   const handleRefine = async (message: string) => {
       if (!data || !selectedAttemptNum) return;

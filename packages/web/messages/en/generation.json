@@ -292,5 +292,16 @@
     "title": "Course Generated!",
     "message": "Your course is ready.",
     "viewCourse": "View Course"
+  },
+  "globalChat": {
+    "title": "Course AI Assistant",
+    "messageCount": "{count} messages",
+    "emptyState": "Ask a question or request course improvements",
+    "placeholder": "How can I help improve your course?",
+    "thinking": "Thinking...",
+    "error": "Error",
+    "errorDescription": "Failed to send message. Please try again.",
+    "regenerationTriggered": "Course Regeneration",
+    "preparingRegeneration": "Preparing regeneration..."
   }
 }

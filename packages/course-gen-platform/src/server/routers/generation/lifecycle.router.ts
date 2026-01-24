@@ -726,7 +726,7 @@ export const lifecycleRouter = router({
 
         // Step 5: Build GenerationJobInput
         // Validate input lengths (frontend enforces these, backend logs violations)
-        const MAX_DESCRIPTION_LENGTH = 5000;
+        const MAX_DESCRIPTION_LENGTH = 7000;
         const MAX_LEARNING_OUTCOMES = 20;
         const MAX_ESTIMATED_LESSONS = 200;
         const MAX_ESTIMATED_SECTIONS = 50;
