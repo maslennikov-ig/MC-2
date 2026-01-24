@@ -37,6 +37,10 @@ import { createModelConfigService } from '../../../../shared/llm/model-config-se
  *
  * @param message - User message to classify
  * @returns Intent: 'refine' or 'regenerate'
+ *
+ * @example
+ * classifyIntent('Перегенерируй курс') // returns 'regenerate'
+ * classifyIntent('Добавь больше примеров') // returns 'refine'
  */
 function classifyIntent(message: string): ChatIntent {
   const lowerMessage = message.toLowerCase();
@@ -116,18 +120,15 @@ export const chatRouter = {
       const convId = conversationId || crypto.randomUUID();
 
       // Save user message to conversation history
-      // Note: Using type assertion until migration runs and types are regenerated
-      const { error: insertUserMsgError } = await (supabase as any)
-        .from('course_chat_messages')
-        .insert({
-          course_id: courseId,
-          conversation_id: convId,
-          role: 'user',
-          content: userMessage,
-          chat_type: chatType,
-          node_context: nodeContext || null,
-          intent,
-        });
+      const { error: insertUserMsgError } = await supabase.from('course_chat_messages').insert({
+        course_id: courseId,
+        conversation_id: convId,
+        role: 'user',
+        content: userMessage,
+        chat_type: chatType,
+        node_context: nodeContext || null,
+        intent,
+      });
 
       if (insertUserMsgError) {
         // Non-blocking: log but continue
@@ -236,8 +237,7 @@ ${contentContext}
       }
 
       // Save assistant message with metrics
-      // Note: Using type assertion until migration runs and types are regenerated
-      const { error: insertAssistantMsgError } = await (supabase as any)
+      const { error: insertAssistantMsgError } = await supabase
         .from('course_chat_messages')
         .insert({
           course_id: courseId,
