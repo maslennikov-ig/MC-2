@@ -137,6 +137,31 @@ echo ""
 echo "Stopping old application environment ($CURRENT_COLOR)..."
 docker compose -f "$BASE_PATH/docker-compose.app.yml" -p "megacampus-$CURRENT_COLOR" down 2>/dev/null || true
 
+# 10. Docker Cleanup (prevent disk space exhaustion)
+echo ""
+echo "Cleaning up Docker resources..."
+
+# Remove dangling images (not tagged, safe to remove)
+DANGLING_CLEANED=$(docker image prune -f 2>/dev/null | tail -1 || echo "0B")
+echo "   Dangling images cleaned: $DANGLING_CLEANED"
+
+# Remove unused build cache older than 7 days
+BUILD_CACHE_CLEANED=$(docker builder prune -f --filter "until=168h" 2>/dev/null | tail -1 || echo "0B")
+echo "   Build cache cleaned: $BUILD_CACHE_CLEANED"
+
+# Report disk space
+DISK_FREE=$(df -h / | awk 'NR==2 {print $4}')
+DISK_USED=$(df -h / | awk 'NR==2 {print $5}')
+echo "   Disk status: $DISK_FREE free ($DISK_USED used)"
+
+# Warning if disk is critically low
+DISK_PERCENT=$(df / | awk 'NR==2 {print $5}' | tr -d '%')
+if [ "$DISK_PERCENT" -gt 90 ]; then
+    echo ""
+    echo "⚠️  WARNING: Disk usage above 90%!"
+    echo "   Consider running: docker system prune -a --volumes"
+fi
+
 echo ""
 echo "Deployment Complete!"
 echo "   Active: $NEW_COLOR"
