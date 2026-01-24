@@ -2,6 +2,18 @@
 
 _Released on 2025-12-26_
 
+## v0.28.36
+
+_Released on 2026-01-24_
+
+### 🐛 Bug Fixes
+
+- **slug**: Prevent suffix truncation in generateSlug
+
+---
+
+_This release was automatically generated from 3 commits._
+
 ## v0.28.35
 
 _Released on 2026-01-24_
