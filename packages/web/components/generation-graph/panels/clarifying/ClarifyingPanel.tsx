@@ -10,6 +10,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import confetti from 'canvas-confetti'
 import { QuestionCard } from './QuestionCard'
 import { trpc } from '@/lib/trpc/client'
+import { toast } from 'sonner'
 
 type QuestionPriority = 'critical' | 'important' | 'nice_to_have'
 
@@ -118,12 +119,24 @@ export function ClarifyingPanel({ courseId, onComplete }: ClarifyingPanelProps) 
       .then(() => {
         setAnsweredQuestions((prev) => new Set(prev).add(questionId))
       })
+      .catch((error: Error) => {
+        toast.error('Не удалось сохранить ответ', {
+          description: error.message || 'Попробуйте ещё раз',
+        })
+      })
   }
 
   const handleSkip = (questionId: string) => {
-    void skipQuestionMutation.mutateAsync({ questionId }).then(() => {
-      setAnsweredQuestions((prev) => new Set(prev).add(questionId))
-    })
+    void skipQuestionMutation
+      .mutateAsync({ questionId })
+      .then(() => {
+        setAnsweredQuestions((prev) => new Set(prev).add(questionId))
+      })
+      .catch((error: Error) => {
+        toast.error('Не удалось пропустить вопрос', {
+          description: error.message || 'Попробуйте ещё раз',
+        })
+      })
   }
 
   const handleAcceptAll = async () => {
@@ -146,15 +159,25 @@ export function ClarifyingPanel({ courseId, onComplete }: ClarifyingPanelProps) 
         await new Promise((r) => setTimeout(r, 100))
       } catch (error) {
         console.error(`Failed to submit answer for ${q.id}:`, error)
+        toast.error('Ошибка при автоматическом ответе', {
+          description: `Не удалось ответить на вопрос. Продолжаем с остальными.`,
+        })
         // Continue with other questions on failure
       }
     }
   }
 
   const handleContinue = () => {
-    void approveAndProceedMutation.mutateAsync({ courseId }).then(() => {
-      onComplete?.()
-    })
+    void approveAndProceedMutation
+      .mutateAsync({ courseId })
+      .then(() => {
+        onComplete?.()
+      })
+      .catch((error: Error) => {
+        toast.error('Не удалось продолжить генерацию', {
+          description: error.message || 'Убедитесь, что все обязательные вопросы отвечены',
+        })
+      })
   }
 
   if (isLoading) {

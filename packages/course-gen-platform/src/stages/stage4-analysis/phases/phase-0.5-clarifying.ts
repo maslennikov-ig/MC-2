@@ -62,38 +62,56 @@ export const ClarifyingOutputSchema = z.object({
 export type ClarifyingOutput = z.infer<typeof ClarifyingOutputSchema>;
 
 // ============================================================================
-// INPUT TYPES
+// INPUT SCHEMA
 // ============================================================================
 
 /**
- * Input data for Phase 0.5 Clarifying Questions
+ * Previous answer schema for round 2
  */
-export interface Phase05Input {
-  /** Course UUID */
-  course_id: string;
+const PreviousAnswerSchema = z.object({
+  question_text: z.string().min(1),
+  user_answer: z.string().min(1),
+});
 
-  /** Budget allocation from Stage 4 budget allocator */
-  budgetAllocation: Stage4BudgetAllocation;
+/**
+ * Course context schema
+ */
+const CourseContextSchema = z.object({
+  title: z.string().min(1, 'Course title is required'),
+  description: z.string().optional(),
+  target_audience: z.string().optional(),
+});
+
+/**
+ * Input schema for Phase 0.5 Clarifying Questions
+ *
+ * Runtime validation ensures data integrity at module boundary.
+ * budgetAllocation uses z.custom() since it's validated in its own module.
+ */
+export const Phase05InputSchema = z.object({
+  /** Course UUID */
+  course_id: z.string().uuid('Invalid course UUID'),
+
+  /** Budget allocation from Stage 4 budget allocator (validated in its module) */
+  budgetAllocation: z.custom<Stage4BudgetAllocation>(
+    val => val !== null && typeof val === 'object' && 'documents' in val,
+    { message: 'Invalid budget allocation object' }
+  ),
 
   /** Course context */
-  courseContext: {
-    title: string;
-    description?: string;
-    target_audience?: string;
-  };
+  courseContext: CourseContextSchema,
 
   /** Language code (ISO 639-1) */
-  language: string;
+  language: z.string().min(2).max(5),
 
   /** Iteration round (1 or 2, max 2 rounds allowed) */
-  iterationRound: 1 | 2;
+  iterationRound: z.union([z.literal(1), z.literal(2)]),
 
   /** Previous answers from round 1 (only for round 2) */
-  previousAnswers?: Array<{
-    question_text: string;
-    user_answer: string;
-  }>;
-}
+  previousAnswers: z.array(PreviousAnswerSchema).optional(),
+});
+
+export type Phase05Input = z.infer<typeof Phase05InputSchema>;
 
 /**
  * Database row type for clarifying_questions table
@@ -309,7 +327,19 @@ async function storeQuestions(
  *   iterationRound: 1,
  * });
  */
-export async function runPhase05Clarifying(input: Phase05Input): Promise<ClarifyingOutput> {
+export async function runPhase05Clarifying(rawInput: Phase05Input): Promise<ClarifyingOutput> {
+  // =================================================================
+  // STEP 0: Validate input at module boundary
+  // =================================================================
+  const parseResult = Phase05InputSchema.safeParse(rawInput);
+  if (!parseResult.success) {
+    const errorMessage = parseResult.error.issues
+      .map(i => `${i.path.join('.')}: ${i.message}`)
+      .join(', ');
+    throw new Error(`Invalid Phase 0.5 input: ${errorMessage}`);
+  }
+  const input = parseResult.data;
+
   const { course_id: courseId, language, iterationRound } = input;
   const startTime = Date.now();
 
