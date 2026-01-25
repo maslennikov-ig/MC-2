@@ -8,6 +8,7 @@ import { Sparkles, CheckCircle2, ArrowRight } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import confetti from 'canvas-confetti'
 import { QuestionCard } from './QuestionCard'
+import { trpc } from '@/lib/trpc/client'
 
 type QuestionPriority = 'critical' | 'important' | 'nice_to_have'
 
@@ -30,110 +31,27 @@ interface ClarifyingPanelProps {
   onComplete?: () => void
 }
 
-// Mock API hooks - replace with real tRPC calls when backend is ready
-function useGetQuestions(courseId: string) {
-  // TODO: Replace with trpc.clarifying.getQuestions.useQuery({ courseId })
-  const [data, setData] = useState<Question[]>([])
-  const [isLoading, setIsLoading] = useState(true)
-
-  useEffect(() => {
-    // Mock data for development
-    setTimeout(() => {
-      setData([
-        {
-          id: 'q1',
-          text: 'Какой уровень подготовки предполагается у учащихся?',
-          priority: 'critical',
-          suggestedAnswers: [
-            {
-              text: 'Начальный (без предварительных знаний)',
-              rationale: 'Курс будет включать базовые понятия',
-            },
-            {
-              text: 'Средний (базовые знания в области)',
-              rationale: 'Курс сосредоточится на практике',
-            },
-            { text: 'Продвинутый (опытные специалисты)', rationale: 'Курс будет углубленным' },
-          ],
-          isAnswered: false,
-        },
-        {
-          id: 'q2',
-          text: 'Какова целевая продолжительность курса?',
-          priority: 'important',
-          suggestedAnswers: [
-            { text: '4-6 недель', rationale: 'Стандартный формат онлайн-курса' },
-            { text: '8-12 недель', rationale: 'Углубленное изучение материала' },
-            { text: '2-3 недели', rationale: 'Интенсивный краткосрочный курс' },
-          ],
-          isAnswered: false,
-        },
-        {
-          id: 'q3',
-          text: 'Нужны ли практические задания?',
-          priority: 'nice_to_have',
-          suggestedAnswers: [
-            { text: 'Да, после каждого урока', rationale: 'Максимальная практика' },
-            { text: 'Да, после каждого модуля', rationale: 'Баланс теории и практики' },
-            { text: 'Нет, только теория', rationale: 'Фокус на знаниях' },
-          ],
-          isAnswered: false,
-        },
-      ])
-      setIsLoading(false)
-    }, 500)
-  }, [courseId])
-
-  return { data, isLoading }
-}
-
-function useSubmitAnswer() {
-  // TODO: Replace with trpc.clarifying.submitAnswer.useMutation()
-  const [isPending, setIsPending] = useState(false)
-
-  const mutate = async (params: { courseId: string; questionId: string; answer: string }) => {
-    setIsPending(true)
-    await new Promise((resolve) => setTimeout(resolve, 300))
-    console.log('Submitted answer:', params)
-    setIsPending(false)
-  }
-
-  return { mutate, isPending }
-}
-
-function useSkipQuestion() {
-  // TODO: Replace with trpc.clarifying.skipQuestion.useMutation()
-  const [isPending, setIsPending] = useState(false)
-
-  const mutate = async (params: { courseId: string; questionId: string }) => {
-    setIsPending(true)
-    await new Promise((resolve) => setTimeout(resolve, 300))
-    console.log('Skipped question:', params)
-    setIsPending(false)
-  }
-
-  return { mutate, isPending }
-}
-
-function useApproveAndProceed() {
-  // TODO: Replace with trpc.clarifying.approveAndProceed.useMutation()
-  const [isPending, setIsPending] = useState(false)
-
-  const mutate = async (params: { courseId: string }) => {
-    setIsPending(true)
-    await new Promise((resolve) => setTimeout(resolve, 500))
-    console.log('Approved and proceeding:', params)
-    setIsPending(false)
-  }
-
-  return { mutate, isPending }
-}
-
 export function ClarifyingPanel({ courseId, onComplete }: ClarifyingPanelProps) {
-  const { data: questions = [], isLoading } = useGetQuestions(courseId)
-  const submitAnswer = useSubmitAnswer()
-  const skipQuestion = useSkipQuestion()
-  const approveAndProceed = useApproveAndProceed()
+  // Real tRPC hooks
+  const { data: questionsData, isLoading } = trpc.clarifying.getQuestions.useQuery({ courseId })
+  const submitAnswerMutation = trpc.clarifying.submitAnswer.useMutation()
+  const skipQuestionMutation = trpc.clarifying.skipQuestion.useMutation()
+  const approveAndProceedMutation = trpc.clarifying.approveAndProceed.useMutation()
+
+  // Transform API response to Question format
+  const questions: Question[] = (questionsData?.questions || []).map((q) => ({
+    id: q.id,
+    text: q.question_text,
+    priority: q.question_priority as QuestionPriority,
+    suggestedAnswers: Array.isArray(q.suggested_answers)
+      ? q.suggested_answers.map((text) => ({
+          text,
+          rationale: undefined,
+        }))
+      : [],
+    currentAnswer: q.user_answer || undefined,
+    isAnswered: q.status === 'answered',
+  }))
 
   const [answeredQuestions, setAnsweredQuestions] = useState<Set<string>>(new Set())
   const [hasShownConfetti, setHasShownConfetti] = useState(false)
@@ -177,22 +95,23 @@ export function ClarifyingPanel({ courseId, onComplete }: ClarifyingPanelProps) 
   const handleAnswer = (
     questionId: string,
     answer: string,
-    _source: 'suggested' | 'modified' | 'custom'
+    source: 'suggested' | 'modified' | 'custom'
   ) => {
-    void submitAnswer.mutate({ courseId, questionId, answer })
-    setAnsweredQuestions((prev) => new Set(prev).add(questionId))
-
-    // Update question data
-    const questionIndex = questions.findIndex((q) => q.id === questionId)
-    if (questionIndex !== -1) {
-      questions[questionIndex].currentAnswer = answer
-      questions[questionIndex].isAnswered = true
-    }
+    void submitAnswerMutation
+      .mutateAsync({
+        questionId,
+        answer,
+        answerSource: source,
+      })
+      .then(() => {
+        setAnsweredQuestions((prev) => new Set(prev).add(questionId))
+      })
   }
 
   const handleSkip = (questionId: string) => {
-    void skipQuestion.mutate({ courseId, questionId })
-    setAnsweredQuestions((prev) => new Set(prev).add(questionId))
+    void skipQuestionMutation.mutateAsync({ questionId }).then(() => {
+      setAnsweredQuestions((prev) => new Set(prev).add(questionId))
+    })
   }
 
   const handleAcceptAll = () => {
@@ -205,8 +124,9 @@ export function ClarifyingPanel({ courseId, onComplete }: ClarifyingPanelProps) 
   }
 
   const handleContinue = () => {
-    void approveAndProceed.mutate({ courseId })
-    onComplete?.()
+    void approveAndProceedMutation.mutateAsync({ courseId }).then(() => {
+      onComplete?.()
+    })
   }
 
   if (isLoading) {
@@ -271,7 +191,7 @@ export function ClarifyingPanel({ courseId, onComplete }: ClarifyingPanelProps) 
             size="sm"
             variant="outline"
             onClick={handleAcceptAll}
-            disabled={submitAnswer.isPending}
+            disabled={submitAnswerMutation.isPending}
           >
             <Sparkles className="h-3.5 w-3.5" />
             Принять все рекомендации
@@ -294,7 +214,7 @@ export function ClarifyingPanel({ courseId, onComplete }: ClarifyingPanelProps) 
                 onAnswer={handleAnswer}
                 onSkip={handleSkip}
                 isAnswered={answeredQuestions.has(question.id)}
-                isProcessing={submitAnswer.isPending || skipQuestion.isPending}
+                isProcessing={submitAnswerMutation.isPending || skipQuestionMutation.isPending}
               />
             </div>
           ))}
@@ -310,10 +230,10 @@ export function ClarifyingPanel({ courseId, onComplete }: ClarifyingPanelProps) 
         <Button
           size="lg"
           className="w-full shadow-lg"
-          disabled={!allCriticalAnswered || approveAndProceed.isPending}
+          disabled={!allCriticalAnswered || approveAndProceedMutation.isPending}
           onClick={handleContinue}
         >
-          {approveAndProceed.isPending ? (
+          {approveAndProceedMutation.isPending ? (
             <>
               <div className="mr-2 h-4 w-4 animate-spin rounded-full border-b-2 border-white" />
               Обработка...

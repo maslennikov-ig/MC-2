@@ -41,6 +41,13 @@ export interface Phase4Input {
   phase2_output: Phase2Output;
   /** Phase 3 output (expert analysis) */
   phase3_output: Phase3Output;
+  /** Clarifying answers from Phase 0.5 */
+  clarifying_answers?: Array<{
+    question: string;
+    answer: string;
+    priority: string;
+    category: string | null;
+  }>;
 }
 
 /**
@@ -367,6 +374,15 @@ function buildPhase4Prompt(input: Phase4Input, documentCount: number): string {
       ? `\n\nRESEARCH FLAGS (${researchFlagsCount} topics requiring up-to-date information):\n${phase3_output.research_flags.map(flag => `- ${flag.topic}: ${flag.context} [${flag.reason}]`).join('\n')}`
       : '';
 
+  // Build clarifying context from user answers
+  let clarifyingContext = '';
+  if (input.clarifying_answers && input.clarifying_answers.length > 0) {
+    clarifyingContext = '\n\nUSER CLARIFICATIONS (from Phase 0.5):\n';
+    clarifyingContext += input.clarifying_answers
+      .map((a, i) => `[Q${i + 1}] ${a.question}\n[A${i + 1}] ${a.answer}`)
+      .join('\n\n');
+  }
+
   // Generate Zod schema description for LLM
   const schemaDescription = zodToPromptSchema(Phase4OutputSchema);
 
@@ -401,7 +417,7 @@ ${phase2_output.recommended_structure.sections_breakdown.map(section => `- ${sec
 
 Phase 3 - Pedagogical Approach:
 ${phase3_output.pedagogical_strategy.progression_logic}
-${documentSummariesSection}
+${documentSummariesSection}${clarifyingContext}
 
 ---
 
