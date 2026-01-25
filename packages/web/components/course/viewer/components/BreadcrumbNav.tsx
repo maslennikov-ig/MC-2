@@ -22,8 +22,8 @@ interface BreadcrumbNavProps {
   currentSection?: Section
   currentLesson?: Lesson
   focusMode?: boolean
-  /** Organization slug for URL building */
-  orgSlug?: string
+  /** Organization slug for URL building (REQUIRED) */
+  orgSlug: string
 }
 
 export function BreadcrumbNav({
@@ -60,7 +60,7 @@ export function BreadcrumbNav({
 
         <li>
           <Link
-            href={orgSlug ? buildCourseUrl(orgSlug, course.slug || course.id) : `/courses/${course.slug}`}
+            href={buildCourseUrl(orgSlug, course.slug || course.id)}
             className="max-w-[200px] truncate transition-colors hover:text-purple-600 dark:hover:text-purple-400"
             title={sanitizeText(course.title)}
           >

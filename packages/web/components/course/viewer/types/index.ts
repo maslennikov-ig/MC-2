@@ -19,8 +19,8 @@ export interface CourseViewerProps {
   readOnly?: boolean
   /** Initial lesson label from URL (e.g., "1.2") for deep-linking */
   initialLessonLabel?: string
-  /** Organization slug for URL building (required for new URL format /courses/{org}/{course}) */
-  orgSlug?: string
+  /** Organization slug for URL building (REQUIRED - no fallback to old URL format) */
+  orgSlug: string
 }
 
 export function isActivityObject(activity: string | LessonActivity): activity is LessonActivity {

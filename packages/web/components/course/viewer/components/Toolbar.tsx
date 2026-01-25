@@ -36,8 +36,8 @@ interface ToolbarProps {
   hasNext: boolean
   /** Read-only mode for shared/public viewing - hides edit features */
   readOnly?: boolean
-  /** Organization slug for URL building */
-  orgSlug?: string
+  /** Organization slug for URL building (REQUIRED) */
+  orgSlug: string
   onToggleSidebar: () => void
   onToggleMobileSidebar: () => void
   onToggleFocusMode: () => void
@@ -104,7 +104,7 @@ export function Toolbar({
                     size="sm"
                     className="text-gray-600 hover:text-purple-600 dark:text-white/70 dark:hover:text-purple-400"
                   >
-                    <Link href={orgSlug ? buildCourseLessonsUrl(orgSlug, course.slug || course.id) : `/courses/${course.slug || course.id}/lessons`}>
+                    <Link href={buildCourseLessonsUrl(orgSlug, course.slug || course.id)}>
                       <LayoutGrid className="h-4 w-4" />
                       <span className="ml-2 hidden lg:inline">{t('allLessons')}</span>
                     </Link>
@@ -126,7 +126,7 @@ export function Toolbar({
                       className="text-gray-600 hover:text-blue-600 dark:text-white/70 dark:hover:text-blue-400"
                     >
                       <Link
-                        href={orgSlug ? buildCourseGeneratingUrl(orgSlug, course.slug || course.id, true) : `/courses/generating/${course.slug || course.id}?workflow=true`}
+                        href={buildCourseGeneratingUrl(orgSlug, course.slug || course.id, true)}
                         target="_blank"
                       >
                         <GitBranch className="h-4 w-4" />
