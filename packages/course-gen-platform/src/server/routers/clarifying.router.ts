@@ -566,6 +566,14 @@ export const clarifyingRouter = router({
           });
         }
 
+        // Custom answers should not have suggestion-related fields
+        if (answerSource === 'custom' && selectedSuggestionIndex !== undefined) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'Custom answers should not include selectedSuggestionIndex',
+          });
+        }
+
         // Validate suggestion index if provided
         if (selectedSuggestionIndex !== undefined) {
           const suggestions = question.suggested_answers || [];

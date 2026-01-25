@@ -339,9 +339,23 @@ export async function runPhase05Clarifying(input: Phase05Input): Promise<Clarify
     phaseLogger.debug('Prompt built with course context and document context');
 
     // =================================================================
-    // STEP 3: Invoke LLM
+    // STEP 3: Invoke LLM with timeout protection
     // =================================================================
-    const response = await model.invoke(promptMessages);
+    const LLM_TIMEOUT_MS = 60_000; // 60 seconds timeout for LLM call
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => {
+      controller.abort();
+      phaseLogger.warn({ timeoutMs: LLM_TIMEOUT_MS }, 'LLM call timed out, aborting');
+    }, LLM_TIMEOUT_MS);
+
+    let response;
+    try {
+      response = await model.invoke(promptMessages, {
+        signal: controller.signal,
+      });
+    } finally {
+      clearTimeout(timeoutId);
+    }
     const rawOutput = response.content as string;
 
     phaseLogger.debug(
