@@ -111,6 +111,7 @@ export function GlobalCourseChat({
   const [tokenEstimates, setTokenEstimates] = useState<TokenEstimates | null>(null)
   const scrollRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const abortControllerRef = useRef<AbortController | null>(null)
 
   // Scroll to bottom on new messages
   useEffect(() => {
@@ -140,9 +141,23 @@ export function GlobalCourseChat({
     void fetchEstimates()
   }, [courseId])
 
+  // Cleanup: abort any pending request on unmount
+  useEffect(() => {
+    return () => {
+      abortControllerRef.current?.abort()
+    }
+  }, [])
+
   const sendMessage = useCallback(
     async (messageText: string, intent: 'refine' | 'regenerate' = selectedIntent) => {
       if (!messageText.trim() || isProcessing) return
+
+      // Abort any previous request
+      abortControllerRef.current?.abort()
+
+      // Create new controller for this request
+      const controller = new AbortController()
+      abortControllerRef.current = controller
 
       setIsProcessing(true)
 
@@ -160,13 +175,19 @@ export function GlobalCourseChat({
 
       try {
         // Use server action with proper auth headers
-        const result = await sendChatMessage({
-          courseId,
-          chatType: 'global',
-          userMessage: messageText,
-          conversationId,
-          intent,
-        })
+        const result = await sendChatMessage(
+          {
+            courseId,
+            chatType: 'global',
+            userMessage: messageText,
+            conversationId,
+            intent,
+          },
+          controller.signal
+        )
+
+        // Check if aborted before processing result
+        if (controller.signal.aborted) return
 
         setConversationId(result.conversationId)
 
@@ -186,7 +207,11 @@ export function GlobalCourseChat({
           })
           onRegenerationRequest()
         }
-      } catch {
+      } catch (error) {
+        // Ignore AbortError - request was intentionally cancelled
+        if (error instanceof Error && error.name === 'AbortError') {
+          return
+        }
         toast.error(t('error'), {
           description: t('errorDescription'),
         })
@@ -200,7 +225,10 @@ export function GlobalCourseChat({
           return prev.filter((msg) => msg.id !== tempId)
         })
       } finally {
-        setIsProcessing(false)
+        // Only update state if this is still the active request
+        if (abortControllerRef.current === controller) {
+          setIsProcessing(false)
+        }
       }
     },
     [courseId, conversationId, isProcessing, onRegenerationRequest, selectedIntent, t]

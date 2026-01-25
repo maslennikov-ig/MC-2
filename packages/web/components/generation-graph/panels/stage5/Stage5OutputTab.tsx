@@ -144,6 +144,8 @@ export const Stage5OutputTab = memo<Stage5OutputTabProps>(function Stage5OutputT
   const [isDeleting, setIsDeleting] = useState(false)
   // Track if we've already checked and confirmed deletion for this session
   const downstreamDeletedRef = useRef(false)
+  // Key to force re-render of EditableFields when cascade is canceled (resets local state to original values)
+  const [fieldResetKey, setFieldResetKey] = useState(0)
 
   // Helper to actually perform the save
   const performSave = useCallback(
@@ -249,6 +251,8 @@ export const Stage5OutputTab = memo<Stage5OutputTabProps>(function Stage5OutputT
     setCascadeModalOpen(false)
     setPendingChange(null)
     setDownstreamInfo(null)
+    // Force re-render of EditableFields to revert their local state to original values
+    setFieldResetKey((prev) => prev + 1)
   }, [])
 
   // Get status for a specific field
@@ -351,6 +355,7 @@ export const Stage5OutputTab = memo<Stage5OutputTabProps>(function Stage5OutputT
 
       {/* Metadata Card */}
       <Card
+        key={fieldResetKey}
         className={cn(
           'border-l-4 border-l-orange-500',
           'bg-gradient-to-r from-orange-50/50 to-amber-50/50',

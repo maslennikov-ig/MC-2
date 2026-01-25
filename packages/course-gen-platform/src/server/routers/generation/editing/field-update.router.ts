@@ -331,9 +331,21 @@ export const fieldUpdateRouter = {
           });
         }
 
-        const sectionIds = sections?.map(s => s.id) || [];
+        // Validate section IDs are valid UUIDs (defense-in-depth)
+        const sectionIds = (sections ?? [])
+          .map(s => s.id)
+          .filter(id => {
+            const isValid = z.string().uuid().safeParse(id).success;
+            if (!isValid) {
+              logger.warn(
+                { requestId, courseId, invalidId: id },
+                'Invalid section ID found, skipping'
+              );
+            }
+            return isValid;
+          });
 
-        // Delete lessons if we have sections (Stage 6 data)
+        // Delete lessons if we have valid sections (Stage 6 data)
         if (sectionIds.length > 0) {
           // First get lesson IDs to delete related data
           const { data: lessons, error: lessonsQueryError } = await supabase
@@ -342,12 +354,31 @@ export const fieldUpdateRouter = {
             .in('section_id', sectionIds);
 
           if (lessonsQueryError) {
-            logger.warn({ requestId, courseId, error: lessonsQueryError }, 'Failed to get lessons');
+            logger.error(
+              { requestId, courseId, error: lessonsQueryError },
+              'Failed to get lessons'
+            );
+            throw new TRPCError({
+              code: 'INTERNAL_SERVER_ERROR',
+              message: 'Failed to fetch lessons for deletion',
+            });
           }
 
-          const lessonIds = lessons?.map(l => l.id) || [];
+          // Validate lesson IDs are valid UUIDs (defense-in-depth)
+          const lessonIds = (lessons ?? [])
+            .map(l => l.id)
+            .filter(id => {
+              const isValid = z.string().uuid().safeParse(id).success;
+              if (!isValid) {
+                logger.warn(
+                  { requestId, courseId, invalidId: id },
+                  'Invalid lesson ID found, skipping'
+                );
+              }
+              return isValid;
+            });
 
-          // Delete lesson_contents if there are lessons
+          // Delete lesson_contents if there are valid lessons
           if (lessonIds.length > 0) {
             const { error: contentsError } = await supabase
               .from('lesson_contents')
@@ -355,11 +386,14 @@ export const fieldUpdateRouter = {
               .in('lesson_id', lessonIds);
 
             if (contentsError) {
+              // NOTE: This is acceptable because:
+              // 1. lesson_contents has ON DELETE CASCADE FK to lessons
+              // 2. If we fail here, deleting lessons will still cascade-delete contents
+              // 3. This is a best-effort cleanup to avoid FK constraint issues
               logger.warn(
                 { requestId, courseId, error: contentsError },
-                'Failed to delete lesson_contents'
+                'Failed to delete lesson_contents - will rely on CASCADE'
               );
-              // Continue anyway, as lesson_contents might not exist
             }
           }
 

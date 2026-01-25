@@ -40,7 +40,12 @@ export const RefinementChat: React.FC<RefinementChatProps> = ({
   isProcessing = false,
 }) => {
   const { t } = useTranslation()
-  const [isOpen, setIsOpen] = useState(true) // Expanded by default (FR-022)
+  // Expanded by default (FR-022), with localStorage persistence
+  const [isOpen, setIsOpen] = useState(() => {
+    if (typeof window === 'undefined') return true
+    const saved = localStorage.getItem('refinementChat.isOpen')
+    return saved !== null ? JSON.parse(saved) : true
+  })
   const [message, setMessage] = useState('')
   const [selectedIntent, setSelectedIntent] = useState<'refine' | 'regenerate'>('refine')
   const [pendingMessages, setPendingMessages] = useState<ChatMessage[]>([])
@@ -77,6 +82,11 @@ export const RefinementChat: React.FC<RefinementChatProps> = ({
       scrollRef.current.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
     }
   }, [displayHistory])
+
+  // Persist isOpen preference in localStorage
+  useEffect(() => {
+    localStorage.setItem('refinementChat.isOpen', JSON.stringify(isOpen))
+  }, [isOpen])
 
   // Auto-focus textarea when chat opens (FR-022)
   useEffect(() => {
