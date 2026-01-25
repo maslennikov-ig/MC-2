@@ -4,6 +4,10 @@
  * Minimal tRPC client implementation for clarifying router.
  * Uses native fetch with React hooks for data fetching.
  *
+ * Security Features:
+ * - CSRF protection via X-CSRF-Token header
+ * - Credentials included for session auth
+ *
  * TODO: Replace with proper @trpc/react-query setup when package is installed.
  */
 
@@ -11,6 +15,47 @@
 
 import React from 'react'
 import { BACKEND_URL } from '@/lib/env-client'
+
+/**
+ * Get CSRF token from meta tag or cookie
+ * The token should be set by the server in a meta tag or cookie
+ */
+function getCsrfToken(): string | null {
+  if (typeof document === 'undefined') return null
+
+  // Try meta tag first (preferred method)
+  const metaTag = document.querySelector('meta[name="csrf-token"]')
+  if (metaTag) {
+    return metaTag.getAttribute('content')
+  }
+
+  // Fallback to cookie
+  const cookies = document.cookie.split(';')
+  for (const cookie of cookies) {
+    const [name, value] = cookie.trim().split('=')
+    if (name === 'csrf-token' || name === '_csrf') {
+      return decodeURIComponent(value)
+    }
+  }
+
+  return null
+}
+
+/**
+ * Build headers with CSRF protection
+ */
+function buildHeaders(): Record<string, string> {
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  }
+
+  const csrfToken = getCsrfToken()
+  if (csrfToken) {
+    headers['X-CSRF-Token'] = csrfToken
+  }
+
+  return headers
+}
 
 /**
  * React Query-like hook types
@@ -48,9 +93,7 @@ function createUseQuery<TInput, TOutput>(
           `${BACKEND_URL}/trpc/${procedurePath}?input=${encodeURIComponent(JSON.stringify(input))}`,
           {
             credentials: 'include',
-            headers: {
-              'Content-Type': 'application/json',
-            },
+            headers: buildHeaders(),
           }
         )
 
@@ -102,7 +145,7 @@ function createUseMutation<TInput, TOutput>(
 
           const response = await fetch(`${BACKEND_URL}/trpc/${procedurePath}`, {
             method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
+            headers: buildHeaders(),
             credentials: 'include',
             body: JSON.stringify(variables),
           })
