@@ -34,7 +34,12 @@ import { checkPauseAndDelay } from '../../shared/pause-check';
  */
 export interface AnalysisErrorDetails {
   /** Error code for classification */
-  code: 'BARRIER_FAILED' | 'MINIMUM_LESSONS_NOT_MET' | 'LLM_ERROR' | 'UNKNOWN';
+  code:
+    | 'AWAITING_CLARIFYING_ANSWERS'
+    | 'BARRIER_FAILED'
+    | 'MINIMUM_LESSONS_NOT_MET'
+    | 'LLM_ERROR'
+    | 'UNKNOWN';
 
   /** Human-readable error message */
   message: string;
@@ -88,6 +93,7 @@ export interface StructureAnalysisJobResult {
  * Used for monitoring, alerting, and retry decisions.
  *
  * Error codes:
+ * - AWAITING_CLARIFYING_ANSWERS: Clarifying questions pending (special - not a real error)
  * - BARRIER_FAILED: Stage 3 document processing not complete
  * - MINIMUM_LESSONS_NOT_MET: Topic too narrow (<10 lessons estimated)
  * - LLM_ERROR: LLM processing failure (API error, timeout, etc.)
@@ -98,8 +104,18 @@ export interface StructureAnalysisJobResult {
  */
 function classifyAnalysisError(
   error: Error | string
-): 'BARRIER_FAILED' | 'MINIMUM_LESSONS_NOT_MET' | 'LLM_ERROR' | 'UNKNOWN' {
+):
+  | 'AWAITING_CLARIFYING_ANSWERS'
+  | 'BARRIER_FAILED'
+  | 'MINIMUM_LESSONS_NOT_MET'
+  | 'LLM_ERROR'
+  | 'UNKNOWN' {
   const errorMessage = error instanceof Error ? error.message : String(error);
+
+  // Special case: clarifying questions pending (not a real error)
+  if (errorMessage.includes('AWAITING_CLARIFYING_ANSWERS')) {
+    return 'AWAITING_CLARIFYING_ANSWERS';
+  }
 
   if (errorMessage.includes('BARRIER_FAILED') || errorMessage.includes('Stage 3 barrier')) {
     return 'BARRIER_FAILED';
@@ -500,7 +516,11 @@ class Stage4AnalysisHandler {
         }
 
         const currentStatus = currentCourse.generation_status;
-        const validStage4ProgressStates = ['stage_4_init', 'stage_4_analyzing'];
+        const validStage4ProgressStates = [
+          'stage_4_init',
+          'stage_4_clarifying',
+          'stage_4_analyzing',
+        ];
 
         // Only perform status initialization if NOT already in Stage 4 progression
         if (!validStage4ProgressStates.includes(currentStatus as string)) {
@@ -555,6 +575,49 @@ class Stage4AnalysisHandler {
           // Ensure we're in analyzing state (idempotent - only transitions if needed)
           if (currentStatus === 'stage_4_init') {
             jobLogger.info('Transitioning from stage_4_init to stage_4_analyzing');
+
+            const { error: statusAnalyzeError } = await supabaseAdmin
+              .from('courses')
+              .update({
+                generation_status: 'stage_4_analyzing' as const,
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', course_id)
+              .eq('organization_id', organization_id);
+
+            if (statusAnalyzeError) {
+              throw new Error(
+                `Failed to update status to stage_4_analyzing: ${statusAnalyzeError.message}`
+              );
+            }
+          } else if (currentStatus === 'stage_4_clarifying') {
+            // Check if user has answered critical/important questions
+            jobLogger.info('Status is stage_4_clarifying - checking if answers are complete');
+
+            const { getPendingQuestions } = await import('./phases/phase-0.5-clarifying');
+            const pendingQuestions = await getPendingQuestions(course_id);
+
+            const criticalPending = pendingQuestions.filter(
+              q => q.question_priority === 'critical' || q.question_priority === 'important'
+            );
+
+            if (criticalPending.length > 0) {
+              jobLogger.info(
+                {
+                  criticalPendingCount: criticalPending.length,
+                  totalPendingCount: pendingQuestions.length,
+                },
+                'Critical/important questions still pending - aborting job (will retry when answered)'
+              );
+              throw new Error(
+                `AWAITING_CLARIFYING_ANSWERS: ${criticalPending.length} critical/important questions pending`
+              );
+            }
+
+            // All critical/important questions answered - transition to analyzing
+            jobLogger.info(
+              'All critical/important questions answered - transitioning to analyzing'
+            );
 
             const { error: statusAnalyzeError } = await supabaseAdmin
               .from('courses')
@@ -787,6 +850,21 @@ class Stage4AnalysisHandler {
           } else if (error.message.includes('Phase 5')) {
             phase = 'final_assembly';
           }
+        }
+
+        // Special handling for clarifying questions pause (not an error)
+        if (errorCode === 'AWAITING_CLARIFYING_ANSWERS') {
+          jobLogger.info(
+            {
+              errorCode,
+              phase: 'clarifying_questions',
+            },
+            'Job paused awaiting clarifying answers - not an error, will resume when user answers'
+          );
+
+          // Don't mark as failed - job will be retried when user answers questions
+          // Status already set to stage_4_clarifying by orchestrator
+          throw error;
         }
 
         // Log permanent errors (non-retriable)

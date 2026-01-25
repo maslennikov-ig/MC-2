@@ -242,6 +242,71 @@ export type Database = {
           },
         ]
       }
+      clarifying_questions: {
+        Row: {
+          answer_source: string | null
+          answered_at: string | null
+          course_id: string
+          created_at: string | null
+          id: string
+          iteration_round: number
+          metadata: Json | null
+          order_index: number
+          question_category: string | null
+          question_priority: string
+          question_text: string
+          selected_suggestion_index: number | null
+          status: string
+          suggested_answers: Json | null
+          user_answer: string | null
+          user_modification: string | null
+        }
+        Insert: {
+          answer_source?: string | null
+          answered_at?: string | null
+          course_id: string
+          created_at?: string | null
+          id?: string
+          iteration_round?: number
+          metadata?: Json | null
+          order_index?: number
+          question_category?: string | null
+          question_priority: string
+          question_text: string
+          selected_suggestion_index?: number | null
+          status?: string
+          suggested_answers?: Json | null
+          user_answer?: string | null
+          user_modification?: string | null
+        }
+        Update: {
+          answer_source?: string | null
+          answered_at?: string | null
+          course_id?: string
+          created_at?: string | null
+          id?: string
+          iteration_round?: number
+          metadata?: Json | null
+          order_index?: number
+          question_category?: string | null
+          question_priority?: string
+          question_text?: string
+          selected_suggestion_index?: number | null
+          status?: string
+          suggested_answers?: Json | null
+          user_answer?: string | null
+          user_modification?: string | null
+        }
+        Relationships: [
+          {
+            foreignKeyName: "clarifying_questions_course_id_fkey"
+            columns: ["course_id"]
+            isOneToOne: false
+            referencedRelation: "courses"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       config_backups: {
         Row: {
           backup_data: Json
@@ -3296,6 +3361,7 @@ export type Database = {
         | "stage_3_complete"
         | "stage_3_awaiting_approval"
         | "stage_4_init"
+        | "stage_4_clarifying"
         | "stage_4_analyzing"
         | "stage_4_complete"
         | "stage_4_awaiting_approval"
@@ -3347,6 +3413,7 @@ export type Database = {
         | "DATABASE_ERROR"
         | "TIMEOUT"
         | "UNKNOWN"
+        | "BARRIER_FAILED"
       tier: "trial" | "free" | "basic" | "standard" | "premium"
       vector_status: "pending" | "indexing" | "indexed" | "failed"
     }
@@ -3516,6 +3583,7 @@ export const Constants = {
         "stage_3_complete",
         "stage_3_awaiting_approval",
         "stage_4_init",
+        "stage_4_clarifying",
         "stage_4_analyzing",
         "stage_4_complete",
         "stage_4_awaiting_approval",
@@ -3571,6 +3639,7 @@ export const Constants = {
         "DATABASE_ERROR",
         "TIMEOUT",
         "UNKNOWN",
+        "BARRIER_FAILED",
       ],
       tier: ["trial", "free", "basic", "standard", "premium"],
       vector_status: ["pending", "indexing", "indexed", "failed"],

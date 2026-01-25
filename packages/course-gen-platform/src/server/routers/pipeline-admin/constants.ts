@@ -185,6 +185,12 @@ export const DEFAULT_MODEL_CONFIGS: Record<PhaseName, DefaultModelConfig> = {
     fallbackModelId: DEFAULT_FALLBACK_MODEL_ID,
   },
   // Stage 4: Analysis
+  stage_4_clarifying: {
+    modelId: 'google/gemini-2.0-flash-thinking-exp-01-21',
+    temperature: 0.5,
+    maxTokens: 4000,
+    fallbackModelId: 'anthropic/claude-sonnet-4',
+  },
   stage_4_classification: {
     modelId: DEFAULT_MODEL_ID,
     temperature: 0.7,
