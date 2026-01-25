@@ -15,6 +15,7 @@ interface LocalProgressData {
 
 export function useViewerState(
   course: Course,
+  orgSlug: string | undefined,
   rawSections: Section[],
   rawLessons: Lesson[],
   initialLessonLabel?: string
@@ -138,7 +139,7 @@ export function useViewerState(
       if (!userId) return
 
       try {
-        await fetch(`/api/courses/${course.slug}/progress`, {
+        await fetch(`/api/courses/${orgSlug}/${course.slug}/progress`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ lesson_id: lessonId, action }),
@@ -147,19 +148,19 @@ export function useViewerState(
         // Offline - progress already saved to localStorage
       }
     },
-    [userId, course.slug]
+    [userId, orgSlug, course.slug]
   )
 
   // Fetch server progress with conflict resolution (CR-005) and sync loading state (CR-019)
   useEffect(() => {
-    if (!userId || !course.slug) return
+    if (!userId || !orgSlug || !course.slug) return
 
     let cancelled = false
 
     const fetchServerProgress = async () => {
       setIsSyncingProgress(true)
       try {
-        const response = await fetch(`/api/courses/${course.slug}/progress`)
+        const response = await fetch(`/api/courses/${orgSlug}/${course.slug}/progress`)
         if (response.ok && !cancelled) {
           const data = await response.json()
           if (data.lessons_completed && Array.isArray(data.lessons_completed)) {
@@ -196,7 +197,7 @@ export function useViewerState(
     return () => {
       cancelled = true
     }
-  }, [userId, course.slug])
+  }, [userId, orgSlug, course.slug])
 
   // Initial lesson selection from URL or first lesson
   // CR-011: Uses memoized lessonLabelMap for O(1) lookup instead of O(n+m) findLessonIdByLabel
