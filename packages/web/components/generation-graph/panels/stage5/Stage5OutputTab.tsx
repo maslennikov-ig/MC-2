@@ -1,6 +1,6 @@
 'use client'
 
-import React, { memo, useMemo, useState, useCallback, useRef } from 'react'
+import React, { memo, useMemo, useState, useCallback } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -11,14 +11,11 @@ import { StructureTree } from './components/StructureTree'
 import { AutoCardPreview } from '../shared/AutoCardPreview'
 import { EditableField } from '../output/EditableField'
 import { SaveStatusIndicator } from '../output/SaveStatusIndicator'
-import { CascadeStageDeleteModal, DownstreamStagesInfo } from '../output/CascadeStageDeleteModal'
-import { useAutoSave, SaveStatus } from '../../hooks/useAutoSave'
-import {
-  updateFieldAction,
-  checkDownstreamStagesAction,
-  deleteDownstreamStagesAction,
-} from '@/app/actions/admin-generation'
-import { toast } from 'sonner'
+import { CascadeStageDeleteModal } from '../output/CascadeStageDeleteModal'
+import { useAutoSave } from '../../hooks/useAutoSave'
+import { useFieldStatusTracking } from '../../hooks/useFieldStatusTracking'
+import { useCascadeStageDelete } from '../../hooks/useCascadeStageDelete'
+import { updateFieldAction } from '@/app/actions/admin-generation'
 import type { Stage5OutputTabProps, CourseStructure } from './types'
 
 // ============================================================================
@@ -131,162 +128,19 @@ export const Stage5OutputTab = memo<Stage5OutputTabProps>(function Stage5OutputT
     { debounceMs: 1000 }
   )
 
-  // Per-field save status tracking
-  const [fieldStatuses, setFieldStatuses] = useState<Map<string, SaveStatus>>(new Map())
-  const lastSavedFieldRef = useRef<string | null>(null)
+  // Per-field save status tracking (fixes race condition with rapid edits)
+  const { performSave, getFieldStatus } = useFieldStatusTracking(save, status)
 
-  // Cascade delete modal state
-  const [cascadeModalOpen, setCascadeModalOpen] = useState(false)
-  const [downstreamInfo, setDownstreamInfo] = useState<DownstreamStagesInfo | null>(null)
-  const [pendingChange, setPendingChange] = useState<{ fieldPath: string; value: unknown } | null>(
-    null
-  )
-  const [isDeleting, setIsDeleting] = useState(false)
-  // Track if we've already checked and confirmed deletion for this session
-  const downstreamDeletedRef = useRef(false)
-  // Key to force re-render of EditableFields when cascade is canceled (resets local state to original values)
-  const [fieldResetKey, setFieldResetKey] = useState(0)
-
-  // Helper to actually perform the save
-  const performSave = useCallback(
-    (fieldPath: string, value: unknown) => {
-      setFieldStatuses((prev) => {
-        const next = new Map(prev)
-        next.set(fieldPath, 'saving')
-        return next
-      })
-      lastSavedFieldRef.current = fieldPath
-      save(fieldPath, value)
-    },
-    [save]
-  )
-
-  // Async handler that checks for downstream stages first
-  const handleFieldSaveAsync = useCallback(
-    async (fieldPath: string, value: unknown) => {
-      // If we've already deleted downstream stages in this session, just save
-      if (downstreamDeletedRef.current) {
-        performSave(fieldPath, value)
-        return
-      }
-
-      // Check for downstream stages
-      if (!courseId) {
-        performSave(fieldPath, value)
-        return
-      }
-
-      try {
-        const info = await checkDownstreamStagesAction(courseId)
-
-        // If no Stage 6 exists, just save (Stage 5 edits only affect Stage 6)
-        if (!info.hasStage6) {
-          performSave(fieldPath, value)
-          return
-        }
-
-        // Stage 6 exists - show modal
-        setDownstreamInfo(info)
-        setPendingChange({ fieldPath, value })
-        setCascadeModalOpen(true)
-      } catch (error) {
-        console.error('Failed to check downstream stages:', error)
-        // On error, proceed with save anyway (fail open for UX)
-        performSave(fieldPath, value)
-      }
-    },
-    [courseId, performSave]
-  )
-
-  // Sync wrapper for EditableField onChange (avoids @typescript-eslint/no-misused-promises)
-  const handleFieldSave = useCallback(
-    (fieldPath: string, value: unknown) => {
-      void handleFieldSaveAsync(fieldPath, value)
-    },
-    [handleFieldSaveAsync]
-  )
-
-  // Async handler for cascade delete confirmation
-  const handleCascadeConfirmAsync = useCallback(async () => {
-    if (!courseId || !pendingChange) return
-
-    setIsDeleting(true)
-    try {
-      // Delete downstream stages (Stage 6 only for Stage 5 edits)
-      const result = await deleteDownstreamStagesAction(courseId, 5)
-
-      toast.success(
-        locale === 'ru'
-          ? `Удалено: ${result.deletedLessonsCount} уроков`
-          : `Deleted: ${result.deletedLessonsCount} lessons`
-      )
-
-      // Mark as deleted for this session so we don't ask again
-      downstreamDeletedRef.current = true
-
-      // Now apply the pending change
-      performSave(pendingChange.fieldPath, pendingChange.value)
-
-      // Close modal and clear state
-      setCascadeModalOpen(false)
-      setPendingChange(null)
-      setDownstreamInfo(null)
-    } catch (error) {
-      console.error('Failed to delete downstream stages:', error)
-      toast.error(
-        locale === 'ru' ? 'Ошибка при удалении данных' : 'Failed to delete downstream data'
-      )
-    } finally {
-      setIsDeleting(false)
-    }
-  }, [courseId, pendingChange, performSave, locale])
-
-  // Sync wrapper for modal onConfirm (avoids @typescript-eslint/no-misused-promises)
-  const handleCascadeConfirm = useCallback(() => {
-    void handleCascadeConfirmAsync()
-  }, [handleCascadeConfirmAsync])
-
-  // Handle cascade delete cancellation
-  const handleCascadeCancel = useCallback(() => {
-    setCascadeModalOpen(false)
-    setPendingChange(null)
-    setDownstreamInfo(null)
-    // Force re-render of EditableFields to revert their local state to original values
-    setFieldResetKey((prev) => prev + 1)
-  }, [])
-
-  // Get status for a specific field
-  const getFieldStatus = useCallback(
-    (fieldPath: string): SaveStatus => {
-      return fieldStatuses.get(fieldPath) ?? 'idle'
-    },
-    [fieldStatuses]
-  )
-
-  // Update per-field status when save completes or errors
-  React.useEffect(() => {
-    if ((status === 'saved' || status === 'error') && lastSavedFieldRef.current) {
-      const fieldPath = lastSavedFieldRef.current
-
-      setFieldStatuses((prev) => {
-        const next = new Map(prev)
-        next.set(fieldPath, status)
-        return next
-      })
-
-      // Clear after 2 seconds
-      const timer = setTimeout(() => {
-        setFieldStatuses((prev) => {
-          const next = new Map(prev)
-          next.delete(fieldPath)
-          return next
-        })
-      }, 2000)
-
-      return () => clearTimeout(timer)
-    }
-    return undefined
-  }, [status])
+  // Cascade delete modal state and handlers
+  const {
+    cascadeModalOpen,
+    downstreamInfo,
+    isDeleting,
+    fieldResetKey,
+    handleFieldSave,
+    handleCascadeConfirm,
+    handleCascadeCancel,
+  } = useCascadeStageDelete(courseId, 5, performSave, locale)
 
   const canEdit = editable && courseId
 

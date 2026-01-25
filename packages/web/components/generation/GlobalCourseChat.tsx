@@ -18,6 +18,7 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useTranslations } from 'next-intl'
+import { nanoid } from 'nanoid'
 import { MarkdownRendererClient } from '@/components/markdown/MarkdownRendererClient'
 import { toast } from '@/lib/toast'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
@@ -71,12 +72,12 @@ const CHAT_LAYOUT = {
 
 /**
  * Generate unique ID for chat messages.
- * Uses timestamp + random suffix for uniqueness.
+ * Uses nanoid for better collision resistance.
  *
  * @param prefix - 'temp' for pending user messages, 'msg' for confirmed messages
  */
 function generateMessageId(prefix: 'temp' | 'msg'): string {
-  return `${prefix}-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+  return `${prefix}-${nanoid(12)}`
 }
 
 export function GlobalCourseChat({
@@ -109,6 +110,7 @@ export function GlobalCourseChat({
   const [conversationId, setConversationId] = useState<string | undefined>()
   const [selectedIntent, setSelectedIntent] = useState<'refine' | 'regenerate'>('refine')
   const [tokenEstimates, setTokenEstimates] = useState<TokenEstimates | null>(null)
+  const [isLoadingEstimates, setIsLoadingEstimates] = useState(true)
   const scrollRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
@@ -132,9 +134,14 @@ export function GlobalCourseChat({
     if (!courseId) return
 
     const fetchEstimates = async () => {
-      const result = await getChatTokenEstimates(courseId)
-      if (result) {
-        setTokenEstimates(result)
+      setIsLoadingEstimates(true)
+      try {
+        const result = await getChatTokenEstimates(courseId)
+        if (result) {
+          setTokenEstimates(result)
+        }
+      } finally {
+        setIsLoadingEstimates(false)
       }
     }
 
@@ -264,9 +271,9 @@ export function GlobalCourseChat({
 
       {/* Expanded panel */}
       {isOpen && (
-        <div className="flex max-h-[400px] flex-col border-t">
+        <div className="flex flex-col border-t" style={{ maxHeight: CHAT_LAYOUT.PANEL_MAX_HEIGHT }}>
           {/* Chat history */}
-          <ScrollArea className="min-h-[200px] flex-1 p-4">
+          <ScrollArea className="flex-1 p-4" style={{ minHeight: CHAT_LAYOUT.HISTORY_MIN_HEIGHT }}>
             {chatHistory.length === 0 ? (
               <div className="text-muted-foreground py-8 text-center">
                 <MessageSquare className="mx-auto mb-2 h-8 w-8 opacity-50" />
@@ -329,7 +336,13 @@ export function GlobalCourseChat({
                 className="text-xs"
               >
                 <Wand2 className="mr-1 h-3 w-3" />
-                {t('modes.refine')} ({tokenEstimates?.refine?.formatted ?? '~2K'})
+                {t('modes.refine')} (
+                {isLoadingEstimates ? (
+                  <Loader2 className="inline h-3 w-3 animate-spin" />
+                ) : (
+                  (tokenEstimates?.refine?.formatted ?? '~2K')
+                )}
+                )
               </ToggleGroupItem>
               <ToggleGroupItem
                 value="regenerate"
@@ -337,7 +350,13 @@ export function GlobalCourseChat({
                 className="text-xs"
               >
                 <RefreshCcw className="mr-1 h-3 w-3" />
-                {t('modes.regenerate')} ({tokenEstimates?.regenerate?.formatted ?? '~20K+'})
+                {t('modes.regenerate')} (
+                {isLoadingEstimates ? (
+                  <Loader2 className="inline h-3 w-3 animate-spin" />
+                ) : (
+                  (tokenEstimates?.regenerate?.formatted ?? '~20K+')
+                )}
+                )
               </ToggleGroupItem>
             </ToggleGroup>
           </div>
@@ -366,7 +385,8 @@ export function GlobalCourseChat({
               value={message}
               onChange={(e) => setMessage(e.target.value)}
               placeholder={t('placeholder')}
-              className="min-h-[60px] flex-1 resize-none"
+              className="flex-1 resize-none"
+              style={{ minHeight: CHAT_LAYOUT.INPUT_MIN_HEIGHT }}
               disabled={isProcessing || isGenerating}
               onKeyDown={(e) => {
                 if (e.key === 'Enter' && !e.shiftKey) {
@@ -378,7 +398,10 @@ export function GlobalCourseChat({
             <Button
               type="submit"
               size="icon"
-              className="h-[60px] w-[60px]"
+              style={{
+                height: CHAT_LAYOUT.SEND_BUTTON_SIZE,
+                width: CHAT_LAYOUT.SEND_BUTTON_SIZE,
+              }}
               disabled={!message.trim() || isProcessing || isGenerating}
             >
               {isProcessing ? (
