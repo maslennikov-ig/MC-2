@@ -9,6 +9,7 @@ import { getModuleWord, getLessonWord } from '@/lib/generation-graph/utils/plura
 import { motion } from 'framer-motion';
 import { Link } from '@/src/i18n/navigation';
 import { useParams } from 'next/navigation';
+import { buildCourseUrl } from '@/lib/helpers/course-urls';
 
 /**
  * End Node component for React Flow graph.
@@ -41,9 +42,10 @@ const EndNode = ({ id, data, selected }: NodeProps<RFEndNode>) => {
   const { courseInfo } = useStaticGraph();
   const { moduleCount, lessonCount } = courseInfo;
 
-  // Get courseSlug from URL params for navigation
+  // Get courseSlug and orgSlug from URL params for navigation
   const params = useParams();
   const courseSlug = params?.courseSlug as string | undefined;
+  const orgSlug = params?.orgSlug as string | undefined;
 
   // Translations
   const { t } = useTranslation();
@@ -151,9 +153,9 @@ const EndNode = ({ id, data, selected }: NodeProps<RFEndNode>) => {
           )}
 
           {/* Open Course Button */}
-          {courseSlug ? (
+          {courseSlug && orgSlug ? (
             <Link
-              href={`/courses/${courseSlug}`}
+              href={buildCourseUrl(orgSlug, courseSlug)}
               className="nopan nodrag flex items-center justify-center gap-1.5 w-full px-3 py-1.5 rounded-md text-xs font-semibold
                 bg-emerald-500 hover:bg-emerald-600 text-white transition-colors
                 dark:bg-emerald-600 dark:hover:bg-emerald-500"

@@ -290,6 +290,7 @@ export default async function CoursePage({ params, searchParams }: CoursePagePro
         enrichmentsLoadError={enrichmentsError}
         lessonContents={lessonContentsByLessonId}
         initialLessonLabel={initialLessonLabel}
+        orgSlug={orgSlug}
       />
     </CourseErrorBoundary>
   )

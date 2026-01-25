@@ -243,9 +243,10 @@ function GraphViewInner({
   const { fitView, getNodes, setCenter } = useReactFlow()
   const initialFitDone = useRef(false)
 
-  // Get courseSlug from URL params for navigation
+  // Get courseSlug and orgSlug from URL params for navigation
   const params = useParams()
   const courseSlug = params?.courseSlug as string | undefined
+  const orgSlug = params?.orgSlug as string | undefined
 
   // Sync locale for step name translations
   const locale = useLocale()
@@ -1178,6 +1179,7 @@ function GraphViewInner({
                     courseId={courseId}
                     isCompleted={pipelineStatus === 'completed'}
                     courseSlug={courseSlug}
+                    orgSlug={orgSlug}
                     moduleCount={staticData.courseInfo.moduleCount}
                     lessonCount={staticData.courseInfo.lessonCount}
                     generationStatus={pipelineStatus ?? undefined}

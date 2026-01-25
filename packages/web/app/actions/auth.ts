@@ -19,7 +19,7 @@ export async function refreshAuthState() {
   revalidatePath('/', 'layout')
   revalidatePath('/courses', 'layout')
   revalidatePath('/create', 'layout')
-  revalidatePath('/courses/[slug]', 'layout')
+  revalidatePath('/courses/[orgSlug]/[courseSlug]', 'layout')
   
   // Revalidate auth tag if we use it
   revalidateTag('auth')

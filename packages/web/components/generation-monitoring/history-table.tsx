@@ -33,10 +33,12 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { getGenerationHistoryAction } from '@/app/actions/admin-history';
 import { cn } from '@/lib/utils';
+import { buildCourseGeneratingUrl } from '@/lib/helpers/course-urls';
 
 interface CourseHistoryItem {
   id: string;
   slug: string;
+  org_slug: string;
   generation_code: string | null;
   title: string;
   generation_status:
@@ -321,7 +323,7 @@ export function HistoryTable() {
               className="h-8 w-8 text-gray-500 hover:text-purple-500 dark:hover:text-cyan-400"
               onClick={(e) => {
                 e.stopPropagation();
-                router.push(`/courses/generating/${row.original.slug}?workflow=true`);
+                router.push(buildCourseGeneratingUrl(row.original.org_slug, row.original.slug, true));
               }}
               title={t('actions.openWorkflow')}
             >
@@ -522,7 +524,7 @@ export function HistoryTable() {
                   <tr
                     key={row.id}
                     className="cursor-pointer transition-colors even:bg-gray-50 dark:even:bg-slate-900/50 hover:bg-gray-100 dark:hover:bg-slate-800"
-                    onClick={() => router.push(`/courses/generating/${row.original.slug}?workflow=true`)}
+                    onClick={() => router.push(buildCourseGeneratingUrl(row.original.org_slug, row.original.slug, true))}
                   >
                     {row.getVisibleCells().map((cell) => (
                       <td key={cell.id} className="p-4 align-middle">

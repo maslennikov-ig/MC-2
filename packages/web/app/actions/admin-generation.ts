@@ -83,7 +83,7 @@ export async function startGeneration(courseId: string) {
     await extractApiError(response, 'Failed to start generation')
   }
 
-  revalidatePath('/courses/generating/[slug]', 'page')
+  revalidatePath('/courses/[orgSlug]/[courseSlug]/generating', 'page')
   return response.json()
 }
 
@@ -104,7 +104,7 @@ export async function approveStage(courseId: string, currentStage: number) {
     await extractApiError(response, 'Failed to approve stage')
   }
 
-  revalidatePath('/courses/generating/[slug]', 'page')
+  revalidatePath('/courses/[orgSlug]/[courseSlug]/generating', 'page')
   return response.json()
 }
 
@@ -139,7 +139,7 @@ export async function pauseGeneration(courseId: string) {
     throw new Error(errorData.error || 'Failed to pause generation')
   }
 
-  revalidatePath('/courses/generating/[slug]', 'page')
+  revalidatePath('/courses/[orgSlug]/[courseSlug]/generating', 'page')
   return response.json()
 }
 
@@ -174,7 +174,7 @@ export async function resumeGeneration(courseId: string) {
     throw new Error(errorData.error || 'Failed to resume generation')
   }
 
-  revalidatePath('/courses/generating/[slug]', 'page')
+  revalidatePath('/courses/[orgSlug]/[courseSlug]/generating', 'page')
   return response.json()
 }
 
@@ -213,7 +213,7 @@ export async function cancelGeneration(courseId: string) {
     console.error('Failed to call backend cancel:', backendError)
   }
 
-  revalidatePath('/courses/generating/[slug]', 'page')
+  revalidatePath('/courses/[orgSlug]/[courseSlug]/generating', 'page')
   return { success: true }
 }
 
@@ -262,7 +262,7 @@ export async function updateFieldAction(
     await extractApiError(response, 'Failed to update field')
   }
 
-  revalidatePath('/courses/generating/[slug]', 'page')
+  revalidatePath('/courses/[orgSlug]/[courseSlug]/generating', 'page')
   const data = await response.json()
   return data?.result?.data || data
 }
@@ -296,7 +296,7 @@ export async function addElementAction(
     await extractApiError(response, 'Failed to add element')
   }
 
-  revalidatePath('/courses/generating/[slug]', 'page')
+  revalidatePath('/courses/[orgSlug]/[courseSlug]/generating', 'page')
   const data = await response.json()
   return data?.result?.data || data
 }
@@ -329,7 +329,7 @@ export async function regenerateBlockAction(
     await extractApiError(response, 'Failed to regenerate block')
   }
 
-  revalidatePath('/courses/generating/[slug]', 'page')
+  revalidatePath('/courses/[orgSlug]/[courseSlug]/generating', 'page')
   const data = await response.json()
   return data?.result?.data || data
 }
@@ -384,7 +384,7 @@ export async function cascadeUpdateAction(
     await extractApiError(response, 'Failed to perform cascade update')
   }
 
-  revalidatePath('/courses/generating/[slug]', 'page')
+  revalidatePath('/courses/[orgSlug]/[courseSlug]/generating', 'page')
   const data = await response.json()
   return data?.result?.data || data
 }
@@ -419,7 +419,7 @@ export async function deleteElementAction(
     await extractApiError(response, 'Failed to delete element')
   }
 
-  revalidatePath('/courses/generating/[slug]', 'page')
+  revalidatePath('/courses/[orgSlug]/[courseSlug]/generating', 'page')
   const data = await response.json()
   return data?.result?.data || data
 }
@@ -446,7 +446,7 @@ export async function switchToManualMode(courseId: string) {
     await extractApiError(response, 'Failed to switch to manual mode')
   }
 
-  revalidatePath('/courses/generating/[slug]', 'page')
+  revalidatePath('/courses/[orgSlug]/[courseSlug]/generating', 'page')
   const data = await response.json()
   return data?.result?.data || data
 }

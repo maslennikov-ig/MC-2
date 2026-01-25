@@ -314,7 +314,7 @@ export const generationMonitoringRouter = router({
       try {
         const supabase = getSupabaseAdmin();
 
-        // Build query with specific columns and user join
+        // Build query with specific columns, user join and organization
         let query = supabase
           .from('courses')
           .select(`
@@ -329,7 +329,8 @@ export const generationMonitoringRouter = router({
             generation_completed_at,
             created_at,
             error_message,
-            user_id
+            user_id,
+            organizations!inner(slug)
           `, { count: 'exact' })
           .not('generation_status', 'is', null)
           .order('created_at', { ascending: false });
@@ -356,11 +357,17 @@ export const generationMonitoringRouter = router({
           users?.users.map(u => [u.id, u.email || 'Unknown']) || []
         );
 
-        // Combine course data with user emails
-        const coursesWithUsers = (data || []).map(course => ({
-          ...course,
-          user_email: userEmailMap.get(course.user_id) || 'Unknown',
-        }));
+        // Combine course data with user emails and org_slug
+        const coursesWithUsers = (data || []).map(course => {
+          // Extract org_slug from joined organizations
+          const orgData = course.organizations as { slug: string } | null;
+          const { organizations: _orgs, ...courseWithoutOrg } = course;
+          return {
+            ...courseWithoutOrg,
+            org_slug: orgData?.slug || 'default-organization',
+            user_email: userEmailMap.get(course.user_id) || 'Unknown',
+          };
+        });
 
         return {
           courses: coursesWithUsers,
