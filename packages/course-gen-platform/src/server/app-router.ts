@@ -135,6 +135,17 @@
  * - `enrichment.updateDraft` - Update draft content before final generation (authenticated users)
  * - `enrichment.approveDraft` - Approve draft and trigger final generation (authenticated users)
  *
+ * ### clarifying
+ * Clarifying questions operations (Stage 4) for gathering user input before analysis.
+ *
+ * Procedures:
+ * - `clarifying.getQuestions` - Get all clarifying questions for a course (authenticated users)
+ * - `clarifying.getProgress` - Get progress statistics (authenticated users)
+ * - `clarifying.submitAnswer` - Submit an answer to a question (authenticated users)
+ * - `clarifying.skipQuestion` - Skip a nice_to_have question (authenticated users)
+ * - `clarifying.approveAndProceed` - Approve answers and continue to analysis (authenticated users)
+ * - `clarifying.requestSecondRound` - Request additional questions (authenticated users)
+ *
  * ## Usage Example
  *
  * ```typescript
@@ -170,6 +181,7 @@
  * @see {@link lessonContentRouter} - Lesson content generation (T054)
  * @see {@link locksRouter} - Generation lock management (FR-037, FR-038)
  * @see {@link enrichmentRouter} - Lesson enrichment operations (T018-T032)
+ * @see {@link clarifyingRouter} - Clarifying questions operations (Stage 4)
  */
 
 import { router } from './trpc';
@@ -188,6 +200,7 @@ import { pipelineAdminRouter } from './routers/pipeline-admin';
 import { documentProcessingRouter } from './routers/document-processing';
 import { lmsRouter } from './routers/lms';
 import { enrichmentRouter } from './routers/enrichment';
+import { clarifyingRouter } from './routers/clarifying.router';
 
 /**
  * Main application router combining all feature routers
@@ -286,6 +299,12 @@ export const appRouter = router({
    * @see {@link enrichmentRouter}
    */
   enrichment: enrichmentRouter,
+
+  /**
+   * Clarifying questions operations (Stage 4)
+   * @see {@link clarifyingRouter}
+   */
+  clarifying: clarifyingRouter,
 });
 
 /**

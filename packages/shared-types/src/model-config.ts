@@ -24,6 +24,7 @@ export type PhaseName =
   // Stage 3: Classification
   | 'stage_3_classification'
   // Stage 4: Analysis
+  | 'stage_4_clarifying'
   | 'stage_4_classification'
   | 'stage_4_scope'
   | 'stage_4_expert'

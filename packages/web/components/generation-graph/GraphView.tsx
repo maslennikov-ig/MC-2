@@ -23,6 +23,7 @@ import DocumentNode from './nodes/DocumentNode'
 import LessonNode from './nodes/LessonNode'
 import ModuleGroup from './nodes/ModuleGroup'
 import Stage2Group from './nodes/Stage2Group'
+import ClarifyingNode from './nodes/ClarifyingNode'
 import AnimatedEdge from './edges/AnimatedEdge'
 import DataFlowEdge from './edges/DataFlowEdge'
 import { StaticGraphProvider } from './contexts/StaticGraphContext'
@@ -90,6 +91,7 @@ const nodeTypes: NodeTypes = {
   lesson: LessonNode,
   module: ModuleGroup,
   stage2group: Stage2Group,
+  clarifying: ClarifyingNode,
 }
 
 const edgeTypes: EdgeTypes = {

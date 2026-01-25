@@ -39,6 +39,12 @@ import { runPhase4Synthesis } from './phases/phase-4-synthesis';
 // import { runPhase6RagPlanning } from './phases/phase-6-rag-planning';
 import { assembleAnalysisResult } from './phases/phase-5-assembly';
 import {
+  runPhase05Clarifying,
+  getPendingQuestions,
+  getAnsweredQuestions,
+  getClarifyingConfig,
+} from './phases/phase-0.5-clarifying';
+import {
   updateCourseProgress,
   validateStage3Barrier,
   formatErrorMessage,
@@ -312,6 +318,99 @@ export async function runAnalysisOrchestration(job: StructureAnalysisJob): Promi
       });
     } else {
       orchestrationLogger.info('Skipping budget allocation: No documents available');
+    }
+
+    // =================================================================
+    // PHASE 0.5: Clarifying Questions (if enabled and not skipped)
+    // =================================================================
+    const clarifyingConfig = await getClarifyingConfig(courseId);
+
+    if (clarifyingConfig.enabled && !clarifyingConfig.skipped) {
+      orchestrationLogger.info('Clarifying questions enabled - checking status');
+
+      const pendingQuestions = await getPendingQuestions(courseId);
+
+      if (pendingQuestions.length === 0) {
+        // First time - generate questions
+        orchestrationLogger.info('No questions found - generating clarifying questions');
+
+        await runPhase05Clarifying({
+          course_id: courseId,
+          budgetAllocation: budgetAllocation!,
+          courseContext: {
+            title: input.topic,
+            description: input.course_description,
+            target_audience: input.target_audience,
+          },
+          language: input.language,
+          iterationRound: 1,
+        });
+
+        // Transition to clarifying status and pause
+        const { error: statusError } = await supabase
+          .from('courses')
+          .update({
+            generation_status: 'stage_4_clarifying',
+            updated_at: new Date().toISOString(),
+          })
+          .eq('id', courseId);
+
+        if (statusError) {
+          orchestrationLogger.error(
+            { error: statusError.message },
+            'Failed to transition to stage_4_clarifying'
+          );
+        } else {
+          orchestrationLogger.info('Transitioned to stage_4_clarifying - awaiting user answers');
+        }
+
+        // Throw special error to pause execution
+        throw new Error('AWAITING_CLARIFYING_ANSWERS: Questions generated, awaiting user input');
+      }
+
+      // Check if still waiting for critical/important answers
+      const criticalPending = pendingQuestions.filter(
+        q => q.question_priority === 'critical' || q.question_priority === 'important'
+      );
+
+      if (criticalPending.length > 0) {
+        orchestrationLogger.info(
+          {
+            criticalPendingCount: criticalPending.length,
+            totalPendingCount: pendingQuestions.length,
+          },
+          'Critical/important questions pending - pausing analysis'
+        );
+
+        throw new Error(
+          `AWAITING_CLARIFYING_ANSWERS: ${criticalPending.length} critical/important questions pending`
+        );
+      }
+
+      // All critical/important questions answered - continue
+      orchestrationLogger.info(
+        'All critical/important questions answered - proceeding to analysis'
+      );
+    } else {
+      orchestrationLogger.info(
+        {
+          enabled: clarifyingConfig.enabled,
+          skipped: clarifyingConfig.skipped,
+        },
+        'Clarifying questions disabled or skipped - proceeding to Phase 1'
+      );
+    }
+
+    // Collect answered questions for injection into analysis phases
+    const clarifyingAnswers = await getAnsweredQuestions(courseId);
+
+    if (clarifyingAnswers.length > 0) {
+      orchestrationLogger.info(
+        {
+          answeredCount: clarifyingAnswers.length,
+        },
+        'Clarifying answers available for analysis phases'
+      );
     }
 
     // =================================================================
