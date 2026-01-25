@@ -14,7 +14,7 @@ import {
   groupEnrichmentsByLessonId,
   prepareLessonsForViewer,
 } from '@/lib/course-data-utils'
-import type { Section, Course, Asset } from '@/types/database'
+import type { Section, Course } from '@/types/database'
 import { Database } from '@/types/database.generated'
 
 // Force dynamic rendering to ensure fresh data
