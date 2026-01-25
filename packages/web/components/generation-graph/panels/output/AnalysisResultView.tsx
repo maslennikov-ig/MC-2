@@ -9,13 +9,18 @@ import { cn } from '@/lib/utils'
 import { EditableField } from './EditableField'
 import { EditableChips } from './EditableChips'
 import { useAutoSave, SaveStatus } from '../../hooks/useAutoSave'
-import { updateFieldAction } from '@/app/actions/admin-generation'
+import {
+  updateFieldAction,
+  checkDownstreamStagesAction,
+  deleteDownstreamStagesAction,
+} from '@/app/actions/admin-generation'
 import { SaveStatusIndicator } from './SaveStatusIndicator'
 import { Eye } from 'lucide-react'
 import { useEditingShortcuts } from '../../hooks/useEditingShortcuts'
 import { toast } from 'sonner'
 import { useEditHistoryStore } from '@/stores/useEditHistoryStore'
 import { useFileCatalog } from '../../hooks/useFileCatalog'
+import { CascadeStageDeleteModal, DownstreamStagesInfo } from './CascadeStageDeleteModal'
 
 interface AnalysisResultViewProps {
   data: AnalysisResult
@@ -174,11 +179,21 @@ export const AnalysisResultView = ({
   const [fieldStatuses, setFieldStatuses] = useState<Map<string, SaveStatus>>(new Map())
   const lastSavedFieldRef = useRef<string | null>(null)
 
-  // Wrapper for save that tracks per-field status
-  const handleFieldSave = useCallback(
+  // Cascade delete modal state
+  const [cascadeModalOpen, setCascadeModalOpen] = useState(false)
+  const [downstreamInfo, setDownstreamInfo] = useState<DownstreamStagesInfo | null>(null)
+  const [pendingChange, setPendingChange] = useState<{ fieldPath: string; value: unknown } | null>(
+    null
+  )
+  const [isDeleting, setIsDeleting] = useState(false)
+  // Track if we've already checked and confirmed deletion for this session
+  const downstreamDeletedRef = useRef(false)
+
+  // Helper to actually perform the save
+  const performSave = useCallback(
     (fieldPath: string, value: unknown) => {
       // Set this field to 'saving' immediately
-      setFieldStatuses(prev => {
+      setFieldStatuses((prev) => {
         const next = new Map(prev)
         next.set(fieldPath, 'saving')
         return next
@@ -188,6 +203,98 @@ export const AnalysisResultView = ({
     },
     [save]
   )
+
+  // Async handler that checks for downstream stages first
+  const handleFieldSaveAsync = useCallback(
+    async (fieldPath: string, value: unknown) => {
+      // If we've already deleted downstream stages in this session, just save
+      if (downstreamDeletedRef.current) {
+        performSave(fieldPath, value)
+        return
+      }
+
+      // Check for downstream stages
+      if (!courseId) {
+        performSave(fieldPath, value)
+        return
+      }
+
+      try {
+        const info = await checkDownstreamStagesAction(courseId)
+
+        // If no downstream stages exist, just save
+        if (!info.hasStage5 && !info.hasStage6) {
+          performSave(fieldPath, value)
+          return
+        }
+
+        // Downstream stages exist - show modal
+        setDownstreamInfo(info)
+        setPendingChange({ fieldPath, value })
+        setCascadeModalOpen(true)
+      } catch (error) {
+        console.error('Failed to check downstream stages:', error)
+        // On error, proceed with save anyway (fail open for UX)
+        performSave(fieldPath, value)
+      }
+    },
+    [courseId, performSave]
+  )
+
+  // Sync wrapper for EditableField onChange (avoids @typescript-eslint/no-misused-promises)
+  const handleFieldSave = useCallback(
+    (fieldPath: string, value: unknown) => {
+      void handleFieldSaveAsync(fieldPath, value)
+    },
+    [handleFieldSaveAsync]
+  )
+
+  // Handle cascade delete confirmation (async handler)
+  const handleCascadeConfirmAsync = useCallback(async () => {
+    if (!courseId || !pendingChange) return
+
+    setIsDeleting(true)
+    try {
+      // Delete downstream stages
+      const result = await deleteDownstreamStagesAction(courseId, 4)
+
+      toast.success(
+        locale === 'ru'
+          ? `Удалено: ${result.deletedLessonsCount} уроков, ${result.deletedSectionsCount} модулей`
+          : `Deleted: ${result.deletedLessonsCount} lessons, ${result.deletedSectionsCount} sections`
+      )
+
+      // Mark as deleted for this session so we don't ask again
+      downstreamDeletedRef.current = true
+
+      // Now apply the pending change
+      performSave(pendingChange.fieldPath, pendingChange.value)
+
+      // Close modal and clear state
+      setCascadeModalOpen(false)
+      setPendingChange(null)
+      setDownstreamInfo(null)
+    } catch (error) {
+      console.error('Failed to delete downstream stages:', error)
+      toast.error(
+        locale === 'ru' ? 'Ошибка при удалении данных' : 'Failed to delete downstream data'
+      )
+    } finally {
+      setIsDeleting(false)
+    }
+  }, [courseId, pendingChange, performSave, locale])
+
+  // Sync wrapper for void callback (avoids @typescript-eslint/no-misused-promises)
+  const handleCascadeConfirm = useCallback(() => {
+    void handleCascadeConfirmAsync()
+  }, [handleCascadeConfirmAsync])
+
+  // Handle cascade delete cancellation
+  const handleCascadeCancel = useCallback(() => {
+    setCascadeModalOpen(false)
+    setPendingChange(null)
+    setDownstreamInfo(null)
+  }, [])
 
   // Get status for a specific field from the Map
   const getFieldStatus = useCallback(
@@ -203,7 +310,7 @@ export const AnalysisResultView = ({
       const fieldPath = lastSavedFieldRef.current
 
       // Update this field's status
-      setFieldStatuses(prev => {
+      setFieldStatuses((prev) => {
         const next = new Map(prev)
         next.set(fieldPath, status)
         return next
@@ -213,7 +320,7 @@ export const AnalysisResultView = ({
       let isMounted = true
       const timer = setTimeout(() => {
         if (isMounted) {
-          setFieldStatuses(prev => {
+          setFieldStatuses((prev) => {
             const next = new Map(prev)
             next.delete(fieldPath)
             return next
@@ -339,6 +446,18 @@ export const AnalysisResultView = ({
 
   return (
     <div className="space-y-4 p-2">
+      {/* Cascade Delete Modal */}
+      {downstreamInfo && (
+        <CascadeStageDeleteModal
+          isOpen={cascadeModalOpen}
+          onClose={handleCascadeCancel}
+          onConfirm={handleCascadeConfirm}
+          downstreamInfo={downstreamInfo}
+          locale={locale}
+          isDeleting={isDeleting}
+        />
+      )}
+
       {/* Show read-only banner when in read-only mode */}
       {readOnly && (
         <div className="mb-4 rounded border border-blue-200 bg-blue-50 p-2 text-sm text-blue-700 dark:border-blue-800 dark:bg-blue-900/30 dark:text-blue-300">
@@ -583,7 +702,9 @@ export const AnalysisResultView = ({
               <EditableChips
                 label={t.assessmentTypes}
                 items={data.pedagogical_patterns.assessment_types}
-                onChange={(items) => handleFieldSave('pedagogical_patterns.assessment_types', items)}
+                onChange={(items) =>
+                  handleFieldSave('pedagogical_patterns.assessment_types', items)
+                }
                 onBlur={flush}
                 status={getFieldStatus('pedagogical_patterns.assessment_types')}
               />
@@ -617,7 +738,9 @@ export const AnalysisResultView = ({
                   <EditableChips
                     label="Специфичные аналогии"
                     items={data.generation_guidance.specific_analogies || []}
-                    onChange={(items) => handleFieldSave('generation_guidance.specific_analogies', items)}
+                    onChange={(items) =>
+                      handleFieldSave('generation_guidance.specific_analogies', items)
+                    }
                     onBlur={flush}
                     status={getFieldStatus('generation_guidance.specific_analogies')}
                   />

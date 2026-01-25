@@ -488,3 +488,52 @@ export async function getEditHistoryAction(courseId: string, limit: number = 50)
   const data = await response.json()
   return data?.result?.data || data
 }
+
+/**
+ * Check if downstream stages (5 and/or 6) exist for a course
+ * Used by CascadeStageDeleteModal to determine what will be deleted
+ * Calls generation.checkDownstreamStages tRPC endpoint
+ */
+export async function checkDownstreamStagesAction(courseId: string) {
+  const headers = await getBackendAuthHeaders()
+
+  const response = await fetch(
+    `${TRPC_URL}/generation.checkDownstreamStages?input=${encodeURIComponent(JSON.stringify({ courseId }))}`,
+    {
+      method: 'GET',
+      headers,
+    }
+  )
+
+  if (!response.ok) {
+    await extractApiError(response, 'Failed to check downstream stages')
+  }
+
+  const data = await response.json()
+  return data?.result?.data || data
+}
+
+/**
+ * Delete downstream stages data
+ * fromStage=4: DELETE course_structure (set to null), DELETE lessons, DELETE sections
+ * fromStage=5: DELETE lessons only
+ * Used by CascadeStageDeleteModal after user confirms deletion
+ * Calls generation.deleteDownstreamStages tRPC endpoint
+ */
+export async function deleteDownstreamStagesAction(courseId: string, fromStage: 4 | 5) {
+  const headers = await getBackendAuthHeaders()
+
+  const response = await fetch(`${TRPC_URL}/generation.deleteDownstreamStages`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ courseId, fromStage }),
+  })
+
+  if (!response.ok) {
+    await extractApiError(response, 'Failed to delete downstream stages')
+  }
+
+  revalidatePath('/courses/[orgSlug]/[courseSlug]/generating', 'page')
+  const data = await response.json()
+  return data?.result?.data || data
+}
