@@ -27,6 +27,7 @@ import {
   startGeneration,
 } from '@/app/actions/admin-generation'
 import type { Stage1CourseData } from '@/components/generation-graph'
+import { useRestartStage } from '@/components/generation-graph/hooks/useRestartStage'
 import { GlobalCourseChat, ChatErrorBoundary } from '@/components/generation'
 
 /** Default fallback when lessons count is unknown (before Stage 4 analysis completes) */
@@ -144,7 +145,9 @@ export default function GenerationProgressContainerEnhanced({
   generationPausedAt = null,
 }: GenerationProgressContainerProps) {
   const router = useRouter()
-  const t = useTranslations('generation.success')
+  const t = useTranslations('generation')
+  const tSuccess = useTranslations('generation.success')
+  const { restartStage } = useRestartStage(courseSlug)
   const [supabase, setSupabase] = useState<ReturnType<typeof createClient> | null>(null)
   const pollingInterval = useRef<NodeJS.Timeout | null>(null)
   const redirectTimeout = useRef<NodeJS.Timeout | null>(null)
@@ -339,6 +342,16 @@ export default function GenerationProgressContainerEnhanced({
       console.error(error)
     }
   }, [courseId])
+
+  const handleRegenerationRequest = useCallback(() => {
+    void restartStage(4).then((result) => {
+      if (result.success) {
+        toast.success(t('restart.restartingButton') || 'Regeneration started')
+      } else {
+        toast.error(result.error || 'Failed to start regeneration')
+      }
+    })
+  }, [restartStage, t])
 
   const calculateEstimatedTime = useCallback((progress: GenerationProgress) => {
     const avgStepTime = 30
@@ -644,6 +657,7 @@ export default function GenerationProgressContainerEnhanced({
             !state.status?.includes('awaiting_approval') &&
             !state.status?.includes('_complete')
           }
+          onRegenerationRequest={handleRegenerationRequest}
         />
       </ChatErrorBoundary>
       <AnimatePresence>
@@ -689,12 +703,12 @@ export default function GenerationProgressContainerEnhanced({
                 </svg>
               </motion.div>
               <h3 className="mb-2 text-2xl font-bold text-gray-900 dark:text-gray-100">
-                {t('title')}
+                {tSuccess('title')}
               </h3>
-              <p className="mb-6 text-gray-600 dark:text-gray-400">{t('message')}</p>
+              <p className="mb-6 text-gray-600 dark:text-gray-400">{tSuccess('message')}</p>
               <Button asChild>
                 <Link href={courseUrl} target="_blank" rel="noopener noreferrer">
-                  {t('viewCourse')}
+                  {tSuccess('viewCourse')}
                 </Link>
               </Button>
             </motion.div>

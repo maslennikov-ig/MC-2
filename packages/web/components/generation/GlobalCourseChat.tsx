@@ -5,6 +5,16 @@ import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog'
+import {
   MessageSquare,
   ChevronUp,
   ChevronDown,
@@ -113,6 +123,7 @@ export function GlobalCourseChat({
   const [selectedIntent, setSelectedIntent] = useState<'refine' | 'regenerate' | null>(null)
   const [tokenEstimates, setTokenEstimates] = useState<TokenEstimates | null>(null)
   const [isLoadingEstimates, setIsLoadingEstimates] = useState(true)
+  const [showRegenerateConfirm, setShowRegenerateConfirm] = useState(false)
   const scrollRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
@@ -215,12 +226,9 @@ export function GlobalCourseChat({
         }
         setChatHistory((prev) => [...prev, assistantMessage])
 
-        // If regeneration intent detected, trigger callback
-        if (result.intent === 'regenerate' && onRegenerationRequest) {
-          toast.info(t('regenerationTriggered'), {
-            description: t('preparingRegeneration'),
-          })
-          onRegenerationRequest()
+        // If regeneration intent detected, show confirmation dialog
+        if (result.intent === 'regenerate') {
+          setShowRegenerateConfirm(true)
         }
       } catch (error) {
         // Ignore AbortError - request was intentionally cancelled
@@ -254,10 +262,13 @@ export function GlobalCourseChat({
     void sendMessage(message, selectedIntent)
   }
 
-  const handleQuickAction = (actionPrompt: string, intent: 'refine' | 'regenerate' = 'refine') => {
-    setSelectedIntent(intent)
-    void sendMessage(actionPrompt, intent)
-  }
+  const handleQuickAction = useCallback(
+    (actionPrompt: string, intent: 'refine' | 'regenerate' = 'refine') => {
+      setSelectedIntent(intent)
+      void sendMessage(actionPrompt, intent)
+    },
+    [sendMessage]
+  )
 
   return (
     <div className="bg-background fixed right-0 bottom-0 left-0 z-40 border-t shadow-lg">
@@ -349,11 +360,13 @@ export function GlobalCourseChat({
               >
                 <Wand2 className="mr-1 h-3 w-3" />
                 {t('modes.refine')} (
-                {isLoadingEstimates ? (
-                  <Loader2 className="inline h-3 w-3 animate-spin" />
-                ) : (
-                  (tokenEstimates?.refine?.formatted ?? '~2K')
-                )}
+                <span className="inline-block min-w-[3ch] text-center">
+                  {isLoadingEstimates ? (
+                    <Loader2 className="inline h-3 w-3 animate-spin" />
+                  ) : (
+                    (tokenEstimates?.refine?.formatted ?? '~2K')
+                  )}
+                </span>
                 )
               </ToggleGroupItem>
               <ToggleGroupItem
@@ -363,11 +376,13 @@ export function GlobalCourseChat({
               >
                 <RefreshCcw className="mr-1 h-3 w-3" />
                 {t('modes.regenerate')} (
-                {isLoadingEstimates ? (
-                  <Loader2 className="inline h-3 w-3 animate-spin" />
-                ) : (
-                  (tokenEstimates?.regenerate?.formatted ?? '~20K+')
-                )}
+                <span className="inline-block min-w-[4ch] text-center">
+                  {isLoadingEstimates ? (
+                    <Loader2 className="inline h-3 w-3 animate-spin" />
+                  ) : (
+                    (tokenEstimates?.regenerate?.formatted ?? '~20K+')
+                  )}
+                </span>
                 )
               </ToggleGroupItem>
             </ToggleGroup>
@@ -425,6 +440,26 @@ export function GlobalCourseChat({
           </form>
         </div>
       )}
+
+      <AlertDialog open={showRegenerateConfirm} onOpenChange={setShowRegenerateConfirm}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>{t('regenerateConfirmTitle')}</AlertDialogTitle>
+            <AlertDialogDescription>{t('regenerateConfirmDescription')}</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>{t('cancel')}</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                setShowRegenerateConfirm(false)
+                onRegenerationRequest?.()
+              }}
+            >
+              {t('startRegeneration')}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </div>
   )
 }
