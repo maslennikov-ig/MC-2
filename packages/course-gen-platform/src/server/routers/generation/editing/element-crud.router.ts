@@ -17,14 +17,13 @@ import {
   addElement as addStructureElement,
 } from '../../../../stages/stage5-generation/utils/course-structure-editor';
 import { llmClient } from '../../../../shared/llm/client';
-import {
-  getElementAtPath,
-} from '../_shared/helpers';
+import { getElementAtPath } from '../_shared/helpers';
+import { assertCourseAccess, buildAuthContext } from '../../../helpers/course-authorization';
 
 export const elementCrudRouter = {
   deleteElement: instructorProcedure
     .input(deleteElementInputSchema)
-    .mutation(async ({ ctx, input }: { ctx: any, input: any }): Promise<DeleteElementResponse> => {
+    .mutation(async ({ ctx, input }: { ctx: any; input: any }): Promise<DeleteElementResponse> => {
       const { courseId, elementPath, confirm } = input;
       const supabase = getSupabaseAdmin();
       const requestId = nanoid();
@@ -41,7 +40,7 @@ export const elementCrudRouter = {
       try {
         const { data: course, error: courseError } = await supabase
           .from('courses')
-          .select('id, user_id, course_structure, generation_status')
+          .select('id, user_id, organization_id, course_structure, generation_status')
           .eq('id', courseId)
           .single();
 
@@ -53,18 +52,8 @@ export const elementCrudRouter = {
           });
         }
 
-        if (course.user_id !== userId) {
-          logger.warn({
-            requestId,
-            userId,
-            courseId,
-            courseOwnerId: course.user_id,
-          }, 'Course ownership violation in deleteElement');
-          throw new TRPCError({
-            code: 'FORBIDDEN',
-            message: 'You do not have access to this course',
-          });
-        }
+        // Check authorization: superadmin/admin/owner can delete
+        assertCourseAccess(buildAuthContext(ctx.user), course, 'delete element');
 
         const courseStructure = course.course_structure as CourseStructure | null;
         if (!courseStructure) {
@@ -77,15 +66,23 @@ export const elementCrudRouter = {
 
         const generationStatus = course.generation_status as string;
         const inProgressStatuses = [
-          'generating', 'queued',
-          'stage_2_init', 'stage_2_processing',
-          'stage_3_init', 'stage_3_summarizing',
-          'stage_4_init', 'stage_4_analyzing',
-          'stage_5_init', 'stage_5_generating',
+          'generating',
+          'queued',
+          'stage_2_init',
+          'stage_2_processing',
+          'stage_3_init',
+          'stage_3_summarizing',
+          'stage_4_init',
+          'stage_4_analyzing',
+          'stage_5_init',
+          'stage_5_generating',
         ];
 
         if (inProgressStatuses.includes(generationStatus)) {
-          logger.warn({ requestId, courseId, status: generationStatus }, 'Cannot delete while generating');
+          logger.warn(
+            { requestId, courseId, status: generationStatus },
+            'Cannot delete while generating'
+          );
           throw new TRPCError({
             code: 'CONFLICT',
             message: 'Cannot delete elements while course generation is in progress',
@@ -96,12 +93,15 @@ export const elementCrudRouter = {
         try {
           element = getElementAtPath(courseStructure, elementPath);
         } catch (error) {
-          logger.warn({
-            requestId,
-            courseId,
-            elementPath,
-            error: error instanceof Error ? error.message : String(error),
-          }, 'Invalid element path in deleteElement');
+          logger.warn(
+            {
+              requestId,
+              courseId,
+              elementPath,
+              error: error instanceof Error ? error.message : String(error),
+            },
+            'Invalid element path in deleteElement'
+          );
           throw new TRPCError({
             code: 'BAD_REQUEST',
             message: `Invalid element path: ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -118,7 +118,7 @@ export const elementCrudRouter = {
                 elementType: 'section',
                 title: section.section_title,
                 lessonCount: section.lessons.length,
-                impactSummary: `Удаление секции "${section.section_title}" удалит ${section.lessons.length} ${section.lessons.length === 1 ? 'урок' : section.lessons.length < 5 ? 'урока' : 'уроков'} и пересчитает длительность курса.`, 
+                impactSummary: `Удаление секции "${section.section_title}" удалит ${section.lessons.length} ${section.lessons.length === 1 ? 'урок' : section.lessons.length < 5 ? 'урока' : 'уроков'} и пересчитает длительность курса.`,
               },
             };
           } else {
@@ -127,7 +127,7 @@ export const elementCrudRouter = {
               requiresConfirmation: {
                 elementType: 'lesson',
                 title: lesson.lesson_title,
-                impactSummary: `Удаление урока "${lesson.lesson_title}" пересчитает нумерацию уроков и длительность секции.`, 
+                impactSummary: `Удаление урока "${lesson.lesson_title}" пересчитает нумерацию уроков и длительность секции.`,
               },
             };
           }
@@ -145,25 +145,31 @@ export const elementCrudRouter = {
           .eq('id', courseId);
 
         if (updateError) {
-          logger.error({
-            requestId,
-            courseId,
-            elementPath,
-            error: updateError,
-          }, 'Database update failed in deleteElement');
+          logger.error(
+            {
+              requestId,
+              courseId,
+              elementPath,
+              error: updateError,
+            },
+            'Database update failed in deleteElement'
+          );
           throw new TRPCError({
             code: 'INTERNAL_SERVER_ERROR',
             message: 'Failed to delete element',
           });
         }
 
-        logger.info({
-          requestId,
-          courseId,
-          elementPath,
-          isSection,
-          recalculated: result.recalculated,
-        }, 'Element deleted successfully');
+        logger.info(
+          {
+            requestId,
+            courseId,
+            elementPath,
+            isSection,
+            recalculated: result.recalculated,
+          },
+          'Element deleted successfully'
+        );
 
         return {
           success: true,
@@ -173,11 +179,14 @@ export const elementCrudRouter = {
       } catch (error) {
         if (error instanceof TRPCError) throw error;
 
-        logger.error({
-          requestId,
-          courseId,
-          error: error instanceof Error ? error.message : String(error),
-        }, 'Unexpected error in deleteElement');
+        logger.error(
+          {
+            requestId,
+            courseId,
+            error: error instanceof Error ? error.message : String(error),
+          },
+          'Unexpected error in deleteElement'
+        );
 
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
@@ -188,7 +197,7 @@ export const elementCrudRouter = {
 
   addElement: instructorProcedure
     .input(addElementInputSchema)
-    .mutation(async ({ ctx, input }: { ctx: any, input: any }): Promise<AddElementResponse> => {
+    .mutation(async ({ ctx, input }: { ctx: any; input: any }): Promise<AddElementResponse> => {
       const { courseId, elementType, parentPath, position, userInstruction } = input;
       const supabase = getSupabaseAdmin();
       const requestId = nanoid();
@@ -205,7 +214,9 @@ export const elementCrudRouter = {
       try {
         const { data: course, error: courseError } = await supabase
           .from('courses')
-          .select('id, user_id, course_structure, generation_status, analysis_result, title')
+          .select(
+            'id, user_id, organization_id, course_structure, generation_status, analysis_result, title'
+          )
           .eq('id', courseId)
           .single();
 
@@ -217,18 +228,8 @@ export const elementCrudRouter = {
           });
         }
 
-        if (course.user_id !== userId) {
-          logger.warn({
-            requestId,
-            userId,
-            courseId,
-            courseOwnerId: course.user_id,
-          }, 'Course ownership violation in addElement');
-          throw new TRPCError({
-            code: 'FORBIDDEN',
-            message: 'You do not have access to this course',
-          });
-        }
+        // Check authorization: superadmin/admin/owner can add
+        assertCourseAccess(buildAuthContext(ctx.user), course, 'add element');
 
         const courseStructure = course.course_structure as CourseStructure | null;
         if (!courseStructure) {
@@ -241,15 +242,23 @@ export const elementCrudRouter = {
 
         const generationStatus = course.generation_status as string;
         const inProgressStatuses = [
-          'generating', 'queued',
-          'stage_2_init', 'stage_2_processing',
-          'stage_3_init', 'stage_3_summarizing',
-          'stage_4_init', 'stage_4_analyzing',
-          'stage_5_init', 'stage_5_generating',
+          'generating',
+          'queued',
+          'stage_2_init',
+          'stage_2_processing',
+          'stage_3_init',
+          'stage_3_summarizing',
+          'stage_4_init',
+          'stage_4_analyzing',
+          'stage_5_init',
+          'stage_5_generating',
         ];
 
         if (inProgressStatuses.includes(generationStatus)) {
-          logger.warn({ requestId, courseId, status: generationStatus }, 'Cannot add element while generating');
+          logger.warn(
+            { requestId, courseId, status: generationStatus },
+            'Cannot add element while generating'
+          );
           throw new TRPCError({
             code: 'CONFLICT',
             message: 'Cannot add elements while course generation is in progress',
@@ -275,7 +284,9 @@ export const elementCrudRouter = {
 
         const analysisResult = course.analysis_result as Record<string, unknown> | null;
         const courseTitle = course.title || 'Course';
-        const recommendedStructure = analysisResult?.recommended_structure as Record<string, unknown> | undefined;
+        const recommendedStructure = analysisResult?.recommended_structure as
+          | Record<string, unknown>
+          | undefined;
         const targetAudience = recommendedStructure?.target_audience || 'general learners';
         const difficultyLevel = recommendedStructure?.difficulty_level || 'intermediate';
         const detectedLanguage = (analysisResult?.detected_language as string) || 'en';
@@ -302,14 +313,17 @@ export const elementCrudRouter = {
           contextInfo += `Description: ${lastSection.section_description}\n`;
         }
 
-        let averageDuration = 15; 
+        let averageDuration = 15;
         if (elementType === 'lesson' && isLessonPath) {
           const sectionMatch = parentPath.match(/sections\[(\d+)\]/);
           if (sectionMatch) {
             const sectionIdx = parseInt(sectionMatch[1], 10);
             const section = courseStructure.sections[sectionIdx];
             if (section && section.lessons.length > 0) {
-              const totalDuration = section.lessons.reduce((sum, l) => sum + l.estimated_duration_minutes, 0);
+              const totalDuration = section.lessons.reduce(
+                (sum, l) => sum + l.estimated_duration_minutes,
+                0
+              );
               averageDuration = Math.round(totalDuration / section.lessons.length);
             }
           }
@@ -359,13 +373,17 @@ Return ONLY valid JSON matching this structure:
             model: 'openai/gpt-4o-mini',
             temperature: 0.7,
             maxTokens: 2000,
-            systemPrompt: 'You are an expert instructional designer. Generate valid JSON only, no markdown or explanations.',
+            systemPrompt:
+              'You are an expert instructional designer. Generate valid JSON only, no markdown or explanations.',
           });
 
           try {
             generatedElement = JSON.parse(response.content) as Lesson;
           } catch (parseError) {
-            logger.error({ requestId, courseId, error: parseError, content: response.content }, 'Failed to parse LLM response for lesson');
+            logger.error(
+              { requestId, courseId, error: parseError, content: response.content },
+              'Failed to parse LLM response for lesson'
+            );
             throw new TRPCError({
               code: 'INTERNAL_SERVER_ERROR',
               message: 'AI generation failed: invalid JSON response',
@@ -422,13 +440,17 @@ Return ONLY valid JSON matching this structure:
             model: 'openai/gpt-4o-mini',
             temperature: 0.7,
             maxTokens: 4000,
-            systemPrompt: 'You are an expert instructional designer. Generate valid JSON only, no markdown or explanations.',
+            systemPrompt:
+              'You are an expert instructional designer. Generate valid JSON only, no markdown or explanations.',
           });
 
           try {
             generatedElement = JSON.parse(response.content) as Section;
           } catch (parseError) {
-            logger.error({ requestId, courseId, error: parseError, content: response.content }, 'Failed to parse LLM response for section');
+            logger.error(
+              { requestId, courseId, error: parseError, content: response.content },
+              'Failed to parse LLM response for section'
+            );
             throw new TRPCError({
               code: 'INTERNAL_SERVER_ERROR',
               message: 'AI generation failed: invalid JSON response',
@@ -478,25 +500,31 @@ Return ONLY valid JSON matching this structure:
           .eq('id', courseId);
 
         if (updateError) {
-          logger.error({
-            requestId,
-            courseId,
-            parentPath,
-            error: updateError,
-          }, 'Database update failed in addElement');
+          logger.error(
+            {
+              requestId,
+              courseId,
+              parentPath,
+              error: updateError,
+            },
+            'Database update failed in addElement'
+          );
           throw new TRPCError({
             code: 'INTERNAL_SERVER_ERROR',
             message: 'Failed to add element',
           });
         }
 
-        logger.info({
-          requestId,
-          courseId,
-          elementType,
-          elementPath,
-          recalculated: result.recalculated,
-        }, 'Element added successfully');
+        logger.info(
+          {
+            requestId,
+            courseId,
+            elementType,
+            elementPath,
+            recalculated: result.recalculated,
+          },
+          'Element added successfully'
+        );
 
         return {
           success: true,
@@ -508,11 +536,14 @@ Return ONLY valid JSON matching this structure:
       } catch (error) {
         if (error instanceof TRPCError) throw error;
 
-        logger.error({
-          requestId,
-          courseId,
-          error: error instanceof Error ? error.message : String(error),
-        }, 'Unexpected error in addElement');
+        logger.error(
+          {
+            requestId,
+            courseId,
+            error: error instanceof Error ? error.message : String(error),
+          },
+          'Unexpected error in addElement'
+        );
 
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
