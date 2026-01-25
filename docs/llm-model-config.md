@@ -37,9 +37,9 @@
 
 ### Phase 0.5: Clarifying Questions
 
-| Phase              | Tier     | Primary Model           | Fallback Model                             | Temp | Tokens |
-| ------------------ | -------- | ----------------------- | ------------------------------------------ | ---- | ------ |
-| stage_4_clarifying | standard | moonshotai/kimi-k2-0905 | google/gemini-2.0-flash-thinking-exp-01-21 | 0.50 | 4000   |
+| Phase              | Tier     | Primary Model           | Fallback Model                | Temp | Tokens |
+| ------------------ | -------- | ----------------------- | ----------------------------- | ---- | ------ |
+| stage_4_clarifying | standard | moonshotai/kimi-k2-0905 | google/gemini-3-flash-preview | 0.50 | 4000   |
 
 ### Phase 1-4: Analysis
 
