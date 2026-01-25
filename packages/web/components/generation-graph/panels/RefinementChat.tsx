@@ -14,8 +14,9 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useTranslation } from '@/lib/generation-graph/useTranslation'
-import { QuickActions } from './QuickActions'
+import { QuickActions, type ChatIntent } from './QuickActions'
 import { MarkdownRendererClient } from '@/components/markdown'
+import { toast } from '@/lib/toast'
 
 interface ChatMessage {
   role: 'user' | 'assistant'
@@ -47,7 +48,7 @@ export const RefinementChat: React.FC<RefinementChatProps> = ({
     return saved !== null ? JSON.parse(saved) : true
   })
   const [message, setMessage] = useState('')
-  const [selectedIntent, setSelectedIntent] = useState<'refine' | 'regenerate'>('refine')
+  const [selectedIntent, setSelectedIntent] = useState<ChatIntent | null>(null)
   const [pendingMessages, setPendingMessages] = useState<ChatMessage[]>([])
   const scrollRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -102,24 +103,31 @@ export const RefinementChat: React.FC<RefinementChatProps> = ({
 
   const handleSubmit = (e?: React.FormEvent) => {
     e?.preventDefault()
-    if (message.trim() && !isProcessing) {
-      // Add to pending immediately for optimistic update
-      setPendingMessages((prev) => [
-        ...prev,
-        {
-          role: 'user',
-          content: message,
-          timestamp: new Date().toISOString(),
-          pending: true,
-        },
-      ])
+    if (!message.trim() || isProcessing) return
 
-      onRefine(message, selectedIntent)
-      setMessage('')
+    // Validate intent is selected
+    if (!selectedIntent) {
+      toast.warning(t('refinementChat.modes.selectModeRequired'))
+      return
     }
+
+    // Add to pending immediately for optimistic update
+    setPendingMessages((prev) => [
+      ...prev,
+      {
+        role: 'user',
+        content: message,
+        timestamp: new Date().toISOString(),
+        pending: true,
+      },
+    ])
+
+    onRefine(message, selectedIntent)
+    setMessage('')
   }
 
-  const handleQuickAction = (actionText: string) => {
+  const handleQuickAction = (actionText: string, intent: ChatIntent) => {
+    setSelectedIntent(intent)
     setMessage(actionText)
   }
 
@@ -197,10 +205,8 @@ export const RefinementChat: React.FC<RefinementChatProps> = ({
             <div className="mb-3 flex items-center gap-2">
               <ToggleGroup
                 type="single"
-                value={selectedIntent}
-                onValueChange={(value) =>
-                  value && setSelectedIntent(value as 'refine' | 'regenerate')
-                }
+                value={selectedIntent ?? ''}
+                onValueChange={(value) => value && setSelectedIntent(value as ChatIntent)}
                 className="justify-start"
                 disabled={isProcessing}
               >
@@ -238,7 +244,7 @@ export const RefinementChat: React.FC<RefinementChatProps> = ({
                 type="submit"
                 size="icon"
                 className="h-[80px] w-[50px]"
-                disabled={!message.trim() || isProcessing}
+                disabled={!message.trim() || isProcessing || !selectedIntent}
                 data-testid="refinement-submit"
                 title={t('refinementChat.send')}
               >

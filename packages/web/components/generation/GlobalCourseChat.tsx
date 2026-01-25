@@ -94,12 +94,14 @@ export function GlobalCourseChat({
       label: t('quickActions.addPractice.label'),
       icon: Plus,
       prompt: t('quickActions.addPractice.prompt'),
+      intent: 'refine' as const,
     },
     {
       id: 'simplify',
       label: t('quickActions.simplify.label'),
       icon: Scissors,
       prompt: t('quickActions.simplify.prompt'),
+      intent: 'refine' as const,
     },
   ]
 
@@ -108,7 +110,7 @@ export function GlobalCourseChat({
   const [isProcessing, setIsProcessing] = useState(false)
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([])
   const [conversationId, setConversationId] = useState<string | undefined>()
-  const [selectedIntent, setSelectedIntent] = useState<'refine' | 'regenerate'>('refine')
+  const [selectedIntent, setSelectedIntent] = useState<'refine' | 'regenerate' | null>(null)
   const [tokenEstimates, setTokenEstimates] = useState<TokenEstimates | null>(null)
   const [isLoadingEstimates, setIsLoadingEstimates] = useState(true)
   const scrollRef = useRef<HTMLDivElement>(null)
@@ -156,8 +158,14 @@ export function GlobalCourseChat({
   }, [])
 
   const sendMessage = useCallback(
-    async (messageText: string, intent: 'refine' | 'regenerate' = selectedIntent) => {
+    async (messageText: string, intent: 'refine' | 'regenerate' | null = selectedIntent) => {
       if (!messageText.trim() || isProcessing) return
+
+      // Validate intent is selected
+      if (!intent) {
+        toast.warning(t('selectModeRequired'))
+        return
+      }
 
       // Abort any previous request
       abortControllerRef.current?.abort()
@@ -246,8 +254,9 @@ export function GlobalCourseChat({
     void sendMessage(message, selectedIntent)
   }
 
-  const handleQuickAction = (actionPrompt: string) => {
-    void sendMessage(actionPrompt, selectedIntent)
+  const handleQuickAction = (actionPrompt: string, intent: 'refine' | 'regenerate' = 'refine') => {
+    setSelectedIntent(intent)
+    void sendMessage(actionPrompt, intent)
   }
 
   return (
@@ -323,7 +332,7 @@ export function GlobalCourseChat({
           <div className="flex items-center gap-2 border-t px-4 py-2">
             <ToggleGroup
               type="single"
-              value={selectedIntent}
+              value={selectedIntent ?? ''}
               onValueChange={(value) =>
                 value && setSelectedIntent(value as 'refine' | 'regenerate')
               }
@@ -368,7 +377,7 @@ export function GlobalCourseChat({
                 key={action.id}
                 variant="outline"
                 size="sm"
-                onClick={() => handleQuickAction(action.prompt)}
+                onClick={() => handleQuickAction(action.prompt, action.intent)}
                 disabled={isProcessing || isGenerating}
                 className="text-xs"
               >
@@ -402,7 +411,7 @@ export function GlobalCourseChat({
                 height: CHAT_LAYOUT.SEND_BUTTON_SIZE,
                 width: CHAT_LAYOUT.SEND_BUTTON_SIZE,
               }}
-              disabled={!message.trim() || isProcessing || isGenerating}
+              disabled={!message.trim() || isProcessing || isGenerating || !selectedIntent}
             >
               {isProcessing ? (
                 <Loader2 className="h-4 w-4 animate-spin" />

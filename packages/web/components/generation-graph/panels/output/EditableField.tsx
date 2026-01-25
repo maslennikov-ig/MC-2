@@ -1,51 +1,63 @@
-'use client';
+'use client'
 
-import React, { useState, useEffect, useRef } from 'react';
-import { FieldConfig } from './types';
-import { SaveStatus } from '../../hooks/useAutoSave';
-import { Input } from '@/components/ui/input';
-import { Textarea } from '@/components/ui/textarea';
-import { Switch } from '@/components/ui/switch';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Label } from '@/components/ui/label';
-import { Button } from '@/components/ui/button';
-import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
-import { SaveStatusIndicator } from './SaveStatusIndicator';
-import { InlineRegenerateChat, type RegenerationResult } from './InlineRegenerateChat';
-import { SemanticDiffViewer } from './SemanticDiff';
-import { ImpactAnalysisModal, type CascadeAction } from './ImpactAnalysisModal';
-import { getBlockDependenciesAction, updateFieldAction, cascadeUpdateAction } from '@/app/actions/admin-generation';
-import { Wand2 } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import { useEditHistoryStore } from '@/stores/useEditHistoryStore';
+import React, { useState, useEffect, useRef } from 'react'
+import { FieldConfig } from './types'
+import { SaveStatus } from '../../hooks/useAutoSave'
+import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
+import { Switch } from '@/components/ui/switch'
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select'
+import { Label } from '@/components/ui/label'
+import { Button } from '@/components/ui/button'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
+import { SaveStatusIndicator } from './SaveStatusIndicator'
+import { InlineRegenerateChat, type RegenerationResult } from './InlineRegenerateChat'
+import { SemanticDiffViewer } from './SemanticDiff'
+import { ImpactAnalysisModal, type CascadeAction } from './ImpactAnalysisModal'
+import {
+  getBlockDependenciesAction,
+  updateFieldAction,
+  cascadeUpdateAction,
+} from '@/app/actions/admin-generation'
+import { Wand2 } from 'lucide-react'
+import { cn } from '@/lib/utils'
+import { useEditHistoryStore } from '@/stores/useEditHistoryStore'
 
 interface EditableFieldProps {
-  config: FieldConfig;
-  value: unknown;
-  onChange: (value: unknown) => void;
-  onBlur?: () => void;
-  status?: SaveStatus;
-  disabled?: boolean;
-  className?: string;
-  regeneratable?: boolean; // Flag to enable AI regeneration
-  courseId?: string; // Required if regeneratable or isLearningObjective
-  stageId?: 'stage_4' | 'stage_5'; // Required if regeneratable
-  locale?: 'ru' | 'en';
-  isLearningObjective?: boolean; // Flag for LO fields that need cascade check
-  onCascadeChange?: (value: unknown, action: CascadeAction) => Promise<void>;
+  config: FieldConfig
+  value: unknown
+  onChange: (value: unknown) => void
+  onBlur?: () => void
+  status?: SaveStatus
+  disabled?: boolean
+  className?: string
+  regeneratable?: boolean // Flag to enable AI regeneration
+  courseId?: string // Required if regeneratable or isLearningObjective
+  stageId?: 'stage_4' | 'stage_5' | 'stage_6' // Required if regeneratable
+  locale?: 'ru' | 'en'
+  isLearningObjective?: boolean // Flag for LO fields that need cascade check
+  onCascadeChange?: (value: unknown, action: CascadeAction) => Promise<void>
 }
 
 /**
  * Helper function to determine change type based on concept changes
  */
-function determineChangeType(result: RegenerationResult): 'simplified' | 'expanded' | 'restructured' | 'refined' {
-  const added = result.concepts_added.length;
-  const removed = result.concepts_removed.length;
+function determineChangeType(
+  result: RegenerationResult
+): 'simplified' | 'expanded' | 'restructured' | 'refined' {
+  const added = result.concepts_added.length
+  const removed = result.concepts_removed.length
 
-  if (added > 0 && removed > 0) return 'restructured';
-  if (added > 2) return 'expanded';
-  if (removed > 2) return 'simplified';
-  return 'refined';
+  if (added > 0 && removed > 0) return 'restructured'
+  if (added > 2) return 'expanded'
+  if (removed > 2) return 'simplified'
+  return 'refined'
 }
 
 export const EditableField: React.FC<EditableFieldProps> = ({
@@ -63,45 +75,45 @@ export const EditableField: React.FC<EditableFieldProps> = ({
   isLearningObjective = false,
   onCascadeChange,
 }) => {
-  const { label, type, placeholder, helpText, min, max, options } = config;
+  const { label, type, placeholder, helpText, min, max, options } = config
   const [localValue, setLocalValue] = useState<string>(
     value !== null && value !== undefined ? String(value) : ''
-  );
-  const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const containerRef = useRef<HTMLDivElement>(null);
+  )
+  const textareaRef = useRef<HTMLTextAreaElement>(null)
+  const inputRef = useRef<HTMLInputElement>(null)
+  const containerRef = useRef<HTMLDivElement>(null)
 
   // Edit history store
-  const pushEdit = useEditHistoryStore((state) => state.pushEdit);
+  const pushEdit = useEditHistoryStore((state) => state.pushEdit)
 
   // Track previous value for edit history
-  const previousValueRef = useRef<unknown>(value);
+  const previousValueRef = useRef<unknown>(value)
 
   // Regeneration state
-  const [isRegenerateOpen, setIsRegenerateOpen] = useState(false);
-  const [regenerationResult, setRegenerationResult] = useState<RegenerationResult | null>(null);
+  const [isRegenerateOpen, setIsRegenerateOpen] = useState(false)
+  const [regenerationResult, setRegenerationResult] = useState<RegenerationResult | null>(null)
 
   // Impact Analysis Modal state
-  const [showImpactModal, setShowImpactModal] = useState(false);
-  const [pendingValue, setPendingValue] = useState<unknown>(null);
-  const [affectedCount, setAffectedCount] = useState(0);
+  const [showImpactModal, setShowImpactModal] = useState(false)
+  const [pendingValue, setPendingValue] = useState<unknown>(null)
+  const [affectedCount, setAffectedCount] = useState(0)
 
   // Sync local value when external value changes
   useEffect(() => {
-    const newValue = value !== null && value !== undefined ? String(value) : '';
-    setLocalValue(newValue);
+    const newValue = value !== null && value !== undefined ? String(value) : ''
+    setLocalValue(newValue)
     // Update previous value ref when external value changes
-    previousValueRef.current = value;
-  }, [value]);
+    previousValueRef.current = value
+  }, [value])
 
   // Auto-resize textarea
   useEffect(() => {
     if (type === 'textarea' && textareaRef.current) {
-      const textarea = textareaRef.current;
-      textarea.style.height = 'auto';
-      textarea.style.height = `${textarea.scrollHeight}px`;
+      const textarea = textareaRef.current
+      textarea.style.height = 'auto'
+      textarea.style.height = `${textarea.scrollHeight}px`
     }
-  }, [localValue, type]);
+  }, [localValue, type])
 
   const handleChange = async (newValue: unknown) => {
     // Track edit in history (only if courseId and stageId are available)
@@ -112,116 +124,121 @@ export const EditableField: React.FC<EditableFieldProps> = ({
         fieldPath: config.path,
         previousValue: previousValueRef.current,
         newValue,
-      });
+      })
 
       // Update previous value ref for next edit
-      previousValueRef.current = newValue;
+      previousValueRef.current = newValue
     }
 
     if (isLearningObjective) {
       // Validate required props for learning objective cascade flow
       if (!courseId || !config.path) {
-        console.warn('[EditableField] isLearningObjective=true but courseId or config.path missing, falling back to direct onChange');
-        onChange(newValue);
-        return;
+        console.warn(
+          '[EditableField] isLearningObjective=true but courseId or config.path missing, falling back to direct onChange'
+        )
+        onChange(newValue)
+        return
       }
 
       // Store pending value and fetch affected count
-      setPendingValue(newValue);
+      setPendingValue(newValue)
 
       try {
-        const result = await getBlockDependenciesAction(courseId, config.path);
-        setAffectedCount(result.downstream?.length || 0);
-        setShowImpactModal(true);
+        const result = await getBlockDependenciesAction(courseId, config.path)
+        setAffectedCount(result.downstream?.length || 0)
+        setShowImpactModal(true)
       } catch (error) {
-        console.error('Failed to get dependencies:', error);
+        console.error('Failed to get dependencies:', error)
         // Fallback: apply change without cascade check
-        onChange(newValue);
+        onChange(newValue)
       }
     } else {
-      onChange(newValue);
+      onChange(newValue)
     }
-  };
+  }
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
-    const newValue = e.target.value;
-    setLocalValue(newValue);
-    handleChange(newValue);
-  };
+    const newValue = e.target.value
+    setLocalValue(newValue)
+    handleChange(newValue)
+  }
 
   const handleNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const newValue = e.target.value;
-    setLocalValue(newValue);
-    const numValue = parseFloat(newValue);
+    const newValue = e.target.value
+    setLocalValue(newValue)
+    const numValue = parseFloat(newValue)
     if (!isNaN(numValue)) {
-      handleChange(numValue);
+      handleChange(numValue)
     }
-  };
+  }
 
   const handleToggleChange = (checked: boolean) => {
-    handleChange(checked);
-  };
+    handleChange(checked)
+  }
 
   const handleSelectChange = (newValue: string) => {
-    setLocalValue(newValue);
-    handleChange(newValue);
-  };
+    setLocalValue(newValue)
+    handleChange(newValue)
+  }
 
   const handleBlur = () => {
-    onBlur?.();
-  };
+    onBlur?.()
+  }
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     switch (e.key) {
       case 'Enter':
         if (!e.shiftKey && type === 'text') {
-          e.preventDefault();
+          e.preventDefault()
           // Focus the input for editing
-          inputRef.current?.focus();
+          inputRef.current?.focus()
         }
         // For textarea, allow Enter to create new lines (don't preventDefault)
-        break;
+        break
       case 'Escape':
-        e.preventDefault();
+        e.preventDefault()
         // Cancel editing and return focus to container
-        if (inputRef.current === document.activeElement || textareaRef.current === document.activeElement) {
-          handleBlur();
-          containerRef.current?.focus();
+        if (
+          inputRef.current === document.activeElement ||
+          textareaRef.current === document.activeElement
+        ) {
+          handleBlur()
+          containerRef.current?.focus()
         }
-        break;
+        break
       // Tab navigation is handled naturally by browser
     }
-  };
+  }
 
   const handleCascadeConfirm = async (action: CascadeAction) => {
-    setShowImpactModal(false);
+    setShowImpactModal(false)
 
-    if (pendingValue === null) return;
+    if (pendingValue === null) return
 
     try {
       if (onCascadeChange) {
         // Use custom cascade handler if provided
-        await onCascadeChange(pendingValue, action);
+        await onCascadeChange(pendingValue, action)
       } else if (courseId && config.path) {
         // Default cascade handler: update field then handle cascade
-        await updateFieldAction(courseId, stageId || 'stage_4', config.path, pendingValue);
+        await updateFieldAction(courseId, stageId || 'stage_4', config.path, pendingValue)
 
         if (action !== 'mark_stale') {
-          await cascadeUpdateAction(courseId, config.path, action);
+          await cascadeUpdateAction(courseId, config.path, action)
         }
       }
 
       // Apply the change to local state
-      onChange(pendingValue);
+      onChange(pendingValue)
     } catch (error) {
-      console.error('Failed to apply cascade change:', error);
+      console.error('Failed to apply cascade change:', error)
     } finally {
-      setPendingValue(null);
+      setPendingValue(null)
     }
-  };
+  }
 
-  const fieldId = `field-${config.path.replace(/\./g, '-')}`;
-  const hasError = status === 'error';
+  const fieldId = `field-${config.path.replace(/\./g, '-')}`
+  const hasError = status === 'error'
 
   return (
     <div
@@ -315,7 +332,10 @@ export const EditableField: React.FC<EditableFieldProps> = ({
             aria-busy={status === 'saving'}
           />
           {localValue && (
-            <div className="absolute bottom-2 right-2 text-xs text-slate-400 dark:text-slate-500" aria-live="polite">
+            <div
+              className="absolute right-2 bottom-2 text-xs text-slate-400 dark:text-slate-500"
+              aria-live="polite"
+            >
               {localValue.length} символов
             </div>
           )}
@@ -360,17 +380,10 @@ export const EditableField: React.FC<EditableFieldProps> = ({
       )}
 
       {type === 'select' && options && (
-        <Select
-          value={localValue}
-          onValueChange={handleSelectChange}
-          disabled={disabled}
-        >
+        <Select value={localValue} onValueChange={handleSelectChange} disabled={disabled}>
           <SelectTrigger
             id={fieldId}
-            className={cn(
-              'w-full',
-              hasError && 'border-red-500 focus:ring-red-500'
-            )}
+            className={cn('w-full', hasError && 'border-red-500 focus:ring-red-500')}
             aria-label={label}
             aria-describedby={helpText ? `${fieldId}-help` : undefined}
             aria-invalid={hasError}
@@ -390,7 +403,9 @@ export const EditableField: React.FC<EditableFieldProps> = ({
 
       {/* Help Text */}
       {helpText && !hasError && (
-        <p id={`${fieldId}-help`} className="text-xs text-slate-500 dark:text-slate-400">{helpText}</p>
+        <p id={`${fieldId}-help`} className="text-xs text-slate-500 dark:text-slate-400">
+          {helpText}
+        </p>
       )}
 
       {/* Error Message */}
@@ -428,18 +443,18 @@ export const EditableField: React.FC<EditableFieldProps> = ({
           }}
           locale={locale}
           onAccept={() => {
-            onChange(regenerationResult.regenerated_content);
-            setRegenerationResult(null);
-            setIsRegenerateOpen(false);
+            onChange(regenerationResult.regenerated_content)
+            setRegenerationResult(null)
+            setIsRegenerateOpen(false)
           }}
           onEdit={() => {
             // Apply the change and close diff viewer, allow manual editing
-            onChange(regenerationResult.regenerated_content);
-            setRegenerationResult(null);
-            setIsRegenerateOpen(false);
+            onChange(regenerationResult.regenerated_content)
+            setRegenerationResult(null)
+            setIsRegenerateOpen(false)
           }}
           onCancel={() => {
-            setRegenerationResult(null);
+            setRegenerationResult(null)
             // Keep regenerate chat open for retry
           }}
         />
@@ -450,10 +465,10 @@ export const EditableField: React.FC<EditableFieldProps> = ({
         <ImpactAnalysisModal
           isOpen={showImpactModal}
           onClose={() => {
-            setShowImpactModal(false);
-            setPendingValue(null);
+            setShowImpactModal(false)
+            setPendingValue(null)
           }}
-          onConfirm={handleCascadeConfirm}
+          onConfirm={(action) => void handleCascadeConfirm(action)}
           affectedCount={affectedCount}
           fieldLabel={config.label}
           fieldPath={config.path}
@@ -461,5 +476,5 @@ export const EditableField: React.FC<EditableFieldProps> = ({
         />
       )}
     </div>
-  );
-};
+  )
+}

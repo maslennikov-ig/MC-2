@@ -313,6 +313,7 @@
       "refineAriaLabel": "Switch to refine mode for small edits",
       "regenerateAriaLabel": "Switch to regenerate mode for full content recreation"
     },
+    "selectModeRequired": "Select a mode (Refine or Regenerate) before sending",
     "quickActions": {
       "addPractice": {
         "label": "Add practice",
