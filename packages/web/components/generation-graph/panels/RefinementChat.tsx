@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef, useMemo } from 'react'
+import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { ScrollArea } from '@/components/ui/scroll-area'
@@ -126,23 +126,26 @@ export const RefinementChat: React.FC<RefinementChatProps> = ({
     setMessage('')
   }
 
-  const handleQuickAction = (actionText: string, intent: ChatIntent) => {
-    setSelectedIntent(intent)
-    setMessage(actionText)
+  const handleQuickAction = useCallback(
+    (actionText: string, intent: ChatIntent) => {
+      setSelectedIntent(intent)
+      setMessage(actionText)
 
-    // Send immediately (consistent with GlobalCourseChat behavior)
-    // Add to pending for optimistic update
-    setPendingMessages((prev) => [
-      ...prev,
-      {
-        role: 'user',
-        content: actionText,
-        timestamp: new Date().toISOString(),
-        pending: true,
-      },
-    ])
-    onRefine(actionText, intent)
-  }
+      // Send immediately (consistent with GlobalCourseChat behavior)
+      // Add to pending for optimistic update
+      setPendingMessages((prev) => [
+        ...prev,
+        {
+          role: 'user',
+          content: actionText,
+          timestamp: new Date().toISOString(),
+          pending: true,
+        },
+      ])
+      onRefine(actionText, intent)
+    },
+    [onRefine]
+  )
 
   return (
     <div className="bg-card mt-6 rounded-md border" data-testid="refinement-chat">

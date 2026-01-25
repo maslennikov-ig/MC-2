@@ -324,6 +324,10 @@
         "label": "Simplify",
         "prompt": "Simplify the language and explanations, make the material more accessible"
       }
-    }
+    },
+    "regenerateConfirmTitle": "Start Course Regeneration?",
+    "regenerateConfirmDescription": "This will regenerate stages 4-6. Existing content will be replaced.",
+    "startRegeneration": "Start Regeneration",
+    "cancel": "Cancel"
   }
 }
