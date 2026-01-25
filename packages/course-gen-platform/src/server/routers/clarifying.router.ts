@@ -51,10 +51,17 @@ const getQuestionsSchema = z.object({
  */
 const submitAnswerSchema = z.object({
   questionId: z.string().uuid('Invalid question ID'),
-  answer: z.string().min(1, 'Answer is required').max(10000, 'Answer too long'),
+  answer: z
+    .string()
+    .transform(s => s.trim())
+    .pipe(z.string().min(3, 'Answer must be at least 3 characters').max(10000, 'Answer too long')),
   answerSource: z.enum(['suggested', 'modified', 'custom']),
   selectedSuggestionIndex: z.number().int().min(0).optional(),
-  userModification: z.string().max(10000).optional(),
+  userModification: z
+    .string()
+    .transform(s => s.trim())
+    .pipe(z.string().max(10000, 'Modification too long'))
+    .optional(),
 });
 
 /**
