@@ -20,6 +20,7 @@ import { JobType } from '@megacampus/shared-types';
 import type { Database, GenerationMetadata, JobData } from '@megacampus/shared-types';
 import { isValidStyle } from '@megacampus/shared-types/style-prompts';
 import type { CourseSettings } from './_shared/types';
+import { assertCourseAccess, buildAuthContext } from '../../helpers/course-authorization';
 
 // Type aliases for Database tables
 type Course = Database['public']['Tables']['courses']['Row'];
@@ -205,9 +206,9 @@ export const statusRouter = router({
       if (error || !course) {
         throw new TRPCError({ code: 'NOT_FOUND', message: 'Course not found' });
       }
-      if (course.user_id !== userId) {
-        throw new TRPCError({ code: 'FORBIDDEN', message: 'Access denied' });
-      }
+
+      // Check authorization: superadmin/admin/owner can approve
+      assertCourseAccess(buildAuthContext(ctx.user!), course, 'approve stage');
 
       const currentStatus = course.generation_status as string;
       const expectedStatus = `stage_${currentStage}_awaiting_approval`;

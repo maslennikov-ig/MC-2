@@ -10,15 +10,13 @@ import {
 } from '@megacampus/shared-types/regeneration-types';
 import type { CourseStructure } from '@megacampus/shared-types';
 import { applyFieldUpdate } from '../../../../stages/stage5-generation/utils/course-structure-editor';
-import {
-  setNestedValue,
-  normalizePathForValidation,
-} from '../_shared/helpers';
+import { setNestedValue, normalizePathForValidation } from '../_shared/helpers';
+import { assertCourseAccess, buildAuthContext } from '../../../helpers/course-authorization';
 
 export const fieldUpdateRouter = {
   updateField: instructorProcedure
     .input(updateFieldInputSchema)
-    .mutation(async ({ ctx, input }: { ctx: any, input: any }) => {
+    .mutation(async ({ ctx, input }: { ctx: any; input: any }) => {
       const { courseId, stageId, fieldPath, value } = input;
       const supabase = getSupabaseAdmin();
       const requestId = nanoid();
@@ -35,7 +33,7 @@ export const fieldUpdateRouter = {
       try {
         const { data: course, error: courseError } = await supabase
           .from('courses')
-          .select('id, user_id, analysis_result, course_structure')
+          .select('id, user_id, organization_id, analysis_result, course_structure')
           .eq('id', courseId)
           .single();
 
@@ -47,45 +45,35 @@ export const fieldUpdateRouter = {
           });
         }
 
-        if (course.user_id !== userId) {
-          logger.warn({
-            requestId,
-            userId,
-            courseId,
-            courseOwnerId: course.user_id,
-          }, 'Course ownership violation in updateField');
-          throw new TRPCError({
-            code: 'FORBIDDEN',
-            message: 'You do not have access to this course',
-          });
-        }
+        // Check authorization: superadmin/admin/owner can update
+        assertCourseAccess(buildAuthContext(ctx.user), course, 'update field');
 
-        const allowedFields = stageId === 'stage_4'
-          ? STAGE4_EDITABLE_FIELDS
-          : STAGE5_EDITABLE_FIELDS;
+        const allowedFields =
+          stageId === 'stage_4' ? STAGE4_EDITABLE_FIELDS : STAGE5_EDITABLE_FIELDS;
 
-        const normalizedFieldPath = stageId === 'stage_5'
-          ? normalizePathForValidation(fieldPath)
-          : fieldPath;
+        const normalizedFieldPath =
+          stageId === 'stage_5' ? normalizePathForValidation(fieldPath) : fieldPath;
 
         if (!allowedFields.includes(normalizedFieldPath)) {
-          logger.warn({
-            requestId,
-            courseId,
-            stageId,
-            fieldPath,
-            normalizedFieldPath,
-            allowedFields,
-          }, 'Field path not in whitelist');
+          logger.warn(
+            {
+              requestId,
+              courseId,
+              stageId,
+              fieldPath,
+              normalizedFieldPath,
+              allowedFields,
+            },
+            'Field path not in whitelist'
+          );
           throw new TRPCError({
             code: 'BAD_REQUEST',
             message: `Field "${fieldPath}" is not editable`,
           });
         }
 
-        const currentData = stageId === 'stage_4'
-          ? course.analysis_result
-          : course.course_structure;
+        const currentData =
+          stageId === 'stage_4' ? course.analysis_result : course.course_structure;
 
         if (!currentData) {
           logger.warn({ requestId, courseId, stageId }, 'Target data is null or undefined');
@@ -100,11 +88,7 @@ export const fieldUpdateRouter = {
 
         try {
           if (stageId === 'stage_5') {
-            const result = applyFieldUpdate(
-              currentData as CourseStructure,
-              fieldPath,
-              value
-            );
+            const result = applyFieldUpdate(currentData as CourseStructure, fieldPath, value);
             updatedData = result.updatedStructure;
             recalculated = result.recalculated;
           } else {
@@ -112,12 +96,15 @@ export const fieldUpdateRouter = {
             setNestedValue(updatedData, fieldPath, value);
           }
         } catch (error) {
-          logger.warn({
-            requestId,
-            courseId,
-            fieldPath,
-            error: error instanceof Error ? error.message : String(error),
-          }, 'Invalid field path');
+          logger.warn(
+            {
+              requestId,
+              courseId,
+              fieldPath,
+              error: error instanceof Error ? error.message : String(error),
+            },
+            'Invalid field path'
+          );
           throw new TRPCError({
             code: 'BAD_REQUEST',
             message: `Invalid field path: ${error instanceof Error ? error.message : 'Unknown error'}`,
@@ -136,26 +123,32 @@ export const fieldUpdateRouter = {
           .eq('id', courseId);
 
         if (updateError) {
-          logger.error({
-            requestId,
-            courseId,
-            stageId,
-            fieldPath,
-            error: updateError,
-          }, 'Database update failed in updateField');
+          logger.error(
+            {
+              requestId,
+              courseId,
+              stageId,
+              fieldPath,
+              error: updateError,
+            },
+            'Database update failed in updateField'
+          );
           throw new TRPCError({
             code: 'INTERNAL_SERVER_ERROR',
             message: 'Failed to update field',
           });
         }
 
-        logger.info({
-          requestId,
-          courseId,
-          stageId,
-          fieldPath,
-          recalculated,
-        }, 'Field updated successfully');
+        logger.info(
+          {
+            requestId,
+            courseId,
+            stageId,
+            fieldPath,
+            recalculated,
+          },
+          'Field updated successfully'
+        );
 
         return {
           success: true,
@@ -166,11 +159,14 @@ export const fieldUpdateRouter = {
       } catch (error) {
         if (error instanceof TRPCError) throw error;
 
-        logger.error({
-          requestId,
-          courseId,
-          error: error instanceof Error ? error.message : String(error),
-        }, 'Unexpected error in updateField');
+        logger.error(
+          {
+            requestId,
+            courseId,
+            error: error instanceof Error ? error.message : String(error),
+          },
+          'Unexpected error in updateField'
+        );
 
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
