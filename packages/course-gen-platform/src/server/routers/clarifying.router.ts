@@ -27,7 +27,7 @@ import { protectedProcedure } from '../middleware/auth';
 import { createRateLimiter } from '../middleware/rate-limit.js';
 import { getSupabaseAdmin } from '../../shared/supabase/admin';
 import { addJob } from '../../orchestrator/queue';
-import { JobType } from '@megacampus/shared-types';
+import { JobType, StructureAnalysisJobData } from '@megacampus/shared-types';
 import { logger } from '../../shared/logger/index.js';
 
 // ============================================================================
@@ -86,7 +86,7 @@ const requestSecondRoundSchema = z.object({
  * Question row from database
  * Note: This type matches the clarifying_questions table schema
  */
-interface QuestionRow {
+export interface QuestionRow {
   id: string;
   course_id: string;
   question_text: string;
@@ -975,9 +975,34 @@ export const clarifyingRouter = router({
           created_at: new Date().toISOString(),
         };
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const job = await addJob(JobType.STRUCTURE_ANALYSIS, jobData as any, { priority });
-        const jobId = job.id as string;
+        // Create job with rollback on failure
+        let jobId: string;
+        try {
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const job = await addJob(JobType.STRUCTURE_ANALYSIS, jobData as any, { priority });
+          jobId = job.id as string;
+        } catch (jobError) {
+          // Rollback status on job creation failure
+          logger.error(
+            {
+              requestId,
+              courseId,
+              error: jobError instanceof Error ? jobError.message : String(jobError),
+            },
+            'Failed to create analysis job, rolling back status'
+          );
+
+          await typedSupabase
+            .from('courses')
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            .update({ generation_status: 'stage_4_clarifying' as any })
+            .eq('id', courseId);
+
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Failed to create analysis job',
+          });
+        }
 
         logger.info(
           {
@@ -1142,32 +1167,35 @@ export const clarifyingRouter = router({
         const tier = typedCourseDetails.organization?.tier || 'free';
         const priority = getTierPriority(tier);
 
-        // Create CLARIFYING_QUESTIONS job for round 2
-        // Note: This assumes a CLARIFYING_QUESTIONS job type exists
-        // If not, this would need to be handled differently
-        const jobData: Record<string, unknown> = {
-          jobType: 'CLARIFYING_QUESTIONS',
+        // Create STRUCTURE_ANALYSIS job for round 2
+        // The handler will extract iterationRound and previousAnswers to pass to orchestrator
+        const jobData: StructureAnalysisJobData & {
+          iterationRound?: number;
+          previousAnswers?: Array<{
+            question: string;
+            answer: string;
+            priority: string;
+            category: string;
+          }>;
+        } = {
+          jobType: JobType.STRUCTURE_ANALYSIS,
           organizationId: currentUser.organizationId,
           courseId,
           userId: currentUser.id,
           createdAt: new Date().toISOString(),
-          course_id: courseId,
-          organization_id: currentUser.organizationId,
-          user_id: currentUser.id,
-          input: {
-            iteration_round: 2,
-            previous_answers: previousAnswers,
-            course_title: typedCourseDetails.title,
-            course_description: typedCourseDetails.course_description,
-            target_audience: typedCourseDetails.target_audience,
-          },
-          priority,
-          attempt_count: 0,
-          created_at: new Date().toISOString(),
+          locale: 'ru', // Default to Russian, handler will fetch actual locale from DB
+          iterationRound: 2,
+          previousAnswers: previousAnswers.map(a => ({
+            question: a.question,
+            answer: a.answer || '',
+            priority: a.priority,
+            category: a.category || 'general', // Default category if null
+          })),
         };
 
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        const job = await addJob('CLARIFYING_QUESTIONS' as any, jobData as any, { priority });
+        const job = await addJob(JobType.STRUCTURE_ANALYSIS, jobData as StructureAnalysisJobData, {
+          priority,
+        });
         const jobId = job.id as string;
 
         logger.info(

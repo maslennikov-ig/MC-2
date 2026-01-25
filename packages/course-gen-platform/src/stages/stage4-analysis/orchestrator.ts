@@ -325,7 +325,7 @@ export async function runAnalysisOrchestration(job: StructureAnalysisJob): Promi
     // =================================================================
     const clarifyingConfig = await getClarifyingConfig(courseId);
 
-    if (clarifyingConfig.enabled && !clarifyingConfig.skipped) {
+    if (clarifyingConfig.enabled && !clarifyingConfig.skipped && budgetAllocation) {
       orchestrationLogger.info('Clarifying questions enabled - checking status');
 
       const pendingQuestions = await getPendingQuestions(courseId);
@@ -336,7 +336,7 @@ export async function runAnalysisOrchestration(job: StructureAnalysisJob): Promi
 
         await runPhase05Clarifying({
           course_id: courseId,
-          budgetAllocation: budgetAllocation!,
+          budgetAllocation: budgetAllocation,
           courseContext: {
             title: input.topic,
             description: input.course_description,
@@ -433,6 +433,13 @@ export async function runAnalysisOrchestration(job: StructureAnalysisJob): Promi
             })) || null,
           target_audience: input.target_audience,
           lesson_duration_minutes: input.lesson_duration_minutes,
+          // NEW: Pass clarifying answers from Phase 0.5
+          clarifying_answers: clarifyingAnswers.map(q => ({
+            question: q.question_text,
+            answer: q.user_answer || '',
+            priority: q.question_priority,
+            category: q.question_category,
+          })),
         }),
       orchestrationLogger
     );
@@ -497,6 +504,13 @@ export async function runAnalysisOrchestration(job: StructureAnalysisJob): Promi
           size_guidance: input.size_guidance,
           min_lessons: input.min_lessons,
           max_lessons: input.max_lessons,
+          // NEW: Pass clarifying answers from Phase 0.5
+          clarifying_answers: clarifyingAnswers.map(q => ({
+            question: q.question_text,
+            answer: q.user_answer || '',
+            priority: q.question_priority,
+            category: q.question_category,
+          })),
         }),
       orchestrationLogger
     );
@@ -567,6 +581,13 @@ export async function runAnalysisOrchestration(job: StructureAnalysisJob): Promi
           document_summaries: documentSummariesText,
           phase1_output: phase1Output,
           phase2_output: phase2Output,
+          // NEW: Pass clarifying answers from Phase 0.5
+          clarifying_answers: clarifyingAnswers.map(q => ({
+            question: q.question_text,
+            answer: q.user_answer || '',
+            priority: q.question_priority,
+            category: q.question_category,
+          })),
         }),
       orchestrationLogger
     );
@@ -612,6 +633,13 @@ export async function runAnalysisOrchestration(job: StructureAnalysisJob): Promi
           phase1_output: phase1Output,
           phase2_output: phase2Output,
           phase3_output: phase3Output,
+          // NEW: Pass clarifying answers from Phase 0.5
+          clarifying_answers: clarifyingAnswers.map(q => ({
+            question: q.question_text,
+            answer: q.user_answer || '',
+            priority: q.question_priority,
+            category: q.question_category,
+          })),
         }),
       orchestrationLogger
     );

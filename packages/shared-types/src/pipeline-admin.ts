@@ -31,6 +31,7 @@ export const phaseNameSchema = z.enum([
   'stage_4_scope',
   'stage_4_expert',
   'stage_4_synthesis',
+  'stage_4_clarifying', // Phase 0.5: Clarifying Questions
   'stage_4_standard_ru',
   'stage_4_standard_en',
   'stage_4_extended_ru',

@@ -48,6 +48,13 @@ export interface Phase1Input {
   target_audience?: 'beginner' | 'intermediate' | 'advanced' | 'mixed';
   /** Lesson duration in minutes */
   lesson_duration_minutes?: number;
+  /** Clarifying answers from Phase 0.5 */
+  clarifying_answers?: Array<{
+    question: string;
+    answer: string;
+    priority: string;
+    category: string | null;
+  }>;
 }
 
 /**
@@ -126,12 +133,21 @@ CATEGORIES (with examples):
       .join('\n\n');
   }
 
+  // Build clarifying context from user answers
+  let clarifyingContext = '';
+  if (input.clarifying_answers && input.clarifying_answers.length > 0) {
+    clarifyingContext = '\n\nUSER CLARIFICATIONS (from Phase 0.5):\n';
+    clarifyingContext += input.clarifying_answers
+      .map((a, i) => `[Q${i + 1}] ${a.question}\n[A${i + 1}] ${a.answer}`)
+      .join('\n\n');
+  }
+
   const humanMessage = new HumanMessage(`COURSE INFORMATION:
 Topic: ${input.topic}
 Target Language: ${outputLanguage} (ALL OUTPUT MUST BE IN ${outputLanguage.toUpperCase()})
 Target Audience: ${input.target_audience || 'mixed'}
 Lesson Duration: ${input.lesson_duration_minutes || 15} minutes
-${documentContext}
+${documentContext}${clarifyingContext}
 
 TASK:
 1. Classify this course into the most appropriate category

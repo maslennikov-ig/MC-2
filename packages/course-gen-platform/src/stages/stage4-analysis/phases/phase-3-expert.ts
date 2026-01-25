@@ -43,6 +43,13 @@ export interface Phase3Input {
   document_summaries?: string[] | null;
   phase1_output: Phase1Output;
   phase2_output: Phase2Output;
+  /** Clarifying answers from Phase 0.5 */
+  clarifying_answers?: Array<{
+    question: string;
+    answer: string;
+    priority: string;
+    category: string | null;
+  }>;
 }
 
 interface RawPhase3Output {
@@ -121,6 +128,15 @@ function buildPhase3Prompt(input: Phase3Input): string {
       ? `\n\nDOCUMENT SUMMARIES (${documentCount} documents, truncated for context):\n${document_summaries.map((summary, idx) => `\n[Document ${idx + 1}]\n${truncateSummary(summary, tokensPerDocument)}`).join('\n\n')}`
       : '';
 
+  // Build clarifying context from user answers
+  let clarifyingContext = '';
+  if (input.clarifying_answers && input.clarifying_answers.length > 0) {
+    clarifyingContext = '\n\nUSER CLARIFICATIONS (from Phase 0.5):\n';
+    clarifyingContext += input.clarifying_answers
+      .map((a, i) => `[Q${i + 1}] ${a.question}\n[A${i + 1}] ${a.answer}`)
+      .join('\n\n');
+  }
+
   // Generate Zod schema description for LLM
   const schemaDescription = zodToPromptSchema(Phase3OutputSchema);
 
@@ -146,7 +162,7 @@ SCOPE:
 - Total lessons: ${phase2_output.recommended_structure.total_lessons}
 - Estimated hours: ${phase2_output.recommended_structure.estimated_content_hours}h
 - Lesson duration: ${phase2_output.recommended_structure.lesson_duration_minutes} minutes
-- Total sections: ${phase2_output.recommended_structure.total_sections}${documentContext}
+- Total sections: ${phase2_output.recommended_structure.total_sections}${documentContext}${clarifyingContext}
 
 ===== YOUR TASKS =====
 
