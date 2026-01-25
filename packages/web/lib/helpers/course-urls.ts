@@ -83,12 +83,18 @@ function encodeSlug(slug: string): string {
  * @param orgSlug - Organization slug
  * @param courseSlug - Course slug
  * @returns URL path like /courses/{org}/{course}
+ * @throws Error if slugs are empty or invalid
  *
  * @example
  * buildCourseUrl('acme-corp', 'intro-to-ai')
  * // => '/courses/acme-corp/intro-to-ai'
  */
 export function buildCourseUrl(orgSlug: string, courseSlug: string): string {
+  if (!orgSlug || !courseSlug) {
+    throw new Error(
+      `[buildCourseUrl] Invalid slugs: orgSlug="${orgSlug}", courseSlug="${courseSlug}"`
+    )
+  }
   return `/courses/${encodeSlug(orgSlug)}/${encodeSlug(courseSlug)}`
 }
 
@@ -112,6 +118,11 @@ export function buildCourseGeneratingUrl(
   courseSlug: string,
   workflow?: boolean
 ): string {
+  if (!orgSlug || !courseSlug) {
+    throw new Error(
+      `[buildCourseGeneratingUrl] Invalid slugs: orgSlug="${orgSlug}", courseSlug="${courseSlug}"`
+    )
+  }
   const base = `/courses/${encodeSlug(orgSlug)}/${encodeSlug(courseSlug)}/generating`
   return workflow ? `${base}?workflow=true` : base
 }
@@ -128,6 +139,11 @@ export function buildCourseGeneratingUrl(
  * // => '/courses/acme-corp/intro-to-ai/lessons'
  */
 export function buildCourseLessonsUrl(orgSlug: string, courseSlug: string): string {
+  if (!orgSlug || !courseSlug) {
+    throw new Error(
+      `[buildCourseLessonsUrl] Invalid slugs: orgSlug="${orgSlug}", courseSlug="${courseSlug}"`
+    )
+  }
   return `/courses/${encodeSlug(orgSlug)}/${encodeSlug(courseSlug)}/lessons`
 }
 
@@ -143,6 +159,11 @@ export function buildCourseLessonsUrl(orgSlug: string, courseSlug: string): stri
  * // => '/courses/acme-corp/intro-to-ai/visuals'
  */
 export function buildCourseVisualsUrl(orgSlug: string, courseSlug: string): string {
+  if (!orgSlug || !courseSlug) {
+    throw new Error(
+      `[buildCourseVisualsUrl] Invalid slugs: orgSlug="${orgSlug}", courseSlug="${courseSlug}"`
+    )
+  }
   return `/courses/${encodeSlug(orgSlug)}/${encodeSlug(courseSlug)}/visuals`
 }
 
@@ -169,6 +190,11 @@ export function buildCourseVisualsUrl(orgSlug: string, courseSlug: string): stri
  * // => '/api/courses/acme-corp/intro-to-ai/progress'
  */
 export function buildCourseApiUrl(orgSlug: string, courseSlug: string, action?: string): string {
+  if (!orgSlug || !courseSlug) {
+    throw new Error(
+      `[buildCourseApiUrl] Invalid slugs: orgSlug="${orgSlug}", courseSlug="${courseSlug}"`
+    )
+  }
   const base = `/api/courses/${encodeSlug(orgSlug)}/${encodeSlug(courseSlug)}`
   return action ? `${base}/${encodeURIComponent(action)}` : base
 }
@@ -185,6 +211,11 @@ export function buildCourseApiUrl(orgSlug: string, courseSlug: string, action?: 
  * // => '/api/og/course/acme-corp/intro-to-ai'
  */
 export function buildCourseOgImageUrl(orgSlug: string, courseSlug: string): string {
+  if (!orgSlug || !courseSlug) {
+    throw new Error(
+      `[buildCourseOgImageUrl] Invalid slugs: orgSlug="${orgSlug}", courseSlug="${courseSlug}"`
+    )
+  }
   return `/api/og/course/${encodeSlug(orgSlug)}/${encodeSlug(courseSlug)}`
 }
 

@@ -29,6 +29,11 @@ export default function CourseViewerEnhanced({
   initialLessonLabel,
   orgSlug,
 }: CourseViewerProps) {
+  // Runtime validation: orgSlug is required (no fallback to old URL format)
+  if (!orgSlug) {
+    console.error('[CourseViewerEnhanced] orgSlug is required but missing')
+    throw new Error('Organization slug is required for course viewer')
+  }
   const {
     sections,
     lessons,
