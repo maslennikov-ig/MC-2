@@ -26,7 +26,7 @@ const StageNode = (props: NodeProps<RFStageNode>) => {
   const statusEntry = useNodeStatus(id);
   const { t } = useTranslation();
   const params = useParams();
-  const courseSlug = params?.slug as string | undefined;
+  const courseSlug = params?.courseSlug as string | undefined;
   const [showRestartDialog, setShowRestartDialog] = useState(false);
   const updateNodeInternals = useUpdateNodeInternals();
 

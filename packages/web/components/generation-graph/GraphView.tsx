@@ -245,7 +245,7 @@ function GraphViewInner({
 
   // Get courseSlug from URL params for navigation
   const params = useParams()
-  const courseSlug = params?.slug as string | undefined
+  const courseSlug = params?.courseSlug as string | undefined
 
   // Sync locale for step name translations
   const locale = useLocale()
