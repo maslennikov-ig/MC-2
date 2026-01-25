@@ -414,7 +414,8 @@ export function CourseCard({
                 </div>
                 <div className="flex items-center gap-1">
                   <ShareButton
-                    slug={courseSlug}
+                    orgSlug={course.orgSlug}
+                    courseSlug={courseSlug}
                     shareToken={course.share_token}
                     isOwner={user?.id === course.user_id}
                     isAdmin={user?.role === 'admin' || user?.role === 'superadmin'}
@@ -786,7 +787,8 @@ export function CourseCard({
                 />
 
                 <ShareButton
-                  slug={courseSlug}
+                  orgSlug={course.orgSlug}
+                  courseSlug={courseSlug}
                   shareToken={course.share_token}
                   isOwner={user?.id === course.user_id}
                   isAdmin={user?.role === 'admin' || user?.role === 'superadmin'}
