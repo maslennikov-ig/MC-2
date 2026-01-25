@@ -27,6 +27,7 @@ export default function CourseViewerEnhanced({
   lessonContents,
   readOnly = false,
   initialLessonLabel,
+  orgSlug,
 }: CourseViewerProps) {
   const {
     sections,
@@ -188,6 +189,8 @@ export default function CourseViewerEnhanced({
           completedCount={completedCount}
           totalLessons={totalLessons}
           remainingMinutes={remainingMinutes}
+          orgSlug={orgSlug}
+          readOnly={readOnly}
           onToggleSidebar={setSidebarOpen}
           onToggleMobileSidebar={setMobileSidebarOpen}
           onToggleSection={toggleSection}
@@ -211,6 +214,7 @@ export default function CourseViewerEnhanced({
             currentSection={currentSection}
             currentLesson={currentLesson}
             focusMode={focusMode}
+            orgSlug={orgSlug}
           />
           <Toolbar
             currentSection={currentSection}
@@ -225,6 +229,7 @@ export default function CourseViewerEnhanced({
             hasPrev={!!prevLesson}
             hasNext={!!nextLesson}
             readOnly={readOnly}
+            orgSlug={orgSlug}
             onToggleSidebar={() => setSidebarOpen(true)}
             onToggleMobileSidebar={() => setMobileSidebarOpen(true)}
             onToggleFocusMode={() => setFocusMode(!focusMode)}

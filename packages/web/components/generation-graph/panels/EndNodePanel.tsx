@@ -16,6 +16,7 @@ import { Link } from '@/src/i18n/navigation'
 import { useTranslation } from '@/lib/generation-graph/useTranslation'
 import { getModuleWord, getLessonWord } from '@/lib/generation-graph/utils/pluralization'
 import { cn } from '@/lib/utils'
+import { buildCourseUrl } from '@/lib/helpers/course-urls'
 
 /**
  * Props for the EndNodePanel component.
@@ -23,6 +24,8 @@ import { cn } from '@/lib/utils'
 interface EndNodePanelProps {
   /** Course URL slug for navigation (optional, shows fallback if missing) */
   courseSlug?: string
+  /** Organization URL slug for navigation (required together with courseSlug) */
+  orgSlug?: string
   /** Display title of the course */
   courseTitle: string
   /** Total number of modules in the course */
@@ -58,6 +61,7 @@ interface EndNodePanelProps {
  */
 export function EndNodePanel({
   courseSlug,
+  orgSlug,
   courseTitle,
   moduleCount,
   lessonCount,
@@ -207,13 +211,13 @@ export function EndNodePanel({
       {/* CTA Button */}
       {isCompleted && (
         <div className="mt-auto">
-          {courseSlug ? (
+          {courseSlug && orgSlug ? (
             <Button
               asChild
               className="w-full bg-emerald-500 text-white hover:bg-emerald-600 dark:bg-emerald-600 dark:hover:bg-emerald-500"
               size="lg"
             >
-              <Link href={`/courses/${courseSlug}`} target="_blank" rel="noopener noreferrer">
+              <Link href={buildCourseUrl(orgSlug, courseSlug)} target="_blank" rel="noopener noreferrer">
                 <span>{t('endNode.viewCourse')}</span>
                 <ExternalLink size={16} className="ml-2" />
               </Link>

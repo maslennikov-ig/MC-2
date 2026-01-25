@@ -29,6 +29,7 @@ import { useThemeSync } from '@/lib/hooks/use-theme-sync'
 import { Link } from '@/src/i18n/navigation'
 import { useTranslation } from '@/lib/generation-graph/useTranslation'
 import { getModuleWord, getLessonWord } from '@/lib/generation-graph/utils/pluralization'
+import { buildCourseUrl } from '@/lib/helpers/course-urls'
 
 const STORAGE_KEY = 'stage6-toolbar-minimized'
 
@@ -42,6 +43,8 @@ interface SelectionToolbarProps {
   isCompleted?: boolean
   /** Course URL slug for navigation to completed course */
   courseSlug?: string
+  /** Organization URL slug for navigation to completed course */
+  orgSlug?: string
   /** Total number of modules (displayed in completion stats) */
   moduleCount?: number
   /** Total number of lessons (displayed in completion stats) */
@@ -81,6 +84,7 @@ export function SelectionToolbar({
   courseId,
   isCompleted = false,
   courseSlug,
+  orgSlug,
   moduleCount = 0,
   lessonCount = 0,
   generationStatus,
@@ -358,13 +362,13 @@ export function SelectionToolbar({
                   {/* Right: CTA Button + Minimize */}
                   <div className="flex shrink-0 items-center gap-2">
                     {/* Open Course Button */}
-                    {courseSlug && (
+                    {courseSlug && orgSlug && (
                       <Button
                         asChild
                         size="compact"
                         className="border-0 bg-emerald-500 text-white shadow-md shadow-emerald-500/25 transition-all hover:bg-emerald-600 dark:bg-emerald-600 dark:hover:bg-emerald-500"
                       >
-                        <Link href={`/courses/${courseSlug}`}>
+                        <Link href={buildCourseUrl(orgSlug, courseSlug)}>
                           <span>{t('selectionToolbar.openCourse')}</span>
                           <ExternalLink size={14} className="ml-1.5" />
                         </Link>

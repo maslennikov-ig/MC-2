@@ -168,6 +168,7 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
   const { isAdmin } = useUserRole();
   const params = useParams();
   const courseSlug = params?.courseSlug as string | undefined;
+  const orgSlug = params?.orgSlug as string | undefined;
   const [selectedAttemptNum, setSelectedAttemptNum] = useState<number | null>(null);
   const [selectedPhaseId, setSelectedPhaseId] = useState<string | null>(null);
   const { refine, isRefining, chatHistory } = useRefinement(courseInfo.id);
@@ -865,6 +866,7 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
             /* End Node - Course Completion Panel */
             <EndNodePanel
               courseSlug={courseSlug}
+              orgSlug={orgSlug}
               courseTitle={courseInfo.title}
               moduleCount={courseInfo.moduleCount}
               lessonCount={courseInfo.lessonCount}

@@ -615,7 +615,9 @@ export async function updateDraftAndStartGeneration(
       .single()
 
     revalidatePath('/courses')
-    revalidatePath(`/courses/${course.slug}`)
+    if (orgData?.slug) {
+      revalidatePath(`/courses/${orgData.slug}/${course.slug}`)
+    }
 
     return {
       id: course.id,

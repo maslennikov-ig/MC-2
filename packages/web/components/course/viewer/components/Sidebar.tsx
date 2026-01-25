@@ -20,6 +20,7 @@ import { Badge } from '@/components/ui/badge'
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import LessonProgressCard from '@/components/common/lesson-progress-card'
 import { Course, Section, Lesson } from '@/types/database'
+import { buildCourseLessonsUrl, buildCourseGeneratingUrl } from '@/lib/helpers/course-urls'
 
 interface SidebarProps {
   course: Course
@@ -34,6 +35,10 @@ interface SidebarProps {
   completedCount: number
   totalLessons: number
   remainingMinutes: number
+  /** Organization slug for URL building */
+  orgSlug?: string
+  /** Read-only mode for shared/public viewing - hides edit features */
+  readOnly?: boolean
   onToggleSidebar: (open: boolean) => void
   onToggleMobileSidebar: (open: boolean) => void
   onToggleSection: (id: string) => void
@@ -53,6 +58,8 @@ export function Sidebar({
   completedCount,
   totalLessons,
   remainingMinutes,
+  orgSlug,
+  readOnly = false,
   onToggleSidebar,
   onToggleMobileSidebar,
   onToggleSection,
@@ -76,26 +83,28 @@ export function Sidebar({
             <span className="text-sm">{isMobile ? 'К каталогу' : 'К каталогу'}</span>
           </Link>
           <div className="flex items-center gap-1">
-            <TooltipProvider>
-              <Tooltip>
-                <TooltipTrigger asChild>
-                  <Button
-                    asChild
-                    variant="ghost"
-                    size="icon"
-                    className="h-8 w-8 text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400"
-                  >
-                    <Link
-                      href={`/courses/generating/${course.slug || course.id}?workflow=true`}
-                      target="_blank"
+            {!readOnly && (
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      asChild
+                      variant="ghost"
+                      size="icon"
+                      className="h-8 w-8 text-gray-500 hover:text-blue-600 dark:text-gray-400 dark:hover:text-blue-400"
                     >
-                      <GitBranch className="h-4 w-4" />
-                    </Link>
-                  </Button>
-                </TooltipTrigger>
-                <TooltipContent>Конструктор курса</TooltipContent>
-              </Tooltip>
-            </TooltipProvider>
+                      <Link
+                        href={orgSlug ? buildCourseGeneratingUrl(orgSlug, course.slug || course.id, true) : `/courses/generating/${course.slug || course.id}?workflow=true`}
+                        target="_blank"
+                      >
+                        <GitBranch className="h-4 w-4" />
+                      </Link>
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>Конструктор курса</TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
+            )}
             {!isMobile && (
               <Button
                 onClick={() => onToggleSidebar(false)}
@@ -142,7 +151,7 @@ export function Sidebar({
 
         {/* All Lessons button */}
         <Link
-          href={`/courses/${course.slug || course.id}/lessons`}
+          href={orgSlug ? buildCourseLessonsUrl(orgSlug, course.slug || course.id) : `/courses/${course.slug || course.id}/lessons`}
           className="hover:to-purple-150/50 group mt-4 flex w-full items-center justify-between rounded-lg border border-purple-200/50 bg-gradient-to-r from-purple-50 to-purple-100/50 px-4 py-3 transition-all hover:from-purple-100 dark:border-purple-700/30 dark:from-purple-900/20 dark:to-purple-800/10 dark:hover:from-purple-900/30 dark:hover:to-purple-800/20"
         >
           <div className="flex items-center gap-3">
