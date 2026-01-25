@@ -115,10 +115,10 @@ export async function approveStage(courseId: string, currentStage: number) {
 export async function pauseGeneration(courseId: string) {
   const supabase = await createClient()
 
-  // Get the course slug for API call
+  // Get the course slug and org slug for API call
   const { data: course, error: fetchError } = await supabase
     .from('courses')
-    .select('slug')
+    .select('slug, organizations!inner(slug)')
     .eq('id', courseId)
     .single()
 
@@ -126,10 +126,17 @@ export async function pauseGeneration(courseId: string) {
     throw new Error('Course not found')
   }
 
+  // Extract org_slug from joined organization
+  const orgData = course.organizations as { slug: string } | null
+  const orgSlug = orgData?.slug
+  if (!orgSlug) {
+    throw new Error('Organization not found for course')
+  }
+
   // Call the API endpoint which uses atomic RPC with FOR UPDATE lock
   // Use absolute URL for server actions (fetch requires absolute URLs in server context)
   const appUrl = ENV.NEXT_PUBLIC_APP_URL
-  const response = await fetch(`${appUrl}/api/courses/${course.slug}/pause`, {
+  const response = await fetch(`${appUrl}/api/courses/${orgSlug}/${course.slug}/pause`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
   })
@@ -150,10 +157,10 @@ export async function pauseGeneration(courseId: string) {
 export async function resumeGeneration(courseId: string) {
   const supabase = await createClient()
 
-  // Get the course slug for API call
+  // Get the course slug and org slug for API call
   const { data: course, error: fetchError } = await supabase
     .from('courses')
-    .select('slug')
+    .select('slug, organizations!inner(slug)')
     .eq('id', courseId)
     .single()
 
@@ -161,10 +168,17 @@ export async function resumeGeneration(courseId: string) {
     throw new Error('Course not found')
   }
 
+  // Extract org_slug from joined organization
+  const orgData = course.organizations as { slug: string } | null
+  const orgSlug = orgData?.slug
+  if (!orgSlug) {
+    throw new Error('Organization not found for course')
+  }
+
   // Call the API endpoint
   // Use absolute URL for server actions (fetch requires absolute URLs in server context)
   const appUrl = ENV.NEXT_PUBLIC_APP_URL
-  const response = await fetch(`${appUrl}/api/courses/${course.slug}/resume`, {
+  const response = await fetch(`${appUrl}/api/courses/${orgSlug}/${course.slug}/resume`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
   })
