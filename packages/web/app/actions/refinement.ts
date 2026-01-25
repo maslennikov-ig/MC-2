@@ -32,6 +32,67 @@ const HTTP_ERROR_MESSAGES: Record<number, string> = {
  * @returns Validated chat response
  * @throws Error with user-friendly message on failure
  */
+/**
+ * Token estimates response for chat intent modes.
+ */
+export interface TokenEstimates {
+  refine: {
+    tokens: number
+    formatted: string
+  }
+  regenerate: {
+    tokens: number
+    formatted: string
+  }
+}
+
+/**
+ * Fetch token estimates for chat intents (refine vs regenerate).
+ * Used to show users estimated token cost before sending.
+ *
+ * @param courseId - Course UUID
+ * @returns Token estimates for both intent modes
+ */
+export async function getChatTokenEstimates(courseId: string): Promise<TokenEstimates | null> {
+  const headers = await getBackendAuthHeaders()
+
+  const response = await fetch(
+    `${TRPC_URL}/generation.getChatTokenEstimates?input=${encodeURIComponent(JSON.stringify({ json: { courseId } }))}`,
+    {
+      method: 'GET',
+      headers,
+    }
+  )
+
+  if (!response.ok) {
+    console.warn('[getChatTokenEstimates] Failed to fetch:', response.status)
+    return null
+  }
+
+  const data = await response.json()
+  const result = data?.result?.data
+
+  if (!result) {
+    return null
+  }
+
+  return result as TokenEstimates
+}
+
+/**
+ * Submit a chat request to the backend.
+ * Connects to trpc.generation.chat endpoint.
+ *
+ * Features:
+ * - Response validation with Zod schema
+ * - Context-aware error messages based on HTTP status
+ * - AbortController support for request cancellation
+ *
+ * @param request - Chat request payload
+ * @param signal - Optional AbortSignal for request cancellation
+ * @returns Validated chat response
+ * @throws Error with user-friendly message on failure
+ */
 export async function sendChatMessage(
   request: ChatRequest,
   signal?: AbortSignal

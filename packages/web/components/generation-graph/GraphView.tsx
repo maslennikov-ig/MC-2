@@ -370,7 +370,7 @@ function GraphViewInner({
   }, [pipelineStatus, getNodes, setCenter])
 
   // Fallback polling when realtime disconnects
-  const polledTraces = useFallbackPolling(courseId, isConnected)
+  const polledTraces = useFallbackPolling(orgSlug, courseSlug, isConnected)
 
   // Use realtime traces when connected, polled traces when not
   const effectiveTraces = isConnected ? traces : polledTraces

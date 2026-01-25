@@ -21,6 +21,7 @@ import { useTranslations } from 'next-intl'
 import { MarkdownRendererClient } from '@/components/markdown/MarkdownRendererClient'
 import { toast } from '@/lib/toast'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+import { sendChatMessage, getChatTokenEstimates, TokenEstimates } from '@/app/actions/refinement'
 
 interface ChatMessage {
   id?: string // Add optional ID for tracking
@@ -35,17 +36,6 @@ interface GlobalCourseChatProps {
   courseTitle?: string
   isGenerating?: boolean
   onRegenerationRequest?: () => void
-}
-
-interface TokenEstimates {
-  refine: {
-    tokens: number
-    formatted: string
-  }
-  regenerate: {
-    tokens: number
-    formatted: string
-  }
 }
 
 // ============================================================================
@@ -136,37 +126,18 @@ export function GlobalCourseChat({
     }
   }, [isOpen])
 
-  // Fetch token estimates on mount
+  // Fetch token estimates on mount using server action
   useEffect(() => {
     if (!courseId) return
 
-    const fetchTokenEstimates = async () => {
-      try {
-        const response = await fetch(
-          `/api/trpc/generation.getChatTokenEstimates?input=${encodeURIComponent(JSON.stringify({ json: { courseId } }))}`,
-          {
-            method: 'GET',
-            headers: { 'Content-Type': 'application/json' },
-          }
-        )
-
-        if (!response.ok) {
-          throw new Error('Failed to fetch token estimates')
-        }
-
-        const data = await response.json()
-        const result = data?.result?.data
-
-        if (result) {
-          setTokenEstimates(result)
-        }
-      } catch (error) {
-        // Silent fail - will use fallback values in UI
-        console.warn('Failed to fetch token estimates:', error)
+    const fetchEstimates = async () => {
+      const result = await getChatTokenEstimates(courseId)
+      if (result) {
+        setTokenEstimates(result)
       }
     }
 
-    void fetchTokenEstimates()
+    void fetchEstimates()
   }, [courseId])
 
   const sendMessage = useCallback(
@@ -188,46 +159,32 @@ export function GlobalCourseChat({
       setMessage('')
 
       try {
-        const response = await fetch('/api/trpc/generation.chat', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            json: {
-              courseId,
-              chatType: 'global',
-              userMessage: messageText,
-              conversationId,
-              intent,
-            },
-          }),
+        // Use server action with proper auth headers
+        const result = await sendChatMessage({
+          courseId,
+          chatType: 'global',
+          userMessage: messageText,
+          conversationId,
+          intent,
         })
 
-        if (!response.ok) {
-          throw new Error('Failed to send message')
+        setConversationId(result.conversationId)
+
+        const assistantMessage: ChatMessage = {
+          id: generateMessageId('msg'),
+          role: 'assistant',
+          content: result.assistantMessage,
+          timestamp: new Date().toISOString(),
+          intent: result.intent,
         }
+        setChatHistory((prev) => [...prev, assistantMessage])
 
-        const data = await response.json()
-        const result = data?.result?.data
-
-        if (result) {
-          setConversationId(result.conversationId)
-
-          const assistantMessage: ChatMessage = {
-            id: generateMessageId('msg'),
-            role: 'assistant',
-            content: result.assistantMessage,
-            timestamp: new Date().toISOString(),
-            intent: result.intent,
-          }
-          setChatHistory((prev) => [...prev, assistantMessage])
-
-          // If regeneration intent detected, trigger callback
-          if (result.intent === 'regenerate' && onRegenerationRequest) {
-            toast.info(t('regenerationTriggered'), {
-              description: t('preparingRegeneration'),
-            })
-            onRegenerationRequest()
-          }
+        // If regeneration intent detected, trigger callback
+        if (result.intent === 'regenerate' && onRegenerationRequest) {
+          toast.info(t('regenerationTriggered'), {
+            description: t('preparingRegeneration'),
+          })
+          onRegenerationRequest()
         }
       } catch {
         toast.error(t('error'), {
@@ -338,11 +295,19 @@ export function GlobalCourseChat({
               className="justify-start"
               disabled={isProcessing}
             >
-              <ToggleGroupItem value="refine" aria-label={t('modes.refineAriaLabel')} className="text-xs">
+              <ToggleGroupItem
+                value="refine"
+                aria-label={t('modes.refineAriaLabel')}
+                className="text-xs"
+              >
                 <Wand2 className="mr-1 h-3 w-3" />
                 {t('modes.refine')} ({tokenEstimates?.refine?.formatted ?? '~2K'})
               </ToggleGroupItem>
-              <ToggleGroupItem value="regenerate" aria-label={t('modes.regenerateAriaLabel')} className="text-xs">
+              <ToggleGroupItem
+                value="regenerate"
+                aria-label={t('modes.regenerateAriaLabel')}
+                className="text-xs"
+              >
                 <RefreshCcw className="mr-1 h-3 w-3" />
                 {t('modes.regenerate')} ({tokenEstimates?.regenerate?.formatted ?? '~20K+'})
               </ToggleGroupItem>
