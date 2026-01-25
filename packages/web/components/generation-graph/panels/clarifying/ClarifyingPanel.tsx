@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect, useRef } from 'react'
+import DOMPurify from 'isomorphic-dompurify'
 import { Card, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
@@ -39,17 +40,18 @@ export function ClarifyingPanel({ courseId, onComplete }: ClarifyingPanelProps) 
   const approveAndProceedMutation = trpc.clarifying.approveAndProceed.useMutation()
 
   // Transform API response to Question format
+  // XSS Protection: Sanitize all user-submitted and AI-generated text
   const questions: Question[] = (questionsData?.questions || []).map((q) => ({
     id: q.id,
-    text: q.question_text,
+    text: DOMPurify.sanitize(q.question_text),
     priority: q.question_priority as QuestionPriority,
     suggestedAnswers: Array.isArray(q.suggested_answers)
       ? q.suggested_answers.map((text) => ({
-          text,
+          text: DOMPurify.sanitize(text),
           rationale: undefined,
         }))
       : [],
-    currentAnswer: q.user_answer || undefined,
+    currentAnswer: q.user_answer ? DOMPurify.sanitize(q.user_answer) : undefined,
     isAnswered: q.status === 'answered',
   }))
 

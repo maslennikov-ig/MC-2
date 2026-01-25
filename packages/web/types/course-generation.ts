@@ -24,6 +24,7 @@ export type CourseStatus =
   | 'stage_3_complete'
   | 'stage_3_awaiting_approval'
   | 'stage_4_init'
+  | 'stage_4_clarifying'
   | 'stage_4_analyzing'
   | 'stage_4_complete'
   | 'stage_4_awaiting_approval'
