@@ -60,7 +60,7 @@ export default function CourseViewerEnhanced({
     remainingMinutes,
     toggleSection,
     markLessonComplete,
-  } = useViewerState(course, rawSections, rawLessons, initialLessonLabel)
+  } = useViewerState(course, orgSlug, rawSections, rawLessons, initialLessonLabel)
 
   // Manage enrichments with refetch capability
   const {

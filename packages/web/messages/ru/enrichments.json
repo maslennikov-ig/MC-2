@@ -319,6 +319,9 @@
     "batchGenerate": "Сгенерировать недостающие",
     "batchProgress": "Генерация {current} из {total}...",
     "batchComplete": "Запущена генерация для {count} обложек",
+    "batchStarted": "Запущена генерация для {count} изображений",
+    "batchGenerating": "Генерация: {completed}/{total}",
+    "batchAllComplete": "Все {count} изображений успешно сгенерированы",
     "allGenerated": "Все обложки уже сгенерированы"
   },
   "generate": "Сгенерировать",
