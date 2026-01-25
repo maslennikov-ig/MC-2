@@ -58,6 +58,8 @@ import { useLessonInspectorData } from '../hooks/useLessonInspectorData';
 import { useEnrichmentInspectorStore } from '../stores/enrichment-inspector-store';
 // End Node completion panel
 import { EndNodePanel } from './EndNodePanel';
+// Stage 4 Clarifying Questions panel
+import { ClarifyingPanel } from './clarifying/ClarifyingPanel';
 
 /**
  * Extract module number from moduleId string (e.g., "module_1" -> 1)
@@ -874,6 +876,16 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
                 realtimeStatus?.status === 'completed' ||
                 generationStatus === 'completed'
               }
+            />
+          ) : generationStatus === 'stage_4_clarifying' && data?.stageNumber === 4 ? (
+            /* Stage 4 Clarifying Questions Panel */
+            <ClarifyingPanel
+              courseId={courseInfo.id}
+              onComplete={() => {
+                // Status will update via realtime subscription
+                // Deselect node to let user see the graph update
+                deselectNode();
+              }}
             />
           ) : realtimeStatus?.status === 'skipped' || data?.status === 'skipped' ? (
             /* Skipped Stage - show informative message */

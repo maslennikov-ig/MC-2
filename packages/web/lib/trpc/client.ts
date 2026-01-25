@@ -10,7 +10,7 @@
 'use client'
 
 import React from 'react'
-import { BACKEND_URL } from '@/lib/auth'
+import { BACKEND_URL } from '@/lib/env-client'
 
 /**
  * React Query-like hook types
