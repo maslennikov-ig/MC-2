@@ -7,6 +7,68 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.28.38] - 2026-01-25
+
+### Added
+
+- **stage4**: Phase 0.5 security and reliability improvements (ec8f8694)
+- **stage4**: implement Phase 0.5 Clarifying Questions (8a67c19b)
+- **chat**: require intent selection before send + Stage 6 inline editing (3372c834)
+
+### Changed
+
+- **hooks**: extract useFieldStatusTracking and useCascadeStageDelete (fac701b0)
+
+### Fixed
+
+- **stage4**: change clarifying fallback to Gemini 3 Flash (4b11db4f)
+- **stage4**: fix clarifying config stage_number and swap models (f314029d)
+- **stage4**: Phase 0.5 final improvements from code review (95da6804)
+- **stage4**: Phase 0.5 backlog improvements (1eddf68f)
+- **stage4**: Phase 0.5 Clarifying Questions - critical fixes Phase 2 (61821678)
+- **stage4**: critical fixes for Phase 0.5 Clarifying Questions (c096b082)
+- **chat**: code review fixes - P1-P3 improvements (76d34f9c)
+- **chat**: code review fixes for cascade and auth (f0c28707)
+- **chat**: resolve 401/404 errors and add cascade stage deletion (e05435fc)
+- **share**: update Share API URL to new [orgSlug]/[courseSlug] format (637409e1)
+- **urls**: fix API routes and add code review report (5d9d149b)
+- **web**: remove fallback to old URLs in viewer components (de783f55)
+- **media**: fix 404 on progress API and add polling for image generation (9e93af69)
+- **urls**: update course URLs to new format /courses/{org}/{course} (17aba1cc)
+- **auth**: add superadmin role and public course access for anon users (573d20c9)
+- **web**: keep hover panel visible when visibility dropdown is open (b920dd2f)
+- **auth**: add role-based authorization for course operations (1ec6fb2a)
+- **web**: fix courseSlug param name in remaining graph components (74db7779)
+- **web**: approval button not showing on Stage 5 (2da9cc9a)
+
+### Other
+
+- update docs (48c152ce)
+- update llm-model-config with actual DB values (051ba5ec)
+- add QA testing guide for 2026-01-25 release (ae75e593)
+- bd sync: 2026-01-25 20:13:03 (fde2db69)
+- bd sync: 2026-01-25 19:38:02 (dc0144d7)
+- bd sync: 2026-01-25 18:21:34 (314851ba)
+- bd sync: 2026-01-25 18:21:19 (14527b40)
+- bd sync: 2026-01-25 17:57:10 (15e344df)
+- bd sync: 2026-01-25 17:55:27 (9718ed71)
+- bd sync: 2026-01-25 17:54:55 (817e239c)
+- bd sync: 2026-01-25 17:39:11 (79389240)
+- bd sync: 2026-01-25 17:29:19 (55a614f3)
+- bd sync: 2026-01-25 17:05:24 (591cb42a)
+- bd sync: 2026-01-25 17:05:11 (ee714ec9)
+- bd sync: 2026-01-25 16:43:32 (a3ef5dcd)
+- bd sync: 2026-01-25 16:43:21 (4066df07)
+- bd sync: 2026-01-25 15:36:29 (bcdee229)
+- bd sync: 2026-01-25 14:54:27 (3d0ac6bc)
+- bd sync: 2026-01-25 14:42:02 (10cbecb6)
+- bd sync: 2026-01-25 14:35:26 (8a230ab3)
+- bd sync: 2026-01-25 14:30:19 (4aca8c43)
+- bd sync: 2026-01-25 11:31:06 (15ce0d17)
+- bd sync: 2026-01-25 11:28:02 (7b95fd51)
+- bd sync: 2026-01-25 09:39:01 (546f0552)
+- bd sync: 2026-01-25 09:38:40 (4191e0c5)
+
 ## [0.28.37] - 2026-01-24
 
 ### Fixed

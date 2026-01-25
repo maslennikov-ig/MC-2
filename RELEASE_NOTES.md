@@ -2,6 +2,46 @@
 
 _Released on 2025-12-26_
 
+## v0.28.38
+
+_Released on 2026-01-25_
+
+### ✨ New Features
+
+- **stage4**: Phase 0.5 security and reliability improvements
+- **stage4**: Implement Phase 0.5 Clarifying Questions
+- **chat**: Require intent selection before send + Stage 6 inline editing
+
+### 🔧 Improvements
+
+- **hooks**: Extract useFieldStatusTracking and useCascadeStageDelete
+
+### 🐛 Bug Fixes
+
+- **stage4**: Change clarifying fallback to Gemini 3 Flash
+- **stage4**: Fix clarifying config stage_number and swap models
+- **stage4**: Phase 0.5 final improvements from code review
+- **stage4**: Phase 0.5 backlog improvements
+- **stage4**: Phase 0.5 Clarifying Questions - critical fixes Phase 2
+- **stage4**: Critical fixes for Phase 0.5 Clarifying Questions
+- **chat**: Code review fixes - P1-P3 improvements
+- **chat**: Code review fixes for cascade and auth
+- **chat**: Resolve 401/404 errors and add cascade stage deletion
+- **share**: Update Share API URL to new [orgSlug]/[courseSlug] format
+- **urls**: Fix API routes and add code review report
+- **web**: Remove fallback to old URLs in viewer components
+- **media**: Fix 404 on progress API and add polling for image generation
+- **urls**: Update course URLs to new format /courses/{org}/{course}
+- **Authentication**: Add superadmin role and public course access for anon users
+- **web**: Keep hover panel visible when visibility dropdown is open
+- **Authentication**: Add role-based authorization for course operations
+- **web**: Fix courseSlug param name in remaining graph components
+- **web**: Approval button not showing on Stage 5
+
+---
+
+_This release was automatically generated from 48 commits._
+
 ## v0.28.37
 
 _Released on 2026-01-24_
