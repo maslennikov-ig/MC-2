@@ -28,6 +28,7 @@ import {
 import { Wand2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useEditHistoryStore } from '@/stores/useEditHistoryStore'
+import { GRAPH_TRANSLATIONS } from '@/lib/generation-graph/translations'
 
 interface EditableFieldProps {
   config: FieldConfig
@@ -116,18 +117,21 @@ export const EditableField: React.FC<EditableFieldProps> = ({
   }, [localValue, type])
 
   const handleChange = async (newValue: unknown) => {
+    // Capture previous value immediately (before any async operations)
+    const capturedPreviousValue = previousValueRef.current
+
+    // Update ref immediately to prevent race condition in rapid successive edits
+    previousValueRef.current = newValue
+
     // Track edit in history (only if courseId and stageId are available)
     if (courseId && stageId && config.path) {
       pushEdit({
         courseId,
         stageId,
         fieldPath: config.path,
-        previousValue: previousValueRef.current,
+        previousValue: capturedPreviousValue,
         newValue,
       })
-
-      // Update previous value ref for next edit
-      previousValueRef.current = newValue
     }
 
     if (isLearningObjective) {
@@ -285,7 +289,7 @@ export const EditableField: React.FC<EditableFieldProps> = ({
         </div>
 
         <div aria-live="polite" aria-atomic="true">
-          <SaveStatusIndicator status={status} />
+          <SaveStatusIndicator status={status} locale={locale} />
         </div>
       </div>
 
@@ -336,7 +340,7 @@ export const EditableField: React.FC<EditableFieldProps> = ({
               className="absolute right-2 bottom-2 text-xs text-slate-400 dark:text-slate-500"
               aria-live="polite"
             >
-              {localValue.length} символов
+              {localValue.length} {GRAPH_TRANSLATIONS.common?.characters?.[locale] ?? 'characters'}
             </div>
           )}
         </div>

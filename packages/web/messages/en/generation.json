@@ -311,7 +311,8 @@
       "refine": "Refine",
       "regenerate": "Regenerate",
       "refineAriaLabel": "Switch to refine mode for small edits",
-      "regenerateAriaLabel": "Switch to regenerate mode for full content recreation"
+      "regenerateAriaLabel": "Switch to regenerate mode for full content recreation",
+      "modeSelectionLabel": "Select chat mode"
     },
     "selectModeRequired": "Select a mode (Refine or Regenerate) before sending",
     "quickActions": {

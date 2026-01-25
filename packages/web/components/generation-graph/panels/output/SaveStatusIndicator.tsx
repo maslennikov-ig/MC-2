@@ -1,50 +1,70 @@
-'use client';
+'use client'
 
-import React from 'react';
-import { Check, Loader2, AlertCircle } from 'lucide-react';
-import { SaveStatus } from '../../hooks/useAutoSave';
-import { cn } from '@/lib/utils';
+import React from 'react'
+import { Check, Loader2, AlertCircle } from 'lucide-react'
+import { SaveStatus } from '../../hooks/useAutoSave'
+import { cn } from '@/lib/utils'
+import { GRAPH_TRANSLATIONS } from '@/lib/generation-graph/translations'
 
 interface SaveStatusIndicatorProps {
-  status: SaveStatus;
-  error?: string | null;
-  className?: string;
+  status: SaveStatus
+  error?: string | null
+  className?: string
+  locale?: 'ru' | 'en'
 }
 
 export const SaveStatusIndicator: React.FC<SaveStatusIndicatorProps> = ({
   status,
   error,
   className,
+  locale = 'ru',
 }) => {
-  if (status === 'idle') return null;
+  const t = GRAPH_TRANSLATIONS.common
+
+  // Use invisible placeholder for idle state to prevent layout shift
+  if (status === 'idle') {
+    return (
+      <div
+        className={cn('flex items-center gap-1.5 text-xs opacity-0', className)}
+        aria-hidden="true"
+      >
+        <Check className="h-3 w-3" />
+        <span>{t?.saved?.[locale] ?? 'Saved'}</span>
+      </div>
+    )
+  }
 
   return (
     <div
-      className={cn(
-        'flex items-center gap-1.5 text-xs transition-opacity duration-200',
-        className
-      )}
+      className={cn('flex items-center gap-1.5 text-xs transition-opacity duration-200', className)}
     >
       {status === 'saving' && (
         <>
           <Loader2 className="h-3 w-3 animate-spin text-blue-500 dark:text-blue-400" />
-          <span className="text-slate-500 dark:text-slate-400">Сохранение...</span>
+          <span className="text-slate-500 dark:text-slate-400">
+            {t?.saving?.[locale] ?? 'Saving...'}
+          </span>
         </>
       )}
       {status === 'saved' && (
         <>
           <Check className="h-3 w-3 text-green-500 dark:text-green-400" />
-          <span className="text-green-600 dark:text-green-400">Сохранено</span>
+          <span className="text-green-600 dark:text-green-400">
+            {t?.saved?.[locale] ?? 'Saved'}
+          </span>
         </>
       )}
       {status === 'error' && (
         <>
           <AlertCircle className="h-3 w-3 text-red-500 dark:text-red-400" />
-          <span className="text-red-600 dark:text-red-400" title={error || 'Ошибка сохранения'}>
-            Ошибка
+          <span
+            className="text-red-600 dark:text-red-400"
+            title={error || t?.saveErrorTooltip?.[locale] || 'Save error'}
+          >
+            {t?.saveError?.[locale] ?? 'Error'}
           </span>
         </>
       )}
     </div>
-  );
-};
+  )
+}

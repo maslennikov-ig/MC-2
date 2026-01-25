@@ -129,6 +129,19 @@ export const RefinementChat: React.FC<RefinementChatProps> = ({
   const handleQuickAction = (actionText: string, intent: ChatIntent) => {
     setSelectedIntent(intent)
     setMessage(actionText)
+
+    // Send immediately (consistent with GlobalCourseChat behavior)
+    // Add to pending for optimistic update
+    setPendingMessages((prev) => [
+      ...prev,
+      {
+        role: 'user',
+        content: actionText,
+        timestamp: new Date().toISOString(),
+        pending: true,
+      },
+    ])
+    onRefine(actionText, intent)
   }
 
   return (
@@ -206,7 +219,12 @@ export const RefinementChat: React.FC<RefinementChatProps> = ({
               <ToggleGroup
                 type="single"
                 value={selectedIntent ?? ''}
-                onValueChange={(value) => value && setSelectedIntent(value as ChatIntent)}
+                onValueChange={(value) => {
+                  if (value === 'refine' || value === 'regenerate') {
+                    setSelectedIntent(value)
+                  }
+                }}
+                aria-label={t('refinementChat.modes.modeSelectionLabel')}
                 className="justify-start"
                 disabled={isProcessing}
               >
