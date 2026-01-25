@@ -533,7 +533,11 @@ export async function deleteDownstreamStagesAction(courseId: string, fromStage: 
     await extractApiError(response, 'Failed to delete downstream stages')
   }
 
+  // Revalidate all course-related paths after cascade delete
   revalidatePath('/courses/[orgSlug]/[courseSlug]/generating', 'page')
+  revalidatePath('/courses/[orgSlug]/[courseSlug]', 'layout') // Also revalidates nested pages
+  revalidatePath('/admin/generation/[courseId]', 'page')
+
   const data = await response.json()
   return data?.result?.data || data
 }

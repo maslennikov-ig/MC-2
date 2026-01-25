@@ -28,7 +28,7 @@ const deleteDownstreamStagesInputSchema = z.object({
 export const fieldUpdateRouter = {
   updateField: instructorProcedure
     .input(updateFieldInputSchema)
-    .mutation(async ({ ctx, input }: { ctx: any; input: any }) => {
+    .mutation(async ({ ctx, input }) => {
       const { courseId, stageId, fieldPath, value } = input;
       const supabase = getSupabaseAdmin();
       const requestId = nanoid();

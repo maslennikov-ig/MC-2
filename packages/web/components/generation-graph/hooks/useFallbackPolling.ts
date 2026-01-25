@@ -46,10 +46,12 @@ export function useFallbackPolling(
         }
       } catch (err) {
         // Log polling errors for debugging - these are expected during network issues
-        console.debug(
-          '[useFallbackPolling] Polling failed:',
-          err instanceof Error ? err.message : 'Unknown error'
-        )
+        if (process.env.NODE_ENV === 'development') {
+          console.debug(
+            '[useFallbackPolling] Polling failed:',
+            err instanceof Error ? err.message : 'Unknown error'
+          )
+        }
       }
     }
 
