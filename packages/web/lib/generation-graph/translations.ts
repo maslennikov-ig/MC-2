@@ -30,6 +30,13 @@ export const GRAPH_TRANSLATIONS: GraphTranslations & {
     lessonWord: { ru: 'урок', en: 'lesson' },
     lessonsWord: { ru: 'урока', en: 'lessons' },
     lessonsManyWord: { ru: 'уроков', en: 'lessons' },
+    // SaveStatusIndicator
+    saving: { ru: 'Сохранение...', en: 'Saving...' },
+    saved: { ru: 'Сохранено', en: 'Saved' },
+    saveError: { ru: 'Ошибка', en: 'Error' },
+    saveErrorTooltip: { ru: 'Ошибка сохранения', en: 'Save error' },
+    // EditableField
+    characters: { ru: 'символов', en: 'characters' },
   },
   stages: {
     stage_1: { ru: 'Инициализация курса', en: 'Course Initialization' },
@@ -166,6 +173,10 @@ export const GRAPH_TRANSLATIONS: GraphTranslations & {
       selectModeRequired: {
         ru: 'Выберите режим (Уточнить или Перегенерировать) перед отправкой',
         en: 'Select a mode (Refine or Regenerate) before sending',
+      },
+      modeSelectionLabel: {
+        ru: 'Выберите режим чата',
+        en: 'Select chat mode',
       },
     },
   },

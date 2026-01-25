@@ -38,6 +38,7 @@ interface LessonContentViewProps {
   courseId?: string
   editable?: boolean
   readOnly?: boolean
+  stageId?: 'stage_4' | 'stage_5' | 'stage_6'
 }
 
 const translations = {
@@ -100,6 +101,7 @@ export function LessonContentView({
   courseId,
   editable = false,
   readOnly = false,
+  stageId = 'stage_6',
 }: LessonContentViewProps) {
   const t = translations[locale]
   const [showFullContent, setShowFullContent] = useState(false)
@@ -107,10 +109,15 @@ export function LessonContentView({
 
   // Initialize useAutoSave for lesson content updates
   const { status, save } = useAutoSave(
-    async (input: { courseId: string; stageId: 'stage_6'; fieldPath: string; value: unknown }) => {
+    async (input: {
+      courseId: string
+      stageId: 'stage_4' | 'stage_5' | 'stage_6'
+      fieldPath: string
+      value: unknown
+    }) => {
       return await updateFieldAction(input.courseId, input.stageId, input.fieldPath, input.value)
     },
-    { courseId: courseId || '', stageId: 'stage_6' as const },
+    { courseId: courseId || '', stageId },
     { debounceMs: 1000 }
   )
 
@@ -275,7 +282,7 @@ export function LessonContentView({
               onChange={handleContentChange}
               status={status}
               courseId={courseId}
-              stageId="stage_6"
+              stageId={stageId}
               locale={locale}
               regeneratable={true}
             />

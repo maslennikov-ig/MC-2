@@ -643,6 +643,7 @@ export interface GraphTranslations {
       refineAriaLabel: { ru: string; en: string };
       regenerateAriaLabel: { ru: string; en: string };
       selectModeRequired?: { ru: string; en: string };
+      modeSelectionLabel?: { ru: string; en: string };
     };
   };
   errors: {

@@ -333,11 +333,14 @@ export function GlobalCourseChat({
             <ToggleGroup
               type="single"
               value={selectedIntent ?? ''}
-              onValueChange={(value) =>
-                value && setSelectedIntent(value as 'refine' | 'regenerate')
-              }
+              onValueChange={(value) => {
+                if (value === 'refine' || value === 'regenerate') {
+                  setSelectedIntent(value)
+                }
+              }}
               className="justify-start"
               disabled={isProcessing}
+              aria-label={t('modes.modeSelectionLabel')}
             >
               <ToggleGroupItem
                 value="refine"
