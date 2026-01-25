@@ -255,12 +255,12 @@ export async function getStageResults(courseId: string, stage: number) {
 }
 
 /**
- * Update a field in stage results (stage 4 or stage 5)
+ * Update a field in stage results (stage 4, stage 5, or stage 6)
  * Used by EditableField and EditableChips components for inline editing
  */
 export async function updateFieldAction(
   courseId: string,
-  stageId: 'stage_4' | 'stage_5',
+  stageId: 'stage_4' | 'stage_5' | 'stage_6',
   fieldPath: string,
   value: unknown
 ) {
@@ -322,7 +322,7 @@ export async function addElementAction(
  */
 export async function regenerateBlockAction(
   courseId: string,
-  stageId: 'stage_4' | 'stage_5',
+  stageId: 'stage_4' | 'stage_5' | 'stage_6',
   blockPath: string,
   userInstruction: string
 ) {

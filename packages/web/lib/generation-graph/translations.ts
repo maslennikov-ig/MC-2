@@ -159,7 +159,14 @@ export const GRAPH_TRANSLATIONS: GraphTranslations & {
       refine: { ru: 'Уточнить', en: 'Refine' },
       regenerate: { ru: 'Перегенерировать', en: 'Regenerate' },
       refineAriaLabel: { ru: 'Переключить в режим уточнения', en: 'Switch to refine mode' },
-      regenerateAriaLabel: { ru: 'Переключить в режим перегенерации', en: 'Switch to regenerate mode' },
+      regenerateAriaLabel: {
+        ru: 'Переключить в режим перегенерации',
+        en: 'Switch to regenerate mode',
+      },
+      selectModeRequired: {
+        ru: 'Выберите режим (Уточнить или Перегенерировать) перед отправкой',
+        en: 'Select a mode (Refine or Regenerate) before sending',
+      },
     },
   },
   errors: {

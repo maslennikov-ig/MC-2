@@ -1,5 +1,5 @@
-import { create } from 'zustand';
-import { immer } from 'zustand/middleware/immer';
+import { create } from 'zustand'
+import { immer } from 'zustand/middleware/immer'
 
 // ============================================================================
 // TYPES
@@ -7,19 +7,19 @@ import { immer } from 'zustand/middleware/immer';
 
 export interface EditHistoryEntry {
   /** Unique edit ID */
-  id: string;
+  id: string
   /** Timestamp when edit was created */
-  timestamp: number;
-  /** Stage ID (stage_4 = Analysis Result, stage_5 = Course Structure) */
-  stageId: 'stage_4' | 'stage_5';
+  timestamp: number
+  /** Stage ID (stage_4 = Analysis Result, stage_5 = Course Structure, stage_6 = Lesson Content) */
+  stageId: 'stage_4' | 'stage_5' | 'stage_6'
   /** Course ID */
-  courseId: string;
+  courseId: string
   /** Field path (e.g., "sections[0].lessons[1].lesson_title") */
-  fieldPath: string;
+  fieldPath: string
   /** Previous value before the change */
-  previousValue: unknown;
+  previousValue: unknown
   /** New value after the change */
-  newValue: unknown;
+  newValue: unknown
 }
 
 // ============================================================================
@@ -28,29 +28,29 @@ export interface EditHistoryEntry {
 
 interface EditHistoryState {
   /** Stack of past edits (for undo) */
-  past: EditHistoryEntry[];
+  past: EditHistoryEntry[]
   /** Stack of future edits (for redo) */
-  future: EditHistoryEntry[];
+  future: EditHistoryEntry[]
 
   // ========== ACTIONS ==========
 
   /** Add new edit to history */
-  pushEdit: (entry: Omit<EditHistoryEntry, 'id' | 'timestamp'>) => void;
+  pushEdit: (entry: Omit<EditHistoryEntry, 'id' | 'timestamp'>) => void
 
   /** Revert last edit, returns the reverted entry for UI update */
-  undo: () => EditHistoryEntry | null;
+  undo: () => EditHistoryEntry | null
 
   /** Re-apply last undone edit, returns the re-applied entry */
-  redo: () => EditHistoryEntry | null;
+  redo: () => EditHistoryEntry | null
 
   /** Check if undo is available */
-  canUndo: () => boolean;
+  canUndo: () => boolean
 
   /** Check if redo is available */
-  canRedo: () => boolean;
+  canRedo: () => boolean
 
   /** Clear history (optionally filtered by courseId) */
-  clearHistory: (courseId?: string) => void;
+  clearHistory: (courseId?: string) => void
 }
 
 // ============================================================================
@@ -58,7 +58,7 @@ interface EditHistoryState {
 // ============================================================================
 
 /** Maximum number of history entries per course to prevent memory issues */
-const MAX_HISTORY_ENTRIES = 50;
+const MAX_HISTORY_ENTRIES = 50
 
 // ============================================================================
 // STORE IMPLEMENTATION
@@ -77,52 +77,52 @@ export const useEditHistoryStore = create<EditHistoryState>()(
           ...entry,
           id: crypto.randomUUID(),
           timestamp: Date.now(),
-        };
+        }
 
         // Add to past stack
-        state.past.push(fullEntry);
+        state.past.push(fullEntry)
 
         // Clear redo stack on new edit (standard undo/redo behavior)
-        state.future = [];
+        state.future = []
 
         // Limit history size per course
-        const courseEntries = state.past.filter(e => e.courseId === entry.courseId);
+        const courseEntries = state.past.filter((e) => e.courseId === entry.courseId)
         if (courseEntries.length > MAX_HISTORY_ENTRIES) {
           // Remove oldest entry for this course
-          const oldestIndex = state.past.findIndex(e => e.courseId === entry.courseId);
+          const oldestIndex = state.past.findIndex((e) => e.courseId === entry.courseId)
           if (oldestIndex >= 0) {
-            state.past.splice(oldestIndex, 1);
+            state.past.splice(oldestIndex, 1)
           }
         }
-      });
+      })
     },
 
     undo: () => {
-      let undoneEntry: EditHistoryEntry | null = null;
+      let undoneEntry: EditHistoryEntry | null = null
 
       set((state) => {
-        if (state.past.length === 0) return;
+        if (state.past.length === 0) return
 
         // Pop from past and push to future
-        undoneEntry = state.past.pop()!;
-        state.future.push(undoneEntry);
-      });
+        undoneEntry = state.past.pop()!
+        state.future.push(undoneEntry)
+      })
 
-      return undoneEntry;
+      return undoneEntry
     },
 
     redo: () => {
-      let redoneEntry: EditHistoryEntry | null = null;
+      let redoneEntry: EditHistoryEntry | null = null
 
       set((state) => {
-        if (state.future.length === 0) return;
+        if (state.future.length === 0) return
 
         // Pop from future and push to past
-        redoneEntry = state.future.pop()!;
-        state.past.push(redoneEntry);
-      });
+        redoneEntry = state.future.pop()!
+        state.past.push(redoneEntry)
+      })
 
-      return redoneEntry;
+      return redoneEntry
     },
 
     canUndo: () => get().past.length > 0,
@@ -133,14 +133,14 @@ export const useEditHistoryStore = create<EditHistoryState>()(
       set((state) => {
         if (courseId) {
           // Clear only entries for specific course
-          state.past = state.past.filter(e => e.courseId !== courseId);
-          state.future = state.future.filter(e => e.courseId !== courseId);
+          state.past = state.past.filter((e) => e.courseId !== courseId)
+          state.future = state.future.filter((e) => e.courseId !== courseId)
         } else {
           // Clear all history
-          state.past = [];
-          state.future = [];
+          state.past = []
+          state.future = []
         }
-      });
+      })
     },
   }))
-);
+)
