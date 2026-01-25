@@ -191,6 +191,7 @@ export function CourseCard({
   const [isUpdatingFavorite, setIsUpdatingFavorite] = useState(false)
   const [visibility, setVisibility] = useState<CourseVisibility>(course.visibility || 'private')
   const [isUpdatingVisibility, setIsUpdatingVisibility] = useState(false)
+  const [isVisibilityDropdownOpen, setIsVisibilityDropdownOpen] = useState(false)
   // Track which URLs have been loaded to avoid flickering on re-renders
   const [loadedUrls, setLoadedUrls] = useState<Set<string>>(new Set())
   const [errorUrls, setErrorUrls] = useState<Set<string>>(new Set())
@@ -630,7 +631,7 @@ export function CourseCard({
 
         {/* Hover Reveal Panel */}
         <AnimatePresence>
-          {isHovered && (
+          {(isHovered || isVisibilityDropdownOpen) && (
             <motion.div
               initial={{ y: '100%' }}
               animate={{ y: 0 }}
@@ -796,7 +797,7 @@ export function CourseCard({
                   (user.id === course.user_id ||
                     user.role === 'admin' ||
                     user.role === 'superadmin') && (
-                    <DropdownMenu>
+                    <DropdownMenu onOpenChange={setIsVisibilityDropdownOpen}>
                       <DropdownMenuTrigger asChild>
                         <Button
                           variant="ghost"
