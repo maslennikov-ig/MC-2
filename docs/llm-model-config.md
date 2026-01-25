@@ -31,27 +31,35 @@
 
 ## Stage 4: Analysis
 
-| Phase                  | Tier     | Primary Model             | Fallback Model                | Temp | Tokens |
-| ---------------------- | -------- | ------------------------- | ----------------------------- | ---- | ------ |
-| stage_4_classification | standard | xiaomi/mimo-v2-flash:free | google/gemini-2.5-flash       | 0.70 | 4096   |
-| stage_4_classification | extended | google/gemini-2.5-flash   | xiaomi/mimo-v2-flash:free     | 0.70 | 4096   |
-| stage_4_scope          | standard | xiaomi/mimo-v2-flash:free | google/gemini-2.5-flash       | 0.70 | 4096   |
-| stage_4_scope          | extended | google/gemini-2.5-flash   | xiaomi/mimo-v2-flash:free     | 0.70 | 4096   |
-| stage_4_expert         | standard | moonshotai/kimi-k2-0905   | google/gemini-3-flash-preview | 0.50 | 8000   |
-| stage_4_expert         | extended | google/gemini-2.5-flash   | xiaomi/mimo-v2-flash:free     | 0.50 | 8000   |
-| stage_4_synthesis      | standard | moonshotai/kimi-k2-0905   | google/gemini-3-flash-preview | 0.70 | 6000   |
-| stage_4_synthesis      | extended | google/gemini-2.5-flash   | xiaomi/mimo-v2-flash:free     | 0.70 | 6000   |
+| Phase                  | Tier     | Primary Model                        | Fallback Model                | Temp | Tokens |
+| ---------------------- | -------- | ------------------------------------ | ----------------------------- | ---- | ------ |
+| stage_4_clarifying     | -        | google/gemini-2.0-flash-thinking-exp | moonshotai/kimi-k2-0905       | 0.50 | 4000   |
+| stage_4_classification | standard | xiaomi/mimo-v2-flash:free            | google/gemini-2.5-flash       | 0.70 | 4096   |
+| stage_4_classification | extended | google/gemini-2.5-flash              | xiaomi/mimo-v2-flash:free     | 0.70 | 4096   |
+| stage_4_scope          | standard | xiaomi/mimo-v2-flash:free            | google/gemini-2.5-flash       | 0.70 | 4096   |
+| stage_4_scope          | extended | google/gemini-2.5-flash              | xiaomi/mimo-v2-flash:free     | 0.70 | 4096   |
+| stage_4_expert         | standard | moonshotai/kimi-k2-0905              | google/gemini-3-flash-preview | 0.50 | 8000   |
+| stage_4_expert         | extended | google/gemini-2.5-flash              | xiaomi/mimo-v2-flash:free     | 0.50 | 8000   |
+| stage_4_synthesis      | standard | moonshotai/kimi-k2-0905              | google/gemini-3-flash-preview | 0.70 | 6000   |
+| stage_4_synthesis      | extended | google/gemini-2.5-flash              | xiaomi/mimo-v2-flash:free     | 0.70 | 6000   |
 
 ---
 
 ## Stage 5: Structure Generation
 
-| Phase            | Tier     | Primary Model             | Fallback Model                | Temp | Tokens |
-| ---------------- | -------- | ------------------------- | ----------------------------- | ---- | ------ |
-| stage_5_metadata | standard | moonshotai/kimi-k2-0905   | google/gemini-3-flash-preview | 0.70 | 4096   |
-| stage_5_metadata | extended | google/gemini-2.5-flash   | xiaomi/mimo-v2-flash:free     | 0.70 | 4096   |
-| stage_5_sections | standard | xiaomi/mimo-v2-flash:free | google/gemini-2.5-flash       | 0.70 | 8000   |
-| stage_5_sections | extended | google/gemini-2.5-flash   | xiaomi/mimo-v2-flash:free     | 0.70 | 8000   |
+| Phase              | Tier       | Primary Model             | Fallback Model                | Temp | Tokens |
+| ------------------ | ---------- | ------------------------- | ----------------------------- | ---- | ------ |
+| stage_5_metadata   | standard   | moonshotai/kimi-k2-0905   | google/gemini-3-flash-preview | 0.70 | 4096   |
+| stage_5_metadata   | extended   | google/gemini-2.5-flash   | xiaomi/mimo-v2-flash:free     | 0.70 | 4096   |
+| stage_5_sections   | standard   | xiaomi/mimo-v2-flash:free | google/gemini-2.5-flash       | 0.70 | 8000   |
+| stage_5_sections   | extended   | google/gemini-2.5-flash   | xiaomi/mimo-v2-flash:free     | 0.70 | 8000   |
+| stage_5_tier1      | primary    | google/gemini-2.5-flash   | openai/gpt-oss-120b           | 0.70 | 30000  |
+| stage_5_tier1      | secondary  | openai/gpt-oss-120b       | moonshotai/kimi-k2-0905       | 0.70 | 30000  |
+| stage_5_escalation | primary    | deepseek/deepseek-v3.2    | moonshotai/kimi-k2-0905       | 0.70 | 30000  |
+| stage_5_escalation | secondary  | qwen/qwen3-235b-a22b-2507 | moonshotai/kimi-k2-0905       | 0.70 | 30000  |
+| stage_5_escalation | fallback-1 | google/gemini-2.5-flash   | deepseek/deepseek-v3.2        | 0.70 | 30000  |
+| stage_5_escalation | fallback-2 | google/gemini-2.5-flash   | qwen/qwen3-235b-a22b-2507     | 0.70 | 30000  |
+| stage_5_escalation | fallback-3 | moonshotai/kimi-k2-0905   | google/gemini-2.5-flash       | 0.70 | 30000  |
 
 ---
 
@@ -78,17 +86,17 @@
 
 Система голосования из 3 судей для оценки качества сгенерированного контента.
 
-| Language | Role       | Primary Model                   | Fallback Model      | Weight |
-| -------- | ---------- | ------------------------------- | ------------------- | ------ |
-| **ru**   | primary    | deepseek/deepseek-v3.1-terminus | openai/gpt-oss-120b | 0.74   |
-| ru       | secondary  | moonshotai/kimi-k2-0905         | openai/gpt-oss-120b | 0.73   |
-| ru       | tiebreaker | minimax/minimax-m2.1            | openai/gpt-oss-120b | 0.72   |
-| **en**   | primary    | qwen/qwen3-235b-a22b-2507       | openai/gpt-oss-120b | 0.75   |
-| en       | secondary  | moonshotai/kimi-k2-0905         | openai/gpt-oss-120b | 0.73   |
-| en       | tiebreaker | minimax/minimax-m2.1            | openai/gpt-oss-120b | 0.72   |
-| **any**  | primary    | qwen/qwen3-235b-a22b-2507       | openai/gpt-oss-120b | 0.75   |
-| any      | secondary  | moonshotai/kimi-k2-0905         | openai/gpt-oss-120b | 0.73   |
-| any      | tiebreaker | minimax/minimax-m2.1            | openai/gpt-oss-120b | 0.72   |
+| Language | Role       | Primary Model             | Fallback Model      | Weight |
+| -------- | ---------- | ------------------------- | ------------------- | ------ |
+| **ru**   | primary    | deepseek/deepseek-v3.2    | openai/gpt-oss-120b | 0.74   |
+| ru       | secondary  | moonshotai/kimi-k2-0905   | openai/gpt-oss-120b | 0.73   |
+| ru       | tiebreaker | minimax/minimax-m2.1      | openai/gpt-oss-120b | 0.72   |
+| **en**   | primary    | qwen/qwen3-235b-a22b-2507 | openai/gpt-oss-120b | 0.75   |
+| en       | secondary  | moonshotai/kimi-k2-0905   | openai/gpt-oss-120b | 0.73   |
+| en       | tiebreaker | minimax/minimax-m2.1      | openai/gpt-oss-120b | 0.72   |
+| **any**  | primary    | qwen/qwen3-235b-a22b-2507 | openai/gpt-oss-120b | 0.75   |
+| any      | secondary  | moonshotai/kimi-k2-0905   | openai/gpt-oss-120b | 0.73   |
+| any      | tiebreaker | minimax/minimax-m2.1      | openai/gpt-oss-120b | 0.72   |
 
 ---
 
@@ -98,10 +106,20 @@
 | -------------------- | ----------------------------- | ------------------------- | ------ | --------------------- |
 | stage_7_cover        | google/gemini-2.5-flash-image | xiaomi/mimo-v2-flash:free | 1024   | Обложки уроков (16:9) |
 | stage_7_card         | openai/gpt-5-image-mini       | xiaomi/mimo-v2-flash:free | 1024   | Карточки (1:1)        |
-| stage_7_video        | xiaomi/mimo-v2-flash:free     | openai/gpt-4o-mini        | 8000   | Видео-скрипты         |
-| stage_7_audio        | xiaomi/mimo-v2-flash:free     | openai/gpt-4o-mini        | 8000   | TTS-скрипты           |
-| stage_7_quiz         | xiaomi/mimo-v2-flash:free     | openai/gpt-4o-mini        | 4096   | Тесты                 |
-| stage_7_presentation | xiaomi/mimo-v2-flash:free     | openai/gpt-4o-mini        | 8000   | Презентации           |
+| stage_7_video        | xiaomi/mimo-v2-flash:free     | qwen/qwen3-235b-a22b-2507 | 8000   | Видео-скрипты         |
+| stage_7_audio        | xiaomi/mimo-v2-flash:free     | qwen/qwen3-235b-a22b-2507 | 8000   | TTS-скрипты           |
+| stage_7_quiz         | xiaomi/mimo-v2-flash:free     | qwen/qwen3-235b-a22b-2507 | 4096   | Тесты                 |
+| stage_7_presentation | xiaomi/mimo-v2-flash:free     | qwen/qwen3-235b-a22b-2507 | 8000   | Презентации           |
+
+---
+
+## Chat Phases
+
+| Phase                  | Primary Model             | Fallback Model          | Temp | Tokens | Description               |
+| ---------------------- | ------------------------- | ----------------------- | ---- | ------ | ------------------------- |
+| chat_full_regeneration | qwen/qwen3-235b-a22b-2507 | moonshotai/kimi-k2-0905 | 0.60 | 16000  | Полная перегенерация      |
+| chat_global_guidance   | qwen/qwen3-235b-a22b-2507 | moonshotai/kimi-k2-0905 | 0.70 | 2048   | Общие указания            |
+| chat_node_refinement   | qwen/qwen3-235b-a22b-2507 | moonshotai/kimi-k2-0905 | 0.70 | 4096   | Уточнение отдельных узлов |
 
 ---
 
@@ -111,28 +129,30 @@
 | ---------------- | -------- | ------------------------- | ------------------------- | ---- | ------ | ----------------------------- |
 | global_default   | standard | xiaomi/mimo-v2-flash:free | google/gemini-2.5-flash   | 0.70 | 4096   | Дефолт для неизвестных фаз    |
 | global_default   | extended | google/gemini-2.5-flash   | xiaomi/mimo-v2-flash:free | 0.70 | 4096   | Дефолт для больших контекстов |
-| emergency        | standard | google/gemini-2.5-flash   | -                         | 0.70 | 4096   | Аварийный fallback            |
-| quality_fallback | standard | openai/gpt-oss-120b       | google/gemini-2.5-flash   | 0.50 | 8000   | Fallback для качества         |
+| emergency        | -        | google/gemini-2.5-flash   | -                         | 0.70 | 4096   | Аварийный fallback            |
+| quality_fallback | -        | openai/gpt-oss-120b       | google/gemini-2.5-flash   | 0.50 | 8000   | Fallback для качества         |
 
 ---
 
 ## Model Aliases
 
-| Alias            | Full Model ID                   | Provider | Notes                  |
-| ---------------- | ------------------------------- | -------- | ---------------------- |
-| MiMo V2 Flash    | xiaomi/mimo-v2-flash:free       | Xiaomi   | Бесплатная, быстрая    |
-| Gemini 2.5 Flash | google/gemini-2.5-flash         | Google   | Большой контекст (1M)  |
-| DeepSeek V3.1    | deepseek/deepseek-v3.1-terminus | DeepSeek | Лучшая для русского    |
-| Qwen3 235B       | qwen/qwen3-235b-a22b-2507       | Alibaba  | Лучшая для английского |
-| Kimi K2          | moonshotai/kimi-k2-0905         | Moonshot | Мультиязычная          |
-| Minimax M2.1     | minimax/minimax-m2.1            | Minimax  | Стабильный tiebreaker  |
-| GPT-OSS 120B     | openai/gpt-oss-120b             | OpenAI   | Премиум fallback       |
-| GPT-4o Mini      | openai/gpt-4o-mini              | OpenAI   | Дешёвый fallback       |
+| Alias                  | Full Model ID                        | Provider | Notes                  |
+| ---------------------- | ------------------------------------ | -------- | ---------------------- |
+| MiMo V2 Flash          | xiaomi/mimo-v2-flash:free            | Xiaomi   | Бесплатная, быстрая    |
+| Gemini 2.5 Flash       | google/gemini-2.5-flash              | Google   | Большой контекст (1M)  |
+| Gemini 2.0 Thinking    | google/gemini-2.0-flash-thinking-exp | Google   | Reasoning модель       |
+| DeepSeek V3.2          | deepseek/deepseek-v3.2               | DeepSeek | Лучшая для русского    |
+| Qwen3 235B             | qwen/qwen3-235b-a22b-2507            | Alibaba  | Лучшая для английского |
+| Kimi K2                | moonshotai/kimi-k2-0905              | Moonshot | Мультиязычная          |
+| Minimax M2.1           | minimax/minimax-m2.1                 | Minimax  | Стабильный tiebreaker  |
+| GPT-OSS 120B           | openai/gpt-oss-120b                  | OpenAI   | Премиум fallback       |
+| Gemini 2.5 Flash Image | google/gemini-2.5-flash-image        | Google   | Генерация изображений  |
+| GPT-5 Image Mini       | openai/gpt-5-image-mini              | OpenAI   | Генерация карточек     |
 
 ---
 
 ## Statistics
 
-- **Total configs**: 48
-- **Active configs**: 35 (Stage 7 pending Zod validation fix)
-- **Last updated**: 2026-01-24
+- **Total configs**: 60
+- **Active configs**: 60
+- **Last updated**: 2026-01-25
