@@ -22,6 +22,9 @@ export function useFallbackPolling(
   const pollingRef = useRef<NodeJS.Timeout | null>(null)
 
   useEffect(() => {
+    // Clear polled data when course changes to avoid showing stale data
+    setPolledTraces([])
+
     // Clear any existing interval
     if (pollingRef.current) {
       clearInterval(pollingRef.current)

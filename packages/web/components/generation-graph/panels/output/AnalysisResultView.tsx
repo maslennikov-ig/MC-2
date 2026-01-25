@@ -188,6 +188,8 @@ export const AnalysisResultView = ({
   const [isDeleting, setIsDeleting] = useState(false)
   // Track if we've already checked and confirmed deletion for this session
   const downstreamDeletedRef = useRef(false)
+  // Key to force re-render of EditableFields when cascade is canceled (resets local state to original values)
+  const [fieldResetKey, setFieldResetKey] = useState(0)
 
   // Helper to actually perform the save
   const performSave = useCallback(
@@ -294,6 +296,8 @@ export const AnalysisResultView = ({
     setCascadeModalOpen(false)
     setPendingChange(null)
     setDownstreamInfo(null)
+    // Force re-render of EditableFields to revert their local state to original values
+    setFieldResetKey((prev) => prev + 1)
   }, [])
 
   // Get status for a specific field from the Map
@@ -473,7 +477,11 @@ export const AnalysisResultView = ({
         </div>
       )}
 
-      <PhaseAccordion type="multiple" defaultValue={['classification', 'topic', 'structure']}>
+      <PhaseAccordion
+        key={fieldResetKey}
+        type="multiple"
+        defaultValue={['classification', 'topic', 'structure']}
+      >
         {/* 1. Course Classification */}
         <AccordionItem
           value="classification"

@@ -2,6 +2,7 @@
 
 import { ChatRequest, ChatResponse, chatResponseSchema } from '@megacampus/shared-types/chat-types'
 import { getBackendAuthHeaders, TRPC_URL } from '@/lib/auth'
+import { createClient } from '@/lib/supabase/server'
 
 /**
  * HTTP status code to user-friendly error message mapping.
@@ -54,6 +55,39 @@ export interface TokenEstimates {
  * @returns Token estimates for both intent modes
  */
 export async function getChatTokenEstimates(courseId: string): Promise<TokenEstimates | null> {
+  // Verify user authentication
+  const supabase = await createClient()
+  const {
+    data: { user },
+  } = await supabase.auth.getUser()
+
+  if (!user) {
+    console.warn('[getChatTokenEstimates] No authenticated user')
+    return null
+  }
+
+  // Verify user has access to this course
+  const { data: course, error: courseError } = await supabase
+    .from('courses')
+    .select('user_id')
+    .eq('id', courseId)
+    .single()
+
+  if (courseError || !course) {
+    console.warn('[getChatTokenEstimates] Course not found or access denied', { courseId })
+    return null
+  }
+
+  // Check ownership (user owns course)
+  if (course.user_id !== user.id) {
+    console.warn('[getChatTokenEstimates] User does not own course', {
+      userId: user.id,
+      courseId,
+      courseOwner: course.user_id,
+    })
+    return null
+  }
+
   const headers = await getBackendAuthHeaders()
 
   const response = await fetch(
