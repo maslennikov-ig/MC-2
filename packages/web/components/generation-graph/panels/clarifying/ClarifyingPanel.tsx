@@ -59,6 +59,16 @@ export function ClarifyingPanel({ courseId, onComplete }: ClarifyingPanelProps) 
   const [hasShownConfetti, setHasShownConfetti] = useState(false)
   const questionRefs = useRef<Map<string, HTMLDivElement>>(new Map())
 
+  // Clean up stale refs when questions change (memory leak fix)
+  useEffect(() => {
+    const currentIds = new Set(questions.map((q) => q.id))
+    for (const id of questionRefs.current.keys()) {
+      if (!currentIds.has(id)) {
+        questionRefs.current.delete(id)
+      }
+    }
+  }, [questions])
+
   // Calculate progress
   const totalQuestions = questions.length
   const answeredCount = answeredQuestions.size
@@ -74,7 +84,7 @@ export function ClarifyingPanel({ courseId, onComplete }: ClarifyingPanelProps) 
   useEffect(() => {
     if (isComplete && !hasShownConfetti) {
       setHasShownConfetti(true)
-      confetti({
+      void confetti({
         particleCount: 100,
         spread: 70,
         origin: { y: 0.6 },
@@ -116,13 +126,29 @@ export function ClarifyingPanel({ courseId, onComplete }: ClarifyingPanelProps) 
     })
   }
 
-  const handleAcceptAll = () => {
+  const handleAcceptAll = async () => {
     // Auto-select first suggested answer for all unanswered questions
-    questions.forEach((q) => {
-      if (!answeredQuestions.has(q.id) && q.suggestedAnswers.length > 0) {
-        handleAnswer(q.id, q.suggestedAnswers[0].text, 'suggested')
+    // Sequential submission with delay to avoid rate limiting (30 req/min backend limit)
+    const unanswered = questions.filter(
+      (q) => !answeredQuestions.has(q.id) && q.suggestedAnswers.length > 0
+    )
+
+    for (const q of unanswered) {
+      try {
+        await submitAnswerMutation.mutateAsync({
+          questionId: q.id,
+          answer: q.suggestedAnswers[0].text,
+          answerSource: 'suggested',
+          selectedSuggestionIndex: 0,
+        })
+        setAnsweredQuestions((prev) => new Set(prev).add(q.id))
+        // Small delay to avoid rate limit (100ms between requests)
+        await new Promise((r) => setTimeout(r, 100))
+      } catch (error) {
+        console.error(`Failed to submit answer for ${q.id}:`, error)
+        // Continue with other questions on failure
       }
-    })
+    }
   }
 
   const handleContinue = () => {
@@ -192,7 +218,7 @@ export function ClarifyingPanel({ courseId, onComplete }: ClarifyingPanelProps) 
           <Button
             size="sm"
             variant="outline"
-            onClick={handleAcceptAll}
+            onClick={() => void handleAcceptAll()}
             disabled={submitAnswerMutation.isPending}
           >
             <Sparkles className="h-3.5 w-3.5" />
