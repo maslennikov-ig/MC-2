@@ -20,6 +20,49 @@ import { BACKEND_URL } from '@/lib/env-client'
  * Get CSRF token from meta tag or cookie
  * The token should be set by the server in a meta tag or cookie
  */
+/**
+ * Fetch with exponential backoff retry for 5xx errors
+ * @param url - Fetch URL
+ * @param options - Fetch options
+ * @param maxRetries - Maximum retry attempts (default: 3)
+ * @returns Response object
+ */
+async function fetchWithRetry(
+  url: string,
+  options: RequestInit,
+  maxRetries: number = 3
+): Promise<Response> {
+  let lastError: Error | null = null
+
+  for (let attempt = 1; attempt <= maxRetries; attempt++) {
+    try {
+      const response = await fetch(url, options)
+
+      // Retry only on 5xx errors (server errors)
+      if (response.ok || response.status < 500) {
+        return response
+      }
+
+      lastError = new Error(`HTTP ${response.status}: ${response.statusText}`)
+    } catch (error) {
+      // Network errors, timeouts, etc.
+      lastError = error instanceof Error ? error : new Error(String(error))
+    }
+
+    // Exponential backoff: 1s, 2s, 4s (max 5s)
+    if (attempt < maxRetries) {
+      const delay = Math.min(1000 * Math.pow(2, attempt - 1), 5000)
+      await new Promise((r) => setTimeout(r, delay))
+    }
+  }
+
+  throw lastError || new Error('Fetch failed after retries')
+}
+
+/**
+ * Get CSRF token from meta tag or cookie
+ * The token should be set by the server in a meta tag or cookie
+ */
 function getCsrfToken(): string | null {
   if (typeof document === 'undefined') return null
 
@@ -89,7 +132,7 @@ function createUseQuery<TInput, TOutput>(
     const fetchData = React.useCallback(async () => {
       try {
         setIsLoading(true)
-        const response = await fetch(
+        const response = await fetchWithRetry(
           `${BACKEND_URL}/trpc/${procedurePath}?input=${encodeURIComponent(JSON.stringify(input))}`,
           {
             credentials: 'include',
@@ -143,7 +186,7 @@ function createUseMutation<TInput, TOutput>(
           setIsPending(true)
           setError(null)
 
-          const response = await fetch(`${BACKEND_URL}/trpc/${procedurePath}`, {
+          const response = await fetchWithRetry(`${BACKEND_URL}/trpc/${procedurePath}`, {
             method: 'POST',
             headers: buildHeaders(),
             credentials: 'include',

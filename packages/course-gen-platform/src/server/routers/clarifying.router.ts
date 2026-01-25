@@ -744,6 +744,9 @@ export const clarifyingRouter = router({
    * enqueues the STRUCTURE_ANALYSIS job to continue Stage 4. Transitions
    * course status from stage_4_clarifying to stage_4_analyzing.
    *
+   * Uses atomic RPC function `approve_and_proceed_atomic` with FOR UPDATE lock
+   * to prevent race conditions during status transition.
+   *
    * Authorization: Requires authenticated user (protectedProcedure)
    *
    * Input:
@@ -772,67 +775,76 @@ export const clarifyingRouter = router({
       logger.info({ requestId, courseId, userId: currentUser.id }, 'Approve and proceed request');
 
       try {
-        // Verify course access
-        const course = await verifyCourseAccess(
-          courseId,
-          currentUser.id,
-          currentUser.organizationId,
-          requestId
+        const supabase = getTypedSupabaseAdmin();
+        const typedSupabase = getSupabaseAdmin();
+
+        // Use atomic RPC function to validate and transition status
+        // This prevents race conditions with FOR UPDATE lock
+        const { data: rpcResult, error: rpcError } = await supabase.rpc(
+          'approve_and_proceed_atomic',
+          {
+            p_course_id: courseId,
+            p_user_id: currentUser.id,
+            p_org_id: currentUser.organizationId,
+          }
         );
 
-        // Verify course is in clarifying status
-        if (course.generation_status !== 'stage_4_clarifying') {
-          throw new TRPCError({
-            code: 'BAD_REQUEST',
-            message: `Cannot proceed from status '${course.generation_status}'. Expected: stage_4_clarifying`,
-          });
-        }
-
-        const supabase = getTypedSupabaseAdmin();
-
-        // Check that all critical/important questions are answered
-        const { data: unansweredRequired, error: checkError } = await supabase
-          .from('clarifying_questions')
-          .select('id, question_priority, question_text')
-          .eq('course_id', courseId)
-          .in('question_priority', ['critical', 'important'])
-          .eq('status', 'pending');
-
-        if (checkError) {
+        if (rpcError) {
           logger.error(
-            { requestId, courseId, error: checkError.message },
-            'Failed to check unanswered questions'
+            { requestId, courseId, error: rpcError.message },
+            'RPC approve_and_proceed_atomic failed'
           );
-
           throw new TRPCError({
             code: 'INTERNAL_SERVER_ERROR',
-            message: 'Failed to verify questions',
+            message: 'Failed to proceed',
           });
         }
 
-        const unansweredList = (unansweredRequired || []) as Pick<
-          QuestionRow,
-          'id' | 'question_priority' | 'question_text'
-        >[];
+        // Handle RPC result errors
+        const result = rpcResult as {
+          success: boolean;
+          error?: string;
+          code?: string;
+          unanswered_critical?: number;
+          unanswered_important?: number;
+          current_status?: string;
+        };
 
-        if (unansweredList.length > 0) {
-          const criticalCount = unansweredList.filter(
-            q => q.question_priority === 'critical'
-          ).length;
-          const importantCount = unansweredList.filter(
-            q => q.question_priority === 'important'
-          ).length;
+        if (!result.success) {
+          logger.warn({ requestId, courseId, rpcResult: result }, 'RPC returned failure');
 
-          logger.warn(
-            { requestId, courseId, criticalCount, importantCount },
-            'Cannot proceed - unanswered required questions'
-          );
-
-          throw new TRPCError({
-            code: 'BAD_REQUEST',
-            message: `Cannot proceed. ${criticalCount} critical and ${importantCount} important questions remain unanswered.`,
-          });
+          // Map RPC error codes to TRPC errors
+          switch (result.code) {
+            case 'NOT_FOUND':
+              throw new TRPCError({
+                code: 'NOT_FOUND',
+                message: 'Course not found',
+              });
+            case 'FORBIDDEN':
+              throw new TRPCError({
+                code: 'FORBIDDEN',
+                message: 'You do not have access to this course',
+              });
+            case 'INVALID_STATUS':
+              throw new TRPCError({
+                code: 'BAD_REQUEST',
+                message: `Cannot proceed from status '${result.current_status}'. Expected: stage_4_clarifying`,
+              });
+            case 'UNANSWERED_QUESTIONS':
+              throw new TRPCError({
+                code: 'BAD_REQUEST',
+                message: `Cannot proceed. ${result.unanswered_critical} critical and ${result.unanswered_important} important questions remain unanswered.`,
+              });
+            default:
+              throw new TRPCError({
+                code: 'INTERNAL_SERVER_ERROR',
+                message: result.error || 'Failed to proceed',
+              });
+          }
         }
+
+        // Status successfully transitioned to stage_4_analyzing
+        // Now fetch data needed for the job
 
         // Fetch all answered questions to include in analysis job
         const { data: answeredQuestions, error: questionsError } = await supabase
@@ -847,6 +859,13 @@ export const clarifyingRouter = router({
             'Failed to fetch answered questions'
           );
 
+          // Rollback status on failure
+          await typedSupabase
+            .from('courses')
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            .update({ generation_status: 'stage_4_clarifying' as any })
+            .eq('id', courseId);
+
           throw new TRPCError({
             code: 'INTERNAL_SERVER_ERROR',
             message: 'Failed to fetch answers',
@@ -855,8 +874,7 @@ export const clarifyingRouter = router({
 
         const answeredList = (answeredQuestions || []) as QuestionRow[];
 
-        // Fetch course details for analysis job (use typed supabase for courses table)
-        const typedSupabase = getSupabaseAdmin();
+        // Fetch course details for analysis job
         const { data: courseDetails, error: courseError } = await typedSupabase
           .from('courses')
           .select(
@@ -874,6 +892,13 @@ export const clarifyingRouter = router({
             'Failed to fetch course details'
           );
 
+          // Rollback status
+          await typedSupabase
+            .from('courses')
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            .update({ generation_status: 'stage_4_clarifying' as any })
+            .eq('id', courseId);
+
           throw new TRPCError({
             code: 'INTERNAL_SERVER_ERROR',
             message: 'Failed to fetch course details',
@@ -881,24 +906,6 @@ export const clarifyingRouter = router({
         }
 
         const typedCourseDetails = courseDetails as unknown as CourseDetails;
-
-        // Update course status to stage_4_analyzing
-        const { error: updateError } = await typedSupabase
-          .from('courses')
-          .update({ generation_status: 'stage_4_analyzing' as const })
-          .eq('id', courseId);
-
-        if (updateError) {
-          logger.error(
-            { requestId, courseId, error: updateError.message },
-            'Failed to update course status'
-          );
-
-          throw new TRPCError({
-            code: 'INTERNAL_SERVER_ERROR',
-            message: 'Failed to update course status',
-          });
-        }
 
         // Fetch document summaries for analysis
         const { data: documents, error: documentsError } = await typedSupabase
@@ -915,7 +922,6 @@ export const clarifyingRouter = router({
           );
 
           // Rollback status
-          // Note: stage_4_clarifying may not be in generated types yet
           await typedSupabase
             .from('courses')
             // eslint-disable-next-line @typescript-eslint/no-explicit-any
