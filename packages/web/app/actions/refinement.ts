@@ -91,7 +91,7 @@ export async function getChatTokenEstimates(courseId: string): Promise<TokenEsti
   const headers = await getBackendAuthHeaders()
 
   const response = await fetch(
-    `${TRPC_URL}/generation.getChatTokenEstimates?input=${encodeURIComponent(JSON.stringify({ json: { courseId } }))}`,
+    `${TRPC_URL}/generation.getChatTokenEstimates?input=${encodeURIComponent(JSON.stringify({ courseId }))}`,
     {
       method: 'GET',
       headers,
