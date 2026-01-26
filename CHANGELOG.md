@@ -7,6 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.28.39] - 2026-01-26
+
+### Changed
+
+- **web**: P3.3 migrate i18n from GRAPH_TRANSLATIONS to next-intl (a88b6d9a)
+
+### Fixed
+
+- **shared-types**: update 1 source file(s), update docs (bf2c554b)
+- **web**: TypeScript errors in P3.3 i18n migration (d0f6e648)
+- **web**: P3 code review fixes + course regeneration flow (1178d618)
+
+### Other
+
+- bd sync: 2026-01-26 10:44:17 (19fcf9ba)
+- update README to reflect next-intl migration (8bde1b06)
+
 ## [0.28.38] - 2026-01-25
 
 ### Added
