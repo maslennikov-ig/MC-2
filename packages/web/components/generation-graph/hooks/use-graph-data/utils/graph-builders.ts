@@ -769,13 +769,15 @@ export function buildGraph({
           },
         } as unknown as AppNode)
 
-        // Edge from Stage 4 to Clarifying (side branch, NOT inline)
+        // Edge from Stage 4 BOTTOM to Clarifying TOP (side branch, NOT inline)
         // By NOT updating prevNodeId, Stage 5 will connect from Stage 4
         // This makes Clarifying a branch below Stage 4, not between Stage 4 and Stage 5
         newEdges.push({
           id: `e${stageKey}-${clarifyingNodeId}`,
           source: stageKey,
+          sourceHandle: 'bottom', // Exit from bottom of Stage 4
           target: clarifyingNodeId,
+          targetHandle: null, // ClarifyingNode has default top target
           type: 'animated',
           data: { status: 'idle', animated: false },
         })
