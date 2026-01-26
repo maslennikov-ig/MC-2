@@ -386,11 +386,12 @@ function GraphViewInner({
 
   // File catalog for document filename lookup (T014: Fix UUID display)
   // Also loads document statuses for Stage 2 graph initialization
+  // Pass pipelineStatus to trigger refetch when generation starts (for deduplicated docs)
   const {
     documents: documentsWithStatus,
     getFilename,
     isLoading: isCatalogLoading,
-  } = useDocumentsWithStatus(courseId)
+  } = useDocumentsWithStatus(courseId, pipelineStatus)
 
   // Clarifying questions - two-step query pattern to avoid unnecessary API calls
   // Step 1: Check if clarifying is enabled (lightweight, cached forever - config doesn't change)
@@ -415,6 +416,7 @@ function GraphViewInner({
     { courseId },
     {
       enabled: isAtStage4OrBeyond && clarifyingEnabled?.enabled === true,
+      staleTime: 5000, // Cache 5 sec - prevents rate limit (12 req/sec → 0.2 req/sec)
       refetchOnWindowFocus: false,
     }
   )
@@ -659,20 +661,22 @@ function GraphViewInner({
   // Initialize Stage 2 documents from database with proper statuses
   // This ensures documents appear in the graph on page load (before realtime traces arrive)
   // and have correct completion status for Stage2Group display
-  // Note: We check store state instead of using ref because Zustand store can reset on HMR
+  // Note: initializeDocumentsWithStatus is safe to call multiple times - it only updates
+  // documents that are still 'pending' (won't overwrite progress from realtime traces)
   const storeDocumentsCount = useGenerationStore((state) => state.documents.size)
   useEffect(() => {
     if (isCatalogLoading || !hasDocuments) return
     if (documentsWithStatus.length === 0) return
 
-    // Only initialize if store is empty (handles HMR reset)
-    if (storeDocumentsCount > 0) return
-
-    // Initialize Zustand store with proper statuses (for Stage2Group counters)
+    // Initialize/update Zustand store with proper statuses (for Stage2Group counters)
+    // Safe to call multiple times - only updates pending documents
+    // This handles: initial load, HMR reset, and status changes (e.g., after "Start" clicked)
     initializeDocumentsWithStatus(documentsWithStatus)
 
-    // Initialize useGraphData documentSteps (for graph node creation)
-    initializeDocumentsFromDb(documentsWithStatus)
+    // Initialize useGraphData documentSteps only if store was empty (first load or HMR)
+    if (storeDocumentsCount === 0) {
+      initializeDocumentsFromDb(documentsWithStatus)
+    }
   }, [
     documentsWithStatus,
     isCatalogLoading,
