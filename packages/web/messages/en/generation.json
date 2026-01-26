@@ -98,6 +98,13 @@
     "retryButton": "Retry",
     "cancelButton": "Cancel"
   },
+  "clarifyingNode": {
+    "title": "Clarifying Questions",
+    "autoBadge": "Auto",
+    "progress": "{answered} / {total} answered",
+    "critical": "({answered}/{total} required)",
+    "invalidData": "Invalid node data"
+  },
   "mobile": {
     "title": "Generation Progress",
     "noStages": "No stages yet",

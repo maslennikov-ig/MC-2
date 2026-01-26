@@ -274,6 +274,7 @@ function getTierPriority(tier: string | null): number {
  * Clarifying questions router
  *
  * Provides endpoints for Stage 4 clarifying questions workflow:
+ * - isEnabled: Check if clarifying questions are enabled for a course (lightweight)
  * - getQuestions: Retrieve all questions for a course
  * - getProgress: Get progress statistics
  * - submitAnswer: Submit an answer to a question
@@ -282,6 +283,53 @@ function getTierPriority(tier: string | null): number {
  * - requestSecondRound: Request additional questions
  */
 export const clarifyingRouter = router({
+  /**
+   * Check if clarifying questions are enabled for a course
+   *
+   * Purpose: Lightweight check to determine if clarifying questions feature
+   * is enabled for a course. Used by GraphView to avoid unnecessary getProgress
+   * queries when clarifying is disabled.
+   *
+   * Authorization: Requires authenticated user (protectedProcedure)
+   *
+   * Input:
+   * - courseId: UUID of the course
+   *
+   * Output:
+   * - enabled: Boolean indicating if clarifying questions are enabled
+   *
+   * @example
+   * ```typescript
+   * const result = await trpc.clarifying.isEnabled.query({
+   *   courseId: '3f8e1cd4-0c6e-43cf-8264-57c470a6c102',
+   * });
+   * // { enabled: true }
+   * ```
+   */
+  isEnabled: protectedProcedure
+    .input(z.object({ courseId: z.string().uuid('Invalid course ID') }))
+    .query(async ({ input }) => {
+      const { courseId } = input;
+      const supabase = getSupabaseAdmin();
+
+      // Fetch only the settings.clarifying_questions_enabled field
+      const { data: course, error } = await supabase
+        .from('courses')
+        .select('settings')
+        .eq('id', courseId)
+        .single();
+
+      if (error) {
+        // If course not found or error, return disabled
+        return { enabled: false };
+      }
+
+      const settings = (course?.settings as Record<string, unknown>) || {};
+      const enabled = (settings.clarifying_questions_enabled as boolean) || false;
+
+      return { enabled };
+    }),
+
   /**
    * Get all questions for a course
    *

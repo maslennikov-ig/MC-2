@@ -379,7 +379,14 @@ export async function runAnalysisOrchestration(job: StructureAnalysisJob): Promi
           }
 
           // Throw special error to pause execution
-          throw new Error('AWAITING_CLARIFYING_ANSWERS: Questions generated, awaiting user input');
+          throw new Error('AWAITING_CLARIFYING_ANSWERS: Questions generated, awaiting user input', {
+            cause: {
+              code: 'QUESTIONS_PENDING',
+              criticalCount: 0,
+              totalCount: 0,
+              message: 'Please answer the critical and important questions to continue',
+            },
+          });
         }
       } else {
         // Questions already exist - check if we need to wait
@@ -406,7 +413,15 @@ export async function runAnalysisOrchestration(job: StructureAnalysisJob): Promi
             );
 
             throw new Error(
-              `AWAITING_CLARIFYING_ANSWERS: ${criticalPending.length} critical/important questions pending`
+              `AWAITING_CLARIFYING_ANSWERS: ${criticalPending.length} critical/important questions pending`,
+              {
+                cause: {
+                  code: 'QUESTIONS_PENDING',
+                  criticalCount: criticalPending.length,
+                  totalCount: pendingQuestions.length,
+                  message: 'Please answer the critical and important questions to continue',
+                },
+              }
             );
           }
         }

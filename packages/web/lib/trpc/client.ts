@@ -93,7 +93,7 @@ function buildHeaders(): Record<string, string> {
   }
 
   const csrfToken = getCsrfToken()
-  if (csrfToken) {
+  if (csrfToken !== null && csrfToken !== '') {
     headers['X-CSRF-Token'] = csrfToken
   }
 
@@ -124,7 +124,16 @@ type UseMutationResult<TData, TVariables> = {
 type QueryOptions = {
   enabled?: boolean
   refetchOnWindowFocus?: boolean
+  /** Time in ms to consider data fresh (Infinity = never refetch automatically) */
+  staleTime?: number
 }
+
+/**
+ * Simple cache for staleTime support
+ * Key: procedurePath + JSON.stringify(input)
+ * Value: { data, timestamp }
+ */
+const queryCache = new Map<string, { data: unknown; timestamp: number }>()
 
 /**
  * Create a minimal useQuery hook implementation
@@ -138,11 +147,29 @@ function createUseQuery<TInput, TOutput>(
     const [error, setError] = React.useState<Error | null>(null)
 
     const isEnabled = options?.enabled !== false
+    const staleTime = options?.staleTime ?? 0
 
     const fetchData = React.useCallback(async () => {
       if (!isEnabled) {
         setIsLoading(false)
         return
+      }
+
+      // Check cache for staleTime support
+      const cacheKey = `${procedurePath}:${JSON.stringify(input)}`
+      const cached = queryCache.get(cacheKey)
+      const now = Date.now()
+
+      if (cached) {
+        // If staleTime is Infinity, never refetch
+        // Otherwise, check if cache is still fresh
+        const isFresh = staleTime === Infinity || now - cached.timestamp < staleTime
+        if (isFresh) {
+          setData(cached.data as TOutput)
+          setIsLoading(false)
+          setError(null)
+          return
+        }
       }
 
       try {
@@ -163,6 +190,10 @@ function createUseQuery<TInput, TOutput>(
 
         // tRPC wraps response in { result: { data: ... } }
         const unwrappedData = result?.result?.data ?? result
+
+        // Store in cache
+        queryCache.set(cacheKey, { data: unwrappedData, timestamp: now })
+
         setData(unwrappedData)
         setError(null)
       } catch (err) {
@@ -170,7 +201,7 @@ function createUseQuery<TInput, TOutput>(
       } finally {
         setIsLoading(false)
       }
-    }, [input, isEnabled])
+    }, [input, isEnabled, staleTime])
 
     React.useEffect(() => {
       void fetchData()
@@ -252,6 +283,9 @@ function createUseMutation<TInput, TOutput>(
  */
 export const trpc = {
   clarifying: {
+    isEnabled: {
+      useQuery: createUseQuery<{ courseId: string }, { enabled: boolean }>('clarifying.isEnabled'),
+    },
     getQuestions: {
       useQuery: createUseQuery<
         { courseId: string },
