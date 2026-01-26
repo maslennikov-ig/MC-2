@@ -19,7 +19,7 @@ import { format } from 'date-fns';
 import { ru as ruLocale } from 'date-fns/locale';
 import { toast } from 'sonner';
 import { useTranslations } from 'next-intl';
-import { Stage1OutputTabProps, Stage1OutputData, StoragePath } from './types';
+import { Stage1OutputTabProps, StoragePath } from './types';
 
 // ============================================================================
 // HELPER FUNCTIONS

@@ -49,7 +49,7 @@ const PHASE_TO_STEP_INDEX: Record<string, number> = {
 // TYPES
 // ============================================================================
 
-type StageId = 'stage_1' | 'stage_2' | 'stage_3' | 'stage_4' | 'stage_5' | 'stage_6';
+export type StageId = 'stage_1' | 'stage_2' | 'stage_3' | 'stage_4' | 'stage_5' | 'stage_6';
 
 /**
  * Document state for Stage 2 parallel processing.
