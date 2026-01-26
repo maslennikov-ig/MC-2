@@ -152,6 +152,8 @@ export function isAwaitingApproval(status: string): number | null {
   if (!status) return null
   // Stage 0: Course created but generation not yet started
   if (status === 'pending') return 0
+  // Stage 4 Clarifying: User needs to answer clarifying questions before proceeding
+  if (status === 'stage_4_clarifying') return 4
   const match = status.match(/stage_(\d+)_awaiting_approval/)
   return match ? parseInt(match[1], 10) : null
 }
