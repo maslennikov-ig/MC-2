@@ -101,7 +101,7 @@
   "mobile": {
     "title": "Generation Progress",
     "noStages": "No stages yet",
-    "stageProgress": "Stage {{current}} of {{total}}"
+    "stageProgress": "Stage {current} of {total}"
   },
   "viewToggle": {
     "graphView": "Graph View",
@@ -212,7 +212,7 @@
   },
   "restart": {
     "confirmTitle": "Restart Stage?",
-    "confirmDescription": "You are about to restart generation from Stage {{stageNumber}} ({{stageName}}). All results after this stage will be regenerated.",
+    "confirmDescription": "You are about to restart generation from Stage {stageNumber} ({stageName}). All results after this stage will be regenerated.",
     "warningMessage": "This action will overwrite current generation results.",
     "restartButton": "Restart",
     "restartingButton": "Restarting...",
@@ -277,7 +277,7 @@
     "default": {
       "compact": "Next",
       "full": "Confirm and Continue",
-      "description": "Phase {{stageName}} is complete. Please review the results before proceeding to the next stage.",
+      "description": "Phase {stageName} is complete. Please review the results before proceeding to the next stage.",
       "hint": "Click to see details"
     },
     "automatic": {
