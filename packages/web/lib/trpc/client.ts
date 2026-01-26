@@ -15,6 +15,7 @@
 
 import React from 'react'
 import { BACKEND_URL } from '@/lib/env-client'
+import { getSupabaseClient } from '@/lib/supabase/browser-client'
 
 /**
  * Get CSRF token from meta tag or cookie
@@ -85,9 +86,9 @@ function getCsrfToken(): string | null {
 }
 
 /**
- * Build headers with CSRF protection
+ * Build headers with CSRF protection and Authorization
  */
-function buildHeaders(): Record<string, string> {
+async function buildHeaders(): Promise<Record<string, string>> {
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
   }
@@ -95,6 +96,19 @@ function buildHeaders(): Record<string, string> {
   const csrfToken = getCsrfToken()
   if (csrfToken !== null && csrfToken !== '') {
     headers['X-CSRF-Token'] = csrfToken
+  }
+
+  // Add Authorization header with Supabase access token
+  try {
+    const supabase = getSupabaseClient()
+    const {
+      data: { session },
+    } = await supabase.auth.getSession()
+    if (session?.access_token) {
+      headers['Authorization'] = `Bearer ${session.access_token}`
+    }
+  } catch {
+    // Ignore errors - request will proceed without auth
   }
 
   return headers
@@ -136,6 +150,13 @@ type QueryOptions = {
 const queryCache = new Map<string, { data: unknown; timestamp: number }>()
 
 /**
+ * In-flight request deduplication
+ * Prevents parallel requests for the same query from hitting the server
+ * Multiple components requesting same data will share one Promise
+ */
+const inFlightRequests = new Map<string, Promise<unknown>>()
+
+/**
  * Create a minimal useQuery hook implementation
  */
 function createUseQuery<TInput, TOutput>(
@@ -172,13 +193,29 @@ function createUseQuery<TInput, TOutput>(
         }
       }
 
-      try {
-        setIsLoading(true)
+      // Request deduplication: if same query is already in-flight, wait for it
+      const inFlight = inFlightRequests.get(cacheKey)
+      if (inFlight) {
+        try {
+          setIsLoading(true)
+          const result = await inFlight
+          setData(result as TOutput)
+          setError(null)
+        } catch (err) {
+          setError(err instanceof Error ? err : new Error(String(err)))
+        } finally {
+          setIsLoading(false)
+        }
+        return
+      }
+
+      // Create fetch promise and track it
+      const fetchPromise = (async () => {
         const response = await fetchWithRetry(
           `${BACKEND_URL}/trpc/${procedurePath}?input=${encodeURIComponent(JSON.stringify(input))}`,
           {
             credentials: 'include',
-            headers: buildHeaders(),
+            headers: await buildHeaders(),
           }
         )
 
@@ -192,13 +229,24 @@ function createUseQuery<TInput, TOutput>(
         const unwrappedData = result?.result?.data ?? result
 
         // Store in cache
-        queryCache.set(cacheKey, { data: unwrappedData, timestamp: now })
+        queryCache.set(cacheKey, { data: unwrappedData, timestamp: Date.now() })
 
-        setData(unwrappedData)
+        return unwrappedData
+      })()
+
+      // Register in-flight request
+      inFlightRequests.set(cacheKey, fetchPromise)
+
+      try {
+        setIsLoading(true)
+        const result = await fetchPromise
+        setData(result as TOutput)
         setError(null)
       } catch (err) {
         setError(err instanceof Error ? err : new Error(String(err)))
       } finally {
+        // Clean up in-flight tracking
+        inFlightRequests.delete(cacheKey)
         setIsLoading(false)
       }
     }, [input, isEnabled, staleTime])
@@ -234,7 +282,7 @@ function createUseMutation<TInput, TOutput>(
 
           const response = await fetchWithRetry(`${BACKEND_URL}/trpc/${procedurePath}`, {
             method: 'POST',
-            headers: buildHeaders(),
+            headers: await buildHeaders(),
             credentials: 'include',
             body: JSON.stringify(variables),
           })
