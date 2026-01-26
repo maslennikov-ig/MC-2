@@ -147,7 +147,7 @@ export default function GenerationProgressContainerEnhanced({
   const router = useRouter()
   const t = useTranslations('generation')
   const tSuccess = useTranslations('generation.success')
-  const { restartStage } = useRestartStage(courseSlug)
+  const { restartStage } = useRestartStage(orgSlug, courseSlug)
   const [supabase, setSupabase] = useState<ReturnType<typeof createClient> | null>(null)
   const pollingInterval = useRef<NodeJS.Timeout | null>(null)
   const redirectTimeout = useRef<NodeJS.Timeout | null>(null)

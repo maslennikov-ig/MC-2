@@ -17,6 +17,7 @@ import { useTranslations } from 'next-intl'
 interface RestartConfirmDialogProps {
   open: boolean
   onClose: () => void
+  orgSlug: string
   courseSlug: string
   stageNumber: number
   stageName: string
@@ -32,12 +33,13 @@ interface RestartConfirmDialogProps {
 export const RestartConfirmDialog = ({
   open,
   onClose,
+  orgSlug,
   courseSlug,
   stageNumber,
   stageName,
   onSuccess,
 }: RestartConfirmDialogProps) => {
-  const { restartStage, isRestarting, error } = useRestartStage(courseSlug)
+  const { restartStage, isRestarting, error } = useRestartStage(orgSlug, courseSlug)
   const t = useTranslations('generation')
 
   const handleConfirm = async () => {
@@ -56,14 +58,16 @@ export const RestartConfirmDialog = ({
             <RotateCcw className="h-5 w-5 text-orange-500" />
             {t('restart.confirmTitle')}
           </DialogTitle>
-          <DialogDescription className="pt-2">
-            <div className="mb-3 flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-3">
-              <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
-              <div className="text-sm text-amber-800">{t('restart.warningMessage')}</div>
+          <DialogDescription asChild>
+            <div className="pt-2 text-sm text-muted-foreground">
+              <div className="mb-3 flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-3">
+                <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-600" />
+                <span className="text-sm text-amber-800">{t('restart.warningMessage')}</span>
+              </div>
+              <p className="text-slate-600">
+                {t('restart.confirmDescription', { stageName, stageNumber })}
+              </p>
             </div>
-            <p className="text-slate-600">
-              {t('restart.confirmDescription', { stageName, stageNumber })}
-            </p>
           </DialogDescription>
         </DialogHeader>
 

@@ -11,6 +11,7 @@ import { cn } from '@/lib/utils'
 
 interface ApprovalControlsProps {
   courseId: string
+  orgSlug: string
   courseSlug: string
   stageNumber: number
   onApproved?: () => void
@@ -37,6 +38,7 @@ interface ApprovalControlsProps {
 
 export const ApprovalControls = ({
   courseId,
+  orgSlug,
   courseSlug,
   stageNumber,
   onApproved,
@@ -49,7 +51,7 @@ export const ApprovalControls = ({
   const [isProcessing, setIsProcessing] = useState(false)
   const [action, setAction] = useState<'approve' | 'regenerate' | null>(null)
   const t = useTranslations('generation')
-  const { restartStage, isRestarting } = useRestartStage(courseSlug)
+  const { restartStage, isRestarting } = useRestartStage(orgSlug, courseSlug)
 
   // Track mounted state to prevent state updates after unmount
   const mountedRef = useRef(true)
