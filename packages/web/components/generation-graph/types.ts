@@ -71,8 +71,8 @@ export type RFClarifyingNode = Node<ClarifyingNodeData, 'clarifying'>
  * Union type of all possible graph nodes.
  * Used throughout the graph components for type-safe node handling.
  *
- * Note: ClarifyingNode is handled separately as it has a different data structure
- * and is rendered by a standalone component.
+ * Note: ClarifyingNode is handled separately in some contexts due to its
+ * different data structure. Use AppNodeWithClarifying when clarifying support is needed.
  */
 export type AppNode =
   | RFStageNode
@@ -82,6 +82,9 @@ export type AppNode =
   | RFLessonNode
   | RFModuleNode
   | RFStage2GroupNode
+
+/** Extended AppNode type that includes ClarifyingNode */
+export type AppNodeWithClarifying = AppNode | RFClarifyingNode
 
 // Edge Data
 
