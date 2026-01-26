@@ -769,7 +769,9 @@ export function buildGraph({
           },
         } as unknown as AppNode)
 
-        // Edge from Stage 4 to Clarifying (branch/inline)
+        // Edge from Stage 4 to Clarifying (side branch, NOT inline)
+        // By NOT updating prevNodeId, Stage 5 will connect from Stage 4
+        // This makes Clarifying a branch below Stage 4, not between Stage 4 and Stage 5
         newEdges.push({
           id: `e${stageKey}-${clarifyingNodeId}`,
           source: stageKey,
@@ -778,8 +780,9 @@ export function buildGraph({
           data: { status: 'idle', animated: false },
         })
 
-        // Update prevNodeId so Stage 5 connects from Clarifying
-        prevNodeId = clarifyingNodeId
+        // DO NOT update prevNodeId - Stage 5 should connect from Stage 4, not Clarifying
+        // This positions clarifying as a side branch below Stage 4
+        // prevNodeId = clarifyingNodeId  // REMOVED - causes horizontal layout
       }
     }
   }
