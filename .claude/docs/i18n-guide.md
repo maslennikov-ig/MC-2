@@ -338,6 +338,158 @@ export const config = {
 };
 ```
 
+## Generation Graph i18n
+
+> **P3.3 Migration (2026-01-26)**: All generation-graph components migrated from legacy `GRAPH_TRANSLATIONS` to `next-intl`.
+
+### Quick Reference
+
+| Item | Location |
+|------|----------|
+| Messages | `messages/{locale}/generation.json` |
+| Namespace | `generation` |
+| Components | `components/generation-graph/**/*.tsx` |
+| Pluralization | `lib/generation-graph/utils/pluralization.ts` |
+
+### Translation Keys Structure
+
+```
+generation.json
+├── stages (stage names)
+├── status (8 status types)
+├── actions (37 action labels)
+├── common (shared UI strings)
+├── stage1-6 (stage-specific keys)
+│   ├── tabs, phases, fields
+│   └── status messages
+├── enrichments (Stage 7)
+├── endNode (completion screen)
+└── selectionToolbar (bulk actions)
+```
+
+**Total keys**: ~1000+ per locale
+
+### Usage Patterns
+
+#### Stage Components
+
+```tsx
+// Stage-specific translations
+import { useTranslations } from 'next-intl';
+
+function Stage4InputTab() {
+  const t = useTranslations('generation.stage4');
+  const tCommon = useTranslations('generation.common');
+
+  return (
+    <div>
+      <h2>{t('title')}</h2>
+      <button>{tCommon('save')}</button>
+    </div>
+  );
+}
+```
+
+#### Multiple Namespaces
+
+```tsx
+function StagePanel() {
+  const tStage = useTranslations('generation.stage2');
+  const tStatus = useTranslations('generation.status');
+  const tActions = useTranslations('generation.actions');
+
+  return (
+    <>
+      <Badge>{tStatus('completed')}</Badge>
+      <Button>{tActions('approve')}</Button>
+    </>
+  );
+}
+```
+
+#### Pluralization (Russian)
+
+For Russian pluralization (1 модуль, 2 модуля, 5 модулей):
+
+```tsx
+import { getModuleWord, getLessonWord } from '@/lib/generation-graph/utils/pluralization';
+
+function EndNode({ moduleCount, lessonCount }) {
+  const t = useTranslations('generation');
+
+  const moduleLabel = getModuleWord(moduleCount, t, 'common');
+  const lessonLabel = getLessonWord(lessonCount, t, 'common');
+
+  return <span>{moduleCount} {moduleLabel}, {lessonCount} {lessonLabel}</span>;
+}
+```
+
+#### Helper Functions with Translations
+
+When passing translator to non-React functions:
+
+```tsx
+type TranslatorFn = (key: string, params?: Record<string, string | number>) => string;
+
+function generatePhases(t: TranslatorFn): Phase[] {
+  return [
+    { name: t('phases.analysis'), status: 'pending' },
+    { name: t('phases.generation'), status: 'pending' },
+  ];
+}
+
+// Usage in component
+const t = useTranslations('generation.stage4');
+const phases = generatePhases(t as TranslatorFn);
+```
+
+### Migration History
+
+**Removed files** (legacy system):
+- ~~`lib/generation-graph/translations.ts`~~ (1375 lines)
+- ~~`lib/generation-graph/useTranslation.ts`~~
+
+**Pattern change**:
+```tsx
+// BEFORE (legacy)
+import { GRAPH_TRANSLATIONS } from '@/lib/generation-graph/translations';
+const t = GRAPH_TRANSLATIONS.stage1;
+{t?.topic?.[locale] ?? 'Topic'}
+
+// AFTER (next-intl)
+import { useTranslations } from 'next-intl';
+const t = useTranslations('generation.stage1');
+{t('topic')}
+```
+
+### Adding New Generation Keys
+
+1. Add to BOTH locale files:
+```bash
+messages/ru/generation.json
+messages/en/generation.json
+```
+
+2. Follow existing structure:
+```json
+{
+  "stage4": {
+    "newFeature": {
+      "title": "New Feature",
+      "description": "Feature description"
+    }
+  }
+}
+```
+
+3. Use in component:
+```tsx
+const t = useTranslations('generation.stage4');
+<h3>{t('newFeature.title')}</h3>
+```
+
+---
+
 ## Backend i18n (BullMQ Workers)
 
 > Progress messages from course generation workers are localized via a lightweight i18n service.
