@@ -26,6 +26,7 @@ const StageNode = (props: NodeProps<RFStageNode>) => {
   const statusEntry = useNodeStatus(id);
   const t = useTranslations('generation');
   const params = useParams();
+  const orgSlug = params?.orgSlug as string | undefined;
   const courseSlug = params?.courseSlug as string | undefined;
   const [showRestartDialog, setShowRestartDialog] = useState(false);
   const updateNodeInternals = useUpdateNodeInternals();
@@ -221,10 +222,11 @@ const StageNode = (props: NodeProps<RFStageNode>) => {
       />
 
       {/* Restart Confirmation Dialog */}
-      {courseSlug && data.stageNumber && (
+      {orgSlug && courseSlug && data.stageNumber && (
         <RestartConfirmDialog
           open={showRestartDialog}
           onClose={() => setShowRestartDialog(false)}
+          orgSlug={orgSlug}
           courseSlug={courseSlug}
           stageNumber={data.stageNumber}
           stageName={stageName}

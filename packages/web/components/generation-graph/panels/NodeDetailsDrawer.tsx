@@ -914,6 +914,7 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
                      </p>
                      <ApprovalControls
                         courseId={courseInfo.id}
+                        orgSlug={orgSlug || ''}
                         courseSlug={courseSlug}
                         stageNumber={data.stageNumber}
                         onApproved={handleStageApproved}
@@ -1133,10 +1134,11 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
         </div>
 
         {/* Restart Confirmation Dialog */}
-        {courseSlug && data?.stageNumber && (
+        {orgSlug && courseSlug && data?.stageNumber && (
           <RestartConfirmDialog
             open={showRestartDialog}
             onClose={() => setShowRestartDialog(false)}
+            orgSlug={orgSlug}
             courseSlug={courseSlug}
             stageNumber={data.stageNumber}
             stageName={t(`stages.stage_${data.stageNumber}`)}
