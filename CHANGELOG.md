@@ -7,6 +7,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.28.40] - 2026-01-26
+
+### Added
+
+- **web**: add clarifying questions info to StageResultsPreview (20ff98e7)
+- **backend**: add dev:worker:stage6 script for Stage 6 worker (b7eaa887)
+- **stage4**: add self-reflection auto-answer in automatic mode (91552cba)
+
+### Fixed
+
+- **web**: update 4 source file(s), update MCP configs, +3 more (9fdd52ef)
+- **stage4**: classify AbortError as LLM_ERROR for proper retry (0b1ffaf1)
+- **stage4**: prevent BullMQ retry for AWAITING_CLARIFYING_ANSWERS (6808e381)
+- **graph**: connect clarifying node from Stage 4 bottom handle (9a71fd23)
+- **graph**: position clarifying node BELOW Stage 4 (95c6a9b8)
+- **stage4**: increase clarifying LLM timeout to 5 minutes (e7d70aa3)
+- **web**: position clarifying node as side branch below Stage 4 (273687df)
+- **db**: add stage_4_clarifying status to FSM (ca24f522)
+- **web**: add pipelineStatus param to useDocumentsWithStatus (ac1cdb9b)
+- **web**: fix Clarifying Questions node display and auto-open issues (dfce9e2d)
+- **web**: prevent rate limit for clarifying.getProgress (19ae4114)
+- **dev**: add Stage 6 worker to start-dev.sh (26a9683e)
+- **web**: improve error handling in RealtimeProvider (6e579b89)
+- **api**: revert to simple JSON format for restart-stage tRPC call (32aa0793)
+- **api**: use tRPC batch format for restart-stage endpoint (11568a6b)
+- **api**: correct tRPC endpoint path for restart-stage (9d8957fa)
+- **web**: resolve ESLint errors in NodeDetailsDrawer (a8184926)
+- **web**: resolve 405 error and hydration warnings in restart-stage (143b9e82)
+- **stage4**: address medium/low code review findings (db67b053)
+- **stage4**: address code review findings for self-reflection (1c3ab8ad)
+- **web**: use correct tRPC GET input format in getChatTokenEstimates (60448086)
+- **i18n**: use correct ICU interpolation format {var} instead of {{var}} (c01af199)
+- **config**: switch xiaomi/mimo-v2-flash from free to paid tier (b8a8dad5)
+
+### Other
+
+- bd sync: 2026-01-26 18:20:56 (9e27ecbe)
+- bd sync: 2026-01-26 18:20:17 (1caee731)
+- bd sync: 2026-01-26 14:50:44 (d739ecb7)
+- bd sync: 2026-01-26 14:36:20 (60ab6b15)
+- **i18n**: add Generation Graph section after P3.3 migration (988ec98c)
+
 ## [0.28.39] - 2026-01-26
 
 ### Changed
