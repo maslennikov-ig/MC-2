@@ -62,9 +62,7 @@ export const RestartConfirmDialog = ({
               <div className="text-sm text-amber-800">{t('restart.warningMessage')}</div>
             </div>
             <p className="text-slate-600">
-              {t('restart.confirmDescription')
-                .replace('{{stageName}}', stageName)
-                .replace('{{stageNumber}}', String(stageNumber))}
+              {t('restart.confirmDescription', { stageName, stageNumber })}
             </p>
           </DialogDescription>
         </DialogHeader>
