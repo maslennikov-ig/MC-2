@@ -12,7 +12,7 @@ import { motion } from 'framer-motion';
 import { useTranslations } from 'next-intl';
 import { RestartConfirmDialog } from '../controls/RestartConfirmDialog';
 import { useOptionalPartialGenerationContext } from '../contexts/PartialGenerationContext';
-import { useGenerationStore } from '@/stores/useGenerationStore';
+import { useGenerationStore, type StageId } from '@/stores/useGenerationStore';
 import {
   NodeErrorTooltip,
   NodeErrorPanel,
@@ -47,7 +47,7 @@ const StageNode = (props: NodeProps<RFStageNode>) => {
   const partialGenContext = useOptionalPartialGenerationContext();
 
   // Get optimistic status from Zustand store (for immediate UI feedback)
-  const stageId = `stage_${data.stageNumber}`;
+  const stageId = `stage_${data.stageNumber}` as StageId;
   const zustandStatus = useGenerationStore(state => state.getStageStatus(stageId));
 
   // Semantic Zoom - thresholds adjusted for better initial visibility
