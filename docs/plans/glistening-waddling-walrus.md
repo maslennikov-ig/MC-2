@@ -1,125 +1,285 @@
-# План: Исправление конфигурации stage_4_clarifying
+# План: Self-Reflection в автоматическом режиме Phase 0.5
 
 > **Статус**: Готов к реализации
-> **Дата**: 2026-01-25
+> **Дата**: 2026-01-26
+> **Выбранный вариант**: B) Self-Reflection + UI нода
 
 ---
 
-## Проблемы
+## Цель
 
-1. **stage_number: null** — должен быть `4`
-2. **Модель** — сменить primary на Kimi-K2 (дешевле при 4000 токенов)
-3. **Порядок в документации** — clarifying показан первым, но выполняется после Budget Allocation
+1. В `automatic` режиме генерировать clarifying questions и автоматически выбирать suggested answers
+2. Показывать Clarifying Node в UI графе **в обоих режимах** (semi_automatic и automatic)
+3. Пользователь всегда видит "какие вопросы система задала и какие ответы дала"
 
----
-
-## Минорные улучшения: Статус
-
-| Улучшение                   | Статус      | Файл/Строка                           |
-| --------------------------- | ----------- | ------------------------------------- |
-| trim() + min 3 chars        | ✅ Уже есть | `clarifying.router.ts:56,62`          |
-| Zod validation Phase05Input | ✅ Уже есть | `phase-0.5-clarifying.ts:91,334`      |
-| Toast уведомления ошибок    | ✅ Уже есть | `ClarifyingPanel.tsx:123,136,162,177` |
-| RPC агрегация COUNT         | ❌ Не нужно | 3-7 вопросов макс — fetch+JS быстрее  |
-| Pagination                  | ❌ Не нужно | 14 вопросов макс (7×2 раунда)         |
-
-**Вывод**: Все нужные минорные улучшения уже реализованы.
+**Поведение по режимам:**
+| Режим | Вопросы | Ответы | UI Node |
+|-------|---------|--------|---------|
+| semi_automatic | Генерируются | User выбирает | ✅ Видна (кликабельна для ввода) |
+| automatic | Генерируются | Auto-select | ✅ Видна (read-only, badge "Авто") |
 
 ---
 
-## План изменений
+## Текущее состояние
 
-### 1. Миграция БД
+| Компонент           | Статус                             |
+| ------------------- | ---------------------------------- |
+| ClarifyingNode.tsx  | ✅ Существует, зарегистрирован     |
+| ClarifyingPanel.tsx | ✅ Существует, полнофункциональный |
+| Нода в графе        | ❌ **НЕ создаётся** в buildGraph   |
+| Auto-answer backend | ❌ Не реализовано                  |
 
-**Файл**: `packages/course-gen-platform/supabase/migrations/20260125220000_fix_clarifying_config.sql`
+---
 
-```sql
--- Fix stage_number and swap models for stage_4_clarifying
--- Primary: Kimi K2 (cheaper for 4000 tokens)
--- Fallback: Gemini 2.0 Thinking (reasoning capability)
-UPDATE llm_model_config
-SET
-  stage_number = 4,
-  model_id = 'moonshotai/kimi-k2-0905',
-  fallback_model_id = 'google/gemini-2.0-flash-thinking-exp-01-21',
-  primary_display_name = 'Kimi K2',
-  fallback_display_name = 'Gemini 2.0 Thinking',
-  updated_at = NOW()
-WHERE phase_name = 'stage_4_clarifying';
+## Архитектура решения
+
+```
+                    ┌─────────────────┐
+                    │    Stage 4      │
+                    │   (Analysis)    │
+                    └────────┬────────┘
+                             │
+              ┌──────────────┴──────────────┐
+              │                             │
+              ▼                             ▼
+    ┌─────────────────┐           ┌─────────────────┐
+    │  Clarifying     │           │   Phase 1-4     │
+    │  Questions Node │◄──────────│   (Analysis)    │
+    │  (ответвление)  │  context  │                 │
+    └─────────────────┘           └─────────────────┘
 ```
 
-### 2. Документация
+Clarifying Node — визуальное ответвление от Stage 4, показывает:
 
-**Файл**: `docs/llm-model-config.md`
+- Количество вопросов (3-7)
+- Прогресс ответов
+- При клике — ClarifyingPanel с деталями
 
-Изменения:
+---
 
-1. Переместить `stage_4_clarifying` в отдельную секцию "Phase 0.5"
-2. Показать правильный порядок выполнения
-3. Обновить модели на Kimi-K2 / Gemini Thinking
+## Часть 1: Backend (Self-Reflection)
 
-**Новая структура Stage 4**:
+### 1.1 Новая функция: `autoAnswerAllQuestions`
 
-```markdown
-## Stage 4: Analysis
+**Файл**: `packages/course-gen-platform/src/stages/stage4-analysis/phases/phase-0.5-clarifying.ts`
 
-### Phase 0: Budget Allocation
+```typescript
+/**
+ * Auto-answer all pending questions with first suggested answer
+ * Used in automatic mode for self-reflection without user input
+ */
+export async function autoAnswerAllQuestions(courseId: string): Promise<number> {
+  const supabase = getSupabaseAdmin();
 
-> Нет отдельной LLM конфигурации — использует документы из Stage 3
+  const { data: questions, error } = await supabase
+    .from('clarifying_questions')
+    .select('id, suggested_answers')
+    .eq('course_id', courseId)
+    .eq('status', 'pending');
 
-### Phase 0.5: Clarifying Questions
+  if (error || !questions?.length) return 0;
 
-| Phase              | Tier     | Primary Model           | Fallback Model                       | Temp | Tokens |
-| ------------------ | -------- | ----------------------- | ------------------------------------ | ---- | ------ |
-| stage_4_clarifying | standard | moonshotai/kimi-k2-0905 | google/gemini-2.0-flash-thinking-exp | 0.50 | 4000   |
+  let answeredCount = 0;
 
-### Phase 1-4: Analysis
+  for (const question of questions) {
+    const suggestions = question.suggested_answers as Array<{ text: string }> | null;
+    const firstAnswer = suggestions?.[0]?.text || 'Auto-selected by system';
 
-| Phase                  | Tier     | Primary Model             | Fallback Model                | Temp | Tokens |
-| ---------------------- | -------- | ------------------------- | ----------------------------- | ---- | ------ |
-| stage_4_classification | standard | xiaomi/mimo-v2-flash:free | google/gemini-2.5-flash       | 0.70 | 4096   |
-| stage_4_classification | extended | google/gemini-2.5-flash   | xiaomi/mimo-v2-flash:free     | 0.70 | 4096   |
-| stage_4_scope          | standard | xiaomi/mimo-v2-flash:free | google/gemini-2.5-flash       | 0.70 | 4096   |
-| stage_4_scope          | extended | google/gemini-2.5-flash   | xiaomi/mimo-v2-flash:free     | 0.70 | 4096   |
-| stage_4_expert         | standard | moonshotai/kimi-k2-0905   | google/gemini-3-flash-preview | 0.50 | 8000   |
-| stage_4_expert         | extended | google/gemini-2.5-flash   | xiaomi/mimo-v2-flash:free     | 0.50 | 8000   |
-| stage_4_synthesis      | standard | moonshotai/kimi-k2-0905   | google/gemini-3-flash-preview | 0.70 | 6000   |
-| stage_4_synthesis      | extended | google/gemini-2.5-flash   | xiaomi/mimo-v2-flash:free     | 0.70 | 6000   |
+    const { error: updateError } = await supabase
+      .from('clarifying_questions')
+      .update({
+        user_answer: firstAnswer,
+        answer_source: 'suggested',
+        selected_suggestion_index: 0,
+        status: 'answered',
+        answered_at: new Date().toISOString(),
+      })
+      .eq('id', question.id);
+
+    if (!updateError) answeredCount++;
+  }
+
+  logger.info({ courseId, answeredCount }, 'Auto-answered clarifying questions');
+  return answeredCount;
+}
+```
+
+### 1.2 Изменение `getClarifyingConfig`
+
+**Файл**: `packages/course-gen-platform/src/stages/stage4-analysis/phases/phase-0.5-clarifying.ts` (строки 592-617)
+
+Добавить поле `isAutomatic`:
+
+```typescript
+export async function getClarifyingConfig(
+  courseId: string
+): Promise<{ enabled: boolean; skipped: boolean; isAutomatic: boolean }> {
+  // ... select settings, generation_mode ...
+  const isAutomatic = course?.generation_mode === 'automatic';
+  return { enabled, skipped, isAutomatic };
+}
+```
+
+### 1.3 Изменение orchestrator
+
+**Файл**: `packages/course-gen-platform/src/stages/stage4-analysis/orchestrator.ts` (строки 328-388)
+
+После генерации вопросов:
+
+```typescript
+if (clarifyingConfig.isAutomatic) {
+  // Auto-answer and continue without pause
+  const answeredCount = await autoAnswerAllQuestions(courseId);
+  orchestrationLogger.info({ answeredCount }, 'Auto-answered, proceeding to Phase 1');
+} else {
+  // Semi-automatic: pause for user input
+  throw new Error('AWAITING_CLARIFYING_ANSWERS');
+}
+```
+
+---
+
+## Часть 2: Frontend (UI Node)
+
+### 2.1 Источник данных для ноды
+
+**Файл**: `packages/web/components/generation-graph/hooks/use-graph-data/index.ts`
+
+Добавить запрос clarifying данных:
+
+```typescript
+// Fetch clarifying questions summary
+const { data: clarifyingData } = trpc.clarifying.getProgress.useQuery(
+  { courseId: courseInfo?.id ?? '' },
+  { enabled: !!courseInfo?.id }
+);
+```
+
+### 2.2 Добавление ноды в buildGraph
+
+**Файл**: `packages/web/components/generation-graph/hooks/use-graph-data/utils/graph-builders.ts`
+
+После создания Stage 4 ноды, добавить Clarifying node:
+
+```typescript
+// Special handling for Stage 4: Add Clarifying Questions branch
+if (i === 4 && clarifyingData && clarifyingData.total > 0) {
+  const clarifyingNodeId = 'stage_4_clarifying';
+
+  newNodes.push({
+    id: clarifyingNodeId,
+    type: 'clarifying',
+    position: getExistingPos(clarifyingNodeId),
+    data: {
+      label: 'Уточняющие вопросы',
+      status: clarifyingData.canProceed ? 'completed' : 'active',
+      stageNumber: 4,
+      questionsCount: clarifyingData.total,
+      answeredCount: clarifyingData.answered,
+      isAutomatic: clarifyingData.isAutomatic, // new field
+    },
+  });
+
+  // Edge from Stage 4 to Clarifying (branch)
+  newEdges.push({
+    id: `e${stageKey}-${clarifyingNodeId}`,
+    source: stageKey,
+    target: clarifyingNodeId,
+    type: 'animated',
+    data: { status: 'idle', animated: false },
+  });
+}
+```
+
+### 2.3 Обновление ClarifyingNode визуала
+
+**Файл**: `packages/web/components/generation-graph/nodes/ClarifyingNode.tsx`
+
+Добавить индикатор "auto-answered":
+
+```typescript
+{nodeData.isAutomatic && (
+  <Badge variant="secondary" className="text-xs">
+    Авто-ответы
+  </Badge>
+)}
+```
+
+### 2.4 Обновление API (getProgress)
+
+**Файл**: `packages/course-gen-platform/src/server/routers/clarifying.router.ts`
+
+Добавить `isAutomatic` в ответ `getProgress`:
+
+```typescript
+return {
+  // ... existing fields
+  isAutomatic: course.generation_mode === 'automatic',
+};
 ```
 
 ---
 
 ## Критические файлы
 
-| Файл                                                                                        | Действие                      |
-| ------------------------------------------------------------------------------------------- | ----------------------------- |
-| `packages/course-gen-platform/supabase/migrations/20260125220000_fix_clarifying_config.sql` | Создать                       |
-| `docs/llm-model-config.md`                                                                  | Модифицировать (строки 33-45) |
+### Backend
+
+| Файл                             | Строки      | Изменение                  |
+| -------------------------------- | ----------- | -------------------------- |
+| `phases/phase-0.5-clarifying.ts` | ~580        | + `autoAnswerAllQuestions` |
+| `phases/phase-0.5-clarifying.ts` | 592-617     | + `isAutomatic` в config   |
+| `orchestrator.ts`                | 328-388     | Auto-answer логика         |
+| `clarifying.router.ts`           | getProgress | + `isAutomatic`            |
+
+### Frontend
+
+| Файл                         | Изменение                  |
+| ---------------------------- | -------------------------- |
+| `use-graph-data/index.ts`    | + clarifying query         |
+| `graph-builders.ts`          | + clarifying node creation |
+| `ClarifyingNode.tsx`         | + isAutomatic badge        |
+| `BuildGraphParams` interface | + clarifyingData param     |
 
 ---
 
 ## Verification
 
-### 1. Применить миграцию
+### 1. Type-check & Build
 
 ```bash
-cd packages/course-gen-platform && pnpm supabase db push
+pnpm type-check && pnpm build
 ```
 
-### 2. Проверить БД
+### 2. Backend test (automatic mode)
 
 ```sql
-SELECT phase_name, stage_number, model_id, fallback_model_id, primary_display_name
-FROM llm_model_config
-WHERE phase_name = 'stage_4_clarifying';
+-- Set course to automatic mode with clarifying enabled
+UPDATE courses
+SET generation_mode = 'automatic',
+    settings = jsonb_set(COALESCE(settings, '{}'), '{clarifying_questions_enabled}', 'true')
+WHERE id = '<test-course-id>';
+
+-- After Stage 4 runs, verify auto-answered questions
+SELECT id, question_text, user_answer, answer_source, status
+FROM clarifying_questions
+WHERE course_id = '<test-course-id>';
+-- Expected: status='answered', answer_source='suggested'
 ```
 
-**Ожидаемый результат**:
-| phase_name | stage_number | model_id | fallback_model_id | primary_display_name |
-|------------|--------------|----------|-------------------|---------------------|
-| stage_4_clarifying | 4 | moonshotai/kimi-k2-0905 | google/gemini-2.0-flash-thinking-exp-01-21 | Kimi K2 |
+### 3. Frontend test
 
-### 3. Проверить документацию
+- Открыть граф генерации курса
+- Должна появиться Clarifying нода как ответвление от Stage 4
+- При клике — открывается панель с вопросами/ответами
+- В automatic mode — badge "Авто-ответы"
 
-- Порядок фаз соответствует execution flow
-- Модели синхронизированы с БД
+---
+
+## Оценка сложности
+
+| Часть    | Файлов | Сложность |
+| -------- | ------ | --------- |
+| Backend  | 3      | Низкая    |
+| Frontend | 4      | Средняя   |
+
+**Рекомендация**: Реализовать сначала Backend (Часть 1), затем Frontend (Часть 2).

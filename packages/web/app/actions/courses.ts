@@ -568,6 +568,10 @@ export async function updateDraftAndStartGeneration(
         updated_at: new Date().toISOString(),
         settings: {
           lesson_duration_minutes: validatedData.lesson_duration_minutes || 15,
+          // Enable clarifying questions for BOTH modes
+          // - semi_automatic: waits for user answers
+          // - automatic: AI answers automatically, but node is still visible for review
+          clarifying_questions_enabled: true,
         } as unknown as Json,
       })
       .eq('id', courseId)

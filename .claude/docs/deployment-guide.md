@@ -28,10 +28,11 @@ Variables prefixed with `NEXT_PUBLIC_` are embedded into the JavaScript bundle a
 
 These are read at runtime and can be changed without rebuilding:
 
-| Variable                    | Description                    | Default           |
-| --------------------------- | ------------------------------ | ----------------- |
-| `COURSEGEN_BACKEND_URL`     | API URL for server-side calls  | `http://api:4000` |
-| `SUPABASE_SERVICE_ROLE_KEY` | Service role key (server only) | Required          |
+| Variable                    | Description                          | Default             |
+| --------------------------- | ------------------------------------ | ------------------- |
+| `COURSEGEN_BACKEND_URL`     | API URL for server-side calls        | `http://api:4000`   |
+| `SUPABASE_SERVICE_ROLE_KEY` | Service role key (server only)       | Required            |
+| `BULLMQ_QUEUE_NAME`         | Queue name for environment isolation | `course-generation` |
 
 ## Blue/Green Deployment
 
@@ -220,6 +221,51 @@ curl -f http://localhost:3002
 curl -f http://localhost:4001/health
 curl -f http://localhost:4002/health
 ```
+
+## Local Development
+
+When running locally with **shared Supabase** (cloud), you must configure queue isolation to prevent staging from processing your jobs.
+
+### Problem
+
+- Local dev and staging share the same Supabase database
+- Staging server runs 24/7 with its own outbox processor
+- Without queue isolation, staging's outbox processor picks up your local jobs
+
+### Solution
+
+Add to `packages/course-gen-platform/.env`:
+
+```bash
+# Local development queue isolation
+BULLMQ_QUEUE_NAME=course-generation-local
+```
+
+This ensures:
+
+1. Local outbox processor only processes jobs with `target_queue = 'course-generation-local'`
+2. Local FSM creates outbox entries with this `target_queue`
+3. Staging ignores your local jobs (it filters by `course-generation`)
+
+### If Jobs Were Already Created
+
+If you started generation before configuring queue isolation:
+
+```sql
+-- Reset jobs to be picked up by local processor
+UPDATE job_outbox
+SET processed_at = NULL, target_queue = 'course-generation-local'
+WHERE entity_id = '<course-id>';
+
+-- Reset course status
+UPDATE courses
+SET generation_status = 'stage_2_init'
+WHERE id = '<course-id>';
+```
+
+Then restart local backend/worker to apply new `BULLMQ_QUEUE_NAME`.
+
+---
 
 ## Dev Environment (dev.ai.megacampus.ru)
 

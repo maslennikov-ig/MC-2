@@ -175,7 +175,9 @@ const app: express.Application = express();
  */
 app.use(
   cors({
-    origin: IS_PRODUCTION ? CORS_ORIGIN : '*',
+    origin: IS_PRODUCTION
+      ? CORS_ORIGIN
+      : ['http://localhost:3000', 'http://localhost:3001', 'http://localhost:3002'],
     credentials: true,
     allowedHeaders: ['Content-Type', 'Authorization'],
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
