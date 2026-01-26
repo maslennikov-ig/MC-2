@@ -13,7 +13,7 @@ import {
   RefreshCcw,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
-import { useTranslation } from '@/lib/generation-graph/useTranslation'
+import { useTranslations } from 'next-intl'
 import { QuickActions, type ChatIntent } from './QuickActions'
 import { MarkdownRendererClient } from '@/components/markdown'
 import { toast } from '@/lib/toast'
@@ -40,7 +40,7 @@ export const RefinementChat: React.FC<RefinementChatProps> = ({
   history = [],
   isProcessing = false,
 }) => {
-  const { t } = useTranslation()
+  const t = useTranslations('generation')
   // Expanded by default (FR-022), with localStorage persistence
   const [isOpen, setIsOpen] = useState(() => {
     if (typeof window === 'undefined') return true

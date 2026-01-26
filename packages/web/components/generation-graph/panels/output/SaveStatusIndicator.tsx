@@ -4,22 +4,20 @@ import React from 'react'
 import { Check, Loader2, AlertCircle } from 'lucide-react'
 import { SaveStatus } from '../../hooks/useAutoSave'
 import { cn } from '@/lib/utils'
-import { GRAPH_TRANSLATIONS } from '@/lib/generation-graph/translations'
+import { useTranslations } from 'next-intl'
 
 interface SaveStatusIndicatorProps {
   status: SaveStatus
   error?: string | null
   className?: string
-  locale?: 'ru' | 'en'
 }
 
 export const SaveStatusIndicator: React.FC<SaveStatusIndicatorProps> = ({
   status,
   error,
   className,
-  locale = 'ru',
 }) => {
-  const t = GRAPH_TRANSLATIONS.common
+  const t = useTranslations('generation.common')
 
   // Use invisible placeholder for idle state to prevent layout shift
   if (status === 'idle') {
@@ -29,7 +27,7 @@ export const SaveStatusIndicator: React.FC<SaveStatusIndicatorProps> = ({
         aria-hidden="true"
       >
         <Check className="h-3 w-3" />
-        <span>{t?.saved?.[locale] ?? 'Saved'}</span>
+        <span>{t('saved')}</span>
       </div>
     )
   }
@@ -42,7 +40,7 @@ export const SaveStatusIndicator: React.FC<SaveStatusIndicatorProps> = ({
         <>
           <Loader2 className="h-3 w-3 animate-spin text-blue-500 dark:text-blue-400" />
           <span className="text-slate-500 dark:text-slate-400">
-            {t?.saving?.[locale] ?? 'Saving...'}
+            {t('saving')}
           </span>
         </>
       )}
@@ -50,7 +48,7 @@ export const SaveStatusIndicator: React.FC<SaveStatusIndicatorProps> = ({
         <>
           <Check className="h-3 w-3 text-green-500 dark:text-green-400" />
           <span className="text-green-600 dark:text-green-400">
-            {t?.saved?.[locale] ?? 'Saved'}
+            {t('saved')}
           </span>
         </>
       )}
@@ -59,9 +57,9 @@ export const SaveStatusIndicator: React.FC<SaveStatusIndicatorProps> = ({
           <AlertCircle className="h-3 w-3 text-red-500 dark:text-red-400" />
           <span
             className="text-red-600 dark:text-red-400"
-            title={error || t?.saveErrorTooltip?.[locale] || 'Save error'}
+            title={error || t('saveErrorTooltip')}
           >
-            {t?.saveError?.[locale] ?? 'Error'}
+            {t('saveError')}
           </span>
         </>
       )}

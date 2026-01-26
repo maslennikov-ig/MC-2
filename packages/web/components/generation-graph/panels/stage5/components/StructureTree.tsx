@@ -5,7 +5,7 @@ import { BookOpen } from 'lucide-react';
 import { Accordion, AccordionContent, AccordionItem, AccordionTrigger } from '@/components/ui/accordion';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { GRAPH_TRANSLATIONS } from '@/lib/generation-graph/translations';
+import { useTranslations } from 'next-intl';
 import type { StructureTreeProps, Section, Lesson } from '../types';
 
 // ============================================================================
@@ -15,11 +15,10 @@ import type { StructureTreeProps, Section, Lesson } from '../types';
 interface LessonItemProps {
   lesson: Lesson;
   index: number;
-  locale: 'ru' | 'en';
 }
 
-const LessonItem = memo<LessonItemProps>(function LessonItem({ lesson, index, locale }) {
-  const t = GRAPH_TRANSLATIONS.stage5!;
+const LessonItem = memo<LessonItemProps>(function LessonItem({ lesson, index }) {
+  const t = useTranslations('generation.stage5');
 
   return (
     <div className="flex items-start gap-3 py-3 px-4 border-l-2 border-muted hover:bg-muted/30 transition-colors">
@@ -71,7 +70,7 @@ const LessonItem = memo<LessonItemProps>(function LessonItem({ lesson, index, lo
 
       {/* Duration */}
       <div className="flex-shrink-0 text-xs text-muted-foreground">
-        {lesson.estimated_duration_minutes} {t?.minutesShort?.[locale] ?? 'm'}
+        {lesson.estimated_duration_minutes} {t('minutesShort')}
       </div>
     </div>
   );
@@ -84,11 +83,10 @@ const LessonItem = memo<LessonItemProps>(function LessonItem({ lesson, index, lo
 interface SectionItemProps {
   section: Section;
   index: number;
-  locale: 'ru' | 'en';
 }
 
-const SectionItem = memo<SectionItemProps>(function SectionItem({ section, index, locale }) {
-  const t = GRAPH_TRANSLATIONS.stage5!;
+const SectionItem = memo<SectionItemProps>(function SectionItem({ section, index }) {
+  const t = useTranslations('generation.stage5');
 
   // Use section_number as string for accordion value
   const sectionId = String(section.section_number || index + 1);
@@ -118,7 +116,7 @@ const SectionItem = memo<SectionItemProps>(function SectionItem({ section, index
 
           {/* Lesson Count Badge */}
           <Badge variant="secondary" className="ml-auto text-xs">
-            {section.lessons.length} {t?.lessonsInSection?.[locale] ?? 'lessons'}
+            {section.lessons.length} {t('lessonsInSection')}
           </Badge>
         </div>
       </AccordionTrigger>
@@ -151,7 +149,6 @@ const SectionItem = memo<SectionItemProps>(function SectionItem({ section, index
               key={lesson.lesson_number || lessonIdx}
               lesson={lesson}
               index={lessonIdx}
-              locale={locale}
             />
           ))}
         </div>
@@ -188,7 +185,7 @@ export const StructureTree = memo<StructureTreeProps>(function StructureTree({
   sections,
   expandedSections,
   onToggleSection,
-  locale = 'ru',
+  locale: _locale = 'ru',
 }) {
   // Handle accordion value change
   const handleValueChange = (value: string[]) => {
@@ -217,7 +214,6 @@ export const StructureTree = memo<StructureTreeProps>(function StructureTree({
           key={section.section_number || index}
           section={section}
           index={index}
-          locale={locale}
         />
       ))}
     </Accordion>

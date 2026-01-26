@@ -23,7 +23,7 @@ import {
   Bell,
 } from 'lucide-react'
 import { getLearningStyleByValue } from '@/lib/constants/learning-styles'
-import { GRAPH_TRANSLATIONS } from '@/lib/generation-graph/translations'
+import { useTranslations } from 'next-intl'
 import { getCourseSizeLabels } from '@megacampus/shared-types'
 import type { Stage1InputTabProps, Stage1InputData } from './types'
 
@@ -50,23 +50,6 @@ function getStrategyColor(strategy: Stage1InputData['content_strategy']): string
   return STRATEGY_COLORS[strategy] || STRATEGY_COLORS.default
 }
 
-function getStrategyLabel(
-  strategy: Stage1InputData['content_strategy'],
-  locale: 'ru' | 'en'
-): string {
-  const t = GRAPH_TRANSLATIONS.stage1
-  switch (strategy) {
-    case 'auto':
-      return t?.strategyAuto?.[locale] || 'Auto'
-    case 'create_from_scratch':
-      return t?.strategyFromScratch?.[locale] || 'From Scratch'
-    case 'expand_and_enhance':
-      return t?.strategyExpand?.[locale] || 'Expand'
-    default:
-      return strategy
-  }
-}
-
 // ============================================================================
 // FORMAT ICONS
 // ============================================================================
@@ -74,7 +57,7 @@ function getStrategyLabel(
 interface FormatIconProps {
   format: 'text' | 'audio' | 'video' | 'presentation' | 'test'
   isActive: boolean
-  locale: 'ru' | 'en'
+  label: string
 }
 
 const FORMAT_ICONS = {
@@ -85,17 +68,8 @@ const FORMAT_ICONS = {
   test: ClipboardCheck,
 } as const
 
-const FORMAT_LABELS = {
-  text: { ru: 'Текст', en: 'Text' },
-  audio: { ru: 'Аудио', en: 'Audio' },
-  video: { ru: 'Видео', en: 'Video' },
-  presentation: { ru: 'Презентация', en: 'Presentation' },
-  test: { ru: 'Тест', en: 'Test' },
-} as const
-
-function FormatIcon({ format, isActive, locale }: FormatIconProps) {
+function FormatIcon({ format, isActive, label }: FormatIconProps) {
   const Icon = FORMAT_ICONS[format]
-  const label = FORMAT_LABELS[format][locale]
 
   return (
     <div
@@ -117,12 +91,12 @@ function FormatIcon({ format, isActive, locale }: FormatIconProps) {
 
 interface DescriptionWithToggleProps {
   description: string
-  locale: 'ru' | 'en'
+  showMoreLabel: string
+  showLessLabel: string
 }
 
-function DescriptionWithToggle({ description, locale }: DescriptionWithToggleProps) {
+function DescriptionWithToggle({ description, showMoreLabel, showLessLabel }: DescriptionWithToggleProps) {
   const [isExpanded, setIsExpanded] = useState(false)
-  const t = GRAPH_TRANSLATIONS.stage1
 
   // Estimate ~80 chars per line, 3 lines = 240 chars threshold
   const shouldShowToggle = description.length > 240
@@ -140,12 +114,12 @@ function DescriptionWithToggle({ description, locale }: DescriptionWithTogglePro
         >
           {isExpanded ? (
             <>
-              {t?.showLess?.[locale] || 'Show less'}
+              {showLessLabel}
               <ChevronUp className="h-3 w-3" />
             </>
           ) : (
             <>
-              {t?.showMore?.[locale] || 'Show more'}
+              {showMoreLabel}
               <ChevronDown className="h-3 w-3" />
             </>
           )}
@@ -163,7 +137,7 @@ export const Stage1InputTab = memo<Stage1InputTabProps>(function Stage1InputTab(
   inputData,
   locale = 'ru',
 }) {
-  const t = GRAPH_TRANSLATIONS.stage1
+  const t = useTranslations('generation.stage1')
 
   // Parse inputData safely - cast to expected type
   const data: Stage1InputData | undefined = inputData
@@ -184,10 +158,33 @@ export const Stage1InputTab = memo<Stage1InputTabProps>(function Stage1InputTab(
     'test',
   ]
 
+  // Format labels mapped from translations
+  const formatLabels: Record<typeof allFormats[number], string> = {
+    text: t('formatText'),
+    audio: t('formatAudio'),
+    video: t('formatVideo'),
+    presentation: t('formatPresentation'),
+    test: t('formatTest'),
+  }
+
+  // Strategy labels
+  const getStrategyLabel = (strategy: Stage1InputData['content_strategy']): string => {
+    switch (strategy) {
+      case 'auto':
+        return t('strategyAuto')
+      case 'create_from_scratch':
+        return t('strategyFromScratch')
+      case 'expand_and_enhance':
+        return t('strategyExpand')
+      default:
+        return strategy
+    }
+  }
+
   if (!data) {
     return (
       <div className="text-muted-foreground p-4 text-center">
-        {t?.notSpecified?.[locale] || 'Not specified'}
+        {t('notSpecified')}
       </div>
     )
   }
@@ -198,7 +195,7 @@ export const Stage1InputTab = memo<Stage1InputTabProps>(function Stage1InputTab(
       <Card className="col-span-2">
         <CardHeader className="pb-3">
           <CardTitle className="text-muted-foreground text-sm font-medium">
-            {t?.identity?.[locale] || 'Identity'}
+            {t('identity')}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -207,7 +204,11 @@ export const Stage1InputTab = memo<Stage1InputTabProps>(function Stage1InputTab(
 
           {/* Description with show more/less */}
           {data.course_description && (
-            <DescriptionWithToggle description={data.course_description} locale={locale} />
+            <DescriptionWithToggle
+              description={data.course_description}
+              showMoreLabel={t('showMore')}
+              showLessLabel={t('showLess')}
+            />
           )}
 
           {/* Optional fields: Prerequisites and Learning Outcomes */}
@@ -216,7 +217,7 @@ export const Stage1InputTab = memo<Stage1InputTabProps>(function Stage1InputTab(
               {data.prerequisites && (
                 <div>
                   <span className="text-muted-foreground text-xs font-medium">
-                    {t?.prerequisites?.[locale] || 'Prerequisites'}
+                    {t('prerequisites')}
                   </span>
                   <p className="mt-1 text-sm">{data.prerequisites}</p>
                 </div>
@@ -224,7 +225,7 @@ export const Stage1InputTab = memo<Stage1InputTabProps>(function Stage1InputTab(
               {data.learning_outcomes && (
                 <div>
                   <span className="text-muted-foreground text-xs font-medium">
-                    {t?.learningOutcomes?.[locale] || 'Learning Outcomes'}
+                    {t('learningOutcomes')}
                   </span>
                   <p className="mt-1 text-sm">{data.learning_outcomes}</p>
                 </div>
@@ -238,17 +239,17 @@ export const Stage1InputTab = memo<Stage1InputTabProps>(function Stage1InputTab(
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-muted-foreground text-sm font-medium">
-            {t?.strategyAndLogistics?.[locale] || 'Strategy & Parameters'}
+            {t('strategyAndLogistics')}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Strategy Badge */}
           <div className="flex items-center gap-2">
             <span className="text-muted-foreground text-xs">
-              {t?.strategy?.[locale] || 'Strategy'}:
+              {t('strategy')}:
             </span>
             <Badge className={cn('border', getStrategyColor(data.content_strategy))}>
-              {getStrategyLabel(data.content_strategy, locale)}
+              {getStrategyLabel(data.content_strategy)}
             </Badge>
           </div>
 
@@ -258,7 +259,7 @@ export const Stage1InputTab = memo<Stage1InputTabProps>(function Stage1InputTab(
             <span className="text-sm">
               {data.target_audience || (
                 <span className="text-muted-foreground italic">
-                  {t?.notSpecified?.[locale] || 'Not specified'}
+                  {t('notSpecified')}
                 </span>
               )}
             </span>
@@ -268,7 +269,7 @@ export const Stage1InputTab = memo<Stage1InputTabProps>(function Stage1InputTab(
           {learningStyle && (
             <div className="flex items-center gap-2">
               <span className="text-muted-foreground text-xs">
-                {t?.style?.[locale] || 'Style'}:
+                {t('style')}:
               </span>
               <Badge variant="outline">{learningStyle.title}</Badge>
             </div>
@@ -278,7 +279,7 @@ export const Stage1InputTab = memo<Stage1InputTabProps>(function Stage1InputTab(
           <div className="flex items-baseline gap-2 pt-2">
             <span className="text-3xl font-bold">{data.estimated_lessons ?? '--'}</span>
             <span className="text-muted-foreground text-sm">
-              {t?.lessonsCount?.[locale] || 'Lessons'}
+              {t('lessonsCount')}
             </span>
           </div>
 
@@ -287,7 +288,7 @@ export const Stage1InputTab = memo<Stage1InputTabProps>(function Stage1InputTab(
             <div className="flex items-center gap-2">
               <span className="text-xl font-semibold">{data.estimated_sections}</span>
               <span className="text-muted-foreground text-xs">
-                {t?.sectionsCount?.[locale] || 'Sections'}
+                {t('sectionsCount')}
               </span>
             </div>
           )}
@@ -305,7 +306,7 @@ export const Stage1InputTab = memo<Stage1InputTabProps>(function Stage1InputTab(
             <div className="flex items-center gap-2">
               <Clock className="text-muted-foreground h-4 w-4" />
               <span className="text-sm">
-                {data.lesson_duration_minutes} {t?.lessonDuration?.[locale] || 'min/lesson'}
+                {data.lesson_duration_minutes} {t('lessonDuration')}
               </span>
             </div>
           )}
@@ -315,7 +316,7 @@ export const Stage1InputTab = memo<Stage1InputTabProps>(function Stage1InputTab(
             <div className="flex items-center gap-2">
               <Layers className="text-muted-foreground h-4 w-4" />
               <span className="text-muted-foreground text-xs">
-                {t?.courseSize?.[locale] || 'Size:'}
+                {t('courseSize')}:
               </span>
               <Badge variant="outline">{getCourseSizeLabels(locale, data.course_size).title}</Badge>
             </div>
@@ -325,18 +326,18 @@ export const Stage1InputTab = memo<Stage1InputTabProps>(function Stage1InputTab(
           {data.generation_mode && (
             <div className="flex items-center gap-2">
               <span className="text-muted-foreground text-xs">
-                {t?.generationMode?.[locale] || 'Mode'}:
+                {t('generationMode')}:
               </span>
               <Badge variant="outline" className="flex items-center gap-1">
                 {data.generation_mode === 'automatic' ? (
                   <>
                     <Zap className="h-3 w-3" />
-                    {t?.modeAutomatic?.[locale] || 'Auto'}
+                    {t('modeAutomatic')}
                   </>
                 ) : (
                   <>
                     <Hand className="h-3 w-3" />
-                    {t?.modeSemiAutomatic?.[locale] || 'Manual'}
+                    {t('modeSemiAutomatic')}
                   </>
                 )}
               </Badge>
@@ -349,17 +350,17 @@ export const Stage1InputTab = memo<Stage1InputTabProps>(function Stage1InputTab(
               <Bell className="text-muted-foreground h-4 w-4" />
               {data.notify_on_completion && (
                 <Badge variant="secondary" className="text-xs">
-                  {t?.notifyCompletion?.[locale] || 'On completion'}
+                  {t('notifyCompletion')}
                 </Badge>
               )}
               {data.notify_on_error && (
                 <Badge variant="secondary" className="text-xs">
-                  {t?.notifyError?.[locale] || 'On error'}
+                  {t('notifyError')}
                 </Badge>
               )}
               {data.notify_on_stage_complete && (
                 <Badge variant="secondary" className="text-xs">
-                  {t?.notifyStage?.[locale] || 'On stage'}
+                  {t('notifyStage')}
                 </Badge>
               )}
             </div>
@@ -368,7 +369,7 @@ export const Stage1InputTab = memo<Stage1InputTabProps>(function Stage1InputTab(
           {/* Output Formats */}
           <div className="border-border/50 border-t pt-2">
             <span className="text-muted-foreground mb-2 block text-xs">
-              {t?.formats?.[locale] || 'Formats'}:
+              {t('formats')}:
             </span>
             <div className="flex items-center gap-4">
               {allFormats.map((format) => (
@@ -376,7 +377,7 @@ export const Stage1InputTab = memo<Stage1InputTabProps>(function Stage1InputTab(
                   key={format}
                   format={format}
                   isActive={activeFormats.has(format)}
-                  locale={locale}
+                  label={formatLabels[format]}
                 />
               ))}
             </div>
@@ -390,7 +391,7 @@ export const Stage1InputTab = memo<Stage1InputTabProps>(function Stage1InputTab(
           <div className="flex items-center gap-2">
             <FolderOpen className="text-muted-foreground h-4 w-4" />
             <CardTitle className="text-muted-foreground text-sm font-medium">
-              {t?.knowledgeBase?.[locale] || 'Knowledge Base'}
+              {t('knowledgeBase')}
             </CardTitle>
           </div>
         </CardHeader>
@@ -419,7 +420,7 @@ export const Stage1InputTab = memo<Stage1InputTabProps>(function Stage1InputTab(
             <div className="py-6 text-center">
               <FolderOpen className="text-muted-foreground/50 mx-auto mb-2 h-8 w-8" />
               <p className="text-muted-foreground text-sm italic">
-                {t?.noFiles?.[locale] || 'No files'}
+                {t('noFiles')}
               </p>
             </div>
           )}

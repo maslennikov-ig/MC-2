@@ -13,7 +13,8 @@
  * getModuleWord(21, t) // "модуль"
  */
 
-type TranslationFn = (key: string) => string;
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+type TranslationFn = (key: any) => string;
 
 /**
  * Determines Russian plural form based on count.

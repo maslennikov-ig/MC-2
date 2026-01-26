@@ -4,7 +4,7 @@ import { RFEndNode } from '../types';
 import { Trophy, Sparkles, CheckCircle2, ExternalLink, Layers, BookOpen, AlertCircle } from 'lucide-react';
 import { useNodeStatus } from '../hooks/useNodeStatus';
 import { useStaticGraph } from '../contexts/StaticGraphContext';
-import { useTranslation } from '@/lib/generation-graph/useTranslation';
+import { useTranslations } from 'next-intl';
 import { getModuleWord, getLessonWord } from '@/lib/generation-graph/utils/pluralization';
 import { motion } from 'framer-motion';
 import { Link } from '@/src/i18n/navigation';
@@ -48,15 +48,16 @@ const EndNode = ({ id, data, selected }: NodeProps<RFEndNode>) => {
   const orgSlug = params?.orgSlug as string | undefined;
 
   // Translations
-  const { t } = useTranslation();
+  const t = useTranslations('generation');
 
   // Memoized plural forms for Russian language support
+  // Cast t to (key: string) => string for pluralization utility compatibility
   const moduleLabel = useMemo(
-    () => getModuleWord(moduleCount, t, 'common'),
+    () => getModuleWord(moduleCount, t as unknown as (key: string) => string, 'common'),
     [moduleCount, t]
   );
   const lessonLabel = useMemo(
-    () => getLessonWord(lessonCount, t, 'common'),
+    () => getLessonWord(lessonCount, t as unknown as (key: string) => string, 'common'),
     [lessonCount, t]
   );
 

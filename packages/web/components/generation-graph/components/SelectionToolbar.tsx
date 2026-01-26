@@ -27,7 +27,7 @@ import { toast } from 'sonner'
 import type { CourseStructure } from '@megacampus/shared-types'
 import { useThemeSync } from '@/lib/hooks/use-theme-sync'
 import { Link } from '@/src/i18n/navigation'
-import { useTranslation } from '@/lib/generation-graph/useTranslation'
+import { useTranslations } from 'next-intl'
 import { getModuleWord, getLessonWord } from '@/lib/generation-graph/utils/pluralization'
 import { buildCourseUrl } from '@/lib/helpers/course-urls'
 
@@ -96,7 +96,7 @@ export function SelectionToolbar({
   const [isMinimized, setIsMinimized] = useState(false)
   const { resolvedTheme, mounted } = useThemeSync()
   const isDark = mounted && resolvedTheme === 'dark'
-  const { t } = useTranslation()
+  const t = useTranslations('generation')
 
   // Memoized plural forms for Russian language support
   const moduleLabel = useMemo(() => getModuleWord(moduleCount, t, 'common'), [moduleCount, t])

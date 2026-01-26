@@ -22,7 +22,7 @@ import {
 } from '@/components/ui/tooltip';
 import type { ModuleDashboardAggregates } from '@megacampus/shared-types';
 import { cn } from '@/lib/utils';
-import { useTranslation } from '@/lib/generation-graph/useTranslation';
+import { useTranslations, useLocale } from 'next-intl';
 
 /**
  * ModuleDashboardFooter - Footer with batch actions for Module Dashboard
@@ -71,7 +71,8 @@ export function ModuleDashboardFooter({
   isApproving = false,
   className,
 }: ModuleDashboardFooterProps) {
-  const { t, locale } = useTranslation();
+  const t = useTranslations('generation');
+  const locale = useLocale();
   const hasCompletedLessons = aggregates.completedLessons > 0;
   const hasErrorLessons = aggregates.errorLessons > 0;
   const hasLowQualityLessons = lowQualityCount > 0;

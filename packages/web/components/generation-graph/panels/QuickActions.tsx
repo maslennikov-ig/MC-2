@@ -1,7 +1,7 @@
 import React from 'react'
 import { Button } from '@/components/ui/button'
 import { Sparkles, Wand2, ShieldCheck, Scale, LucideIcon } from 'lucide-react'
-import { useTranslation } from '@/lib/generation-graph/useTranslation'
+import { useTranslations } from 'next-intl'
 
 export type ChatIntent = 'refine' | 'regenerate'
 
@@ -18,7 +18,7 @@ interface QuickActionsProps {
 }
 
 export const QuickActions: React.FC<QuickActionsProps> = ({ onSelect, disabled }) => {
-  const { t } = useTranslation()
+  const t = useTranslations('generation')
 
   const actions: QuickAction[] = [
     {

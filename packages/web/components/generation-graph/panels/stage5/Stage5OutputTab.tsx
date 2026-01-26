@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { cn } from '@/lib/utils'
 import { CheckCircle2, BookOpen, Clock, Tag, GitBranch } from 'lucide-react'
-import { GRAPH_TRANSLATIONS } from '@/lib/generation-graph/translations'
+import { useTranslations } from 'next-intl'
 import { StructureTree } from './components/StructureTree'
 import { AutoCardPreview } from '../shared/AutoCardPreview'
 import { EditableField } from '../output/EditableField'
@@ -95,7 +95,8 @@ export const Stage5OutputTab = memo<Stage5OutputTabProps>(function Stage5OutputT
   editable = false,
   locale = 'ru',
 }) {
-  const t = GRAPH_TRANSLATIONS.stage5
+  const t = useTranslations('generation.stage5')
+  const tCourse = useTranslations('generation.courseStructure')
   const te = editableTranslations[locale]
 
   // Expanded sections state for StructureTree
@@ -150,7 +151,7 @@ export const Stage5OutputTab = memo<Stage5OutputTabProps>(function Stage5OutputT
       <div className="flex flex-col items-center justify-center py-12 text-center">
         <GitBranch className="text-muted-foreground/50 mb-4 h-12 w-12" />
         <p className="text-muted-foreground text-sm">
-          {t?.emptyOutput?.[locale] ?? 'Course structure will appear here'}
+          {t('emptyOutput')}
         </p>
       </div>
     )
@@ -180,7 +181,7 @@ export const Stage5OutputTab = memo<Stage5OutputTabProps>(function Stage5OutputT
     | 'beginner'
     | 'intermediate'
     | 'advanced'
-  const difficultyLabel = t?.[difficultyLower]?.[locale] ?? difficulty_level
+  const difficultyLabel = t(difficultyLower)
 
   return (
     <div className="space-y-4 p-1">
@@ -312,7 +313,7 @@ export const Stage5OutputTab = memo<Stage5OutputTabProps>(function Stage5OutputT
             <div>
               <h4 className="mb-2 flex items-center gap-2 text-sm font-semibold">
                 <CheckCircle2 className="h-4 w-4 text-green-500" />
-                {t?.learningOutcomes?.[locale] ?? 'Learning Outcomes'}
+                {t('learningOutcomes')}
               </h4>
               <ul className="space-y-1.5">
                 {learning_outcomes.map((outcome, idx) => (
@@ -329,7 +330,7 @@ export const Stage5OutputTab = memo<Stage5OutputTabProps>(function Stage5OutputT
           <div>
             <h4 className="mb-2 flex items-center gap-2 text-sm font-semibold">
               <BookOpen className="text-muted-foreground h-4 w-4" />
-              {t?.prerequisites?.[locale] ?? 'Prerequisites'}
+              {t('prerequisites')}
             </h4>
             {prerequisites && prerequisites.length > 0 ? (
               <div className="flex flex-wrap gap-1.5">
@@ -341,7 +342,7 @@ export const Stage5OutputTab = memo<Stage5OutputTabProps>(function Stage5OutputT
               </div>
             ) : (
               <p className="text-muted-foreground text-sm italic">
-                {t?.noPrerequisites?.[locale] ?? 'No prerequisites'}
+                {tCourse('noPrerequisites')}
               </p>
             )}
           </div>
@@ -351,7 +352,7 @@ export const Stage5OutputTab = memo<Stage5OutputTabProps>(function Stage5OutputT
             {/* Difficulty */}
             <div className="flex items-center gap-2">
               <span className="text-muted-foreground text-xs">
-                {t?.difficulty?.[locale] ?? 'Difficulty'}:
+                {t('difficulty')}:
               </span>
               <Badge className={cn('text-xs font-medium', difficultyColor)}>
                 {difficultyLabel}
@@ -363,7 +364,7 @@ export const Stage5OutputTab = memo<Stage5OutputTabProps>(function Stage5OutputT
               <Clock className="text-muted-foreground h-3.5 w-3.5" />
               <span className="text-sm font-medium">
                 {estimated_duration_hours}
-                {t?.hoursShort?.[locale] ?? 'h'}
+                {t('hoursShort')}
               </span>
             </div>
 
@@ -392,10 +393,10 @@ export const Stage5OutputTab = memo<Stage5OutputTabProps>(function Stage5OutputT
         <CardHeader className="pb-3">
           <CardTitle className="flex items-center gap-2 text-base font-semibold">
             <GitBranch className="h-4 w-4 text-orange-500" />
-            {t?.structure?.[locale] ?? 'Course Structure'}
+            {t('structurePreview')}
           </CardTitle>
           <p className="text-muted-foreground text-sm">
-            {t?.structureDesc?.[locale] ?? 'Modules and lessons'}
+            {t('structureDesc')}
           </p>
         </CardHeader>
         <CardContent>

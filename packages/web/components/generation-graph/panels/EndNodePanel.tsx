@@ -13,7 +13,7 @@ import {
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Link } from '@/src/i18n/navigation'
-import { useTranslation } from '@/lib/generation-graph/useTranslation'
+import { useTranslations } from 'next-intl'
 import { getModuleWord, getLessonWord } from '@/lib/generation-graph/utils/pluralization'
 import { cn } from '@/lib/utils'
 import { buildCourseUrl } from '@/lib/helpers/course-urls'
@@ -67,11 +67,11 @@ export function EndNodePanel({
   lessonCount,
   isCompleted,
 }: EndNodePanelProps) {
-  const { t } = useTranslation()
+  const t = useTranslations('generation')
 
   // Memoized plural forms for Russian language support
-  const moduleLabel = useMemo(() => getModuleWord(moduleCount, t, 'common'), [moduleCount, t])
-  const lessonLabel = useMemo(() => getLessonWord(lessonCount, t, 'common'), [lessonCount, t])
+  const moduleLabel = useMemo(() => getModuleWord(moduleCount, t as unknown as (key: string) => string, 'common'), [moduleCount, t])
+  const lessonLabel = useMemo(() => getLessonWord(lessonCount, t as unknown as (key: string) => string, 'common'), [lessonCount, t])
 
   return (
     <div className="flex h-full flex-col">

@@ -4,7 +4,7 @@ import React, { memo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { Palette, Sparkles, Shapes, Heart } from 'lucide-react';
-import { GRAPH_TRANSLATIONS } from '@/lib/generation-graph/translations';
+import { useTranslations } from 'next-intl';
 import type { VisualStyle } from '@megacampus/shared-types';
 
 // ============================================================================
@@ -36,34 +36,34 @@ interface VisualStylePreviewProps {
  * Used in Stage 4 OutputTab to preview course branding direction.
  */
 export const VisualStylePreview = memo<VisualStylePreviewProps>(
-  function VisualStylePreview({ visualStyle, locale = 'ru', className }) {
-    const t = GRAPH_TRANSLATIONS.stage4 as Record<string, { ru: string; en: string }>;
+  function VisualStylePreview({ visualStyle, locale: _locale = 'ru', className }) {
+    const t = useTranslations('generation.stage4');
 
     const styleItems = [
       {
         icon: Palette,
-        label: t.visualStyleColorScheme?.[locale] ?? 'Color Scheme',
+        label: t('visualStyleColorScheme'),
         value: visualStyle.colorScheme,
         iconColor: 'text-pink-500 dark:text-pink-400',
         bgColor: 'bg-pink-50 dark:bg-pink-950/30',
       },
       {
         icon: Sparkles,
-        label: t.visualStyleAesthetic?.[locale] ?? 'Aesthetic',
+        label: t('visualStyleAesthetic'),
         value: visualStyle.aesthetic,
         iconColor: 'text-violet-500 dark:text-violet-400',
         bgColor: 'bg-violet-50 dark:bg-violet-950/30',
       },
       {
         icon: Shapes,
-        label: t.visualStyleVisualElements?.[locale] ?? 'Visual Elements',
+        label: t('visualStyleVisualElements'),
         value: visualStyle.visualElements,
         iconColor: 'text-blue-500 dark:text-blue-400',
         bgColor: 'bg-blue-50 dark:bg-blue-950/30',
       },
       {
         icon: Heart,
-        label: t.visualStyleMood?.[locale] ?? 'Mood',
+        label: t('visualStyleMood'),
         value: visualStyle.mood,
         iconColor: 'text-amber-500 dark:text-amber-400',
         bgColor: 'bg-amber-50 dark:bg-amber-950/30',
@@ -87,10 +87,10 @@ export const VisualStylePreview = memo<VisualStylePreviewProps>(
             className="text-base font-semibold flex items-center gap-2"
           >
             <Palette className="h-4 w-4 text-pink-500" aria-hidden="true" />
-            {t.visualStyleTitle?.[locale] ?? 'Course Visual Style'}
+            {t('visualStyleTitle')}
           </CardTitle>
           <p className="text-xs text-muted-foreground">
-            {t.visualStyleDescription?.[locale] ?? 'Recommendations for covers and cards'}
+            {t('visualStyleDescription')}
           </p>
         </CardHeader>
         <CardContent className="space-y-3" role="list">

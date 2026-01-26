@@ -9,7 +9,7 @@ import { LucideIcon } from 'lucide-react';
 import MinimalNode from './MinimalNode';
 import MediumNode from './MediumNode';
 import { motion } from 'framer-motion';
-import { useTranslation } from '@/lib/generation-graph/useTranslation';
+import { useTranslations } from 'next-intl';
 import { RestartConfirmDialog } from '../controls/RestartConfirmDialog';
 import { useOptionalPartialGenerationContext } from '../contexts/PartialGenerationContext';
 import { useGenerationStore } from '@/stores/useGenerationStore';
@@ -24,7 +24,7 @@ const StageNode = (props: NodeProps<RFStageNode>) => {
   const { id, data, selected } = props;
   const { zoom } = useViewport();
   const statusEntry = useNodeStatus(id);
-  const { t } = useTranslation();
+  const t = useTranslations('generation');
   const params = useParams();
   const courseSlug = params?.courseSlug as string | undefined;
   const [showRestartDialog, setShowRestartDialog] = useState(false);
@@ -47,7 +47,7 @@ const StageNode = (props: NodeProps<RFStageNode>) => {
   const partialGenContext = useOptionalPartialGenerationContext();
 
   // Get optimistic status from Zustand store (for immediate UI feedback)
-  const stageId = `stage_${data.stageNumber}` as 'stage_1' | 'stage_2' | 'stage_3' | 'stage_4' | 'stage_5' | 'stage_6';
+  const stageId = `stage_${data.stageNumber}`;
   const zustandStatus = useGenerationStore(state => state.getStageStatus(stageId));
 
   // Semantic Zoom - thresholds adjusted for better initial visibility

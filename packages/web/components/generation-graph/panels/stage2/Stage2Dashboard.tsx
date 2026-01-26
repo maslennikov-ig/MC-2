@@ -4,7 +4,7 @@ import React, { useMemo } from 'react';
 import { ErrorBoundary } from 'react-error-boundary';
 import { cn } from '@/lib/utils';
 import { useNodeSelection } from '../../hooks/useNodeSelection';
-import { useTranslation } from '@/lib/generation-graph/useTranslation';
+import { useTranslations, useLocale } from 'next-intl';
 import {
   PRIORITY_CONFIG,
   isValidPriority,
@@ -110,7 +110,7 @@ function DashboardErrorFallback({
   error: Error;
   resetErrorBoundary: () => void;
 }) {
-  const { t } = useTranslation();
+  const t = useTranslations('generation');
 
   return (
     <div className="flex flex-col items-center justify-center h-full py-12 text-center">
@@ -282,7 +282,7 @@ interface Stage2DashboardHeaderProps {
  * Dashboard header with title and vital signs
  */
 function Stage2DashboardHeader({ data, className }: Stage2DashboardHeaderProps) {
-  const { t } = useTranslation();
+  const t = useTranslations('generation');
   const progressPercent =
     data.totalDocuments > 0
       ? Math.round((data.completedDocuments / data.totalDocuments) * 100)
@@ -308,7 +308,7 @@ function Stage2DashboardHeader({ data, className }: Stage2DashboardHeaderProps) 
               {t('stage2.dashboardTitle')}
             </h2>
           </div>
-          {getStatusBadge(data, t)}
+          {getStatusBadge(data, t as unknown as (key: string) => string)}
         </div>
 
         {/* Progress Bar */}
@@ -430,7 +430,8 @@ function DocumentMatrix({
   className,
   isLoading,
 }: DocumentMatrixProps) {
-  const { t, locale } = useTranslation();
+  const t = useTranslations('generation');
+  const locale = useLocale();
 
   // Sort by priority (CORE > IMPORTANT > SUPPLEMENTARY) then by filename
   // Must be called before any early returns to comply with React hooks rules
@@ -584,7 +585,7 @@ function DocumentMatrix({
                 <StatusIndicator status={doc.status} />
               </TableCell>
               <TableCell className="text-right font-mono text-sm">
-                {formatDuration(doc.processingTimeMs, t)}
+                {formatDuration(doc.processingTimeMs, t as unknown as (key: string) => string)}
               </TableCell>
               <TableCell className="text-center">
                 <ActionButton document={doc} onDocumentClick={onDocumentClick} />
@@ -614,7 +615,7 @@ interface StatusIndicatorProps {
  * Status indicator badge
  */
 function StatusIndicator({ status }: StatusIndicatorProps) {
-  const { t } = useTranslation();
+  const t = useTranslations('generation');
 
   const variants: Record<
     DocumentMatrixRow['status'],
@@ -669,7 +670,7 @@ interface ActionButtonProps {
  * Action button for document row
  */
 function ActionButton({ document, onDocumentClick }: ActionButtonProps) {
-  const { t } = useTranslation();
+  const t = useTranslations('generation');
 
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -720,7 +721,7 @@ function Stage2DashboardFooter({
   onRetryFailed,
   className,
 }: Stage2DashboardFooterProps) {
-  const { t } = useTranslation();
+  const t = useTranslations('generation');
 
   return (
     <div
@@ -743,7 +744,7 @@ function Stage2DashboardFooter({
         </div>
         <div className="flex items-center gap-2">
           <Timer className="h-4 w-4" />
-          <span>{formatAvgTime(aggregates.avgProcessingTimeMs, t)}{t('stage2.perDoc')}</span>
+          <span>{formatAvgTime(aggregates.avgProcessingTimeMs, t as unknown as (key: string) => string)}{t('stage2.perDoc')}</span>
         </div>
       </div>
 
@@ -809,7 +810,7 @@ export function Stage2Dashboard({
   className,
 }: Stage2DashboardProps) {
   const { selectNode } = useNodeSelection();
-  const { t } = useTranslation();
+  const t = useTranslations('generation');
 
   // Convert documentId to React Flow node ID
   const toNodeId = (documentId: string) => `doc_${documentId}`;

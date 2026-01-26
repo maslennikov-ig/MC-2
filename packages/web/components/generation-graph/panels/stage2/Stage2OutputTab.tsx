@@ -1,6 +1,6 @@
 'use client';
 
-import React, { memo, useCallback, useEffect, useMemo, useState } from 'react';
+import React, { memo, useEffect, useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -26,7 +26,7 @@ import {
   TrendingUp,
   Loader2,
 } from 'lucide-react';
-import { GRAPH_TRANSLATIONS } from '@/lib/generation-graph/translations';
+import { useTranslations } from 'next-intl';
 import { formatNumber, MARKDOWN_TRUNCATE_LIMIT } from '@/lib/generation-graph/format-utils';
 import { useGenerationStore } from '@/stores/useGenerationStore';
 import { getSupabaseClient } from '@/lib/supabase/browser-client';
@@ -63,7 +63,7 @@ function isStage2OutputData(data: unknown): data is Stage2OutputData {
   const d = data as Record<string, unknown>;
   return (
     typeof d.vectorStatus === 'string' &&
-    ['pending', 'indexing', 'indexed', 'failed'].includes(d.vectorStatus as string)
+    ['pending', 'indexing', 'indexed', 'failed'].includes(d.vectorStatus)
   );
 }
 
@@ -71,45 +71,9 @@ function isStage2OutputData(data: unknown): data is Stage2OutputData {
 // TYPES
 // ============================================================================
 
-/**
- * Stage 2 Output translation keys used in this component
- */
-type Stage2OutputTranslationKey =
-  | 'executiveSummary'
-  | 'summaryEmpty'
-  | 'knowledgeAtoms'
-  | 'atomPages'
-  | 'atomChunks'
-  | 'atomVisuals'
-  | 'atomTokens'
-  | 'qualityHealth'
-  | 'qualityHigh'
-  | 'qualityHighDesc'
-  | 'qualityMedium'
-  | 'qualityMediumDesc'
-  | 'qualityLow'
-  | 'qualityLowDesc'
-  | 'inspectMarkdown'
-  | 'contentTruncated'
-  | 'vectorStatus'
-  | 'vectorIndexed'
-  | 'vectorPending'
-  | 'vectorFailed';
-
 // ============================================================================
 // HELPER FUNCTIONS
 // ============================================================================
-
-/**
- * Get translation helper with safe fallback
- */
-function getTranslation(key: Stage2OutputTranslationKey, locale: 'ru' | 'en'): string {
-  const translations = GRAPH_TRANSLATIONS.stage2;
-  if (!translations) return key;
-  const entry = translations[key as keyof typeof translations];
-  if (!entry) return key;
-  return (entry as { ru: string; en: string })[locale] || key;
-}
 
 /**
  * Get quality configuration based on score
@@ -171,14 +135,14 @@ function getVectorStatusConfig(status: Stage2OutputData['vectorStatus']): {
 
 interface ExecutiveSummaryCardProps {
   summaryText: string | undefined;
-  t: (key: Stage2OutputTranslationKey) => string;
 }
 
 /**
  * Executive Summary Card with gradient border
  */
 const ExecutiveSummaryCard = memo<ExecutiveSummaryCardProps>(
-  function ExecutiveSummaryCard({ summaryText, t }) {
+  function ExecutiveSummaryCard({ summaryText }) {
+    const t = useTranslations('generation.stage2');
     const displayText = summaryText || t('summaryEmpty');
     const isEmpty = !summaryText;
 
@@ -215,14 +179,14 @@ const ExecutiveSummaryCard = memo<ExecutiveSummaryCardProps>(
 
 interface KnowledgeAtomsGridProps {
   stats: DocumentStats | undefined;
-  t: (key: Stage2OutputTranslationKey) => string;
 }
 
 /**
  * Knowledge Atoms 2x2 Grid
  */
 const KnowledgeAtomsGrid = memo<KnowledgeAtomsGridProps>(
-  function KnowledgeAtomsGrid({ stats, t }) {
+  function KnowledgeAtomsGrid({ stats }) {
+    const t = useTranslations('generation.stage2');
     const metrics = useMemo(() => {
       const pages = stats?.pages ?? 0;
       const chunks = stats?.chunksCreated ?? 0;
@@ -284,14 +248,14 @@ const KnowledgeAtomsGrid = memo<KnowledgeAtomsGridProps>(
 interface QualityHealthSectionProps {
   qualityScore: number;
   markdownContent: string | undefined;
-  t: (key: Stage2OutputTranslationKey) => string;
 }
 
 /**
  * Quality Health Section with progress bar and markdown inspector
  */
 const QualityHealthSection = memo<QualityHealthSectionProps>(
-  function QualityHealthSection({ qualityScore, markdownContent, t }) {
+  function QualityHealthSection({ qualityScore, markdownContent }) {
+    const t = useTranslations('generation.stage2');
     const [isDialogOpen, setIsDialogOpen] = useState(false);
     const [isLoading, setIsLoading] = useState(false);
 
@@ -430,14 +394,14 @@ const QualityHealthSection = memo<QualityHealthSectionProps>(
 
 interface VectorStatusBadgeProps {
   status: Stage2OutputData['vectorStatus'];
-  t: (key: Stage2OutputTranslationKey) => string;
 }
 
 /**
  * Vector Indexing Status Badge
  */
 const VectorStatusBadge = memo<VectorStatusBadgeProps>(
-  function VectorStatusBadge({ status, t }) {
+  function VectorStatusBadge({ status }) {
+    const t = useTranslations('generation.stage2');
     const config = getVectorStatusConfig(status);
 
     return (
@@ -465,11 +429,8 @@ const VectorStatusBadge = memo<VectorStatusBadgeProps>(
 // EMPTY STATE
 // ============================================================================
 
-interface EmptyStateProps {
-  t: (key: Stage2OutputTranslationKey) => string;
-}
-
-const EmptyState = memo<EmptyStateProps>(function EmptyState({ t }) {
+const EmptyState = memo(function EmptyState() {
+  const t = useTranslations('generation.stage2');
   return (
     <div className="flex flex-col items-center justify-center py-12 text-center">
       <div className="w-12 h-12 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-4">
@@ -505,7 +466,7 @@ export const Stage2OutputTab = memo<Stage2OutputTabProps>(function Stage2OutputT
   outputData,
   courseId: _courseId, // Available for future use
   documentId,
-  locale = 'ru',
+  locale: _locale = 'ru',
 }) {
   // State for file_catalog data from Supabase
   const [fileCatalogData, setFileCatalogData] = useState<FileCatalogData | null>(null);
@@ -535,7 +496,7 @@ export const Stage2OutputTab = memo<Stage2OutputTabProps>(function Stage2OutputT
 
         if (row) {
           setFileCatalogData({
-            vectorStatus: (row.vector_status as FileCatalogData['vectorStatus']) || 'pending',
+            vectorStatus: (row.vector_status) || 'pending',
             chunkCount: row.chunk_count || 0,
             markdownLength: row.markdown_content?.length || 0,
             markdownContent: row.markdown_content,
@@ -686,12 +647,6 @@ export const Stage2OutputTab = memo<Stage2OutputTabProps>(function Stage2OutputT
     return undefined;
   }, [outputData, documentFromStore, fileCatalogData]);
 
-  // Translation helper
-  const t = useCallback(
-    (key: Stage2OutputTranslationKey) => getTranslation(key, locale),
-    [locale]
-  );
-
   // Extract key values with defaults
   const summaryText = data?.summarization?.summaryText;
   const qualityScore = (() => {
@@ -707,7 +662,7 @@ export const Stage2OutputTab = memo<Stage2OutputTabProps>(function Stage2OutputT
   // ============================================================================
 
   if (!data) {
-    return <EmptyState t={t} />;
+    return <EmptyState />;
   }
 
   // ============================================================================
@@ -717,20 +672,19 @@ export const Stage2OutputTab = memo<Stage2OutputTabProps>(function Stage2OutputT
   return (
     <div className="space-y-4 p-1">
       {/* Section A: Executive Summary */}
-      <ExecutiveSummaryCard summaryText={summaryText} t={t} />
+      <ExecutiveSummaryCard summaryText={summaryText} />
 
       {/* Section B: Knowledge Atoms Grid */}
-      <KnowledgeAtomsGrid stats={stats} t={t} />
+      <KnowledgeAtomsGrid stats={stats} />
 
       {/* Section C: Quality Health */}
       <QualityHealthSection
         qualityScore={qualityScore}
         markdownContent={markdownContent}
-        t={t}
       />
 
       {/* Section D: Vector Status Badge */}
-      <VectorStatusBadge status={vectorStatus} t={t} />
+      <VectorStatusBadge status={vectorStatus} />
     </div>
   );
 });
