@@ -862,6 +862,29 @@ export const clarifyingRouter = router({
         // Status successfully transitioned to stage_4_analyzing
         // Now fetch data needed for the job
 
+        // Defensive check: verify status hasn't changed (Issue #1 race condition protection)
+        const { data: statusCheck } = await typedSupabase
+          .from('courses')
+          .select('generation_status')
+          .eq('id', courseId)
+          .single();
+
+        if (statusCheck?.generation_status !== 'stage_4_analyzing') {
+          logger.warn(
+            {
+              requestId,
+              courseId,
+              expectedStatus: 'stage_4_analyzing',
+              actualStatus: statusCheck?.generation_status,
+            },
+            'Course status changed during operation (race condition detected)'
+          );
+          throw new TRPCError({
+            code: 'CONFLICT',
+            message: 'Course status changed during operation. Please try again.',
+          });
+        }
+
         // Fetch all answered questions to include in analysis job
         const { data: answeredQuestions, error: questionsError } = await supabase
           .from('clarifying_questions')

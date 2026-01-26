@@ -22,12 +22,33 @@ export interface ClarifyingNodeData {
 }
 
 export const ClarifyingNode = memo(({ data, selected }: NodeProps) => {
-  const nodeData = data as unknown as ClarifyingNodeData
-  const isActive = nodeData.status === 'active'
-  const isComplete =
-    nodeData.answeredCount === nodeData.questionsCount && nodeData.questionsCount > 0
-  const progress =
-    nodeData.questionsCount > 0 ? (nodeData.answeredCount / nodeData.questionsCount) * 100 : 0
+  // Defensive type casting with validation (Issue #5)
+  const rawData = data as unknown as ClarifyingNodeData | undefined
+
+  // Handle missing or malformed data gracefully
+  if (!rawData) {
+    return (
+      <div className="clarifying-node min-w-[200px] rounded-xl border-2 border-red-400 bg-red-50 px-4 py-3 dark:bg-red-950/20">
+        <Handle type="target" position={Position.Top} className="!bg-red-500" />
+        <span className="text-xs text-red-600">Invalid node data</span>
+        <Handle type="source" position={Position.Bottom} className="!bg-red-500" />
+      </div>
+    )
+  }
+
+  // Extract with fallback values for resilience
+  const {
+    status = 'pending',
+    questionsCount = 0,
+    answeredCount = 0,
+    criticalAnswered = 0,
+    criticalTotal = 0,
+    isAutomatic = false,
+  } = rawData
+
+  const isActive = status === 'active'
+  const isComplete = answeredCount === questionsCount && questionsCount > 0
+  const progress = questionsCount > 0 ? (answeredCount / questionsCount) * 100 : 0
 
   return (
     <div
@@ -53,7 +74,7 @@ export const ClarifyingNode = memo(({ data, selected }: NodeProps) => {
           />
         )}
         <span className="text-sm font-medium">Уточняющие вопросы</span>
-        {nodeData.isAutomatic && (
+        {isAutomatic && (
           <Badge variant="secondary" className="ml-auto flex items-center gap-1 text-xs">
             <Bot className="h-3 w-3" />
             Авто
@@ -62,10 +83,10 @@ export const ClarifyingNode = memo(({ data, selected }: NodeProps) => {
       </div>
 
       <div className="mb-2 text-xs text-slate-500 dark:text-slate-400">
-        {nodeData.answeredCount} / {nodeData.questionsCount} отвечено
-        {nodeData.criticalTotal > 0 && (
+        {answeredCount} / {questionsCount} отвечено
+        {criticalTotal > 0 && (
           <span className="ml-2 text-red-600 dark:text-red-400">
-            ({nodeData.criticalAnswered}/{nodeData.criticalTotal} обязательных)
+            ({criticalAnswered}/{criticalTotal} обязательных)
           </span>
         )}
       </div>

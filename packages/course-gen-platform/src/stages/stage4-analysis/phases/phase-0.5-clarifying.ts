@@ -619,11 +619,24 @@ export async function getClarifyingConfig(
 }
 
 /**
+ * Lenient schema for validating suggested_answers from database
+ * More permissive than SuggestedAnswerSchema to handle legacy data
+ */
+const SuggestedAnswerValidationSchema = z.object({
+  text: z.string().min(1),
+  rationale: z.string().optional(),
+});
+
+const SuggestedAnswersArraySchema = z.array(SuggestedAnswerValidationSchema).min(1);
+
+/**
  * Auto-answer all pending questions with first suggested answer
  *
  * Used in automatic mode for self-reflection without user input.
  * The AI generates questions and automatically selects the first
  * suggested answer for each question.
+ *
+ * Performance: Uses bulk upsert instead of N sequential updates.
  *
  * @param courseId - Course UUID
  * @returns Promise<number> - Count of auto-answered questions
@@ -650,37 +663,76 @@ export async function autoAnswerAllQuestions(courseId: string): Promise<number> 
     return 0;
   }
 
-  let answeredCount = 0;
+  // Build all updates at once (fix N+1 query pattern)
+  const answeredAt = new Date().toISOString();
+  let fallbackCount = 0;
 
-  for (const question of questions) {
-    const suggestions = question.suggested_answers as Array<{ text: string }> | null;
-    const firstAnswer = suggestions?.[0]?.text || 'Auto-selected by system';
+  const updates = questions.map(question => {
+    // Validate suggested_answers structure with Zod (Issue #3)
+    const validationResult = SuggestedAnswersArraySchema.safeParse(question.suggested_answers);
 
-    const { error: updateError } = await supabase
+    let firstAnswer: string;
+    if (!validationResult.success) {
+      logger.warn(
+        {
+          courseId,
+          questionId: question.id,
+          error: validationResult.error.message,
+        },
+        'Invalid suggested_answers structure, using fallback'
+      );
+      firstAnswer = 'Auto-selected by system';
+      fallbackCount++;
+    } else {
+      firstAnswer = validationResult.data[0].text;
+    }
+
+    return {
+      id: question.id,
+      user_answer: firstAnswer,
+      answer_source: 'suggested' as const,
+      selected_suggestion_index: 0,
+      status: 'answered' as const,
+      answered_at: answeredAt,
+    };
+  });
+
+  // Parallel updates - faster than sequential, avoids upsert required fields issue
+  const updatePromises = updates.map(update =>
+    supabase
       .from('clarifying_questions')
       .update({
-        user_answer: firstAnswer,
-        answer_source: 'suggested',
-        selected_suggestion_index: 0,
-        status: 'answered',
-        answered_at: new Date().toISOString(),
+        user_answer: update.user_answer,
+        answer_source: update.answer_source,
+        selected_suggestion_index: update.selected_suggestion_index,
+        status: update.status,
+        answered_at: update.answered_at,
       })
-      .eq('id', question.id);
+      .eq('id', update.id)
+  );
 
-    if (updateError) {
-      logger.warn(
-        { courseId, questionId: question.id, error: updateError.message },
-        'Failed to auto-answer question'
-      );
-    } else {
-      answeredCount++;
-    }
+  const results = await Promise.all(updatePromises);
+  const failedCount = results.filter(r => r.error).length;
+
+  if (failedCount > 0) {
+    logger.error(
+      { courseId, failedCount, totalCount: questions.length },
+      'Some auto-answer updates failed'
+    );
   }
 
+  const successCount = updates.length - failedCount;
+
   logger.info(
-    { courseId, answeredCount, totalPending: questions.length },
+    {
+      courseId,
+      answeredCount: successCount,
+      failedCount,
+      fallbackCount,
+      totalPending: questions.length,
+    },
     'Auto-answered clarifying questions in automatic mode'
   );
 
-  return answeredCount;
+  return successCount;
 }
