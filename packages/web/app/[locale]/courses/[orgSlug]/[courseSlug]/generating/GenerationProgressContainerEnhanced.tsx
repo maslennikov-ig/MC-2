@@ -28,6 +28,7 @@ import {
 } from '@/app/actions/admin-generation'
 import type { Stage1CourseData } from '@/components/generation-graph'
 import { useRestartStage } from '@/components/generation-graph/hooks/useRestartStage'
+import { getStageFromStatus } from '@/lib/generation-graph/utils'
 import { GlobalCourseChat, ChatErrorBoundary } from '@/components/generation'
 
 /** Default fallback when lessons count is unknown (before Stage 4 analysis completes) */
@@ -658,6 +659,7 @@ export default function GenerationProgressContainerEnhanced({
             !state.status?.includes('_complete')
           }
           onRegenerationRequest={handleRegenerationRequest}
+          currentStage={getStageFromStatus(state.status || '')}
         />
       </ChatErrorBoundary>
       <AnimatePresence>

@@ -47,6 +47,8 @@ interface GlobalCourseChatProps {
   courseTitle?: string
   isGenerating?: boolean
   onRegenerationRequest?: () => void
+  /** Current generation stage number. Chat is hidden on Stage 3 (document prioritization). */
+  currentStage?: number | null
 }
 
 // ============================================================================
@@ -94,6 +96,7 @@ export function GlobalCourseChat({
   courseId,
   isGenerating = false,
   onRegenerationRequest,
+  currentStage,
 }: GlobalCourseChatProps) {
   const t = useTranslations('generation.globalChat')
 
@@ -269,6 +272,9 @@ export function GlobalCourseChat({
     },
     [sendMessage]
   )
+
+  // Show chat only on Stages 4, 5, 6 (after document prioritization) — must be after all hooks
+  if (!currentStage || currentStage < 4) return null
 
   return (
     <div className="bg-background fixed right-0 bottom-0 left-0 z-40 border-t shadow-lg">
