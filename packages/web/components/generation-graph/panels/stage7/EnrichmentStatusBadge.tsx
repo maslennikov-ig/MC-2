@@ -7,7 +7,7 @@
  * @module components/generation-graph/panels/stage7/EnrichmentStatusBadge
  */
 
-import { useLocale } from 'next-intl';
+import { useTranslations } from 'next-intl';
 import {
   Clock,
   Loader2,
@@ -20,7 +20,6 @@ import {
   ENRICHMENT_STATUS_CONFIG,
   type EnrichmentStatus,
 } from '@/lib/generation-graph/enrichment-config';
-import { GRAPH_TRANSLATIONS } from '@/lib/generation-graph/translations';
 import { cn } from '@/lib/utils';
 
 /**
@@ -74,7 +73,7 @@ export function EnrichmentStatusBadge({
   showLabel = true,
   className,
 }: EnrichmentStatusBadgeProps) {
-  const locale = useLocale();
+  const t = useTranslations('generation.enrichments');
 
   // Get status configuration
   const statusConfig = ENRICHMENT_STATUS_CONFIG[status];
@@ -83,7 +82,7 @@ export function EnrichmentStatusBadge({
   const textColor = statusConfig.color;
 
   // Get label text from translations
-  const label = GRAPH_TRANSLATIONS.enrichments?.status[status][locale as 'ru' | 'en'] ?? status;
+  const label = t(`status.${status}`);
 
   // Size variants
   const iconSize = size === 'sm' ? 'w-3 h-3' : 'w-3.5 h-3.5';

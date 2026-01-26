@@ -16,7 +16,7 @@ import {
   Loader2,
   Pen,
 } from 'lucide-react'
-import { GRAPH_TRANSLATIONS } from '@/lib/generation-graph/translations'
+import { useTranslations } from 'next-intl'
 import { AnalysisResultView } from '../output/AnalysisResultView'
 import { VisualStylePreview } from './VisualStylePreview'
 import { useStaticGraph } from '../../contexts/StaticGraphContext'
@@ -61,17 +61,17 @@ const AnalysisHero = memo<AnalysisHeroProps>(function AnalysisHero({
   totalSections: _totalSections, // Available for future use (e.g., modules count display)
   lessonDuration,
   writingStyle,
-  locale = 'ru',
+  locale: _locale = 'ru',
 }) {
-  const t = GRAPH_TRANSLATIONS.stage4 as Record<string, { ru: string; en: string }>
+  const t = useTranslations('generation.stage4')
 
   // Get category icon
   const CategoryIcon =
     CATEGORY_ICONS[category as AnalysisResult['course_category']['primary']] || GraduationCap
 
   // Get translated category name
-  const categoryTranslationKey = `category${category.charAt(0).toUpperCase()}${category.slice(1)}`
-  const categoryName = t[categoryTranslationKey]?.[locale] ?? category
+  const categoryTranslationKey = `category${category.charAt(0).toUpperCase()}${category.slice(1)}` as 'categoryProfessional' | 'categoryPersonal' | 'categoryCreative' | 'categoryHobby' | 'categorySpiritual' | 'categoryAcademic'
+  const categoryName = t(categoryTranslationKey)
 
   // Calculate approximate total duration in hours
   const totalMinutes = totalLessons * lessonDuration
@@ -79,8 +79,8 @@ const AnalysisHero = memo<AnalysisHeroProps>(function AnalysisHero({
   const minutes = totalMinutes % 60
   const durationDisplay =
     hours > 0
-      ? `~${hours}${t.hoursShort?.[locale] ?? 'h'}${minutes > 0 ? ` ${minutes}${t.minutesShort?.[locale] ?? 'min'}` : ''}`
-      : `~${minutes}${t.minutesShort?.[locale] ?? 'min'}`
+      ? `~${hours}${t('hoursShort')}${minutes > 0 ? ` ${minutes}${t('minutesShort')}` : ''}`
+      : `~${minutes}${t('minutesShort')}`
 
   return (
     <Card
@@ -116,7 +116,7 @@ const AnalysisHero = memo<AnalysisHeroProps>(function AnalysisHero({
                       : 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400'
                 )}
               >
-                {Math.round(confidence * 100)}% {t.confidenceLevel?.[locale] ?? 'confidence'}
+                {Math.round(confidence * 100)}% {t('confidenceLevel')}
               </Badge>
             </div>
           </div>
@@ -131,7 +131,7 @@ const AnalysisHero = memo<AnalysisHeroProps>(function AnalysisHero({
                   {totalLessons}
                 </div>
                 <div className="truncate text-xs text-slate-500 dark:text-slate-400">
-                  {t.lessonsLabel?.[locale] ?? 'Lessons'}
+                  {t('lessonsLabel')}
                 </div>
               </div>
             </div>
@@ -144,7 +144,7 @@ const AnalysisHero = memo<AnalysisHeroProps>(function AnalysisHero({
                   {durationDisplay}
                 </div>
                 <div className="truncate text-xs text-slate-500 dark:text-slate-400">
-                  {t.durationLabel?.[locale] ?? 'Duration'}
+                  {t('durationLabel')}
                 </div>
               </div>
             </div>
@@ -161,7 +161,7 @@ const AnalysisHero = memo<AnalysisHeroProps>(function AnalysisHero({
                     {getLearningStyleTitle(writingStyle)}
                   </div>
                   <div className="truncate text-xs text-slate-500 dark:text-slate-400">
-                    {t.writingStyleLabel?.[locale] ?? 'Стиль текста'}
+                    {t('writingStyleLabel')}
                   </div>
                 </div>
               </div>
@@ -196,7 +196,7 @@ export const Stage4OutputTab = memo<Stage4OutputTabProps>(function Stage4OutputT
   locale = 'ru',
   onApproved: _onApproved, // Reserved for future use (approval handled by parent)
 }) {
-  const t = GRAPH_TRANSLATIONS.stage4 as Record<string, { ru: string; en: string }>
+  const t = useTranslations('generation.stage4')
 
   // Get visual style, writing style, and persisted analysis result from context
   const { courseInfo } = useStaticGraph()
@@ -249,9 +249,7 @@ export const Stage4OutputTab = memo<Stage4OutputTabProps>(function Stage4OutputT
     return (
       <div className="flex flex-col items-center justify-center p-8 text-center">
         <Loader2 className="mb-4 h-8 w-8 animate-spin text-violet-500" />
-        <p className="text-muted-foreground text-sm">
-          {t.emptyOutput?.[locale] ?? 'Analysis results will appear here'}
-        </p>
+        <p className="text-muted-foreground text-sm">{t('emptyOutput')}</p>
       </div>
     )
   }
@@ -267,7 +265,6 @@ export const Stage4OutputTab = memo<Stage4OutputTabProps>(function Stage4OutputT
           totalSections={heroData.totalSections}
           lessonDuration={heroData.lessonDuration}
           writingStyle={writingStyle}
-          locale={locale}
         />
       )}
 

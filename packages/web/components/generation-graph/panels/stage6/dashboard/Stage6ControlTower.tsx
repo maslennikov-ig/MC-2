@@ -1,7 +1,7 @@
 'use client';
 
 import React, { memo } from 'react';
-import { GRAPH_TRANSLATIONS } from '@/lib/generation-graph/translations';
+import { useTranslations, useLocale } from 'next-intl';
 import { getTierModelName } from '@/lib/generation-graph/constants';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -46,8 +46,6 @@ export interface Stage6ControlTowerProps {
   };
   /** Subscription tier: 'trial' | 'free' | 'basic' | 'standard' | 'premium' */
   modelTier: string;
-  /** Locale for translations */
-  locale?: 'ru' | 'en';
   /** Callback for "Regenerate All" action */
   onRegenerateAll: () => void;
   /** Callback for "Export All" action */
@@ -112,7 +110,6 @@ function formatDuration(ms: number): string {
  *     estimatedRemainingMs: 120000,
  *   }}
  *   modelTier="high"
- *   locale="ru"
  *   onRegenerateAll={() => console.log('Regenerate all')}
  *   onExportAll={() => console.log('Export all')}
  * />
@@ -122,11 +119,11 @@ export const Stage6ControlTower = memo<Stage6ControlTowerProps>(function Stage6C
   moduleTitle,
   stats,
   modelTier = 'standard',
-  locale = 'ru',
   onRegenerateAll,
   onExportAll,
 }) {
-  const t = GRAPH_TRANSLATIONS.stage6;
+  const t = useTranslations('generation.stage6');
+  const locale = useLocale();
 
   // Calculate progress percentage (completed + approved are both "ready")
   const totalLessons =
@@ -160,7 +157,7 @@ export const Stage6ControlTower = memo<Stage6ControlTowerProps>(function Stage6C
               disabled={hasActiveLessons}
             >
               <RefreshCw size={14} />
-              {t?.controlTower?.regenerateAll?.[locale] ?? 'Regenerate All'}
+              {t('controlTower.regenerateAll')}
             </Button>
             <Button
               variant="default"
@@ -170,7 +167,7 @@ export const Stage6ControlTower = memo<Stage6ControlTowerProps>(function Stage6C
               className="bg-blue-600 hover:bg-blue-700 dark:bg-blue-500 dark:hover:bg-blue-600"
             >
               <Download size={14} />
-              {t?.controlTower?.exportAll?.[locale] ?? 'Export'}
+              {t('controlTower.exportAll')}
             </Button>
           </div>
         </div>
@@ -184,7 +181,7 @@ export const Stage6ControlTower = memo<Stage6ControlTowerProps>(function Stage6C
                 <span className="font-medium text-foreground">
                   {readyLessons}/{totalLessons}
                 </span>
-                <span>{t?.controlTower?.ready?.[locale] ?? 'Ready'}</span>
+                <span>{t('controlTower.ready')}</span>
               </div>
             </div>
 
@@ -195,27 +192,27 @@ export const Stage6ControlTower = memo<Stage6ControlTowerProps>(function Stage6C
             <div className="flex items-center gap-2 text-xs text-muted-foreground">
               {stats.statusCounts.approved > 0 && (
                 <Badge variant="outline" className="bg-emerald-50 dark:bg-emerald-950/30 text-emerald-700 dark:text-emerald-400 border-emerald-200 dark:border-emerald-800">
-                  {stats.statusCounts.approved} {t?.status?.approved?.[locale] ?? 'approved'}
+                  {stats.statusCounts.approved} {t('status.approved')}
                 </Badge>
               )}
               {stats.statusCounts.completed > 0 && (
                 <Badge variant="outline" className="bg-green-50 dark:bg-green-950/30 text-green-700 dark:text-green-400 border-green-200 dark:border-green-800">
-                  {stats.statusCounts.completed} {t?.status?.completed?.[locale] ?? 'completed'}
+                  {stats.statusCounts.completed} {t('status.completed')}
                 </Badge>
               )}
               {stats.statusCounts.active > 0 && (
                 <Badge variant="outline" className="bg-blue-50 dark:bg-blue-950/30 text-blue-700 dark:text-blue-400 border-blue-200 dark:border-blue-800">
-                  {stats.statusCounts.active} {t?.status?.active?.[locale] ?? 'active'}
+                  {stats.statusCounts.active} {t('status.active')}
                 </Badge>
               )}
               {stats.statusCounts.pending > 0 && (
                 <Badge variant="outline" className="bg-gray-50 dark:bg-gray-800/30 text-gray-700 dark:text-gray-400 border-gray-200 dark:border-gray-700">
-                  {stats.statusCounts.pending} {t?.status?.pending?.[locale] ?? 'pending'}
+                  {stats.statusCounts.pending} {t('status.pending')}
                 </Badge>
               )}
               {stats.statusCounts.failed > 0 && (
                 <Badge variant="outline" className="bg-red-50 dark:bg-red-950/30 text-red-700 dark:text-red-400 border-red-200 dark:border-red-800">
-                  {stats.statusCounts.failed} {t?.status?.error?.[locale] ?? 'failed'}
+                  {stats.statusCounts.failed} {t('status.error')}
                 </Badge>
               )}
             </div>
@@ -226,7 +223,7 @@ export const Stage6ControlTower = memo<Stage6ControlTowerProps>(function Stage6C
             <div className="flex items-center gap-2 mb-1">
               <Coins className="h-4 w-4 text-cyan-500 dark:text-cyan-400" />
               <span className="text-xs font-medium text-muted-foreground">
-                {t?.controlTower?.tokensUsed?.[locale] ?? 'Tokens'}
+                {t('controlTower.tokensUsed')}
               </span>
             </div>
             <div className="text-lg font-mono font-semibold text-foreground">
@@ -242,14 +239,14 @@ export const Stage6ControlTower = memo<Stage6ControlTowerProps>(function Stage6C
             <div className="flex items-center gap-2 mb-1">
               <Gauge className="h-4 w-4 text-blue-500 dark:text-blue-400" />
               <span className="text-xs font-medium text-muted-foreground">
-                {t?.controlTower?.quality?.[locale] ?? 'Quality'}
+                {t('controlTower.quality')}
               </span>
             </div>
             <div className="text-lg font-mono font-semibold text-foreground">
               {Math.round(stats.avgQuality)}%
             </div>
             <div className="text-xs text-muted-foreground">
-              {t?.status?.completed?.[locale] ?? 'completed'}
+              {t('status.completed')}
             </div>
           </div>
 
@@ -258,7 +255,7 @@ export const Stage6ControlTower = memo<Stage6ControlTowerProps>(function Stage6C
             <div className="flex items-center gap-2 mb-1">
               <Clock className="h-4 w-4 text-blue-500 dark:text-blue-400" />
               <span className="text-xs font-medium text-muted-foreground">
-                {t?.controlTower?.time?.[locale] ?? 'Time'}
+                {t('controlTower.time')}
               </span>
             </div>
             <div className="text-lg font-mono font-semibold text-foreground">
@@ -266,7 +263,7 @@ export const Stage6ControlTower = memo<Stage6ControlTowerProps>(function Stage6C
             </div>
             {stats.estimatedRemainingMs !== undefined && stats.estimatedRemainingMs > 0 && (
               <div className="text-xs text-muted-foreground">
-                ~{formatDuration(stats.estimatedRemainingMs)} {t?.controlTower?.remaining?.[locale] ?? 'left'}
+                ~{formatDuration(stats.estimatedRemainingMs)} {t('controlTower.remaining')}
               </div>
             )}
           </div>

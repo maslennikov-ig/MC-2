@@ -20,7 +20,7 @@ import {
   Building2,
   Hash,
 } from 'lucide-react';
-import { GRAPH_TRANSLATIONS } from '@/lib/generation-graph/translations';
+import { useTranslations } from 'next-intl';
 import { formatFileSize, HEAVY_PAYLOAD_THRESHOLD_BYTES } from '@/lib/generation-graph/format-utils';
 import { useGenerationStore } from '@/stores/useGenerationStore';
 import { getSupabaseClient } from '@/lib/supabase/browser-client';
@@ -158,12 +158,10 @@ interface FeatureItemProps {
   label: string;
   /** Whether the feature is active */
   isActive: boolean;
-  /** Locale for translations */
-  locale: 'ru' | 'en';
 }
 
-function FeatureItem({ label, isActive, locale }: FeatureItemProps) {
-  const t = GRAPH_TRANSLATIONS.stage2;
+function FeatureItem({ label, isActive }: FeatureItemProps) {
+  const t = useTranslations('generation.stage2');
 
   if (isActive) {
     return (
@@ -174,7 +172,7 @@ function FeatureItem({ label, isActive, locale }: FeatureItemProps) {
           variant="outline"
           className="ml-auto text-[10px] bg-green-50 text-green-600 border-green-200 dark:bg-green-900/20 dark:text-green-400 dark:border-green-800"
         >
-          {t?.featureActive?.[locale] || 'Active'}
+          {t('featureActive')}
         </Badge>
       </div>
     );
@@ -188,7 +186,7 @@ function FeatureItem({ label, isActive, locale }: FeatureItemProps) {
             className="flex items-center gap-2 text-sm opacity-60 cursor-help"
             role="button"
             tabIndex={0}
-            aria-label={`${label} - ${t?.featureLocked?.[locale] || 'Locked'}`}
+            aria-label={`${label} - ${t('featureLocked')}`}
             aria-describedby={`tier-upgrade-hint-${label.replace(/\s+/g, '-').toLowerCase()}`}
             onKeyDown={(e) => {
               if (e.key === 'Enter' || e.key === ' ') {
@@ -203,13 +201,13 @@ function FeatureItem({ label, isActive, locale }: FeatureItemProps) {
               variant="outline"
               className="ml-auto text-[10px] bg-slate-50 text-slate-500 border-slate-200 dark:bg-slate-800 dark:text-slate-500 dark:border-slate-700"
             >
-              {t?.featureLocked?.[locale] || 'Locked'}
+              {t('featureLocked')}
             </Badge>
           </div>
         </TooltipTrigger>
         <TooltipContent>
           <p id={`tier-upgrade-hint-${label.replace(/\s+/g, '-').toLowerCase()}`}>
-            {t?.upgradeHint?.[locale] || 'Requires Premium'}
+            {t('upgradeHint')}
           </p>
         </TooltipContent>
       </Tooltip>
@@ -223,32 +221,31 @@ function FeatureItem({ label, isActive, locale }: FeatureItemProps) {
 
 interface TierFeaturesListProps {
   features: TierFeatures;
-  locale: 'ru' | 'en';
 }
 
-function TierFeaturesList({ features, locale }: TierFeaturesListProps) {
-  const t = GRAPH_TRANSLATIONS.stage2;
+function TierFeaturesList({ features }: TierFeaturesListProps) {
+  const t = useTranslations('generation.stage2');
 
   const featureItems = [
     {
-      key: 'textExtraction',
-      label: locale === 'ru' ? 'Извлечение текста' : 'Text Extraction',
-      isActive: true, // Always active for all tiers
-    },
-    {
       key: 'doclingConversion',
-      label: t?.featureDocling?.[locale] || 'Smart Reading',
+      label: t('featureDocling'),
       isActive: features.doclingConversion,
     },
     {
       key: 'ocrExtraction',
-      label: t?.featureOCR?.[locale] || 'Text Recognition',
+      label: t('featureOCR'),
       isActive: features.ocrExtraction,
     },
     {
       key: 'enhancedVisuals',
-      label: t?.featureEnhanced?.[locale] || 'Enhanced Processing',
+      label: t('featureEnhanced'),
       isActive: features.enhancedVisuals,
+    },
+    {
+      key: 'visualAnalysis',
+      label: t('featureVisuals'),
+      isActive: features.enhancedVisuals, // Visual analysis tied to enhanced processing
     },
   ];
 
@@ -259,7 +256,6 @@ function TierFeaturesList({ features, locale }: TierFeaturesListProps) {
           key={item.key}
           label={item.label}
           isActive={item.isActive}
-          locale={locale}
         />
       ))}
     </div>
@@ -273,9 +269,9 @@ function TierFeaturesList({ features, locale }: TierFeaturesListProps) {
 export const Stage2InputTab = memo<Stage2InputTabProps>(function Stage2InputTab({
   documentId,
   inputData,
-  locale = 'ru',
+  locale: _locale = 'ru',
 }) {
-  const t = GRAPH_TRANSLATIONS.stage2;
+  const t = useTranslations('generation.stage2');
 
   // State for file_catalog data from Supabase
   const [fileCatalogData, setFileCatalogData] = useState<FileCatalogInputData | null>(null);
@@ -309,11 +305,8 @@ export const Stage2InputTab = memo<Stage2InputTabProps>(function Stage2InputTab(
           .single();
 
         if (error) {
-          const errorMsg = locale === 'ru'
-            ? 'Не удалось загрузить данные файла'
-            : 'Failed to load file details';
           console.error('[Stage2InputTab] Error fetching file_catalog:', error);
-          setFetchError(errorMsg);
+          setFetchError(t('loadingError'));
           return;
         }
 
@@ -349,16 +342,13 @@ export const Stage2InputTab = memo<Stage2InputTabProps>(function Stage2InputTab(
           });
         }
       } catch (err) {
-        const errorMsg = locale === 'ru'
-          ? 'Ошибка загрузки данных'
-          : 'Failed to fetch file catalog data';
-        console.error('[Stage2InputTab]', errorMsg, err);
-        setFetchError(errorMsg);
+        console.error('[Stage2InputTab] Failed to fetch file catalog data', err);
+        setFetchError(t('loadingError'));
       }
     };
 
     fetchFileCatalogData();
-  }, [documentId, locale]);
+  }, [documentId, t]);
 
   // Parse inputData safely with runtime type guard OR build from file_catalog/Zustand store
   const data = useMemo((): Stage2InputData | undefined => {
@@ -437,21 +427,19 @@ export const Stage2InputTab = memo<Stage2InputTabProps>(function Stage2InputTab(
 
   // Get tier label
   const tierLabel = useMemo(() => {
-    if (!data?.tier) return t?.tierStandard?.[locale] || 'Standard';
+    if (!data?.tier) return t('tierStandard');
     switch (data.tier) {
       case 'premium':
-        return t?.tierPremium?.[locale] || 'Premium';
+        return t('tierPremium');
       case 'standard':
-        return t?.tierStandard?.[locale] || 'Standard';
+        return t('tierStandard');
       case 'trial':
-        return locale === 'ru' ? 'Пробный' : 'Trial';
       case 'free':
-        return locale === 'ru' ? 'Бесплатный' : 'Free';
       case 'basic':
       default:
-        return t?.tierBasic?.[locale] || 'Basic';
+        return t('tierBasic');
     }
-  }, [data?.tier, locale, t]);
+  }, [data?.tier, t]);
 
   // Error state
   if (fetchError) {
@@ -462,7 +450,7 @@ export const Stage2InputTab = memo<Stage2InputTabProps>(function Stage2InputTab(
           onClick={() => window.location.reload()}
           className="text-sm text-muted-foreground hover:text-foreground underline"
         >
-          {locale === 'ru' ? 'Обновить страницу' : 'Refresh page'}
+          {t('tryAgain')}
         </button>
       </div>
     );
@@ -472,7 +460,7 @@ export const Stage2InputTab = memo<Stage2InputTabProps>(function Stage2InputTab(
   if (!data) {
     return (
       <div className="p-4 text-center text-muted-foreground">
-        {t?.noActivity?.[locale] || 'No data available'}
+        {t('noDataAvailable')}
       </div>
     );
   }
@@ -487,7 +475,7 @@ export const Stage2InputTab = memo<Stage2InputTabProps>(function Stage2InputTab(
       <Card className="col-span-2">
         <CardHeader className="pb-3">
           <CardTitle className="text-sm font-medium text-muted-foreground">
-            {t?.fileDNA?.[locale] || 'File DNA'}
+            {t('fileDNA')}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -505,7 +493,7 @@ export const Stage2InputTab = memo<Stage2InputTabProps>(function Stage2InputTab(
           {/* File Size with Heavy Payload Badge */}
           <div className="flex items-center gap-2">
             <span className="text-sm text-muted-foreground">
-              {t?.fileSize?.[locale] || 'Size'}:
+              {t('fileSize')}:
             </span>
             <span className="text-sm font-medium">
               {formatFileSize(data.fileSize || 0)}
@@ -519,11 +507,11 @@ export const Stage2InputTab = memo<Stage2InputTabProps>(function Stage2InputTab(
                       className="bg-yellow-50 text-yellow-600 border-yellow-200 dark:bg-yellow-900/20 dark:text-yellow-400 dark:border-yellow-800 cursor-help"
                     >
                       <AlertTriangle className="h-3 w-3 mr-1" />
-                      {t?.heavyPayload?.[locale] || 'Heavy Payload'}
+                      {t('heavyPayload')}
                     </Badge>
                   </TooltipTrigger>
                   <TooltipContent>
-                    <p>{t?.heavyPayloadHint?.[locale] || 'Processing may take longer'}</p>
+                    <p>{t('heavyPayloadHint')}</p>
                   </TooltipContent>
                 </Tooltip>
               </TooltipProvider>
@@ -534,7 +522,7 @@ export const Stage2InputTab = memo<Stage2InputTabProps>(function Stage2InputTab(
           {data.pageCount !== undefined && data.pageCount > 0 && (
             <div className="flex items-center gap-2">
               <span className="text-sm text-muted-foreground">
-                {t?.pageCount?.[locale] || 'Pages'}:
+                {t('pageCount')}:
               </span>
               <span className="text-sm font-medium">{data.pageCount}</span>
             </div>
@@ -549,7 +537,7 @@ export const Stage2InputTab = memo<Stage2InputTabProps>(function Stage2InputTab(
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              {t?.tierCapabilities?.[locale] || 'Processing Capabilities'}
+              {t('tierCapabilities')}
             </CardTitle>
             <Badge className={cn('border', TIER_COLORS[data.tier || 'basic'])}>
               {tierLabel}
@@ -557,7 +545,7 @@ export const Stage2InputTab = memo<Stage2InputTabProps>(function Stage2InputTab(
           </div>
         </CardHeader>
         <CardContent>
-          <TierFeaturesList features={tierFeatures} locale={locale} />
+          <TierFeaturesList features={tierFeatures} />
         </CardContent>
       </Card>
 
@@ -567,7 +555,7 @@ export const Stage2InputTab = memo<Stage2InputTabProps>(function Stage2InputTab(
       <Card className="col-span-5">
         <CardHeader className="pb-3">
           <CardTitle className="text-sm font-medium text-muted-foreground">
-            {t?.metadata?.[locale] || 'Metadata'}
+            {t('metadata')}
           </CardTitle>
         </CardHeader>
         <CardContent>
@@ -577,10 +565,10 @@ export const Stage2InputTab = memo<Stage2InputTabProps>(function Stage2InputTab(
               <User className="h-4 w-4 text-muted-foreground shrink-0" />
               <div className="min-w-0">
                 <span className="text-xs text-muted-foreground block">
-                  {t?.uploadedBy?.[locale] || 'Uploaded by'}
+                  {t('uploadedBy')}
                 </span>
                 <span className="text-sm font-medium truncate block">
-                  {locale === 'ru' ? 'Система' : 'System'}
+                  {t('systemUser')}
                 </span>
               </div>
             </div>
@@ -590,7 +578,7 @@ export const Stage2InputTab = memo<Stage2InputTabProps>(function Stage2InputTab(
               <Building2 className="h-4 w-4 text-muted-foreground shrink-0" />
               <div className="min-w-0">
                 <span className="text-xs text-muted-foreground block">
-                  {t?.organization?.[locale] || 'Organization'}
+                  {t('organization')}
                 </span>
                 <span className="text-sm font-medium truncate block" title={data.organizationId}>
                   {data.organizationId
@@ -605,7 +593,7 @@ export const Stage2InputTab = memo<Stage2InputTabProps>(function Stage2InputTab(
               <Hash className="h-4 w-4 text-muted-foreground shrink-0" />
               <div className="min-w-0">
                 <span className="text-xs text-muted-foreground block">
-                  {t?.pipelineId?.[locale] || 'Pipeline ID'}
+                  {t('pipelineId')}
                 </span>
                 <span
                   className="text-sm font-mono text-muted-foreground truncate block"

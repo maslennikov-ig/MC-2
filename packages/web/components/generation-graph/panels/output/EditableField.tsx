@@ -28,7 +28,7 @@ import {
 import { Wand2 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useEditHistoryStore } from '@/stores/useEditHistoryStore'
-import { GRAPH_TRANSLATIONS } from '@/lib/generation-graph/translations'
+import { useTranslations } from 'next-intl'
 
 interface EditableFieldProps {
   config: FieldConfig
@@ -83,6 +83,9 @@ export const EditableField: React.FC<EditableFieldProps> = ({
   const textareaRef = useRef<HTMLTextAreaElement>(null)
   const inputRef = useRef<HTMLInputElement>(null)
   const containerRef = useRef<HTMLDivElement>(null)
+
+  // Translations
+  const t = useTranslations('generation.common')
 
   // Edit history store
   const pushEdit = useEditHistoryStore((state) => state.pushEdit)
@@ -275,13 +278,13 @@ export const EditableField: React.FC<EditableFieldProps> = ({
                     className="h-6 w-6 p-0"
                     onClick={() => setIsRegenerateOpen(true)}
                     disabled={disabled}
-                    aria-label={locale === 'ru' ? 'Перегенерировать с AI' : 'Regenerate with AI'}
+                    aria-label={t('regenerateWithAI')}
                   >
                     <Wand2 className="h-3.5 w-3.5 text-slate-500 hover:text-indigo-600" />
                   </Button>
                 </TooltipTrigger>
                 <TooltipContent>
-                  <p>{locale === 'ru' ? 'Перегенерировать с AI' : 'Regenerate with AI'}</p>
+                  <p>{t('regenerateWithAI')}</p>
                 </TooltipContent>
               </Tooltip>
             </TooltipProvider>
@@ -289,7 +292,7 @@ export const EditableField: React.FC<EditableFieldProps> = ({
         </div>
 
         <div aria-live="polite" aria-atomic="true">
-          <SaveStatusIndicator status={status} locale={locale} />
+          <SaveStatusIndicator status={status} />
         </div>
       </div>
 
@@ -340,7 +343,7 @@ export const EditableField: React.FC<EditableFieldProps> = ({
               className="absolute right-2 bottom-2 text-xs text-slate-400 dark:text-slate-500"
               aria-live="polite"
             >
-              {localValue.length} {GRAPH_TRANSLATIONS.common?.characters?.[locale] ?? 'characters'}
+              {localValue.length} {t('characters')}
             </div>
           )}
         </div>

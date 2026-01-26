@@ -7,7 +7,7 @@ import { ScrollArea } from '@/components/ui/scroll-area';
 import { Progress } from '@/components/ui/progress';
 import { cn } from '@/lib/utils';
 import { FileText, Scale, Zap, Trophy, ChevronDown, ChevronUp } from 'lucide-react';
-import { GRAPH_TRANSLATIONS } from '@/lib/generation-graph/translations';
+import { useTranslations } from 'next-intl';
 import { formatFileSize } from '@/lib/generation-graph/format-utils';
 import { getSupabaseClient } from '@/lib/supabase/browser-client';
 import type { Stage3InputTabProps, Stage3InputData, Stage3DocumentCandidate } from './types';
@@ -54,12 +54,11 @@ function isStage3InputData(data: unknown): data is Stage3InputData {
 
 interface DescriptionWithToggleProps {
   description: string;
-  locale: 'ru' | 'en';
 }
 
-function DescriptionWithToggle({ description, locale }: DescriptionWithToggleProps) {
+function DescriptionWithToggle({ description }: DescriptionWithToggleProps) {
   const [isExpanded, setIsExpanded] = useState(false);
-  const t = GRAPH_TRANSLATIONS.stage1;
+  const t = useTranslations('generation.stage1');
 
   const shouldShowToggle = description.length > DESCRIPTION_TRUNCATE_LENGTH;
   const displayText =
@@ -74,16 +73,16 @@ function DescriptionWithToggle({ description, locale }: DescriptionWithTogglePro
           onClick={() => setIsExpanded(!isExpanded)}
           className="flex items-center gap-1 text-xs text-primary hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 rounded"
           aria-expanded={isExpanded}
-          aria-label={isExpanded ? (t?.showLess?.[locale] || 'Show less') : (t?.showMore?.[locale] || 'Show more')}
+          aria-label={isExpanded ? t('showLess') : t('showMore')}
         >
           {isExpanded ? (
             <>
-              {t?.showLess?.[locale] || 'Show less'}
+              {t('showLess')}
               <ChevronUp className="h-3 w-3" aria-hidden="true" />
             </>
           ) : (
             <>
-              {t?.showMore?.[locale] || 'Show more'}
+              {t('showMore')}
               <ChevronDown className="h-3 w-3" aria-hidden="true" />
             </>
           )}
@@ -95,7 +94,6 @@ function DescriptionWithToggle({ description, locale }: DescriptionWithTogglePro
 
 interface DocumentCandidateItemProps {
   document: Stage3DocumentCandidate;
-  locale: 'ru' | 'en';
 }
 
 function DocumentCandidateItem({ document }: DocumentCandidateItemProps) {
@@ -161,7 +159,7 @@ export const Stage3InputTab = memo<Stage3InputTabProps>(function Stage3InputTab(
   inputData,
   locale = 'ru',
 }) {
-  const t = GRAPH_TRANSLATIONS.stage3;
+  const t = useTranslations('generation.stage3');
 
   // State for fetched data
   const [courseContext, setCourseContext] = useState<{ title: string; description: string } | null>(null);
@@ -301,7 +299,7 @@ export const Stage3InputTab = memo<Stage3InputTabProps>(function Stage3InputTab(
       <div className="flex flex-col items-center justify-center p-8 text-center">
         <Scale className="h-12 w-12 text-muted-foreground/30 mb-4" />
         <p className="text-sm text-muted-foreground">
-          {t?.emptyInput?.[locale] || 'Waiting for Stage 2 documents...'}
+          {t('emptyInput')}
         </p>
       </div>
     );
@@ -336,7 +334,7 @@ export const Stage3InputTab = memo<Stage3InputTabProps>(function Stage3InputTab(
       <Card className="col-span-5 border-l-4 border-l-amber-500">
         <CardHeader className="pb-3">
           <CardTitle className="text-sm font-medium text-muted-foreground">
-            {t?.courseContext?.[locale] || 'Course Criteria'}
+            {t('courseContext')}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-3">
@@ -347,7 +345,7 @@ export const Stage3InputTab = memo<Stage3InputTabProps>(function Stage3InputTab(
 
           {/* Description with show more/less */}
           {courseContext?.description && (
-            <DescriptionWithToggle description={courseContext.description} locale={locale} />
+            <DescriptionWithToggle description={courseContext.description} />
           )}
         </CardContent>
       </Card>
@@ -359,14 +357,14 @@ export const Stage3InputTab = memo<Stage3InputTabProps>(function Stage3InputTab(
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              {t?.candidates?.[locale] || 'Candidates'}
+              {t('candidates')}
             </CardTitle>
             <Badge variant="outline" className="text-xs">
-              {documents.length} {t?.candidatesCount?.[locale] || 'documents'}
+              {documents.length} {t('candidatesCount')}
             </Badge>
           </div>
           <p className="text-xs text-muted-foreground mt-1">
-            {t?.sortedByTokens?.[locale] || 'Sorted by weight (tokens)'}
+            {t('sortedByTokens')}
           </p>
         </CardHeader>
         <CardContent>
@@ -381,12 +379,11 @@ export const Stage3InputTab = memo<Stage3InputTabProps>(function Stage3InputTab(
                   <DocumentCandidateItem
                     key={doc.id}
                     document={doc}
-                    locale={locale}
                   />
                 ))
               ) : (
                 <div className="text-center py-8 text-muted-foreground text-sm">
-                  {t?.noDocumentsToClassify?.[locale] || 'No documents to classify'}
+                  {t('noDocumentsToClassify')}
                 </div>
               )}
             </div>
@@ -400,7 +397,7 @@ export const Stage3InputTab = memo<Stage3InputTabProps>(function Stage3InputTab(
       <Card className="col-span-2">
         <CardHeader className="pb-3">
           <CardTitle className="text-sm font-medium text-muted-foreground">
-            {t?.strategyEngine?.[locale] || 'Evaluation Mode'}
+            {t('strategyEngine')}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -408,7 +405,7 @@ export const Stage3InputTab = memo<Stage3InputTabProps>(function Stage3InputTab(
           <div className="space-y-2">
             <div className="flex items-center justify-between text-xs">
               <span className="text-muted-foreground">
-                {t?.tokenBudget?.[locale] || 'Token Budget'}
+                {t('tokenBudget')}
               </span>
               <span className="font-mono">
                 {totalTokens.toLocaleString()} / {TOKEN_BUDGET.toLocaleString()}
@@ -432,10 +429,10 @@ export const Stage3InputTab = memo<Stage3InputTabProps>(function Stage3InputTab(
                 </div>
                 <div>
                   <Badge className="bg-green-500/10 text-green-600 border-green-500/20 dark:text-green-400">
-                    {t?.strategySinglePass?.[locale] || 'Single Pass'}
+                    {t('strategySinglePass')}
                   </Badge>
                   <p className="text-xs text-muted-foreground mt-1">
-                    {t?.strategySinglePassDesc?.[locale] || 'All documents evaluated in one call'}
+                    {t('strategySinglePassDesc')}
                   </p>
                 </div>
               </div>
@@ -446,10 +443,10 @@ export const Stage3InputTab = memo<Stage3InputTabProps>(function Stage3InputTab(
                 </div>
                 <div>
                   <Badge className="bg-amber-500/10 text-amber-600 border-amber-500/20 dark:text-amber-400">
-                    {t?.strategyTournament?.[locale] || 'Tournament Mode'}
+                    {t('strategyTournament')}
                   </Badge>
                   <p className="text-xs text-muted-foreground mt-1">
-                    {t?.strategyTournamentDesc?.[locale] || 'Documents compared pairwise'}
+                    {t('strategyTournamentDesc')}
                   </p>
                 </div>
               </div>
@@ -462,7 +459,7 @@ export const Stage3InputTab = memo<Stage3InputTabProps>(function Stage3InputTab(
               <div className="text-center">
                 <span className="text-2xl font-bold">{documents.length}</span>
                 <p className="text-xs text-muted-foreground">
-                  {t?.candidatesCount?.[locale] || 'documents'}
+                  {t('candidatesCount')}
                 </p>
               </div>
               <div className="text-center">
@@ -470,7 +467,7 @@ export const Stage3InputTab = memo<Stage3InputTabProps>(function Stage3InputTab(
                   {documents.filter((d) => d.summaryTokens > HEAVY_TOKEN_THRESHOLD).length}
                 </span>
                 <p className="text-xs text-muted-foreground">
-                  {t?.heavyDocument?.[locale] || 'Heavy Document'}
+                  {t('heavyDocument')}
                 </p>
               </div>
             </div>

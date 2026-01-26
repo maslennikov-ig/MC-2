@@ -31,7 +31,6 @@ import { RealtimeStatusProvider } from './contexts/RealtimeStatusContext'
 import { FullscreenProvider } from './contexts/FullscreenContext'
 import { GraphOperationsProvider } from './contexts/GraphOperationsContext'
 import { GRAPH_STAGE_CONFIG, NODE_STYLES, ACTIVE_STATUSES } from '@/lib/generation-graph/constants'
-import { GRAPH_TRANSLATIONS } from '@/lib/generation-graph/translations'
 import { useGenerationRealtime } from '@/components/generation-monitoring/realtime-provider'
 import {
   RealtimeStatusData,
@@ -895,7 +894,6 @@ function GraphViewInner({
 
     return {
       stageConfig: GRAPH_STAGE_CONFIG,
-      translations: GRAPH_TRANSLATIONS,
       nodeStyles: NODE_STYLES,
       courseInfo: {
         id: courseId,

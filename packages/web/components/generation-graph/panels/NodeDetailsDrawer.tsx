@@ -9,7 +9,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { useNodeSelection } from '../hooks/useNodeSelection';
-import { useTranslation } from '@/lib/generation-graph/useTranslation';
+import { useTranslations } from 'next-intl';
 import { useUserRole } from '../hooks/useUserRole';
 import { AppNode, getDocumentId, getStagePhases, AppNodeData } from '../types';
 import { AttemptSelector } from './AttemptSelector';
@@ -162,7 +162,7 @@ function getQualityScoreFromMetadata(metadata: Record<string, unknown> | null | 
 
 export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
   const { selectedNodeId, deselectNode, focusRefinement, clearRefinementFocus, autoOpened } = useNodeSelection();
-  const { t } = useTranslation();
+  const t = useTranslations('generation');
   const { getNode } = useReactFlow();
   const { courseInfo } = useStaticGraph();
   const { portalContainerRef } = useFullscreenContext();

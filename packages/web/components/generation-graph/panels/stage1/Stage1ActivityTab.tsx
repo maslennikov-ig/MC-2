@@ -10,7 +10,7 @@ import {
   useGenerationRealtime,
   GenerationTrace,
 } from '@/components/generation-monitoring/realtime-provider';
-import { GRAPH_TRANSLATIONS } from '@/lib/generation-graph/translations';
+import { useTranslations } from 'next-intl';
 import { Stage1ActivityTabProps, ActivityEvent, ActivityActor, Stage1InputData, Stage1OutputData } from './types';
 
 /**
@@ -68,27 +68,22 @@ function determineEventType(
  */
 function translateEventMessage(
   trace: GenerationTrace,
-  locale: 'ru' | 'en'
+  t: ReturnType<typeof useTranslations<'generation.stage1'>>
 ): string {
-  const t = GRAPH_TRANSLATIONS.stage1;
-
   // Map common step names to translated messages
-  const stepMessageMap: Record<string, { ru: string; en: string }> = {
-    course_created: { ru: 'Курс создан', en: 'Course created' },
-    topic_updated: { ru: 'Тема обновлена', en: 'Topic updated' },
-    files_uploaded: { ru: 'Файлы загружены', en: 'Files uploaded' },
-    file_upload: { ru: 'Файлы загружены', en: 'Files uploaded' },
-    validation_passed: { ru: 'Валидация пройдена', en: 'Validation passed' },
-    validation_failed: {
-      ru: 'Валидация не пройдена',
-      en: 'Validation failed',
-    },
-    triggered_stage_2: { ru: 'Запущен Этап 2', en: 'Triggered Stage 2' },
-    stage_2_triggered: { ru: 'Запущен Этап 2', en: 'Triggered Stage 2' },
-    initialization: { ru: 'Инициализация', en: 'Initialization' },
-    security_scan: { ru: 'Проверка безопасности', en: 'Security scan' },
-    storage_upload: { ru: 'Загрузка в хранилище', en: 'Storage upload' },
-    registry: { ru: 'Регистрация курса', en: 'Course registration' },
+  const stepMessageMap: Record<string, () => string> = {
+    course_created: () => t('courseCreated'),
+    topic_updated: () => t('topicUpdated'),
+    files_uploaded: () => t('filesUploaded'),
+    file_upload: () => t('filesUploaded'),
+    validation_passed: () => t('validationPassed'),
+    validation_failed: () => t('validationFailed'),
+    triggered_stage_2: () => t('triggeredStage2'),
+    stage_2_triggered: () => t('triggeredStage2'),
+    initialization: () => t('validation'),
+    security_scan: () => t('securityScan'),
+    storage_upload: () => t('storageUpload'),
+    registry: () => t('registry'),
   };
 
   // Normalize step name
@@ -96,7 +91,7 @@ function translateEventMessage(
 
   // Try to find a translation
   if (normalizedStep && stepMessageMap[normalizedStep]) {
-    return stepMessageMap[normalizedStep][locale];
+    return stepMessageMap[normalizedStep]();
   }
 
   // Fallback: use phase and step_name
@@ -105,16 +100,14 @@ function translateEventMessage(
   }
 
   // Use translation keys if available
-  if (t?.courseCreated && trace.step_name?.includes('create')) {
-    return t.courseCreated[locale];
+  if (trace.step_name?.includes('create')) {
+    return t('courseCreated');
   }
-  if (t?.filesUploaded && trace.step_name?.includes('upload')) {
-    return t.filesUploaded[locale];
+  if (trace.step_name?.includes('upload')) {
+    return t('filesUploaded');
   }
-  if (t?.validationPassed && trace.step_name?.includes('validation')) {
-    return trace.error_data
-      ? t.validationFailed?.[locale] || 'Validation failed'
-      : t.validationPassed[locale];
+  if (trace.step_name?.includes('validation')) {
+    return trace.error_data ? t('validationFailed') : t('validationPassed');
   }
 
   return trace.step_name || trace.phase || 'Unknown event';
@@ -125,14 +118,14 @@ function translateEventMessage(
  */
 function traceToActivityEvent(
   trace: GenerationTrace,
-  locale: 'ru' | 'en'
+  t: ReturnType<typeof useTranslations<'generation.stage1'>>
 ): ActivityEvent {
   return {
     id: trace.id,
     timestamp: new Date(trace.created_at),
     actor: detectActor(trace),
     type: determineEventType(trace),
-    message: translateEventMessage(trace, locale),
+    message: translateEventMessage(trace, t),
     details: trace.input_data,
   };
 }
@@ -144,10 +137,10 @@ function traceToActivityEvent(
 function generateSyntheticEvents(
   inputData: Stage1InputData | undefined,
   outputData: Stage1OutputData | undefined,
+  t: ReturnType<typeof useTranslations<'generation.stage1'>>,
   locale: 'ru' | 'en'
 ): ActivityEvent[] {
   const events: ActivityEvent[] = [];
-  const t = GRAPH_TRANSLATIONS.stage1;
 
   // Event: Course created (from outputData.createdAt)
   if (outputData?.createdAt) {
@@ -156,20 +149,21 @@ function generateSyntheticEvents(
       timestamp: new Date(outputData.createdAt),
       actor: 'system',
       type: 'success',
-      message: t?.courseCreated?.[locale] || 'Course created',
+      message: t('courseCreated'),
     });
   }
 
   // Event: Topic set (from inputData.topic)
   if (inputData?.topic && outputData?.createdAt) {
+    const topicPreview = inputData.topic.slice(0, 50) + (inputData.topic.length > 50 ? '...' : '');
     events.push({
       id: 'synthetic_topic_set',
       timestamp: new Date(new Date(outputData.createdAt).getTime() + 100), // slightly after creation
       actor: 'user',
       type: 'info',
       message: locale === 'ru'
-        ? `Тема курса: "${inputData.topic.slice(0, 50)}${inputData.topic.length > 50 ? '...' : ''}"`
-        : `Course topic: "${inputData.topic.slice(0, 50)}${inputData.topic.length > 50 ? '...' : ''}"`,
+        ? `Тема курса: "${topicPreview}"`
+        : `Course topic: "${topicPreview}"`,
     });
   }
 
@@ -214,7 +208,7 @@ function generateSyntheticEvents(
       timestamp: new Date(new Date(outputData.createdAt).getTime() + 500),
       actor: 'system',
       type: 'success',
-      message: t?.validationPassed?.[locale] || 'Validation passed',
+      message: t('validationPassed'),
     });
   }
 
@@ -269,15 +263,15 @@ export const Stage1ActivityTab = memo<Stage1ActivityTabProps>(function Stage1Act
   inputData,
   outputData,
 }) {
-  const t = GRAPH_TRANSLATIONS.stage1;
+  const t = useTranslations('generation.stage1');
   const dateLocale = locale === 'ru' ? ruLocale : enLocale;
 
   // Get traces from realtime context - will throw if provider is missing (intentional)
   const { traces } = useGenerationRealtime();
 
   // Parse inputData and outputData safely
-  const parsedInputData = inputData as Stage1InputData | undefined;
-  const parsedOutputData = outputData as Stage1OutputData | undefined;
+  const parsedInputData = inputData;
+  const parsedOutputData = outputData;
 
   // Filter and transform traces to activity events, or use synthetic events
   const activities = useMemo(() => {
@@ -289,7 +283,7 @@ export const Stage1ActivityTab = memo<Stage1ActivityTabProps>(function Stage1Act
     // Get real traces for stage_1
     const realActivities = safeTraces
       .filter((trace) => trace.stage === 'stage_1')
-      .map((trace) => traceToActivityEvent(trace, locale));
+      .map((trace) => traceToActivityEvent(trace, t));
 
     // If we have real traces, use them
     if (realActivities.length > 0) {
@@ -297,16 +291,16 @@ export const Stage1ActivityTab = memo<Stage1ActivityTabProps>(function Stage1Act
     }
 
     // Otherwise, generate synthetic events from course data
-    const syntheticActivities = generateSyntheticEvents(parsedInputData, parsedOutputData, locale);
+    const syntheticActivities = generateSyntheticEvents(parsedInputData, parsedOutputData, t, locale);
     return syntheticActivities.sort((a, b) => b.timestamp.getTime() - a.timestamp.getTime());
-  }, [traces, nodeId, locale, parsedInputData, parsedOutputData]);
+  }, [traces, nodeId, t, locale, parsedInputData, parsedOutputData]);
 
   // Empty state
   if (activities.length === 0) {
     return (
       <div className="flex h-[300px] items-center justify-center p-4">
         <p className="text-sm text-muted-foreground">
-          {t?.noActivity?.[locale] || 'No activity recorded'}
+          {t('noActivity')}
         </p>
       </div>
     );
@@ -367,8 +361,8 @@ export const Stage1ActivityTab = memo<Stage1ActivityTabProps>(function Stage1Act
                 {/* Actor label */}
                 <span className="text-xs text-muted-foreground">
                   {activity.actor === 'user'
-                    ? t?.userAction?.[locale] || 'User'
-                    : t?.systemAction?.[locale] || 'System'}
+                    ? t('userAction')
+                    : t('systemAction')}
                 </span>
 
                 {/* Error details if present */}

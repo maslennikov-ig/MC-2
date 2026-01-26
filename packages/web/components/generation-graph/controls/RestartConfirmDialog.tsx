@@ -12,7 +12,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { RotateCcw, Loader2, AlertTriangle } from 'lucide-react'
 import { useRestartStage } from '../hooks/useRestartStage'
-import { useTranslation } from '@/lib/generation-graph/useTranslation'
+import { useTranslations } from 'next-intl'
 
 interface RestartConfirmDialogProps {
   open: boolean
@@ -38,7 +38,7 @@ export const RestartConfirmDialog = ({
   onSuccess,
 }: RestartConfirmDialogProps) => {
   const { restartStage, isRestarting, error } = useRestartStage(courseSlug)
-  const { t } = useTranslation()
+  const t = useTranslations('generation')
 
   const handleConfirm = async () => {
     const result = await restartStage(stageNumber)
