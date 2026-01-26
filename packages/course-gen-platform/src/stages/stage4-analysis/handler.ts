@@ -870,9 +870,19 @@ class Stage4AnalysisHandler {
             'Job paused awaiting clarifying answers - not an error, will resume when user answers'
           );
 
-          // Don't mark as failed - job will be retried when user answers questions
+          // CRITICAL: Return success (don't throw) to prevent BullMQ retry
           // Status already set to stage_4_clarifying by orchestrator
-          throw error;
+          // Job will be re-queued when user answers questions via resumeFromClarifying
+          return {
+            success: true,
+            message: 'Paused for clarifying questions - awaiting user input',
+            course_id,
+            metadata: {
+              total_duration_ms: totalDurationMs,
+              retry_count: job.attemptsMade,
+              completed_at: new Date().toISOString(),
+            },
+          };
         }
 
         // Log permanent errors (non-retriable)
