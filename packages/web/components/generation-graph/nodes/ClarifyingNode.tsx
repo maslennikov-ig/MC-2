@@ -3,8 +3,9 @@
 import { memo } from 'react'
 import { Handle, Position, type NodeProps } from '@xyflow/react'
 import { cn } from '@/lib/utils'
-import { MessageCircleQuestion, Check } from 'lucide-react'
+import { MessageCircleQuestion, Check, Bot } from 'lucide-react'
 import { NodeProgressBar } from '../components/shared'
+import { Badge } from '@/components/ui/badge'
 
 export interface ClarifyingNodeData {
   status: 'pending' | 'active' | 'completed'
@@ -12,6 +13,12 @@ export interface ClarifyingNodeData {
   answeredCount: number
   criticalAnswered: number
   criticalTotal: number
+  /** Whether questions were auto-answered in automatic mode */
+  isAutomatic?: boolean
+  /** Optional label for node display */
+  label?: string
+  /** Index signature for React Flow Node<Data> compatibility */
+  [key: string]: string | number | boolean | undefined
 }
 
 export const ClarifyingNode = memo(({ data, selected }: NodeProps) => {
@@ -46,6 +53,12 @@ export const ClarifyingNode = memo(({ data, selected }: NodeProps) => {
           />
         )}
         <span className="text-sm font-medium">Уточняющие вопросы</span>
+        {nodeData.isAutomatic && (
+          <Badge variant="secondary" className="ml-auto flex items-center gap-1 text-xs">
+            <Bot className="h-3 w-3" />
+            Авто
+          </Badge>
+        )}
       </div>
 
       <div className="mb-2 text-xs text-slate-500 dark:text-slate-400">

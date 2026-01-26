@@ -583,21 +583,22 @@ export async function getAnsweredQuestions(courseId: string): Promise<Clarifying
 /**
  * Get clarifying configuration for a course
  *
- * Determines if clarifying questions are enabled and if they've been skipped.
+ * Determines if clarifying questions are enabled, if they've been skipped,
+ * and whether the course is in automatic mode (for self-reflection).
  * Used by orchestrator to decide whether to run Phase 0.5.
  *
  * @param courseId - Course UUID
- * @returns Promise<{ enabled: boolean; skipped: boolean }> - Configuration
+ * @returns Promise<{ enabled: boolean; skipped: boolean; isAutomatic: boolean }> - Configuration
  */
 export async function getClarifyingConfig(
   courseId: string
-): Promise<{ enabled: boolean; skipped: boolean }> {
+): Promise<{ enabled: boolean; skipped: boolean; isAutomatic: boolean }> {
   const supabase = getSupabaseAdmin();
 
-  // Check if course has settings.clarifying_questions_enabled
+  // Check if course has settings.clarifying_questions_enabled and generation_mode
   const { data: course, error } = await supabase
     .from('courses')
-    .select('settings')
+    .select('settings, generation_mode')
     .eq('id', courseId)
     .single();
 
@@ -606,12 +607,80 @@ export async function getClarifyingConfig(
       { courseId, error: error.message },
       'Failed to fetch clarifying config, defaulting to disabled'
     );
-    return { enabled: false, skipped: false };
+    return { enabled: false, skipped: false, isAutomatic: false };
   }
 
   const settings = (course?.settings as Record<string, unknown>) || {};
   const enabled = (settings.clarifying_questions_enabled as boolean) || false;
   const skipped = (settings.clarifying_questions_skipped as boolean) || false;
+  const isAutomatic = course?.generation_mode === 'automatic';
 
-  return { enabled, skipped };
+  return { enabled, skipped, isAutomatic };
+}
+
+/**
+ * Auto-answer all pending questions with first suggested answer
+ *
+ * Used in automatic mode for self-reflection without user input.
+ * The AI generates questions and automatically selects the first
+ * suggested answer for each question.
+ *
+ * @param courseId - Course UUID
+ * @returns Promise<number> - Count of auto-answered questions
+ */
+export async function autoAnswerAllQuestions(courseId: string): Promise<number> {
+  const supabase = getSupabaseAdmin();
+
+  const { data: questions, error } = await supabase
+    .from('clarifying_questions')
+    .select('id, suggested_answers')
+    .eq('course_id', courseId)
+    .eq('status', 'pending');
+
+  if (error) {
+    logger.error(
+      { courseId, error: error.message },
+      'Failed to fetch pending questions for auto-answer'
+    );
+    return 0;
+  }
+
+  if (!questions || questions.length === 0) {
+    logger.info({ courseId }, 'No pending questions to auto-answer');
+    return 0;
+  }
+
+  let answeredCount = 0;
+
+  for (const question of questions) {
+    const suggestions = question.suggested_answers as Array<{ text: string }> | null;
+    const firstAnswer = suggestions?.[0]?.text || 'Auto-selected by system';
+
+    const { error: updateError } = await supabase
+      .from('clarifying_questions')
+      .update({
+        user_answer: firstAnswer,
+        answer_source: 'suggested',
+        selected_suggestion_index: 0,
+        status: 'answered',
+        answered_at: new Date().toISOString(),
+      })
+      .eq('id', question.id);
+
+    if (updateError) {
+      logger.warn(
+        { courseId, questionId: question.id, error: updateError.message },
+        'Failed to auto-answer question'
+      );
+    } else {
+      answeredCount++;
+    }
+  }
+
+  logger.info(
+    { courseId, answeredCount, totalPending: questions.length },
+    'Auto-answered clarifying questions in automatic mode'
+  );
+
+  return answeredCount;
 }

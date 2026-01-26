@@ -80,6 +80,8 @@ import { PartialGenerationProvider } from './contexts/PartialGenerationContext'
 import { SelectionToolbar } from './components/SelectionToolbar'
 import { useGenerationStore } from '@/stores/useGenerationStore'
 import { AppNode, AppEdge } from './types'
+import { trpc } from '@/lib/trpc/client'
+import type { ClarifyingProgressData } from './hooks/use-graph-data/types'
 
 // Define node and edge types OUTSIDE component to prevent re-creation on each render
 const nodeTypes: NodeTypes = {
@@ -389,6 +391,34 @@ function GraphViewInner({
     getFilename,
     isLoading: isCatalogLoading,
   } = useDocumentsWithStatus(courseId)
+
+  // Clarifying questions progress for Phase 0.5 node
+  // Query is enabled when pipeline reaches Stage 4 or beyond
+  const { data: clarifyingProgressRaw } = trpc.clarifying.getProgress.useQuery(
+    { courseId },
+    {
+      enabled:
+        !!courseId &&
+        (pipelineStatus?.startsWith('stage_4') ||
+          pipelineStatus?.startsWith('stage_5') ||
+          pipelineStatus?.startsWith('stage_6') ||
+          pipelineStatus === 'completed'),
+      refetchOnWindowFocus: false,
+    }
+  )
+
+  // Transform clarifying progress to expected format
+  const clarifyingData: ClarifyingProgressData | undefined =
+    clarifyingProgressRaw && clarifyingProgressRaw.total > 0
+      ? {
+          total: clarifyingProgressRaw.total,
+          answered: clarifyingProgressRaw.answered,
+          criticalAnswered: clarifyingProgressRaw.criticalAnswered,
+          criticalTotal: clarifyingProgressRaw.criticalTotal,
+          canProceed: clarifyingProgressRaw.canProceed,
+          isAutomatic: clarifyingProgressRaw.isAutomatic ?? false,
+        }
+      : undefined
   const initializeDocumentsWithStatus = useGenerationStore(
     (state) => state.initializeDocumentsWithStatus
   )
@@ -407,7 +437,7 @@ function GraphViewInner({
     removeLesson,
     setNodes,
     nodePositionsRef,
-  } = useGraphData({ getFilename, hasDocuments, stage1CourseData })
+  } = useGraphData({ getFilename, hasDocuments, stage1CourseData, clarifyingData })
   const { layoutNodes, layoutError: _layoutError } = useGraphLayout()
   // Layout generation counter to prevent stale layout results (Fix #6: Race condition)
   const layoutGenerationRef = useRef(0)

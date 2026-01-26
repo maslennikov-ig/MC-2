@@ -43,6 +43,7 @@ import {
   getPendingQuestions,
   getAnsweredQuestions,
   getClarifyingConfig,
+  autoAnswerAllQuestions,
 } from './phases/phase-0.5-clarifying';
 import {
   updateCourseProgress,
@@ -326,7 +327,10 @@ export async function runAnalysisOrchestration(job: StructureAnalysisJob): Promi
     const clarifyingConfig = await getClarifyingConfig(courseId);
 
     if (clarifyingConfig.enabled && !clarifyingConfig.skipped && budgetAllocation) {
-      orchestrationLogger.info('Clarifying questions enabled - checking status');
+      orchestrationLogger.info(
+        { isAutomatic: clarifyingConfig.isAutomatic },
+        'Clarifying questions enabled - checking status'
+      );
 
       const pendingQuestions = await getPendingQuestions(courseId);
 
@@ -346,45 +350,66 @@ export async function runAnalysisOrchestration(job: StructureAnalysisJob): Promi
           iterationRound: 1,
         });
 
-        // Transition to clarifying status and pause
-        const { error: statusError } = await supabase
-          .from('courses')
-          .update({
-            generation_status: 'stage_4_clarifying',
-            updated_at: new Date().toISOString(),
-          })
-          .eq('id', courseId);
-
-        if (statusError) {
-          orchestrationLogger.error(
-            { error: statusError.message },
-            'Failed to transition to stage_4_clarifying'
+        // AUTOMATIC MODE: Auto-answer all questions and proceed without pause
+        if (clarifyingConfig.isAutomatic) {
+          const answeredCount = await autoAnswerAllQuestions(courseId);
+          orchestrationLogger.info(
+            { answeredCount },
+            'Automatic mode: auto-answered questions, proceeding to Phase 1'
           );
+          // No pause - continue directly to Phase 1
         } else {
-          orchestrationLogger.info('Transitioned to stage_4_clarifying - awaiting user answers');
+          // SEMI-AUTOMATIC MODE: Pause for user input
+          // Transition to clarifying status and pause
+          const { error: statusError } = await supabase
+            .from('courses')
+            .update({
+              generation_status: 'stage_4_clarifying',
+              updated_at: new Date().toISOString(),
+            })
+            .eq('id', courseId);
+
+          if (statusError) {
+            orchestrationLogger.error(
+              { error: statusError.message },
+              'Failed to transition to stage_4_clarifying'
+            );
+          } else {
+            orchestrationLogger.info('Transitioned to stage_4_clarifying - awaiting user answers');
+          }
+
+          // Throw special error to pause execution
+          throw new Error('AWAITING_CLARIFYING_ANSWERS: Questions generated, awaiting user input');
         }
-
-        // Throw special error to pause execution
-        throw new Error('AWAITING_CLARIFYING_ANSWERS: Questions generated, awaiting user input');
-      }
-
-      // Check if still waiting for critical/important answers
-      const criticalPending = pendingQuestions.filter(
-        q => q.question_priority === 'critical' || q.question_priority === 'important'
-      );
-
-      if (criticalPending.length > 0) {
-        orchestrationLogger.info(
-          {
-            criticalPendingCount: criticalPending.length,
-            totalPendingCount: pendingQuestions.length,
-          },
-          'Critical/important questions pending - pausing analysis'
+      } else {
+        // Questions already exist - check if we need to wait
+        // Check if still waiting for critical/important answers
+        const criticalPending = pendingQuestions.filter(
+          q => q.question_priority === 'critical' || q.question_priority === 'important'
         );
 
-        throw new Error(
-          `AWAITING_CLARIFYING_ANSWERS: ${criticalPending.length} critical/important questions pending`
-        );
+        if (criticalPending.length > 0) {
+          // In automatic mode, auto-answer any pending questions
+          if (clarifyingConfig.isAutomatic) {
+            const answeredCount = await autoAnswerAllQuestions(courseId);
+            orchestrationLogger.info(
+              { answeredCount, criticalPending: criticalPending.length },
+              'Automatic mode: auto-answered remaining questions'
+            );
+          } else {
+            orchestrationLogger.info(
+              {
+                criticalPendingCount: criticalPending.length,
+                totalPendingCount: pendingQuestions.length,
+              },
+              'Critical/important questions pending - pausing analysis'
+            );
+
+            throw new Error(
+              `AWAITING_CLARIFYING_ANSWERS: ${criticalPending.length} critical/important questions pending`
+            );
+          }
+        }
       }
 
       // All critical/important questions answered - continue
