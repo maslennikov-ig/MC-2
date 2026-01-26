@@ -1,426 +1,348 @@
-# План: P3 Code Review Fixes + COURSE_REGENERATION Job
+# P3.3: Унификация i18n (GRAPH_TRANSLATIONS → next-intl)
 
 ## Резюме
 
-**4 задачи:**
+**Проблема:** Две параллельные системы i18n в packages/web:
 
-1. **P3.2** - Layout shift в token estimates (5 мин)
-2. **P3.3** - Унификация i18n на next-intl (2-3 дня, 32 компонента)
-3. **P3.4** - useCallback для handleQuickAction (5 мин)
-4. **mc2-g0iz** - COURSE_REGENERATION через restartStage (2-4 часа)
+- `GRAPH_TRANSLATIONS` в `lib/generation-graph/translations.ts` (1375 строк) — 28 файлов
+- `next-intl` с `messages/{en,ru}/generation.json` (330+ ключей) — 3+ файлов
 
-## Context7 Validation
+**Цель:** Мигрировать все 28 файлов на next-intl, удалить кастомную систему.
 
-| Задача           | Библиотека | Benchmark | Подтверждено                            |
-| ---------------- | ---------- | --------- | --------------------------------------- |
-| P3.3 i18n        | next-intl  | 92.3      | ✅ useTranslations('namespace') pattern |
-| P3.4 useCallback | React      | 89.9      | ✅ Dependency array required            |
-| mc2-g0iz         | BullMQ     | 87.1      | ✅ queue.add() + job.remove() patterns  |
+**Оценка:** 8-9 рабочих дней
 
 ---
 
-## Task 1: P3.2 Layout Shift Fix
+## Beads Issue
 
-**Проблема:** Кнопки меняют ширину при загрузке token estimates.
+**ID:** `mc2-???` (создать через `bd create`)
 
-**Файл:** `packages/web/components/generation/GlobalCourseChat.tsx`
-
-**Решение:**
-
-```tsx
-// Строки 351-357 и 365-371
-<span className="inline-block min-w-[3ch] text-center">
-  {isLoadingEstimates ? (
-    <Loader2 className="inline h-3 w-3 animate-spin" />
-  ) : (
-    (tokenEstimates?.refine?.formatted ?? '~2K')
-  )}
-</span>
+```bash
+bd create --title="P3.3: Унификация i18n (GRAPH_TRANSLATIONS → next-intl)" \
+  --type=task \
+  --priority=3 \
+  --labels=frontend,i18n,tech-debt \
+  --description="Миграция 28 файлов с GRAPH_TRANSLATIONS на next-intl. 8-9 дней."
 ```
-
-**Время:** 5 минут
 
 ---
 
-## Task 2: P3.3 Унификация i18n (GRAPH_TRANSLATIONS → next-intl)
+## Текущее состояние
 
-### Проблема
+### GRAPH_TRANSLATIONS (удалить)
 
-Две параллельные системы i18n:
+**Файл:** `packages/web/lib/generation-graph/translations.ts`
 
-- `GRAPH_TRANSLATIONS` (1375 строк в translations.ts) - 32 компонента
-- `next-intl` (JSON файлы) - 50+ компонентов
+**Структура:**
 
-100+ дублирующихся ключей: `stages`, `status`, `actions`, `drawer`, `errors`, `metrics`.
-
-### Решение: Полная миграция на next-intl
-
-#### Фаза 2.1: Расширение JSON файлов (1 день)
-
-**Файлы:**
-
-- `packages/web/messages/en/generation.json`
-- `packages/web/messages/ru/generation.json`
-
-**Действия:**
-
-1. Перенести ВСЕ ключи из `translations.ts` в JSON:
-   - `stages.*` (6 ключей)
-   - `status.*` (8 ключей)
-   - `actions.*` (30+ ключей)
-   - `drawer.*` (5 ключей)
-   - `errors.*` (5 ключей)
-   - `metrics.*` (4 ключей)
-   - `longRunning.*` (3 ключей)
-   - `completionMessages.*` (6 ключей)
-   - `analysisResult.*` (30+ ключей)
-   - `courseStructure.*` (40+ ключей)
-   - `refinementChat.*` (20+ ключей)
-   - `stage1-7.*` (200+ ключей)
-   - `enrichments.*` (20+ ключей)
-   - `endNode.*`, `selectionToolbar.*`, `common.*`
-
-2. Структура JSON:
-
-```json
-{
-  "stages": {
-    "stage_1": "Course Initialization",
-    "stage_2": "Document Processing"
-  },
-  "status": {
-    "pending": "Pending",
-    "active": "In Progress"
-  },
-  "analysisResult": {
-    "classification": "Course Classification",
-    "topicAnalysis": "Topic Analysis"
-  }
-}
+```
+stages, status, actions, drawer, stageDescriptions
+refinementChat, errors, retry, mobile, viewToggle
+longRunning, metrics, completionMessages
+analysisResult (35 ключей), courseStructure (45 ключей)
+stage1 (50), stage2 (80), stage3 (50), stage4 (60), stage5 (50), stage6 (60)
+enrichments, endNode, selectionToolbar, common
 ```
 
-#### Фаза 2.2: Создание типизированного хука (30 мин)
+**Формат:** `{ key: { ru: string, en: string } }`
 
-**Новый файл:** `packages/web/lib/generation-graph/useGenerationTranslations.ts`
+### next-intl generation.json (расширить)
 
-```typescript
-import { useTranslations } from 'next-intl';
+**Файлы:** `packages/web/messages/{en,ru}/generation.json`
 
-export type GenerationNamespace =
-  | 'stages'
-  | 'status'
-  | 'actions'
-  | 'drawer'
-  | 'errors'
-  | 'metrics'
-  | 'analysisResult'
-  | 'courseStructure'
-  | 'refinementChat'
-  | 'stage1'
-  | 'stage2'
-  | 'stage3'
-  | 'stage4'
-  | 'stage5'
-  | 'stage6'
-  | 'stage7'
-  | 'enrichments'
-  | 'common';
+**Уже есть (330+ ключей):**
 
-export function useGenerationTranslations(namespace: GenerationNamespace) {
-  return useTranslations(`generation.${namespace}`);
-}
+- stages (6), status (6), actions (7), drawer (8)
+- refinementChat (20+), errors (3), retry (4), mobile (3)
+- viewToggle (2), longRunning (4), metrics (4), completionMessages (6)
+- analysisResult (30+), courseStructure (50+), restart (6)
+- stepNames (40+), missionControl (15+), stats (20+), globalChat (20+)
 
-// Для backwards compatibility во время миграции
-export function useGraphTranslations() {
-  return useTranslations('generation');
-}
-```
+**Нужно добавить (~500 ключей):**
 
-#### Фаза 2.3: Миграция компонентов (1.5 дня)
+- stage1-6 sections (каждый 50-80 ключей)
+- stageDescriptions (7)
+- common (10)
+- endNode (20)
+- selectionToolbar (15)
 
-**32 файла для изменения:**
+---
 
-| Директория         | Файлы                                                                      | Изменения                                                |
-| ------------------ | -------------------------------------------------------------------------- | -------------------------------------------------------- |
-| `panels/`          | RefinementChat, QuickActions, InputTab, OutputTab, ProcessTab, ActivityTab | Заменить `GRAPH_TRANSLATIONS.key?.[locale]` → `t('key')` |
-| `panels/output/`   | EditableField, SaveStatusIndicator, ImpactAnalysisModal, SemanticDiff      | То же                                                    |
-| `panels/stage1-7/` | Все Stage*InputTab, Stage*OutputTab, Stage\*ProcessTab                     | То же                                                    |
-| `nodes/`           | StageNode, EnrichmentNode, EndNode                                         | То же                                                    |
-| `controls/`        | GraphControls, SelectionToolbar                                            | То же                                                    |
+## Файлы для миграции (28 файлов)
 
-**Паттерн замены (Context7 validated):**
+### Shared Components (10 файлов)
+
+| Файл                                    | Usages |
+| --------------------------------------- | ------ |
+| `panels/output/SaveStatusIndicator.tsx` | 1      |
+| `panels/output/EditableField.tsx`       | 1      |
+| `components/SelectionToolbar.tsx`       | ?      |
+| `nodes/EndNode.tsx`                     | ?      |
+| `panels/EndNodePanel.tsx`               | ?      |
+| `nodes/AssetDock.tsx`                   | ?      |
+| `controls/RestartConfirmDialog.tsx`     | ?      |
+| `controls/ApprovalControls.tsx`         | ?      |
+| `controls/ConnectionStatus.tsx`         | ?      |
+| `controls/LongRunningIndicator.tsx`     | ?      |
+
+### Stage 1 (4 файла)
+
+- `panels/stage1/Stage1InputTab.tsx` (3)
+- `panels/stage1/Stage1ProcessTab.tsx` (3)
+- `panels/stage1/Stage1OutputTab.tsx` (1)
+- `panels/stage1/Stage1ActivityTab.tsx` (3)
+
+### Stage 2 (5 файлов)
+
+- `panels/stage2/Stage2InputTab.tsx` (3)
+- `panels/stage2/Stage2ProcessTab.tsx` (5)
+- `panels/stage2/Stage2OutputTab.tsx` (1)
+- `panels/stage2/Stage2ActivityTab.tsx` (2)
+
+### Stage 3 (4 файла)
+
+- `panels/stage3/Stage3InputTab.tsx` (2)
+- `panels/stage3/Stage3ProcessTab.tsx` (3)
+- `panels/stage3/Stage3OutputTab.tsx` (2)
+- `panels/stage3/Stage3ActivityTab.tsx` (2)
+
+### Stage 4 (5 файлов)
+
+- `panels/stage4/Stage4InputTab.tsx` (3)
+- `panels/stage4/Stage4ProcessTab.tsx` (5)
+- `panels/stage4/Stage4OutputTab.tsx` (2)
+- `panels/stage4/Stage4ActivityTab.tsx` (2)
+- `panels/stage4/VisualStylePreview.tsx` (1)
+
+### Stage 5 (6 файлов)
+
+- `panels/stage5/Stage5InputTab.tsx` (1)
+- `panels/stage5/Stage5ProcessTab.tsx` (3)
+- `panels/stage5/Stage5OutputTab.tsx` (1)
+- `panels/stage5/Stage5ActivityTab.tsx` (2)
+- `panels/stage5/components/StructureTree.tsx` (2)
+- `panels/stage5/components/BlueprintPreview.tsx` (1)
+
+### Stage 6 (2 файла)
+
+- `panels/stage6/dashboard/Stage6ControlTower.tsx` (1)
+- `panels/stage6/inspector/tabs/Stage6BlueprintTab.tsx` (1)
+
+### Stage 7 / Enrichments (1 файл)
+
+- `panels/stage7/EnrichmentStatusBadge.tsx` (1)
+
+---
+
+## Паттерн миграции
 
 ```typescript
 // БЫЛО:
 import { GRAPH_TRANSLATIONS } from '@/lib/generation-graph/translations';
-const t = GRAPH_TRANSLATIONS.stage4;
-<span>{t?.topic?.[locale] ?? 'Topic'}</span>
+import { useLocale } from 'next-intl';
 
-// СТАЛО (next-intl pattern):
+const locale = useLocale();
+const t = GRAPH_TRANSLATIONS.stage1;
+const label = t?.topic?.[locale] ?? 'Topic';
+
+// СТАЛО:
 import { useTranslations } from 'next-intl';
-const t = useTranslations('generation.stage4');
-<span>{t('topic')}</span>
 
-// Interpolation:
-<span>{t('greeting', { name: user.name })}</span>
+const t = useTranslations('generation.stage1');
+const label = t('topic');
 
-// Pluralization (ICU syntax):
-<span>{t('items', { count: items.length })}</span>
-// JSON: "items": "{count, plural, =0 {No items} =1 {One item} other {# items}}"
-
-// Rich text with components:
-{t.rich('description', {
-  bold: (chunks) => <strong>{chunks}</strong>,
-  code: (chunks) => <code>{chunks}</code>
-})}
+// Интерполяция:
+// БЫЛО: { greeting: { ru: 'Привет, {{name}}!', en: 'Hello, {{name}}!' } }
+// СТАЛО: { "greeting": "Hello, {name}!" }  // одинарные скобки!
+t('greeting', { name: 'John' });
 ```
-
-#### Фаза 2.4: Удаление translations.ts (30 мин)
-
-1. Удалить `packages/web/lib/generation-graph/translations.ts`
-2. Удалить `packages/web/lib/generation-graph/useTranslation.ts`
-3. Удалить типы из `packages/shared-types/src/generation-graph.ts` (GraphTranslations)
-4. Обновить экспорты
-
-#### Верификация
-
-```bash
-pnpm type-check
-pnpm build
-# Проверить UI на всех stage panels
-```
-
-**Время:** 2-3 дня
 
 ---
 
-## Task 3: P3.4 useCallback для handleQuickAction
+## План по фазам
 
-**Проблема:** `handleQuickAction` создаётся заново при каждом рендере.
+### Фаза 0: Подготовка (1 день)
 
-**Файлы:**
+- [ ] Создать Beads issue
+- [ ] Аудит overlapping ключей между GRAPH_TRANSLATIONS и generation.json
+- [ ] Создать таблицу маппинга ключей
 
-- `packages/web/components/generation-graph/panels/RefinementChat.tsx`
-- `packages/web/components/generation/GlobalCourseChat.tsx`
+### Фаза 1: Добавление ключей в JSON (1-2 дня)
 
-**Context7 Best Practice (React docs):**
+- [ ] Добавить `stage1` section (~50 ключей) в en/ru
+- [ ] Добавить `stage2` section (~80 ключей) в en/ru
+- [ ] Добавить `stage3` section (~50 ключей) в en/ru
+- [ ] Добавить `stage4` section (~60 ключей) в en/ru
+- [ ] Добавить `stage5` section (~50 ключей) в en/ru
+- [ ] Добавить `stage6` section (~60 ключей) в en/ru
+- [ ] Добавить `stageDescriptions` section (7 ключей)
+- [ ] Добавить `common` section (10 ключей)
+- [ ] Добавить `endNode` section (20 ключей)
+- [ ] Добавить `selectionToolbar` section (15 ключей)
+- [ ] Исправить интерполяцию: `{{var}}` → `{var}`
+- [ ] `pnpm type-check` & `pnpm build`
 
-> `useCallback` returns a memoized callback function. The dependency array is **required** - without it, a new function is returned on every render.
+### Фаза 2: Миграция shared components (1 день)
 
-**Решение:**
+- [ ] SaveStatusIndicator.tsx
+- [ ] EditableField.tsx
+- [ ] SelectionToolbar.tsx
+- [ ] EndNode.tsx, EndNodePanel.tsx
+- [ ] AssetDock.tsx
+- [ ] RestartConfirmDialog.tsx, ApprovalControls.tsx
+- [ ] ConnectionStatus.tsx, LongRunningIndicator.tsx
+- [ ] `pnpm type-check` & `pnpm build`
 
-```typescript
-// RefinementChat.tsx (строка ~129)
-// ✅ Dependencies: [onRefine] - only prop that can change
-const handleQuickAction = useCallback(
-  (actionText: string, intent: ChatIntent) => {
-    setSelectedIntent(intent);
-    setMessage(actionText);
-    // Send immediately
-    setPendingMessages(prev => [
-      ...prev,
-      {
-        role: 'user',
-        content: actionText,
-        timestamp: new Date().toISOString(),
-        pending: true,
-      },
-    ]);
-    onRefine(actionText, intent);
-  },
-  [onRefine]
-);
+### Фаза 3-8: Миграция stage components (3 дня)
 
-// GlobalCourseChat.tsx (строка ~257)
-// ✅ Dependencies: [sendMessage] - already memoized with useCallback
-const handleQuickAction = useCallback(
-  (actionPrompt: string, intent: 'refine' | 'regenerate' = 'refine') => {
-    setSelectedIntent(intent);
-    void sendMessage(actionPrompt, intent);
-  },
-  [sendMessage]
-);
-```
+- [ ] Stage 1 components (4 файла)
+- [ ] Stage 2 components (5 файлов)
+- [ ] Stage 3 components (4 файла)
+- [ ] Stage 4 components (5 файлов)
+- [ ] Stage 5 components (6 файлов)
+- [ ] Stage 6 components (2 файла)
+- [ ] `pnpm type-check` & `pnpm build` после каждого stage
 
-**Почему эти dependencies:**
+### Фаза 9: Stage 7 / Enrichments (0.5 дня)
 
-- `setSelectedIntent`, `setMessage`, `setPendingMessages` - стабильные (useState setters)
-- `onRefine` / `sendMessage` - могут меняться, включаем в deps
+- [ ] EnrichmentStatusBadge.tsx
+- [ ] Проверить остальные enrichment компоненты
 
-**Время:** 5 минут
+### Фаза 10: Оставшиеся компоненты (0.5 дня)
+
+- [ ] GraphView.tsx, GraphHeader.tsx
+- [ ] RefinementChat.tsx, NodeDetailsDrawer.tsx
+- [ ] QuickActions.tsx, LessonPanelWithTabs.tsx
+- [ ] StageNode.tsx, MinimalNode.tsx
+- [ ] RejectionModal.tsx
+
+### Фаза 11: Cleanup (0.5 дня)
+
+- [ ] Удалить `lib/generation-graph/translations.ts`
+- [ ] Удалить `lib/generation-graph/useTranslation.ts`
+- [ ] Удалить/обновить GraphTranslations type из `shared-types/src/generation-graph.ts`
+- [ ] Обновить `.claude/docs/i18n-guide.md` с паттернами миграции
+- [ ] Final `pnpm type-check` & `pnpm build`
+- [ ] Визуальная проверка всех stage panels в обеих локалях
 
 ---
 
-## Task 4: mc2-g0iz COURSE_REGENERATION Job
-
-### Анализ
-
-**Существующая инфраструктура:**
-
-- `restartStage` endpoint уже работает
-- Chat endpoint возвращает `intent: 'regenerate'`
-- Progress tracking через Supabase Realtime готов
-- НЕ нужен новый JobType!
-
-**Context7 BullMQ Patterns (validated):**
-
-```typescript
-// Добавление job с custom ID (предотвращает дубликаты)
-await queue.add('job-name', data, { jobId: `regen-${courseId}` });
-
-// Удаление job
-await job.remove(); // Locked jobs throw error
-
-// Уже реализовано в проекте:
-await removeJobsByCourseId(courseId); // Очистка перед restart
-```
-
-### Решение: Минимальный путь через restartStage
-
-#### Шаг 4.1: Обновить Frontend для вызова restartStage
-
-**Файл:** `packages/web/components/generation/GlobalCourseChat.tsx`
-
-```typescript
-// После получения ответа с intent='regenerate'
-if (result.intent === 'regenerate' && onRegenerationRequest) {
-  toast.info(t('regenerationTriggered'), {
-    description: t('preparingRegeneration'),
-  });
-  onRegenerationRequest(); // Вызывает restartStage
-}
-```
-
-**Файл:** Родительский компонент (где используется GlobalCourseChat)
-
-```typescript
-const handleRegenerationRequest = async () => {
-  try {
-    await trpc.generation.lifecycle.restartStage.mutate({
-      courseId,
-      stageNumber: 4, // Restart from Stage 4
-    });
-    toast.success('Regeneration started');
-  } catch (error) {
-    toast.error('Failed to start regeneration');
-  }
-};
-
-<GlobalCourseChat
-  courseId={courseId}
-  onRegenerationRequest={handleRegenerationRequest}
-/>
-```
-
-#### Шаг 4.2: Добавить конфигурацию стартового stage
-
-**Опционально:** Позволить пользователю выбирать с какого stage начать regeneration.
-
-```typescript
-// В chat response добавить рекомендуемый stage
-interface ChatResponse {
-  // ...existing
-  suggestedRestartStage?: 4 | 5 | 6; // AI может предложить
-}
-
-// Frontend использует suggestedRestartStage или default 4
-const stageNumber = result.suggestedRestartStage ?? 4;
-```
-
-#### Шаг 4.3: Улучшить UX с confirmation dialog
-
-**Файл:** `packages/web/components/generation/GlobalCourseChat.tsx`
-
-```typescript
-const [showRegenerateConfirm, setShowRegenerateConfirm] = useState(false);
-
-// При получении intent='regenerate'
-if (result.intent === 'regenerate') {
-  setShowRegenerateConfirm(true);
-}
-
-// Dialog
-<AlertDialog open={showRegenerateConfirm} onOpenChange={setShowRegenerateConfirm}>
-  <AlertDialogContent>
-    <AlertDialogHeader>
-      <AlertDialogTitle>{t('regenerateConfirmTitle')}</AlertDialogTitle>
-      <AlertDialogDescription>
-        {t('regenerateConfirmDescription')}
-      </AlertDialogDescription>
-    </AlertDialogHeader>
-    <AlertDialogFooter>
-      <AlertDialogCancel>{t('cancel')}</AlertDialogCancel>
-      <AlertDialogAction onClick={handleRegenerationRequest}>
-        {t('startRegeneration')}
-      </AlertDialogAction>
-    </AlertDialogFooter>
-  </AlertDialogContent>
-</AlertDialog>
-```
-
-#### Шаг 4.4: Добавить i18n ключи
-
-**Файл:** `packages/web/messages/{ru,en}/generation.json`
+## JSON структура для новых ключей
 
 ```json
 {
-  "globalChat": {
-    "regenerateConfirmTitle": "Start Course Regeneration?",
-    "regenerateConfirmDescription": "This will regenerate stages 4-6. Existing content will be replaced.",
-    "startRegeneration": "Start Regeneration",
-    "regenerationStarted": "Regeneration started",
-    "regenerationFailed": "Failed to start regeneration"
+  "stage1": {
+    "identity": "Identity",
+    "topic": "Course Topic",
+    "description": "Description",
+    "targetAudience": "Target Audience",
+    "difficulty": "Difficulty",
+    "format": "Course Format",
+    "parameters": "Course Parameters"
+  },
+  "stage2": {
+    "fileDNA": "File DNA",
+    "pipeline": "Processing Pipeline",
+    "docling": "Document Conversion",
+    "chunking": "Text Chunking",
+    "embedding": "Creating Embeddings",
+    "indexing": "Indexing"
+  },
+  "stage3": {
+    "classification": "Document Classification",
+    "priority": "Priority",
+    "relevance": "Relevance Score"
+  },
+  "stage4": {
+    "analysis": "Deep Analysis",
+    "topic": "Topic Analysis",
+    "structure": "Structure Recommendation",
+    "pedagogy": "Pedagogical Strategy"
+  },
+  "stage5": {
+    "structure": "Course Structure",
+    "sections": "Sections",
+    "lessons": "Lessons",
+    "blueprint": "Blueprint"
+  },
+  "stage6": {
+    "controlTower": { ... },
+    "lessonCard": { ... },
+    "tabs": { ... },
+    "nodes": { ... }
+  },
+  "stageDescriptions": {
+    "stage_1": "Course passport with basic parameters",
+    "stage_2": "Document processing and indexing",
+    "stage_3": "Document classification and prioritization",
+    "stage_4": "Deep analysis and recommendations",
+    "stage_5": "Course structure formation",
+    "stage_6": "Lesson content generation"
+  },
+  "common": {
+    "moduleWord": "module",
+    "lessonWord": "lesson",
+    "saving": "Saving...",
+    "characters": "characters",
+    "loading": "Loading..."
+  },
+  "endNode": {
+    "finish": "Finish",
+    "courseReady": "Course Ready!",
+    "viewCourse": "View Course",
+    "downloadOLX": "Download OLX"
+  },
+  "selectionToolbar": {
+    "generateAll": "Start All",
+    "retrySelected": "Retry Selected",
+    "approveSelected": "Approve Selected"
   }
 }
 ```
 
-### Файлы для изменения
-
-| Файл                          | Действие                                          |
-| ----------------------------- | ------------------------------------------------- |
-| `GlobalCourseChat.tsx`        | Добавить confirmation dialog и вызов restartStage |
-| `messages/en/generation.json` | Добавить i18n ключи                               |
-| `messages/ru/generation.json` | Добавить i18n ключи                               |
-| Родительский компонент        | Передать `onRegenerationRequest` callback         |
-
-### Верификация
-
-1. Открыть GlobalCourseChat
-2. Выбрать intent "Regenerate"
-3. Отправить сообщение
-4. Получить ответ с `intent='regenerate'`
-5. Увидеть confirmation dialog
-6. Подтвердить → restartStage вызывается
-7. Progress отображается через Realtime
-
-**Время:** 2-4 часа
-
 ---
 
-## Порядок выполнения
+## Верификация
 
-| #   | Задача                | Приоритет | Время   | Зависимости |
-| --- | --------------------- | --------- | ------- | ----------- |
-| 1   | P3.2 Layout shift     | P3        | 5 мин   | -           |
-| 2   | P3.4 useCallback      | P3        | 5 мин   | -           |
-| 3   | mc2-g0iz Regeneration | P3        | 2-4 ч   | -           |
-| 4   | P3.3 i18n унификация  | P3        | 2-3 дня | После 1-3   |
-
-**Рекомендация:** Задачи 1-3 выполнить сегодня, задачу 4 (i18n) — отдельным спринтом.
-
----
-
-## Верификация всех задач
+### После каждой фазы:
 
 ```bash
-# После каждой задачи
 pnpm type-check
 pnpm build
-
-# После P3.3 (i18n)
-# Проверить все stage panels на корректность переводов
-# Проверить EN/RU локали
-
-# После mc2-g0iz
-# Протестировать полный flow: chat → regenerate intent → confirmation → restartStage → progress tracking
 ```
+
+### После завершения:
+
+- [ ] Проверить все stage panels в браузере (EN локаль)
+- [ ] Проверить все stage panels в браузере (RU локаль)
+- [ ] Проверить интерполяцию переменных
+- [ ] Проверить pluralization (если есть)
+- [ ] Убедиться что translations.ts удалён
+- [ ] Убедиться что useTranslation.ts удалён
+
+---
+
+## Критические файлы
+
+| Файл                                     | Действие                       |
+| ---------------------------------------- | ------------------------------ |
+| `messages/en/generation.json`            | Расширить +500 ключей          |
+| `messages/ru/generation.json`            | Расширить +500 ключей          |
+| `lib/generation-graph/translations.ts`   | УДАЛИТЬ                        |
+| `lib/generation-graph/useTranslation.ts` | УДАЛИТЬ                        |
+| `shared-types/src/generation-graph.ts`   | Удалить GraphTranslations type |
+| `.claude/docs/i18n-guide.md`             | Обновить с паттернами          |
+
+---
+
+## Решения по дизайну
+
+1. **useGenerationTranslations hook** — НЕ создаём. next-intl уже даёт полную типизацию.
+
+2. **Stage namespaces** — Используем dot notation: `useTranslations('generation.stage1')`
+
+3. **Порядок миграции** — Shared components первыми, потом stage-by-stage.
+
+4. **Backwards compatibility** — Оставляем useTranslation hook до полной миграции.
+
+5. **i18n-guide.md** — Обновить в Фазе 11 с паттернами миграции.
