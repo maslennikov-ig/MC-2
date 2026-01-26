@@ -2,6 +2,24 @@
 
 _Released on 2025-12-26_
 
+## v0.28.39
+
+_Released on 2026-01-26_
+
+### 🔧 Improvements
+
+- **web**: P3.3 migrate i18n from GRAPH_TRANSLATIONS to next-intl
+
+### 🐛 Bug Fixes
+
+- **shared-types**: Update 1 source file(s), update docs
+- **web**: TypeScript errors in P3.3 i18n migration
+- **web**: P3 code review fixes + course regeneration flow
+
+---
+
+_This release was automatically generated from 6 commits._
+
 ## v0.28.38
 
 _Released on 2026-01-25_
