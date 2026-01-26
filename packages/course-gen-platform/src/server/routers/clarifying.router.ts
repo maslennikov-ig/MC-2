@@ -416,16 +416,20 @@ export const clarifyingRouter = router({
         await verifyCourseAccess(courseId, currentUser.id, currentUser.organizationId, requestId);
 
         const supabase = getTypedSupabaseAdmin();
+        const typedSupabase = getSupabaseAdmin();
 
-        // Fetch all questions to calculate statistics
-        const { data: questions, error } = await supabase
-          .from('clarifying_questions')
-          .select('id, question_priority, status, iteration_round')
-          .eq('course_id', courseId);
+        // Fetch all questions and course generation_mode in parallel
+        const [questionsResult, courseResult] = await Promise.all([
+          supabase
+            .from('clarifying_questions')
+            .select('id, question_priority, status, iteration_round')
+            .eq('course_id', courseId),
+          typedSupabase.from('courses').select('generation_mode').eq('id', courseId).single(),
+        ]);
 
-        if (error) {
+        if (questionsResult.error) {
           logger.error(
-            { requestId, courseId, error: error.message },
+            { requestId, courseId, error: questionsResult.error.message },
             'Failed to fetch questions for progress'
           );
 
@@ -435,7 +439,7 @@ export const clarifyingRouter = router({
           });
         }
 
-        const allQuestions = (questions || []) as Pick<
+        const allQuestions = (questionsResult.data || []) as Pick<
           QuestionRow,
           'id' | 'question_priority' | 'status' | 'iteration_round'
         >[];
@@ -461,6 +465,9 @@ export const clarifyingRouter = router({
         // Get max iteration round
         const currentRound = Math.max(...allQuestions.map(q => q.iteration_round), 1);
 
+        // Check if course is in automatic mode
+        const isAutomatic = courseResult.data?.generation_mode === 'automatic';
+
         logger.debug(
           {
             requestId,
@@ -472,6 +479,7 @@ export const clarifyingRouter = router({
             criticalAnswered,
             criticalTotal,
             canProceed,
+            isAutomatic,
           },
           'Progress calculated'
         );
@@ -487,6 +495,7 @@ export const clarifyingRouter = router({
           importantAnswered,
           canProceed,
           currentRound,
+          isAutomatic,
         };
       } catch (error) {
         if (error instanceof TRPCError) throw error;

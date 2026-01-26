@@ -119,17 +119,32 @@ type UseMutationResult<TData, TVariables> = {
 }
 
 /**
+ * Query options for useQuery hook
+ */
+type QueryOptions = {
+  enabled?: boolean
+  refetchOnWindowFocus?: boolean
+}
+
+/**
  * Create a minimal useQuery hook implementation
  */
 function createUseQuery<TInput, TOutput>(
   procedurePath: string
-): (input: TInput) => UseQueryResult<TOutput> {
-  return (input: TInput) => {
+): (input: TInput, options?: QueryOptions) => UseQueryResult<TOutput> {
+  return (input: TInput, options?: QueryOptions) => {
     const [data, setData] = React.useState<TOutput | undefined>(undefined)
     const [isLoading, setIsLoading] = React.useState(true)
     const [error, setError] = React.useState<Error | null>(null)
 
+    const isEnabled = options?.enabled !== false
+
     const fetchData = React.useCallback(async () => {
+      if (!isEnabled) {
+        setIsLoading(false)
+        return
+      }
+
       try {
         setIsLoading(true)
         const response = await fetchWithRetry(
@@ -155,7 +170,7 @@ function createUseQuery<TInput, TOutput>(
       } finally {
         setIsLoading(false)
       }
-    }, [input])
+    }, [input, isEnabled])
 
     React.useEffect(() => {
       void fetchData()
@@ -261,6 +276,24 @@ export const trpc = {
           }>
         }
       >('clarifying.getQuestions'),
+    },
+    getProgress: {
+      useQuery: createUseQuery<
+        { courseId: string },
+        {
+          total: number
+          answered: number
+          skipped: number
+          pending: number
+          criticalTotal: number
+          criticalAnswered: number
+          importantTotal: number
+          importantAnswered: number
+          canProceed: boolean
+          currentRound: number
+          isAutomatic: boolean
+        }
+      >('clarifying.getProgress'),
     },
     submitAnswer: {
       useMutation: createUseMutation<
