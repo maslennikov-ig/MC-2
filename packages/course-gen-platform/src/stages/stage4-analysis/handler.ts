@@ -132,7 +132,9 @@ function classifyAnalysisError(
     errorMessage.includes('LLM_ERROR') ||
     errorMessage.includes('OpenRouter') ||
     errorMessage.includes('rate limit') ||
-    errorMessage.includes('API error')
+    errorMessage.includes('API error') ||
+    errorMessage.includes('aborted') ||
+    errorMessage.includes('AbortError')
   ) {
     return 'LLM_ERROR';
   }
