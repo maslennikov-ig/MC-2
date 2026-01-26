@@ -19,6 +19,7 @@ export interface DocumentWithStatus {
  * Used to initialize Stage 2 document nodes on page load before realtime traces arrive.
  *
  * @param courseId - Course ID to fetch documents for
+ * @param pipelineStatus - Optional pipeline status to trigger refetch when generation starts
  * @returns Object containing:
  *   - documents: Array of documents with status
  *   - filenameMap: Map<fileId, filename> for lookups
@@ -26,10 +27,14 @@ export interface DocumentWithStatus {
  *   - isLoading: Loading state
  *   - error: Error if fetch failed
  */
-export function useDocumentsWithStatus(courseId: string) {
+export function useDocumentsWithStatus(courseId: string, pipelineStatus?: string | null) {
   const [documents, setDocuments] = useState<DocumentWithStatus[]>([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState<Error | null>(null)
+
+  // Derive generationStarted from pipelineStatus parameter
+  // This allows refetch when generation status changes (e.g., user clicks "Start")
+  const generationStarted = pipelineStatus && pipelineStatus !== 'pending'
 
   // Fetch file catalog data with processing statuses
   useEffect(() => {
@@ -105,19 +110,36 @@ export function useDocumentsWithStatus(courseId: string) {
         }
 
         // Build documents array
-        // Priority: vector_status from file_catalog > traces > pending
+        // If generation hasn't started, all documents are pending (even if deduplicated)
+        // This prevents confusing UI where documents appear "completed" before user clicks "Start"
         const docsWithStatus: DocumentWithStatus[] = files.map((file) => {
           const displayName = file.generated_title || file.original_name || file.filename
 
-          // Determine status: vector_status is the source of truth for document processing
+          // If generation hasn't started, show all as pending
+          if (!generationStarted) {
+            return {
+              id: file.id,
+              name: displayName,
+              status: 'pending' as NodeStatus,
+              priority: file.priority as 'CORE' | 'IMPORTANT' | 'SUPPLEMENTARY' | undefined,
+            }
+          }
+
+          // Generation started - determine status from traces first, then vector_status
+          // Priority: traces > vector_status > pending
           let status: NodeStatus
-          if (file.vector_status === 'indexed') {
+          const traceStatus = documentStatuses.get(file.id)
+
+          if (traceStatus) {
+            // Traces exist - use trace status
+            status = traceStatus
+          } else if (file.vector_status === 'indexed') {
+            // No traces but indexed = deduplicated during this generation run
             status = 'completed'
           } else if (file.vector_status === 'failed') {
             status = 'error'
           } else {
-            // Fallback to traces if vector_status is not set
-            status = documentStatuses.get(file.id) || 'pending'
+            status = 'pending'
           }
 
           return {
@@ -148,7 +170,7 @@ export function useDocumentsWithStatus(courseId: string) {
     return () => {
       cancelled = true
     }
-  }, [courseId])
+  }, [courseId, generationStarted])
 
   // Build filename map from documents
   const filenameMap = useMemo(() => {
