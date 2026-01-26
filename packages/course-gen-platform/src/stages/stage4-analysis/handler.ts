@@ -610,7 +610,15 @@ class Stage4AnalysisHandler {
                 'Critical/important questions still pending - aborting job (will retry when answered)'
               );
               throw new Error(
-                `AWAITING_CLARIFYING_ANSWERS: ${criticalPending.length} critical/important questions pending`
+                `AWAITING_CLARIFYING_ANSWERS: ${criticalPending.length} critical/important questions pending`,
+                {
+                  cause: {
+                    code: 'QUESTIONS_PENDING',
+                    criticalCount: criticalPending.length,
+                    totalCount: pendingQuestions.length,
+                    message: 'Please answer the critical and important questions to continue',
+                  },
+                }
               );
             }
 

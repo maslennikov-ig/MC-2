@@ -98,6 +98,13 @@
     "retryButton": "Повторить",
     "cancelButton": "Отмена"
   },
+  "clarifyingNode": {
+    "title": "Уточняющие вопросы",
+    "autoBadge": "Авто",
+    "progress": "{answered} / {total} отвечено",
+    "critical": "({answered}/{total} обязательных)",
+    "invalidData": "Некорректные данные"
+  },
   "mobile": {
     "title": "Прогресс генерации",
     "noStages": "Этапов пока нет",

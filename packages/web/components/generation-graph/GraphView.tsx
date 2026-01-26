@@ -392,17 +392,29 @@ function GraphViewInner({
     isLoading: isCatalogLoading,
   } = useDocumentsWithStatus(courseId)
 
-  // Clarifying questions progress for Phase 0.5 node
-  // Query is enabled when pipeline reaches Stage 4 or beyond
+  // Clarifying questions - two-step query pattern to avoid unnecessary API calls
+  // Step 1: Check if clarifying is enabled (lightweight, cached forever - config doesn't change)
+  const isAtStage4OrBeyond =
+    !!courseId &&
+    (pipelineStatus?.startsWith('stage_4') ||
+      pipelineStatus?.startsWith('stage_5') ||
+      pipelineStatus?.startsWith('stage_6') ||
+      pipelineStatus === 'completed')
+
+  const { data: clarifyingEnabled } = trpc.clarifying.isEnabled.useQuery(
+    { courseId },
+    {
+      enabled: isAtStage4OrBeyond,
+      staleTime: Infinity, // Config doesn't change, cache forever
+      refetchOnWindowFocus: false,
+    }
+  )
+
+  // Step 2: Only fetch progress if clarifying is actually enabled
   const { data: clarifyingProgressRaw } = trpc.clarifying.getProgress.useQuery(
     { courseId },
     {
-      enabled:
-        !!courseId &&
-        (pipelineStatus?.startsWith('stage_4') ||
-          pipelineStatus?.startsWith('stage_5') ||
-          pipelineStatus?.startsWith('stage_6') ||
-          pipelineStatus === 'completed'),
+      enabled: isAtStage4OrBeyond && clarifyingEnabled?.enabled === true,
       refetchOnWindowFocus: false,
     }
   )

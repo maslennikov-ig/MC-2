@@ -2,6 +2,7 @@
 
 import { memo } from 'react'
 import { Handle, Position, type NodeProps } from '@xyflow/react'
+import { useTranslations } from 'next-intl'
 import { cn } from '@/lib/utils'
 import { MessageCircleQuestion, Check, Bot } from 'lucide-react'
 import { NodeProgressBar } from '../components/shared'
@@ -22,6 +23,8 @@ export interface ClarifyingNodeData {
 }
 
 export const ClarifyingNode = memo(({ data, selected }: NodeProps) => {
+  const t = useTranslations('generation.clarifyingNode')
+
   // Defensive type casting with validation (Issue #5)
   const rawData = data as unknown as ClarifyingNodeData | undefined
 
@@ -30,7 +33,7 @@ export const ClarifyingNode = memo(({ data, selected }: NodeProps) => {
     return (
       <div className="clarifying-node min-w-[200px] rounded-xl border-2 border-red-400 bg-red-50 px-4 py-3 dark:bg-red-950/20">
         <Handle type="target" position={Position.Top} className="!bg-red-500" />
-        <span className="text-xs text-red-600">Invalid node data</span>
+        <span className="text-xs text-red-600">{t('invalidData')}</span>
         <Handle type="source" position={Position.Bottom} className="!bg-red-500" />
       </div>
     )
@@ -73,20 +76,20 @@ export const ClarifyingNode = memo(({ data, selected }: NodeProps) => {
             className={cn('h-5 w-5', isActive ? 'text-purple-500' : 'text-slate-400')}
           />
         )}
-        <span className="text-sm font-medium">Уточняющие вопросы</span>
+        <span className="text-sm font-medium">{t('title')}</span>
         {isAutomatic && (
           <Badge variant="secondary" className="ml-auto flex items-center gap-1 text-xs">
             <Bot className="h-3 w-3" />
-            Авто
+            {t('autoBadge')}
           </Badge>
         )}
       </div>
 
       <div className="mb-2 text-xs text-slate-500 dark:text-slate-400">
-        {answeredCount} / {questionsCount} отвечено
+        {t('progress', { answered: answeredCount, total: questionsCount })}
         {criticalTotal > 0 && (
           <span className="ml-2 text-red-600 dark:text-red-400">
-            ({criticalAnswered}/{criticalTotal} обязательных)
+            {t('critical', { answered: criticalAnswered, total: criticalTotal })}
           </span>
         )}
       </div>

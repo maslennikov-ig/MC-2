@@ -27,6 +27,19 @@ import logger from '@/shared/logger';
 import type { Stage4BudgetAllocation } from './stage4-budget-allocator';
 
 // ============================================================================
+// CONSTANTS
+// ============================================================================
+
+/**
+ * LLM timeout for clarifying questions generation in milliseconds.
+ * Configurable via environment variable for different model latencies.
+ */
+export const LLM_CLARIFYING_TIMEOUT_MS = parseInt(
+  process.env.LLM_CLARIFYING_TIMEOUT_MS || '60000',
+  10
+);
+
+// ============================================================================
 // SCHEMAS
 // ============================================================================
 
@@ -358,7 +371,7 @@ export async function runPhase05Clarifying(rawInput: Phase05Input): Promise<Clar
     const model = await getModelForPhase('stage_4_clarifying', courseId, undefined, language);
     const modelId = model.model || 'unknown';
 
-    phaseLogger.info({ modelId }, 'Model selected for clarifying questions generation');
+    phaseLogger.debug({ modelId }, 'Model selected for clarifying questions generation');
 
     // =================================================================
     // STEP 2: Build prompt
@@ -371,12 +384,11 @@ export async function runPhase05Clarifying(rawInput: Phase05Input): Promise<Clar
     // =================================================================
     // STEP 3: Invoke LLM with timeout protection
     // =================================================================
-    const LLM_TIMEOUT_MS = 60_000; // 60 seconds timeout for LLM call
     const controller = new AbortController();
     const timeoutId = setTimeout(() => {
       controller.abort();
-      phaseLogger.warn({ timeoutMs: LLM_TIMEOUT_MS }, 'LLM call timed out, aborting');
-    }, LLM_TIMEOUT_MS);
+      phaseLogger.warn({ timeoutMs: LLM_CLARIFYING_TIMEOUT_MS }, 'LLM call timed out, aborting');
+    }, LLM_CLARIFYING_TIMEOUT_MS);
 
     let response;
     try {
@@ -454,7 +466,7 @@ export async function runPhase05Clarifying(rawInput: Phase05Input): Promise<Clar
 
     const output = validationResult.data;
 
-    phaseLogger.info(
+    phaseLogger.debug(
       {
         questionCount: output.questions.length,
         criticalCount: output.questions.filter(q => q.question_priority === 'critical').length,
@@ -651,15 +663,15 @@ export async function autoAnswerAllQuestions(courseId: string): Promise<number> 
     .eq('status', 'pending');
 
   if (error) {
-    logger.error(
+    logger.warn(
       { courseId, error: error.message },
-      'Failed to fetch pending questions for auto-answer'
+      'Failed to fetch pending questions for auto-answer, returning 0'
     );
     return 0;
   }
 
   if (!questions || questions.length === 0) {
-    logger.info({ courseId }, 'No pending questions to auto-answer');
+    logger.debug({ courseId }, 'No pending questions to auto-answer');
     return 0;
   }
 
