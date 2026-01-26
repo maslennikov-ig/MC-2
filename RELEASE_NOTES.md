@@ -2,6 +2,46 @@
 
 _Released on 2025-12-26_
 
+## v0.28.40
+
+_Released on 2026-01-26_
+
+### ✨ New Features
+
+- **web**: Add clarifying questions info to StageResultsPreview
+- **backend**: Add dev:worker:stage6 script for Stage 6 worker
+- **stage4**: Add self-reflection auto-answer in automatic mode
+
+### 🐛 Bug Fixes
+
+- **web**: Update 4 source file(s), update MCP configs, +3 more
+- **stage4**: Classify AbortError as LLM_ERROR for proper retry
+- **stage4**: Prevent BullMQ retry for AWAITING_CLARIFYING_ANSWERS
+- **graph**: Connect clarifying node from Stage 4 bottom handle
+- **graph**: Position clarifying node BELOW Stage 4
+- **stage4**: Increase clarifying LLM timeout to 5 minutes
+- **web**: Position clarifying node as side branch below Stage 4
+- **Database**: Add stage_4_clarifying status to FSM
+- **web**: Add pipelineStatus param to useDocumentsWithStatus
+- **web**: Fix Clarifying Questions node display and auto-open issues
+- **web**: Prevent rate limit for clarifying.getProgress
+- **dev**: Add Stage 6 worker to start-dev.sh
+- **web**: Improve error handling in RealtimeProvider
+- **API**: Revert to simple JSON format for restart-stage tRPC call
+- **API**: Use tRPC batch format for restart-stage endpoint
+- **API**: Correct tRPC endpoint path for restart-stage
+- **web**: Resolve ESLint errors in NodeDetailsDrawer
+- **web**: Resolve 405 error and hydration warnings in restart-stage
+- **stage4**: Address medium/low code review findings
+- **stage4**: Address code review findings for self-reflection
+- **web**: Use correct tRPC GET input format in getChatTokenEstimates
+- **i18n**: Use correct ICU interpolation format {var} instead of {{var}}
+- **config**: Switch xiaomi/mimo-v2-flash from free to paid tier
+
+---
+
+_This release was automatically generated from 31 commits._
+
 ## v0.28.39
 
 _Released on 2026-01-26_
