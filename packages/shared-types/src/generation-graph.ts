@@ -710,8 +710,8 @@ export interface StaticGraphData {
   /** Stage configuration */
   stageConfig: Record<string, StageConfig>;
 
-  /** Translation strings */
-  translations: GraphTranslations;
+  /** Translation strings (deprecated - use next-intl instead) */
+  translations?: GraphTranslations;
 
   /** Node styling */
   nodeStyles: NodeStyles;
