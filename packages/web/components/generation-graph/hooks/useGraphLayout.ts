@@ -558,6 +558,31 @@ export function useGraphLayout() {
         layoutedTopLevel = [...nonModuleNodes, ...alignedModules]
       }
 
+      // POST-PROCESSING PHASE 3: Position clarifying node BELOW Stage 4
+      // ELK places it to the right (horizontal layout), but it should be a side branch below
+      const clarifyingNode = layoutedTopLevel.find((n) => (n.type as string) === 'clarifying')
+      const stage4Node = layoutedTopLevel.find(
+        (n) => n.type === 'stage' && (n.data as Record<string, unknown>)?.stageNumber === 4
+      )
+
+      if (clarifyingNode && stage4Node) {
+        const stage4Height = (stage4Node.style?.height as number) || DEFAULT_NODE_HEIGHT
+        const verticalGap = 40 // Gap between Stage 4 and Clarifying node
+
+        layoutedTopLevel = layoutedTopLevel.map((node) => {
+          if ((node.type as string) === 'clarifying') {
+            return {
+              ...node,
+              position: {
+                x: stage4Node.position.x, // Same X as Stage 4
+                y: stage4Node.position.y + stage4Height + verticalGap, // Below Stage 4
+              },
+            }
+          }
+          return node
+        })
+      }
+
       // PHASE 2 (MICRO): Recalculate child positions relative to their parents
       // This is critical for auto-arrange button to work correctly
       // Group children by parent
