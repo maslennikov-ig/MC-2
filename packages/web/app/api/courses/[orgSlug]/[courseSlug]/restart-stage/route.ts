@@ -115,31 +115,25 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
       return NextResponse.json({ error: 'No valid session', code: 'UNAUTHORIZED' }, { status: 401 })
     }
 
-    // Call tRPC endpoint (batch format required by httpBatchLink)
+    // Call tRPC endpoint
     const backendUrl = process.env.COURSEGEN_BACKEND_URL || 'http://localhost:3456'
     const tRPCUrl = `${backendUrl}/trpc`
 
-    const tRPCResponse = await fetch(`${tRPCUrl}/generation.restartStage?batch=1`, {
+    const tRPCResponse = await fetch(`${tRPCUrl}/generation.restartStage`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${accessToken}`,
       },
       body: JSON.stringify({
-        '0': {
-          json: {
-            courseId: courseData.id,
-            stageNumber,
-          },
-        },
+        courseId: courseData.id,
+        stageNumber,
       }),
     })
 
-    // Parse batch response (array format)
-    const batchResponse = await tRPCResponse.json()
-    const data = Array.isArray(batchResponse) ? batchResponse[0] : batchResponse
+    const data = await tRPCResponse.json()
 
-    if (!tRPCResponse.ok || data?.error) {
+    if (!tRPCResponse.ok) {
       logger.error('tRPC generation.restartStage failed', {
         userId: user.id,
         courseId: courseData.id,
@@ -156,32 +150,28 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
         TOO_MANY_REQUESTS: 429,
       }
 
-      const errorData = data?.error
-      const httpStatus = statusMap[errorData?.data?.code] || tRPCResponse.status || 500
+      const httpStatus = statusMap[data.error?.data?.code] || tRPCResponse.status
       return NextResponse.json(
         {
-          error: errorData?.message || 'Failed to restart stage',
-          code: errorData?.data?.code || 'INTERNAL_ERROR',
+          error: data.error?.message || 'Failed to restart stage',
+          code: data.error?.data?.code || 'INTERNAL_ERROR',
         },
         { status: httpStatus }
       )
     }
 
-    // Extract result from batch response format
-    const resultData = data?.result?.data
-
     logger.info('Stage restart initiated successfully', {
       userId: user.id,
       courseId: courseData.id,
       stageNumber,
-      previousStatus: resultData?.previousStatus,
-      newStatus: resultData?.newStatus,
+      previousStatus: data.result?.data?.previousStatus,
+      newStatus: data.result?.data?.newStatus,
     })
 
     // Return tRPC result data
     return NextResponse.json({
       success: true,
-      ...resultData,
+      ...data.result?.data,
     })
   } catch (error) {
     logger.error('Unexpected error in restart-stage', {
