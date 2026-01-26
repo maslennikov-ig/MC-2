@@ -35,7 +35,7 @@ import type { Stage4BudgetAllocation } from './stage4-budget-allocator';
  * Configurable via environment variable for different model latencies.
  */
 export const LLM_CLARIFYING_TIMEOUT_MS = parseInt(
-  process.env.LLM_CLARIFYING_TIMEOUT_MS || '60000',
+  process.env.LLM_CLARIFYING_TIMEOUT_MS || '300000',
   10
 );
 
