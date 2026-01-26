@@ -988,8 +988,14 @@ function GraphViewInner({
     let selectedStage: string | null = null
     let isAwaitingState = false
 
+    // Check clarifying state FIRST - specific handling for clarifying node
+    // (stage_4_clarifying returns awaitingStage=4, but we want to open clarifying node, not stage_4)
+    if (pipelineStatus === 'stage_4_clarifying') {
+      selectedStage = 'stage_4_clarifying'
+      isAwaitingState = true
+    }
     // Check awaiting approval states - ALWAYS open for awaiting (user needs to take action)
-    if (awaitingStage === 3) {
+    else if (awaitingStage === 3) {
       selectedStage = 'stage_3'
       isAwaitingState = true
     } else if (awaitingStage === 4) {

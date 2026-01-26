@@ -21,6 +21,7 @@ import { Maximize2, Minimize2, RotateCcw } from 'lucide-react'
 import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip'
 import { RestartConfirmDialog } from '../controls/RestartConfirmDialog'
 import { useParams } from 'next/navigation'
+import dynamic from 'next/dynamic'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
@@ -80,8 +81,18 @@ import { useLessonInspectorData } from '../hooks/useLessonInspectorData'
 import { useEnrichmentInspectorStore } from '../stores/enrichment-inspector-store'
 // End Node completion panel
 import { EndNodePanel } from './EndNodePanel'
-// Stage 4 Clarifying Questions panel
-import { ClarifyingPanel } from './clarifying/ClarifyingPanel'
+// Stage 4 Clarifying Questions panel - Dynamic import to avoid SSR issues with isomorphic-dompurify
+const ClarifyingPanel = dynamic(
+  () => import('./clarifying/ClarifyingPanel').then((mod) => mod.ClarifyingPanel),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex h-64 items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-purple-600" />
+      </div>
+    ),
+  }
+)
 
 /**
  * Extract module number from moduleId string (e.g., "module_1" -> 1)
@@ -942,8 +953,10 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
                 realtimeStatus?.status === 'completed' || generationStatus === 'completed'
               }
             />
-          ) : generationStatus === 'stage_4_clarifying' && data?.stageNumber === 4 ? (
-            /* Stage 4 Clarifying Questions Panel */
+          ) : selectedNodeId === 'stage_4_clarifying' ||
+            (generationStatus === 'stage_4_clarifying' && data?.stageNumber === 4) ? (
+            /* Stage 4 Clarifying Questions Panel - show when clarifying node is selected
+               OR when status is stage_4_clarifying and Stage 4 node is selected (backward compat) */
             <ClarifyingPanel
               courseId={courseInfo.id}
               onComplete={() => {
