@@ -148,9 +148,12 @@ export function GenerationRealtimeProvider({
     const { data: skeletonData, error: skeletonError } = skeletonResult;
     const { data: criticalData, error: criticalError } = criticalResult;
 
-    if (skeletonError) {
-      console.error('[RealtimeProvider] Failed to fetch skeleton traces:', skeletonError);
-      console.error('[RealtimeProvider] Error details:', {
+    // Check for actual errors (not empty objects)
+    const hasSkeletonError = skeletonError && (skeletonError.message || skeletonError.code);
+    const hasCriticalError = criticalError && (criticalError.message || criticalError.code);
+
+    if (hasSkeletonError) {
+      console.error('[RealtimeProvider] Failed to fetch skeleton traces:', {
         message: skeletonError.message,
         code: skeletonError.code,
         details: skeletonError.details,
@@ -159,8 +162,11 @@ export function GenerationRealtimeProvider({
       return;
     }
 
-    if (criticalError) {
-      console.error('[RealtimeProvider] Failed to fetch critical traces:', criticalError);
+    if (hasCriticalError) {
+      console.error('[RealtimeProvider] Failed to fetch critical traces:', {
+        message: criticalError.message,
+        code: criticalError.code,
+      });
       // Continue with skeleton data even if critical fails
     }
 
