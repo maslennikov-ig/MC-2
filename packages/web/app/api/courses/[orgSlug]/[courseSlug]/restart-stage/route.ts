@@ -119,7 +119,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
     const backendUrl = process.env.COURSEGEN_BACKEND_URL || 'http://localhost:3456'
     const tRPCUrl = `${backendUrl}/trpc`
 
-    const tRPCResponse = await fetch(`${tRPCUrl}/generation.restartStage`, {
+    const tRPCResponse = await fetch(`${tRPCUrl}/generation.lifecycle.restartStage`, {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
@@ -134,7 +134,7 @@ export async function POST(request: NextRequest, { params }: RouteContext) {
     const data = await tRPCResponse.json()
 
     if (!tRPCResponse.ok) {
-      logger.error('tRPC generation.restartStage failed', {
+      logger.error('tRPC generation.lifecycle.restartStage failed', {
         userId: user.id,
         courseId: courseData.id,
         stageNumber,
