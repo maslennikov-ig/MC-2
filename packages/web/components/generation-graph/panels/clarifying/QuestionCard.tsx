@@ -142,6 +142,7 @@ export function QuestionCard({
   const [selectedSuggestionIndexes, setSelectedSuggestionIndexes] = useState<number[]>([])
   const [customText, setCustomText] = useState('')
   const [hasCustomInput, setHasCustomInput] = useState(false)
+  const [isCustomSelected, setIsCustomSelected] = useState(false)
 
   const priorityConf = priorityConfig[question.priority]
   const typeConf = typeConfig[question.type]
@@ -155,10 +156,12 @@ export function QuestionCard({
       return selectedSuggestionIndex !== null || customText.trim().length > 0
     }
     if (question.type === 'single_choice') {
-      return selectedSuggestionIndex !== null
+      return selectedSuggestionIndex !== null || (isCustomSelected && customText.trim().length > 0)
     }
     if (question.type === 'multi_choice') {
-      return selectedSuggestionIndexes.length > 0
+      return (
+        selectedSuggestionIndexes.length > 0 || (isCustomSelected && customText.trim().length > 0)
+      )
     }
     return false
   })()
@@ -193,6 +196,14 @@ export function QuestionCard({
   const handleSingleChoiceSelect = (index: number) => {
     if (isProcessing || mode === 'answered') return
     setSelectedSuggestionIndex(index)
+    setIsCustomSelected(false)
+    setCustomText('')
+  }
+
+  const handleCustomSelectSingle = () => {
+    if (isProcessing || mode === 'answered') return
+    setSelectedSuggestionIndex(null)
+    setIsCustomSelected(true)
   }
 
   // === MULTI CHOICE HANDLERS ===
@@ -201,6 +212,14 @@ export function QuestionCard({
     setSelectedSuggestionIndexes((prev) =>
       prev.includes(index) ? prev.filter((i) => i !== index) : [...prev, index]
     )
+  }
+
+  const handleCustomToggleMulti = () => {
+    if (isProcessing || mode === 'answered') return
+    setIsCustomSelected((prev) => !prev)
+    if (isCustomSelected) {
+      setCustomText('')
+    }
   }
 
   // === CONFIRM ANSWER (Phase 2: Save to backend) ===
@@ -221,12 +240,25 @@ export function QuestionCard({
         const answer = question.suggestedAnswers[selectedSuggestionIndex].text
         onAnswer(question.id, answer, 'suggested', selectedSuggestionIndex)
       }
-    } else if (question.type === 'single_choice' && selectedSuggestionIndex !== null) {
-      const answer = question.suggestedAnswers[selectedSuggestionIndex].text
-      onAnswer(question.id, answer, 'suggested', selectedSuggestionIndex)
-    } else if (question.type === 'multi_choice' && selectedSuggestionIndexes.length > 0) {
+    } else if (question.type === 'single_choice') {
+      if (isCustomSelected && customText.trim()) {
+        // User typed custom answer
+        onAnswer(question.id, customText.trim(), 'custom')
+      } else if (selectedSuggestionIndex !== null) {
+        // User selected from suggestions
+        const answer = question.suggestedAnswers[selectedSuggestionIndex].text
+        onAnswer(question.id, answer, 'suggested', selectedSuggestionIndex)
+      }
+    } else if (question.type === 'multi_choice') {
       const answers = selectedSuggestionIndexes.map((idx) => question.suggestedAnswers[idx].text)
-      onAnswer(question.id, answers, 'suggested', undefined, selectedSuggestionIndexes)
+      if (isCustomSelected && customText.trim()) {
+        answers.push(customText.trim())
+      }
+      if (answers.length > 0) {
+        // If has custom → 'modified', else 'suggested'
+        const source = isCustomSelected ? 'modified' : 'suggested'
+        onAnswer(question.id, answers, source, undefined, selectedSuggestionIndexes)
+      }
     }
   }
 
@@ -238,15 +270,32 @@ export function QuestionCard({
       setCustomText(question.currentAnswer)
       setHasCustomInput(true)
     } else if (question.type === 'single_choice' && question.currentAnswer) {
-      // Find index of current answer
       const idx = question.suggestedAnswers.findIndex((s) => s.text === question.currentAnswer)
-      setSelectedSuggestionIndex(idx !== -1 ? idx : null)
+      if (idx !== -1) {
+        setSelectedSuggestionIndex(idx)
+        setIsCustomSelected(false)
+      } else {
+        // Answer was custom
+        setSelectedSuggestionIndex(null)
+        setIsCustomSelected(true)
+        setCustomText(question.currentAnswer)
+      }
     } else if (question.type === 'multi_choice' && question.currentAnswers) {
       // Find indexes of current answers
       const indexes = question.currentAnswers
         .map((ans) => question.suggestedAnswers.findIndex((s) => s.text === ans))
         .filter((idx) => idx !== -1)
       setSelectedSuggestionIndexes(indexes)
+      // Check if any answer was custom (not in suggestions)
+      const customAnswers = question.currentAnswers.filter(
+        (ans) => !question.suggestedAnswers.some((s) => s.text === ans)
+      )
+      if (customAnswers.length > 0) {
+        setIsCustomSelected(true)
+        setCustomText(customAnswers[0]) // Take first custom answer
+      } else {
+        setIsCustomSelected(false)
+      }
     }
   }
 
@@ -257,6 +306,7 @@ export function QuestionCard({
     setSelectedSuggestionIndexes([])
     setCustomText('')
     setHasCustomInput(false)
+    setIsCustomSelected(false)
   }
 
   // === RENDER ANSWERED STATE (Read Mode) ===
@@ -457,6 +507,56 @@ export function QuestionCard({
             </button>
           )
         })}
+
+        {/* Custom option divider */}
+        <div className="mt-4 flex items-center gap-2">
+          <div className="h-px flex-1 bg-slate-200 dark:bg-slate-700" />
+          <span className="text-xs text-slate-500 dark:text-slate-400">или</span>
+          <div className="h-px flex-1 bg-slate-200 dark:bg-slate-700" />
+        </div>
+
+        {/* Custom input option */}
+        <button
+          type="button"
+          onClick={handleCustomSelectSingle}
+          disabled={isProcessing}
+          className={cn(
+            'w-full rounded-lg border-2 p-4 text-left transition-all',
+            'min-h-[56px] touch-manipulation',
+            'hover:border-purple-400 hover:bg-purple-50 dark:hover:bg-purple-950/20',
+            'disabled:cursor-not-allowed disabled:opacity-50',
+            'focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-2',
+            isCustomSelected
+              ? 'border-purple-500 bg-purple-50 dark:bg-purple-950/20'
+              : 'border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900'
+          )}
+        >
+          <div className="flex items-start gap-3">
+            <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center">
+              {isCustomSelected ? (
+                <CircleDot className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+              ) : (
+                <div className="h-5 w-5 rounded-full border-2 border-slate-300 dark:border-slate-600" />
+              )}
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-medium text-slate-900 dark:text-slate-100">Свой вариант</p>
+            </div>
+          </div>
+        </button>
+
+        {/* Custom text input (shown when custom selected) */}
+        {isCustomSelected && (
+          <div className="mt-2 ml-8">
+            <Textarea
+              value={customText}
+              onChange={(e) => setCustomText(e.target.value)}
+              placeholder="Введите свой вариант..."
+              className="min-h-[80px]"
+              disabled={isProcessing}
+            />
+          </div>
+        )}
       </div>
     )
   }
@@ -528,6 +628,56 @@ export function QuestionCard({
             </button>
           )
         })}
+
+        {/* Custom option divider */}
+        <div className="mt-4 flex items-center gap-2">
+          <div className="h-px flex-1 bg-slate-200 dark:bg-slate-700" />
+          <span className="text-xs text-slate-500 dark:text-slate-400">дополнительно</span>
+          <div className="h-px flex-1 bg-slate-200 dark:bg-slate-700" />
+        </div>
+
+        {/* Custom input option */}
+        <button
+          type="button"
+          onClick={handleCustomToggleMulti}
+          disabled={isProcessing}
+          className={cn(
+            'w-full rounded-lg border-2 p-4 text-left transition-all',
+            'min-h-[56px] touch-manipulation',
+            'hover:border-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/20',
+            'disabled:cursor-not-allowed disabled:opacity-50',
+            'focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2',
+            isCustomSelected
+              ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-950/20'
+              : 'border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900'
+          )}
+        >
+          <div className="flex items-start gap-3">
+            <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center">
+              {isCustomSelected ? (
+                <CheckSquare className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+              ) : (
+                <div className="h-5 w-5 rounded border-2 border-slate-300 dark:border-slate-600" />
+              )}
+            </div>
+            <div className="flex-1">
+              <p className="text-sm font-medium text-slate-900 dark:text-slate-100">Свой вариант</p>
+            </div>
+          </div>
+        </button>
+
+        {/* Custom text input (shown when custom selected) */}
+        {isCustomSelected && (
+          <div className="mt-2 ml-8">
+            <Textarea
+              value={customText}
+              onChange={(e) => setCustomText(e.target.value)}
+              placeholder="Введите дополнительный вариант..."
+              className="min-h-[80px]"
+              disabled={isProcessing}
+            />
+          </div>
+        )}
       </div>
     )
   }

@@ -55,7 +55,7 @@ import { NodeDetailsDrawer } from './panels/NodeDetailsDrawer'
 import { AdminPanel } from './panels/AdminPanel'
 import { useNodeSelection } from './hooks/useNodeSelection'
 import { MissionControlBanner } from '@/components/generation-celestial/MissionControlBanner'
-import { ClarifyingBanner } from '@/components/generation-celestial/ClarifyingBanner'
+import { trpc } from '@/lib/trpc/client'
 import { startGeneration, cancelGeneration, approveStage } from '@/app/actions/admin-generation'
 import { toast } from 'sonner'
 // MobileProgressList removed - maintaining two view modes adds complexity
@@ -81,7 +81,6 @@ import { PartialGenerationProvider } from './contexts/PartialGenerationContext'
 import { SelectionToolbar } from './components/SelectionToolbar'
 import { useGenerationStore } from '@/stores/useGenerationStore'
 import { AppNode, AppEdge } from './types'
-import { trpc } from '@/lib/trpc/client'
 import type { ClarifyingProgressData } from './hooks/use-graph-data/types'
 
 // Define node and edge types OUTSIDE component to prevent re-creation on each render
@@ -333,6 +332,9 @@ function GraphViewInner({
 
   // Realtime Data
   const { traces, status: pipelineStatus, isConnected } = useGenerationRealtime()
+
+  // Check if we're in clarifying phase (for MissionControlBanner mode)
+  const isClarifyingPhase = pipelineStatus === 'stage_4_clarifying'
 
   // Graceful degradation
   const { degradationMode, handleRealtimeFailure, statusMessage } = useGracefulDegradation()
@@ -1121,22 +1123,42 @@ function GraphViewInner({
 
                 {/* Show banner when:
                     - In automatic mode (readOnly=true) and not in terminal state
-                    - OR awaiting approval in semi-automatic mode */}
+                    - OR awaiting approval in semi-automatic mode
+                    - OR during clarifying phase (stage_4_clarifying) */}
                 {(() => {
                   const terminalStatuses = ['completed', 'failed', 'cancelled']
-                  const isClarifyingPhase = pipelineStatus === 'stage_4_clarifying'
 
-                  // Show ClarifyingBanner during clarifying phase (not MissionControlBanner)
+                  // Show MissionControlBanner in clarifying mode during clarifying phase
                   if (isClarifyingPhase && !readOnly) {
                     return (
-                      <ClarifyingBanner
+                      <MissionControlBanner
                         courseId={courseId}
-                        onContinue={() => {
+                        awaitingStage={4}
+                        isNodePanelOpen={!!selectedNodeId}
+                        isAutomaticMode={false}
+                        isClarifyingMode={true}
+                        clarifyingProgress={clarifyingData}
+                        onApprove={() => {
                           // Open clarifying panel by selecting the clarifying node
                           selectNode('stage_4_clarifying')
                         }}
-                        isDark={isDark}
+                        onCancel={async () => {
+                          setIsProcessingBanner(true)
+                          try {
+                            await cancelGeneration(courseId)
+                            toast.info('Генерация отменена')
+                          } catch (error) {
+                            toast.error('Не удалось отменить генерацию', {
+                              description:
+                                error instanceof Error ? error.message : 'Неизвестная ошибка',
+                            })
+                          } finally {
+                            setIsProcessingBanner(false)
+                          }
+                        }}
+                        onViewResults={() => selectNode('stage_4_clarifying')}
                         isProcessing={isProcessingBanner}
+                        isDark={isDark}
                       />
                     )
                   }

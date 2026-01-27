@@ -299,6 +299,14 @@
       "manualMode": "Manual Mode",
       "manualModeHint": "In manual mode you can review and modify results at each stage."
     },
+    "clarifying": {
+      "title": "Clarifying Questions",
+      "hint": "Answer questions to continue",
+      "progress": "{answered} / {total}",
+      "criticalRemaining": "Critical remaining: {count}",
+      "button": "Continue Generation",
+      "buttonDisabled": "Answer all required questions"
+    },
     "aria": {
       "expand": "Expand control panel",
       "collapse": "Collapse panel",

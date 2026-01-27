@@ -480,7 +480,7 @@ export function ClarifyingPanel({ courseId, onComplete }: ClarifyingPanelProps) 
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: allCriticalAnswered ? 1 : 0.5 }}
-          className="sticky bottom-4 mt-6"
+          className="mt-6"
         >
           <Button
             size="lg"
