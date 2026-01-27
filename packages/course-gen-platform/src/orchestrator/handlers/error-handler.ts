@@ -93,6 +93,7 @@ export function classifyError(error: Error | unknown): ErrorType {
     '404',
     'schema',
     'parse',
+    'awaiting_clarifying_answers', // Prevent retry when waiting for user answers
   ];
 
   for (const pattern of permanentPatterns) {

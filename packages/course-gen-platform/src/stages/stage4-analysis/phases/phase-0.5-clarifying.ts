@@ -24,6 +24,7 @@ import { HumanMessage, SystemMessage } from '@langchain/core/messages';
 import { getSupabaseAdmin } from '@/shared/supabase/admin';
 import { logTrace } from '@/shared/trace-logger';
 import logger from '@/shared/logger';
+import { safeJSONParse } from '@/shared/utils/json-repair';
 import type { Stage4BudgetAllocation } from './stage4-budget-allocator';
 
 // ============================================================================
@@ -428,22 +429,19 @@ export async function runPhase05Clarifying(rawInput: Phase05Input): Promise<Clar
     });
 
     // =================================================================
-    // STEP 4: Parse and validate output
+    // STEP 4: Parse and validate output (with JSON repair)
     // =================================================================
     let parsedOutput: unknown;
     try {
-      // Extract JSON from potential markdown code blocks
-      const jsonMatch = rawOutput.match(/```json\s*\n?([\s\S]*?)\n?```/);
-      const jsonText = jsonMatch ? jsonMatch[1] : rawOutput;
-
-      parsedOutput = JSON.parse(jsonText);
+      // safeJSONParse includes: markdown extraction, jsonrepair library, 4-level custom repair
+      parsedOutput = safeJSONParse(rawOutput);
     } catch (parseError) {
       phaseLogger.error(
         {
           error: parseError instanceof Error ? parseError.message : String(parseError),
           rawOutputPreview: rawOutput.substring(0, 500),
         },
-        'Failed to parse LLM output as JSON'
+        'Failed to parse LLM output as JSON after repair attempts'
       );
       throw new Error(
         `JSON parsing failed: ${parseError instanceof Error ? parseError.message : String(parseError)}`
