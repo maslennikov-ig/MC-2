@@ -74,7 +74,11 @@ import type {
 import type { Phase6Output } from './phases/phase-6-rag-planning';
 import type pino from 'pino';
 import { validateLocale } from '@/shared/validation';
-import { ClarifyingQuestionsInterrupt, BarrierFailedError } from '@/shared/errors';
+import {
+  ClarifyingQuestionsInterrupt,
+  BarrierFailedError,
+  isPipelineInterrupt,
+} from '@/shared/errors';
 
 /**
  * RT-004 style retry configuration for Stage 4 phases
@@ -847,38 +851,59 @@ export async function runAnalysisOrchestration(job: StructureAnalysisJob): Promi
     // =================================================================
     // ERROR HANDLING (FR-013)
     // =================================================================
-    orchestrationLogger.error(
-      {
-        error: error instanceof Error ? error.message : String(error),
-        stack: error instanceof Error ? error.stack : undefined,
-        duration_ms: Date.now() - startTime,
-      },
-      'Stage 4 analysis orchestration failed'
-    );
 
-    await logTrace({
-      courseId,
-      stage: 'stage_4',
-      phase: 'complete',
-      stepName: 'failed',
-      errorData: { error: error instanceof Error ? error.message : String(error) },
-      durationMs: Date.now() - startTime,
-    });
+    // Check if this is an interrupt (control flow, NOT an error)
+    const isInterrupt = isPipelineInterrupt(error);
 
-    // Check if this is a special "pause" error for clarifying questions
-    const rawErrorMessage = error instanceof Error ? error.message : String(error);
-    const isAwaitingClarifying = rawErrorMessage.includes('AWAITING_CLARIFYING_ANSWERS');
+    // Log at appropriate level - INFO for interrupts, ERROR for real errors
+    if (isInterrupt) {
+      orchestrationLogger.info(
+        {
+          code: error.code,
+          message: error.message,
+          courseId,
+          duration_ms: Date.now() - startTime,
+        },
+        'Stage 4 paused (interrupt)'
+      );
 
-    if (!isAwaitingClarifying) {
-      // Only update status to failed for real errors
-      const errorMessage = formatErrorMessage(error as Error);
-      await updateCourseProgress(courseId, 'failed', 0, errorMessage, supabase);
-    } else {
-      // For AWAITING_CLARIFYING_ANSWERS - just log, status is already stage_4_clarifying
+      await logTrace({
+        courseId,
+        stage: 'stage_4',
+        phase: 'complete',
+        stepName: 'paused',
+        inputData: { code: error.code },
+        durationMs: Date.now() - startTime,
+      });
+
+      // Status is already stage_4_clarifying, just log
       orchestrationLogger.info(
         { courseId },
         'Orchestration paused for clarifying questions - status preserved as stage_4_clarifying'
       );
+    } else {
+      // Real error - log at ERROR level
+      orchestrationLogger.error(
+        {
+          error: error instanceof Error ? error.message : String(error),
+          stack: error instanceof Error ? error.stack : undefined,
+          duration_ms: Date.now() - startTime,
+        },
+        'Stage 4 analysis orchestration failed'
+      );
+
+      await logTrace({
+        courseId,
+        stage: 'stage_4',
+        phase: 'complete',
+        stepName: 'failed',
+        errorData: { error: error instanceof Error ? error.message : String(error) },
+        durationMs: Date.now() - startTime,
+      });
+
+      // Only update status to failed for real errors
+      const errorMessage = formatErrorMessage(error as Error);
+      await updateCourseProgress(courseId, 'failed', 0, errorMessage, supabase);
     }
 
     // Re-throw error for worker handler to process
