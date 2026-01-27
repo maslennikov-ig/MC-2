@@ -26,6 +26,7 @@ import { logTrace } from '@/shared/trace-logger';
 import logger from '@/shared/logger';
 import { safeJSONParse } from '@/shared/utils/json-repair';
 import type { Stage4BudgetAllocation } from './stage4-budget-allocator';
+import type { ClarifyingQuestionRow, UserAnswerValue } from '@megacampus/shared-types';
 
 // ============================================================================
 // CONSTANTS
@@ -144,16 +145,6 @@ export const Phase05InputSchema = z.object({
 export type Phase05Input = z.infer<typeof Phase05InputSchema>;
 
 /**
- * User answer stored in JSONB format
- * - For open/single_choice: { value: "answer text" }
- * - For multi_choice: { values: ["option1", "option2"] }
- */
-export interface UserAnswerValue {
-  value?: string; // For open/single_choice
-  values?: string[]; // For multi_choice
-}
-
-/**
  * Extract string representation from UserAnswerValue
  * Used for backwards compatibility with code expecting string answers
  *
@@ -168,29 +159,6 @@ export function extractAnswerString(answer: UserAnswerValue | string | null): st
   if (answer.value) return answer.value;
   if (answer.values && answer.values.length > 0) return answer.values.join(', ');
   return '';
-}
-
-/**
- * Database row type for clarifying_questions table
- */
-export interface ClarifyingQuestionRow {
-  id: string;
-  course_id: string;
-  question_text: string;
-  question_type: QuestionType;
-  question_priority: 'critical' | 'important' | 'nice_to_have';
-  question_category: string;
-  suggested_answers: SuggestedAnswer[];
-  user_answer: UserAnswerValue | null; // JSONB: { value: string } or { values: string[] }
-  answer_source: 'suggested' | 'modified' | 'custom' | null;
-  selected_suggestion_index: number | null;
-  user_modification: string | null;
-  iteration_round: number;
-  status: 'pending' | 'answered' | 'skipped';
-  order_index: number;
-  created_at: string;
-  answered_at: string | null;
-  metadata: Record<string, unknown>;
 }
 
 // ============================================================================

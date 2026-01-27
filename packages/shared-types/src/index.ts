@@ -92,3 +92,6 @@ export * from './stage-names';
 
 // Course Size Presets (Advisory parameters for LLM)
 export * from './course-size';
+
+// Clarifying Questions (Stage 4 Clarifying Flow)
+export * from './clarifying-questions';
