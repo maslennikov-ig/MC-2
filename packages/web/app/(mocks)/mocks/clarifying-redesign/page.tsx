@@ -14,6 +14,7 @@ import {
 } from '@/components/ui/table'
 import { Check, X, Minus, ArrowLeft } from 'lucide-react'
 import Link from 'next/link'
+import ThemeToggle from '@/components/common/theme-toggle'
 
 import { MockVariant1Minimal } from '@/components/mocks/clarifying/MockVariant1Minimal'
 import { MockVariant2Accordion } from '@/components/mocks/clarifying/MockVariant2Accordion'
@@ -137,13 +138,16 @@ export default function ClarifyingRedesignPage() {
       {/* Header */}
       <div className="border-b border-slate-200 bg-white dark:border-slate-800 dark:bg-slate-900">
         <div className="mx-auto max-w-6xl px-4 py-6">
-          <Link
-            href="/"
-            className="mb-4 inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
-          >
-            <ArrowLeft className="h-4 w-4" />
-            Назад
-          </Link>
+          <div className="mb-4 flex items-center justify-between">
+            <Link
+              href="/"
+              className="inline-flex items-center gap-1 text-sm text-slate-500 hover:text-slate-700 dark:text-slate-400 dark:hover:text-slate-200"
+            >
+              <ArrowLeft className="h-4 w-4" />
+              Назад
+            </Link>
+            <ThemeToggle />
+          </div>
           <h1 className="text-2xl font-bold text-slate-900 dark:text-slate-100">
             Редизайн уточняющих вопросов
           </h1>
