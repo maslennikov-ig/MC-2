@@ -1,0 +1,7 @@
+export { MockVariant1Minimal } from './MockVariant1Minimal'
+export { MockVariant2Accordion } from './MockVariant2Accordion'
+export { MockVariant3Wizard } from './MockVariant3Wizard'
+export { MockVariant4Field } from './MockVariant4Field'
+export { MockVariant5Floating } from './MockVariant5Floating'
+export { mockQuestions, variantDescriptions } from './mockData'
+export type { MockQuestion, MockSuggestedAnswer, VariantKey } from './mockData'
