@@ -98,7 +98,11 @@ function ClarifyingErrorFallback({ courseId: _courseId }: { courseId: string }) 
 
 export function ClarifyingPanel({ courseId, onComplete }: ClarifyingPanelProps) {
   // Real tRPC hooks
-  const { data: questionsData, isLoading } = trpc.clarifying.getQuestions.useQuery(
+  const {
+    data: questionsData,
+    isLoading,
+    refetch: refetchQuestions,
+  } = trpc.clarifying.getQuestions.useQuery(
     { courseId },
     {
       staleTime: 5 * 60 * 1000, // 5 минут - вопросы статичны в рамках сессии
@@ -269,6 +273,8 @@ export function ClarifyingPanel({ courseId, onComplete }: ClarifyingPanelProps) 
         setAnsweredQuestions((prev) => new Set(prev).add(questionId))
         // HIGH-005 fix: Scroll only after THIS specific answer is saved
         scrollToNextUnanswered(questionId)
+        // Refetch to get updated currentAnswer for display
+        void refetchQuestions()
       })
       .catch((error: Error) => {
         toast.error('Не удалось сохранить ответ', {
@@ -289,6 +295,8 @@ export function ClarifyingPanel({ courseId, onComplete }: ClarifyingPanelProps) 
         setAnsweredQuestions((prev) => new Set(prev).add(questionId))
         // HIGH-005 fix: Scroll after skip as well
         scrollToNextUnanswered(questionId)
+        // Refetch to get updated status
+        void refetchQuestions()
       })
       .catch((error: Error) => {
         toast.error('Не удалось пропустить вопрос', {
