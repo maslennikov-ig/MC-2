@@ -18,7 +18,10 @@ import {
   Pause,
   Settings,
   Loader2,
+  MessageCircleQuestion,
+  ArrowRight,
 } from 'lucide-react'
+import { Progress } from '@/components/ui/progress'
 import { STAGE_CONFIG } from './utils'
 
 const getStorageKey = (courseId: string) => `mission-control-banner-minimized-${courseId}`
@@ -26,6 +29,15 @@ const getStorageKey = (courseId: string) => `mission-control-banner-minimized-${
 // Swipe gesture thresholds
 const SWIPE_VELOCITY_THRESHOLD = -500 // px/s
 const SWIPE_DISTANCE_THRESHOLD = -100 // px
+
+/** Progress data for clarifying questions mode */
+interface ClarifyingProgress {
+  answered: number
+  total: number
+  criticalAnswered: number
+  criticalTotal: number
+  canProceed: boolean
+}
 
 interface MissionControlBannerProps {
   courseId: string
@@ -45,6 +57,9 @@ interface MissionControlBannerProps {
   onPause?: () => Promise<void>
   onResume?: () => Promise<void>
   onSwitchToManual?: () => Promise<void>
+  /** NEW: Clarifying questions mode */
+  isClarifyingMode?: boolean
+  clarifyingProgress?: ClarifyingProgress
 }
 
 export function MissionControlBanner({
@@ -61,6 +76,8 @@ export function MissionControlBanner({
   onPause,
   onResume,
   onSwitchToManual,
+  isClarifyingMode = false,
+  clarifyingProgress,
 }: MissionControlBannerProps) {
   const [isExpanded, setIsExpanded] = useState(false)
   const [isMinimized, setIsMinimized] = useState(false)
@@ -166,6 +183,16 @@ export function MissionControlBanner({
   const automaticTitle = isPaused ? t('automatic.titlePaused') : t('automatic.title')
   const automaticHint = isPaused ? t('automatic.hintPaused') : t('automatic.hint')
 
+  // Clarifying mode: determine title, hint, and progress
+  const ClarifyingIcon = MessageCircleQuestion
+  const clarifyingTitle = t('clarifying.title')
+  const clarifyingHint = t('clarifying.hint')
+  const clarifyingProgressPercent = clarifyingProgress?.total
+    ? Math.round((clarifyingProgress.answered / clarifyingProgress.total) * 100)
+    : 0
+  const criticalRemaining =
+    (clarifyingProgress?.criticalTotal ?? 0) - (clarifyingProgress?.criticalAnswered ?? 0)
+
   return (
     <AnimatePresence mode="wait">
       {isMinimized ? (
@@ -190,12 +217,18 @@ export function MissionControlBanner({
           >
             <div
               className={`shrink-0 rounded-full border p-1 ${
-                isDark
-                  ? 'border-amber-500/30 bg-amber-500/10 text-amber-400'
-                  : 'border-amber-200 bg-amber-50 text-amber-600'
+                isClarifyingMode
+                  ? isDark
+                    ? 'border-purple-500/30 bg-purple-500/10 text-purple-400'
+                    : 'border-purple-200 bg-purple-50 text-purple-600'
+                  : isDark
+                    ? 'border-amber-500/30 bg-amber-500/10 text-amber-400'
+                    : 'border-amber-200 bg-amber-50 text-amber-600'
               }`}
             >
-              {isAutomaticMode ? (
+              {isClarifyingMode ? (
+                <MessageCircleQuestion className="h-3 w-3" />
+              ) : isAutomaticMode ? (
                 <Zap className="h-3 w-3" />
               ) : (
                 <AlertTriangle className="h-3 w-3" />
@@ -258,12 +291,18 @@ export function MissionControlBanner({
                   </div>
                   <div
                     className={`shrink-0 rounded-full border p-2 ${
-                      isDark
-                        ? 'border-amber-500/30 bg-amber-500/10 text-amber-400'
-                        : 'border-amber-200 bg-amber-50 text-amber-600'
+                      isClarifyingMode
+                        ? isDark
+                          ? 'border-purple-500/30 bg-purple-500/10 text-purple-400'
+                          : 'border-purple-200 bg-purple-50 text-purple-600'
+                        : isDark
+                          ? 'border-amber-500/30 bg-amber-500/10 text-amber-400'
+                          : 'border-amber-200 bg-amber-50 text-amber-600'
                     }`}
                   >
-                    {isAutomaticMode ? (
+                    {isClarifyingMode ? (
+                      <ClarifyingIcon className="h-4 w-4" />
+                    ) : isAutomaticMode ? (
                       <AutomaticIcon className="h-4 w-4" />
                     ) : (
                       <AlertTriangle className="h-4 w-4" />
@@ -274,17 +313,35 @@ export function MissionControlBanner({
                       <h3
                         className={`truncate text-sm font-bold ${isDark ? 'text-gray-100' : 'text-gray-900'}`}
                       >
-                        {isAutomaticMode ? automaticTitle : `${stageName}: ${t('awaitingStatus')}`}
+                        {isClarifyingMode
+                          ? clarifyingTitle
+                          : isAutomaticMode
+                            ? automaticTitle
+                            : `${stageName}: ${t('awaitingStatus')}`}
                       </h3>
-                      {!isPaused && (
+                      {!isPaused && !isClarifyingMode && (
                         <div className="h-1.5 w-1.5 shrink-0 animate-pulse rounded-full bg-amber-500" />
+                      )}
+                      {isClarifyingMode && clarifyingProgress && (
+                        <span
+                          className={`text-xs font-medium ${isDark ? 'text-purple-400' : 'text-purple-600'}`}
+                        >
+                          {t('clarifying.progress', {
+                            answered: clarifyingProgress.answered,
+                            total: clarifyingProgress.total,
+                          })}
+                        </span>
                       )}
                     </div>
                     {!isExpanded && (
                       <p
                         className={`truncate text-xs ${isDark ? 'text-gray-400' : 'text-gray-500'}`}
                       >
-                        {isAutomaticMode ? automaticHint : getHint()}
+                        {isClarifyingMode
+                          ? clarifyingHint
+                          : isAutomaticMode
+                            ? automaticHint
+                            : getHint()}
                       </p>
                     )}
                   </div>
@@ -343,7 +400,27 @@ export function MissionControlBanner({
                       </Button>
                     </>
                   )}
-                  {!isExpanded && !isAutomaticMode && (
+                  {!isExpanded && isClarifyingMode && (
+                    <Button
+                      size="sm"
+                      onClick={(e) => {
+                        e.stopPropagation()
+                        onApprove()
+                      }}
+                      disabled={isProcessing || !clarifyingProgress?.canProceed}
+                      className="h-9 border-0 bg-gradient-to-r from-purple-500 to-indigo-600 px-5 text-sm font-medium text-white shadow-lg shadow-purple-500/25 transition-all hover:from-purple-600 hover:to-indigo-700"
+                    >
+                      {isProcessing ? (
+                        <Loader2 className="h-3 w-3 animate-spin" />
+                      ) : (
+                        <>
+                          <ArrowRight className="mr-1.5 h-3 w-3" />
+                          {t('clarifying.button')}
+                        </>
+                      )}
+                    </Button>
+                  )}
+                  {!isExpanded && !isAutomaticMode && !isClarifyingMode && (
                     <Button
                       size="sm"
                       onClick={(e) => {
@@ -409,7 +486,87 @@ export function MissionControlBanner({
                     <div
                       className={`space-y-4 px-4 pt-0 pb-4 ${isDark ? 'border-t border-white/5' : 'border-t border-slate-100'}`}
                     >
-                      {isAutomaticMode ? (
+                      {isClarifyingMode ? (
+                        /* Clarifying Mode Expanded View */
+                        <>
+                          <div className="space-y-3 pt-4">
+                            {/* Progress bar */}
+                            {clarifyingProgress && (
+                              <div className="space-y-2">
+                                <div className="flex justify-between text-xs">
+                                  <span className={isDark ? 'text-gray-400' : 'text-gray-600'}>
+                                    {t('clarifying.progress', {
+                                      answered: clarifyingProgress.answered,
+                                      total: clarifyingProgress.total,
+                                    })}
+                                  </span>
+                                  <span
+                                    className={`font-medium ${isDark ? 'text-purple-400' : 'text-purple-600'}`}
+                                  >
+                                    {clarifyingProgressPercent}%
+                                  </span>
+                                </div>
+                                <Progress value={clarifyingProgressPercent} className="h-2" />
+                                {criticalRemaining > 0 && (
+                                  <p
+                                    className={`text-xs ${isDark ? 'text-red-400' : 'text-red-600'}`}
+                                  >
+                                    {t('clarifying.criticalRemaining', {
+                                      count: criticalRemaining,
+                                    })}
+                                  </p>
+                                )}
+                              </div>
+                            )}
+                            <p className={`text-sm ${isDark ? 'text-gray-300' : 'text-gray-700'}`}>
+                              {clarifyingHint}
+                            </p>
+                            <p className="text-xs text-gray-500 italic">{t('aria.swipeHint')}</p>
+                          </div>
+
+                          <div className="flex flex-wrap items-center justify-between gap-3">
+                            <Button
+                              variant="ghost"
+                              size="sm"
+                              onClick={() => void onCancel()}
+                              disabled={isProcessing}
+                              className={`h-8 text-xs ${
+                                isDark
+                                  ? 'text-gray-400 hover:bg-red-950/30 hover:text-red-400'
+                                  : 'text-gray-600 hover:bg-red-50 hover:text-red-600'
+                              }`}
+                            >
+                              <X className="mr-1.5 h-3 w-3" />
+                              {t('cancel')}
+                            </Button>
+
+                            <Button
+                              size="sm"
+                              onClick={() => void onApprove()}
+                              disabled={isProcessing || !clarifyingProgress?.canProceed}
+                              className="h-10 w-full border-0 bg-gradient-to-r from-purple-500 to-indigo-600 px-6 text-sm font-medium text-white shadow-lg shadow-purple-500/25 transition-all hover:from-purple-600 hover:to-indigo-700 sm:w-auto"
+                            >
+                              {isProcessing ? (
+                                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                              ) : (
+                                <>
+                                  <ArrowRight className="mr-2 h-4 w-4" />
+                                  {t('clarifying.button')}
+                                </>
+                              )}
+                            </Button>
+                          </div>
+
+                          {/* Helper text when button disabled */}
+                          {!clarifyingProgress?.canProceed && (
+                            <p
+                              className={`text-center text-xs ${isDark ? 'text-gray-500' : 'text-gray-400'}`}
+                            >
+                              {t('clarifying.buttonDisabled')}
+                            </p>
+                          )}
+                        </>
+                      ) : isAutomaticMode ? (
                         /* Automatic Mode Expanded View */
                         <>
                           <div

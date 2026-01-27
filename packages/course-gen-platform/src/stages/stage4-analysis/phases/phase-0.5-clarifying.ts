@@ -254,6 +254,20 @@ CRITICAL RULES:
    - "multi_choice": When user can select MULTIPLE options (e.g., topics to cover, features to include)
      * Mark recommended options with "is_recommended": true
      * 3-6 options that can be combined
+
+   QUESTION TYPE SELECTION RULES:
+   - Use "single_choice" when options are MUTUALLY EXCLUSIVE:
+     * "What difficulty level?" (only one level possible)
+     * "What format is preferred?" (one format)
+     * "What language for the course?" (one language)
+   - Use "multi_choice" when user can SELECT MULTIPLE:
+     * "What topics to include?" (multiple topics)
+     * "What metrics are important?" (multiple metrics)
+     * "What tools to use?" (multiple tools)
+     * HINT: If question uses plural form ("какие", "which ones", "welche") → multi_choice
+   - Use "open" when answer requires FREE TEXT:
+     * "Describe the target audience"
+     * "What are the specific learning goals?"
 5. Prioritize questions as:
    - critical: Must be answered for quality course (e.g., target skill level, key outcomes)
    - important: Will significantly improve course (e.g., preferred learning style, time constraints)
