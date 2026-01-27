@@ -54,6 +54,7 @@ import {
   DatabaseError,
   PipelineError,
   isPipelineInterrupt,
+  classifyPipelineError,
 } from '@/shared/errors';
 
 /**
@@ -267,13 +268,8 @@ function classifyGenerationError(
     return 'DATABASE_ERROR';
   }
   if (error instanceof PipelineError) {
-    // Map any other PipelineError code
-    const code = error.code;
-    if (code === 'ORCHESTRATION_FAILED') return 'ORCHESTRATION_FAILED';
-    if (code === 'VALIDATION_FAILED') return 'VALIDATION_FAILED';
-    if (code === 'QUALITY_THRESHOLD_NOT_MET') return 'QUALITY_THRESHOLD_NOT_MET';
-    if (code === 'MINIMUM_LESSONS_NOT_MET') return 'MINIMUM_LESSONS_NOT_MET';
-    if (code === 'DATABASE_ERROR') return 'DATABASE_ERROR';
+    // Type-safe classification for any PipelineError
+    return classifyPipelineError(error) as any;
   }
 
   // PRIORITY 2: string matching fallback для legacy ошибок

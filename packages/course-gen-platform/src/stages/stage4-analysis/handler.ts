@@ -35,6 +35,7 @@ import {
   LLMError,
   PipelineError,
   isPipelineInterrupt,
+  classifyPipelineError,
 } from '@/shared/errors';
 
 /**
@@ -132,7 +133,7 @@ function classifyAnalysisError(
     return 'LLM_ERROR';
   }
   if (error instanceof PipelineError) {
-    return error.code as any;
+    return classifyPipelineError(error) as any; // Type-safe classification
   }
 
   // PRIORITY 2: string matching fallback for legacy errors

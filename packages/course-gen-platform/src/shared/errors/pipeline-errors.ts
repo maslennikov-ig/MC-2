@@ -20,6 +20,23 @@
 export type PipelineErrorSeverity = 'INFO' | 'WARNING' | 'ERROR' | 'CRITICAL';
 
 /**
+ * Base metadata interface for pipeline errors
+ *
+ * Provides type hints for common metadata fields while allowing
+ * additional arbitrary fields via index signature.
+ */
+export interface PipelineErrorMetadata {
+  /** Course ID if error is course-specific */
+  courseId?: string;
+  /** Pipeline phase where error occurred */
+  phase?: string;
+  /** Retry attempt number */
+  attemptNumber?: number;
+  /** Additional context fields */
+  [key: string]: unknown;
+}
+
+/**
  * Base abstract class for all pipeline errors
  *
  * All custom pipeline errors inherit from this class.
@@ -39,9 +56,9 @@ export abstract class PipelineError extends Error {
   readonly timestamp: Date = new Date();
 
   /** Additional metadata for debugging */
-  readonly metadata: Record<string, unknown>;
+  readonly metadata: PipelineErrorMetadata;
 
-  constructor(message: string, metadata: Record<string, unknown> = {}) {
+  constructor(message: string, metadata: PipelineErrorMetadata = {}) {
     super(message);
     this.name = this.constructor.name;
     this.metadata = metadata;
@@ -51,7 +68,7 @@ export abstract class PipelineError extends Error {
   }
 
   /**
-   * Convert to structured log object
+   * Convert to structured log object for logging frameworks (e.g., Pino)
    */
   toLogObject(): Record<string, unknown> {
     return {
@@ -64,6 +81,15 @@ export abstract class PipelineError extends Error {
       metadata: this.metadata,
       stack: this.stack,
     };
+  }
+
+  /**
+   * Convert to JSON for serialization (JSON.stringify support)
+   *
+   * @returns Structured object representation of the error
+   */
+  toJSON(): Record<string, unknown> {
+    return this.toLogObject();
   }
 }
 
@@ -292,21 +318,67 @@ export class DatabaseError extends PipelineInternalError {
 // =============================================================================
 
 /**
- * Check if error is a pipeline interrupt (not a real error)
+ * Check if error is a pipeline interrupt (control flow, not a real error)
+ *
+ * Interrupts represent pipeline pauses waiting for external action (e.g., user input).
+ * They should be logged at INFO level, not ERROR.
+ *
+ * @example
+ * ```typescript
+ * try {
+ *   await runAnalysis();
+ * } catch (error) {
+ *   if (isPipelineInterrupt(error)) {
+ *     logger.info({ code: error.code }, 'Pipeline paused for user input');
+ *     return; // Don't retry, wait for user action
+ *   }
+ *   throw error; // Real error, let BullMQ retry
+ * }
+ * ```
+ *
+ * @param error - Any value that might be an error
+ * @returns True if error is a PipelineInterrupt instance
  */
 export function isPipelineInterrupt(error: unknown): error is PipelineInterrupt {
   return error instanceof PipelineInterrupt;
 }
 
 /**
- * Check if error is a pipeline error
+ * Check if error is any type of pipeline error
+ *
+ * Use this to detect errors from the pipeline error hierarchy,
+ * which have structured metadata and classification properties.
+ *
+ * @example
+ * ```typescript
+ * if (isPipelineError(error)) {
+ *   console.log(`Error code: ${error.code}, retryable: ${error.retryable}`);
+ * }
+ * ```
+ *
+ * @param error - Any value that might be an error
+ * @returns True if error is a PipelineError instance
  */
 export function isPipelineError(error: unknown): error is PipelineError {
   return error instanceof PipelineError;
 }
 
 /**
- * Check if error is retryable
+ * Check if error should be retried by job queue
+ *
+ * Returns true for transient errors (network, rate limit, LLM failures)
+ * that may succeed on retry. Returns false for validation errors and interrupts.
+ *
+ * @example
+ * ```typescript
+ * if (isRetryableError(error) && attemptsMade < maxAttempts) {
+ *   // Schedule retry with backoff
+ *   return { retry: true, delay: Math.pow(2, attemptsMade) * 1000 };
+ * }
+ * ```
+ *
+ * @param error - Any value that might be an error
+ * @returns True if error is retryable
  */
 export function isRetryableError(error: unknown): boolean {
   if (error instanceof PipelineError) {
@@ -316,9 +388,28 @@ export function isRetryableError(error: unknown): boolean {
 }
 
 /**
- * Check if error should be logged at ERROR level
+ * Check if error should be logged at ERROR or CRITICAL level
  *
- * Returns false for interrupts (INFO level) and transient errors (WARNING level)
+ * Returns false for:
+ * - Interrupts (INFO level) - control flow, not errors
+ * - Transient errors (WARNING level) - temporary issues that will retry
+ *
+ * Returns true for:
+ * - Validation errors (ERROR level) - permanent business logic failures
+ * - Internal errors (CRITICAL level) - bugs requiring attention
+ * - Unknown errors - default to ERROR level
+ *
+ * @example
+ * ```typescript
+ * if (shouldLogAsError(error)) {
+ *   logger.error({ err: error }, 'Job failed permanently');
+ * } else {
+ *   logger.warn({ err: error }, 'Job failed, will retry');
+ * }
+ * ```
+ *
+ * @param error - Any value that might be an error
+ * @returns True if error should be logged at ERROR/CRITICAL level
  */
 export function shouldLogAsError(error: unknown): boolean {
   if (error instanceof PipelineInterrupt) {
@@ -358,10 +449,57 @@ export type PipelineErrorCode =
  *
  * Returns the code property for PipelineError instances,
  * or 'UNKNOWN' for other errors.
+ *
+ * @param error - Any value that might be an error
+ * @returns Error code string
  */
 export function getErrorCode(error: unknown): PipelineErrorCode {
   if (error instanceof PipelineError) {
     return error.code as PipelineErrorCode;
   }
+  return 'UNKNOWN';
+}
+
+/**
+ * Type-safe error code classification for PipelineError instances
+ *
+ * Use this in handlers to get the error code without unsafe `as any` casts.
+ * Validates that the code is a known PipelineErrorCode.
+ *
+ * @example
+ * ```typescript
+ * function classifyAnalysisError(error: Error | string) {
+ *   if (error instanceof PipelineError) {
+ *     return classifyPipelineError(error); // Type-safe!
+ *   }
+ *   // Fallback to string matching for legacy errors
+ *   return 'UNKNOWN';
+ * }
+ * ```
+ *
+ * @param error - A PipelineError instance
+ * @returns The error code with proper type
+ */
+export function classifyPipelineError(error: PipelineError): PipelineErrorCode {
+  const code = error.code;
+
+  // Validate against known codes
+  const knownCodes: PipelineErrorCode[] = [
+    'AWAITING_CLARIFYING_ANSWERS',
+    'BARRIER_FAILED',
+    'MINIMUM_LESSONS_NOT_MET',
+    'QUALITY_THRESHOLD_NOT_MET',
+    'LLM_ERROR',
+    'NETWORK_ERROR',
+    'RATE_LIMIT_ERROR',
+    'ORCHESTRATION_FAILED',
+    'VALIDATION_FAILED',
+    'DATABASE_ERROR',
+  ];
+
+  if (knownCodes.includes(code as PipelineErrorCode)) {
+    return code as PipelineErrorCode;
+  }
+
   return 'UNKNOWN';
 }

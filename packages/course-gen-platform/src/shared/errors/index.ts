@@ -40,8 +40,10 @@ export {
 
   // Utilities
   getErrorCode,
+  classifyPipelineError,
 
   // Types
   type PipelineErrorSeverity,
   type PipelineErrorCode,
+  type PipelineErrorMetadata,
 } from './pipeline-errors';
