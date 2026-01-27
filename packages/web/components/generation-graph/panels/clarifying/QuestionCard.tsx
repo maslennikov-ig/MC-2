@@ -1,6 +1,6 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
@@ -123,6 +123,14 @@ export function QuestionCard({
 }: QuestionCardProps) {
   // Determine initial mode based on isAnswered prop
   const [mode, setMode] = useState<CardMode>(isAnswered ? 'answered' : 'unanswered')
+
+  // BUG FIX: Sync mode with isAnswered prop changes
+  // useState only reads initial value - we need useEffect to react to prop updates
+  useEffect(() => {
+    if (isAnswered && mode !== 'answered') {
+      setMode('answered')
+    }
+  }, [isAnswered, mode])
 
   // Selection state (Phase 1: not saved yet)
   const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState<number | null>(null)

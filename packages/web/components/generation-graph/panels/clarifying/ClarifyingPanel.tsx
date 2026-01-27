@@ -163,7 +163,21 @@ export function ClarifyingPanel({ courseId, onComplete }: ClarifyingPanelProps) 
 
   const [answeredQuestions, setAnsweredQuestions] = useState<Set<string>>(new Set())
   const [hasShownConfetti, setHasShownConfetti] = useState(false)
+  const [processingQuestionId, setProcessingQuestionId] = useState<string | null>(null)
   const questionRefs = useRef<Map<string, HTMLDivElement>>(new Map())
+
+  // BUG FIX: Sync answeredQuestions with API data on load
+  // questions array comes from async API call, so we need useEffect to sync
+  useEffect(() => {
+    const alreadyAnswered = questions.filter((q) => q.isAnswered).map((q) => q.id)
+    if (alreadyAnswered.length > 0) {
+      setAnsweredQuestions((prev) => {
+        const next = new Set(prev)
+        alreadyAnswered.forEach((id) => next.add(id))
+        return next
+      })
+    }
+  }, [questions])
 
   // CRITICAL-003 fix: Cleanup refs on unmount
   useEffect(() => {
@@ -237,6 +251,9 @@ export function ClarifyingPanel({ courseId, onComplete }: ClarifyingPanelProps) 
       payload.selectedSuggestionIndex = selectedSuggestionIndex
     }
 
+    // Track which question is being processed for per-card loading state
+    setProcessingQuestionId(questionId)
+
     void submitAnswerMutation
       .mutateAsync(payload)
       .then(() => {
@@ -249,9 +266,14 @@ export function ClarifyingPanel({ courseId, onComplete }: ClarifyingPanelProps) 
           description: error.message || 'Попробуйте ещё раз',
         })
       })
+      .finally(() => {
+        setProcessingQuestionId(null)
+      })
   }
 
   const handleSkip = (questionId: string) => {
+    setProcessingQuestionId(questionId)
+
     void skipQuestionMutation
       .mutateAsync({ questionId })
       .then(() => {
@@ -263,6 +285,9 @@ export function ClarifyingPanel({ courseId, onComplete }: ClarifyingPanelProps) 
         toast.error('Не удалось пропустить вопрос', {
           description: error.message || 'Попробуйте ещё раз',
         })
+      })
+      .finally(() => {
+        setProcessingQuestionId(null)
       })
   }
 
@@ -427,11 +452,7 @@ export function ClarifyingPanel({ courseId, onComplete }: ClarifyingPanelProps) 
                   onAnswer={handleAnswer}
                   onSkip={handleSkip}
                   isAnswered={answeredQuestions.has(question.id)}
-                  isProcessing={
-                    submitAnswerMutation.isPending ||
-                    submitMultipleAnswersMutation.isPending ||
-                    skipQuestionMutation.isPending
-                  }
+                  isProcessing={processingQuestionId === question.id}
                 />
               </div>
             ))}
