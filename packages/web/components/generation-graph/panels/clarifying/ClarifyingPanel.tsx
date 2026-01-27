@@ -1,15 +1,15 @@
 'use client'
 
-import { useState, useEffect, useRef, useCallback } from 'react'
+import { useState, useEffect, useRef, useCallback, useMemo } from 'react'
 import DOMPurify from 'isomorphic-dompurify'
 import { Card, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
-import { Progress } from '@/components/ui/progress'
-import { Sparkles, CheckCircle2, ArrowRight, AlertCircle } from 'lucide-react'
+import { Sparkles, CheckCircle2, AlertCircle } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import confetti from 'canvas-confetti'
 import { ErrorBoundary } from 'react-error-boundary'
 import { QuestionCard } from './QuestionCard'
+import { WizardProgress, WizardSidebar, WizardNavigation } from './wizard'
 import { trpc, invalidateQueryCache } from '@/lib/trpc/client'
 import { toast } from 'sonner'
 import { z } from 'zod'
@@ -174,6 +174,47 @@ export function ClarifyingPanel({ courseId, onComplete }: ClarifyingPanelProps) 
   })
 
   const [answeredQuestions, setAnsweredQuestions] = useState<Set<string>>(new Set())
+
+  // Sort questions by priority
+  const sortedQuestions = useMemo(
+    () =>
+      [...questions].sort((a, b) => {
+        const order = { critical: 0, important: 1, nice_to_have: 2 }
+        return order[a.priority] - order[b.priority]
+      }),
+    [questions]
+  )
+
+  // Current question index state - start with first unanswered
+  const [currentIndex, setCurrentIndex] = useState(() => {
+    const firstUnanswered = sortedQuestions.findIndex((q) => !answeredQuestions.has(q.id))
+    return firstUnanswered >= 0 ? firstUnanswered : 0
+  })
+
+  // Priority counts for WizardProgress
+  const priorityCounts = useMemo(
+    () => ({
+      critical: {
+        total: sortedQuestions.filter((q) => q.priority === 'critical').length,
+        answered: sortedQuestions.filter(
+          (q) => q.priority === 'critical' && answeredQuestions.has(q.id)
+        ).length,
+      },
+      important: {
+        total: sortedQuestions.filter((q) => q.priority === 'important').length,
+        answered: sortedQuestions.filter(
+          (q) => q.priority === 'important' && answeredQuestions.has(q.id)
+        ).length,
+      },
+      nice_to_have: {
+        total: sortedQuestions.filter((q) => q.priority === 'nice_to_have').length,
+        answered: sortedQuestions.filter(
+          (q) => q.priority === 'nice_to_have' && answeredQuestions.has(q.id)
+        ).length,
+      },
+    }),
+    [sortedQuestions, answeredQuestions]
+  )
   // Track if confetti was ever shown for this course (persisted in localStorage)
   const confettiStorageKey = `clarifying_confetti_shown_${courseId}`
   const [hasShownConfetti, setHasShownConfetti] = useState(() => {
@@ -182,7 +223,6 @@ export function ClarifyingPanel({ courseId, onComplete }: ClarifyingPanelProps) 
   })
   const wasAlreadyCompleteOnMount = useRef<boolean | null>(null)
   const [processingQuestionId, setProcessingQuestionId] = useState<string | null>(null)
-  const questionRefs = useRef<Map<string, HTMLDivElement>>(new Map())
 
   // BUG FIX: Sync answeredQuestions with API data on load
   // Use questionsData as dependency (stable reference from tRPC) instead of questions array
@@ -206,19 +246,11 @@ export function ClarifyingPanel({ courseId, onComplete }: ClarifyingPanelProps) 
     }
   }, [questionsData])
 
-  // CRITICAL-003 fix: Cleanup refs on unmount
-  useEffect(() => {
-    return () => {
-      questionRefs.current.clear()
-    }
-  }, [])
-
   // Calculate progress
-  const totalQuestions = questions.length
+  const totalQuestions = sortedQuestions.length
   const answeredCount = answeredQuestions.size
-  const progress = totalQuestions > 0 ? (answeredCount / totalQuestions) * 100 : 0
 
-  const criticalQuestions = questions.filter((q) => q.priority === 'critical')
+  const criticalQuestions = sortedQuestions.filter((q) => q.priority === 'critical')
   const criticalAnswered = criticalQuestions.filter((q) => answeredQuestions.has(q.id)).length
   const allCriticalAnswered = criticalAnswered === criticalQuestions.length
 
@@ -248,21 +280,18 @@ export function ClarifyingPanel({ courseId, onComplete }: ClarifyingPanelProps) 
     }
   }, [isComplete, hasShownConfetti, totalQuestions, courseId])
 
-  // HIGH-005 fix: Scroll helper - called directly from mutation callback to avoid race conditions
-  const scrollToNextUnanswered = useCallback(
-    (justAnsweredId: string) => {
-      const nextUnanswered = questions.find(
-        (q) => !answeredQuestions.has(q.id) && q.id !== justAnsweredId
-      )
-      if (nextUnanswered) {
-        const element = questionRefs.current.get(nextUnanswered.id)
-        if (element) {
-          element.scrollIntoView({ behavior: 'smooth', block: 'center' })
-        }
-      }
-    },
-    [questions, answeredQuestions]
-  )
+  // Navigation handlers
+  const handlePrev = () => {
+    if (currentIndex > 0) setCurrentIndex(currentIndex - 1)
+  }
+
+  const handleNext = () => {
+    if (currentIndex < sortedQuestions.length - 1) setCurrentIndex(currentIndex + 1)
+  }
+
+  const handleSelectQuestion = (index: number) => {
+    setCurrentIndex(index)
+  }
 
   const handleAnswer = (
     questionId: string,
@@ -296,8 +325,15 @@ export function ClarifyingPanel({ courseId, onComplete }: ClarifyingPanelProps) 
       .mutateAsync(payload)
       .then(async () => {
         setAnsweredQuestions((prev) => new Set(prev).add(questionId))
-        // HIGH-005 fix: Scroll only after THIS specific answer is saved
-        scrollToNextUnanswered(questionId)
+
+        // Auto-advance to next unanswered question
+        const nextUnanswered = sortedQuestions.findIndex(
+          (q, idx) => idx > currentIndex && !answeredQuestions.has(q.id)
+        )
+        if (nextUnanswered >= 0) {
+          setCurrentIndex(nextUnanswered)
+        }
+
         // Invalidate cache to force refetch with updated currentAnswer
         await invalidateAndRefetch()
       })
@@ -318,8 +354,15 @@ export function ClarifyingPanel({ courseId, onComplete }: ClarifyingPanelProps) 
       .mutateAsync({ questionId })
       .then(async () => {
         setAnsweredQuestions((prev) => new Set(prev).add(questionId))
-        // HIGH-005 fix: Scroll after skip as well
-        scrollToNextUnanswered(questionId)
+
+        // Auto-advance to next unanswered question
+        const nextUnanswered = sortedQuestions.findIndex(
+          (q, idx) => idx > currentIndex && !answeredQuestions.has(q.id)
+        )
+        if (nextUnanswered >= 0) {
+          setCurrentIndex(nextUnanswered)
+        }
+
         // Invalidate cache to force refetch with updated status
         await invalidateAndRefetch()
       })
@@ -336,7 +379,7 @@ export function ClarifyingPanel({ courseId, onComplete }: ClarifyingPanelProps) 
   const handleAcceptAll = async () => {
     // Auto-select first suggested answer for all unanswered questions
     // Uses batch endpoint to submit all answers in a single API call (fixes HIGH-002 rate limit issue)
-    const unanswered = questions.filter(
+    const unanswered = sortedQuestions.filter(
       (q) => !answeredQuestions.has(q.id) && q.suggestedAnswers.length > 0
     )
 
@@ -405,6 +448,15 @@ export function ClarifyingPanel({ courseId, onComplete }: ClarifyingPanelProps) 
     )
   }
 
+  // Get current question (ensure it exists)
+  const currentQuestion = sortedQuestions[currentIndex]
+
+  if (!currentQuestion && sortedQuestions.length > 0) {
+    // Reset to first question if index is invalid
+    setCurrentIndex(0)
+    return null
+  }
+
   return (
     <ErrorBoundary
       fallbackRender={() => <ClarifyingErrorFallback courseId={courseId} />}
@@ -413,7 +465,7 @@ export function ClarifyingPanel({ courseId, onComplete }: ClarifyingPanelProps) 
       }}
     >
       <div className="space-y-4">
-        {/* Header with Progress */}
+        {/* Header */}
         <Card className="border-purple-200 bg-gradient-to-r from-purple-50 to-blue-50 dark:border-purple-800 dark:from-purple-950/20 dark:to-blue-950/20">
           <CardHeader>
             <div className="flex items-center justify-between">
@@ -430,29 +482,6 @@ export function ClarifyingPanel({ courseId, onComplete }: ClarifyingPanelProps) 
                   <CheckCircle2 className="h-5 w-5" />
                   <span className="text-sm font-medium">Все вопросы отвечены!</span>
                 </motion.div>
-              )}
-            </div>
-            <div className="mt-4 space-y-2">
-              <div className="flex justify-between text-sm">
-                <span className="text-slate-600 dark:text-slate-400">
-                  Прогресс: {answeredCount} / {totalQuestions}
-                </span>
-                <span className="font-medium text-purple-600 dark:text-purple-400">
-                  {Math.round(progress)}%
-                </span>
-              </div>
-              <Progress value={progress} className="h-2" />
-              {criticalQuestions.length > 0 && (
-                <div className="flex items-center gap-2 text-xs">
-                  <span className="font-medium text-red-600 dark:text-red-400">
-                    Обязательные: {criticalAnswered} / {criticalQuestions.length}
-                  </span>
-                  {!allCriticalAnswered && (
-                    <span className="text-slate-500 dark:text-slate-400">
-                      (необходимо ответить для продолжения)
-                    </span>
-                  )}
-                </div>
               )}
             </div>
           </CardHeader>
@@ -473,64 +502,67 @@ export function ClarifyingPanel({ courseId, onComplete }: ClarifyingPanelProps) 
           </div>
         )}
 
-        {/* Questions List */}
-        <div className="space-y-3">
-          <AnimatePresence>
-            {questions.map((question) => (
-              <div
-                key={question.id}
-                ref={(node) => {
-                  // CRITICAL-003 fix: Ref callback with cleanup
-                  if (node) {
-                    questionRefs.current.set(question.id, node)
-                  } else {
-                    // Cleanup when element unmounts (node becomes null)
-                    questionRefs.current.delete(question.id)
-                  }
-                }}
-              >
-                <QuestionCard
-                  question={question}
-                  onAnswer={handleAnswer}
-                  onSkip={handleSkip}
-                  isAnswered={answeredQuestions.has(question.id)}
-                  isProcessing={processingQuestionId === question.id}
-                />
-              </div>
-            ))}
-          </AnimatePresence>
-        </div>
+        {/* Wizard Layout */}
+        <div className="flex gap-4">
+          {/* Sidebar (hidden on mobile) */}
+          <WizardSidebar
+            questions={sortedQuestions.map((q) => ({
+              id: q.id,
+              text: q.text,
+              priority: q.priority,
+              isAnswered: answeredQuestions.has(q.id),
+            }))}
+            currentIndex={currentIndex}
+            onSelect={handleSelectQuestion}
+          />
 
-        {/* Continue Button */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: allCriticalAnswered ? 1 : 0.5 }}
-          className="mt-6"
-        >
-          <Button
-            size="lg"
-            className="w-full shadow-lg"
-            disabled={!allCriticalAnswered || approveAndProceedMutation.isPending}
-            onClick={handleContinue}
-          >
-            {approveAndProceedMutation.isPending ? (
-              <>
-                <div className="mr-2 h-4 w-4 animate-spin rounded-full border-b-2 border-white" />
-                Обработка...
-              </>
-            ) : (
-              <>
-                Продолжить генерацию
-                <ArrowRight className="ml-2 h-4 w-4" />
-              </>
+          {/* Main content */}
+          <div className="min-w-0 flex-1">
+            {/* Progress */}
+            <WizardProgress
+              currentIndex={currentIndex}
+              totalQuestions={totalQuestions}
+              answeredCount={answeredCount}
+              priorityCounts={priorityCounts}
+            />
+
+            {/* Current question - ONLY ONE card */}
+            {currentQuestion && (
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={currentQuestion.id}
+                  initial={{ opacity: 0, x: 20 }}
+                  animate={{ opacity: 1, x: 0 }}
+                  exit={{ opacity: 0, x: -20 }}
+                  transition={{ duration: 0.2 }}
+                >
+                  <QuestionCard
+                    question={currentQuestion}
+                    onAnswer={handleAnswer}
+                    onSkip={handleSkip}
+                    isAnswered={answeredQuestions.has(currentQuestion.id)}
+                    isProcessing={processingQuestionId === currentQuestion.id}
+                  />
+                </motion.div>
+              </AnimatePresence>
             )}
-          </Button>
-          {!allCriticalAnswered && (
-            <p className="mt-2 text-center text-xs text-slate-500 dark:text-slate-400">
-              Ответьте на все обязательные вопросы для продолжения
-            </p>
-          )}
-        </motion.div>
+
+            {/* Navigation */}
+            <WizardNavigation
+              currentIndex={currentIndex}
+              totalQuestions={totalQuestions}
+              questionsStatus={sortedQuestions.map((q) => ({
+                isAnswered: answeredQuestions.has(q.id),
+                priority: q.priority,
+              }))}
+              onPrev={handlePrev}
+              onNext={handleNext}
+              canContinue={allCriticalAnswered}
+              onContinue={handleContinue}
+              isProcessing={approveAndProceedMutation.isPending}
+            />
+          </div>
+        </div>
       </div>
     </ErrorBoundary>
   )
