@@ -65,6 +65,7 @@ export function ClarifyingPanel({ courseId, onComplete }: ClarifyingPanelProps) 
   const [answeredQuestions, setAnsweredQuestions] = useState<Set<string>>(new Set())
   const [hasShownConfetti, setHasShownConfetti] = useState(false)
   const questionRefs = useRef<Map<string, HTMLDivElement>>(new Map())
+  const prevAnsweredCount = useRef(0)
 
   // Clean up stale refs when questions change (memory leak fix)
   useEffect(() => {
@@ -100,14 +101,24 @@ export function ClarifyingPanel({ courseId, onComplete }: ClarifyingPanelProps) 
     }
   }, [isComplete, hasShownConfetti])
 
-  // Auto-scroll to next unanswered question
+  // Auto-scroll to next unanswered question ONLY when user answers
   useEffect(() => {
-    const firstUnanswered = questions.find((q) => !answeredQuestions.has(q.id))
-    if (firstUnanswered) {
-      const element = questionRefs.current.get(firstUnanswered.id)
-      if (element) {
-        element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+    const currentCount = answeredQuestions.size
+
+    // Scroll only when answer count increases (user answered a question)
+    if (currentCount > prevAnsweredCount.current) {
+      prevAnsweredCount.current = currentCount
+
+      const firstUnanswered = questions.find((q) => !answeredQuestions.has(q.id))
+      if (firstUnanswered) {
+        const element = questionRefs.current.get(firstUnanswered.id)
+        if (element) {
+          element.scrollIntoView({ behavior: 'smooth', block: 'center' })
+        }
       }
+    } else {
+      // Sync counter on initialization (when questions load)
+      prevAnsweredCount.current = currentCount
     }
   }, [answeredQuestions, questions])
 
