@@ -1,9 +1,9 @@
-import createMiddleware from 'next-intl/middleware';
-import { type NextRequest } from 'next/server';
-import { routing } from '@/src/i18n/routing';
-import { updateSession } from '@/lib/supabase/middleware';
+import createMiddleware from 'next-intl/middleware'
+import { type NextRequest } from 'next/server'
+import { routing } from '@/src/i18n/routing'
+import { updateSession } from '@/lib/supabase/middleware'
 
-const handleI18nRouting = createMiddleware(routing);
+const handleI18nRouting = createMiddleware(routing)
 
 // Note: Redis-based rate limiting removed from middleware because ioredis
 // is a Node.js-only library that cannot run in Edge runtime.
@@ -14,17 +14,17 @@ const handleI18nRouting = createMiddleware(routing);
 
 export async function middleware(request: NextRequest) {
   // Step 1: Handle i18n routing (locale detection, cookies)
-  const response = handleI18nRouting(request);
+  const response = handleI18nRouting(request)
 
   // Step 2: Update Supabase session (auth cookies)
   // Pass the i18n response to preserve its headers and cookies
-  const finalResponse = await updateSession(request, response);
+  const finalResponse = await updateSession(request, response)
 
   // Step 3: Add request ID for logging correlation
-  const requestId = request.headers.get('x-request-id') || crypto.randomUUID();
-  finalResponse.headers.set('x-request-id', requestId);
+  const requestId = request.headers.get('x-request-id') || crypto.randomUUID()
+  finalResponse.headers.set('x-request-id', requestId)
 
-  return finalResponse;
+  return finalResponse
 }
 
 export const config = {
@@ -33,9 +33,10 @@ export const config = {
      * Match all request paths except for:
      * - /api, /trpc (API routes)
      * - /_next, /_vercel (Next.js internals)
+     * - /mocks (demo/mock pages without i18n)
      * - Files with extensions (e.g., favicon.ico, *.svg)
      */
-    '/((?!api|trpc|_next|_vercel|.*\\..*).*)',
+    '/((?!api|trpc|mocks|_next|_vercel|.*\\..*).*)',
   ],
   // Allow dynamic code evaluation for Supabase libraries that use eval()
   unstable_allowDynamic: [
@@ -48,4 +49,4 @@ export const config = {
     '**/node_modules/@supabase/functions-js/**',
     '**/node_modules/@supabase/gotrue-js/**',
   ],
-};
+}
