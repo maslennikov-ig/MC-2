@@ -24,6 +24,12 @@ interface BuildGraphParams {
   stage1CourseData?: Stage1CourseData
   /** Clarifying questions progress data (Phase 0.5) */
   clarifyingData?: ClarifyingProgressData
+  /**
+   * Current course generation status.
+   * Used to show fallback clarifying node when status is 'stage_4_clarifying'
+   * but clarifyingData is not yet available.
+   */
+  courseStatus?: string
   getTrace: (id: string) => GenerationTrace | undefined
   getAttempts: (id: string) => TraceAttempt[]
   getPhases: (id: string) => PhaseData[]
@@ -215,6 +221,7 @@ export function buildGraph({
   hasDocuments,
   stage1CourseData,
   clarifyingData,
+  courseStatus,
   getTrace,
   getAttempts,
   getPhases,
@@ -739,19 +746,34 @@ export function buildGraph({
 
       // =========================================================
       // CLARIFYING NODE: Add after Stage 4 if questions exist
+      // OR if course status is 'stage_4_clarifying' (fallback for loading state)
       // =========================================================
-      if (i === 4 && clarifyingData && clarifyingData.total > 0) {
+      const hasClarifyingQuestions = clarifyingData && clarifyingData.total > 0
+      const isInClarifyingStatus = courseStatus === 'stage_4_clarifying'
+
+      // Show clarifying node when:
+      // 1. We have questions data (normal case)
+      // 2. OR course status is 'stage_4_clarifying' (fallback - questions still loading or failed to load)
+      if (i === 4 && (hasClarifyingQuestions || isInClarifyingStatus)) {
         const clarifyingNodeId = 'stage_4_clarifying'
 
         // Determine clarifying node status
         let clarifyingStatus: NodeStatus = 'pending'
         const stage4Status = getStatus(stageKey)
-        if (stage4Status === 'completed' || stage4Status === 'active') {
-          if (clarifyingData.canProceed) {
-            clarifyingStatus = 'completed'
-          } else {
-            clarifyingStatus = 'active'
+
+        if (hasClarifyingQuestions) {
+          // Normal case: we have question data
+          if (stage4Status === 'completed' || stage4Status === 'active') {
+            if (clarifyingData.canProceed) {
+              clarifyingStatus = 'completed'
+            } else {
+              clarifyingStatus = 'active'
+            }
           }
+        } else if (isInClarifyingStatus) {
+          // Fallback: course is in clarifying status but questions not loaded yet
+          // Show as 'active' to indicate work in progress
+          clarifyingStatus = 'active'
         }
 
         // Clarifying node has different data structure, cast to AppNode for array compatibility
@@ -761,11 +783,14 @@ export function buildGraph({
           position: getExistingPos(clarifyingNodeId),
           data: {
             status: clarifyingStatus,
-            questionsCount: clarifyingData.total,
-            answeredCount: clarifyingData.answered,
-            criticalAnswered: clarifyingData.criticalAnswered,
-            criticalTotal: clarifyingData.criticalTotal,
-            isAutomatic: clarifyingData.isAutomatic,
+            // Use actual data if available, otherwise show loading state with zeros
+            questionsCount: clarifyingData?.total ?? 0,
+            answeredCount: clarifyingData?.answered ?? 0,
+            criticalAnswered: clarifyingData?.criticalAnswered ?? 0,
+            criticalTotal: clarifyingData?.criticalTotal ?? 0,
+            isAutomatic: clarifyingData?.isAutomatic ?? false,
+            // Flag to indicate this is a fallback (questions still loading)
+            isLoading: isInClarifyingStatus && !hasClarifyingQuestions,
           },
         } as unknown as AppNode)
 

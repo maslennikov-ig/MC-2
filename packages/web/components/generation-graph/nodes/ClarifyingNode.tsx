@@ -4,7 +4,7 @@ import { memo } from 'react'
 import { Handle, Position, type NodeProps } from '@xyflow/react'
 import { useTranslations } from 'next-intl'
 import { cn } from '@/lib/utils'
-import { MessageCircleQuestion, Check, Bot } from 'lucide-react'
+import { MessageCircleQuestion, Check, Bot, Loader2 } from 'lucide-react'
 import { NodeProgressBar } from '../components/shared'
 import { Badge } from '@/components/ui/badge'
 
@@ -18,6 +18,8 @@ export interface ClarifyingNodeData {
   isAutomatic?: boolean
   /** Optional label for node display */
   label?: string
+  /** Whether questions are still loading (fallback state when course is in stage_4_clarifying but questions not fetched yet) */
+  isLoading?: boolean
   /** Index signature for React Flow Node<Data> compatibility */
   [key: string]: string | number | boolean | undefined
 }
@@ -47,10 +49,11 @@ export const ClarifyingNode = memo(({ data, selected }: NodeProps) => {
     criticalAnswered = 0,
     criticalTotal = 0,
     isAutomatic = false,
+    isLoading = false,
   } = rawData
 
   const isActive = status === 'active'
-  const isComplete = answeredCount === questionsCount && questionsCount > 0
+  const isComplete = answeredCount === questionsCount && questionsCount > 0 && !isLoading
   const progress = questionsCount > 0 ? (answeredCount / questionsCount) * 100 : 0
 
   return (
@@ -85,17 +88,24 @@ export const ClarifyingNode = memo(({ data, selected }: NodeProps) => {
         )}
       </div>
 
-      <div className="mb-2 text-xs text-slate-500 dark:text-slate-400">
-        {t('progress', { answered: answeredCount, total: questionsCount })}
-        {criticalTotal > 0 && (
-          <span className="ml-2 text-red-600 dark:text-red-400">
-            {t('critical', { answered: criticalAnswered, total: criticalTotal })}
-          </span>
-        )}
-      </div>
+      {isLoading ? (
+        <div className="mb-2 flex items-center gap-2 text-xs text-purple-500">
+          <Loader2 className="h-3 w-3 animate-spin" />
+          {t('generating')}
+        </div>
+      ) : (
+        <div className="mb-2 text-xs text-slate-500 dark:text-slate-400">
+          {t('progress', { answered: answeredCount, total: questionsCount })}
+          {criticalTotal > 0 && (
+            <span className="ml-2 text-red-600 dark:text-red-400">
+              {t('critical', { answered: criticalAnswered, total: criticalTotal })}
+            </span>
+          )}
+        </div>
+      )}
 
       <NodeProgressBar
-        progress={progress}
+        progress={isLoading ? 0 : progress}
         variant={isComplete ? 'success' : isActive ? 'active' : 'default'}
       />
 
