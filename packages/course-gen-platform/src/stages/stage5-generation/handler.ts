@@ -46,6 +46,15 @@ import {
 } from '../stage7-enrichments/services/auto-card-trigger';
 import { handleStageCompletion } from '@/shared/auto-approval';
 import { checkPauseAndDelay } from '../../shared/pause-check';
+import {
+  OrchestrationFailedError,
+  ValidationFailedError,
+  QualityThresholdNotMetError,
+  MinimumLessonsNotMetError,
+  DatabaseError,
+  PipelineError,
+  isPipelineInterrupt,
+} from '@/shared/errors';
 
 /**
  * Cleanup placeholder patterns in generated content
@@ -241,6 +250,33 @@ function classifyGenerationError(
   | 'MINIMUM_LESSONS_NOT_MET'
   | 'DATABASE_ERROR'
   | 'UNKNOWN' {
+  // PRIORITY 1: instanceof проверки для PipelineError
+  if (error instanceof OrchestrationFailedError) {
+    return 'ORCHESTRATION_FAILED';
+  }
+  if (error instanceof ValidationFailedError) {
+    return 'VALIDATION_FAILED';
+  }
+  if (error instanceof QualityThresholdNotMetError) {
+    return 'QUALITY_THRESHOLD_NOT_MET';
+  }
+  if (error instanceof MinimumLessonsNotMetError) {
+    return 'MINIMUM_LESSONS_NOT_MET';
+  }
+  if (error instanceof DatabaseError) {
+    return 'DATABASE_ERROR';
+  }
+  if (error instanceof PipelineError) {
+    // Map any other PipelineError code
+    const code = error.code;
+    if (code === 'ORCHESTRATION_FAILED') return 'ORCHESTRATION_FAILED';
+    if (code === 'VALIDATION_FAILED') return 'VALIDATION_FAILED';
+    if (code === 'QUALITY_THRESHOLD_NOT_MET') return 'QUALITY_THRESHOLD_NOT_MET';
+    if (code === 'MINIMUM_LESSONS_NOT_MET') return 'MINIMUM_LESSONS_NOT_MET';
+    if (code === 'DATABASE_ERROR') return 'DATABASE_ERROR';
+  }
+
+  // PRIORITY 2: string matching fallback для legacy ошибок
   const errorMessage = error instanceof Error ? error.message : String(error);
 
   // StateGraph execution failures
@@ -975,6 +1011,12 @@ class Stage5GenerationHandler {
         // =================================================================
         // ERROR HANDLING
         // =================================================================
+        // Interrupts are control flow, not errors (for future use)
+        if (isPipelineInterrupt(error)) {
+          jobLogger.info({ code: error.code }, 'Pipeline paused');
+          throw error; // Re-throw for handler
+        }
+
         const totalDurationMs = Date.now() - startTime;
 
         jobLogger.error(

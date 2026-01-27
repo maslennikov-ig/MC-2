@@ -28,6 +28,14 @@ import { generateVisualStyle } from './utils/visual-style-generator';
 import { handleStageCompletion } from '../../shared/auto-approval';
 import { notifyStageComplete, notifyCourseError } from '../../shared/notifications';
 import { checkPauseAndDelay } from '../../shared/pause-check';
+import {
+  ClarifyingQuestionsInterrupt,
+  BarrierFailedError,
+  MinimumLessonsNotMetError,
+  LLMError,
+  PipelineError,
+  isPipelineInterrupt,
+} from '@/shared/errors';
 
 /**
  * Error details for STRUCTURE_ANALYSIS jobs
@@ -110,6 +118,24 @@ function classifyAnalysisError(
   | 'MINIMUM_LESSONS_NOT_MET'
   | 'LLM_ERROR'
   | 'UNKNOWN' {
+  // PRIORITY 1: instanceof checks for PipelineError (type-safe, O(1))
+  if (error instanceof ClarifyingQuestionsInterrupt) {
+    return 'AWAITING_CLARIFYING_ANSWERS';
+  }
+  if (error instanceof BarrierFailedError) {
+    return 'BARRIER_FAILED';
+  }
+  if (error instanceof MinimumLessonsNotMetError) {
+    return 'MINIMUM_LESSONS_NOT_MET';
+  }
+  if (error instanceof LLMError) {
+    return 'LLM_ERROR';
+  }
+  if (error instanceof PipelineError) {
+    return error.code as any;
+  }
+
+  // PRIORITY 2: string matching fallback for legacy errors
   const errorMessage = error instanceof Error ? error.message : String(error);
 
   // Special case: clarifying questions pending (not a real error)
@@ -820,15 +846,25 @@ class Stage4AnalysisHandler {
         // =================================================================
         const totalDurationMs = Date.now() - startTime;
 
-        jobLogger.error(
-          {
-            error: error instanceof Error ? error.message : String(error),
-            stack: error instanceof Error ? error.stack : undefined,
-            duration_ms: totalDurationMs,
-            attemptsMade: job.attemptsMade,
-          },
-          'Stage 4 analysis job failed'
-        );
+        // CRITICAL: Check for pipeline interrupt BEFORE logging as ERROR
+        if (isPipelineInterrupt(error)) {
+          jobLogger.info(
+            { errorCode: error.code, courseId: course_id },
+            'Pipeline paused (not an error)'
+          );
+          // Continue to special handling below (AWAITING_CLARIFYING_ANSWERS)
+        } else {
+          // Real error - log at ERROR level
+          jobLogger.error(
+            {
+              error: error instanceof Error ? error.message : String(error),
+              stack: error instanceof Error ? error.stack : undefined,
+              duration_ms: totalDurationMs,
+              attemptsMade: job.attemptsMade,
+            },
+            'Stage 4 analysis job failed'
+          );
+        }
 
         // Classify error for monitoring and retry decisions
         const errorCode = classifyAnalysisError(error instanceof Error ? error : String(error));
