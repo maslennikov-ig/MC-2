@@ -29,6 +29,7 @@ import { getSupabaseAdmin } from '../../shared/supabase/admin';
 import { addJob } from '../../orchestrator/queue';
 import { JobType, StructureAnalysisJobData } from '@megacampus/shared-types';
 import { logger } from '../../shared/logger/index.js';
+import { extractAnswerString } from '../../stages/stage4-analysis/phases/phase-0.5-clarifying';
 
 // ============================================================================
 // INPUT SCHEMAS
@@ -48,15 +49,34 @@ const getQuestionsSchema = z.object({
  * - suggested: User selected a suggested answer (requires selectedSuggestionIndex)
  * - modified: User modified a suggested answer (requires selectedSuggestionIndex + userModification)
  * - custom: User wrote a completely custom answer
+ *
+ * For multi_choice questions:
+ * - Use answers (array) instead of answer (string)
+ * - selectedSuggestionIndexes (array) instead of selectedSuggestionIndex
  */
 const submitAnswerSchema = z.object({
   questionId: z.string().uuid('Invalid question ID'),
+  // Single answer for open/single_choice
   answer: z
     .string()
     .transform(s => s.trim())
-    .pipe(z.string().min(3, 'Answer must be at least 3 characters').max(10000, 'Answer too long')),
+    .pipe(z.string().min(3, 'Answer must be at least 3 characters').max(10000, 'Answer too long'))
+    .optional(),
+  // Multiple answers for multi_choice
+  answers: z
+    .array(
+      z
+        .string()
+        .transform(s => s.trim())
+        .pipe(z.string().min(1).max(10000))
+    )
+    .min(1, 'At least one answer required')
+    .max(10, 'Too many answers')
+    .optional(),
   answerSource: z.enum(['suggested', 'modified', 'custom']),
   selectedSuggestionIndex: z.number().int().min(0).optional(),
+  // Multiple indexes for multi_choice
+  selectedSuggestionIndexes: z.array(z.number().int().min(0)).optional(),
   userModification: z
     .string()
     .transform(s => s.trim())
@@ -90,6 +110,21 @@ const requestSecondRoundSchema = z.object({
 // ============================================================================
 
 /**
+ * Question types for different UI rendering
+ */
+export type QuestionType = 'open' | 'single_choice' | 'multi_choice';
+
+/**
+ * User answer stored in JSONB format
+ * - For open/single_choice: { value: "answer text" }
+ * - For multi_choice: { values: ["option1", "option2"] }
+ */
+export interface UserAnswerValue {
+  value?: string;
+  values?: string[];
+}
+
+/**
  * Question row from database
  * Note: This type matches the clarifying_questions table schema
  */
@@ -97,10 +132,11 @@ export interface QuestionRow {
   id: string;
   course_id: string;
   question_text: string;
+  question_type: QuestionType;
   question_priority: string;
   question_category: string | null;
-  suggested_answers: string[] | null;
-  user_answer: string | null;
+  suggested_answers: Array<{ text: string; rationale?: string; is_recommended?: boolean }> | null;
+  user_answer: UserAnswerValue | null; // JSONB: { value: string } or { values: string[] }
   answer_source: string | null;
   selected_suggestion_index: number | null;
   user_modification: string | null;
@@ -593,7 +629,15 @@ export const clarifyingRouter = router({
     .use(createRateLimiter({ requests: 30, window: 60 })) // 30 submissions per minute
     .input(submitAnswerSchema)
     .mutation(async ({ ctx, input }) => {
-      const { questionId, answer, answerSource, selectedSuggestionIndex, userModification } = input;
+      const {
+        questionId,
+        answer,
+        answers,
+        answerSource,
+        selectedSuggestionIndex,
+        selectedSuggestionIndexes,
+        userModification,
+      } = input;
       const requestId = nanoid();
       const currentUser = ctx.user;
 
@@ -611,12 +655,41 @@ export const clarifyingRouter = router({
           requestId
         );
 
+        const questionType = question.question_type || 'open';
+        const isMultiChoice = questionType === 'multi_choice';
+
+        // Validate input based on question type
+        if (isMultiChoice) {
+          if (!answers || answers.length === 0) {
+            throw new TRPCError({
+              code: 'BAD_REQUEST',
+              message: 'answers array is required for multi_choice questions',
+            });
+          }
+        } else {
+          if (!answer) {
+            throw new TRPCError({
+              code: 'BAD_REQUEST',
+              message: 'answer is required for open/single_choice questions',
+            });
+          }
+        }
+
         // Validate answer source requirements
-        if (answerSource === 'suggested' && selectedSuggestionIndex === undefined) {
-          throw new TRPCError({
-            code: 'BAD_REQUEST',
-            message: 'selectedSuggestionIndex is required for suggested answers',
-          });
+        if (answerSource === 'suggested') {
+          if (isMultiChoice) {
+            if (!selectedSuggestionIndexes || selectedSuggestionIndexes.length === 0) {
+              throw new TRPCError({
+                code: 'BAD_REQUEST',
+                message: 'selectedSuggestionIndexes is required for suggested multi_choice answers',
+              });
+            }
+          } else if (selectedSuggestionIndex === undefined) {
+            throw new TRPCError({
+              code: 'BAD_REQUEST',
+              message: 'selectedSuggestionIndex is required for suggested answers',
+            });
+          }
         }
 
         if (
@@ -638,9 +711,9 @@ export const clarifyingRouter = router({
           });
         }
 
-        // Validate suggestion index if provided
+        // Validate suggestion indexes if provided
+        const suggestions = question.suggested_answers || [];
         if (selectedSuggestionIndex !== undefined) {
-          const suggestions = question.suggested_answers || [];
           if (selectedSuggestionIndex >= suggestions.length) {
             throw new TRPCError({
               code: 'BAD_REQUEST',
@@ -648,19 +721,39 @@ export const clarifyingRouter = router({
             });
           }
         }
+        if (selectedSuggestionIndexes) {
+          for (const idx of selectedSuggestionIndexes) {
+            if (idx >= suggestions.length) {
+              throw new TRPCError({
+                code: 'BAD_REQUEST',
+                message: `Invalid suggestion index: ${idx}`,
+              });
+            }
+          }
+        }
 
         const supabase = getTypedSupabaseAdmin();
+
+        // Build user_answer as JSONB based on question type
+        const userAnswerValue: UserAnswerValue = isMultiChoice
+          ? { values: answers }
+          : { value: answer };
 
         // Update question with answer
         const { error: updateError } = await supabase
           .from('clarifying_questions')
           .update({
-            user_answer: answer,
+            user_answer: userAnswerValue,
             answer_source: answerSource,
-            selected_suggestion_index: selectedSuggestionIndex ?? null,
+            selected_suggestion_index: isMultiChoice ? null : (selectedSuggestionIndex ?? null),
             user_modification: userModification ?? null,
             status: 'answered',
             answered_at: new Date().toISOString(),
+            // Store multi_choice indexes in metadata
+            metadata:
+              isMultiChoice && selectedSuggestionIndexes
+                ? { selected_suggestion_indexes: selectedSuggestionIndexes }
+                : question.metadata,
           })
           .eq('id', questionId);
 
@@ -1237,7 +1330,7 @@ export const clarifyingRouter = router({
         // Format round 1 answers for job
         const previousAnswers = round1List.map(q => ({
           question: q.question_text,
-          answer: q.user_answer,
+          answer: extractAnswerString(q.user_answer),
           priority: q.question_priority,
           category: q.question_category,
         }));
@@ -1288,7 +1381,7 @@ export const clarifyingRouter = router({
           iterationRound: 2,
           previousAnswers: previousAnswers.map(a => ({
             question: a.question,
-            answer: a.answer || '',
+            answer: a.answer, // Already string from extractAnswerString
             priority: a.priority,
             category: a.category || 'general', // Default category if null
           })),

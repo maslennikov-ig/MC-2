@@ -13,18 +13,27 @@ import { trpc } from '@/lib/trpc/client'
 import { toast } from 'sonner'
 
 type QuestionPriority = 'critical' | 'important' | 'nice_to_have'
+type QuestionType = 'open' | 'single_choice' | 'multi_choice'
 
 interface SuggestedAnswer {
   text: string
   rationale?: string
+  is_recommended?: boolean
+}
+
+interface UserAnswerValue {
+  value?: string
+  values?: string[]
 }
 
 interface Question {
   id: string
   text: string
+  type: QuestionType
   priority: QuestionPriority
   suggestedAnswers: SuggestedAnswer[]
   currentAnswer?: string
+  currentAnswers?: string[] // For multi_choice
   isAnswered: boolean
 }
 
@@ -48,19 +57,67 @@ export function ClarifyingPanel({ courseId, onComplete }: ClarifyingPanelProps) 
 
   // Transform API response to Question format
   // XSS Protection: Sanitize all user-submitted and AI-generated text
-  const questions: Question[] = (questionsData?.questions || []).map((q) => ({
-    id: q.id,
-    text: DOMPurify.sanitize(q.question_text),
-    priority: q.question_priority as QuestionPriority,
-    suggestedAnswers: Array.isArray(q.suggested_answers)
-      ? q.suggested_answers.map((item: string | { text: string; rationale?: string }) => ({
-          text: DOMPurify.sanitize(typeof item === 'string' ? item : item.text),
-          rationale: typeof item === 'string' ? undefined : item.rationale,
-        }))
-      : [],
-    currentAnswer: q.user_answer ? DOMPurify.sanitize(q.user_answer) : undefined,
-    isAnswered: q.status === 'answered',
-  }))
+  // Extended type for new fields not yet in generated types
+  interface ExtendedQuestionFromAPI {
+    id: string
+    course_id: string
+    question_text: string
+    question_type?: QuestionType
+    question_priority: string
+    question_category: string | null
+    suggested_answers: Array<
+      string | { text: string; rationale?: string; is_recommended?: boolean }
+    > | null
+    user_answer: UserAnswerValue | string | null
+    answer_source: string | null
+    selected_suggestion_index: number | null
+    user_modification: string | null
+    iteration_round: number
+    status: string
+    order_index: number
+    created_at: string | null
+    answered_at: string | null
+    metadata: Record<string, unknown> | null
+  }
+
+  const questions: Question[] = (questionsData?.questions || []).map((rawQ) => {
+    const q = rawQ as unknown as ExtendedQuestionFromAPI
+    // Extract answer from JSONB format
+    const userAnswer = q.user_answer
+    let currentAnswer: string | undefined
+    let currentAnswers: string[] | undefined
+
+    if (userAnswer) {
+      if (typeof userAnswer === 'string') {
+        // Legacy format
+        currentAnswer = DOMPurify.sanitize(userAnswer)
+      } else if (userAnswer.value) {
+        currentAnswer = DOMPurify.sanitize(userAnswer.value)
+      } else if (userAnswer.values) {
+        currentAnswers = userAnswer.values.map((v) => DOMPurify.sanitize(v))
+        currentAnswer = currentAnswers.join(', ') // Display format
+      }
+    }
+
+    return {
+      id: q.id,
+      text: DOMPurify.sanitize(q.question_text),
+      type: (q.question_type as QuestionType) || 'open',
+      priority: q.question_priority as QuestionPriority,
+      suggestedAnswers: Array.isArray(q.suggested_answers)
+        ? q.suggested_answers.map(
+            (item: string | { text: string; rationale?: string; is_recommended?: boolean }) => ({
+              text: DOMPurify.sanitize(typeof item === 'string' ? item : item.text),
+              rationale: typeof item === 'string' ? undefined : item.rationale,
+              is_recommended: typeof item === 'string' ? undefined : item.is_recommended,
+            })
+          )
+        : [],
+      currentAnswer,
+      currentAnswers,
+      isAnswered: q.status === 'answered',
+    }
+  })
 
   const [answeredQuestions, setAnsweredQuestions] = useState<Set<string>>(new Set())
   const [hasShownConfetti, setHasShownConfetti] = useState(false)
@@ -124,17 +181,31 @@ export function ClarifyingPanel({ courseId, onComplete }: ClarifyingPanelProps) 
 
   const handleAnswer = (
     questionId: string,
-    answer: string,
+    answer: string | string[],
     source: 'suggested' | 'modified' | 'custom',
-    selectedSuggestionIndex?: number
+    selectedSuggestionIndex?: number,
+    selectedSuggestionIndexes?: number[]
   ) => {
+    // Determine if this is a multi_choice answer
+    const isMultiChoice = Array.isArray(answer)
+
+    // Build mutation payload based on answer type
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const payload: any = {
+      questionId,
+      answerSource: source,
+    }
+
+    if (isMultiChoice) {
+      payload.answers = answer
+      payload.selectedSuggestionIndexes = selectedSuggestionIndexes
+    } else {
+      payload.answer = answer
+      payload.selectedSuggestionIndex = selectedSuggestionIndex
+    }
+
     void submitAnswerMutation
-      .mutateAsync({
-        questionId,
-        answer,
-        answerSource: source,
-        selectedSuggestionIndex,
-      })
+      .mutateAsync(payload)
       .then(() => {
         setAnsweredQuestions((prev) => new Set(prev).add(questionId))
       })
