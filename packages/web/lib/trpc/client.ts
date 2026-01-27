@@ -150,6 +150,25 @@ type QueryOptions = {
 const queryCache = new Map<string, { data: unknown; timestamp: number }>()
 
 /**
+ * Invalidate cache for a specific procedure
+ * Forces next query to fetch fresh data from server
+ */
+export function invalidateQueryCache(procedurePath: string, input?: unknown): void {
+  if (input !== undefined) {
+    // Invalidate specific query
+    const cacheKey = `${procedurePath}:${JSON.stringify(input)}`
+    queryCache.delete(cacheKey)
+  } else {
+    // Invalidate all queries for this procedure
+    for (const key of queryCache.keys()) {
+      if (key.startsWith(`${procedurePath}:`)) {
+        queryCache.delete(key)
+      }
+    }
+  }
+}
+
+/**
  * In-flight request deduplication
  * Prevents parallel requests for the same query from hitting the server
  * Multiple components requesting same data will share one Promise
