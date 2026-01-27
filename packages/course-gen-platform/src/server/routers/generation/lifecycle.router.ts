@@ -31,6 +31,7 @@ import { cleanupCourseResources } from '../../../shared/cleanup';
 import { workerReadiness, getReadinessFromRedis } from '../../../orchestrator/worker-readiness';
 import * as path from 'path';
 import { validateLocale } from '@/shared/validation';
+import { logTrace } from '../../../shared/trace-logger';
 
 // Type aliases for Database tables
 type Course = Database['public']['Tables']['courses']['Row'];
@@ -359,6 +360,21 @@ export const lifecycleRouter = router({
             },
           ];
           initialState = 'stage_3_init';
+
+          // Log trace for each deduplicated file to show Stage 2 was skipped
+          for (const file of allFiles) {
+            await logTrace({
+              courseId,
+              stage: 'stage_2',
+              phase: 'skip',
+              stepName: 'deduplicated',
+              inputData: {
+                fileId: file.id,
+                reason: 'already_indexed',
+              },
+              durationMs: 0,
+            });
+          }
 
           logger.info(
             {
