@@ -71,46 +71,46 @@ interface TypeConfigItem {
 
 const priorityConfig: Record<QuestionPriority, PriorityConfigItem> = {
   critical: {
-    card: 'border-l-4 border-l-red-500 border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/20',
-    badge: 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300',
+    card: 'border-l-2 border-l-red-500 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900',
+    badge: '',
     icon: AlertCircle,
-    label: 'ОБЯЗАТЕЛЬНЫЙ',
+    label: 'Обязательный',
     iconColor: 'text-red-500 dark:text-red-400',
   },
   important: {
-    card: 'border-l-4 border-l-amber-500 border border-amber-200 dark:border-amber-800 bg-amber-50 dark:bg-amber-950/20',
-    badge: 'bg-amber-100 text-amber-700 dark:bg-amber-900 dark:text-amber-300',
+    card: 'border-l-2 border-l-amber-400 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900',
+    badge: '',
     icon: AlertTriangle,
-    label: 'ВАЖНЫЙ',
+    label: 'Важный',
     iconColor: 'text-amber-500 dark:text-amber-400',
   },
   nice_to_have: {
-    card: 'border-l-4 border-l-slate-300 border-dashed border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900/20',
-    badge: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-400',
+    card: 'border-l-2 border-l-slate-300 border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900',
+    badge: '',
     icon: Info,
-    label: 'ЖЕЛАТЕЛЬНЫЙ',
-    iconColor: 'text-slate-500 dark:text-slate-400',
+    label: 'Желательный',
+    iconColor: 'text-slate-400 dark:text-slate-500',
   },
 }
 
 const typeConfig: Record<QuestionType, TypeConfigItem> = {
   open: {
     icon: Lightbulb,
-    label: 'ОТКРЫТЫЙ ВОПРОС',
-    color: 'text-blue-600 dark:text-blue-400',
-    helperText: 'Рекомендуемый ответ (можно изменить)',
+    label: 'Открытый',
+    color: 'text-slate-500 dark:text-slate-400',
+    helperText: 'Напишите развёрнутый ответ',
   },
   single_choice: {
     icon: CircleDot,
-    label: 'ВЫБОР ОДНОГО ВАРИАНТА',
-    color: 'text-purple-600 dark:text-purple-400',
+    label: 'Выбор одного',
+    color: 'text-slate-500 dark:text-slate-400',
     helperText: 'Выберите один вариант',
   },
   multi_choice: {
     icon: CheckSquare,
-    label: 'ВЫБОР НЕСКОЛЬКИХ ВАРИАНТОВ',
-    color: 'text-indigo-600 dark:text-indigo-400',
-    helperText: 'Выберите один или несколько вариантов',
+    label: 'Выбор нескольких',
+    color: 'text-slate-500 dark:text-slate-400',
+    helperText: 'Выберите один или несколько',
   },
 }
 
@@ -163,7 +163,6 @@ export function QuestionCard({
 
   const priorityConf = priorityConfig[question.priority]
   const typeConf = typeConfig[question.type]
-  const PriorityIcon = priorityConf.icon
   const TypeIcon = typeConf.icon
   const canSkip = question.priority === 'nice_to_have' && onSkip
 
@@ -337,11 +336,11 @@ export function QuestionCard({
         exit={{ opacity: 0, height: 0 }}
         className="space-y-3"
       >
-        <div className="rounded-lg border-2 border-emerald-500 bg-emerald-50 p-4 dark:bg-emerald-950/30">
+        <div className="rounded-lg border border-emerald-200 bg-emerald-50/50 p-4 dark:border-emerald-800 dark:bg-emerald-950/20">
           <div className="mb-2 flex items-center gap-2">
             <Check className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-            <span className="text-sm font-semibold text-emerald-900 dark:text-emerald-100">
-              Ваш ответ:
+            <span className="text-sm font-medium text-slate-700 dark:text-slate-200">
+              Ваш ответ
             </span>
           </div>
 
@@ -350,14 +349,12 @@ export function QuestionCard({
               {question.currentAnswers.map((answer, idx) => (
                 <li key={idx} className="flex items-start gap-2">
                   <span className="text-emerald-600 dark:text-emerald-400">•</span>
-                  <span className="text-sm text-emerald-900 dark:text-emerald-100">{answer}</span>
+                  <span className="text-sm text-slate-800 dark:text-slate-100">{answer}</span>
                 </li>
               ))}
             </ul>
           ) : (
-            <p className="text-sm text-emerald-900 dark:text-emerald-100">
-              {question.currentAnswer}
-            </p>
+            <p className="text-sm text-slate-800 dark:text-slate-100">{question.currentAnswer}</p>
           )}
         </div>
 
@@ -482,11 +479,11 @@ export function QuestionCard({
               className={cn(
                 'w-full rounded-lg border-2 p-4 text-left transition-all',
                 'min-h-[56px] touch-manipulation', // Mobile touch target
-                'hover:border-purple-400 hover:bg-purple-50 dark:hover:bg-purple-950/20',
+                'hover:border-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800',
                 'disabled:cursor-not-allowed disabled:opacity-50',
                 'focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-2',
                 isSelected
-                  ? 'border-purple-500 bg-purple-50 dark:bg-purple-950/20'
+                  ? 'border-slate-400 bg-slate-50 dark:border-slate-500 dark:bg-slate-800'
                   : 'border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900'
               )}
             >
@@ -494,7 +491,7 @@ export function QuestionCard({
                 {/* Radio button visual */}
                 <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center">
                   {isSelected ? (
-                    <CircleDot className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                    <CircleDot className="h-5 w-5 text-slate-700 dark:text-slate-300" />
                   ) : (
                     <div className="h-5 w-5 rounded-full border-2 border-slate-300 dark:border-slate-600" />
                   )}
@@ -540,18 +537,18 @@ export function QuestionCard({
           className={cn(
             'w-full rounded-lg border-2 p-4 text-left transition-all',
             'min-h-[56px] touch-manipulation',
-            'hover:border-purple-400 hover:bg-purple-50 dark:hover:bg-purple-950/20',
+            'hover:border-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800',
             'disabled:cursor-not-allowed disabled:opacity-50',
             'focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-2',
             isCustomSelected
-              ? 'border-purple-500 bg-purple-50 dark:bg-purple-950/20'
+              ? 'border-slate-400 bg-slate-50 dark:border-slate-500 dark:bg-slate-800'
               : 'border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900'
           )}
         >
           <div className="flex items-start gap-3">
             <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center">
               {isCustomSelected ? (
-                <CircleDot className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                <CircleDot className="h-5 w-5 text-slate-700 dark:text-slate-300" />
               ) : (
                 <div className="h-5 w-5 rounded-full border-2 border-slate-300 dark:border-slate-600" />
               )}
@@ -585,7 +582,7 @@ export function QuestionCard({
     return (
       <div className="space-y-2">
         {selectedCount > 0 && (
-          <p className="text-xs font-medium text-indigo-600 dark:text-indigo-400">
+          <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
             Выбрано: {selectedCount} {selectedCount === 1 ? 'вариант' : 'вариантов'}
           </p>
         )}
@@ -603,11 +600,11 @@ export function QuestionCard({
               className={cn(
                 'w-full rounded-lg border-2 p-4 text-left transition-all',
                 'min-h-[56px] touch-manipulation', // Mobile touch target
-                'hover:border-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/20',
+                'hover:border-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800',
                 'disabled:cursor-not-allowed disabled:opacity-50',
-                'focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2',
+                'focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-2',
                 isSelected
-                  ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-950/20'
+                  ? 'border-slate-400 bg-slate-50 dark:border-slate-500 dark:bg-slate-800'
                   : 'border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900'
               )}
             >
@@ -615,7 +612,7 @@ export function QuestionCard({
                 {/* Checkbox visual */}
                 <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center">
                   {isSelected ? (
-                    <CheckSquare className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+                    <CheckSquare className="h-5 w-5 text-slate-700 dark:text-slate-300" />
                   ) : (
                     <div className="h-5 w-5 rounded border-2 border-slate-300 dark:border-slate-600" />
                   )}
@@ -661,18 +658,18 @@ export function QuestionCard({
           className={cn(
             'w-full rounded-lg border-2 p-4 text-left transition-all',
             'min-h-[56px] touch-manipulation',
-            'hover:border-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-950/20',
+            'hover:border-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800',
             'disabled:cursor-not-allowed disabled:opacity-50',
-            'focus:outline-none focus-visible:ring-2 focus-visible:ring-indigo-500 focus-visible:ring-offset-2',
+            'focus:outline-none focus-visible:ring-2 focus-visible:ring-purple-500 focus-visible:ring-offset-2',
             isCustomSelected
-              ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-950/20'
+              ? 'border-slate-400 bg-slate-50 dark:border-slate-500 dark:bg-slate-800'
               : 'border-slate-200 bg-white dark:border-slate-700 dark:bg-slate-900'
           )}
         >
           <div className="flex items-start gap-3">
             <div className="mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center">
               {isCustomSelected ? (
-                <CheckSquare className="h-5 w-5 text-indigo-600 dark:text-indigo-400" />
+                <CheckSquare className="h-5 w-5 text-slate-700 dark:text-slate-300" />
               ) : (
                 <div className="h-5 w-5 rounded border-2 border-slate-300 dark:border-slate-600" />
               )}
@@ -770,36 +767,32 @@ export function QuestionCard({
         )}
         <CardContent className="space-y-4 p-4">
           {/* Type & Priority Header */}
-          <div className="space-y-2">
-            {/* Question Type Indicator */}
-            <div className="flex items-center gap-2">
-              <TypeIcon className={cn('h-5 w-5', typeConf.color)} />
-              <span className={cn('text-xs font-bold uppercase', typeConf.color)}>
-                {typeConf.label}
+          <div className="mb-3 flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400">
+            <TypeIcon className="h-4 w-4" />
+            <span>{typeConf.label}</span>
+            <span>•</span>
+            <div
+              className={cn('h-2 w-2 rounded-full', {
+                'bg-red-500': question.priority === 'critical',
+                'bg-amber-400': question.priority === 'important',
+                'bg-slate-300 dark:bg-slate-500': question.priority === 'nice_to_have',
+              })}
+            />
+            <span>{priorityConf.label}</span>
+            {isAnswered && mode === 'answered' && (
+              <span className="ml-auto flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
+                <Check className="h-3 w-3" />
+                Отвечено
               </span>
-            </div>
-
-            {/* Priority Badge */}
-            <div className="flex items-start gap-2">
-              <PriorityIcon className={cn('mt-0.5 h-5 w-5 shrink-0', priorityConf.iconColor)} />
-              <div className="flex-1">
-                <Badge className={cn(priorityConf.badge, 'text-xs')}>{priorityConf.label}</Badge>
-              </div>
-              {isAnswered && mode === 'answered' && (
-                <div className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400">
-                  <Check className="h-4 w-4" />
-                  <span className="text-xs font-medium">Отвечено</span>
-                </div>
-              )}
-            </div>
+            )}
           </div>
 
           {/* Question Text */}
-          <div>
-            <p className="text-sm font-medium text-slate-900 dark:text-slate-100">
+          <div className="mb-4">
+            <p className="text-base font-medium text-slate-800 dark:text-slate-100">
               {question.text}
             </p>
-            <p className="mt-1 text-xs text-slate-600 dark:text-slate-400">{typeConf.helperText}</p>
+            <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{typeConf.helperText}</p>
           </div>
 
           {/* Main Content (Conditional based on mode) */}
