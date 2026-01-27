@@ -167,17 +167,26 @@ export function ClarifyingPanel({ courseId, onComplete }: ClarifyingPanelProps) 
   const questionRefs = useRef<Map<string, HTMLDivElement>>(new Map())
 
   // BUG FIX: Sync answeredQuestions with API data on load
-  // questions array comes from async API call, so we need useEffect to sync
+  // Use questionsData as dependency (stable reference from tRPC) instead of questions array
   useEffect(() => {
-    const alreadyAnswered = questions.filter((q) => q.isAnswered).map((q) => q.id)
-    if (alreadyAnswered.length > 0) {
+    if (!questionsData?.questions) return
+
+    const alreadyAnsweredIds = (questionsData.questions as Array<{ id: string; status: string }>)
+      .filter((q) => q.status === 'answered')
+      .map((q) => q.id)
+
+    if (alreadyAnsweredIds.length > 0) {
       setAnsweredQuestions((prev) => {
+        // Check if already synced to prevent unnecessary updates
+        const needsUpdate = alreadyAnsweredIds.some((id) => !prev.has(id))
+        if (!needsUpdate) return prev
+
         const next = new Set(prev)
-        alreadyAnswered.forEach((id) => next.add(id))
+        alreadyAnsweredIds.forEach((id) => next.add(id))
         return next
       })
     }
-  }, [questions])
+  }, [questionsData])
 
   // CRITICAL-003 fix: Cleanup refs on unmount
   useEffect(() => {
