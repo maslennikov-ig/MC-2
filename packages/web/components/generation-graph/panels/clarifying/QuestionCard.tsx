@@ -18,9 +18,9 @@ import {
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { motion, AnimatePresence } from 'framer-motion'
+// MEDIUM-003: Import types from Single Source of Truth
+import type { QuestionPriority, QuestionType } from '@megacampus/shared-types'
 
-type QuestionPriority = 'critical' | 'important' | 'nice_to_have'
-type QuestionType = 'open' | 'single_choice' | 'multi_choice'
 type CardMode = 'unanswered' | 'answered' | 'editing'
 
 interface SuggestedAnswer {
@@ -53,7 +53,23 @@ interface QuestionCardProps {
   isProcessing?: boolean
 }
 
-const priorityConfig = {
+// MEDIUM-003: Typed config objects with Record for exhaustiveness checking
+interface PriorityConfigItem {
+  card: string
+  badge: string
+  icon: typeof AlertCircle
+  label: string
+  iconColor: string
+}
+
+interface TypeConfigItem {
+  icon: typeof Lightbulb
+  label: string
+  color: string
+  helperText: string
+}
+
+const priorityConfig: Record<QuestionPriority, PriorityConfigItem> = {
   critical: {
     card: 'border-l-4 border-l-red-500 border border-red-200 dark:border-red-800 bg-red-50 dark:bg-red-950/20',
     badge: 'bg-red-100 text-red-700 dark:bg-red-900 dark:text-red-300',
@@ -77,7 +93,7 @@ const priorityConfig = {
   },
 }
 
-const typeConfig = {
+const typeConfig: Record<QuestionType, TypeConfigItem> = {
   open: {
     icon: Lightbulb,
     label: 'ОТКРЫТЫЙ ВОПРОС',
