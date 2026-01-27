@@ -85,68 +85,63 @@ export function classifyError(error: Error | unknown): ErrorType {
     return ErrorType.UNKNOWN;
   }
 
-  const message = error.message.toLowerCase();
+  /**
+   * Error pattern classification map
+   *
+   * ORDER MATTERS: LLM-specific patterns (more specific) must be checked
+   * before generic transient patterns. For example, "placeholder" is an
+   * LLM-specific retriable error, not a generic transient error.
+   *
+   * Pattern matching is case-insensitive via lowercase comparison.
+   *
+   * Uses Map for O(1) lookup vs O(n) sequential array checks.
+   */
+  const ERROR_PATTERN_MAP = new Map<string, ErrorType>([
+    // LLM-specific retriable errors (check FIRST - more specific than generic transient)
+    // These are errors from LLM generation that may succeed on retry with different output
+    ['placeholders detected', ErrorType.TRANSIENT], // LLM generated placeholder text
+    ['placeholder', ErrorType.TRANSIENT], // Generic placeholder detection
+    ['model fallback', ErrorType.TRANSIENT], // Model fallback needed
+    ['generation failed', ErrorType.TRANSIENT], // Generic generation failure
+    ['content generation', ErrorType.TRANSIENT], // Content generation issues
 
-  // LLM-specific retriable errors (check FIRST before permanent patterns)
-  // These are errors from LLM generation that may succeed on retry with different output
-  const llmRetriablePatterns = [
-    'placeholders detected', // LLM generated placeholder text instead of actual content
-    'placeholder', // Generic placeholder detection
-    'model fallback', // Model fallback needed
-    'generation failed', // Generic generation failure
-    'content generation', // Content generation issues
-  ];
+    // Transient errors (network/service issues)
+    ['timeout', ErrorType.TRANSIENT],
+    ['network', ErrorType.TRANSIENT],
+    ['econnrefused', ErrorType.TRANSIENT],
+    ['econnreset', ErrorType.TRANSIENT],
+    ['enotfound', ErrorType.TRANSIENT],
+    ['etimedout', ErrorType.TRANSIENT],
+    ['socket', ErrorType.TRANSIENT],
+    ['redis connection', ErrorType.TRANSIENT],
+    ['rate limit', ErrorType.TRANSIENT],
+    ['too many requests', ErrorType.TRANSIENT],
+    ['service unavailable', ErrorType.TRANSIENT],
+    ['503', ErrorType.TRANSIENT],
+    ['502', ErrorType.TRANSIENT],
+    ['504', ErrorType.TRANSIENT],
 
-  for (const pattern of llmRetriablePatterns) {
-    if (message.includes(pattern)) {
-      return ErrorType.TRANSIENT;
-    }
-  }
+    // Permanent errors (validation/auth issues)
+    ['validation', ErrorType.PERMANENT],
+    ['invalid', ErrorType.PERMANENT],
+    ['unauthorized', ErrorType.PERMANENT],
+    ['forbidden', ErrorType.PERMANENT],
+    ['not found', ErrorType.PERMANENT],
+    ['bad request', ErrorType.PERMANENT],
+    ['400', ErrorType.PERMANENT],
+    ['401', ErrorType.PERMANENT],
+    ['403', ErrorType.PERMANENT],
+    ['404', ErrorType.PERMANENT],
+    ['schema', ErrorType.PERMANENT],
+    ['parse', ErrorType.PERMANENT],
+    ['awaiting_clarifying_answers', ErrorType.PERMANENT], // Prevent retry when waiting for user answers
+  ]);
 
-  // Transient errors that should be retried
-  const transientPatterns = [
-    'timeout',
-    'network',
-    'econnrefused',
-    'econnreset',
-    'enotfound',
-    'etimedout',
-    'socket',
-    'redis connection',
-    'rate limit',
-    'too many requests',
-    'service unavailable',
-    '503',
-    '502',
-    '504',
-  ];
-
-  for (const pattern of transientPatterns) {
-    if (message.includes(pattern)) {
-      return ErrorType.TRANSIENT;
-    }
-  }
-
-  // Permanent errors that should not be retried
-  const permanentPatterns = [
-    'validation',
-    'invalid',
-    'unauthorized',
-    'forbidden',
-    'not found',
-    'bad request',
-    '400',
-    '401',
-    '403',
-    '404',
-    'schema',
-    'parse',
-    'awaiting_clarifying_answers', // Prevent retry when waiting for user answers
-  ];
-
-  for (const pattern of permanentPatterns) {
-    if (message.includes(pattern)) {
-      return ErrorType.PERMANENT;
+  // Single-pass pattern matching with O(1) Map lookups
+  const messageLower = error.message.toLowerCase();
+  for (const [pattern, type] of ERROR_PATTERN_MAP) {
+    if (messageLower.includes(pattern)) {
+      return type;
     }
   }
 

@@ -134,6 +134,88 @@ describe('Pipeline Error Classes', () => {
   });
 
   // ===========================================================================
+  // CROSS-CATEGORY ISOLATION TESTS
+  // ===========================================================================
+
+  describe('cross-category isolation', () => {
+    it('validation errors should not be instanceof other categories', () => {
+      const barrier = new BarrierFailedError(3, 5, 10);
+      const minLessons = new MinimumLessonsNotMetError(5, 10);
+      const quality = new QualityThresholdNotMetError(0.6, 0.75);
+
+      // Should NOT be transient
+      expect(barrier instanceof PipelineTransientError).toBe(false);
+      expect(minLessons instanceof PipelineTransientError).toBe(false);
+      expect(quality instanceof PipelineTransientError).toBe(false);
+
+      // Should NOT be internal
+      expect(barrier instanceof PipelineInternalError).toBe(false);
+      expect(minLessons instanceof PipelineInternalError).toBe(false);
+      expect(quality instanceof PipelineInternalError).toBe(false);
+
+      // Should NOT be interrupt
+      expect(barrier instanceof PipelineInterrupt).toBe(false);
+      expect(minLessons instanceof PipelineInterrupt).toBe(false);
+      expect(quality instanceof PipelineInterrupt).toBe(false);
+    });
+
+    it('transient errors should not be instanceof other categories', () => {
+      const llm = new LLMError('timeout', 'openrouter', 'gpt-4', 429);
+      const network = new NetworkError('ECONNREFUSED', 'https://api.example.com');
+      const rateLimit = new RateLimitError('Too many requests', 'openrouter', 60000);
+
+      // Should NOT be validation
+      expect(llm instanceof PipelineValidationError).toBe(false);
+      expect(network instanceof PipelineValidationError).toBe(false);
+      expect(rateLimit instanceof PipelineValidationError).toBe(false);
+
+      // Should NOT be internal
+      expect(llm instanceof PipelineInternalError).toBe(false);
+      expect(network instanceof PipelineInternalError).toBe(false);
+      expect(rateLimit instanceof PipelineInternalError).toBe(false);
+
+      // Should NOT be interrupt
+      expect(llm instanceof PipelineInterrupt).toBe(false);
+      expect(network instanceof PipelineInterrupt).toBe(false);
+      expect(rateLimit instanceof PipelineInterrupt).toBe(false);
+    });
+
+    it('internal errors should not be instanceof other categories', () => {
+      const orchestration = new OrchestrationFailedError('StateGraph failed', 'phase_1');
+      const validation = new ValidationFailedError('Schema validation failed', 'CourseStructure');
+      const database = new DatabaseError('Insert failed', 'insert', 'courses');
+
+      // Should NOT be validation
+      expect(orchestration instanceof PipelineValidationError).toBe(false);
+      expect(validation instanceof PipelineValidationError).toBe(false);
+      expect(database instanceof PipelineValidationError).toBe(false);
+
+      // Should NOT be transient
+      expect(orchestration instanceof PipelineTransientError).toBe(false);
+      expect(validation instanceof PipelineTransientError).toBe(false);
+      expect(database instanceof PipelineTransientError).toBe(false);
+
+      // Should NOT be interrupt
+      expect(orchestration instanceof PipelineInterrupt).toBe(false);
+      expect(validation instanceof PipelineInterrupt).toBe(false);
+      expect(database instanceof PipelineInterrupt).toBe(false);
+    });
+
+    it('interrupts should not be instanceof other categories', () => {
+      const clarifying = new ClarifyingQuestionsInterrupt(3, 7, 'course-123');
+
+      // Should NOT be validation
+      expect(clarifying instanceof PipelineValidationError).toBe(false);
+
+      // Should NOT be transient
+      expect(clarifying instanceof PipelineTransientError).toBe(false);
+
+      // Should NOT be internal
+      expect(clarifying instanceof PipelineInternalError).toBe(false);
+    });
+  });
+
+  // ===========================================================================
   // METADATA TESTS
   // ===========================================================================
 
