@@ -174,9 +174,12 @@ export function ClarifyingPanel({ courseId, onComplete }: ClarifyingPanelProps) 
   })
 
   const [answeredQuestions, setAnsweredQuestions] = useState<Set<string>>(new Set())
-  // Track if confetti was shown THIS session (not just on mount)
-  // Also track if questions were already complete when component mounted
-  const [hasShownConfetti, setHasShownConfetti] = useState(false)
+  // Track if confetti was ever shown for this course (persisted in localStorage)
+  const confettiStorageKey = `clarifying_confetti_shown_${courseId}`
+  const [hasShownConfetti, setHasShownConfetti] = useState(() => {
+    if (typeof window === 'undefined') return false
+    return localStorage.getItem(confettiStorageKey) === 'true'
+  })
   const wasAlreadyCompleteOnMount = useRef<boolean | null>(null)
   const [processingQuestionId, setProcessingQuestionId] = useState<string | null>(null)
   const questionRefs = useRef<Map<string, HTMLDivElement>>(new Map())
@@ -221,7 +224,7 @@ export function ClarifyingPanel({ courseId, onComplete }: ClarifyingPanelProps) 
 
   const isComplete = answeredCount === totalQuestions
 
-  // Trigger confetti on 100% completion - but only if user completed it during this session
+  // Trigger confetti on 100% completion - only ONCE ever per course
   useEffect(() => {
     // On first render with data, check if already complete
     if (wasAlreadyCompleteOnMount.current === null && totalQuestions > 0) {
@@ -230,10 +233,12 @@ export function ClarifyingPanel({ courseId, onComplete }: ClarifyingPanelProps) 
 
     // Only show confetti if:
     // 1. All questions are answered
-    // 2. Haven't shown confetti yet this session
+    // 2. Haven't shown confetti ever (persisted in localStorage)
     // 3. Questions were NOT already complete when component mounted (user completed them now)
     if (isComplete && !hasShownConfetti && wasAlreadyCompleteOnMount.current === false) {
       setHasShownConfetti(true)
+      // Persist to localStorage so confetti never shows again for this course
+      localStorage.setItem(confettiStorageKey, 'true')
       void confetti({
         particleCount: 100,
         spread: 70,
@@ -241,7 +246,7 @@ export function ClarifyingPanel({ courseId, onComplete }: ClarifyingPanelProps) 
         colors: ['#a855f7', '#8b5cf6', '#7c3aed'],
       })
     }
-  }, [isComplete, hasShownConfetti, totalQuestions])
+  }, [isComplete, hasShownConfetti, totalQuestions, confettiStorageKey])
 
   // HIGH-005 fix: Scroll helper - called directly from mutation callback to avoid race conditions
   const scrollToNextUnanswered = useCallback(
