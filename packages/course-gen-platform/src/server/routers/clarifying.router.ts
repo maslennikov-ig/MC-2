@@ -43,6 +43,75 @@ import type { Database } from '@megacampus/shared-types';
 // ============================================================================
 
 /**
+ * MEDIUM-005: Text sanitization for answer inputs
+ *
+ * - Trims whitespace
+ * - Collapses multiple spaces to single
+ * - Removes control characters (except newlines for multi-line answers)
+ * - Enforces hard character limit
+ */
+const MAX_ANSWER_LENGTH = 5000;
+const MAX_WORD_COUNT = 1000;
+
+function sanitizeAnswerText(text: string): string {
+  return (
+    text
+      .trim()
+      .replace(/[^\S\n]+/g, ' ') // Collapse spaces (preserve newlines)
+      // eslint-disable-next-line no-control-regex
+      .replace(/[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]/g, '') // Remove control chars except \n \r \t
+      .slice(0, MAX_ANSWER_LENGTH)
+  );
+}
+
+/**
+ * LOW-002: Rate limit configuration with documented rationale
+ *
+ * These values are tuned based on:
+ * - Typical user behavior during clarifying questions phase
+ * - Prevention of accidental DoS from UI bugs
+ * - Balance between usability and server protection
+ */
+export const CLARIFYING_RATE_LIMITS = {
+  /** Read operations - frequent polling allowed */
+  GET_QUESTIONS: {
+    requests: 60,
+    windowSeconds: 60,
+    rationale: 'Read-heavy endpoint, allow frequent polling for real-time updates',
+  },
+  /** Single answer submission */
+  SUBMIT_ANSWER: {
+    requests: 30,
+    windowSeconds: 60,
+    rationale: 'User typically answers 3-7 questions, allow burst with buffer for edits',
+  },
+  /** Batch answer submission */
+  SUBMIT_BATCH: {
+    requests: 10,
+    windowSeconds: 60,
+    rationale: 'Batch replaces multiple single calls, stricter limit',
+  },
+  /** Skip question */
+  SKIP_QUESTION: {
+    requests: 30,
+    windowSeconds: 60,
+    rationale: 'Same as submit - users may skip multiple questions',
+  },
+  /** Job creation endpoint */
+  APPROVE_AND_PROCEED: {
+    requests: 10,
+    windowSeconds: 60,
+    rationale: 'Job creation endpoint - very strict to prevent duplicate jobs',
+  },
+  /** Second round request */
+  REQUEST_SECOND_ROUND: {
+    requests: 5,
+    windowSeconds: 60,
+    rationale: 'Max 2 rounds allowed - very strict limit',
+  },
+} as const;
+
+/**
  * Schema for getQuestions endpoint
  */
 const getQuestionsSchema = z.object({
@@ -63,20 +132,25 @@ const getQuestionsSchema = z.object({
  */
 const submitAnswerSchema = z.object({
   questionId: z.string().uuid('Invalid question ID'),
+  // MEDIUM-005: Stricter validation with sanitization
   // Single answer for open/single_choice
   answer: z
     .string()
-    .transform(s => s.trim())
-    .pipe(z.string().min(3, 'Answer must be at least 3 characters').max(10000, 'Answer too long'))
+    .transform(sanitizeAnswerText)
+    .pipe(
+      z
+        .string()
+        .min(3, 'Answer must be at least 3 characters')
+        .max(MAX_ANSWER_LENGTH, `Answer too long (max ${MAX_ANSWER_LENGTH} characters)`)
+        .refine(
+          val => val.split(/\s+/).filter(Boolean).length <= MAX_WORD_COUNT,
+          `Answer exceeds word limit (max ${MAX_WORD_COUNT} words)`
+        )
+    )
     .optional(),
   // Multiple answers for multi_choice
   answers: z
-    .array(
-      z
-        .string()
-        .transform(s => s.trim())
-        .pipe(z.string().min(1).max(10000))
-    )
+    .array(z.string().transform(sanitizeAnswerText).pipe(z.string().min(1).max(MAX_ANSWER_LENGTH)))
     .min(1, 'At least one answer required')
     .max(10, 'Too many answers')
     .optional(),
@@ -86,8 +160,10 @@ const submitAnswerSchema = z.object({
   selectedSuggestionIndexes: z.array(z.number().int().min(0)).optional(),
   userModification: z
     .string()
-    .transform(s => s.trim())
-    .pipe(z.string().max(10000, 'Modification too long'))
+    .transform(sanitizeAnswerText)
+    .pipe(
+      z.string().max(MAX_ANSWER_LENGTH, `Modification too long (max ${MAX_ANSWER_LENGTH} chars)`)
+    )
     .optional(),
 });
 
@@ -102,7 +178,11 @@ const submitMultipleAnswersSchema = z.object({
     .array(
       z.object({
         questionId: z.string().uuid('Invalid question ID'),
-        answer: z.string().min(1, 'Answer is required').max(10000, 'Answer too long'),
+        // MEDIUM-005: Consistent sanitization in batch endpoint
+        answer: z
+          .string()
+          .transform(sanitizeAnswerText)
+          .pipe(z.string().min(1, 'Answer is required').max(MAX_ANSWER_LENGTH, 'Answer too long')),
         answerSource: z.enum(['suggested', 'modified', 'custom']),
         selectedSuggestionIndex: z.number().int().min(0).optional(),
       })
@@ -391,7 +471,12 @@ export const clarifyingRouter = router({
    * ```
    */
   getQuestions: protectedProcedure
-    .use(createRateLimiter({ requests: 60, window: 60 })) // 60 reads per minute
+    .use(
+      createRateLimiter({
+        requests: CLARIFYING_RATE_LIMITS.GET_QUESTIONS.requests,
+        window: CLARIFYING_RATE_LIMITS.GET_QUESTIONS.windowSeconds,
+      })
+    )
     .input(getQuestionsSchema)
     .query(async ({ ctx, input }) => {
       const { courseId } = input;
@@ -490,7 +575,12 @@ export const clarifyingRouter = router({
    * ```
    */
   getProgress: protectedProcedure
-    .use(createRateLimiter({ requests: 60, window: 60 }))
+    .use(
+      createRateLimiter({
+        requests: CLARIFYING_RATE_LIMITS.GET_QUESTIONS.requests,
+        window: CLARIFYING_RATE_LIMITS.GET_QUESTIONS.windowSeconds,
+      })
+    )
     .input(getQuestionsSchema)
     .query(async ({ ctx, input }) => {
       const { courseId } = input;
@@ -628,7 +718,12 @@ export const clarifyingRouter = router({
    * ```
    */
   submitAnswer: protectedProcedure
-    .use(createRateLimiter({ requests: 30, window: 60 })) // 30 submissions per minute
+    .use(
+      createRateLimiter({
+        requests: CLARIFYING_RATE_LIMITS.SUBMIT_ANSWER.requests,
+        window: CLARIFYING_RATE_LIMITS.SUBMIT_ANSWER.windowSeconds,
+      })
+    )
     .input(submitAnswerSchema)
     .mutation(async ({ ctx, input }) => {
       const {
@@ -858,7 +953,12 @@ export const clarifyingRouter = router({
    * ```
    */
   submitMultipleAnswers: protectedProcedure
-    .use(createRateLimiter({ requests: 10, window: 60 })) // More relaxed limit for batch operations
+    .use(
+      createRateLimiter({
+        requests: CLARIFYING_RATE_LIMITS.SUBMIT_BATCH.requests,
+        window: CLARIFYING_RATE_LIMITS.SUBMIT_BATCH.windowSeconds,
+      })
+    )
     .input(submitMultipleAnswersSchema)
     .mutation(async ({ ctx, input }) => {
       const { submissions } = input;
@@ -1057,7 +1157,12 @@ export const clarifyingRouter = router({
    * ```
    */
   skipQuestion: protectedProcedure
-    .use(createRateLimiter({ requests: 30, window: 60 }))
+    .use(
+      createRateLimiter({
+        requests: CLARIFYING_RATE_LIMITS.SKIP_QUESTION.requests,
+        window: CLARIFYING_RATE_LIMITS.SKIP_QUESTION.windowSeconds,
+      })
+    )
     .input(skipQuestionSchema)
     .mutation(async ({ ctx, input }) => {
       const { questionId } = input;
@@ -1154,7 +1259,12 @@ export const clarifyingRouter = router({
    * ```
    */
   approveAndProceed: protectedProcedure
-    .use(createRateLimiter({ requests: 10, window: 60 })) // Strict limit for job creation
+    .use(
+      createRateLimiter({
+        requests: CLARIFYING_RATE_LIMITS.APPROVE_AND_PROCEED.requests,
+        window: CLARIFYING_RATE_LIMITS.APPROVE_AND_PROCEED.windowSeconds,
+      })
+    )
     .input(approveAndProceedSchema)
     .mutation(async ({ ctx, input }) => {
       const { courseId } = input;
@@ -1523,7 +1633,12 @@ export const clarifyingRouter = router({
    * ```
    */
   requestSecondRound: protectedProcedure
-    .use(createRateLimiter({ requests: 5, window: 60 })) // Very strict limit
+    .use(
+      createRateLimiter({
+        requests: CLARIFYING_RATE_LIMITS.REQUEST_SECOND_ROUND.requests,
+        window: CLARIFYING_RATE_LIMITS.REQUEST_SECOND_ROUND.windowSeconds,
+      })
+    )
     .input(requestSecondRoundSchema)
     .mutation(async ({ ctx, input }) => {
       const { courseId } = input;

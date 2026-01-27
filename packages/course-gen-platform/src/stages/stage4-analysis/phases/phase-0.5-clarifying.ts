@@ -285,6 +285,53 @@ Output MUST be valid JSON with all text fields in ${language.toUpperCase()}.`
 }
 
 /**
+ * Validate that question_type matches suggested_answers count
+ *
+ * MEDIUM-002 fix: Ensures structural consistency between question type and suggestions.
+ *
+ * Expected ranges:
+ * - open: 2-3 suggestions (one recommendation + alternatives)
+ * - single_choice: 2-4 mutually exclusive options
+ * - multi_choice: 3-6 combinable options
+ *
+ * @param question - Question to validate
+ * @returns true if valid, logs warning if mismatch but continues
+ */
+function validateQuestionTypeSuggestions(question: ClarifyingQuestion): boolean {
+  const type = question.question_type || 'open';
+  const count = question.suggested_answers.length;
+
+  const expectedRanges: Record<string, { min: number; max: number }> = {
+    open: { min: 2, max: 3 },
+    single_choice: { min: 2, max: 4 },
+    multi_choice: { min: 3, max: 6 },
+  };
+
+  const range = expectedRanges[type];
+  if (!range) {
+    logger.warn({ questionType: type }, 'Unknown question type, skipping validation');
+    return true;
+  }
+
+  if (count < range.min || count > range.max) {
+    logger.warn(
+      {
+        questionText: question.question_text.substring(0, 50),
+        questionType: type,
+        suggestionCount: count,
+        expectedMin: range.min,
+        expectedMax: range.max,
+      },
+      'Question type / suggestion count mismatch - consider reviewing'
+    );
+    // Don't throw - let the question through with a warning
+    // The UI can handle any count, this is just a quality signal
+  }
+
+  return true;
+}
+
+/**
  * Store clarifying questions in database
  *
  * Inserts generated questions into clarifying_questions table.
@@ -301,6 +348,9 @@ async function storeQuestions(
   iterationRound: number
 ): Promise<void> {
   const supabase = getSupabaseAdmin();
+
+  // MEDIUM-002: Validate question type vs suggestion count
+  questions.forEach(validateQuestionTypeSuggestions);
 
   // Build insert data
   const rows = questions.map((q, index) => ({
