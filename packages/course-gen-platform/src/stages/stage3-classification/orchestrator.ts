@@ -89,6 +89,15 @@ export class Stage3ClassificationOrchestrator {
 
     logger.info({ courseId, organizationId }, 'Starting Stage 3 document classification');
 
+    await logTrace({
+      courseId,
+      stage: 'stage_3',
+      phase: 'init',
+      stepName: 'start',
+      inputData: { organizationId },
+      durationMs: 0,
+    });
+
     if (onProgress) {
       onProgress(10, 'Loading documents...');
     }
@@ -132,11 +141,22 @@ export class Stage3ClassificationOrchestrator {
 
     logger.info({ courseId, documentCount: fileIds.length }, 'Documents loaded for classification');
 
+    await logTrace({
+      courseId,
+      stage: 'stage_3',
+      phase: 'loading',
+      stepName: 'documents_loaded',
+      inputData: { organizationId },
+      outputData: { documentCount: fileIds.length },
+      durationMs: Date.now() - startTime,
+    });
+
     if (onProgress) {
       onProgress(30, `Classifying ${fileIds.length} documents...`);
     }
 
     // Step 2: Execute comparative classification
+    const classificationStartTime = Date.now();
     const classificationResults: DocumentPriority[] =
       await executeDocumentClassificationComparative(courseId, fileIds, organizationId);
 
@@ -160,6 +180,20 @@ export class Stage3ClassificationOrchestrator {
     const importantCount = classifications.filter(c => c.priority === 'IMPORTANT').length;
     const supplementaryCount = classifications.filter(c => c.priority === 'SUPPLEMENTARY').length;
 
+    await logTrace({
+      courseId,
+      stage: 'stage_3',
+      phase: 'classification',
+      stepName: 'llm_classification_complete',
+      inputData: { documentCount: fileIds.length },
+      outputData: {
+        coreCount,
+        importantCount,
+        supplementaryCount,
+      },
+      durationMs: Date.now() - classificationStartTime,
+    });
+
     const processingTimeMs = Date.now() - startTime;
 
     logger.info(
@@ -177,6 +211,20 @@ export class Stage3ClassificationOrchestrator {
     if (onProgress) {
       onProgress(100, 'Classification finished');
     }
+
+    await logTrace({
+      courseId,
+      stage: 'stage_3',
+      phase: 'complete',
+      stepName: 'finish',
+      inputData: { documentCount: fileIds.length },
+      outputData: {
+        coreCount,
+        importantCount,
+        supplementaryCount,
+      },
+      durationMs: processingTimeMs,
+    });
 
     return {
       success: true,
