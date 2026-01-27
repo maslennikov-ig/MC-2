@@ -561,7 +561,13 @@ export function QuestionCard({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
     >
-      <Card className={cn(priorityConf.card, 'overflow-hidden')}>
+      <Card className={cn(priorityConf.card, 'relative overflow-hidden')}>
+        {/* Loading overlay (MEDIUM-004 fix) */}
+        {isProcessing && (
+          <div className="absolute inset-0 z-10 flex items-center justify-center bg-white/60 dark:bg-slate-900/60">
+            <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-purple-600 dark:border-purple-400" />
+          </div>
+        )}
         <CardContent className="space-y-4 p-4">
           {/* Type & Priority Header */}
           <div className="space-y-2">
