@@ -126,8 +126,9 @@ export function QuestionCard({
 
   // BUG FIX: Sync mode with isAnswered prop changes
   // useState only reads initial value - we need useEffect to react to prop updates
+  // IMPORTANT: Don't override 'editing' mode - user intentionally entered edit mode
   useEffect(() => {
-    if (isAnswered && mode !== 'answered') {
+    if (isAnswered && mode === 'unanswered') {
       setMode('answered')
     }
   }, [isAnswered, mode])
