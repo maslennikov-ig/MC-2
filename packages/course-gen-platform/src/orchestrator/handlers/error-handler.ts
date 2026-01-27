@@ -4,6 +4,9 @@
  * This module provides error handling for failed BullMQ jobs, including
  * detailed error logging, retry decision logic, and failure notifications.
  *
+ * Uses custom PipelineError classes for instanceof-based error classification
+ * instead of string matching on error messages.
+ *
  * @module orchestrator/handlers/error-handler
  */
 
@@ -13,6 +16,15 @@ import { Job } from 'bullmq';
 import { JobData, JobType } from '@megacampus/shared-types';
 import logger, { logPermanentFailure } from '../../shared/logger';
 import { metricsStore } from '../metrics';
+import {
+  PipelineError,
+  PipelineInterrupt,
+  PipelineTransientError,
+  PipelineValidationError,
+  PipelineInternalError,
+  isPipelineInterrupt,
+  shouldLogAsError,
+} from '../../shared/errors';
 
 /**
  * Error classification for retry decisions
@@ -29,10 +41,46 @@ export enum ErrorType {
 /**
  * Classify an error to determine if it should be retried
  *
+ * Uses instanceof checks for PipelineError classes first,
+ * then falls back to string pattern matching for legacy/external errors.
+ *
  * @param {Error | unknown} error - The error to classify
  * @returns {ErrorType} The error classification
  */
 export function classifyError(error: Error | unknown): ErrorType {
+  // =========================================================================
+  // PRIORITY 1: instanceof checks for PipelineError classes
+  // =========================================================================
+
+  // Pipeline interrupts are NOT errors - treated as permanent (no retry)
+  if (error instanceof PipelineInterrupt) {
+    return ErrorType.PERMANENT;
+  }
+
+  // Transient errors should be retried
+  if (error instanceof PipelineTransientError) {
+    return ErrorType.TRANSIENT;
+  }
+
+  // Validation errors are permanent (business logic failures)
+  if (error instanceof PipelineValidationError) {
+    return ErrorType.PERMANENT;
+  }
+
+  // Internal errors are permanent (bugs that won't fix themselves on retry)
+  if (error instanceof PipelineInternalError) {
+    return ErrorType.PERMANENT;
+  }
+
+  // Any other PipelineError - check retryable flag
+  if (error instanceof PipelineError) {
+    return error.retryable ? ErrorType.TRANSIENT : ErrorType.PERMANENT;
+  }
+
+  // =========================================================================
+  // PRIORITY 2: String pattern matching (legacy/external errors)
+  // =========================================================================
+
   if (!(error instanceof Error)) {
     return ErrorType.UNKNOWN;
   }
@@ -183,6 +231,9 @@ export function shouldRetryJob(job: Job<JobData>, error: Error | unknown): boole
  * This function is called when a job fails. It logs the failure with full context,
  * records metrics, and determines if the job should be retried.
  *
+ * IMPORTANT: PipelineInterrupt errors are NOT logged at ERROR level - they are
+ * control flow signals, not actual errors. They get logged at INFO level.
+ *
  * @param {Job<JobData>} job - The failed job
  * @param {Error | unknown} error - The error that caused the failure
  */
@@ -190,6 +241,9 @@ export function handleJobFailure(job: Job<JobData>, error: Error | unknown): voi
   const jobData = job.data;
   const errorType = classifyError(error);
   const willRetry = shouldRetryJob(job, error);
+
+  // Check if this is a pipeline interrupt (control flow, not error)
+  const isInterrupt = isPipelineInterrupt(error);
 
   // Create structured error log
   const errorLog = {
@@ -202,14 +256,17 @@ export function handleJobFailure(job: Job<JobData>, error: Error | unknown): voi
     attemptsMax: job.opts.attempts || 3,
     errorType,
     willRetry,
+    isInterrupt,
     error:
-      error instanceof Error
-        ? {
-            name: error.name,
-            message: error.message,
-            stack: error.stack,
-          }
-        : error,
+      error instanceof PipelineError
+        ? error.toLogObject()
+        : error instanceof Error
+          ? {
+              name: error.name,
+              message: error.message,
+              stack: error.stack,
+            }
+          : error,
     jobData: {
       ...jobData,
       // Redact sensitive information if any
@@ -217,19 +274,39 @@ export function handleJobFailure(job: Job<JobData>, error: Error | unknown): voi
     timestamp: new Date().toISOString(),
   };
 
-  // Log the failure
-  logger.error(errorLog, 'Job failed');
+  // Log at appropriate level based on error type
+  // PipelineInterrupt = INFO (control flow, not error)
+  // PipelineTransientError = WARN (will retry)
+  // Other errors = ERROR
+  if (isInterrupt) {
+    logger.info(errorLog, 'Job paused (interrupt)');
+  } else if (!shouldLogAsError(error)) {
+    logger.warn(errorLog, 'Job failed (transient, will retry)');
+  } else {
+    logger.error(errorLog, 'Job failed');
+  }
 
   // Record retry metric if applicable
   if (willRetry) {
     metricsStore.recordJobRetry(job.name as JobType);
   }
 
-  // Log ALL errors to error_logs table for admin visibility
+  // Skip database logging for interrupts (they are not errors)
+  if (isInterrupt) {
+    return;
+  }
+
+  // Log errors to error_logs table for admin visibility
   // - WARNING for retryable errors (transient issues that will retry)
   // - ERROR for final failures (all retries exhausted)
   // - CRITICAL for permanent errors (won't retry due to error type)
   const getSeverity = (): 'WARNING' | 'ERROR' | 'CRITICAL' => {
+    // Use severity from PipelineError if available
+    if (error instanceof PipelineError) {
+      if (error.severity === 'INFO' || error.severity === 'WARNING') return 'WARNING';
+      if (error.severity === 'CRITICAL') return 'CRITICAL';
+      return 'ERROR';
+    }
     if (willRetry) return 'WARNING';
     if (errorType === ErrorType.PERMANENT) return 'CRITICAL';
     return 'ERROR';
@@ -248,6 +325,7 @@ export function handleJobFailure(job: Job<JobData>, error: Error | unknown): voi
     metadata: {
       courseId: jobData.courseId,
       errorType,
+      errorCode: error instanceof PipelineError ? error.code : undefined,
       attemptsMade: job.attemptsMade,
       attemptsMax: job.opts.attempts || 3,
       willRetry,

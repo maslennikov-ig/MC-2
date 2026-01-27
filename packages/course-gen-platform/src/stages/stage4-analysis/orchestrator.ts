@@ -74,6 +74,7 @@ import type {
 import type { Phase6Output } from './phases/phase-6-rag-planning';
 import type pino from 'pino';
 import { validateLocale } from '@/shared/validation';
+import { ClarifyingQuestionsInterrupt, BarrierFailedError } from '@/shared/errors';
 
 /**
  * RT-004 style retry configuration for Stage 4 phases
@@ -258,7 +259,7 @@ export async function runAnalysisOrchestration(job: StructureAnalysisJob): Promi
         barrierResult.errorMessage || 'Обработка документов не завершена',
         supabase
       );
-      throw new Error(`BARRIER_FAILED: ${barrierResult.errorMessage}`);
+      throw new BarrierFailedError(3, barrierResult.completedFiles, barrierResult.totalFiles);
     }
 
     await completePhase(0, courseId, supabase, orchestrationLogger, {
@@ -378,15 +379,18 @@ export async function runAnalysisOrchestration(job: StructureAnalysisJob): Promi
             orchestrationLogger.info('Transitioned to stage_4_clarifying - awaiting user answers');
           }
 
-          // Throw special error to pause execution
-          throw new Error('AWAITING_CLARIFYING_ANSWERS: Questions generated, awaiting user input', {
-            cause: {
-              code: 'QUESTIONS_PENDING',
-              criticalCount: 0,
-              totalCount: 0,
-              message: 'Please answer the critical and important questions to continue',
-            },
-          });
+          // Fetch generated questions to get counts
+          const generatedQuestions = await getPendingQuestions(courseId);
+          const criticalCount = generatedQuestions.filter(
+            q => q.question_priority === 'critical' || q.question_priority === 'important'
+          ).length;
+
+          // Throw custom interrupt to pause execution
+          throw new ClarifyingQuestionsInterrupt(
+            criticalCount,
+            generatedQuestions.length,
+            courseId
+          );
         }
       } else {
         // Questions already exist - check if we need to wait
@@ -412,16 +416,10 @@ export async function runAnalysisOrchestration(job: StructureAnalysisJob): Promi
               'Critical/important questions pending - pausing analysis'
             );
 
-            throw new Error(
-              `AWAITING_CLARIFYING_ANSWERS: ${criticalPending.length} critical/important questions pending`,
-              {
-                cause: {
-                  code: 'QUESTIONS_PENDING',
-                  criticalCount: criticalPending.length,
-                  totalCount: pendingQuestions.length,
-                  message: 'Please answer the critical and important questions to continue',
-                },
-              }
+            throw new ClarifyingQuestionsInterrupt(
+              criticalPending.length,
+              pendingQuestions.length,
+              courseId
             );
           }
         }
