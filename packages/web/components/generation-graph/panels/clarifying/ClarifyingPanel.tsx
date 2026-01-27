@@ -10,7 +10,7 @@ import { motion, AnimatePresence } from 'framer-motion'
 import confetti from 'canvas-confetti'
 import { ErrorBoundary } from 'react-error-boundary'
 import { QuestionCard } from './QuestionCard'
-import { trpc } from '@/lib/trpc/client'
+import { trpc, invalidateQueryCache } from '@/lib/trpc/client'
 import { toast } from 'sonner'
 import { z } from 'zod'
 
@@ -105,7 +105,7 @@ export function ClarifyingPanel({ courseId, onComplete }: ClarifyingPanelProps) 
   } = trpc.clarifying.getQuestions.useQuery(
     { courseId },
     {
-      staleTime: 5 * 60 * 1000, // 5 минут - вопросы статичны в рамках сессии
+      staleTime: 0, // Always refetch to get latest answers
       refetchOnWindowFocus: false, // Предотвращает rate limit spam при переключении окон
     }
   )
@@ -113,6 +113,14 @@ export function ClarifyingPanel({ courseId, onComplete }: ClarifyingPanelProps) 
   const submitMultipleAnswersMutation = trpc.clarifying.submitMultipleAnswers.useMutation()
   const skipQuestionMutation = trpc.clarifying.skipQuestion.useMutation()
   const approveAndProceedMutation = trpc.clarifying.approveAndProceed.useMutation()
+
+  // Invalidate cache and refetch questions after any mutation
+  const invalidateAndRefetch = useCallback(async () => {
+    // Clear cache to force fresh fetch
+    invalidateQueryCache('clarifying.getQuestions', { courseId })
+    // Refetch with fresh data
+    await refetchQuestions()
+  }, [courseId, refetchQuestions])
 
   // Transform API response to Question format
   // XSS Protection: Sanitize all user-submitted and AI-generated text
@@ -269,12 +277,12 @@ export function ClarifyingPanel({ courseId, onComplete }: ClarifyingPanelProps) 
 
     void submitAnswerMutation
       .mutateAsync(payload)
-      .then(() => {
+      .then(async () => {
         setAnsweredQuestions((prev) => new Set(prev).add(questionId))
         // HIGH-005 fix: Scroll only after THIS specific answer is saved
         scrollToNextUnanswered(questionId)
-        // Refetch to get updated currentAnswer for display
-        void refetchQuestions()
+        // Invalidate cache to force refetch with updated currentAnswer
+        await invalidateAndRefetch()
       })
       .catch((error: Error) => {
         toast.error('Не удалось сохранить ответ', {
@@ -291,12 +299,12 @@ export function ClarifyingPanel({ courseId, onComplete }: ClarifyingPanelProps) 
 
     void skipQuestionMutation
       .mutateAsync({ questionId })
-      .then(() => {
+      .then(async () => {
         setAnsweredQuestions((prev) => new Set(prev).add(questionId))
         // HIGH-005 fix: Scroll after skip as well
         scrollToNextUnanswered(questionId)
-        // Refetch to get updated status
-        void refetchQuestions()
+        // Invalidate cache to force refetch with updated status
+        await invalidateAndRefetch()
       })
       .catch((error: Error) => {
         toast.error('Не удалось пропустить вопрос', {
