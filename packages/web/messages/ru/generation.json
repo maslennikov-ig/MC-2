@@ -103,7 +103,8 @@
     "autoBadge": "Авто",
     "progress": "{answered} / {total} отвечено",
     "critical": "({answered}/{total} обязательных)",
-    "invalidData": "Некорректные данные"
+    "invalidData": "Некорректные данные",
+    "generating": "Генерация вопросов..."
   },
   "mobile": {
     "title": "Прогресс генерации",

@@ -451,7 +451,13 @@ function GraphViewInner({
     removeLesson,
     setNodes,
     nodePositionsRef,
-  } = useGraphData({ getFilename, hasDocuments, stage1CourseData, clarifyingData })
+  } = useGraphData({
+    getFilename,
+    hasDocuments,
+    stage1CourseData,
+    clarifyingData,
+    courseStatus: pipelineStatus ?? undefined,
+  })
   const { layoutNodes, layoutError: _layoutError } = useGraphLayout()
   // Layout generation counter to prevent stale layout results (Fix #6: Race condition)
   const layoutGenerationRef = useRef(0)

@@ -103,7 +103,8 @@
     "autoBadge": "Auto",
     "progress": "{answered} / {total} answered",
     "critical": "({answered}/{total} required)",
-    "invalidData": "Invalid node data"
+    "invalidData": "Invalid node data",
+    "generating": "Generating questions..."
   },
   "mobile": {
     "title": "Generation Progress",

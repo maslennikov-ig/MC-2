@@ -28,7 +28,13 @@ import { buildGraph } from './use-graph-data/utils/graph-builders'
  * and parallel items (documents in stage 2, modules/lessons in stage 6).
  */
 export function useGraphData(options: UseGraphDataOptions = {}) {
-  const { getFilename, hasDocuments = true, stage1CourseData, clarifyingData } = options
+  const {
+    getFilename,
+    hasDocuments = true,
+    stage1CourseData,
+    clarifyingData,
+    courseStatus,
+  } = options
   const [nodes, setNodes, onNodesChange] = useNodesState<AppNode>([])
   const [edges, setEdges, onEdgesChange] = useEdgesState<AppEdge>([])
 
@@ -416,6 +422,7 @@ export function useGraphData(options: UseGraphDataOptions = {}) {
       hasDocuments,
       stage1CourseData,
       clarifyingData,
+      courseStatus,
       getTrace: (id) => traceMapRef.current[id],
       getAttempts: (id) => attemptsMap.get(id) || [],
       getPhases: (id) => phasesMap.get(id) || [],
@@ -467,6 +474,7 @@ export function useGraphData(options: UseGraphDataOptions = {}) {
     hasDocuments,
     stage1CourseData,
     clarifyingData,
+    courseStatus,
     setNodes,
     setEdges,
   ])

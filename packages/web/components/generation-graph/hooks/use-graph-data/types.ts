@@ -163,4 +163,10 @@ export interface UseGraphDataOptions {
    * When provided, a clarifying node is shown after Stage 4.
    */
   clarifyingData?: ClarifyingProgressData
+  /**
+   * Current course generation status.
+   * Used to show fallback clarifying node when status is 'stage_4_clarifying'
+   * but clarifyingData is not yet available (questions still loading).
+   */
+  courseStatus?: string
 }
