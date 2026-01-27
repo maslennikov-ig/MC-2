@@ -105,7 +105,7 @@ export function ClarifyingPanel({ courseId, onComplete }: ClarifyingPanelProps) 
   } = trpc.clarifying.getQuestions.useQuery(
     { courseId },
     {
-      staleTime: 0, // Always refetch to get latest answers
+      staleTime: 30 * 1000, // 30 seconds - allow some caching but refresh relatively often
       refetchOnWindowFocus: false, // Предотвращает rate limit spam при переключении окон
     }
   )
@@ -174,7 +174,10 @@ export function ClarifyingPanel({ courseId, onComplete }: ClarifyingPanelProps) 
   })
 
   const [answeredQuestions, setAnsweredQuestions] = useState<Set<string>>(new Set())
+  // Track if confetti was shown THIS session (not just on mount)
+  // Also track if questions were already complete when component mounted
   const [hasShownConfetti, setHasShownConfetti] = useState(false)
+  const wasAlreadyCompleteOnMount = useRef<boolean | null>(null)
   const [processingQuestionId, setProcessingQuestionId] = useState<string | null>(null)
   const questionRefs = useRef<Map<string, HTMLDivElement>>(new Map())
 
@@ -218,9 +221,18 @@ export function ClarifyingPanel({ courseId, onComplete }: ClarifyingPanelProps) 
 
   const isComplete = answeredCount === totalQuestions
 
-  // Trigger confetti on 100% completion
+  // Trigger confetti on 100% completion - but only if user completed it during this session
   useEffect(() => {
-    if (isComplete && !hasShownConfetti) {
+    // On first render with data, check if already complete
+    if (wasAlreadyCompleteOnMount.current === null && totalQuestions > 0) {
+      wasAlreadyCompleteOnMount.current = isComplete
+    }
+
+    // Only show confetti if:
+    // 1. All questions are answered
+    // 2. Haven't shown confetti yet this session
+    // 3. Questions were NOT already complete when component mounted (user completed them now)
+    if (isComplete && !hasShownConfetti && wasAlreadyCompleteOnMount.current === false) {
       setHasShownConfetti(true)
       void confetti({
         particleCount: 100,
@@ -229,7 +241,7 @@ export function ClarifyingPanel({ courseId, onComplete }: ClarifyingPanelProps) 
         colors: ['#a855f7', '#8b5cf6', '#7c3aed'],
       })
     }
-  }, [isComplete, hasShownConfetti])
+  }, [isComplete, hasShownConfetti, totalQuestions])
 
   // HIGH-005 fix: Scroll helper - called directly from mutation callback to avoid race conditions
   const scrollToNextUnanswered = useCallback(
