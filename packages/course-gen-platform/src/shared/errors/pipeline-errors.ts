@@ -155,11 +155,14 @@ export class BarrierFailedError extends PipelineValidationError {
     public readonly completedDocs: number,
     public readonly totalDocs: number
   ) {
-    super(`Stage ${stage} barrier failed: ${completedDocs}/${totalDocs} docs complete`, {
-      stage,
-      completedDocs,
-      totalDocs,
-    });
+    super(
+      `Stage ${stage} requires all documents complete (${completedDocs}/${totalDocs} processed)`,
+      {
+        stage,
+        completedDocs,
+        totalDocs,
+      }
+    );
   }
 }
 
@@ -173,10 +176,10 @@ export class MinimumLessonsNotMetError extends PipelineValidationError {
     public readonly estimatedLessons: number,
     public readonly minimumRequired: number = 10
   ) {
-    super(
-      `Insufficient scope: ${estimatedLessons} lessons estimated, minimum ${minimumRequired} required`,
-      { estimatedLessons, minimumRequired }
-    );
+    super(`Course has ${estimatedLessons} lessons, minimum ${minimumRequired} required`, {
+      estimatedLessons,
+      minimumRequired,
+    });
   }
 }
 
@@ -190,7 +193,7 @@ export class QualityThresholdNotMetError extends PipelineValidationError {
     public readonly actualScore: number,
     public readonly requiredScore: number = 0.75
   ) {
-    super(`Quality score ${actualScore.toFixed(2)} below threshold ${requiredScore}`, {
+    super(`Content scored ${actualScore.toFixed(2)}, minimum ${requiredScore} required`, {
       actualScore,
       requiredScore,
     });
