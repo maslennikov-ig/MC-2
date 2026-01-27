@@ -105,7 +105,7 @@ export function ClarifyingPanel({ courseId, onComplete }: ClarifyingPanelProps) 
   } = trpc.clarifying.getQuestions.useQuery(
     { courseId },
     {
-      staleTime: 5 * 60 * 1000, // 5 minutes - questions rarely change, prevent UI disruption during editing
+      staleTime: Infinity, // Questions never change after generation, only answers do (updated via invalidateAndRefetch)
       refetchOnWindowFocus: false, // Предотвращает rate limit spam при переключении окон
     }
   )
