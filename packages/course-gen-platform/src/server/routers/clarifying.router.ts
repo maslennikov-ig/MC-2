@@ -722,6 +722,7 @@ export const clarifyingRouter = router({
           }
         }
         if (selectedSuggestionIndexes) {
+          // HIGH-001 fix: Validate each index is within bounds
           for (const idx of selectedSuggestionIndexes) {
             if (idx >= suggestions.length) {
               throw new TRPCError({
@@ -729,6 +730,22 @@ export const clarifyingRouter = router({
                 message: `Invalid suggestion index: ${idx}`,
               });
             }
+          }
+
+          // HIGH-001 fix: Check for duplicate indexes
+          if (new Set(selectedSuggestionIndexes).size !== selectedSuggestionIndexes.length) {
+            throw new TRPCError({
+              code: 'BAD_REQUEST',
+              message: 'Duplicate selections detected',
+            });
+          }
+
+          // HIGH-001 fix: Ensure count doesn't exceed available suggestions
+          if (selectedSuggestionIndexes.length > suggestions.length) {
+            throw new TRPCError({
+              code: 'BAD_REQUEST',
+              message: `Cannot select more than ${suggestions.length} options`,
+            });
           }
         }
 

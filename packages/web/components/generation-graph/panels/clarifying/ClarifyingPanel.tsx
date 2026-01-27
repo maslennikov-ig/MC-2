@@ -1,16 +1,18 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import DOMPurify from 'isomorphic-dompurify'
 import { Card, CardHeader, CardTitle } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Progress } from '@/components/ui/progress'
-import { Sparkles, CheckCircle2, ArrowRight } from 'lucide-react'
+import { Sparkles, CheckCircle2, ArrowRight, AlertCircle } from 'lucide-react'
 import { motion, AnimatePresence } from 'framer-motion'
 import confetti from 'canvas-confetti'
+import { ErrorBoundary } from 'react-error-boundary'
 import { QuestionCard } from './QuestionCard'
 import { trpc } from '@/lib/trpc/client'
 import { toast } from 'sonner'
+import { z } from 'zod'
 
 type QuestionPriority = 'critical' | 'important' | 'nice_to_have'
 type QuestionType = 'open' | 'single_choice' | 'multi_choice'
@@ -40,6 +42,58 @@ interface Question {
 interface ClarifyingPanelProps {
   courseId: string
   onComplete?: () => void
+}
+
+// HIGH-004 fix: Zod schema for validating JSONB user_answer
+const UserAnswerSchema = z.union([
+  z.object({ value: z.string() }),
+  z.object({ values: z.array(z.string()) }),
+  z.string(), // Legacy format
+])
+
+/**
+ * Safely parse user_answer from JSONB with Zod validation
+ */
+function parseUserAnswer(raw: unknown): { currentAnswer?: string; currentAnswers?: string[] } {
+  if (!raw) return {}
+
+  try {
+    const validated = UserAnswerSchema.parse(raw)
+
+    if (typeof validated === 'string') {
+      return { currentAnswer: DOMPurify.sanitize(validated) }
+    }
+    if ('value' in validated) {
+      return { currentAnswer: DOMPurify.sanitize(validated.value) }
+    }
+    if ('values' in validated) {
+      const sanitizedValues = validated.values.map((v) => DOMPurify.sanitize(v))
+      return {
+        currentAnswers: sanitizedValues,
+        currentAnswer: sanitizedValues.join(', '),
+      }
+    }
+  } catch {
+    console.warn('[ClarifyingPanel] Invalid user_answer format:', raw)
+  }
+  return {}
+}
+
+// MEDIUM-006 fix: Error boundary fallback
+function ClarifyingErrorFallback({ courseId: _courseId }: { courseId: string }) {
+  // _courseId available for future error reporting
+  return (
+    <Card className="p-6">
+      <div className="space-y-4 text-center">
+        <AlertCircle className="mx-auto h-12 w-12 text-red-500" />
+        <h3 className="text-lg font-semibold">Ошибка загрузки вопросов</h3>
+        <p className="text-sm text-slate-600 dark:text-slate-400">
+          Не удалось отобразить вопросы для курса. Попробуйте обновить страницу.
+        </p>
+        <Button onClick={() => window.location.reload()}>Обновить страницу</Button>
+      </div>
+    </Card>
+  )
 }
 
 export function ClarifyingPanel({ courseId, onComplete }: ClarifyingPanelProps) {
@@ -82,22 +136,9 @@ export function ClarifyingPanel({ courseId, onComplete }: ClarifyingPanelProps) 
 
   const questions: Question[] = (questionsData?.questions || []).map((rawQ) => {
     const q = rawQ as unknown as ExtendedQuestionFromAPI
-    // Extract answer from JSONB format
-    const userAnswer = q.user_answer
-    let currentAnswer: string | undefined
-    let currentAnswers: string[] | undefined
 
-    if (userAnswer) {
-      if (typeof userAnswer === 'string') {
-        // Legacy format
-        currentAnswer = DOMPurify.sanitize(userAnswer)
-      } else if (userAnswer.value) {
-        currentAnswer = DOMPurify.sanitize(userAnswer.value)
-      } else if (userAnswer.values) {
-        currentAnswers = userAnswer.values.map((v) => DOMPurify.sanitize(v))
-        currentAnswer = currentAnswers.join(', ') // Display format
-      }
-    }
+    // HIGH-004 fix: Use Zod-validated parser instead of inline logic
+    const { currentAnswer, currentAnswers } = parseUserAnswer(q.user_answer)
 
     return {
       id: q.id,
@@ -122,17 +163,13 @@ export function ClarifyingPanel({ courseId, onComplete }: ClarifyingPanelProps) 
   const [answeredQuestions, setAnsweredQuestions] = useState<Set<string>>(new Set())
   const [hasShownConfetti, setHasShownConfetti] = useState(false)
   const questionRefs = useRef<Map<string, HTMLDivElement>>(new Map())
-  const prevAnsweredCount = useRef(0)
 
-  // Clean up stale refs when questions change (memory leak fix)
+  // CRITICAL-003 fix: Cleanup refs on unmount
   useEffect(() => {
-    const currentIds = new Set(questions.map((q) => q.id))
-    for (const id of questionRefs.current.keys()) {
-      if (!currentIds.has(id)) {
-        questionRefs.current.delete(id)
-      }
+    return () => {
+      questionRefs.current.clear()
     }
-  }, [questions])
+  }, [])
 
   // Calculate progress
   const totalQuestions = questions.length
@@ -158,26 +195,21 @@ export function ClarifyingPanel({ courseId, onComplete }: ClarifyingPanelProps) 
     }
   }, [isComplete, hasShownConfetti])
 
-  // Auto-scroll to next unanswered question ONLY when user answers
-  useEffect(() => {
-    const currentCount = answeredQuestions.size
-
-    // Scroll only when answer count increases (user answered a question)
-    if (currentCount > prevAnsweredCount.current) {
-      prevAnsweredCount.current = currentCount
-
-      const firstUnanswered = questions.find((q) => !answeredQuestions.has(q.id))
-      if (firstUnanswered) {
-        const element = questionRefs.current.get(firstUnanswered.id)
+  // HIGH-005 fix: Scroll helper - called directly from mutation callback to avoid race conditions
+  const scrollToNextUnanswered = useCallback(
+    (justAnsweredId: string) => {
+      const nextUnanswered = questions.find(
+        (q) => !answeredQuestions.has(q.id) && q.id !== justAnsweredId
+      )
+      if (nextUnanswered) {
+        const element = questionRefs.current.get(nextUnanswered.id)
         if (element) {
           element.scrollIntoView({ behavior: 'smooth', block: 'center' })
         }
       }
-    } else {
-      // Sync counter on initialization (when questions load)
-      prevAnsweredCount.current = currentCount
-    }
-  }, [answeredQuestions, questions])
+    },
+    [questions, answeredQuestions]
+  )
 
   const handleAnswer = (
     questionId: string,
@@ -208,6 +240,8 @@ export function ClarifyingPanel({ courseId, onComplete }: ClarifyingPanelProps) 
       .mutateAsync(payload)
       .then(() => {
         setAnsweredQuestions((prev) => new Set(prev).add(questionId))
+        // HIGH-005 fix: Scroll only after THIS specific answer is saved
+        scrollToNextUnanswered(questionId)
       })
       .catch((error: Error) => {
         toast.error('Не удалось сохранить ответ', {
@@ -221,6 +255,8 @@ export function ClarifyingPanel({ courseId, onComplete }: ClarifyingPanelProps) 
       .mutateAsync({ questionId })
       .then(() => {
         setAnsweredQuestions((prev) => new Set(prev).add(questionId))
+        // HIGH-005 fix: Scroll after skip as well
+        scrollToNextUnanswered(questionId)
       })
       .catch((error: Error) => {
         toast.error('Не удалось пропустить вопрос', {
@@ -279,119 +315,132 @@ export function ClarifyingPanel({ courseId, onComplete }: ClarifyingPanelProps) 
   }
 
   return (
-    <div className="space-y-4">
-      {/* Header with Progress */}
-      <Card className="border-purple-200 bg-gradient-to-r from-purple-50 to-blue-50 dark:border-purple-800 dark:from-purple-950/20 dark:to-blue-950/20">
-        <CardHeader>
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2">
-              <Sparkles className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-              <CardTitle className="text-lg">Уточняющие вопросы</CardTitle>
-            </div>
-            {isComplete && (
-              <motion.div
-                initial={{ scale: 0 }}
-                animate={{ scale: 1 }}
-                className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400"
-              >
-                <CheckCircle2 className="h-5 w-5" />
-                <span className="text-sm font-medium">Все вопросы отвечены!</span>
-              </motion.div>
-            )}
-          </div>
-          <div className="mt-4 space-y-2">
-            <div className="flex justify-between text-sm">
-              <span className="text-slate-600 dark:text-slate-400">
-                Прогресс: {answeredCount} / {totalQuestions}
-              </span>
-              <span className="font-medium text-purple-600 dark:text-purple-400">
-                {Math.round(progress)}%
-              </span>
-            </div>
-            <Progress value={progress} className="h-2" />
-            {criticalQuestions.length > 0 && (
-              <div className="flex items-center gap-2 text-xs">
-                <span className="font-medium text-red-600 dark:text-red-400">
-                  Обязательные: {criticalAnswered} / {criticalQuestions.length}
-                </span>
-                {!allCriticalAnswered && (
-                  <span className="text-slate-500 dark:text-slate-400">
-                    (необходимо ответить для продолжения)
-                  </span>
-                )}
+    <ErrorBoundary
+      fallbackRender={() => <ClarifyingErrorFallback courseId={courseId} />}
+      onError={(error) => {
+        console.error('[ClarifyingPanel] Render error:', error)
+      }}
+    >
+      <div className="space-y-4">
+        {/* Header with Progress */}
+        <Card className="border-purple-200 bg-gradient-to-r from-purple-50 to-blue-50 dark:border-purple-800 dark:from-purple-950/20 dark:to-blue-950/20">
+          <CardHeader>
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Sparkles className="h-5 w-5 text-purple-600 dark:text-purple-400" />
+                <CardTitle className="text-lg">Уточняющие вопросы</CardTitle>
               </div>
-            )}
-          </div>
-        </CardHeader>
-      </Card>
-
-      {/* Quick Actions */}
-      {!isComplete && (
-        <div className="flex gap-2">
-          <Button
-            size="sm"
-            variant="outline"
-            onClick={() => void handleAcceptAll()}
-            disabled={submitAnswerMutation.isPending}
-          >
-            <Sparkles className="h-3.5 w-3.5" />
-            Принять все рекомендации
-          </Button>
-        </div>
-      )}
-
-      {/* Questions List */}
-      <div className="space-y-3">
-        <AnimatePresence>
-          {questions.map((question) => (
-            <div
-              key={question.id}
-              ref={(el) => {
-                if (el) questionRefs.current.set(question.id, el)
-              }}
-            >
-              <QuestionCard
-                question={question}
-                onAnswer={handleAnswer}
-                onSkip={handleSkip}
-                isAnswered={answeredQuestions.has(question.id)}
-                isProcessing={submitAnswerMutation.isPending || skipQuestionMutation.isPending}
-              />
+              {isComplete && (
+                <motion.div
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400"
+                >
+                  <CheckCircle2 className="h-5 w-5" />
+                  <span className="text-sm font-medium">Все вопросы отвечены!</span>
+                </motion.div>
+              )}
             </div>
-          ))}
-        </AnimatePresence>
-      </div>
+            <div className="mt-4 space-y-2">
+              <div className="flex justify-between text-sm">
+                <span className="text-slate-600 dark:text-slate-400">
+                  Прогресс: {answeredCount} / {totalQuestions}
+                </span>
+                <span className="font-medium text-purple-600 dark:text-purple-400">
+                  {Math.round(progress)}%
+                </span>
+              </div>
+              <Progress value={progress} className="h-2" />
+              {criticalQuestions.length > 0 && (
+                <div className="flex items-center gap-2 text-xs">
+                  <span className="font-medium text-red-600 dark:text-red-400">
+                    Обязательные: {criticalAnswered} / {criticalQuestions.length}
+                  </span>
+                  {!allCriticalAnswered && (
+                    <span className="text-slate-500 dark:text-slate-400">
+                      (необходимо ответить для продолжения)
+                    </span>
+                  )}
+                </div>
+              )}
+            </div>
+          </CardHeader>
+        </Card>
 
-      {/* Continue Button */}
-      <motion.div
-        initial={{ opacity: 0 }}
-        animate={{ opacity: allCriticalAnswered ? 1 : 0.5 }}
-        className="sticky bottom-4 mt-6"
-      >
-        <Button
-          size="lg"
-          className="w-full shadow-lg"
-          disabled={!allCriticalAnswered || approveAndProceedMutation.isPending}
-          onClick={handleContinue}
-        >
-          {approveAndProceedMutation.isPending ? (
-            <>
-              <div className="mr-2 h-4 w-4 animate-spin rounded-full border-b-2 border-white" />
-              Обработка...
-            </>
-          ) : (
-            <>
-              Продолжить генерацию
-              <ArrowRight className="ml-2 h-4 w-4" />
-            </>
-          )}
-        </Button>
-        {!allCriticalAnswered && (
-          <p className="mt-2 text-center text-xs text-slate-500 dark:text-slate-400">
-            Ответьте на все обязательные вопросы для продолжения
-          </p>
+        {/* Quick Actions */}
+        {!isComplete && (
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => void handleAcceptAll()}
+              disabled={submitAnswerMutation.isPending}
+            >
+              <Sparkles className="h-3.5 w-3.5" />
+              Принять все рекомендации
+            </Button>
+          </div>
         )}
-      </motion.div>
-    </div>
+
+        {/* Questions List */}
+        <div className="space-y-3">
+          <AnimatePresence>
+            {questions.map((question) => (
+              <div
+                key={question.id}
+                ref={(node) => {
+                  // CRITICAL-003 fix: Ref callback with cleanup
+                  if (node) {
+                    questionRefs.current.set(question.id, node)
+                  } else {
+                    // Cleanup when element unmounts (node becomes null)
+                    questionRefs.current.delete(question.id)
+                  }
+                }}
+              >
+                <QuestionCard
+                  question={question}
+                  onAnswer={handleAnswer}
+                  onSkip={handleSkip}
+                  isAnswered={answeredQuestions.has(question.id)}
+                  isProcessing={submitAnswerMutation.isPending || skipQuestionMutation.isPending}
+                />
+              </div>
+            ))}
+          </AnimatePresence>
+        </div>
+
+        {/* Continue Button */}
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: allCriticalAnswered ? 1 : 0.5 }}
+          className="sticky bottom-4 mt-6"
+        >
+          <Button
+            size="lg"
+            className="w-full shadow-lg"
+            disabled={!allCriticalAnswered || approveAndProceedMutation.isPending}
+            onClick={handleContinue}
+          >
+            {approveAndProceedMutation.isPending ? (
+              <>
+                <div className="mr-2 h-4 w-4 animate-spin rounded-full border-b-2 border-white" />
+                Обработка...
+              </>
+            ) : (
+              <>
+                Продолжить генерацию
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </>
+            )}
+          </Button>
+          {!allCriticalAnswered && (
+            <p className="mt-2 text-center text-xs text-slate-500 dark:text-slate-400">
+              Ответьте на все обязательные вопросы для продолжения
+            </p>
+          )}
+        </motion.div>
+      </div>
+    </ErrorBoundary>
   )
 }
