@@ -55,6 +55,7 @@ import { NodeDetailsDrawer } from './panels/NodeDetailsDrawer'
 import { AdminPanel } from './panels/AdminPanel'
 import { useNodeSelection } from './hooks/useNodeSelection'
 import { MissionControlBanner } from '@/components/generation-celestial/MissionControlBanner'
+import { ClarifyingBanner } from '@/components/generation-celestial/ClarifyingBanner'
 import { startGeneration, cancelGeneration, approveStage } from '@/app/actions/admin-generation'
 import { toast } from 'sonner'
 // MobileProgressList removed - maintaining two view modes adds complexity
@@ -1123,6 +1124,23 @@ function GraphViewInner({
                     - OR awaiting approval in semi-automatic mode */}
                 {(() => {
                   const terminalStatuses = ['completed', 'failed', 'cancelled']
+                  const isClarifyingPhase = pipelineStatus === 'stage_4_clarifying'
+
+                  // Show ClarifyingBanner during clarifying phase (not MissionControlBanner)
+                  if (isClarifyingPhase && !readOnly) {
+                    return (
+                      <ClarifyingBanner
+                        courseId={courseId}
+                        onContinue={() => {
+                          // Open clarifying panel by selecting the clarifying node
+                          selectNode('stage_4_clarifying')
+                        }}
+                        isDark={isDark}
+                        isProcessing={isProcessingBanner}
+                      />
+                    )
+                  }
+
                   const showBanner = readOnly
                     ? !terminalStatuses.includes(pipelineStatus || '')
                     : awaitingStage !== null && (awaitingStage !== 2 || areAllDocumentsComplete())
