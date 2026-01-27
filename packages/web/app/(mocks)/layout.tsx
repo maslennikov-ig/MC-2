@@ -1,4 +1,5 @@
 import { Manrope } from 'next/font/google'
+import { AppThemeProvider } from '@/components/common/app-theme-provider'
 import '../globals.css'
 
 const manrope = Manrope({
@@ -15,8 +16,10 @@ export const metadata = {
 
 export default function MocksLayout({ children }: { children: React.ReactNode }) {
   return (
-    <html lang="ru" className={manrope.variable}>
-      <body className="font-sans antialiased">{children}</body>
+    <html lang="ru" className={manrope.variable} suppressHydrationWarning>
+      <body className="font-sans antialiased">
+        <AppThemeProvider>{children}</AppThemeProvider>
+      </body>
     </html>
   )
 }
