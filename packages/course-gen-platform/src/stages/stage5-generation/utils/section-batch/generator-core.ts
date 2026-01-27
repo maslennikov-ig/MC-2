@@ -3,6 +3,7 @@ import type { QdrantClient } from '@qdrant/js-client-rest';
 import type { GenerationJobInput, Section } from '@megacampus/shared-types';
 import { SectionSchema } from '@megacampus/shared-types/generation-result';
 import { UnifiedRegenerator } from '@/shared/regeneration';
+import { safeJSONParse } from '@/shared/utils/json-repair';
 import { preprocessObject } from '@/shared/validation/preprocessing';
 import { createModelConfigService } from '@/shared/llm/model-config-service';
 import { normalizeLanguageCode } from '@/shared/utils/language-utils';
@@ -128,7 +129,9 @@ function generatePlaceholderReplacement(
  */
 function preprocessResponse(rawContent: string): string {
   try {
-    const parsedRaw = JSON.parse(rawContent) as Record<string, unknown> | Record<string, unknown>[];
+    const parsedRaw = safeJSONParse(rawContent) as
+      | Record<string, unknown>
+      | Record<string, unknown>[];
     let sectionsArray: Record<string, unknown>[] | undefined;
 
     if (Array.isArray(parsedRaw)) {

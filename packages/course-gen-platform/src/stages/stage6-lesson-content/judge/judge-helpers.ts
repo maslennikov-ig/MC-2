@@ -1,6 +1,7 @@
 import type { LessonGraphStateType } from '../state';
 import type { LessonContent, LessonContentBody } from '@megacampus/shared-types/lesson-content';
 import { logger } from '@/shared/logger';
+import { safeJSONParse } from '@/shared/utils/json-repair';
 import { parseMarkdownContent } from '../utils/markdown-parser';
 
 /**
@@ -32,18 +33,12 @@ export function extractContentBody(state: LessonGraphStateType): LessonContentBo
     }
 
     // Try to parse JSON from string (for backward compatibility)
-    const parsed = JSON.parse(state.generatedContent);
+    // safeJSONParse handles markdown code blocks, thinking tags, and JSON repair
+    const parsed = safeJSONParse(state.generatedContent);
     return parsed as LessonContentBody;
   } catch {
-    // Try to extract JSON from markdown code blocks
-    const jsonMatch = state.generatedContent.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-    if (jsonMatch) {
-      try {
-        return JSON.parse(jsonMatch[1]) as LessonContentBody;
-      } catch {
-        logger.debug('Failed to parse JSON from code block, trying markdown parser');
-      }
-    }
+    // JSON parsing failed, try markdown parser
+    logger.debug('Failed to parse JSON, trying markdown parser');
 
     // NEW: Parse markdown content using the markdown parser
     // This is the primary path for the new generator node which outputs markdown

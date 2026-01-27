@@ -19,6 +19,7 @@ import type {
 import { LLMClient } from '@/shared/llm';
 import { createModelConfigService } from '@/shared/llm/model-config-service';
 import { logger } from '@/shared/logger';
+import { safeJSONParse } from '@/shared/utils/json-repair';
 
 /**
  * Build prompt for Delta Judge verification
@@ -99,21 +100,16 @@ function parseDeltaJudgeResponse(content: string): {
   newIssues?: unknown[];
 } | null {
   try {
-    let jsonStr = content;
-
-    // Remove markdown code blocks if present
-    const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-    if (jsonMatch) {
-      jsonStr = jsonMatch[1];
-    }
-
-    // Find JSON object
-    const objectMatch = jsonStr.match(/\{[\s\S]*\}/);
-    if (objectMatch) {
-      jsonStr = objectMatch[0];
-    }
-
-    const parsed = JSON.parse(jsonStr);
+    // Use safeJSONParse which handles:
+    // - Markdown code blocks extraction
+    // - LLM thinking tags removal
+    // - JSON repair (truncated, trailing commas, etc.)
+    const parsed = safeJSONParse(content) as {
+      passed: boolean;
+      confidence: string;
+      reasoning: string;
+      newIssues?: unknown[];
+    };
 
     if (typeof parsed.passed !== 'boolean' || typeof parsed.reasoning !== 'string') {
       return null;
@@ -152,8 +148,10 @@ export async function verifyPatch(input: DeltaJudgeInput): Promise<DeltaJudgeOut
       maxTokens = config.maxTokens;
       logger.info({ modelId, source: config.source }, 'Delta-Judge using model from config');
     } catch (error) {
-      logger.warn({ error: error instanceof Error ? error.message : String(error) },
-        'Failed to get delta judge model config, using fallback');
+      logger.warn(
+        { error: error instanceof Error ? error.message : String(error) },
+        'Failed to get delta judge model config, using fallback'
+      );
     }
 
     // Build prompts (functions already exist in this file)
@@ -168,20 +166,26 @@ export async function verifyPatch(input: DeltaJudgeInput): Promise<DeltaJudgeOut
       systemPrompt,
     });
 
-    logger.info({
-      issue: input.addressedIssue.criterion,
-      inputTokens: response.inputTokens,
-      outputTokens: response.outputTokens,
-    }, 'Delta-Judge: LLM call complete');
+    logger.info(
+      {
+        issue: input.addressedIssue.criterion,
+        inputTokens: response.inputTokens,
+        outputTokens: response.outputTokens,
+      },
+      'Delta-Judge: LLM call complete'
+    );
 
     // Parse JSON response
     const result = parseDeltaJudgeResponse(response.content);
 
     if (!result) {
-      logger.warn({
-        responseLength: response.content.length,
-        responsePreview: response.content.slice(0, 200),
-      }, 'Failed to parse delta judge response');
+      logger.warn(
+        {
+          responseLength: response.content.length,
+          responsePreview: response.content.slice(0, 200),
+        },
+        'Failed to parse delta judge response'
+      );
 
       return {
         passed: false,
@@ -202,9 +206,12 @@ export async function verifyPatch(input: DeltaJudgeInput): Promise<DeltaJudgeOut
       durationMs: Date.now() - startTime,
     };
   } catch (error) {
-    logger.error({
-      error: error instanceof Error ? error.message : String(error),
-    }, 'Delta-Judge verification failed');
+    logger.error(
+      {
+        error: error instanceof Error ? error.message : String(error),
+      },
+      'Delta-Judge verification failed'
+    );
 
     return {
       passed: false,
@@ -233,17 +240,13 @@ export function parseNewIssues(rawIssues: any[]): JudgeIssue[] {
   }
 
   return rawIssues
-    .filter((issue) => {
+    .filter(issue => {
       // Basic validation
       return (
-        issue &&
-        typeof issue === 'object' &&
-        issue.criterion &&
-        issue.severity &&
-        issue.description
+        issue && typeof issue === 'object' && issue.criterion && issue.severity && issue.description
       );
     })
-    .map((issue) => ({
+    .map(issue => ({
       criterion: issue.criterion,
       severity: issue.severity,
       location: issue.location || 'unknown',

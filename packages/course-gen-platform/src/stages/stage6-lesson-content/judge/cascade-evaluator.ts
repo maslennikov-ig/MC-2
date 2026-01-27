@@ -24,11 +24,7 @@ import type {
 } from '@megacampus/shared-types';
 import type { LessonSpecificationV2 } from '@megacampus/shared-types/lesson-specification-v2';
 import type { LessonContentBody, RAGChunk } from '@megacampus/shared-types/lesson-content';
-import {
-  executeCLEVVoting,
-  selectJudgeModels,
-  type CLEVEvaluationInput,
-} from './clev-voter';
+import { executeCLEVVoting, selectJudgeModels, type CLEVEvaluationInput } from './clev-voter';
 import {
   executeFactualVerification,
   type FactualVerificationResult,
@@ -37,7 +33,12 @@ import {
 } from './factual-verifier';
 import { LLMClient, type LLMResponse } from '@/shared/llm';
 import { logger } from '@/shared/logger';
-import { DEFAULT_OSCQR_RUBRIC, type OSCQRRubric, type CriterionConfig } from '@megacampus/shared-types';
+import { safeJSONParse } from '@/shared/utils/json-repair';
+import {
+  DEFAULT_OSCQR_RUBRIC,
+  type OSCQRRubric,
+  type CriterionConfig,
+} from '@megacampus/shared-types';
 import { determineRecommendation } from '@megacampus/shared-types';
 import { calculateWordCountThresholds } from '@megacampus/shared-types/judge-thresholds';
 
@@ -281,7 +282,7 @@ export function countSyllables(word: string): number {
  */
 export function calculateFleschKincaid(text: string): number {
   // Split into sentences
-  const sentences = text.split(/[.!?]+/).filter((s) => s.trim().length > 0);
+  const sentences = text.split(/[.!?]+/).filter(s => s.trim().length > 0);
   const sentenceCount = Math.max(1, sentences.length);
 
   // Split into words
@@ -293,9 +294,7 @@ export function calculateFleschKincaid(text: string): number {
 
   // Calculate Flesch-Kincaid Grade Level
   const gradeLevel =
-    0.39 * (wordCount / sentenceCount) +
-    11.8 * (syllableCount / wordCount) -
-    15.59;
+    0.39 * (wordCount / sentenceCount) + 11.8 * (syllableCount / wordCount) - 15.59;
 
   // Clamp to reasonable range
   return Math.max(1, Math.min(20, gradeLevel));
@@ -364,7 +363,7 @@ function checkRequiredSections(
   content: LessonContentBody,
   requiredSections: string[]
 ): { present: boolean; missing: string[] } {
-  const sectionTitles = content.sections.map((s) => s.title.toLowerCase());
+  const sectionTitles = content.sections.map(s => s.title.toLowerCase());
   const allText = extractTextContent(content).toLowerCase();
 
   const missing: string[] = [];
@@ -386,10 +385,9 @@ function checkRequiredSections(
     if (requiredLower === 'conclusion') {
       const allMarkers = [...CONCLUSION_MARKERS.en, ...CONCLUSION_MARKERS.ru];
       // Assumes 3+ sections includes intro + body + conclusion structure (common educational pattern)
-      const hasConclusion = content.sections.length >= 3 ||
-        sectionTitles.some((title) =>
-          allMarkers.some(marker => title.includes(marker))
-        ) ||
+      const hasConclusion =
+        content.sections.length >= 3 ||
+        sectionTitles.some(title => allMarkers.some(marker => title.includes(marker))) ||
         // Also check if last section title contains conclusion-like patterns
         (sectionTitles.length > 0 &&
           CONCLUSION_REGEX.test(sectionTitles[sectionTitles.length - 1]));
@@ -410,8 +408,8 @@ function checkRequiredSections(
     }
 
     // Default behavior for other required sections
-    const found = sectionTitles.some((title) => title.includes(requiredLower)) ||
-      allText.includes(requiredLower);
+    const found =
+      sectionTitles.some(title => title.includes(requiredLower)) || allText.includes(requiredLower);
 
     if (!found) {
       missing.push(required);
@@ -443,12 +441,60 @@ function calculateKeywordCoverage(
   // Common words to exclude (English and Russian)
   const commonWords = new Set([
     // English
-    'that', 'this', 'with', 'from', 'have', 'will', 'able', 'about', 'which', 'their', 'when', 'what', 'your', 'more', 'been', 'some',
+    'that',
+    'this',
+    'with',
+    'from',
+    'have',
+    'will',
+    'able',
+    'about',
+    'which',
+    'their',
+    'when',
+    'what',
+    'your',
+    'more',
+    'been',
+    'some',
     // Russian
-    'этот', 'этой', 'этих', 'этим', 'этого', 'который', 'которая', 'которое', 'которые', 'которых',
-    'более', 'менее', 'также', 'между', 'через', 'после', 'перед', 'около', 'вместе',
-    'быть', 'было', 'были', 'будет', 'будут', 'можно', 'нужно', 'должен', 'должна', 'должны',
-    'своих', 'свою', 'свои', 'своей', 'своего', 'всех', 'всей', 'всего',
+    'этот',
+    'этой',
+    'этих',
+    'этим',
+    'этого',
+    'который',
+    'которая',
+    'которое',
+    'которые',
+    'которых',
+    'более',
+    'менее',
+    'также',
+    'между',
+    'через',
+    'после',
+    'перед',
+    'около',
+    'вместе',
+    'быть',
+    'было',
+    'были',
+    'будет',
+    'будут',
+    'можно',
+    'нужно',
+    'должен',
+    'должна',
+    'должны',
+    'своих',
+    'свою',
+    'свои',
+    'своей',
+    'своего',
+    'всех',
+    'всей',
+    'всего',
   ]);
 
   for (const objective of lessonSpec.learning_objectives) {
@@ -482,7 +528,7 @@ function calculateKeywordCoverage(
     msg: 'Keyword coverage calculation',
     totalKeywords: keywords.size,
     foundKeywords: foundCount,
-    coverage: (foundCount / keywords.size * 100).toFixed(0) + '%',
+    coverage: ((foundCount / keywords.size) * 100).toFixed(0) + '%',
     sampleKeywords: Array.from(keywords).slice(0, 5),
   });
 
@@ -508,7 +554,7 @@ function countWordsInText(text: string): number {
     .trim();
 
   // Split on whitespace and filter empty strings
-  return cleanedText.split(/\s+/).filter((word) => word.length > 0).length;
+  return cleanedText.split(/\s+/).filter(word => word.length > 0).length;
 }
 
 /**
@@ -603,9 +649,7 @@ export function runHeuristicFilters(
   const sectionsCheck = checkRequiredSections(content, thresholds.requiredSections);
 
   if (!sectionsCheck.present) {
-    failureReasons.push(
-      `Missing required sections: ${sectionsCheck.missing.join(', ')}`
-    );
+    failureReasons.push(`Missing required sections: ${sectionsCheck.missing.join(', ')}`);
   }
 
   // Calculate keyword coverage
@@ -681,24 +725,22 @@ export function runHeuristicFilters(
 /**
  * Build evaluation prompt for single judge
  */
-function buildSingleJudgePrompt(
-  input: CascadeEvaluationInput,
-  rubric: OSCQRRubric
-): string {
+function buildSingleJudgePrompt(input: CascadeEvaluationInput, rubric: OSCQRRubric): string {
   const { lessonContent, lessonSpec, ragChunks } = input;
 
   // Format learning objectives
   const objectives = lessonSpec.learning_objectives
-    .map((lo) => `- [${lo.id}] ${lo.objective} (Bloom: ${lo.bloom_level})`)
+    .map(lo => `- [${lo.id}] ${lo.objective} (Bloom: ${lo.bloom_level})`)
     .join('\n');
 
   // Format RAG context for fact verification
-  const ragContext = ragChunks.length > 0
-    ? ragChunks
-        .slice(0, 5)
-        .map((chunk) => `[${chunk.document_name}]: ${chunk.content.slice(0, 500)}...`)
-        .join('\n\n')
-    : 'No RAG context provided.';
+  const ragContext =
+    ragChunks.length > 0
+      ? ragChunks
+          .slice(0, 5)
+          .map(chunk => `[${chunk.document_name}]: ${chunk.content.slice(0, 500)}...`)
+          .join('\n\n')
+      : 'No RAG context provided.';
 
   // Format content for evaluation - provide full content for accurate evaluation
   // Truncation caused low quality scores because judges couldn't assess complete content
@@ -707,18 +749,21 @@ function buildSingleJudgePrompt(
 ${lessonContent.intro}
 
 ## Sections (${lessonContent.sections.length} total)
-${lessonContent.sections.map((s) => `### ${s.title}\n${s.content}`).join('\n\n')}
+${lessonContent.sections.map(s => `### ${s.title}\n${s.content}`).join('\n\n')}
 
 ## Examples (${lessonContent.examples.length} total)
-${lessonContent.examples.map((e) => `- **${e.title}**: ${e.content.slice(0, 500)}${e.content.length > 500 ? '...' : ''}`).join('\n')}
+${lessonContent.examples.map(e => `- **${e.title}**: ${e.content.slice(0, 500)}${e.content.length > 500 ? '...' : ''}`).join('\n')}
 
 ## Exercises (${lessonContent.exercises.length} total)
-${lessonContent.exercises.map((e) => `- ${e.question}`).join('\n')}
+${lessonContent.exercises.map(e => `- ${e.question}`).join('\n')}
 `;
 
   // Format rubric criteria
   const rubricCriteria = rubric.criteria
-    .map((c: CriterionConfig) => `- **${c.criterion}** (${(c.weight * 100).toFixed(0)}% weight): ${c.description}`)
+    .map(
+      (c: CriterionConfig) =>
+        `- **${c.criterion}** (${(c.weight * 100).toFixed(0)}% weight): ${c.description}`
+    )
     .join('\n');
 
   return `You are an expert educational content evaluator. Evaluate the following lesson content against the OSCQR-based rubric.
@@ -828,22 +873,11 @@ function parseSingleJudgeResponse(content: string): {
   strengths: string[];
 } | null {
   try {
-    // Extract JSON from response (handle markdown code blocks)
-    let jsonStr = content;
-
-    // Remove markdown code blocks if present
-    const jsonMatch = content.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
-    if (jsonMatch) {
-      jsonStr = jsonMatch[1];
-    }
-
-    // Try to find JSON object in response
-    const objectMatch = jsonStr.match(/\{[\s\S]*\}/);
-    if (objectMatch) {
-      jsonStr = objectMatch[0];
-    }
-
-    const parsed = JSON.parse(jsonStr) as unknown as RawJudgeResponse;
+    // Use safeJSONParse which handles:
+    // - Markdown code blocks extraction
+    // - LLM thinking tags removal
+    // - JSON repair (truncated, trailing commas, etc.)
+    const parsed = safeJSONParse(content) as RawJudgeResponse;
 
     // Validate required fields
     if (
@@ -929,7 +963,7 @@ async function executeSingleJudge(
       passed: parsed.passed,
       confidence: parsed.confidence,
       criteriaScores: parsed.criteriaScores,
-      issues: parsed.issues.map((issue) => ({
+      issues: parsed.issues.map(issue => ({
         criterion: issue.criterion as keyof CriteriaScores,
         severity: issue.severity as 'critical' | 'major' | 'minor',
         location: issue.location,
@@ -939,7 +973,7 @@ async function executeSingleJudge(
       strengths: parsed.strengths,
       recommendation: determineRecommendation(
         parsed.overallScore,
-        parsed.issues.map((issue) => ({
+        parsed.issues.map(issue => ({
           criterion: issue.criterion as keyof CriteriaScores,
           severity: issue.severity as 'critical' | 'major' | 'minor',
           location: issue.location,
@@ -979,7 +1013,7 @@ async function executeSingleJudge(
         msg: 'Judge found issues',
         judge: modelConfig.displayName,
         issueCount: verdict.issues.length,
-        issues: verdict.issues.map((issue) => ({
+        issues: verdict.issues.map(issue => ({
           criterion: issue.criterion,
           severity: issue.severity,
           location: issue.location,
@@ -1177,7 +1211,7 @@ export async function executeCascadeEvaluation(
   let singleJudgeVerdict: JudgeVerdict | undefined;
 
   if (!finalConfig.skipSingleJudge) {
-    singleJudgeVerdict = await executeSingleJudge(input, finalConfig) || undefined;
+    singleJudgeVerdict = (await executeSingleJudge(input, finalConfig)) || undefined;
 
     if (singleJudgeVerdict) {
       totalTokensUsed += singleJudgeVerdict.tokensUsed;
@@ -1185,8 +1219,9 @@ export async function executeCascadeEvaluation(
       // Check confidence threshold
       const confidenceRank: Record<JudgeConfidence, number> = { high: 2, medium: 1, low: 0 };
       const isHighConfidence = confidenceRank[singleJudgeVerdict.confidence] >= 1; // medium or high
-      const isAboveThreshold = singleJudgeVerdict.overallScore >= finalConfig.singleJudgeConfidenceThreshold ||
-        singleJudgeVerdict.overallScore < (1 - finalConfig.singleJudgeConfidenceThreshold);
+      const isAboveThreshold =
+        singleJudgeVerdict.overallScore >= finalConfig.singleJudgeConfidenceThreshold ||
+        singleJudgeVerdict.overallScore < 1 - finalConfig.singleJudgeConfidenceThreshold;
 
       if (isHighConfidence && isAboveThreshold) {
         logger.info({
