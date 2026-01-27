@@ -867,16 +867,28 @@ export async function runAnalysisOrchestration(job: StructureAnalysisJob): Promi
       durationMs: Date.now() - startTime,
     });
 
-    // Update course progress to failed state
-    const errorMessage = formatErrorMessage(error as Error);
+    // Check if this is a special "pause" error for clarifying questions
+    const rawErrorMessage = error instanceof Error ? error.message : String(error);
+    const isAwaitingClarifying = rawErrorMessage.includes('AWAITING_CLARIFYING_ANSWERS');
 
-    await updateCourseProgress(courseId, 'failed', 0, errorMessage, supabase);
+    if (!isAwaitingClarifying) {
+      // Only update status to failed for real errors
+      const errorMessage = formatErrorMessage(error as Error);
+      await updateCourseProgress(courseId, 'failed', 0, errorMessage, supabase);
+    } else {
+      // For AWAITING_CLARIFYING_ANSWERS - just log, status is already stage_4_clarifying
+      orchestrationLogger.info(
+        { courseId },
+        'Orchestration paused for clarifying questions - status preserved as stage_4_clarifying'
+      );
+    }
 
     // Re-throw error for worker handler to process
     // Worker handler will:
     // 1. Determine error code (BARRIER_FAILED, MINIMUM_LESSONS_NOT_MET, LLM_ERROR)
     // 2. Send notification to technical support via admin panel (FR-013)
     // 3. Mark job as failed with detailed metadata (FR-014)
+    // Note: For AWAITING_CLARIFYING_ANSWERS, error-handler returns success:true (no retry)
     throw error;
   }
 }
