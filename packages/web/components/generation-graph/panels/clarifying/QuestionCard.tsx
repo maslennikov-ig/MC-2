@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
@@ -125,13 +125,17 @@ export function QuestionCard({
   const [mode, setMode] = useState<CardMode>(isAnswered ? 'answered' : 'unanswered')
 
   // BUG FIX: Sync mode with isAnswered prop changes
-  // useState only reads initial value - we need useEffect to react to prop updates
-  // IMPORTANT: Don't override 'editing' mode - user intentionally entered edit mode
+  // Track previous isAnswered value to detect when answer was just saved
+  const prevIsAnswered = useRef(isAnswered)
+
   useEffect(() => {
-    if (isAnswered && mode === 'unanswered') {
+    // If isAnswered just changed from false to true (answer was saved)
+    // This handles both: unanswered→answered and editing→answered transitions
+    if (isAnswered && !prevIsAnswered.current) {
       setMode('answered')
     }
-  }, [isAnswered, mode])
+    prevIsAnswered.current = isAnswered
+  }, [isAnswered])
 
   // Selection state (Phase 1: not saved yet)
   const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState<number | null>(null)
@@ -202,6 +206,10 @@ export function QuestionCard({
   // === CONFIRM ANSWER (Phase 2: Save to backend) ===
   const handleConfirmAnswer = () => {
     if (!hasSelection || isProcessing) return
+
+    // Optimistically switch to answered mode
+    // If save fails, ClarifyingPanel will show error toast
+    setMode('answered')
 
     if (question.type === 'open') {
       if (hasCustomInput && customText.trim()) {
