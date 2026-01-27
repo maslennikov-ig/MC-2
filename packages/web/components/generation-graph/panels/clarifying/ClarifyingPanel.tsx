@@ -35,7 +35,13 @@ interface ClarifyingPanelProps {
 
 export function ClarifyingPanel({ courseId, onComplete }: ClarifyingPanelProps) {
   // Real tRPC hooks
-  const { data: questionsData, isLoading } = trpc.clarifying.getQuestions.useQuery({ courseId })
+  const { data: questionsData, isLoading } = trpc.clarifying.getQuestions.useQuery(
+    { courseId },
+    {
+      staleTime: 5 * 60 * 1000, // 5 минут - вопросы статичны в рамках сессии
+      refetchOnWindowFocus: false, // Предотвращает rate limit spam при переключении окон
+    }
+  )
   const submitAnswerMutation = trpc.clarifying.submitAnswer.useMutation()
   const skipQuestionMutation = trpc.clarifying.skipQuestion.useMutation()
   const approveAndProceedMutation = trpc.clarifying.approveAndProceed.useMutation()
