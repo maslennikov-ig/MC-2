@@ -2,6 +2,61 @@
 
 _Released on 2025-12-26_
 
+## v0.28.41
+
+_Released on 2026-01-27_
+
+### ✨ New Features
+
+- Add 1 skill(s), update docs
+- **clarifying**: Implement Wizard UI layout for Stage 4
+- **mocks**: Add theme toggle and AppThemeProvider support
+- **clarifying-redesign**: Add mock comparison page for Stage 4 UI redesign
+- **trace-logger**: Add logTrace() to Stages 1 and 3 for Admin Monitor visibility
+- **lifecycle**: Add logTrace for Stage 2 skip path
+- **clarifying**: Add custom input for single/multi choice questions + MissionControlBanner clarifying mode
+- **clarifying**: Add ClarifyingBanner component with progress tracking
+- **Database**: Add race condition fix, GIN index, and rollback migrations
+- **clarifying**: Add multi-type questions support (open, single_choice, multi_choice)
+- **errors**: Implement pipeline error class hierarchy
+
+### 🔧 Improvements
+
+- **clarifying**: Simplify QuestionCard styles for minimalist design
+- **stage5,stage6**: Use unified safeJSONParse for LLM output
+
+### 🐛 Bug Fixes
+
+- **mocks**: Add middleware exclusion and proper layout for /mocks routes
+- **clarifying**: Use staleTime Infinity - questions never change after generation
+- **clarifying**: Prevent unwanted refetches causing UI reset during editing
+- **clarifying**: Fix useEffect deps array size mismatch error
+- **clarifying**: Persist confetti shown state in localStorage
+- **clarifying**: Fix infinite loader and confetti showing on every open
+- **clarifying**: Force cache invalidation on answer save for immediate UI update
+- **clarifying**: Fix multi_choice with custom answer validation + UI update after edit
+- **clarifying**: Refetch questions after answer saved
+- **clarifying**: Optimistically switch to answered mode after confirm
+- **clarifying**: Don't override editing mode in useEffect
+- **clarifying**: Fix infinite loop in useEffect
+- **clarifying**: Fix UI state sync bugs
+- **clarifying**: Code review fixes MEDIUM-002/003/005 + LOW-002
+- **clarifying**: Batch endpoint and atomic autoAnswer (HIGH-002, HIGH-003)
+- **types**: Replace unsafe any cast with proper JSONB types for clarifying_questions
+- **clarifying**: Address code review issues (CRITICAL-003, HIGH-001,004,005, MEDIUM-004,006)
+- **clarifying**: Prevent auto-scroll from hijacking user scroll
+- **clarifying**: Fix [object Object] display and add selectedSuggestionIndex
+- **clarifying**: Add query caching to prevent rate limit spam
+- **stage4**: Log ClarifyingQuestionsInterrupt as INFO instead of ERROR
+- **errors**: Address code review feedback for pipeline errors
+- **Interface**: Show clarifying node fallback when status is stage_4_clarifying
+- **stage4**: Preserve stage_4_clarifying status on AWAITING_CLARIFYING_ANSWERS
+- **stage4**: Prevent retry loop for AWAITING_CLARIFYING_ANSWERS + add JSON repair
+
+---
+
+_This release was automatically generated from 63 commits._
+
 ## v0.28.40
 
 _Released on 2026-01-26_

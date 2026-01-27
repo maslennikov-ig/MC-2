@@ -7,6 +7,83 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.28.41] - 2026-01-27
+
+### Added
+
+- add 1 skill(s), update docs (2cdd126c)
+- **clarifying**: implement Wizard UI layout for Stage 4 (4f064dba)
+- **mocks**: add theme toggle and AppThemeProvider support (ace644ad)
+- **clarifying-redesign**: add mock comparison page for Stage 4 UI redesign (f7f1621c)
+- **trace-logger**: add logTrace() to Stages 1 and 3 for Admin Monitor visibility (81eeff06)
+- **lifecycle**: add logTrace for Stage 2 skip path (be537842)
+- **clarifying**: add custom input for single/multi choice questions + MissionControlBanner clarifying mode (57acaad2)
+- **clarifying**: add ClarifyingBanner component with progress tracking (7184e878)
+- **db**: add race condition fix, GIN index, and rollback migrations (0b4c4645)
+- **clarifying**: add multi-type questions support (open, single_choice, multi_choice) (b8b9c376)
+- **errors**: implement pipeline error class hierarchy (4e3b1905)
+
+### Changed
+
+- **clarifying**: simplify QuestionCard styles for minimalist design (1a537241)
+- **stage5,stage6**: use unified safeJSONParse for LLM output (a5012d73)
+
+### Fixed
+
+- **mocks**: add middleware exclusion and proper layout for /mocks routes (c4813a27)
+- **clarifying**: use staleTime Infinity - questions never change after generation (ab0b0017)
+- **clarifying**: prevent unwanted refetches causing UI reset during editing (5b7f4911)
+- **clarifying**: fix useEffect deps array size mismatch error (8557a451)
+- **clarifying**: persist confetti shown state in localStorage (b9ea2ec5)
+- **clarifying**: fix infinite loader and confetti showing on every open (eb8fcea2)
+- **clarifying**: force cache invalidation on answer save for immediate UI update (0b644be0)
+- **clarifying**: fix multi_choice with custom answer validation + UI update after edit (d69f471d)
+- **clarifying**: refetch questions after answer saved (12ad3550)
+- **clarifying**: optimistically switch to answered mode after confirm (866ddb4e)
+- **clarifying**: don't override editing mode in useEffect (9d818863)
+- **clarifying**: fix infinite loop in useEffect (b33bb6b1)
+- **clarifying**: fix UI state sync bugs (efde24f3)
+- **clarifying**: code review fixes MEDIUM-002/003/005 + LOW-002 (b5c5ba87)
+- **clarifying**: batch endpoint and atomic autoAnswer (HIGH-002, HIGH-003) (fc53d7a2)
+- **types**: replace unsafe any cast with proper JSONB types for clarifying_questions (f1f5cf75)
+- **clarifying**: address code review issues (CRITICAL-003, HIGH-001,004,005, MEDIUM-004,006) (0185b025)
+- **clarifying**: prevent auto-scroll from hijacking user scroll (9968d8bc)
+- **clarifying**: fix [object Object] display and add selectedSuggestionIndex (e7e88f55)
+- **clarifying**: add query caching to prevent rate limit spam (055e0672)
+- **stage4**: log ClarifyingQuestionsInterrupt as INFO instead of ERROR (8a841954)
+- **errors**: address code review feedback for pipeline errors (f7699ea9)
+- **ui**: show clarifying node fallback when status is stage_4_clarifying (e5f952c1)
+- **stage4**: preserve stage_4_clarifying status on AWAITING_CLARIFYING_ANSWERS (5c9c6a6e)
+- **stage4**: prevent retry loop for AWAITING_CLARIFYING_ANSWERS + add JSON repair (9ebfcd68)
+
+### Other
+
+- bd sync: 2026-01-27 22:15:09 (bd5b8031)
+- bd sync: 2026-01-27 21:15:13 (44a35e5a)
+- bd sync: 2026-01-27 21:02:33 (d7fe648f)
+- bd sync: 2026-01-27 19:08:27 (265b6ef1)
+- bd sync: 2026-01-27 18:54:22 (0316a206)
+- bd sync: 2026-01-27 17:48:41 (f9434ce4)
+- bd sync: 2026-01-27 17:47:41 (636053b0)
+- bd sync: 2026-01-27 17:31:55 (acc5d8ef)
+- bd sync: 2026-01-27 17:23:31 (7f76a250)
+- bd sync: 2026-01-27 17:14:02 (f3b918a6)
+- bd sync: 2026-01-27 16:51:43 (ae81be17)
+- bd sync: 2026-01-27 16:51:28 (f6ada813)
+- **stage4**: add tests for interrupt vs error logging behavior (5b024e0d)
+- bd sync: 2026-01-27 14:23:34 (db8ad151)
+- bd sync: 2026-01-27 14:09:35 (21e7f519)
+- **errors**: standardize error messages to active voice (06d53b4e)
+- bd sync: 2026-01-27 14:05:21 (dcba6821)
+- bd sync: 2026-01-27 14:03:40 (f6130d09)
+- bd sync: 2026-01-27 14:01:59 (6244e1d1)
+- bd sync: 2026-01-27 13:59:42 (507df08f)
+- bd sync: 2026-01-27 13:57:12 (5a105f01)
+- bd sync: 2026-01-27 13:50:09 (759d281c)
+- bd sync: 2026-01-27 13:15:17 (07ac116c)
+- bd sync: 2026-01-27 09:54:31 (d602fa29)
+- **stage4**: remove broken json-repair test (86d39b31)
+
 ## [0.28.40] - 2026-01-26
 
 ### Added
