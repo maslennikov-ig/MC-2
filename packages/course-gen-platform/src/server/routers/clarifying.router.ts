@@ -789,15 +789,28 @@ export const clarifyingRouter = router({
           }
         }
 
-        if (
-          answerSource === 'modified' &&
-          (selectedSuggestionIndex === undefined || !userModification)
-        ) {
-          throw new TRPCError({
-            code: 'BAD_REQUEST',
-            message:
-              'selectedSuggestionIndex and userModification are required for modified answers',
-          });
+        // Validate 'modified' source requirements
+        // For multi_choice: selectedSuggestionIndexes required (user selected suggestions + added custom)
+        // For open/single_choice: selectedSuggestionIndex + userModification required
+        if (answerSource === 'modified') {
+          if (isMultiChoice) {
+            // multi_choice modified = selected suggestions + custom answer in answers array
+            if (!selectedSuggestionIndexes || selectedSuggestionIndexes.length === 0) {
+              throw new TRPCError({
+                code: 'BAD_REQUEST',
+                message: 'selectedSuggestionIndexes is required for modified multi_choice answers',
+              });
+            }
+          } else {
+            // open/single_choice modified = suggestion + userModification
+            if (selectedSuggestionIndex === undefined || !userModification) {
+              throw new TRPCError({
+                code: 'BAD_REQUEST',
+                message:
+                  'selectedSuggestionIndex and userModification are required for modified answers',
+              });
+            }
+          }
         }
 
         // Custom answers should not have suggestion-related fields

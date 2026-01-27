@@ -127,15 +127,32 @@ export function QuestionCard({
   // BUG FIX: Sync mode with isAnswered prop changes
   // Track previous isAnswered value to detect when answer was just saved
   const prevIsAnswered = useRef(isAnswered)
+  // Track previous answer to detect when answer was updated (for edit mode)
+  const prevAnswer = useRef(question.currentAnswer)
+  const prevAnswers = useRef(question.currentAnswers)
 
   useEffect(() => {
-    // If isAnswered just changed from false to true (answer was saved)
-    // This handles both: unanswered→answered and editing→answered transitions
+    // Case 1: If isAnswered just changed from false to true (new answer saved)
     if (isAnswered && !prevIsAnswered.current) {
       setMode('answered')
     }
+
+    // Case 2: If we're in editing mode and currentAnswer/currentAnswers changed (edit saved)
+    // This happens when user edits an existing answer and data is refetched
+    if (mode === 'editing') {
+      const answerChanged = question.currentAnswer !== prevAnswer.current
+      const answersChanged =
+        JSON.stringify(question.currentAnswers) !== JSON.stringify(prevAnswers.current)
+
+      if (answerChanged || answersChanged) {
+        setMode('answered')
+      }
+    }
+
     prevIsAnswered.current = isAnswered
-  }, [isAnswered])
+    prevAnswer.current = question.currentAnswer
+    prevAnswers.current = question.currentAnswers
+  }, [isAnswered, question.currentAnswer, question.currentAnswers, mode])
 
   // Selection state (Phase 1: not saved yet)
   const [selectedSuggestionIndex, setSelectedSuggestionIndex] = useState<number | null>(null)
