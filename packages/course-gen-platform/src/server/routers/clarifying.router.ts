@@ -27,9 +27,16 @@ import { protectedProcedure } from '../middleware/auth';
 import { createRateLimiter } from '../middleware/rate-limit.js';
 import { getSupabaseAdmin } from '../../shared/supabase/admin';
 import { addJob } from '../../orchestrator/queue';
-import { JobType, StructureAnalysisJobData } from '@megacampus/shared-types';
+import {
+  JobType,
+  StructureAnalysisJobData,
+  ClarifyingQuestionRow,
+  UserAnswerValue,
+} from '@megacampus/shared-types';
 import { logger } from '../../shared/logger/index.js';
 import { extractAnswerString } from '../../stages/stage4-analysis/phases/phase-0.5-clarifying';
+import type { SupabaseClient } from '@supabase/supabase-js';
+import type { Database } from '@megacampus/shared-types';
 
 // ============================================================================
 // INPUT SCHEMAS
@@ -110,43 +117,14 @@ const requestSecondRoundSchema = z.object({
 // ============================================================================
 
 /**
- * Question types for different UI rendering
+ * Type re-exports for convenience
+ * These are now imported from @megacampus/shared-types to ensure consistency
  */
-export type QuestionType = 'open' | 'single_choice' | 'multi_choice';
-
-/**
- * User answer stored in JSONB format
- * - For open/single_choice: { value: "answer text" }
- * - For multi_choice: { values: ["option1", "option2"] }
- */
-export interface UserAnswerValue {
-  value?: string;
-  values?: string[];
-}
-
-/**
- * Question row from database
- * Note: This type matches the clarifying_questions table schema
- */
-export interface QuestionRow {
-  id: string;
-  course_id: string;
-  question_text: string;
-  question_type: QuestionType;
-  question_priority: string;
-  question_category: string | null;
-  suggested_answers: Array<{ text: string; rationale?: string; is_recommended?: boolean }> | null;
-  user_answer: UserAnswerValue | null; // JSONB: { value: string } or { values: string[] }
-  answer_source: string | null;
-  selected_suggestion_index: number | null;
-  user_modification: string | null;
-  iteration_round: number;
-  status: string;
-  order_index: number;
-  created_at: string | null;
-  answered_at: string | null;
-  metadata: Record<string, unknown> | null;
-}
+export type {
+  QuestionType,
+  UserAnswerValue,
+  ClarifyingQuestionRow,
+} from '@megacampus/shared-types';
 
 /**
  * Course row for access verification
@@ -178,12 +156,16 @@ interface CourseDetails {
 // ============================================================================
 
 /**
- * Get Supabase admin client with RPC access for clarifying_questions table
- * Since clarifying_questions may not be in generated types, we use type assertions
+ * Get Supabase admin client with full Database type safety
+ *
+ * Returns properly typed Supabase client for accessing clarifying_questions table.
+ * JSONB columns (user_answer, suggested_answers) are correctly typed via
+ * ClarifyingQuestionRow interface from shared-types.
+ *
+ * @returns SupabaseClient<Database> with full type safety for all tables
  */
-function getTypedSupabaseAdmin() {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return getSupabaseAdmin() as any;
+function getTypedSupabaseAdmin(): SupabaseClient<Database> {
+  return getSupabaseAdmin();
 }
 
 /**
@@ -257,7 +239,7 @@ async function verifyQuestionAccess(
   userId: string,
   organizationId: string,
   requestId: string
-): Promise<{ question: QuestionRow; course: CourseRow }> {
+): Promise<{ question: ClarifyingQuestionRow; course: CourseRow }> {
   const supabase = getTypedSupabaseAdmin();
 
   // Fetch question
@@ -279,7 +261,7 @@ async function verifyQuestionAccess(
   // Verify course access
   const course = await verifyCourseAccess(question.course_id, userId, organizationId, requestId);
 
-  return { question: question as QuestionRow, course };
+  return { question: question as ClarifyingQuestionRow, course };
 }
 
 /**
@@ -420,7 +402,7 @@ export const clarifyingRouter = router({
           });
         }
 
-        const allQuestions = (questions || []) as QuestionRow[];
+        const allQuestions = (questions || []) as ClarifyingQuestionRow[];
 
         // Sort by priority: critical first, then important, then nice_to_have
         const priorityOrder: Record<string, number> = {
@@ -524,7 +506,7 @@ export const clarifyingRouter = router({
         }
 
         const allQuestions = (questionsResult.data || []) as Pick<
-          QuestionRow,
+          ClarifyingQuestionRow,
           'id' | 'question_priority' | 'status' | 'iteration_round'
         >[];
 
@@ -757,10 +739,12 @@ export const clarifyingRouter = router({
           : { value: answer };
 
         // Update question with answer
+        // Note: Cast to unknown needed because database.types.ts incorrectly types
+        // user_answer as string instead of JSONB. The actual column is JSONB.
         const { error: updateError } = await supabase
           .from('clarifying_questions')
           .update({
-            user_answer: userAnswerValue,
+            user_answer: userAnswerValue as unknown as string,
             answer_source: answerSource,
             selected_suggestion_index: isMultiChoice ? null : (selectedSuggestionIndex ?? null),
             user_modification: userModification ?? null,
@@ -769,8 +753,10 @@ export const clarifyingRouter = router({
             // Store multi_choice indexes in metadata
             metadata:
               isMultiChoice && selectedSuggestionIndexes
-                ? { selected_suggestion_indexes: selectedSuggestionIndexes }
-                : question.metadata,
+                ? ({
+                    selected_suggestion_indexes: selectedSuggestionIndexes,
+                  } as unknown as Database['public']['Tables']['clarifying_questions']['Update']['metadata'])
+                : (question.metadata as unknown as Database['public']['Tables']['clarifying_questions']['Update']['metadata']),
           })
           .eq('id', questionId);
 
@@ -954,7 +940,8 @@ export const clarifyingRouter = router({
 
         // Use atomic RPC function to validate and transition status
         // This prevents race conditions with FOR UPDATE lock
-        const { data: rpcResult, error: rpcError } = await supabase.rpc(
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const { data: rpcResult, error: rpcError } = await (supabase as any).rpc(
           'approve_and_proceed_atomic',
           {
             p_course_id: courseId,
@@ -975,13 +962,16 @@ export const clarifyingRouter = router({
         }
 
         // Handle RPC result errors
-        const result = rpcResult as {
+        // Note: RPC function not in generated database.types.ts, manual typing required
+        const result = rpcResult as unknown as {
           success: boolean;
           error?: string;
           code?: string;
           unanswered_critical?: number;
           unanswered_important?: number;
           current_status?: string;
+          existing_job_id?: string;
+          is_duplicate?: boolean;
         };
 
         if (!result.success) {
@@ -1009,12 +999,31 @@ export const clarifyingRouter = router({
                 code: 'BAD_REQUEST',
                 message: `Cannot proceed. ${result.unanswered_critical} critical and ${result.unanswered_important} important questions remain unanswered.`,
               });
+            case 'CONCURRENT_REQUEST':
+              // Race condition: another request is already processing this course
+              throw new TRPCError({
+                code: 'CONFLICT',
+                message: 'Another request is already processing this course. Please wait.',
+              });
             default:
               throw new TRPCError({
                 code: 'INTERNAL_SERVER_ERROR',
                 message: result.error || 'Failed to proceed',
               });
           }
+        }
+
+        // RACE CONDITION PROTECTION: If this is a duplicate request, return existing job ID
+        if (result.is_duplicate && result.existing_job_id) {
+          logger.info(
+            {
+              requestId,
+              courseId,
+              existingJobId: result.existing_job_id,
+            },
+            'Returning existing job ID (duplicate request detected)'
+          );
+          return { success: true, jobId: result.existing_job_id };
         }
 
         // Status successfully transitioned to stage_4_analyzing
@@ -1069,7 +1078,7 @@ export const clarifyingRouter = router({
           });
         }
 
-        const answeredList = (answeredQuestions || []) as QuestionRow[];
+        const answeredList = (answeredQuestions || []) as ClarifyingQuestionRow[];
 
         // Fetch course details for analysis job
         const { data: courseDetails, error: courseError } = await typedSupabase
@@ -1192,6 +1201,27 @@ export const clarifyingRouter = router({
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const job = await addJob(JobType.STRUCTURE_ANALYSIS, jobData as any, { priority });
           jobId = job.id as string;
+
+          // RACE CONDITION PROTECTION: Set proceed_job_id after successful job creation
+          // This prevents duplicate jobs by tracking the created job ID in the database
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const { error: setJobIdError } = await (supabase as any).rpc('set_proceed_job_id', {
+            p_course_id: courseId,
+            p_job_id: jobId,
+          });
+
+          if (setJobIdError) {
+            // Non-fatal: log warning but continue - job was created successfully
+            logger.warn(
+              {
+                requestId,
+                courseId,
+                jobId,
+                error: setJobIdError.message,
+              },
+              'Failed to set proceed_job_id (non-fatal)'
+            );
+          }
         } catch (jobError) {
           // Rollback status on job creation failure
           logger.error(
@@ -1312,7 +1342,7 @@ export const clarifyingRouter = router({
           });
         }
 
-        const questionList = (questions || []) as Pick<QuestionRow, 'iteration_round'>[];
+        const questionList = (questions || []) as Pick<ClarifyingQuestionRow, 'iteration_round'>[];
         const currentRound = questionList[0]?.iteration_round || 1;
 
         if (currentRound >= 2) {
@@ -1342,7 +1372,7 @@ export const clarifyingRouter = router({
           });
         }
 
-        const round1List = (round1Answers || []) as QuestionRow[];
+        const round1List = (round1Answers || []) as ClarifyingQuestionRow[];
 
         // Format round 1 answers for job
         const previousAnswers = round1List.map(q => ({
