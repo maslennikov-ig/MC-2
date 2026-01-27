@@ -44,6 +44,7 @@ import {
   getAnsweredQuestions,
   getClarifyingConfig,
   autoAnswerAllQuestions,
+  extractAnswerString,
 } from './phases/phase-0.5-clarifying';
 import {
   updateCourseProgress,
@@ -478,7 +479,7 @@ export async function runAnalysisOrchestration(job: StructureAnalysisJob): Promi
           // NEW: Pass clarifying answers from Phase 0.5
           clarifying_answers: clarifyingAnswers.map(q => ({
             question: q.question_text,
-            answer: q.user_answer || '',
+            answer: extractAnswerString(q.user_answer),
             priority: q.question_priority,
             category: q.question_category,
           })),
@@ -549,7 +550,7 @@ export async function runAnalysisOrchestration(job: StructureAnalysisJob): Promi
           // NEW: Pass clarifying answers from Phase 0.5
           clarifying_answers: clarifyingAnswers.map(q => ({
             question: q.question_text,
-            answer: q.user_answer || '',
+            answer: extractAnswerString(q.user_answer),
             priority: q.question_priority,
             category: q.question_category,
           })),
@@ -626,7 +627,7 @@ export async function runAnalysisOrchestration(job: StructureAnalysisJob): Promi
           // NEW: Pass clarifying answers from Phase 0.5
           clarifying_answers: clarifyingAnswers.map(q => ({
             question: q.question_text,
-            answer: q.user_answer || '',
+            answer: extractAnswerString(q.user_answer),
             priority: q.question_priority,
             category: q.question_category,
           })),
@@ -678,7 +679,7 @@ export async function runAnalysisOrchestration(job: StructureAnalysisJob): Promi
           // NEW: Pass clarifying answers from Phase 0.5
           clarifying_answers: clarifyingAnswers.map(q => ({
             question: q.question_text,
-            answer: q.user_answer || '',
+            answer: extractAnswerString(q.user_answer),
             priority: q.question_priority,
             category: q.question_category,
           })),

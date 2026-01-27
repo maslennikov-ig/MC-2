@@ -45,23 +45,39 @@ export const LLM_CLARIFYING_TIMEOUT_MS = parseInt(
 // ============================================================================
 
 /**
+ * Question type determines UI rendering and answer validation
+ * - open: Free text with AI recommendation
+ * - single_choice: Select one option (radio buttons)
+ * - multi_choice: Select multiple options (checkboxes)
+ */
+export const QuestionTypeSchema = z.enum(['open', 'single_choice', 'multi_choice']);
+export type QuestionType = z.infer<typeof QuestionTypeSchema>;
+
+/**
  * Suggested answer for a clarifying question
  */
 export const SuggestedAnswerSchema = z.object({
   text: z.string().min(5).max(500),
   rationale: z.string().min(10).max(300),
+  is_recommended: z.boolean().optional(), // For open type: marks the AI-recommended answer
 });
 
 export type SuggestedAnswer = z.infer<typeof SuggestedAnswerSchema>;
 
 /**
  * Single clarifying question with metadata
+ *
+ * Question types:
+ * - open: AI provides a recommendation, user can accept, modify, or write custom
+ * - single_choice: User selects ONE option from suggested answers
+ * - multi_choice: User selects MULTIPLE options from suggested answers
  */
 export const ClarifyingQuestionSchema = z.object({
   question_text: z.string().min(10).max(500),
+  question_type: QuestionTypeSchema.default('open'),
   question_priority: z.enum(['critical', 'important', 'nice_to_have']),
   question_category: z.string().min(3).max(50),
-  suggested_answers: z.array(SuggestedAnswerSchema).min(2).max(4),
+  suggested_answers: z.array(SuggestedAnswerSchema).min(2).max(6), // Increased max to 6 for multi_choice
 });
 
 export type ClarifyingQuestion = z.infer<typeof ClarifyingQuestionSchema>;
@@ -128,16 +144,44 @@ export const Phase05InputSchema = z.object({
 export type Phase05Input = z.infer<typeof Phase05InputSchema>;
 
 /**
+ * User answer stored in JSONB format
+ * - For open/single_choice: { value: "answer text" }
+ * - For multi_choice: { values: ["option1", "option2"] }
+ */
+export interface UserAnswerValue {
+  value?: string; // For open/single_choice
+  values?: string[]; // For multi_choice
+}
+
+/**
+ * Extract string representation from UserAnswerValue
+ * Used for backwards compatibility with code expecting string answers
+ *
+ * @param answer - UserAnswerValue or string (for backwards compatibility)
+ * @returns String representation of the answer
+ */
+export function extractAnswerString(answer: UserAnswerValue | string | null): string {
+  if (!answer) return '';
+  // Handle legacy string format
+  if (typeof answer === 'string') return answer;
+  // Handle JSONB format
+  if (answer.value) return answer.value;
+  if (answer.values && answer.values.length > 0) return answer.values.join(', ');
+  return '';
+}
+
+/**
  * Database row type for clarifying_questions table
  */
 export interface ClarifyingQuestionRow {
   id: string;
   course_id: string;
   question_text: string;
+  question_type: QuestionType;
   question_priority: 'critical' | 'important' | 'nice_to_have';
   question_category: string;
   suggested_answers: SuggestedAnswer[];
-  user_answer: string | null;
+  user_answer: UserAnswerValue | null; // JSONB: { value: string } or { values: string[] }
   answer_source: 'suggested' | 'modified' | 'custom' | null;
   selected_suggestion_index: number | null;
   user_modification: string | null;
@@ -221,17 +265,27 @@ CRITICAL RULES:
   "questions": [
     {
       "question_text": "string (10-500 chars)",
+      "question_type": "open|single_choice|multi_choice",
       "question_priority": "critical|important|nice_to_have",
       "question_category": "audience|content|depth|format|outcome|tool",
       "suggested_answers": [
-        { "text": "string (5-500 chars)", "rationale": "string (10-300 chars)" }
+        { "text": "string (5-500 chars)", "rationale": "string (10-300 chars)", "is_recommended": boolean }
       ]
     }
   ]
 }
 
 3. Generate 3-7 questions total
-4. Each question MUST have 2-4 suggested answers
+4. QUESTION TYPES - choose the optimal type for each question:
+   - "open": When answer requires free-form text (e.g., specific goals, unique requirements)
+     * MUST mark exactly ONE answer as "is_recommended": true
+     * 2-3 suggested answers as starting points
+   - "single_choice": When user must choose ONE option (e.g., difficulty level, format preference)
+     * First answer = recommended option
+     * 2-4 mutually exclusive options
+   - "multi_choice": When user can select MULTIPLE options (e.g., topics to cover, features to include)
+     * Mark recommended options with "is_recommended": true
+     * 3-6 options that can be combined
 5. Prioritize questions as:
    - critical: Must be answered for quality course (e.g., target skill level, key outcomes)
    - important: Will significantly improve course (e.g., preferred learning style, time constraints)
@@ -284,6 +338,7 @@ async function storeQuestions(
   const rows = questions.map((q, index) => ({
     course_id: courseId,
     question_text: q.question_text,
+    question_type: q.question_type || 'open', // Default to 'open' for backwards compatibility
     question_priority: q.question_priority,
     question_category: q.question_category,
     suggested_answers: q.suggested_answers,
