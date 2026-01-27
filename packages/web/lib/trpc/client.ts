@@ -389,6 +389,19 @@ export const trpc = {
         { success: boolean; canProceed: boolean }
       >('clarifying.submitAnswer'),
     },
+    submitMultipleAnswers: {
+      useMutation: createUseMutation<
+        {
+          submissions: Array<{
+            questionId: string
+            answer: string
+            answerSource: 'suggested' | 'modified' | 'custom'
+            selectedSuggestionIndex?: number
+          }>
+        },
+        { successCount: number; failedIds: string[]; canProceed: boolean }
+      >('clarifying.submitMultipleAnswers'),
+    },
     skipQuestion: {
       useMutation: createUseMutation<{ questionId: string }, { success: boolean }>(
         'clarifying.skipQuestion'

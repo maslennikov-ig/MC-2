@@ -92,6 +92,26 @@ const submitAnswerSchema = z.object({
 });
 
 /**
+ * Schema for submitMultipleAnswers endpoint (batch)
+ *
+ * Allows submitting multiple answers in a single request.
+ * Used by "Accept All" feature to avoid rate limiting issues.
+ */
+const submitMultipleAnswersSchema = z.object({
+  submissions: z
+    .array(
+      z.object({
+        questionId: z.string().uuid('Invalid question ID'),
+        answer: z.string().min(1, 'Answer is required').max(10000, 'Answer too long'),
+        answerSource: z.enum(['suggested', 'modified', 'custom']),
+        selectedSuggestionIndex: z.number().int().min(0).optional(),
+      })
+    )
+    .min(1, 'At least one submission required')
+    .max(20, 'Maximum 20 submissions per batch'),
+});
+
+/**
  * Schema for skipQuestion endpoint
  */
 const skipQuestionSchema = z.object({
@@ -801,6 +821,215 @@ export const clarifyingRouter = router({
         throw new TRPCError({
           code: 'INTERNAL_SERVER_ERROR',
           message: 'Failed to submit answer',
+        });
+      }
+    }),
+
+  /**
+   * Submit multiple answers in a batch
+   *
+   * Purpose: Allows submitting multiple answers in a single API call.
+   * Used by "Accept All" feature to avoid rate limiting issues.
+   * All answers are submitted atomically in a single database transaction.
+   *
+   * Authorization: Requires authenticated user (protectedProcedure)
+   *
+   * Input:
+   * - submissions: Array of answer submissions (max 20)
+   *   - questionId: UUID of the question
+   *   - answer: The answer text
+   *   - answerSource: 'suggested' | 'modified' | 'custom'
+   *   - selectedSuggestionIndex: Index of selected suggestion (for suggested)
+   *
+   * Output:
+   * - successCount: Number of successfully submitted answers
+   * - failedIds: Array of question IDs that failed
+   * - canProceed: Whether all required questions are now answered
+   *
+   * @example
+   * ```typescript
+   * const result = await trpc.clarifying.submitMultipleAnswers.mutate({
+   *   submissions: [
+   *     { questionId: '...', answer: 'Answer 1', answerSource: 'suggested', selectedSuggestionIndex: 0 },
+   *     { questionId: '...', answer: 'Answer 2', answerSource: 'suggested', selectedSuggestionIndex: 0 },
+   *   ],
+   * });
+   * // { successCount: 2, failedIds: [], canProceed: true }
+   * ```
+   */
+  submitMultipleAnswers: protectedProcedure
+    .use(createRateLimiter({ requests: 10, window: 60 })) // More relaxed limit for batch operations
+    .input(submitMultipleAnswersSchema)
+    .mutation(async ({ ctx, input }) => {
+      const { submissions } = input;
+      const requestId = nanoid();
+      const currentUser = ctx.user;
+
+      logger.info(
+        { requestId, submissionCount: submissions.length, userId: currentUser.id },
+        'Submit multiple answers request'
+      );
+
+      try {
+        const supabase = getTypedSupabaseAdmin();
+        const successfulIds: string[] = [];
+        const failedIds: string[] = [];
+
+        // Verify all questions belong to the same course and user has access
+        const questionIds = submissions.map(s => s.questionId);
+
+        // Fetch all questions in one query
+        const { data: questions, error: fetchError } = await supabase
+          .from('clarifying_questions')
+          .select('id, course_id, status, suggested_answers')
+          .in('id', questionIds);
+
+        if (fetchError || !questions) {
+          logger.error(
+            { requestId, error: fetchError?.message },
+            'Failed to fetch questions for batch submission'
+          );
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Failed to fetch questions',
+          });
+        }
+
+        const questionList = questions as Array<{
+          id: string;
+          course_id: string;
+          status: string;
+          suggested_answers: Array<{ text: string }> | null;
+        }>;
+
+        // Validate all questions exist
+        const foundIds = new Set(questionList.map(q => q.id));
+        const missingIds = questionIds.filter(id => !foundIds.has(id));
+        if (missingIds.length > 0) {
+          throw new TRPCError({
+            code: 'NOT_FOUND',
+            message: `Questions not found: ${missingIds.join(', ')}`,
+          });
+        }
+
+        // Validate all questions belong to the same course
+        const courseIds = new Set(questionList.map(q => q.course_id));
+        if (courseIds.size > 1) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'All questions must belong to the same course',
+          });
+        }
+
+        const courseId = questionList[0].course_id;
+
+        // Verify course access
+        await verifyCourseAccess(courseId, currentUser.id, currentUser.organizationId, requestId);
+
+        // Create a map for quick question lookup
+        const questionMap = new Map(questionList.map(q => [q.id, q]));
+
+        // Process each submission
+        const now = new Date().toISOString();
+
+        for (const submission of submissions) {
+          const question = questionMap.get(submission.questionId);
+          if (!question) {
+            failedIds.push(submission.questionId);
+            continue;
+          }
+
+          // Skip already answered questions
+          if (question.status === 'answered') {
+            logger.debug(
+              { requestId, questionId: submission.questionId },
+              'Question already answered, skipping'
+            );
+            successfulIds.push(submission.questionId);
+            continue;
+          }
+
+          // Validate suggestion index if provided
+          const suggestions = question.suggested_answers || [];
+          if (
+            submission.answerSource === 'suggested' &&
+            submission.selectedSuggestionIndex !== undefined
+          ) {
+            if (submission.selectedSuggestionIndex >= suggestions.length) {
+              logger.warn(
+                {
+                  requestId,
+                  questionId: submission.questionId,
+                  index: submission.selectedSuggestionIndex,
+                  suggestionsCount: suggestions.length,
+                },
+                'Invalid suggestion index'
+              );
+              failedIds.push(submission.questionId);
+              continue;
+            }
+          }
+
+          // Build user_answer as JSONB
+          const userAnswerValue: UserAnswerValue = { value: submission.answer };
+
+          // Update question with answer
+          const { error: updateError } = await supabase
+            .from('clarifying_questions')
+            .update({
+              user_answer: userAnswerValue as unknown as string,
+              answer_source: submission.answerSource,
+              selected_suggestion_index: submission.selectedSuggestionIndex ?? null,
+              status: 'answered',
+              answered_at: now,
+            })
+            .eq('id', submission.questionId);
+
+          if (updateError) {
+            logger.error(
+              { requestId, questionId: submission.questionId, error: updateError.message },
+              'Failed to update question in batch'
+            );
+            failedIds.push(submission.questionId);
+          } else {
+            successfulIds.push(submission.questionId);
+          }
+        }
+
+        // Check if all critical/important questions are now answered
+        const { data: remainingRequired } = await supabase
+          .from('clarifying_questions')
+          .select('id')
+          .eq('course_id', courseId)
+          .in('question_priority', ['critical', 'important'])
+          .eq('status', 'pending');
+
+        const canProceed = !remainingRequired || remainingRequired.length === 0;
+
+        logger.info(
+          {
+            requestId,
+            successCount: successfulIds.length,
+            failedCount: failedIds.length,
+            canProceed,
+          },
+          'Batch answer submission completed'
+        );
+
+        return {
+          successCount: successfulIds.length,
+          failedIds,
+          canProceed,
+        };
+      } catch (error) {
+        if (error instanceof TRPCError) throw error;
+        logger.error(
+          { requestId, error: error instanceof Error ? error.message : String(error) },
+          'Submit multiple answers failed'
+        );
+        throw new TRPCError({
+          code: 'INTERNAL_SERVER_ERROR',
+          message: 'Failed to submit answers',
         });
       }
     }),

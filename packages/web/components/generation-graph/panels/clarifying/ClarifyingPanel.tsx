@@ -106,6 +106,7 @@ export function ClarifyingPanel({ courseId, onComplete }: ClarifyingPanelProps) 
     }
   )
   const submitAnswerMutation = trpc.clarifying.submitAnswer.useMutation()
+  const submitMultipleAnswersMutation = trpc.clarifying.submitMultipleAnswers.useMutation()
   const skipQuestionMutation = trpc.clarifying.skipQuestion.useMutation()
   const approveAndProceedMutation = trpc.clarifying.approveAndProceed.useMutation()
 
@@ -267,29 +268,52 @@ export function ClarifyingPanel({ courseId, onComplete }: ClarifyingPanelProps) 
 
   const handleAcceptAll = async () => {
     // Auto-select first suggested answer for all unanswered questions
-    // Sequential submission with delay to avoid rate limiting (30 req/min backend limit)
+    // Uses batch endpoint to submit all answers in a single API call (fixes HIGH-002 rate limit issue)
     const unanswered = questions.filter(
       (q) => !answeredQuestions.has(q.id) && q.suggestedAnswers.length > 0
     )
 
-    for (const q of unanswered) {
-      try {
-        await submitAnswerMutation.mutateAsync({
-          questionId: q.id,
-          answer: q.suggestedAnswers[0].text,
-          answerSource: 'suggested',
-          selectedSuggestionIndex: 0,
+    if (unanswered.length === 0) {
+      return
+    }
+
+    // Build batch submission payload
+    const submissions = unanswered.map((q) => ({
+      questionId: q.id,
+      answer: q.suggestedAnswers[0].text,
+      answerSource: 'suggested' as const,
+      selectedSuggestionIndex: 0,
+    }))
+
+    try {
+      const result = await submitMultipleAnswersMutation.mutateAsync({ submissions })
+
+      // Update local state for all successful answers
+      const successfulIds = submissions
+        .map((s) => s.questionId)
+        .filter((id) => !result.failedIds.includes(id))
+
+      setAnsweredQuestions((prev) => {
+        const newSet = new Set(prev)
+        successfulIds.forEach((id) => newSet.add(id))
+        return newSet
+      })
+
+      // Show feedback
+      if (result.failedIds.length > 0) {
+        toast.warning('Некоторые ответы не сохранены', {
+          description: `Сохранено ${result.successCount} из ${submissions.length} ответов`,
         })
-        setAnsweredQuestions((prev) => new Set(prev).add(q.id))
-        // Small delay to avoid rate limit (100ms between requests)
-        await new Promise((r) => setTimeout(r, 100))
-      } catch (error) {
-        console.error(`Failed to submit answer for ${q.id}:`, error)
-        toast.error('Ошибка при автоматическом ответе', {
-          description: `Не удалось ответить на вопрос. Продолжаем с остальными.`,
+      } else {
+        toast.success('Все рекомендации приняты', {
+          description: `Сохранено ${result.successCount} ответов`,
         })
-        // Continue with other questions on failure
       }
+    } catch (error) {
+      console.error('Failed to submit batch answers:', error)
+      toast.error('Ошибка при автоматическом ответе', {
+        description: (error as Error).message || 'Попробуйте ещё раз',
+      })
     }
   }
 
@@ -374,7 +398,7 @@ export function ClarifyingPanel({ courseId, onComplete }: ClarifyingPanelProps) 
               size="sm"
               variant="outline"
               onClick={() => void handleAcceptAll()}
-              disabled={submitAnswerMutation.isPending}
+              disabled={submitAnswerMutation.isPending || submitMultipleAnswersMutation.isPending}
             >
               <Sparkles className="h-3.5 w-3.5" />
               Принять все рекомендации
@@ -403,7 +427,11 @@ export function ClarifyingPanel({ courseId, onComplete }: ClarifyingPanelProps) 
                   onAnswer={handleAnswer}
                   onSkip={handleSkip}
                   isAnswered={answeredQuestions.has(question.id)}
-                  isProcessing={submitAnswerMutation.isPending || skipQuestionMutation.isPending}
+                  isProcessing={
+                    submitAnswerMutation.isPending ||
+                    submitMultipleAnswersMutation.isPending ||
+                    skipQuestionMutation.isPending
+                  }
                 />
               </div>
             ))}
