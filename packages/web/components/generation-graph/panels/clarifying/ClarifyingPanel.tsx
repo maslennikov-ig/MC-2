@@ -238,7 +238,7 @@ export function ClarifyingPanel({ courseId, onComplete }: ClarifyingPanelProps) 
     if (isComplete && !hasShownConfetti && wasAlreadyCompleteOnMount.current === false) {
       setHasShownConfetti(true)
       // Persist to localStorage so confetti never shows again for this course
-      localStorage.setItem(confettiStorageKey, 'true')
+      localStorage.setItem(`clarifying_confetti_shown_${courseId}`, 'true')
       void confetti({
         particleCount: 100,
         spread: 70,
@@ -246,7 +246,7 @@ export function ClarifyingPanel({ courseId, onComplete }: ClarifyingPanelProps) 
         colors: ['#a855f7', '#8b5cf6', '#7c3aed'],
       })
     }
-  }, [isComplete, hasShownConfetti, totalQuestions, confettiStorageKey])
+  }, [isComplete, hasShownConfetti, totalQuestions, courseId])
 
   // HIGH-005 fix: Scroll helper - called directly from mutation callback to avoid race conditions
   const scrollToNextUnanswered = useCallback(
