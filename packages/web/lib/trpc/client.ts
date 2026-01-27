@@ -189,6 +189,9 @@ function createUseQuery<TInput, TOutput>(
     const isEnabled = options?.enabled !== false
     const staleTime = options?.staleTime ?? 0
 
+    // Stabilize input reference to prevent unnecessary refetches
+    const inputKey = JSON.stringify(input)
+
     const fetchData = React.useCallback(async () => {
       if (!isEnabled) {
         setIsLoading(false)
@@ -268,7 +271,7 @@ function createUseQuery<TInput, TOutput>(
         inFlightRequests.delete(cacheKey)
         setIsLoading(false)
       }
-    }, [input, isEnabled, staleTime])
+    }, [inputKey, isEnabled, staleTime])
 
     React.useEffect(() => {
       void fetchData()
