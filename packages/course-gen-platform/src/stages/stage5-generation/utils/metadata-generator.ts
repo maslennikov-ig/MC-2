@@ -22,6 +22,7 @@ import {
 } from '@megacampus/shared-types/generation-result';
 import { getStylePrompt } from '@megacampus/shared-types/style-prompts';
 import { UnifiedRegenerator } from '@/shared/regeneration';
+import { safeJSONParse } from '@/shared/utils/json-repair';
 import { z } from 'zod';
 import {
   getDifficultyFromAnalysis,
@@ -243,7 +244,7 @@ export class MetadataGenerator {
     // Stage 5: NO warning fallback - database must be strict
     let preprocessedContent = rawContent;
     try {
-      const parsedRaw = JSON.parse(rawContent) as Record<string, unknown>;
+      const parsedRaw = safeJSONParse(rawContent) as Record<string, unknown>;
       // Preprocess learning_outcomes if present
       if (parsedRaw.learning_outcomes && Array.isArray(parsedRaw.learning_outcomes)) {
         parsedRaw.learning_outcomes = parsedRaw.learning_outcomes.map((outcome: unknown) =>
