@@ -652,15 +652,18 @@ export async function getClarifyingConfig(
 }
 
 /**
- * Lenient schema for validating suggested_answers from database
- * More permissive than SuggestedAnswerSchema to handle legacy data
+ * RPC response type for auto_answer_questions_atomic function
  */
-const SuggestedAnswerValidationSchema = z.object({
-  text: z.string().min(1),
-  rationale: z.string().optional(),
-});
-
-const SuggestedAnswersArraySchema = z.array(SuggestedAnswerValidationSchema).min(1);
+interface AutoAnswerRpcResponse {
+  success: boolean;
+  updated_count: number;
+  fallback_count: number;
+  total_pending: number;
+  answered_at?: string;
+  error?: string;
+  code?: string;
+  message?: string;
+}
 
 /**
  * Auto-answer all pending questions with first suggested answer
@@ -669,103 +672,62 @@ const SuggestedAnswersArraySchema = z.array(SuggestedAnswerValidationSchema).min
  * The AI generates questions and automatically selects the first
  * suggested answer for each question.
  *
- * Performance: Uses bulk upsert instead of N sequential updates.
+ * Implementation: Uses atomic RPC function (auto_answer_questions_atomic)
+ * to ensure all-or-nothing updates. If any update fails, the entire
+ * transaction rolls back - no partial state.
  *
  * @param courseId - Course UUID
  * @returns Promise<number> - Count of auto-answered questions
+ * @throws Error if RPC call fails critically
  */
 export async function autoAnswerAllQuestions(courseId: string): Promise<number> {
   const supabase = getSupabaseAdmin();
 
-  const { data: questions, error } = await supabase
-    .from('clarifying_questions')
-    .select('id, suggested_answers')
-    .eq('course_id', courseId)
-    .eq('status', 'pending');
-
-  if (error) {
-    logger.warn(
-      { courseId, error: error.message },
-      'Failed to fetch pending questions for auto-answer, returning 0'
-    );
-    return 0;
-  }
-
-  if (!questions || questions.length === 0) {
-    logger.debug({ courseId }, 'No pending questions to auto-answer');
-    return 0;
-  }
-
-  // Build all updates at once (fix N+1 query pattern)
-  const answeredAt = new Date().toISOString();
-  let fallbackCount = 0;
-
-  const updates = questions.map(question => {
-    // Validate suggested_answers structure with Zod (Issue #3)
-    const validationResult = SuggestedAnswersArraySchema.safeParse(question.suggested_answers);
-
-    let firstAnswer: string;
-    if (!validationResult.success) {
-      logger.warn(
-        {
-          courseId,
-          questionId: question.id,
-          error: validationResult.error.message,
-        },
-        'Invalid suggested_answers structure, using fallback'
-      );
-      firstAnswer = 'Auto-selected by system';
-      fallbackCount++;
-    } else {
-      firstAnswer = validationResult.data[0].text;
-    }
-
-    return {
-      id: question.id,
-      user_answer: firstAnswer,
-      answer_source: 'suggested' as const,
-      selected_suggestion_index: 0,
-      status: 'answered' as const,
-      answered_at: answeredAt,
-    };
+  // Use atomic RPC function for transaction safety
+  // This ensures all questions are updated or none are (rollback on failure)
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const { data, error } = await (supabase.rpc as any)('auto_answer_questions_atomic', {
+    p_course_id: courseId,
   });
 
-  // Parallel updates - faster than sequential, avoids upsert required fields issue
-  const updatePromises = updates.map(update =>
-    supabase
-      .from('clarifying_questions')
-      .update({
-        user_answer: update.user_answer,
-        answer_source: update.answer_source,
-        selected_suggestion_index: update.selected_suggestion_index,
-        status: update.status,
-        answered_at: update.answered_at,
-      })
-      .eq('id', update.id)
-  );
-
-  const results = await Promise.all(updatePromises);
-  const failedCount = results.filter(r => r.error).length;
-
-  if (failedCount > 0) {
+  if (error) {
     logger.error(
-      { courseId, failedCount, totalCount: questions.length },
-      'Some auto-answer updates failed'
+      { courseId, error: error.message, code: error.code },
+      'RPC auto_answer_questions_atomic failed'
+    );
+    throw new Error(`Failed to auto-answer questions: ${error.message}`);
+  }
+
+  const result = data as AutoAnswerRpcResponse;
+
+  if (!result.success) {
+    logger.error(
+      {
+        courseId,
+        error: result.error,
+        code: result.code,
+        totalPending: result.total_pending,
+      },
+      'Auto-answer atomic operation failed'
+    );
+    throw new Error(`Auto-answer failed: ${result.error || 'Unknown error'}`);
+  }
+
+  // Log success with statistics
+  if (result.updated_count === 0) {
+    logger.debug({ courseId }, 'No pending questions to auto-answer');
+  } else {
+    logger.info(
+      {
+        courseId,
+        answeredCount: result.updated_count,
+        fallbackCount: result.fallback_count,
+        totalPending: result.total_pending,
+        answeredAt: result.answered_at,
+      },
+      'Auto-answered clarifying questions in automatic mode (atomic)'
     );
   }
 
-  const successCount = updates.length - failedCount;
-
-  logger.info(
-    {
-      courseId,
-      answeredCount: successCount,
-      failedCount,
-      fallbackCount,
-      totalPending: questions.length,
-    },
-    'Auto-answered clarifying questions in automatic mode'
-  );
-
-  return successCount;
+  return result.updated_count;
 }
