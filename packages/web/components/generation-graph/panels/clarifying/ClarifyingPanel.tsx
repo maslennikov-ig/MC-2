@@ -53,9 +53,9 @@ export function ClarifyingPanel({ courseId, onComplete }: ClarifyingPanelProps) 
     text: DOMPurify.sanitize(q.question_text),
     priority: q.question_priority as QuestionPriority,
     suggestedAnswers: Array.isArray(q.suggested_answers)
-      ? q.suggested_answers.map((text) => ({
-          text: DOMPurify.sanitize(text),
-          rationale: undefined,
+      ? q.suggested_answers.map((item: string | { text: string; rationale?: string }) => ({
+          text: DOMPurify.sanitize(typeof item === 'string' ? item : item.text),
+          rationale: typeof item === 'string' ? undefined : item.rationale,
         }))
       : [],
     currentAnswer: q.user_answer ? DOMPurify.sanitize(q.user_answer) : undefined,
@@ -114,13 +114,15 @@ export function ClarifyingPanel({ courseId, onComplete }: ClarifyingPanelProps) 
   const handleAnswer = (
     questionId: string,
     answer: string,
-    source: 'suggested' | 'modified' | 'custom'
+    source: 'suggested' | 'modified' | 'custom',
+    selectedSuggestionIndex?: number
   ) => {
     void submitAnswerMutation
       .mutateAsync({
         questionId,
         answer,
         answerSource: source,
+        selectedSuggestionIndex,
       })
       .then(() => {
         setAnsweredQuestions((prev) => new Set(prev).add(questionId))

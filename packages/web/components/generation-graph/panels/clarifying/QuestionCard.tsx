@@ -29,7 +29,8 @@ interface QuestionCardProps {
   onAnswer: (
     questionId: string,
     answer: string,
-    source: 'suggested' | 'modified' | 'custom'
+    source: 'suggested' | 'modified' | 'custom',
+    selectedSuggestionIndex?: number
   ) => void
   onSkip?: (questionId: string) => void
   isAnswered: boolean
@@ -78,7 +79,7 @@ export function QuestionCard({
 
     setSelectedSuggestion(index)
     const answer = question.suggestedAnswers[index].text
-    onAnswer(question.id, answer, 'suggested')
+    onAnswer(question.id, answer, 'suggested', index)
   }
 
   const handleModify = () => {
@@ -89,8 +90,8 @@ export function QuestionCard({
   }
 
   const handleSaveModified = () => {
-    if (modifiedAnswer.trim()) {
-      onAnswer(question.id, modifiedAnswer, 'modified')
+    if (modifiedAnswer.trim() && selectedSuggestion !== null) {
+      onAnswer(question.id, modifiedAnswer, 'modified', selectedSuggestion)
       setMode('select')
     }
   }
