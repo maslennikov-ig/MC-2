@@ -129,15 +129,63 @@ export interface ApproveAndProceedResponse {
 // ============================================================================
 
 /**
- * Query keys for clarifying procedures.
+ * Available clarifying procedures for type-safe query keys.
+ * Adding new procedures requires updating this union type.
+ */
+export type ClarifyingProcedure = 'isEnabled' | 'questions' | 'progress'
+
+/**
+ * Type for clarifying query keys.
+ * Ensures consistent key structure across the application.
+ */
+export type ClarifyingQueryKey =
+  | readonly ['clarifying']
+  | readonly ['clarifying', ClarifyingProcedure, string]
+
+/**
+ * Query keys factory for clarifying procedures.
+ *
  * Follows TanStack Query key factory pattern for consistent cache management.
+ * Keys are hierarchical, enabling bulk invalidation:
+ * - `clarifyingKeys.all` - invalidates ALL clarifying queries
+ * - `clarifyingKeys.progress(courseId)` - invalidates specific query
+ *
+ * @see https://tanstack.com/query/v5/docs/framework/react/guides/query-keys
+ *
+ * @example
+ * ```ts
+ * // Invalidate all clarifying queries
+ * queryClient.invalidateQueries({ queryKey: clarifyingKeys.all })
+ *
+ * // Invalidate specific progress query
+ * queryClient.invalidateQueries({ queryKey: clarifyingKeys.progress(courseId) })
+ * ```
  */
 export const clarifyingKeys = {
+  /** Base key for all clarifying queries */
   all: ['clarifying'] as const,
-  isEnabled: (courseId: string) => [...clarifyingKeys.all, 'isEnabled', courseId] as const,
-  questions: (courseId: string) => [...clarifyingKeys.all, 'questions', courseId] as const,
-  progress: (courseId: string) => [...clarifyingKeys.all, 'progress', courseId] as const,
-}
+
+  /**
+   * Creates query key for isEnabled procedure.
+   * @param courseId - Course ID to check clarifying status
+   */
+  isEnabled: (courseId: string): ClarifyingQueryKey =>
+    [...clarifyingKeys.all, 'isEnabled', courseId] as const,
+
+  /**
+   * Creates query key for questions procedure.
+   * @param courseId - Course ID to fetch questions for
+   */
+  questions: (courseId: string): ClarifyingQueryKey =>
+    [...clarifyingKeys.all, 'questions', courseId] as const,
+
+  /**
+   * Creates query key for progress procedure.
+   * @param courseId - Course ID to fetch progress for
+   */
+  progress: (courseId: string): ClarifyingQueryKey =>
+    [...clarifyingKeys.all, 'progress', courseId] as const,
+} as const
 
 // ============================================================================
 // HTTP Utilities
@@ -360,6 +408,25 @@ async function approveAndProceed(
 
 /**
  * Hook to check if clarifying is enabled for a course.
+ *
+ * Returns whether the clarifying feature is enabled for the given course.
+ * Use this before fetching questions or progress to avoid unnecessary API calls.
+ *
+ * @param courseId - The course ID to check clarifying status for
+ * @param options - Additional TanStack Query options (enabled, staleTime, etc.)
+ * @returns Query result with `enabled` boolean and loading/error states
+ *
+ * @example
+ * ```tsx
+ * const { data, isLoading, error } = useClarifyingIsEnabled(courseId, {
+ *   enabled: isAtStage4OrBeyond,
+ *   staleTime: Infinity, // Config doesn't change
+ * })
+ *
+ * if (data?.enabled) {
+ *   // Show clarifying panel
+ * }
+ * ```
  */
 export function useClarifyingIsEnabled(
   courseId: string,
@@ -374,6 +441,25 @@ export function useClarifyingIsEnabled(
 
 /**
  * Hook to fetch clarifying questions for a course.
+ *
+ * Returns all clarifying questions with their current answers and status.
+ * Questions are generated once and cached with `staleTime: Infinity`.
+ *
+ * @param courseId - The course ID to fetch questions for
+ * @param options - Additional TanStack Query options (enabled, staleTime, refetchInterval, etc.)
+ * @returns Query result with questions array and loading/error states
+ *
+ * @example
+ * ```tsx
+ * const { data, isLoading, refetch } = useClarifyingQuestions(courseId, {
+ *   staleTime: Infinity, // Questions don't change
+ *   refetchOnWindowFocus: false,
+ *   // Poll until questions are generated
+ *   refetchInterval: (query) => query.state.data?.questions?.length ? false : 2000,
+ * })
+ *
+ * const questions = data?.questions ?? []
+ * ```
  */
 export function useClarifyingQuestions(
   courseId: string,
@@ -388,6 +474,29 @@ export function useClarifyingQuestions(
 
 /**
  * Hook to fetch clarifying progress for a course.
+ *
+ * Returns progress stats including total, answered, skipped counts,
+ * and whether the user can proceed to the next stage.
+ *
+ * This hook is automatically refetched when mutations invalidate the cache,
+ * ensuring all components stay in sync.
+ *
+ * @param courseId - The course ID to fetch progress for
+ * @param options - Additional TanStack Query options (enabled, staleTime, etc.)
+ * @returns Query result with progress data and loading/error states
+ *
+ * @example
+ * ```tsx
+ * const { data } = useClarifyingProgress(courseId, {
+ *   enabled: clarifyingEnabled,
+ *   staleTime: 5000, // Cache 5 sec to prevent rate limiting
+ * })
+ *
+ * if (data) {
+ *   console.log(`${data.answered}/${data.total} answered`)
+ *   console.log(`Can proceed: ${data.canProceed}`)
+ * }
+ * ```
  */
 export function useClarifyingProgress(
   courseId: string,
@@ -402,7 +511,31 @@ export function useClarifyingProgress(
 
 /**
  * Hook to submit an answer to a clarifying question.
- * Automatically invalidates questions and progress cache on success.
+ *
+ * Automatically invalidates questions and progress cache on success,
+ * which triggers refetch in all components using these queries (e.g., GraphView).
+ *
+ * Features:
+ * - Automatic retry (2 retries with exponential backoff)
+ * - Cache invalidation on success
+ * - Error-safe invalidation (logs but doesn't fail mutation)
+ *
+ * @param courseId - Course ID for cache invalidation scope
+ * @returns Mutation object with mutate/mutateAsync functions
+ *
+ * @example
+ * ```tsx
+ * const submitAnswer = useSubmitAnswer(courseId)
+ *
+ * const handleSubmit = async () => {
+ *   await submitAnswer.mutateAsync({
+ *     questionId: '123',
+ *     answer: 'My answer',
+ *     answerSource: 'custom',
+ *   })
+ *   // Cache automatically invalidated, GraphView updates
+ * }
+ * ```
  */
 export function useSubmitAnswer(courseId: string) {
   const queryClient = useQueryClient()
@@ -427,8 +560,29 @@ export function useSubmitAnswer(courseId: string) {
 }
 
 /**
- * Hook to submit multiple answers at once.
- * Automatically invalidates questions and progress cache on success.
+ * Hook to submit multiple answers at once (batch operation).
+ *
+ * Use this for "Accept All Recommendations" feature to avoid rate limiting.
+ * Automatically invalidates cache on success.
+ *
+ * @param courseId - Course ID for cache invalidation scope
+ * @returns Mutation object with mutate/mutateAsync functions
+ *
+ * @example
+ * ```tsx
+ * const submitMultiple = useSubmitMultipleAnswers(courseId)
+ *
+ * const handleAcceptAll = async () => {
+ *   const result = await submitMultiple.mutateAsync({
+ *     submissions: questions.map(q => ({
+ *       questionId: q.id,
+ *       answer: q.suggestedAnswers[0].text,
+ *       answerSource: 'suggested',
+ *     }))
+ *   })
+ *   console.log(`Saved ${result.successCount} answers`)
+ * }
+ * ```
  */
 export function useSubmitMultipleAnswers(courseId: string) {
   const queryClient = useQueryClient()
@@ -452,7 +606,21 @@ export function useSubmitMultipleAnswers(courseId: string) {
 
 /**
  * Hook to skip a clarifying question.
- * Automatically invalidates questions and progress cache on success.
+ *
+ * Marks the question as skipped (status changes but no answer saved).
+ * Use for "nice_to_have" questions that user doesn't want to answer.
+ *
+ * @param courseId - Course ID for cache invalidation scope
+ * @returns Mutation object with mutate/mutateAsync functions
+ *
+ * @example
+ * ```tsx
+ * const skipQuestion = useSkipQuestion(courseId)
+ *
+ * <Button onClick={() => skipQuestion.mutate({ questionId: '123' })}>
+ *   Skip
+ * </Button>
+ * ```
  */
 export function useSkipQuestion(courseId: string) {
   const queryClient = useQueryClient()
@@ -475,7 +643,22 @@ export function useSkipQuestion(courseId: string) {
 }
 
 /**
- * Hook to approve clarifying and proceed to next stage.
+ * Hook to approve clarifying answers and proceed to next pipeline stage.
+ *
+ * Call this when user has answered all critical questions and wants to
+ * continue with course generation. Triggers Stage 5 (structure generation).
+ *
+ * @returns Mutation object with mutate/mutateAsync functions
+ *
+ * @example
+ * ```tsx
+ * const approveAndProceed = useApproveAndProceed()
+ *
+ * const handleContinue = async () => {
+ *   const { jobId } = await approveAndProceed.mutateAsync({ courseId })
+ *   console.log('Stage 5 started, job:', jobId)
+ * }
+ * ```
  */
 export function useApproveAndProceed() {
   return useMutation({
@@ -485,7 +668,29 @@ export function useApproveAndProceed() {
 
 /**
  * Hook to manually invalidate clarifying cache.
- * Use this when you need to force refetch from external triggers.
+ *
+ * Returns a stable callback that invalidates both questions and progress queries.
+ * Use for polling scenarios or manual refresh triggers.
+ *
+ * Note: Mutations (useSubmitAnswer, etc.) automatically invalidate cache,
+ * so manual invalidation is rarely needed.
+ *
+ * @param courseId - Course ID to invalidate cache for
+ * @returns Stable async callback function for invalidation
+ *
+ * @example
+ * ```tsx
+ * const invalidate = useInvalidateClarifying(courseId)
+ *
+ * // Manual refresh button
+ * <Button onClick={() => invalidate()}>Refresh</Button>
+ *
+ * // Or in useEffect for polling
+ * useEffect(() => {
+ *   const interval = setInterval(invalidate, 5000)
+ *   return () => clearInterval(interval)
+ * }, [invalidate])
+ * ```
  */
 export function useInvalidateClarifying(courseId: string) {
   const queryClient = useQueryClient()
