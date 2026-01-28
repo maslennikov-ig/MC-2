@@ -10,7 +10,14 @@ import confetti from 'canvas-confetti'
 import { ErrorBoundary } from 'react-error-boundary'
 import { QuestionCard } from './QuestionCard'
 import { WizardProgress, WizardSidebar, WizardNavigation } from './wizard'
-import { trpc, invalidateQueryCache } from '@/lib/trpc/client'
+import {
+  useClarifyingQuestions,
+  useSubmitAnswer,
+  useSubmitMultipleAnswers,
+  useSkipQuestion,
+  useApproveAndProceed,
+  useInvalidateClarifying,
+} from '@/lib/trpc/client'
 import { toast } from 'sonner'
 import { z } from 'zod'
 
@@ -97,18 +104,18 @@ function ClarifyingErrorFallback({ courseId: _courseId }: { courseId: string }) 
 }
 
 export function ClarifyingPanel({ courseId, onComplete }: ClarifyingPanelProps) {
-  // Real tRPC hooks
+  // TanStack Query hooks for data fetching
   const {
     data: questionsData,
     isLoading,
     refetch: refetchQuestions,
-  } = trpc.clarifying.getQuestions.useQuery(
-    { courseId },
-    {
-      staleTime: Infinity, // Questions never change after generation, only answers do
-      refetchOnWindowFocus: false, // Предотвращает rate limit spam при переключении окон
-    }
-  )
+  } = useClarifyingQuestions(courseId, {
+    staleTime: Infinity, // Questions never change after generation, only answers do
+    refetchOnWindowFocus: false, // Prevents rate limit spam when switching windows
+  })
+
+  // Cache invalidation hook for TanStack Query
+  const invalidateClarifying = useInvalidateClarifying(courseId)
 
   // FIX: Poll for questions when cache returned empty array
   // This handles race condition where panel opens before questions are generated
@@ -119,30 +126,29 @@ export function ClarifyingPanel({ courseId, onComplete }: ClarifyingPanelProps) 
     }
 
     // Poll every 2 seconds until questions appear
-    // IMPORTANT: Must invalidate cache first, otherwise staleTime: Infinity
-    // prevents actual network request even when refetch() is called
+    // TanStack Query invalidation automatically triggers refetch for all subscribers
     const interval = setInterval(() => {
-      invalidateQueryCache('clarifying.getQuestions', { courseId })
-      invalidateQueryCache('clarifying.getProgress', { courseId })
-      void refetchQuestions()
+      void invalidateClarifying()
     }, 2000)
 
     return () => clearInterval(interval)
-  }, [isLoading, questionsData?.questions?.length, refetchQuestions, courseId])
-  const submitAnswerMutation = trpc.clarifying.submitAnswer.useMutation()
-  const submitMultipleAnswersMutation = trpc.clarifying.submitMultipleAnswers.useMutation()
-  const skipQuestionMutation = trpc.clarifying.skipQuestion.useMutation()
-  const approveAndProceedMutation = trpc.clarifying.approveAndProceed.useMutation()
+  }, [isLoading, questionsData?.questions?.length, invalidateClarifying])
+
+  // Mutations with automatic cache invalidation (notifies GraphView automatically)
+  const submitAnswerMutation = useSubmitAnswer(courseId)
+  const submitMultipleAnswersMutation = useSubmitMultipleAnswers(courseId)
+  const skipQuestionMutation = useSkipQuestion(courseId)
+  const approveAndProceedMutation = useApproveAndProceed()
 
   // Invalidate cache and refetch questions after any mutation
+  // Note: With TanStack Query mutations, this is called automatically on success,
+  // but we keep this for manual polling scenarios
   const invalidateAndRefetch = useCallback(async () => {
-    // Clear cache to force fresh fetch
-    invalidateQueryCache('clarifying.getQuestions', { courseId })
-    // Also invalidate progress cache so node in graph updates
-    invalidateQueryCache('clarifying.getProgress', { courseId })
-    // Refetch with fresh data
+    // TanStack Query invalidation notifies ALL subscribers (including GraphView)
+    await invalidateClarifying()
+    // Refetch to get latest data
     await refetchQuestions()
-  }, [courseId, refetchQuestions])
+  }, [invalidateClarifying, refetchQuestions])
 
   // Transform API response to Question format
   // XSS Protection: Sanitize all user-submitted and AI-generated text

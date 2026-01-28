@@ -3,14 +3,49 @@
 import { SupabaseProvider } from '@/lib/supabase/browser-client'
 import { AuthModal } from '@/components/auth/auth-modal'
 import { AppThemeProvider } from '@/components/common/app-theme-provider'
+import { QueryClient, QueryClientProvider, isServer } from '@tanstack/react-query'
+
+/**
+ * Create a new QueryClient instance with sensible defaults.
+ * staleTime of 60s prevents unnecessary refetches.
+ */
+function makeQueryClient() {
+  return new QueryClient({
+    defaultOptions: {
+      queries: {
+        staleTime: 60 * 1000, // 60 seconds
+      },
+    },
+  })
+}
+
+let browserQueryClient: QueryClient | undefined = undefined
+
+/**
+ * Get or create QueryClient following TanStack Query best practices for Next.js App Router.
+ * - Server: Always create new instance (prevents cross-request data leaks)
+ * - Browser: Create once and reuse (enables proper caching)
+ */
+function getQueryClient() {
+  if (isServer) {
+    return makeQueryClient()
+  } else {
+    if (!browserQueryClient) browserQueryClient = makeQueryClient()
+    return browserQueryClient
+  }
+}
 
 export function Providers({ children }: { children: React.ReactNode }) {
+  const queryClient = getQueryClient()
+
   return (
-    <AppThemeProvider>
-      <SupabaseProvider>
-        {children}
-        <AuthModal />
-      </SupabaseProvider>
-    </AppThemeProvider>
+    <QueryClientProvider client={queryClient}>
+      <AppThemeProvider>
+        <SupabaseProvider>
+          {children}
+          <AuthModal />
+        </SupabaseProvider>
+      </AppThemeProvider>
+    </QueryClientProvider>
   )
 }
