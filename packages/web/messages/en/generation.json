@@ -84,7 +84,9 @@
       "selectModeRequired": "Select a mode (Refine or Regenerate) before sending",
       "modeSelectionLabel": "Select chat mode",
       "refineAriaLabel": "Switch to refine mode for small edits",
-      "regenerateAriaLabel": "Switch to regenerate mode for full content recreation"
+      "regenerateAriaLabel": "Switch to regenerate mode for full content recreation",
+      "refineTooltip": "Small edits to current content. Fast (~2K tokens)",
+      "regenerateTooltip": "Full recreation from scratch. Slower (~20K tokens)"
     }
   },
   "errors": {
