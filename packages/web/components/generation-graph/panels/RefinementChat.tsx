@@ -112,7 +112,11 @@ export const RefinementChat: React.FC<RefinementChatProps> = ({
 
   // Persist isOpen preference in localStorage
   useEffect(() => {
-    localStorage.setItem('refinementChat.isOpen', JSON.stringify(isOpen))
+    try {
+      localStorage.setItem('refinementChat.isOpen', JSON.stringify(isOpen))
+    } catch {
+      // Ignore localStorage errors (quota exceeded, private mode, etc.)
+    }
   }, [isOpen])
 
   // Auto-focus textarea when chat opens (FR-022)
