@@ -733,6 +733,34 @@ const stage6Prompts: HardcodedPrompt[] = [
 *Syntax keywords (mermaid, filename, [!TIP]) stay in English regardless of output language.*
 </visual_toolkit>
 
+<forbidden_patterns>
+**ИЗБЕГАЙТЕ КЛИШЕ** — Эти фразы снижают качество контента:
+
+РУССКИЙ:
+- "Знаете ли вы..." / "А знаете ли вы..."
+- "Интересный факт:" / "Любопытный факт:"
+- "Вы когда-нибудь задумывались..."
+- "Давайте разберёмся..." / "Давайте рассмотрим..."
+- "В современном мире..."
+- "С каждым годом всё больше..."
+- "Не секрет, что..."
+- "Как известно..."
+
+ENGLISH:
+- "Did you know..."
+- "Fun fact:" / "Interesting fact:"
+- "Have you ever wondered..."
+- "Let's dive into..." / "Let's explore..."
+- "In today's world..."
+- "It's no secret that..."
+- "As we all know..."
+
+Вместо клише:
+- Начинайте с конкретного факта или примера
+- Используйте прямые утверждения
+- Переходите сразу к сути
+</forbidden_patterns>
+
 <output_language>
 MANDATORY: Write ALL content in {{outputLanguage}}.
 Every word, header, example, and explanation must be in {{outputLanguage}}.
