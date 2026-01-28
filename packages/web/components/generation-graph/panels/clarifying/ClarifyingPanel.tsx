@@ -137,6 +137,8 @@ export function ClarifyingPanel({ courseId, onComplete }: ClarifyingPanelProps) 
   const invalidateAndRefetch = useCallback(async () => {
     // Clear cache to force fresh fetch
     invalidateQueryCache('clarifying.getQuestions', { courseId })
+    // Also invalidate progress cache so node in graph updates
+    invalidateQueryCache('clarifying.getProgress', { courseId })
     // Refetch with fresh data
     await refetchQuestions()
   }, [courseId, refetchQuestions])
