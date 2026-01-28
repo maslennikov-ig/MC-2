@@ -414,7 +414,7 @@ function GraphViewInner({
   // Step 2: Only fetch progress if clarifying is actually enabled
   const { data: clarifyingProgressRaw } = useClarifyingProgress(courseId, {
     enabled: isAtStage4OrBeyond && clarifyingEnabled?.enabled === true,
-    staleTime: 5000, // Cache 5 sec - prevents rate limit (12 req/sec → 0.2 req/sec)
+    staleTime: 0, // Invalidation triggers immediate refetch (fixes node counter not updating)
     refetchOnWindowFocus: false,
   })
 

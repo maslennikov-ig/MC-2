@@ -12,6 +12,7 @@ import { QuestionCard } from './QuestionCard'
 import { WizardProgress, WizardSidebar, WizardNavigation } from './wizard'
 import {
   useClarifyingQuestions,
+  useClarifyingProgress,
   useSubmitAnswer,
   useSubmitMultipleAnswers,
   useSkipQuestion,
@@ -121,21 +122,25 @@ export function ClarifyingPanel({ courseId, onComplete }: ClarifyingPanelProps) 
   // Cache invalidation hook for TanStack Query
   const invalidateClarifying = useInvalidateClarifying(courseId)
 
+  // Progress hook for explicit refetch (ensures GraphView node updates immediately)
+  const { refetch: refetchProgress } = useClarifyingProgress(courseId, {
+    enabled: false, // Don't auto-fetch, only used for manual refetch
+  })
+
   // Mutations with automatic cache invalidation (notifies GraphView automatically)
   const submitAnswerMutation = useSubmitAnswer(courseId)
   const submitMultipleAnswersMutation = useSubmitMultipleAnswers(courseId)
   const skipQuestionMutation = useSkipQuestion(courseId)
   const approveAndProceedMutation = useApproveAndProceed()
 
-  // Invalidate cache and refetch questions after any mutation
-  // Note: With TanStack Query mutations, this is called automatically on success,
-  // but we keep this for manual polling scenarios
+  // Invalidate cache and refetch both questions AND progress after any mutation
+  // This ensures GraphView node counter updates immediately without page refresh
   const invalidateAndRefetch = useCallback(async () => {
     // TanStack Query invalidation notifies ALL subscribers (including GraphView)
     await invalidateClarifying()
-    // Refetch to get latest data
-    await refetchQuestions()
-  }, [invalidateClarifying, refetchQuestions])
+    // Explicitly refetch both queries to guarantee immediate UI update
+    await Promise.all([refetchQuestions(), refetchProgress()])
+  }, [invalidateClarifying, refetchQuestions, refetchProgress])
 
   // Transform API response to Question format
   // XSS Protection: Sanitize all user-submitted and AI-generated text
