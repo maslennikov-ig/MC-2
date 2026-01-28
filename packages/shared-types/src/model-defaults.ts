@@ -19,7 +19,7 @@
  * Default primary model (used when DB is unavailable)
  * @see llm_model_config.model_id
  */
-export const DEFAULT_MODEL_ID = 'xiaomi/mimo-v2-flash:free';
+export const DEFAULT_MODEL_ID = 'xiaomi/mimo-v2-flash';
 
 /**
  * Default fallback model (used when primary fails and DB is unavailable)

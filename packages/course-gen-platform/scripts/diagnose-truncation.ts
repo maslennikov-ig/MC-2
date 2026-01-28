@@ -29,7 +29,7 @@ const client = new OpenAI({
   },
 });
 
-const MODEL = 'xiaomi/mimo-v2-flash:free';
+const MODEL = 'xiaomi/mimo-v2-flash';
 
 interface TestResult {
   name: string;
@@ -127,24 +127,28 @@ async function main() {
   const results: TestResult[] = [];
 
   // Test 1: Simple JSON (should work)
-  results.push(await runTest(
-    'Simple JSON',
-    'Return ONLY valid JSON, no markdown.',
-    'Return a JSON object with status "PASS", reasoning "All checks passed", and an empty issues array.',
-    1000
-  ));
+  results.push(
+    await runTest(
+      'Simple JSON',
+      'Return ONLY valid JSON, no markdown.',
+      'Return a JSON object with status "PASS", reasoning "All checks passed", and an empty issues array.',
+      1000
+    )
+  );
 
   // Test 2: Medium JSON with nested content
-  results.push(await runTest(
-    'Medium JSON with content field',
-    'Return ONLY valid JSON, no markdown.',
-    `Return a JSON object with:
+  results.push(
+    await runTest(
+      'Medium JSON with content field',
+      'Return ONLY valid JSON, no markdown.',
+      `Return a JSON object with:
 - status: "FIXED"
 - reasoning: "Fixed minor issues"
 - issues: array with 3 items, each having type, severity, location, description
 - patched_content: a nested object with intro (200 chars of Russian text) and sections array (3 items with id, title, content of 300 chars each)`,
-    4000
-  ));
+      4000
+    )
+  );
 
   // Test 3: Large JSON mimicking actual self-review response
   const largeLesson = `
@@ -182,10 +186,11 @@ function greet(user: User): string {
 \`\`\`
 `;
 
-  results.push(await runTest(
-    'Large JSON with patched_content (realistic)',
-    `Return ONLY valid JSON. Include the full patched_content field with the corrected lesson content.`,
-    `Analyze this lesson and return a JSON object:
+  results.push(
+    await runTest(
+      'Large JSON with patched_content (realistic)',
+      `Return ONLY valid JSON. Include the full patched_content field with the corrected lesson content.`,
+      `Analyze this lesson and return a JSON object:
 - status: "FIXED"
 - reasoning: brief explanation
 - issues: array of found issues
@@ -193,14 +198,16 @@ function greet(user: User): string {
 
 Lesson to analyze:
 ${largeLesson}`,
-    4000
-  ));
+      4000
+    )
+  );
 
   // Test 4: Same test with higher maxTokens
-  results.push(await runTest(
-    'Large JSON with patched_content (8192 tokens)',
-    `Return ONLY valid JSON. Include the full patched_content field with the corrected lesson content.`,
-    `Analyze this lesson and return a JSON object:
+  results.push(
+    await runTest(
+      'Large JSON with patched_content (8192 tokens)',
+      `Return ONLY valid JSON. Include the full patched_content field with the corrected lesson content.`,
+      `Analyze this lesson and return a JSON object:
 - status: "FIXED"
 - reasoning: brief explanation
 - issues: array of found issues
@@ -208,14 +215,16 @@ ${largeLesson}`,
 
 Lesson to analyze:
 ${largeLesson}`,
-    8192
-  ));
+      8192
+    )
+  );
 
   // Test 5: Very high maxTokens
-  results.push(await runTest(
-    'Large JSON with patched_content (16000 tokens)',
-    `Return ONLY valid JSON. Include the full patched_content field with the corrected lesson content.`,
-    `Analyze this lesson and return a JSON object:
+  results.push(
+    await runTest(
+      'Large JSON with patched_content (16000 tokens)',
+      `Return ONLY valid JSON. Include the full patched_content field with the corrected lesson content.`,
+      `Analyze this lesson and return a JSON object:
 - status: "FIXED"
 - reasoning: brief explanation
 - issues: array of found issues
@@ -223,17 +232,19 @@ ${largeLesson}`,
 
 Lesson to analyze:
 ${largeLesson}`,
-    16000
-  ));
+      16000
+    )
+  );
 
   // Test 6: Explicit NO MARKDOWN instruction
-  results.push(await runTest(
-    'NO MARKDOWN - explicit instruction',
-    `You are a JSON-only assistant. Return ONLY raw JSON.
+  results.push(
+    await runTest(
+      'NO MARKDOWN - explicit instruction',
+      `You are a JSON-only assistant. Return ONLY raw JSON.
 CRITICAL: Do NOT wrap JSON in markdown code blocks.
 Do NOT use \`\`\`json or \`\`\`.
 Output ONLY the JSON object starting with { and ending with }.`,
-    `Return a JSON object with:
+      `Return a JSON object with:
 - status: "FIXED"
 - reasoning: "Fixed issues"
 - issues: array with 2 items
@@ -241,8 +252,9 @@ Output ONLY the JSON object starting with { and ending with }.`,
 
 Lesson:
 ${largeLesson}`,
-    8192
-  ));
+      8192
+    )
+  );
 
   // Test 7: Different model - compare
   const testWithDifferentPrompt = await runTest(
@@ -267,7 +279,9 @@ ${largeLesson}`,
   for (const r of results) {
     const status = r.isValidJson ? '✅' : '❌';
     console.log(`  ${status} ${r.name}`);
-    console.log(`     maxTokens: ${r.maxTokens}, output: ${r.outputTokens}, finish: ${r.finishReason}`);
+    console.log(
+      `     maxTokens: ${r.maxTokens}, output: ${r.outputTokens}, finish: ${r.finishReason}`
+    );
   }
 
   const failedTests = results.filter(r => !r.isValidJson);
@@ -276,7 +290,9 @@ ${largeLesson}`,
     console.log(`  Analysis:`);
     for (const r of failedTests) {
       if (r.finishReason === 'stop' && r.outputTokens < r.maxTokens * 0.8) {
-        console.log(`    - ${r.name}: Model stopped early (${r.outputTokens}/${r.maxTokens} tokens)`);
+        console.log(
+          `    - ${r.name}: Model stopped early (${r.outputTokens}/${r.maxTokens} tokens)`
+        );
         console.log(`      → Model quality issue, not token limit`);
       } else if (r.finishReason === 'length') {
         console.log(`    - ${r.name}: Hit token limit`);

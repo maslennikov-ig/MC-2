@@ -63,7 +63,7 @@ function parseArgs(): CLIArgs {
     verbose: args.includes('--verbose'),
     models: (
       args.find(a => a.startsWith('--models='))?.split('=')[1] ||
-      'deepseek/deepseek-chat,xiaomi/mimo-v2-flash:free'
+      'deepseek/deepseek-chat,xiaomi/mimo-v2-flash'
     ).split(','),
   };
 }

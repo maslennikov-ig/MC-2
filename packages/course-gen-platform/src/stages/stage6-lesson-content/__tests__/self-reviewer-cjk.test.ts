@@ -76,7 +76,7 @@ mockGenerateCompletion.mockResolvedValue({
     issues: [],
   }),
   totalTokens: 500,
-  model: 'xiaomi/mimo-v2-flash:free',
+  model: 'xiaomi/mimo-v2-flash',
   finishReason: 'stop',
 });
 
@@ -88,7 +88,7 @@ vi.mock('@/shared/llm', () => ({
 vi.mock('@/shared/llm/model-config-service', () => ({
   createModelConfigService: vi.fn().mockReturnValue({
     getModelForPhase: vi.fn().mockResolvedValue({
-      modelId: 'xiaomi/mimo-v2-flash:free',
+      modelId: 'xiaomi/mimo-v2-flash',
       maxTokens: 8000,
       temperature: 0.7,
     }),
@@ -1093,7 +1093,7 @@ describe('Error Handling', () => {
         issues: [],
       }),
       totalTokens: 500,
-      model: 'xiaomi/mimo-v2-flash:free',
+      model: 'xiaomi/mimo-v2-flash',
       finishReason: 'stop',
     });
   });
@@ -1103,7 +1103,7 @@ describe('Error Handling', () => {
     const malformedResponse = {
       content: 'not valid json {broken',
       totalTokens: 100,
-      model: 'xiaomi/mimo-v2-flash:free',
+      model: 'xiaomi/mimo-v2-flash',
       finishReason: 'stop' as const,
     };
     mockGenerateCompletion
@@ -1135,7 +1135,7 @@ describe('Error Handling', () => {
         issues: [],
       }),
       totalTokens: 500,
-      model: 'xiaomi/mimo-v2-flash:free',
+      model: 'xiaomi/mimo-v2-flash',
       finishReason: 'stop',
     });
   });
