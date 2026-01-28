@@ -1,32 +1,150 @@
 /**
  * tRPC Client for Web Frontend
  *
- * Minimal tRPC client implementation for clarifying router.
- * Uses native fetch with React hooks for data fetching.
+ * TanStack Query-based tRPC client implementation for clarifying router.
+ * Uses native fetch with React Query hooks for data fetching and caching.
  *
  * Security Features:
  * - CSRF protection via X-CSRF-Token header
  * - Credentials included for session auth
  *
- * TODO: Replace with proper @trpc/react-query setup when package is installed.
+ * Key Benefits over custom implementation:
+ * - Automatic cache invalidation notifies ALL subscribers (fixes GraphView/ClarifyingPanel sync)
+ * - Built-in query deduplication
+ * - Optimistic updates support
+ * - DevTools integration
  */
 
 'use client'
 
-import React from 'react'
+import { useQuery, useMutation, useQueryClient, UseQueryOptions } from '@tanstack/react-query'
+import { useCallback } from 'react'
 import { BACKEND_URL } from '@/lib/env-client'
 import { getSupabaseClient } from '@/lib/supabase/browser-client'
 
+// ============================================================================
+// Types
+// ============================================================================
+
+/** Clarifying question from API */
+export interface ClarifyingQuestion {
+  id: string
+  course_id: string
+  question_text: string
+  question_priority: string
+  question_category: string | null
+  suggested_answers: string[] | null
+  user_answer: string | null
+  answer_source: string | null
+  selected_suggestion_index: number | null
+  user_modification: string | null
+  iteration_round: number
+  status: string
+  order_index: number
+  created_at: string | null
+  answered_at: string | null
+  metadata: Record<string, unknown> | null
+}
+
+/** Response from clarifying.isEnabled */
+export interface ClarifyingIsEnabledResponse {
+  enabled: boolean
+}
+
+/** Response from clarifying.getQuestions */
+export interface ClarifyingQuestionsResponse {
+  questions: ClarifyingQuestion[]
+}
+
+/** Response from clarifying.getProgress */
+export interface ClarifyingProgressResponse {
+  total: number
+  answered: number
+  skipped: number
+  pending: number
+  criticalTotal: number
+  criticalAnswered: number
+  importantTotal: number
+  importantAnswered: number
+  canProceed: boolean
+  currentRound: number
+  isAutomatic: boolean
+}
+
+/** Input for clarifying.submitAnswer */
+export interface SubmitAnswerInput {
+  questionId: string
+  answer: string
+  answerSource: 'suggested' | 'modified' | 'custom'
+  selectedSuggestionIndex?: number
+  userModification?: string
+}
+
+/** Response from clarifying.submitAnswer */
+export interface SubmitAnswerResponse {
+  success: boolean
+  canProceed: boolean
+}
+
+/** Input for clarifying.submitMultipleAnswers */
+export interface SubmitMultipleAnswersInput {
+  submissions: Array<{
+    questionId: string
+    answer: string
+    answerSource: 'suggested' | 'modified' | 'custom'
+    selectedSuggestionIndex?: number
+  }>
+}
+
+/** Response from clarifying.submitMultipleAnswers */
+export interface SubmitMultipleAnswersResponse {
+  successCount: number
+  failedIds: string[]
+  canProceed: boolean
+}
+
+/** Input for clarifying.skipQuestion */
+export interface SkipQuestionInput {
+  questionId: string
+}
+
+/** Response from clarifying.skipQuestion */
+export interface SkipQuestionResponse {
+  success: boolean
+}
+
+/** Input for clarifying.approveAndProceed */
+export interface ApproveAndProceedInput {
+  courseId: string
+}
+
+/** Response from clarifying.approveAndProceed */
+export interface ApproveAndProceedResponse {
+  success: boolean
+  jobId: string
+}
+
+// ============================================================================
+// Query Keys Factory
+// ============================================================================
+
 /**
- * Get CSRF token from meta tag or cookie
- * The token should be set by the server in a meta tag or cookie
+ * Query keys for clarifying procedures.
+ * Follows TanStack Query key factory pattern for consistent cache management.
  */
+export const clarifyingKeys = {
+  all: ['clarifying'] as const,
+  isEnabled: (courseId: string) => [...clarifyingKeys.all, 'isEnabled', courseId] as const,
+  questions: (courseId: string) => [...clarifyingKeys.all, 'questions', courseId] as const,
+  progress: (courseId: string) => [...clarifyingKeys.all, 'progress', courseId] as const,
+}
+
+// ============================================================================
+// HTTP Utilities
+// ============================================================================
+
 /**
  * Fetch with exponential backoff retry for 5xx errors
- * @param url - Fetch URL
- * @param options - Fetch options
- * @param maxRetries - Maximum retry attempts (default: 3)
- * @returns Response object
  */
 async function fetchWithRetry(
   url: string,
@@ -62,7 +180,6 @@ async function fetchWithRetry(
 
 /**
  * Get CSRF token from meta tag or cookie
- * The token should be set by the server in a meta tag or cookie
  */
 function getCsrfToken(): string | null {
   if (typeof document === 'undefined') return null
@@ -114,325 +231,345 @@ async function buildHeaders(): Promise<Record<string, string>> {
   return headers
 }
 
-/**
- * React Query-like hook types
- */
-type UseQueryResult<TData> = {
-  data: TData | undefined
-  isLoading: boolean
-  error: Error | null
-  refetch: () => Promise<void>
-}
+// ============================================================================
+// Fetch Functions (for TanStack Query)
+// ============================================================================
 
-type UseMutationResult<TData, TVariables> = {
-  mutateAsync: (variables: TVariables) => Promise<TData>
-  mutate: (variables: TVariables) => void
-  isPending: boolean
-  isLoading: boolean
-  error: Error | null
-}
-
-/**
- * Query options for useQuery hook
- */
-type QueryOptions = {
-  enabled?: boolean
-  refetchOnWindowFocus?: boolean
-  /** Time in ms to consider data fresh (Infinity = never refetch automatically) */
-  staleTime?: number
-}
-
-/**
- * Simple cache for staleTime support
- * Key: procedurePath + JSON.stringify(input)
- * Value: { data, timestamp }
- */
-const queryCache = new Map<string, { data: unknown; timestamp: number }>()
-
-/**
- * Invalidate cache for a specific procedure
- * Forces next query to fetch fresh data from server
- */
-export function invalidateQueryCache(procedurePath: string, input?: unknown): void {
-  if (input !== undefined) {
-    // Invalidate specific query
-    const cacheKey = `${procedurePath}:${JSON.stringify(input)}`
-    queryCache.delete(cacheKey)
-  } else {
-    // Invalidate all queries for this procedure
-    for (const key of queryCache.keys()) {
-      if (key.startsWith(`${procedurePath}:`)) {
-        queryCache.delete(key)
-      }
+async function fetchClarifyingIsEnabled(courseId: string): Promise<ClarifyingIsEnabledResponse> {
+  const response = await fetchWithRetry(
+    `${BACKEND_URL}/trpc/clarifying.isEnabled?input=${encodeURIComponent(JSON.stringify({ courseId }))}`,
+    {
+      credentials: 'include',
+      headers: await buildHeaders(),
     }
+  )
+
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}: ${response.statusText}`)
   }
+
+  const result = await response.json()
+  return result?.result?.data ?? result
 }
 
-/**
- * In-flight request deduplication
- * Prevents parallel requests for the same query from hitting the server
- * Multiple components requesting same data will share one Promise
- */
-const inFlightRequests = new Map<string, Promise<unknown>>()
-
-/**
- * Create a minimal useQuery hook implementation
- */
-function createUseQuery<TInput, TOutput>(
-  procedurePath: string
-): (input: TInput, options?: QueryOptions) => UseQueryResult<TOutput> {
-  return (input: TInput, options?: QueryOptions) => {
-    const [data, setData] = React.useState<TOutput | undefined>(undefined)
-    const [isLoading, setIsLoading] = React.useState(true)
-    const [error, setError] = React.useState<Error | null>(null)
-
-    const isEnabled = options?.enabled !== false
-    const staleTime = options?.staleTime ?? 0
-
-    // Stabilize input reference to prevent unnecessary refetches
-    const inputKey = JSON.stringify(input)
-
-    const fetchData = React.useCallback(async () => {
-      if (!isEnabled) {
-        setIsLoading(false)
-        return
-      }
-
-      // Check cache for staleTime support
-      const cacheKey = `${procedurePath}:${JSON.stringify(input)}`
-      const cached = queryCache.get(cacheKey)
-      const now = Date.now()
-
-      if (cached) {
-        // If staleTime is Infinity, never refetch
-        // Otherwise, check if cache is still fresh
-        const isFresh = staleTime === Infinity || now - cached.timestamp < staleTime
-        if (isFresh) {
-          setData(cached.data as TOutput)
-          setIsLoading(false)
-          setError(null)
-          return
-        }
-      }
-
-      // Request deduplication: if same query is already in-flight, wait for it
-      const inFlight = inFlightRequests.get(cacheKey)
-      if (inFlight) {
-        try {
-          setIsLoading(true)
-          const result = await inFlight
-          setData(result as TOutput)
-          setError(null)
-        } catch (err) {
-          setError(err instanceof Error ? err : new Error(String(err)))
-        } finally {
-          setIsLoading(false)
-        }
-        return
-      }
-
-      // Create fetch promise and track it
-      const fetchPromise = (async () => {
-        const response = await fetchWithRetry(
-          `${BACKEND_URL}/trpc/${procedurePath}?input=${encodeURIComponent(JSON.stringify(input))}`,
-          {
-            credentials: 'include',
-            headers: await buildHeaders(),
-          }
-        )
-
-        if (!response.ok) {
-          throw new Error(`HTTP ${response.status}: ${response.statusText}`)
-        }
-
-        const result = await response.json()
-
-        // tRPC wraps response in { result: { data: ... } }
-        const unwrappedData = result?.result?.data ?? result
-
-        // Store in cache
-        queryCache.set(cacheKey, { data: unwrappedData, timestamp: Date.now() })
-
-        return unwrappedData
-      })()
-
-      // Register in-flight request
-      inFlightRequests.set(cacheKey, fetchPromise)
-
-      try {
-        setIsLoading(true)
-        const result = await fetchPromise
-        setData(result as TOutput)
-        setError(null)
-      } catch (err) {
-        setError(err instanceof Error ? err : new Error(String(err)))
-      } finally {
-        // Clean up in-flight tracking
-        inFlightRequests.delete(cacheKey)
-        setIsLoading(false)
-      }
-    }, [inputKey, isEnabled, staleTime])
-
-    React.useEffect(() => {
-      void fetchData()
-    }, [fetchData])
-
-    return {
-      data,
-      isLoading,
-      error,
-      refetch: fetchData,
+async function fetchClarifyingQuestions(courseId: string): Promise<ClarifyingQuestionsResponse> {
+  const response = await fetchWithRetry(
+    `${BACKEND_URL}/trpc/clarifying.getQuestions?input=${encodeURIComponent(JSON.stringify({ courseId }))}`,
+    {
+      credentials: 'include',
+      headers: await buildHeaders(),
     }
+  )
+
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}: ${response.statusText}`)
   }
+
+  const result = await response.json()
+  return result?.result?.data ?? result
 }
 
-/**
- * Create a minimal useMutation hook implementation
- */
-function createUseMutation<TInput, TOutput>(
-  procedurePath: string
-): () => UseMutationResult<TOutput, TInput> {
-  return () => {
-    const [isPending, setIsPending] = React.useState(false)
-    const [error, setError] = React.useState<Error | null>(null)
-
-    const mutateAsync = React.useCallback(
-      async (variables: TInput) => {
-        try {
-          setIsPending(true)
-          setError(null)
-
-          const response = await fetchWithRetry(`${BACKEND_URL}/trpc/${procedurePath}`, {
-            method: 'POST',
-            headers: await buildHeaders(),
-            credentials: 'include',
-            body: JSON.stringify(variables),
-          })
-
-          if (!response.ok) {
-            throw new Error(`HTTP ${response.status}: ${response.statusText}`)
-          }
-
-          const result = await response.json()
-
-          // tRPC wraps response in { result: { data: ... } }
-          const unwrappedData = result?.result?.data ?? result
-          return unwrappedData
-        } catch (err) {
-          const error = err instanceof Error ? err : new Error(String(err))
-          setError(error)
-          throw error
-        } finally {
-          setIsPending(false)
-        }
-      },
-      [procedurePath]
-    )
-
-    const mutate = React.useCallback(
-      (variables: TInput) => {
-        void mutateAsync(variables)
-      },
-      [mutateAsync]
-    )
-
-    return {
-      mutateAsync,
-      mutate,
-      isPending,
-      isLoading: isPending,
-      error,
+async function fetchClarifyingProgress(courseId: string): Promise<ClarifyingProgressResponse> {
+  const response = await fetchWithRetry(
+    `${BACKEND_URL}/trpc/clarifying.getProgress?input=${encodeURIComponent(JSON.stringify({ courseId }))}`,
+    {
+      credentials: 'include',
+      headers: await buildHeaders(),
     }
+  )
+
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}: ${response.statusText}`)
   }
+
+  const result = await response.json()
+  return result?.result?.data ?? result
+}
+
+async function submitAnswer(input: SubmitAnswerInput): Promise<SubmitAnswerResponse> {
+  const response = await fetchWithRetry(`${BACKEND_URL}/trpc/clarifying.submitAnswer`, {
+    method: 'POST',
+    headers: await buildHeaders(),
+    credentials: 'include',
+    body: JSON.stringify(input),
+  })
+
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+  }
+
+  const result = await response.json()
+  return result?.result?.data ?? result
+}
+
+async function submitMultipleAnswers(
+  input: SubmitMultipleAnswersInput
+): Promise<SubmitMultipleAnswersResponse> {
+  const response = await fetchWithRetry(`${BACKEND_URL}/trpc/clarifying.submitMultipleAnswers`, {
+    method: 'POST',
+    headers: await buildHeaders(),
+    credentials: 'include',
+    body: JSON.stringify(input),
+  })
+
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+  }
+
+  const result = await response.json()
+  return result?.result?.data ?? result
+}
+
+async function skipQuestion(input: SkipQuestionInput): Promise<SkipQuestionResponse> {
+  const response = await fetchWithRetry(`${BACKEND_URL}/trpc/clarifying.skipQuestion`, {
+    method: 'POST',
+    headers: await buildHeaders(),
+    credentials: 'include',
+    body: JSON.stringify(input),
+  })
+
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+  }
+
+  const result = await response.json()
+  return result?.result?.data ?? result
+}
+
+async function approveAndProceed(
+  input: ApproveAndProceedInput
+): Promise<ApproveAndProceedResponse> {
+  const response = await fetchWithRetry(`${BACKEND_URL}/trpc/clarifying.approveAndProceed`, {
+    method: 'POST',
+    headers: await buildHeaders(),
+    credentials: 'include',
+    body: JSON.stringify(input),
+  })
+
+  if (!response.ok) {
+    throw new Error(`HTTP ${response.status}: ${response.statusText}`)
+  }
+
+  const result = await response.json()
+  return result?.result?.data ?? result
+}
+
+// ============================================================================
+// TanStack Query Hooks
+// ============================================================================
+
+/**
+ * Hook to check if clarifying is enabled for a course.
+ */
+export function useClarifyingIsEnabled(
+  courseId: string,
+  options?: Omit<UseQueryOptions<ClarifyingIsEnabledResponse, Error>, 'queryKey' | 'queryFn'>
+) {
+  return useQuery({
+    queryKey: clarifyingKeys.isEnabled(courseId),
+    queryFn: () => fetchClarifyingIsEnabled(courseId),
+    ...options,
+  })
 }
 
 /**
- * tRPC React Client
+ * Hook to fetch clarifying questions for a course.
+ */
+export function useClarifyingQuestions(
+  courseId: string,
+  options?: Omit<UseQueryOptions<ClarifyingQuestionsResponse, Error>, 'queryKey' | 'queryFn'>
+) {
+  return useQuery({
+    queryKey: clarifyingKeys.questions(courseId),
+    queryFn: () => fetchClarifyingQuestions(courseId),
+    ...options,
+  })
+}
+
+/**
+ * Hook to fetch clarifying progress for a course.
+ */
+export function useClarifyingProgress(
+  courseId: string,
+  options?: Omit<UseQueryOptions<ClarifyingProgressResponse, Error>, 'queryKey' | 'queryFn'>
+) {
+  return useQuery({
+    queryKey: clarifyingKeys.progress(courseId),
+    queryFn: () => fetchClarifyingProgress(courseId),
+    ...options,
+  })
+}
+
+/**
+ * Hook to submit an answer to a clarifying question.
+ * Automatically invalidates questions and progress cache on success.
+ */
+export function useSubmitAnswer(courseId: string) {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: submitAnswer,
+    onSuccess: async () => {
+      // Invalidate both questions and progress - this notifies ALL subscribers
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: clarifyingKeys.questions(courseId) }),
+        queryClient.invalidateQueries({ queryKey: clarifyingKeys.progress(courseId) }),
+      ])
+    },
+  })
+}
+
+/**
+ * Hook to submit multiple answers at once.
+ * Automatically invalidates questions and progress cache on success.
+ */
+export function useSubmitMultipleAnswers(courseId: string) {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: submitMultipleAnswers,
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: clarifyingKeys.questions(courseId) }),
+        queryClient.invalidateQueries({ queryKey: clarifyingKeys.progress(courseId) }),
+      ])
+    },
+  })
+}
+
+/**
+ * Hook to skip a clarifying question.
+ * Automatically invalidates questions and progress cache on success.
+ */
+export function useSkipQuestion(courseId: string) {
+  const queryClient = useQueryClient()
+
+  return useMutation({
+    mutationFn: skipQuestion,
+    onSuccess: async () => {
+      await Promise.all([
+        queryClient.invalidateQueries({ queryKey: clarifyingKeys.questions(courseId) }),
+        queryClient.invalidateQueries({ queryKey: clarifyingKeys.progress(courseId) }),
+      ])
+    },
+  })
+}
+
+/**
+ * Hook to approve clarifying and proceed to next stage.
+ */
+export function useApproveAndProceed() {
+  return useMutation({
+    mutationFn: approveAndProceed,
+  })
+}
+
+/**
+ * Hook to manually invalidate clarifying cache.
+ * Use this when you need to force refetch from external triggers.
+ */
+export function useInvalidateClarifying(courseId: string) {
+  const queryClient = useQueryClient()
+
+  return useCallback(async () => {
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: clarifyingKeys.questions(courseId) }),
+      queryClient.invalidateQueries({ queryKey: clarifyingKeys.progress(courseId) }),
+    ])
+  }, [queryClient, courseId])
+}
+
+// ============================================================================
+// Legacy API (for backward compatibility during migration)
+// ============================================================================
+
+/**
+ * @deprecated Use useClarifyingIsEnabled, useClarifyingQuestions, etc. directly
  *
- * Minimal implementation for clarifying router.
+ * Legacy tRPC-style API maintained for gradual migration.
+ * Components should migrate to the new hooks above.
  */
 export const trpc = {
   clarifying: {
     isEnabled: {
-      useQuery: createUseQuery<{ courseId: string }, { enabled: boolean }>('clarifying.isEnabled'),
+      useQuery: (
+        input: { courseId: string },
+        options?: { enabled?: boolean; staleTime?: number; refetchOnWindowFocus?: boolean }
+      ) => {
+        return useClarifyingIsEnabled(input.courseId, {
+          enabled: options?.enabled,
+          staleTime: options?.staleTime,
+          refetchOnWindowFocus: options?.refetchOnWindowFocus,
+        })
+      },
     },
     getQuestions: {
-      useQuery: createUseQuery<
-        { courseId: string },
-        {
-          questions: Array<{
-            id: string
-            course_id: string
-            question_text: string
-            question_priority: string
-            question_category: string | null
-            suggested_answers: string[] | null
-            user_answer: string | null
-            answer_source: string | null
-            selected_suggestion_index: number | null
-            user_modification: string | null
-            iteration_round: number
-            status: string
-            order_index: number
-            created_at: string | null
-            answered_at: string | null
-            metadata: Record<string, unknown> | null
-          }>
-        }
-      >('clarifying.getQuestions'),
+      useQuery: (
+        input: { courseId: string },
+        options?: { enabled?: boolean; staleTime?: number; refetchOnWindowFocus?: boolean }
+      ) => {
+        return useClarifyingQuestions(input.courseId, {
+          enabled: options?.enabled,
+          staleTime: options?.staleTime,
+          refetchOnWindowFocus: options?.refetchOnWindowFocus,
+        })
+      },
     },
     getProgress: {
-      useQuery: createUseQuery<
-        { courseId: string },
-        {
-          total: number
-          answered: number
-          skipped: number
-          pending: number
-          criticalTotal: number
-          criticalAnswered: number
-          importantTotal: number
-          importantAnswered: number
-          canProceed: boolean
-          currentRound: number
-          isAutomatic: boolean
-        }
-      >('clarifying.getProgress'),
+      useQuery: (
+        input: { courseId: string },
+        options?: { enabled?: boolean; staleTime?: number; refetchOnWindowFocus?: boolean }
+      ) => {
+        return useClarifyingProgress(input.courseId, {
+          enabled: options?.enabled,
+          staleTime: options?.staleTime,
+          refetchOnWindowFocus: options?.refetchOnWindowFocus,
+        })
+      },
     },
     submitAnswer: {
-      useMutation: createUseMutation<
-        {
-          questionId: string
-          answer: string
-          answerSource: 'suggested' | 'modified' | 'custom'
-          selectedSuggestionIndex?: number
-          userModification?: string
-        },
-        { success: boolean; canProceed: boolean }
-      >('clarifying.submitAnswer'),
+      useMutation: () => {
+        // Note: This legacy wrapper cannot auto-invalidate because courseId is not available
+        // Use useSubmitAnswer(courseId) for automatic cache invalidation
+        return useMutation({
+          mutationFn: submitAnswer,
+        })
+      },
     },
     submitMultipleAnswers: {
-      useMutation: createUseMutation<
-        {
-          submissions: Array<{
-            questionId: string
-            answer: string
-            answerSource: 'suggested' | 'modified' | 'custom'
-            selectedSuggestionIndex?: number
-          }>
-        },
-        { successCount: number; failedIds: string[]; canProceed: boolean }
-      >('clarifying.submitMultipleAnswers'),
+      useMutation: () => {
+        return useMutation({
+          mutationFn: submitMultipleAnswers,
+        })
+      },
     },
     skipQuestion: {
-      useMutation: createUseMutation<{ questionId: string }, { success: boolean }>(
-        'clarifying.skipQuestion'
-      ),
+      useMutation: () => {
+        return useMutation({
+          mutationFn: skipQuestion,
+        })
+      },
     },
     approveAndProceed: {
-      useMutation: createUseMutation<{ courseId: string }, { success: boolean; jobId: string }>(
-        'clarifying.approveAndProceed'
-      ),
+      useMutation: () => {
+        return useApproveAndProceed()
+      },
     },
   },
+}
+
+/**
+ * @deprecated Use useInvalidateClarifying hook instead
+ *
+ * Legacy cache invalidation function.
+ * This is kept for backward compatibility but does nothing in TanStack Query
+ * because invalidation now requires QueryClient context.
+ *
+ * Components should migrate to useInvalidateClarifying hook.
+ */
+export function invalidateQueryCache(_procedurePath: string, _input?: unknown): void {
+  // No-op in TanStack Query - use useInvalidateClarifying hook instead
+  console.warn(
+    '[trpc/client] invalidateQueryCache is deprecated. Use useInvalidateClarifying hook instead.'
+  )
 }
