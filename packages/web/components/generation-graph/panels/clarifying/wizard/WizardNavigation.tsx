@@ -54,7 +54,7 @@ export function WizardNavigation({
       )}
 
       {/* Navigation controls */}
-      <div className="-mx-4 flex items-center justify-between border-t border-slate-200 bg-white p-4 md:mx-0 md:border-0 md:bg-transparent md:p-0 dark:border-slate-800 dark:bg-slate-950">
+      <div className="flex items-center justify-between border-t border-slate-200 bg-white p-4 md:border-0 md:bg-transparent md:p-0 dark:border-slate-800 dark:bg-transparent">
         <Button
           variant="outline"
           onClick={onPrev}
