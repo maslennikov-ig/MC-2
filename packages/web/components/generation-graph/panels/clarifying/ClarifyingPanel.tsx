@@ -119,12 +119,15 @@ export function ClarifyingPanel({ courseId, onComplete }: ClarifyingPanelProps) 
     }
 
     // Poll every 2 seconds until questions appear
+    // IMPORTANT: Must invalidate cache first, otherwise staleTime: Infinity
+    // prevents actual network request even when refetch() is called
     const interval = setInterval(() => {
+      invalidateQueryCache('clarifying.getQuestions', { courseId })
       void refetchQuestions()
     }, 2000)
 
     return () => clearInterval(interval)
-  }, [isLoading, questionsData?.questions?.length, refetchQuestions])
+  }, [isLoading, questionsData?.questions?.length, refetchQuestions, courseId])
   const submitAnswerMutation = trpc.clarifying.submitAnswer.useMutation()
   const submitMultipleAnswersMutation = trpc.clarifying.submitMultipleAnswers.useMutation()
   const skipQuestionMutation = trpc.clarifying.skipQuestion.useMutation()
