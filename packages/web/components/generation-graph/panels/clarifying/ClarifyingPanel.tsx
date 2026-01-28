@@ -105,6 +105,7 @@ function ClarifyingErrorFallback({ courseId: _courseId }: { courseId: string }) 
 
 export function ClarifyingPanel({ courseId, onComplete }: ClarifyingPanelProps) {
   // TanStack Query hooks for data fetching
+  // Uses refetchInterval to poll for questions until they appear (race condition protection)
   const {
     data: questionsData,
     isLoading,
@@ -112,27 +113,13 @@ export function ClarifyingPanel({ courseId, onComplete }: ClarifyingPanelProps) 
   } = useClarifyingQuestions(courseId, {
     staleTime: Infinity, // Questions never change after generation, only answers do
     refetchOnWindowFocus: false, // Prevents rate limit spam when switching windows
+    // Poll every 2s when no questions exist yet, stop when questions arrive
+    refetchInterval: (query) => (query.state.data?.questions?.length ? false : 2000),
+    refetchIntervalInBackground: false, // Pause polling when window is hidden
   })
 
   // Cache invalidation hook for TanStack Query
   const invalidateClarifying = useInvalidateClarifying(courseId)
-
-  // FIX: Poll for questions when cache returned empty array
-  // This handles race condition where panel opens before questions are generated
-  useEffect(() => {
-    // Only poll if not loading and no questions yet
-    if (isLoading || questionsData?.questions?.length) {
-      return
-    }
-
-    // Poll every 2 seconds until questions appear
-    // TanStack Query invalidation automatically triggers refetch for all subscribers
-    const interval = setInterval(() => {
-      void invalidateClarifying()
-    }, 2000)
-
-    return () => clearInterval(interval)
-  }, [isLoading, questionsData?.questions?.length, invalidateClarifying])
 
   // Mutations with automatic cache invalidation (notifies GraphView automatically)
   const submitAnswerMutation = useSubmitAnswer(courseId)

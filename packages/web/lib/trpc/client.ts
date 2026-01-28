@@ -409,12 +409,19 @@ export function useSubmitAnswer(courseId: string) {
 
   return useMutation({
     mutationFn: submitAnswer,
+    retry: 2, // Retry twice on failure (total 3 attempts)
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 5000), // 1s, 2s, max 5s
     onSuccess: async () => {
       // Invalidate both questions and progress - this notifies ALL subscribers
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: clarifyingKeys.questions(courseId) }),
-        queryClient.invalidateQueries({ queryKey: clarifyingKeys.progress(courseId) }),
-      ])
+      try {
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: clarifyingKeys.questions(courseId) }),
+          queryClient.invalidateQueries({ queryKey: clarifyingKeys.progress(courseId) }),
+        ])
+      } catch (error) {
+        // Log but don't fail mutation - data is already saved on server
+        console.error('[useSubmitAnswer] Cache invalidation failed:', error)
+      }
     },
   })
 }
@@ -428,11 +435,17 @@ export function useSubmitMultipleAnswers(courseId: string) {
 
   return useMutation({
     mutationFn: submitMultipleAnswers,
+    retry: 2,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 5000),
     onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: clarifyingKeys.questions(courseId) }),
-        queryClient.invalidateQueries({ queryKey: clarifyingKeys.progress(courseId) }),
-      ])
+      try {
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: clarifyingKeys.questions(courseId) }),
+          queryClient.invalidateQueries({ queryKey: clarifyingKeys.progress(courseId) }),
+        ])
+      } catch (error) {
+        console.error('[useSubmitMultipleAnswers] Cache invalidation failed:', error)
+      }
     },
   })
 }
@@ -446,11 +459,17 @@ export function useSkipQuestion(courseId: string) {
 
   return useMutation({
     mutationFn: skipQuestion,
+    retry: 2,
+    retryDelay: (attemptIndex) => Math.min(1000 * 2 ** attemptIndex, 5000),
     onSuccess: async () => {
-      await Promise.all([
-        queryClient.invalidateQueries({ queryKey: clarifyingKeys.questions(courseId) }),
-        queryClient.invalidateQueries({ queryKey: clarifyingKeys.progress(courseId) }),
-      ])
+      try {
+        await Promise.all([
+          queryClient.invalidateQueries({ queryKey: clarifyingKeys.questions(courseId) }),
+          queryClient.invalidateQueries({ queryKey: clarifyingKeys.progress(courseId) }),
+        ])
+      } catch (error) {
+        console.error('[useSkipQuestion] Cache invalidation failed:', error)
+      }
     },
   })
 }
