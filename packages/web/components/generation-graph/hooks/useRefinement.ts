@@ -124,7 +124,9 @@ export const useRefinement = (courseId: string) => {
           intent,
         }
 
-        const response = await sendChatMessage(request, controller.signal)
+        // NOTE: AbortSignal cannot be passed to server actions (not serializable).
+        // Abort handling is done client-side by checking controller.signal.aborted after response.
+        const response = await sendChatMessage(request)
 
         // Check if aborted after response or component unmounted - ignore result
         if (controller.signal.aborted || !isMountedRef.current) return

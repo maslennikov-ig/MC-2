@@ -116,17 +116,15 @@ export async function getChatTokenEstimates(courseId: string): Promise<TokenEsti
  * @returns Validated chat response
  * @throws Error with user-friendly message on failure
  */
-export async function sendChatMessage(
-  request: ChatRequest,
-  signal?: AbortSignal
-): Promise<ChatResponse> {
+export async function sendChatMessage(request: ChatRequest): Promise<ChatResponse> {
   const headers = await getBackendAuthHeaders()
 
+  // NOTE: AbortSignal cannot be passed to server actions (not serializable).
+  // Abort handling is done client-side by checking controller.signal.aborted after response.
   const response = await fetch(`${TRPC_URL}/generation.chat`, {
     method: 'POST',
     headers,
     body: JSON.stringify(request),
-    signal,
   })
 
   if (!response.ok) {
