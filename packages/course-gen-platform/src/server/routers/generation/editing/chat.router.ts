@@ -46,7 +46,6 @@ import { applyFieldUpdate } from '../../../../stages/stage5-generation/utils/cou
 import type { CourseStructure } from '@megacampus/shared-types';
 import { setNestedValue, normalizePathForValidation } from '../_shared/helpers';
 import { assertCourseAccess, buildAuthContext } from '../../../helpers/course-authorization';
-import { verifyCourseAccess } from '../../lesson-content/helpers';
 import { resolveLessonIdOrUuid } from '../../../../shared/database/lesson-resolver';
 
 // ============================================================================
@@ -182,6 +181,23 @@ function parseProposalFromLLMResponse(
         logger.warn(
           { requestId, path, normalizedPath, allowedFields },
           'Proposal parsing: field path not in whitelist, skipping'
+        );
+        continue;
+      }
+
+      // Validate newValue exists
+      if (update.newValue === undefined) {
+        logger.warn({ requestId, path }, 'Proposal parsing: newValue is undefined, skipping');
+        continue;
+      }
+
+      // Validate newValue is JSON-serializable
+      try {
+        JSON.stringify(update.newValue);
+      } catch {
+        logger.warn(
+          { requestId, path },
+          'Proposal parsing: newValue is not serializable, skipping'
         );
         continue;
       }
@@ -643,7 +659,23 @@ ${contentContext}
           }
 
           // Apply all updates sequentially to build final state
-          let updatedData: unknown = structuredClone(currentData);
+          let updatedData: unknown;
+          try {
+            updatedData = structuredClone(currentData);
+          } catch (cloneError) {
+            logger.warn(
+              { requestId, courseId, error: cloneError },
+              'structuredClone failed, using JSON fallback'
+            );
+            try {
+              updatedData = JSON.parse(JSON.stringify(currentData));
+            } catch {
+              throw new TRPCError({
+                code: 'INTERNAL_SERVER_ERROR',
+                message: 'Cannot process data structure',
+              });
+            }
+          }
 
           for (const update of updates) {
             const normalizedPath =
@@ -729,8 +761,18 @@ ${contentContext}
           // Apply lesson content patch for Stage 6
           const { lessonId, patchedContent, sectionId } = proposal;
 
-          // Verify course access (using lesson-content helper)
-          await verifyCourseAccess(courseId, ctx.user.id, ctx.user.organizationId, requestId);
+          // Fetch course for authorization check
+          const { data: lessonCourse, error: lessonCourseError } = await supabase
+            .from('courses')
+            .select('id, user_id, organization_id')
+            .eq('id', courseId)
+            .single();
+
+          if (lessonCourseError || !lessonCourse) {
+            throw new TRPCError({ code: 'NOT_FOUND', message: 'Course not found' });
+          }
+
+          assertCourseAccess(buildAuthContext(ctx.user), lessonCourse, 'apply proposal');
 
           // Resolve lesson UUID
           const lessonUuid = await resolveLessonIdOrUuid(courseId, lessonId);

@@ -32,7 +32,7 @@ interface RefinementChatProps {
   stageId: string
   nodeId?: string
   attemptNumber: number
-  onRefine: (message: string, intent: 'refine' | 'regenerate') => void
+  onRefine: (message: string, intent: 'refine' | 'regenerate') => Promise<void> | void
   history?: ChatMessage[]
   isProcessing?: boolean
   latestProposal?: Proposal | null
@@ -109,48 +109,63 @@ export const RefinementChat: React.FC<RefinementChatProps> = ({
     return () => clearTimeout(timer)
   }, [isOpen])
 
-  const handleSubmit = (e?: React.FormEvent) => {
-    e?.preventDefault()
-    if (!message.trim() || isProcessing) return
+  const handleSubmit = useCallback(
+    async (e?: React.FormEvent) => {
+      e?.preventDefault()
+      if (!message.trim() || isProcessing) return
 
-    // Validate intent is selected
-    if (!selectedIntent) {
-      toast.warning(t('refinementChat.modes.selectModeRequired'))
-      return
-    }
+      // Validate intent is selected
+      if (!selectedIntent) {
+        toast.warning(t('refinementChat.modes.selectModeRequired'))
+        return
+      }
 
-    // Add to pending immediately for optimistic update
-    setPendingMessages((prev) => [
-      ...prev,
-      {
+      const pendingMsg: ChatMessage = {
         role: 'user',
         content: message,
         timestamp: new Date().toISOString(),
         pending: true,
-      },
-    ])
+      }
 
-    onRefine(message, selectedIntent)
-    setMessage('')
-  }
+      // Add to pending immediately for optimistic update
+      setPendingMessages((prev) => [...prev, pendingMsg])
+      const messageToSend = message
+      setMessage('')
+
+      try {
+        await onRefine(messageToSend, selectedIntent)
+      } catch {
+        // Remove pending message on error
+        setPendingMessages((prev) => prev.filter((m) => m !== pendingMsg))
+        // Error toast is shown by useRefinement hook
+      }
+    },
+    [message, isProcessing, selectedIntent, onRefine, t]
+  )
 
   const handleQuickAction = useCallback(
-    (actionText: string, intent: ChatIntent) => {
+    async (actionText: string, intent: ChatIntent) => {
       setSelectedIntent(intent)
       setMessage(actionText)
 
+      const pendingMsg: ChatMessage = {
+        role: 'user',
+        content: actionText,
+        timestamp: new Date().toISOString(),
+        pending: true,
+      }
+
       // Send immediately (consistent with GlobalCourseChat behavior)
       // Add to pending for optimistic update
-      setPendingMessages((prev) => [
-        ...prev,
-        {
-          role: 'user',
-          content: actionText,
-          timestamp: new Date().toISOString(),
-          pending: true,
-        },
-      ])
-      onRefine(actionText, intent)
+      setPendingMessages((prev) => [...prev, pendingMsg])
+
+      try {
+        await onRefine(actionText, intent)
+      } catch {
+        // Remove pending message on error
+        setPendingMessages((prev) => prev.filter((m) => m !== pendingMsg))
+        // Error toast is shown by useRefinement hook
+      }
     },
     [onRefine]
   )
@@ -257,7 +272,10 @@ export const RefinementChat: React.FC<RefinementChatProps> = ({
                 </ToggleGroupItem>
               </ToggleGroup>
             </div>
-            <QuickActions onSelect={handleQuickAction} disabled={isProcessing} />
+            <QuickActions
+              onSelect={(text, intent) => void handleQuickAction(text, intent)}
+              disabled={isProcessing}
+            />
 
             {latestProposal && (
               <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-4 dark:border-blue-800 dark:bg-blue-900/20">
@@ -316,7 +334,7 @@ export const RefinementChat: React.FC<RefinementChatProps> = ({
               </div>
             )}
 
-            <form onSubmit={handleSubmit} className="flex gap-2">
+            <form onSubmit={(e) => void handleSubmit(e)} className="flex gap-2">
               <Textarea
                 ref={textareaRef}
                 value={message}

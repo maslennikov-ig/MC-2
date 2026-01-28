@@ -16,12 +16,16 @@ export const useRefinement = (courseId: string) => {
   const [latestProposal, setLatestProposal] = useState<Proposal | null>(null)
   const [isApplying, setIsApplying] = useState(false)
   const abortControllerRef = useRef<AbortController | null>(null)
+  const isMountedRef = useRef(true)
 
-  // Cleanup: abort pending requests on unmount
+  // Cleanup: abort pending requests and track mount state
   useEffect(() => {
+    isMountedRef.current = true
     return () => {
+      isMountedRef.current = false
       if (abortControllerRef.current) {
         abortControllerRef.current.abort()
+        abortControllerRef.current = null
       }
     }
   }, [])
@@ -48,7 +52,12 @@ export const useRefinement = (courseId: string) => {
       await applyProposalAction(courseId, conversationId, latestProposal)
       toast.success('Изменения применены')
       setLatestProposal(null)
-      // TODO: Trigger data refetch via invalidation
+      // Emit custom event for data refetch (graph and other components can listen)
+      window.dispatchEvent(
+        new CustomEvent('course-data-updated', {
+          detail: { courseId, proposalType: latestProposal.type },
+        })
+      )
     } catch (error) {
       toast.error(error instanceof Error ? error.message : 'Ошибка применения изменений')
     } finally {
@@ -92,11 +101,11 @@ export const useRefinement = (courseId: string) => {
 
         const response = await sendChatMessage(request)
 
-        // Check if aborted after response - ignore result if cancelled
-        if (controller.signal.aborted) return
+        // Check if aborted after response or component unmounted - ignore result
+        if (controller.signal.aborted || !isMountedRef.current) return
 
-        // Only update state if request wasn't aborted
-        if (!controller.signal.aborted) {
+        // Only update state if request wasn't aborted and component is mounted
+        if (!controller.signal.aborted && isMountedRef.current) {
           // Update conversation state from response
           if (response.conversationId) {
             setConversationId(response.conversationId)
@@ -143,10 +152,13 @@ export const useRefinement = (courseId: string) => {
         })
         throw error
       } finally {
-        // Only reset state if this is still the current controller
+        // Always clean up the controller reference
         if (abortControllerRef.current === controller) {
-          setIsRefining(false)
           abortControllerRef.current = null
+        }
+        // Only reset state if component is still mounted
+        if (isMountedRef.current) {
+          setIsRefining(false)
         }
       }
     },
