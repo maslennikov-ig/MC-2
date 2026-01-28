@@ -58,7 +58,7 @@ export const STYLE_PROMPTS: Record<CourseStyle, string> = {
     'Approach topics through data-driven analysis and logical reasoning. Present statistics, metrics, benchmarks, and quantifiable evidence from industry research. Build arguments through systematic reasoning and cause-effect relationships. Use structured analytical frameworks (SWOT, root cause analysis, decision matrices). Break complex systems into components. Include data visualizations descriptions, comparison tables, and evidence-based conclusions.',
 
   conversational:
-    "Write as friendly dialogue with the reader. Use personal pronouns 'you' and 'we' throughout. Include relatable everyday analogies and real-life examples. Ask rhetorical questions to engage. Keep sentences short and paragraphs scannable. Maintain warm, approachable tone like explaining to a curious friend.",
+    "Write as friendly dialogue with the reader. Use personal pronouns 'you' and 'we' throughout. Include relatable everyday analogies and real-life examples. Engage through direct address and relatable examples. Avoid cliché questions like 'Did you know?' or 'Have you ever wondered?' — instead, state facts directly and let the content speak for itself. Keep sentences short and paragraphs scannable. Maintain warm, approachable tone like explaining to a curious friend.",
 
   storytelling:
     'Structure lessons as compelling narratives with characters facing real challenges. Begin with intriguing hooks, build tension through conflict, resolve with learning moments. Weave theoretical concepts naturally into story progression. Create emotional connections that make abstract concepts memorable through concrete scenarios.',
@@ -76,7 +76,7 @@ export const STYLE_PROMPTS: Record<CourseStyle, string> = {
     'Prioritize precision and technical accuracy above all. Include exact specifications, code snippets, mathematical formulas. Use proper technical terminology without simplification. Focus on system architecture, algorithms, and implementation details. Assume reader comfort with technical complexity.',
 
   research:
-    "Guide learning through strategic inquiry and investigation. Start with thought-provoking questions: 'What would happen if...?', 'Why do you think...?'. Present hypotheses to test, experiments to try. Encourage critical thinking by challenging assumptions. Balance open-ended exploration with evidence-based conclusions.",
+    'Guide learning through strategic inquiry. Pose questions that promote investigation rather than rhetorical clichés. Frame hypotheses to test and encourage evidence-based conclusions. Present experiments to try. Encourage critical thinking by challenging assumptions. Balance open-ended exploration with evidence-based conclusions.',
 
   gamified:
     "Transform learning into an adventure game. Frame content as quests, missions, and challenges to complete. Use gaming language: 'Level up your skills', 'Achievement unlocked', 'Boss battle ahead'. Create sense of progression with experience points and skill trees. Make failure fun with 'Game Over - Try Again!' attitude.",
