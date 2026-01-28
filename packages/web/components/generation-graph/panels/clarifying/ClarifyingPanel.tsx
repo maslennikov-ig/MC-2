@@ -105,10 +105,26 @@ export function ClarifyingPanel({ courseId, onComplete }: ClarifyingPanelProps) 
   } = trpc.clarifying.getQuestions.useQuery(
     { courseId },
     {
-      staleTime: Infinity, // Questions never change after generation, only answers do (updated via invalidateAndRefetch)
+      staleTime: Infinity, // Questions never change after generation, only answers do
       refetchOnWindowFocus: false, // Предотвращает rate limit spam при переключении окон
     }
   )
+
+  // FIX: Poll for questions when cache returned empty array
+  // This handles race condition where panel opens before questions are generated
+  useEffect(() => {
+    // Only poll if not loading and no questions yet
+    if (isLoading || questionsData?.questions?.length) {
+      return
+    }
+
+    // Poll every 2 seconds until questions appear
+    const interval = setInterval(() => {
+      void refetchQuestions()
+    }, 2000)
+
+    return () => clearInterval(interval)
+  }, [isLoading, questionsData?.questions?.length, refetchQuestions])
   const submitAnswerMutation = trpc.clarifying.submitAnswer.useMutation()
   const submitMultipleAnswersMutation = trpc.clarifying.submitMultipleAnswers.useMutation()
   const skipQuestionMutation = trpc.clarifying.skipQuestion.useMutation()
