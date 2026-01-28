@@ -4,6 +4,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip'
 import {
   MessageSquare,
   ChevronDown,
@@ -74,7 +75,7 @@ export const RefinementChat: React.FC<RefinementChatProps> = ({
     }
   })
   const [message, setMessage] = useState('')
-  const [selectedIntent, setSelectedIntent] = useState<ChatIntent | null>(null)
+  const [selectedIntent, setSelectedIntent] = useState<ChatIntent | null>('refine')
   const [pendingMessages, setPendingMessages] = useState<ChatMessage[]>([])
   const scrollRef = useRef<HTMLDivElement>(null)
   const textareaRef = useRef<HTMLTextAreaElement>(null)
@@ -297,35 +298,56 @@ export const RefinementChat: React.FC<RefinementChatProps> = ({
 
           <div className="space-y-3">
             <div className="mb-3 flex items-center gap-2">
-              <ToggleGroup
-                type="single"
-                value={selectedIntent ?? ''}
-                onValueChange={(value) => {
-                  if (value === 'refine' || value === 'regenerate') {
-                    setSelectedIntent(value)
-                  }
-                }}
-                aria-label={t('refinementChat.modes.modeSelectionLabel')}
-                className="justify-start"
-                disabled={isProcessing}
-              >
-                <ToggleGroupItem
-                  value="refine"
-                  aria-label={t('refinementChat.modes.refineAriaLabel')}
-                  className="h-8 text-xs"
+              <TooltipProvider delayDuration={300}>
+                <ToggleGroup
+                  type="single"
+                  value={selectedIntent ?? ''}
+                  onValueChange={(value) => {
+                    if (value === 'refine' || value === 'regenerate') {
+                      setSelectedIntent(value)
+                    }
+                  }}
+                  aria-label={t('refinementChat.modes.modeSelectionLabel')}
+                  className="justify-start"
+                  disabled={isProcessing}
                 >
-                  <Wand2 className="mr-1 h-3 w-3" />
-                  {t('refinementChat.modes.refine')} (~2K)
-                </ToggleGroupItem>
-                <ToggleGroupItem
-                  value="regenerate"
-                  aria-label={t('refinementChat.modes.regenerateAriaLabel')}
-                  className="h-8 text-xs"
-                >
-                  <RefreshCcw className="mr-1 h-3 w-3" />
-                  {t('refinementChat.modes.regenerate')} (~20K)
-                </ToggleGroupItem>
-              </ToggleGroup>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <ToggleGroupItem
+                        value="refine"
+                        aria-label={t('refinementChat.modes.refineAriaLabel')}
+                        className="h-8 text-xs"
+                      >
+                        <Wand2 className="mr-1 h-3 w-3" />
+                        {t('refinementChat.modes.refine')} (~2K)
+                      </ToggleGroupItem>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom">
+                      <p className="max-w-[200px] text-xs">
+                        {t('refinementChat.modes.refineTooltip')}
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <ToggleGroupItem
+                        value="regenerate"
+                        aria-label={t('refinementChat.modes.regenerateAriaLabel')}
+                        className="h-8 text-xs"
+                      >
+                        <RefreshCcw className="mr-1 h-3 w-3" />
+                        {t('refinementChat.modes.regenerate')} (~20K)
+                      </ToggleGroupItem>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom">
+                      <p className="max-w-[200px] text-xs">
+                        {t('refinementChat.modes.regenerateTooltip')}
+                      </p>
+                    </TooltipContent>
+                  </Tooltip>
+                </ToggleGroup>
+              </TooltipProvider>
             </div>
             <QuickActions
               onSelect={(text, intent) => void handleQuickAction(text, intent)}
