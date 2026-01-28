@@ -45,10 +45,10 @@ let runMermaidFixPipeline: typeof import('../../../src/stages/stage6-lesson-cont
 /**
  * Model to use for diagram generation tests
  * Using EXACTLY the same model as Stage 6 section expander (from llm_model_config table)
- * Primary: xiaomi/mimo-v2-flash:free
+ * Primary: xiaomi/mimo-v2-flash
  * Fallback: qwen/qwen3-235b-a22b-2507
  */
-const GENERATION_MODEL_PRIMARY = 'xiaomi/mimo-v2-flash:free';
+const GENERATION_MODEL_PRIMARY = 'xiaomi/mimo-v2-flash';
 const GENERATION_MODEL_FALLBACK = 'qwen/qwen3-235b-a22b-2507';
 
 /**
@@ -113,9 +113,13 @@ vi.mock('@/shared/logger', () => ({
 beforeAll(async () => {
   // DOM and DOMPurify should be set up by tests/setup.ts
   // Now dynamically import mermaid modules
-  const validator = await import('../../../src/stages/stage6-lesson-content/utils/mermaid-validator');
+  const validator = await import(
+    '../../../src/stages/stage6-lesson-content/utils/mermaid-validator'
+  );
   const fixer = await import('../../../src/stages/stage6-lesson-content/utils/mermaid-llm-fixer');
-  const pipeline = await import('../../../src/stages/stage6-lesson-content/utils/mermaid-fix-pipeline');
+  const pipeline = await import(
+    '../../../src/stages/stage6-lesson-content/utils/mermaid-fix-pipeline'
+  );
 
   validateMermaidSyntax = validator.validateMermaidSyntax;
   fixMermaidWithLLM = fixer.fixMermaidWithLLM;
@@ -288,7 +292,10 @@ async function generateDiagram(
   let content = response.content as string;
 
   // Clean up markdown code blocks if present
-  content = content.replace(/```mermaid\s*/g, '').replace(/```\s*/g, '').trim();
+  content = content
+    .replace(/```mermaid\s*/g, '')
+    .replace(/```\s*/g, '')
+    .trim();
 
   return { content, model: modelId };
 }
@@ -333,7 +340,10 @@ async function validateDiagram(diagram: string): Promise<{
 /**
  * Fix diagram using LLM fixer
  */
-async function fixDiagram(diagram: string, error: string): Promise<{
+async function fixDiagram(
+  diagram: string,
+  error: string
+): Promise<{
   fixed: boolean;
   content: string;
   tokensUsed: number;
@@ -494,54 +504,66 @@ describe.skipIf(SKIP_LLM_TESTS)('Mermaid LLM Fixer', () => {
     console.log(`  Total tokens: ${metrics.totalTokensUsed}`);
   });
 
-  it('should fix flowchart with invalid arrow syntax', async () => {
-    const broken = `flowchart TD
+  it(
+    'should fix flowchart with invalid arrow syntax',
+    async () => {
+      const broken = `flowchart TD
     A[Start] -> B[Process]
     B -> C[End]`;
 
-    const result = await fixDiagram(broken, 'Invalid arrow syntax: use --> instead of ->');
+      const result = await fixDiagram(broken, 'Invalid arrow syntax: use --> instead of ->');
 
-    expect(result.fixed).toBe(true);
-    expect(result.content).toContain('-->');
-    expect(result.content).not.toMatch(/[^-]->(?!>)/); // No single arrows
+      expect(result.fixed).toBe(true);
+      expect(result.content).toContain('-->');
+      expect(result.content).not.toMatch(/[^-]->(?!>)/); // No single arrows
 
-    // Validate the fixed diagram
-    const validation = await validateDiagram(result.content);
-    expect(validation.valid).toBe(true);
-  }, LLM_TIMEOUT + 5000);
+      // Validate the fixed diagram
+      const validation = await validateDiagram(result.content);
+      expect(validation.valid).toBe(true);
+    },
+    LLM_TIMEOUT + 5000
+  );
 
-  it('should fix mindmap with arrows (convert to indentation)', async () => {
-    const broken = `mindmap
+  it(
+    'should fix mindmap with arrows (convert to indentation)',
+    async () => {
+      const broken = `mindmap
   root((Продажи))
     Навыки --> Коммуникация
     Процесс --> Закрытие`;
 
-    const result = await fixDiagram(broken, 'Mindmap should use indentation, not arrows');
+      const result = await fixDiagram(broken, 'Mindmap should use indentation, not arrows');
 
-    expect(result.fixed).toBe(true);
-    expect(result.content).not.toContain('-->');
+      expect(result.fixed).toBe(true);
+      expect(result.content).not.toContain('-->');
 
-    // Validate the fixed diagram
-    const validation = await validateDiagram(result.content);
-    expect(validation.valid).toBe(true);
-  }, LLM_TIMEOUT + 5000);
+      // Validate the fixed diagram
+      const validation = await validateDiagram(result.content);
+      expect(validation.valid).toBe(true);
+    },
+    LLM_TIMEOUT + 5000
+  );
 
-  it('should fix mindmap with brackets around nodes', async () => {
-    const broken = `mindmap
+  it(
+    'should fix mindmap with brackets around nodes',
+    async () => {
+      const broken = `mindmap
   root((Продажи))
     [Навыки]
       [Коммуникация]
     [Процесс]`;
 
-    const result = await fixDiagram(broken, 'Mindmap nodes should not have brackets []');
+      const result = await fixDiagram(broken, 'Mindmap nodes should not have brackets []');
 
-    expect(result.fixed).toBe(true);
-    // Brackets should be removed (except root)
-    expect(result.content.match(/\[(?!.*root)/g)).toBeFalsy();
+      expect(result.fixed).toBe(true);
+      // Brackets should be removed (except root)
+      expect(result.content.match(/\[(?!.*root)/g)).toBeFalsy();
 
-    const validation = await validateDiagram(result.content);
-    expect(validation.valid).toBe(true);
-  }, LLM_TIMEOUT + 5000);
+      const validation = await validateDiagram(result.content);
+      expect(validation.valid).toBe(true);
+    },
+    LLM_TIMEOUT + 5000
+  );
 });
 
 // ============================================================================
@@ -557,215 +579,247 @@ describe.skipIf(SKIP_LLM_TESTS)('Mermaid Diagram Generation', () => {
   });
 
   describe('Flowchart Generation (со стрелками)', () => {
-    it('should generate valid simple flowchart', async () => {
-      const result = await generateDiagram(GENERATION_PROMPTS.flowchart.simple);
+    it(
+      'should generate valid simple flowchart',
+      async () => {
+        const result = await generateDiagram(GENERATION_PROMPTS.flowchart.simple);
 
-      console.log(`\n📝 Generated flowchart (simple) using ${result.model}:`);
-      console.log(result.content);
+        console.log(`\n📝 Generated flowchart (simple) using ${result.model}:`);
+        console.log(result.content);
 
-      const validation = await validateDiagram(result.content);
+        const validation = await validateDiagram(result.content);
 
-      if (!validation.valid) {
-        console.log('❌ Validation errors:', validation.errors);
-        // Try to fix
-        const fixResult = await fixDiagram(result.content, validation.errors.join('; '));
-        console.log('\n🔧 Fixed diagram:');
-        console.log(fixResult.content);
-        const revalidation = await validateDiagram(fixResult.content);
-        expect(revalidation.valid).toBe(true);
-      } else {
-        expect(validation.valid).toBe(true);
-        // Mermaid 11+ returns 'flowchart-v2'
-        expect(['flowchart', 'flowchart-v2']).toContain(validation.diagramType);
-      }
-    }, LLM_TIMEOUT + 10000);
+        if (!validation.valid) {
+          console.log('❌ Validation errors:', validation.errors);
+          // Try to fix
+          const fixResult = await fixDiagram(result.content, validation.errors.join('; '));
+          console.log('\n🔧 Fixed diagram:');
+          console.log(fixResult.content);
+          const revalidation = await validateDiagram(fixResult.content);
+          expect(revalidation.valid).toBe(true);
+        } else {
+          expect(validation.valid).toBe(true);
+          // Mermaid 11+ returns 'flowchart-v2'
+          expect(['flowchart', 'flowchart-v2']).toContain(validation.diagramType);
+        }
+      },
+      LLM_TIMEOUT + 10000
+    );
 
-    it('should generate valid complex flowchart with conditions', async () => {
-      const result = await generateDiagram(GENERATION_PROMPTS.flowchart.complex);
+    it(
+      'should generate valid complex flowchart with conditions',
+      async () => {
+        const result = await generateDiagram(GENERATION_PROMPTS.flowchart.complex);
 
-      console.log(`\n📝 Generated flowchart (complex) using ${result.model}:`);
-      console.log(result.content);
+        console.log(`\n📝 Generated flowchart (complex) using ${result.model}:`);
+        console.log(result.content);
 
-      const validation = await validateDiagram(result.content);
+        const validation = await validateDiagram(result.content);
 
-      if (!validation.valid) {
-        console.log('❌ Validation errors:', validation.errors);
+        if (!validation.valid) {
+          console.log('❌ Validation errors:', validation.errors);
 
-        // Try to fix it
-        const fixResult = await fixDiagram(result.content, validation.errors.join('; '));
-        console.log('\n🔧 Fixed diagram:');
-        console.log(fixResult.content);
+          // Try to fix it
+          const fixResult = await fixDiagram(result.content, validation.errors.join('; '));
+          console.log('\n🔧 Fixed diagram:');
+          console.log(fixResult.content);
 
-        const revalidation = await validateDiagram(fixResult.content);
-        expect(revalidation.valid).toBe(true);
-      } else {
-        expect(validation.valid).toBe(true);
-      }
-    }, LLM_TIMEOUT + 15000);
+          const revalidation = await validateDiagram(fixResult.content);
+          expect(revalidation.valid).toBe(true);
+        } else {
+          expect(validation.valid).toBe(true);
+        }
+      },
+      LLM_TIMEOUT + 15000
+    );
   });
 
   describe('Mindmap Generation (без стрелок, только отступы)', () => {
-    it('should generate valid simple mindmap', async () => {
-      const result = await generateDiagram(GENERATION_PROMPTS.mindmap.simple);
+    it(
+      'should generate valid simple mindmap',
+      async () => {
+        const result = await generateDiagram(GENERATION_PROMPTS.mindmap.simple);
 
-      console.log(`\n📝 Generated mindmap (simple) using ${result.model}:`);
-      console.log(result.content);
+        console.log(`\n📝 Generated mindmap (simple) using ${result.model}:`);
+        console.log(result.content);
 
-      const validation = await validateDiagram(result.content);
+        const validation = await validateDiagram(result.content);
 
-      if (!validation.valid) {
-        console.log('❌ Validation errors:', validation.errors);
+        if (!validation.valid) {
+          console.log('❌ Validation errors:', validation.errors);
 
-        // Try to fix it
-        const fixResult = await fixDiagram(result.content, validation.errors.join('; '));
-        console.log('\n🔧 Fixed diagram:');
-        console.log(fixResult.content);
+          // Try to fix it
+          const fixResult = await fixDiagram(result.content, validation.errors.join('; '));
+          console.log('\n🔧 Fixed diagram:');
+          console.log(fixResult.content);
 
-        const revalidation = await validateDiagram(fixResult.content);
-        expect(revalidation.valid).toBe(true);
-      } else {
-        expect(validation.valid).toBe(true);
-        expect(validation.diagramType).toBe('mindmap');
-      }
-    }, LLM_TIMEOUT * 2);
-
-    it('should generate valid complex mindmap', async () => {
-      const result = await generateDiagram(GENERATION_PROMPTS.mindmap.complex);
-
-      console.log(`\n📝 Generated mindmap (complex) using ${result.model}:`);
-      console.log(result.content);
-
-      const validation = await validateDiagram(result.content);
-
-      if (!validation.valid) {
-        console.log('❌ Validation errors:', validation.errors);
-
-        // Try the full pipeline
-        const pipelineResult = await runMermaidFixPipeline(
-          `\`\`\`mermaid\n${result.content}\n\`\`\``
-        );
-        console.log('\n🔧 Pipeline result:');
-        console.log('Modified:', pipelineResult.modified);
-        console.log('Metrics:', pipelineResult.metrics);
-
-        if (pipelineResult.modified) {
-          // Extract fixed diagram from pipeline result
-          const fixedMatch = pipelineResult.content.match(/```mermaid\s*([\s\S]*?)```/);
-          if (fixedMatch) {
-            console.log('\n📝 Fixed diagram:');
-            console.log(fixedMatch[1]);
-
-            const revalidation = await validateDiagram(fixedMatch[1]);
-            expect(revalidation.valid).toBe(true);
-          }
+          const revalidation = await validateDiagram(fixResult.content);
+          expect(revalidation.valid).toBe(true);
+        } else {
+          expect(validation.valid).toBe(true);
+          expect(validation.diagramType).toBe('mindmap');
         }
-      } else {
-        expect(validation.valid).toBe(true);
-      }
-    }, LLM_TIMEOUT * 2);
+      },
+      LLM_TIMEOUT * 2
+    );
+
+    it(
+      'should generate valid complex mindmap',
+      async () => {
+        const result = await generateDiagram(GENERATION_PROMPTS.mindmap.complex);
+
+        console.log(`\n📝 Generated mindmap (complex) using ${result.model}:`);
+        console.log(result.content);
+
+        const validation = await validateDiagram(result.content);
+
+        if (!validation.valid) {
+          console.log('❌ Validation errors:', validation.errors);
+
+          // Try the full pipeline
+          const pipelineResult = await runMermaidFixPipeline(
+            `\`\`\`mermaid\n${result.content}\n\`\`\``
+          );
+          console.log('\n🔧 Pipeline result:');
+          console.log('Modified:', pipelineResult.modified);
+          console.log('Metrics:', pipelineResult.metrics);
+
+          if (pipelineResult.modified) {
+            // Extract fixed diagram from pipeline result
+            const fixedMatch = pipelineResult.content.match(/```mermaid\s*([\s\S]*?)```/);
+            if (fixedMatch) {
+              console.log('\n📝 Fixed diagram:');
+              console.log(fixedMatch[1]);
+
+              const revalidation = await validateDiagram(fixedMatch[1]);
+              expect(revalidation.valid).toBe(true);
+            }
+          }
+        } else {
+          expect(validation.valid).toBe(true);
+        }
+      },
+      LLM_TIMEOUT * 2
+    );
   });
 
   describe('Sequence Diagram Generation', () => {
-    it('should generate valid sequenceDiagram', async () => {
-      const result = await generateDiagram(GENERATION_PROMPTS.sequenceDiagram.simple);
+    it(
+      'should generate valid sequenceDiagram',
+      async () => {
+        const result = await generateDiagram(GENERATION_PROMPTS.sequenceDiagram.simple);
 
-      console.log(`\n📝 Generated sequenceDiagram using ${result.model}:`);
-      console.log(result.content);
+        console.log(`\n📝 Generated sequenceDiagram using ${result.model}:`);
+        console.log(result.content);
 
-      const validation = await validateDiagram(result.content);
+        const validation = await validateDiagram(result.content);
 
-      if (!validation.valid) {
-        console.log('❌ Validation errors:', validation.errors);
-        const fixResult = await fixDiagram(result.content, validation.errors.join('; '));
-        console.log('\n🔧 Fixed diagram:');
-        console.log(fixResult.content);
-        const revalidation = await validateDiagram(fixResult.content);
-        expect(revalidation.valid).toBe(true);
-      } else {
-        expect(validation.valid).toBe(true);
-        // Mermaid 11+ returns 'sequence' instead of 'sequenceDiagram'
-        expect(['sequenceDiagram', 'sequence']).toContain(validation.diagramType);
-      }
-    }, LLM_TIMEOUT * 2);
+        if (!validation.valid) {
+          console.log('❌ Validation errors:', validation.errors);
+          const fixResult = await fixDiagram(result.content, validation.errors.join('; '));
+          console.log('\n🔧 Fixed diagram:');
+          console.log(fixResult.content);
+          const revalidation = await validateDiagram(fixResult.content);
+          expect(revalidation.valid).toBe(true);
+        } else {
+          expect(validation.valid).toBe(true);
+          // Mermaid 11+ returns 'sequence' instead of 'sequenceDiagram'
+          expect(['sequenceDiagram', 'sequence']).toContain(validation.diagramType);
+        }
+      },
+      LLM_TIMEOUT * 2
+    );
   });
 
   describe('Class Diagram Generation', () => {
-    it('should generate valid classDiagram', async () => {
-      const result = await generateDiagram(GENERATION_PROMPTS.classDiagram.simple);
+    it(
+      'should generate valid classDiagram',
+      async () => {
+        const result = await generateDiagram(GENERATION_PROMPTS.classDiagram.simple);
 
-      console.log(`\n📝 Generated classDiagram using ${result.model}:`);
-      console.log(result.content);
+        console.log(`\n📝 Generated classDiagram using ${result.model}:`);
+        console.log(result.content);
 
-      const validation = await validateDiagram(result.content);
+        const validation = await validateDiagram(result.content);
 
-      if (!validation.valid) {
-        console.log('❌ Validation errors:', validation.errors);
+        if (!validation.valid) {
+          console.log('❌ Validation errors:', validation.errors);
 
-        // Try to fix it
-        const fixResult = await fixDiagram(result.content, validation.errors.join('; '));
-        console.log('\n🔧 Fixed diagram:');
-        console.log(fixResult.content);
+          // Try to fix it
+          const fixResult = await fixDiagram(result.content, validation.errors.join('; '));
+          console.log('\n🔧 Fixed diagram:');
+          console.log(fixResult.content);
 
-        const revalidation = await validateDiagram(fixResult.content);
-        expect(revalidation.valid).toBe(true);
-      } else {
-        expect(validation.valid).toBe(true);
-        // Mermaid 11+ returns 'class' instead of 'classDiagram'
-        expect(['classDiagram', 'class']).toContain(validation.diagramType);
-      }
-    }, LLM_TIMEOUT + 10000);
+          const revalidation = await validateDiagram(fixResult.content);
+          expect(revalidation.valid).toBe(true);
+        } else {
+          expect(validation.valid).toBe(true);
+          // Mermaid 11+ returns 'class' instead of 'classDiagram'
+          expect(['classDiagram', 'class']).toContain(validation.diagramType);
+        }
+      },
+      LLM_TIMEOUT + 10000
+    );
   });
 
   describe('State Diagram Generation', () => {
-    it('should generate valid stateDiagram', async () => {
-      const result = await generateDiagram(GENERATION_PROMPTS.stateDiagram.simple);
+    it(
+      'should generate valid stateDiagram',
+      async () => {
+        const result = await generateDiagram(GENERATION_PROMPTS.stateDiagram.simple);
 
-      console.log(`\n📝 Generated stateDiagram using ${result.model}:`);
-      console.log(result.content);
+        console.log(`\n📝 Generated stateDiagram using ${result.model}:`);
+        console.log(result.content);
 
-      const validation = await validateDiagram(result.content);
+        const validation = await validateDiagram(result.content);
 
-      if (!validation.valid) {
-        console.log('❌ Validation errors:', validation.errors);
+        if (!validation.valid) {
+          console.log('❌ Validation errors:', validation.errors);
 
-        const fixResult = await fixDiagram(result.content, validation.errors.join('; '));
-        console.log('\n🔧 Fixed diagram:');
-        console.log(fixResult.content);
+          const fixResult = await fixDiagram(result.content, validation.errors.join('; '));
+          console.log('\n🔧 Fixed diagram:');
+          console.log(fixResult.content);
 
-        const revalidation = await validateDiagram(fixResult.content);
-        expect(revalidation.valid).toBe(true);
-      } else {
-        expect(validation.valid).toBe(true);
-        // Mermaid 11+ returns 'stateDiagram-v2' or 'state' instead of 'stateDiagram'
-        expect(['stateDiagram', 'stateDiagram-v2', 'state']).toContain(validation.diagramType);
-      }
-    }, LLM_TIMEOUT * 2);
+          const revalidation = await validateDiagram(fixResult.content);
+          expect(revalidation.valid).toBe(true);
+        } else {
+          expect(validation.valid).toBe(true);
+          // Mermaid 11+ returns 'stateDiagram-v2' or 'state' instead of 'stateDiagram'
+          expect(['stateDiagram', 'stateDiagram-v2', 'state']).toContain(validation.diagramType);
+        }
+      },
+      LLM_TIMEOUT * 2
+    );
   });
 
   describe('ER Diagram Generation', () => {
-    it('should generate valid erDiagram', async () => {
-      const result = await generateDiagram(GENERATION_PROMPTS.erDiagram.simple);
+    it(
+      'should generate valid erDiagram',
+      async () => {
+        const result = await generateDiagram(GENERATION_PROMPTS.erDiagram.simple);
 
-      console.log(`\n📝 Generated erDiagram using ${result.model}:`);
-      console.log(result.content);
+        console.log(`\n📝 Generated erDiagram using ${result.model}:`);
+        console.log(result.content);
 
-      const validation = await validateDiagram(result.content);
+        const validation = await validateDiagram(result.content);
 
-      if (!validation.valid) {
-        console.log('❌ Validation errors:', validation.errors);
+        if (!validation.valid) {
+          console.log('❌ Validation errors:', validation.errors);
 
-        const fixResult = await fixDiagram(result.content, validation.errors.join('; '));
-        console.log('\n🔧 Fixed diagram:');
-        console.log(fixResult.content);
+          const fixResult = await fixDiagram(result.content, validation.errors.join('; '));
+          console.log('\n🔧 Fixed diagram:');
+          console.log(fixResult.content);
 
-        const revalidation = await validateDiagram(fixResult.content);
-        expect(revalidation.valid).toBe(true);
-      } else {
-        expect(validation.valid).toBe(true);
-        // Mermaid 11+ returns 'er' instead of 'erDiagram'
-        expect(['erDiagram', 'er']).toContain(validation.diagramType);
-      }
-    }, LLM_TIMEOUT + 10000);
+          const revalidation = await validateDiagram(fixResult.content);
+          expect(revalidation.valid).toBe(true);
+        } else {
+          expect(validation.valid).toBe(true);
+          // Mermaid 11+ returns 'er' instead of 'erDiagram'
+          expect(['erDiagram', 'er']).toContain(validation.diagramType);
+        }
+      },
+      LLM_TIMEOUT + 10000
+    );
   });
 });
 
@@ -774,27 +828,31 @@ describe.skipIf(SKIP_LLM_TESTS)('Mermaid Diagram Generation', () => {
 // ============================================================================
 
 describe.skipIf(SKIP_LLM_TESTS)('Model Fallback Strategy', () => {
-  it('should use fallback model when primary produces invalid diagram', async () => {
-    // This test verifies the fallback strategy works
-    const result = await generateDiagramWithFallback(GENERATION_PROMPTS.flowchart.simple);
+  it(
+    'should use fallback model when primary produces invalid diagram',
+    async () => {
+      // This test verifies the fallback strategy works
+      const result = await generateDiagramWithFallback(GENERATION_PROMPTS.flowchart.simple);
 
-    console.log(`\n📝 Generated with fallback strategy:`);
-    console.log(`  Model used: ${result.model}`);
-    console.log(`  Used fallback: ${result.usedFallback}`);
-    console.log(result.content);
+      console.log(`\n📝 Generated with fallback strategy:`);
+      console.log(`  Model used: ${result.model}`);
+      console.log(`  Used fallback: ${result.usedFallback}`);
+      console.log(result.content);
 
-    const validation = await validateDiagram(result.content);
+      const validation = await validateDiagram(result.content);
 
-    // Final result should be valid (either from primary or fallback)
-    if (!validation.valid) {
-      // If still invalid, try LLM fixer
-      const fixResult = await fixDiagram(result.content, validation.errors.join('; '));
-      const revalidation = await validateDiagram(fixResult.content);
-      expect(revalidation.valid).toBe(true);
-    } else {
-      expect(validation.valid).toBe(true);
-    }
-  }, LLM_TIMEOUT * 2 + 10000);
+      // Final result should be valid (either from primary or fallback)
+      if (!validation.valid) {
+        // If still invalid, try LLM fixer
+        const fixResult = await fixDiagram(result.content, validation.errors.join('; '));
+        const revalidation = await validateDiagram(fixResult.content);
+        expect(revalidation.valid).toBe(true);
+      } else {
+        expect(validation.valid).toBe(true);
+      }
+    },
+    LLM_TIMEOUT * 2 + 10000
+  );
 });
 
 // ============================================================================
@@ -802,8 +860,10 @@ describe.skipIf(SKIP_LLM_TESTS)('Model Fallback Strategy', () => {
 // ============================================================================
 
 describe.skipIf(SKIP_LLM_TESTS)('Full Mermaid Pipeline Integration', () => {
-  it('should process content with multiple diagram types through pipeline', async () => {
-    const content = `## Урок: Продажи билетов
+  it(
+    'should process content with multiple diagram types through pipeline',
+    async () => {
+      const content = `## Урок: Продажи билетов
 
 ### Процесс продажи
 
@@ -841,20 +901,22 @@ sequenceDiagram
 \`\`\`
 `;
 
-    console.log('\n📄 Processing content with 3 diagram types...');
+      console.log('\n📄 Processing content with 3 diagram types...');
 
-    const result = await runMermaidFixPipeline(content);
+      const result = await runMermaidFixPipeline(content);
 
-    console.log('\n📊 Pipeline Result:');
-    console.log('  Total diagrams:', result.metrics.diagramsTotal);
-    console.log('  Fixed by regex:', result.metrics.diagramsFixedRegex);
-    console.log('  Fixed by LLM:', result.metrics.diagramsFixedLLM);
-    console.log('  Fallback:', result.metrics.diagramsFallback);
-    console.log('  Duration:', result.metrics.durationMs, 'ms');
+      console.log('\n📊 Pipeline Result:');
+      console.log('  Total diagrams:', result.metrics.diagramsTotal);
+      console.log('  Fixed by regex:', result.metrics.diagramsFixedRegex);
+      console.log('  Fixed by LLM:', result.metrics.diagramsFixedLLM);
+      console.log('  Fallback:', result.metrics.diagramsFallback);
+      console.log('  Duration:', result.metrics.durationMs, 'ms');
 
-    expect(result.metrics.diagramsTotal).toBe(3);
-    expect(result.metrics.diagramsFallback).toBe(0); // No fallbacks
-  }, LLM_TIMEOUT * 3 + 10000);
+      expect(result.metrics.diagramsTotal).toBe(3);
+      expect(result.metrics.diagramsFallback).toBe(0); // No fallbacks
+    },
+    LLM_TIMEOUT * 3 + 10000
+  );
 });
 
 // ============================================================================
@@ -890,24 +952,25 @@ describe('Regression: Real Broken Mindmap from Course', () => {
     expect(validation.diagramType).toBe('mindmap');
   });
 
-  it.skipIf(SKIP_LLM_TESTS)('should fix broken mindmap via LLM', async () => {
-    const validation = await validateDiagram(REAL_BROKEN_MINDMAP);
+  it.skipIf(SKIP_LLM_TESTS)(
+    'should fix broken mindmap via LLM',
+    async () => {
+      const validation = await validateDiagram(REAL_BROKEN_MINDMAP);
 
-    const fixResult = await fixDiagram(
-      REAL_BROKEN_MINDMAP,
-      validation.errors.join('; ')
-    );
+      const fixResult = await fixDiagram(REAL_BROKEN_MINDMAP, validation.errors.join('; '));
 
-    console.log('\n🔧 Fixed mindmap:');
-    console.log(fixResult.content);
+      console.log('\n🔧 Fixed mindmap:');
+      console.log(fixResult.content);
 
-    expect(fixResult.fixed).toBe(true);
+      expect(fixResult.fixed).toBe(true);
 
-    const revalidation = await validateDiagram(fixResult.content);
-    console.log('Revalidation:', revalidation);
+      const revalidation = await validateDiagram(fixResult.content);
+      console.log('Revalidation:', revalidation);
 
-    expect(revalidation.valid).toBe(true);
-  }, LLM_TIMEOUT + 5000);
+      expect(revalidation.valid).toBe(true);
+    },
+    LLM_TIMEOUT + 5000
+  );
 });
 
 // ============================================================================
@@ -1030,8 +1093,9 @@ describe('Additional Validation Tests', () => {
 
 describe('Stress Tests', () => {
   it('should validate large flowchart (20+ nodes)', async () => {
-    const nodes = Array.from({ length: 20 }, (_, i) =>
-      `    N${i}[Узел ${i}] --> N${i + 1}[Узел ${i + 1}]`
+    const nodes = Array.from(
+      { length: 20 },
+      (_, i) => `    N${i}[Узел ${i}] --> N${i + 1}[Узел ${i + 1}]`
     ).join('\n');
 
     const diagram = `flowchart TD\n${nodes}`;
@@ -1045,8 +1109,9 @@ describe('Stress Tests', () => {
 
   it('should handle diagram near size limit (1500 chars)', async () => {
     // Create a mindmap that's close to the 2000 char limit
-    const branches = Array.from({ length: 15 }, (_, i) =>
-      `    Ветка ${i + 1}\n      Подветка ${i + 1}.1\n      Подветка ${i + 1}.2`
+    const branches = Array.from(
+      { length: 15 },
+      (_, i) => `    Ветка ${i + 1}\n      Подветка ${i + 1}.1\n      Подветка ${i + 1}.2`
     ).join('\n');
 
     const diagram = `mindmap\n  root((Большая диаграмма))\n${branches}`;
@@ -1069,21 +1134,27 @@ describe('Statistics Collection', () => {
     const metrics = getLLMFixerMetrics();
 
     console.log('\n📊 Final LLM Fixer Statistics:');
-    console.log(JSON.stringify({
-      timestamp: new Date().toISOString(),
-      model: FIXER_MODEL,
-      metrics: {
-        totalAttempts: metrics.totalAttempts,
-        successfulFixes: metrics.successfulFixes,
-        failedFixes: metrics.failedFixes,
-        skippedRateLimit: metrics.skippedRateLimit,
-        skippedTooLarge: metrics.skippedTooLarge,
-        timeouts: metrics.timeouts,
-        totalTokensUsed: metrics.totalTokensUsed,
-        successRate: `${(metrics.successRate * 100).toFixed(1)}%`,
-        avgTokensPerFix: metrics.avgTokensPerFix.toFixed(0),
-      }
-    }, null, 2));
+    console.log(
+      JSON.stringify(
+        {
+          timestamp: new Date().toISOString(),
+          model: FIXER_MODEL,
+          metrics: {
+            totalAttempts: metrics.totalAttempts,
+            successfulFixes: metrics.successfulFixes,
+            failedFixes: metrics.failedFixes,
+            skippedRateLimit: metrics.skippedRateLimit,
+            skippedTooLarge: metrics.skippedTooLarge,
+            timeouts: metrics.timeouts,
+            totalTokensUsed: metrics.totalTokensUsed,
+            successRate: `${(metrics.successRate * 100).toFixed(1)}%`,
+            avgTokensPerFix: metrics.avgTokensPerFix.toFixed(0),
+          },
+        },
+        null,
+        2
+      )
+    );
 
     // Basic assertions about metrics structure
     expect(metrics.totalAttempts).toBeGreaterThanOrEqual(0);
