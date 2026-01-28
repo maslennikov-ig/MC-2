@@ -32,7 +32,7 @@
  *
  * 4. **Trie-based matching** - For prefix-heavy patterns
  *
- * Current rule count: 32 (no optimization needed)
+ * Current rule count: 35 (no optimization needed)
  * Review threshold: 30+ rules
  */
 
@@ -229,6 +229,25 @@ export const AUTO_MUTE_RULES: AutoMuteRule[] = [
     pattern: /Unexpected exit code: 10/i,
     reason: 'job_lifecycle',
     description: 'Worker TTL timeout (10 min) - job exceeded max time, will be retried',
+  },
+
+  // === Expected HTTP Responses ===
+  {
+    pattern: /\/trpc\/.*401/i,
+    reason: 'expected_behavior',
+    description: 'Unauthenticated tRPC request - 401 is correct response',
+  },
+
+  // === Cache & Config Warnings ===
+  {
+    pattern: /Cache directory does not exist/i,
+    reason: 'expected_behavior',
+    description: 'Cache directory missing on fresh environment - will be created when needed',
+  },
+  {
+    pattern: /ModelConfigBunker.*sync.*fail/i,
+    reason: 'external_service',
+    description: 'ModelConfigBunker network issue - has retry with exponential backoff',
   },
 ];
 
