@@ -614,7 +614,7 @@ export function QuestionCard({
                   {isSelected ? (
                     <CheckSquare className="h-5 w-5 text-slate-700 dark:text-slate-300" />
                   ) : (
-                    <div className="h-5 w-5 rounded border-2 border-slate-300 dark:border-slate-600" />
+                    <div className="h-5 w-5 rounded-sm border-2 border-slate-300 dark:border-slate-600" />
                   )}
                 </div>
 
@@ -671,7 +671,7 @@ export function QuestionCard({
               {isCustomSelected ? (
                 <CheckSquare className="h-5 w-5 text-slate-700 dark:text-slate-300" />
               ) : (
-                <div className="h-5 w-5 rounded border-2 border-slate-300 dark:border-slate-600" />
+                <div className="h-5 w-5 rounded-sm border-2 border-slate-300 dark:border-slate-600" />
               )}
             </div>
             <div className="flex-1">
