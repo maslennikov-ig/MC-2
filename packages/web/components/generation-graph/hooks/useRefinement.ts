@@ -1,7 +1,7 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
 import { toast } from 'sonner'
-import { ChatRequest, ChatResponse } from '@megacampus/shared-types/chat-types'
-import { sendChatMessage } from '@/app/actions/refinement'
+import { ChatRequest, ChatResponse, Proposal } from '@megacampus/shared-types/chat-types'
+import { sendChatMessage, applyProposal as applyProposalAction } from '@/app/actions/refinement'
 
 interface ChatMessage {
   role: 'user' | 'assistant'
@@ -13,6 +13,8 @@ export const useRefinement = (courseId: string) => {
   const [isRefining, setIsRefining] = useState(false)
   const [conversationId, setConversationId] = useState<string | undefined>()
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([])
+  const [latestProposal, setLatestProposal] = useState<Proposal | null>(null)
+  const [isApplying, setIsApplying] = useState(false)
   const abortControllerRef = useRef<AbortController | null>(null)
 
   // Cleanup: abort pending requests on unmount
@@ -35,7 +37,24 @@ export const useRefinement = (courseId: string) => {
   const clearConversation = useCallback(() => {
     setConversationId(undefined)
     setChatHistory([])
+    setLatestProposal(null)
   }, [])
+
+  const acceptProposal = useCallback(async () => {
+    if (!latestProposal || !conversationId) return
+
+    setIsApplying(true)
+    try {
+      await applyProposalAction(courseId, conversationId, latestProposal)
+      toast.success('Изменения применены')
+      setLatestProposal(null)
+      // TODO: Trigger data refetch via invalidation
+    } catch (error) {
+      toast.error(error instanceof Error ? error.message : 'Ошибка применения изменений')
+    } finally {
+      setIsApplying(false)
+    }
+  }, [courseId, conversationId, latestProposal])
 
   const refine = useCallback(
     async (
@@ -94,6 +113,11 @@ export const useRefinement = (courseId: string) => {
             },
           ])
 
+          // Update proposal state if present
+          if (response.proposal) {
+            setLatestProposal(response.proposal)
+          }
+
           // Show appropriate toast based on intent
           if (response.intent === 'regenerate') {
             toast.success('Regeneration Started', {
@@ -136,5 +160,8 @@ export const useRefinement = (courseId: string) => {
     conversationId,
     chatHistory,
     clearConversation,
+    latestProposal,
+    isApplying,
+    acceptProposal,
   }
 }

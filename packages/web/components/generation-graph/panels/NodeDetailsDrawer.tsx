@@ -222,7 +222,8 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
   const orgSlug = params?.orgSlug as string | undefined
   const [selectedAttemptNum, setSelectedAttemptNum] = useState<number | null>(null)
   const [selectedPhaseId, setSelectedPhaseId] = useState<string | null>(null)
-  const { refine, isRefining, chatHistory } = useRefinement(courseInfo.id)
+  const { refine, isRefining, chatHistory, latestProposal, isApplying, acceptProposal } =
+    useRefinement(courseInfo.id)
   const refinementChatRef = useRef<HTMLDivElement>(null)
   const [isExpanded, setIsExpanded] = useState(false)
   const [isLessonMaximized, setIsLessonMaximized] = useState(false)
@@ -762,7 +763,9 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
     )
   }
 
-  const isAIStage = data?.stageNumber && [3, 4, 5, 6].includes(data.stageNumber)
+  // Stage 3 (Document Classification) uses priority selection only, no chat
+  // Stages 4, 5, 6 use RefinementChat with Confirm-then-Apply flow
+  const isAIStage = data?.stageNumber && [4, 5, 6].includes(data.stageNumber)
 
   // Restart button available for stages 2-6 with completed/error/awaiting status
   const canRestart =
@@ -1240,6 +1243,9 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
                     onRefine={(msg, intent) => void handleRefine(msg, intent)}
                     history={chatHistory}
                     isProcessing={isRefining}
+                    latestProposal={latestProposal}
+                    isApplying={isApplying}
+                    onAcceptProposal={() => void acceptProposal()}
                   />
                 </div>
               )}

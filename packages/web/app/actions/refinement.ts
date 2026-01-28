@@ -1,6 +1,11 @@
 'use server'
 
-import { ChatRequest, ChatResponse, chatResponseSchema } from '@megacampus/shared-types/chat-types'
+import {
+  ChatRequest,
+  ChatResponse,
+  chatResponseSchema,
+  Proposal,
+} from '@megacampus/shared-types/chat-types'
 import { getBackendAuthHeaders, TRPC_URL } from '@/lib/auth'
 import { createClient } from '@/lib/supabase/server'
 
@@ -139,4 +144,36 @@ export async function sendChatMessage(request: ChatRequest): Promise<ChatRespons
   }
 
   return parseResult.data
+}
+
+/**
+ * Apply a proposal (Confirm-then-Apply flow).
+ * Submits the accepted proposal to the backend for execution.
+ *
+ * @param courseId - Course UUID
+ * @param conversationId - Conversation UUID for context
+ * @param proposal - Proposal to apply
+ * @returns Success status
+ * @throws Error with user-friendly message on failure
+ */
+export async function applyProposal(
+  courseId: string,
+  conversationId: string,
+  proposal: Proposal
+): Promise<{ success: boolean }> {
+  const headers = await getBackendAuthHeaders()
+
+  const response = await fetch(`${TRPC_URL}/generation.applyProposal`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ courseId, conversationId, proposal }),
+  })
+
+  if (!response.ok) {
+    const errorMessage = HTTP_ERROR_MESSAGES[response.status] || 'Failed to apply changes'
+    throw new Error(errorMessage)
+  }
+
+  const data = await response.json()
+  return { success: data?.result?.data?.success ?? false }
 }
