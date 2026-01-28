@@ -1,11 +1,15 @@
+'use client'
+
 /**
  * TanStack Query Client Configuration
  *
  * Provides QueryClient singleton pattern for Next.js App Router.
  * This file is extracted from providers.tsx for reusability in:
- * - Server Components (prefetching)
  * - Client Components (QueryClientProvider)
  * - Tests (mocking)
+ *
+ * Note: For Server Component prefetching, use makeQueryClient() directly
+ * in the server component instead of getQueryClient().
  *
  * @see https://tanstack.com/query/v5/docs/framework/react/guides/advanced-ssr
  */
