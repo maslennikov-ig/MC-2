@@ -142,13 +142,10 @@ If Phase 1 passes, check structure and fixable issues.
 6. **Duplicate Content**: Check for repeated paragraphs
    - Flag if same paragraph (>50 chars) appears twice
 
-7. **Repetitive Clichés** (FLAG_TO_JUDGE): Check for overused phrases
-   - Phrases to detect (case-insensitive):
-     - RU: "знаете ли вы", "интересный факт", "любопытный факт", "вы когда-нибудь задумывались", "давайте разберёмся", "в современном мире", "не секрет, что", "как известно"
-     - EN: "did you know", "fun fact", "interesting fact", "have you ever wondered", "let's dive into", "let's explore", "in today's world", "it's no secret", "as we all know"
-   - Flag if same cliché phrase appears more than once
-   - Flag if more than 2 different cliché phrases detected in content
-   - These reduce content quality and reader engagement
+7. **Opening Quality** (INFO severity, advisory only):
+   - Note if sections frequently start with generic questions without specific context
+   - Suggest leading with concrete facts or examples
+   - This is informational feedback, NOT a blocking issue
 
 ## Phase 2.5: Language & Grammar Fixes (Status: FIXED)
 Check for language-specific grammar errors that can be fixed with EXACT text replacement.
@@ -234,7 +231,7 @@ Start with { and end with }.
   "reasoning": "Concise explanation (max 2 sentences).",
   "issues": [
     {
-      "type": "TRUNCATION" | "LANGUAGE" | "EMPTY" | "SHORT_SECTION" | "MISSING_ELEMENT" | "HEADING_HIERARCHY" | "CODE_BLOCK_LANG" | "DUPLICATE" | "CLICHE" | "ALIGNMENT" | "HALLUCINATION" | "LOGIC" | "DIFFICULTY" | "HYGIENE" | "GRAMMAR",
+      "type": "TRUNCATION" | "LANGUAGE" | "EMPTY" | "SHORT_SECTION" | "MISSING_ELEMENT" | "HEADING_HIERARCHY" | "CODE_BLOCK_LANG" | "DUPLICATE" | "OPENING_QUALITY" | "ALIGNMENT" | "HALLUCINATION" | "LOGIC" | "DIFFICULTY" | "HYGIENE" | "GRAMMAR",
       "severity": "CRITICAL" | "FIXABLE" | "COMPLEX" | "INFO",
       "location": "intro | sec_<id> | examples | exercises | global",
       "description": "Specific error details.",
