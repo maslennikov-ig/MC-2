@@ -509,9 +509,9 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
     let blobUrl: string | null = null
 
     try {
-      const result = await exportModuleLessons(courseInfo.id, moduleNumber, abortController.signal)
+      const result = await exportModuleLessons(courseInfo.id, moduleNumber)
 
-      // Check if request was aborted
+      // Check if request was aborted after response
       if (abortController.signal.aborted) return
 
       if (result.content) {
