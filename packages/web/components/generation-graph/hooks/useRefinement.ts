@@ -57,6 +57,10 @@ export const useRefinement = (courseId: string) => {
 
     try {
       await applyProposalAction(courseId, conversationId, previousProposal)
+
+      // Only update state if component is still mounted
+      if (!isMountedRef.current) return
+
       toast.success('Изменения применены')
 
       // Emit event for data refetch
@@ -66,13 +70,18 @@ export const useRefinement = (courseId: string) => {
         })
       )
     } catch (error) {
+      // Only update state if component is still mounted
+      if (!isMountedRef.current) return
+
       // Rollback on error
       setLatestProposal(previousProposal)
       const errorMsg = error instanceof Error ? error.message : 'Ошибка применения изменений'
       setProposalError(errorMsg)
       toast.error(errorMsg)
     } finally {
-      setIsApplying(false)
+      if (isMountedRef.current) {
+        setIsApplying(false)
+      }
     }
   }, [courseId, conversationId, latestProposal])
 
