@@ -292,6 +292,8 @@ export type ErrorGroupItem = {
   latestLogId: string;
   latestProblemId: string | null;
   jobType: string | null;
+  courseId: string | null; // course_id from latest log
+  courseName: string | null; // course name (fetched separately)
 };
 
 /**
@@ -1446,6 +1448,7 @@ async function buildGroupedErrorLogsQuery(
     latest_problem_id: string | null;
     job_type: string | null;
     issue_status: string | null; // Status returned from RPC (matches filter)
+    latest_course_id: string | null; // Course ID from latest log
   };
 
   // Prepare filter parameters (use undefined for omitted values, as Supabase types expect)
@@ -1494,6 +1497,23 @@ async function buildGroupedErrorLogsQuery(
     return { items: [], total: 0 };
   }
 
+  // Fetch course names for all unique course IDs
+  const courseIds = [
+    ...new Set(groupedData.map(g => g.latest_course_id).filter(Boolean) as string[]),
+  ];
+
+  const courseNameMap = new Map<string, string>();
+  if (courseIds.length > 0) {
+    const { data: courses } = await supabase
+      .from('courses')
+      .select('id, title')
+      .in('id', courseIds);
+
+    (courses || []).forEach(c => {
+      courseNameMap.set(c.id, c.title);
+    });
+  }
+
   // Map RPC result to ErrorGroupItem
   // NOTE: Use issue_status from RPC directly to ensure consistency with filtering
   // Previously we fetched statuses separately which caused mismatch when status changed
@@ -1510,6 +1530,8 @@ async function buildGroupedErrorLogsQuery(
     latestLogId: g.latest_log_id,
     latestProblemId: g.latest_problem_id,
     jobType: g.job_type,
+    courseId: g.latest_course_id,
+    courseName: g.latest_course_id ? (courseNameMap.get(g.latest_course_id) ?? null) : null,
   }));
 
   return { items, total };
