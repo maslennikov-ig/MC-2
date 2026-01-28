@@ -222,8 +222,16 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
   const orgSlug = params?.orgSlug as string | undefined
   const [selectedAttemptNum, setSelectedAttemptNum] = useState<number | null>(null)
   const [selectedPhaseId, setSelectedPhaseId] = useState<string | null>(null)
-  const { refine, isRefining, chatHistory, latestProposal, isApplying, acceptProposal } =
-    useRefinement(courseInfo.id)
+  const {
+    refine,
+    isRefining,
+    chatHistory,
+    latestProposal,
+    isApplying,
+    acceptProposal,
+    proposalError,
+    retryProposal,
+  } = useRefinement(courseInfo.id)
   const refinementChatRef = useRef<HTMLDivElement>(null)
   const [isExpanded, setIsExpanded] = useState(false)
   const [isLessonMaximized, setIsLessonMaximized] = useState(false)
@@ -1243,6 +1251,8 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
                     latestProposal={latestProposal}
                     isApplying={isApplying}
                     onAcceptProposal={() => void acceptProposal()}
+                    proposalError={proposalError}
+                    onRetryProposal={() => void retryProposal()}
                   />
                 </div>
               )}
