@@ -4,6 +4,7 @@ import { SupabaseProvider } from '@/lib/supabase/browser-client'
 import { AuthModal } from '@/components/auth/auth-modal'
 import { AppThemeProvider } from '@/components/common/app-theme-provider'
 import { QueryClient, QueryClientProvider, isServer } from '@tanstack/react-query'
+import { ReactQueryDevtools } from '@tanstack/react-query-devtools'
 
 /**
  * Create a new QueryClient instance with sensible defaults.
@@ -46,6 +47,9 @@ export function Providers({ children }: { children: React.ReactNode }) {
           <AuthModal />
         </SupabaseProvider>
       </AppThemeProvider>
+      {process.env.NODE_ENV === 'development' && (
+        <ReactQueryDevtools initialIsOpen={false} buttonPosition="bottom-left" />
+      )}
     </QueryClientProvider>
   )
 }

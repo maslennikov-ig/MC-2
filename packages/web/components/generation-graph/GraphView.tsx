@@ -55,7 +55,7 @@ import { NodeDetailsDrawer } from './panels/NodeDetailsDrawer'
 import { AdminPanel } from './panels/AdminPanel'
 import { useNodeSelection } from './hooks/useNodeSelection'
 import { MissionControlBanner } from '@/components/generation-celestial/MissionControlBanner'
-import { trpc } from '@/lib/trpc/client'
+import { useClarifyingIsEnabled, useClarifyingProgress } from '@/lib/trpc/client'
 import { startGeneration, cancelGeneration, approveStage } from '@/app/actions/admin-generation'
 import { toast } from 'sonner'
 // MobileProgressList removed - maintaining two view modes adds complexity
@@ -405,24 +405,18 @@ function GraphViewInner({
       pipelineStatus?.startsWith('stage_6') ||
       pipelineStatus === 'completed')
 
-  const { data: clarifyingEnabled } = trpc.clarifying.isEnabled.useQuery(
-    { courseId },
-    {
-      enabled: isAtStage4OrBeyond,
-      staleTime: Infinity, // Config doesn't change, cache forever
-      refetchOnWindowFocus: false,
-    }
-  )
+  const { data: clarifyingEnabled } = useClarifyingIsEnabled(courseId, {
+    enabled: isAtStage4OrBeyond,
+    staleTime: Infinity, // Config doesn't change, cache forever
+    refetchOnWindowFocus: false,
+  })
 
   // Step 2: Only fetch progress if clarifying is actually enabled
-  const { data: clarifyingProgressRaw } = trpc.clarifying.getProgress.useQuery(
-    { courseId },
-    {
-      enabled: isAtStage4OrBeyond && clarifyingEnabled?.enabled === true,
-      staleTime: 5000, // Cache 5 sec - prevents rate limit (12 req/sec → 0.2 req/sec)
-      refetchOnWindowFocus: false,
-    }
-  )
+  const { data: clarifyingProgressRaw } = useClarifyingProgress(courseId, {
+    enabled: isAtStage4OrBeyond && clarifyingEnabled?.enabled === true,
+    staleTime: 5000, // Cache 5 sec - prevents rate limit (12 req/sec → 0.2 req/sec)
+    refetchOnWindowFocus: false,
+  })
 
   // Transform clarifying progress to expected format
   const clarifyingData: ClarifyingProgressData | undefined =
