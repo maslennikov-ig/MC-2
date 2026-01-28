@@ -437,6 +437,11 @@ export function useGraphData(options: UseGraphDataOptions = {}) {
       const hasChanges = newNodes.some((newNode, idx) => {
         const currentNode = currentNodes[idx]
         if (!currentNode) return true
+        // Type-safe comparison with clarifying node fields (not in AppNode union type)
+        type NodeDataWithClarifying = { answeredCount?: number; questionsCount?: number }
+        const currentData = currentNode.data as NodeDataWithClarifying | undefined
+        const newData = newNode.data as NodeDataWithClarifying | undefined
+
         return (
           currentNode.id !== newNode.id ||
           currentNode.type !== newNode.type ||
@@ -445,7 +450,10 @@ export function useGraphData(options: UseGraphDataOptions = {}) {
           currentNode.data?.currentStep !== newNode.data?.currentStep ||
           currentNode.data?.label !== newNode.data?.label ||
           // Compare isCollapsed for container nodes (module, stage2group)
-          currentNode.data?.isCollapsed !== newNode.data?.isCollapsed
+          currentNode.data?.isCollapsed !== newNode.data?.isCollapsed ||
+          // Compare clarifying node progress fields
+          currentData?.answeredCount !== newData?.answeredCount ||
+          currentData?.questionsCount !== newData?.questionsCount
         )
       })
       return hasChanges ? newNodes : currentNodes
