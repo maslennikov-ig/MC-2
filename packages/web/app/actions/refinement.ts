@@ -116,13 +116,17 @@ export async function getChatTokenEstimates(courseId: string): Promise<TokenEsti
  * @returns Validated chat response
  * @throws Error with user-friendly message on failure
  */
-export async function sendChatMessage(request: ChatRequest): Promise<ChatResponse> {
+export async function sendChatMessage(
+  request: ChatRequest,
+  signal?: AbortSignal
+): Promise<ChatResponse> {
   const headers = await getBackendAuthHeaders()
 
   const response = await fetch(`${TRPC_URL}/generation.chat`, {
     method: 'POST',
     headers,
     body: JSON.stringify(request),
+    signal,
   })
 
   if (!response.ok) {

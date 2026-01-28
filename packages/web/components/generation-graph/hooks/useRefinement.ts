@@ -15,6 +15,7 @@ export const useRefinement = (courseId: string) => {
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([])
   const [latestProposal, setLatestProposal] = useState<Proposal | null>(null)
   const [isApplying, setIsApplying] = useState(false)
+  const [proposalError, setProposalError] = useState<string | null>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
   const isMountedRef = useRef(true)
 
@@ -47,29 +48,43 @@ export const useRefinement = (courseId: string) => {
   const acceptProposal = useCallback(async () => {
     if (!latestProposal || !conversationId) return
 
+    // Optimistic: save current state for potential rollback
+    const previousProposal = latestProposal
+
     setIsApplying(true)
+    setLatestProposal(null) // Hide immediately (optimistic)
+    setProposalError(null)
+
     try {
-      await applyProposalAction(courseId, conversationId, latestProposal)
+      await applyProposalAction(courseId, conversationId, previousProposal)
       toast.success('Изменения применены')
-      setLatestProposal(null)
-      // Emit custom event for data refetch (graph and other components can listen)
+
+      // Emit event for data refetch
       window.dispatchEvent(
         new CustomEvent('course-data-updated', {
-          detail: { courseId, proposalType: latestProposal.type },
+          detail: { courseId, proposalType: previousProposal.type },
         })
       )
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Ошибка применения изменений')
+      // Rollback on error
+      setLatestProposal(previousProposal)
+      const errorMsg = error instanceof Error ? error.message : 'Ошибка применения изменений'
+      setProposalError(errorMsg)
+      toast.error(errorMsg)
     } finally {
       setIsApplying(false)
     }
   }, [courseId, conversationId, latestProposal])
 
+  const retryProposal = useCallback(async () => {
+    setProposalError(null)
+    await acceptProposal()
+  }, [acceptProposal])
+
   const refine = useCallback(
     async (
       stageId: string,
       nodeId: string | undefined,
-      _attemptNumber: number,
       userMessage: string,
       previousOutput: string,
       intent: 'refine' | 'regenerate' = 'refine'
@@ -99,7 +114,7 @@ export const useRefinement = (courseId: string) => {
           intent,
         }
 
-        const response = await sendChatMessage(request)
+        const response = await sendChatMessage(request, controller.signal)
 
         // Check if aborted after response or component unmounted - ignore result
         if (controller.signal.aborted || !isMountedRef.current) return
@@ -125,6 +140,7 @@ export const useRefinement = (courseId: string) => {
           // Update proposal state if present
           if (response.proposal) {
             setLatestProposal(response.proposal)
+            setProposalError(null) // Clear any previous error
           }
 
           // Show appropriate toast based on intent
@@ -175,5 +191,7 @@ export const useRefinement = (courseId: string) => {
     latestProposal,
     isApplying,
     acceptProposal,
+    proposalError,
+    retryProposal,
   }
 }

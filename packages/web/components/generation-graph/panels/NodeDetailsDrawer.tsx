@@ -748,15 +748,12 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
   const handleRefine = async (message: string, intent: 'refine' | 'regenerate' = 'refine') => {
     if (!data) return
 
-    // Use attemptNum or default to 1 for phase-based nodes (Stage 4, 5, 6)
-    const attemptNum = selectedAttemptNum || 1
     // Get current output to refine
     const currentOutput = JSON.stringify(displayData?.outputData || {})
 
     await refine(
       `stage_${data.stageNumber}`,
       selectedNodeId || undefined,
-      attemptNum,
       message,
       currentOutput,
       intent

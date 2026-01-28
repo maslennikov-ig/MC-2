@@ -2,6 +2,7 @@ import React, { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { ScrollArea } from '@/components/ui/scroll-area'
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible'
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group'
 import {
   MessageSquare,
@@ -38,6 +39,15 @@ interface RefinementChatProps {
   latestProposal?: Proposal | null
   isApplying?: boolean
   onAcceptProposal?: () => void
+  proposalError?: string | null
+  onRetryProposal?: () => void
+  selectedIntent?: ChatIntent | null
+}
+
+// Helper to safely format timestamp
+const formatTime = (timestamp: string): string => {
+  const date = new Date(timestamp)
+  return isNaN(date.getTime()) ? '' : date.toLocaleTimeString()
 }
 
 export const RefinementChat: React.FC<RefinementChatProps> = ({
@@ -47,6 +57,9 @@ export const RefinementChat: React.FC<RefinementChatProps> = ({
   latestProposal,
   isApplying = false,
   onAcceptProposal,
+  proposalError,
+  onRetryProposal,
+  selectedIntent: externalSelectedIntent,
 }) => {
   const t = useTranslations('generation')
   // Expanded by default (FR-022), with localStorage persistence
@@ -170,6 +183,39 @@ export const RefinementChat: React.FC<RefinementChatProps> = ({
     [onRefine]
   )
 
+  // Wrap onAcceptProposal to prevent double-toast
+  const handleAcceptProposal = useCallback(() => {
+    try {
+      onAcceptProposal?.()
+    } catch {
+      // Error toast already shown by useRefinement hook, don't show again
+      console.error('Failed to accept proposal')
+    }
+  }, [onAcceptProposal])
+
+  // Keyboard shortcuts
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // Only handle when chat is open
+      if (!isOpen) return
+
+      // Ctrl/Cmd + Enter to submit
+      if (
+        (e.ctrlKey || e.metaKey) &&
+        e.key === 'Enter' &&
+        !isProcessing &&
+        message.trim() &&
+        selectedIntent
+      ) {
+        e.preventDefault()
+        void handleSubmit()
+      }
+    }
+
+    document.addEventListener('keydown', handleKeyDown)
+    return () => document.removeEventListener('keydown', handleKeyDown)
+  }, [isOpen, isProcessing, message, selectedIntent, handleSubmit])
+
   return (
     <div className="bg-card mt-6 rounded-md border" data-testid="refinement-chat">
       <button
@@ -217,7 +263,7 @@ export const RefinementChat: React.FC<RefinementChatProps> = ({
                       )}
                     </div>
                     <span className="text-muted-foreground text-[10px]">
-                      {new Date(msg.timestamp).toLocaleTimeString()}
+                      {formatTime(msg.timestamp)}
                     </span>
                   </div>
                 ))}
@@ -277,6 +323,22 @@ export const RefinementChat: React.FC<RefinementChatProps> = ({
               disabled={isProcessing}
             />
 
+            {/* Loading skeleton while waiting for proposal */}
+            {isProcessing &&
+              (selectedIntent === 'refine' || externalSelectedIntent === 'refine') && (
+                <div className="mt-4 animate-pulse rounded-lg border border-gray-200 bg-gray-50 p-4 dark:border-gray-700 dark:bg-gray-800">
+                  <div className="h-4 w-48 rounded bg-gray-300 dark:bg-gray-600" />
+                  <div className="mt-3 space-y-2">
+                    <div className="h-3 w-full rounded bg-gray-200 dark:bg-gray-700" />
+                    <div className="h-3 w-3/4 rounded bg-gray-200 dark:bg-gray-700" />
+                  </div>
+                  <div className="mt-4 flex gap-2">
+                    <div className="h-9 w-24 rounded bg-gray-300 dark:bg-gray-600" />
+                    <div className="h-9 w-24 rounded bg-gray-200 dark:bg-gray-700" />
+                  </div>
+                </div>
+              )}
+
             {latestProposal && (
               <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-4 dark:border-blue-800 dark:bg-blue-900/20">
                 <h4 className="mb-2 font-medium text-blue-900 dark:text-blue-100">
@@ -284,19 +346,39 @@ export const RefinementChat: React.FC<RefinementChatProps> = ({
                 </h4>
 
                 {latestProposal.type === 'field_updates' && (
-                  <ul className="mb-3 space-y-1 text-sm">
-                    {latestProposal.updates.map((u, i) => (
-                      <li key={i} className="text-blue-800 dark:text-blue-200">
-                        •{' '}
-                        <code className="rounded bg-blue-100 px-1 dark:bg-blue-800">{u.path}</code>
-                        {u.description && (
-                          <span className="ml-1 text-gray-600 dark:text-gray-400">
-                            — {u.description}
-                          </span>
-                        )}
-                      </li>
-                    ))}
-                  </ul>
+                  <Collapsible>
+                    <CollapsibleTrigger asChild>
+                      <Button variant="ghost" size="sm" className="mb-2 -ml-2">
+                        <ChevronDown className="mr-2 h-4 w-4" />
+                        Показать детали ({latestProposal.updates.length} изменений)
+                      </Button>
+                    </CollapsibleTrigger>
+                    <CollapsibleContent>
+                      <ul className="mb-3 space-y-2 text-sm">
+                        {latestProposal.updates.map((u, i) => (
+                          <li
+                            key={i}
+                            className="rounded border border-blue-200 bg-white p-2 dark:border-blue-700 dark:bg-blue-900/30"
+                          >
+                            <code className="block text-xs font-medium text-blue-800 dark:text-blue-200">
+                              {u.path}
+                            </code>
+                            {u.oldValue !== undefined && (
+                              <pre className="mt-1 max-h-20 overflow-auto text-xs text-red-600 line-through dark:text-red-400">
+                                {JSON.stringify(u.oldValue, null, 2).slice(0, 200)}
+                              </pre>
+                            )}
+                            <pre className="mt-1 max-h-20 overflow-auto text-xs text-green-600 dark:text-green-400">
+                              {JSON.stringify(u.newValue, null, 2).slice(0, 200)}
+                            </pre>
+                            {u.description && (
+                              <p className="mt-1 text-xs text-gray-500">{u.description}</p>
+                            )}
+                          </li>
+                        ))}
+                      </ul>
+                    </CollapsibleContent>
+                  </Collapsible>
                 )}
 
                 {latestProposal.type === 'lesson_patch' && (
@@ -305,9 +387,25 @@ export const RefinementChat: React.FC<RefinementChatProps> = ({
                   </pre>
                 )}
 
+                {/* Error with retry button */}
+                {proposalError && (
+                  <div className="mt-2 flex items-center gap-2 text-sm text-red-600 dark:text-red-400">
+                    <span>{proposalError}</span>
+                    <Button
+                      variant="outline"
+                      size="sm"
+                      onClick={() => void onRetryProposal?.()}
+                      className="border-red-300 text-red-700 hover:bg-red-50 dark:border-red-700 dark:text-red-300"
+                    >
+                      <RefreshCcw className="mr-1 h-3 w-3" />
+                      Повторить
+                    </Button>
+                  </div>
+                )}
+
                 <div className="flex gap-2">
                   <Button
-                    onClick={onAcceptProposal}
+                    onClick={handleAcceptProposal}
                     disabled={isApplying}
                     className="bg-blue-600 hover:bg-blue-700"
                   >
@@ -339,7 +437,7 @@ export const RefinementChat: React.FC<RefinementChatProps> = ({
                 ref={textareaRef}
                 value={message}
                 onChange={(e) => setMessage(e.target.value)}
-                placeholder={t('refinementChat.placeholder')}
+                placeholder={`${t('refinementChat.placeholder')} (Ctrl+Enter)`}
                 className="min-h-[80px] resize-none"
                 disabled={isProcessing}
                 data-testid="refinement-input"

@@ -265,10 +265,26 @@ export const chatRouter = {
     .use(chatRateLimiter)
     .input(chatRequestSchema)
     .mutation(async ({ ctx, input }): Promise<ChatResponse> => {
-      const { courseId, chatType, userMessage, conversationId, nodeContext, previousOutput } =
-        input;
+      const { courseId, chatType, conversationId, nodeContext, previousOutput } = input;
       const requestId = nanoid();
       const userId = ctx.user?.id;
+
+      // Semantic validation
+      const userMessage = input.userMessage.trim();
+      if (!userMessage) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Message cannot be empty or whitespace only',
+        });
+      }
+
+      // Validate previousOutput size (prevent memory issues, 1MB limit)
+      if (previousOutput && previousOutput.length > 1_000_000) {
+        throw new TRPCError({
+          code: 'BAD_REQUEST',
+          message: 'Previous output too large (max 1MB)',
+        });
+      }
 
       if (!userId) {
         throw new TRPCError({
@@ -292,6 +308,23 @@ export const chatRouter = {
 
       // Use admin client for chat message inserts (no user-facing RLS on chat_messages)
       const supabaseAdmin = getSupabaseAdmin();
+
+      // Validate conversationId belongs to this course if provided
+      if (conversationId) {
+        const { data: existingConv } = await supabaseAdmin
+          .from('course_chat_messages')
+          .select('course_id')
+          .eq('conversation_id', conversationId)
+          .limit(1)
+          .maybeSingle();
+
+        if (existingConv && existingConv.course_id !== courseId) {
+          throw new TRPCError({
+            code: 'BAD_REQUEST',
+            message: 'Conversation does not belong to this course',
+          });
+        }
+      }
 
       // Query course using authenticated client - RLS enforces ownership automatically
       const { data: course, error: courseError } = await supabaseAuth
