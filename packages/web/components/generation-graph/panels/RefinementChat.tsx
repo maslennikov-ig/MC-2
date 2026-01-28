@@ -11,12 +11,14 @@ import {
   Loader2,
   Wand2,
   RefreshCcw,
+  Check,
 } from 'lucide-react'
 import { cn } from '@/lib/utils'
 import { useTranslations } from 'next-intl'
 import { QuickActions, type ChatIntent } from './QuickActions'
 import { MarkdownRendererClient } from '@/components/markdown'
 import { toast } from '@/lib/toast'
+import { Proposal } from '@megacampus/shared-types/chat-types'
 
 interface ChatMessage {
   role: 'user' | 'assistant'
@@ -33,12 +35,18 @@ interface RefinementChatProps {
   onRefine: (message: string, intent: 'refine' | 'regenerate') => void
   history?: ChatMessage[]
   isProcessing?: boolean
+  latestProposal?: Proposal | null
+  isApplying?: boolean
+  onAcceptProposal?: () => void
 }
 
 export const RefinementChat: React.FC<RefinementChatProps> = ({
   onRefine,
   history = [],
   isProcessing = false,
+  latestProposal,
+  isApplying = false,
+  onAcceptProposal,
 }) => {
   const t = useTranslations('generation')
   // Expanded by default (FR-022), with localStorage persistence
@@ -250,6 +258,63 @@ export const RefinementChat: React.FC<RefinementChatProps> = ({
               </ToggleGroup>
             </div>
             <QuickActions onSelect={handleQuickAction} disabled={isProcessing} />
+
+            {latestProposal && (
+              <div className="mt-4 rounded-lg border border-blue-200 bg-blue-50 p-4 dark:border-blue-800 dark:bg-blue-900/20">
+                <h4 className="mb-2 font-medium text-blue-900 dark:text-blue-100">
+                  Предложенные изменения
+                </h4>
+
+                {latestProposal.type === 'field_updates' && (
+                  <ul className="mb-3 space-y-1 text-sm">
+                    {latestProposal.updates.map((u, i) => (
+                      <li key={i} className="text-blue-800 dark:text-blue-200">
+                        •{' '}
+                        <code className="rounded bg-blue-100 px-1 dark:bg-blue-800">{u.path}</code>
+                        {u.description && (
+                          <span className="ml-1 text-gray-600 dark:text-gray-400">
+                            — {u.description}
+                          </span>
+                        )}
+                      </li>
+                    ))}
+                  </ul>
+                )}
+
+                {latestProposal.type === 'lesson_patch' && (
+                  <pre className="mb-3 max-h-32 overflow-auto rounded bg-blue-100 p-2 text-xs dark:bg-blue-800">
+                    {latestProposal.diffSummary}
+                  </pre>
+                )}
+
+                <div className="flex gap-2">
+                  <Button
+                    onClick={onAcceptProposal}
+                    disabled={isApplying}
+                    className="bg-blue-600 hover:bg-blue-700"
+                  >
+                    {isApplying ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        Применяю...
+                      </>
+                    ) : (
+                      <>
+                        <Check className="mr-2 h-4 w-4" />
+                        Принять
+                      </>
+                    )}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    onClick={() => textareaRef.current?.focus()}
+                    disabled={isApplying}
+                  >
+                    Дополнить
+                  </Button>
+                </div>
+              </div>
+            )}
 
             <form onSubmit={handleSubmit} className="flex gap-2">
               <Textarea

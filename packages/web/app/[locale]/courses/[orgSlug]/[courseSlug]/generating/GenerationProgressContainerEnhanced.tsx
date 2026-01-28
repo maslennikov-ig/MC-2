@@ -27,9 +27,7 @@ import {
   startGeneration,
 } from '@/app/actions/admin-generation'
 import type { Stage1CourseData } from '@/components/generation-graph'
-import { useRestartStage } from '@/components/generation-graph/hooks/useRestartStage'
-import { getStageFromStatus } from '@/lib/generation-graph/utils'
-import { GlobalCourseChat, ChatErrorBoundary } from '@/components/generation'
+// GlobalCourseChat removed - now using RefinementChat in NodeDetailsDrawer for Stages 4, 5, 6
 
 /** Default fallback when lessons count is unknown (before Stage 4 analysis completes) */
 const DEFAULT_LESSONS_COUNT = 5
@@ -146,9 +144,7 @@ export default function GenerationProgressContainerEnhanced({
   generationPausedAt = null,
 }: GenerationProgressContainerProps) {
   const router = useRouter()
-  const t = useTranslations('generation')
   const tSuccess = useTranslations('generation.success')
-  const { restartStage } = useRestartStage(orgSlug, courseSlug)
   const [supabase, setSupabase] = useState<ReturnType<typeof createClient> | null>(null)
   const pollingInterval = useRef<NodeJS.Timeout | null>(null)
   const redirectTimeout = useRef<NodeJS.Timeout | null>(null)
@@ -343,16 +339,6 @@ export default function GenerationProgressContainerEnhanced({
       console.error(error)
     }
   }, [courseId])
-
-  const handleRegenerationRequest = useCallback(() => {
-    void restartStage(4).then((result) => {
-      if (result.success) {
-        toast.success(t('restart.restartingButton') || 'Regeneration started')
-      } else {
-        toast.error(result.error || 'Failed to start regeneration')
-      }
-    })
-  }, [restartStage, t])
 
   const calculateEstimatedTime = useCallback((progress: GenerationProgress) => {
     const avgStepTime = 30
@@ -647,21 +633,7 @@ export default function GenerationProgressContainerEnhanced({
         onCancelGeneration={handleCancel}
         onSwitchToManual={handleSwitchToManual}
       />
-      <ChatErrorBoundary>
-        <GlobalCourseChat
-          courseId={courseId}
-          isGenerating={
-            state.status !== 'completed' &&
-            state.status !== 'failed' &&
-            state.status !== 'cancelled' &&
-            state.status !== 'pending' &&
-            !state.status?.includes('awaiting_approval') &&
-            !state.status?.includes('_complete')
-          }
-          onRegenerationRequest={handleRegenerationRequest}
-          currentStage={getStageFromStatus(state.status || '')}
-        />
-      </ChatErrorBoundary>
+      {/* GlobalCourseChat removed - using RefinementChat in NodeDetailsDrawer for Stages 4, 5, 6 */}
       <AnimatePresence>
         {showSuccess && (
           <motion.div
