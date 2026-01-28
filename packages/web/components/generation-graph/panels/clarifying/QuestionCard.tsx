@@ -184,10 +184,16 @@ export function QuestionCard({
 
   // === OPEN QUESTION HANDLERS ===
   const handleAcceptSuggested = () => {
-    if (question.suggestedAnswers.length > 0) {
+    if (question.suggestedAnswers.length > 0 && !isProcessing) {
+      // Оптимистично переключаем в answered режим
       setSelectedSuggestionIndex(0)
       setHasCustomInput(false)
       setCustomText('')
+      setMode('answered')
+
+      // Сразу сохраняем на сервер
+      const answer = question.suggestedAnswers[0].text
+      onAnswer(question.id, answer, 'suggested', 0)
     }
   }
 
@@ -420,19 +426,6 @@ export function QuestionCard({
                 Скорректировать
               </Button>
             </div>
-          </motion.div>
-        )}
-
-        {/* Visual selection indicator for accepted suggestion */}
-        {selectedSuggestionIndex !== null && !hasCustomInput && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.95 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="rounded-lg border-2 border-purple-500 bg-purple-50 p-3 dark:bg-purple-950/20"
-          >
-            <p className="text-sm font-medium text-purple-900 dark:text-purple-100">
-              ✓ Выбран рекомендованный ответ
-            </p>
           </motion.div>
         )}
 

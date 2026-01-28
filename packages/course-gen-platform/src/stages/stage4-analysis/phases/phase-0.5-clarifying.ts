@@ -123,11 +123,13 @@ export const Phase05InputSchema = z.object({
   /** Course UUID */
   course_id: z.string().uuid('Invalid course UUID'),
 
-  /** Budget allocation from Stage 4 budget allocator (validated in its module) */
-  budgetAllocation: z.custom<Stage4BudgetAllocation>(
-    val => val !== null && typeof val === 'object' && 'documents' in val,
-    { message: 'Invalid budget allocation object' }
-  ),
+  /** Budget allocation from Stage 4 budget allocator (nullable when no documents) */
+  budgetAllocation: z
+    .custom<Stage4BudgetAllocation | null>(
+      val => val === null || (typeof val === 'object' && 'documents' in val),
+      { message: 'Invalid budget allocation object' }
+    )
+    .nullable(),
 
   /** Course context */
   courseContext: CourseContextSchema,
@@ -171,10 +173,15 @@ export function extractAnswerString(answer: UserAnswerValue | string | null): st
  * Creates a compact summary of document context for prompt injection.
  * Similar to pattern used in other phases for token-aware context building.
  *
- * @param budgetAllocation - Stage 4 budget allocation result
+ * @param budgetAllocation - Stage 4 budget allocation result (nullable when no documents)
  * @returns Condensed context string
  */
-function buildCondensedContext(budgetAllocation: Stage4BudgetAllocation): string {
+function buildCondensedContext(budgetAllocation: Stage4BudgetAllocation | null): string {
+  // Handle case when no documents were uploaded
+  if (!budgetAllocation) {
+    return 'No documents provided. Course will be generated based on title and description only.';
+  }
+
   const { documents, breakdown } = budgetAllocation;
 
   const contextParts: string[] = [];
@@ -507,7 +514,7 @@ export async function runPhase05Clarifying(rawInput: Phase05Input): Promise<Clar
         title: input.courseContext.title,
         language,
         iterationRound,
-        documentCount: input.budgetAllocation.documents.length,
+        documentCount: input.budgetAllocation?.documents.length ?? 0,
       },
       promptText,
       completionText: rawOutput,
