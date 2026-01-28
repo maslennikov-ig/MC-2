@@ -204,18 +204,15 @@ export function GlobalCourseChat({
 
       try {
         // Use server action with proper auth headers
-        const result = await sendChatMessage(
-          {
-            courseId,
-            chatType: 'global',
-            userMessage: messageText,
-            conversationId,
-            intent,
-          },
-          controller.signal
-        )
+        const result = await sendChatMessage({
+          courseId,
+          chatType: 'global',
+          userMessage: messageText,
+          conversationId,
+          intent,
+        })
 
-        // Check if aborted before processing result
+        // Check if aborted after response - ignore result if cancelled
         if (controller.signal.aborted) return
 
         setConversationId(result.conversationId)

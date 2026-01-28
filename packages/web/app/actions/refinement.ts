@@ -20,20 +20,6 @@ const HTTP_ERROR_MESSAGES: Record<number, string> = {
 }
 
 /**
- * Submit a chat request to the backend.
- * Connects to trpc.generation.chat endpoint.
- *
- * Features:
- * - Response validation with Zod schema
- * - Context-aware error messages based on HTTP status
- * - AbortController support for request cancellation
- *
- * @param request - Chat request payload
- * @param signal - Optional AbortSignal for request cancellation
- * @returns Validated chat response
- * @throws Error with user-friendly message on failure
- */
-/**
  * Token estimates response for chat intent modes.
  */
 export interface TokenEstimates {
@@ -120,24 +106,18 @@ export async function getChatTokenEstimates(courseId: string): Promise<TokenEsti
  * Features:
  * - Response validation with Zod schema
  * - Context-aware error messages based on HTTP status
- * - AbortController support for request cancellation
  *
  * @param request - Chat request payload
- * @param signal - Optional AbortSignal for request cancellation
  * @returns Validated chat response
  * @throws Error with user-friendly message on failure
  */
-export async function sendChatMessage(
-  request: ChatRequest,
-  signal?: AbortSignal
-): Promise<ChatResponse> {
+export async function sendChatMessage(request: ChatRequest): Promise<ChatResponse> {
   const headers = await getBackendAuthHeaders()
 
   const response = await fetch(`${TRPC_URL}/generation.chat`, {
     method: 'POST',
     headers,
     body: JSON.stringify(request),
-    signal,
   })
 
   if (!response.ok) {

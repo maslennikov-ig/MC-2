@@ -71,7 +71,10 @@ export const useRefinement = (courseId: string) => {
           intent,
         }
 
-        const response = await sendChatMessage(request, controller.signal)
+        const response = await sendChatMessage(request)
+
+        // Check if aborted after response - ignore result if cancelled
+        if (controller.signal.aborted) return
 
         // Only update state if request wasn't aborted
         if (!controller.signal.aborted) {
