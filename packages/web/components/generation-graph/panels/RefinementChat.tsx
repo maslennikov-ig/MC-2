@@ -65,8 +65,13 @@ export const RefinementChat: React.FC<RefinementChatProps> = ({
   // Expanded by default (FR-022), with localStorage persistence
   const [isOpen, setIsOpen] = useState(() => {
     if (typeof window === 'undefined') return true
-    const saved = localStorage.getItem('refinementChat.isOpen')
-    return saved !== null ? JSON.parse(saved) : true
+    try {
+      const saved = localStorage.getItem('refinementChat.isOpen')
+      return saved !== null ? JSON.parse(saved) : true
+    } catch {
+      // Corrupted localStorage value, use default
+      return true
+    }
   })
   const [message, setMessage] = useState('')
   const [selectedIntent, setSelectedIntent] = useState<ChatIntent | null>(null)

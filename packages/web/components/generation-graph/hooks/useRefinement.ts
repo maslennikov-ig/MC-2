@@ -86,6 +86,7 @@ export const useRefinement = (courseId: string) => {
   }, [courseId, conversationId, latestProposal])
 
   const retryProposal = useCallback(async () => {
+    if (!isMountedRef.current) return
     setProposalError(null)
     await acceptProposal()
   }, [acceptProposal])
