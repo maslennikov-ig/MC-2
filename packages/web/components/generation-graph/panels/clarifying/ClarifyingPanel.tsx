@@ -428,6 +428,9 @@ export function ClarifyingPanel({ courseId, onComplete }: ClarifyingPanelProps) 
         return newSet
       })
 
+      // Invalidate cache to sync with other components (node badges, etc.)
+      await invalidateAndRefetch()
+
       // Show feedback
       if (result.failedIds.length > 0) {
         toast.warning('Некоторые ответы не сохранены', {
