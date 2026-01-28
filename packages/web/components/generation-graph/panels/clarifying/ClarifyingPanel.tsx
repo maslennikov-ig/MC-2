@@ -123,6 +123,7 @@ export function ClarifyingPanel({ courseId, onComplete }: ClarifyingPanelProps) 
     // prevents actual network request even when refetch() is called
     const interval = setInterval(() => {
       invalidateQueryCache('clarifying.getQuestions', { courseId })
+      invalidateQueryCache('clarifying.getProgress', { courseId })
       void refetchQuestions()
     }, 2000)
 
