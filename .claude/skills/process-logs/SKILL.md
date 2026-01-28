@@ -303,11 +303,11 @@ The `error_logs` table has an `environment` column that indicates where the erro
 **Always check environment distribution first:**
 
 ```sql
--- Check how many errors per environment
+-- Check how many errors per environment (includes both NULL status AND status='new')
 SELECT environment, COUNT(*) as count
 FROM error_logs el
-LEFT JOIN log_issue_status lis ON lis.fingerprint = el.fingerprint
-WHERE lis.id IS NULL
+LEFT JOIN log_issue_status lis ON lis.fingerprint = el.fingerprint AND lis.log_type = 'error_log'
+WHERE lis.id IS NULL OR lis.status = 'new'
 GROUP BY environment
 ORDER BY count DESC;
 ```
@@ -317,11 +317,12 @@ ORDER BY count DESC;
 ```sql
 -- Bulk resolve ONLY local environment errors (environment IS NULL)
 -- NEVER bulk resolve dev or stage errors - they must be investigated individually!
+-- NOTE: This handles both NULL status AND status='new'
 WITH local_fingerprints AS (
   SELECT DISTINCT ON (el.fingerprint) el.id, el.fingerprint
   FROM error_logs el
-  LEFT JOIN log_issue_status lis ON lis.fingerprint = el.fingerprint
-  WHERE lis.id IS NULL
+  LEFT JOIN log_issue_status lis ON lis.fingerprint = el.fingerprint AND lis.log_type = 'error_log'
+  WHERE (lis.id IS NULL OR lis.status = 'new')
     AND el.environment IS NULL
     AND el.fingerprint IS NOT NULL
   ORDER BY el.fingerprint, el.created_at DESC
@@ -336,6 +337,7 @@ ON CONFLICT (log_type, log_id) DO UPDATE SET status = 'resolved', notes = EXCLUD
 
 ```sql
 -- Get only SERVER errors (dev and stage environments)
+-- NOTE: Includes both NULL status AND status='new'
 SELECT
   el.environment,
   el.fingerprint,
@@ -344,8 +346,8 @@ SELECT
   COUNT(*) as count,
   MAX(el.created_at) as last_seen
 FROM error_logs el
-LEFT JOIN log_issue_status lis ON lis.fingerprint = el.fingerprint
-WHERE lis.id IS NULL
+LEFT JOIN log_issue_status lis ON lis.fingerprint = el.fingerprint AND lis.log_type = 'error_log'
+WHERE (lis.id IS NULL OR lis.status = 'new')
   AND el.fingerprint IS NOT NULL
   AND el.environment IS NOT NULL  -- Exclude local (NULL)
 GROUP BY el.environment, el.fingerprint, el.severity
@@ -505,7 +507,12 @@ The `/admin/logs` page aggregates errors from **two sources**:
 
 Status is tracked in `log_issue_status` table with composite key `(log_type, log_id)`.
 
-**UI Logic:** If no `log_issue_status` record exists → status shows as "Новый" (new).
+**UI Logic:** Status shows as "Новый" (new) when:
+
+1. No `log_issue_status` record exists for the fingerprint
+2. OR record exists with explicit `status = 'new'`
+
+**IMPORTANT:** Always check BOTH conditions when querying for new errors.
 
 ### Grouped View (fingerprint)
 
