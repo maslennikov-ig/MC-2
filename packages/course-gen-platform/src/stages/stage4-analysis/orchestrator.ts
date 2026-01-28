@@ -332,7 +332,7 @@ export async function runAnalysisOrchestration(job: StructureAnalysisJob): Promi
     // =================================================================
     const clarifyingConfig = await getClarifyingConfig(courseId);
 
-    if (clarifyingConfig.enabled && !clarifyingConfig.skipped && budgetAllocation) {
+    if (clarifyingConfig.enabled && !clarifyingConfig.skipped) {
       orchestrationLogger.info(
         { isAutomatic: clarifyingConfig.isAutomatic },
         'Clarifying questions enabled - checking status'
