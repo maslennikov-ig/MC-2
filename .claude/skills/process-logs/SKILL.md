@@ -127,8 +127,11 @@ Some errors are **automatically ignored** by the system with status `auto_muted`
 | `Unexpected exit code: 10`         | job_lifecycle     | Worker TTL timeout (10 min), will retry    |
 | `No RAG chunks found`              | expected_behavior | Course without docs, generates w/o RAG     |
 | `Mermaid.*fallback.*used`          | graceful_fallback | Diagram gen failed, fallback to text       |
+| `/trpc/.*401`                      | expected_behavior | Unauthenticated tRPC request, 401 correct  |
+| `Cache directory does not exist`   | expected_behavior | Cache missing on fresh env, created later  |
+| `ModelConfigBunker.*sync.*fail`    | external_service  | Network issue, has retry with backoff      |
 
-**Total rules: 29** (test validates sync with code)
+**Total rules: 35** (test validates sync with code)
 
 **When you see `auto_muted` errors:**
 
