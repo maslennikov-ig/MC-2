@@ -71,7 +71,7 @@ export function useDocumentsWithStatus(courseId: string, pipelineStatus?: string
         }
 
         // Fetch Stage 2 traces to determine document statuses
-        // We look for 'finish' step_name traces to identify completed documents
+        // We look for 'finish' or 'deduplicated' step_name traces to identify completed documents
         const { data: traces, error: tracesError } = await supabase
           .from('generation_trace')
           .select('input_data, error_data, step_name')
@@ -97,8 +97,8 @@ export function useDocumentsWithStatus(courseId: string, pipelineStatus?: string
             // Determine status from trace
             if (trace.error_data) {
               documentStatuses.set(docId, 'error')
-            } else if (trace.step_name === 'finish') {
-              // Only mark as completed if we have a finish trace
+            } else if (trace.step_name === 'finish' || trace.step_name === 'deduplicated') {
+              // Mark as completed if we have a finish trace or deduplicated (skipped) trace
               if (documentStatuses.get(docId) !== 'error') {
                 documentStatuses.set(docId, 'completed')
               }
