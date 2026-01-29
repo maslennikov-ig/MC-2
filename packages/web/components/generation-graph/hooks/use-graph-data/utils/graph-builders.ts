@@ -759,16 +759,20 @@ export function buildGraph({
 
         // Determine clarifying node status
         let clarifyingStatus: NodeStatus = 'pending'
-        const stage4Status = getStatus(stageKey)
 
         if (hasClarifyingQuestions) {
           // Normal case: we have question data
-          if (stage4Status === 'completed' || stage4Status === 'active') {
+          if (courseStatus === 'stage_4_clarifying') {
+            // Active clarifying phase - show based on answer status
             if (clarifyingData.canProceed) {
               clarifyingStatus = 'completed'
             } else {
               clarifyingStatus = 'active'
             }
+          } else {
+            // Questions phase finished (course moved past clarifying)
+            // Show as completed regardless of individual answer status
+            clarifyingStatus = 'completed'
           }
         } else if (isInClarifyingStatus) {
           // Fallback: course is in clarifying status but questions not loaded yet

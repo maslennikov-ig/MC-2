@@ -64,10 +64,10 @@ export async function getEnrichment(enrichmentId: string): Promise<EnrichmentWit
       .single();
 
     // Get the course (using course_id from enrichment, which is denormalized)
-    // Include visual_style for card/cover image generation and course_description for context
+    // Include visual_style for card/cover image generation, course_description for context, style for tone
     const { data: course, error: courseError } = await supabaseAdmin
       .from('courses')
-      .select('id, title, language, course_description, visual_style, settings')
+      .select('id, title, language, course_description, visual_style, settings, style')
       .eq('id', enrichment.course_id)
       .single();
 
@@ -118,6 +118,7 @@ export async function getEnrichment(enrichmentId: string): Promise<EnrichmentWit
         course_description: course.course_description ?? null,
         visual_style: course.visual_style as Record<string, unknown> | null,
         settings: course.settings as Record<string, unknown> | null,
+        style: course.style ?? null,
       },
     };
   } catch (error) {

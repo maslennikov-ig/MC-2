@@ -16,6 +16,8 @@ interface WizardNavigationProps {
   canContinue: boolean // все critical отвечены
   onContinue: () => void
   isProcessing: boolean
+  /** Hide the continue button (used in read-only mode) */
+  hideContinueButton?: boolean
 }
 
 export function WizardNavigation({
@@ -27,14 +29,15 @@ export function WizardNavigation({
   canContinue,
   onContinue,
   isProcessing,
+  hideContinueButton = false,
 }: WizardNavigationProps) {
   const isFirstQuestion = currentIndex === 0
   const isLastQuestion = currentIndex === totalQuestions - 1
 
   return (
     <div className="mt-4">
-      {/* Continue button (when ready) */}
-      {canContinue && (
+      {/* Continue button (when ready) - hidden in read-only mode */}
+      {canContinue && !hideContinueButton && (
         <div className="mb-3">
           <Button
             onClick={onContinue}

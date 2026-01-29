@@ -1,244 +1,166 @@
-# План: Редизайн Stage 4 Clarifying в стиле Wizard
+# План: Исправить FSM переход stage_4_clarifying → stage_4_analyzing
 
-## Выбранный вариант
+## Проблема
 
-**Пошаговый Wizard** — показывать по одному вопросу за раз с прогресс-баром и навигацией.
+При нажатии "Продолжить генерацию" на Stage 4 Clarifying возникает ошибка:
 
-## Требования
+```
+Invalid generation status transition: stage_4_clarifying -> stage_4_analyzing
+```
 
-1. **Сортировка по приоритету**: critical → important → nice_to_have (уже есть в бэкенде)
-2. **Свой ответ**: для каждого вопроса возможность ввести кастомный текст (уже поддерживается)
-3. **Wizard UX**: один вопрос на экране, кнопки Назад/Далее, sidebar с миниатюрами
+## Причина
 
-## Текущие проблемы UI
+Несогласованность между:
 
-- Цветовой хаос: красный, фиолетовый, зелёный, янтарный одновременно
-- Визуальная перегрузка: иконки + бейджи + текст + цветные бордеры
-- Нет визуальной иерархии
-- Непрофессиональный вид
+1. **RPC функция** `approve_and_proceed_atomic` пытается перейти в `stage_4_analyzing`
+2. **FSM триггер** в миграции `20260126220000_add_stage4_clarifying_status.sql` **НЕ разрешает** этот переход
+
+Текущие разрешённые переходы из `stage_4_clarifying`:
+
+```
+"stage_4_clarifying": ["stage_4_complete", "stage_4_awaiting_approval", "failed", "cancelled"]
+```
+
+Но нужен переход в `stage_4_analyzing` чтобы обработать ответы.
+
+## Решение
+
+Добавить `stage_4_analyzing` в список разрешённых переходов из `stage_4_clarifying`.
 
 ## Файлы для изменения
 
-| Файл                                                                             | Действие                       |
-| -------------------------------------------------------------------------------- | ------------------------------ |
-| `packages/web/components/generation-graph/panels/clarifying/ClarifyingPanel.tsx` | Переделать layout в Wizard     |
-| `packages/web/components/generation-graph/panels/clarifying/QuestionCard.tsx`    | Упростить стили, убрать бейджи |
-| `packages/web/app/(mocks)/`                                                      | **Удалить** полностью          |
-| `packages/web/components/mocks/`                                                 | **Удалить** полностью          |
-| `packages/web/middleware.ts`                                                     | Убрать `mocks` из исключений   |
+| Файл                                                                                     | Действие       |
+| ---------------------------------------------------------------------------------------- | -------------- |
+| `packages/course-gen-platform/supabase/migrations/20260127XXXXXX_fix_clarifying_fsm.sql` | Новая миграция |
 
-## Дизайн Wizard UI
+## Миграция
 
-### Layout структура
+```sql
+-- Migration: Fix FSM transition from stage_4_clarifying to stage_4_analyzing
+-- Problem: approve_and_proceed_atomic attempts to transition to stage_4_analyzing
+-- but this transition was not added to the FSM
 
-```
-┌─────────────────────────────────────────────────────────────┐
-│  Progress: ████████░░░░░░░░░░░░  Вопрос 3 из 8             │
-│  Приоритет: 🔴 Обязательные (3)  🟡 Важные (2)  ⚪ Доп. (3) │
-├──────────────┬──────────────────────────────────────────────┤
-│              │                                              │
-│  Sidebar     │  Текущий вопрос (крупно)                    │
-│  (desktop)   │                                              │
-│              │  ┌──────────────────────────────────────┐   │
-│  1. ✓        │  │ Какие типы мероприятий продаёт      │   │
-│  2. ✓        │  │ отдел продаж?                        │   │
-│  3. ●        │  │                                      │   │
-│  4. ○        │  │ ○ Концерты                           │   │
-│  5. ○        │  │ ○ Бизнес-мероприятия                 │   │
-│  6. ○        │  │ ○ Спортивные события                 │   │
-│              │  │ ○ Свой вариант: [___________]        │   │
-│              │  └──────────────────────────────────────┘   │
-│              │                                              │
-│              │  [← Назад]                    [Далее →]     │
-└──────────────┴──────────────────────────────────────────────┘
-```
+CREATE OR REPLACE FUNCTION validate_generation_status_transition()
+RETURNS TRIGGER AS $$
+DECLARE
+  v_valid_transitions JSONB;
+  v_bypass TEXT;
+BEGIN
+  v_bypass := current_setting('app.bypass_fsm_validation', true);
+  IF v_bypass = 'true' THEN
+    RETURN NEW;
+  END IF;
 
-### Mobile layout
+  IF OLD.generation_status IS NULL THEN
+    RETURN NEW;
+  END IF;
 
-```
-┌─────────────────────────────┐
-│ ████████░░░░░░  3/8        │
-│ 🔴3  🟡2  ⚪3               │
-├─────────────────────────────┤
-│                             │
-│ Какие типы мероприятий      │
-│ продаёт отдел продаж?       │
-│                             │
-│ ○ Концерты                  │
-│ ○ Бизнес-мероприятия        │
-│ ○ Спортивные события        │
-│ ○ Свой вариант: [_______]   │
-│                             │
-├─────────────────────────────┤
-│ [← Назад]      [Далее →]   │  ← fixed bottom
-├─────────────────────────────┤
-│  • • ● • • • • •           │  ← dots indicator
-└─────────────────────────────┘
-```
+  IF NEW.generation_status = OLD.generation_status THEN
+    RETURN NEW;
+  END IF;
 
-## Детали реализации
+  v_valid_transitions := '{
+    "pending": ["stage_2_init", "stage_3_init", "stage_4_init", "cancelled"],
+    "stage_2_init": ["stage_2_processing", "stage_2_complete", "stage_2_awaiting_approval", "stage_4_init", "failed", "cancelled"],
+    "stage_2_processing": ["stage_2_complete", "stage_2_awaiting_approval", "failed", "cancelled"],
+    "stage_2_complete": ["stage_2_awaiting_approval", "stage_3_init", "stage_3_summarizing", "stage_4_init", "failed", "cancelled"],
+    "stage_2_awaiting_approval": ["stage_3_init", "stage_3_summarizing", "stage_4_init", "cancelled"],
+    "stage_3_init": ["stage_3_summarizing", "stage_3_complete", "stage_3_awaiting_approval", "stage_2_complete", "failed", "cancelled"],
+    "stage_3_summarizing": ["stage_3_complete", "stage_3_awaiting_approval", "stage_2_complete", "failed", "cancelled"],
+    "stage_3_complete": ["stage_3_awaiting_approval", "stage_4_init", "failed", "cancelled"],
+    "stage_3_awaiting_approval": ["stage_4_init", "cancelled"],
+    "stage_4_init": ["stage_4_analyzing", "stage_4_complete", "stage_4_awaiting_approval", "failed", "cancelled"],
+    "stage_4_analyzing": ["stage_4_clarifying", "stage_4_complete", "stage_4_awaiting_approval", "failed", "cancelled"],
+    "stage_4_clarifying": ["stage_4_analyzing", "stage_4_complete", "stage_4_awaiting_approval", "failed", "cancelled"],
+    "stage_4_complete": ["stage_4_awaiting_approval", "stage_5_init", "failed", "cancelled"],
+    "stage_4_awaiting_approval": ["stage_5_init", "cancelled"],
+    "stage_5_init": ["stage_5_generating", "stage_5_complete", "stage_5_awaiting_approval", "failed", "cancelled"],
+    "stage_5_generating": ["stage_5_complete", "stage_5_awaiting_approval", "failed", "cancelled"],
+    "stage_5_complete": ["stage_5_awaiting_approval", "stage_6_init", "finalizing", "failed", "cancelled"],
+    "stage_5_awaiting_approval": ["stage_5_complete", "stage_6_init", "finalizing", "cancelled"],
+    "stage_6_init": ["stage_6_generating", "stage_6_complete", "failed", "cancelled"],
+    "stage_6_generating": ["stage_6_complete", "completed", "failed", "cancelled"],
+    "stage_6_complete": ["finalizing", "completed", "failed", "cancelled"],
+    "finalizing": ["completed", "failed", "cancelled"],
+    "completed": ["pending", "stage_2_init", "stage_3_init", "stage_4_init", "stage_5_init", "stage_6_init"],
+    "failed": ["pending", "stage_2_init", "stage_3_init", "stage_4_init", "stage_5_init", "stage_6_init"],
+    "cancelled": ["pending", "stage_2_init", "stage_3_init", "stage_4_init", "stage_5_init", "stage_6_init"]
+  }'::JSONB;
 
-### 1. ClarifyingPanel.tsx — Wizard Container
+  IF NOT (v_valid_transitions->OLD.generation_status::text) ? NEW.generation_status::text THEN
+    RAISE EXCEPTION 'Invalid generation status transition: % -> % (course_id: %)',
+      OLD.generation_status,
+      NEW.generation_status,
+      NEW.id
+    USING HINT = 'Valid transitions from ' || OLD.generation_status || ': ' ||
+                  (v_valid_transitions->OLD.generation_status::text)::text;
+  END IF;
 
-**Новое состояние:**
-
-```typescript
-const [currentIndex, setCurrentIndex] = useState(0);
-// Начинать с первого неотвеченного вопроса
-
-const sortedQuestions = useMemo(
-  () =>
-    [...questions].sort((a, b) => {
-      const order = { critical: 0, important: 1, nice_to_have: 2 };
-      return order[a.priority] - order[b.priority];
-    }),
-  [questions]
-);
+  RETURN NEW;
+END;
+$$ LANGUAGE plpgsql
+SET search_path = public;
 ```
 
-**Компоненты:**
-
-- `WizardProgress` — прогресс-бар + счётчики по приоритетам
-- `WizardSidebar` — миниатюры вопросов (скрыт на mobile)
-- `WizardNavigation` — кнопки Назад/Далее + dots на mobile
-- `WizardQuestionCard` — переработанная карточка вопроса
-
-**Навигация:**
-
-- Далее: переход к следующему вопросу
-- Назад: переход к предыдущему
-- Клик по sidebar: прямой переход к вопросу
-- После ответа: auto-advance к следующему неотвеченному
-
-### 2. QuestionCard.tsx — Упрощённый дизайн
-
-**Убрать:**
-
-- Яркие цветные бордеры
-- Бейджи "ОБЯЗАТЕЛЬНЫЙ", "ВАЖНЫЙ"
-- Тип вопроса в заголовке
-
-**Оставить/Добавить:**
-
-- Тонкая полоска приоритета слева (2px)
-- Иконка типа вопроса (мелкая, серая)
-- Крупный текст вопроса
-- Чистые radio/checkbox из shadcn
-- **Свой вариант** — всегда видимая опция внизу
-
-**Цветовая схема:**
-
-- Фон: slate-50 (light) / slate-900 (dark)
-- Текст: slate-700 / slate-200
-- Акцент: purple-500 (выбранный вариант)
-- Приоритеты: red-500 / amber-400 / slate-300 (только полоска)
-
-### 3. Свой ответ — улучшенная видимость
-
-Для **single_choice** и **multi_choice**:
+**Изменение**: строка 48 изменена с
 
 ```
-┌────────────────────────────┐
-│ ○ Вариант 1                │
-│ ○ Вариант 2                │
-│ ○ Вариант 3                │
-├────────────────────────────┤
-│ ○ Свой вариант             │  ← явно выделенная секция
-│   ┌──────────────────────┐ │
-│   │ Введите свой ответ   │ │
-│   └──────────────────────┘ │
-└────────────────────────────┘
+"stage_4_clarifying": ["stage_4_complete", "stage_4_awaiting_approval", "failed", "cancelled"],
 ```
 
-Для **open**:
+на
 
 ```
-┌────────────────────────────┐
-│ 💡 Рекомендация:           │
-│ "Текст рекомендации..."    │
-│ [Принять] [Изменить]       │
-├────────────────────────────┤
-│ или напишите свой ответ:   │
-│ ┌──────────────────────┐   │
-│ │                      │   │
-│ │                      │   │
-│ └──────────────────────┘   │
-└────────────────────────────┘
+"stage_4_clarifying": ["stage_4_analyzing", "stage_4_complete", "stage_4_awaiting_approval", "failed", "cancelled"],
 ```
 
-### 4. Удаление тестовой страницы
+## Как ответы clarifying используются сейчас
+
+**Stage 4** (напрямую в промптах):
+
+- Phase 1 Classifier — классификация курса
+- Phase 2 Scope — определение структуры
+- Phase 3 Expert — педагогическая стратегия
+- Phase 4 Synthesis — генерирует `generation_guidance`
+
+**Stage 5** (косвенно):
+
+- Читает `course_structure` из БД
+- Напрямую ответы НЕ передаются
+
+## План действий
+
+### Шаг 1: Исправить FSM (срочно)
+
+Создать миграцию, добавить `stage_4_analyzing` в переходы из `stage_4_clarifying`.
+
+### Шаг 2: Создать задачу в Beads
+
+Задача для исследования: нужно ли передавать ответы clarifying напрямую в Stage 5.
 
 ```bash
-rm -rf packages/web/app/(mocks)/
-rm -rf packages/web/components/mocks/
+bd create --title="Исследовать: передача clarifying ответов в Stage 5" \
+  --type=task \
+  --priority=3 \
+  --label=pipeline \
+  --description="Исследовать: нужно ли передавать ответы clarifying напрямую в Stage 5 промпты. Сейчас ответы влияют только на course_structure (Stage 4), но не на генерацию контента уроков."
 ```
-
-В middleware.ts убрать `mocks|` из matcher.
-
-## Поэтапный план
-
-### Этап 1: Удаление моков
-
-- [ ] Удалить `packages/web/app/(mocks)/`
-- [ ] Удалить `packages/web/components/mocks/`
-- [ ] Убрать `mocks` из middleware.ts matcher
-
-### Этап 2: Создание Wizard компонентов
-
-- [ ] `WizardProgress.tsx` — прогресс-бар и счётчики
-- [ ] `WizardSidebar.tsx` — список вопросов (desktop)
-- [ ] `WizardNavigation.tsx` — кнопки + dots (mobile)
-
-### Этап 3: Рефакторинг ClarifyingPanel
-
-- [ ] Добавить состояние currentIndex
-- [ ] Реализовать сортировку вопросов по приоритету
-- [ ] Заменить список на Wizard layout
-- [ ] Интегрировать новые компоненты
-
-### Этап 4: Рефакторинг QuestionCard
-
-- [ ] Убрать яркие бейджи и бордеры
-- [ ] Применить минималистичную цветовую схему
-- [ ] Улучшить секцию "Свой вариант"
-- [ ] Увеличить размер шрифта для вопроса
-
-### Этап 5: Responsive и Dark Mode
-
-- [ ] Протестировать на mobile (375px)
-- [ ] Протестировать на tablet (768px)
-- [ ] Проверить dark mode
-
-### Этап 6: Верификация
-
-- [ ] Проверить все типы вопросов (open, single, multi)
-- [ ] Проверить сортировку по приоритету
-- [ ] Проверить навигацию (Назад/Далее/sidebar)
-- [ ] Проверить сохранение ответов (API)
-- [ ] Проверить "Свой вариант" для всех типов
 
 ## Верификация
 
-1. **Функциональная проверка:**
-   - Открыть курс на этапе Stage 4
-   - Убедиться что вопросы отсортированы: critical → important → nice_to_have
-   - Ответить на вопрос → авто-переход к следующему
-   - Навигация Назад/Далее работает
-   - Sidebar позволяет перейти к любому вопросу
+1. Применить миграцию локально:
 
-2. **UI проверка:**
-   - Нет ярких бейджей и цветных бордеров
-   - Минималистичный дизайн
-   - "Свой вариант" явно виден для choice-вопросов
-   - Dark mode корректно отображается
+```bash
+pnpm supabase:migrate
+```
 
-3. **Mobile проверка:**
-   - Sidebar скрыт, dots-индикатор виден
-   - Кнопки навигации fixed внизу
-   - Touch targets ≥ 44px
+2. Проверить что переход работает:
+   - Открыть курс на Stage 4 Clarifying
+   - Нажать "Продолжить генерацию"
+   - Должен начаться переход без ошибки 500
 
-4. **Type-check и build:**
-   ```bash
-   pnpm type-check
-   pnpm build
-   ```
+3. Задеплоить миграцию на remote Supabase:
+
+```bash
+pnpm supabase:push
+```

@@ -51,6 +51,8 @@ interface QuestionCardProps {
   onSkip?: (questionId: string) => void
   isAnswered: boolean
   isProcessing?: boolean
+  /** When true, shows the card in read-only mode (no editing allowed) */
+  readOnly?: boolean
 }
 
 // MEDIUM-003: Typed config objects with Record for exhaustiveness checking
@@ -120,9 +122,11 @@ export function QuestionCard({
   onSkip,
   isAnswered,
   isProcessing = false,
+  readOnly = false,
 }: QuestionCardProps) {
-  // Determine initial mode based on isAnswered prop
-  const [mode, setMode] = useState<CardMode>(isAnswered ? 'answered' : 'unanswered')
+  // Determine initial mode based on isAnswered prop (or readOnly)
+  // In readOnly mode, always show answered state
+  const [mode, setMode] = useState<CardMode>(isAnswered || readOnly ? 'answered' : 'unanswered')
 
   // BUG FIX: Sync mode with isAnswered prop changes
   // Track previous isAnswered value to detect when answer was just saved
@@ -364,16 +368,19 @@ export function QuestionCard({
           )}
         </div>
 
-        <Button
-          size="sm"
-          variant="outline"
-          onClick={handleEnterEditMode}
-          disabled={isProcessing}
-          className="w-full py-3"
-        >
-          <Edit2 className="mr-2 h-4 w-4" />
-          Изменить ответ
-        </Button>
+        {/* Hide edit button in read-only mode */}
+        {!readOnly && (
+          <Button
+            size="sm"
+            variant="outline"
+            onClick={handleEnterEditMode}
+            disabled={isProcessing}
+            className="w-full py-3"
+          >
+            <Edit2 className="mr-2 h-4 w-4" />
+            Изменить ответ
+          </Button>
+        )}
       </motion.div>
     )
   }
