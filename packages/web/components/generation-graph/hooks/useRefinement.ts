@@ -4,7 +4,7 @@ import { ChatRequest, ChatResponse, Proposal } from '@megacampus/shared-types/ch
 import { sendChatMessage, applyProposal as applyProposalAction } from '@/app/actions/refinement'
 
 interface ChatMessage {
-  role: 'user' | 'assistant'
+  role: 'user' | 'assistant' | 'system'
   content: string
   timestamp: string
 }
@@ -63,6 +63,24 @@ export const useRefinement = (courseId: string) => {
 
       toast.success('Изменения применены')
 
+      // Добавить inline feedback в историю чата
+      const updateCount =
+        previousProposal.type === 'field_updates' ? previousProposal.updates.length : 1
+      const fieldWord =
+        updateCount === 1
+          ? 'поле обновлено'
+          : updateCount < 5
+            ? 'поля обновлено'
+            : 'полей обновлено'
+      setChatHistory((prev) => [
+        ...prev,
+        {
+          role: 'system',
+          content: `✅ Изменения применены (${updateCount} ${fieldWord})`,
+          timestamp: new Date().toISOString(),
+        },
+      ])
+
       // Emit event for data refetch
       window.dispatchEvent(
         new CustomEvent('course-data-updated', {
@@ -78,6 +96,16 @@ export const useRefinement = (courseId: string) => {
       const errorMsg = error instanceof Error ? error.message : 'Ошибка применения изменений'
       setProposalError(errorMsg)
       toast.error(errorMsg)
+
+      // Добавить inline error в историю чата
+      setChatHistory((prev) => [
+        ...prev,
+        {
+          role: 'system',
+          content: `❌ Ошибка: ${errorMsg}`,
+          timestamp: new Date().toISOString(),
+        },
+      ])
     } finally {
       if (isMountedRef.current) {
         setIsApplying(false)
