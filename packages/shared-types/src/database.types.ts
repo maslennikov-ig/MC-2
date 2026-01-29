@@ -2785,6 +2785,54 @@ export type Database = {
         }
         Relationships: []
       }
+      llm_model_leaderboard: {
+        Row: {
+          content_quality_score: number
+          critical_issues: number
+          error_rate: number
+          language_quality_score: number
+          model_name: string
+          model_slug: string
+          overall_quality_score: number
+          provider: string
+          quality_tier: string
+          schema_compliance_score: number
+          test_date: string
+          test_version: string
+          total_issues: number
+        }
+        Insert: {
+          content_quality_score?: never
+          critical_issues?: never
+          error_rate?: never
+          language_quality_score?: never
+          model_name?: never
+          model_slug?: never
+          overall_quality_score?: never
+          provider?: never
+          quality_tier?: never
+          schema_compliance_score?: never
+          test_date?: never
+          test_version?: never
+          total_issues?: never
+        }
+        Update: {
+          content_quality_score?: never
+          critical_issues?: never
+          error_rate?: never
+          language_quality_score?: never
+          model_name?: never
+          model_slug?: never
+          overall_quality_score?: never
+          provider?: never
+          quality_tier?: never
+          schema_compliance_score?: never
+          test_date?: never
+          test_version?: never
+          total_issues?: never
+        }
+        Relationships: []
+      }
     }
     Functions: {
       accept_invitation: {
