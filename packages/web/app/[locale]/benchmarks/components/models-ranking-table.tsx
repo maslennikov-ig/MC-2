@@ -39,6 +39,7 @@ import {
   ScenarioResult,
 } from '@/app/actions/benchmarks'
 import { cn } from '@/lib/utils'
+import { SampleContentViewer } from './sample-content-viewer'
 
 const TIER_COLORS = {
   S: 'bg-yellow-500/20 text-yellow-300 border-yellow-500/50',
@@ -264,6 +265,18 @@ export function ModelsRankingTable({ locale: _locale }: ModelsRankingTableProps)
           <span className={cn('text-white', row.original.errorRate > 0.1 && 'text-red-400')}>
             {(row.original.errorRate * 100).toFixed(1)}%
           </span>
+        ),
+      },
+      {
+        id: 'sample',
+        header: '',
+        cell: ({ row }) => (
+          <div onClick={(e) => e.stopPropagation()}>
+            <SampleContentViewer
+              modelSlug={row.original.modelSlug}
+              modelName={row.original.modelName}
+            />
+          </div>
         ),
       },
     ],
