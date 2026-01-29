@@ -237,86 +237,87 @@
 
 ### Промпт для судьи
 
-```
-You are an expert content quality evaluator. Rate the following generated content using EXACT criteria and point scale.
+См. полный промпт в `.claude/skills/llm-quality-tester/prompts/judge-prompt.md`
 
+**Краткая структура:**
+
+```
 ## Criteria (100 base points max):
 
-1. **Content Depth (0-30 points)**
-   - 25-30: Expert-level, exceeds expectations
-   - 20-24: Good depth, all key aspects covered
-   - 15-19: Basic coverage, somewhat shallow
-   - 10-14: Weak depth, many gaps
-   - 0-9: Very superficial
+1. **Semantic Quality (0-35 points)** — ГЛАВНЫЙ КРИТЕРИЙ
+   - 32-35: Expert-level, unique insights
+   - 26-31: Excellent depth, all key aspects
+   - 20-25: Good, main topics covered
+   - 14-19: Basic, shallow coverage
+   - 7-13: Weak, superficial
+   - 0-6: Poor, empty or incorrect
 
 2. **Practical Value (0-25 points)**
-   - 22-25: Immediately actionable, excellent cases
-   - 18-21: Good examples, clear application
-   - 12-17: Examples present but abstract
-   - 6-11: Mostly theory, little practice
-   - 0-5: Pure theory, no examples
+   - 23-25: Immediately actionable, real cases
+   - 18-22: Good examples, clear application
+   - 13-17: Examples present but abstract
+   - 7-12: Mostly theory
+   - 0-6: Pure theory, no examples
 
-3. **Structure & Logic (0-20 points)**
-   - 18-20: Perfect structure, easy to follow
-   - 14-17: Good structure, minor issues
-   - 10-13: Structure exists but confusing
-   - 5-9: Weak structure, chaotic
-   - 0-4: No structure
+3. **Task Compliance (0-15 points)**
+   - 14-15: All requirements met
+   - 11-13: Almost all, minor deviations
+   - 8-10: Main part done, some missed
+   - 4-7: Much doesn't match
+   - 0-3: Task ignored
 
-4. **Language Quality (0-15 points)**
-   - 14-15: Flawless, editor-level
-   - 11-13: Very good, minimal edits needed
-   - 7-10: Good but rough edges
-   - 4-6: Many errors, awkward phrases
-   - 0-3: Hard to read, serious errors
+4. **No Hallucinations (0-10 points)**
+   - 10: Everything verifiable and correct
+   - 8-9: No obvious hallucinations
+   - 6-7: Minor inaccuracies
+   - 3-5: Questionable claims present
+   - 0-2: Clear hallucinations
 
-5. **Task Compliance (0-10 points)**
-   - 9-10: Perfect match to requirements
-   - 7-8: Almost all, minor deviations
-   - 5-6: Main part done, some missed
-   - 2-4: Much doesn't match
-   - 0-1: Off-topic, ignored task
+5. **Structure & Navigation (0-10 points)**
+   - 10: Perfect structure, easy to follow
+   - 8-9: Good structure, minor issues
+   - 6-7: Understandable but confusing
+   - 3-5: Chaotic structure
+   - 0-2: No structure
+
+6. **Visualization (0-5 points)**
+   - 5: Diagrams help understanding, correct syntax
+   - 4: Useful visualizations, minor issues
+   - 3: Present but don't help much
+   - 1-2: Syntax errors or inappropriate
+   - 0: None or all broken
 
 ## Bonuses (can exceed 100):
+- Unique insights: +5-15
 - Creative examples: +5-10
-- Expert insights: +5-15
 - Perfect style: +5
-- Unexpected valuable insights: +5-10
+- Ready-to-use templates: +5
 
 ## Penalties:
-- Factual errors: -10 each
-- Hallucinations: -15 each
-- Format violations: -5
-- Truncated content: -10
+- Critical hallucination: -15
+- Factual error: -10
+- Content truncation: -10
 - Language switching: -10
+- Broken JSON: -10
+- Broken Mermaid: -5
+- Prompt plagiarism: -5
+- Forbidden phrases: -3
 
----
-
-**CONTENT TO EVALUATE:**
-{content}
-
----
-
-**OUTPUT FORMAT (JSON):**
+## OUTPUT FORMAT (JSON):
 {
   "scores": {
-    "contentDepth": <0-30>,
+    "semanticQuality": <0-35>,
     "practicalValue": <0-25>,
-    "structureLogic": <0-20>,
-    "languageQuality": <0-15>,
-    "taskCompliance": <0-10>
+    "taskCompliance": <0-15>,
+    "noHallucinations": <0-10>,
+    "structure": <0-10>,
+    "visualization": <0-5>
   },
-  "bonuses": [
-    { "type": "creative_examples", "points": <0-10>, "reason": "..." }
-  ],
-  "penalties": [
-    { "type": "factual_error", "points": <-10>, "reason": "..." }
-  ],
+  "bonuses": [...],
+  "penalties": [...],
   "totalScore": <calculated>,
   "tier": "<S|A|B|C|D>",
-  "summary": "<2-3 sentence summary>",
-  "strengths": ["..."],
-  "weaknesses": ["..."]
+  ...
 }
 ```
 
@@ -337,16 +338,17 @@ You are an expert content quality evaluator. Rate the following generated conten
 ### Таблица `llm_model_benchmarks` (обновлённая)
 
 ```sql
--- Новые поля для балльной системы
+-- Поля для балльной системы v2.0
 ALTER TABLE llm_model_benchmarks ADD COLUMN IF NOT EXISTS
-  score_content_depth INTEGER,
-  score_practical_value INTEGER,
-  score_structure_logic INTEGER,
-  score_language_quality INTEGER,
-  score_task_compliance INTEGER,
+  score_semantic_quality INTEGER CHECK (score_semantic_quality >= 0 AND score_semantic_quality <= 35),
+  score_practical_value INTEGER CHECK (score_practical_value >= 0 AND score_practical_value <= 25),
+  score_task_compliance INTEGER CHECK (score_task_compliance >= 0 AND score_task_compliance <= 15),
+  score_no_hallucinations INTEGER CHECK (score_no_hallucinations >= 0 AND score_no_hallucinations <= 10),
+  score_structure INTEGER CHECK (score_structure >= 0 AND score_structure <= 10),
+  score_visualization INTEGER CHECK (score_visualization >= 0 AND score_visualization <= 5),
   score_bonuses INTEGER DEFAULT 0,
   score_penalties INTEGER DEFAULT 0,
-  total_points INTEGER,  -- Итоговые баллы
+  total_points INTEGER,  -- Итоговые баллы (base + bonuses - penalties)
   test_session_id UUID;  -- Для группировки по тесту
 ```
 
@@ -355,21 +357,22 @@ ALTER TABLE llm_model_benchmarks ADD COLUMN IF NOT EXISTS
 ```sql
 CREATE TABLE llm_benchmark_samples (
   id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-  benchmark_id UUID REFERENCES llm_model_benchmarks(id),
-  test_session_id UUID NOT NULL,
+  model_slug TEXT NOT NULL,
+  scenario TEXT NOT NULL,  -- 'full-generation', 'metadata-generation', etc.
+  language TEXT NOT NULL CHECK (language IN ('en', 'ru')),
 
   -- Контент
-  scenario TEXT NOT NULL,  -- 'full-generation', 'lesson-en', etc.
   input_prompt TEXT,
   output_content TEXT NOT NULL,  -- Полный сгенерированный текст
+  output_preview TEXT,           -- Первые ~500 символов для превью
 
   -- Оценки от судей
   judge_scores JSONB,  -- { primary: {...}, secondary: {...}, tiebreaker: {...} }
   final_score INTEGER,
+  tier TEXT CHECK (tier IN ('S', 'A', 'B', 'C', 'D')),
+  score_breakdown JSONB,  -- { semanticQuality: 32, practicalValue: 24, ... }
 
   -- Метаданные
-  model_slug TEXT NOT NULL,
-  language TEXT NOT NULL,
   word_count INTEGER,
   generation_time_ms INTEGER,
 
@@ -434,11 +437,12 @@ pnpm benchmark-llm test <model-slug> --scenario full-generation
 ```json
 {
   "scores": {
-    "contentDepth": 28,
+    "semanticQuality": 32,
     "practicalValue": 23,
-    "structureLogic": 18,
-    "languageQuality": 13,
-    "taskCompliance": 10
+    "taskCompliance": 14,
+    "noHallucinations": 9,
+    "structure": 9,
+    "visualization": 5
   },
   "bonuses": [],
   "penalties": [],
@@ -452,14 +456,15 @@ pnpm benchmark-llm test <model-slug> --scenario full-generation
 ```json
 {
   "scores": {
-    "contentDepth": 29,
+    "semanticQuality": 34,
     "practicalValue": 24,
-    "structureLogic": 19,
-    "languageQuality": 14,
-    "taskCompliance": 9
+    "taskCompliance": 14,
+    "noHallucinations": 10,
+    "structure": 9,
+    "visualization": 4
   },
   "bonuses": [
-    { "type": "expert_insights", "points": 10, "reason": "Unique ABC/XYZ analysis framework" }
+    { "type": "unique_insights", "points": 10, "reason": "Unique ABC/XYZ analysis framework" }
   ],
   "penalties": [],
   "totalScore": 105,
@@ -472,14 +477,17 @@ pnpm benchmark-llm test <model-slug> --scenario full-generation
 ```json
 {
   "scores": {
-    "contentDepth": 15,
-    "practicalValue": 12,
-    "structureLogic": 10,
-    "languageQuality": 8,
-    "taskCompliance": 8
+    "semanticQuality": 18,
+    "practicalValue": 15,
+    "taskCompliance": 10,
+    "noHallucinations": 5,
+    "structure": 7,
+    "visualization": 3
   },
   "bonuses": [],
-  "penalties": [{ "type": "hallucination", "points": -15, "reason": "Invented statistics" }],
+  "penalties": [
+    { "type": "critical_hallucination", "points": -15, "reason": "Invented statistics" }
+  ],
   "totalScore": 48,
   "tier": "D"
 }
