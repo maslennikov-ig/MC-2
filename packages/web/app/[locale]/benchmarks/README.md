@@ -143,6 +143,8 @@ interface Params {
   sortOrder?: 'asc' | 'desc'
   provider?: string
   tier?: 'S' | 'A' | 'B' | 'C' | 'D'
+  scenario?: string    // 'lesson-en', 'lesson-ru', 'metadata-en', 'metadata-ru'
+  testDate?: string    // '2026-01-28'
   limit?: number
   offset?: number
 }
@@ -171,6 +173,33 @@ Get list of unique providers for filter dropdown.
 ```typescript
 const providers = await getProvidersAction()
 // ['Anthropic', 'DeepSeek', 'Google', 'Meta', 'Mistral', 'OpenAI', 'xAI']
+```
+
+### `getScenariosAction()`
+
+Get list of unique test scenarios.
+
+```typescript
+const scenarios = await getScenariosAction()
+// ['lesson-en', 'lesson-ru', 'metadata-en', 'metadata-ru']
+```
+
+### `getTestDatesAction()`
+
+Get list of unique test dates.
+
+```typescript
+const dates = await getTestDatesAction()
+// ['2026-01-28', '2025-11-13']
+```
+
+### `getModelScenarioResultsAction(modelSlug)`
+
+Get detailed scenario results for expandable rows.
+
+```typescript
+const results = await getModelScenarioResultsAction('deepseek-v32-exp')
+// [{ scenario: 'lesson-en', runNumber: 1, schemaScore: 1.0, ... }, ...]
 ```
 
 ### `getLatestTestDateAction()`
@@ -221,6 +250,9 @@ interface ModelsRankingTableProps {
 - Sortable columns (click header)
 - Filter by provider (dropdown)
 - Filter by tier (dropdown)
+- Filter by scenario (lesson-en/ru, metadata-en/ru)
+- Filter by test date
+- Expandable rows with detailed scenario results
 - Pagination (10/20/50/100 per page)
 - Responsive design
 
