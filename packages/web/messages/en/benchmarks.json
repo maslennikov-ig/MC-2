@@ -76,5 +76,18 @@
     "showing": "Showing {from}-{to} of {total}",
     "previous": "Previous",
     "next": "Next"
+  },
+  "sampleViewer": {
+    "viewContent": "View",
+    "points": "points",
+    "words": "words",
+    "generatedContent": "Generated Content",
+    "judgeScores": "Judge Scores",
+    "inputPrompt": "Input Prompt",
+    "scoreBreakdown": "Score Breakdown",
+    "judgeDetails": "Judge Details",
+    "noScoreData": "No score data available",
+    "noPromptData": "No prompt data available",
+    "noSampleData": "No sample data available for this model"
   }
 }

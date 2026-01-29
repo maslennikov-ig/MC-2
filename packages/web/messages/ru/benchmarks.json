@@ -76,5 +76,18 @@
     "showing": "Показано {from}-{to} из {total}",
     "previous": "Назад",
     "next": "Вперёд"
+  },
+  "sampleViewer": {
+    "viewContent": "Просмотр",
+    "points": "баллов",
+    "words": "слов",
+    "generatedContent": "Сгенерированный контент",
+    "judgeScores": "Оценки судей",
+    "inputPrompt": "Входной промпт",
+    "scoreBreakdown": "Разбивка по критериям",
+    "judgeDetails": "Детали оценки",
+    "noScoreData": "Нет данных об оценках",
+    "noPromptData": "Нет данных о промпте",
+    "noSampleData": "Нет данных о генерации для этой модели"
   }
 }
