@@ -963,15 +963,23 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
                 realtimeStatus?.status === 'completed' || generationStatus === 'completed'
               }
             />
-          ) : selectedNodeId === 'stage_4_clarifying' ||
-            (generationStatus === 'stage_4_clarifying' && data?.stageNumber === 4) ? (
-            /* Stage 4 Clarifying Questions Panel - show when clarifying node is selected
-               OR when status is stage_4_clarifying and Stage 4 node is selected (backward compat) */
+          ) : selectedNodeId === 'stage_4_clarifying' ? (
+            /* ClarifyingNode selected - show questions panel
+               In read-only mode if course already moved past clarifying phase */
             <ClarifyingPanel
               courseId={courseInfo.id}
+              readOnly={generationStatus !== 'stage_4_clarifying'}
               onComplete={() => {
                 // Status will update via realtime subscription
                 // Deselect node to let user see the graph update
+                deselectNode()
+              }}
+            />
+          ) : generationStatus === 'stage_4_clarifying' && data?.stageNumber === 4 ? (
+            /* Stage 4 node clicked while still in clarifying phase - show questions */
+            <ClarifyingPanel
+              courseId={courseInfo.id}
+              onComplete={() => {
                 deselectNode()
               }}
             />

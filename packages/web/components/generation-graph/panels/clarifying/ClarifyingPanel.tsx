@@ -50,6 +50,8 @@ interface Question {
 interface ClarifyingPanelProps {
   courseId: string
   onComplete?: () => void
+  /** When true, shows answers in read-only mode (no editing, no continue button) */
+  readOnly?: boolean
 }
 
 // HIGH-004 fix: Zod schema for validating JSONB user_answer
@@ -104,7 +106,7 @@ function ClarifyingErrorFallback({ courseId: _courseId }: { courseId: string }) 
   )
 }
 
-export function ClarifyingPanel({ courseId, onComplete }: ClarifyingPanelProps) {
+export function ClarifyingPanel({ courseId, onComplete, readOnly = false }: ClarifyingPanelProps) {
   // TanStack Query hooks for data fetching
   // Uses refetchInterval to poll for questions until they appear (race condition protection)
   const {
@@ -494,7 +496,9 @@ export function ClarifyingPanel({ courseId, onComplete }: ClarifyingPanelProps) 
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
                 <Sparkles className="h-5 w-5 text-purple-600 dark:text-purple-400" />
-                <CardTitle className="text-lg">Уточняющие вопросы</CardTitle>
+                <CardTitle className="text-lg">
+                  {readOnly ? 'Ответы на вопросы' : 'Уточняющие вопросы'}
+                </CardTitle>
               </div>
               {isComplete && (
                 <motion.div
@@ -510,8 +514,8 @@ export function ClarifyingPanel({ courseId, onComplete }: ClarifyingPanelProps) 
           </CardHeader>
         </Card>
 
-        {/* Quick Actions */}
-        {!isComplete && (
+        {/* Quick Actions - hidden in read-only mode */}
+        {!isComplete && !readOnly && (
           <div className="flex gap-2">
             <Button
               size="sm"
@@ -565,25 +569,45 @@ export function ClarifyingPanel({ courseId, onComplete }: ClarifyingPanelProps) 
                     onSkip={handleSkip}
                     isAnswered={answeredQuestions.has(currentQuestion.id)}
                     isProcessing={processingQuestionId === currentQuestion.id}
+                    readOnly={readOnly}
                   />
                 </motion.div>
               </AnimatePresence>
             )}
 
-            {/* Navigation */}
-            <WizardNavigation
-              currentIndex={currentIndex}
-              totalQuestions={totalQuestions}
-              questionsStatus={sortedQuestions.map((q) => ({
-                isAnswered: answeredQuestions.has(q.id),
-                priority: q.priority,
-              }))}
-              onPrev={handlePrev}
-              onNext={handleNext}
-              canContinue={allCriticalAnswered}
-              onContinue={handleContinue}
-              isProcessing={approveAndProceedMutation.isPending}
-            />
+            {/* Navigation - show navigation arrows in read-only, but hide continue button */}
+            {readOnly ? (
+              /* Read-only mode: show simplified navigation without continue button */
+              <WizardNavigation
+                currentIndex={currentIndex}
+                totalQuestions={totalQuestions}
+                questionsStatus={sortedQuestions.map((q) => ({
+                  isAnswered: answeredQuestions.has(q.id),
+                  priority: q.priority,
+                }))}
+                onPrev={handlePrev}
+                onNext={handleNext}
+                canContinue={false}
+                onContinue={() => {}}
+                isProcessing={false}
+                hideContinueButton
+              />
+            ) : (
+              /* Active mode: show full navigation with continue button */
+              <WizardNavigation
+                currentIndex={currentIndex}
+                totalQuestions={totalQuestions}
+                questionsStatus={sortedQuestions.map((q) => ({
+                  isAnswered: answeredQuestions.has(q.id),
+                  priority: q.priority,
+                }))}
+                onPrev={handlePrev}
+                onNext={handleNext}
+                canContinue={allCriticalAnswered}
+                onContinue={handleContinue}
+                isProcessing={approveAndProceedMutation.isPending}
+              />
+            )}
           </div>
         </div>
       </div>
