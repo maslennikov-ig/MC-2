@@ -50,8 +50,27 @@
     "title": "Фильтры",
     "provider": "Провайдер",
     "tier": "Уровень",
+    "scenario": "Сценарий",
+    "testDate": "Дата теста",
     "allProviders": "Все провайдеры",
-    "allTiers": "Все уровни"
+    "allTiers": "Все уровни",
+    "allScenarios": "Все сценарии",
+    "allDates": "Все даты"
+  },
+  "scenarios": {
+    "lesson-en": "Урок (Английский)",
+    "lesson-ru": "Урок (Русский)",
+    "metadata-en": "Метаданные (Английский)",
+    "metadata-ru": "Метаданные (Русский)"
+  },
+  "expandedTable": {
+    "scenario": "Сценарий",
+    "run": "Прогон",
+    "schema": "Схема",
+    "content": "Контент",
+    "language": "Язык",
+    "overall": "Общий",
+    "error": "Ошибка"
   },
   "pagination": {
     "showing": "Показано {from}-{to} из {total}",

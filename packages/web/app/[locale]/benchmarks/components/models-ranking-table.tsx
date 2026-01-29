@@ -11,7 +11,15 @@ import {
   flexRender,
   ColumnDef,
 } from '@tanstack/react-table'
-import { ArrowUpDown, ChevronLeft, ChevronRight, Loader2, Filter } from 'lucide-react'
+import {
+  ArrowUpDown,
+  ChevronLeft,
+  ChevronRight,
+  ChevronDown,
+  ChevronUp,
+  Loader2,
+  Filter,
+} from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import {
@@ -21,7 +29,15 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select'
-import { getBenchmarksAction, getProvidersAction, BenchmarkData } from '@/app/actions/benchmarks'
+import {
+  getBenchmarksAction,
+  getProvidersAction,
+  getScenariosAction,
+  getTestDatesAction,
+  getModelScenarioResultsAction,
+  BenchmarkData,
+  ScenarioResult,
+} from '@/app/actions/benchmarks'
 import { cn } from '@/lib/utils'
 
 const TIER_COLORS = {
@@ -47,15 +63,67 @@ export function ModelsRankingTable({ locale: _locale }: ModelsRankingTableProps)
   const [sorting, setSorting] = useState<SortingState>([{ id: 'overallQualityScore', desc: true }])
   const [providerFilter, setProviderFilter] = useState<string>('all')
   const [tierFilter, setTierFilter] = useState<string>('all')
+  const [scenarioFilter, setScenarioFilter] = useState<string>('all')
+  const [testDateFilter, setTestDateFilter] = useState<string>('all')
   const [providers, setProviders] = useState<string[]>([])
+  const [scenarios, setScenarios] = useState<string[]>([])
+  const [testDates, setTestDates] = useState<string[]>([])
+  const [expandedRow, setExpandedRow] = useState<string | null>(null)
+  const [scenarioDetails, setScenarioDetails] = useState<Record<string, ScenarioResult[]>>({})
+  const [loadingDetails, setLoadingDetails] = useState<Record<string, boolean>>({})
 
-  // Fetch providers on mount
+  // Fetch filter options on mount
   useEffect(() => {
     void getProvidersAction().then(setProviders)
+    void getScenariosAction().then(setScenarios)
+    void getTestDatesAction().then(setTestDates)
   }, [])
+
+  // Handle row expansion
+  const handleRowClick = useCallback(
+    async (modelSlug: string) => {
+      if (expandedRow === modelSlug) {
+        // Collapse if already expanded
+        setExpandedRow(null)
+      } else {
+        // Expand and load details if not already loaded
+        setExpandedRow(modelSlug)
+        if (!scenarioDetails[modelSlug]) {
+          setLoadingDetails((prev) => ({ ...prev, [modelSlug]: true }))
+          try {
+            const results = await getModelScenarioResultsAction(modelSlug)
+            setScenarioDetails((prev) => ({ ...prev, [modelSlug]: results }))
+          } catch (err) {
+            console.error('Failed to fetch scenario details', err)
+          } finally {
+            setLoadingDetails((prev) => ({ ...prev, [modelSlug]: false }))
+          }
+        }
+      }
+    },
+    [expandedRow, scenarioDetails]
+  )
 
   const columns = useMemo<ColumnDef<BenchmarkData>[]>(
     () => [
+      {
+        id: 'expand',
+        header: '',
+        cell: ({ row }) => {
+          const isExpanded = expandedRow === row.original.modelSlug
+          return (
+            <button
+              onClick={(e) => {
+                e.stopPropagation()
+                void handleRowClick(row.original.modelSlug)
+              }}
+              className="text-white/70 transition-colors hover:text-white"
+            >
+              {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+            </button>
+          )
+        },
+      },
       {
         accessorKey: 'rank',
         header: t('table.rank'),
@@ -199,7 +267,7 @@ export function ModelsRankingTable({ locale: _locale }: ModelsRankingTableProps)
         ),
       },
     ],
-    [t, pageIndex, pageSize]
+    [t, pageIndex, pageSize, expandedRow, handleRowClick]
   )
 
   const loadData = useCallback(async () => {
@@ -213,6 +281,8 @@ export function ModelsRankingTable({ locale: _locale }: ModelsRankingTableProps)
         sortOrder,
         provider: providerFilter !== 'all' ? providerFilter : undefined,
         tier: tierFilter !== 'all' ? tierFilter : undefined,
+        scenario: scenarioFilter !== 'all' ? scenarioFilter : undefined,
+        testDate: testDateFilter !== 'all' ? testDateFilter : undefined,
         limit: pageSize,
         offset: pageIndex * pageSize,
       })
@@ -224,7 +294,7 @@ export function ModelsRankingTable({ locale: _locale }: ModelsRankingTableProps)
     } finally {
       setLoading(false)
     }
-  }, [sorting, providerFilter, tierFilter, pageSize, pageIndex])
+  }, [sorting, providerFilter, tierFilter, scenarioFilter, testDateFilter, pageSize, pageIndex])
 
   useEffect(() => {
     void loadData()
@@ -306,6 +376,46 @@ export function ModelsRankingTable({ locale: _locale }: ModelsRankingTableProps)
             </SelectContent>
           </Select>
 
+          <Select
+            value={scenarioFilter}
+            onValueChange={(value) => {
+              setScenarioFilter(value)
+              setPageIndex(0)
+            }}
+          >
+            <SelectTrigger className="w-[200px] border-white/20 bg-white/5 text-white">
+              <SelectValue placeholder={t('filters.scenario')} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{t('filters.allScenarios')}</SelectItem>
+              {scenarios.map((scenario) => (
+                <SelectItem key={scenario} value={scenario}>
+                  {t(`scenarios.${scenario}` as any) || scenario}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
+          <Select
+            value={testDateFilter}
+            onValueChange={(value) => {
+              setTestDateFilter(value)
+              setPageIndex(0)
+            }}
+          >
+            <SelectTrigger className="w-[180px] border-white/20 bg-white/5 text-white">
+              <SelectValue placeholder={t('filters.testDate')} />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">{t('filters.allDates')}</SelectItem>
+              {testDates.map((date) => (
+                <SelectItem key={date} value={date}>
+                  {new Date(date).toLocaleDateString(_locale)}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+
           <Button
             variant="outline"
             size="icon"
@@ -352,18 +462,103 @@ export function ModelsRankingTable({ locale: _locale }: ModelsRankingTableProps)
                   </td>
                 </tr>
               ) : (
-                table.getRowModel().rows.map((row) => (
-                  <tr
-                    key={row.id}
-                    className="transition-colors even:bg-white/[0.02] hover:bg-white/5"
-                  >
-                    {row.getVisibleCells().map((cell) => (
-                      <td key={cell.id} className="p-4 align-middle">
-                        {flexRender(cell.column.columnDef.cell, cell.getContext())}
-                      </td>
-                    ))}
-                  </tr>
-                ))
+                table.getRowModel().rows.map((row) => {
+                  const isExpanded = expandedRow === row.original.modelSlug
+                  const details = scenarioDetails[row.original.modelSlug]
+                  const isLoadingDetails = loadingDetails[row.original.modelSlug]
+
+                  return (
+                    <>
+                      <tr
+                        key={row.id}
+                        className="cursor-pointer transition-colors even:bg-white/[0.02] hover:bg-white/5"
+                        onClick={() => void handleRowClick(row.original.modelSlug)}
+                      >
+                        {row.getVisibleCells().map((cell) => (
+                          <td key={cell.id} className="p-4 align-middle">
+                            {flexRender(cell.column.columnDef.cell, cell.getContext())}
+                          </td>
+                        ))}
+                      </tr>
+                      {isExpanded && (
+                        <tr key={`${row.id}-expanded`}>
+                          <td colSpan={columns.length} className="bg-white/[0.08] p-0">
+                            <div className="overflow-hidden transition-all duration-300">
+                              {isLoadingDetails ? (
+                                <div className="flex items-center justify-center py-8">
+                                  <Loader2 className="h-6 w-6 animate-spin text-white/70" />
+                                </div>
+                              ) : details && details.length > 0 ? (
+                                <div className="p-4">
+                                  <table className="w-full text-sm">
+                                    <thead>
+                                      <tr className="border-b border-white/10">
+                                        <th className="pb-2 text-left font-medium text-white/80">
+                                          {t('expandedTable.scenario')}
+                                        </th>
+                                        <th className="pb-2 text-left font-medium text-white/80">
+                                          {t('expandedTable.run')}
+                                        </th>
+                                        <th className="pb-2 text-left font-medium text-white/80">
+                                          {t('expandedTable.schema')}
+                                        </th>
+                                        <th className="pb-2 text-left font-medium text-white/80">
+                                          {t('expandedTable.content')}
+                                        </th>
+                                        <th className="pb-2 text-left font-medium text-white/80">
+                                          {t('expandedTable.language')}
+                                        </th>
+                                        <th className="pb-2 text-left font-medium text-white/80">
+                                          {t('expandedTable.overall')}
+                                        </th>
+                                      </tr>
+                                    </thead>
+                                    <tbody>
+                                      {details.map((detail, idx) => (
+                                        <tr
+                                          key={idx}
+                                          className="border-b border-white/5 last:border-0"
+                                        >
+                                          <td className="py-2 text-white/90">
+                                            {t(`scenarios.${detail.scenario}` as any) ||
+                                              detail.scenario}
+                                          </td>
+                                          <td className="py-2 text-white/90">{detail.runNumber}</td>
+                                          <td className="py-2 text-white/90">
+                                            {(detail.schemaScore * 100).toFixed(1)}%
+                                          </td>
+                                          <td className="py-2 text-white/90">
+                                            {(detail.contentScore * 100).toFixed(1)}%
+                                          </td>
+                                          <td className="py-2 text-white/90">
+                                            {(detail.languageScore * 100).toFixed(1)}%
+                                          </td>
+                                          <td className="py-2 text-white/90">
+                                            {detail.isError ? (
+                                              <span className="text-red-400">
+                                                {t('expandedTable.error')}
+                                              </span>
+                                            ) : (
+                                              `${(detail.overallScore * 100).toFixed(1)}%`
+                                            )}
+                                          </td>
+                                        </tr>
+                                      ))}
+                                    </tbody>
+                                  </table>
+                                </div>
+                              ) : (
+                                <div className="py-8 text-center text-white/70">
+                                  {t('table.noData')}
+                                </div>
+                              )}
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </>
+                  )
+                })
               )}
             </tbody>
           </table>

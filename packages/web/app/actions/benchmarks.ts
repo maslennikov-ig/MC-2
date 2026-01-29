@@ -40,11 +40,25 @@ export interface BenchmarkData {
   testVersion: string
 }
 
+export interface ScenarioResult {
+  scenario: string
+  runNumber: number
+  language: string
+  schemaScore: number
+  contentScore: number
+  languageScore: number
+  overallScore: number
+  isError: boolean
+  errorMessage?: string | null
+}
+
 interface BenchmarksParams {
   sortBy?: string
   sortOrder?: 'asc' | 'desc'
   provider?: string
   tier?: string
+  scenario?: string
+  testDate?: string
   limit?: number
   offset?: number
 }
@@ -58,14 +72,48 @@ export async function getBenchmarksAction(params: BenchmarksParams = {}): Promis
     sortOrder = 'desc',
     provider,
     tier,
+    scenario,
+    testDate,
     limit = 20,
     offset = 0,
   } = params
 
   const supabase = (await createClient()) as UntypedSupabase
 
-  // Build query using llm_model_leaderboard view
-  let query = supabase.from('llm_model_leaderboard').select('*', { count: 'exact' })
+  // If filtering by scenario or testDate, query llm_model_benchmarks directly
+  // Otherwise use the leaderboard view for performance
+  const useDirectQuery = (scenario && scenario !== 'all') || (testDate && testDate !== 'all')
+
+  let query: any
+
+  if (useDirectQuery) {
+    // Query llm_model_benchmarks table directly with filters
+    query = supabase.from('llm_model_benchmarks').select('*', { count: 'exact' })
+
+    // For scenario filter, we need to check if benchmark has runs with that scenario
+    if (scenario && scenario !== 'all') {
+      // Get benchmark IDs that have this scenario
+      const { data: runData } = await supabase
+        .from('llm_benchmark_runs')
+        .select('benchmark_id')
+        .eq('scenario', scenario)
+
+      if (runData && runData.length > 0) {
+        const benchmarkIds = runData.map((r: any) => r.benchmark_id)
+        query = query.in('id', benchmarkIds)
+      } else {
+        // No benchmarks have this scenario
+        return { benchmarks: [], totalCount: 0 }
+      }
+    }
+
+    if (testDate && testDate !== 'all') {
+      query = query.eq('test_date', testDate)
+    }
+  } else {
+    // Use the optimized leaderboard view
+    query = supabase.from('llm_model_leaderboard').select('*', { count: 'exact' })
+  }
 
   // Apply filters
   if (provider && provider !== 'all') {
@@ -170,4 +218,104 @@ export async function getLatestTestDateAction(): Promise<string | null> {
   }
 
   return (data as { test_date: string }).test_date
+}
+
+export async function getScenariosAction(): Promise<string[]> {
+  const supabase = (await createClient()) as UntypedSupabase
+
+  const { data, error } = await supabase
+    .from('llm_benchmark_runs')
+    .select('scenario')
+    .order('scenario')
+
+  if (error) {
+    console.error('Failed to fetch scenarios:', error)
+    return []
+  }
+
+  // Get unique scenarios
+  const rows = (data || []) as Array<{ scenario: string }>
+  const scenarios: string[] = Array.from(new Set(rows.map((row) => row.scenario)))
+  return scenarios
+}
+
+export async function getTestDatesAction(): Promise<string[]> {
+  const supabase = (await createClient()) as UntypedSupabase
+
+  const { data, error } = await supabase
+    .from('llm_model_benchmarks')
+    .select('test_date')
+    .order('test_date', { ascending: false })
+
+  if (error) {
+    console.error('Failed to fetch test dates:', error)
+    return []
+  }
+
+  // Get unique dates
+  const rows = (data || []) as Array<{ test_date: string }>
+  const dates: string[] = Array.from(new Set(rows.map((row) => row.test_date)))
+  return dates
+}
+
+export async function getModelScenarioResultsAction(modelSlug: string): Promise<ScenarioResult[]> {
+  const supabase = (await createClient()) as UntypedSupabase
+
+  // First, get the benchmark_id for this model (latest test_date)
+  const { data: benchmarkData, error: benchmarkError } = await supabase
+    .from('llm_model_benchmarks')
+    .select('id')
+    .eq('model_slug', modelSlug)
+    .order('test_date', { ascending: false })
+    .limit(1)
+    .single()
+
+  if (benchmarkError || !benchmarkData) {
+    console.error('Failed to fetch benchmark:', benchmarkError)
+    return []
+  }
+
+  const benchmarkId = (benchmarkData as { id: string }).id
+
+  // Now get all runs for this benchmark
+  const { data: runsData, error: runsError } = await supabase
+    .from('llm_benchmark_runs')
+    .select(
+      'scenario, run_number, language, schema_score, content_score, language_score, overall_score, is_error, error_message'
+    )
+    .eq('benchmark_id', benchmarkId)
+    .order('scenario')
+    .order('run_number')
+
+  if (runsError) {
+    console.error('Failed to fetch benchmark runs:', runsError)
+    return []
+  }
+
+  // Transform to camelCase
+  interface RunRow {
+    scenario: string
+    run_number: number
+    language: string
+    schema_score: number
+    content_score: number
+    language_score: number
+    overall_score: number
+    is_error: boolean
+    error_message?: string | null
+  }
+
+  const results: ScenarioResult[] = (runsData || []).map((row: RunRow) => ({
+    scenario: row.scenario,
+    runNumber: row.run_number,
+    language: row.language,
+    schemaScore: Number(row.schema_score),
+    contentScore: Number(row.content_score),
+    languageScore: Number(row.language_score),
+    overallScore: Number(row.overall_score),
+    isError: row.is_error,
+    errorMessage: row.error_message,
+  }))
+
+  return results
 }
