@@ -23,7 +23,7 @@ import { toast } from '@/lib/toast'
 import { Proposal } from '@megacampus/shared-types/chat-types'
 
 interface ChatMessage {
-  role: 'user' | 'assistant'
+  role: 'user' | 'assistant' | 'system'
   content: string
   timestamp: string
   pending?: boolean
@@ -253,25 +253,38 @@ export const RefinementChat: React.FC<RefinementChatProps> = ({
                       msg.role === 'user' ? 'items-end' : 'items-start'
                     )}
                   >
-                    <div
-                      className={cn(
-                        'max-w-[90%] rounded-lg px-3 py-2',
-                        msg.role === 'user'
-                          ? 'bg-blue-500 text-white'
-                          : 'border-border border bg-gray-100 dark:bg-gray-800',
-                        msg.pending && 'opacity-60'
-                      )}
-                    >
-                      {msg.role === 'assistant' ? (
-                        <MarkdownRendererClient
-                          content={msg.content}
-                          preset="chat"
-                          isStreaming={msg.pending || false}
-                        />
-                      ) : (
-                        <span className="whitespace-pre-wrap">{msg.content}</span>
-                      )}
-                    </div>
+                    {msg.role === 'system' ? (
+                      <div
+                        className={cn(
+                          'max-w-[90%] rounded-lg px-3 py-2 text-sm',
+                          msg.content.startsWith('✅')
+                            ? 'border border-green-200 bg-green-50 text-green-800 dark:border-green-800 dark:bg-green-900/20 dark:text-green-200'
+                            : 'border border-red-200 bg-red-50 text-red-800 dark:border-red-800 dark:bg-red-900/20 dark:text-red-200'
+                        )}
+                      >
+                        {msg.content}
+                      </div>
+                    ) : (
+                      <div
+                        className={cn(
+                          'max-w-[90%] rounded-lg px-3 py-2',
+                          msg.role === 'user'
+                            ? 'bg-blue-500 text-white'
+                            : 'border-border border bg-gray-100 dark:bg-gray-800',
+                          msg.pending && 'opacity-60'
+                        )}
+                      >
+                        {msg.role === 'assistant' ? (
+                          <MarkdownRendererClient
+                            content={msg.content}
+                            preset="chat"
+                            isStreaming={msg.pending || false}
+                          />
+                        ) : (
+                          <span className="whitespace-pre-wrap">{msg.content}</span>
+                        )}
+                      </div>
+                    )}
                     <span className="text-muted-foreground text-[10px]">
                       {formatTime(msg.timestamp)}
                     </span>
