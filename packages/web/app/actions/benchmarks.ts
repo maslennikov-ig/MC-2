@@ -258,6 +258,96 @@ export async function getTestDatesAction(): Promise<string[]> {
   return dates
 }
 
+export interface BenchmarkSample {
+  id: string
+  modelSlug: string
+  scenario: string
+  language: string
+  inputPrompt: string | null
+  outputContent: string
+  outputPreview: string | null
+  judgeScores: Record<string, unknown> | null
+  finalScore: number | null
+  tier: 'S' | 'A' | 'B' | 'C' | 'D' | null
+  scoreBreakdown: Record<string, number> | null
+  wordCount: number | null
+  generationTimeMs: number | null
+  createdAt: string
+}
+
+export async function getBenchmarkSampleAction(
+  modelSlug: string,
+  scenario?: string
+): Promise<BenchmarkSample | null> {
+  const supabase = (await createClient()) as UntypedSupabase
+
+  let query = supabase
+    .from('llm_benchmark_samples')
+    .select('*')
+    .eq('model_slug', modelSlug)
+    .order('created_at', { ascending: false })
+    .limit(1)
+
+  if (scenario) {
+    query = query.eq('scenario', scenario)
+  }
+
+  const { data, error } = await query.single()
+
+  if (error || !data) {
+    return null
+  }
+
+  return {
+    id: data.id,
+    modelSlug: data.model_slug,
+    scenario: data.scenario,
+    language: data.language,
+    inputPrompt: data.input_prompt,
+    outputContent: data.output_content,
+    outputPreview: data.output_preview,
+    judgeScores: data.judge_scores,
+    finalScore: data.final_score,
+    tier: data.tier,
+    scoreBreakdown: data.score_breakdown,
+    wordCount: data.word_count,
+    generationTimeMs: data.generation_time_ms,
+    createdAt: data.created_at,
+  }
+}
+
+export async function getTestSessionsAction(): Promise<
+  Array<{ sessionId: string; testDate: string; modelCount: number }>
+> {
+  const supabase = (await createClient()) as UntypedSupabase
+
+  const { data, error } = await supabase
+    .from('llm_model_benchmarks')
+    .select('test_session_id, test_date')
+    .not('test_session_id', 'is', null)
+    .order('test_date', { ascending: false })
+
+  if (error || !data) {
+    return []
+  }
+
+  // Group by session
+  const sessions = new Map<string, { testDate: string; count: number }>()
+  for (const row of data) {
+    const sessionId = row.test_session_id
+    if (!sessions.has(sessionId)) {
+      sessions.set(sessionId, { testDate: row.test_date, count: 0 })
+    }
+    sessions.get(sessionId)!.count++
+  }
+
+  return Array.from(sessions.entries()).map(([sessionId, { testDate, count }]) => ({
+    sessionId,
+    testDate,
+    modelCount: count,
+  }))
+}
+
 export async function getModelScenarioResultsAction(modelSlug: string): Promise<ScenarioResult[]> {
   const supabase = (await createClient()) as UntypedSupabase
 
