@@ -1,0 +1,61 @@
+{
+  "metadata": {
+    "title": "LLM Model Benchmarks - MegaCampusAI",
+    "description": "Compare quality and performance metrics of leading language models. Comprehensive benchmarks for GPT, DeepSeek, Claude, and other LLMs.",
+    "ogTitle": "LLM Model Benchmarks - Quality Comparison",
+    "ogDescription": "Detailed benchmarks and quality metrics for top language models used in course generation",
+    "twitterTitle": "LLM Model Benchmarks",
+    "twitterDescription": "Compare quality metrics of leading AI language models"
+  },
+  "backToHome": "Back to Home",
+  "hero": {
+    "title": "LLM Model Benchmarks",
+    "subtitle": "Comprehensive quality and performance metrics for language models powering course generation",
+    "lastUpdated": "Last updated"
+  },
+  "topModels": {
+    "title": "🏆 Top Performing Models"
+  },
+  "ranking": {
+    "title": "Complete Leaderboard"
+  },
+  "tiers": {
+    "S": "S-Tier (0.95+)",
+    "A": "A-Tier (0.85-0.94)",
+    "B": "B-Tier (0.75-0.84)",
+    "C": "C-Tier (0.60-0.74)",
+    "D": "D-Tier (<0.60)"
+  },
+  "metrics": {
+    "quality": "Quality Score",
+    "content": "Content Quality",
+    "schema": "Schema Compliance",
+    "language": "Language Quality",
+    "errorRate": "Error Rate",
+    "criticalIssues": "Critical Issues"
+  },
+  "table": {
+    "rank": "#",
+    "model": "Model",
+    "provider": "Provider",
+    "tier": "Tier",
+    "quality": "Quality",
+    "content": "Content",
+    "schema": "Schema",
+    "language": "Language",
+    "errorRate": "Error Rate",
+    "noData": "No benchmark data available"
+  },
+  "filters": {
+    "title": "Filters",
+    "provider": "Provider",
+    "tier": "Tier",
+    "allProviders": "All Providers",
+    "allTiers": "All Tiers"
+  },
+  "pagination": {
+    "showing": "Showing {from}-{to} of {total}",
+    "previous": "Previous",
+    "next": "Next"
+  }
+}
