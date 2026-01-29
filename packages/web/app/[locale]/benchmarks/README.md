@@ -375,8 +375,71 @@ SET ROLE anon;
 SELECT * FROM llm_model_leaderboard;
 ```
 
+## Scoring Methodology v2.0
+
+The benchmark system uses **point-based scoring** instead of percentages to allow tracking model improvements over time without hitting a 100% ceiling.
+
+### Criteria (100 base points)
+
+| Criterion         | Max Points | Description                                |
+| ----------------- | ---------- | ------------------------------------------ |
+| Semantic Quality  | 35         | Content depth, accuracy, completeness      |
+| Practical Value   | 25         | Examples, applicability, actionable advice |
+| Task Compliance   | 15         | Following instructions, format             |
+| No Hallucinations | 10         | Factual accuracy, no invented claims       |
+| Structure         | 10         | Logic, navigation, scaffolding             |
+| Visualization     | 5          | Mermaid diagrams quality                   |
+
+### Bonuses & Penalties
+
+- **Bonuses** (+5 to +15): Unique insights, creative examples, exceptional style
+- **Penalties** (-5 to -15): Hallucinations, errors, truncation, language switching
+
+### Tier System
+
+| Tier | Points | Recommendation   |
+| ---- | ------ | ---------------- |
+| S    | ≥95    | Primary model    |
+| A    | 80-94  | Production ready |
+| B    | 65-79  | With review      |
+| C    | 50-64  | Fallback only    |
+| D    | <50    | Do not use       |
+
+### Comparison Rules
+
+**IMPORTANT**: Models can only be compared within the same test session!
+
+- Each test has a `test_session_id`
+- Filter by session to see valid comparisons
+- Different test dates = different conditions = not comparable
+
+### Viewing Full Results
+
+Users can view the complete generated content:
+
+1. Click on a model in the leaderboard
+2. See full text output in expandable section
+3. Compare side-by-side with other models (same session)
+
+## Testing Models
+
+Use the `/test-model` skill to run benchmarks:
+
+```bash
+/test-model deepseek/deepseek-v3.2 --scenario full-generation --language ru
+```
+
+Or via CLI:
+
+```bash
+pnpm benchmark-llm test deepseek-v3.2 --scenario full-generation
+```
+
 ## Related Files
 
+- **Scoring System**: `docs/llm-testing/LLM-BENCHMARK-SCORING-SYSTEM.md`
+- **Quality Tester Skill**: `.claude/skills/llm-quality-tester/SKILL.md`
+- **LLM Judge System**: `docs/STAGE6-LLM-JUDGE-SYSTEM.md`
 - **Heuristic filters**: `packages/course-gen-platform/src/stages/.../heuristic-filter.ts`
 - **Model configs**: `llm_model_configs` table
-- **Plan document**: `docs/plans/refactored-hugging-dewdrop.md`
+- **Migration**: `supabase/migrations/20260129120000_benchmark_scoring_v2.sql`
