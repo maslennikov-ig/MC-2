@@ -339,9 +339,16 @@ export async function runAnalysisOrchestration(job: StructureAnalysisJob): Promi
       );
 
       const pendingQuestions = await getPendingQuestions(courseId);
+      const answeredQuestions = await getAnsweredQuestions(courseId);
 
-      if (pendingQuestions.length === 0) {
-        // First time - generate questions
+      // Check if questions were ever generated (prevents duplicate generation)
+      // Bug fix: pendingQuestions.length === 0 could mean either:
+      // A) First run - no questions generated yet
+      // B) All questions answered (status changed from 'pending' to 'answered')
+      const hasExistingQuestions = pendingQuestions.length > 0 || answeredQuestions.length > 0;
+
+      if (!hasExistingQuestions) {
+        // First time - no questions at all - generate
         orchestrationLogger.info('No questions found - generating clarifying questions');
 
         await runPhase05Clarifying({
@@ -397,9 +404,8 @@ export async function runAnalysisOrchestration(job: StructureAnalysisJob): Promi
             courseId
           );
         }
-      } else {
-        // Questions already exist - check if we need to wait
-        // Check if still waiting for critical/important answers
+      } else if (pendingQuestions.length > 0) {
+        // Questions exist and some are still pending
         const criticalPending = pendingQuestions.filter(
           q => q.question_priority === 'critical' || q.question_priority === 'important'
         );
@@ -429,9 +435,12 @@ export async function runAnalysisOrchestration(job: StructureAnalysisJob): Promi
           }
         }
       }
+      // else: pendingQuestions.length === 0 && answeredQuestions.length > 0
+      // → All questions answered, proceed to analysis phases
 
       // All critical/important questions answered - continue
       orchestrationLogger.info(
+        { answeredCount: answeredQuestions.length },
         'All critical/important questions answered - proceeding to analysis'
       );
     } else {
