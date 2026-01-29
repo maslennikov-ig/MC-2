@@ -50,8 +50,27 @@
     "title": "Filters",
     "provider": "Provider",
     "tier": "Tier",
+    "scenario": "Scenario",
+    "testDate": "Test Date",
     "allProviders": "All Providers",
-    "allTiers": "All Tiers"
+    "allTiers": "All Tiers",
+    "allScenarios": "All Scenarios",
+    "allDates": "All Dates"
+  },
+  "scenarios": {
+    "lesson-en": "Lesson (English)",
+    "lesson-ru": "Lesson (Russian)",
+    "metadata-en": "Metadata (English)",
+    "metadata-ru": "Metadata (Russian)"
+  },
+  "expandedTable": {
+    "scenario": "Scenario",
+    "run": "Run",
+    "schema": "Schema",
+    "content": "Content",
+    "language": "Language",
+    "overall": "Overall",
+    "error": "Error"
   },
   "pagination": {
     "showing": "Showing {from}-{to} of {total}",
