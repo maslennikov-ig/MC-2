@@ -2,6 +2,68 @@
 
 _Released on 2025-12-26_
 
+## v0.28.42
+
+_Released on 2026-01-29_
+
+### ✨ New Features
+
+- **course-gen-platform**: Add 3 source file(s), update 14 source file(s), +1 more
+- **chat**: Add inline feedback messages after applyProposal
+- **benchmarks**: Integrate SampleContentViewer into ranking table
+- **benchmarks**: Implement test-model command and sample content viewer
+- **benchmarks**: Add point-based scoring methodology and LLM quality tester skill
+- **benchmarks**: Add scenario/date filters and expandable rows
+- **web**: Add public /benchmarks page for LLM model rankings
+- **refinement-chat**: Add default mode selection and tooltips
+- **prompts**: Add forbidden_patterns section to stage6_serial_generator
+- **chat**: Implement remaining code review recommendations
+- **chat**: Implement Confirm-then-Apply flow for Stages 4, 5, 6
+- **admin/logs**: Add course column to grouped view
+- **logger**: Add auto-mute rules for expected errors
+
+### 🔧 Improvements
+
+- **prompts**: Soften cliché prevention approach
+- **clarifying**: Code review LOW priority improvements
+
+### 🐛 Bug Fixes
+
+- **stage4**: Prevent duplicate clarifying questions generation
+- **Interface**: Correctly show deduplicated documents as completed in Stage 2
+- **benchmarks**: Sync scoring criteria across all documents
+- **graph**: Add answeredCount/questionsCount to shallow compare
+- **stage5**: SetAtPath now correctly handles array access on object properties
+- **clarifying**: Update node counter without page refresh
+- **style-prompts**: Update conversational and research styles to avoid rhetorical clichés
+- **refinement**: Remove AbortSignal from server action and add localStorage safety
+- Pass missing proposalError and retryProposal props
+- Additional self-review fixes
+- **hooks**: Add isMountedRef check to acceptProposal
+- **chat**: Address P1 and P2 bugs from code review
+- **server-actions**: Remove AbortSignal parameters to fix serialization error
+- **query-client**: Add 'use client' directive
+- **refinement**: Allow refinement chat for phase-based nodes (Stage 4, 5, 6)
+- **clarifying**: Address code review findings for TanStack Query migration
+- **clarifying**: Migrate to @tanstack/react-query for proper cache sync
+- **clarifying**: Generate questions without documents + one-click accept
+- **clarifying**: Invalidate getProgress cache during polling
+- **clarifying**: Invalidate getProgress cache to update node in graph
+- **docker**: Add NEXT_PUBLIC_COURSEGEN_BACKEND_URL to Dockerfile
+- **clarifying**: Invalidate cache after bulk accept recommendations
+- **clarifying**: Use rounded-sm for multi-choice checkboxes
+- **clarifying**: Remove dark mode navigation bar artifact
+- **clarifying**: Invalidate cache before refetch in polling
+- **clarifying**: Poll for questions when cache empty + fix progress on skip
+- **admin/logs**: List view now shows all new errors
+- **Database**: Add stage_1 and stage_7 to generation_trace constraint
+- **llm**: Migrate from xiaomi/mimo-v2-flash:free to paid version
+- **fsm**: Allow stage_4_clarifying → stage_4_analyzing transition
+
+---
+
+_This release was automatically generated from 84 commits._
+
 ## v0.28.41
 
 _Released on 2026-01-27_

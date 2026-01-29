@@ -7,6 +7,104 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.28.42] - 2026-01-29
+
+### Added
+
+- **course-gen-platform**: add 3 source file(s), update 14 source file(s), +1 more (727c04e5)
+- **chat**: add inline feedback messages after applyProposal (c049b7c0)
+- **benchmarks**: integrate SampleContentViewer into ranking table (0c3fbfe3)
+- **benchmarks**: implement test-model command and sample content viewer (01cc13f0)
+- **benchmarks**: add point-based scoring methodology and LLM quality tester skill (ff031819)
+- **benchmarks**: add scenario/date filters and expandable rows (81d87881)
+- **web**: add public /benchmarks page for LLM model rankings (b4abeddb)
+- **refinement-chat**: add default mode selection and tooltips (7887414d)
+- **prompts**: add forbidden_patterns section to stage6_serial_generator (d716019e)
+- **chat**: implement remaining code review recommendations (8f48f2fd)
+- **chat**: implement Confirm-then-Apply flow for Stages 4, 5, 6 (90b27fac)
+- **admin/logs**: add course column to grouped view (c2d35e23)
+- **logger**: add auto-mute rules for expected errors (ab22c3d2)
+
+### Changed
+
+- **prompts**: soften cliché prevention approach (37698972)
+- **clarifying**: code review LOW priority improvements (665b420c)
+
+### Fixed
+
+- **stage4**: prevent duplicate clarifying questions generation (1ed07253)
+- **ui**: correctly show deduplicated documents as completed in Stage 2 (8633e40f)
+- **benchmarks**: sync scoring criteria across all documents (a435406e)
+- **graph**: add answeredCount/questionsCount to shallow compare (499995f9)
+- **stage5**: setAtPath now correctly handles array access on object properties (45327515)
+- **clarifying**: update node counter without page refresh (213679f6)
+- **style-prompts**: update conversational and research styles to avoid rhetorical clichés (c6800a44)
+- **refinement**: remove AbortSignal from server action and add localStorage safety (dab15549)
+- pass missing proposalError and retryProposal props (1bae8f93)
+- additional self-review fixes (70521244)
+- **hooks**: add isMountedRef check to acceptProposal (421ef9ab)
+- **chat**: address P1 and P2 bugs from code review (a1a1fb5f)
+- **server-actions**: remove AbortSignal parameters to fix serialization error (87a40e44)
+- **query-client**: add 'use client' directive (845d4ca7)
+- **refinement**: allow refinement chat for phase-based nodes (Stage 4, 5, 6) (91b57df0)
+- **clarifying**: address code review findings for TanStack Query migration (0d8d5332)
+- **clarifying**: migrate to @tanstack/react-query for proper cache sync (15926db0)
+- **clarifying**: generate questions without documents + one-click accept (42f38c4b)
+- **clarifying**: invalidate getProgress cache during polling (a830f0fa)
+- **clarifying**: invalidate getProgress cache to update node in graph (3d16b156)
+- **docker**: add NEXT_PUBLIC_COURSEGEN_BACKEND_URL to Dockerfile (5c7059c0)
+- **clarifying**: invalidate cache after bulk accept recommendations (6931a3c9)
+- **clarifying**: use rounded-sm for multi-choice checkboxes (d7a32112)
+- **clarifying**: remove dark mode navigation bar artifact (a38e05e6)
+- **clarifying**: invalidate cache before refetch in polling (3dab23cc)
+- **clarifying**: poll for questions when cache empty + fix progress on skip (9045c34b)
+- **admin/logs**: list view now shows all new errors (6d7c7654)
+- **db**: add stage_1 and stage_7 to generation_trace constraint (3b4cf4fd)
+- **llm**: migrate from xiaomi/mimo-v2-flash:free to paid version (c539eec9)
+- **fsm**: allow stage_4_clarifying → stage_4_analyzing transition (6a7f4a2e)
+
+### Other
+
+- bd sync: 2026-01-29 21:10:49 (09c792dd)
+- bd sync: 2026-01-29 21:05:47 (1b98be8e)
+- bd sync: 2026-01-29 20:46:54 (642f893c)
+- **benchmarks**: fix criteria mismatch in scoring system docs (7187081b)
+- bd sync: 2026-01-29 19:01:31 (da710a35)
+- bd sync: 2026-01-29 12:43:27 (0439cb8a)
+- bd sync: 2026-01-29 12:36:05 (95e4206f)
+- **benchmarks**: update README with scenario/date filters (7f2b2ea6)
+- bd sync: 2026-01-29 10:22:35 (96d57e04)
+- bd sync: 2026-01-29 10:19:20 (0a7f8990)
+- bd sync: 2026-01-28 21:23:20 (66142eed)
+- bd sync: 2026-01-28 21:11:24 (90a7e340)
+- bd sync: 2026-01-28 21:10:22 (ab6eaa77)
+- bd sync: 2026-01-28 20:13:43 (3edb686a)
+- bd sync: 2026-01-28 19:53:22 (04871c29)
+- bd sync: 2026-01-28 19:36:43 (14861528)
+- bd sync: 2026-01-28 19:33:20 (a8091869)
+- bd sync: 2026-01-28 19:32:11 (1a796fe4)
+- bd sync: 2026-01-28 19:15:19 (fc233f1c)
+- bd sync: 2026-01-28 19:12:07 (462af7af)
+- bd sync: 2026-01-28 19:10:37 (9256c6b7)
+- bd sync: 2026-01-28 18:41:24 (63721d94)
+- bd sync: 2026-01-28 18:40:44 (a85f8f5f)
+- bd sync: 2026-01-28 18:22:35 (b8bfeedc)
+- bd sync: 2026-01-28 18:13:15 (5f3429c2)
+- bd sync: 2026-01-28 18:00:11 (ca931f56)
+- bd sync: 2026-01-28 17:58:43 (6af6985c)
+- bd sync: 2026-01-28 17:45:39 (96d98fba)
+- bd sync: 2026-01-28 15:56:32 (9ac3bbe6)
+- bd sync: 2026-01-28 15:42:54 (d5d3dba5)
+- bd sync: 2026-01-28 15:32:06 (2eeea3b0)
+- bd sync: 2026-01-28 14:42:57 (d22f12d7)
+- bd sync: 2026-01-28 14:42:45 (08af4676)
+- bd sync: 2026-01-28 14:31:01 (345b6ee1)
+- bd sync: 2026-01-28 14:17:49 (4ffc34a1)
+- bd sync: 2026-01-28 12:15:35 (e971294f)
+- bd sync: 2026-01-28 12:14:53 (9c262ab3)
+- bd sync: 2026-01-28 11:57:34 (ce56f63a)
+- bd sync: 2026-01-28 11:55:36 (d95a6cf4)
+
 ## [0.28.41] - 2026-01-27
 
 ### Added
