@@ -271,11 +271,6 @@ export function ClarifyingPanel({ courseId, onComplete, readOnly = false }: Clar
   // Calculate progress
   const totalQuestions = sortedQuestions.length
   const answeredCount = answeredQuestions.size
-
-  const criticalQuestions = sortedQuestions.filter((q) => q.priority === 'critical')
-  const criticalAnswered = criticalQuestions.filter((q) => answeredQuestions.has(q.id)).length
-  const allCriticalAnswered = criticalAnswered === criticalQuestions.length
-
   const isComplete = answeredCount === totalQuestions
 
   // Trigger confetti on 100% completion - only ONCE ever per course
@@ -587,13 +582,13 @@ export function ClarifyingPanel({ courseId, onComplete, readOnly = false }: Clar
                 }))}
                 onPrev={handlePrev}
                 onNext={handleNext}
-                canContinue={false}
                 onContinue={() => {}}
                 isProcessing={false}
+                isComplete={false}
                 hideContinueButton
               />
             ) : (
-              /* Active mode: show full navigation with continue button */
+              /* Active mode: show full navigation with continue button and skip option */
               <WizardNavigation
                 currentIndex={currentIndex}
                 totalQuestions={totalQuestions}
@@ -603,9 +598,14 @@ export function ClarifyingPanel({ courseId, onComplete, readOnly = false }: Clar
                 }))}
                 onPrev={handlePrev}
                 onNext={handleNext}
-                canContinue={allCriticalAnswered}
                 onContinue={handleContinue}
                 isProcessing={approveAndProceedMutation.isPending}
+                isComplete={isComplete}
+                canSkipCurrent={
+                  currentQuestion?.priority === 'nice_to_have' &&
+                  !answeredQuestions.has(currentQuestion?.id)
+                }
+                onSkip={() => currentQuestion && handleSkip(currentQuestion.id)}
               />
             )}
           </div>

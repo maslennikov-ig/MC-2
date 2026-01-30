@@ -119,7 +119,7 @@ const typeConfig: Record<QuestionType, TypeConfigItem> = {
 export function QuestionCard({
   question,
   onAnswer,
-  onSkip,
+  onSkip: _onSkip, // Skip is now handled in WizardNavigation, kept for API compatibility
   isAnswered,
   isProcessing = false,
   readOnly = false,
@@ -168,7 +168,6 @@ export function QuestionCard({
   const priorityConf = priorityConfig[question.priority]
   const typeConf = typeConfig[question.type]
   const TypeIcon = typeConf.icon
-  const canSkip = question.priority === 'nice_to_have' && onSkip
 
   // Check if confirm button should be enabled
   const hasSelection = (() => {
@@ -734,18 +733,6 @@ export function QuestionCard({
           >
             <X className="mr-1 h-4 w-4" />
             Отмена
-          </Button>
-        )}
-
-        {canSkip && !isEditing && (
-          <Button
-            size="sm"
-            variant="ghost"
-            onClick={() => onSkip(question.id)}
-            disabled={isProcessing}
-            className="py-3"
-          >
-            Пропустить
           </Button>
         )}
       </div>
