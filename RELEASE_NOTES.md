@@ -2,6 +2,43 @@
 
 _Released on 2025-12-26_
 
+## v0.28.45
+
+_Released on 2026-01-30_
+
+### ✨ New Features
+
+- **web**: Complete code review improvements for course data updates
+
+### 🔧 Improvements
+
+- **web**: Standardize logging and add structure change detection (L2, M3)
+
+### 🐛 Bug Fixes
+
+- **course-gen-platform**: Update 2 source file(s)
+- **CI/CD**: Reduce unit tests timeout to 5min
+- **CI/CD**: Add always() to downstream jobs for workflow-level cancellation
+- **web**: Address code review issues for course data update
+- **CI/CD**: Update test job dependencies to allow cancelled unit tests
+- **web**: UI now updates after course data changes (Stage 4/5)
+- **CI/CD**: Allow unit tests timeout in CI Success gate
+- **CI/CD**: Add continue-on-error for unit tests (hanging process issue)
+- **CI/CD**: Mock Redis in unit tests to prevent hanging
+- **CI/CD**: Remove Redis from unit tests
+- **CI/CD**: Fix poller tests and increase unit test timeout
+- **CI/CD**: Add teardown for unit tests to close Redis
+- **CI/CD**: Separate vitest config for unit tests
+- **CI/CD**: Run contract tests sequentially after unit tests
+- **CI/CD**: Use real secrets for contract and integration tests
+- **CI/CD**: Add env vars for contract and integration tests
+- **CI/CD**: Add Redis service for test jobs
+- **CI/CD**: Add course-gen-platform build before tests
+
+---
+
+_This release was automatically generated from 28 commits._
+
 ## v0.28.44
 
 _Released on 2026-01-30_

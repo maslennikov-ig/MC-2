@@ -7,6 +7,48 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.28.45] - 2026-01-30
+
+### Added
+
+- **web**: complete code review improvements for course data updates (19f811ea)
+
+### Changed
+
+- **web**: standardize logging and add structure change detection (L2, M3) (5497d018)
+
+### Fixed
+
+- **course-gen-platform**: update 2 source file(s) (0889ceab)
+- **ci**: reduce unit tests timeout to 5min (695d4f44)
+- **ci**: add always() to downstream jobs for workflow-level cancellation (0c25b405)
+- **web**: address code review issues for course data update (40b47496)
+- **ci**: update test job dependencies to allow cancelled unit tests (b6b3f3dd)
+- **web**: UI now updates after course data changes (Stage 4/5) (c6d2e939)
+- **ci**: allow unit tests timeout in CI Success gate (34209e43)
+- **ci**: add continue-on-error for unit tests (hanging process issue) (4d2776d9)
+- **ci**: mock Redis in unit tests to prevent hanging (388a9520)
+- **ci**: remove Redis from unit tests (bd8b84bf)
+- **ci**: fix poller tests and increase unit test timeout (d7e9cd77)
+- **ci**: add teardown for unit tests to close Redis (264b36dd)
+- **ci**: separate vitest config for unit tests (6fe0c30a)
+- **ci**: run contract tests sequentially after unit tests (3cb16ef7)
+- **ci**: use real secrets for contract and integration tests (246a264c)
+- **ci**: add env vars for contract and integration tests (97546e21)
+- **ci**: add Redis service for test jobs (a985fc93)
+- **ci**: add course-gen-platform build before tests (eb4cfdbc)
+
+### Other
+
+- bd sync: 2026-01-30 22:13:38 (97ece389)
+- bd sync: 2026-01-30 22:08:07 (f278483b)
+- bd sync: 2026-01-30 21:49:53 (c9e52250)
+- add code review report and plan for course data update fix (a7339372)
+- bd sync: 2026-01-30 21:18:25 (393b7f65)
+- Merge branch 'develop' (b6a7a5d6)
+- merge develop into master (a4cae6a3)
+- resolve merge conflict in UserTasks.md (afc69d13)
+
 ## [0.28.44] - 2026-01-30
 
 ### Security
