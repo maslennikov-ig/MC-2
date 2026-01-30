@@ -5,10 +5,9 @@
  * Runs after Budget Allocation, before Phase 1 (Classification).
  *
  * Key Features:
- * - Generates 3-7 context-aware questions with priorities
+ * - Generates 3-14 context-aware questions with priorities
  * - Provides suggested answers with rationale
  * - Stores questions in clarifying_questions table
- * - Supports 2-round iteration for refinement
  * - Integrates with Budget Allocator for condensed context
  *
  * Model: Configured via database (llm_model_config table, phase: stage_4_clarifying)
@@ -87,7 +86,7 @@ export type ClarifyingQuestion = z.infer<typeof ClarifyingQuestionSchema>;
  * LLM output schema for clarifying questions generation
  */
 export const ClarifyingOutputSchema = z.object({
-  questions: z.array(ClarifyingQuestionSchema).min(3).max(7),
+  questions: z.array(ClarifyingQuestionSchema).min(3).max(14),
 });
 
 export type ClarifyingOutput = z.infer<typeof ClarifyingOutputSchema>;
@@ -95,14 +94,6 @@ export type ClarifyingOutput = z.infer<typeof ClarifyingOutputSchema>;
 // ============================================================================
 // INPUT SCHEMA
 // ============================================================================
-
-/**
- * Previous answer schema for round 2
- */
-const PreviousAnswerSchema = z.object({
-  question_text: z.string().min(1),
-  user_answer: z.string().min(1),
-});
 
 /**
  * Course context schema
@@ -136,12 +127,6 @@ export const Phase05InputSchema = z.object({
 
   /** Language code (ISO 639-1) */
   language: z.string().min(2).max(5),
-
-  /** Iteration round (1 or 2, max 2 rounds allowed) */
-  iterationRound: z.union([z.literal(1), z.literal(2)]),
-
-  /** Previous answers from round 1 (only for round 2) */
-  previousAnswers: z.array(PreviousAnswerSchema).optional(),
 });
 
 export type Phase05Input = z.infer<typeof Phase05InputSchema>;
@@ -213,18 +198,10 @@ function buildCondensedContext(budgetAllocation: Stage4BudgetAllocation | null):
  * @returns Prompt messages for LLM
  */
 function buildClarifyingPrompt(input: Phase05Input): [SystemMessage, HumanMessage] {
-  const { courseContext, language, budgetAllocation, iterationRound, previousAnswers } = input;
+  const { courseContext, language, budgetAllocation } = input;
 
   // Build condensed context from budget allocation
   const condensedContext = buildCondensedContext(budgetAllocation);
-
-  // Build previous answers section (for round 2)
-  let previousAnswersText = '';
-  if (iterationRound === 2 && previousAnswers && previousAnswers.length > 0) {
-    previousAnswersText = previousAnswers
-      .map((ans, idx) => `Q${idx + 1}: ${ans.question_text}\nA: ${ans.user_answer}`)
-      .join('\n\n');
-  }
 
   // System message with role and constraints
   const systemMessage = new SystemMessage(
@@ -250,7 +227,7 @@ CRITICAL RULES:
   ]
 }
 
-3. Generate 3-7 questions total
+3. Generate 3-14 questions total
 4. QUESTION TYPES - choose the optimal type for each question:
    - "open": When answer requires free-form text (e.g., specific goals, unique requirements)
      * MUST mark exactly ONE answer as "is_recommended": true
@@ -294,10 +271,8 @@ Language: ${language.toUpperCase()}
 DOCUMENT CONTEXT (condensed):
 ${condensedContext}
 
-${previousAnswersText ? `PREVIOUS ROUND ANSWERS:\n${previousAnswersText}\n\n` : ''}
 TASK:
-Generate 3-7 clarifying questions that will help create a better course.
-${iterationRound === 2 ? 'Build on the answers from round 1 to ask more specific follow-up questions.' : ''}
+Generate 3-14 clarifying questions that will help create a better course.
 
 Output MUST be valid JSON with all text fields in ${language.toUpperCase()}.`
   );
@@ -360,7 +335,7 @@ function validateQuestionTypeSuggestions(question: ClarifyingQuestion): boolean 
  *
  * @param courseId - Course UUID
  * @param questions - Generated questions from LLM
- * @param iterationRound - Round number (1 or 2)
+ * @param iterationRound - Always 1 (round 2 removed)
  * @returns Promise<void>
  */
 async function storeQuestions(
@@ -432,7 +407,6 @@ async function storeQuestions(
  *   budgetAllocation: { ... },
  *   courseContext: { title: 'Python for Beginners', target_audience: 'beginner' },
  *   language: 'ru',
- *   iterationRound: 1,
  * });
  */
 export async function runPhase05Clarifying(rawInput: Phase05Input): Promise<ClarifyingOutput> {
@@ -448,13 +422,12 @@ export async function runPhase05Clarifying(rawInput: Phase05Input): Promise<Clar
   }
   const input = parseResult.data;
 
-  const { course_id: courseId, language, iterationRound } = input;
+  const { course_id: courseId, language } = input;
   const startTime = Date.now();
 
   const phaseLogger = logger.child({
     courseId,
     phase: 'phase_0.5_clarifying',
-    iterationRound,
   });
 
   phaseLogger.info('Starting Phase 0.5: Clarifying Questions');
@@ -513,7 +486,6 @@ export async function runPhase05Clarifying(rawInput: Phase05Input): Promise<Clar
       inputData: {
         title: input.courseContext.title,
         language,
-        iterationRound,
         documentCount: input.budgetAllocation?.documents.length ?? 0,
       },
       promptText,
@@ -572,7 +544,7 @@ export async function runPhase05Clarifying(rawInput: Phase05Input): Promise<Clar
     // =================================================================
     // STEP 5: Store questions in database
     // =================================================================
-    await storeQuestions(courseId, output.questions, iterationRound);
+    await storeQuestions(courseId, output.questions, 1);
 
     // =================================================================
     // STEP 6: Log final trace
