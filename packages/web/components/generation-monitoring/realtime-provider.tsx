@@ -267,18 +267,29 @@ export function GenerationRealtimeProvider({
             }
           }
 
-          // Dispatch event for any course data update (analysis_result, course_structure, etc.)
-          // This allows components to react to changes that aren't just status updates
-          window.dispatchEvent(
-            new CustomEvent('course-data-updated', {
-              detail: {
-                courseId,
-                updatedFields: Object.keys(payload.new || {}),
-                source: 'realtime'
-              },
-            })
-          );
-          log(' Dispatched course-data-updated event');
+          // Dispatch event for course data updates (analysis_result, course_structure, etc.)
+          // H1: Only dispatch if relevant fields changed (not just generation_status)
+          const updatedFields = Object.keys(payload.new || {});
+          const relevantFields = ['analysis_result', 'course_structure', 'visual_style', 'style'];
+          const hasRelevantChanges = updatedFields.some(f => relevantFields.includes(f));
+
+          if (hasRelevantChanges) {
+            // M1: Try-catch to prevent listener errors from breaking the provider
+            try {
+              window.dispatchEvent(
+                new CustomEvent('course-data-updated', {
+                  detail: {
+                    courseId,
+                    updatedFields,
+                    source: 'realtime'
+                  },
+                })
+              );
+              log(' Dispatched course-data-updated event for fields:', updatedFields.filter(f => relevantFields.includes(f)));
+            } catch (error) {
+              console.error('[RealtimeProvider] Failed to dispatch course-data-updated event:', error);
+            }
+          }
         }
       )
       .subscribe((status) => {
