@@ -31,6 +31,7 @@ import { cleanupCourseResources } from '../../../shared/cleanup';
 import { workerReadiness, getReadinessFromRedis } from '../../../orchestrator/worker-readiness';
 import * as path from 'path';
 import { validateLocale } from '@/shared/validation';
+import { logTrace } from '../../../shared/trace-logger';
 
 // Type aliases for Database tables
 type Course = Database['public']['Tables']['courses']['Row'];
@@ -98,10 +99,12 @@ export const lifecycleRouter = router({
 
       try {
         // T013: Verify course ownership and get organization tier
-        // NOTE: course_size is included to pass to Stage 4 job data (avoid race conditions)
+        // NOTE: All form fields included to pass to Stage 5 job data (frontend_parameters)
         const { data: course, error: courseError } = await supabase
           .from('courses')
-          .select('*, language, course_size, organization:organizations(tier)')
+          .select(
+            '*, language, course_size, course_description, estimated_lessons, estimated_sections, learning_outcomes, organization:organizations(tier)'
+          )
           .eq('id', courseId)
           .single();
 
@@ -239,17 +242,17 @@ export const lifecycleRouter = router({
         }
 
         // T015: Determine job type based on uploaded files
-        // Query all files with complete metadata for per-file job creation
-        const { data: uploadedFiles, error: filesError } = await supabase
+        // Query 1: Files with pending vector_status (need Stage 2 processing)
+        const { data: pendingFiles, error: pendingFilesError } = await supabase
           .from('file_catalog')
           .select('id, storage_path, mime_type')
           .eq('course_id', courseId)
-          .eq('vector_status', 'pending'); // Only process pending files
+          .eq('vector_status', 'pending');
 
-        if (filesError) {
+        if (pendingFilesError) {
           logger.error(
-            { requestId, courseId, error: filesError },
-            'Failed to check uploaded files'
+            { requestId, courseId, error: pendingFilesError },
+            'Failed to check pending files'
           );
           throw new TRPCError({
             code: 'INTERNAL_SERVER_ERROR',
@@ -257,22 +260,42 @@ export const lifecycleRouter = router({
           });
         }
 
-        const hasFiles = uploadedFiles && uploadedFiles.length > 0;
-        const jobType = hasFiles ? JobType.DOCUMENT_PROCESSING : JobType.STRUCTURE_ANALYSIS;
+        // Query 2: All files regardless of status (for Stage 3 decision)
+        // If all files are already indexed (deduplicated), we still need Stage 3 classification
+        const { data: allFiles, error: allFilesError } = await supabase
+          .from('file_catalog')
+          .select('id')
+          .eq('course_id', courseId);
+
+        if (allFilesError) {
+          logger.error({ requestId, courseId, error: allFilesError }, 'Failed to check all files');
+          throw new TRPCError({
+            code: 'INTERNAL_SERVER_ERROR',
+            message: 'Failed to fetch course files',
+          });
+        }
+
+        const hasPendingFiles = pendingFiles && pendingFiles.length > 0;
+        const hasAnyFiles = allFiles && allFiles.length > 0;
         const priority = TIER_PRIORITY[tier] || 1;
 
         logger.info(
           {
             requestId,
             courseId,
-            hasFiles,
-            jobType,
-            uploadedFilesCount: uploadedFiles?.length || 0,
+            hasPendingFiles,
+            hasAnyFiles,
+            pendingFilesCount: pendingFiles?.length || 0,
+            totalFilesCount: allFiles?.length || 0,
           },
-          'Determined job type'
+          'Determined generation path'
         );
 
         // T016: Build job data array for Transactional Outbox
+        // Three-path decision logic:
+        // 1. hasPendingFiles=true → Stage 2 (process documents)
+        // 2. hasPendingFiles=false && hasAnyFiles=true → Stage 3 (classify deduplicated docs)
+        // 3. hasAnyFiles=false → Stage 4 (no documents at all)
         let jobs: Array<{
           queue: string;
           data: Record<string, unknown>;
@@ -280,9 +303,9 @@ export const lifecycleRouter = router({
         }>;
         let initialState: string;
 
-        if (hasFiles) {
-          // Path 1: Document processing (hasFiles=true, start at Stage 2)
-          jobs = uploadedFiles.map(file => {
+        if (hasPendingFiles) {
+          // Path 1: Document processing (pending files need Stage 2 processing)
+          jobs = pendingFiles.map(file => {
             // Convert relative storage_path to absolute path
             // storage_path is relative to project root (e.g., "uploads/org-id/course-id/filename")
             // Use DOCLING_UPLOADS_BASE_PATH for Docker container compatibility
@@ -315,12 +338,54 @@ export const lifecycleRouter = router({
             {
               requestId,
               courseId,
-              fileCount: uploadedFiles.length,
+              fileCount: pendingFiles.length,
             },
             'Course generation path: document processing (Stage 2)'
           );
+        } else if (hasAnyFiles) {
+          // Path 2: All files already indexed (deduplicated) - skip to Stage 3 for classification
+          // Priority classification is per-course, so deduplicated docs still need classification
+          jobs = [
+            {
+              queue: JobType.DOCUMENT_CLASSIFICATION, // 'document_classification'
+              data: {
+                jobType: JobType.DOCUMENT_CLASSIFICATION,
+                organizationId: currentUser.organizationId,
+                courseId,
+                userId,
+                createdAt: new Date().toISOString(),
+                locale: validateLocale(course.language),
+              },
+              options: { priority },
+            },
+          ];
+          initialState = 'stage_3_init';
+
+          // Log trace for each deduplicated file to show Stage 2 was skipped
+          for (const file of allFiles) {
+            await logTrace({
+              courseId,
+              stage: 'stage_2',
+              phase: 'skip',
+              stepName: 'deduplicated',
+              inputData: {
+                fileId: file.id,
+                reason: 'already_indexed',
+              },
+              durationMs: 0,
+            });
+          }
+
+          logger.info(
+            {
+              requestId,
+              courseId,
+              fileCount: allFiles.length,
+            },
+            'Course generation path: classification only (Stage 3, all docs deduplicated/indexed)'
+          );
         } else {
-          // Path 2: Analysis-only (hasFiles=false, skip to Stage 4)
+          // Path 3: Analysis-only (no files at all, skip to Stage 4)
           // IMPORTANT: course_size is passed in job data to avoid race conditions
           // (see GTQ-6162: course_size may be updated async before generation starts)
           jobs = [
@@ -366,8 +431,9 @@ export const lifecycleRouter = router({
           initialState,
           data: {
             courseTitle: course.title,
-            fileCount: hasFiles ? uploadedFiles.length : 0,
-            hasFiles,
+            fileCount: allFiles?.length || 0,
+            hasFiles: hasAnyFiles,
+            hasPendingFiles,
           },
           jobs,
         });
@@ -675,6 +741,77 @@ export const lifecycleRouter = router({
           : [];
 
         // Step 5: Build GenerationJobInput
+        // Validate input lengths (frontend enforces these, backend logs violations)
+        const MAX_DESCRIPTION_LENGTH = 7000;
+        const MAX_LEARNING_OUTCOMES = 20;
+        const MAX_ESTIMATED_LESSONS = 200;
+        const MAX_ESTIMATED_SECTIONS = 50;
+
+        if (
+          course.course_description &&
+          course.course_description.length > MAX_DESCRIPTION_LENGTH
+        ) {
+          logger.warn(
+            { requestId, courseId, descriptionLength: course.course_description.length },
+            `Course description exceeds ${MAX_DESCRIPTION_LENGTH} chars (frontend validation bypassed?)`
+          );
+        }
+
+        // Parse learning_outcomes: can be JSON array string or newline-separated string
+        let parsedLearningOutcomes: string[] | undefined;
+        if (course.learning_outcomes) {
+          if (typeof course.learning_outcomes === 'string') {
+            // Try JSON parse first, then fallback to newline split
+            try {
+              parsedLearningOutcomes = JSON.parse(course.learning_outcomes);
+            } catch (parseError) {
+              logger.warn(
+                {
+                  requestId,
+                  courseId,
+                  error: parseError instanceof Error ? parseError.message : 'Unknown',
+                  rawValueLength: course.learning_outcomes.length,
+                },
+                'Failed to parse learning_outcomes as JSON, using newline fallback'
+              );
+              parsedLearningOutcomes = course.learning_outcomes
+                .split('\n')
+                .map((s: string) => s.trim())
+                .filter(Boolean);
+            }
+          } else if (Array.isArray(course.learning_outcomes)) {
+            parsedLearningOutcomes = course.learning_outcomes;
+          }
+        }
+
+        // Validate learning_outcomes count (frontend enforces limit, backend logs violations)
+        if (parsedLearningOutcomes && parsedLearningOutcomes.length > MAX_LEARNING_OUTCOMES) {
+          logger.warn(
+            { requestId, courseId, count: parsedLearningOutcomes.length },
+            `Learning outcomes exceed ${MAX_LEARNING_OUTCOMES} items (frontend validation bypassed?)`
+          );
+        }
+
+        // Validate estimated_lessons/sections bounds
+        if (
+          course.estimated_lessons &&
+          (course.estimated_lessons < 1 || course.estimated_lessons > MAX_ESTIMATED_LESSONS)
+        ) {
+          logger.warn(
+            { requestId, courseId, value: course.estimated_lessons },
+            `estimated_lessons out of recommended range (1-${MAX_ESTIMATED_LESSONS})`
+          );
+        }
+        if (
+          course.estimated_sections &&
+          (course.estimated_sections < 1 || course.estimated_sections > MAX_ESTIMATED_SECTIONS)
+        ) {
+          logger.warn(
+            { requestId, courseId, value: course.estimated_sections },
+            `estimated_sections out of recommended range (1-${MAX_ESTIMATED_SECTIONS})`
+          );
+        }
+
         const jobInput = {
           course_id: courseId,
           organization_id: course.organization_id,
@@ -687,13 +824,17 @@ export const lifecycleRouter = router({
             style: course.style && isValidStyle(course.style) ? course.style : DEFAULT_COURSE_STYLE,
             target_audience: course.target_audience ?? undefined,
             difficulty: course.difficulty ?? 'intermediate',
-            desired_lessons_count: (course.settings as unknown as CourseSettings)
-              ?.desired_lessons_count,
-            desired_modules_count: (course.settings as unknown as CourseSettings)
-              ?.desired_modules_count,
+            // User description for context (frontend enforces 5000 char limit)
+            description: course.course_description ?? undefined,
+            // NEW: Add course size preset
+            course_size: course.course_size ?? undefined,
+            // FIX: Read from courses table, not from settings
+            desired_lessons_count: course.estimated_lessons ?? undefined,
+            desired_modules_count: course.estimated_sections ?? undefined,
             lesson_duration_minutes: (course.settings as unknown as CourseSettings)
               ?.lesson_duration_minutes,
-            learning_outcomes: (course.settings as unknown as CourseSettings)?.learning_outcomes,
+            // FIX: Read from courses table with proper parsing
+            learning_outcomes: parsedLearningOutcomes,
           },
           vectorized_documents: hasVectorizedDocs,
           document_summaries: documentSummaries,

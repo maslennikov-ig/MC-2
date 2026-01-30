@@ -12,23 +12,23 @@ import { Target, BookOpen, Gauge, PenLine, LayoutGrid } from 'lucide-react'
 import { Card, CardContent } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { cn } from '@/lib/utils'
-import { GRAPH_TRANSLATIONS } from '@/lib/generation-graph/translations'
+import { useTranslations } from 'next-intl'
 import type { BlueprintPreviewProps } from '../types'
 
 export function BlueprintPreview({
   analysisResult,
   frontendParams,
-  locale = 'en',
+  locale: _locale = 'en',
 }: BlueprintPreviewProps) {
-  const tAnalysis = GRAPH_TRANSLATIONS.analysisResult
+  const t = useTranslations('generation.analysisResult')
 
-  // Get translated labels with fallbacks
-  const categoryLabel = tAnalysis?.category?.[locale] ?? 'Category'
-  const confidenceLabel = tAnalysis?.confidence?.[locale] ?? 'Confidence'
-  const lessonsLabel = tAnalysis?.totalLessons?.[locale] ?? 'Lessons'
-  const modulesLabel = tAnalysis?.totalSections?.[locale] ?? 'Modules'
-  const complexityLabel = tAnalysis?.complexity?.[locale] ?? 'Complexity'
-  const contentStyleLabel = tAnalysis?.contentStyle?.[locale] ?? 'Content Style'
+  // Get translated labels
+  const categoryLabel = t('category')
+  const confidenceLabel = t('confidence')
+  const lessonsLabel = t('totalLessons')
+  const modulesLabel = t('totalSections')
+  const complexityLabel = t('complexity')
+  // Note: contentStyle is not in analysisResult namespace, just display the raw value
 
   // Format confidence percentage
   const confidencePercent = Math.round(analysisResult.confidence * 100)
@@ -115,7 +115,9 @@ export function BlueprintPreview({
                 <PenLine className="h-3.5 w-3.5 text-orange-600 dark:text-orange-400" />
               </div>
               <div>
-                <div className="text-muted-foreground text-xs">{contentStyleLabel}</div>
+                <div className="text-muted-foreground text-xs">
+                  {_locale === 'ru' ? 'Стиль контента' : 'Content Style'}
+                </div>
                 <div className="text-sm font-medium capitalize">{analysisResult.contentStyle}</div>
               </div>
             </div>

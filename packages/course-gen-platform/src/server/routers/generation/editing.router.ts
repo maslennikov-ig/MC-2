@@ -14,6 +14,8 @@ import { elementCrudRouter } from './editing/element-crud.router';
 import { regenerationRouter } from './editing/regeneration.router';
 import { permissionsRouter } from './editing/permissions.router';
 import { editHistoryRouter } from './editing/edit-history.router';
+import { chatRouter } from './editing/chat.router';
+import { tokenEstimateRouter } from './editing/token-estimate.router';
 
 /**
  * Editing Router - Course content editing operations
@@ -25,6 +27,7 @@ import { editHistoryRouter } from './editing/edit-history.router';
  * - regenerateBlock: Regenerate a block (field) using AI with smart context routing
  * - getEditPermissions: Check if the current user can edit a specific course
  * - getEditHistory: Get edit history for a course (diff view)
+ * - chat: Conversational interface for course refinement/regeneration
  */
 export const editingRouter = router({
   ...fieldUpdateRouter,
@@ -32,4 +35,6 @@ export const editingRouter = router({
   ...regenerationRouter,
   ...permissionsRouter,
   ...editHistoryRouter,
+  ...chatRouter,
+  ...tokenEstimateRouter,
 });

@@ -27,7 +27,13 @@ export default function CourseViewerEnhanced({
   lessonContents,
   readOnly = false,
   initialLessonLabel,
+  orgSlug,
 }: CourseViewerProps) {
+  // Runtime validation: orgSlug is required (no fallback to old URL format)
+  if (!orgSlug) {
+    console.error('[CourseViewerEnhanced] orgSlug is required but missing')
+    throw new Error('Organization slug is required for course viewer')
+  }
   const {
     sections,
     lessons,
@@ -59,7 +65,7 @@ export default function CourseViewerEnhanced({
     remainingMinutes,
     toggleSection,
     markLessonComplete,
-  } = useViewerState(course, rawSections, rawLessons, initialLessonLabel)
+  } = useViewerState(course, orgSlug, rawSections, rawLessons, initialLessonLabel)
 
   // Manage enrichments with refetch capability
   const {
@@ -188,6 +194,8 @@ export default function CourseViewerEnhanced({
           completedCount={completedCount}
           totalLessons={totalLessons}
           remainingMinutes={remainingMinutes}
+          orgSlug={orgSlug}
+          readOnly={readOnly}
           onToggleSidebar={setSidebarOpen}
           onToggleMobileSidebar={setMobileSidebarOpen}
           onToggleSection={toggleSection}
@@ -211,6 +219,7 @@ export default function CourseViewerEnhanced({
             currentSection={currentSection}
             currentLesson={currentLesson}
             focusMode={focusMode}
+            orgSlug={orgSlug}
           />
           <Toolbar
             currentSection={currentSection}
@@ -225,6 +234,7 @@ export default function CourseViewerEnhanced({
             hasPrev={!!prevLesson}
             hasNext={!!nextLesson}
             readOnly={readOnly}
+            orgSlug={orgSlug}
             onToggleSidebar={() => setSidebarOpen(true)}
             onToggleMobileSidebar={() => setMobileSidebarOpen(true)}
             onToggleFocusMode={() => setFocusMode(!focusMode)}

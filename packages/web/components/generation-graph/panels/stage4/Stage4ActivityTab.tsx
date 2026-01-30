@@ -26,12 +26,12 @@ import {
   type LucideIcon,
 } from 'lucide-react';
 import { format } from 'date-fns';
-import { ru as ruLocale, enUS as enLocale } from 'date-fns/locale';
+import { ru as ruLocale } from 'date-fns/locale';
 import {
   useGenerationRealtime,
   type GenerationTrace,
 } from '@/components/generation-monitoring/realtime-provider';
-import { GRAPH_TRANSLATIONS } from '@/lib/generation-graph/translations';
+import { useTranslations } from 'next-intl';
 import type {
   Stage4ActivityTabProps,
   Stage4ActivityEvent,
@@ -134,16 +134,15 @@ function StatusIcon({ type }: { type: Stage4ActivityEvent['type'] }) {
  */
 interface ActivityEventRowProps {
   event: Stage4ActivityEvent;
-  locale: 'ru' | 'en';
   previousEventTime?: Date;
 }
 
 const ActivityEventRow = memo<ActivityEventRowProps>(function ActivityEventRow({
   event,
-  locale,
   previousEventTime,
 }) {
-  const dateLocale = locale === 'ru' ? ruLocale : enLocale;
+  // Use Russian locale for date formatting (project default)
+  const dateLocale = ruLocale;
 
   // Format timestamp
   const timeStr = format(new Date(event.timestamp), 'HH:mm:ss', { locale: dateLocale });
@@ -230,9 +229,9 @@ const ActivityEventRow = memo<ActivityEventRowProps>(function ActivityEventRow({
 export const Stage4ActivityTab = memo<Stage4ActivityTabProps>(function Stage4ActivityTab({
   nodeId,
   courseId: _courseId,
-  locale = 'ru',
+  locale: _locale = 'ru',
 }) {
-  const t = GRAPH_TRANSLATIONS.stage4 as Record<string, { ru: string; en: string }>;
+  const t = useTranslations('generation.stage4');
 
   // Get traces from realtime provider
   const { traces } = useGenerationRealtime();
@@ -240,7 +239,7 @@ export const Stage4ActivityTab = memo<Stage4ActivityTabProps>(function Stage4Act
   // Filter and transform traces to activity events
   const events = useMemo((): Stage4ActivityEvent[] => {
     if (!traces || traces.length === 0) {
-      return generateMockEvents(locale);
+      return generateMockEvents(t as TranslatorFn);
     }
 
     // Filter traces for this node/stage
@@ -261,7 +260,7 @@ export const Stage4ActivityTab = memo<Stage4ActivityTabProps>(function Stage4Act
     });
 
     if (relevantTraces.length === 0) {
-      return generateMockEvents(locale);
+      return generateMockEvents(t as TranslatorFn);
     }
 
     // Sort by timestamp ascending for proper delta calculation
@@ -281,7 +280,7 @@ export const Stage4ActivityTab = memo<Stage4ActivityTabProps>(function Stage4Act
         details: extractDetailsFromTrace(trace),
       };
     });
-  }, [traces, nodeId, locale]);
+  }, [traces, nodeId, t]);
 
   // Group events by phase
   const eventsByPhase = useMemo(() => {
@@ -323,8 +322,8 @@ export const Stage4ActivityTab = memo<Stage4ActivityTabProps>(function Stage4Act
 
   // Translation helper for phase labels
   const getPhaseLabel = (phase: ActivityPhaseGroup): string => {
-    const labelKey = `phase${phase.charAt(0).toUpperCase() + phase.slice(1)}Group` as keyof typeof t;
-    return t[labelKey]?.[locale] ?? phase;
+    const labelKey = `phase${phase.charAt(0).toUpperCase() + phase.slice(1)}Group`;
+    return (t as TranslatorFn)(labelKey);
   };
 
   // Empty state
@@ -332,9 +331,7 @@ export const Stage4ActivityTab = memo<Stage4ActivityTabProps>(function Stage4Act
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center">
         <Sparkles className="h-12 w-12 text-violet-300 dark:text-violet-700 mb-4" aria-hidden="true" />
-        <p className="text-sm text-muted-foreground">
-          {t.emptyActivity?.[locale] ?? 'No events recorded yet'}
-        </p>
+        <p className="text-sm text-muted-foreground">{t('emptyActivity')}</p>
       </div>
     );
   }
@@ -373,7 +370,7 @@ export const Stage4ActivityTab = memo<Stage4ActivityTabProps>(function Stage4Act
                           variant="outline"
                           className="text-xs text-violet-600 dark:text-violet-400 border-violet-300 dark:border-violet-700"
                         >
-                          {locale === 'ru' ? 'Решение' : 'Decision'}
+                          {t('decisionBadge')}
                         </Badge>
                       )}
                       <Badge variant="secondary" className="text-xs">
@@ -389,14 +386,13 @@ export const Stage4ActivityTab = memo<Stage4ActivityTabProps>(function Stage4Act
                         <ActivityEventRow
                           key={event.id}
                           event={event}
-                          locale={locale}
                           previousEventTime={index > 0 ? phaseEvents[index - 1].timestamp : undefined}
                         />
                       ))}
                     </div>
                   ) : (
                     <p className="text-sm text-muted-foreground text-center py-4">
-                      {t.noEventsInPhase?.[locale] ?? 'No events in this phase'}
+                      {t('noEventsInPhase')}
                     </p>
                   )}
                 </AccordionContent>
@@ -544,12 +540,14 @@ function extractDetailsFromTrace(trace: GenerationTrace): Record<string, unknown
   return Object.keys(details).length > 0 ? details : undefined;
 }
 
+/** Translation function type for helper functions */
+type TranslatorFn = (key: string) => string;
+
 /**
  * Generate mock events for demo/empty state
  */
-function generateMockEvents(locale: 'ru' | 'en'): Stage4ActivityEvent[] {
+function generateMockEvents(t: TranslatorFn): Stage4ActivityEvent[] {
   const now = new Date();
-  const t = GRAPH_TRANSLATIONS.stage4 as Record<string, { ru: string; en: string }>;
 
   return [
     {
@@ -557,7 +555,7 @@ function generateMockEvents(locale: 'ru' | 'en'): Stage4ActivityEvent[] {
       timestamp: new Date(now.getTime() - 10000),
       actor: 'system',
       type: 'success',
-      message: locale === 'ru' ? 'Входные данные загружены' : 'Input data loaded',
+      message: t('mockInputLoaded'),
       phase: 'preparation',
     },
     {
@@ -565,11 +563,7 @@ function generateMockEvents(locale: 'ru' | 'en'): Stage4ActivityEvent[] {
       timestamp: new Date(now.getTime() - 8000),
       actor: 'ai',
       type: 'decision',
-      message:
-        t.insightCategorySelected?.[locale]
-          ?.replace('{category}', locale === 'ru' ? 'Профессиональный' : 'Professional')
-          .replace('{confidence}', '92') ??
-        'Category: Professional (92%)',
+      message: t('mockCategoryDecision'),
       phase: 'classification',
       details: { tokens: 2450 },
     },
@@ -578,10 +572,7 @@ function generateMockEvents(locale: 'ru' | 'en'): Stage4ActivityEvent[] {
       timestamp: new Date(now.getTime() - 6000),
       actor: 'ai',
       type: 'decision',
-      message:
-        t.insightStructureRecommended?.[locale]
-          ?.replace('{sections}', '4')
-          .replace('{lessons}', '12') ?? 'Recommended: 4 modules, 12 lessons',
+      message: t('mockStructureDecision'),
       phase: 'planning',
       details: { tokens: 1850 },
     },
@@ -590,7 +581,7 @@ function generateMockEvents(locale: 'ru' | 'en'): Stage4ActivityEvent[] {
       timestamp: new Date(now.getTime() - 4000),
       actor: 'ai',
       type: 'success',
-      message: locale === 'ru' ? 'Ключевые концепции извлечены' : 'Key concepts extracted',
+      message: t('mockConceptsExtracted'),
       phase: 'synthesis',
     },
     {
@@ -598,7 +589,7 @@ function generateMockEvents(locale: 'ru' | 'en'): Stage4ActivityEvent[] {
       timestamp: new Date(now.getTime() - 2000),
       actor: 'system',
       type: 'success',
-      message: locale === 'ru' ? 'RAG-связи установлены' : 'RAG connections established',
+      message: t('mockRagConnections'),
       phase: 'mapping',
     },
   ];

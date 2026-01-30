@@ -321,6 +321,18 @@ export const Phase2InputSchema = z.object({
 
   /** Learning outcomes (user-specified goals) */
   learning_outcomes: z.union([z.string(), z.array(z.string())]).optional(),
+
+  /** Clarifying answers from Phase 0.5 */
+  clarifying_answers: z
+    .array(
+      z.object({
+        question: z.string(),
+        answer: z.string(),
+        priority: z.string(),
+        category: z.string().nullable(),
+      })
+    )
+    .optional(),
 });
 
 /**

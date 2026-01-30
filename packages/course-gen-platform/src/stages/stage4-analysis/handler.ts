@@ -23,18 +23,32 @@ import { getCourseSizePreset, type CourseSize } from '@megacampus/shared-types';
 import logger from '../../shared/logger';
 import { getSupabaseAdmin } from '../../shared/supabase/admin';
 import { runAnalysisOrchestration } from './orchestrator';
-import { generationLockService } from '@/shared/locks';
+import { acquireGenerationLock } from '@/shared/locks';
 import { generateVisualStyle } from './utils/visual-style-generator';
 import { handleStageCompletion } from '../../shared/auto-approval';
 import { notifyStageComplete, notifyCourseError } from '../../shared/notifications';
 import { checkPauseAndDelay } from '../../shared/pause-check';
+import {
+  ClarifyingQuestionsInterrupt,
+  BarrierFailedError,
+  MinimumLessonsNotMetError,
+  LLMError,
+  PipelineError,
+  isPipelineInterrupt,
+  classifyPipelineError,
+} from '@/shared/errors';
 
 /**
  * Error details for STRUCTURE_ANALYSIS jobs
  */
 export interface AnalysisErrorDetails {
   /** Error code for classification */
-  code: 'BARRIER_FAILED' | 'MINIMUM_LESSONS_NOT_MET' | 'LLM_ERROR' | 'UNKNOWN';
+  code:
+    | 'AWAITING_CLARIFYING_ANSWERS'
+    | 'BARRIER_FAILED'
+    | 'MINIMUM_LESSONS_NOT_MET'
+    | 'LLM_ERROR'
+    | 'UNKNOWN';
 
   /** Human-readable error message */
   message: string;
@@ -88,6 +102,7 @@ export interface StructureAnalysisJobResult {
  * Used for monitoring, alerting, and retry decisions.
  *
  * Error codes:
+ * - AWAITING_CLARIFYING_ANSWERS: Clarifying questions pending (special - not a real error)
  * - BARRIER_FAILED: Stage 3 document processing not complete
  * - MINIMUM_LESSONS_NOT_MET: Topic too narrow (<10 lessons estimated)
  * - LLM_ERROR: LLM processing failure (API error, timeout, etc.)
@@ -98,8 +113,36 @@ export interface StructureAnalysisJobResult {
  */
 function classifyAnalysisError(
   error: Error | string
-): 'BARRIER_FAILED' | 'MINIMUM_LESSONS_NOT_MET' | 'LLM_ERROR' | 'UNKNOWN' {
+):
+  | 'AWAITING_CLARIFYING_ANSWERS'
+  | 'BARRIER_FAILED'
+  | 'MINIMUM_LESSONS_NOT_MET'
+  | 'LLM_ERROR'
+  | 'UNKNOWN' {
+  // PRIORITY 1: instanceof checks for PipelineError (type-safe, O(1))
+  if (error instanceof ClarifyingQuestionsInterrupt) {
+    return 'AWAITING_CLARIFYING_ANSWERS';
+  }
+  if (error instanceof BarrierFailedError) {
+    return 'BARRIER_FAILED';
+  }
+  if (error instanceof MinimumLessonsNotMetError) {
+    return 'MINIMUM_LESSONS_NOT_MET';
+  }
+  if (error instanceof LLMError) {
+    return 'LLM_ERROR';
+  }
+  if (error instanceof PipelineError) {
+    return classifyPipelineError(error) as any; // Type-safe classification
+  }
+
+  // PRIORITY 2: string matching fallback for legacy errors
   const errorMessage = error instanceof Error ? error.message : String(error);
+
+  // Special case: clarifying questions pending (not a real error)
+  if (errorMessage.includes('AWAITING_CLARIFYING_ANSWERS')) {
+    return 'AWAITING_CLARIFYING_ANSWERS';
+  }
 
   if (errorMessage.includes('BARRIER_FAILED') || errorMessage.includes('Stage 3 barrier')) {
     return 'BARRIER_FAILED';
@@ -116,7 +159,9 @@ function classifyAnalysisError(
     errorMessage.includes('LLM_ERROR') ||
     errorMessage.includes('OpenRouter') ||
     errorMessage.includes('rate limit') ||
-    errorMessage.includes('API error')
+    errorMessage.includes('API error') ||
+    errorMessage.includes('aborted') ||
+    errorMessage.includes('AbortError')
   ) {
     return 'LLM_ERROR';
   }
@@ -206,32 +251,12 @@ class Stage4AnalysisHandler {
     // Check if generation is paused before starting work
     await checkPauseAndDelay(job, course_id, token);
 
-    // Acquire generation lock (FR-037: Prevent concurrent generation)
-    const lockId = `stage-4-${job.id || Date.now()}`;
-    const lockResult = await generationLockService.acquireLock(course_id, lockId);
-    if (!lockResult.acquired) {
-      logger.warn(
-        { courseId: course_id, reason: lockResult.reason },
-        'Failed to acquire generation lock'
-      );
-      throw new Error(`Course ${course_id} is already being processed: ${lockResult.reason}`);
-    }
-
-    // Set up heartbeat to extend lock every 2 minutes
-    const heartbeatInterval = setInterval(() => {
-      void (async () => {
-        try {
-          const extended = await generationLockService.extendLock(course_id, lockId);
-          if (!extended) {
-            logger.warn({ courseId: course_id, lockId }, 'Heartbeat: lock extension failed');
-          } else {
-            logger.debug({ courseId: course_id, lockId }, 'Heartbeat: lock extended');
-          }
-        } catch (err) {
-          logger.error({ courseId: course_id, lockId, error: err }, 'Heartbeat error');
-        }
-      })();
-    }, 120000); // Every 2 minutes
+    // Acquire generation lock with heartbeat (FR-037: Prevent concurrent generation)
+    const lockGuard = await acquireGenerationLock(
+      course_id,
+      `stage-4-${job.id || Date.now()}`,
+      logger
+    );
 
     try {
       // Layer 3: Worker validation and fallback initialization for Stage 4
@@ -520,7 +545,11 @@ class Stage4AnalysisHandler {
         }
 
         const currentStatus = currentCourse.generation_status;
-        const validStage4ProgressStates = ['stage_4_init', 'stage_4_analyzing'];
+        const validStage4ProgressStates = [
+          'stage_4_init',
+          'stage_4_clarifying',
+          'stage_4_analyzing',
+        ];
 
         // Only perform status initialization if NOT already in Stage 4 progression
         if (!validStage4ProgressStates.includes(currentStatus as string)) {
@@ -575,6 +604,57 @@ class Stage4AnalysisHandler {
           // Ensure we're in analyzing state (idempotent - only transitions if needed)
           if (currentStatus === 'stage_4_init') {
             jobLogger.info('Transitioning from stage_4_init to stage_4_analyzing');
+
+            const { error: statusAnalyzeError } = await supabaseAdmin
+              .from('courses')
+              .update({
+                generation_status: 'stage_4_analyzing' as const,
+                updated_at: new Date().toISOString(),
+              })
+              .eq('id', course_id)
+              .eq('organization_id', organization_id);
+
+            if (statusAnalyzeError) {
+              throw new Error(
+                `Failed to update status to stage_4_analyzing: ${statusAnalyzeError.message}`
+              );
+            }
+          } else if (currentStatus === 'stage_4_clarifying') {
+            // Check if user has answered critical/important questions
+            jobLogger.info('Status is stage_4_clarifying - checking if answers are complete');
+
+            const { getPendingQuestions } = await import('./phases/phase-0.5-clarifying');
+            const pendingQuestions = await getPendingQuestions(course_id);
+
+            const criticalPending = pendingQuestions.filter(
+              q => q.question_priority === 'critical' || q.question_priority === 'important'
+            );
+
+            if (criticalPending.length > 0) {
+              jobLogger.info(
+                {
+                  criticalPendingCount: criticalPending.length,
+                  totalPendingCount: pendingQuestions.length,
+                },
+                'Critical/important questions still pending - aborting job (will retry when answered)'
+              );
+              throw new Error(
+                `AWAITING_CLARIFYING_ANSWERS: ${criticalPending.length} critical/important questions pending`,
+                {
+                  cause: {
+                    code: 'QUESTIONS_PENDING',
+                    criticalCount: criticalPending.length,
+                    totalCount: pendingQuestions.length,
+                    message: 'Please answer the critical and important questions to continue',
+                  },
+                }
+              );
+            }
+
+            // All critical/important questions answered - transition to analyzing
+            jobLogger.info(
+              'All critical/important questions answered - transitioning to analyzing'
+            );
 
             const { error: statusAnalyzeError } = await supabaseAdmin
               .from('courses')
@@ -693,11 +773,8 @@ class Stage4AnalysisHandler {
           'Analysis result stored successfully in courses.analysis_result'
         );
 
-        // CRITICAL: Release lock BEFORE auto-approval to allow Stage 5 to acquire it
-        // Without this, Stage 5 job would fail with "Lock held by stage-4-xxx"
-        clearInterval(heartbeatInterval);
-        await generationLockService.releaseLock(course_id, lockId);
-        jobLogger.debug({ courseId: course_id, lockId }, 'Released lock early for auto-approval');
+        // Clear heartbeat - lock will be released in finally block
+        clearInterval(lockGuard.heartbeatInterval);
 
         // Handle stage completion separately (auto-approve if automatic mode)
         try {
@@ -770,15 +847,25 @@ class Stage4AnalysisHandler {
         // =================================================================
         const totalDurationMs = Date.now() - startTime;
 
-        jobLogger.error(
-          {
-            error: error instanceof Error ? error.message : String(error),
-            stack: error instanceof Error ? error.stack : undefined,
-            duration_ms: totalDurationMs,
-            attemptsMade: job.attemptsMade,
-          },
-          'Stage 4 analysis job failed'
-        );
+        // CRITICAL: Check for pipeline interrupt BEFORE logging as ERROR
+        if (isPipelineInterrupt(error)) {
+          jobLogger.info(
+            { errorCode: error.code, courseId: course_id },
+            'Pipeline paused (not an error)'
+          );
+          // Continue to special handling below (AWAITING_CLARIFYING_ANSWERS)
+        } else {
+          // Real error - log at ERROR level
+          jobLogger.error(
+            {
+              error: error instanceof Error ? error.message : String(error),
+              stack: error instanceof Error ? error.stack : undefined,
+              duration_ms: totalDurationMs,
+              attemptsMade: job.attemptsMade,
+            },
+            'Stage 4 analysis job failed'
+          );
+        }
 
         // Classify error for monitoring and retry decisions
         const errorCode = classifyAnalysisError(error instanceof Error ? error : String(error));
@@ -810,6 +897,31 @@ class Stage4AnalysisHandler {
           } else if (error.message.includes('Phase 5')) {
             phase = 'final_assembly';
           }
+        }
+
+        // Special handling for clarifying questions pause (not an error)
+        if (errorCode === 'AWAITING_CLARIFYING_ANSWERS') {
+          jobLogger.info(
+            {
+              errorCode,
+              phase: 'clarifying_questions',
+            },
+            'Job paused awaiting clarifying answers - not an error, will resume when user answers'
+          );
+
+          // CRITICAL: Return success (don't throw) to prevent BullMQ retry
+          // Status already set to stage_4_clarifying by orchestrator
+          // Job will be re-queued when user answers questions via resumeFromClarifying
+          return {
+            success: true,
+            message: 'Paused for clarifying questions - awaiting user input',
+            course_id,
+            metadata: {
+              total_duration_ms: totalDurationMs,
+              retry_count: job.attemptsMade,
+              completed_at: new Date().toISOString(),
+            },
+          };
         }
 
         // Log permanent errors (non-retriable)
@@ -892,9 +1004,8 @@ class Stage4AnalysisHandler {
         throw error;
       }
     } finally {
-      clearInterval(heartbeatInterval); // Clear heartbeat
       // Release generation lock (FR-037: always release in finally)
-      await generationLockService.releaseLock(course_id, lockId);
+      await lockGuard.release();
     }
   }
 }

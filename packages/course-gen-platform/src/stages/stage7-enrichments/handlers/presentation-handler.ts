@@ -14,13 +14,9 @@ import { logger } from '@/shared/logger';
 import { llmClient } from '@/shared/llm/client';
 import { resolveModelWithFallback } from '@/shared/llm/model-config-service';
 import type { EnrichmentHandler } from '../services/enrichment-router';
-import type {
-  EnrichmentHandlerInput,
-  DraftResult,
-  GenerateResult,
-} from '../types';
+import type { EnrichmentHandlerInput, DraftResult, GenerateResult } from '../types';
 import type { PresentationEnrichmentContent, EnrichmentMetadata } from '@megacampus/shared-types';
-import { DEFAULT_MODEL_ID } from '@megacampus/shared-types';
+import { DEFAULT_MODEL_ID, getStylePrompt } from '@megacampus/shared-types';
 import {
   buildPresentationDraftSystemPrompt,
   buildPresentationDraftUserMessage,
@@ -95,7 +91,7 @@ function extractLearningObjectives(lessonContent: string | null): string[] {
     // Extract bullet points
     const bullets = objectivesText.match(/[-*]\s+(.+)/g);
     if (bullets && bullets.length > 0) {
-      return bullets.map((b) => b.replace(/^[-*]\s+/, '').trim()).slice(0, 5);
+      return bullets.map(b => b.replace(/^[-*]\s+/, '').trim()).slice(0, 5);
     }
   }
 
@@ -103,8 +99,8 @@ function extractLearningObjectives(lessonContent: string | null): string[] {
   const sections = lessonContent.match(/^## .+$/gm);
   if (sections && sections.length > 0) {
     return sections
-      .filter((s) => !s.match(/introduction|summary|conclusion/i))
-      .map((s) => `Learn about ${s.replace(/^## /, '')}`)
+      .filter(s => !s.match(/introduction|summary|conclusion/i))
+      .map(s => `Learn about ${s.replace(/^## /, '')}`)
       .slice(0, 5);
   }
 
@@ -134,10 +130,7 @@ function parseDraftResponse(content: string): PresentationDraft | null {
       return result.data;
     }
 
-    logger.warn(
-      { errors: result.error.errors },
-      'Presentation draft validation failed'
-    );
+    logger.warn({ errors: result.error.errors }, 'Presentation draft validation failed');
     return null;
   } catch (error) {
     logger.warn(
@@ -171,10 +164,7 @@ function parseFinalResponse(content: string): PresentationOutput | null {
       return result.data;
     }
 
-    logger.warn(
-      { errors: result.error.errors },
-      'Presentation final output validation failed'
-    );
+    logger.warn({ errors: result.error.errors }, 'Presentation final output validation failed');
     return null;
   } catch (error) {
     logger.warn(
@@ -238,6 +228,7 @@ async function generateDraft(input: EnrichmentHandlerInput): Promise<DraftResult
     lessonObjectives,
     language: (enrichmentContext.course.language || 'en') as 'en' | 'ru',
     settings: presentationSettings,
+    stylePrompt: getStylePrompt(enrichmentContext.course.style),
   });
 
   // Get model with optimized resolution: settings → database → fallback
@@ -246,7 +237,10 @@ async function generateDraft(input: EnrichmentHandlerInput): Promise<DraftResult
     phaseName: 'stage_7_presentation',
     courseId: enrichmentContext.course.id,
     fallbackModel: FALLBACK_MODEL,
-    logContext: { enrichmentId: enrichmentContext.enrichment.id, lessonId: enrichmentContext.lesson.id },
+    logContext: {
+      enrichmentId: enrichmentContext.enrichment.id,
+      lessonId: enrichmentContext.lesson.id,
+    },
   });
 
   try {
@@ -408,6 +402,7 @@ async function generateFinal(
       lessonObjectives,
       language: (enrichmentContext.course.language || 'en') as 'en' | 'ru',
       settings: presentationSettings,
+      stylePrompt: getStylePrompt(enrichmentContext.course.style),
     },
     draftOutput
   );
@@ -456,7 +451,7 @@ async function generateFinal(
       additional_info: {
         slide_count: content.total_slides,
         theme: content.theme,
-        has_speaker_notes: content.slides.some((s) => s.speaker_notes),
+        has_speaker_notes: content.slides.some(s => s.speaker_notes),
         estimated_duration_minutes: presentationOutput.metadata.estimated_duration_minutes,
       },
     };

@@ -1,9 +1,9 @@
 import React from 'react';
 import { Wifi, WifiOff } from 'lucide-react';
-import { useTranslation } from '@/lib/generation-graph/useTranslation';
+import { useTranslations } from 'next-intl';
 
 export const ConnectionStatus = ({ isConnected }: { isConnected: boolean }) => {
-    const { t } = useTranslation();
+    const t = useTranslations('generation');
     
     if (isConnected) {
         return (

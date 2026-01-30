@@ -28,10 +28,11 @@ Variables prefixed with `NEXT_PUBLIC_` are embedded into the JavaScript bundle a
 
 These are read at runtime and can be changed without rebuilding:
 
-| Variable                    | Description                    | Default           |
-| --------------------------- | ------------------------------ | ----------------- |
-| `COURSEGEN_BACKEND_URL`     | API URL for server-side calls  | `http://api:4000` |
-| `SUPABASE_SERVICE_ROLE_KEY` | Service role key (server only) | Required          |
+| Variable                    | Description                          | Default             |
+| --------------------------- | ------------------------------------ | ------------------- |
+| `COURSEGEN_BACKEND_URL`     | API URL for server-side calls        | `http://api:4000`   |
+| `SUPABASE_SERVICE_ROLE_KEY` | Service role key (server only)       | Required            |
+| `BULLMQ_QUEUE_NAME`         | Queue name for environment isolation | `course-generation` |
 
 ## Blue/Green Deployment
 
@@ -85,6 +86,55 @@ bash scripts/deploy_blue_green.sh production latest
 
 # Rollback to previous color
 bash scripts/rollback_blue_green.sh
+```
+
+## Docling MCP Image
+
+**IMPORTANT:** The `docling-mcp` image is NOT built in CI/CD — it's too large (~8GB with PyTorch/CUDA).
+
+### Image Details
+
+| Property      | Value                                              |
+| ------------- | -------------------------------------------------- |
+| Image name    | `ghcr.io/maslennikov-ig/mc-2/docling-mcp:latest`   |
+| Size          | ~8GB                                               |
+| Build context | `packages/course-gen-platform/docker/docling-mcp/` |
+| Pull policy   | `if_not_present` (never auto-pull)                 |
+
+### Manual Build (on server)
+
+```bash
+cd /opt/megacampus
+docker build -t ghcr.io/maslennikov-ig/mc-2/docling-mcp:latest \
+  -f packages/course-gen-platform/docker/docling-mcp/Dockerfile .
+```
+
+### If Image Missing After Cleanup
+
+If `docker image prune -a` removes the docling image:
+
+```bash
+# Option 1: Retag from old name (if exists)
+docker tag ghcr.io/maslennikov-ig/megacampusai/docling-mcp:latest \
+  ghcr.io/maslennikov-ig/mc-2/docling-mcp:latest
+
+# Option 2: Rebuild (takes ~30 min)
+cd /opt/megacampus
+docker build -t ghcr.io/maslennikov-ig/mc-2/docling-mcp:latest \
+  -f packages/course-gen-platform/docker/docling-mcp/Dockerfile .
+```
+
+### Protect from Cleanup
+
+The image is protected by `pull_policy: if_not_present` in `docker-compose.infra.yml`.
+However, `docker image prune -a` removes ALL unused images. To prevent this:
+
+```bash
+# Use selective prune (dangling only, not -a)
+docker image prune -f
+
+# Or exclude docling when using -a
+docker image prune -a --filter "label!=docling"
 ```
 
 ## Rollback
@@ -170,6 +220,85 @@ curl -f http://localhost:3002
 # Check api
 curl -f http://localhost:4001/health
 curl -f http://localhost:4002/health
+```
+
+## Local Development
+
+When running locally with **shared Supabase** (cloud), you must configure queue isolation to prevent staging from processing your jobs.
+
+### Problem
+
+- Local dev and staging share the same Supabase database
+- Staging server runs 24/7 with its own outbox processor
+- Without queue isolation, staging's outbox processor picks up your local jobs
+
+### Solution
+
+Add to `packages/course-gen-platform/.env`:
+
+```bash
+# Local development queue isolation
+BULLMQ_QUEUE_NAME=course-generation-local
+```
+
+This ensures:
+
+1. Local outbox processor only processes jobs with `target_queue = 'course-generation-local'`
+2. Local FSM creates outbox entries with this `target_queue`
+3. Staging ignores your local jobs (it filters by `course-generation`)
+
+### If Jobs Were Already Created
+
+If you started generation before configuring queue isolation:
+
+```sql
+-- Reset jobs to be picked up by local processor
+UPDATE job_outbox
+SET processed_at = NULL, target_queue = 'course-generation-local'
+WHERE entity_id = '<course-id>';
+
+-- Reset course status
+UPDATE courses
+SET generation_status = 'stage_2_init'
+WHERE id = '<course-id>';
+```
+
+Then restart local backend/worker to apply new `BULLMQ_QUEUE_NAME`.
+
+---
+
+## Dev Environment (dev.ai.megacampus.ru)
+
+Dev environment runs alongside staging on the same server with isolated resources.
+
+### Key Differences from Staging
+
+| Resource      | Staging                             | Dev                     |
+| ------------- | ----------------------------------- | ----------------------- |
+| Uploads dir   | `./data/uploads`                    | `./data/uploads-dev`    |
+| BullMQ queues | `course-generation`                 | `course-generation-dev` |
+| Ports         | 3001/4001 (blue), 3002/4002 (green) | 3010/4010               |
+
+### Shared Infrastructure Requirements
+
+**IMPORTANT:** `docling-mcp-internal` in `docker-compose.infra.yml` must mount BOTH directories:
+
+```yaml
+volumes:
+  - ./data/uploads:/app/uploads:ro
+  - ./data/uploads-dev:/app/uploads-dev:ro # Required for dev!
+```
+
+Without `uploads-dev` mount, document processing fails with "File not found" errors.
+
+### Deploying Dev Changes
+
+```bash
+# Dev auto-deploys on push to develop
+git push  # → dev.ai.megacampus.ru
+
+# Manual restart if needed
+ssh megacampus-prod "cd /opt/megacampus && docker compose -f docker-compose.dev.yml up -d"
 ```
 
 ## Nginx Configuration

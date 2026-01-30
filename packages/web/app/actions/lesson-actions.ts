@@ -1,32 +1,27 @@
-'use server';
+'use server'
 
-import { getBackendAuthHeaders, TRPC_URL } from '@/lib/auth';
-import { extractApiError } from '@/lib/api-error-handler';
+import { getBackendAuthHeaders, TRPC_URL } from '@/lib/auth'
+import { extractApiError } from '@/lib/api-error-handler'
 
 /**
  * Approve a lesson after review
  * Connects to trpc.lessonContent.approveLesson
  */
-export async function approveLesson(
-  courseId: string,
-  lessonId: string,
-  signal?: AbortSignal
-) {
-  const headers = await getBackendAuthHeaders();
+export async function approveLesson(courseId: string, lessonId: string) {
+  const headers = await getBackendAuthHeaders()
 
   const response = await fetch(`${TRPC_URL}/lessonContent.approveLesson`, {
     method: 'POST',
     headers,
     body: JSON.stringify({ courseId, lessonId }),
-    signal,
-  });
+  })
 
   if (!response.ok) {
-    await extractApiError(response, 'Failed to approve lesson');
+    await extractApiError(response, 'Failed to approve lesson')
   }
 
-  const data = await response.json();
-  return data?.result?.data || data;
+  const data = await response.json()
+  return data?.result?.data || data
 }
 
 /**
@@ -36,51 +31,43 @@ export async function approveLesson(
 export async function updateLessonContent(
   courseId: string,
   lessonId: string,
-  content: Record<string, unknown>,
-  signal?: AbortSignal
+  content: Record<string, unknown>
 ) {
-  const headers = await getBackendAuthHeaders();
+  const headers = await getBackendAuthHeaders()
 
   const response = await fetch(`${TRPC_URL}/lessonContent.updateLessonContent`, {
     method: 'POST',
     headers,
     body: JSON.stringify({ courseId, lessonId, content }),
-    signal,
-  });
+  })
 
   if (!response.ok) {
-    await extractApiError(response, 'Failed to update lesson content');
+    await extractApiError(response, 'Failed to update lesson content')
   }
 
-  const data = await response.json();
-  return data?.result?.data || data;
+  const data = await response.json()
+  return data?.result?.data || data
 }
 
 /**
  * Regenerate a lesson (uses existing retryLesson procedure)
  * Connects to trpc.lessonContent.retryLesson
  */
-export async function regenerateLesson(
-  courseId: string,
-  lessonId: string,
-  lessonSpec: unknown,
-  signal?: AbortSignal
-) {
-  const headers = await getBackendAuthHeaders();
+export async function regenerateLesson(courseId: string, lessonId: string, lessonSpec: unknown) {
+  const headers = await getBackendAuthHeaders()
 
   const response = await fetch(`${TRPC_URL}/lessonContent.retryLesson`, {
     method: 'POST',
     headers,
     body: JSON.stringify({ courseId, lessonId, lessonSpec }),
-    signal,
-  });
+  })
 
   if (!response.ok) {
-    await extractApiError(response, 'Failed to regenerate lesson');
+    await extractApiError(response, 'Failed to regenerate lesson')
   }
 
-  const data = await response.json();
-  return data?.result?.data || data;
+  const data = await response.json()
+  return data?.result?.data || data
 }
 
 /**
@@ -95,10 +82,9 @@ export async function regenerateLesson(
 export async function retryLessonGeneration(
   courseId: string,
   lessonId: string,
-  priority: number = 8,
-  signal?: AbortSignal
+  priority: number = 8
 ): Promise<{ success: boolean; jobId?: string }> {
-  const headers = await getBackendAuthHeaders();
+  const headers = await getBackendAuthHeaders()
 
   const response = await fetch(`${TRPC_URL}/lessonContent.partialGenerate`, {
     method: 'POST',
@@ -108,20 +94,19 @@ export async function retryLessonGeneration(
       lessonIds: [lessonId],
       priority,
     }),
-    signal,
-  });
+  })
 
   if (!response.ok) {
-    await extractApiError(response, 'Failed to retry lesson generation');
+    await extractApiError(response, 'Failed to retry lesson generation')
   }
 
-  const data = await response.json();
-  const result = data?.result?.data || data;
+  const data = await response.json()
+  const result = data?.result?.data || data
 
   return {
     success: result?.success ?? false,
     jobId: result?.jobIds?.[0],
-  };
+  }
 }
 
 /**
@@ -133,30 +118,28 @@ export async function retryLessonGeneration(
  */
 export async function deleteLesson(
   courseId: string,
-  lessonId: string,
-  signal?: AbortSignal
+  lessonId: string
 ): Promise<{ success: boolean; deletedLessonId?: string; deletedAssetsCount?: number }> {
-  const headers = await getBackendAuthHeaders();
+  const headers = await getBackendAuthHeaders()
 
   const response = await fetch(`${TRPC_URL}/lessonContent.deleteLesson`, {
     method: 'POST',
     headers,
     body: JSON.stringify({ courseId, lessonId }),
-    signal,
-  });
+  })
 
   if (!response.ok) {
-    await extractApiError(response, 'Failed to delete lesson');
+    await extractApiError(response, 'Failed to delete lesson')
   }
 
-  const data = await response.json();
-  const result = data?.result?.data || data;
+  const data = await response.json()
+  const result = data?.result?.data || data
 
   return {
     success: result?.success ?? false,
     deletedLessonId: result?.deletedLessonId,
     deletedAssetsCount: result?.deletedAssetsCount,
-  };
+  }
 }
 
 /**
@@ -168,30 +151,28 @@ export async function deleteLesson(
  */
 export async function approveLessons(
   courseId: string,
-  moduleNumber?: number,
-  signal?: AbortSignal
+  moduleNumber?: number
 ): Promise<{ success: boolean; approvedCount: number; skippedCount: number }> {
-  const headers = await getBackendAuthHeaders();
+  const headers = await getBackendAuthHeaders()
 
   const response = await fetch(`${TRPC_URL}/lessonContent.approveLessons`, {
     method: 'POST',
     headers,
     body: JSON.stringify({ courseId, moduleNumber }),
-    signal,
-  });
+  })
 
   if (!response.ok) {
-    await extractApiError(response, 'Failed to approve lessons');
+    await extractApiError(response, 'Failed to approve lessons')
   }
 
-  const data = await response.json();
-  const result = data?.result?.data || data;
+  const data = await response.json()
+  const result = data?.result?.data || data
 
   return {
     success: result?.success ?? false,
     approvedCount: result?.approvedCount ?? 0,
     skippedCount: result?.skippedCount ?? 0,
-  };
+  }
 }
 
 /**
@@ -203,28 +184,26 @@ export async function approveLessons(
  */
 export async function exportModuleLessons(
   courseId: string,
-  moduleNumber: number,
-  signal?: AbortSignal
+  moduleNumber: number
 ): Promise<{ content: string; filename: string; lessonsCount: number }> {
-  const headers = await getBackendAuthHeaders();
+  const headers = await getBackendAuthHeaders()
 
   const response = await fetch(`${TRPC_URL}/lessonContent.exportLessons`, {
     method: 'POST',
     headers,
     body: JSON.stringify({ courseId, moduleNumber }),
-    signal,
-  });
+  })
 
   if (!response.ok) {
-    await extractApiError(response, 'Failed to export lessons');
+    await extractApiError(response, 'Failed to export lessons')
   }
 
-  const data = await response.json();
-  const result = data?.result?.data || data;
+  const data = await response.json()
+  const result = data?.result?.data || data
 
   return {
     content: result?.content ?? '',
     filename: result?.filename ?? `module_${moduleNumber}_export.md`,
     lessonsCount: result?.lessonsCount ?? 0,
-  };
+  }
 }

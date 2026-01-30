@@ -12,13 +12,19 @@
  */
 
 import { logger } from '../../shared/logger/index.js';
+import { logTrace } from '../../shared/trace-logger';
 import { runPhase1Validation, runPhase2Storage, isValidationError, isStorageError } from './phases';
 import type { Stage1Input, Stage1Output } from './types';
 
 /**
  * Stage 1 execution error codes
  */
-export type Stage1ErrorCode = 'BAD_REQUEST' | 'NOT_FOUND' | 'FORBIDDEN' | 'INTERNAL_SERVER_ERROR' | 'UNAUTHORIZED';
+export type Stage1ErrorCode =
+  | 'BAD_REQUEST'
+  | 'NOT_FOUND'
+  | 'FORBIDDEN'
+  | 'INTERNAL_SERVER_ERROR'
+  | 'UNAUTHORIZED';
 
 /**
  * Stage 1 execution error
@@ -77,6 +83,19 @@ export class Stage1Orchestrator {
   async execute(input: Stage1Input): Promise<Stage1Output> {
     const startTime = Date.now();
 
+    await logTrace({
+      courseId: input.courseId,
+      stage: 'stage_1',
+      phase: 'init',
+      stepName: 'start',
+      inputData: {
+        filename: input.filename,
+        fileSize: input.fileSize,
+        mimeType: input.mimeType,
+      },
+      durationMs: 0,
+    });
+
     logger.info(
       {
         courseId: input.courseId,
@@ -102,6 +121,19 @@ export class Stage1Orchestrator {
         '[Stage 1] Phase 1 complete: Validation passed'
       );
 
+      await logTrace({
+        courseId: input.courseId,
+        stage: 'stage_1',
+        phase: 'validation',
+        stepName: 'complete',
+        inputData: { filename: input.filename },
+        outputData: {
+          tier: validationResult.tier,
+          courseTitle: validationResult.courseTitle,
+        },
+        durationMs: validationResult.durationMs,
+      });
+
       // Phase 2: Storage
       const storageResult = await runPhase2Storage(input);
 
@@ -114,6 +146,19 @@ export class Stage1Orchestrator {
         },
         '[Stage 1] Phase 2 complete: File stored'
       );
+
+      await logTrace({
+        courseId: input.courseId,
+        stage: 'stage_1',
+        phase: 'storage',
+        stepName: 'complete',
+        inputData: { filename: input.filename },
+        outputData: {
+          fileId: storageResult.fileId,
+          storagePath: storageResult.storagePath,
+        },
+        durationMs: storageResult.durationMs,
+      });
 
       // Build output
       const totalDuration = Date.now() - startTime;
@@ -136,6 +181,16 @@ export class Stage1Orchestrator {
         '[Stage 1] Document upload orchestration complete'
       );
 
+      await logTrace({
+        courseId: input.courseId,
+        stage: 'stage_1',
+        phase: 'complete',
+        stepName: 'finish',
+        inputData: { filename: input.filename },
+        outputData: { fileId: output.fileId },
+        durationMs: totalDuration,
+      });
+
       return output;
     } catch (error) {
       // Convert phase errors to execution errors
@@ -151,6 +206,19 @@ export class Stage1Orchestrator {
         },
         '[Stage 1] Document upload failed'
       );
+
+      await logTrace({
+        courseId: input.courseId,
+        stage: 'stage_1',
+        phase: 'error',
+        stepName: 'failed',
+        inputData: { filename: input.filename },
+        errorData: {
+          code: executionError.code,
+          message: executionError.message,
+        },
+        durationMs: Date.now() - startTime,
+      });
 
       throw executionError;
     }

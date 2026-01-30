@@ -32,7 +32,6 @@ export function ExampleMixedStatus() {
         estimatedRemainingMs: 120_000, // ~2m left
       }}
       modelTier="high"
-      locale="ru"
       onRegenerateAll={() => {
         console.log('Regenerate all lessons clicked');
         // TODO: Implement regeneration logic
@@ -67,7 +66,6 @@ export function ExampleAllCompleted() {
         // No estimatedRemainingMs when all completed
       }}
       modelTier="medium"
-      locale="en"
       onRegenerateAll={() => console.log('Regenerate all')}
       onExportAll={() => console.log('Export all')}
     />
@@ -96,7 +94,6 @@ export function ExampleWithErrors() {
         estimatedRemainingMs: 300_000, // ~5m left
       }}
       modelTier="high"
-      locale="ru"
       onRegenerateAll={() => console.log('Regenerate all')}
       onExportAll={() => console.log('Export all')}
     />
@@ -125,7 +122,6 @@ export function ExampleAllPending() {
         // estimatedRemainingMs not available for pending lessons
       }}
       modelTier="medium"
-      locale="ru"
       onRegenerateAll={() => console.log('Regenerate all')}
       onExportAll={() => console.log('Export all')}
     />
@@ -163,7 +159,6 @@ export function ExampleAllPending() {
  *           estimatedRemainingMs: data.aggregates.estimatedTimeRemainingMs,
  *         }}
  *         modelTier="high"
- *         locale="ru"
  *         onRegenerateAll={handleRegenerateAll}
  *         onExportAll={handleExportAll}
  *       />

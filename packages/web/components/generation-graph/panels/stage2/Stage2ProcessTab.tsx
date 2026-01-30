@@ -20,7 +20,7 @@ import {
   Terminal,
   type LucideIcon,
 } from 'lucide-react';
-import { GRAPH_TRANSLATIONS } from '@/lib/generation-graph/translations';
+import { useTranslations } from 'next-intl';
 import { formatDuration } from '@/lib/generation-graph/format-utils';
 import { useGenerationStore } from '@/stores/useGenerationStore';
 import type {
@@ -132,47 +132,32 @@ const ZUSTAND_PHASE_TO_PROCESSING_PHASE: Record<string, ProcessingPhaseId> = {
   'finish': 'summarization',
 };
 
+/** Phase translation keys */
+type PhaseNameKey = 'phaseDocling' | 'phaseMarkdown' | 'phaseImages' | 'phaseChunking' | 'phaseEmbedding' | 'phaseQdrant' | 'phaseSummarization';
+type PhaseDescKey = 'phaseDoclingDesc' | 'phaseMarkdownDesc' | 'phaseImagesDesc' | 'phaseChunkingDesc' | 'phaseEmbeddingDesc' | 'phaseQdrantDesc' | 'phaseSummarizationDesc';
+
+/** Phase translation key mapping */
+const PHASE_TRANSLATIONS: Record<ProcessingPhaseId, { nameKey: PhaseNameKey; descKey: PhaseDescKey }> = {
+  docling: { nameKey: 'phaseDocling', descKey: 'phaseDoclingDesc' },
+  markdown: { nameKey: 'phaseMarkdown', descKey: 'phaseMarkdownDesc' },
+  images: { nameKey: 'phaseImages', descKey: 'phaseImagesDesc' },
+  chunking: { nameKey: 'phaseChunking', descKey: 'phaseChunkingDesc' },
+  embedding: { nameKey: 'phaseEmbedding', descKey: 'phaseEmbeddingDesc' },
+  qdrant: { nameKey: 'phaseQdrant', descKey: 'phaseQdrantDesc' },
+  summarization: { nameKey: 'phaseSummarization', descKey: 'phaseSummarizationDesc' },
+};
+
 /**
  * Generates default phases (all pending) when not provided
+ * Note: This function needs access to the translation function from the component
  */
-function generateDefaultPhases(locale: 'ru' | 'en'): ProcessingPhase[] {
-  const t = GRAPH_TRANSLATIONS.stage2;
-
-  const phaseNameMap: Record<ProcessingPhaseId, { name: string; desc: string }> = {
-    docling: {
-      name: t?.phaseDocling?.[locale] ?? 'Digitization',
-      desc: t?.phaseDoclingDesc?.[locale] ?? 'Smart document structure reading',
-    },
-    markdown: {
-      name: t?.phaseMarkdown?.[locale] ?? 'Cleanup',
-      desc: t?.phaseMarkdownDesc?.[locale] ?? 'Text formatting and cleanup',
-    },
-    images: {
-      name: t?.phaseImages?.[locale] ?? 'Visual Analysis',
-      desc: t?.phaseImagesDesc?.[locale] ?? 'Image and table recognition',
-    },
-    chunking: {
-      name: t?.phaseChunking?.[locale] ?? 'Segmentation',
-      desc: t?.phaseChunkingDesc?.[locale] ?? 'Splitting into semantic blocks',
-    },
-    embedding: {
-      name: t?.phaseEmbedding?.[locale] ?? 'AI Encoding',
-      desc: t?.phaseEmbeddingDesc?.[locale] ?? 'Creating semantic fingerprints',
-    },
-    qdrant: {
-      name: t?.phaseQdrant?.[locale] ?? 'Knowledge Save',
-      desc: t?.phaseQdrantDesc?.[locale] ?? 'Saving to knowledge base',
-    },
-    summarization: {
-      name: t?.phaseSummarization?.[locale] ?? 'Insight Generation',
-      desc: t?.phaseSummarizationDesc?.[locale] ?? 'Creating executive summary',
-    },
-  };
-
+function generateDefaultPhases(
+  t: (key: PhaseNameKey | PhaseDescKey) => string
+): ProcessingPhase[] {
   return PHASE_ORDER.map((id) => ({
     id,
-    name: phaseNameMap[id].name,
-    description: phaseNameMap[id].desc,
+    name: t(PHASE_TRANSLATIONS[id].nameKey),
+    description: t(PHASE_TRANSLATIONS[id].descKey),
     status: 'pending' as const,
   }));
 }
@@ -183,44 +168,26 @@ function generateDefaultPhases(locale: 'ru' | 'en'): ProcessingPhase[] {
 function getPhaseDescription(
   phaseId: ProcessingPhaseId,
   phase: ProcessingPhase,
-  locale: 'ru' | 'en'
+  t: (key: PhaseDescKey) => string
 ): string {
   // If phase has a custom description (e.g., live status), use it
   if (phase.description) return phase.description;
 
-  const t = GRAPH_TRANSLATIONS.stage2;
-  const descMap: Record<ProcessingPhaseId, string | undefined> = {
-    docling: t?.phaseDoclingDesc?.[locale],
-    markdown: t?.phaseMarkdownDesc?.[locale],
-    images: t?.phaseImagesDesc?.[locale],
-    chunking: t?.phaseChunkingDesc?.[locale],
-    embedding: t?.phaseEmbeddingDesc?.[locale],
-    qdrant: t?.phaseQdrantDesc?.[locale],
-    summarization: t?.phaseSummarizationDesc?.[locale],
-  };
-
-  return descMap[phaseId] ?? '';
+  return t(PHASE_TRANSLATIONS[phaseId].descKey);
 }
 
 /**
  * Get phase name from translations
  */
-function getPhaseName(phaseId: ProcessingPhaseId, phase: ProcessingPhase, locale: 'ru' | 'en'): string {
+function getPhaseName(
+  phaseId: ProcessingPhaseId,
+  phase: ProcessingPhase,
+  t: (key: PhaseNameKey) => string
+): string {
   // If phase has a custom name, use it
   if (phase.name) return phase.name;
 
-  const t = GRAPH_TRANSLATIONS.stage2;
-  const nameMap: Record<ProcessingPhaseId, string | undefined> = {
-    docling: t?.phaseDocling?.[locale],
-    markdown: t?.phaseMarkdown?.[locale],
-    images: t?.phaseImages?.[locale],
-    chunking: t?.phaseChunking?.[locale],
-    embedding: t?.phaseEmbedding?.[locale],
-    qdrant: t?.phaseQdrant?.[locale],
-    summarization: t?.phaseSummarization?.[locale],
-  };
-
-  return nameMap[phaseId] ?? phaseId;
+  return t(PHASE_TRANSLATIONS[phaseId].nameKey);
 }
 
 /**
@@ -245,17 +212,17 @@ function formatMetrics(metrics: Record<string, number | string> | undefined): st
  */
 interface PhaseRowProps {
   phase: ProcessingPhase;
-  locale: 'ru' | 'en';
 }
 
-const PhaseRow = memo<PhaseRowProps>(function PhaseRow({ phase, locale }) {
+const PhaseRow = memo<PhaseRowProps>(function PhaseRow({ phase }) {
+  const t = useTranslations('generation.stage2');
   const config = PHASE_CONFIG[phase.id];
   const statusConfig = STATUS_CONFIG[phase.status];
   const PhaseIcon = config?.icon ?? Circle;
   const StatusIcon = statusConfig?.icon ?? Circle;
 
-  const phaseName = getPhaseName(phase.id, phase, locale);
-  const phaseDesc = getPhaseDescription(phase.id, phase, locale);
+  const phaseName = getPhaseName(phase.id, phase, t);
+  const phaseDesc = getPhaseDescription(phase.id, phase, t);
   const metricsText = formatMetrics(phase.metrics);
 
   return (
@@ -271,7 +238,7 @@ const PhaseRow = memo<PhaseRowProps>(function PhaseRow({ phase, locale }) {
         {statusConfig.animate ? (
           <StatusIcon
             className={cn('h-5 w-5 animate-spin', statusConfig.colorClass)}
-            aria-label={locale === 'ru' ? 'Обработка...' : 'Processing...'}
+            aria-label={t('statusActive')}
           />
         ) : (
           <StatusIcon className={cn('h-5 w-5', statusConfig.colorClass)} />
@@ -362,11 +329,10 @@ const LOG_LEVEL_COLORS: Record<TerminalLogEntry['level'], string> = {
  */
 interface TerminalFooterProps {
   logs: TerminalLogEntry[];
-  locale: 'ru' | 'en';
 }
 
-const TerminalFooter = memo<TerminalFooterProps>(function TerminalFooter({ logs, locale }) {
-  const t = GRAPH_TRANSLATIONS.stage2;
+const TerminalFooter = memo<TerminalFooterProps>(function TerminalFooter({ logs }) {
+  const t = useTranslations('generation.stage2');
   const scrollRef = useRef<HTMLDivElement>(null);
 
   // Auto-scroll to bottom when new logs arrive
@@ -379,18 +345,9 @@ const TerminalFooter = memo<TerminalFooterProps>(function TerminalFooter({ logs,
   // Get display name for phase (memoized to avoid recreation on each render)
   const getPhaseDisplayName = useCallback(
     (phaseId: ProcessingPhaseId): string => {
-      const nameMap: Record<ProcessingPhaseId, string | undefined> = {
-        docling: t?.phaseDocling?.[locale],
-        markdown: t?.phaseMarkdown?.[locale],
-        images: t?.phaseImages?.[locale],
-        chunking: t?.phaseChunking?.[locale],
-        embedding: t?.phaseEmbedding?.[locale],
-        qdrant: t?.phaseQdrant?.[locale],
-        summarization: t?.phaseSummarization?.[locale],
-      };
-      return nameMap[phaseId] ?? phaseId.toUpperCase();
+      return t(PHASE_TRANSLATIONS[phaseId].nameKey);
     },
-    [t, locale]
+    [t]
   );
 
   return (
@@ -399,7 +356,7 @@ const TerminalFooter = memo<TerminalFooterProps>(function TerminalFooter({ logs,
       <div className="flex items-center gap-2 px-3 py-1.5 bg-zinc-800 dark:bg-zinc-900 border-b border-zinc-700">
         <Terminal className="h-3.5 w-3.5 text-zinc-400" />
         <span className="text-xs font-medium text-zinc-400">
-          {t?.terminal?.[locale] ?? 'System Log'}
+          {t('terminal')}
         </span>
       </div>
 
@@ -409,7 +366,7 @@ const TerminalFooter = memo<TerminalFooterProps>(function TerminalFooter({ logs,
         className="h-24 overflow-y-auto p-2 font-mono text-xs leading-relaxed"
       >
         {logs.length === 0 ? (
-          <div className="text-zinc-500 italic">{'> Waiting for events...'}</div>
+          <div className="text-zinc-500 italic">{`> ${t('waitingForEvents')}`}</div>
         ) : (
           logs.map((log, index) => (
             <div key={index} className="flex gap-2 text-zinc-300">
@@ -443,9 +400,9 @@ export const Stage2ProcessTab = memo<Stage2ProcessTabProps>(function Stage2Proce
   terminalLogs = [],
   status = 'pending',
   totalProgress,
-  locale = 'ru',
+  locale: _locale = 'ru',
 }) {
-  const t = GRAPH_TRANSLATIONS.stage2;
+  const t = useTranslations('generation.stage2');
 
   // Get document stages from Zustand store - SINGLE SOURCE OF TRUTH
   const documentStages = useGenerationStore(state =>
@@ -494,37 +451,7 @@ export const Stage2ProcessTab = memo<Stage2ProcessTabProps>(function Stage2Proce
       }
     }
 
-    // Generate phases with status from store
-    const phaseNameMap: Record<ProcessingPhaseId, { name: string; desc: string }> = {
-      docling: {
-        name: t?.phaseDocling?.[locale] ?? 'Оцифровка',
-        desc: t?.phaseDoclingDesc?.[locale] ?? 'Умное чтение структуры документа',
-      },
-      markdown: {
-        name: t?.phaseMarkdown?.[locale] ?? 'Очистка',
-        desc: t?.phaseMarkdownDesc?.[locale] ?? 'Форматирование и очистка текста',
-      },
-      images: {
-        name: t?.phaseImages?.[locale] ?? 'Анализ медиа',
-        desc: t?.phaseImagesDesc?.[locale] ?? 'Распознавание изображений и таблиц',
-      },
-      chunking: {
-        name: t?.phaseChunking?.[locale] ?? 'Сегментация',
-        desc: t?.phaseChunkingDesc?.[locale] ?? 'Разбиение на смысловые блоки',
-      },
-      embedding: {
-        name: t?.phaseEmbedding?.[locale] ?? 'Векторизация',
-        desc: t?.phaseEmbeddingDesc?.[locale] ?? 'Создание семантических отпечатков',
-      },
-      qdrant: {
-        name: t?.phaseQdrant?.[locale] ?? 'Индексация',
-        desc: t?.phaseQdrantDesc?.[locale] ?? 'Сохранение в базу знаний',
-      },
-      summarization: {
-        name: t?.phaseSummarization?.[locale] ?? 'Синтез',
-        desc: t?.phaseSummarizationDesc?.[locale] ?? 'Создание краткого резюме',
-      },
-    };
+    // Use the shared PHASE_TRANSLATIONS constant (already defined above)
 
     // Determine which phases should be marked as completed based on overall document status
     const isDocumentCompleted = documentStatus === 'completed';
@@ -561,17 +488,17 @@ export const Stage2ProcessTab = memo<Stage2ProcessTabProps>(function Stage2Proce
 
       return {
         id: phaseId,
-        name: phaseNameMap[phaseId].name,
-        description: phaseNameMap[phaseId].desc,
+        name: t(PHASE_TRANSLATIONS[phaseId].nameKey),
+        description: t(PHASE_TRANSLATIONS[phaseId].descKey),
         status: phaseStatus,
         durationMs: storeData?.durationMs,
         metrics: storeData?.metrics,
       };
     });
-  }, [documentStages, documentStatus, locale, t]);
+  }, [documentStages, documentStatus, t]);
 
   // Determine which phases to use: provided > store > default
-  const phases = providedPhases || (phasesFromStore.length > 0 ? phasesFromStore : generateDefaultPhases(locale));
+  const phases = providedPhases || (phasesFromStore.length > 0 ? phasesFromStore : generateDefaultPhases(t));
 
   // Calculate effective status from phases
   const effectiveStatus = useMemo(() => {
@@ -597,10 +524,10 @@ export const Stage2ProcessTab = memo<Stage2ProcessTabProps>(function Stage2Proce
         <CardHeader className="pb-3">
           <CardTitle className="text-base font-semibold flex items-center gap-2">
             <Database className="h-4 w-4 text-primary" />
-            {t?.pipeline?.[locale] ?? 'Processing Pipeline'}
+            {t('pipeline')}
           </CardTitle>
           <p className="text-sm text-muted-foreground">
-            {t?.pipelineDesc?.[locale] ?? 'Transforming document into knowledge'}
+            {t('pipelineDesc')}
           </p>
 
           {/* Total progress bar - show for active and completed states */}
@@ -609,8 +536,8 @@ export const Stage2ProcessTab = memo<Stage2ProcessTabProps>(function Stage2Proce
               <div className="flex items-center justify-between text-xs text-muted-foreground mb-1">
                 <span>
                   {effectiveStatus === 'completed'
-                    ? (t?.statusCompleted?.[locale] ?? 'Завершено')
-                    : (t?.statusActive?.[locale] ?? 'Обработка')}
+                    ? t('statusCompleted')
+                    : t('statusActive')}
                 </span>
                 <span className="font-mono">{effectiveProgress}%</span>
               </div>
@@ -630,13 +557,13 @@ export const Stage2ProcessTab = memo<Stage2ProcessTabProps>(function Stage2Proce
         <CardContent className="space-y-1 pb-0">
           <ScrollArea className="max-h-[400px]">
             {phases.map((phase) => (
-              <PhaseRow key={phase.id} phase={phase} locale={locale} />
+              <PhaseRow key={phase.id} phase={phase} />
             ))}
           </ScrollArea>
         </CardContent>
 
         {/* Terminal Footer */}
-        <TerminalFooter logs={safeLogs} locale={locale} />
+        <TerminalFooter logs={safeLogs} />
       </Card>
     </div>
   );

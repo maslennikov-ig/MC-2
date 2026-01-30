@@ -5,12 +5,13 @@ import { Button } from '@/components/ui/button'
 import { Check, Loader2, Rocket, RotateCcw } from 'lucide-react'
 import { approveStage } from '@/app/actions/admin-generation'
 import { toast } from 'sonner'
-import { useTranslation } from '@/lib/generation-graph/useTranslation'
+import { useTranslations } from 'next-intl'
 import { useRestartStage } from '../hooks/useRestartStage'
 import { cn } from '@/lib/utils'
 
 interface ApprovalControlsProps {
   courseId: string
+  orgSlug: string
   courseSlug: string
   stageNumber: number
   onApproved?: () => void
@@ -37,6 +38,7 @@ interface ApprovalControlsProps {
 
 export const ApprovalControls = ({
   courseId,
+  orgSlug,
   courseSlug,
   stageNumber,
   onApproved,
@@ -48,8 +50,8 @@ export const ApprovalControls = ({
 }: ApprovalControlsProps) => {
   const [isProcessing, setIsProcessing] = useState(false)
   const [action, setAction] = useState<'approve' | 'regenerate' | null>(null)
-  const { t } = useTranslation()
-  const { restartStage, isRestarting } = useRestartStage(courseSlug)
+  const t = useTranslations('generation')
+  const { restartStage, isRestarting } = useRestartStage(orgSlug, courseSlug)
 
   // Track mounted state to prevent state updates after unmount
   const mountedRef = useRef(true)

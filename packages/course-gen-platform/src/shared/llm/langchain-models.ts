@@ -65,6 +65,11 @@ const PHASE_FALLBACK_CONFIG: Record<
     maxTokens: 2048,
   },
   // Stage 4: Analysis phases
+  stage_4_clarifying: {
+    modelId: DEFAULT_MODEL_ID,
+    temperature: 0.5, // Moderate creativity for question generation
+    maxTokens: 4000,
+  },
   stage_4_classification: {
     modelId: DEFAULT_MODEL_ID,
     temperature: 0.7,
@@ -115,6 +120,16 @@ const PHASE_FALLBACK_CONFIG: Record<
     modelId: DEFAULT_MODEL_ID,
     temperature: 0.7,
     maxTokens: 8000,
+  },
+  stage_5_tier1: {
+    modelId: 'openai/gpt-oss-120b',
+    temperature: 0.7,
+    maxTokens: 30000,
+  },
+  stage_5_escalation: {
+    modelId: 'moonshotai/kimi-k2-0905',
+    temperature: 0.7,
+    maxTokens: 30000,
   },
   stage_5_standard_ru: {
     modelId: DEFAULT_MODEL_ID,

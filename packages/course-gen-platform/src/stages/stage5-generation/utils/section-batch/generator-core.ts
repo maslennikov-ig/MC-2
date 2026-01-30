@@ -3,12 +3,15 @@ import type { QdrantClient } from '@qdrant/js-client-rest';
 import type { GenerationJobInput, Section } from '@megacampus/shared-types';
 import { SectionSchema } from '@megacampus/shared-types/generation-result';
 import { UnifiedRegenerator } from '@/shared/regeneration';
+import { safeJSONParse } from '@/shared/utils/json-repair';
 import { preprocessObject } from '@/shared/validation/preprocessing';
+import { createModelConfigService } from '@/shared/llm/model-config-service';
+import { normalizeLanguageCode } from '@/shared/utils/language-utils';
 import { z } from 'zod';
 import logger from '@/shared/logger';
 import { ModelTier, SectionBatchResult } from './types';
 import { MODELS, OPENROUTER_BASE_URL } from './constants';
-import { buildBatchPrompt } from './prompt-builder';
+import { buildBatchPrompt, CourseConstraints } from './prompt-builder';
 import { estimateTokens } from './utils';
 
 /**
@@ -126,7 +129,9 @@ function generatePlaceholderReplacement(
  */
 function preprocessResponse(rawContent: string): string {
   try {
-    const parsedRaw = JSON.parse(rawContent) as Record<string, unknown> | Record<string, unknown>[];
+    const parsedRaw = safeJSONParse(rawContent) as
+      | Record<string, unknown>
+      | Record<string, unknown>[];
     let sectionsArray: Record<string, unknown>[] | undefined;
 
     if (Array.isArray(parsedRaw)) {
@@ -270,7 +275,8 @@ export async function generateWithRetry(
   qdrantClient: QdrantClient | undefined,
   complexityScore: number,
   criticalityScore: number,
-  language: string
+  language: string,
+  constraints?: CourseConstraints
 ): Promise<SectionBatchResult> {
   const maxAttempts = 2;
   let retryCount = 0;
@@ -278,7 +284,13 @@ export async function generateWithRetry(
 
   while (retryCount < maxAttempts) {
     try {
-      const prompt = buildBatchPrompt(input, sectionIndex, qdrantClient, retryCount + 1);
+      const prompt = buildBatchPrompt(
+        input,
+        sectionIndex,
+        qdrantClient,
+        retryCount + 1,
+        constraints
+      );
 
       const model = createModel(currentModelTier.model);
       const response = await model.invoke(prompt);
@@ -374,13 +386,35 @@ export async function generateWithRetry(
           })
         );
 
-        const isRussian = language === 'ru' || language === 'russian';
-        const escalationModel = isRussian ? MODELS.ru_lessons_primary : MODELS.en_lessons_primary;
+        // Get escalation model from database with language-specific fallback
+        const langCode = normalizeLanguageCode(language, 'en');
+        const isRussian = langCode === 'ru';
+        let escalationModel: string;
+        let escalationSource = 'database';
+
+        try {
+          const modelConfigService = createModelConfigService();
+          const escalationConfig = await modelConfigService.getModelForPhase(
+            'stage_5_escalation',
+            undefined,
+            undefined,
+            langCode
+          );
+          escalationModel = escalationConfig.modelId || MODELS.lessons_fallback;
+          escalationSource = escalationConfig.source;
+        } catch (configError) {
+          logger.warn({
+            msg: 'getModelForPhase failed for escalation, using hardcoded fallback',
+            error: configError instanceof Error ? configError.message : 'Unknown error',
+          });
+          escalationModel = isRussian ? MODELS.ru_lessons_primary : MODELS.en_lessons_primary;
+          escalationSource = 'hardcoded';
+        }
 
         currentModelTier = {
           model: escalationModel,
           tier: isRussian ? 'tier2_ru_lessons' : 'tier2_en_lessons',
-          reason: `Quality escalation from tier1 - using ${language}-optimized model`,
+          reason: `Quality escalation from tier1 - using ${langCode}-optimized model (${escalationSource})`,
         };
 
         logger.info({

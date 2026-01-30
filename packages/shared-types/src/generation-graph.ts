@@ -637,6 +637,14 @@ export interface GraphTranslations {
       simplify: { ru: string; en: string };
       moreDetail: { ru: string; en: string };
     };
+    modes?: {
+      refine: { ru: string; en: string };
+      regenerate: { ru: string; en: string };
+      refineAriaLabel: { ru: string; en: string };
+      regenerateAriaLabel: { ru: string; en: string };
+      selectModeRequired?: { ru: string; en: string };
+      modeSelectionLabel?: { ru: string; en: string };
+    };
   };
   errors: {
     connectionLost: { ru: string; en: string };
@@ -702,8 +710,8 @@ export interface StaticGraphData {
   /** Stage configuration */
   stageConfig: Record<string, StageConfig>;
 
-  /** Translation strings */
-  translations: GraphTranslations;
+  /** Translation strings (deprecated - use next-intl instead) */
+  translations?: GraphTranslations;
 
   /** Node styling */
   nodeStyles: NodeStyles;

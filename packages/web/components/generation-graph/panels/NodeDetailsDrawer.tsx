@@ -1,63 +1,98 @@
-import React, { memo, useState, useEffect, useMemo, useRef, useCallback, Component, ErrorInfo, ReactNode } from 'react';
-import { useReactFlow } from '@xyflow/react';
-import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from '@/components/ui/sheet';
-import { Maximize2, Minimize2, RotateCcw } from 'lucide-react';
-import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip';
-import { RestartConfirmDialog } from '../controls/RestartConfirmDialog';
-import { useParams } from 'next/navigation';
-import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { useNodeSelection } from '../hooks/useNodeSelection';
-import { useTranslation } from '@/lib/generation-graph/useTranslation';
-import { useUserRole } from '../hooks/useUserRole';
-import { AppNode, getDocumentId, getStagePhases, AppNodeData } from '../types';
-import { AttemptSelector } from './AttemptSelector';
-import { PhaseSelector } from './PhaseSelector';
-import { ApprovalControls } from '../controls/ApprovalControls';
-import { InputTab } from './InputTab';
-import { ProcessTab } from './ProcessTab';
-import { OutputTab } from './OutputTab';
-import { ActivityTab } from './ActivityTab';
+import React, {
+  memo,
+  useState,
+  useEffect,
+  useMemo,
+  useRef,
+  useCallback,
+  Component,
+  ErrorInfo,
+  ReactNode,
+} from 'react'
+import { useReactFlow } from '@xyflow/react'
+import {
+  Sheet,
+  SheetContent,
+  SheetHeader,
+  SheetTitle,
+  SheetDescription,
+} from '@/components/ui/sheet'
+import { Maximize2, Minimize2, RotateCcw } from 'lucide-react'
+import { Tooltip, TooltipContent, TooltipTrigger, TooltipProvider } from '@/components/ui/tooltip'
+import { RestartConfirmDialog } from '../controls/RestartConfirmDialog'
+import { useParams } from 'next/navigation'
+import dynamic from 'next/dynamic'
+import { Button } from '@/components/ui/button'
+import { cn } from '@/lib/utils'
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { useNodeSelection } from '../hooks/useNodeSelection'
+import { useTranslations } from 'next-intl'
+import { useUserRole } from '../hooks/useUserRole'
+import { AppNode, getDocumentId, getStagePhases, AppNodeData } from '../types'
+import { AttemptSelector } from './AttemptSelector'
+import { PhaseSelector } from './PhaseSelector'
+import { ApprovalControls } from '../controls/ApprovalControls'
+import { InputTab } from './InputTab'
+import { ProcessTab } from './ProcessTab'
+import { OutputTab } from './OutputTab'
+import { ActivityTab } from './ActivityTab'
 // Stage 1 "Course Passport" UI components
-import { Stage1InputTab, Stage1ProcessTab, Stage1OutputTab, Stage1ActivityTab } from './stage1';
-import type { Stage1InputData, Stage1OutputData } from './stage1/types';
+import { Stage1InputTab, Stage1ProcessTab, Stage1OutputTab, Stage1ActivityTab } from './stage1'
+import type { Stage1InputData, Stage1OutputData } from './stage1/types'
 // Stage 2 "Document Processing" UI components
-import { Stage2InputTab, Stage2ProcessTab, Stage2OutputTab, Stage2ActivityTab, Stage2Dashboard } from './stage2';
+import {
+  Stage2InputTab,
+  Stage2ProcessTab,
+  Stage2OutputTab,
+  Stage2ActivityTab,
+  Stage2Dashboard,
+} from './stage2'
 // Stage 3 "Document Classification" UI components
-import { Stage3InputTab, Stage3ProcessTab, Stage3OutputTab, Stage3ActivityTab } from './stage3';
+import { Stage3InputTab, Stage3ProcessTab, Stage3OutputTab, Stage3ActivityTab } from './stage3'
 // Stage 4 "Deep Analysis" UI components
-import { Stage4InputTab, Stage4ProcessTab, Stage4OutputTab, Stage4ActivityTab } from './stage4';
-import type { Stage4InputData } from './stage4/types';
+import { Stage4InputTab, Stage4ProcessTab, Stage4OutputTab, Stage4ActivityTab } from './stage4'
+import type { Stage4InputData } from './stage4/types'
 // Stage 5 "Generation" UI components
-import { Stage5InputTab, Stage5ProcessTab, Stage5OutputTab, Stage5ActivityTab } from './stage5';
-import { useStage2DashboardData } from '../hooks/useStage2DashboardData';
-import { RefinementChat } from './RefinementChat';
-import { useRefinement } from '../hooks/useRefinement';
-import { useStaticGraph } from '../contexts/StaticGraphContext';
-import { useFullscreenContext } from '../contexts/FullscreenContext';
-import { useGraphOperations } from '../contexts/GraphOperationsContext';
-import { useGenerationRealtime } from '@/components/generation-monitoring/realtime-provider';
-import { useLessonContent } from '../hooks/useLessonContent';
-import { useNodeStatus } from '../hooks/useNodeStatus';
-import { TraceAttempt, PhaseData } from '@megacampus/shared-types';
-import { isAwaitingApproval as getAwaitingStageNumber } from '@/lib/generation-graph/utils';
-import { toast } from 'sonner';
+import { Stage5InputTab, Stage5ProcessTab, Stage5OutputTab, Stage5ActivityTab } from './stage5'
+import { useStage2DashboardData } from '../hooks/useStage2DashboardData'
+import { RefinementChat } from './RefinementChat'
+import { useRefinement } from '../hooks/useRefinement'
+import { useStaticGraph } from '../contexts/StaticGraphContext'
+import { useFullscreenContext } from '../contexts/FullscreenContext'
+import { useGraphOperations } from '../contexts/GraphOperationsContext'
+import { useGenerationRealtime } from '@/components/generation-monitoring/realtime-provider'
+import { useLessonContent } from '../hooks/useLessonContent'
+import { useNodeStatus } from '../hooks/useNodeStatus'
+import { TraceAttempt, PhaseData } from '@megacampus/shared-types'
+import { isAwaitingApproval as getAwaitingStageNumber } from '@/lib/generation-graph/utils'
+import { toast } from 'sonner'
 import {
   approveLesson,
   retryLessonGeneration,
   deleteLesson,
   approveLessons,
   exportModuleLessons,
-} from '@/app/actions/lesson-actions';
+} from '@/app/actions/lesson-actions'
 // Stage 6 "Glass Factory" UI components
-import { ModuleDashboard } from './module/ModuleDashboard';
-import { LessonPanelWithTabs } from './lesson/LessonPanelWithTabs';
-import { useModuleDashboardData } from '../hooks/useModuleDashboardData';
-import { useLessonInspectorData } from '../hooks/useLessonInspectorData';
-import { useEnrichmentInspectorStore } from '../stores/enrichment-inspector-store';
+import { ModuleDashboard } from './module/ModuleDashboard'
+import { LessonPanelWithTabs } from './lesson/LessonPanelWithTabs'
+import { useModuleDashboardData } from '../hooks/useModuleDashboardData'
+import { useLessonInspectorData } from '../hooks/useLessonInspectorData'
+import { useEnrichmentInspectorStore } from '../stores/enrichment-inspector-store'
 // End Node completion panel
-import { EndNodePanel } from './EndNodePanel';
+import { EndNodePanel } from './EndNodePanel'
+// Stage 4 Clarifying Questions panel - Dynamic import to avoid SSR issues with isomorphic-dompurify
+const ClarifyingPanel = dynamic(
+  () => import('./clarifying/ClarifyingPanel').then((mod) => mod.ClarifyingPanel),
+  {
+    ssr: false,
+    loading: () => (
+      <div className="flex h-64 items-center justify-center">
+        <div className="h-8 w-8 animate-spin rounded-full border-b-2 border-purple-600" />
+      </div>
+    ),
+  }
+)
 
 /**
  * Extract module number from moduleId string (e.g., "module_1" -> 1)
@@ -65,8 +100,8 @@ import { EndNodePanel } from './EndNodePanel';
  * @returns Module number or undefined if invalid format
  */
 function extractModuleNumber(moduleId: string): number | undefined {
-  const match = moduleId.match(/^module_(\d+)$/);
-  return match ? parseInt(match[1], 10) : undefined;
+  const match = moduleId.match(/^module_(\d+)$/)
+  return match ? parseInt(match[1], 10) : undefined
 }
 
 /**
@@ -74,28 +109,31 @@ function extractModuleNumber(moduleId: string): number | undefined {
  * Catches render errors and displays fallback UI instead of crashing the whole app
  */
 interface LessonPanelErrorBoundaryProps {
-  children: ReactNode;
-  lessonId: string;
-  onBack?: () => void;
+  children: ReactNode
+  lessonId: string
+  onBack?: () => void
 }
 
 interface LessonPanelErrorBoundaryState {
-  hasError: boolean;
-  error?: Error;
+  hasError: boolean
+  error?: Error
 }
 
-class LessonPanelErrorBoundary extends Component<LessonPanelErrorBoundaryProps, LessonPanelErrorBoundaryState> {
+class LessonPanelErrorBoundary extends Component<
+  LessonPanelErrorBoundaryProps,
+  LessonPanelErrorBoundaryState
+> {
   constructor(props: LessonPanelErrorBoundaryProps) {
-    super(props);
-    this.state = { hasError: false };
+    super(props)
+    this.state = { hasError: false }
   }
 
   static getDerivedStateFromError(error: Error): LessonPanelErrorBoundaryState {
-    return { hasError: true, error };
+    return { hasError: true, error }
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
-    console.error('LessonPanelWithTabs error:', error, errorInfo);
+    console.error('LessonPanelWithTabs error:', error, errorInfo)
   }
 
   render(): ReactNode {
@@ -103,8 +141,18 @@ class LessonPanelErrorBoundary extends Component<LessonPanelErrorBoundaryProps, 
       return (
         <div className="flex h-full flex-col items-center justify-center gap-4 p-6 text-center">
           <div className="text-red-500">
-            <svg className="mx-auto h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+            <svg
+              className="mx-auto h-12 w-12"
+              fill="none"
+              viewBox="0 0 24 24"
+              stroke="currentColor"
+            >
+              <path
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                strokeWidth={2}
+                d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"
+              />
             </svg>
           </div>
           <h3 className="text-lg font-semibold text-slate-900 dark:text-slate-100">
@@ -122,259 +170,271 @@ class LessonPanelErrorBoundary extends Component<LessonPanelErrorBoundaryProps, 
             </button>
           )}
         </div>
-      );
+      )
     }
 
-    return this.props.children;
+    return this.props.children
   }
 }
 
 interface DisplayData {
-  label?: string;
-  inputData?: unknown;
-  outputData?: unknown;
-  duration?: number;
-  tokens?: number;
-  model?: string;
-  qualityScore?: number;
-  status?: string;
-  attempts?: TraceAttempt[];
-  attemptNumber?: number;
-  retryCount?: number;
+  label?: string
+  inputData?: unknown
+  outputData?: unknown
+  duration?: number
+  tokens?: number
+  model?: string
+  qualityScore?: number
+  status?: string
+  attempts?: TraceAttempt[]
+  attemptNumber?: number
+  retryCount?: number
   /** Trace ID for lazy loading full data */
-  traceId?: string;
+  traceId?: string
 }
 
 /**
  * Helper to safely extract qualityScore from lesson content metadata.
  * The metadata is typed as Record<string, unknown> but may contain quality_score field.
  */
-function getQualityScoreFromMetadata(metadata: Record<string, unknown> | null | undefined): number | undefined {
-  if (!metadata) return undefined;
+function getQualityScoreFromMetadata(
+  metadata: Record<string, unknown> | null | undefined
+): number | undefined {
+  if (!metadata) return undefined
   // Check for quality_score (snake_case from DB schema)
-  if (typeof metadata.quality_score === 'number') return metadata.quality_score;
+  if (typeof metadata.quality_score === 'number') return metadata.quality_score
   // Check for qualityScore (camelCase for backward compatibility)
-  if (typeof metadata.qualityScore === 'number') return metadata.qualityScore;
-  return undefined;
+  if (typeof metadata.qualityScore === 'number') return metadata.qualityScore
+  return undefined
 }
 
 export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
-  const { selectedNodeId, deselectNode, focusRefinement, clearRefinementFocus, autoOpened } = useNodeSelection();
-  const { t } = useTranslation();
-  const { getNode } = useReactFlow();
-  const { courseInfo } = useStaticGraph();
-  const { portalContainerRef } = useFullscreenContext();
-  const { removeLesson: removeLessonFromGraph } = useGraphOperations();
-  const { isAdmin } = useUserRole();
-  const params = useParams();
-  const courseSlug = params?.slug as string | undefined;
-  const [selectedAttemptNum, setSelectedAttemptNum] = useState<number | null>(null);
-  const [selectedPhaseId, setSelectedPhaseId] = useState<string | null>(null);
-  const { refine, isRefining } = useRefinement(courseInfo.id);
-  const refinementChatRef = useRef<HTMLDivElement>(null);
-  const [isExpanded, setIsExpanded] = useState(false);
-  const [isLessonMaximized, setIsLessonMaximized] = useState(false);
-  const [showRestartDialog, setShowRestartDialog] = useState(false);
-  const [isApproving, setIsApproving] = useState(false);
-  const [isApprovingAll, setIsApprovingAll] = useState(false);
-  const [isExporting, setIsExporting] = useState(false);
-  const [isRetrying, setIsRetrying] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
+  const { selectedNodeId, deselectNode, focusRefinement, clearRefinementFocus, autoOpened } =
+    useNodeSelection()
+  const t = useTranslations('generation')
+  const { getNode } = useReactFlow()
+  const { courseInfo } = useStaticGraph()
+  const { portalContainerRef } = useFullscreenContext()
+  const { removeLesson: removeLessonFromGraph } = useGraphOperations()
+  const { isAdmin } = useUserRole()
+  const params = useParams()
+  const courseSlug = params?.courseSlug as string | undefined
+  const orgSlug = params?.orgSlug as string | undefined
+  const [selectedAttemptNum, setSelectedAttemptNum] = useState<number | null>(null)
+  const [selectedPhaseId, setSelectedPhaseId] = useState<string | null>(null)
+  const {
+    refine,
+    isRefining,
+    chatHistory,
+    latestProposal,
+    isApplying,
+    acceptProposal,
+    proposalError,
+    retryProposal,
+  } = useRefinement(courseInfo.id)
+  const refinementChatRef = useRef<HTMLDivElement>(null)
+  const [isExpanded, setIsExpanded] = useState(false)
+  const [isLessonMaximized, setIsLessonMaximized] = useState(false)
+  const [showRestartDialog, setShowRestartDialog] = useState(false)
+  const [isApproving, setIsApproving] = useState(false)
+  const [isApprovingAll, setIsApprovingAll] = useState(false)
+  const [isExporting, setIsExporting] = useState(false)
+  const [isRetrying, setIsRetrying] = useState(false)
+  const [isDeleting, setIsDeleting] = useState(false)
 
   // Check if there's a pending enrichment create from toolbar
-  const pendingCreateType = useEnrichmentInspectorStore((state) => state.pendingCreateType);
+  const pendingCreateType = useEnrichmentInspectorStore((state) => state.pendingCreateType)
 
   const toggleExpand = useCallback(() => {
-    setIsExpanded(prev => !prev);
-  }, []);
+    setIsExpanded((prev) => !prev)
+  }, [])
 
-  const selectedNode = selectedNodeId ? getNode(selectedNodeId) as AppNode : null;
-  const data = selectedNode?.data;
+  const selectedNode = selectedNodeId ? (getNode(selectedNodeId) as AppNode) : null
+  const data = selectedNode?.data
 
   // Detect if this node has phases (stages 4, 5)
-  const hasPhases = data?.stageNumber && (data.stageNumber === 4 || data.stageNumber === 5);
+  const hasPhases = data?.stageNumber && (data.stageNumber === 4 || data.stageNumber === 5)
   // Memoize phases to prevent creating new array on every render
-  const phases = useMemo(
-    () => getStagePhases(data as AppNodeData | undefined) || [],
-    [data]
-  );
+  const phases = useMemo(() => getStagePhases(data as AppNodeData | undefined) || [], [data])
 
   // Get realtime status from context (more reliable than node data)
-  const realtimeStatus = useNodeStatus(selectedNodeId || '');
-  const { status: generationStatus, fetchTraceDetails, traces } = useGenerationRealtime();
+  const realtimeStatus = useNodeStatus(selectedNodeId || '')
+  const { status: generationStatus, fetchTraceDetails, traces } = useGenerationRealtime()
 
   // Check if THIS stage is awaiting approval based on course generation_status
   // generationStatus contains the raw generation_status like 'stage_5_awaiting_approval'
-  const awaitingStageNumber = getAwaitingStageNumber(generationStatus || '');
-  const isThisStageAwaiting = awaitingStageNumber !== null && data?.stageNumber === awaitingStageNumber;
+  const awaitingStageNumber = getAwaitingStageNumber(generationStatus || '')
+  const isThisStageAwaiting =
+    awaitingStageNumber !== null && data?.stageNumber === awaitingStageNumber
 
   // Editing permission:
   // - When stage is awaiting approval, EVERYONE can edit (to review/change before approving)
   // - Otherwise, admins get read-only view, owners can edit
   // - In automatic mode (readOnly=true), nobody can edit
-  const isAwaitingApproval = isThisStageAwaiting || realtimeStatus?.status === 'awaiting' || data?.status === 'awaiting';
-  const canEdit = !courseInfo.readOnly && (isAwaitingApproval || !isAdmin);
+  const isAwaitingApproval =
+    isThisStageAwaiting || realtimeStatus?.status === 'awaiting' || data?.status === 'awaiting'
+  const canEdit = !courseInfo.readOnly && (isAwaitingApproval || !isAdmin)
 
   // Detect if this is a lesson node and extract lessonId for content fetching
-  const isLessonNode = selectedNode?.type === 'lesson';
-  const isModuleNode = selectedNode?.type === 'module';
+  const isLessonNode = selectedNode?.type === 'lesson'
+  const isModuleNode = selectedNode?.type === 'module'
   // Stage 2 "Document Processing" UI: Detect if this is a document node
-  const isDocumentNode = selectedNode?.type === 'document';
+  const isDocumentNode = selectedNode?.type === 'document'
   // Stage 2 "Document Processing" UI: Detect if this is the Stage 2 container node
-  const isStage2Group = selectedNode?.type === 'stage2group';
+  const isStage2Group = selectedNode?.type === 'stage2group'
   // End Node: Detect if this is the final "finish" node
-  const isEndNode = selectedNode?.type === 'end';
+  const isEndNode = selectedNode?.type === 'end'
 
   // Safely extract documentId for Stage 2 document nodes
   const documentId = useMemo(() => {
-    return getDocumentId(data as AppNodeData | undefined);
-  }, [data]);
+    return getDocumentId(data as AppNodeData | undefined)
+  }, [data])
 
   // Stage 6 "Glass Factory" UI: Detect if this is a Stage 6 module or lesson
-  const isStage6Module = isModuleNode;
-  const isStage6Lesson = isLessonNode;
+  const isStage6Module = isModuleNode
+  const isStage6Lesson = isLessonNode
 
   // Extract module ID for module dashboard (module_1, module_2, etc.)
   const moduleIdForDashboard = useMemo(() => {
-    if (!isStage6Module || !selectedNodeId) return null;
-    return selectedNodeId; // Already in format like "module_1"
-  }, [isStage6Module, selectedNodeId]);
+    if (!isStage6Module || !selectedNodeId) return null
+    return selectedNodeId // Already in format like "module_1"
+  }, [isStage6Module, selectedNodeId])
 
   // Extract lesson info for lesson inspector
   const lessonInfoForInspector = useMemo(() => {
-    if (!isStage6Lesson || !selectedNodeId) return null;
-    const match = selectedNodeId.match(/^lesson_(\d+)_(\d+)$/);
+    if (!isStage6Lesson || !selectedNodeId) return null
+    const match = selectedNodeId.match(/^lesson_(\d+)_(\d+)$/)
     if (match) {
       return {
         lessonId: `${match[1]}.${match[2]}`,
         moduleNumber: parseInt(match[1], 10),
         lessonNumber: parseInt(match[2], 10),
-      };
+      }
     }
-    return null;
-  }, [isStage6Lesson, selectedNodeId]);
+    return null
+  }, [isStage6Lesson, selectedNodeId])
 
   // Lesson action handlers
   const handleApproveLesson = useCallback(async () => {
-    if (!lessonInfoForInspector) return;
+    if (!lessonInfoForInspector) return
 
-    setIsApproving(true);
+    setIsApproving(true)
     try {
-      await approveLesson(courseInfo.id, lessonInfoForInspector.lessonId);
-      toast.success('Урок одобрен');
+      await approveLesson(courseInfo.id, lessonInfoForInspector.lessonId)
+      toast.success('Урок одобрен')
       // TODO: Refetch lesson data or update local state
     } catch (error) {
-      toast.error(`Ошибка: ${error instanceof Error ? error.message : 'Не удалось одобрить урок'}`);
+      toast.error(`Ошибка: ${error instanceof Error ? error.message : 'Не удалось одобрить урок'}`)
     } finally {
-      setIsApproving(false);
+      setIsApproving(false)
     }
-  }, [lessonInfoForInspector, courseInfo.id]);
+  }, [lessonInfoForInspector, courseInfo.id])
 
   const handleEditLesson = useCallback(() => {
     // For MVP: Show "not available yet" message
-    toast.info('Редактирование пока недоступно');
+    toast.info('Редактирование пока недоступно')
     // TODO: Implement edit mode or modal
-  }, []);
+  }, [])
 
   // Handler for stage approval - marks completion state as auto-opened to prevent drawer flicker
   const handleStageApproved = useCallback(() => {
     // Mark the stage_X_complete state as auto-opened BEFORE closing
     // This prevents the auto-select effect from reopening the drawer
     if (data?.stageNumber && typeof window !== 'undefined') {
-      const key = `graphview_auto_opened_${courseInfo.id}_stage_${data.stageNumber}_complete`;
-      sessionStorage.setItem(key, 'true');
+      const key = `graphview_auto_opened_${courseInfo.id}_stage_${data.stageNumber}_complete`
+      sessionStorage.setItem(key, 'true')
     }
-    deselectNode();
-  }, [data?.stageNumber, courseInfo.id, deselectNode]);
+    deselectNode()
+  }, [data?.stageNumber, courseInfo.id, deselectNode])
 
   const handleRegenerateLesson = useCallback(async () => {
-    if (!lessonInfoForInspector) return;
+    if (!lessonInfoForInspector) return
 
-    setIsRetrying(true);
+    setIsRetrying(true)
     try {
       const result = await retryLessonGeneration(
         courseInfo.id,
         lessonInfoForInspector.lessonId,
         8 // High priority for user-initiated retries
-      );
+      )
       if (result.success) {
-        toast.success('Урок поставлен в очередь на перегенерацию');
+        toast.success('Урок поставлен в очередь на перегенерацию')
       } else {
-        toast.error('Не удалось запустить перегенерацию');
+        toast.error('Не удалось запустить перегенерацию')
       }
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Ошибка перегенерации');
+      toast.error(error instanceof Error ? error.message : 'Ошибка перегенерации')
     } finally {
-      setIsRetrying(false);
+      setIsRetrying(false)
     }
-  }, [lessonInfoForInspector, courseInfo.id]);
+  }, [lessonInfoForInspector, courseInfo.id])
 
   // Handler for retry node button in pipeline stepper
   // Regardless of which node failed, we regenerate the entire lesson
-  const handleRetryNode = useCallback(async (_nodeName: string) => {
-    if (!lessonInfoForInspector) return;
+  const handleRetryNode = useCallback(
+    async (_nodeName: string) => {
+      if (!lessonInfoForInspector) return
 
-    setIsRetrying(true);
-    try {
-      const result = await retryLessonGeneration(
-        courseInfo.id,
-        lessonInfoForInspector.lessonId,
-        9 // Higher priority for error retries
-      );
-      if (result.success) {
-        toast.success('Урок поставлен в очередь на повторную генерацию');
-      } else {
-        toast.error('Не удалось запустить повторную генерацию');
+      setIsRetrying(true)
+      try {
+        const result = await retryLessonGeneration(
+          courseInfo.id,
+          lessonInfoForInspector.lessonId,
+          9 // Higher priority for error retries
+        )
+        if (result.success) {
+          toast.success('Урок поставлен в очередь на повторную генерацию')
+        } else {
+          toast.error('Не удалось запустить повторную генерацию')
+        }
+      } catch (error) {
+        toast.error(error instanceof Error ? error.message : 'Ошибка повторной генерации')
+      } finally {
+        setIsRetrying(false)
       }
-    } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Ошибка повторной генерации');
-    } finally {
-      setIsRetrying(false);
-    }
-  }, [lessonInfoForInspector, courseInfo.id]);
+    },
+    [lessonInfoForInspector, courseInfo.id]
+  )
 
   // Handler for deleting a lesson
   const handleDeleteLesson = useCallback(async () => {
-    if (!lessonInfoForInspector) return;
+    if (!lessonInfoForInspector) return
 
-    setIsDeleting(true);
+    setIsDeleting(true)
     try {
-      const result = await deleteLesson(courseInfo.id, lessonInfoForInspector.lessonId);
+      const result = await deleteLesson(courseInfo.id, lessonInfoForInspector.lessonId)
       if (result.success) {
-        toast.success('Урок удалён');
+        toast.success('Урок удалён')
         // Remove lesson from graph immediately (optimistic UI update)
-        removeLessonFromGraph(lessonInfoForInspector.lessonId);
+        removeLessonFromGraph(lessonInfoForInspector.lessonId)
         // Close the drawer after successful deletion
-        deselectNode();
+        deselectNode()
       } else {
-        toast.error('Не удалось удалить урок');
+        toast.error('Не удалось удалить урок')
       }
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : 'Ошибка удаления урока');
+      toast.error(error instanceof Error ? error.message : 'Ошибка удаления урока')
     } finally {
-      setIsDeleting(false);
+      setIsDeleting(false)
     }
-  }, [lessonInfoForInspector, courseInfo.id, removeLessonFromGraph, deselectNode]);
+  }, [lessonInfoForInspector, courseInfo.id, removeLessonFromGraph, deselectNode])
 
   const lessonIdForFetch = useMemo(() => {
-    if (!isLessonNode || !selectedNodeId) return null;
+    if (!isLessonNode || !selectedNodeId) return null
     // Convert lesson_1_2 format to 1.2 format for API
-    const match = selectedNodeId.match(/^lesson_(\d+)_(\d+)$/);
+    const match = selectedNodeId.match(/^lesson_(\d+)_(\d+)$/)
     if (match) {
-      return `${match[1]}.${match[2]}`;
+      return `${match[1]}.${match[2]}`
     }
-    return null;
-  }, [isLessonNode, selectedNodeId]);
+    return null
+  }, [isLessonNode, selectedNodeId])
 
   // Fetch lesson content from lesson_contents table (only for lesson nodes)
-  const {
-    data: lessonContentData,
-    isLoading: isLoadingLessonContent,
-  } = useLessonContent({
+  const { data: lessonContentData, isLoading: isLoadingLessonContent } = useLessonContent({
     courseId: courseInfo.id,
     lessonId: lessonIdForFetch,
     enabled: isLessonNode && !!lessonIdForFetch,
-  });
+  })
 
   // Stage 6 "Glass Factory" UI: Fetch module dashboard data
   const {
@@ -386,7 +446,7 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
     courseId: courseInfo.id,
     moduleId: moduleIdForDashboard,
     enabled: isStage6Module && !!moduleIdForDashboard,
-  });
+  })
 
   // Stage 2 "Document Processing" UI: Fetch stage 2 dashboard data
   const {
@@ -396,7 +456,7 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
   } = useStage2DashboardData({
     courseId: courseInfo.id || '',
     enabled: isStage2Group && !!courseInfo.id, // Only enable if courseId exists
-  });
+  })
 
   // Stage 6 "Glass Factory" UI: Fetch lesson inspector data
   const {
@@ -407,241 +467,261 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
     courseId: courseInfo.id,
     lessonId: lessonInfoForInspector?.lessonId ?? null,
     enabled: isStage6Lesson && !!lessonInfoForInspector,
-  });
+  })
 
   // Handler for approving all lessons in a module
   const handleApproveAllLessons = useCallback(async () => {
-    if (!moduleIdForDashboard) return;
+    if (!moduleIdForDashboard) return
 
-    const moduleNumber = extractModuleNumber(moduleIdForDashboard);
+    const moduleNumber = extractModuleNumber(moduleIdForDashboard)
 
-    setIsApprovingAll(true);
+    setIsApprovingAll(true)
     try {
-      const result = await approveLessons(courseInfo.id, moduleNumber);
+      const result = await approveLessons(courseInfo.id, moduleNumber)
       if (result.success) {
-        const message = result.approvedCount > 0
-          ? `${t('actions.lessonsApproved')}: ${result.approvedCount}`
-          : t('actions.noLessonsToApprove');
+        const message =
+          result.approvedCount > 0
+            ? `${t('actions.lessonsApproved')}: ${result.approvedCount}`
+            : t('actions.noLessonsToApprove')
         if (result.skippedCount > 0) {
-          toast.success(`${message} (${t('actions.skipped')}: ${result.skippedCount})`);
+          toast.success(`${message} (${t('actions.skipped')}: ${result.skippedCount})`)
         } else {
-          toast.success(message);
+          toast.success(message)
         }
         // Trigger refetch to update dashboard with new approved status
-        refetchModuleDashboard();
+        refetchModuleDashboard()
       } else {
-        toast.error(t('actions.failedToApproveLessons'));
+        toast.error(t('actions.failedToApproveLessons'))
       }
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : t('actions.approvalError'));
+      toast.error(error instanceof Error ? error.message : t('actions.approvalError'))
     } finally {
-      setIsApprovingAll(false);
+      setIsApprovingAll(false)
     }
-  }, [moduleIdForDashboard, courseInfo.id, refetchModuleDashboard, t]);
+  }, [moduleIdForDashboard, courseInfo.id, refetchModuleDashboard, t])
 
   // Handler for exporting all lessons in a module as Markdown
   const handleExportAll = useCallback(async () => {
-    if (!moduleIdForDashboard) return;
+    if (!moduleIdForDashboard) return
 
     // Prevent multiple simultaneous exports (double-click protection)
-    if (isExporting) return;
+    if (isExporting) return
 
-    const moduleNumber = extractModuleNumber(moduleIdForDashboard);
+    const moduleNumber = extractModuleNumber(moduleIdForDashboard)
     if (!moduleNumber) {
-      toast.error('Invalid module ID');
-      return;
+      toast.error('Invalid module ID')
+      return
     }
 
-    setIsExporting(true);
-    const abortController = new AbortController();
-    let blobUrl: string | null = null;
+    setIsExporting(true)
+    const abortController = new AbortController()
+    let blobUrl: string | null = null
 
     try {
-      const result = await exportModuleLessons(courseInfo.id, moduleNumber, abortController.signal);
+      const result = await exportModuleLessons(courseInfo.id, moduleNumber)
 
-      // Check if request was aborted
-      if (abortController.signal.aborted) return;
+      // Check if request was aborted after response
+      if (abortController.signal.aborted) return
 
       if (result.content) {
         // Create and trigger download
-        const blob = new Blob([result.content], { type: 'text/markdown;charset=utf-8' });
-        blobUrl = URL.createObjectURL(blob);
+        const blob = new Blob([result.content], { type: 'text/markdown;charset=utf-8' })
+        blobUrl = URL.createObjectURL(blob)
 
         try {
-          const link = document.createElement('a');
-          link.href = blobUrl;
-          link.download = result.filename;
-          document.body.appendChild(link);
-          link.click();
-          document.body.removeChild(link);
+          const link = document.createElement('a')
+          link.href = blobUrl
+          link.download = result.filename
+          document.body.appendChild(link)
+          link.click()
+          document.body.removeChild(link)
         } finally {
           // Always cleanup blob URL to prevent memory leak
-          URL.revokeObjectURL(blobUrl);
-          blobUrl = null;
+          URL.revokeObjectURL(blobUrl)
+          blobUrl = null
         }
 
-        toast.success(`${t('actions.exported') || 'Exported'}: ${result.lessonsCount} ${t('actions.lessons') || 'lessons'}`);
+        toast.success(
+          `${t('actions.exported') || 'Exported'}: ${result.lessonsCount} ${t('actions.lessons') || 'lessons'}`
+        )
       } else {
-        toast.error(t('actions.noContentToExport') || 'No content to export');
+        toast.error(t('actions.noContentToExport') || 'No content to export')
       }
     } catch (error) {
       // Silent abort handling (user navigated away or cancelled)
-      if (error instanceof Error && error.name === 'AbortError') return;
-      toast.error(error instanceof Error ? error.message : (t('actions.exportError') || 'Export failed'));
+      if (error instanceof Error && error.name === 'AbortError') return
+      toast.error(
+        error instanceof Error ? error.message : t('actions.exportError') || 'Export failed'
+      )
     } finally {
       // Cleanup blob URL if not already done
-      if (blobUrl) URL.revokeObjectURL(blobUrl);
-      setIsExporting(false);
+      if (blobUrl) URL.revokeObjectURL(blobUrl)
+      setIsExporting(false)
     }
-  }, [moduleIdForDashboard, courseInfo.id, isExporting, t]);
+  }, [moduleIdForDashboard, courseInfo.id, isExporting, t])
 
   // Reset phase and attempt selection when node changes
   useEffect(() => {
-      if (hasPhases && phases.length > 0) {
-          // For Stage 4 and 5: prefer 'complete' phase since it contains the final result
-          // Other phases contain intermediate data that doesn't match the expected output format
-          const completePhase = phases.find((p: PhaseData) => p.phaseId === 'complete');
-          if (completePhase && (data?.stageNumber === 4 || data?.stageNumber === 5)) {
-              setSelectedPhaseId('complete');
-          } else {
-              // Fallback: select the latest phase
-              const latestPhase = phases[phases.length - 1];
-              setSelectedPhaseId(latestPhase.phaseId);
-          }
-          setSelectedAttemptNum(null); // Clear attempt selection
-      } else if (data?.attempts && data.attempts.length > 0) {
-          // For non-phase nodes: select latest attempt
-          const latest = data.attempts[data.attempts.length - 1];
-          setSelectedAttemptNum(latest.attemptNumber);
-          setSelectedPhaseId(null); // Clear phase selection
+    if (hasPhases && phases.length > 0) {
+      // For Stage 4 and 5: prefer 'complete' phase since it contains the final result
+      // Other phases contain intermediate data that doesn't match the expected output format
+      const completePhase = phases.find((p: PhaseData) => p.phaseId === 'complete')
+      if (completePhase && (data?.stageNumber === 4 || data?.stageNumber === 5)) {
+        setSelectedPhaseId('complete')
       } else {
-          setSelectedAttemptNum(null);
-          setSelectedPhaseId(null);
+        // Fallback: select the latest phase
+        const latestPhase = phases[phases.length - 1]
+        setSelectedPhaseId(latestPhase.phaseId)
       }
-  }, [selectedNodeId, data?.attempts, data?.stageNumber, hasPhases, phases]);
+      setSelectedAttemptNum(null) // Clear attempt selection
+    } else if (data?.attempts && data.attempts.length > 0) {
+      // For non-phase nodes: select latest attempt
+      const latest = data.attempts[data.attempts.length - 1]
+      setSelectedAttemptNum(latest.attemptNumber)
+      setSelectedPhaseId(null) // Clear phase selection
+    } else {
+      setSelectedAttemptNum(null)
+      setSelectedPhaseId(null)
+    }
+  }, [selectedNodeId, data?.attempts, data?.stageNumber, hasPhases, phases])
 
   // Reset lesson maximization when drawer closes
   useEffect(() => {
     if (!selectedNodeId) {
-      setIsLessonMaximized(false);
+      setIsLessonMaximized(false)
     }
-  }, [selectedNodeId]);
+  }, [selectedNodeId])
 
   // Auto-scroll to RefinementChat (T085)
   useEffect(() => {
-      if (!focusRefinement || !selectedNodeId || !refinementChatRef.current) {
-          return;
-      }
-      
-      // Small delay to allow drawer animation
-      const timer = setTimeout(() => {
-          refinementChatRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-          // Try to focus input
-          const input = refinementChatRef.current?.querySelector('textarea, input');
-          if (input instanceof HTMLElement) input.focus();
-          clearRefinementFocus();
-      }, 300);
-      return () => clearTimeout(timer);
-  }, [focusRefinement, selectedNodeId, clearRefinementFocus]);
+    if (!focusRefinement || !selectedNodeId || !refinementChatRef.current) {
+      return
+    }
+
+    // Small delay to allow drawer animation
+    const timer = setTimeout(() => {
+      refinementChatRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+      // Try to focus input
+      const input = refinementChatRef.current?.querySelector('textarea, input')
+      if (input instanceof HTMLElement) input.focus()
+      clearRefinementFocus()
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [focusRefinement, selectedNodeId, clearRefinementFocus])
 
   // Determine data to show based on selected phase or attempt
   const displayData = useMemo((): DisplayData | undefined => {
-      // If phases exist and a phase is selected, show phase data
-      if (hasPhases && selectedPhaseId && phases.length > 0) {
-          const phase = phases.find((p: PhaseData) => p.phaseId === selectedPhaseId);
-          if (phase) {
-              // If phase.outputData is missing but we have a traceId, check the traces array
-              // This handles the case where lazy loading via fetchTraceDetails updated traces
-              // but phasesMap wasn't updated (since it's a separate state in useGraphData)
-              let outputData = phase.outputData;
-              let inputData = phase.inputData;
-              if ((outputData === undefined || inputData === undefined) && phase.traceId && traces.length > 0) {
-                  const trace = traces.find(t => t.id === phase.traceId);
-                  if (trace) {
-                      if (outputData === undefined && trace.output_data !== undefined) {
-                          outputData = trace.output_data;
-                      }
-                      if (inputData === undefined && trace.input_data !== undefined) {
-                          inputData = trace.input_data;
-                      }
-                  }
+    // If phases exist and a phase is selected, show phase data
+    if (hasPhases && selectedPhaseId && phases.length > 0) {
+      const phase = phases.find((p: PhaseData) => p.phaseId === selectedPhaseId)
+      if (phase) {
+        // If phase.outputData is missing but we have a traceId, check the traces array
+        // This handles the case where lazy loading via fetchTraceDetails updated traces
+        // but phasesMap wasn't updated (since it's a separate state in useGraphData)
+        let outputData = phase.outputData
+        let inputData = phase.inputData
+        if (
+          (outputData === undefined || inputData === undefined) &&
+          phase.traceId &&
+          traces.length > 0
+        ) {
+          const trace = traces.find((t) => t.id === phase.traceId)
+          if (trace) {
+            if (outputData === undefined && trace.output_data !== undefined) {
+              outputData = trace.output_data
+            }
+            if (inputData === undefined && trace.input_data !== undefined) {
+              inputData = trace.input_data
+            }
+          }
+        }
+        return {
+          label: `${data?.label} - ${phase.phaseName}`,
+          inputData,
+          outputData,
+          duration: phase.processMetrics?.duration,
+          tokens: phase.processMetrics?.tokens,
+          model: phase.processMetrics?.model,
+          qualityScore: phase.processMetrics?.qualityScore,
+          status: phase.status,
+          attempts: phase.attempts || [],
+          attemptNumber: 1,
+          retryCount: phase.attempts?.filter((a) => a.status === 'failed').length || 0,
+          traceId: phase.traceId, // For lazy loading full trace data
+        }
+      }
+    }
+
+    // Otherwise, show attempt data (for non-phase nodes or retries within a phase)
+    if (selectedAttemptNum && data?.attempts) {
+      const attempt = data.attempts.find(
+        (a: TraceAttempt) => a.attemptNumber === selectedAttemptNum
+      )
+      if (attempt) {
+        // For lesson nodes: merge fetched lesson content into outputData
+        const outputData =
+          isLessonNode && lessonContentData
+            ? {
+                ...attempt.outputData,
+                content: lessonContentData.content,
+                lessonContent: lessonContentData.content,
+                status: lessonContentData.status,
+                metadata: lessonContentData.metadata,
+                // Extract quality info from metadata
+                qualityScore: getQualityScoreFromMetadata(lessonContentData.metadata),
               }
-              return {
-                  label: `${data?.label} - ${phase.phaseName}`,
-                  inputData,
-                  outputData,
-                  duration: phase.processMetrics?.duration,
-                  tokens: phase.processMetrics?.tokens,
-                  model: phase.processMetrics?.model,
-                  qualityScore: phase.processMetrics?.qualityScore,
-                  status: phase.status,
-                  attempts: phase.attempts || [],
-                  attemptNumber: 1,
-                  retryCount: phase.attempts?.filter((a) => a.status === 'failed').length || 0,
-                  traceId: phase.traceId, // For lazy loading full trace data
-              };
-          }
+            : attempt.outputData
+
+        return {
+          label: data.label,
+          inputData: attempt.inputData,
+          outputData,
+          duration: attempt.processMetrics?.duration,
+          tokens: attempt.processMetrics?.tokens,
+          model: attempt.processMetrics?.model,
+          qualityScore: attempt.processMetrics?.qualityScore,
+          status: attempt.status,
+          attempts: data.attempts,
+          attemptNumber: attempt.attemptNumber,
+          retryCount: data.retryCount,
+        }
       }
+    }
 
-      // Otherwise, show attempt data (for non-phase nodes or retries within a phase)
-      if (selectedAttemptNum && data?.attempts) {
-          const attempt = data.attempts.find((a: TraceAttempt) => a.attemptNumber === selectedAttemptNum);
-          if (attempt) {
-              // For lesson nodes: merge fetched lesson content into outputData
-              const outputData = isLessonNode && lessonContentData
-                ? {
-                    ...attempt.outputData,
-                    content: lessonContentData.content,
-                    lessonContent: lessonContentData.content,
-                    status: lessonContentData.status,
-                    metadata: lessonContentData.metadata,
-                    // Extract quality info from metadata
-                    qualityScore: getQualityScoreFromMetadata(lessonContentData.metadata),
-                  }
-                : attempt.outputData;
-
-              return {
-                  label: data.label,
-                  inputData: attempt.inputData,
-                  outputData,
-                  duration: attempt.processMetrics?.duration,
-                  tokens: attempt.processMetrics?.tokens,
-                  model: attempt.processMetrics?.model,
-                  qualityScore: attempt.processMetrics?.qualityScore,
-                  status: attempt.status,
-                  attempts: data.attempts,
-                  attemptNumber: attempt.attemptNumber,
-                  retryCount: data.retryCount
-              };
-          }
+    // For lesson nodes without attempts but with fetched content
+    if (isLessonNode && lessonContentData) {
+      return {
+        ...data,
+        outputData: {
+          content: lessonContentData.content,
+          lessonContent: lessonContentData.content,
+          status: lessonContentData.status,
+          metadata: lessonContentData.metadata,
+          qualityScore: getQualityScoreFromMetadata(lessonContentData.metadata),
+        },
+        qualityScore: getQualityScoreFromMetadata(lessonContentData.metadata),
+        status: lessonContentData.status === 'completed' ? 'completed' : data?.status,
       }
+    }
 
-      // For lesson nodes without attempts but with fetched content
-      if (isLessonNode && lessonContentData) {
-          return {
-              ...data,
-              outputData: {
-                  content: lessonContentData.content,
-                  lessonContent: lessonContentData.content,
-                  status: lessonContentData.status,
-                  metadata: lessonContentData.metadata,
-                  qualityScore: getQualityScoreFromMetadata(lessonContentData.metadata),
-              },
-              qualityScore: getQualityScoreFromMetadata(lessonContentData.metadata),
-              status: lessonContentData.status === 'completed' ? 'completed' : data?.status,
-          };
-      }
-
-      return data;
-  }, [data, selectedAttemptNum, hasPhases, selectedPhaseId, phases, isLessonNode, lessonContentData]);
+    return data
+  }, [
+    data,
+    selectedAttemptNum,
+    hasPhases,
+    selectedPhaseId,
+    phases,
+    isLessonNode,
+    lessonContentData,
+  ])
 
   // Lazy load full trace details when drawer opens and outputData is missing
   // This is needed for skeleton traces that don't have output_data pre-loaded
   useEffect(() => {
-    let cancelled = false;
+    let cancelled = false
 
     const loadTraceDetails = async () => {
-      if (!selectedNodeId || !displayData) return;
+      if (!selectedNodeId || !displayData) return
 
       // Check if we need to load output_data for completed phases
       // Stage 4/5 complete phases should already have output_data from critical query
@@ -649,68 +729,68 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
       const needsOutputData =
         displayData.outputData === undefined &&
         displayData.status === 'completed' &&
-        displayData.traceId;
+        displayData.traceId
 
       if (needsOutputData && displayData.traceId) {
-        await fetchTraceDetails(displayData.traceId);
+        await fetchTraceDetails(displayData.traceId)
 
         // Prevent stale updates if user rapidly switched nodes
-        if (cancelled) return;
+        if (cancelled) return
       }
-    };
+    }
 
-    loadTraceDetails();
+    void loadTraceDetails()
 
     // Cleanup: mark as cancelled if node changes before fetch completes
     return () => {
-      cancelled = true;
-    };
-  }, [selectedNodeId, displayData?.traceId, displayData?.outputData, displayData?.status, fetchTraceDetails]);
+      cancelled = true
+    }
+  }, [
+    selectedNodeId,
+    displayData?.traceId,
+    displayData?.outputData,
+    displayData?.status,
+    fetchTraceDetails,
+  ])
 
-  // Construct chat history - only show REAL user refinement messages
-  // DO NOT show LLM prompts (prompt_text) which were incorrectly set as refinementMessage
-  const chatHistory = useMemo(() => {
-      // For now, return empty until proper refinement tracking is implemented
-      // Previously, refinementMessage was incorrectly set to prompt_text (LLM prompt)
-      // Real user refinements need to be tracked separately in the database
-      return [];
-  }, []);
+  const handleRefine = async (message: string, intent: 'refine' | 'regenerate' = 'refine') => {
+    if (!data) return
 
-  const handleRefine = async (message: string) => {
-      if (!data || !selectedAttemptNum) return;
-      
-      // Get current output to refine
-      const currentOutput = JSON.stringify(displayData?.outputData || {});
-      
-      await refine(
-          `stage_${data.stageNumber}`,
-          selectedNodeId || undefined,
-          selectedAttemptNum,
-          message,
-          currentOutput
-      );
-  };
+    // Get current output to refine
+    const currentOutput = JSON.stringify(displayData?.outputData || {})
 
-  const isAIStage = data?.stageNumber && [3, 4, 5, 6].includes(data.stageNumber);
+    await refine(
+      `stage_${data.stageNumber}`,
+      selectedNodeId || undefined,
+      message,
+      currentOutput,
+      intent
+    )
+  }
+
+  // Stage 3 (Document Classification) uses priority selection only, no chat
+  // Stages 4, 5, 6 use RefinementChat with Confirm-then-Apply flow
+  const isAIStage = data?.stageNumber && [4, 5, 6].includes(data.stageNumber)
 
   // Restart button available for stages 2-6 with completed/error/awaiting status
-  const canRestart = data?.stageNumber &&
+  const canRestart =
+    data?.stageNumber &&
     data.stageNumber >= 2 &&
     displayData?.status &&
-    ['completed', 'error', 'awaiting'].includes(displayData.status);
+    ['completed', 'error', 'awaiting'].includes(displayData.status)
 
   // Calculate SheetContent width based on node type
   const getSheetWidthClass = () => {
     if (isStage6Lesson) {
       // Lesson nodes: wide by default, fullscreen when maximized
       if (isLessonMaximized) {
-        return 'w-screen max-w-none'; // Full width
+        return 'w-screen max-w-none' // Full width
       }
-      return 'w-full sm:w-[85vw] sm:max-w-[85vw]'; // 85% width
+      return 'w-full sm:w-[85vw] sm:max-w-[85vw]' // 85% width
     }
     // Other nodes: standard behavior
-    return isExpanded ? 'max-w-[100vw]' : 'max-w-[50vw]';
-  };
+    return isExpanded ? 'max-w-[100vw]' : 'max-w-[50vw]'
+  }
 
   return (
     <Sheet
@@ -734,21 +814,19 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
         // - Allow overlay clicks (dark backdrop) to close the drawer
         // - Prevent closing on clicks on other elements (graph buttons, hint panels)
         onInteractOutside={(e) => {
-          const target = e.target as HTMLElement;
+          const target = e.target as HTMLElement
           // Allow clicks on the overlay backdrop to close the drawer
           if (target.hasAttribute('data-sheet-overlay')) {
-            return; // Allow default close behavior
+            return // Allow default close behavior
           }
           // Prevent closing on clicks on other elements
-          e.preventDefault();
+          e.preventDefault()
         }}
         data-testid="node-details-drawer"
       >
         {/* Accessibility: Hidden title for lesson nodes (screen readers only) */}
         {isStage6Lesson && (
-          <SheetTitle className="sr-only">
-            {data?.label || 'Lesson Details'}
-          </SheetTitle>
+          <SheetTitle className="sr-only">{data?.label || 'Lesson Details'}</SheetTitle>
         )}
 
         {/* Hide SheetHeader for lesson nodes - LessonInspector has its own header via LessonInspectorLayout */}
@@ -772,7 +850,7 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
                           variant="ghost"
                           size="icon"
                           onClick={() => setShowRestartDialog(true)}
-                          className="h-8 w-8 text-slate-500 hover:text-orange-600 hover:bg-orange-50"
+                          className="h-8 w-8 text-slate-500 hover:bg-orange-50 hover:text-orange-600"
                           data-testid="drawer-restart-button"
                         >
                           <RotateCcw className="h-4 w-4" />
@@ -814,16 +892,16 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
         {/* Adjust height and margin based on node type:
             - Lesson nodes: full height (no header above), no top margin
             - Other nodes: account for header height (140px), add top margin */}
-        <div className={cn(
-          isStage6Lesson ? 'h-full' : 'mt-6 h-[calc(100vh-140px)]'
-        )}>
+        <div className={cn(isStage6Lesson ? 'h-full' : 'mt-6 h-[calc(100vh-140px)]')}>
           {/* Stage 2 "Document Processing" UI: Stage2 Dashboard */}
           {isStage2Group ? (
             <Stage2Dashboard
               data={stage2DashboardData}
               isLoading={isLoadingStage2Dashboard}
               error={stage2DashboardError}
-              onRetryFailed={() => {/* TODO: Implement retry failed */}}
+              onRetryFailed={() => {
+                /* TODO: Implement retry failed */
+              }}
               className="h-full"
             />
           ) : /* Stage 6 "Glass Factory" UI: Module Dashboard */
@@ -833,8 +911,12 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
               isLoading={isLoadingModuleDashboard}
               error={moduleDashboardError}
               onExportAll={() => void handleExportAll()}
-              onRegenerateFailed={() => {/* TODO: Implement regenerate failed */}}
-              onImproveQuality={() => {/* TODO: Implement improve quality */}}
+              onRegenerateFailed={() => {
+                /* TODO: Implement regenerate failed */
+              }}
+              onImproveQuality={() => {
+                /* TODO: Implement improve quality */
+              }}
               onApproveAll={() => void handleApproveAllLessons()}
               isApproving={isApprovingAll}
               isExporting={isExporting}
@@ -854,11 +936,11 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
                 error={lessonInspectorError}
                 onBack={deselectNode}
                 onClose={deselectNode}
-                onApprove={handleApproveLesson}
+                onApprove={() => void handleApproveLesson()}
                 onEdit={handleEditLesson}
-                onRegenerate={handleRegenerateLesson}
-                onDelete={handleDeleteLesson}
-                onRetryNode={handleRetryNode}
+                onRegenerate={() => void handleRegenerateLesson()}
+                onDelete={() => void handleDeleteLesson()}
+                onRetryNode={(nodeName) => void handleRetryNode(nodeName)}
                 isMaximized={isLessonMaximized}
                 onToggleMaximize={() => setIsLessonMaximized(!isLessonMaximized)}
                 className="h-full"
@@ -873,27 +955,53 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
             /* End Node - Course Completion Panel */
             <EndNodePanel
               courseSlug={courseSlug}
+              orgSlug={orgSlug}
               courseTitle={courseInfo.title}
               moduleCount={courseInfo.moduleCount}
               lessonCount={courseInfo.lessonCount}
               isCompleted={
-                realtimeStatus?.status === 'completed' ||
-                generationStatus === 'completed'
+                realtimeStatus?.status === 'completed' || generationStatus === 'completed'
               }
+            />
+          ) : selectedNodeId === 'stage_4_clarifying' ? (
+            /* ClarifyingNode selected - show questions panel
+               In read-only mode if course already moved past clarifying phase */
+            <ClarifyingPanel
+              courseId={courseInfo.id}
+              readOnly={generationStatus !== 'stage_4_clarifying'}
+              onComplete={() => {
+                // Status will update via realtime subscription
+                // Deselect node to let user see the graph update
+                deselectNode()
+              }}
+            />
+          ) : generationStatus === 'stage_4_clarifying' && data?.stageNumber === 4 ? (
+            /* Stage 4 node clicked while still in clarifying phase - show questions */
+            <ClarifyingPanel
+              courseId={courseInfo.id}
+              onComplete={() => {
+                deselectNode()
+              }}
             />
           ) : realtimeStatus?.status === 'skipped' || data?.status === 'skipped' ? (
             /* Skipped Stage - show informative message */
-            <div className="flex flex-col items-center justify-center h-full py-12 text-center">
-              <div className="w-16 h-16 rounded-full bg-slate-100 dark:bg-slate-800 flex items-center justify-center mb-4">
-                <svg className="w-8 h-8 text-slate-400 dark:text-slate-500" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <div className="flex h-full flex-col items-center justify-center py-12 text-center">
+              <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-slate-100 dark:bg-slate-800">
+                <svg
+                  className="h-8 w-8 text-slate-400 dark:text-slate-500"
+                  viewBox="0 0 24 24"
+                  fill="none"
+                  stroke="currentColor"
+                  strokeWidth="2"
+                >
                   <path d="M9 9l6 6m0-6l-6 6" strokeLinecap="round" />
                   <circle cx="12" cy="12" r="10" />
                 </svg>
               </div>
-              <h3 className="text-lg font-semibold text-slate-700 dark:text-slate-300 mb-2">
+              <h3 className="mb-2 text-lg font-semibold text-slate-700 dark:text-slate-300">
                 {t('status.skipped')}
               </h3>
-              <p className="text-sm text-slate-500 dark:text-slate-400 max-w-xs">
+              <p className="max-w-xs text-sm text-slate-500 dark:text-slate-400">
                 {t('status.skippedDescription')}
               </p>
             </div>
@@ -902,19 +1010,20 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
             <>
               {/* Approval Controls - show when stage is awaiting approval */}
               {isAwaitingApproval && courseSlug && data?.stageNumber && (
-                 <div className="mb-6 p-4 rounded-lg border bg-gradient-to-r from-purple-50 to-indigo-50 border-purple-200 dark:from-purple-900/20 dark:to-indigo-900/20 dark:border-purple-700">
-                     <p className="text-sm text-purple-700 dark:text-purple-300 mb-3">
-                         {t('drawer.awaitingMessage')}
-                     </p>
-                     <ApprovalControls
-                        courseId={courseInfo.id}
-                        courseSlug={courseSlug}
-                        stageNumber={data.stageNumber}
-                        onApproved={handleStageApproved}
-                        onRegenerated={deselectNode}
-                        variant="prominent"
-                     />
-                 </div>
+                <div className="mb-6 rounded-lg border border-purple-200 bg-gradient-to-r from-purple-50 to-indigo-50 p-4 dark:border-purple-700 dark:from-purple-900/20 dark:to-indigo-900/20">
+                  <p className="mb-3 text-sm text-purple-700 dark:text-purple-300">
+                    {t('drawer.awaitingMessage')}
+                  </p>
+                  <ApprovalControls
+                    courseId={courseInfo.id}
+                    orgSlug={orgSlug || ''}
+                    courseSlug={courseSlug}
+                    stageNumber={data.stageNumber}
+                    onApproved={handleStageApproved}
+                    onRegenerated={deselectNode}
+                    variant="prominent"
+                  />
+                </div>
               )}
 
               {/* Phase Selector for stages with phases (4, 5) */}
@@ -928,7 +1037,7 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
                     // PhaseSelector only handles core statuses, map other statuses appropriately
                     status: (['pending', 'active', 'completed', 'error'].includes(p.status)
                       ? p.status
-                      : 'completed') as 'pending' | 'active' | 'completed' | 'error'
+                      : 'completed') as 'pending' | 'active' | 'completed' | 'error',
                   }))}
                   selectedPhase={selectedPhaseId}
                   onSelectPhase={setSelectedPhaseId}
@@ -938,50 +1047,55 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
 
               {/* Attempt Selector only for actual retries (not phases) */}
               {!hasPhases && data?.attempts && data.attempts.length > 1 && (
-                 <AttemptSelector
-                    attempts={data.attempts}
-                    selectedAttempt={selectedAttemptNum || 1}
-                    onSelectAttempt={setSelectedAttemptNum}
-                 />
+                <AttemptSelector
+                  attempts={data.attempts}
+                  selectedAttempt={selectedAttemptNum || 1}
+                  onSelectAttempt={setSelectedAttemptNum}
+                />
               )}
 
               <Tabs defaultValue="output" className="w-full" data-testid="drawer-tabs">
                 <TabsList className="grid w-full grid-cols-4">
-                  <TabsTrigger value="input" data-testid="tab-input">{t('drawer.input')}</TabsTrigger>
-                  <TabsTrigger value="process" data-testid="tab-process">{t('drawer.process')}</TabsTrigger>
-                  <TabsTrigger value="output" data-testid="tab-output">{t('drawer.output')}</TabsTrigger>
-                  <TabsTrigger value="activity" data-testid="tab-activity">{t('drawer.activity')}</TabsTrigger>
+                  <TabsTrigger value="input" data-testid="tab-input">
+                    {t('drawer.input')}
+                  </TabsTrigger>
+                  <TabsTrigger value="process" data-testid="tab-process">
+                    {t('drawer.process')}
+                  </TabsTrigger>
+                  <TabsTrigger value="output" data-testid="tab-output">
+                    {t('drawer.output')}
+                  </TabsTrigger>
+                  <TabsTrigger value="activity" data-testid="tab-activity">
+                    {t('drawer.activity')}
+                  </TabsTrigger>
                 </TabsList>
 
                 <TabsContent value="input" className="mt-4 space-y-4" data-testid="content-input">
                   {data?.stageNumber === 1 ? (
-                    <Stage1InputTab inputData={displayData?.inputData as Stage1InputData | undefined} />
+                    <Stage1InputTab
+                      inputData={displayData?.inputData as Stage1InputData | undefined}
+                    />
                   ) : isDocumentNode ? (
-                    <Stage2InputTab
-                      documentId={documentId}
-                      inputData={displayData?.inputData}
-                    />
+                    <Stage2InputTab documentId={documentId} inputData={displayData?.inputData} />
                   ) : data?.stageNumber === 3 ? (
-                    <Stage3InputTab
-                      courseId={courseInfo.id}
-                      inputData={displayData?.inputData}
-                    />
+                    <Stage3InputTab courseId={courseInfo.id} inputData={displayData?.inputData} />
                   ) : data?.stageNumber === 4 ? (
                     <Stage4InputTab
                       courseId={courseInfo.id}
                       inputData={displayData?.inputData as Stage4InputData | undefined}
                     />
                   ) : data?.stageNumber === 5 ? (
-                    <Stage5InputTab
-                      courseId={courseInfo.id}
-                      inputData={displayData?.inputData}
-                    />
+                    <Stage5InputTab courseId={courseInfo.id} inputData={displayData?.inputData} />
                   ) : (
                     <InputTab inputData={displayData?.inputData} />
                   )}
                 </TabsContent>
 
-                <TabsContent value="process" className="mt-4 space-y-4" data-testid="content-process">
+                <TabsContent
+                  value="process"
+                  className="mt-4 space-y-4"
+                  data-testid="content-process"
+                >
                   {data?.stageNumber === 1 ? (
                     <Stage1ProcessTab
                       status={displayData?.status as 'pending' | 'completed' | 'error' | undefined}
@@ -990,23 +1104,51 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
                   ) : isDocumentNode ? (
                     <Stage2ProcessTab
                       documentId={documentId}
-                      status={displayData?.status as 'pending' | 'active' | 'completed' | 'error' | undefined}
+                      status={
+                        displayData?.status as
+                          | 'pending'
+                          | 'active'
+                          | 'completed'
+                          | 'error'
+                          | undefined
+                      }
                     />
                   ) : data?.stageNumber === 3 ? (
                     <Stage3ProcessTab
                       courseId={courseInfo.id}
-                      status={displayData?.status as 'pending' | 'active' | 'completed' | 'error' | undefined}
+                      status={
+                        displayData?.status as
+                          | 'pending'
+                          | 'active'
+                          | 'completed'
+                          | 'error'
+                          | undefined
+                      }
                     />
                   ) : data?.stageNumber === 4 ? (
                     <Stage4ProcessTab
                       courseId={courseInfo.id}
                       outputData={displayData?.outputData}
-                      status={displayData?.status as 'pending' | 'active' | 'completed' | 'error' | undefined}
+                      status={
+                        displayData?.status as
+                          | 'pending'
+                          | 'active'
+                          | 'completed'
+                          | 'error'
+                          | undefined
+                      }
                     />
                   ) : data?.stageNumber === 5 ? (
                     <Stage5ProcessTab
                       courseId={courseInfo.id}
-                      status={displayData?.status as 'pending' | 'active' | 'completed' | 'error' | undefined}
+                      status={
+                        displayData?.status as
+                          | 'pending'
+                          | 'active'
+                          | 'completed'
+                          | 'error'
+                          | undefined
+                      }
                       outputData={displayData?.outputData}
                       processingTimeMs={displayData?.duration}
                       totalTokens={displayData?.tokens}
@@ -1073,7 +1215,11 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
                   )}
                 </TabsContent>
 
-                <TabsContent value="activity" className="mt-4 space-y-4" data-testid="content-activity">
+                <TabsContent
+                  value="activity"
+                  className="mt-4 space-y-4"
+                  data-testid="content-activity"
+                >
                   {data?.stageNumber === 1 ? (
                     <Stage1ActivityTab
                       nodeId={selectedNodeId}
@@ -1088,20 +1234,11 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
                       documentId={documentId}
                     />
                   ) : data?.stageNumber === 3 ? (
-                    <Stage3ActivityTab
-                      nodeId={selectedNodeId}
-                      courseId={courseInfo.id}
-                    />
+                    <Stage3ActivityTab nodeId={selectedNodeId} courseId={courseInfo.id} />
                   ) : data?.stageNumber === 4 ? (
-                    <Stage4ActivityTab
-                      nodeId={selectedNodeId}
-                      courseId={courseInfo.id}
-                    />
+                    <Stage4ActivityTab nodeId={selectedNodeId} courseId={courseInfo.id} />
                   ) : data?.stageNumber === 5 ? (
-                    <Stage5ActivityTab
-                      nodeId={selectedNodeId}
-                      courseId={courseInfo.id}
-                    />
+                    <Stage5ActivityTab nodeId={selectedNodeId} courseId={courseInfo.id} />
                   ) : (
                     <ActivityTab nodeId={selectedNodeId} />
                   )}
@@ -1110,27 +1247,33 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
 
               {/* Refinement Chat (T084) */}
               {isAIStage && (
-                  <div ref={refinementChatRef}>
-                      <RefinementChat
-                          courseId={courseInfo.id}
-                          stageId={`stage_${data?.stageNumber}`}
-                          nodeId={selectedNodeId || undefined}
-                          attemptNumber={selectedAttemptNum || 1}
-                          onRefine={handleRefine}
-                          history={chatHistory}
-                          isProcessing={isRefining}
-                      />
-                  </div>
+                <div ref={refinementChatRef}>
+                  <RefinementChat
+                    courseId={courseInfo.id}
+                    stageId={`stage_${data?.stageNumber}`}
+                    nodeId={selectedNodeId || undefined}
+                    attemptNumber={selectedAttemptNum || 1}
+                    onRefine={(msg, intent) => void handleRefine(msg, intent)}
+                    history={chatHistory}
+                    isProcessing={isRefining}
+                    latestProposal={latestProposal}
+                    isApplying={isApplying}
+                    onAcceptProposal={() => void acceptProposal()}
+                    proposalError={proposalError}
+                    onRetryProposal={() => void retryProposal()}
+                  />
+                </div>
               )}
             </>
           )}
         </div>
 
         {/* Restart Confirmation Dialog */}
-        {courseSlug && data?.stageNumber && (
+        {orgSlug && courseSlug && data?.stageNumber && (
           <RestartConfirmDialog
             open={showRestartDialog}
             onClose={() => setShowRestartDialog(false)}
+            orgSlug={orgSlug}
             courseSlug={courseSlug}
             stageNumber={data.stageNumber}
             stageName={t(`stages.stage_${data.stageNumber}`)}
@@ -1141,5 +1284,5 @@ export const NodeDetailsDrawer = memo(function NodeDetailsDrawer() {
         )}
       </SheetContent>
     </Sheet>
-  );
-});
+  )
+})

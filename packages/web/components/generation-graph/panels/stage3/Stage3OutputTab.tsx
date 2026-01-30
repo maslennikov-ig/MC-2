@@ -4,7 +4,7 @@ import React, { memo, useMemo } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { cn } from '@/lib/utils';
 import { Scale, Loader2 } from 'lucide-react';
-import { GRAPH_TRANSLATIONS } from '@/lib/generation-graph/translations';
+import { useTranslations, useLocale } from 'next-intl';
 import {
   PRIORITY_CONFIG,
   type DocumentPriority,
@@ -49,7 +49,6 @@ interface HierarchyDistributionProps {
   importantCount: number;
   supplementaryCount: number;
   total: number;
-  locale: 'ru' | 'en';
 }
 
 /**
@@ -57,8 +56,9 @@ interface HierarchyDistributionProps {
  * Uses shared PRIORITY_CONFIG for labels/icons/styling
  */
 const HierarchyDistribution = memo<HierarchyDistributionProps>(
-  function HierarchyDistribution({ coreCount, importantCount, supplementaryCount, total, locale }) {
-    const t = GRAPH_TRANSLATIONS.stage3 as Record<string, { ru: string; en: string }>;
+  function HierarchyDistribution({ coreCount, importantCount, supplementaryCount, total }) {
+    const t = useTranslations('generation.stage3');
+    const locale = useLocale();
 
     // Calculate percentages
     const corePercent = total > 0 ? (coreCount / total) * 100 : 0;
@@ -95,7 +95,7 @@ const HierarchyDistribution = memo<HierarchyDistributionProps>(
         <CardHeader className="pb-3">
           <CardTitle className="text-sm font-medium flex items-center gap-2">
             <Scale className="h-4 w-4 text-amber-500" />
-            {t.hierarchyDistribution?.[locale] ?? 'Document Hierarchy'}
+            {t('hierarchyDistribution')}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -155,9 +155,9 @@ export const Stage3OutputTab = memo<Stage3OutputTabProps>(function Stage3OutputT
   isEditable = false,
   isLoading = false,
   onApprove,
-  locale = 'ru',
 }) {
-  const t = GRAPH_TRANSLATIONS.stage3 as Record<string, { ru: string; en: string }>;
+  const t = useTranslations('generation.stage3');
+  const tCommon = useTranslations('generation.common');
 
   // Parse output data
   const data = useMemo((): Stage3OutputData | null => {
@@ -186,7 +186,7 @@ export const Stage3OutputTab = memo<Stage3OutputTabProps>(function Stage3OutputT
       <div className="flex flex-col items-center justify-center p-8 text-center">
         <Loader2 className="h-8 w-8 animate-spin text-amber-500 mb-4" />
         <p className="text-sm text-muted-foreground">
-          {locale === 'ru' ? 'Загрузка классификации...' : 'Loading classification...'}
+          {tCommon('saving')}
         </p>
       </div>
     );
@@ -198,7 +198,7 @@ export const Stage3OutputTab = memo<Stage3OutputTabProps>(function Stage3OutputT
       <div className="flex flex-col items-center justify-center p-8 text-center">
         <Scale className="h-12 w-12 text-muted-foreground/30 mb-4" />
         <p className="text-sm text-muted-foreground">
-          {t.emptyOutput?.[locale] ?? 'No classification data available'}
+          {t('emptyOutput')}
         </p>
       </div>
     );
@@ -213,7 +213,6 @@ export const Stage3OutputTab = memo<Stage3OutputTabProps>(function Stage3OutputT
           importantCount={counts.important}
           supplementaryCount={counts.supplementary}
           total={counts.total}
-          locale={locale}
         />
       )}
 
@@ -221,7 +220,7 @@ export const Stage3OutputTab = memo<Stage3OutputTabProps>(function Stage3OutputT
       <Card>
         <CardHeader className="pb-3">
           <CardTitle className="text-sm font-medium">
-            {t.priorityTable?.[locale] ?? 'Document Priorities'}
+            {t('priorityTable')}
           </CardTitle>
         </CardHeader>
         <CardContent className="p-0">

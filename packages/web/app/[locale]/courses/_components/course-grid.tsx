@@ -17,6 +17,7 @@ import type { Course } from '@/types/database'
 import { logger } from '@/lib/client-logger'
 
 interface CourseWithFavorite extends Course {
+  orgSlug: string
   isFavorited?: boolean
   coverUrl?: string | null
 }

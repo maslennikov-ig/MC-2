@@ -5,10 +5,10 @@
  * DO NOT duplicate these values elsewhere.
  */
 
-export const locales = ['ru', 'en'] as const;
-export type Locale = (typeof locales)[number];
+export const locales = ['ru', 'en'] as const
+export type Locale = (typeof locales)[number]
 
-export const defaultLocale: Locale = 'ru';
+export const defaultLocale: Locale = 'ru'
 
 /**
  * All translation namespaces.
@@ -20,8 +20,17 @@ export const defaultLocale: Locale = 'ru';
  * 3. Create messages/en/{namespace}.json
  * 4. Update types/i18n.d.ts with the new type
  */
-export const namespaces = ['common', 'admin', 'generation', 'auth', 'enrichments', 'course', 'organizations'] as const;
-export type Namespace = (typeof namespaces)[number];
+export const namespaces = [
+  'common',
+  'admin',
+  'generation',
+  'auth',
+  'enrichments',
+  'course',
+  'organizations',
+  'benchmarks',
+] as const
+export type Namespace = (typeof namespaces)[number]
 
 /**
  * Cookie configuration for locale persistence
@@ -32,18 +41,18 @@ export const localeCookie = {
   path: '/',
   sameSite: 'lax' as const, // lowercase for cookies() API compatibility
   secure: process.env.NODE_ENV === 'production',
-} as const;
+} as const
 
 /**
  * Helper to check if a locale is valid
  */
 export function isValidLocale(locale: unknown): locale is Locale {
-  return typeof locale === 'string' && locales.includes(locale as Locale);
+  return typeof locale === 'string' && locales.includes(locale as Locale)
 }
 
 /**
  * Helper to get locale with fallback
  */
 export function getLocaleOrDefault(locale: unknown): Locale {
-  return isValidLocale(locale) ? locale : defaultLocale;
+  return isValidLocale(locale) ? locale : defaultLocale
 }

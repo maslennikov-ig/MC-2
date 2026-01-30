@@ -76,6 +76,9 @@ export interface PresentationPromptParams {
 
   /** Optional generation settings */
   settings?: PresentationSettings;
+
+  /** Course writing style prompt for tone consistency */
+  stylePrompt?: string;
 }
 
 /**
@@ -92,9 +95,7 @@ const presentationDraftOutlineItemSchema = z.object({
   layout: z.enum(['title', 'content', 'two-column', 'image']),
 });
 
-export type PresentationDraftOutlineItem = z.infer<
-  typeof presentationDraftOutlineItemSchema
->;
+export type PresentationDraftOutlineItem = z.infer<typeof presentationDraftOutlineItemSchema>;
 
 /**
  * Draft output schema (Phase 1)
@@ -203,12 +204,13 @@ You are an **Educational Presentation Designer** specializing in creating engagi
 Your goal is to create a structured outline for a presentation that effectively communicates lesson content through visual slides.
 
 # Input Data
-You will receive four inputs wrapped in XML tags:
+You will receive inputs wrapped in XML tags:
 1. \`<LESSON_TITLE>\`: The title of the lesson
 2. \`<LESSON_CONTENT>\`: The full lesson content in markdown format
 3. \`<LEARNING_OBJECTIVES>\`: The educational goals for this lesson
 4. \`<LANGUAGE>\`: The target language code (ISO 639-1, e.g., 'en', 'ru')
 5. \`<SETTINGS>\`: Optional theme and slide count preferences
+6. \`<STYLE>\` (optional): Course writing style prompt for tone consistency
 
 # Task: Create Slide Outline
 
@@ -274,6 +276,17 @@ Choose the most appropriate theme based on lesson content:
 - **dark**: Technical topics, coding tutorials, modern design
 - **academic**: Research, scientific content, formal presentations
 
+## Style Considerations
+
+If a <STYLE> tag is provided, adapt your slide content tone and language to match:
+- Apply the specified style to slide titles, key points, and speaker notes
+- Keep technical accuracy while adjusting formality and engagement level
+- Style examples:
+  - "gamified" style: Uses quest/achievement language, game metaphors, celebratory headers
+  - "professional" style: Uses formal business language, corporate tone
+  - "conversational" style: Uses friendly, casual language, direct address
+  - "academic" style: Uses scholarly tone, precise terminology, formal structure
+
 # Output Format
 
 CRITICAL: Return ONLY raw JSON. No markdown code blocks.
@@ -315,15 +328,14 @@ Start with { and end with }.
  * @param params - Presentation generation parameters
  * @returns User message string with XML-delimited inputs
  */
-export function buildPresentationDraftUserMessage(
-  params: PresentationPromptParams
-): string {
+export function buildPresentationDraftUserMessage(params: PresentationPromptParams): string {
   const {
     lessonTitle,
     lessonContent,
     lessonObjectives,
     language,
     settings = {},
+    stylePrompt,
   } = params;
 
   const {
@@ -334,9 +346,7 @@ export function buildPresentationDraftUserMessage(
   } = settings;
 
   // Format learning objectives
-  const objectivesText = lessonObjectives
-    .map((obj, idx) => `${idx + 1}. ${obj}`)
-    .join('\n');
+  const objectivesText = lessonObjectives.map((obj, idx) => `${idx + 1}. ${obj}`).join('\n');
 
   // Format settings
   const settingsText = [
@@ -345,6 +355,11 @@ export function buildPresentationDraftUserMessage(
     `Include Visual Suggestions: ${includeVisualSuggestions}`,
     `Include Speaker Notes: ${includeSpeakerNotes}`,
   ].join('\n');
+
+  // Build style section if provided
+  const styleSection = stylePrompt
+    ? `\n\n<STYLE>\n${sanitizeForPrompt(stylePrompt)}\n</STYLE>`
+    : '';
 
   return `<LESSON_TITLE>
 ${sanitizeForPrompt(lessonTitle)}
@@ -364,7 +379,7 @@ ${sanitizeForPrompt(language)}
 
 <SETTINGS>
 ${settingsText}
-</SETTINGS>`;
+</SETTINGS>${styleSection}`;
 }
 
 /**
@@ -381,12 +396,13 @@ You are an **Educational Presentation Designer** creating the final slide conten
 You have an approved outline and must now generate complete, polished slides with markdown content, speaker notes, and visual suggestions.
 
 # Input Data
-You will receive:
+You will receive inputs wrapped in XML tags:
 1. \`<LESSON_TITLE>\`: The title of the lesson
 2. \`<LESSON_CONTENT>\`: The full lesson content in markdown format
 3. \`<APPROVED_OUTLINE>\`: The approved slide outline with titles, key points, and layouts
 4. \`<LANGUAGE>\`: The target language code (ISO 639-1, e.g., 'en', 'ru')
 5. \`<SETTINGS>\`: Theme and feature preferences
+6. \`<STYLE>\` (optional): Course writing style prompt for tone consistency
 
 # Task: Generate Complete Slides
 
@@ -487,6 +503,17 @@ For slides with layout="image" or visual-heavy content, provide specific, action
 - Technical terms: Keep in original language (e.g., "API", "React", "useState")
 - Ensure speaker notes are conversational and natural
 
+## Style Considerations
+
+If a <STYLE> tag is provided, adapt your slide content tone and language to match:
+- Apply the specified style to slide content, titles, and speaker notes
+- Keep technical accuracy while adjusting formality and engagement level
+- Style examples:
+  - "gamified" style: Uses quest/achievement language, game metaphors, celebratory headers
+  - "professional" style: Uses formal business language, corporate tone
+  - "conversational" style: Uses friendly, casual language, direct address
+  - "academic" style: Uses scholarly tone, precise terminology, formal structure
+
 ## Duration Estimation
 
 Estimate realistic presentation duration based on:
@@ -559,12 +586,7 @@ export function buildPresentationFinalUserMessage(
   params: PresentationPromptParams,
   approvedOutline: PresentationDraft
 ): string {
-  const {
-    lessonTitle,
-    lessonContent,
-    language,
-    settings = {},
-  } = params;
+  const { lessonTitle, lessonContent, language, settings = {}, stylePrompt } = params;
 
   const {
     theme = 'default',
@@ -575,9 +597,7 @@ export function buildPresentationFinalUserMessage(
   // Format approved outline
   const outlineText = approvedOutline.outline
     .map((item, idx) => {
-      const keyPointsText = item.key_points
-        .map((point) => `  - ${point}`)
-        .join('\n');
+      const keyPointsText = item.key_points.map(point => `  - ${point}`).join('\n');
       return `Slide ${idx}: ${item.title} (${item.layout})\n${keyPointsText}`;
     })
     .join('\n\n');
@@ -588,6 +608,11 @@ export function buildPresentationFinalUserMessage(
     `Include Visual Suggestions: ${includeVisualSuggestions}`,
     `Include Speaker Notes: ${includeSpeakerNotes}`,
   ].join('\n');
+
+  // Build style section if provided
+  const styleSection = stylePrompt
+    ? `\n\n<STYLE>\n${sanitizeForPrompt(stylePrompt)}\n</STYLE>`
+    : '';
 
   return `<LESSON_TITLE>
 ${sanitizeForPrompt(lessonTitle)}
@@ -607,7 +632,7 @@ ${sanitizeForPrompt(language)}
 
 <SETTINGS>
 ${settingsText}
-</SETTINGS>`;
+</SETTINGS>${styleSection}`;
 }
 
 /**
@@ -712,11 +737,7 @@ export function estimatePresentationTokens(
   estimatedSlides: number = 12,
   includeSpeakerNotes: boolean = true
 ): number {
-  const draftTokens = estimatePresentationDraftTokens(
-    lessonContent,
-    language,
-    estimatedSlides
-  );
+  const draftTokens = estimatePresentationDraftTokens(lessonContent, language, estimatedSlides);
   const finalTokens = estimatePresentationFinalTokens(
     lessonContent,
     language,

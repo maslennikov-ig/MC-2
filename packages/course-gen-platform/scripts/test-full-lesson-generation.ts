@@ -8,7 +8,7 @@
  *
  * Usage:
  * pnpm tsx scripts/test-full-lesson-generation.ts \
- *   --models "xiaomi/mimo-v2-flash:free,allenai/olmo-3.1-32b-instruct"
+ *   --models "xiaomi/mimo-v2-flash,allenai/olmo-3.1-32b-instruct"
  */
 
 import 'dotenv/config';
@@ -443,7 +443,7 @@ async function main(): Promise<void> {
     .option(
       '--models <models>',
       'Comma-separated list of model IDs',
-      'xiaomi/mimo-v2-flash:free,allenai/olmo-3.1-32b-instruct'
+      'xiaomi/mimo-v2-flash,allenai/olmo-3.1-32b-instruct'
     )
     .option('--sections <count>', 'Number of sections to generate', '2')
     .parse();

@@ -16,7 +16,8 @@ import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 
 interface ShareButtonProps {
-  slug: string;
+  orgSlug: string;
+  courseSlug: string;
   shareToken?: string | null;
   isOwner: boolean;
   isAdmin: boolean;
@@ -24,7 +25,8 @@ interface ShareButtonProps {
 }
 
 export function ShareButton({
-  slug,
+  orgSlug,
+  courseSlug,
   shareToken: initialToken,
   isOwner,
   isAdmin,
@@ -149,7 +151,7 @@ export function ShareButton({
     try {
       // Creating share link for course
 
-      const response = await fetchWithRetry(`/api/courses/${slug}/share`, {
+      const response = await fetchWithRetry(`/api/courses/${orgSlug}/${courseSlug}/share`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -229,7 +231,7 @@ export function ShareButton({
     try {
       // Removing share link for course
 
-      const response = await fetchWithRetry(`/api/courses/${slug}/share`, {
+      const response = await fetchWithRetry(`/api/courses/${orgSlug}/${courseSlug}/share`, {
         method: 'DELETE',
         headers: {
           'Content-Type': 'application/json',

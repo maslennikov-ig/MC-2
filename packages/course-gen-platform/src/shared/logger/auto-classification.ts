@@ -32,7 +32,7 @@
  *
  * 4. **Trie-based matching** - For prefix-heavy patterns
  *
- * Current rule count: 29 (no optimization needed)
+ * Current rule count: 35 (no optimization needed)
  * Review threshold: 30+ rules
  */
 
@@ -83,6 +83,11 @@ export const AUTO_MUTE_RULES: AutoMuteRule[] = [
     pattern: /\/health.*404/i,
     reason: 'monitoring_probe',
     description: 'Generic health check probes - monitoring infrastructure',
+  },
+  {
+    pattern: /No procedure found on path "health"/i,
+    reason: 'monitoring_probe',
+    description: 'tRPC health endpoint probe - monitoring infrastructure',
   },
 
   // === External Service Issues ===
@@ -143,6 +148,13 @@ export const AUTO_MUTE_RULES: AutoMuteRule[] = [
     description: 'Redis auto-reconnect during restart - expected behavior',
   },
 
+  // === UI Race Conditions ===
+  {
+    pattern: /Invalid status for approval.*Expected.*got/i,
+    reason: 'ui_race_condition',
+    description: 'User clicked approve but course already progressed - stale UI state',
+  },
+
   // === Job Lifecycle Events ===
   {
     pattern: /Job stalled/i,
@@ -189,6 +201,11 @@ export const AUTO_MUTE_RULES: AutoMuteRule[] = [
     description: 'LLM hallucinated prompt template - patcher correctly rejected, will retry',
   },
   {
+    pattern: /Patcher failed.*edit attempt counted toward section lock/i,
+    reason: 'cascading_repair',
+    description: 'Patcher edit failed - counted toward lock limit, will retry or escalate',
+  },
+  {
     pattern: /No RAG chunks found for section/i,
     reason: 'expected_behavior',
     description: 'Course without documents - content generated without reference materials',
@@ -212,6 +229,25 @@ export const AUTO_MUTE_RULES: AutoMuteRule[] = [
     pattern: /Unexpected exit code: 10/i,
     reason: 'job_lifecycle',
     description: 'Worker TTL timeout (10 min) - job exceeded max time, will be retried',
+  },
+
+  // === Expected HTTP Responses ===
+  {
+    pattern: /\/trpc\/.*401/i,
+    reason: 'expected_behavior',
+    description: 'Unauthenticated tRPC request - 401 is correct response',
+  },
+
+  // === Cache & Config Warnings ===
+  {
+    pattern: /Cache directory does not exist/i,
+    reason: 'expected_behavior',
+    description: 'Cache directory missing on fresh environment - will be created when needed',
+  },
+  {
+    pattern: /ModelConfigBunker.*sync.*fail/i,
+    reason: 'external_service',
+    description: 'ModelConfigBunker network issue - has retry with exponential backoff',
   },
 ];
 

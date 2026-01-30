@@ -19,7 +19,7 @@ import {
   Target,
   BookOpen,
 } from 'lucide-react';
-import { GRAPH_TRANSLATIONS } from '@/lib/generation-graph/translations';
+import { useTranslations } from 'next-intl';
 import { formatDuration } from '@/lib/generation-graph/format-utils';
 import type {
   Stage5ProcessTabProps,
@@ -107,75 +107,78 @@ const phaseConfig: Record<
 };
 
 /**
+ * Phase definitions with translation keys
+ */
+const PHASE_DEFINITIONS: Array<{
+  id: Stage5PhaseId;
+  nameKey: string;
+  descKey: string;
+  mockDuration: number;
+}> = [
+  {
+    id: 'validate_input',
+    nameKey: 'phaseValidateInput',
+    descKey: 'phaseValidateInputDesc',
+    mockDuration: 100,
+  },
+  {
+    id: 'generate_metadata',
+    nameKey: 'phaseGenerateMetadata',
+    descKey: 'phaseGenerateMetadataDesc',
+    mockDuration: 3500,
+  },
+  {
+    id: 'generate_sections',
+    nameKey: 'phaseGenerateSections',
+    descKey: 'phaseGenerateSectionsDesc',
+    mockDuration: 12000,
+  },
+  {
+    id: 'validate_quality',
+    nameKey: 'phaseValidateQuality',
+    descKey: 'phaseValidateQualityDesc',
+    mockDuration: 800,
+  },
+  {
+    id: 'validate_lessons',
+    nameKey: 'phaseValidateLessons',
+    descKey: 'phaseValidateLessonsDesc',
+    mockDuration: 200,
+  },
+];
+
+/**
  * Generates default phases based on overall status
+ * Uses translation function passed from component
  */
 function generateDefaultPhases(
   status: 'pending' | 'active' | 'completed' | 'error',
-  locale: 'ru' | 'en'
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  t: (key: any) => string
 ): Stage5Phase[] {
-  const t = GRAPH_TRANSLATIONS.stage5!;
-
-  const phaseDefinitions: Array<{
-    id: Stage5PhaseId;
-    nameKey: string;
-    descKey: string;
-    mockDuration: number;
-  }> = [
-    {
-      id: 'validate_input',
-      nameKey: 'phaseValidateInput',
-      descKey: 'phaseValidateInputDesc',
-      mockDuration: 100,
-    },
-    {
-      id: 'generate_metadata',
-      nameKey: 'phaseGenerateMetadata',
-      descKey: 'phaseGenerateMetadataDesc',
-      mockDuration: 3500,
-    },
-    {
-      id: 'generate_sections',
-      nameKey: 'phaseGenerateSections',
-      descKey: 'phaseGenerateSectionsDesc',
-      mockDuration: 12000,
-    },
-    {
-      id: 'validate_quality',
-      nameKey: 'phaseValidateQuality',
-      descKey: 'phaseValidateQualityDesc',
-      mockDuration: 800,
-    },
-    {
-      id: 'validate_lessons',
-      nameKey: 'phaseValidateLessons',
-      descKey: 'phaseValidateLessonsDesc',
-      mockDuration: 200,
-    },
-  ];
-
   if (status === 'completed') {
-    return phaseDefinitions.map((def) => ({
+    return PHASE_DEFINITIONS.map((def) => ({
       id: def.id,
-      name: t[def.nameKey]?.[locale] ?? def.id,
-      description: t[def.descKey]?.[locale] ?? '',
+      name: t(def.nameKey),
+      description: t(def.descKey),
       status: 'completed' as const,
       durationMs: def.mockDuration,
     }));
   }
 
   if (status === 'error') {
-    return phaseDefinitions.map((def, index) => ({
+    return PHASE_DEFINITIONS.map((def, index) => ({
       id: def.id,
-      name: t[def.nameKey]?.[locale] ?? def.id,
-      description: t[def.descKey]?.[locale] ?? '',
+      name: t(def.nameKey),
+      description: t(def.descKey),
       status:
-        index === phaseDefinitions.length - 1
+        index === PHASE_DEFINITIONS.length - 1
           ? ('error' as const)
           : ('completed' as const),
       durationMs:
-        index === phaseDefinitions.length - 1 ? undefined : def.mockDuration,
+        index === PHASE_DEFINITIONS.length - 1 ? undefined : def.mockDuration,
       message:
-        index === phaseDefinitions.length - 1
+        index === PHASE_DEFINITIONS.length - 1
           ? 'Structure generation failed'
           : undefined,
     }));
@@ -183,20 +186,20 @@ function generateDefaultPhases(
 
   if (status === 'active') {
     // First phase is active, rest are pending
-    return phaseDefinitions.map((def, index) => ({
+    return PHASE_DEFINITIONS.map((def, index) => ({
       id: def.id,
-      name: t[def.nameKey]?.[locale] ?? def.id,
-      description: t[def.descKey]?.[locale] ?? '',
+      name: t(def.nameKey),
+      description: t(def.descKey),
       status: index === 0 ? ('active' as const) : ('pending' as const),
       durationMs: undefined,
     }));
   }
 
   // Pending: all phases are pending
-  return phaseDefinitions.map((def) => ({
+  return PHASE_DEFINITIONS.map((def) => ({
     id: def.id,
-    name: t[def.nameKey]?.[locale] ?? def.id,
-    description: t[def.descKey]?.[locale] ?? '',
+    name: t(def.nameKey),
+    description: t(def.descKey),
     status: 'pending' as const,
     durationMs: undefined,
   }));
@@ -211,7 +214,7 @@ interface PhaseRowProps {
 }
 
 const PhaseRow = memo<PhaseRowProps>(function PhaseRow({ phase, locale }) {
-  const t = GRAPH_TRANSLATIONS.stage5!;
+  const t = useTranslations('generation.stage5');
   const config = phaseConfig[phase.id];
   const statusCfg = statusConfig[phase.status];
   const PhaseIcon = config?.icon ?? Circle;
@@ -222,12 +225,12 @@ const PhaseRow = memo<PhaseRowProps>(function PhaseRow({ phase, locale }) {
   const getDescription = (): string => {
     if (phase.description) return phase.description;
 
-    const descMap: Record<Stage5PhaseId, string | undefined> = {
-      validate_input: t.phaseValidateInputDesc?.[locale],
-      generate_metadata: t.phaseGenerateMetadataDesc?.[locale],
-      generate_sections: t.phaseGenerateSectionsDesc?.[locale],
-      validate_quality: t.phaseValidateQualityDesc?.[locale],
-      validate_lessons: t.phaseValidateLessonsDesc?.[locale],
+    const descMap: Record<Stage5PhaseId, string> = {
+      validate_input: t('phaseValidateInputDesc'),
+      generate_metadata: t('phaseGenerateMetadataDesc'),
+      generate_sections: t('phaseGenerateSectionsDesc'),
+      validate_quality: t('phaseValidateQualityDesc'),
+      validate_lessons: t('phaseValidateLessonsDesc'),
     };
 
     return descMap[phase.id] ?? '';
@@ -385,10 +388,10 @@ export const Stage5ProcessTab = memo<Stage5ProcessTabProps>(function Stage5Proce
   processingTimeMs,
   totalTokens,
 }) {
-  const t = GRAPH_TRANSLATIONS.stage5!;
+  const t = useTranslations('generation.stage5');
 
   // Generate default phases if not provided
-  const phases = providedPhases || generateDefaultPhases(status, locale);
+  const phases = providedPhases || generateDefaultPhases(status, t);
 
   // Calculate sections and lessons count from outputData
   let sectionsCount: number | undefined;
@@ -421,7 +424,7 @@ export const Stage5ProcessTab = memo<Stage5ProcessTabProps>(function Stage5Proce
       <div className="flex flex-col items-center justify-center py-12 text-center">
         <Layers className="h-12 w-12 text-muted-foreground/50 mb-4" />
         <p className="text-sm text-muted-foreground">
-          {t.emptyProcess?.[locale] ?? 'Generation not started yet'}
+          {t('emptyProcess')}
         </p>
       </div>
     );
@@ -435,10 +438,10 @@ export const Stage5ProcessTab = memo<Stage5ProcessTabProps>(function Stage5Proce
           <CardHeader className="pb-3">
             <CardTitle className="text-base font-semibold flex items-center gap-2">
               <Layers className="h-4 w-4 text-orange-500" />
-              {t.forgePipeline?.[locale] ?? 'Assembly Pipeline'}
+              {t('forgePipeline')}
             </CardTitle>
             <p className="text-sm text-muted-foreground">
-              {t.forgePipelineDesc?.[locale] ?? 'Transforming blueprint into course structure'}
+              {t('forgePipelineDesc')}
             </p>
           </CardHeader>
           <CardContent className="space-y-1">
@@ -455,7 +458,7 @@ export const Stage5ProcessTab = memo<Stage5ProcessTabProps>(function Stage5Proce
           <CardHeader className="pb-3">
             <CardTitle className="text-base font-semibold flex items-center gap-2">
               <Target className="h-4 w-4 text-orange-500" />
-              {t.telemetry?.[locale] ?? 'Telemetry'}
+              {t('telemetry')}
             </CardTitle>
           </CardHeader>
           <CardContent>
@@ -463,7 +466,7 @@ export const Stage5ProcessTab = memo<Stage5ProcessTabProps>(function Stage5Proce
             <div className="grid grid-cols-2 gap-3">
               <TelemetryItem
                 icon={Clock}
-                label={t.processingTime?.[locale] ?? 'Time'}
+                label={t('processingTime')}
                 value={
                   telemetry.processingTimeMs > 0
                     ? `${(telemetry.processingTimeMs / 1000).toFixed(1)}s`
@@ -473,7 +476,7 @@ export const Stage5ProcessTab = memo<Stage5ProcessTabProps>(function Stage5Proce
               />
               <TelemetryItem
                 icon={Coins}
-                label={t.tokensUsed?.[locale] ?? 'Tokens'}
+                label={t('tokensUsed')}
                 value={
                   telemetry.totalTokens > 0
                     ? `${(telemetry.totalTokens / 1000).toFixed(1)}k`
@@ -483,7 +486,7 @@ export const Stage5ProcessTab = memo<Stage5ProcessTabProps>(function Stage5Proce
               />
               <TelemetryItem
                 icon={DollarSign}
-                label={t.costLabel?.[locale] ?? 'Cost'}
+                label={t('costLabel')}
                 value={
                   telemetry.costUsd !== undefined && telemetry.costUsd > 0
                     ? `$${telemetry.costUsd.toFixed(3)}`
@@ -493,7 +496,7 @@ export const Stage5ProcessTab = memo<Stage5ProcessTabProps>(function Stage5Proce
               />
               <TelemetryItem
                 icon={Target}
-                label={t.qualityScore?.[locale] ?? 'Quality'}
+                label={t('qualityScore')}
                 value={
                   telemetry.qualityScore !== undefined
                     ? `${Math.round(telemetry.qualityScore * 100)}%`
@@ -503,7 +506,7 @@ export const Stage5ProcessTab = memo<Stage5ProcessTabProps>(function Stage5Proce
               />
               <TelemetryItem
                 icon={Layers}
-                label={t.sectionsCount?.[locale] ?? 'Sections'}
+                label={t('sectionsCount')}
                 value={
                   telemetry.sectionsCount !== undefined
                     ? telemetry.sectionsCount.toString()
@@ -513,7 +516,7 @@ export const Stage5ProcessTab = memo<Stage5ProcessTabProps>(function Stage5Proce
               />
               <TelemetryItem
                 icon={BookOpen}
-                label={t.lessonsCount?.[locale] ?? 'Lessons'}
+                label={t('lessonsCount')}
                 value={
                   telemetry.lessonsCount !== undefined
                     ? telemetry.lessonsCount.toString()

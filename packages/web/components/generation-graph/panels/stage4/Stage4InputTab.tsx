@@ -19,7 +19,7 @@ import {
   AlertCircle,
   Loader2,
 } from 'lucide-react';
-import { GRAPH_TRANSLATIONS } from '@/lib/generation-graph/translations';
+import { useTranslations } from 'next-intl';
 import { getTierModelName } from '@/lib/generation-graph/constants';
 import { getSupabaseClient } from '@/lib/supabase/browser-client';
 import type {
@@ -59,12 +59,11 @@ function isStage4InputData(data: unknown): data is Stage4InputData {
 
 interface DescriptionWithToggleProps {
   description: string;
-  locale: 'ru' | 'en';
 }
 
-function DescriptionWithToggle({ description, locale }: DescriptionWithToggleProps) {
+function DescriptionWithToggle({ description }: DescriptionWithToggleProps) {
   const [isExpanded, setIsExpanded] = useState(false);
-  const t = GRAPH_TRANSLATIONS.stage1;
+  const t = useTranslations('generation.stage1');
 
   const shouldShowToggle = description.length > DESCRIPTION_TRUNCATE_LENGTH;
   const displayText =
@@ -81,20 +80,16 @@ function DescriptionWithToggle({ description, locale }: DescriptionWithTogglePro
           onClick={() => setIsExpanded(!isExpanded)}
           className="flex items-center gap-1 text-xs text-primary hover:underline focus:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 rounded"
           aria-expanded={isExpanded}
-          aria-label={
-            isExpanded
-              ? t?.showLess?.[locale] || 'Show less'
-              : t?.showMore?.[locale] || 'Show more'
-          }
+          aria-label={isExpanded ? t('showLess') : t('showMore')}
         >
           {isExpanded ? (
             <>
-              {t?.showLess?.[locale] || 'Show less'}
+              {t('showLess')}
               <ChevronUp className="h-3 w-3" aria-hidden="true" />
             </>
           ) : (
             <>
-              {t?.showMore?.[locale] || 'Show more'}
+              {t('showMore')}
               <ChevronDown className="h-3 w-3" aria-hidden="true" />
             </>
           )}
@@ -110,11 +105,10 @@ function DescriptionWithToggle({ description, locale }: DescriptionWithTogglePro
 
 interface KnowledgeStackProps {
   classifications: Stage4DocumentClassification[];
-  locale: 'ru' | 'en';
 }
 
-function KnowledgeStack({ classifications, locale }: KnowledgeStackProps) {
-  const t = GRAPH_TRANSLATIONS.stage4;
+function KnowledgeStack({ classifications }: KnowledgeStackProps) {
+  const t = useTranslations('generation.stage4');
   const [showSupplementary, setShowSupplementary] = useState(false);
 
   // Group documents by priority
@@ -135,7 +129,7 @@ function KnowledgeStack({ classifications, locale }: KnowledgeStackProps) {
       <div className="flex flex-col items-center justify-center py-8 text-center">
         <FileText className="h-10 w-10 text-muted-foreground/30 mb-3" />
         <p className="text-sm text-muted-foreground">
-          {t?.noDocumentsClassified?.[locale] || 'No classified documents'}
+          {t('noDocumentsClassified')}
         </p>
       </div>
     );
@@ -153,7 +147,7 @@ function KnowledgeStack({ classifications, locale }: KnowledgeStackProps) {
             <div className="min-w-0 flex-1">
               <div className="flex items-center gap-2 mb-1">
                 <span className="text-xs font-medium text-amber-700 dark:text-amber-400 uppercase tracking-wide">
-                  {t?.coreSource?.[locale] || 'Core Source'}
+                  {t('coreSource')}
                 </span>
               </div>
               <p className="text-sm font-medium truncate" title={coreDoc.filename}>
@@ -181,7 +175,7 @@ function KnowledgeStack({ classifications, locale }: KnowledgeStackProps) {
           <div className="flex items-center gap-2">
             <Star className="h-4 w-4 text-blue-500" aria-hidden="true" />
             <span className="text-xs font-medium text-muted-foreground">
-              {t?.importantSources?.[locale] || 'Key Materials'}
+              {t('importantSources')}
             </span>
             <Badge variant="secondary" className="text-xs">
               {importantDocs.length}
@@ -221,7 +215,7 @@ function KnowledgeStack({ classifications, locale }: KnowledgeStackProps) {
             )}
             <span>
               + {supplementaryDocs.length}{' '}
-              {t?.supplementarySources?.[locale] || 'supporting files'}
+              {t('supplementarySources')}
             </span>
           </button>
           {showSupplementary && (
@@ -254,7 +248,8 @@ export const Stage4InputTab = memo<Stage4InputTabProps>(function Stage4InputTab(
   inputData,
   locale = 'ru',
 }) {
-  const t = GRAPH_TRANSLATIONS.stage4;
+  const t = useTranslations('generation.stage4');
+  const tStage1 = useTranslations('generation.stage1');
 
   // State for fetched data
   const [courseContext, setCourseContext] = useState<{
@@ -318,9 +313,7 @@ export const Stage4InputTab = memo<Stage4InputTabProps>(function Stage4InputTab(
 
         if (courseError) {
           console.error('[Stage4InputTab] Error fetching course:', courseError);
-          setFetchError(
-            locale === 'ru' ? 'Ошибка загрузки курса' : 'Failed to load course'
-          );
+          setFetchError(t('loadingCourseError'));
           return;
         }
 
@@ -408,9 +401,7 @@ export const Stage4InputTab = memo<Stage4InputTabProps>(function Stage4InputTab(
       } catch (err) {
         if (cancelled) return;
         console.error('[Stage4InputTab] Fetch error:', err);
-        setFetchError(
-          locale === 'ru' ? 'Ошибка загрузки данных' : 'Failed to load data'
-        );
+        setFetchError(t('loadingDataError'));
       } finally {
         if (!cancelled) {
           setIsLoading(false);
@@ -437,7 +428,7 @@ export const Stage4InputTab = memo<Stage4InputTabProps>(function Stage4InputTab(
       <div className="flex flex-col items-center justify-center p-8">
         <Loader2 className="h-8 w-8 animate-spin text-violet-500 mb-4" />
         <p className="text-sm text-muted-foreground">
-          {locale === 'ru' ? 'Загрузка данных...' : 'Loading data...'}
+          {t('loadingData')}
         </p>
       </div>
     );
@@ -452,9 +443,9 @@ export const Stage4InputTab = memo<Stage4InputTabProps>(function Stage4InputTab(
         <button
           onClick={handleRetry}
           className="text-sm text-muted-foreground hover:text-foreground underline focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 rounded"
-          aria-label={locale === 'ru' ? 'Повторить загрузку данных' : 'Retry loading data'}
+          aria-label={t('retryLoadingLabel')}
         >
-          {locale === 'ru' ? 'Попробовать снова' : 'Try again'}
+          {t('tryAgain')}
         </button>
       </div>
     );
@@ -466,7 +457,7 @@ export const Stage4InputTab = memo<Stage4InputTabProps>(function Stage4InputTab(
       <div className="flex flex-col items-center justify-center p-8 text-center">
         <BookOpen className="h-12 w-12 text-muted-foreground/30 mb-4" />
         <p className="text-sm text-muted-foreground">
-          {t?.emptyInput?.[locale] || 'Waiting for Stage 3 data...'}
+          {t('emptyInput')}
         </p>
       </div>
     );
@@ -480,18 +471,18 @@ export const Stage4InputTab = memo<Stage4InputTabProps>(function Stage4InputTab(
       <Card className="col-span-5 border-l-4 border-l-violet-500">
         <CardHeader className="pb-3">
           <CardTitle className="text-sm font-medium text-muted-foreground">
-            {t?.courseBrief?.[locale] || 'Course Brief'}
+            {t('courseBrief')}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
           {/* Topic - Large H3 typography */}
           <h3 className="text-xl font-bold leading-tight">
-            {courseContext?.topic || (locale === 'ru' ? 'Загрузка...' : 'Loading...')}
+            {courseContext?.topic || t('loadingPlaceholder')}
           </h3>
 
           {/* Description with show more/less */}
           {courseContext?.description && (
-            <DescriptionWithToggle description={courseContext.description} locale={locale} />
+            <DescriptionWithToggle description={courseContext.description} />
           )}
 
           {/* Metadata row: audience, style, lessons range */}
@@ -513,7 +504,7 @@ export const Stage4InputTab = memo<Stage4InputTabProps>(function Stage4InputTab(
                 <BookOpen className="h-3.5 w-3.5" aria-hidden="true" />
                 <span>
                   {courseContext.lessonsRange.min}-{courseContext.lessonsRange.max}{' '}
-                  {t?.lessonsRangeLabel?.[locale] || 'lessons'}
+                  {t('lessonsRangeLabel')}
                 </span>
               </div>
             )}
@@ -528,20 +519,20 @@ export const Stage4InputTab = memo<Stage4InputTabProps>(function Stage4InputTab(
         <CardHeader className="pb-3">
           <div className="flex items-center justify-between">
             <CardTitle className="text-sm font-medium text-muted-foreground">
-              {t?.knowledgeFoundation?.[locale] || 'Knowledge Foundation'}
+              {t('knowledgeFoundation')}
             </CardTitle>
             <Badge variant="outline" className="text-xs">
               {classifications.length}{' '}
-              {locale === 'ru' ? 'файлов' : 'files'}
+              {tStage1('filesCount')}
             </Badge>
           </div>
           <p className="text-xs text-muted-foreground mt-1">
-            {t?.knowledgeFoundationDesc?.[locale] || 'Selected materials from Stage 3'}
+            {t('knowledgeFoundationDesc')}
           </p>
         </CardHeader>
         <CardContent>
           <ScrollArea className="h-[260px] pr-4">
-            <KnowledgeStack classifications={classifications} locale={locale} />
+            <KnowledgeStack classifications={classifications} />
           </ScrollArea>
         </CardContent>
       </Card>
@@ -552,7 +543,7 @@ export const Stage4InputTab = memo<Stage4InputTabProps>(function Stage4InputTab(
       <Card className="col-span-2">
         <CardHeader className="pb-3">
           <CardTitle className="text-sm font-medium text-muted-foreground">
-            {t?.technicalConstraints?.[locale] || 'Technical Parameters'}
+            {t('technicalConstraints')}
           </CardTitle>
         </CardHeader>
         <CardContent className="space-y-4">
@@ -560,7 +551,7 @@ export const Stage4InputTab = memo<Stage4InputTabProps>(function Stage4InputTab(
           <div className="flex items-center justify-between p-3 rounded-lg bg-violet-50/50 dark:bg-violet-950/20">
             <div className="flex items-center gap-2">
               <Coins className="h-4 w-4 text-violet-500" aria-hidden="true" />
-              <span className="text-sm">{t?.tokenBudget?.[locale] || 'Token Budget'}</span>
+              <span className="text-sm">{t('tokenBudget')}</span>
             </div>
             <Badge
               variant="outline"
@@ -574,7 +565,7 @@ export const Stage4InputTab = memo<Stage4InputTabProps>(function Stage4InputTab(
           <div className="flex items-center justify-between p-3 rounded-lg bg-muted/30">
             <div className="flex items-center gap-2">
               <Cpu className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-              <span className="text-sm">{t?.modelUsed?.[locale] || 'Model'}</span>
+              <span className="text-sm">{t('modelUsed')}</span>
             </div>
             <Badge variant="secondary" className="text-xs">
               {getTierModelName(parameters?.tier, locale)}
@@ -589,7 +580,7 @@ export const Stage4InputTab = memo<Stage4InputTabProps>(function Stage4InputTab(
                   {classifications.filter((c) => c.priority === 'CORE').length}
                 </span>
                 <p className="text-xs text-muted-foreground">
-                  {locale === 'ru' ? 'Ядро' : 'Core'}
+                  {t('coreLabel')}
                 </p>
               </div>
               <div className="text-center p-2 rounded bg-blue-50/50 dark:bg-blue-950/20">
@@ -597,7 +588,7 @@ export const Stage4InputTab = memo<Stage4InputTabProps>(function Stage4InputTab(
                   {classifications.filter((c) => c.priority === 'IMPORTANT').length}
                 </span>
                 <p className="text-xs text-muted-foreground">
-                  {locale === 'ru' ? 'Важные' : 'Important'}
+                  {t('importantLabel')}
                 </p>
               </div>
               <div className="text-center p-2 rounded bg-slate-50/50 dark:bg-slate-900/20">
@@ -605,7 +596,7 @@ export const Stage4InputTab = memo<Stage4InputTabProps>(function Stage4InputTab(
                   {classifications.filter((c) => c.priority === 'SUPPLEMENTARY').length}
                 </span>
                 <p className="text-xs text-muted-foreground">
-                  {locale === 'ru' ? 'Доп.' : 'Supp.'}
+                  {t('supplementaryLabel')}
                 </p>
               </div>
             </div>

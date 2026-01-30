@@ -14,13 +14,9 @@ import { logger } from '@/shared/logger';
 import { llmClient } from '@/shared/llm/client';
 import { resolveModelWithFallback } from '@/shared/llm/model-config-service';
 import type { EnrichmentHandler } from '../services/enrichment-router';
-import type {
-  EnrichmentHandlerInput,
-  DraftResult,
-  GenerateResult,
-} from '../types';
+import type { EnrichmentHandlerInput, DraftResult, GenerateResult } from '../types';
 import type { VideoEnrichmentContent, EnrichmentMetadata } from '@megacampus/shared-types';
-import { DEFAULT_MODEL_ID } from '@megacampus/shared-types';
+import { DEFAULT_MODEL_ID, getStylePrompt } from '@megacampus/shared-types';
 import {
   buildVideoScriptSystemPrompt,
   buildVideoScriptUserMessage,
@@ -81,7 +77,7 @@ function extractLearningObjectives(lessonContent: string | null): string[] {
     // Extract bullet points
     const bullets = objectivesText.match(/[-*]\s+(.+)/g);
     if (bullets && bullets.length > 0) {
-      return bullets.map((b) => b.replace(/^[-*]\s+/, '').trim()).slice(0, 5);
+      return bullets.map(b => b.replace(/^[-*]\s+/, '').trim()).slice(0, 5);
     }
   }
 
@@ -89,8 +85,8 @@ function extractLearningObjectives(lessonContent: string | null): string[] {
   const sections = lessonContent.match(/^## .+$/gm);
   if (sections && sections.length > 0) {
     return sections
-      .filter((s) => !s.match(/introduction|summary|conclusion/i))
-      .map((s) => `Learn about ${s.replace(/^## /, '')}`)
+      .filter(s => !s.match(/introduction|summary|conclusion/i))
+      .map(s => `Learn about ${s.replace(/^## /, '')}`)
       .slice(0, 5);
   }
 
@@ -120,10 +116,7 @@ function parseScriptResponse(content: string): VideoScriptOutput | null {
       return result.data;
     }
 
-    logger.warn(
-      { errors: result.error.errors },
-      'Video script validation failed'
-    );
+    logger.warn({ errors: result.error.errors }, 'Video script validation failed');
     return null;
   } catch (error) {
     logger.warn(
@@ -185,6 +178,7 @@ async function generateDraft(input: EnrichmentHandlerInput): Promise<DraftResult
     lessonObjectives,
     language: (enrichmentContext.course.language || 'en') as 'en' | 'ru',
     settings: videoSettings,
+    stylePrompt: getStylePrompt(enrichmentContext.course.style),
   });
 
   // Get model with optimized resolution: settings → database → fallback
@@ -193,7 +187,10 @@ async function generateDraft(input: EnrichmentHandlerInput): Promise<DraftResult
     phaseName: 'stage_7_video',
     courseId: enrichmentContext.course.id,
     fallbackModel: FALLBACK_MODEL,
-    logContext: { enrichmentId: enrichmentContext.enrichment.id, lessonId: enrichmentContext.lesson.id },
+    logContext: {
+      enrichmentId: enrichmentContext.enrichment.id,
+      lessonId: enrichmentContext.lesson.id,
+    },
   });
 
   try {

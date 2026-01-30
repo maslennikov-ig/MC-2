@@ -434,8 +434,10 @@ export class GenerationPhases {
         );
       }
 
+      // Use user-edited total_sections from Stage 4, fallback to sections_breakdown.length
+      const recommendedStructure = state.input.analysis_result.recommended_structure;
       const totalSections =
-        state.input.analysis_result.recommended_structure.sections_breakdown.length;
+        recommendedStructure.total_sections ?? recommendedStructure.sections_breakdown.length;
 
       await logTrace({
         courseId,

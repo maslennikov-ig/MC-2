@@ -3,12 +3,12 @@ import { Handle, Position, NodeProps } from '@xyflow/react'
 import { RFStageNode } from '../types'
 import { useNodeStatus } from '../hooks/useNodeStatus'
 import { getStatusColor } from '../hooks/useNodeStatusStyles'
-import { useTranslation } from '@/lib/generation-graph/useTranslation'
+import { useTranslations } from 'next-intl'
 
 const MinimalNode = ({ id, data, selected }: NodeProps<RFStageNode>) => {
   const statusEntry = useNodeStatus(id)
   const currentStatus = statusEntry?.status || data.status
-  const { t } = useTranslation()
+  const t = useTranslations('generation')
 
   return (
     <div

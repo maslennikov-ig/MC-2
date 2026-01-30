@@ -83,7 +83,7 @@ export async function startGeneration(courseId: string) {
     await extractApiError(response, 'Failed to start generation')
   }
 
-  revalidatePath('/courses/generating/[slug]', 'page')
+  revalidatePath('/courses/[orgSlug]/[courseSlug]/generating', 'page')
   return response.json()
 }
 
@@ -104,7 +104,7 @@ export async function approveStage(courseId: string, currentStage: number) {
     await extractApiError(response, 'Failed to approve stage')
   }
 
-  revalidatePath('/courses/generating/[slug]', 'page')
+  revalidatePath('/courses/[orgSlug]/[courseSlug]/generating', 'page')
   return response.json()
 }
 
@@ -115,10 +115,10 @@ export async function approveStage(courseId: string, currentStage: number) {
 export async function pauseGeneration(courseId: string) {
   const supabase = await createClient()
 
-  // Get the course slug for API call
+  // Get the course slug and org slug for API call
   const { data: course, error: fetchError } = await supabase
     .from('courses')
-    .select('slug')
+    .select('slug, organizations!inner(slug)')
     .eq('id', courseId)
     .single()
 
@@ -126,10 +126,17 @@ export async function pauseGeneration(courseId: string) {
     throw new Error('Course not found')
   }
 
+  // Extract org_slug from joined organization
+  const orgData = course.organizations as { slug: string } | null
+  const orgSlug = orgData?.slug
+  if (!orgSlug) {
+    throw new Error('Organization not found for course')
+  }
+
   // Call the API endpoint which uses atomic RPC with FOR UPDATE lock
   // Use absolute URL for server actions (fetch requires absolute URLs in server context)
   const appUrl = ENV.NEXT_PUBLIC_APP_URL
-  const response = await fetch(`${appUrl}/api/courses/${course.slug}/pause`, {
+  const response = await fetch(`${appUrl}/api/courses/${orgSlug}/${course.slug}/pause`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
   })
@@ -139,7 +146,7 @@ export async function pauseGeneration(courseId: string) {
     throw new Error(errorData.error || 'Failed to pause generation')
   }
 
-  revalidatePath('/courses/generating/[slug]', 'page')
+  revalidatePath('/courses/[orgSlug]/[courseSlug]/generating', 'page')
   return response.json()
 }
 
@@ -150,10 +157,10 @@ export async function pauseGeneration(courseId: string) {
 export async function resumeGeneration(courseId: string) {
   const supabase = await createClient()
 
-  // Get the course slug for API call
+  // Get the course slug and org slug for API call
   const { data: course, error: fetchError } = await supabase
     .from('courses')
-    .select('slug')
+    .select('slug, organizations!inner(slug)')
     .eq('id', courseId)
     .single()
 
@@ -161,10 +168,17 @@ export async function resumeGeneration(courseId: string) {
     throw new Error('Course not found')
   }
 
+  // Extract org_slug from joined organization
+  const orgData = course.organizations as { slug: string } | null
+  const orgSlug = orgData?.slug
+  if (!orgSlug) {
+    throw new Error('Organization not found for course')
+  }
+
   // Call the API endpoint
   // Use absolute URL for server actions (fetch requires absolute URLs in server context)
   const appUrl = ENV.NEXT_PUBLIC_APP_URL
-  const response = await fetch(`${appUrl}/api/courses/${course.slug}/resume`, {
+  const response = await fetch(`${appUrl}/api/courses/${orgSlug}/${course.slug}/resume`, {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
   })
@@ -174,7 +188,7 @@ export async function resumeGeneration(courseId: string) {
     throw new Error(errorData.error || 'Failed to resume generation')
   }
 
-  revalidatePath('/courses/generating/[slug]', 'page')
+  revalidatePath('/courses/[orgSlug]/[courseSlug]/generating', 'page')
   return response.json()
 }
 
@@ -213,7 +227,7 @@ export async function cancelGeneration(courseId: string) {
     console.error('Failed to call backend cancel:', backendError)
   }
 
-  revalidatePath('/courses/generating/[slug]', 'page')
+  revalidatePath('/courses/[orgSlug]/[courseSlug]/generating', 'page')
   return { success: true }
 }
 
@@ -241,12 +255,12 @@ export async function getStageResults(courseId: string, stage: number) {
 }
 
 /**
- * Update a field in stage results (stage 4 or stage 5)
+ * Update a field in stage results (stage 4, stage 5, or stage 6)
  * Used by EditableField and EditableChips components for inline editing
  */
 export async function updateFieldAction(
   courseId: string,
-  stageId: 'stage_4' | 'stage_5',
+  stageId: 'stage_4' | 'stage_5' | 'stage_6',
   fieldPath: string,
   value: unknown
 ) {
@@ -262,7 +276,7 @@ export async function updateFieldAction(
     await extractApiError(response, 'Failed to update field')
   }
 
-  revalidatePath('/courses/generating/[slug]', 'page')
+  revalidatePath('/courses/[orgSlug]/[courseSlug]/generating', 'page')
   const data = await response.json()
   return data?.result?.data || data
 }
@@ -296,7 +310,7 @@ export async function addElementAction(
     await extractApiError(response, 'Failed to add element')
   }
 
-  revalidatePath('/courses/generating/[slug]', 'page')
+  revalidatePath('/courses/[orgSlug]/[courseSlug]/generating', 'page')
   const data = await response.json()
   return data?.result?.data || data
 }
@@ -308,7 +322,7 @@ export async function addElementAction(
  */
 export async function regenerateBlockAction(
   courseId: string,
-  stageId: 'stage_4' | 'stage_5',
+  stageId: 'stage_4' | 'stage_5' | 'stage_6',
   blockPath: string,
   userInstruction: string
 ) {
@@ -329,7 +343,7 @@ export async function regenerateBlockAction(
     await extractApiError(response, 'Failed to regenerate block')
   }
 
-  revalidatePath('/courses/generating/[slug]', 'page')
+  revalidatePath('/courses/[orgSlug]/[courseSlug]/generating', 'page')
   const data = await response.json()
   return data?.result?.data || data
 }
@@ -384,7 +398,7 @@ export async function cascadeUpdateAction(
     await extractApiError(response, 'Failed to perform cascade update')
   }
 
-  revalidatePath('/courses/generating/[slug]', 'page')
+  revalidatePath('/courses/[orgSlug]/[courseSlug]/generating', 'page')
   const data = await response.json()
   return data?.result?.data || data
 }
@@ -419,7 +433,7 @@ export async function deleteElementAction(
     await extractApiError(response, 'Failed to delete element')
   }
 
-  revalidatePath('/courses/generating/[slug]', 'page')
+  revalidatePath('/courses/[orgSlug]/[courseSlug]/generating', 'page')
   const data = await response.json()
   return data?.result?.data || data
 }
@@ -446,7 +460,7 @@ export async function switchToManualMode(courseId: string) {
     await extractApiError(response, 'Failed to switch to manual mode')
   }
 
-  revalidatePath('/courses/generating/[slug]', 'page')
+  revalidatePath('/courses/[orgSlug]/[courseSlug]/generating', 'page')
   const data = await response.json()
   return data?.result?.data || data
 }
@@ -470,6 +484,59 @@ export async function getEditHistoryAction(courseId: string, limit: number = 50)
   if (!response.ok) {
     await extractApiError(response, 'Failed to get edit history')
   }
+
+  const data = await response.json()
+  return data?.result?.data || data
+}
+
+/**
+ * Check if downstream stages (5 and/or 6) exist for a course
+ * Used by CascadeStageDeleteModal to determine what will be deleted
+ * Calls generation.checkDownstreamStages tRPC endpoint
+ */
+export async function checkDownstreamStagesAction(courseId: string) {
+  const headers = await getBackendAuthHeaders()
+
+  const response = await fetch(
+    `${TRPC_URL}/generation.checkDownstreamStages?input=${encodeURIComponent(JSON.stringify({ courseId }))}`,
+    {
+      method: 'GET',
+      headers,
+    }
+  )
+
+  if (!response.ok) {
+    await extractApiError(response, 'Failed to check downstream stages')
+  }
+
+  const data = await response.json()
+  return data?.result?.data || data
+}
+
+/**
+ * Delete downstream stages data
+ * fromStage=4: DELETE course_structure (set to null), DELETE lessons, DELETE sections
+ * fromStage=5: DELETE lessons only
+ * Used by CascadeStageDeleteModal after user confirms deletion
+ * Calls generation.deleteDownstreamStages tRPC endpoint
+ */
+export async function deleteDownstreamStagesAction(courseId: string, fromStage: 4 | 5) {
+  const headers = await getBackendAuthHeaders()
+
+  const response = await fetch(`${TRPC_URL}/generation.deleteDownstreamStages`, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify({ courseId, fromStage }),
+  })
+
+  if (!response.ok) {
+    await extractApiError(response, 'Failed to delete downstream stages')
+  }
+
+  // Revalidate all course-related paths after cascade delete
+  revalidatePath('/courses/[orgSlug]/[courseSlug]/generating', 'page')
+  revalidatePath('/courses/[orgSlug]/[courseSlug]', 'layout') // Also revalidates nested pages
+  revalidatePath('/admin/generation/[courseId]', 'page')
 
   const data = await response.json()
   return data?.result?.data || data

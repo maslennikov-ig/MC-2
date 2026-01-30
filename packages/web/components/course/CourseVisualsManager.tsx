@@ -24,6 +24,7 @@ interface CourseVisualsManagerProps {
   courseId: string
   courseTitle: string
   courseSlug: string
+  orgSlug: string
   hasCourseCard: boolean
   lessons: Lesson[]
 }
@@ -63,6 +64,7 @@ export function CourseVisualsManager({
   courseId,
   courseTitle,
   courseSlug,
+  orgSlug,
   hasCourseCard,
   lessons,
 }: CourseVisualsManagerProps) {
@@ -74,6 +76,11 @@ export function CourseVisualsManager({
   const [isGeneratingCovers, setIsGeneratingCovers] = useState(false)
   const [isGeneratingCards, setIsGeneratingCards] = useState(false)
 
+  // Polling state for tracking generation progress
+  const [pendingEnrichmentIds, setPendingEnrichmentIds] = useState<string[]>([])
+  const [completedCount, setCompletedCount] = useState(0)
+  const pollingIntervalRef = useRef<NodeJS.Timeout | null>(null)
+
   // AbortController refs for cleanup on unmount
   const coversAbortRef = useRef<AbortController | null>(null)
   const cardsAbortRef = useRef<AbortController | null>(null)
@@ -83,6 +90,9 @@ export function CourseVisualsManager({
     return () => {
       coversAbortRef.current?.abort()
       cardsAbortRef.current?.abort()
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current)
+      }
     }
   }, [])
 
@@ -100,6 +110,57 @@ export function CourseVisualsManager({
       Authorization: session?.access_token ? `Bearer ${session.access_token}` : '',
     }),
     [session?.access_token]
+  )
+
+  /**
+   * Poll generation status for enrichment IDs
+   * Checks every 3 seconds until all complete
+   */
+  const startPolling = useCallback(
+    (ids: string[]) => {
+      // Clear existing polling
+      if (pollingIntervalRef.current) {
+        clearInterval(pollingIntervalRef.current)
+      }
+
+      const checkStatus = async () => {
+        let completed = 0
+        for (const id of ids) {
+          try {
+            const res = await fetch(
+              `${BACKEND_URL}/trpc/enrichment.getGenerationStatus?input=${encodeURIComponent(JSON.stringify({ enrichmentId: id }))}`,
+              { headers: getAuthHeaders() }
+            )
+            const data = await res.json()
+            if (data.result?.data?.status === 'completed') {
+              completed++
+            }
+          } catch {
+            // Ignore errors, continue polling
+          }
+        }
+
+        setCompletedCount(completed)
+
+        if (completed === ids.length) {
+          // All done - stop polling, refresh page
+          if (pollingIntervalRef.current) {
+            clearInterval(pollingIntervalRef.current)
+            pollingIntervalRef.current = null
+          }
+          setPendingEnrichmentIds([])
+          setCompletedCount(0)
+          toast.success(t('images.batchAllComplete', { count: completed }))
+          router.refresh()
+        }
+      }
+
+      // Immediate first check
+      void checkStatus()
+      // Then poll every 3 seconds
+      pollingIntervalRef.current = setInterval(() => void checkStatus(), 3000)
+    },
+    [getAuthHeaders, router, t]
   )
 
   /**
@@ -150,9 +211,16 @@ export function CourseVisualsManager({
 
         const result = await response.json()
         const data = result.result?.data
+        const enrichmentIds: string[] = data?.details?.succeededIds || []
 
-        toast.success(t('images.batchComplete', { count: data?.triggered || 0 }))
-        router.refresh()
+        if (enrichmentIds.length > 0) {
+          toast.info(t('images.batchStarted', { count: enrichmentIds.length }))
+          setPendingEnrichmentIds(enrichmentIds)
+          startPolling(enrichmentIds)
+        } else {
+          toast.success(t('images.batchComplete', { count: data?.triggered || 0 }))
+          router.refresh()
+        }
       } catch (error) {
         // Ignore abort errors (user navigated away or cancelled)
         if (error instanceof Error && error.name === 'AbortError') {
@@ -169,7 +237,7 @@ export function CourseVisualsManager({
         abortRef.current = null
       }
     },
-    [courseId, getAuthHeaders, router, t]
+    [courseId, getAuthHeaders, router, startPolling, t]
   )
 
   const handleGenerateMissingCovers = useCallback(
@@ -203,7 +271,7 @@ export function CourseVisualsManager({
         <div>
           <div className="mb-2 flex items-center gap-2">
             <Button variant="ghost" size="sm" asChild>
-              <Link href={`/courses/${courseSlug}`}>
+              <Link href={`/courses/${orgSlug}/${courseSlug}`}>
                 <ArrowLeft className="mr-1 h-4 w-4" />
                 {tCourse('backToCourse')}
               </Link>
@@ -287,6 +355,19 @@ export function CourseVisualsManager({
             </div>
             <Progress value={coverPercentage} className="h-2" />
           </div>
+
+          {/* Generation progress indicator */}
+          {pendingEnrichmentIds.length > 0 && (
+            <div className="mb-4 flex items-center gap-2 rounded-lg border border-cyan-200 bg-cyan-50 p-3 text-sm text-cyan-700 dark:border-cyan-800 dark:bg-cyan-950 dark:text-cyan-300">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              <span>
+                {t('images.batchGenerating', {
+                  completed: completedCount,
+                  total: pendingEnrichmentIds.length,
+                })}
+              </span>
+            </div>
+          )}
 
           <div className="max-h-96 space-y-2 overflow-y-auto">
             {lessons.length === 0 ? (

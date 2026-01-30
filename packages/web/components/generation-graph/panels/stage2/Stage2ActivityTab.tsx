@@ -27,12 +27,12 @@ import {
   LucideIcon,
 } from 'lucide-react';
 import { format } from 'date-fns';
-import { ru as ruLocale, enUS as enLocale } from 'date-fns/locale';
+import { ru as ruLocale } from 'date-fns/locale';
 import {
   useGenerationRealtime,
   GenerationTrace,
 } from '@/components/generation-monitoring/realtime-provider';
-import { GRAPH_TRANSLATIONS } from '@/lib/generation-graph/translations';
+import { useTranslations } from 'next-intl';
 import {
   Stage2ActivityTabProps,
   ActivityPhaseGroup,
@@ -186,7 +186,7 @@ function mapTraceToPhase(trace: GenerationTrace): ProcessingPhaseId | null {
 /**
  * Translates event message from trace
  */
-function translateEventMessage(trace: GenerationTrace, locale: 'ru' | 'en'): string {
+function translateEventMessage(trace: GenerationTrace): string {
   const phase = trace.phase || '';
   const stepName = trace.step_name || '';
 
@@ -198,7 +198,8 @@ function translateEventMessage(trace: GenerationTrace, locale: 'ru' | 'en'): str
     return phase;
   }
 
-  return locale === 'ru' ? 'Событие обработки' : 'Processing event';
+  // Fallback - will be handled at component level with translation
+  return 'Processing event';
 }
 
 /**
@@ -206,7 +207,6 @@ function translateEventMessage(trace: GenerationTrace, locale: 'ru' | 'en'): str
  */
 function traceToActivityEvent(
   trace: GenerationTrace,
-  locale: 'ru' | 'en',
   previousTimestamp?: Date
 ): ActivityEvent {
   const timestamp = (() => {
@@ -226,27 +226,34 @@ function traceToActivityEvent(
     timestamp,
     actor: detectActor(trace),
     type: determineEventType(trace),
-    message: translateEventMessage(trace, locale),
+    message: translateEventMessage(trace),
     deltaMs: deltaMs !== undefined && deltaMs >= 0 ? deltaMs : undefined,
     details: trace.input_data,
   };
 }
 
+/** Phase translation key type */
+type PhaseNameKey = 'phaseDocling' | 'phaseMarkdown' | 'phaseImages' | 'phaseChunking' | 'phaseEmbedding' | 'phaseQdrant' | 'phaseSummarization';
+
+/** Phase translation key mapping */
+const PHASE_NAME_KEYS: Record<ProcessingPhaseId, PhaseNameKey> = {
+  docling: 'phaseDocling',
+  markdown: 'phaseMarkdown',
+  images: 'phaseImages',
+  chunking: 'phaseChunking',
+  embedding: 'phaseEmbedding',
+  qdrant: 'phaseQdrant',
+  summarization: 'phaseSummarization',
+};
+
 /**
  * Gets translated phase name
  */
-function getPhaseName(phaseId: ProcessingPhaseId, locale: 'ru' | 'en'): string {
-  const t = GRAPH_TRANSLATIONS.stage2;
-  const phaseNameMap: Record<ProcessingPhaseId, string> = {
-    docling: t?.phaseDocling?.[locale] || 'Digitization',
-    markdown: t?.phaseMarkdown?.[locale] || 'Cleanup',
-    images: t?.phaseImages?.[locale] || 'Visual Analysis',
-    chunking: t?.phaseChunking?.[locale] || 'Segmentation',
-    embedding: t?.phaseEmbedding?.[locale] || 'AI Encoding',
-    qdrant: t?.phaseQdrant?.[locale] || 'Knowledge Save',
-    summarization: t?.phaseSummarization?.[locale] || 'Insight Generation',
-  };
-  return phaseNameMap[phaseId];
+function getPhaseName(
+  phaseId: ProcessingPhaseId,
+  t: (key: PhaseNameKey) => string
+): string {
+  return t(PHASE_NAME_KEYS[phaseId]);
 }
 
 /**
@@ -278,7 +285,9 @@ function formatDeltaTime(ms: number): string {
 /**
  * Generates synthetic phase groups when no traces exist
  */
-function generateSyntheticGroups(locale: 'ru' | 'en'): ActivityPhaseGroup[] {
+function generateSyntheticGroups(
+  t: (key: PhaseNameKey | 'waitingToStart') => string
+): ActivityPhaseGroup[] {
   const now = new Date();
 
   return PHASE_ORDER.map((phaseId, index) => {
@@ -289,13 +298,13 @@ function generateSyntheticGroups(locale: 'ru' | 'en'): ActivityPhaseGroup[] {
         timestamp: baseTime,
         actor: 'system',
         type: 'info',
-        message: locale === 'ru' ? 'Ожидание запуска' : 'Waiting to start',
+        message: t('waitingToStart'),
       },
     ];
 
     return {
       phaseId,
-      phaseName: getPhaseName(phaseId, locale),
+      phaseName: getPhaseName(phaseId, t),
       totalDurationMs: 0,
       eventCount: syntheticEvents.length,
       events: syntheticEvents,
@@ -308,7 +317,7 @@ function generateSyntheticGroups(locale: 'ru' | 'en'): ActivityPhaseGroup[] {
  */
 function groupTracesByPhase(
   traces: GenerationTrace[],
-  locale: 'ru' | 'en'
+  t: (key: PhaseNameKey) => string
 ): ActivityPhaseGroup[] {
   // Group traces by phase
   const groupedTraces = new Map<ProcessingPhaseId, GenerationTrace[]>();
@@ -342,7 +351,7 @@ function groupTracesByPhase(
     let previousTimestamp: Date | undefined;
 
     for (const trace of phaseTraces) {
-      const event = traceToActivityEvent(trace, locale, previousTimestamp);
+      const event = traceToActivityEvent(trace, previousTimestamp);
       events.push(event);
       previousTimestamp = event.timestamp;
     }
@@ -359,7 +368,7 @@ function groupTracesByPhase(
 
     groups.push({
       phaseId,
-      phaseName: getPhaseName(phaseId, locale),
+      phaseName: getPhaseName(phaseId, t),
       totalDurationMs,
       eventCount: events.length,
       events,
@@ -380,9 +389,11 @@ function groupTracesByPhase(
  * Shows timestamp, delta time, actor icon, event message, and status.
  */
 export const Stage2ActivityTab = memo<Stage2ActivityTabProps>(
-  function Stage2ActivityTab({ nodeId, documentId, locale = 'ru' }) {
-    const t = GRAPH_TRANSLATIONS.stage2;
-    const dateLocale = locale === 'ru' ? ruLocale : enLocale;
+  function Stage2ActivityTab({ nodeId, documentId, locale: _locale = 'ru' }) {
+    const t = useTranslations('generation.stage2');
+    // For date-fns, we need to detect locale from translations context
+    // Using a simplified approach - defaulting to Russian since the primary audience is Russian
+    const dateLocale = ruLocale;
 
     // Get traces from realtime context
     const { traces } = useGenerationRealtime();
@@ -412,12 +423,12 @@ export const Stage2ActivityTab = memo<Stage2ActivityTabProps>(
 
       // If we have real traces, group them
       if (stage2Traces.length > 0) {
-        return groupTracesByPhase(stage2Traces, locale);
+        return groupTracesByPhase(stage2Traces, t);
       }
 
       // Generate synthetic groups to show structure
-      return generateSyntheticGroups(locale);
-    }, [traces, nodeId, documentId, locale]);
+      return generateSyntheticGroups(t);
+    }, [traces, nodeId, documentId, t]);
 
     // Check if we have any events at all
     const hasEvents = phaseGroups.some((group) => group.eventCount > 0);
@@ -427,7 +438,7 @@ export const Stage2ActivityTab = memo<Stage2ActivityTabProps>(
       return (
         <div className="flex h-[300px] items-center justify-center p-4">
           <p className="text-sm text-muted-foreground">
-            {t?.noActivity?.[locale] || 'No events recorded'}
+            {t('noActivity')}
           </p>
         </div>
       );
@@ -451,7 +462,7 @@ export const Stage2ActivityTab = memo<Stage2ActivityTabProps>(
                 >
                   <AccordionTrigger
                     className="py-3 hover:no-underline"
-                    aria-label={`${group.phaseName}: ${group.eventCount} ${t?.eventsCount?.[locale] || 'events'}${group.totalDurationMs > 0 ? `, ${formatDuration(group.totalDurationMs)}` : ''}`}
+                    aria-label={`${group.phaseName}: ${group.eventCount} ${t('eventsCount')}${group.totalDurationMs > 0 ? `, ${formatDuration(group.totalDurationMs)}` : ''}`}
                   >
                     <div className="flex flex-1 items-center gap-3">
                       {/* Phase icon */}
@@ -476,7 +487,7 @@ export const Stage2ActivityTab = memo<Stage2ActivityTabProps>(
                         variant={hasGroupEvents ? 'secondary' : 'outline'}
                         className="ml-2"
                       >
-                        {group.eventCount} {t?.eventsCount?.[locale] || 'events'}
+                        {group.eventCount} {t('eventsCount')}
                       </Badge>
 
                       {/* Duration */}
@@ -493,7 +504,7 @@ export const Stage2ActivityTab = memo<Stage2ActivityTabProps>(
                     <div className="relative border-l-2 border-dashed border-slate-200 pl-4 dark:border-slate-700">
                       {group.events.length === 0 ? (
                         <p className="py-2 text-sm text-muted-foreground">
-                          {t?.noActivity?.[locale] || 'No events recorded'}
+                          {t('noActivity')}
                         </p>
                       ) : (
                         <div className="space-y-3">

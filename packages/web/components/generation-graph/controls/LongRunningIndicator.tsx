@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Clock } from 'lucide-react';
 import { useGenerationRealtime } from '@/components/generation-monitoring/realtime-provider';
 import { EmailNotificationRequest } from './EmailNotificationRequest';
-import { useTranslation } from '@/lib/generation-graph/useTranslation';
+import { useTranslations } from 'next-intl';
 import { ACTIVE_STATUSES } from '@/lib/generation-graph/constants';
 
 const LONG_RUNNING_THRESHOLD = 5 * 60 * 1000; // 5 minutes
@@ -11,7 +11,7 @@ export const LongRunningIndicator = () => {
     const { status } = useGenerationRealtime();
     const [startTime] = useState(Date.now());
     const [isLongRunning, setIsLongRunning] = useState(false);
-    const { t } = useTranslation();
+    const t = useTranslations('generation');
 
     useEffect(() => {
         if (!status || !ACTIVE_STATUSES.includes(status)) return;

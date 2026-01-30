@@ -167,6 +167,8 @@ export interface EnrichmentWithContext {
     visual_style?: Record<string, unknown> | null;
     /** Legacy settings (may contain visual_style) */
     settings?: Record<string, unknown> | null;
+    /** Writing style for content generation (from shared-types COURSE_STYLES) */
+    style?: string | null;
   };
 }
 

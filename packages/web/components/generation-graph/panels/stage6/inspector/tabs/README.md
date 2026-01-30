@@ -123,7 +123,7 @@ Component supports both English and Russian locales:
 <Stage6QualityTab locale="ru" {...props} />
 ```
 
-All UI strings are translated via internal translation function. Future enhancement: integrate with GRAPH_TRANSLATIONS.
+All UI strings are translated via `next-intl` using `useTranslations('generation.stage6')` hook.
 
 ### Type Dependencies
 
@@ -136,7 +136,7 @@ From `@megacampus/shared-types`:
 ### Future Enhancements
 
 1. **Diff Viewer Modal**: Implement side-by-side diff comparison for FIXED status
-2. **Translation Integration**: Use GRAPH_TRANSLATIONS instead of inline translations
+2. ~~**Translation Integration**~~: ✅ Completed - using `next-intl`
 3. **Expandable Sections**: Allow collapsing Gate 1/Gate 2 to save space
 4. **Export to PDF**: Generate quality report PDF with all assessment details
 5. **Judge Vote Expansion**: Show individual judge votes in expandable cards

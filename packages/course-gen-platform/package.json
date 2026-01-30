@@ -1,6 +1,6 @@
 {
   "name": "@megacampus/course-gen-platform",
-  "version": "0.28.32",
+  "version": "0.28.44",
   "private": true,
   "type": "module",
   "description": "Main API server for MegaCampusAI course generation platform",
@@ -9,6 +9,7 @@
   "scripts": {
     "dev": "tsx watch src/server/index.ts",
     "dev:worker": "tsx watch src/orchestrator/worker-entrypoint.ts",
+    "dev:worker:stage6": "STAGE6_WORKER=true tsx watch src/orchestrator/worker-entrypoint.ts",
     "dev:worker:stage7": "tsx watch src/stages/stage7-enrichments/worker-entrypoint.ts",
     "dev:worker:safe": "pkill -f 'worker-entrypoint' 2>/dev/null; sleep 1; tsx watch src/orchestrator/worker-entrypoint.ts",
     "kill:workers": "pkill -f 'worker-entrypoint' 2>/dev/null && echo 'Workers killed' || echo 'No workers running'",
@@ -34,7 +35,8 @@
     "cleanup:docling-cache": "tsx tools/maintenance/cleanup-docling-cache.ts",
     "lint": "eslint src --max-warnings=300",
     "type-check": "tsc --noEmit",
-    "analyze:bundle": "tsx scripts/analyze-processor-bundle.ts"
+    "analyze:bundle": "tsx scripts/analyze-processor-bundle.ts",
+    "benchmark-llm": "tsx scripts/benchmark-llm/index.ts"
   },
   "dependencies": {
     "@bull-board/api": "^5.14.0",

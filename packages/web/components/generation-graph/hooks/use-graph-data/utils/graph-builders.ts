@@ -1,31 +1,42 @@
-import { AppNode, AppEdge } from '../../../types';
-import { GRAPH_STAGE_CONFIG } from '@/lib/generation-graph/constants';
+import { AppNode, AppEdge } from '../../../types'
+import { GRAPH_STAGE_CONFIG } from '@/lib/generation-graph/constants'
+import { STAGE6_LAYOUT_CONFIG, STAGE2_LAYOUT_CONFIG } from '@/lib/generation-graph/layout-constants'
+import { NodeStatus, TraceAttempt } from '@megacampus/shared-types'
 import {
-  STAGE6_LAYOUT_CONFIG,
-  STAGE2_LAYOUT_CONFIG,
-} from '@/lib/generation-graph/layout-constants';
-import { NodeStatus, TraceAttempt } from '@megacampus/shared-types';
-import { ParallelItem, DocumentWithSteps, PhaseData, Stage1CourseData } from '../types';
-import { calculateDocumentStatus } from './graph-transformers';
-import { GenerationTrace } from '@/components/generation-celestial/utils';
+  ParallelItem,
+  DocumentWithSteps,
+  PhaseData,
+  Stage1CourseData,
+  ClarifyingProgressData,
+} from '../types'
+import { calculateDocumentStatus } from './graph-transformers'
+import { GenerationTrace } from '@/components/generation-celestial/utils'
 
 // Alias for backward compatibility within this file
-const LAYOUT_CONFIG = STAGE6_LAYOUT_CONFIG;
+const LAYOUT_CONFIG = STAGE6_LAYOUT_CONFIG
 
 interface BuildGraphParams {
-  parallelItems: Map<number, ParallelItem[]>;
-  stageStatuses: Record<string, NodeStatus>;
-  documentSteps: Map<string, DocumentWithSteps>;
-  hasDocuments: boolean;
+  parallelItems: Map<number, ParallelItem[]>
+  stageStatuses: Record<string, NodeStatus>
+  documentSteps: Map<string, DocumentWithSteps>
+  hasDocuments: boolean
   /** Pre-loaded Stage 1 course data (for display before generation starts) */
-  stage1CourseData?: Stage1CourseData;
-  getTrace: (id: string) => GenerationTrace | undefined;
-  getAttempts: (id: string) => TraceAttempt[];
-  getPhases: (id: string) => PhaseData[];
-  getExistingPos: (id: string) => { x: number; y: number };
-  getModuleCollapsed: (id: string) => boolean | undefined;
+  stage1CourseData?: Stage1CourseData
+  /** Clarifying questions progress data (Phase 0.5) */
+  clarifyingData?: ClarifyingProgressData
+  /**
+   * Current course generation status.
+   * Used to show fallback clarifying node when status is 'stage_4_clarifying'
+   * but clarifyingData is not yet available.
+   */
+  courseStatus?: string
+  getTrace: (id: string) => GenerationTrace | undefined
+  getAttempts: (id: string) => TraceAttempt[]
+  getPhases: (id: string) => PhaseData[]
+  getExistingPos: (id: string) => { x: number; y: number }
+  getModuleCollapsed: (id: string) => boolean | undefined
   /** Get collapsed state for stage2group container */
-  getStage2Collapsed: () => boolean | undefined;
+  getStage2Collapsed: () => boolean | undefined
 }
 
 /**
@@ -42,50 +53,51 @@ function buildStage2Group(
   documentSteps: Map<string, DocumentWithSteps>,
   getExistingPos: (id: string) => { x: number; y: number },
   getStage2Collapsed: () => boolean | undefined,
-  config: typeof GRAPH_STAGE_CONFIG['stage_2']
+  config: (typeof GRAPH_STAGE_CONFIG)['stage_2']
 ): { stage2GroupNode: AppNode; documentNodes: AppNode[] } {
-  const documents = Array.from(documentSteps.values());
-  const documentNodes: AppNode[] = [];
-  const childIds: string[] = [];
+  const documents = Array.from(documentSteps.values())
+  const documentNodes: AppNode[] = []
+  const childIds: string[] = []
 
   // Calculate document statuses for group summary
-  let completedCount = 0;
-  let processingCount = 0;
-  let failedCount = 0;
+  let completedCount = 0
+  let processingCount = 0
+  let failedCount = 0
 
   documents.forEach((doc) => {
-    const docNodeId = `doc_${doc.id.replace(/[^a-zA-Z0-9-_]/g, '_')}`;
-    childIds.push(docNodeId);
+    const docNodeId = `doc_${doc.id.replace(/[^a-zA-Z0-9-_]/g, '_')}`
+    childIds.push(docNodeId)
 
-    const overallStatus = calculateDocumentStatus(doc.steps);
+    const overallStatus = calculateDocumentStatus(doc.steps)
 
-    if (overallStatus === 'completed') completedCount++;
-    else if (overallStatus === 'active') processingCount++;
-    else if (overallStatus === 'error') failedCount++;
-  });
+    if (overallStatus === 'completed') completedCount++
+    else if (overallStatus === 'active') processingCount++
+    else if (overallStatus === 'error') failedCount++
+  })
 
   // Determine group status based on documents
-  let groupStatus: NodeStatus = 'pending';
+  let groupStatus: NodeStatus = 'pending'
   if (failedCount > 0) {
-    groupStatus = 'error';
+    groupStatus = 'error'
   } else if (processingCount > 0) {
-    groupStatus = 'active';
+    groupStatus = 'active'
   } else if (documents.length > 0 && completedCount === documents.length) {
-    groupStatus = 'completed';
+    groupStatus = 'completed'
   } else if (completedCount > 0) {
-    groupStatus = 'active';
+    groupStatus = 'active'
   }
 
   // Default to collapsed when there are many documents
-  const defaultCollapsed = documents.length > 5;
-  const isCollapsed = getStage2Collapsed() ?? defaultCollapsed;
+  const defaultCollapsed = documents.length > 5
+  const isCollapsed = getStage2Collapsed() ?? defaultCollapsed
 
   // Calculate group height based on collapse state
   const groupHeight = isCollapsed
     ? STAGE2_LAYOUT_CONFIG.CONTAINER_COLLAPSED_HEIGHT
     : STAGE2_LAYOUT_CONFIG.CONTAINER_HEADER_HEIGHT +
-      (documents.length * (STAGE2_LAYOUT_CONFIG.DOCUMENT_HEIGHT + STAGE2_LAYOUT_CONFIG.DOCUMENT_GAP)) +
-      STAGE2_LAYOUT_CONFIG.CONTAINER_PADDING;
+      documents.length *
+        (STAGE2_LAYOUT_CONFIG.DOCUMENT_HEIGHT + STAGE2_LAYOUT_CONFIG.DOCUMENT_GAP) +
+      STAGE2_LAYOUT_CONFIG.CONTAINER_PADDING
 
   // Create Stage2Group container node
   const stage2GroupNode: AppNode = {
@@ -109,15 +121,15 @@ function buildStage2Group(
       isCollapsed: isCollapsed,
       childIds: childIds,
     },
-  };
+  }
 
   // Create document nodes as children of stage2group
   documents.forEach((doc, index) => {
-    const docNodeId = `doc_${doc.id.replace(/[^a-zA-Z0-9-_]/g, '_')}`;
-    const overallStatus = calculateDocumentStatus(doc.steps);
-    const completedStages = doc.steps.filter(s => s.status === 'completed').length;
-    const totalStages = doc.steps.length;
-    const allAttempts = doc.steps.flatMap(s => s.attempts);
+    const docNodeId = `doc_${doc.id.replace(/[^a-zA-Z0-9-_]/g, '_')}`
+    const overallStatus = calculateDocumentStatus(doc.steps)
+    const completedStages = doc.steps.filter((s) => s.status === 'completed').length
+    const totalStages = doc.steps.length
+    const allAttempts = doc.steps.flatMap((s) => s.attempts)
 
     const stages = doc.steps.map((step, idx) => ({
       stageId: step.id,
@@ -127,12 +139,13 @@ function buildStage2Group(
       attempts: step.attempts,
       inputData: step.inputData as Record<string, unknown> | undefined,
       outputData: step.outputData as Record<string, unknown> | undefined,
-    }));
+    }))
 
     // Calculate position relative to parent (stage2group)
-    const docY = STAGE2_LAYOUT_CONFIG.CONTAINER_HEADER_HEIGHT +
-                 (index * (STAGE2_LAYOUT_CONFIG.DOCUMENT_HEIGHT + STAGE2_LAYOUT_CONFIG.DOCUMENT_GAP));
-    const docX = STAGE2_LAYOUT_CONFIG.CONTAINER_PADDING;
+    const docY =
+      STAGE2_LAYOUT_CONFIG.CONTAINER_HEADER_HEIGHT +
+      index * (STAGE2_LAYOUT_CONFIG.DOCUMENT_HEIGHT + STAGE2_LAYOUT_CONFIG.DOCUMENT_GAP)
+    const docX = STAGE2_LAYOUT_CONFIG.CONTAINER_PADDING
 
     documentNodes.push({
       id: docNodeId,
@@ -143,7 +156,7 @@ function buildStage2Group(
       hidden: isCollapsed,
       draggable: false,
       style: {
-        width: STAGE2_LAYOUT_CONFIG.CONTAINER_WIDTH - (2 * STAGE2_LAYOUT_CONFIG.CONTAINER_PADDING),
+        width: STAGE2_LAYOUT_CONFIG.CONTAINER_WIDTH - 2 * STAGE2_LAYOUT_CONFIG.CONTAINER_PADDING,
         height: STAGE2_LAYOUT_CONFIG.DOCUMENT_HEIGHT,
       },
       data: {
@@ -161,12 +174,12 @@ function buildStage2Group(
         attempts: allAttempts,
         inputData: stages[0]?.inputData,
         outputData: stages[stages.length - 1]?.outputData,
-        retryCount: allAttempts.filter(a => a.status === 'failed').length,
+        retryCount: allAttempts.filter((a) => a.status === 'failed').length,
       },
-    } as AppNode);
-  });
+    } as AppNode)
+  })
 
-  return { stage2GroupNode, documentNodes };
+  return { stage2GroupNode, documentNodes }
 }
 
 /**
@@ -175,7 +188,7 @@ function buildStage2Group(
  */
 function buildEmptyStage2Group(
   getExistingPos: (id: string) => { x: number; y: number },
-  config: typeof GRAPH_STAGE_CONFIG['stage_2']
+  config: (typeof GRAPH_STAGE_CONFIG)['stage_2']
 ): AppNode {
   return {
     id: 'stage2group',
@@ -198,7 +211,7 @@ function buildEmptyStage2Group(
       isCollapsed: true,
       childIds: [],
     },
-  };
+  }
 }
 
 export function buildGraph({
@@ -207,25 +220,27 @@ export function buildGraph({
   documentSteps,
   hasDocuments,
   stage1CourseData,
+  clarifyingData,
+  courseStatus,
   getTrace,
   getAttempts,
   getPhases,
   getExistingPos,
   getModuleCollapsed,
-  getStage2Collapsed
+  getStage2Collapsed,
 }: BuildGraphParams): { nodes: AppNode[]; edges: AppEdge[] } {
-  const newNodes: AppNode[] = [];
-  const newEdges: AppEdge[] = [];
+  const newNodes: AppNode[] = []
+  const newEdges: AppEdge[] = []
 
   // Helper to get status
-  const getStatus = (id: string) => stageStatuses[id] || 'pending';
+  const getStatus = (id: string) => stageStatuses[id] || 'pending'
 
-  let prevNodeId = 'stage_1';
+  let prevNodeId = 'stage_1'
 
   for (let i = 1; i <= 6; i++) {
-    const stageKey = `stage_${i}`;
-    const config = GRAPH_STAGE_CONFIG[stageKey];
-    const items = parallelItems.get(i);
+    const stageKey = `stage_${i}`
+    const config = GRAPH_STAGE_CONFIG[stageKey]
+    const items = parallelItems.get(i)
 
     // Handle skipped Stage 3 when no documents
     // Note: Stage 2 is now always a container (stage2group), even when skipped
@@ -239,25 +254,25 @@ export function buildGraph({
           status: 'skipped' as const,
           stageNumber: i as 1 | 2 | 3 | 4 | 5 | 6,
           label: config.name,
-        }
-      });
+        },
+      })
 
       newEdges.push({
         id: `e${prevNodeId}-${stageKey}`,
         source: prevNodeId,
         target: stageKey,
         type: 'animated',
-        data: { status: 'idle', animated: false }
-      });
+        data: { status: 'idle', animated: false },
+      })
 
-      prevNodeId = stageKey;
-      continue;
+      prevNodeId = stageKey
+      continue
     }
 
     // Special handling for Stage 2: Use Stage2Group container
     // This replaces the old parallel document nodes with a single container
     if (i === 2) {
-      const stage2Config = GRAPH_STAGE_CONFIG['stage_2'];
+      const stage2Config = GRAPH_STAGE_CONFIG['stage_2']
 
       if (documentSteps.size > 0) {
         // Build stage2group container with document children
@@ -266,15 +281,15 @@ export function buildGraph({
           getExistingPos,
           getStage2Collapsed,
           stage2Config
-        );
+        )
 
         // Add stage2group container first (parent must be added before children in React Flow)
-        newNodes.push(stage2GroupNode);
+        newNodes.push(stage2GroupNode)
 
         // Add document nodes as children
-        documentNodes.forEach(docNode => {
-          newNodes.push(docNode);
-        });
+        documentNodes.forEach((docNode) => {
+          newNodes.push(docNode)
+        })
 
         // Edge from stage_1 to stage2group
         newEdges.push({
@@ -282,10 +297,10 @@ export function buildGraph({
           source: prevNodeId,
           target: 'stage2group',
           type: 'animated',
-          data: { status: 'idle', animated: false }
-        });
+          data: { status: 'idle', animated: false },
+        })
 
-        prevNodeId = 'stage2group';
+        prevNodeId = 'stage2group'
       } else if (!hasDocuments) {
         // No documents - create skipped stage2group
         const skippedGroup: AppNode = {
@@ -309,58 +324,69 @@ export function buildGraph({
             isCollapsed: true,
             childIds: [],
           },
-        };
+        }
 
-        newNodes.push(skippedGroup);
+        newNodes.push(skippedGroup)
 
         newEdges.push({
           id: `e${prevNodeId}-stage2group`,
           source: prevNodeId,
           target: 'stage2group',
           type: 'animated',
-          data: { status: 'idle', animated: false }
-        });
+          data: { status: 'idle', animated: false },
+        })
 
-        prevNodeId = 'stage2group';
+        prevNodeId = 'stage2group'
       } else {
         // hasDocuments is true but no documentSteps yet (waiting for data)
         // Create empty stage2group in pending state
-        const emptyGroup = buildEmptyStage2Group(getExistingPos, stage2Config);
-        newNodes.push(emptyGroup);
+        const emptyGroup = buildEmptyStage2Group(getExistingPos, stage2Config)
+        newNodes.push(emptyGroup)
 
         newEdges.push({
           id: `e${prevNodeId}-stage2group`,
           source: prevNodeId,
           target: 'stage2group',
           type: 'animated',
-          data: { status: 'idle', animated: false }
-        });
+          data: { status: 'idle', animated: false },
+        })
 
-        prevNodeId = 'stage2group';
+        prevNodeId = 'stage2group'
       }
 
-      continue;
+      continue
     }
 
     // Special handling for Stage 6: Modules/Lessons
     if (i === 6 && config.parallelizable && items && items.length > 0) {
-      const modules = items.filter(item => item.type === 'module');
-      const lessons = items.filter(item => item.type === 'lesson');
+      const modules = items.filter((item) => item.type === 'module')
+      const lessons = items.filter((item) => item.type === 'lesson')
 
-      let stage6Status: NodeStatus = 'pending';
-      if (lessons.some(l => (l.status || getStatus(l.id)) === 'error')) {
-        stage6Status = 'error';
-      } else if (lessons.some(l => (l.status || getStatus(l.id)) === 'active')) {
-        stage6Status = 'active';
-      } else if (lessons.length > 0 && lessons.every(l => (l.status || getStatus(l.id)) === 'completed')) {
-        stage6Status = 'completed';
+      let stage6Status: NodeStatus = 'pending'
+      if (lessons.some((l) => (l.status || getStatus(l.id)) === 'error')) {
+        stage6Status = 'error'
+      } else if (lessons.some((l) => (l.status || getStatus(l.id)) === 'active')) {
+        stage6Status = 'active'
+      } else if (
+        lessons.length > 0 &&
+        lessons.every((l) => (l.status || getStatus(l.id)) === 'completed')
+      ) {
+        stage6Status = 'completed'
       }
 
-      const allLessonAttempts = lessons.flatMap(l => getAttempts(l.id));
-      const totalTokens = allLessonAttempts.reduce((sum, a) => sum + (a.processMetrics?.tokens || 0), 0);
-      const totalCost = allLessonAttempts.reduce((sum, a) => sum + (a.processMetrics?.cost || 0), 0);
-      const totalDuration = allLessonAttempts.reduce((sum, a) => sum + (a.processMetrics?.duration || 0), 0);
-      const completedLessons = lessons.filter(l => (l.status || getStatus(l.id)) === 'completed').length;
+      const allLessonAttempts = lessons.flatMap((l) => getAttempts(l.id))
+      const totalTokens = allLessonAttempts.reduce(
+        (sum, a) => sum + (a.processMetrics?.tokens || 0),
+        0
+      )
+      const totalCost = allLessonAttempts.reduce((sum, a) => sum + (a.processMetrics?.cost || 0), 0)
+      const totalDuration = allLessonAttempts.reduce(
+        (sum, a) => sum + (a.processMetrics?.duration || 0),
+        0
+      )
+      const completedLessons = lessons.filter(
+        (l) => (l.status || getStatus(l.id)) === 'completed'
+      ).length
 
       newNodes.push({
         id: stageKey,
@@ -377,69 +403,76 @@ export function buildGraph({
           attempts: allLessonAttempts,
           outputData: {
             completedLessons,
-            totalLessons: lessons.length
-          }
-        }
-      });
+            totalLessons: lessons.length,
+          },
+        },
+      })
 
       newEdges.push({
         id: `e${prevNodeId}-${stageKey}`,
         source: prevNodeId,
         target: stageKey,
         type: 'animated',
-        data: { status: 'idle', animated: false }
-      });
+        data: { status: 'idle', animated: false },
+      })
 
       const extractSortKey = (id: string): number => {
-        const numbers = id.match(/\d+/g);
-        if (!numbers) return 0;
+        const numbers = id.match(/\d+/g)
+        if (!numbers) return 0
         if (numbers.length >= 2) {
-          return parseInt(numbers[0]) * 1000 + parseInt(numbers[1]);
+          return parseInt(numbers[0]) * 1000 + parseInt(numbers[1])
         }
-        return parseInt(numbers[0]);
-      };
+        return parseInt(numbers[0])
+      }
 
       const moduleItems = items
-        .filter(item => item.type === 'module')
+        .filter((item) => item.type === 'module')
         .sort((a, b) => {
-          const aNum = (a.data?.moduleOrder as number) ?? (a.data?.section_number as number) ?? extractSortKey(a.id);
-          const bNum = (b.data?.moduleOrder as number) ?? (b.data?.section_number as number) ?? extractSortKey(b.id);
-          return aNum - bNum;
-        });
+          const aNum =
+            (a.data?.moduleOrder as number) ??
+            (a.data?.section_number as number) ??
+            extractSortKey(a.id)
+          const bNum =
+            (b.data?.moduleOrder as number) ??
+            (b.data?.section_number as number) ??
+            extractSortKey(b.id)
+          return aNum - bNum
+        })
 
       const lessonItems = items
-        .filter(item => item.type === 'lesson')
+        .filter((item) => item.type === 'lesson')
         .sort((a, b) => {
-          const aNum = (a.data?.lessonOrder as number) ?? extractSortKey(a.id);
-          const bNum = (b.data?.lessonOrder as number) ?? extractSortKey(b.id);
-          return aNum - bNum;
-        });
+          const aNum = (a.data?.lessonOrder as number) ?? extractSortKey(a.id)
+          const bNum = (b.data?.lessonOrder as number) ?? extractSortKey(b.id)
+          return aNum - bNum
+        })
 
-      moduleItems.forEach(item => {
-        const trace = getTrace(item.id);
-        const attempts = getAttempts(item.id);
-        const latestAttempt = attempts[attempts.length - 1];
-        const childLessons = lessonItems.filter(lesson => lesson.parentId === item.id);
-        const childIds = childLessons.map(lesson => lesson.id);
-        const childStatuses = childLessons.map(lesson => lesson.status || getStatus(lesson.id));
-        const completedLessons = childStatuses.filter(s => s === 'completed').length;
-        const totalLessons = childIds.length;
+      moduleItems.forEach((item) => {
+        const trace = getTrace(item.id)
+        const attempts = getAttempts(item.id)
+        const latestAttempt = attempts[attempts.length - 1]
+        const childLessons = lessonItems.filter((lesson) => lesson.parentId === item.id)
+        const childIds = childLessons.map((lesson) => lesson.id)
+        const childStatuses = childLessons.map((lesson) => lesson.status || getStatus(lesson.id))
+        const completedLessons = childStatuses.filter((s) => s === 'completed').length
+        const totalLessons = childIds.length
 
-        let moduleStatus: NodeStatus = 'pending';
-        if (childStatuses.some(s => s === 'error')) moduleStatus = 'error';
-        else if (childStatuses.some(s => s === 'active')) moduleStatus = 'active';
-        else if (totalLessons > 0 && completedLessons === totalLessons) moduleStatus = 'completed';
-        else if (completedLessons > 0) moduleStatus = 'active';
+        let moduleStatus: NodeStatus = 'pending'
+        if (childStatuses.some((s) => s === 'error')) moduleStatus = 'error'
+        else if (childStatuses.some((s) => s === 'active')) moduleStatus = 'active'
+        else if (totalLessons > 0 && completedLessons === totalLessons) moduleStatus = 'completed'
+        else if (completedLessons > 0) moduleStatus = 'active'
 
-        const defaultCollapsed = modules.length > 5;
-        const isCollapsed = getModuleCollapsed(item.id) ?? (item.data?.isCollapsed as boolean) ?? defaultCollapsed;
+        const defaultCollapsed = modules.length > 5
+        const isCollapsed =
+          getModuleCollapsed(item.id) ?? (item.data?.isCollapsed as boolean) ?? defaultCollapsed
 
         // Calculate module height based on collapse state
         const moduleHeight = isCollapsed
           ? LAYOUT_CONFIG.MODULE_COLLAPSED_HEIGHT
           : LAYOUT_CONFIG.MODULE_HEADER_HEIGHT +
-            (totalLessons * (LAYOUT_CONFIG.LESSON_HEIGHT + LAYOUT_CONFIG.LESSON_GAP)) +
-            LAYOUT_CONFIG.MODULE_PADDING;
+            totalLessons * (LAYOUT_CONFIG.LESSON_HEIGHT + LAYOUT_CONFIG.LESSON_GAP) +
+            LAYOUT_CONFIG.MODULE_PADDING
 
         newNodes.push({
           id: item.id,
@@ -469,41 +502,47 @@ export function buildGraph({
             attempts: attempts,
             inputData: latestAttempt?.inputData,
             outputData: latestAttempt?.outputData,
-            retryCount: attempts.filter(a => a.status === 'failed').length
-          }
-        } as AppNode);
-      });
+            retryCount: attempts.filter((a) => a.status === 'failed').length,
+          },
+        } as AppNode)
+      })
 
-      const defaultCollapsedForLessons = modules.length > 5;
+      const defaultCollapsedForLessons = modules.length > 5
       const moduleCollapsedMap = new Map(
-        moduleItems.map(m => [m.id, getModuleCollapsed(m.id) ?? (m.data?.isCollapsed as boolean) ?? defaultCollapsedForLessons])
-      );
+        moduleItems.map((m) => [
+          m.id,
+          getModuleCollapsed(m.id) ??
+            (m.data?.isCollapsed as boolean) ??
+            defaultCollapsedForLessons,
+        ])
+      )
 
       // Group lessons by parent module for proper index-based positioning
-      const lessonsByParent = new Map<string, typeof lessonItems>();
-      lessonItems.forEach(item => {
-        if (!item.parentId) return;
+      const lessonsByParent = new Map<string, typeof lessonItems>()
+      lessonItems.forEach((item) => {
+        if (!item.parentId) return
         if (!lessonsByParent.has(item.parentId)) {
-          lessonsByParent.set(item.parentId, []);
+          lessonsByParent.set(item.parentId, [])
         }
-        lessonsByParent.get(item.parentId)!.push(item);
-      });
+        lessonsByParent.get(item.parentId)!.push(item)
+      })
 
       // Create lesson nodes with calculated positions (relative to parent's top-left)
       lessonsByParent.forEach((lessonsInModule, parentId) => {
-        const parentCollapsed = moduleCollapsedMap.get(parentId) ?? false;
+        const parentCollapsed = moduleCollapsedMap.get(parentId) ?? false
 
         lessonsInModule.forEach((item, indexInModule) => {
-          const trace = getTrace(item.id);
-          const currentStatus = item.status || getStatus(item.id);
-          const attempts = getAttempts(item.id);
-          const latestAttempt = attempts[attempts.length - 1];
+          const trace = getTrace(item.id)
+          const currentStatus = item.status || getStatus(item.id)
+          const attempts = getAttempts(item.id)
+          const latestAttempt = attempts[attempts.length - 1]
 
           // Calculate position based on index within module
           // y = header height + (index * row height)
-          const lessonY = LAYOUT_CONFIG.MODULE_HEADER_HEIGHT +
-                         (indexInModule * (LAYOUT_CONFIG.LESSON_HEIGHT + LAYOUT_CONFIG.LESSON_GAP));
-          const lessonX = LAYOUT_CONFIG.MODULE_PADDING;
+          const lessonY =
+            LAYOUT_CONFIG.MODULE_HEADER_HEIGHT +
+            indexInModule * (LAYOUT_CONFIG.LESSON_HEIGHT + LAYOUT_CONFIG.LESSON_GAP)
+          const lessonX = LAYOUT_CONFIG.MODULE_PADDING
 
           newNodes.push({
             id: item.id,
@@ -516,7 +555,7 @@ export function buildGraph({
             draggable: false,
             // Explicit dimensions for proper rendering
             style: {
-              width: LAYOUT_CONFIG.MODULE_WIDTH - (2 * LAYOUT_CONFIG.MODULE_PADDING),
+              width: LAYOUT_CONFIG.MODULE_WIDTH - 2 * LAYOUT_CONFIG.MODULE_PADDING,
               height: LAYOUT_CONFIG.LESSON_HEIGHT,
             },
             data: {
@@ -535,13 +574,13 @@ export function buildGraph({
               attempts: attempts,
               inputData: latestAttempt?.inputData,
               outputData: latestAttempt?.outputData,
-              retryCount: attempts.filter(a => a.status === 'failed').length
-            }
-          } as AppNode);
-        });
-      });
+              retryCount: attempts.filter((a) => a.status === 'failed').length,
+            },
+          } as AppNode)
+        })
+      })
 
-      const splitterId = 'stage6_splitter';
+      const splitterId = 'stage6_splitter'
       newNodes.push({
         id: splitterId,
         type: 'merge',
@@ -550,31 +589,31 @@ export function buildGraph({
           label: 'Split',
           status: 'pending',
           stageNumber: null,
-          sourceIds: modules.map(m => m.id),
+          sourceIds: modules.map((m) => m.id),
           color: '#10B981',
-          icon: 'GitBranch'
-        }
-      });
+          icon: 'GitBranch',
+        },
+      })
 
       newEdges.push({
         id: `e${stageKey}-${splitterId}`,
         source: stageKey,
         target: splitterId,
         type: 'animated',
-        data: { status: 'idle', animated: false }
-      });
+        data: { status: 'idle', animated: false },
+      })
 
-      modules.forEach(mod => {
+      modules.forEach((mod) => {
         newEdges.push({
           id: `e${splitterId}-${mod.id}`,
           source: splitterId,
           target: mod.id,
           type: 'animated',
-          data: { status: 'idle', animated: false }
-        });
-      });
+          data: { status: 'idle', animated: false },
+        })
+      })
 
-      const mergerId = 'stage6_merger';
+      const mergerId = 'stage6_merger'
       newNodes.push({
         id: mergerId,
         type: 'merge',
@@ -583,44 +622,43 @@ export function buildGraph({
           label: 'Merge',
           status: 'pending',
           stageNumber: null,
-          sourceIds: modules.map(m => m.id),
+          sourceIds: modules.map((m) => m.id),
           color: '#10B981',
-          icon: 'GitMerge'
-        }
-      });
+          icon: 'GitMerge',
+        },
+      })
 
-      modules.forEach(mod => {
+      modules.forEach((mod) => {
         newEdges.push({
           id: `e${mod.id}-${mergerId}`,
           source: mod.id,
           target: mergerId,
           type: 'animated',
-          data: { status: 'idle', animated: false }
-        });
-      });
+          data: { status: 'idle', animated: false },
+        })
+      })
 
-      prevNodeId = mergerId;
-
+      prevNodeId = mergerId
     } else if (config.parallelizable && items && items.length > 0) {
-      const itemNodes: string[] = [];
+      const itemNodes: string[] = []
 
-      items.forEach(item => {
-        if (item.type === 'document' || item.type === 'document-step') return;
-        if (item.type === 'lesson' || item.type === 'module') return;
-        itemNodes.push(item.id);
-      });
+      items.forEach((item) => {
+        if (item.type === 'document' || item.type === 'document-step') return
+        if (item.type === 'lesson' || item.type === 'module') return
+        itemNodes.push(item.id)
+      })
 
-      itemNodes.forEach(nodeId => {
+      itemNodes.forEach((nodeId) => {
         newEdges.push({
           id: `e${prevNodeId}-${nodeId}`,
           source: prevNodeId,
           target: nodeId,
           type: 'animated',
-          data: { status: 'idle', animated: false }
-        });
-      });
+          data: { status: 'idle', animated: false },
+        })
+      })
 
-      const mergeId = `merge_${stageKey}`;
+      const mergeId = `merge_${stageKey}`
       newNodes.push({
         id: mergeId,
         type: 'merge',
@@ -631,47 +669,47 @@ export function buildGraph({
           stageNumber: null,
           sourceIds: itemNodes,
           color: '#94a3b8',
-          icon: 'GitMerge'
-        }
-      });
+          icon: 'GitMerge',
+        },
+      })
 
-      itemNodes.forEach(nodeId => {
+      itemNodes.forEach((nodeId) => {
         newEdges.push({
           id: `e${nodeId}-${mergeId}`,
           source: nodeId,
           target: mergeId,
           type: 'animated',
-          data: { status: 'idle', animated: false }
-        });
-      });
+          data: { status: 'idle', animated: false },
+        })
+      })
 
-      prevNodeId = mergeId;
-
+      prevNodeId = mergeId
     } else {
-      const trace = getTrace(stageKey);
-      const currentStatus = getStatus(stageKey);
-      const attempts = getAttempts(stageKey);
-      const phases = getPhases(stageKey);
-      const latestAttempt = attempts[attempts.length - 1];
+      const trace = getTrace(stageKey)
+      const currentStatus = getStatus(stageKey)
+      const attempts = getAttempts(stageKey)
+      const phases = getPhases(stageKey)
+      const latestAttempt = attempts[attempts.length - 1]
 
       // For Stage 1: use pre-loaded course data if no traces exist yet
       // This allows displaying course info BEFORE generation starts
-      const isStage1 = i === 1;
-      const hasStage1Preload = isStage1 && stage1CourseData;
+      const isStage1 = i === 1
+      const hasStage1Preload = isStage1 && stage1CourseData
 
       // Stage 1 status: 'completed' if course data exists (course was created)
       // Otherwise fall back to trace status or 'pending'
-      const effectiveStatus = hasStage1Preload && currentStatus === 'pending'
-        ? 'completed' as NodeStatus
-        : currentStatus;
+      const effectiveStatus =
+        hasStage1Preload && currentStatus === 'pending'
+          ? ('completed' as NodeStatus)
+          : currentStatus
 
       // Stage 1 data: use preloaded data if no traces, otherwise use trace data
       const effectiveInputData = isStage1
-        ? (latestAttempt?.inputData || stage1CourseData?.inputData)
-        : latestAttempt?.inputData;
+        ? latestAttempt?.inputData || stage1CourseData?.inputData
+        : latestAttempt?.inputData
       const effectiveOutputData = isStage1
-        ? (latestAttempt?.outputData || stage1CourseData?.outputData)
-        : latestAttempt?.outputData;
+        ? latestAttempt?.outputData || stage1CourseData?.outputData
+        : latestAttempt?.outputData
 
       newNodes.push({
         id: stageKey,
@@ -690,21 +728,93 @@ export function buildGraph({
           phases: phases.length > 0 ? phases : undefined,
           inputData: effectiveInputData,
           outputData: effectiveOutputData,
-          retryCount: attempts.filter(a => a.status === 'failed').length
-        }
-      });
+          retryCount: attempts.filter((a) => a.status === 'failed').length,
+        },
+      })
 
-      if (i > 1) { 
-         newEdges.push({
+      if (i > 1) {
+        newEdges.push({
           id: `e${prevNodeId}-${stageKey}`,
           source: prevNodeId,
           target: stageKey,
           type: 'animated',
-          data: { status: 'idle', animated: false }
-        });
+          data: { status: 'idle', animated: false },
+        })
       }
-      
-      prevNodeId = stageKey;
+
+      prevNodeId = stageKey
+
+      // =========================================================
+      // CLARIFYING NODE: Add after Stage 4 if questions exist
+      // OR if course status is 'stage_4_clarifying' (fallback for loading state)
+      // =========================================================
+      const hasClarifyingQuestions = clarifyingData && clarifyingData.total > 0
+      const isInClarifyingStatus = courseStatus === 'stage_4_clarifying'
+
+      // Show clarifying node when:
+      // 1. We have questions data (normal case)
+      // 2. OR course status is 'stage_4_clarifying' (fallback - questions still loading or failed to load)
+      if (i === 4 && (hasClarifyingQuestions || isInClarifyingStatus)) {
+        const clarifyingNodeId = 'stage_4_clarifying'
+
+        // Determine clarifying node status
+        let clarifyingStatus: NodeStatus = 'pending'
+
+        if (hasClarifyingQuestions) {
+          // Normal case: we have question data
+          if (courseStatus === 'stage_4_clarifying') {
+            // Active clarifying phase - show based on answer status
+            if (clarifyingData.canProceed) {
+              clarifyingStatus = 'completed'
+            } else {
+              clarifyingStatus = 'active'
+            }
+          } else {
+            // Questions phase finished (course moved past clarifying)
+            // Show as completed regardless of individual answer status
+            clarifyingStatus = 'completed'
+          }
+        } else if (isInClarifyingStatus) {
+          // Fallback: course is in clarifying status but questions not loaded yet
+          // Show as 'active' to indicate work in progress
+          clarifyingStatus = 'active'
+        }
+
+        // Clarifying node has different data structure, cast to AppNode for array compatibility
+        newNodes.push({
+          id: clarifyingNodeId,
+          type: 'clarifying',
+          position: getExistingPos(clarifyingNodeId),
+          data: {
+            status: clarifyingStatus,
+            // Use actual data if available, otherwise show loading state with zeros
+            questionsCount: clarifyingData?.total ?? 0,
+            answeredCount: clarifyingData?.answered ?? 0,
+            criticalAnswered: clarifyingData?.criticalAnswered ?? 0,
+            criticalTotal: clarifyingData?.criticalTotal ?? 0,
+            isAutomatic: clarifyingData?.isAutomatic ?? false,
+            // Flag to indicate this is a fallback (questions still loading)
+            isLoading: isInClarifyingStatus && !hasClarifyingQuestions,
+          },
+        } as unknown as AppNode)
+
+        // Edge from Stage 4 BOTTOM to Clarifying TOP (side branch, NOT inline)
+        // By NOT updating prevNodeId, Stage 5 will connect from Stage 4
+        // This makes Clarifying a branch below Stage 4, not between Stage 4 and Stage 5
+        newEdges.push({
+          id: `e${stageKey}-${clarifyingNodeId}`,
+          source: stageKey,
+          sourceHandle: 'bottom', // Exit from bottom of Stage 4
+          target: clarifyingNodeId,
+          targetHandle: null, // ClarifyingNode has default top target
+          type: 'animated',
+          data: { status: 'idle', animated: false },
+        })
+
+        // DO NOT update prevNodeId - Stage 5 should connect from Stage 4, not Clarifying
+        // This positions clarifying as a side branch below Stage 4
+        // prevNodeId = clarifyingNodeId  // REMOVED - causes horizontal layout
+      }
     }
   }
 
@@ -718,17 +828,17 @@ export function buildGraph({
       icon: 'CheckCircle',
       color: '#10B981',
       status: 'pending',
-      stageNumber: null
-    }
-  });
+      stageNumber: null,
+    },
+  })
 
   newEdges.push({
     id: `e${prevNodeId}-end`,
     source: prevNodeId,
     target: 'end',
     type: 'animated',
-    data: { status: 'idle', animated: false }
-  });
+    data: { status: 'idle', animated: false },
+  })
 
-  return { nodes: newNodes, edges: newEdges };
+  return { nodes: newNodes, edges: newEdges }
 }
