@@ -2,6 +2,26 @@
 
 _Released on 2025-12-26_
 
+## v0.28.43
+
+_Released on 2026-01-30_
+
+### ✨ New Features
+
+- **clarifying**: Improve UX - move skip button to navigation, show continue only when complete
+
+### 🔧 Improvements
+
+- **clarifying**: Simplify to 1 round, increase max questions to 14
+
+### 🐛 Bug Fixes
+
+- **clarifying**: Address code review findings HIGH-001, HIGH-002, MED-001, MED-002
+
+---
+
+_This release was automatically generated from 10 commits._
+
 ## v0.28.42
 
 _Released on 2026-01-29_

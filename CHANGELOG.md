@@ -7,6 +7,30 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.28.43] - 2026-01-30
+
+### Added
+
+- **clarifying**: improve UX - move skip button to navigation, show continue only when complete (baa48dcf)
+
+### Changed
+
+- **clarifying**: simplify to 1 round, increase max questions to 14 (62d6aa3f)
+
+### Fixed
+
+- **clarifying**: address code review findings HIGH-001, HIGH-002, MED-001, MED-002 (6123aeae)
+
+### Other
+
+- update docs (8cd42d78)
+- bd sync: 2026-01-30 13:11:39 (e869fef4)
+- bd sync: 2026-01-30 12:57:16 (d0496404)
+- bd sync: 2026-01-30 12:55:43 (59eaacd9)
+- bd sync: 2026-01-30 12:48:01 (e9299725)
+- bd sync: 2026-01-30 12:16:52 (3064c9cb)
+- bd sync: 2026-01-30 12:10:20 (8f5d8633)
+
 ## [0.28.42] - 2026-01-29
 
 ### Added
