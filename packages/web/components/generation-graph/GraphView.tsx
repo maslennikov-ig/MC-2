@@ -472,6 +472,8 @@ function GraphViewInner({
   const refetchInProgressRef = useRef(false)
   // Ref to prevent double-fetch in strict mode
   const courseStructureInitialized = useRef(false)
+  // M3: Ref to store previous course structure for change detection
+  const prevCourseStructureRef = useRef<string | null>(null)
 
   /**
    * Unified function to fetch course data from database.
@@ -583,9 +585,18 @@ function GraphViewInner({
                 ]
               : []
 
-          // Update course structure
+          // Update course structure (M3: only if changed)
           if (courseStructure) {
-            initializeFromCourseStructure(courseStructure, completedLabels)
+            const structureJson = JSON.stringify(courseStructure)
+            const hasStructureChanged = prevCourseStructureRef.current !== structureJson
+
+            if (hasStructureChanged) {
+              initializeFromCourseStructure(courseStructure, completedLabels)
+              prevCourseStructureRef.current = structureJson
+              logger.debug('[GraphView] Course structure updated')
+            } else {
+              logger.debug('[GraphView] Course structure unchanged, skipping rebuild')
+            }
             courseStructureInitialized.current = true
           } else {
             // Reset flag if no structure found during initial load (might be added later)
@@ -627,9 +638,18 @@ function GraphViewInner({
                 ]
               : []
 
-          // Update course structure
+          // Update course structure (M3: only if changed)
           if (courseStructure) {
-            initializeFromCourseStructure(courseStructure, completedLabels)
+            const structureJson = JSON.stringify(courseStructure)
+            const hasStructureChanged = prevCourseStructureRef.current !== structureJson
+
+            if (hasStructureChanged) {
+              initializeFromCourseStructure(courseStructure, completedLabels)
+              prevCourseStructureRef.current = structureJson
+              logger.debug('[GraphView] Course structure updated (structure_only)')
+            } else {
+              logger.debug('[GraphView] Course structure unchanged, skipping rebuild')
+            }
             courseStructureInitialized.current = true
           }
         }
