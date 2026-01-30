@@ -150,9 +150,7 @@ export const Stage5OutputTab = memo<Stage5OutputTabProps>(function Stage5OutputT
     return (
       <div className="flex flex-col items-center justify-center py-12 text-center">
         <GitBranch className="text-muted-foreground/50 mb-4 h-12 w-12" />
-        <p className="text-muted-foreground text-sm">
-          {t('emptyOutput')}
-        </p>
+        <p className="text-muted-foreground text-sm">{t('emptyOutput')}</p>
       </div>
     )
   }
@@ -196,7 +194,6 @@ export const Stage5OutputTab = memo<Stage5OutputTabProps>(function Stage5OutputT
             hasStage5: false, // Stage 5 edits don't delete Stage 5
           }}
           sourceStage={5}
-          locale={locale}
           isDeleting={isDeleting}
         />
       )}
@@ -341,9 +338,7 @@ export const Stage5OutputTab = memo<Stage5OutputTabProps>(function Stage5OutputT
                 ))}
               </div>
             ) : (
-              <p className="text-muted-foreground text-sm italic">
-                {tCourse('noPrerequisites')}
-              </p>
+              <p className="text-muted-foreground text-sm italic">{tCourse('noPrerequisites')}</p>
             )}
           </div>
 
@@ -351,9 +346,7 @@ export const Stage5OutputTab = memo<Stage5OutputTabProps>(function Stage5OutputT
           <div className="border-border flex flex-wrap items-center gap-4 border-t pt-2">
             {/* Difficulty */}
             <div className="flex items-center gap-2">
-              <span className="text-muted-foreground text-xs">
-                {t('difficulty')}:
-              </span>
+              <span className="text-muted-foreground text-xs">{t('difficulty')}:</span>
               <Badge className={cn('text-xs font-medium', difficultyColor)}>
                 {difficultyLabel}
               </Badge>
@@ -395,9 +388,7 @@ export const Stage5OutputTab = memo<Stage5OutputTabProps>(function Stage5OutputT
             <GitBranch className="h-4 w-4 text-orange-500" />
             {t('structurePreview')}
           </CardTitle>
-          <p className="text-muted-foreground text-sm">
-            {t('structureDesc')}
-          </p>
+          <p className="text-muted-foreground text-sm">{t('structureDesc')}</p>
         </CardHeader>
         <CardContent>
           <ScrollArea className="h-[500px] pr-4">

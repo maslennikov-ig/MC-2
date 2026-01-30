@@ -2,6 +2,7 @@
 
 import React, { useState } from 'react'
 import { AlertTriangle } from 'lucide-react'
+import { useTranslations } from 'next-intl'
 import {
   AlertDialog,
   AlertDialogAction,
@@ -27,40 +28,9 @@ export interface CascadeStageDeleteModalProps {
   onClose: () => void
   onConfirm: () => void
   downstreamInfo: DownstreamStagesInfo
-  locale?: 'ru' | 'en'
   isDeleting?: boolean
   /** Source stage being edited (4 or 5). Affects description text. Default: 4 */
   sourceStage?: 4 | 5
-}
-
-const translations = {
-  ru: {
-    title: 'Каскадное удаление',
-    warning: 'Внимание',
-    descriptionStage4:
-      'Редактирование Stage 4 требует удаления существующих данных downstream stages:',
-    descriptionStage5: 'Редактирование Stage 5 требует удаления существующих данных Stage 6:',
-    stage5: 'Stage 5 (структура курса)',
-    stage6: 'Stage 6 (содержимое уроков)',
-    lessonsCount: '{count} уроков будет удалено',
-    confirmLabel: 'Я понимаю, что данные будут удалены безвозвратно',
-    cancel: 'Отмена',
-    confirm: 'Удалить и продолжить',
-    deleting: 'Удаление...',
-  },
-  en: {
-    title: 'Cascade Deletion',
-    warning: 'Warning',
-    descriptionStage4: 'Editing Stage 4 requires deleting existing downstream stages data:',
-    descriptionStage5: 'Editing Stage 5 requires deleting existing Stage 6 data:',
-    stage5: 'Stage 5 (course structure)',
-    stage6: 'Stage 6 (lesson contents)',
-    lessonsCount: '{count} lessons will be deleted',
-    confirmLabel: 'I understand that data will be permanently deleted',
-    cancel: 'Cancel',
-    confirm: 'Delete and continue',
-    deleting: 'Deleting...',
-  },
 }
 
 export const CascadeStageDeleteModal: React.FC<CascadeStageDeleteModalProps> = ({
@@ -68,13 +38,12 @@ export const CascadeStageDeleteModal: React.FC<CascadeStageDeleteModalProps> = (
   onClose,
   onConfirm,
   downstreamInfo,
-  locale = 'ru',
   isDeleting = false,
   sourceStage = 4,
 }) => {
   const [confirmed, setConfirmed] = useState(false)
-  const t = translations[locale]
-  const description = sourceStage === 5 ? t.descriptionStage5 : t.descriptionStage4
+  const t = useTranslations('generation.cascadeDeleteModal')
+  const description = sourceStage === 5 ? t('descriptionStage5') : t('descriptionStage4')
 
   const handleClose = () => {
     setConfirmed(false)
@@ -104,7 +73,7 @@ export const CascadeStageDeleteModal: React.FC<CascadeStageDeleteModalProps> = (
             </div>
             <div>
               <AlertDialogTitle className="text-lg font-semibold">
-                {t.warning}: {t.title}
+                {t('warning')}: {t('title')}
               </AlertDialogTitle>
             </div>
           </div>
@@ -119,21 +88,16 @@ export const CascadeStageDeleteModal: React.FC<CascadeStageDeleteModalProps> = (
               {downstreamInfo.hasStage5 && (
                 <li className="flex items-center gap-2 text-sm text-slate-900 dark:text-slate-100">
                   <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
-                  {t.stage5}
+                  {t('stage5')}
                 </li>
               )}
               {downstreamInfo.hasStage6 && (
                 <li className="flex items-center gap-2 text-sm text-slate-900 dark:text-slate-100">
                   <span className="h-1.5 w-1.5 rounded-full bg-red-500" />
-                  {t.stage6}
+                  {t('stage6')}
                   {downstreamInfo.stage6LessonsCount > 0 && (
                     <span className="text-xs text-slate-500 dark:text-slate-400">
-                      (
-                      {t.lessonsCount.replace(
-                        '{count}',
-                        downstreamInfo.stage6LessonsCount.toString()
-                      )}
-                      )
+                      ({t('lessonsCount', { count: downstreamInfo.stage6LessonsCount })})
                     </span>
                   )}
                 </li>
@@ -164,7 +128,7 @@ export const CascadeStageDeleteModal: React.FC<CascadeStageDeleteModalProps> = (
                     : 'text-slate-700 dark:text-slate-300'
                 )}
               >
-                {t.confirmLabel}
+                {t('confirmLabel')}
               </Label>
             </div>
           </div>
@@ -172,7 +136,7 @@ export const CascadeStageDeleteModal: React.FC<CascadeStageDeleteModalProps> = (
 
         <AlertDialogFooter className="mt-6">
           <AlertDialogCancel onClick={handleClose} disabled={isDeleting}>
-            {t.cancel}
+            {t('cancel')}
           </AlertDialogCancel>
           <AlertDialogAction
             onClick={handleConfirm}
@@ -182,7 +146,7 @@ export const CascadeStageDeleteModal: React.FC<CascadeStageDeleteModalProps> = (
               'disabled:bg-slate-300 disabled:text-slate-500'
             )}
           >
-            {isDeleting ? t.deleting : t.confirm}
+            {isDeleting ? t('deleting') : t('confirm')}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

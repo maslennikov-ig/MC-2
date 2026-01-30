@@ -1073,5 +1073,18 @@
     "allLessonsGenerated": "All lessons generated",
     "finalizeCourse": "Finalize Course",
     "finalizing": "Finalizing..."
+  },
+  "cascadeDeleteModal": {
+    "title": "Cascade Deletion",
+    "warning": "Warning",
+    "descriptionStage4": "Editing Stage 4 requires deleting existing downstream stages data:",
+    "descriptionStage5": "Editing Stage 5 requires deleting existing Stage 6 data:",
+    "stage5": "Stage 5 (course structure)",
+    "stage6": "Stage 6 (lesson contents)",
+    "lessonsCount": "{count} lessons will be deleted",
+    "confirmLabel": "I understand that data will be permanently deleted",
+    "cancel": "Cancel",
+    "confirm": "Delete and continue",
+    "deleting": "Deleting..."
   }
 }

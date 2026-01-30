@@ -1073,5 +1073,18 @@
     "allLessonsGenerated": "Все уроки сгенерированы",
     "finalizeCourse": "Завершить курс",
     "finalizing": "Завершение..."
+  },
+  "cascadeDeleteModal": {
+    "title": "Каскадное удаление",
+    "warning": "Внимание",
+    "descriptionStage4": "Редактирование Stage 4 требует удаления существующих данных downstream stages:",
+    "descriptionStage5": "Редактирование Stage 5 требует удаления существующих данных Stage 6:",
+    "stage5": "Stage 5 (структура курса)",
+    "stage6": "Stage 6 (содержимое уроков)",
+    "lessonsCount": "{count} уроков будет удалено",
+    "confirmLabel": "Я понимаю, что данные будут удалены безвозвратно",
+    "cancel": "Отмена",
+    "confirm": "Удалить и продолжить",
+    "deleting": "Удаление..."
   }
 }

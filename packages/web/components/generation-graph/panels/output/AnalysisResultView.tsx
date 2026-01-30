@@ -304,7 +304,6 @@ export const AnalysisResultView = ({
           onClose={handleCascadeCancel}
           onConfirm={handleCascadeConfirm}
           downstreamInfo={downstreamInfo}
-          locale={locale}
           isDeleting={isDeleting}
         />
       )}
