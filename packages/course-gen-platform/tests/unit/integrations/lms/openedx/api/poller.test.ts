@@ -44,7 +44,9 @@ describe('pollImportStatus', () => {
 
   beforeEach(() => {
     mockGetImportStatus = vi.fn();
-    mockGetCourseUrl = vi.fn((courseKey: string) => `https://studio.example.com/course/${courseKey}`);
+    mockGetCourseUrl = vi.fn(
+      (courseKey: string) => `https://studio.example.com/course/${courseKey}`
+    );
 
     mockClient = {
       getImportStatus: mockGetImportStatus,
@@ -88,7 +90,7 @@ describe('pollImportStatus', () => {
           course_key: courseKey,
         });
 
-      const result = await pollImportStatus(mockClient as OpenEdXClient, taskId, {
+      const result = await pollImportStatus(mockClient, taskId, {
         intervalMs: 10, // Fast interval for test
       });
 
@@ -141,7 +143,7 @@ describe('pollImportStatus', () => {
         .mockResolvedValueOnce(statuses[1])
         .mockResolvedValueOnce(statuses[2]);
 
-      await pollImportStatus(mockClient as OpenEdXClient, taskId, {
+      await pollImportStatus(mockClient, taskId, {
         intervalMs: 10,
         onProgress,
       });
@@ -173,7 +175,7 @@ describe('pollImportStatus', () => {
           course_key: 'course-v1:Test+Course+2025',
         });
 
-      const result = await pollImportStatus(mockClient as OpenEdXClient, taskId, {
+      const result = await pollImportStatus(mockClient, taskId, {
         intervalMs: 10,
       });
 
@@ -196,7 +198,7 @@ describe('pollImportStatus', () => {
       });
 
       await expect(
-        pollImportStatus(mockClient as OpenEdXClient, taskId, {
+        pollImportStatus(mockClient, taskId, {
           intervalMs: 10,
           maxAttempts: customMaxAttempts,
         })
@@ -217,7 +219,7 @@ describe('pollImportStatus', () => {
         course_key: courseKey,
       });
 
-      const result = await pollImportStatus(mockClient as OpenEdXClient, taskId);
+      const result = await pollImportStatus(mockClient, taskId);
 
       expect(result.success).toBe(true);
       expect(result.courseKey).toBe(courseKey);
@@ -236,7 +238,7 @@ describe('pollImportStatus', () => {
         course_key: null,
       });
 
-      const result = await pollImportStatus(mockClient as OpenEdXClient, taskId);
+      const result = await pollImportStatus(mockClient, taskId);
 
       expect(result.success).toBe(true);
       expect(result.courseKey).toBeNull();
@@ -259,13 +261,11 @@ describe('pollImportStatus', () => {
         course_key: null,
       });
 
-      await expect(
-        pollImportStatus(mockClient as OpenEdXClient, taskId)
-      ).rejects.toThrow(OpenEdXImportError);
+      await expect(pollImportStatus(mockClient, taskId)).rejects.toThrow(OpenEdXImportError);
 
-      await expect(
-        pollImportStatus(mockClient as OpenEdXClient, taskId)
-      ).rejects.toThrow(`Course import failed: ${errorMessage}`);
+      await expect(pollImportStatus(mockClient, taskId)).rejects.toThrow(
+        `Course import failed: ${errorMessage}`
+      );
     });
 
     it('should use message field if error_message is null on FAILURE', async () => {
@@ -281,9 +281,9 @@ describe('pollImportStatus', () => {
         course_key: null,
       });
 
-      await expect(
-        pollImportStatus(mockClient as OpenEdXClient, taskId)
-      ).rejects.toThrow(`Course import failed: ${message}`);
+      await expect(pollImportStatus(mockClient, taskId)).rejects.toThrow(
+        `Course import failed: ${message}`
+      );
     });
 
     it('should use default message if both error_message and message are null', async () => {
@@ -298,9 +298,9 @@ describe('pollImportStatus', () => {
         course_key: null,
       });
 
-      await expect(
-        pollImportStatus(mockClient as OpenEdXClient, taskId)
-      ).rejects.toThrow('Course import failed: Import failed');
+      await expect(pollImportStatus(mockClient, taskId)).rejects.toThrow(
+        'Course import failed: Import failed'
+      );
     });
 
     it('should throw LMSTimeoutError after maxAttempts exceeded', async () => {
@@ -317,20 +317,18 @@ describe('pollImportStatus', () => {
       });
 
       await expect(
-        pollImportStatus(mockClient as OpenEdXClient, taskId, {
+        pollImportStatus(mockClient, taskId, {
           intervalMs: 10,
           maxAttempts,
         })
       ).rejects.toThrow(LMSTimeoutError);
 
       await expect(
-        pollImportStatus(mockClient as OpenEdXClient, taskId, {
+        pollImportStatus(mockClient, taskId, {
           intervalMs: 10,
           maxAttempts,
         })
-      ).rejects.toThrow(
-        `Import status polling timed out after ${maxAttempts} attempts`
-      );
+      ).rejects.toThrow(`Import status polling timed out after ${maxAttempts} attempts`);
 
       expect(mockGetImportStatus).toHaveBeenCalledTimes(maxAttempts);
     });
@@ -349,7 +347,7 @@ describe('pollImportStatus', () => {
       mockGetImportStatus.mockResolvedValue(lastStatus);
 
       try {
-        await pollImportStatus(mockClient as OpenEdXClient, taskId, {
+        await pollImportStatus(mockClient, taskId, {
           intervalMs: 10,
           maxAttempts: 2,
         });
@@ -400,7 +398,7 @@ describe('pollImportStatus', () => {
         .mockResolvedValueOnce(status2)
         .mockResolvedValueOnce(status3);
 
-      await pollImportStatus(mockClient as OpenEdXClient, taskId, {
+      await pollImportStatus(mockClient, taskId, {
         intervalMs: 10,
         onProgress,
       });
@@ -456,7 +454,7 @@ describe('pollImportStatus', () => {
           course_key: 'course-v1:Test+Course+2025',
         });
 
-      const result = await pollImportStatus(mockClient as OpenEdXClient, taskId, {
+      const result = await pollImportStatus(mockClient, taskId, {
         intervalMs: 10,
       });
 
@@ -480,7 +478,7 @@ describe('pollImportStatus', () => {
       });
 
       // Should not throw - callback errors are caught and ignored
-      const result = await pollImportStatus(mockClient as OpenEdXClient, taskId, {
+      const result = await pollImportStatus(mockClient, taskId, {
         onProgress,
       });
 
@@ -500,7 +498,7 @@ describe('pollImportStatus', () => {
         course_key: 'course-v1:Test+Course+2025',
       });
 
-      const result = await pollImportStatus(mockClient as OpenEdXClient, taskId);
+      const result = await pollImportStatus(mockClient, taskId);
 
       expect(result.success).toBe(true);
       // No error should occur - just verify it works
@@ -525,7 +523,7 @@ describe('pollImportStatus', () => {
           course_key: 'course-v1:Test+Course+2025',
         });
 
-      const result = await pollImportStatus(mockClient as OpenEdXClient, taskId, {
+      const result = await pollImportStatus(mockClient, taskId, {
         intervalMs: 10,
       });
 
@@ -535,43 +533,22 @@ describe('pollImportStatus', () => {
 
     it('should re-throw OpenEdXImportError directly', async () => {
       const taskId = 'task_import_error';
-      const importError = new OpenEdXImportError(
-        'Custom import error',
-        taskId,
-        'FAILURE'
-      );
+      const importError = new OpenEdXImportError('Custom import error', taskId, 'FAILURE');
 
-      mockGetImportStatus.mockRejectedValueOnce(importError);
+      mockGetImportStatus.mockRejectedValue(importError);
 
-      await expect(
-        pollImportStatus(mockClient as OpenEdXClient, taskId)
-      ).rejects.toThrow(OpenEdXImportError);
-
-      await expect(
-        pollImportStatus(mockClient as OpenEdXClient, taskId)
-      ).rejects.toThrow('Custom import error');
+      await expect(pollImportStatus(mockClient, taskId)).rejects.toThrow(OpenEdXImportError);
 
       expect(mockGetImportStatus).toHaveBeenCalledTimes(1);
     });
 
     it('should re-throw LMSTimeoutError directly', async () => {
       const taskId = 'task_timeout_rethrow';
-      const timeoutError = new LMSTimeoutError(
-        'Custom timeout error',
-        'openedx',
-        30000,
-        'poll'
-      );
+      const timeoutError = new LMSTimeoutError('Custom timeout error', 'openedx', 30000, 'poll');
 
-      mockGetImportStatus.mockRejectedValueOnce(timeoutError);
+      mockGetImportStatus.mockRejectedValue(timeoutError);
 
-      await expect(
-        pollImportStatus(mockClient as OpenEdXClient, taskId)
-      ).rejects.toThrow(LMSTimeoutError);
-
-      await expect(
-        pollImportStatus(mockClient as OpenEdXClient, taskId)
-      ).rejects.toThrow('Custom timeout error');
+      await expect(pollImportStatus(mockClient, taskId)).rejects.toThrow(LMSTimeoutError);
 
       expect(mockGetImportStatus).toHaveBeenCalledTimes(1);
     });
@@ -584,7 +561,7 @@ describe('pollImportStatus', () => {
       mockGetImportStatus.mockRejectedValue(networkError);
 
       await expect(
-        pollImportStatus(mockClient as OpenEdXClient, taskId, {
+        pollImportStatus(mockClient, taskId, {
           intervalMs: 10,
           maxAttempts: 3,
         })
@@ -607,7 +584,7 @@ describe('pollImportStatus', () => {
       });
 
       await expect(
-        pollImportStatus(mockClient as OpenEdXClient, taskId, {
+        pollImportStatus(mockClient, taskId, {
           intervalMs: 10, // Fast interval for test
         })
       ).rejects.toThrow(LMSTimeoutError);
@@ -626,7 +603,7 @@ describe('pollImportStatus', () => {
         course_key: 'course-v1:Test+Course+2025',
       });
 
-      const result = await pollImportStatus(mockClient as OpenEdXClient, taskId);
+      const result = await pollImportStatus(mockClient, taskId);
 
       expect(result.success).toBe(true);
       expect(mockGetImportStatus).toHaveBeenCalledTimes(1);
