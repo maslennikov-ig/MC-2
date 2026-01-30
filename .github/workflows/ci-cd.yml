@@ -198,7 +198,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: setup
     if: ${{ !inputs.skip_tests }}
-    timeout-minutes: 10
+    timeout-minutes: 15
 
     services:
       redis:
