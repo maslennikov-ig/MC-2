@@ -546,59 +546,96 @@ function GraphViewInner({
 
   // Listen for course-data-updated events (dispatched by realtime provider)
   // This handles UI refresh after apply proposal (Stage 5) and clarifying answers (Stage 4)
+  const refetchInProgressRef = useRef(false)
   useEffect(() => {
+    let isMounted = true
+
     const refetchCourseData = async (source?: string) => {
-      logger.info('[GraphView] Course data updated, refetching...', { source })
-
-      const supabase = createClient()
-      const { data, error } = await supabase
-        .from('courses')
-        .select('course_structure, visual_style, style, analysis_result')
-        .eq('id', courseId)
-        .single()
-
-      if (error) {
-        logger.error('[GraphView] Failed to refetch course data:', error)
+      // H2: Prevent concurrent refetches (race condition protection)
+      if (refetchInProgressRef.current) {
+        logger.info('[GraphView] Refetch already in progress, skipping')
         return
       }
 
-      // Update visual style
-      if (data?.visual_style && isVisualStyle(data.visual_style)) {
-        setVisualStyle(data.visual_style)
-      }
+      refetchInProgressRef.current = true
+      const startTime = performance.now()
 
-      // Update course style
-      if (data?.style) {
-        setCourseStyle(data.style)
-      }
+      try {
+        logger.info('[GraphView] Course data updated, refetching...', { source })
 
-      // Update analysis result (Stage 4 output)
-      if (data?.analysis_result) {
-        const parsed = parseAnalysisResult(data.analysis_result)
-        if (parsed) {
-          setAnalysisResult(parsed)
+        const supabase = createClient()
+        const { data, error } = await supabase
+          .from('courses')
+          .select('course_structure, visual_style, style, analysis_result')
+          .eq('id', courseId)
+          .single()
+
+        if (error) {
+          logger.error('[GraphView] Failed to refetch course data:', error)
+          return
         }
-      }
 
-      // Update course structure (Stage 5 output)
-      if (data?.course_structure) {
-        initializeFromCourseStructure(data.course_structure as CourseStructure, [])
-      }
+        // E1: Guard against setState on unmounted component
+        if (!isMounted) {
+          logger.info('[GraphView] Component unmounted, skipping state update')
+          return
+        }
 
-      logger.info('[GraphView] Course data refreshed successfully')
+        // Update visual style
+        if (data?.visual_style && isVisualStyle(data.visual_style)) {
+          setVisualStyle(data.visual_style)
+        }
+
+        // Update course style
+        if (data?.style) {
+          setCourseStyle(data.style)
+        }
+
+        // Update analysis result (Stage 4 output)
+        if (data?.analysis_result) {
+          const parsed = parseAnalysisResult(data.analysis_result)
+          if (parsed) {
+            setAnalysisResult(parsed)
+          }
+        }
+
+        // Update course structure (Stage 5 output)
+        if (data?.course_structure) {
+          initializeFromCourseStructure(data.course_structure as CourseStructure, [])
+        }
+
+        const duration = performance.now() - startTime
+        logger.info('[GraphView] Course data refreshed successfully', { duration: `${duration.toFixed(2)}ms` })
+      } finally {
+        refetchInProgressRef.current = false
+      }
     }
 
     const handleCourseDataUpdated = (event: Event) => {
-      const customEvent = event as CustomEvent<{ courseId: string; source?: string }>
+      const customEvent = event as CustomEvent<{ courseId: string; updatedFields?: string[]; source?: string }>
 
       // Only handle events for this course
       if (customEvent.detail?.courseId !== courseId) return
+
+      // H1: Only refetch if relevant fields changed
+      const updatedFields = customEvent.detail?.updatedFields || []
+      const relevantFields = ['analysis_result', 'course_structure', 'visual_style', 'style']
+      const hasRelevantChanges = updatedFields.length === 0 || updatedFields.some(f => relevantFields.includes(f))
+
+      if (!hasRelevantChanges) {
+        logger.info('[GraphView] No relevant fields updated, skipping refetch', { updatedFields })
+        return
+      }
 
       void refetchCourseData(customEvent.detail?.source)
     }
 
     window.addEventListener('course-data-updated', handleCourseDataUpdated)
-    return () => window.removeEventListener('course-data-updated', handleCourseDataUpdated)
+    return () => {
+      isMounted = false
+      window.removeEventListener('course-data-updated', handleCourseDataUpdated)
+      logger.info('[GraphView] Removed course-data-updated listener for', courseId)
+    }
   }, [courseId, initializeFromCourseStructure])
 
   // Re-fetch course structure when Stage 5 becomes complete
