@@ -266,6 +266,19 @@ export function GenerationRealtimeProvider({
               toast.success('Generation completed successfully');
             }
           }
+
+          // Dispatch event for any course data update (analysis_result, course_structure, etc.)
+          // This allows components to react to changes that aren't just status updates
+          window.dispatchEvent(
+            new CustomEvent('course-data-updated', {
+              detail: {
+                courseId,
+                updatedFields: Object.keys(payload.new || {}),
+                source: 'realtime'
+              },
+            })
+          );
+          log(' Dispatched course-data-updated event');
         }
       )
       .subscribe((status) => {
