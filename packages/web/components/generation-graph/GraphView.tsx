@@ -38,6 +38,9 @@ import {
   VisualStyle,
   parseAnalysisResult,
   type AnalysisResult,
+  COURSE_DATA_UPDATED_EVENT,
+  isCourseDataUpdatedEvent,
+  hasRelevantFieldChanges,
 } from '@megacampus/shared-types'
 import { GenerationProgress, CourseStatus } from '@/types/course-generation'
 import {
@@ -465,92 +468,30 @@ function GraphViewInner({
     nodesRef.current = nodes
   }, [nodes])
 
-  // Fetch course structure on mount to initialize modules/lessons (Task 1: Stage 6 UI/UX)
-  // This ensures the structure appears immediately even on page refresh
-  const courseStructureInitialized = useRef(false)
-  useEffect(() => {
-    // Prevent double-fetch in strict mode
-    if (courseStructureInitialized.current) return
-    courseStructureInitialized.current = true
-
-    const fetchCourseStructure = async () => {
-      const supabase = createClient()
-
-      // Fetch course structure, visual_style, style, analysis_result, and completed lessons in parallel
-      const [courseResult, lessonsResult] = await Promise.all([
-        supabase
-          .from('courses')
-          .select('course_structure, visual_style, style, analysis_result')
-          .eq('id', courseId)
-          .single(),
-        supabase
-          .from('generation_trace')
-          .select('input_data')
-          .eq('course_id', courseId)
-          .eq('stage', 'stage_6')
-          .eq('step_name', 'finish')
-          .not('input_data->lessonLabel', 'is', null),
-      ])
-
-      if (courseResult.error) {
-        console.error('[GraphView] Failed to fetch course structure:', courseResult.error)
-        // Reset flag on error to allow retry on remount
-        courseStructureInitialized.current = false
-        return
-      }
-
-      // Store visual_style if available (generated in Stage 4)
-      if (courseResult.data?.visual_style && isVisualStyle(courseResult.data.visual_style)) {
-        setVisualStyle(courseResult.data.visual_style)
-      }
-
-      // Store course writing style if available
-      if (courseResult.data?.style) {
-        setCourseStyle(courseResult.data.style)
-      }
-
-      // Store analysis result if available (persisted Stage 4 edits)
-      if (courseResult.data?.analysis_result) {
-        const parsed = parseAnalysisResult(courseResult.data.analysis_result)
-        if (parsed) {
-          setAnalysisResult(parsed)
-        }
-      }
-
-      if (courseResult.data?.course_structure) {
-        // Extract unique lessonLabels from completed traces
-        const completedLabels =
-          lessonsResult.data && lessonsResult.data.length > 0
-            ? [
-                ...new Set(
-                  lessonsResult.data
-                    .map((t) => (t.input_data as Record<string, unknown>)?.lessonLabel as string)
-                    .filter(Boolean)
-                ),
-              ]
-            : []
-
-        // Initialize structure with completed statuses in one call
-        initializeFromCourseStructure(
-          courseResult.data.course_structure as CourseStructure,
-          completedLabels
-        )
-      } else {
-        // Reset flag if no structure found (might be added later)
-        courseStructureInitialized.current = false
-      }
-    }
-
-    fetchCourseStructure()
-  }, [courseId, initializeFromCourseStructure])
-
-  // Listen for course-data-updated events (dispatched by realtime provider)
-  // This handles UI refresh after apply proposal (Stage 5) and clarifying answers (Stage 4)
+  // Ref to prevent concurrent refetches (race condition protection)
   const refetchInProgressRef = useRef(false)
-  useEffect(() => {
-    let isMounted = true
+  // Ref to prevent double-fetch in strict mode
+  const courseStructureInitialized = useRef(false)
 
-    const refetchCourseData = async (source?: string) => {
+  /**
+   * Unified function to fetch course data from database.
+   * Consolidates logic from initial fetch, event refetch, and Stage 5 complete fetch.
+   *
+   * @param fields - 'all' fetches course_structure, visual_style, style, analysis_result;
+   *                 'structure_only' fetches only course_structure
+   * @param includeCompletedLessons - Whether to also fetch completed lesson labels from generation_trace
+   * @param options - Additional options for fetch behavior
+   */
+  const fetchCourseData = useCallback(
+    async (
+      fields: 'all' | 'structure_only',
+      includeCompletedLessons: boolean,
+      options?: {
+        source?: string
+        checkMounted?: () => boolean
+        onError?: (context: string) => void
+      }
+    ) => {
       // H2: Prevent concurrent refetches (race condition protection)
       if (refetchInProgressRef.current) {
         logger.info('[GraphView] Refetch already in progress, skipping')
@@ -561,82 +502,213 @@ function GraphViewInner({
       const startTime = performance.now()
 
       try {
-        logger.info('[GraphView] Course data updated, refetching...', { source })
+        if (options?.source) {
+          logger.info('[GraphView] Course data updated, refetching...', { source: options.source })
+        }
 
         const supabase = createClient()
-        const { data, error } = await supabase
-          .from('courses')
-          .select('course_structure, visual_style, style, analysis_result')
-          .eq('id', courseId)
-          .single()
 
-        if (error) {
-          logger.error('[GraphView] Failed to refetch course data:', error)
-          return
-        }
+        // Build completed lessons query if needed
+        const lessonsQuery = includeCompletedLessons
+          ? supabase
+              .from('generation_trace')
+              .select('input_data')
+              .eq('course_id', courseId)
+              .eq('stage', 'stage_6')
+              .eq('step_name', 'finish')
+              .not('input_data->lessonLabel', 'is', null)
+          : null
 
-        // E1: Guard against setState on unmounted component
-        if (!isMounted) {
-          logger.info('[GraphView] Component unmounted, skipping state update')
-          return
-        }
+        // Fetch based on fields parameter - use separate queries for type safety
+        let courseStructure: CourseStructure | null = null
+        let visualStyleData: unknown = null
+        let styleData: string | null = null
+        let analysisResultData: unknown = null
 
-        // Update visual style
-        if (data?.visual_style && isVisualStyle(data.visual_style)) {
-          setVisualStyle(data.visual_style)
-        }
+        if (fields === 'all') {
+          // Fetch all fields
+          const [courseResult, lessonsResult] = await Promise.all([
+            supabase
+              .from('courses')
+              .select('course_structure, visual_style, style, analysis_result')
+              .eq('id', courseId)
+              .single(),
+            lessonsQuery,
+          ])
 
-        // Update course style
-        if (data?.style) {
-          setCourseStyle(data.style)
-        }
+          if (courseResult.error) {
+            logger.error('[GraphView] Failed to fetch course data:', courseResult.error)
+            options?.onError?.('course data')
+            return
+          }
 
-        // Update analysis result (Stage 4 output)
-        if (data?.analysis_result) {
-          const parsed = parseAnalysisResult(data.analysis_result)
-          if (parsed) {
-            setAnalysisResult(parsed)
+          // E1: Guard against setState on unmounted component
+          if (options?.checkMounted && !options.checkMounted()) {
+            logger.info('[GraphView] Component unmounted, skipping state update')
+            return
+          }
+
+          courseStructure = courseResult.data?.course_structure as CourseStructure | null
+          visualStyleData = courseResult.data?.visual_style
+          styleData = courseResult.data?.style ?? null
+          analysisResultData = courseResult.data?.analysis_result
+
+          // Update visual style
+          if (visualStyleData && isVisualStyle(visualStyleData)) {
+            setVisualStyle(visualStyleData)
+          }
+
+          // Update course style
+          if (styleData) {
+            setCourseStyle(styleData)
+          }
+
+          // Update analysis result
+          if (analysisResultData) {
+            const parsed = parseAnalysisResult(analysisResultData)
+            if (parsed) {
+              setAnalysisResult(parsed)
+            }
+          }
+
+          // Extract completed labels
+          const completedLabels =
+            lessonsResult?.data && lessonsResult.data.length > 0
+              ? [
+                  ...new Set(
+                    lessonsResult.data
+                      .map((t) => (t.input_data as Record<string, unknown>)?.lessonLabel as string)
+                      .filter(Boolean)
+                  ),
+                ]
+              : []
+
+          // Update course structure
+          if (courseStructure) {
+            initializeFromCourseStructure(courseStructure, completedLabels)
+            courseStructureInitialized.current = true
+          } else {
+            // Reset flag if no structure found during initial load (might be added later)
+            courseStructureInitialized.current = false
+          }
+        } else {
+          // Fetch structure only
+          const [courseResult, lessonsResult] = await Promise.all([
+            supabase.from('courses').select('course_structure').eq('id', courseId).single(),
+            lessonsQuery,
+          ])
+
+          if (courseResult.error) {
+            logger.error(
+              '[GraphView] Failed to fetch course structure after Stage 5:',
+              courseResult.error
+            )
+            options?.onError?.('course structure after Stage 5')
+            return
+          }
+
+          // E1: Guard against setState on unmounted component
+          if (options?.checkMounted && !options.checkMounted()) {
+            logger.info('[GraphView] Component unmounted, skipping state update')
+            return
+          }
+
+          courseStructure = courseResult.data?.course_structure as CourseStructure | null
+
+          // Extract completed labels
+          const completedLabels =
+            lessonsResult?.data && lessonsResult.data.length > 0
+              ? [
+                  ...new Set(
+                    lessonsResult.data
+                      .map((t) => (t.input_data as Record<string, unknown>)?.lessonLabel as string)
+                      .filter(Boolean)
+                  ),
+                ]
+              : []
+
+          // Update course structure
+          if (courseStructure) {
+            initializeFromCourseStructure(courseStructure, completedLabels)
+            courseStructureInitialized.current = true
           }
         }
 
-        // Update course structure (Stage 5 output)
-        if (data?.course_structure) {
-          initializeFromCourseStructure(data.course_structure as CourseStructure, [])
-        }
-
         const duration = performance.now() - startTime
-        logger.info('[GraphView] Course data refreshed successfully', { duration: `${duration.toFixed(2)}ms` })
+        logger.info('[GraphView] Course data refreshed successfully', {
+          fields,
+          includeCompletedLessons,
+          duration: `${duration.toFixed(2)}ms`,
+        })
       } finally {
         refetchInProgressRef.current = false
       }
-    }
+    },
+    [courseId, initializeFromCourseStructure]
+  )
+
+  // Fetch course structure on mount to initialize modules/lessons (Task 1: Stage 6 UI/UX)
+  // This ensures the structure appears immediately even on page refresh
+  useEffect(() => {
+    // Prevent double-fetch in strict mode
+    if (courseStructureInitialized.current) return
+    courseStructureInitialized.current = true
+
+    // Initial fetch: all fields + completed lessons
+    void fetchCourseData('all', true, {
+      onError: () => {
+        // Reset flag on error to allow retry on remount
+        courseStructureInitialized.current = false
+      },
+    })
+  }, [fetchCourseData])
+
+  // Listen for course-data-updated events (dispatched by realtime provider)
+  // This handles UI refresh after apply proposal (Stage 5) and clarifying answers (Stage 4)
+  useEffect(() => {
+    let isMounted = true
 
     const handleCourseDataUpdated = (event: Event) => {
-      const customEvent = event as CustomEvent<{ courseId: string; updatedFields?: string[]; source?: string }>
-
-      // Only handle events for this course
-      if (customEvent.detail?.courseId !== courseId) return
-
-      // H1: Only refetch if relevant fields changed
-      const updatedFields = customEvent.detail?.updatedFields || []
-      const relevantFields = ['analysis_result', 'course_structure', 'visual_style', 'style']
-      const hasRelevantChanges = updatedFields.length === 0 || updatedFields.some(f => relevantFields.includes(f))
-
-      if (!hasRelevantChanges) {
-        logger.info('[GraphView] No relevant fields updated, skipping refetch', { updatedFields })
+      // M4: Type-safe event validation
+      if (!isCourseDataUpdatedEvent(event)) {
+        logger.warn('[GraphView] Invalid course-data-updated event received')
         return
       }
 
-      void refetchCourseData(customEvent.detail?.source)
+      const { detail } = event
+
+      // Only handle events for this course
+      if (detail.courseId !== courseId) return
+
+      // BP2: Only process realtime events when connected
+      // Fallback polling handles disconnected state - avoid duplicate fetches
+      if (detail.source === 'realtime' && !isConnected) {
+        logger.info('[GraphView] Ignoring realtime event - using fallback polling')
+        return
+      }
+
+      // H1: Only refetch if relevant fields changed
+      if (!hasRelevantFieldChanges(detail.updatedFields)) {
+        logger.info('[GraphView] No relevant fields updated, skipping refetch', {
+          updatedFields: detail.updatedFields,
+        })
+        return
+      }
+
+      // Event refetch: all fields, no completed lessons
+      void fetchCourseData('all', false, {
+        source: detail.source,
+        checkMounted: () => isMounted,
+      })
     }
 
-    window.addEventListener('course-data-updated', handleCourseDataUpdated)
+    window.addEventListener(COURSE_DATA_UPDATED_EVENT, handleCourseDataUpdated)
     return () => {
       isMounted = false
-      window.removeEventListener('course-data-updated', handleCourseDataUpdated)
+      window.removeEventListener(COURSE_DATA_UPDATED_EVENT, handleCourseDataUpdated)
       logger.info('[GraphView] Removed course-data-updated listener for', courseId)
     }
-  }, [courseId, initializeFromCourseStructure])
+  }, [courseId, fetchCourseData, isConnected])
 
   // Re-fetch course structure when Stage 5 becomes complete
   // This ensures lesson nodes appear immediately after Stage 5 approval
@@ -659,54 +731,10 @@ function GraphViewInner({
       // Reset the initialization flag to allow re-fetch
       courseStructureInitialized.current = false
 
-      // Fetch fresh course structure WITH completed lessons
-      const fetchCourseStructure = async () => {
-        const supabase = createClient()
-
-        // Fetch course structure and completed lessons in parallel
-        const [courseResult, lessonsResult] = await Promise.all([
-          supabase.from('courses').select('course_structure').eq('id', courseId).single(),
-          supabase
-            .from('generation_trace')
-            .select('input_data')
-            .eq('course_id', courseId)
-            .eq('stage', 'stage_6')
-            .eq('step_name', 'finish')
-            .not('input_data->lessonLabel', 'is', null),
-        ])
-
-        if (courseResult.error) {
-          console.error(
-            '[GraphView] Failed to fetch course structure after Stage 5:',
-            courseResult.error
-          )
-          return
-        }
-
-        if (courseResult.data?.course_structure) {
-          // Extract unique lessonLabels from completed traces
-          const completedLabels =
-            lessonsResult.data && lessonsResult.data.length > 0
-              ? [
-                  ...new Set(
-                    lessonsResult.data
-                      .map((t) => (t.input_data as Record<string, unknown>)?.lessonLabel as string)
-                      .filter(Boolean)
-                  ),
-                ]
-              : []
-
-          initializeFromCourseStructure(
-            courseResult.data.course_structure as CourseStructure,
-            completedLabels
-          )
-          courseStructureInitialized.current = true
-        }
-      }
-
-      fetchCourseStructure()
+      // Stage 5 complete fetch: structure only + completed lessons
+      void fetchCourseData('structure_only', true)
     }
-  }, [pipelineStatus, courseId, initializeFromCourseStructure])
+  }, [pipelineStatus, fetchCourseData])
 
   // Re-fetch course data (analysis_result, visual_style, style) when stage transitions to awaiting_approval
   // This ensures results appear immediately without manual page refresh

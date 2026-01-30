@@ -6,6 +6,11 @@ import { RealtimeChannel } from '@supabase/supabase-js';
 import { toast } from 'sonner';
 import { CourseStatus } from '@/types/course-generation';
 import { useGenerationStore } from '@/stores/useGenerationStore';
+import {
+  COURSE_RELEVANT_FIELDS,
+  createCourseDataUpdatedEvent,
+  type CourseDataUpdatedDetail,
+} from '@megacampus/shared-types';
 
 // Conditional logging - only in development
 const isDev = process.env.NODE_ENV === 'development';
@@ -270,22 +275,22 @@ export function GenerationRealtimeProvider({
           // Dispatch event for course data updates (analysis_result, course_structure, etc.)
           // H1: Only dispatch if relevant fields changed (not just generation_status)
           const updatedFields = Object.keys(payload.new || {});
-          const relevantFields = ['analysis_result', 'course_structure', 'visual_style', 'style'];
-          const hasRelevantChanges = updatedFields.some(f => relevantFields.includes(f));
+          const hasRelevantChanges = updatedFields.some(f =>
+            (COURSE_RELEVANT_FIELDS as readonly string[]).includes(f)
+          );
 
           if (hasRelevantChanges) {
             // M1: Try-catch to prevent listener errors from breaking the provider
             try {
-              window.dispatchEvent(
-                new CustomEvent('course-data-updated', {
-                  detail: {
-                    courseId,
-                    updatedFields,
-                    source: 'realtime'
-                  },
-                })
+              const eventDetail: CourseDataUpdatedDetail = {
+                courseId,
+                updatedFields,
+                source: 'realtime'
+              };
+              window.dispatchEvent(createCourseDataUpdatedEvent(eventDetail));
+              log(' Dispatched course-data-updated event for fields:',
+                updatedFields.filter(f => (COURSE_RELEVANT_FIELDS as readonly string[]).includes(f))
               );
-              log(' Dispatched course-data-updated event for fields:', updatedFields.filter(f => relevantFields.includes(f)));
             } catch (error) {
               console.error('[RealtimeProvider] Failed to dispatch course-data-updated event:', error);
             }
