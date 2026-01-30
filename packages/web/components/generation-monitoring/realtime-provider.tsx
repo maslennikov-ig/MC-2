@@ -11,12 +11,10 @@ import {
   createCourseDataUpdatedEvent,
   type CourseDataUpdatedDetail,
 } from '@megacampus/shared-types';
+import { logger as baseLogger } from '@/lib/client-logger';
 
-// Conditional logging - only in development
-const isDev = process.env.NODE_ENV === 'development';
-const log = (...args: unknown[]): void => {
-  if (isDev) console.log('[RealtimeProvider]', ...args);
-};
+// L2: Standardized logging with child logger for context
+const logger = baseLogger.child({ component: 'RealtimeProvider' });
 
 // Lightweight trace for graph rendering (no heavy JSONB)
 // Uses idx_trace_skeleton for Index-Only Scan
@@ -116,16 +114,16 @@ export function GenerationRealtimeProvider({
 
     // Wait for auth to be ready
     if (isLoading) {
-      log(' Waiting for auth to load...');
+      logger.debug('Waiting for auth to load...');
       return;
     }
 
     if (!session) {
-      log(' No session available, skipping fetch');
+      logger.debug('No session available, skipping fetch');
       return;
     }
 
-    log(' Fetching traces for courseId:', courseId, 'user:', session.user.id);
+    logger.debug('Fetching traces', { courseId, userId: session.user.id });
 
     // Execute both queries in parallel for 2x faster load (~100ms vs ~200ms)
     // Uses idx_trace_skeleton for skeleton query (Index-Only Scan)
@@ -175,8 +173,10 @@ export function GenerationRealtimeProvider({
       // Continue with skeleton data even if critical fails
     }
 
-    log(' Fetched skeleton traces:', skeletonData?.length || 0, 'items');
-    log(' Fetched critical traces:', criticalData?.length || 0, 'items');
+    logger.debug('Fetched traces', {
+      skeleton: skeletonData?.length || 0,
+      critical: criticalData?.length || 0,
+    });
 
     // Merge critical output_data into skeleton traces
     const criticalMap = new Map(
@@ -200,10 +200,10 @@ export function GenerationRealtimeProvider({
       setTraces(mergedTraces);
       // Load historical traces into generation store (for page refresh)
       useGenerationStore.getState().loadFromTraces(mergedTraces);
-      log(' First trace:', mergedTraces[0]);
+      logger.debug('First trace', { id: mergedTraces[0].id, stage: mergedTraces[0].stage });
     } else {
       setTraces([]);
-      log(' No traces found for this course');
+      logger.debug('No traces found for this course');
     }
   }, [courseId, supabase, isLoading, session]);
 
@@ -220,11 +220,11 @@ export function GenerationRealtimeProvider({
 
     // Wait for auth to be ready
     if (isLoading || !session) {
-      log(' Waiting for auth before setting up subscription');
+      logger.debug('Waiting for auth before setting up subscription');
       return;
     }
 
-    log(' Setting up realtime subscription for courseId:', courseId, 'user:', session.user.id);
+    logger.debug('Setting up realtime subscription', { courseId, userId: session.user.id });
 
     // Cleanup previous subscription
     if (channelRef.current) {
@@ -242,7 +242,7 @@ export function GenerationRealtimeProvider({
           filter: `course_id=eq.${courseId}`,
         },
         (payload) => {
-          log(' Received new trace:', payload.new);
+          logger.debug('Received new trace', { id: (payload.new as { id: string }).id });
           // New traces from realtime arrive with FULL data (not skeleton)
           // Skeleton pattern only applies to historical bulk load
           const newTrace = payload.new as GenerationTrace;
@@ -261,7 +261,7 @@ export function GenerationRealtimeProvider({
           filter: `id=eq.${courseId}`,
         },
         (payload) => {
-          log(' Course updated:', payload.new);
+          logger.debug('Course updated', { status: (payload.new as { generation_status?: string }).generation_status });
           const newStatus = payload.new.generation_status as CourseStatus;
           if (newStatus) {
             setStatus(newStatus);
@@ -288,9 +288,9 @@ export function GenerationRealtimeProvider({
                 source: 'realtime'
               };
               window.dispatchEvent(createCourseDataUpdatedEvent(eventDetail));
-              log(' Dispatched course-data-updated event for fields:',
-                updatedFields.filter(f => (COURSE_RELEVANT_FIELDS as readonly string[]).includes(f))
-              );
+              logger.debug('Dispatched course-data-updated event', {
+                fields: updatedFields.filter(f => (COURSE_RELEVANT_FIELDS as readonly string[]).includes(f)),
+              });
             } catch (error) {
               console.error('[RealtimeProvider] Failed to dispatch course-data-updated event:', error);
             }
@@ -298,14 +298,14 @@ export function GenerationRealtimeProvider({
         }
       )
       .subscribe((status) => {
-        log(' Subscription status:', status);
+        logger.debug('Subscription status', { status });
         if (status === 'SUBSCRIBED') {
           setIsConnected(true);
-          log(' Successfully subscribed to realtime channel');
+          logger.debug('Successfully subscribed to realtime channel');
         } else if (status === 'CLOSED' || status === 'CHANNEL_ERROR') {
           setIsConnected(false);
           // Note: CLOSED is normal during React Strict Mode double-invoke in development
-          log(' Channel status:', status);
+          logger.debug('Channel status changed', { status });
         }
       });
 
@@ -336,11 +336,11 @@ export function GenerationRealtimeProvider({
     // Check if trace is already fully loaded (deduplication)
     const existing = traces.find(t => t.id === traceId);
     if (existing?.input_data !== undefined && existing?.output_data !== undefined) {
-      log(' Trace details already loaded:', traceId);
+      logger.debug('Trace details already loaded', { traceId });
       return existing;
     }
 
-    log(' Fetching trace details for:', traceId);
+    logger.debug('Fetching trace details', { traceId });
 
     const { data, error } = await supabase
       .from('generation_trace')
@@ -383,7 +383,7 @@ export function GenerationRealtimeProvider({
     setTraces(prev => prev.map(t =>
       t.id === traceId ? { ...t, ...trace } : t
     ));
-    log(' Trace details loaded:', traceId);
+    logger.debug('Trace details loaded', { traceId });
 
     return trace;
   }, [supabase, traces]);
