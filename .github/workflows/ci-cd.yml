@@ -313,13 +313,13 @@ jobs:
       - name: Run contract tests
         run: pnpm test:contract
         env:
-          SUPABASE_URL: https://test.supabase.co
-          SUPABASE_SERVICE_KEY: test-service-key
-          SUPABASE_ANON_KEY: test-anon-key
-          OPENROUTER_API_KEY: test-openrouter-key
-          JINA_API_KEY: test-jina-key
-          QDRANT_URL: http://localhost:6333
-          QDRANT_API_KEY: test-qdrant-key
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          JINA_API_KEY: ${{ secrets.JINA_API_KEY }}
+          QDRANT_URL: ${{ secrets.QDRANT_URL }}
+          QDRANT_API_KEY: ${{ secrets.QDRANT_API_KEY }}
           REDIS_URL: redis://localhost:6379
 
   # ============================================
@@ -379,13 +379,13 @@ jobs:
       - name: Run integration tests
         run: pnpm test:integration
         env:
-          SUPABASE_URL: https://test.supabase.co
-          SUPABASE_SERVICE_KEY: test-service-key
-          SUPABASE_ANON_KEY: test-anon-key
-          OPENROUTER_API_KEY: test-openrouter-key
-          JINA_API_KEY: test-jina-key
-          QDRANT_URL: http://localhost:6333
-          QDRANT_API_KEY: test-qdrant-key
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_KEY: ${{ secrets.SUPABASE_SERVICE_KEY }}
+          SUPABASE_ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          OPENROUTER_API_KEY: ${{ secrets.OPENROUTER_API_KEY }}
+          JINA_API_KEY: ${{ secrets.JINA_API_KEY }}
+          QDRANT_URL: ${{ secrets.QDRANT_URL }}
+          QDRANT_API_KEY: ${{ secrets.QDRANT_API_KEY }}
           REDIS_URL: redis://localhost:6379
 
   # ============================================
