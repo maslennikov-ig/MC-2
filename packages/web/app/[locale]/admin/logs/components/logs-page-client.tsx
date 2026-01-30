@@ -1,6 +1,7 @@
 'use client'
 
-import { useState, useCallback } from 'react'
+import { useState, useCallback, useMemo } from 'react'
+import { useSearchParams, usePathname, useRouter } from 'next/navigation'
 import { RefreshCw } from 'lucide-react'
 import { FilterBar, type ViewMode } from './filter-bar'
 import { LogTable } from './log-table'
@@ -12,7 +13,14 @@ import { LogsErrorBoundary } from './error-boundary'
 import { LogsRealtimeProvider, useLogsRealtime } from './logs-realtime-provider'
 import { Button } from '@/components/ui/button'
 import { cn } from '@/lib/utils'
-import type { UnifiedLogItem, LogFilters, LogType, LogStatus } from '@/app/actions/admin-logs'
+import type {
+  UnifiedLogItem,
+  LogFilters,
+  LogType,
+  LogStatus,
+  LogLevel,
+  LogEnvironment,
+} from '@/app/actions/admin-logs'
 
 // Placeholder type for grouped items
 interface GroupedLogItem {
@@ -80,17 +88,73 @@ function NewLogsBanner() {
   )
 }
 
+// URL parameter keys for filter persistence
+const URL_PARAM_KEYS = {
+  level: 'level',
+  source: 'source',
+  status: 'status',
+  environment: 'environment',
+  search: 'search',
+  dateFrom: 'dateFrom',
+  dateTo: 'dateTo',
+  viewMode: 'viewMode',
+} as const
+
+/**
+ * Parse filters from URL search params
+ */
+function parseFiltersFromUrl(searchParams: URLSearchParams): LogFilters {
+  const level = searchParams.get(URL_PARAM_KEYS.level)
+  const source = searchParams.get(URL_PARAM_KEYS.source)
+  const status = searchParams.get(URL_PARAM_KEYS.status)
+  const environment = searchParams.get(URL_PARAM_KEYS.environment)
+  const search = searchParams.get(URL_PARAM_KEYS.search)
+  const dateFrom = searchParams.get(URL_PARAM_KEYS.dateFrom)
+  const dateTo = searchParams.get(URL_PARAM_KEYS.dateTo)
+
+  return {
+    level: level as LogLevel | undefined,
+    source: source as LogType | undefined,
+    status: status as LogStatus | undefined,
+    environment: environment as LogEnvironment | undefined,
+    search: search || undefined,
+    dateFrom: dateFrom || undefined,
+    dateTo: dateTo || undefined,
+  }
+}
+
+/**
+ * Parse view mode from URL search params
+ */
+function parseViewModeFromUrl(searchParams: URLSearchParams): ViewMode {
+  const viewMode = searchParams.get(URL_PARAM_KEYS.viewMode)
+  return viewMode === 'flat' ? 'flat' : 'grouped'
+}
+
 /**
  * Inner content component wrapped by error boundary
  */
 function LogsPageContent() {
   const { refreshTrigger, requestRefresh } = useLogsRealtime()
+  const searchParams = useSearchParams()
+  const pathname = usePathname()
+  const router = useRouter()
 
-  // Filter state - default to 'new' status to show only unresolved issues
-  const [filters, setFilters] = useState<LogFilters>({ status: 'new' })
+  // Parse filters from URL (with default status='new' if no status in URL and no other filters)
+  const filters = useMemo<LogFilters>(() => {
+    const parsed = parseFiltersFromUrl(searchParams)
+    // Apply default status='new' only if no filters are set at all
+    const hasAnyFilter = Object.values(parsed).some((v) => v !== undefined)
+    if (!hasAnyFilter) {
+      return { status: 'new' }
+    }
+    return parsed
+  }, [searchParams])
 
-  // View mode state (default to grouped)
-  const [viewMode, setViewMode] = useState<ViewMode>('grouped')
+  // Parse view mode from URL
+  const viewMode = useMemo<ViewMode>(() => {
+    return parseViewModeFromUrl(searchParams)
+  }, [searchParams])
 
   // Selected rows state
   const [selectedItems, setSelectedItems] = useState<Array<{ logType: LogType; logId: string }>>([])
@@ -109,10 +173,47 @@ function LogsPageContent() {
   // Combined trigger: realtime trigger + internal key
   const combinedTrigger = refreshTrigger + internalRefreshKey
 
-  const handleFilterChange = useCallback((newFilters: LogFilters) => {
-    setFilters(newFilters)
-    setSelectedItems([]) // Clear selection on filter change
-  }, [])
+  // Update URL with new filters (shallow navigation)
+  const updateUrlParams = useCallback(
+    (newFilters: LogFilters, newViewMode?: ViewMode) => {
+      const params = new URLSearchParams()
+
+      // Set filter params
+      if (newFilters.level) params.set(URL_PARAM_KEYS.level, newFilters.level)
+      if (newFilters.source) params.set(URL_PARAM_KEYS.source, newFilters.source)
+      if (newFilters.status) params.set(URL_PARAM_KEYS.status, newFilters.status)
+      if (newFilters.environment) params.set(URL_PARAM_KEYS.environment, newFilters.environment)
+      if (newFilters.search) params.set(URL_PARAM_KEYS.search, newFilters.search)
+      if (newFilters.dateFrom) params.set(URL_PARAM_KEYS.dateFrom, newFilters.dateFrom)
+      if (newFilters.dateTo) params.set(URL_PARAM_KEYS.dateTo, newFilters.dateTo)
+
+      // Set view mode if provided and not default
+      const effectiveViewMode = newViewMode ?? viewMode
+      if (effectiveViewMode !== 'grouped') {
+        params.set(URL_PARAM_KEYS.viewMode, effectiveViewMode)
+      }
+
+      const queryString = params.toString()
+      const newUrl = queryString ? `${pathname}?${queryString}` : pathname
+      router.push(newUrl, { scroll: false })
+    },
+    [pathname, router, viewMode]
+  )
+
+  const handleFilterChange = useCallback(
+    (newFilters: LogFilters) => {
+      updateUrlParams(newFilters)
+      setSelectedItems([]) // Clear selection on filter change
+    },
+    [updateUrlParams]
+  )
+
+  const handleViewModeChange = useCallback(
+    (newViewMode: ViewMode) => {
+      updateUrlParams(filters, newViewMode)
+    },
+    [updateUrlParams, filters]
+  )
 
   const handleRowSelect = useCallback((item: UnifiedLogItem, selected: boolean) => {
     setSelectedItems((prev) => {
@@ -182,7 +283,7 @@ function LogsPageContent() {
         filters={filters}
         onFilterChange={handleFilterChange}
         viewMode={viewMode}
-        onViewModeChange={setViewMode}
+        onViewModeChange={handleViewModeChange}
       />
 
       {/* New logs notification */}
