@@ -14,6 +14,7 @@ export default defineConfig({
     include: ['tests/unit/**/*.test.ts'],
     setupFiles: ['./tests/setup.ts'],
     // NO globalSetup - unit tests don't need BullMQ worker
+    globalSetup: ['./tests/global-teardown-unit.ts'], // Only teardown, closes Redis
     reporters: ['default'],
     testTimeout: 30000, // 30 seconds - unit tests should be fast
     hookTimeout: 10000, // 10 seconds
@@ -24,6 +25,9 @@ export default defineConfig({
         singleFork: false, // Allow parallel forks for speed
       },
     },
+    // Force exit after tests complete - some modules open Redis connections
+    // that don't close cleanly without globalTeardown
+    teardownTimeout: 5000,
   },
   resolve: {
     alias: {
