@@ -199,17 +199,7 @@ jobs:
     needs: setup
     if: ${{ !inputs.skip_tests }}
     timeout-minutes: 15
-
-    services:
-      redis:
-        image: redis:7-alpine
-        ports:
-          - 6379:6379
-        options: >-
-          --health-cmd "redis-cli ping"
-          --health-interval 10s
-          --health-timeout 5s
-          --health-retries 5
+    # No Redis service - unit tests should use mocks, not real connections
 
     steps:
       - uses: actions/checkout@v4
@@ -254,7 +244,7 @@ jobs:
           JINA_API_KEY: test-jina-key
           QDRANT_URL: http://localhost:6333
           QDRANT_API_KEY: test-qdrant-key
-          REDIS_URL: redis://localhost:6379
+          # No REDIS_URL - unit tests should mock Redis, not connect to real instance
 
   # ============================================
   # Test Tier 2: Contract Tests (non-blocking, after unit tests)
