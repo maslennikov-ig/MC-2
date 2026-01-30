@@ -246,6 +246,15 @@ jobs:
 
       - name: Run unit tests
         run: pnpm test:unit
+        env:
+          SUPABASE_URL: https://test.supabase.co
+          SUPABASE_SERVICE_KEY: test-service-key
+          SUPABASE_ANON_KEY: test-anon-key
+          OPENROUTER_API_KEY: test-openrouter-key
+          JINA_API_KEY: test-jina-key
+          QDRANT_URL: http://localhost:6333
+          QDRANT_API_KEY: test-qdrant-key
+          REDIS_URL: redis://localhost:6379
 
   # ============================================
   # Test Tier 2: Contract Tests (blocks on main/develop)
@@ -303,6 +312,15 @@ jobs:
 
       - name: Run contract tests
         run: pnpm test:contract
+        env:
+          SUPABASE_URL: https://test.supabase.co
+          SUPABASE_SERVICE_KEY: test-service-key
+          SUPABASE_ANON_KEY: test-anon-key
+          OPENROUTER_API_KEY: test-openrouter-key
+          JINA_API_KEY: test-jina-key
+          QDRANT_URL: http://localhost:6333
+          QDRANT_API_KEY: test-qdrant-key
+          REDIS_URL: redis://localhost:6379
 
   # ============================================
   # Test Tier 3: Integration Tests (only on main/master, after unit + contract)
@@ -360,6 +378,15 @@ jobs:
 
       - name: Run integration tests
         run: pnpm test:integration
+        env:
+          SUPABASE_URL: https://test.supabase.co
+          SUPABASE_SERVICE_KEY: test-service-key
+          SUPABASE_ANON_KEY: test-anon-key
+          OPENROUTER_API_KEY: test-openrouter-key
+          JINA_API_KEY: test-jina-key
+          QDRANT_URL: http://localhost:6333
+          QDRANT_API_KEY: test-qdrant-key
+          REDIS_URL: redis://localhost:6379
 
   # ============================================
   # STAGE 3: Build All Packages
