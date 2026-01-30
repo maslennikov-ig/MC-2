@@ -7,6 +7,37 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.28.44] - 2026-01-30
+
+### Security
+
+- remove unused debug and test endpoints (513879fe)
+
+### Added
+
+- **ci**: implement tiered testing strategy (071b1daf)
+- **admin**: persist log filters in URL params (f0207a8e)
+- **i18n**: migrate CascadeStageDeleteModal to next-intl (6f162f27)
+- **skills**: add documentation check to /work skill (618b7120)
+- **skills**: add /work skill for task management (0bd74f54)
+
+### Other
+
+- update docs (60fe71ed)
+- bd sync: 2026-01-30 15:09:06 (5f9c89c5)
+- bd sync: 2026-01-30 15:06:33 (2d3e43d0)
+- bd sync: 2026-01-30 15:05:12 (ed944cea)
+- bd sync: 2026-01-30 15:03:50 (0fe98376)
+- bd sync: 2026-01-30 15:02:49 (658954c7)
+- bd sync: 2026-01-30 15:01:43 (d5929005)
+- bd sync: 2026-01-30 14:50:43 (cf274657)
+- bd sync: 2026-01-30 14:50:16 (9e02f5dc)
+- bd sync: 2026-01-30 14:18:13 (47718329)
+- bd sync: 2026-01-30 14:14:44 (3461cb89)
+- bd sync: 2026-01-30 14:03:44 (ff93582c)
+- bd sync: 2026-01-30 13:56:33 (5b3b9df1)
+- bd sync: 2026-01-30 13:55:21 (3a3fb496)
+
 ## [0.28.43] - 2026-01-30
 
 ### Added

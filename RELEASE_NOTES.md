@@ -2,6 +2,26 @@
 
 _Released on 2025-12-26_
 
+## v0.28.44
+
+_Released on 2026-01-30_
+
+### ✨ New Features
+
+- **CI/CD**: Implement tiered testing strategy
+- **admin**: Persist log filters in URL params
+- **i18n**: Migrate CascadeStageDeleteModal to next-intl
+- **Skills**: Add documentation check to /work skill
+- **Skills**: Add /work skill for task management
+
+### 🔒 Security
+
+- Remove unused debug and test endpoints
+
+---
+
+_This release was automatically generated from 20 commits._
+
 ## v0.28.43
 
 _Released on 2026-01-30_
