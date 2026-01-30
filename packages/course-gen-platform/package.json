@@ -22,7 +22,7 @@
     "start:worker:stage7": "node dist/stages/stage7-enrichments/worker-entrypoint.js",
     "test": "vitest run",
     "test:watch": "vitest",
-    "test:unit": "vitest run tests/unit",
+    "test:unit": "vitest run --config vitest.config.unit.ts",
     "test:contract": "vitest run tests/contract",
     "test:integration": "vitest run tests/integration",
     "test:fixtures": "vitest run tests/fixtures/seed-database.test.ts",
