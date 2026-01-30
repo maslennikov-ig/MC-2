@@ -12,8 +12,9 @@ export default defineConfig({
     globals: true,
     environment: 'node',
     include: ['tests/unit/**/*.test.ts'],
-    setupFiles: ['./tests/setup.ts'],
+    setupFiles: ['./tests/setup-unit.ts'],
     // NO globalSetup/globalTeardown - unit tests don't need BullMQ worker or Redis
+    // setup-unit.ts mocks Redis to prevent real connections
     reporters: ['default'],
     testTimeout: 30000, // 30 seconds - unit tests should be fast
     hookTimeout: 10000, // 10 seconds
