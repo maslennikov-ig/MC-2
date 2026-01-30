@@ -87,3 +87,28 @@ console.log(
 if (!process.env.SUPABASE_URL || !process.env.SUPABASE_SERVICE_KEY) {
   throw new Error('Missing required Supabase environment variables');
 }
+
+// ============================================================================
+// CLEANUP: Ensure Node.js process can exit cleanly
+// ============================================================================
+import { afterAll, afterEach } from 'vitest';
+
+afterEach(() => {
+  // Clear all mocks between tests to prevent state leakage
+  vi.clearAllMocks();
+});
+
+afterAll(() => {
+  // Restore all mocks to original implementations
+  vi.restoreAllMocks();
+
+  // Close JSDOM to release resources
+  if (dom && dom.window) {
+    dom.window.close();
+  }
+
+  // Clear any pending timers (safety net)
+  vi.useRealTimers();
+
+  console.log('=== UNIT TEST CLEANUP COMPLETE ===');
+});

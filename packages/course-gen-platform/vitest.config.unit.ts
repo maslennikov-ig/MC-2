@@ -28,6 +28,10 @@ export default defineConfig({
     // Force exit after tests complete - some modules open Redis connections
     // that don't close cleanly without globalTeardown
     teardownTimeout: 5000,
+    // Isolate tests to prevent state leakage
+    isolate: true,
+    // Don't wait for open handles indefinitely
+    dangerouslyIgnoreUnhandledErrors: false,
   },
   resolve: {
     alias: {
